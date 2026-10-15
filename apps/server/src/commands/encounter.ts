@@ -35,6 +35,9 @@ import { defineCommand } from "./pipeline.js";
 export const encounterCommands = [
   defineCommand({
     type: "encounter.start",
+    operationId: "startEncounter",
+    description:
+      "Starts an encounter on a calibrated battlemap with initial combatants (GM-grade only). Missing initiative scores are rolled server-side.",
     summary: "Start an encounter on a battlemap; omit the combatants to start on the live scene's staged list (GM).",
     schema: EncounterStartSchema,
     malformed: "The encounter setup is malformed.",
@@ -98,6 +101,9 @@ export const encounterCommands = [
 
   defineCommand({
     type: "encounter.end",
+    operationId: "endEncounter",
+    description:
+      "Ends the encounter (GM-grade only). The whole fight auto-archives permanently (see /encounters) in the same transaction.",
     summary: "End the encounter and archive it permanently (GM).",
     schema: CommandIdentitySchema,
     malformed: "The encounter command is malformed.",
@@ -176,6 +182,9 @@ export const encounterCommands = [
 
   defineCommand({
     type: "encounter.add-combatant",
+    operationId: "addEncounterCombatant",
+    description:
+      "Adds a rostered actor to the running encounter (GM-grade only); rolls initiative when no score is given.",
     summary: "Add a rostered actor to the running encounter (GM).",
     schema: AddCombatantSchema,
     malformed: "The add-combatant command is malformed.",
@@ -202,6 +211,8 @@ export const encounterCommands = [
 
   defineCommand({
     type: "initiative.set",
+    operationId: "setInitiativeScore",
+    description: "Sets a combatant's initiative score (GM-grade only).",
     summary: "Set a combatant's initiative score (GM).",
     schema: InitiativeScoreSchema,
     malformed: "The Initiative update is malformed.",
@@ -213,6 +224,9 @@ export const encounterCommands = [
 
   defineCommand({
     type: "initiative.roll-self",
+    operationId: "rollOwnInitiative",
+    description:
+      "Rolls initiative for a character (server rolls the d20 unless a manual `natural` is supplied; `rollMode` gives advantage/disadvantage), adds its initiative modifier, sets its score, and clears its pending flag. GM-grade for anyone; a player session only for their own claimed character. When the encounter runs in `wait` mode, the last pending roll begins turns.",
     summary: "Roll your own claimed character's initiative (GM anyone); the server rolls unless a manual d20 is given.",
     schema: InitiativeRollSelfSchema,
     malformed: "The initiative roll is malformed.",
@@ -245,6 +259,9 @@ export const encounterCommands = [
 
   defineCommand({
     type: "initiative.roll-remaining",
+    operationId: "rollRemainingInitiative",
+    description:
+      "Rolls initiative for every combatant still pending a player roll (GM-grade only), beginning a `wait`-mode fight.",
     summary: "Roll initiative for every player still pending, beginning a wait-mode fight (GM).",
     schema: InitiativeRollRemainingSchema,
     malformed: "The initiative command is malformed.",
@@ -269,6 +286,9 @@ export const encounterCommands = [
 
   defineCommand({
     type: "initiative.next",
+    operationId: "nextTurn",
+    description:
+      'Advances the turn (GM-grade only). While the table is rewound this steps forward through recorded history; a 409 with `needsConfirm: "rewrite-history"` asks for `confirmRewrite: true` to truncate the undone future.',
     summary: "Advance the turn; steps forward through recorded history while rewound (GM).",
     schema: InitiativeNextSchema,
     malformed: "The Initiative command is malformed.",
@@ -295,6 +315,9 @@ export const encounterCommands = [
 
   defineCommand({
     type: "initiative.previous",
+    operationId: "previousTurn",
+    description:
+      'Rewinds the whole table to the previous turn boundary (GM-grade only). A 409 with `needsConfirm: "discard-changes"` asks for `confirmDiscard: true` to drop changes made while rewound.',
     summary: "Rewind the whole table to the previous turn boundary (GM).",
     schema: InitiativePreviousSchema,
     malformed: "The Initiative command is malformed.",
@@ -312,6 +335,9 @@ export const encounterCommands = [
 
   defineCommand({
     type: "turn.end",
+    operationId: "endTurn",
+    description:
+      "Ends the current turn and advances. The GM (or an integration) may end anyone's turn; a player session only their own claimed character's.",
     summary: "End the current turn (GM anyone; a player only their own turn).",
     schema: CommandIdentitySchema,
     malformed: "The end-turn command is malformed.",
@@ -340,6 +366,9 @@ export const encounterCommands = [
 
   defineCommand({
     type: "turn.use",
+    operationId: "useTurnSlot",
+    description:
+      "Marks the current turn's action or bonus action used/unused. A free manual toggle (never blocks); structured action resolution validates against this state per the encounter's rules mode, and un-marking the action slot also clears any open compound-action instance.",
     summary: "Mark the current turn's action or bonus action used/unused.",
     schema: TurnUseSchema,
     malformed: "The turn command is malformed.",
@@ -361,6 +390,8 @@ export const encounterCommands = [
 
   defineCommand({
     type: "turn.use-reaction",
+    operationId: "useReaction",
+    description: "Marks a combatant's reaction used/unused; reactions refresh at the start of their own turn.",
     summary: "Mark a combatant's reaction used/unused.",
     schema: TurnReactionSchema,
     malformed: "The reaction command is malformed.",
@@ -379,6 +410,9 @@ export const encounterCommands = [
 
   defineCommand({
     type: "turn.use-legendary",
+    operationId: "useLegendaryActions",
+    description:
+      "Sets a legendary creature's spent legendary actions this round (GM-grade only; 0 clears). Structured legendary action resolves spend the pool automatically; it refills at the creature's own turn start.",
     summary: "Set a legendary creature's spent legendary actions this round.",
     schema: TurnLegendarySchema,
     malformed: "The legendary-action command is malformed.",

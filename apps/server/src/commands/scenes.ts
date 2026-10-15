@@ -29,6 +29,9 @@ import { defineCommand } from "./pipeline.js";
 export const sceneCommands = [
   defineCommand({
     type: "scene.create",
+    operationId: "createScene",
+    description:
+      "Prepares a staged scene on a battlemap, privately, without touching the live table (GM-grade only). The response's `sceneId` equals the commandId.",
     summary:
       "Prepare a staged scene on a battlemap without touching the live table, or go live on it in the same command (GM).",
     schema: SceneCreateSchema,
@@ -60,6 +63,8 @@ export const sceneCommands = [
 
   defineCommand({
     type: "scene.rename",
+    operationId: "renameScene",
+    description: "Renames a prepared scene (GM-grade only).",
     summary: "Rename a prepared scene (GM).",
     schema: SceneRenameSchema,
     malformed: "The scene rename is malformed.",
@@ -71,6 +76,8 @@ export const sceneCommands = [
 
   defineCommand({
     type: "scene.remove",
+    operationId: "removeScene",
+    description: "Removes a prepared scene (GM-grade only); the active scene cannot be removed.",
     summary: "Remove a prepared scene (GM).",
     schema: SceneIdSchema,
     malformed: "The scene command is malformed.",
@@ -82,6 +89,9 @@ export const sceneCommands = [
 
   defineCommand({
     type: "scene.activate",
+    operationId: "activateScene",
+    description:
+      "Switches the live table to a prepared scene, parking the current one non-destructively (GM-grade only). Rejected while the timeline is rewound; the turn-snapshot timeline restarts for the newly live scene.",
     summary: "Switch the live table to a prepared scene, parking the current one (GM).",
     schema: SceneIdSchema,
     malformed: "The scene command is malformed.",
@@ -114,6 +124,8 @@ export const sceneCommands = [
 
   defineCommand({
     type: "scene.set-combatants",
+    operationId: "setSceneCombatants",
+    description: "Replaces a prepared scene's combatant list (GM-grade only).",
     summary: "Replace a prepared scene's combatant list (GM).",
     schema: SceneSetCombatantsSchema,
     malformed: "The scene update is malformed.",
@@ -129,6 +141,9 @@ export const sceneCommands = [
 
   defineCommand({
     type: "scene.duplicate",
+    operationId: "duplicateScene",
+    description:
+      "Duplicates a prepared scene as a new staged copy carrying the same map and staged combatants/tokens (GM-grade only). Duplicating the live scene snapshots its current combat into the copy; the copy is always parked, next to the original. The response's `sceneId` equals the commandId.",
     summary: "Duplicate a prepared scene as a new staged copy (GM).",
     schema: SceneIdSchema,
     malformed: "The scene command is malformed.",
@@ -143,6 +158,9 @@ export const sceneCommands = [
 
   defineCommand({
     type: "scene.reorder",
+    operationId: "reorderScenes",
+    description:
+      "Reorders the prepared-scene list to the given permutation of every scene id (GM-grade only). Does not change which scene is live.",
     summary: "Reorder the prepared-scene list (GM).",
     schema: SceneReorderSchema,
     malformed: "The scene order is malformed.",
@@ -154,6 +172,9 @@ export const sceneCommands = [
 
   defineCommand({
     type: "replay.launch",
+    operationId: "launchEncounterArchive",
+    description:
+      "Parks the live table exactly as a scene switch does and makes one recorded moment of this archive live on it (GM-grade only). The moment's combatants are cloned under new ids, so tonight's characters are never rewritten, and the parked scene resumes any time through scene.activate.",
     summary:
       "Launch one recorded moment of an archived fight onto the live table, parking the current scene; the moment's combatants are cloned under new ids so live characters are never rewritten (GM).",
     schema: ReplayLaunchSchema,
@@ -202,6 +223,9 @@ export const sceneCommands = [
 
   defineCommand({
     type: "fog.set-enabled",
+    operationId: "setFogEnabled",
+    description:
+      "Turns manual fog of war on/off (GM-grade only). Enabled fog with no reveal strokes hides the whole map from players and the shared screen; `sceneId` targets a prepared scene's private prep instead of the live table.",
     summary: "Turn manual fog of war on/off for the live table or a prepared scene (GM).",
     schema: FogSetEnabledSchema,
     malformed: "The fog command is malformed.",
@@ -220,6 +244,9 @@ export const sceneCommands = [
 
   defineCommand({
     type: "fog.paint",
+    operationId: "paintFog",
+    description:
+      "Paints one reveal/hide fog rect (GM-grade only). The server snaps to whole grid cells on calibrated unrotated maps and clamps to the map bounds; a stroke covering the whole map replaces all prior strokes. `sceneId` targets a prepared scene.",
     summary: "Paint a reveal/hide fog rect, grid-snapped and clamped to the map (GM).",
     schema: FogPaintSchema,
     malformed: "The fog stroke is malformed.",
@@ -241,6 +268,9 @@ export const sceneCommands = [
 
   defineCommand({
     type: "fog.reset",
+    operationId: "resetFog",
+    description:
+      "Clears every fog stroke - with fog enabled the whole map is hidden again (GM-grade only). `sceneId` targets a prepared scene.",
     summary: "Hide the whole map again (clear every fog stroke) (GM).",
     schema: FogResetSchema,
     malformed: "The fog command is malformed.",

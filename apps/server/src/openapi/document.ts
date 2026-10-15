@@ -6,7 +6,6 @@ import {
   CODEX_PATHS,
   CONTENT_PATHS,
   ENCOUNTER_ARCHIVE_PATHS,
-  GAME_COMMANDS,
   GAME_PATHS,
   HOMEBREW_PATHS,
   HomebrewContentStateSchema,
@@ -20,10 +19,11 @@ import {
   SYSTEM_PATHS,
   VIEWER_PATHS,
   VIEWER_SESSION_COOKIE,
-  type GameCommandType,
-  type HomebrewContentType,
-  type IntegrationScope
+  type HomebrewContentType
 } from "@vtt/api-contract";
+import { gameCommandDocs, gameSecurity, gameSecurityWithPlayer, mutationResponses } from "./game-commands.js";
+
+const commandDocs = gameCommandDocs();
 
 const envelopeSchema = (dataRef: string) => ({
   type: "object",
@@ -43,50 +43,6 @@ const jsonBody = (schemaRef: string, required = true) => ({
   required,
   content: { "application/json": { schema: { $ref: `#/components/schemas/${schemaRef}` } } }
 });
-/** Accepted principals: an integration credential with the given scope, or a GM session - as HTTP bearer tokens. */
-const gameSecurity = (scope: IntegrationScope) => [{ bearerAuth: [scope] }, { gmAuth: [] }];
-/** Operations a player session can genuinely use (within its own-character limits) additionally list playerAuth. */
-const gameSecurityWithPlayer = (scope: IntegrationScope) => [
-  { bearerAuth: [scope] },
-  { gmAuth: [] },
-  { playerAuth: [] }
-];
-const mutationResponses = {
-  "200": {
-    description: "Command accepted, or replayed idempotently (`duplicate: true`) for a commandId already processed",
-    content: { "application/json": { schema: { $ref: "#/components/schemas/GameMutationAcceptedResponse" } } }
-  },
-  "400": apiError,
-  "401": apiError,
-  "403": apiError,
-  "409": {
-    description:
-      "Rejected by the game rules, a stale expectedRevision (`error.currentRevision` set), or a timeline navigation needing GM confirmation (`error.details.needsConfirm`)",
-    content: { "application/json": { schema: { $ref: "#/components/schemas/ApiErrorEnvelope" } } }
-  }
-} as const;
-/** A command's path item, keyed by its route in `GAME_COMMANDS` so the path, verb and scope are written once. */
-const gameCommandPath = <Operation>(type: GameCommandType, operation: (scope: IntegrationScope) => Operation) => {
-  const { path, method, scope } = GAME_COMMANDS[type];
-  return { [path]: { [method]: operation(scope) } };
-};
-const gameCommandOperation = (
-  type: GameCommandType,
-  operationId: string,
-  description: string,
-  requestRef?: string,
-  parameters?: readonly unknown[],
-  requiredBody = true,
-  playerAllowed = false
-) =>
-  gameCommandPath(type, (scope) => ({
-    operationId,
-    description,
-    security: playerAllowed ? gameSecurityWithPlayer(scope) : gameSecurity(scope),
-    ...(parameters ? { parameters } : {}),
-    ...(requestRef ? { requestBody: jsonBody(requestRef, requiredBody) } : {}),
-    responses: mutationResponses
-  }));
 
 /** A bundled-content catalog read: public SRD rules reference, so it also accepts a player session. The bestiary
  * is the exception and uses the GM-only `gameSecurity`. */
@@ -442,15 +398,6 @@ const homebrewDataObject = (key: string, valueSchema: unknown) => ({
 //   1. Absent, never null: Zod `.optional()` rejects null. `required` is exactly the Zod schema's non-optional
 //      keys; a field with a Zod `.default()` is optional on the wire.
 //   2. Riders are hoisted into named components, because `reference.ts` flattens only one level of nesting.
-/** The rule families an override waives; absent, it waives every block on the command (the GM's own ruling). */
-const rulesOverrideFamilies = {
-  type: "array",
-  minItems: 1,
-  maxItems: 5,
-  items: { type: "string", enum: ["movement", "economy", "resources", "targeting", "slots"] },
-  description:
-    "Limit the override to these kinds of block, so allowing one kind never waves another through. Absent, it waives every block on the command."
-} as const;
 const homebrewAbility = { type: "string", enum: ["str", "dex", "con", "int", "wis", "cha"] } as const;
 const homebrewLevel = { type: "integer", minimum: 1, maximum: 20 } as const;
 const homebrewSize = { type: "string", enum: ["tiny", "small", "medium", "large", "huge", "gargantuan"] } as const;
@@ -1445,245 +1392,7 @@ export const openApiDocument = {
         responses: { ...mutationResponses, "404": apiError }
       }
     },
-    ...gameCommandOperation(
-      "encounter.start",
-      "startEncounter",
-      "Starts an encounter on a calibrated battlemap with initial combatants (GM-grade only). Missing initiative scores are rolled server-side.",
-      "EncounterStartRequest"
-    ),
-    ...gameCommandOperation(
-      "encounter.end",
-      "endEncounter",
-      "Ends the encounter (GM-grade only). The whole fight auto-archives permanently (see /encounters) in the same transaction.",
-      "CommandControlRequest",
-      undefined,
-      false
-    ),
-    ...gameCommandOperation(
-      "encounter.add-combatant",
-      "addEncounterCombatant",
-      "Adds a rostered actor to the running encounter (GM-grade only); rolls initiative when no score is given.",
-      "AddCombatantRequest"
-    ),
-    ...gameCommandOperation(
-      "initiative.set",
-      "setInitiativeScore",
-      "Sets a combatant's initiative score (GM-grade only).",
-      "InitiativeSetRequest"
-    ),
-    ...gameCommandOperation(
-      "initiative.roll-self",
-      "rollOwnInitiative",
-      "Rolls initiative for a character (server rolls the d20 unless a manual `natural` is supplied; `rollMode` gives advantage/disadvantage), adds its initiative modifier, sets its score, and clears its pending flag. GM-grade for anyone; a player session only for their own claimed character. When the encounter runs in `wait` mode, the last pending roll begins turns.",
-      "InitiativeRollSelfRequest",
-      undefined,
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "initiative.roll-remaining",
-      "rollRemainingInitiative",
-      "Rolls initiative for every combatant still pending a player roll (GM-grade only), beginning a `wait`-mode fight.",
-      "CommandControlRequest",
-      undefined,
-      false
-    ),
-    ...gameCommandOperation(
-      "initiative.next",
-      "nextTurn",
-      'Advances the turn (GM-grade only). While the table is rewound this steps forward through recorded history; a 409 with `needsConfirm: "rewrite-history"` asks for `confirmRewrite: true` to truncate the undone future.',
-      "InitiativeNextRequest",
-      undefined,
-      false
-    ),
-    ...gameCommandOperation(
-      "initiative.previous",
-      "previousTurn",
-      'Rewinds the whole table to the previous turn boundary (GM-grade only). A 409 with `needsConfirm: "discard-changes"` asks for `confirmDiscard: true` to drop changes made while rewound.',
-      "InitiativePreviousRequest",
-      undefined,
-      false
-    ),
-    ...gameCommandOperation(
-      "turn.end",
-      "endTurn",
-      "Ends the current turn and advances. The GM (or an integration) may end anyone's turn; a player session only their own claimed character's.",
-      "CommandControlRequest",
-      undefined,
-      false,
-      true
-    ),
-    ...gameCommandOperation(
-      "turn.use",
-      "useTurnSlot",
-      "Marks the current turn's action or bonus action used/unused. A free manual toggle (never blocks); structured action resolution validates against this state per the encounter's rules mode, and un-marking the action slot also clears any open compound-action instance.",
-      "TurnUseRequest",
-      undefined,
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "turn.use-reaction",
-      "useReaction",
-      "Marks a combatant's reaction used/unused; reactions refresh at the start of their own turn.",
-      "TurnReactionRequest",
-      undefined,
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "turn.use-legendary",
-      "useLegendaryActions",
-      "Sets a legendary creature's spent legendary actions this round (GM-grade only; 0 clears). Structured legendary action resolves spend the pool automatically; it refills at the creature's own turn start.",
-      "TurnLegendaryRequest"
-    ),
-    ...gameCommandOperation(
-      "token.move",
-      "moveToken",
-      "Moves a combatant's token; the server snaps to the calibrated grid. `position: null` returns the token to the tray. Player sessions may move only their claimed character. `sceneId` targets a prepared (GM-private) scene instead of the live table.",
-      "TokenMoveRequest",
-      [uuidParam("actorId")],
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "actor.add-from-definition",
-      "addActorFromDefinition",
-      "Instantiates a bundled SRD monster onto the roster (GM-grade only). The response's `actorId` equals the commandId.",
-      "ActorAddRequest"
-    ),
-    ...gameCommandOperation(
-      "actor.remove",
-      "removeActor",
-      "Removes an actor from the roster (GM-grade only); rejected for claimed characters and, while rewound, for combatants in the fight.",
-      "CommandControlRequest",
-      [uuidParam("actorId")],
-      false
-    ),
-    ...gameCommandOperation(
-      "actor.apply-damage",
-      "applyDamage",
-      "Applies damage (temporary hit points absorb first). Optional typed `parts` run the defense pipeline - immunity, then resistance (half, rounded down), then vulnerability (double) - from the target's definition and active effects, with the per-part breakdown returned in `applied`; the bare `amount` is the manual path (no defense math). Dropping a player character to 0 starts the dying state (Unconscious + Prone + death saves; `critical: true` while dying adds two failures). Player sessions may target only their claimed character.",
-      "DamageRequest",
-      [uuidParam("actorId")],
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "actor.heal",
-      "healActor",
-      "Heals hit points up to the maximum. Player sessions may target only their claimed character.",
-      "HpAmountRequest",
-      [uuidParam("actorId")],
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "actor.set-temp-hp",
-      "setTemporaryHp",
-      "Sets temporary hit points (replaces, 5e-style). Player sessions may target only their claimed character.",
-      "TempHpRequest",
-      [uuidParam("actorId")],
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "actor.set-hp",
-      "setCurrentHp",
-      "Sets current hit points directly (GM-grade only).",
-      "SetHpRequest",
-      [uuidParam("actorId")]
-    ),
-    ...gameCommandOperation(
-      "actor.set-condition",
-      "setCondition",
-      "Applies or clears a bundled SRD condition (exhaustion carries a level). Player sessions may target only their claimed character.",
-      "ConditionRequest",
-      [uuidParam("actorId")],
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "actor.import-definition",
-      "importActorDefinition",
-      "Imports a canonical ActorDefinition JSON as a claimable actor with a full sheet (GM-grade only). The response's `actorId` equals the commandId.",
-      "ActorImportRequest"
-    ),
-    ...gameCommandOperation(
-      "character.submit-import",
-      "submitCharacterImport",
-      "Submits a character sheet into the GM's approval queue instead of importing it directly - the player path (a GM importing their own sheet uses the definitions import). Any joined session may submit; nothing reaches the roster until the GM resolves it. The queued entry's `importId` is this call's commandId, so keep it to resolve or re-send the submission idempotently.",
-      "CharacterSubmitImportRequest",
-      undefined,
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "character.resolve-import",
-      "resolveCharacterImport",
-      "Approves (`approve: true`) or rejects a queued character submission (GM-grade only). Either decision removes it from the queue; approving instantiates the claimable actor, whose id equals THIS call's commandId (returned as `actorId`).",
-      "CharacterResolveImportRequest",
-      [{ name: "importId", in: "path", required: true, schema: { type: "string", maxLength: 120 } }]
-    ),
-    ...gameCommandOperation(
-      "dice.roll",
-      "rollDice",
-      "Rolls dice into the shared, auditable roll history; the response carries `rollId`. Player sessions cannot roll gm-only, and rolling for an actor requires owning it.",
-      "DiceRollRequest",
-      undefined,
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "action.resolve",
-      "resolveAction",
-      "Runs a stat-block action: attack vs target AC with 2024 crit doubling, or save-DC surfacing with proposed damage. GM-grade for any combatant; a player session only for their own claimed character (area templates, cover, and rules overrides stay GM-only). A player's hit is handed to the GM as a damage proposal, or applied directly when the table's player-damage-mode is `direct`. Targets are explicit ids or an area template (never both); rolls are recorded in the shared history and the response carries the `resolution`.",
-      "ActionResolveRequest",
-      undefined,
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "save.answer",
-      "answerSave",
-      "Answers a pending saving throw by server roll or manual total; on commit the outcome auto-applies damage/conditions. Player sessions may answer only their claimed character's saves. The response carries the `outcome`.",
-      "SaveAnswerRequest",
-      [uuidParam("saveId")],
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "save.dismiss",
-      "dismissSave",
-      "Dismisses a pending saving throw without resolving it (GM-grade, or the owing player).",
-      "CommandControlRequest",
-      [uuidParam("saveId")],
-      false,
-      true
-    ),
-    ...gameCommandOperation(
-      "reaction.answer",
-      "answerReaction",
-      "Answers a pending reaction prompt (Uncanny Dodge). The triggering attack's damage was parked on the prompt, so both answers apply it here: `use: true` spends the reaction and halves each typed part first; `use: false` applies it in full. Player sessions may answer only their claimed character's prompts. The response carries the `outcome`.",
-      "ReactionAnswerRequest",
-      [uuidParam("reactionId")],
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "reaction.dismiss",
-      "dismissReaction",
-      "Dismisses a pending reaction prompt WITHOUT applying its parked damage (GM-grade only) - for when the damage was already applied manually.",
-      "CommandControlRequest",
-      [uuidParam("reactionId")],
-      false
-    ),
-    ...gameCommandOperation(
-      "damage.resolve",
-      "resolveProposedDamage",
-      "Applies or dismisses a parked player-hit damage proposal (proposal mode; GM-grade only). `apply: true` reduces the target's HP through the typed-defense pipeline (an optional `amount` overrides the total as a bare number, no defense math); `apply: false` discards it. Either way the proposal clears.",
-      "DamageResolveRequest"
-    ),
+    ...commandDocs.paths,
     [GAME_PATHS.actorAvailableActions]: {
       get: {
         operationId: "getActorAvailableActions",
@@ -1702,420 +1411,6 @@ export const openApiDocument = {
         }
       }
     },
-    ...gameCommandOperation(
-      "effect.add",
-      "addEffect",
-      "Adds a rules-engine effect to a combatant (GM-grade only): a named, tagged state with an optional duration and typed modifiers (damage bonus, damage resistance, advantage). Structured actions create richer effects via their own declarations; this is the house-rule/manual path. The response's `effectId` equals the commandId.",
-      "EffectAddRequest",
-      [uuidParam("actorId")]
-    ),
-    ...gameCommandOperation(
-      "effect.end",
-      "endEffect",
-      "Ends an effect: linked conditions clear (a released grapple removes Grappled/Restrained) and its on-end grants fire (a Frenzied Rage ending adds Exhaustion). GM-grade anyone; a player session only their claimed character.",
-      "CommandControlRequest",
-      [
-        uuidParam("actorId"),
-        { name: "effectId", in: "path", required: true, schema: { type: "string", maxLength: 120 } }
-      ],
-      false,
-      true
-    ),
-    ...gameCommandOperation(
-      "death-save.roll",
-      "rollDeathSave",
-      "Rolls a death saving throw for a dying character (at 0 HP): natural 20 regains 1 HP, natural 1 counts two failures, 10+ succeeds (three stabilize), otherwise a failure (three kill). Default applies in one step; pass `commit: false` to preview the projected pips first (honoring `rollMode` adv/disadv), then confirm with `commit: true` and the shown `naturalRoll`. The roll is recorded in the shared history and the response carries `deathSave`. GM-grade anyone; a player session only their claimed character.",
-      "DeathSaveRollRequest",
-      [uuidParam("actorId")],
-      false,
-      true
-    ),
-    ...gameCommandOperation(
-      "encounter.set-rules-mode",
-      "setRulesMode",
-      "Sets the rules-engine enforcement mode (GM-grade only): `strict` rejects invalid structured actions with an overridable `error.details.blocked`, `assisted` allows them with logged warnings, `freeform` skips validation. Also settable at encounter start.",
-      "RulesModeRequest"
-    ),
-    ...gameCommandOperation(
-      "encounter.set-player-damage-mode",
-      "setPlayerDamageMode",
-      "Sets how a player's own confirmed hit reaches an enemy's HP (GM-grade only): `proposal` parks a GM-confirmed damage proposal (the default), `direct` applies the typed damage immediately server-side.",
-      "PlayerDamageModeRequest"
-    ),
-    ...gameCommandOperation(
-      "encounter.set-player-initiative-mode",
-      "setPlayerInitiativeMode",
-      "Sets how player-rolled initiative behaves (GM-grade only): `immediate` begins turns at once on a provisional order that re-sorts as players roll in, `wait` holds turn advancement until every player has rolled (or the GM rolls the rest).",
-      "PlayerInitiativeModeRequest"
-    ),
-    ...gameCommandOperation(
-      "encounter.set-health-display",
-      "setHealthDisplay",
-      "Sets the table-wide default for how token health shows on the map (GM-grade only): `band` a coarse status badge, `bar` a thin HP bar, or `ring` a green-to-red ring; `audience` `gm` keeps a bar/ring on the GM map only, `all` shows it to players and the shared screen. Exact hit points never leave the GM - non-owners see only a coarse band-fraction. A single token can override this via the actor health-display command.",
-      "HealthDisplayRequest"
-    ),
-    ...gameCommandOperation(
-      "encounter.set-environment",
-      "setEnvironment",
-      "Toggles the underwater environment on the live encounter (GM-grade only; SRD Underwater Combat): melee attacks take Disadvantage unless they deal piercing damage, ranged attacks automatically miss beyond normal range, and every combatant resists fire damage.",
-      "EnvironmentRequest"
-    ),
-    ...gameCommandOperation(
-      "actor.rechoose",
-      "rechooseActorPick",
-      "Re-makes a pick the character's content says may be re-made on a rest (Circle of the Land's land type on a Long Rest; Fiendish Resilience's damage type on either). The answer is NOT written to the character's choices ledger - it is runtime state on the actor, cleared by the matching rest - so a re-choice between fights needs no rebuild. A player session may re-choose only on their claimed character, the GM on anyone. Which offers are re-choosable, and what each may become, are both decided from the content: a client cannot widen either.",
-      "ActorRechooseRequest",
-      [uuidParam("actorId")],
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "actor.rest",
-      "restActor",
-      "Applies a rest to a rostered actor outside combat; a player session may rest only their claimed character, the GM anyone. Long: remaining effects end (their on-end grants fire first), hit points restore to maximum, temporary HP clears, the dying state resets, limited-use pools refresh, all spent Hit Point Dice restore, spell slots and prepared spells reset to the sheet defaults, and Exhaustion drops one level. Short: per-short-rest and recharge pools re-arm; healing is the separate spend-hit-dice call.",
-      "ActorRestRequest",
-      [uuidParam("actorId")],
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "actor.spend-hit-dice",
-      "spendHitDice",
-      "Spends Hit Point Dice to heal (SRD Short Rest: each die heals its roll + Con modifier, minimum 1). Rejected while the actor is in an active encounter. Player sessions may target only their claimed character; the dice land in the shared roll history.",
-      "ActorSpendHitDiceRequest",
-      [uuidParam("actorId")],
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "character.set-slot",
-      "setSpellSlot",
-      "Sets a character's remaining spell slots for one level (clamped to the sheet maximum) - spend or restore a slot during play. Player sessions may target only their claimed character.",
-      "CharacterSetSlotRequest",
-      [uuidParam("actorId")],
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "character.set-prepared",
-      "setPreparedSpell",
-      "Prepares or un-prepares one of a character's known spells (cantrips and always-prepared spells can't be toggled). Player sessions may target only their claimed character.",
-      "CharacterSetPreparedRequest",
-      [uuidParam("actorId")],
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "character.set-inventory",
-      "setInventory",
-      "Adds, updates, or removes (quantity 0) one of a character's inventory items and toggles equipped/attuned. Player sessions may target only their claimed character.",
-      "CharacterSetInventoryRequest",
-      [uuidParam("actorId")],
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "character.set-currency",
-      "setCurrency",
-      "Sets a character's coin purse (cp/sp/ep/gp/pp). Player sessions may target only their claimed character.",
-      "CharacterSetCurrencyRequest",
-      [uuidParam("actorId")],
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "character.set-identity",
-      "setIdentity",
-      "Sets a character's identity (class/level/race/background/feats) on its editable imported sheet - a light hand-edit, not a guided builder. Player sessions may target only their claimed character.",
-      "CharacterSetIdentityRequest",
-      [uuidParam("actorId")],
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "character.create",
-      "createCharacter",
-      "Creates a character from CHOICES rather than a finished sheet - the GM always, and a player when the table's builderPolicy.playerBuilder is open (D13), in which case the new character is auto-claimed by its creator and a per-session daily cap applies: identity ids (species/background/class/subclass), base ability scores plus the background's +2/+1 or +1/+1/+1 allocation, per-level hit-point entries (or the fixed average), and the choice-provenance ledger as the literal build input. The server validates every id against the content catalogs, resolves every catalog-driven choice through the same resolver the wizard uses, interprets the content features' structured riders into sheet actions, assembles the canonical ActorDefinition, and lands it through the import path - the new claimable actor's id equals this call's commandId and its editable sheet is keyed import-<actorId>.",
-      "CharacterCreateRequest",
-      undefined,
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "character.generate",
-      "generateCharacter",
-      "Rolls a complete, playable, single-class character at a level and lands it on the roster - the GM always, and a player when the table's builderPolicy.playerRandom is open, which unlike playerBuilder is CLOSED by default. The request carries only the level, an optional class (omitted means one is drawn) and an optional name; every other decision is made server-side from the same dice authority as every other roll: the standard array distributed by the class's own stat priority, the background's printed spread aimed the same way, and species, lineage, background, subclass, size, skills, tools, languages, feats, fighting styles, spells and starting equipment drawn at random from the offers the character builder itself computes. The result is assembled, validated and imported exactly as `POST /game/characters` is - same ActorDefinition, same choice ledger, so it levels up and respecs like a hand-built character - and the hit-point dice are recorded in the table feed. Auto-claimed by a player caller, with the same per-session daily cap.",
-      "CharacterGenerateRequest",
-      undefined,
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "character.rebuild",
-      "rebuildCharacter",
-      "Rebuilds one character at a new level - up OR down - or respecs it outright: the same build input `POST /game/characters` takes, minus the name (kept from the live actor), re-run through the identical validation. The GM may rebuild anyone; a player only their own claimed character, and only while the table's builder is open. Rolled hit points recorded in the choice ledger are reused, so a level-down/level-up round trip restores the same maximum; a sheet with no recorded rolls rebuilds on the average. Refused while the character is in a live (or paused) fight.",
-      "CharacterRebuildRequest",
-      [uuidParam("actorId")],
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "builder.roll-abilities",
-      "rollBuilderAbilities",
-      "Rolls six ability scores SERVER-SIDE for the character builder (D14), through the table's allowed method and the GM's formula. The set is recorded as one public roll in the table feed. Character creation still bound-checks submitted scores rather than binding them to this roll: physical dice at the table stay a supported path.",
-      "BuilderRollAbilitiesRequest",
-      undefined,
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "rules.set-policy",
-      "setRulesPolicy",
-      "Sets the table's STANDING rules policy (GM-grade only): the dial every new fight starts from, plus per-family exceptions (movement, economy, resources, targeting, slots). This is campaign policy, not the live fight - use the rules-mode command to change the fight in progress. Omitting `exceptions` keeps the stored ones. The `slots` family ships as `assisted` so slot tracking advises rather than blocks until a GM opts in.",
-      "RulesPolicyRequest"
-    ),
-    ...gameCommandOperation(
-      "table.set-staging-defaults",
-      "setStagingDefaults",
-      'Sets the table\'s staging defaults (GM-grade only): the token visibility a newly staged combatant starts at. A surface initializes its "Shown to players / GM only" toggle from this; the per-add `visibility` argument stays explicit on the wire, so a command still says exactly what it did.',
-      "StagingDefaultsRequest"
-    ),
-    ...gameCommandOperation(
-      "table.set-party-visibility",
-      "setPartyVisibility",
-      "Sets how much a player sees of ANOTHER player's character (GM-grade only): `off` (no party surface - the combatant still appears on the map and in the turn order, but carries no class, no sheet and no resources), `name-and-class` (the identity card - the default), `full-sheet` (plus their read-only imported sheet) or `sheet-and-resources` (plus live spell slots, prepared spells, inventory, currency, hit dice and limited uses). The tier subtracts FIELDS, never combatants, and is applied SERVER-SIDE in the player projection - a withheld field is never sent. A player's own claimed character is unaffected at every tier.",
-      "PartyVisibilityRequest"
-    ),
-    ...gameCommandOperation(
-      "builder.set-policy",
-      "setBuilderPolicy",
-      "Sets the character-builder table policy (GM-grade only; task-packet decision 10): which ability-score generation methods the wizard offers players (standard-array, point-buy, roll, custom - all four by default) and the GM's custom roll formula. A supplied formula is validated through the server's own dice grammar and bounds (a formula that can roll outside 1-30 is rejected); allowing \"custom\" is only actionable while a formula is set. The stored policy is projected to every player verbatim.",
-      "BuilderSetPolicyRequest"
-    ),
-    ...gameCommandOperation(
-      "character.set-proficiencies",
-      "setProficiencies",
-      "Sets a character's save and skill proficiency selections on its editable imported sheet. Player sessions may target only their claimed character.",
-      "CharacterSetProficienciesRequest",
-      [uuidParam("actorId")],
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "annotation.add",
-      "addAnnotation",
-      "Draws a measurement or area shape on the encounter map; the server snaps geometry to the grid. The response's `annotationId` equals the commandId.",
-      "AnnotationAddRequest",
-      undefined,
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "annotation.ping",
-      "pingMap",
-      "Pings a point on the encounter map (ephemeral, labeled with the sender).",
-      "AnnotationPingRequest",
-      undefined,
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "annotation.clear",
-      "clearAnnotations",
-      "Clears drawn shapes: your own, all player shapes (GM-grade), or everything (GM-grade).",
-      "AnnotationClearRequest",
-      undefined,
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "annotation.remove",
-      "removeAnnotation",
-      "Removes one annotation (owners, the GM, and GM-grade integrations).",
-      "CommandControlRequest",
-      [uuidParam("id")],
-      false,
-      true
-    ),
-    ...gameCommandOperation(
-      "annotation.move",
-      "moveAnnotation",
-      "Moves/resizes an annotation; the server re-snaps geometry.",
-      "AnnotationMoveRequest",
-      [uuidParam("id")],
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "annotation.set-color",
-      "setAnnotationColor",
-      "Changes an annotation's color.",
-      "AnnotationColorRequest",
-      [uuidParam("id")],
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "annotation.set-visibility",
-      "setAnnotationVisibility",
-      "Changes who can see an annotation (public, gm-only, owner-only, owner-gm, gm-actor).",
-      "AnnotationVisibilityRequest",
-      [uuidParam("id")],
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "annotation.set-movable",
-      "setAnnotationMovable",
-      "Allows or disallows other players moving a shape.",
-      "AnnotationMovableRequest",
-      [uuidParam("id")],
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "character.claim",
-      "claimCharacter",
-      "Claims an unclaimed player character for the calling session. Player sessions only - GM sessions and integration credentials are refused (an integration wanting a seat at the table should hold a player session from POST /sessions/player).",
-      "ClaimRequest",
-      undefined,
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "character.release",
-      "releaseCharacters",
-      "Releases every character claimed by the calling player session.",
-      "CommandControlRequest",
-      undefined,
-      false,
-      true
-    ),
-    ...gameCommandOperation(
-      "character.force-release",
-      "forceReleaseCharacter",
-      "Force-releases a claimed character (GM-grade only) - the recovery path for a lost player device.",
-      "CommandControlRequest",
-      [uuidParam("actorId")],
-      false
-    ),
-    ...gameCommandOperation(
-      "actor.set-token-image",
-      "setActorTokenImage",
-      "Sets or clears (null) a combatant's token image from the uploaded token library: the GM for any combatant, a player for their own claimed character (D18).",
-      "TokenImageRequest",
-      [uuidParam("actorId")]
-    ),
-    ...gameCommandOperation(
-      "actor.set-size",
-      "setActorSize",
-      "Sets a combatant's creature size; large+ tokens size to their grid footprint and re-snap (GM-grade only).",
-      "ActorSizeRequest",
-      [uuidParam("actorId")]
-    ),
-    ...gameCommandOperation(
-      "actor.set-visibility",
-      "setActorVisibility",
-      "Moves a combatant between the shared layer (public) and the GM-only layer (GM-grade only).",
-      "ActorVisibilityRequest",
-      [uuidParam("actorId")]
-    ),
-    ...gameCommandOperation(
-      "actor.set-archived",
-      "setActorArchived",
-      "Archives or restores a character (GM-grade only). Archived characters are hidden from players, refused by claim, and rejected server-side by scene staging and encounter start/add; a character in the running encounter must be removed first. Archiving a CLAIMED character releases the claim in the same mutation, so its player is not left holding an invisible claim.",
-      "ActorArchivedRequest",
-      [uuidParam("actorId")]
-    ),
-    ...gameCommandOperation(
-      "actor.set-sheet-preview",
-      "setActorSheetPreview",
-      "Shares (or un-shares) an ARCHIVED character's sheet with players as a read-only keepsake (GM-grade only). Default hidden - a retired character stays private until the GM shares it. Meaningless while the character is not archived. Players receive only the character's id and name in their projection.",
-      "ActorSheetPreviewRequest",
-      [uuidParam("actorId")]
-    ),
-    ...gameCommandOperation(
-      "actor.set-health-display",
-      "setActorHealthDisplay",
-      "Overrides how one combatant's token health shows on the map (GM-grade only), or clears the override (`display: null`) so the token follows the table-wide default. Same style/audience choices as the table-wide health-display command.",
-      "ActorHealthDisplayRequest",
-      [uuidParam("actorId")]
-    ),
-    ...gameCommandOperation(
-      "actor.set-speed",
-      "setActorSpeed",
-      "Sets a combatant's walking speed in feet (GM-grade only); null clears it to unknown, which skips the movement rules for that combatant. Speed seeds from the imported definition automatically.",
-      "ActorSpeedRequest",
-      [uuidParam("actorId")]
-    ),
-    ...gameCommandOperation(
-      "scene.create",
-      "createScene",
-      "Prepares a staged scene on a battlemap, privately, without touching the live table (GM-grade only). The response's `sceneId` equals the commandId.",
-      "SceneCreateRequest"
-    ),
-    ...gameCommandOperation(
-      "scene.remove",
-      "removeScene",
-      "Removes a prepared scene (GM-grade only); the active scene cannot be removed.",
-      "CommandControlRequest",
-      [uuidParam("sceneId")],
-      false
-    ),
-    ...gameCommandOperation(
-      "scene.rename",
-      "renameScene",
-      "Renames a prepared scene (GM-grade only).",
-      "SceneRenameRequest",
-      [uuidParam("sceneId")]
-    ),
-    ...gameCommandOperation(
-      "scene.activate",
-      "activateScene",
-      "Switches the live table to a prepared scene, parking the current one non-destructively (GM-grade only). Rejected while the timeline is rewound; the turn-snapshot timeline restarts for the newly live scene.",
-      "CommandControlRequest",
-      [uuidParam("sceneId")],
-      false
-    ),
-    ...gameCommandOperation(
-      "scene.set-combatants",
-      "setSceneCombatants",
-      "Replaces a prepared scene's combatant list (GM-grade only).",
-      "SceneCombatantsRequest",
-      [uuidParam("sceneId")]
-    ),
-    ...gameCommandOperation(
-      "scene.duplicate",
-      "duplicateScene",
-      "Duplicates a prepared scene as a new staged copy carrying the same map and staged combatants/tokens (GM-grade only). Duplicating the live scene snapshots its current combat into the copy; the copy is always parked, next to the original. The response's `sceneId` equals the commandId.",
-      "CommandControlRequest",
-      [uuidParam("sceneId")],
-      false
-    ),
-    ...gameCommandOperation(
-      "scene.reorder",
-      "reorderScenes",
-      "Reorders the prepared-scene list to the given permutation of every scene id (GM-grade only). Does not change which scene is live.",
-      "SceneReorderRequest"
-    ),
-    ...gameCommandOperation(
-      "fog.set-enabled",
-      "setFogEnabled",
-      "Turns manual fog of war on/off (GM-grade only). Enabled fog with no reveal strokes hides the whole map from players and the shared screen; `sceneId` targets a prepared scene's private prep instead of the live table.",
-      "FogEnabledRequest"
-    ),
-    ...gameCommandOperation(
-      "fog.paint",
-      "paintFog",
-      "Paints one reveal/hide fog rect (GM-grade only). The server snaps to whole grid cells on calibrated unrotated maps and clamps to the map bounds; a stroke covering the whole map replaces all prior strokes. `sceneId` targets a prepared scene.",
-      "FogPaintRequest"
-    ),
-    ...gameCommandOperation(
-      "fog.reset",
-      "resetFog",
-      "Clears every fog stroke - with fog enabled the whole map is hidden again (GM-grade only). `sceneId` targets a prepared scene.",
-      "FogResetRequest"
-    ),
     [SESSION_PATHS.player]: {
       post: {
         operationId: "issuePlayerSession",
@@ -2131,39 +1426,6 @@ export const openApiDocument = {
         }
       }
     },
-    ...gameCommandOperation(
-      "action.use",
-      "useAction",
-      'Uses an action and lets the SERVER decide what that means (D10 - the routing used to be a client-side boolean, so the same tap meant different things on different clients). In the fight on this creature\'s turn it delegates to the full structured resolution and acks `route: "resolved"`. Off turn it is refused with the overridable, askable rules block `economy.not-your-turn` (reactions and legendary actions are exempt - taking those off turn is the point); under an `economy` exception of advise/off it resolves, with a GM-only warning line under advise. With no fight running - or with this creature not in the turn order - the server rolls the action\'s own attack die (and, only with `includeDamage`, its damage parts) as attributed rolls, touches no combat state, and acks `route: "loose"` with the roll ids. No hit points ever move on the loose route. GM-grade for any combatant, including a monster\'s sheet; a player session only for their own claimed character.',
-      "ActionUseRequest",
-      undefined,
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "save.roll",
-      "rollSave",
-      'Rolls a saving throw for one character (D10). When a pending save is open for that character and ability, this ANSWERS it through the same path the encounter tracker uses - the damage and condition apply and the prompt closes - and acks `route: "answered"` with the `saveId`; the sheet\'s save chip used to roll a loose die that ignored the open prompt entirely. With nothing open it rolls a loose, attributed save at the same modifier the resolver would use, and acks `route: "loose"`. Supply `total` for an off-screen die. GM-grade for anyone; a player session only for their own claimed character.',
-      "SaveRollRequest",
-      undefined,
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "rules.ask",
-      "askTheGm",
-      "Asks the GM to allow a command the rules engine just blocked (D8 - a blocked player is never a silent dead end). Send the ORIGINAL request as `payload`; the server revalidates it with that command's own schema and re-runs it under YOUR authority with no override, so an action that would now succeed simply succeeds (`ran: true`) and nothing is parked. A still-blocked command is parked as one question per character (a second replaces the first, up to ten at the table) and the response carries `askId` plus the `blocked` details. Player sessions may ask only about their own claimed character.",
-      "RulesAskRequest",
-      undefined,
-      true,
-      true
-    ),
-    ...gameCommandOperation(
-      "rules.answer",
-      "answerRulesAsk",
-      "Answers a parked question in one tap (GM-grade only, D9). `allow: true` re-runs the parked command under GM authority with an injected override of the asked rule's FAMILY only - the `reason` is optional and the audit line falls back to \"GM override\" - and the rules engine remembers that family for the rest of that character's turn, so the same kind of block stops re-prompting. The replay runs against CURRENT state and passes full validation, so a stale question (the target moved, the target died) fails loudly and stays parked for another look. A replay stopped by a block of ANOTHER family does not ride the same Allow: the question is re-asked about that block under a fresh `askId` (the reply carries `blocked`), and the next Allow covers both families. `allow: false` clears it and tells the player. A question that no longer exists is a 409.",
-      "RulesAnswerRequest"
-    ),
     [CONTENT_PATHS.monsters]: {
       get: {
         operationId: "listContentMonsters",
@@ -2320,7 +1582,7 @@ export const openApiDocument = {
         operationId: "listEncounterArchives",
         security: gameSecurity("combat:read"),
         description:
-          "Permanent records of ended encounters, newest first. ROLE-AWARE (D26): a GM sees every archive, a player session sees only the ones the GM has shared (`playerVisible`).",
+          "Permanent records of ended encounters, newest first. ROLE-AWARE: a GM sees every archive, a player session sees only the ones the GM has shared (`playerVisible`).",
         responses: {
           "200": {
             description: "Archive summaries",
@@ -2397,28 +1659,6 @@ export const openApiDocument = {
         }
       }
     },
-    ...gameCommandPath("replay.launch", (scope) => ({
-      operationId: "launchEncounterArchive",
-      security: gameSecurity(scope),
-      description:
-        "Launch-from-here (D25): parks the live table exactly as a scene switch does and makes one recorded moment of this archive live on it. The moment's combatants are CLONED under new ids (tonight's characters are never rewritten) and the parked scene resumes any time through scene.activate. GM-grade only.",
-      parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer", minimum: 1 } }],
-      requestBody: {
-        required: true,
-        content: { "application/json": { schema: { $ref: "#/components/schemas/EncounterArchiveLaunchRequest" } } }
-      },
-      responses: {
-        "200": {
-          description: "The launched scene and the cloned combatants",
-          content: { "application/json": { schema: { $ref: "#/components/schemas/EncounterArchiveLaunchResponse" } } }
-        },
-        "400": apiError,
-        "401": apiError,
-        "403": apiError,
-        "404": apiError,
-        "409": apiError
-      }
-    })),
     // ===== Codex: worldbuilding wiki / atlas / journal / calendar (codex-http.ts). Reads project per role; writes
     // are GM-grade. Scoped credentials act at GM grade except on `POST /codex/preview-session`. Every codex GET
     // answers a conditional request with 304. =====
@@ -2840,7 +2080,7 @@ export const openApiDocument = {
         ok: "201",
         body: "CodexQuestCreateRequest",
         description:
-          "Creates a quest, and appends its first history record in the SAME transaction - a quest starting is an event (D11), so its initial status is recorded exactly as a later change would be. That record is a hidden `quest` journal entry with empty player text, dated at the GM's clock and filed under the active session; revealing it publishes nothing unless the quest itself is revealed. Only `title` is required - everything else opens empty, so the GM can name a lead the moment it appears at the table and fill it in later."
+          "Creates a quest, and appends its first history record in the SAME transaction - a quest starting is an event, so its initial status is recorded exactly as a later change would be. That record is a hidden `quest` journal entry with empty player text, dated at the GM's clock and filed under the active session; revealing it publishes nothing unless the quest itself is revealed. Only `title` is required - everything else opens empty, so the GM can name a lead the moment it appears at the table and fill it in later."
       })
     },
     [CODEX_PATHS.questById]: {
@@ -2858,7 +2098,7 @@ export const openApiDocument = {
         notFound: true,
         conflict: "A stale `expectedRev`; `error.currentRevision` carries the quest's current revision.",
         description:
-          "Edits a quest; an omitted field is left alone. **A status change also appends a hidden `quest` history record** in the same transaction (D11) - editing prose does not, because that is not something that happened in the world. `expectedRev` rejects a stale write with 409. `objectives` is REPLACED wholesale and stored in exactly the order given - order is content here, not incidental, so the array is never sorted, deduped, or re-keyed by position."
+          "Edits a quest; an omitted field is left alone. **A status change also appends a hidden `quest` history record** in the same transaction - editing prose does not, because that is not something that happened in the world. `expectedRev` rejects a stale write with 409. `objectives` is REPLACED wholesale and stored in exactly the order given - order is content here, not incidental, so the array is never sorted, deduped, or re-keyed by position."
       }),
       delete: codexOp("deleteCodexQuest", codexWrite, "CodexDeletedResponse", {
         bad: false,
@@ -3180,6 +2420,7 @@ export const openApiDocument = {
       }
     },
     schemas: {
+      ...commandDocs.schemas,
       SystemHealth: {
         type: "object",
         additionalProperties: false,
@@ -3459,12 +2700,6 @@ export const openApiDocument = {
           overlayWarning: { type: ["string", "null"] }
         }
       },
-      /** Shared control fields of every game command: omit commandId to have one minted; resend the same commandId to retry idempotently; expectedRevision rejects stale writes with 409. */
-      CommandControlRequest: {
-        type: "object",
-        additionalProperties: false,
-        properties: { commandId: { type: "string", format: "uuid" }, expectedRevision: { type: "integer", minimum: 0 } }
-      },
       ViewerAccess: {
         type: "object",
         additionalProperties: false,
@@ -3633,1398 +2868,6 @@ export const openApiDocument = {
             additionalProperties: true,
             description:
               "The command's Socket.IO payload shape, minus commandId/expectedRevision (carried at the envelope level)"
-          }
-        }
-      },
-      AnnotationGeometryInput: {
-        type: "object",
-        additionalProperties: false,
-        required: ["origin", "target"],
-        properties: {
-          origin: { $ref: "#/components/schemas/ImagePoint" },
-          target: { $ref: "#/components/schemas/ImagePoint" }
-        }
-      },
-      EncounterStartRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["mapAssetId"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          mapAssetId: { type: "string", format: "uuid" },
-          rulesMode: {
-            type: "string",
-            enum: ["strict", "assisted", "freeform"],
-            description: "Rules-engine enforcement for this fight; omitted seeds from the table's standing rules policy"
-          },
-          ruleExceptions: {
-            $ref: "#/components/schemas/RuleExceptions",
-            description: "Per-family exceptions for this fight; omitted seeds from the table's standing rules policy"
-          },
-          playersRollInitiative: {
-            type: "boolean",
-            description:
-              "When true, claimed player-characters (without an explicit score) roll their own initiative; a provisional auto-roll parks them until they do"
-          },
-          entries: {
-            type: "array",
-            minItems: 1,
-            maxItems: 200,
-            description:
-              "Combatants to start with. Omit the whole field while a prepared scene is live to start on exactly the combatants staged in it (the server owns that list). Archived characters are rejected.",
-            items: {
-              type: "object",
-              additionalProperties: false,
-              required: ["actorId"],
-              properties: {
-                actorId: { type: "string", format: "uuid" },
-                score: {
-                  type: "integer",
-                  minimum: -1000,
-                  maximum: 1000,
-                  description: "Omit to roll initiative server-side"
-                },
-                surprised: {
-                  type: "boolean",
-                  description: "2024 surprise: the server rolls this combatant's initiative with disadvantage"
-                }
-              }
-            }
-          }
-        }
-      },
-      AddCombatantRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["actorId"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          actorId: { type: "string", format: "uuid" },
-          score: { type: "integer", minimum: -1000, maximum: 1000 }
-        }
-      },
-      InitiativeSetRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["actorId", "score"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          actorId: { type: "string", format: "uuid" },
-          score: { type: "integer", minimum: -1000, maximum: 1000 }
-        }
-      },
-      InitiativeNextRequest: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          confirmRewrite: {
-            type: "boolean",
-            description: "Confirm rewriting history from the reviewed turn (truncates the undone future)"
-          }
-        }
-      },
-      InitiativePreviousRequest: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          confirmDiscard: {
-            type: "boolean",
-            description: "Confirm discarding changes made while rewound (re-restores the viewed turn in place)"
-          }
-        }
-      },
-      TurnUseRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["slot", "used"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          slot: { type: "string", enum: ["action", "bonus-action"] },
-          used: { type: "boolean" }
-        }
-      },
-      TurnReactionRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["actorId", "used"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          actorId: { type: "string", format: "uuid" },
-          used: { type: "boolean" }
-        }
-      },
-      TurnLegendaryRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["actorId", "spent"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          actorId: { type: "string", format: "uuid" },
-          spent: { type: "integer", minimum: 0, maximum: 10 }
-        }
-      },
-      TokenMoveRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["position"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          position: {
-            oneOf: [{ $ref: "#/components/schemas/ImagePoint" }, { type: "null" }],
-            description: "Image-space coordinates (server snaps to the grid); null returns the token to the tray"
-          },
-          sceneId: {
-            type: "string",
-            format: "uuid",
-            description: "Target a prepared GM-private scene instead of the live encounter"
-          },
-          override: {
-            type: "object",
-            additionalProperties: false,
-            required: ["reason"],
-            properties: { reason: { type: "string", minLength: 1, maxLength: 300 }, families: rulesOverrideFamilies },
-            description: "GM-grade bypass of a movement-budget rejection; audited in the combat log"
-          }
-        }
-      },
-      HpAmountRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["amount"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          amount: { type: "integer", minimum: 1, maximum: 1000 }
-        }
-      },
-      DamageRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["amount"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          amount: {
-            type: "integer",
-            minimum: 1,
-            maximum: 1000,
-            description: "Untyped total - used when `parts` is absent; kept for compatibility either way"
-          },
-          parts: {
-            type: "array",
-            minItems: 1,
-            maxItems: 9,
-            items: {
-              type: "object",
-              additionalProperties: false,
-              required: ["amount", "type"],
-              properties: {
-                amount: { type: "integer", minimum: 0, maximum: 1000 },
-                type: { type: "string", minLength: 1, maxLength: 40 }
-              }
-            },
-            description: "Typed components; the server applies the target's defenses and returns the breakdown"
-          },
-          damageType: {
-            type: "string",
-            minLength: 1,
-            maxLength: 40,
-            description:
-              'OPTIONAL type for the manual `amount` path. Absent or "untyped" keeps the exact, defence-free correction; naming a type (one of the 13 SRD slugs, or a homebrew one - the vocabulary is open) runs it through resistance/immunity/vulnerability. Ignored when `parts` is present'
-          },
-          damageOverride: {
-            type: "integer",
-            minimum: 0,
-            maximum: 1000,
-            description:
-              "A hand-entered total that REPLACES what was rolled while keeping its types: the server re-weights `parts` to this number, so an amended hit still meets the target's defences"
-          },
-          sourceActorId: { type: "string", format: "uuid" },
-          sourceActionId: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 120 },
-          sourceName: { type: "string", minLength: 1, maxLength: 120 },
-          critical: {
-            type: "boolean",
-            description: "Adds two death-save failures instead of one when the target is already dying"
-          },
-          nonlethal: {
-            type: "boolean",
-            description:
-              "Knocking out a creature (SRD): a drop to 0 leaves the target Unconscious and stable instead of dying/defeated"
-          }
-        }
-      },
-      EffectAddRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["name"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          name: { type: "string", minLength: 1, maxLength: 120 },
-          tags: { type: "array", maxItems: 8, items: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 40 } },
-          duration: {
-            type: "object",
-            description: "rounds | until-source-next-turn | encounter | manual (default manual)",
-            properties: {
-              type: { type: "string", enum: ["rounds", "until-source-next-turn", "encounter", "manual"] },
-              rounds: { type: "integer", minimum: 1, maximum: 100 }
-            },
-            required: ["type"],
-            additionalProperties: false
-          },
-          modifiers: {
-            type: "array",
-            maxItems: 8,
-            items: { $ref: "#/components/schemas/HomebrewModifier" },
-            description:
-              "What the effect does, in the shared rider vocabulary with its gates; the modifiers the sheet stores (armor-class, initiative, spell-slot, ...) are refused, as on any effect"
-          },
-          concentration: {
-            type: "boolean",
-            description:
-              "the bearer concentrates to sustain this effect: one at a time, damage prompts a CON save, incapacitation breaks it"
-          }
-        }
-      },
-      RuleExceptions: {
-        type: "object",
-        additionalProperties: false,
-        description:
-          "Per-family overrides of the dial (movement, economy, resources, targeting, slots). An absent family follows the dial. Wire values stay `strict`/`assisted`/`freeform`; the GM-facing words Enforce/Advise/Off are surface copy only.",
-        properties: {
-          movement: { type: "string", enum: ["strict", "assisted", "freeform"] },
-          economy: { type: "string", enum: ["strict", "assisted", "freeform"] },
-          resources: { type: "string", enum: ["strict", "assisted", "freeform"] },
-          targeting: { type: "string", enum: ["strict", "assisted", "freeform"] },
-          slots: { type: "string", enum: ["strict", "assisted", "freeform"] }
-        }
-      },
-      RulesModeRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["mode"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          mode: { type: "string", enum: ["strict", "assisted", "freeform"] },
-          exceptions: {
-            $ref: "#/components/schemas/RuleExceptions",
-            description:
-              "Per-family overrides for the LIVE fight; omitting the field leaves the stored exceptions untouched"
-          }
-        }
-      },
-      RulesPolicyRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["dial"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          dial: {
-            type: "string",
-            enum: ["strict", "assisted", "freeform"],
-            description: "The standing enforcement level every new fight inherits"
-          },
-          exceptions: {
-            $ref: "#/components/schemas/RuleExceptions",
-            description: "Standing per-family overrides; omitting the field keeps the stored ones"
-          }
-        }
-      },
-      ActionUseRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["actorId", "actionId"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          actorId: { type: "string", format: "uuid" },
-          actionId: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 120 },
-          targetIds: { type: "array", minItems: 1, maxItems: 20, items: { type: "string", format: "uuid" } },
-          rollMode: { type: "string", enum: ["advantage", "disadvantage", "normal"] },
-          includeDamage: {
-            type: "boolean",
-            description:
-              "Loose route only: roll the action's damage parts in the same tap. Opt-in so a sheet rendering its own damage chip cannot double-roll. Ignored in the fight, where the resolver rolls damage itself."
-          },
-          override: {
-            type: "object",
-            additionalProperties: false,
-            properties: { reason: { type: "string", minLength: 1, maxLength: 300 }, families: rulesOverrideFamilies },
-            description:
-              "GM-grade only: waves the off-turn refusal (and the resolver's own economy blocks) through, remembers the family for the rest of the turn, and audits the line. The reason is optional."
-          }
-        }
-      },
-      SaveRollRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["actorId", "ability"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          actorId: { type: "string", format: "uuid" },
-          ability: { type: "string", enum: ["str", "dex", "con", "int", "wis", "cha"] },
-          rollMode: { type: "string", enum: ["advantage", "disadvantage", "normal"] },
-          total: {
-            type: "integer",
-            minimum: -50,
-            maximum: 100,
-            description: "Hand-entered final total (an off-screen die), used verbatim instead of rolling"
-          }
-        }
-      },
-      RulesAskRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["type", "payload"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          type: {
-            type: "string",
-            enum: ["action.resolve", "action.use", "token.move", "actor.set-condition"],
-            description: "Which command was blocked - a closed list, because Allow replays it under GM authority"
-          },
-          payload: {
-            type: "object",
-            description:
-              "The original request body, verbatim. Revalidated with the named command's own schema before it runs again; its `expectedRevision` is stripped on replay (the ask-time revision would always conflict) and its `commandId` is replaced by the server-minted ask id, which is what makes a repeated Allow idempotent."
-          }
-        }
-      },
-      RulesAnswerRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["askId", "allow"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          askId: { type: "string", format: "uuid" },
-          allow: {
-            type: "boolean",
-            description: "true replays the parked command with an override; false declines it and tells the player"
-          },
-          reason: {
-            type: "string",
-            minLength: 1,
-            maxLength: 300,
-            description: 'Optional audit note; omitted lines read "GM override"'
-          }
-        }
-      },
-      StagingDefaultsRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["visibility"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          visibility: {
-            type: "string",
-            enum: ["public", "gm-only"],
-            description: "What a newly staged combatant's token visibility starts at"
-          }
-        }
-      },
-      PartyVisibilityRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["visibility"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          visibility: {
-            type: "string",
-            enum: ["off", "name-and-class", "full-sheet", "sheet-and-resources"],
-            description: "How much a player sees of another player's character; the default is name-and-class"
-          }
-        }
-      },
-      PlayerDamageModeRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["mode"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          mode: {
-            type: "string",
-            enum: ["proposal", "direct"],
-            description:
-              "proposal parks a GM-confirmed damage proposal for a player's hit; direct applies the typed damage immediately server-side"
-          }
-        }
-      },
-      PlayerInitiativeModeRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["mode"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          mode: {
-            type: "string",
-            enum: ["immediate", "wait"],
-            description:
-              "immediate begins turns at once on a provisional order; wait holds turns until every player has rolled"
-          }
-        }
-      },
-      InitiativeRollSelfRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["actorId"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          actorId: { type: "string", format: "uuid" },
-          natural: {
-            type: "integer",
-            minimum: 1,
-            maximum: 20,
-            description: "a hand-rolled physical d20 (1-20); omit to have the server roll"
-          },
-          rollMode: { type: "string", enum: ["advantage", "disadvantage", "normal"] }
-        }
-      },
-      DamageResolveRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["proposalId", "apply"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          proposalId: { type: "string", format: "uuid" },
-          apply: { type: "boolean", description: "true applies the parked damage; false dismisses it" },
-          amount: {
-            type: "integer",
-            minimum: 0,
-            maximum: 1000,
-            description: "optional override total (bare number, no defense math)"
-          }
-        }
-      },
-      HealthDisplayRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["style", "audience"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          style: { type: "string", enum: ["band", "bar", "ring", "aura"] },
-          audience: {
-            type: "string",
-            enum: ["gm", "all"],
-            description:
-              "gm keeps a bar/ring on the GM map only; all shows it to players and the shared screen (coarse band-fraction for non-owners)"
-          }
-        }
-      },
-      ActorHealthDisplayRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["display"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          display: {
-            description: "The per-token override, or null to clear it and follow the table default",
-            oneOf: [
-              {
-                type: "object",
-                additionalProperties: false,
-                required: ["style", "audience"],
-                properties: {
-                  style: { type: "string", enum: ["band", "bar", "ring", "aura"] },
-                  audience: { type: "string", enum: ["gm", "all"] }
-                }
-              },
-              { type: "null" }
-            ]
-          }
-        }
-      },
-      EnvironmentRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["underwater"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          underwater: { type: "boolean" }
-        }
-      },
-      ActorRestRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["kind"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          kind: {
-            type: "string",
-            enum: ["long", "short"],
-            description:
-              "short re-arms per-short-rest and recharge pools (heal by spending Hit Point Dice separately); long is the full reset"
-          }
-        }
-      },
-      ActorRechooseRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["offer", "id"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          offer: {
-            type: "string",
-            pattern: "^[a-z0-9-]+(:[a-z0-9-]+)?$",
-            maxLength: 80,
-            description:
-              'The offer key whose answer is being re-made - the same key the build already uses ("feature:circle-of-the-land-spells")'
-          },
-          id: {
-            type: "string",
-            pattern: "^[a-z0-9-]+$",
-            maxLength: 80,
-            description:
-              "The new answer. Must be one the original pick could itself have chosen; the server resolves that list from the content and a client cannot widen it"
-          }
-        }
-      },
-      ActorSpendHitDiceRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["count"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          count: {
-            type: "integer",
-            minimum: 1,
-            maximum: 40,
-            description: "How many Hit Point Dice to spend; each heals its roll + Con modifier (minimum 1)"
-          }
-        }
-      },
-      CharacterSetSlotRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["level", "remaining"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          level: { type: "integer", minimum: 1, maximum: 9 },
-          remaining: {
-            type: "integer",
-            minimum: 0,
-            maximum: 9,
-            description: "New remaining slots for this level; clamped to the sheet's maximum"
-          }
-        }
-      },
-      CharacterSetPreparedRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["spellId", "prepared"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          spellId: { type: "string", minLength: 1, maxLength: 80 },
-          prepared: { type: "boolean" }
-        }
-      },
-      CharacterSetInventoryRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["item"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          item: {
-            type: "object",
-            additionalProperties: false,
-            required: ["id", "name"],
-            properties: {
-              id: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 80 },
-              name: { type: "string", minLength: 1, maxLength: 120 },
-              quantity: { type: "integer", minimum: 0, maximum: 9999, description: "0 removes the item" },
-              equipped: { type: "boolean" },
-              attuned: { type: "boolean" },
-              weightEach: { type: "number", minimum: 0 },
-              description: { type: "string", maxLength: 4000 },
-              category: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 40 },
-              baseId: {
-                type: "string",
-                pattern: "^[a-z0-9-]+$",
-                maxLength: 80,
-                description:
-                  "C9: the picked base for a TEMPLATE magic item - one of the catalog record's appliesTo.baseIds. Validated server-side; the base's weapon/armor stats are COPIED by the server and any client-supplied block on a template row is overwritten. Omit on non-template items (it is stripped there); a single-base template auto-binds without it; on a bound row an omitted baseId inherits the stored pick, and a non-GM write may not change one - remove and re-add instead"
-              },
-              weapon: {
-                type: "object",
-                additionalProperties: false,
-                required: ["category", "damageDice", "damageType", "rangeFeet", "longRangeFeet"],
-                properties: {
-                  category: { enum: ["simple", "martial"] },
-                  damageDice: { type: "string", minLength: 1, maxLength: 20 },
-                  damageType: { type: "string", minLength: 1, maxLength: 40 },
-                  rangeFeet: { type: ["integer", "null"], minimum: 1 },
-                  longRangeFeet: { type: ["integer", "null"], minimum: 1 },
-                  properties: {
-                    type: "array",
-                    maxItems: 12,
-                    items: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 40 },
-                    description:
-                      "SRD weapon property slugs (finesse, light, thrown, versatile, reach, heavy, two-handed, loading, ammunition). The engine reads these: finesse decides whether the swing uses Dexterity, reach decides 10 feet versus 5. Copy them from the catalog row. Absent = not recorded (the swing behaves as if the weapon had none); an empty array = this weapon really has none. Open slugs, so a homebrew property is expressible."
-                  }
-                },
-                description:
-                  "Weapon stats (from the SRD catalog); equipping surfaces a rollable attack on the sheet. NOT `mastery`: that is browse-only and is rejected here."
-              },
-              armor: {
-                type: "object",
-                additionalProperties: false,
-                required: ["acBase", "addDexModifier", "dexModifierCap", "stealthDisadvantage", "strengthRequired"],
-                properties: {
-                  acBase: { type: "integer", minimum: 2, maximum: 25 },
-                  addDexModifier: { type: "boolean" },
-                  dexModifierCap: { type: ["integer", "null"] },
-                  stealthDisadvantage: { type: "boolean" },
-                  strengthRequired: { type: ["integer", "null"] }
-                },
-                description: "Armor/shield stats (from the SRD catalog); equipping derives Armor Class"
-              }
-            }
-          }
-        }
-      },
-      CharacterSetCurrencyRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["currency"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          currency: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              cp: { type: "integer", minimum: 0, maximum: 1000000 },
-              sp: { type: "integer", minimum: 0, maximum: 1000000 },
-              ep: { type: "integer", minimum: 0, maximum: 1000000 },
-              gp: { type: "integer", minimum: 0, maximum: 1000000 },
-              pp: { type: "integer", minimum: 0, maximum: 1000000 }
-            }
-          }
-        }
-      },
-      CharacterSetIdentityRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["character"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          character: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              classes: {
-                type: "array",
-                maxItems: 4,
-                items: {
-                  type: "object",
-                  additionalProperties: false,
-                  required: ["id", "name", "level"],
-                  properties: {
-                    id: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 60 },
-                    name: { type: "string", minLength: 1, maxLength: 60 },
-                    subclass: {
-                      type: "object",
-                      additionalProperties: false,
-                      required: ["id", "name"],
-                      properties: {
-                        id: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 60 },
-                        name: { type: "string", minLength: 1, maxLength: 60 }
-                      }
-                    },
-                    level: { type: "integer", minimum: 1, maximum: 20 }
-                  }
-                }
-              },
-              race: {
-                type: "object",
-                additionalProperties: false,
-                required: ["id", "name"],
-                properties: {
-                  id: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 60 },
-                  name: { type: "string", minLength: 1, maxLength: 60 },
-                  subrace: {
-                    type: "object",
-                    additionalProperties: false,
-                    required: ["id", "name"],
-                    properties: {
-                      id: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 60 },
-                      name: { type: "string", minLength: 1, maxLength: 60 }
-                    }
-                  }
-                }
-              },
-              background: {
-                type: "object",
-                additionalProperties: false,
-                required: ["id", "name"],
-                properties: {
-                  id: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 60 },
-                  name: { type: "string", minLength: 1, maxLength: 60 }
-                }
-              },
-              feats: {
-                type: "array",
-                maxItems: 40,
-                items: {
-                  type: "object",
-                  additionalProperties: false,
-                  required: ["id", "name"],
-                  properties: {
-                    id: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 60 },
-                    name: { type: "string", minLength: 1, maxLength: 80 },
-                    description: { type: "string", maxLength: 4000 }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      CharacterSetProficienciesRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["proficiencies"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          proficiencies: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              saves: {
-                type: "array",
-                maxItems: 6,
-                items: { type: "string", enum: ["str", "dex", "con", "int", "wis", "cha"] }
-              },
-              skills: {
-                type: "array",
-                maxItems: 40,
-                items: {
-                  type: "object",
-                  additionalProperties: false,
-                  required: ["id", "proficiency"],
-                  properties: {
-                    id: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 60 },
-                    proficiency: { type: "string", enum: ["proficient", "expertise"] }
-                  }
-                }
-              },
-              saveOverrides: { type: "object", additionalProperties: { type: "integer", minimum: -20, maximum: 30 } },
-              skillOverrides: { type: "object", additionalProperties: { type: "integer", minimum: -20, maximum: 30 } }
-            }
-          }
-        }
-      },
-      CharacterRebuildRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: [
-          "speciesId",
-          "backgroundId",
-          "classId",
-          "level",
-          "abilityMethod",
-          "baseScores",
-          "backgroundBonusAllocation",
-          "hp",
-          "choices"
-        ],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          speciesId: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 80 },
-          backgroundId: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 80 },
-          classId: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 80 },
-          level: {
-            type: "integer",
-            minimum: 1,
-            maximum: 20,
-            description: "The level to rebuild AT - lower than the current level is a level-down, and is supported"
-          },
-          subclassId: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 80 },
-          abilityMethod: { type: "string", enum: ["standard-array", "point-buy", "roll", "custom"] },
-          baseScores: {
-            type: "object",
-            additionalProperties: false,
-            required: ["str", "dex", "con", "int", "wis", "cha"],
-            properties: {
-              str: { type: "integer", minimum: 1, maximum: 30 },
-              dex: { type: "integer", minimum: 1, maximum: 30 },
-              con: { type: "integer", minimum: 1, maximum: 30 },
-              int: { type: "integer", minimum: 1, maximum: 30 },
-              wis: { type: "integer", minimum: 1, maximum: 30 },
-              cha: { type: "integer", minimum: 1, maximum: 30 }
-            }
-          },
-          backgroundBonusAllocation: {
-            type: "array",
-            maxItems: 3,
-            items: {
-              type: "object",
-              additionalProperties: false,
-              required: ["ability", "amount"],
-              properties: {
-                ability: { type: "string", enum: ["str", "dex", "con", "int", "wis", "cha"] },
-                amount: { type: "integer", minimum: 1, maximum: 3 }
-              }
-            }
-          },
-          hp: {
-            type: "object",
-            additionalProperties: false,
-            required: ["mode"],
-            properties: {
-              mode: { type: "string", enum: ["average", "entries"] },
-              entries: { type: "array", maxItems: 19, items: { type: "integer", minimum: 1, maximum: 12 } }
-            }
-          },
-          choices: {
-            type: "array",
-            maxItems: 200,
-            items: {
-              type: "object",
-              additionalProperties: false,
-              required: ["level", "kind", "id"],
-              properties: {
-                level: { type: "integer", minimum: 1, maximum: 20 },
-                classId: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 60 },
-                kind: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 60 },
-                id: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 80 },
-                payload: { type: "object", additionalProperties: true }
-              },
-              description:
-                "Includes the hp-roll rows the previous build recorded, which is what makes a level round trip exact"
-            }
-          }
-        }
-      },
-      BuilderRollAbilitiesRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["method"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          method: {
-            type: "string",
-            enum: ["roll", "custom"],
-            description: "roll = the SRD 4d6kh3; custom = the GM's configured formula"
-          }
-        }
-      },
-      CharacterCreateRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: [
-          "name",
-          "speciesId",
-          "backgroundId",
-          "classId",
-          "level",
-          "abilityMethod",
-          "baseScores",
-          "backgroundBonusAllocation",
-          "hp",
-          "choices"
-        ],
-        properties: {
-          commandId: {
-            type: "string",
-            format: "uuid",
-            description:
-              "Also becomes the created actor's id (and keys its editable sheet as import-<actorId>); resend it to retry idempotently"
-          },
-          expectedRevision: { type: "integer", minimum: 0 },
-          name: { type: "string", minLength: 1, maxLength: 120 },
-          speciesId: {
-            type: "string",
-            pattern: "^[a-z0-9-]+$",
-            maxLength: 80,
-            description: "A species id from the content catalog"
-          },
-          backgroundId: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 80 },
-          classId: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 80 },
-          level: { type: "integer", minimum: 1, maximum: 20 },
-          subclassId: {
-            type: "string",
-            pattern: "^[a-z0-9-]+$",
-            maxLength: 80,
-            description: "Required once level reaches the class's subclass level"
-          },
-          abilityMethod: {
-            type: "string",
-            enum: ["standard-array", "point-buy", "roll", "custom"],
-            description:
-              "Must be one of the methods the builder policy allows; base scores are validated against the method (array multiset, point-buy budget, formula bounds)"
-          },
-          baseScores: {
-            type: "object",
-            additionalProperties: false,
-            required: ["str", "dex", "con", "int", "wis", "cha"],
-            properties: {
-              str: { type: "integer", minimum: 1, maximum: 30 },
-              dex: { type: "integer", minimum: 1, maximum: 30 },
-              con: { type: "integer", minimum: 1, maximum: 30 },
-              int: { type: "integer", minimum: 1, maximum: 30 },
-              wis: { type: "integer", minimum: 1, maximum: 30 },
-              cha: { type: "integer", minimum: 1, maximum: 30 }
-            },
-            description: "The six scores BEFORE the background allocation and any species/feat bonuses"
-          },
-          backgroundBonusAllocation: {
-            type: "array",
-            maxItems: 3,
-            items: {
-              type: "object",
-              additionalProperties: false,
-              required: ["ability", "amount"],
-              properties: {
-                ability: { type: "string", enum: ["str", "dex", "con", "int", "wis", "cha"] },
-                amount: { type: "integer", minimum: 1, maximum: 3 }
-              }
-            },
-            description:
-              "The background's ability increases, matching one of its printed spreads (+2/+1 or +1/+1/+1) over its listed abilities; empty when the background grants none"
-          },
-          hp: {
-            type: "object",
-            additionalProperties: false,
-            required: ["mode"],
-            properties: {
-              mode: {
-                type: "string",
-                enum: ["average", "entries"],
-                description:
-                  "average = the SRD fixed value every level; entries = one rolled result per level after the first, applied as max(roll, average) - the builder's friendly default"
-              },
-              entries: {
-                type: "array",
-                maxItems: 19,
-                items: { type: "integer", minimum: 1, maximum: 12 },
-                description: "Required for mode entries: exactly level-1 rolls, each within [1, hit die]"
-              }
-            }
-          },
-          choices: {
-            type: "array",
-            maxItems: 200,
-            items: {
-              type: "object",
-              additionalProperties: false,
-              required: ["level", "kind", "id"],
-              properties: {
-                level: { type: "integer", minimum: 1, maximum: 20 },
-                classId: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 60 },
-                kind: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 60 },
-                id: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 80 },
-                payload: { type: "object", additionalProperties: true }
-              }
-            },
-            description:
-              "The choice-provenance ledger AS the build input: every pick the wizard collected (skills, subclass, spells, cantrips, feats/ASI with their splits, equipment options, lineage, languages, tools). Catalog-driven picks are validated through the same fromCatalog resolver the wizard used; the ledger is stored verbatim on the sheet for level-up and respec"
-          }
-        }
-      },
-      CharacterGenerateRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["level"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          level: {
-            type: "integer",
-            minimum: 1,
-            maximum: 20,
-            description: "Character level to roll up; refused above the table's builderPolicy.maxLevel"
-          },
-          classId: {
-            type: "string",
-            pattern: "^[a-z0-9-]+$",
-            maxLength: 80,
-            description: "Class to build; omit to draw one from the catalog the caller may read"
-          },
-          name: {
-            type: "string",
-            minLength: 1,
-            maxLength: 120,
-            description: "Name to use verbatim; omit to draw one from the rolled species' own name bundle"
-          }
-        }
-      },
-      BuilderSetPolicyRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["allowedAbilityMethods"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          allowedAbilityMethods: {
-            type: "array",
-            minItems: 1,
-            maxItems: 4,
-            items: { type: "string", enum: ["standard-array", "point-buy", "roll", "custom"] },
-            description:
-              "Which ability-score methods the wizard offers players (task-packet decision 10); duplicates rejected"
-          },
-          customFormula: {
-            type: ["string", "null"],
-            minLength: 1,
-            maxLength: 160,
-            description:
-              "The GM's custom roll formula (e.g. 3d6, 2d6+6), validated through the server dice grammar and 1-30 bounds; null clears it. Omitting the field keeps the stored formula"
-          },
-          maxLevel: {
-            type: "integer",
-            minimum: 1,
-            maximum: 20,
-            description:
-              "Highest character level this table builds to (default 20). Enforced by the builder AND by the sheet's identity edit; omitting the field keeps the stored cap"
-          },
-          playerBuilder: {
-            type: "string",
-            enum: ["open", "gm-only"],
-            description:
-              "Whether players may run the character builder themselves (default open). Stored policy: character creation is still GM-gated at this version, and the projected value is what a player's wizard reads to know whether its door is open. Omitting the field keeps the stored setting"
-          },
-          playerRandom: {
-            type: "string",
-            enum: ["open", "gm-only"],
-            description:
-              "Whether players may roll a RANDOM character themselves. Default gm-only - the opposite of playerBuilder, because a generator is one tap that fills a roster slot rather than eight considered steps. Omitting the field keeps the stored setting"
-          }
-        }
-      },
-      TempHpRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["amount"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          amount: { type: "integer", minimum: 0, maximum: 1000 }
-        }
-      },
-      SetHpRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["current"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          current: { type: "integer", minimum: 0, maximum: 10000 }
-        }
-      },
-      ConditionRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["conditionId", "active"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          conditionId: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 60 },
-          active: { type: "boolean" },
-          level: { type: "integer", minimum: 1, maximum: 6, description: "Exhaustion level" },
-          override: {
-            type: "object",
-            additionalProperties: false,
-            required: ["reason"],
-            properties: { reason: { type: "string", minLength: 1, maxLength: 300 }, families: rulesOverrideFamilies },
-            description: "GM-grade bypass of the stand-up movement cost rejection; audited"
-          }
-        }
-      },
-      ActorAddRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["definitionId"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          definitionId: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 200 },
-          visibility: { type: "string", enum: ["public", "gm-only"], default: "public" },
-          joinEncounter: {
-            type: "boolean",
-            description:
-              "Also drop the new combatant into the running fight - roster, initiative and tray token in ONE command and one revision. Ignored when no encounter is running"
-          }
-        }
-      },
-      ActorImportRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["definition"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          definition: {
-            type: "object",
-            additionalProperties: true,
-            description: "A canonical ActorDefinition JSON (schema version discoverable via /system/version)"
-          },
-          visibility: { type: "string", enum: ["public", "gm-only"], default: "public" }
-        }
-      },
-      CharacterSubmitImportRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["definition"],
-        properties: {
-          commandId: {
-            type: "string",
-            format: "uuid",
-            description: "Also becomes the queued submission's importId; resend it to retry the submission idempotently"
-          },
-          expectedRevision: { type: "integer", minimum: 0 },
-          definition: {
-            type: "object",
-            additionalProperties: true,
-            description:
-              "A canonical ActorDefinition JSON, at most 256 KiB serialized (schema version discoverable via /system/version)"
-          }
-        }
-      },
-      CharacterResolveImportRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["approve"],
-        properties: {
-          commandId: { type: "string", format: "uuid", description: "Also becomes the approved actor's id" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          approve: {
-            type: "boolean",
-            description:
-              "true instantiates the submitted sheet as a claimable actor; false discards it. Either way the submission leaves the queue"
-          }
-        }
-      },
-      DiceRollRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["formula", "purpose", "visibility"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          formula: { type: "string", minLength: 1, maxLength: 160, description: "e.g. 2d6+3, 4d6kh3, 2d20kl1" },
-          purpose: { type: "string", enum: ["attack", "save", "check", "damage", "manual"] },
-          visibility: { type: "string", enum: ["public", "gm-only", "blind", "self-only"] },
-          label: {
-            type: "string",
-            minLength: 1,
-            maxLength: 80,
-            description:
-              'What was rolled, specifically (e.g. "Athletics check", "DEX save", a weapon/spell name); shown in the roll log alongside the coarse purpose'
-          },
-          actorId: { type: "string", format: "uuid" }
-        }
-      },
-      ActionResolveRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["actorId", "actionId"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          actorId: { type: "string", format: "uuid" },
-          actionId: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 120 },
-          targetIds: { type: "array", minItems: 1, maxItems: 20, items: { type: "string", format: "uuid" } },
-          template: {
-            type: "object",
-            additionalProperties: false,
-            required: ["shape", "origin", "target"],
-            properties: {
-              shape: { type: "string", enum: ["circle", "cone", "line", "square"] },
-              origin: { $ref: "#/components/schemas/ImagePoint" },
-              target: { $ref: "#/components/schemas/ImagePoint" }
-            },
-            description:
-              "Area targeting: the server snaps the template and finds who is under it. Provide targetIds or template, never both."
-          },
-          conditionId: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 60 },
-          rollMode: {
-            type: "string",
-            enum: ["advantage", "disadvantage", "normal"],
-            description: "Explicit GM choice; wins over the engine's advantage/disadvantage aggregation"
-          },
-          override: {
-            type: "object",
-            additionalProperties: false,
-            required: ["reason"],
-            properties: { reason: { type: "string", minLength: 1, maxLength: 300 }, families: rulesOverrideFamilies },
-            description: "Bypasses a rules-mode rejection; audited in the combat log and journal"
-          },
-          effectId: {
-            type: "string",
-            maxLength: 120,
-            description:
-              "For the escape-grapple builtin: which escapable effect to break (defaults to the first with an escape DC)"
-          },
-          note: {
-            type: "string",
-            minLength: 1,
-            maxLength: 100,
-            description: "Free-text annotation (the Ready builtin's trigger), shown in the granted effect's name"
-          },
-          cover: {
-            type: "string",
-            enum: ["half", "three-quarters", "total"],
-            description:
-              "GM-adjudicated cover for the target: +2/+5 to AC and Dex saves; total blocks targeting (overridable)"
-          },
-          commit: {
-            type: "boolean",
-            default: true,
-            description:
-              "false previews a single-target attack's d20 only (no damage/riders/prompts/economy) so the answerer can re-roll adv/disadv or confirm; confirm with commit=true and the shown attackNatural. Non-attack actions ignore it."
-          },
-          attackNatural: {
-            type: "integer",
-            minimum: 1,
-            maximum: 20,
-            description:
-              "Apply this exact d20 face for the attack instead of rolling - confirming a preview, or a hand-rolled die"
-          },
-          attackTotal: {
-            type: "integer",
-            minimum: -50,
-            maximum: 100,
-            description:
-              'Hand-entered final attack total ("final total" manual mode) - used verbatim vs AC; pair with critical for a nat 20'
-          },
-          critical: {
-            type: "boolean",
-            description:
-              "Declares a natural 20 (critical hit) for the hand-entered-total path, where the natural die can't be inferred"
-          }
-        }
-      },
-      SaveAnswerRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["method"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          method: { type: "string", enum: ["roll", "manual"] },
-          total: { type: "integer", minimum: -20, maximum: 60, description: "Required for method=manual" },
-          rollMode: {
-            type: "string",
-            enum: ["advantage", "disadvantage", "normal"],
-            description:
-              "For method=roll: the answerer's explicit advantage/disadvantage choice; wins over the engine's aggregated sources (2d20kh1 / 2d20kl1)"
-          },
-          commit: {
-            type: "boolean",
-            default: true,
-            description: "false previews the outcome without applying damage/conditions"
-          },
-          legendaryResistance: {
-            type: "boolean",
-            default: false,
-            description:
-              "GM only, commit only: spend a Legendary Resistance use to turn a failed save into a success (a natural success spends nothing)"
-          },
-          damageOverride: {
-            type: "integer",
-            minimum: 0,
-            maximum: 1000,
-            description:
-              "Hand-entered damage replacing the auto-rolled proposal, applied BEFORE the success halving and keeping the proposal's damage types. A player may amend only their own claimed character's save"
-          }
-        }
-      },
-      DeathSaveRollRequest: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          commit: {
-            type: "boolean",
-            default: true,
-            description:
-              "false previews the projected pips without changing them; confirm with commit=true and the shown naturalRoll"
-          },
-          rollMode: {
-            type: "string",
-            enum: ["advantage", "disadvantage", "normal"],
-            description: "Roll two d20s keeping the higher/lower (2d20kh1 / 2d20kl1); the kept face is the natural roll"
-          },
-          naturalRoll: {
-            type: "integer",
-            minimum: 1,
-            maximum: 20,
-            description:
-              "Apply this exact d20 value with no fresh roll - confirming a preview, or an off-screen physical die"
-          }
-        }
-      },
-      ReactionAnswerRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["use"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          use: {
-            type: "boolean",
-            description: "true spends the reaction and applies half the parked damage; false applies it in full"
-          },
-          actionId: {
-            type: "string",
-            pattern: "^[a-z0-9-]+$",
-            maxLength: 120,
-            description:
-              "Opportunity attacks: which melee action to swing with (defaults to the reactor's first melee, else Unarmed Strike)"
-          },
-          commit: {
-            type: "boolean",
-            default: true,
-            description:
-              "Opportunity attacks: false previews the swing (roll only, reaction unspent, nothing applied) so the answerer can re-roll adv/disadv or confirm; confirm with commit=true and the shown attackNatural"
-          },
-          rollMode: {
-            type: "string",
-            enum: ["advantage", "disadvantage", "normal"],
-            description: "Opportunity attacks: the answerer's advantage/disadvantage choice for the swing's d20"
-          },
-          attackNatural: {
-            type: "integer",
-            minimum: 1,
-            maximum: 20,
-            description:
-              "Opportunity attacks: apply this exact d20 for the swing instead of rolling - confirming a preview, or a hand-rolled die"
           }
         }
       },
@@ -5378,84 +3221,6 @@ export const openApiDocument = {
         }
       },
       BuilderOffersResponse: envelopeSchema("#/components/schemas/BuilderOffersData"),
-      AnnotationAddRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["kind", "geometry"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          kind: { type: "string", enum: ["measurement", "shape"] },
-          shape: { type: "string", enum: ["circle", "cone", "line", "square"] },
-          geometry: { $ref: "#/components/schemas/AnnotationGeometryInput" },
-          visibility: { type: "string", enum: ["public", "gm-only", "owner-only", "owner-gm", "gm-actor"] },
-          visibleToActorId: { type: ["string", "null"], format: "uuid" },
-          movableByOthers: { type: "boolean" },
-          color: { type: "string", pattern: "^#[0-9a-fA-F]{6}$" }
-        }
-      },
-      AnnotationPingRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["point"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          point: { $ref: "#/components/schemas/ImagePoint" },
-          color: { type: "string", pattern: "^#[0-9a-fA-F]{6}$" }
-        }
-      },
-      AnnotationMoveRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["geometry"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          geometry: { $ref: "#/components/schemas/AnnotationGeometryInput" }
-        }
-      },
-      AnnotationColorRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["color"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          color: { type: "string", pattern: "^#[0-9a-fA-F]{6}$" }
-        }
-      },
-      AnnotationVisibilityRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["visibility"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          visibility: { type: "string", enum: ["public", "gm-only", "owner-only", "owner-gm", "gm-actor"] },
-          visibleToActorId: { type: ["string", "null"], format: "uuid" }
-        }
-      },
-      AnnotationMovableRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["movableByOthers"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          movableByOthers: { type: "boolean" }
-        }
-      },
-      AnnotationClearRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["scope"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          scope: { type: "string", enum: ["mine", "players", "all"] }
-        }
-      },
       ContentMonstersData: {
         type: "object",
         additionalProperties: false,
@@ -6497,24 +4262,6 @@ export const openApiDocument = {
         properties: { id: { type: "integer", minimum: 1 }, playerVisible: { type: "boolean" } }
       },
       EncounterArchiveVisibilityResponse: envelopeSchema("#/components/schemas/EncounterArchiveVisibilityData"),
-      EncounterArchiveLaunchRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["turnIndex"],
-        properties: {
-          commandId: {
-            type: "string",
-            format: "uuid",
-            description: "Idempotency identity; the server mints one when omitted"
-          },
-          turnIndex: {
-            type: "integer",
-            minimum: 0,
-            description: "Index into the archive document's turns array - the moment to make live"
-          },
-          expectedRevision: { type: "integer", minimum: 0 }
-        }
-      },
       EncounterArchiveLaunchData: {
         type: "object",
         additionalProperties: false,
@@ -6560,198 +4307,6 @@ export const openApiDocument = {
         properties: { id: { type: "integer", minimum: 1 }, deleted: { const: true } }
       },
       EncounterArchiveDeletedResponse: envelopeSchema("#/components/schemas/EncounterArchiveDeletedData"),
-      ClaimRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["actorId"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          actorId: { type: "string", format: "uuid" }
-        }
-      },
-      TokenImageRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["tokenAssetId"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          tokenAssetId: {
-            type: ["string", "null"],
-            format: "uuid",
-            description: "A token-library asset id, or null to clear the image"
-          }
-        }
-      },
-      ActorSizeRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["size"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          size: { type: "string", enum: ["tiny", "small", "medium", "large", "huge", "gargantuan"] }
-        }
-      },
-      ActorVisibilityRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["visibility"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          visibility: { type: "string", enum: ["public", "gm-only"] }
-        }
-      },
-      ActorArchivedRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["archived"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          archived: {
-            type: "boolean",
-            description:
-              "true archives (hides from players, refuses claims, and is rejected by scene/encounter staging) and releases any claim; false restores"
-          }
-        }
-      },
-      ActorSheetPreviewRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["enabled"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          enabled: {
-            type: "boolean",
-            description:
-              "true shares this archived character's sheet with players read-only; false hides it again (the default)"
-          }
-        }
-      },
-      ActorSpeedRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["speedFeet"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          speedFeet: {
-            type: ["integer", "null"],
-            minimum: 0,
-            maximum: 500,
-            description: "Walking speed in feet; null clears to unknown (movement rules skip)"
-          }
-        }
-      },
-      SceneCreateRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["name", "mapAssetId", "combatantIds"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          name: { type: "string", minLength: 1, maxLength: 120 },
-          mapAssetId: { type: "string", format: "uuid" },
-          combatantIds: {
-            type: "array",
-            maxItems: 200,
-            description: "Archived characters are rejected",
-            items: { type: "string", format: "uuid" }
-          },
-          activate: {
-            type: "boolean",
-            description: "Go live on the new scene in the same command (prepare-and-go), parking whatever was live"
-          }
-        }
-      },
-      SceneRenameRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["name"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          name: { type: "string", minLength: 1, maxLength: 120 }
-        }
-      },
-      SceneCombatantsRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["combatantIds"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          combatantIds: { type: "array", maxItems: 200, items: { type: "string", format: "uuid" } }
-        }
-      },
-      SceneReorderRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["order"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          order: {
-            type: "array",
-            minItems: 1,
-            maxItems: 20,
-            items: { type: "string", format: "uuid" },
-            description: "Every prepared scene's id, in the new order"
-          }
-        }
-      },
-      FogEnabledRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["enabled"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          enabled: { type: "boolean" },
-          sceneId: {
-            type: "string",
-            format: "uuid",
-            description: "Target a prepared (parked) scene's private prep instead of the live table"
-          }
-        }
-      },
-      FogPaintRequest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["op", "rect"],
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          op: { type: "string", enum: ["reveal", "hide"] },
-          rect: {
-            type: "object",
-            additionalProperties: false,
-            required: ["x", "y", "width", "height"],
-            properties: {
-              x: { type: "number" },
-              y: { type: "number" },
-              width: { type: "number", exclusiveMinimum: 0 },
-              height: { type: "number", exclusiveMinimum: 0 }
-            },
-            description:
-              "Image-pixel rect; snapped to whole grid cells on calibrated unrotated maps and clamped to the map"
-          },
-          sceneId: { type: "string", format: "uuid" }
-        }
-      },
-      FogResetRequest: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          commandId: { type: "string", format: "uuid" },
-          expectedRevision: { type: "integer", minimum: 0 },
-          sceneId: { type: "string", format: "uuid" }
-        }
-      },
       PlayerSessionIssuedData: {
         type: "object",
         additionalProperties: false,
@@ -6987,7 +4542,7 @@ export const openApiDocument = {
           characterPageId: {
             ...codexNullableUuid,
             description:
-              "D12: the character page this downtime belongs to, or null. Always present, including on records written before the field existed - the stored-payload reader supplies the null, so no consumer branches on key presence. A plain id with no foreign key: the record outlives the page, and deleting the page nulls this while `who` survives as the display fallback."
+              "the character page this downtime belongs to, or null. Always present, including on records written before the field existed - the stored-payload reader supplies the null, so no consumer branches on key presence. A plain id with no foreign key: the record outlives the page, and deleting the page nulls this while `who` survives as the display fallback."
           }
         }
       },
@@ -6995,7 +4550,7 @@ export const openApiDocument = {
         type: "object",
         additionalProperties: false,
         description:
-          "D11: a quest CHANGED STATE. The quest record says where a quest stands; this says what happened - exactly as a `standing` record does beside the standing table. Written automatically, in the same transaction as the quest write, when a quest is CREATED (its initial status - a quest entering the log is an event, whether or not the party has begun it) and whenever a PATCH changes its status. Editing a quest's prose writes nothing. There is no cached title: readers resolve `questId` against the live quest, so a renamed quest reads correctly and a deleted one is a name they cannot show rather than an error - the history outlives the quest.",
+          "a quest CHANGED STATE. The quest record says where a quest stands; this says what happened - exactly as a `standing` record does beside the standing table. Written automatically, in the same transaction as the quest write, when a quest is CREATED (its initial status - a quest entering the log is an event, whether or not the party has begun it) and whenever a PATCH changes its status. Editing a quest's prose writes nothing. There is no cached title: readers resolve `questId` against the live quest, so a renamed quest reads correctly and a deleted one is a name they cannot show rather than an error - the history outlives the quest.",
         required: ["questId", "status"],
         properties: {
           questId: codexUuid,
@@ -7025,7 +4580,7 @@ export const openApiDocument = {
         type: "object",
         additionalProperties: false,
         description:
-          "A revealed downtime record as a PLAYER sees it: the campaign facts, and `applied` allow-listed away (D11-E).",
+          "A revealed downtime record as a PLAYER sees it: the campaign facts, and `applied` allow-listed away.",
         required: ["who", "activity", "days", "characterPageId"],
         properties: {
           who: { type: "string" },
@@ -7034,7 +4589,7 @@ export const openApiDocument = {
           characterPageId: {
             ...codexNullableUuid,
             description:
-              "D12: carried ONLY when that character page is itself revealed, else null - the `factionPageId` rule on a standing payload verbatim. Unlike a standing record the ROW is not hidden when the link is nulled: a downtime row stands on its own player-visible content (`who`, `activity`, `days`, and usually prose), so a nulled link leaves a row that still means something."
+              "carried ONLY when that character page is itself revealed, else null - the `factionPageId` rule on a standing payload verbatim. Unlike a standing record the ROW is not hidden when the link is nulled: a downtime row stands on its own player-visible content (`who`, `activity`, `days`, and usually prose), so a nulled link leaves a row that still means something."
           }
         }
       },
@@ -7167,7 +4722,7 @@ export const openApiDocument = {
           sessionId: {
             ...codexNullableUuid,
             description:
-              "D9: the session this entry belongs to, BY IDENTITY. Null when it is filed under no session. This is what a WRITE sets; `sessionNumber` beside it is what a reader displays."
+              "the session this entry belongs to, BY IDENTITY. Null when it is filed under no session. This is what a WRITE sets; `sessionNumber` beside it is what a reader displays."
           },
           sessionNumber: {
             type: ["integer", "null"],
@@ -7259,7 +4814,7 @@ export const openApiDocument = {
           sessionId: {
             ...codexNullableUuid,
             description:
-              "D9: the session this row belongs to, by identity. Null for an `event` page and for an unfiled entry."
+              "the session this row belongs to, by identity. Null for an `event` page and for an unfiled entry."
           },
           sessionNumber: {
             type: ["integer", "null"],
@@ -7343,7 +4898,7 @@ export const openApiDocument = {
           sessionNumber: {
             type: ["integer", "null"],
             description:
-              '"Session 12" - the session\'s DISPLAY number. Unique across sessions; null until the GM assigns one. Journal entries link to the session by ID (D9) and resolve this live, so renumbering a session relabels every one of its entries with no journal write.'
+              '"Session 12" - the session\'s DISPLAY number. Unique across sessions; null until the GM assigns one. Journal entries link to the session by ID and resolve this live, so renumbering a session relabels every one of its entries with no journal write.'
           },
           realDate: {
             type: ["string", "null"],
@@ -7359,7 +4914,7 @@ export const openApiDocument = {
             type: "array",
             items: codexUuid,
             description:
-              "D31: the prepared scenes staged for this session, so the GM can put any of them live in one tap at the table. GM-ONLY, ALWAYS - stricter than the session's own reveal, because a revealed session publishes its RECAP and tonight's planned fights are spoilers even then."
+              "the prepared scenes staged for this session, so the GM can put any of them live in one tap at the table. GM-ONLY, ALWAYS - stricter than the session's own reveal, because a revealed session publishes its RECAP and tonight's planned fights are spoilers even then."
           },
           prepBody: {
             type: "string",
@@ -7381,7 +4936,7 @@ export const openApiDocument = {
             type: "array",
             items: { type: "string" },
             description:
-              "D10: the codex-wide tag vocabulary, so sessions filter and cross-link like every other record. Single-layer - there is no GM-only tag - and player-facing on a revealed session."
+              "the codex-wide tag vocabulary, so sessions filter and cross-link like every other record. Single-layer - there is no GM-only tag - and player-facing on a revealed session."
           },
           rev: {
             type: "integer",
@@ -7471,7 +5026,7 @@ export const openApiDocument = {
             type: "array",
             items: { type: "string" },
             description:
-              "D10: the codex-wide tag vocabulary, so quests filter and cross-link like every other record. Single-layer, and player-facing on a revealed quest."
+              "the codex-wide tag vocabulary, so quests filter and cross-link like every other record. Single-layer, and player-facing on a revealed quest."
           },
           rev: {
             type: "integer",
@@ -7637,7 +5192,7 @@ export const openApiDocument = {
           sessionId: {
             ...codexNullableUuid,
             description:
-              "D9/D14: the session this entry belongs to, so a player can navigate from an entry to its recap. Present ONLY when that session is revealed - in which case the player can already list and open it, so this adds no information. Nulled TOGETHER with `sessionNumber` when the session is hidden: either half of the link would announce that a session they have not been shown exists."
+              "The session this entry belongs to, so a player can navigate from an entry to its recap. Present ONLY when that session is revealed - in which case the player can already list and open it, so this adds no information. Nulled TOGETHER with `sessionNumber` when the session is hidden: either half of the link would announce that a session they have not been shown exists."
           },
           sessionNumber: {
             type: ["integer", "null"],
@@ -7691,12 +5246,12 @@ export const openApiDocument = {
           inWorldDate: {
             ...codexInWorldDateOrNull,
             description:
-              "D17: the row's raw in-world date, so a calendar view can place it on a day without re-parsing prose. Information-equivalent to `inWorldLabel` beside it, which already spells out weekday, day, month and year - the structured parts add no bits and remove a client parse. Not the campaign's \"now\": the GM's clock is `CodexCalendarPlayer.currentDate`, which is the PUBLISHED date."
+              "the row's raw in-world date, so a calendar view can place it on a day without re-parsing prose. Information-equivalent to `inWorldLabel` beside it, which already spells out weekday, day, month and year - the structured parts add no bits and remove a client parse. Not the campaign's \"now\": the GM's clock is `CodexCalendarPlayer.currentDate`, which is the PUBLISHED date."
           },
           calendarInstant: {
             type: ["number", "null"],
             description:
-              "D17: the sortable day index for `inWorldDate` against the calendar the player already holds - a pure function of two things they have, computed once on the server. It is here so the client never re-derives it: the two derivations disagreed on a day that overflows its month, and one authority for one number is the fix. Null exactly when `inWorldDate` is."
+              "the sortable day index for `inWorldDate` against the calendar the player already holds - a pure function of two things they have, computed once on the server. It is here so the client never re-derives it: the two derivations disagreed on a day that overflows its month, and one authority for one number is the fix. Null exactly when `inWorldDate` is."
           },
           tags: { type: "array", items: { type: "string" } },
           fired: { type: "boolean", description: "Derived against the PUBLISHED date." },
@@ -7730,7 +5285,7 @@ export const openApiDocument = {
             type: "array",
             items: { type: "string" },
             description:
-              "D10: tags are SINGLE-LAYER in this codex - there is no GM-only tag - and every other record kind already ships its tags to players. A revealed session's tags are its player-facing categorization, and they are already in the player search index by the same rule."
+              "tags are SINGLE-LAYER in this codex - there is no GM-only tag - and every other record kind already ships its tags to players. A revealed session's tags are its player-facing categorization, and they are already in the player search index by the same rule."
           }
         }
       },
@@ -7752,7 +5307,7 @@ export const openApiDocument = {
             type: "array",
             items: { type: "string" },
             description:
-              "D10: the `CodexSessionPlayer.tags` rule verbatim - tags are single-layer, and the quest's own reveal flag remains the whole predicate."
+              "the `CodexSessionPlayer.tags` rule verbatim - tags are single-layer, and the quest's own reveal flag remains the whole predicate."
           }
         }
       },
@@ -8058,7 +5613,7 @@ export const openApiDocument = {
           sessionId: {
             ...codexNullableUuid,
             description:
-              "D9: file this entry under a session BY ID. Omitted on a create auto-files it under the ACTIVE session; explicit `null` files it under none; an id naming no session is a 404. `sessionNumber` is NOT accepted on any write - the number is a display value the server resolves from the linked record, so a body carrying one is a 400 with the key named in `details.issues`."
+              "file this entry under a session BY ID. Omitted on a create auto-files it under the ACTIVE session; explicit `null` files it under none; an id naming no session is a 404. `sessionNumber` is NOT accepted on any write - the number is a display value the server resolves from the linked record, so a body carrying one is a 400 with the key named in `details.issues`."
           },
           realDate: { type: ["string", "null"], maxLength: 40 },
           inWorldLabel: { type: ["string", "null"], maxLength: 120 },
@@ -8075,7 +5630,7 @@ export const openApiDocument = {
         type: "object",
         additionalProperties: false,
         description:
-          "Edits a journal entry; an omitted field is left alone. Identical to `CodexJournalCreateRequest` plus ONE narrow payload group (D12).",
+          "Edits a journal entry; an omitted field is left alone. Identical to `CodexJournalCreateRequest` plus ONE narrow payload group.",
         properties: {
           tags: { type: "array", maxItems: 24, items: { type: "string", minLength: 1, maxLength: 40 } },
           playerText: { type: "string", maxLength: 20_000 },
@@ -8086,7 +5641,7 @@ export const openApiDocument = {
           sessionId: {
             ...codexNullableUuid,
             description:
-              "D9: file this entry under a session BY ID. Omitted on a create auto-files it under the ACTIVE session; explicit `null` files it under none; an id naming no session is a 404. `sessionNumber` is NOT accepted on any write - the number is a display value the server resolves from the linked record, so a body carrying one is a 400 with the key named in `details.issues`."
+              "file this entry under a session BY ID. Omitted on a create auto-files it under the ACTIVE session; explicit `null` files it under none; an id naming no session is a 404. `sessionNumber` is NOT accepted on any write - the number is a display value the server resolves from the linked record, so a body carrying one is a 400 with the key named in `details.issues`."
           },
           realDate: { type: ["string", "null"], maxLength: 40 },
           inWorldLabel: { type: ["string", "null"], maxLength: 120 },
@@ -8095,7 +5650,7 @@ export const openApiDocument = {
             type: "object",
             additionalProperties: false,
             description:
-              "D12: edits a DOWNTIME record's own facts. **400 when the entry is not a downtime record** - a caller sending downtime details to a milestone has misunderstood something, and hearing so beats being quietly overruled. This is the adoption path the tracker needs: it is what lets a GM link the free-text rows that already exist to real character pages, so D12 works for downtime recorded before the upgrade as well as after it. `days` is deliberately NOT a member and sending it is a 400: it is what `apply-downtime` moved the campaign clock by, so editing it afterwards would leave the clock disagreeing with the record that justified it. A typo in `days` is a delete-and-recreate. `applied` is likewise absent - confirming the clock move is its own explicit act.",
+              "edits a DOWNTIME record's own facts. **400 when the entry is not a downtime record** - a caller sending downtime details to a milestone has misunderstood something, and hearing so beats being quietly overruled. This is the adoption path the tracker needs: it is what lets a GM link the free-text rows that already exist to real character pages, so downtime recorded before character links existed can link too. `days` is deliberately NOT a member and sending it is a 400: it is what `apply-downtime` moved the campaign clock by, so editing it afterwards would leave the clock disagreeing with the record that justified it. A typo in `days` is a delete-and-recreate. `applied` is likewise absent - confirming the clock move is its own explicit act.",
             properties: {
               who: { type: "string", maxLength: 120 },
               activity: { type: "string", maxLength: 120 },
@@ -8135,7 +5690,7 @@ export const openApiDocument = {
           sessionId: {
             ...codexNullableUuid,
             description:
-              "D9: file this entry under a session BY ID. Omitted on a create auto-files it under the ACTIVE session; explicit `null` files it under none; an id naming no session is a 404. `sessionNumber` is NOT accepted on any write - the number is a display value the server resolves from the linked record, so a body carrying one is a 400 with the key named in `details.issues`."
+              "file this entry under a session BY ID. Omitted on a create auto-files it under the ACTIVE session; explicit `null` files it under none; an id naming no session is a 404. `sessionNumber` is NOT accepted on any write - the number is a display value the server resolves from the linked record, so a body carrying one is a 400 with the key named in `details.issues`."
           },
           realDate: { type: ["string", "null"], maxLength: 40 },
           inWorldLabel: { type: ["string", "null"], maxLength: 120 },
@@ -8181,7 +5736,7 @@ export const openApiDocument = {
           characterPageId: {
             ...codexNullableUuid,
             description:
-              "D12: which character PAGE this downtime belongs to, so the tracker totals a person rather than a spelling of their name. Optional; `who` remains the free-text fallback for anyone with no page, and both may coexist. An id naming no page is a **404**. The page's TYPE is deliberately NOT enforced - a GM may track downtime for an NPC or a hireling - which is the opposite of the standing rule, because standing is *about* a faction while downtime is about someone the GM happens to have a record for."
+              "which character PAGE this downtime belongs to, so the tracker totals a person rather than a spelling of their name. Optional; `who` remains the free-text fallback for anyone with no page, and both may coexist. An id naming no page is a **404**. The page's TYPE is deliberately NOT enforced - a GM may track downtime for an NPC or a hireling - which is the opposite of the standing rule, because standing is *about* a faction while downtime is about someone the GM happens to have a record for."
           }
         }
       },
@@ -8201,7 +5756,7 @@ export const openApiDocument = {
           sessionId: {
             ...codexNullableUuid,
             description:
-              "D9: file this entry under a session BY ID. Omitted on a create auto-files it under the ACTIVE session; explicit `null` files it under none; an id naming no session is a 404. `sessionNumber` is NOT accepted on any write - the number is a display value the server resolves from the linked record, so a body carrying one is a 400 with the key named in `details.issues`."
+              "file this entry under a session BY ID. Omitted on a create auto-files it under the ACTIVE session; explicit `null` files it under none; an id naming no session is a 404. `sessionNumber` is NOT accepted on any write - the number is a display value the server resolves from the linked record, so a body carrying one is a 400 with the key named in `details.issues`."
           },
           realDate: { type: ["string", "null"], maxLength: 40 },
           inWorldLabel: { type: ["string", "null"], maxLength: 120 },
@@ -8252,7 +5807,7 @@ export const openApiDocument = {
           sessionId: {
             ...codexNullableUuid,
             description:
-              "D9: file this entry under a session BY ID. Omitted on a create auto-files it under the ACTIVE session; explicit `null` files it under none; an id naming no session is a 404. `sessionNumber` is NOT accepted on any write - the number is a display value the server resolves from the linked record, so a body carrying one is a 400 with the key named in `details.issues`."
+              "file this entry under a session BY ID. Omitted on a create auto-files it under the ACTIVE session; explicit `null` files it under none; an id naming no session is a 404. `sessionNumber` is NOT accepted on any write - the number is a display value the server resolves from the linked record, so a body carrying one is a 400 with the key named in `details.issues`."
           },
           realDate: { type: ["string", "null"], maxLength: 40 },
           inWorldLabel: { type: ["string", "null"], maxLength: 120 },
@@ -8311,7 +5866,7 @@ export const openApiDocument = {
             type: "array",
             maxItems: 20,
             items: codexUuid,
-            description: "Prepared scenes staged for this session (D31). Capped at the table's scene cap."
+            description: "Prepared scenes staged for this session. Capped at the table's scene cap."
           },
           commandId: {
             type: "string",
@@ -8341,7 +5896,7 @@ export const openApiDocument = {
             type: "array",
             maxItems: 20,
             items: codexUuid,
-            description: "Prepared scenes staged for this session (D31); replaces the stored list."
+            description: "Prepared scenes staged for this session; replaces the stored list."
           },
           expectedRev: {
             type: "integer",
@@ -8508,8 +6063,7 @@ export const openApiDocument = {
           fromKind: {
             type: "string",
             enum: ["page", "session", "quest", "journal"],
-            description:
-              "Which record the connection comes FROM. Session, quest and journal bodies join the graph (D13)."
+            description: "Which record the connection comes FROM. Session, quest and journal bodies join the graph."
           },
           fromId: codexUuid,
           toPageId: {

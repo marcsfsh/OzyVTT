@@ -25,6 +25,9 @@ import { defineCommand } from "./pipeline.js";
 export const actorCommands = [
   defineCommand({
     type: "actor.add-from-definition",
+    operationId: "addActorFromDefinition",
+    description:
+      "Instantiates a bundled SRD monster onto the roster (GM-grade only). The response's `actorId` equals the commandId.",
     summary:
       "Instantiate a bundled SRD monster onto the roster, optionally joining the running fight in the same command (GM).",
     schema: ActorAddFromDefinitionSchema,
@@ -56,6 +59,9 @@ export const actorCommands = [
 
   defineCommand({
     type: "actor.import-definition",
+    operationId: "importActorDefinition",
+    description:
+      "Imports a canonical ActorDefinition JSON as a claimable actor with a full sheet (GM-grade only). The response's `actorId` equals the commandId.",
     summary: "Import a canonical ActorDefinition JSON as a claimable actor (GM).",
     schema: ActorImportDefinitionSchema,
     malformed: "The import command is malformed.",
@@ -73,6 +79,9 @@ export const actorCommands = [
 
   defineCommand({
     type: "actor.remove",
+    operationId: "removeActor",
+    description:
+      "Removes an actor from the roster (GM-grade only); rejected for claimed characters and, while rewound, for combatants in the fight.",
     summary: "Remove an actor from the roster (GM).",
     schema: ActorRemoveSchema,
     malformed: "The remove-combatant command is malformed.",
@@ -84,8 +93,11 @@ export const actorCommands = [
 
   defineCommand({
     type: "actor.set-token-image",
+    operationId: "setActorTokenImage",
+    description:
+      "Sets or clears (null) a combatant's token image from the uploaded token library: the GM for any combatant, a player for their own claimed character.",
     summary:
-      "Set or clear a combatant's token image from the token library - the GM for anyone, a player for their own claimed character (D18).",
+      "Set or clear a combatant's token image from the token library - the GM for anyone, a player for their own claimed character.",
     schema: SetTokenImageSchema,
     malformed: "The token image command is malformed.",
     async run({ principal, request, execute }, kit) {
@@ -111,6 +123,9 @@ export const actorCommands = [
 
   defineCommand({
     type: "actor.set-size",
+    operationId: "setActorSize",
+    description:
+      "Sets a combatant's creature size; large+ tokens size to their grid footprint and re-snap (GM-grade only).",
     summary: "Set a combatant's creature size; the token re-snaps to its footprint (GM).",
     schema: SetActorSizeSchema,
     malformed: "The token size command is malformed.",
@@ -124,6 +139,8 @@ export const actorCommands = [
 
   defineCommand({
     type: "actor.set-visibility",
+    operationId: "setActorVisibility",
+    description: "Moves a combatant between the shared layer (public) and the GM-only layer (GM-grade only).",
     summary: "Move a combatant between the shared layer and the GM-only layer (GM).",
     schema: SetActorVisibilitySchema,
     malformed: "The token visibility command is malformed.",
@@ -135,6 +152,9 @@ export const actorCommands = [
 
   defineCommand({
     type: "actor.set-archived",
+    operationId: "setActorArchived",
+    description:
+      "Archives or restores a character (GM-grade only). Archived characters are hidden from players, refused by claim, and rejected server-side by scene staging and encounter start/add; a character in the running encounter must be removed first. Archiving a CLAIMED character releases the claim in the same mutation, so its player is not left holding an invisible claim.",
     summary:
       "Archive or restore a character - archived characters are hidden from players, refused by claim, rejected by scene and encounter staging, and any claim is released on archive (GM).",
     schema: SetActorArchivedSchema,
@@ -168,6 +188,9 @@ export const actorCommands = [
 
   defineCommand({
     type: "actor.set-sheet-preview",
+    operationId: "setActorSheetPreview",
+    description:
+      "Shares (or un-shares) an ARCHIVED character's sheet with players as a read-only keepsake (GM-grade only). Default hidden - a retired character stays private until the GM shares it. Meaningless while the character is not archived. Players receive only the character's id and name in their projection.",
     summary: "Share or hide an archived character's sheet as a read-only keepsake for players; hidden by default (GM).",
     schema: SetActorSheetPreviewSchema,
     malformed: "The sheet-preview command is malformed.",
@@ -192,6 +215,9 @@ export const actorCommands = [
 
   defineCommand({
     type: "actor.set-speed",
+    operationId: "setActorSpeed",
+    description:
+      "Sets a combatant's walking speed in feet (GM-grade only); null clears it to unknown, which skips the movement rules for that combatant. Speed seeds from the imported definition automatically.",
     summary: "Set a combatant's walking speed in feet (null clears to unknown, skipping movement rules) (GM).",
     schema: ActorSetSpeedSchema,
     malformed: "The speed command is malformed.",
@@ -209,6 +235,9 @@ export const actorCommands = [
 
   defineCommand({
     type: "actor.set-health-display",
+    operationId: "setActorHealthDisplay",
+    description:
+      "Overrides how one combatant's token health shows on the map (GM-grade only), or clears the override (`display: null`) so the token follows the table-wide default. Same style/audience choices as the table-wide health-display command.",
     summary: "Override one combatant's token health display, or clear it to follow the table default (GM).",
     schema: SetActorHealthDisplaySchema,
     malformed: "The health-display command is malformed.",

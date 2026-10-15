@@ -78,11 +78,11 @@ describe("the retired table-wide roll mode", () => {
       { properties?: Record<string, { enum?: readonly string[] }> }
     >;
     for (const request of [
-      "InitiativeRollSelfRequest",
-      "ActionResolveRequest",
-      "SaveAnswerRequest",
-      "DeathSaveRollRequest",
-      "ReactionAnswerRequest"
+      "RollOwnInitiativeRequest",
+      "ResolveActionRequest",
+      "AnswerSaveRequest",
+      "RollDeathSaveRequest",
+      "AnswerReactionRequest"
     ]) {
       expect(schemas[request]?.properties?.rollMode?.enum, `${request} lost its advantage/disadvantage choice`).toEqual(
         ["advantage", "disadvantage", "normal"]
