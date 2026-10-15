@@ -1,17 +1,25 @@
 import type { DatabaseSync } from "node:sqlite";
-import { GameStateSchema, type GameState, type TurnHistoryEntry } from "@vtt/domain";
+import { GameStateSchema, type GameState, type RefusalCode, type TurnHistoryEntry } from "@vtt/domain";
 import { migrate, openDatabase, transaction, type Migration } from "./database.js";
 
-export class CommandRejectedError extends Error {}
-/** A rules-mode rejection (ADR-0020); rolls back without burning the commandId and carries the rule id and
- *  whether `override: {reason}` may bypass it. */
+/** An expected refusal. `code` is what a client branches on (see `RefusalCode`); the message is for people. */
+export class CommandRejectedError extends Error {
+  constructor(
+    message: string,
+    public readonly code: RefusalCode | (string & {}) = "refused"
+  ) {
+    super(message);
+  }
+}
+/** A rules-mode rejection (ADR-0020); rolls back without burning the commandId and carries the rule id (also
+ *  its refusal code) and whether `override: {reason}` may bypass it. */
 export class RulesBlockedError extends CommandRejectedError {
   constructor(
     public readonly rule: string,
     message: string,
     public readonly overridable: boolean = true
   ) {
-    super(message);
+    super(message, rule);
   }
 }
 export class RevisionConflictError extends Error {}

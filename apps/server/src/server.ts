@@ -23,7 +23,13 @@ import { developmentClientUrl } from "./client-hosting.js";
 import { CombatLogStore, projectFeedRow } from "./combat-log.js";
 import { timelineDirtied, type TimelineOutcome } from "./combat-history.js";
 import { createGameApiRouter } from "./game-http.js";
-import { createGameCommands, describeFailure, socketEventOf, type GamePrincipal } from "./commands/index.js";
+import {
+  createGameCommands,
+  failureReply,
+  NOT_JOINED_REPLY,
+  socketEventOf,
+  type GamePrincipal
+} from "./commands/index.js";
 import { CommandRejectedError, GameStore } from "./game-store.js";
 import { CodexStore } from "./codex-store.js";
 import { createCodexImportGuard, createCodexRouter } from "./codex-http.js";
@@ -692,16 +698,12 @@ export function createServer(options: CreateServerOptions) {
         if (typeof acknowledge === "function") acknowledge(result);
       };
       const principal = principalOf();
-      if (!principal) return reply({ ok: false, message: "Join a session first." });
+      if (!principal) return reply(NOT_JOINED_REPLY);
       let outcome: Record<string, unknown>;
       try {
         outcome = { ok: true, ...(await work(principal)) };
       } catch (error) {
-        const failure = describeFailure(error);
-        const { needsConfirm, blocked } = failure.details ?? {};
-        outcome = needsConfirm
-          ? { ok: true, needsConfirm, message: failure.message }
-          : { ok: false, message: failure.message, ...(blocked ? { blocked } : {}) };
+        outcome = failureReply(error);
       }
       reply(outcome);
     };

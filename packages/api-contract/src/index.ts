@@ -4018,7 +4018,17 @@ export const openApiDocument = {
               code: { type: "string", enum: ApiErrorCodeSchema.options },
               message: { type: "string" },
               requestId: { type: "string", format: "uuid" },
-              details: { type: "object", additionalProperties: true },
+              details: {
+                type: "object",
+                additionalProperties: true,
+                properties: {
+                  reason: {
+                    type: "string",
+                    description:
+                      "On a refused game command or read: a stable code for why, finer than `code` and safe to branch on (the message may be reworded). One of not_joined, validation_failed, forbidden, not_found, stale_revision, needs_confirm, refused, history_review, scene_room_full, internal_error; a rules-mode block's reason is the blocking rule's id (`details.blocked.rule`)."
+                  }
+                }
+              },
               retryAfterSeconds: { type: "integer", minimum: 1 },
               currentRevision: { type: "integer", minimum: 0 }
             }

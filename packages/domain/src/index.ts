@@ -878,11 +878,29 @@ export type SessionJoinResult = {
   token?: string;
   message?: string;
 };
+/**
+ * Why a command or read was refused, stable across rewording: branch on this, show the message. A
+ * rules-mode block's code is instead the id of the rule that blocked it (`blocked.rule`). Over HTTP the
+ * same code is `error.details.reason`, beside the envelope's coarse `error.code`.
+ */
+export type RefusalCode =
+  | "not_joined"
+  | "validation_failed"
+  | "forbidden"
+  | "not_found"
+  | "stale_revision"
+  | "needs_confirm"
+  | "refused"
+  | "history_review"
+  | "scene_room_full"
+  | "internal_error";
 export type MutationResult = {
   ok: boolean;
   revision?: number;
   duplicate?: boolean;
   message?: string;
+  /** Present on every refusal (`ok: false`). */
+  code?: RefusalCode | (string & {});
   needsConfirm?: "rewrite-history" | "discard-changes";
   /** Present when a rules-mode validation blocked the command (ADR-0020); resend with override to bypass. */ blocked?: RulesBlocked;
 };
