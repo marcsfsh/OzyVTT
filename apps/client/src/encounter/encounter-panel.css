@@ -829,7 +829,7 @@
 /* Hand-rolled controls (bare buttons and inputs predating the primitives) take the material at button
    scale: smaller cut, shared rim, flat plate, cue wedge on hover/focus/press. Never the scanline.
    The cut rides a backing layer, never the element (`clip-path` clips hit-testing), and
-   `inset: -1px` keeps every control's size; re-run `scripts/tap-audit.mjs 375` after editing. */
+   `inset: -1px` keeps every control's size. */
 .dock-log-door,
 .encounter-dock-choice,
 .encounter-primary,

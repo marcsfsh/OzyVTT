@@ -233,7 +233,7 @@
   border-radius: var(--radius-sm);
   background: var(--surface-3);
 }
-/* The phone's one door onto the toolbar: masked, with 2.75rem of real paint (`tap-audit.mjs 375`). */
+/* The phone's one door onto the toolbar: masked, with 2.75rem of real paint. */
 .map-toolbar-toggle {
   display: inline-flex;
   align-items: center;

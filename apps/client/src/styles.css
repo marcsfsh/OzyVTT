@@ -86,7 +86,7 @@ main:has(> .frame-tabbar.rim-player) {
 }
 /* The scene tier: content-light surfaces stand on a sky (all --sky-* tokens); the table never does.
    The wash is this element's background; the rest is the `.pane-sky` child, which clips the floor's
-   perspective spill (here it would grow document.scrollHeight; see `scripts/no-scroll-audit.mjs`).
+   perspective spill (here it would grow document.scrollHeight).
    `isolation` layers the negative z-indexes without a containing block. Never add transform, filter,
    backdrop-filter, perspective, will-change or contain: paint here: fixed overlays would be trapped. */
 .pane-scene {

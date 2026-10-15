@@ -509,7 +509,7 @@
 /* The "Saving move…" line is out of flow at every width, or mounting it on token release would steal
    height from the flex stage and make the map jump until the server acks. `bottom: 0` puts it in
    the row the feedback line reserves; the two never show together (`submitMove` clears the message
-   first). `scripts/map-stability-audit.mjs` guards this. */
+   first). The smoke suite's fight journey guards this. */
 .encounter-map-interaction .encounter-map-saving {
   position: absolute;
   z-index: 4;

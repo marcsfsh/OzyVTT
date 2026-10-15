@@ -33,3 +33,29 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run build
+
+  smoke:
+    name: Browser smoke tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run smoke
+
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-report
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+          retention-days: 7
