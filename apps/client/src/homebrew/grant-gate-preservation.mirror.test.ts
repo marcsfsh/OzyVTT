@@ -27,7 +27,7 @@ import { mintHomebrewId } from "../../../server/src/homebrew-ids.js";
 import { copyName, HomebrewStore } from "../../../server/src/homebrew-store.js";
 import { findCatalogRecord, rewriteForNewId } from "../../../server/src/homebrew-srd-copy.js";
 import { validateForPublish } from "../../../server/src/homebrew-validate.js";
-import { grantRowsOf, grantsFromRows, type GrantRow } from "./RiderEditor";
+import { grantRowsOf, grantsFromRows, type GrantRow } from "./riders/GrantsEditor";
 
 const HERO = "7a4b1a58-0f6c-4a52-9a51-2f60cf6f9d10";
 const SOURCE_ID = "path-of-the-berserker";

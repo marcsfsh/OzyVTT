@@ -39,7 +39,7 @@ import {
   storedBody
 } from "./authoring-harness";
 import { blankDraft, forStorage } from "./defaults";
-import { grantRowsOf, grantsFromRows } from "./RiderEditor";
+import { grantRowsOf, grantsFromRows } from "./riders/GrantsEditor";
 import { EMPTY_CONTEXT } from "./schema";
 import { SCHEMAS } from "./schemas";
 import type { Draft, FieldDef } from "./schema";

@@ -22,7 +22,9 @@ import { featurePicks, NAMED_PICK_BUDGET_KEYS } from "@vtt/content-srd-5.2.1/sch
 import { Button, Chip, Field, FieldGrid, RowEditor, SegmentedControl, Select } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { FieldRenderer } from "./FieldRenderer";
-import { RiderEditor, riderSummary, slugValidate, type RiderKind } from "./RiderEditor";
+import { RiderEditor, riderSummary } from "./RiderEditor";
+import { slugValidate } from "./riders/triggers";
+import { type RiderKind } from "./riders/vocabulary";
 import { LEVELS, blankFeature } from "./defaults";
 import { getAt, setAt } from "./paths";
 import { namesOwnRecord } from "./schema";
