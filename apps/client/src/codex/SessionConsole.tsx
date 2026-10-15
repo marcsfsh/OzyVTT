@@ -1,4 +1,5 @@
-import { Alert, Badge, Button, Drawer, GmOnlyTag, Skeleton, VisibilityBadge } from "@vtt/ui";
+import { Alert, Badge, Button, Drawer, GmOnlyTag, Modal, Skeleton, VisibilityBadge } from "@vtt/ui";
+import { useMediaQuery } from "../lib/useMediaQuery";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { sessionTitle } from "./sessions";
 import type { CodexSession } from "@vtt/domain";
@@ -6,8 +7,10 @@ import type { CodexSession } from "@vtt/domain";
 /**
  * The session console: tonight's prep, readable from any Codex section. A view only: it fetches and writes
  * nothing, rendering the record Sessions edits. Uses the non-modal `Drawer` so the GM can keep working
- * behind it.
+ * behind it, except on a phone, where the drawer would cover the view and its own opener, so it is a `Modal`.
  */
+const PHONE_QUERY = "(max-width: 560px)";
+
 export function SessionConsole({
   open,
   onClose,
@@ -32,14 +35,10 @@ export function SessionConsole({
   /** Reaching Sessions with nothing selected, for the no-active-session empty state. */
   onOpenSessions: () => void;
 }>) {
-  return (
-    <Drawer
-      open={open}
-      onClose={onClose}
-      ariaLabel="Session prep"
-      title={session ? sessionTitle(session) : "Session prep"}
-      className="codex-prepdrawer"
-    >
+  const phone = useMediaQuery(PHONE_QUERY);
+  const title = session ? sessionTitle(session) : "Session prep";
+  const body = (
+    <>
       {/* Gated on `open`: the drawer stays mounted while closed, and an unopened console must not announce a failure. */}
       {open && error && (
         <Alert tone="danger" title="Couldn't load the session">
@@ -99,6 +98,15 @@ export function SessionConsole({
           </Button>
         </div>
       )}
+    </>
+  );
+  return phone ? (
+    <Modal open={open} onClose={onClose} ariaLabel="Session prep" title={title}>
+      {body}
+    </Modal>
+  ) : (
+    <Drawer open={open} onClose={onClose} ariaLabel="Session prep" title={title} className="codex-prepdrawer">
+      {body}
     </Drawer>
   );
 }
