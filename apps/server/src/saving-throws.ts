@@ -18,7 +18,7 @@ import { requireGm, type Initiator } from "./authorization.js";
 import { applyDamageDetailed, adjustableActor } from "./hit-points.js";
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
-import { addEffect, endEffectIfPresent, type EffectNarration } from "./effects.js";
+import { addEffect, endEffectIfPresent, makeEffect, type EffectNarration } from "./effects.js";
 import {
   deriveEquipment,
   EMPTY_DERIVATION,
@@ -482,24 +482,18 @@ export function answerSave(
     const applied = addEffect(
       state,
       target.id,
-      {
+      makeEffect({
         id: `${commandId}:${saveId}:fail`,
         name: pending.onFailEffect.name,
         tags: [...pending.onFailEffect.tags],
         sourceActorId: pending.onFailEffect.sourceActorId,
         sourceName: pending.onFailEffect.sourceName,
-        sourceActionId: null,
         startedRound: state.combat.round,
         duration: { type: "manual" },
         endsWhenSourceDefeated: true,
-        voidWhileIncapacitated: false,
-        concentration: false,
-        modifiers: [],
         linkedConditionIds: [...pending.onFailEffect.linkedConditionIds],
-        escapeDc: pending.onFailEffect.escapeDc,
-        onEnd: [],
-        endsWithTag: null
-      },
+        escapeDc: pending.onFailEffect.escapeDc
+      }),
       undefined,
       deps
     );

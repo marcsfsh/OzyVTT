@@ -27,7 +27,7 @@ import {
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
 import { effectiveModeFor, familyModeFor, overrideCovers, overrideReason, rememberOverride } from "./rules-families.js";
 import { recordRoll as recordRollInHistory } from "./roll-history.js";
-import { addEffect, endEffect, hasEffectTag } from "./effects.js";
+import { addEffect, endEffect, hasEffectTag, makeEffect } from "./effects.js";
 import { conditionFrom, createPendingSaves, halfOnSuccessFrom, saveModifierFor } from "./saving-throws.js";
 import {
   conditionLabel,
@@ -970,7 +970,7 @@ export function resolveDefinitionAction(
       const effect = addEffect(
         state,
         attacker.id,
-        {
+        makeEffect({
           id: `${input.commandId}:hide`,
           name: "Hiding",
           tags: ["hidden"],
@@ -979,15 +979,8 @@ export function resolveDefinitionAction(
           sourceActionId: "hide",
           startedRound: state.combat.round,
           duration: { type: "manual" },
-          endsWhenSourceDefeated: false,
-          voidWhileIncapacitated: false,
-          concentration: false,
-          modifiers: [],
-          linkedConditionIds: ["invisible"],
-          escapeDc: null,
-          onEnd: [],
-          endsWithTag: null
-        },
+          linkedConditionIds: ["invisible"]
+        }),
         undefined,
         deps
       );
@@ -1309,7 +1302,7 @@ export function resolveDefinitionAction(
       const effect = addEffect(
         state,
         target.id,
-        {
+        makeEffect({
           id: `${input.commandId}:hit:${target.id}:${index}`,
           name: `${conditionLabel(conditionIds[0])} by ${attacker.name} (${action.name})`,
           tags: conditionIds.includes("grappled") ? ["grapple"] : [],
@@ -1319,14 +1312,9 @@ export function resolveDefinitionAction(
           startedRound: state.combat.round,
           duration: { type: "manual" },
           endsWhenSourceDefeated: true,
-          voidWhileIncapacitated: false,
-          concentration: false,
-          modifiers: [],
           linkedConditionIds: conditionIds,
-          escapeDc: rider.escapeDc ?? null,
-          onEnd: [],
-          endsWithTag: null
-        },
+          escapeDc: rider.escapeDc ?? null
+        }),
         undefined,
         deps
       );
@@ -1336,12 +1324,12 @@ export function resolveDefinitionAction(
 
   // Mastery on-hit effects (Sap); `addEffect` is idempotent by id, so its return is what gets narrated.
   for (const applied of masteryHitEffects(masterySwing)) {
-    const effect = addEffect(state, applied.targetId, applied.effect, undefined, deps);
+    const effect = addEffect(state, applied.targetId, makeEffect(applied.effect), undefined, deps);
     effectsApplied.push({
       targetId: applied.targetId,
       targetName: applied.targetName,
       name: effect.name,
-      conditionIds: applied.effect.linkedConditionIds
+      conditionIds: effect.linkedConditionIds
     });
   }
 
@@ -1439,7 +1427,7 @@ export function resolveDefinitionAction(
     const effect = addEffect(
       state,
       recipient.id,
-      {
+      makeEffect({
         id: `${input.commandId}:grant`,
         name: readyNote ?? grant.name ?? action.name,
         tags: grant.tags,
@@ -1452,13 +1440,11 @@ export function resolveDefinitionAction(
         endsWhenSourceDefeated: true,
         voidWhileIncapacitated: grant.voidWhileIncapacitated,
         modifiers: grant.modifiers,
-        linkedConditionIds: [],
-        escapeDc: null,
         onEnd: grant.onEnd,
         endsWithTag: grant.endsWithTag ?? null,
         concentration: grant.concentration,
         ...grantedMovement
-      },
+      }),
       replaced,
       deps
     );

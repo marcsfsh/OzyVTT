@@ -12,6 +12,32 @@ export type EffectNarration = Readonly<{ kind: "effect" | "condition"; text: str
 
 const MAX_EFFECTS = 20;
 
+/** What an effect must name; every other field takes `EffectInstanceSchema`'s default. */
+export type EffectSpec = Pick<EffectInstance, "id" | "name" | "duration"> & Partial<EffectInstance>;
+
+/** Builds an effect from the fields it sets, with the schema's defaults (in schema order) for the rest. */
+export function makeEffect({ id, name, duration, ...rest }: EffectSpec): EffectInstance {
+  return {
+    id,
+    name,
+    tags: [],
+    sourceActorId: null,
+    sourceName: null,
+    sourceActionId: null,
+    startedRound: 1,
+    duration,
+    endsWhenSourceDefeated: false,
+    voidWhileIncapacitated: false,
+    concentration: false,
+    endsWithTag: null,
+    modifiers: [],
+    linkedConditionIds: [],
+    escapeDc: null,
+    onEnd: [],
+    ...rest
+  };
+}
+
 /** Where item- and feat-granted condition immunities are read from. Without a catalog only the actor's
  *  innate immunities apply. */
 export type ConditionImmunitySource = Readonly<{
