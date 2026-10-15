@@ -71,7 +71,14 @@ function initialState() {
         { actorId: OTHER, score: 10 },
         { actorId: GOBLIN, score: 1 }
       ],
-      turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 30 }
+      turn: {
+        actionUsed: false,
+        bonusActionUsed: false,
+        actionInstance: null,
+        bonusActionInstance: null,
+        turnUses: {},
+        movementUsedFeet: 30
+      }
     }
   });
 }

@@ -388,9 +388,24 @@ function markUnavailable(cards: Card[], survey: DraftSurvey, library: ContentVie
       !featurePicks(feat.feature).some((pick) => pick.fromCatalog?.endsWith("-spells") ?? false)
     );
   };
+  // Every fixed source the build merges with the picks, so a pick it would refuse as a repeat is greyed here.
   const heldProficiencies = new Map<string, string>();
-  for (const skill of survey.background?.skillProficiencies ?? [])
-    heldProficiencies.set(skill, `already granted by ${survey.background!.name}`);
+  const hold = (ids: readonly string[], source: string) => {
+    for (const id of ids) if (!heldProficiencies.has(id)) heldProficiencies.set(id, `already granted by ${source}`);
+  };
+  const { background, classRecord, species } = survey;
+  if (background) {
+    hold(background.skillProficiencies, background.name);
+    hold(background.toolProficiencies, background.name);
+    hold(background.languages, background.name);
+  }
+  if (classRecord) hold(classRecord.toolProficiencies, classRecord.name);
+  if (species) hold(species.languages, species.name);
+  for (const { record } of survey.granted) {
+    // Only ungated grants are baked into the sheet, so only they make a pick a repeat.
+    if (!record.grants || (record.grants.when?.length ?? 0) > 0) continue;
+    hold([...record.grants.skills, ...record.grants.tools, ...record.grants.languages], record.name);
+  }
   for (const card of cards) {
     if (FEAT_KINDS.has(card.kind))
       card.options = card.options.filter(

@@ -371,8 +371,14 @@ export function deriveEquipment(
     (definition?.character?.choices ?? []).filter((row) => row.kind === "weapon-mastery").map((row) => row.id)
   );
   const masteryByActionId: Record<string, MasteryInForce> = {};
+  // Martial Arts holds only while the Monk wears no armour and wields no shield (SRD 5.2.1).
+  const martialArtsInForce =
+    definition?.character?.martialArts !== undefined &&
+    !equipped.some(
+      (entry) => entry.item.armor !== undefined && ["armor", "shield"].includes(effectiveSlot(slotView(entry)))
+    );
   for (const entry of equipped) {
-    const weaponAttack = weaponAction(entry.item, definition, weaponProficiencies);
+    const weaponAttack = weaponAction(entry.item, definition, weaponProficiencies, martialArtsInForce);
     if (!weaponAttack) continue;
     actions.push(weaponAttack);
     weaponActionIds.push(weaponAttack.id);
@@ -386,7 +392,7 @@ export function deriveEquipment(
     if (mastery && unlockedHere && masteryReaches(mastery)) {
       masteryByActionId[weaponAttack.id] = {
         id: mastery,
-        abilityModifier: weaponAbilityModifier(entry.item, definition)
+        abilityModifier: weaponAbilityModifier(entry.item, definition, martialArtsInForce)
       };
     }
   }

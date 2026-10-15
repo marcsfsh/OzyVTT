@@ -24,6 +24,8 @@ export type EconomyPlan = Readonly<{
   markReaction: boolean;
   /** The compound-action components remaining after this resolve (null leaves no instance). */
   instance: Readonly<{ actorId: string; components: Record<string, number> }> | null;
+  /** The same for a compound bonus action (Flurry of Blows). */
+  bonusInstance: Readonly<{ actorId: string; components: Record<string, number> }> | null;
   /** Limited-use spend to record, keyed per scope. */
   spendUse: Readonly<{ key: string; per: "turn" | "encounter" | "long-rest" | "short-rest" | "recharge" }> | null;
   /** Legendary-action cost to add to the attacker's per-round pool (SRD Legendary Actions). */
@@ -160,10 +162,13 @@ function checkLimitedUse({ state, attacker, action, siblings, violations }: Eval
   return { key, per: uses.per };
 }
 
-/** The multiattack parents (sibling actions) that list `action` as a component. */
+/** The action-slot multiattack parents (sibling actions) that list `action` as a component. A bonus-action plan
+ *  (Flurry of Blows) is not one: its strikes come from the bonus instance, never from an Attack action. */
 function multiattackParents(siblings: ReadonlyArray<DefinitionAction>, action: DefinitionAction): DefinitionAction[] {
   return siblings.filter(
-    (candidate) => candidate.multiattack?.some((component) => component.actionId === action.id) ?? false
+    (candidate) =>
+      candidate.activation !== "bonus-action" &&
+      (candidate.multiattack?.some((component) => component.actionId === action.id) ?? false)
   );
 }
 
@@ -174,24 +179,42 @@ function componentMap(parent: DefinitionAction): Record<string, number> {
   return components;
 }
 
-type SlotPlan = Pick<EconomyPlan, "markAction" | "markBonus" | "markReaction" | "instance">;
+type SlotPlan = Pick<EconomyPlan, "markAction" | "markBonus" | "markReaction" | "instance" | "bonusInstance">;
 
-/** The action, bonus action and reaction slots, with the compound-action instance an action opens or continues. */
+/** The action, bonus action and reaction slots, with the compound instance an action or bonus action opens or
+ *  continues. */
 function checkActionSlots(evaluation: Evaluation): SlotPlan {
   const { state, attacker, action, onOwnTurn, violations } = evaluation;
   const unchanged: SlotPlan = {
     markAction: false,
     markBonus: false,
     markReaction: false,
-    instance: state.combat.turn.actionInstance
+    instance: state.combat.turn.actionInstance,
+    bonusInstance: state.combat.turn.bonusActionInstance
   };
+  // An open compound bonus action (Flurry of Blows) spends its own strikes first, costing no further slot.
+  const bonusOpen = state.combat.turn.bonusActionInstance;
+  if (onOwnTurn && bonusOpen && bonusOpen.actorId === attacker.id && !action.multiattack) {
+    const components = { ...bonusOpen.components };
+    const key =
+      (components[action.id] ?? 0) > 0 ? action.id : action.attack && (components.attack ?? 0) > 0 ? "attack" : null;
+    if (key) {
+      components[key] -= 1;
+      return { ...unchanged, bonusInstance: { actorId: attacker.id, components } };
+    }
+  }
   if (onOwnTurn && action.activation === "bonus-action") {
     if (state.combat.turn.bonusActionUsed)
       violations.push({
         rule: "economy.bonus-action-used",
         message: `${attacker.name} has already used a bonus action this turn.`
       });
-    return { ...unchanged, markBonus: true };
+    // A compound bonus action opens its plan, which later swings spend (no rolls are consumed opening it).
+    return {
+      ...unchanged,
+      markBonus: true,
+      ...(action.multiattack ? { bonusInstance: { actorId: attacker.id, components: componentMap(action) } } : {})
+    };
   }
   if (onOwnTurn && action.activation === "action") return checkActionSlot(evaluation);
   if (action.activation === "reaction") {
@@ -239,10 +262,16 @@ function checkActionSlot({
       markAction: true,
       markBonus: false,
       markReaction: false,
-      instance: components ? { actorId: attacker.id, components } : null
+      instance: components ? { actorId: attacker.id, components } : null,
+      bonusInstance: state.combat.turn.bonusActionInstance
     };
   }
-  const plan = { markAction: false, markBonus: false, markReaction: false };
+  const plan = {
+    markAction: false,
+    markBonus: false,
+    markReaction: false,
+    bonusInstance: state.combat.turn.bonusActionInstance
+  };
   if (!active) {
     slotViolations.push({
       rule: "economy.action-used",
@@ -476,6 +505,12 @@ export function commitEconomy({ state, attacker, input, plan, overridden }: Reso
     };
   } else if (plan.instance !== state.combat.turn.actionInstance) {
     state.combat = { ...state.combat, turn: { ...state.combat.turn, actionInstance: instance } };
+  }
+  if (plan.bonusInstance !== state.combat.turn.bonusActionInstance) {
+    const bonusInstance = plan.bonusInstance
+      ? { actorId: plan.bonusInstance.actorId, components: { ...plan.bonusInstance.components } }
+      : null;
+    state.combat = { ...state.combat, turn: { ...state.combat.turn, bonusActionInstance: bonusInstance } };
   }
   if (plan.markReaction) {
     state.combat = {

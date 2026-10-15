@@ -30,10 +30,43 @@ export function AttackOutcome({ attack, audience }: Readonly<{ attack: Attack; a
   );
 }
 
+/** How far a hit's Push shoves (SRD "up to 10 feet"): the full distance, 5 feet, or not at all. */
+export function PushChoice({
+  push,
+  value,
+  busy,
+  onPick
+}: Readonly<{
+  push: NonNullable<ActionResolution["push"]>;
+  value: number;
+  busy: boolean;
+  onPick: (feet: number) => void;
+}>) {
+  const choices = [...new Set([push.maxFeet, 5, 0])].filter((feet) => feet <= push.maxFeet);
+  return (
+    <div className="push-choice" role="group" aria-label={`Push ${push.targetName}`}>
+      <span className="push-choice-label">Push {push.targetName}</span>
+      {choices.map((feet) => (
+        <button
+          key={feet}
+          type="button"
+          className={`save-die-mode${value === feet ? " active" : ""}`}
+          aria-pressed={value === feet}
+          disabled={busy}
+          onClick={() => onPick(feet)}
+        >
+          {feet === 0 ? "No push" : `${feet} ft`}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /**
  * An attack previewed but not yet applied: Adv/Disadv and Re-roll roll the d20 again, Confirm resolves
  * the hit for real (damage, riders, economy). In manual roll mode a second zone takes a typed d20, or
- * the final total with a Natural 20 box when typed bonuses are not added for you.
+ * the final total with a Natural 20 box when typed bonuses are not added for you. A hit that offers a
+ * Push asks how far first; Confirm sends that choice.
  */
 export function AttackPreview({
   attack,
@@ -42,7 +75,8 @@ export function AttackPreview({
   rollMode,
   bonusMode,
   onFeedback,
-  resolve
+  push,
+  resolve: resolveWith
 }: Readonly<{
   attack: Attack;
   /** The die mode the shown roll used. */
@@ -52,8 +86,16 @@ export function AttackPreview({
   /** "total": the typed number is the final total, so a crit must be declared. */
   bonusMode: "auto" | "total";
   onFeedback: (text: string) => void;
+  /** The push this hit's weapon mastery offers; Push is "up to", so the attacker picks the distance. */
+  push?: ActionResolution["push"];
   resolve: (options: ResolveOptions) => void;
 }>) {
+  // null means the full distance, so a re-roll that changes the offer never carries a stale pick.
+  const [pushPick, setPushPick] = useState<number | null>(null);
+  const pushFeet = push ? Math.min(pushPick ?? push.maxFeet, push.maxFeet) : undefined;
+  // Only a confirming call carries the push choice; previews ignore it.
+  const resolve = (options: ResolveOptions) =>
+    resolveWith(options.commit && pushFeet !== undefined ? { ...options, pushFeet } : options);
   const [entry, setEntry] = useState("");
   // Whether the typed roll has been submitted: drives "Use roll" → Confirm/Re-roll.
   const [submitted, setSubmitted] = useState(false);
@@ -98,6 +140,7 @@ export function AttackPreview({
       : resolve({ commit: true, attackNatural: attack.naturalRoll });
   return (
     <div className="action-preview">
+      {push && pushFeet !== undefined && <PushChoice push={push} value={pushFeet} busy={busy} onPick={setPushPick} />}
       <div className="roll-zone">
         <span className="save-prompt-confirm">
           <DieModeButtons

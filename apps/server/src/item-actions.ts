@@ -1,5 +1,5 @@
 import type { FeatureAction, FeatureSaveDc, FeatureUses, ItemSpellCast, SpellReference } from "@vtt/content-srd-5.2.1";
-import { abilityModifier, weaponAbilityModifierFrom, type RiderAbility } from "@vtt/rules-5e";
+import { abilityModifier, isMonkWeapon, weaponAbilityModifierFrom, type RiderAbility } from "@vtt/rules-5e";
 import type { ActorAction, ActorDefinition, InventoryItem } from "@vtt/schemas";
 
 /**
@@ -174,37 +174,85 @@ export function castAction(
   };
 }
 
-/** Finesse takes the better of STR and DEX, ranged takes DEX, else STR. Shared with Graze. */
-export function weaponAbilityModifier(item: InventoryItem, definition: ActorDefinition | undefined): number {
+/** Martial Arts reaches this swing: the bearer has it, it is in force (no armour, no shield) and this is a Monk weapon. */
+function martialArtsSwing(item: InventoryItem, definition: ActorDefinition, martialArtsInForce: boolean) {
+  const weapon = item.weapon;
+  if (!martialArtsInForce || !weapon || !definition.character?.martialArts) return null;
+  return isMonkWeapon(weapon.category, weapon.properties ?? [], weapon.rangeFeet)
+    ? definition.character.martialArts
+    : null;
+}
+
+/** Finesse takes the better of STR and DEX, ranged takes DEX, else STR; a Monk weapon under Martial Arts takes the
+ *  better too. Shared with Graze. */
+export function weaponAbilityModifier(
+  item: InventoryItem,
+  definition: ActorDefinition | undefined,
+  martialArtsInForce = false
+): number {
   const weapon = item.weapon;
   if (!weapon || !definition) return 0;
+  const str = abilityModifier(definition.abilityScores.str);
+  const dex = abilityModifier(definition.abilityScores.dex);
+  if (martialArtsSwing(item, definition, martialArtsInForce)) return Math.max(str, dex);
   // The rule lives in `@vtt/rules-5e` so the sheet's tap-to-roll preview derives the same number.
-  return weaponAbilityModifierFrom(
-    weapon.properties ?? [],
-    weapon.rangeFeet,
-    abilityModifier(definition.abilityScores.str),
-    abilityModifier(definition.abilityScores.dex)
-  );
+  return weaponAbilityModifierFrom(weapon.properties ?? [], weapon.rangeFeet, str, dex);
+}
+
+/** The bigger of two single-term dice by average ("1d6" vs "1d8"); anything else keeps the weapon's own. */
+function biggerDie(weaponDice: string, martialArtsDie: string): string {
+  const average = (dice: string) => {
+    const match = /^(\d+)d(\d+)$/.exec(dice.trim());
+    return match ? (Number(match[1]) * (Number(match[2]) + 1)) / 2 : null;
+  };
+  const own = average(weaponDice);
+  const art = average(martialArtsDie);
+  return own !== null && art !== null && art > own ? martialArtsDie : weaponDice;
+}
+
+/**
+ * Whether weapon training covers a weapon: its category, its id, or a qualified slice of Martial read against its
+ * properties ("martial-light" is the Monk's, "martial-finesse-or-light" the Rogue's). A "-weapons" suffix, as an
+ * authored grant spells it ("martial-weapons"), names the same thing.
+ */
+export function trainingCovers(
+  slugs: readonly string[],
+  weapon: Readonly<{ category: string; properties?: readonly string[] }>,
+  ids: readonly string[]
+): boolean {
+  const properties = weapon.properties ?? [];
+  return slugs.some((raw) => {
+    const slug = raw.replace(/-weapons$/, "");
+    if (slug === weapon.category || ids.includes(slug)) return true;
+    if (weapon.category !== "martial") return false;
+    if (slug === "martial-light") return properties.includes("light");
+    if (slug === "martial-finesse") return properties.includes("finesse");
+    if (slug === "martial-finesse-or-light") return properties.includes("finesse") || properties.includes("light");
+    return false;
+  });
 }
 
 /** An attack action for an equipped weapon. Absent `proficiencies.weapons` means "not recorded", so proficient. */
 export function weaponAction(
   item: InventoryItem,
   definition: ActorDefinition | undefined,
-  grantedWeapons: readonly string[] = []
+  grantedWeapons: readonly string[] = [],
+  martialArtsInForce = false
 ): ActorAction | null {
   const weapon = item.weapon;
   if (!weapon || !definition) return null;
   const properties = weapon.properties ?? [];
-  const modifier = weaponAbilityModifier(item, definition);
+  const modifier = weaponAbilityModifier(item, definition, martialArtsInForce);
+  // Martial Arts: the Monk may roll its die in place of the weapon's, so the bigger one is rolled.
+  const martialArts = martialArtsSwing(item, definition, martialArtsInForce);
+  const dice = martialArts ? biggerDie(weapon.damageDice, martialArts.die) : weapon.damageDice;
   const trained = definition.proficiencies?.weapons;
   // A bound template row also answers to its base weapon's id for proficiency.
   const ids = item.baseId !== undefined ? [item.id, item.baseId] : [item.id];
-  const granted = grantedWeapons.includes(weapon.category) || ids.some((id) => grantedWeapons.includes(id));
   const proficient =
-    granted || trained === undefined || trained.includes(weapon.category) || ids.some((id) => trained.includes(id));
+    trained === undefined || trainingCovers(grantedWeapons, weapon, ids) || trainingCovers(trained, weapon, ids);
   const bonus = modifier + (proficient ? definition.proficiencyBonus : 0);
-  const damageFormula = `${weapon.damageDice}${modifier === 0 ? "" : modifier > 0 ? ` + ${modifier}` : ` - ${Math.abs(modifier)}`}`;
+  const damageFormula = `${dice}${modifier === 0 ? "" : modifier > 0 ? ` + ${modifier}` : ` - ${Math.abs(modifier)}`}`;
   return {
     id: itemActionId(item.id),
     name: item.name,

@@ -46,7 +46,14 @@ function fight(
         { actorId: IDS.hero, position: { x: 100, y: 100 }, sizePx: 40 },
         { actorId: IDS.goblin, position: { x: 900, y: 900 }, sizePx: 40 }
       ],
-      turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet }
+      turn: {
+        actionUsed: false,
+        bonusActionUsed: false,
+        actionInstance: null,
+        bonusActionInstance: null,
+        turnUses: {},
+        movementUsedFeet
+      }
     }
   });
 }

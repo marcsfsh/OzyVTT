@@ -144,6 +144,11 @@ export function ActionRunner({
   const instance =
     state.combat.turn.actionInstance?.actorId === actor.id ? state.combat.turn.actionInstance.components : null;
   const attacksLeft = instance ? Object.values(instance).reduce((sum, remaining) => sum + remaining, 0) : 0;
+  const bonusInstance =
+    state.combat.turn.bonusActionInstance?.actorId === actor.id
+      ? state.combat.turn.bonusActionInstance.components
+      : null;
+  const bonusLeft = bonusInstance ? Object.values(bonusInstance).reduce((sum, remaining) => sum + remaining, 0) : 0;
 
   return (
     <div className="action-runner">
@@ -172,6 +177,11 @@ export function ActionRunner({
       {attacksLeft > 0 && !picking && instance && (
         <p className="action-instance-note" role="status">
           Remaining in this action: {componentLabel(instance, actions)}.
+        </p>
+      )}
+      {bonusLeft > 0 && !picking && bonusInstance && (
+        <p className="action-instance-note" role="status">
+          Remaining in this bonus action: {componentLabel(bonusInstance, actions)}.
         </p>
       )}
       {actions && !picking && (

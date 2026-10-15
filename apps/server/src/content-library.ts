@@ -36,6 +36,7 @@ import {
   loadSkills,
   loadSpecies,
   loadSpells,
+  cantripScalingOf,
   loadSubclasses,
   type BackgroundReference,
   type ClassLevelRow,
@@ -565,7 +566,8 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
       classes: spell.classes,
       damageRoll: spell.damage.roll,
       damageTypes: spell.damage.types,
-      castingOptions: slotCastingOptions(spell.castingOptions)
+      castingOptions: slotCastingOptions(spell.castingOptions),
+      cantripScaling: spell.level === 0 ? cantripScalingOf(spell.castingOptions) : []
     }))
     .sort(byName);
 

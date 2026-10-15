@@ -72,7 +72,7 @@ const fighter = (masteries: readonly string[], level: 3 | 5 = 3): MutableInput =
   ],
   hp: { mode: "average" },
   choices: [
-    { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
+    { level: 1, classId: "fighter", kind: "skill", id: "survival" },
     { level: 1, classId: "fighter", kind: "skill", id: "perception" },
     { level: 1, classId: "fighter", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
     ...masteries.slice(0, 3).map((id) => ({ level: 1, classId: "fighter", kind: "weapon-mastery", id }) as Row),
@@ -986,13 +986,79 @@ function parkOpportunityAttack(built: Built): string {
   return id;
 }
 
-describe("a mastery that cannot act off-turn says so where the GM reads it", () => {
-  it("puts Push's 'move the token' sentence in the feed when a pike hits on an opportunity attack", async () => {
-    // The pike is the reach weapon among the Push weapons, so it is the one swung off-turn, and
-    // `reactions.ts` resolves with no geometry callback, so Push here is only the sentence.
+describe("Push off-turn and by choice", () => {
+  it("moves the token when a pike hits on an opportunity attack, as an on-turn hit does", async () => {
+    // The pike is the reach weapon among the Push weapons, so it is the one swung off-turn; the reaction
+    // answer reads the grid like `action.resolve` does.
     const built = battlefield(["pike", "longbow", "rapier"], ["pike"], cell(2, 2), cell(3, 2));
     const reactionId = parkOpportunityAttack(built);
-    const { commands, store, logged, broadcast } = await commandsFor(built);
+    const { commands, store, logged } = await commandsFor(built);
+    await commands.dispatch(
+      "reaction.answer",
+      { kind: "gm", sessionId: IDS.gmSession },
+      { commandId: randomUUID(), reactionId, use: true, actionId: "item-pike", commit: true, attackNatural: 18 }
+    );
+    expect(store.snapshot.combat.tokens.find((token) => token.actorId === IDS.foe)!.position).toEqual(cell(5, 2));
+    expect(logged.some((line) => line.text === "Foe is pushed 10 ft straight away from Borin.")).toBe(true);
+  });
+
+  it("pushes only as far as the attacker chose, and not at all on 0", async () => {
+    const shorter = battlefield(["warhammer", "longbow", "rapier"], ["warhammer"], cell(2, 2), cell(3, 2));
+    const five = await commandsFor(shorter);
+    await five.commands.dispatch(
+      "action.resolve",
+      { kind: "gm", sessionId: IDS.gmSession },
+      {
+        commandId: randomUUID(),
+        actorId: IDS.hero,
+        actionId: "item-warhammer",
+        targetIds: [IDS.foe],
+        attackNatural: 18,
+        pushFeet: 5
+      }
+    );
+    expect(five.store.snapshot.combat.tokens.find((token) => token.actorId === IDS.foe)!.position).toEqual(cell(4, 2));
+
+    const declined = battlefield(["warhammer", "longbow", "rapier"], ["warhammer"], cell(2, 2), cell(3, 2));
+    const none = await commandsFor(declined);
+    await none.commands.dispatch(
+      "action.resolve",
+      { kind: "gm", sessionId: IDS.gmSession },
+      {
+        commandId: randomUUID(),
+        actorId: IDS.hero,
+        actionId: "item-warhammer",
+        targetIds: [IDS.foe],
+        attackNatural: 18,
+        pushFeet: 0
+      }
+    );
+    expect(none.store.snapshot.combat.tokens.find((token) => token.actorId === IDS.foe)!.position).toEqual(cell(3, 2));
+    expect(none.logged.some((line) => line.text === "Rules note: Borin chose not to push Foe.")).toBe(true);
+  });
+
+  it("names the push a previewed hit offers, so the confirm can choose", () => {
+    const built = battlefield(["warhammer", "longbow", "rapier"], ["warhammer"], cell(2, 2), cell(3, 2));
+    const preview = resolveDefinitionAction(
+      built.state,
+      effectiveActions(built.definition, built.hero, catalog).find((action) => action.id === "item-warhammer")!,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: randomUUID(), commit: false },
+      deps(built, built.definition, [18, 4])
+    );
+    expect(preview.push).toEqual({ targetName: "Foe", maxFeet: 10 });
+  });
+});
+
+describe("a mastery that cannot act off-turn says so where the GM reads it", () => {
+  it("puts Push's 'move the token' sentence in the feed when the opportunity attack's map cannot be measured", async () => {
+    // A scene switch between the grid read and the mutation leaves Push only the sentence, as on-turn.
+    const built = battlefield(["pike", "longbow", "rapier"], ["pike"], cell(2, 2), cell(3, 2));
+    const reactionId = parkOpportunityAttack(built);
+    const { commands, store, logged, broadcast } = await commandsFor(built, async (live) => {
+      await live.execute({ id: randomUUID(), type: "test.scene-switch" }, (state) => {
+        state.combat = { ...state.combat, mapAssetId: "20000000-0000-5000-8000-000000000002" };
+      });
+    });
     const before = store.snapshot.combat.tokens.find((token) => token.actorId === IDS.foe)!.position;
 
     // +5 to hit vs AC 13, so a pinned natural 18 lands.

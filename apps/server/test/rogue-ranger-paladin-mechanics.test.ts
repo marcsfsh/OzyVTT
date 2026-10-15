@@ -120,7 +120,14 @@ const resolve = (built: Table, id: string, faces: number[], targetIds: string[] 
 function newTurn(built: Table): void {
   built.state.combat = {
     ...built.state.combat,
-    turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }
+    turn: {
+      actionUsed: false,
+      bonusActionUsed: false,
+      actionInstance: null,
+      bonusActionInstance: null,
+      turnUses: {},
+      movementUsedFeet: 0
+    }
   };
 }
 

@@ -318,6 +318,8 @@ export const ActionResolveSchema = z
     attackTotal: z.number().int().min(-50).max(100).optional(),
     /** Declares a natural 20 (critical hit) for the hand-entered-total path, where the natural die can't be inferred. */
     critical: z.boolean().optional(),
+    /** Push mastery (SRD "up to 10 feet"): how far to push on this hit, 0 to decline; absent pushes the full 10. */
+    pushFeet: z.number().int().min(0).max(10).multipleOf(5).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
@@ -373,6 +375,8 @@ export const ReactionAnswerSchema = z
       z.boolean().default(true),
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
     attackNatural: z.number().int().min(1).max(20).optional(),
+    /** Push mastery (SRD "up to 10 feet"): how far to push on this hit, 0 to decline; absent pushes the full 10. */
+    pushFeet: z.number().int().min(0).max(10).multipleOf(5).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

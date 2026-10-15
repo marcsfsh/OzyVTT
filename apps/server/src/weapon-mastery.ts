@@ -77,8 +77,7 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
   },
 
   /** Push (SRD): on a hit, push the creature up to 10 feet straight away if it is Large or smaller. The
-   *  caller derives direction and does the geometry. Limitation: always the full 10 feet, with no
-   *  attacker choice of a shorter push. */
+   *  caller derives direction, does the geometry, and shortens or skips the push as the attacker chose. */
   push: {
     onHitPush: (swing) => [
       {

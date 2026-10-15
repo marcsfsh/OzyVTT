@@ -5,7 +5,7 @@ import { CommandRejectedError } from "./game-store.js";
 import { requireGm, type Initiator } from "./authorization.js";
 import { adjustableActor, applyDamageDetailed, halvedDamageParts } from "./hit-points.js";
 import type { EffectNarration } from "./effects.js";
-import { resolveDefinitionAction } from "./action-resolution.js";
+import { resolveDefinitionAction, type ResolveDependencies } from "./action-resolution.js";
 import { builtinAction } from "./builtin-actions.js";
 import { effectiveActions } from "./effective-actions.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
@@ -20,6 +20,8 @@ export type ReactionAnswerDependencies = Readonly<{
   newRollId: () => string;
   gmSessionId: string;
   now: () => string;
+  /** Forced movement on the map (Push on an opportunity attack); absent, the GM is asked to move the token. */
+  pushToken?: ResolveDependencies["pushToken"];
 }>;
 /** The two optional halves of a `ReactionOutcome`, spread at both return sites. */
 const detailOf = (application: DamageApplication | null) =>
@@ -49,6 +51,8 @@ export type OpportunityAttackOptions = Readonly<{
   commit?: boolean;
   rollMode?: "advantage" | "disadvantage" | "normal";
   attackNatural?: number;
+  /** Push mastery's chosen distance on a hit (0 declines). */
+  pushFeet?: number;
 }>;
 
 /**
@@ -140,7 +144,8 @@ export function answerReaction(
         commit,
         attackNatural: attackOptions.attackNatural,
         // The resolver can't infer an opportunity attack from the action, so announce it for `attack-kind-is` riders.
-        attackKinds: ["reaction", "opportunity"]
+        attackKinds: ["reaction", "opportunity"],
+        ...(attackOptions.pushFeet !== undefined ? { pushFeet: attackOptions.pushFeet } : {})
       },
       {
         random: deps.random,
@@ -149,7 +154,8 @@ export function answerReaction(
         now: deps.now,
         definition,
         resolveDefinition: deps.resolveDefinition,
-        catalog: deps.catalog
+        catalog: deps.catalog,
+        ...(deps.pushToken ? { pushToken: deps.pushToken } : {})
       }
     );
     if (!commit) return { ...base, used: false, appliedDamage: 0, resolution, events: [] };

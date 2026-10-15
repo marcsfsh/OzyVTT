@@ -131,7 +131,8 @@ export const actionCommands = [
             commit,
             attackNatural,
             attackTotal,
-            critical
+            critical,
+            ...(request.pushFeet !== undefined ? { pushFeet: request.pushFeet } : {})
           },
           {
             random: (sides) => kit.context.random(sides),

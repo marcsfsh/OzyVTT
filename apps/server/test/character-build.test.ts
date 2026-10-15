@@ -54,7 +54,7 @@ const fighterInput = (): MutableCreateInput => ({
   choices: [
     { level: 1, kind: "language", id: "dwarvish" },
     { level: 1, kind: "language", id: "giant" },
-    { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
+    { level: 1, classId: "fighter", kind: "skill", id: "survival" },
     { level: 1, classId: "fighter", kind: "skill", id: "perception" },
     { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
     { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
@@ -140,7 +140,7 @@ const warlockInput = (): MutableCreateInput => ({
     { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "warlock", kind: "skill", id: "arcana" },
     { level: 1, classId: "warlock", kind: "skill", id: "deception" },
-    { level: 1, kind: "skill", id: "insight", payload: { featureId: "human-skillful" } },
+    { level: 1, kind: "skill", id: "perception", payload: { featureId: "human-skillful" } },
     { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
     // Five invocations at level 5: the printed Invocations column runs 1 -> 3 (L2) -> 5 (L5), and
     // `class-resource-growth` lets the budget follow it. Each is stamped at the level gained, so a rebuild
@@ -258,7 +258,7 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
   it("fills saves, chosen + granted skills, and the armor/weapon/tool/language lists", () => {
     expect(definition.proficiencies?.saves).toEqual(["str", "con"]);
     const skills = new Map(definition.proficiencies?.skills.map((skill) => [skill.id, skill.proficiency]));
-    expect([...skills.keys()].sort()).toEqual(["athletics", "intimidation", "perception", "stealth"]);
+    expect([...skills.keys()].sort()).toEqual(["athletics", "intimidation", "perception", "stealth", "survival"]);
     expect(skills.get("athletics")).toBe("proficient");
     expect(definition.proficiencies?.armor).toEqual(["light", "medium", "heavy", "shields"]);
     expect(definition.proficiencies?.weapons).toEqual(["simple", "martial"]);
@@ -903,7 +903,7 @@ describe("extra picks raise the budget the server validates against", () => {
       /"Cleric skills" needs 3 pick\(s\) of kind "skill"; got 2/
     );
     const threeSkills = clericInput();
-    threeSkills.choices.push({ level: 1, classId: "cleric", kind: "skill", id: "insight" });
+    threeSkills.choices.push({ level: 1, classId: "cleric", kind: "skill", id: "persuasion" });
     expect(() => buildCharacterDefinition(threeSkills, scholarly, defaultPolicy)).not.toThrow();
     // Without the trait, the third skill is refused.
     expect(() => buildCharacterDefinition(threeSkills, library, defaultPolicy)).toThrowError(
@@ -978,7 +978,7 @@ describe("extra picks raise the budget the server validates against", () => {
       choices: [
         { level: 1, kind: "language", id: "dwarvish" },
         { level: 1, kind: "language", id: "giant" },
-        { level: 1, classId: "paladin", kind: "skill", id: "athletics" },
+        { level: 1, classId: "paladin", kind: "skill", id: "medicine" },
         { level: 1, classId: "paladin", kind: "skill", id: "persuasion" },
         { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
         { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
@@ -1557,5 +1557,44 @@ describe("buildCharacterDefinition - derived save DCs", () => {
     // 8 + CON modifier + proficiency bonus, resolved at build time.
     expect(typeof breath!.save?.dc).toBe("number");
     expect(breath!.save?.dc).toBe(8 + abilityModifier(definition.abilityScores.con) + definition.proficiencyBonus);
+  });
+});
+
+describe("a proficiency is never taken twice", () => {
+  /** The fighter with one choice row swapped for another. */
+  const swapping = (from: Readonly<{ kind: string; id: string }>, to: Readonly<{ id: string }>) => {
+    const input = fighterInput();
+    input.choices = input.choices.map((row) =>
+      row.kind === from.kind && row.id === from.id ? { ...row, id: to.id } : row
+    );
+    return input;
+  };
+
+  it("refuses a class skill the background already grants", () => {
+    // The Soldier grants Athletics and Intimidation.
+    expect(() =>
+      buildCharacterDefinition(
+        swapping({ kind: "skill", id: "survival" }, { id: "intimidation" }),
+        library,
+        defaultPolicy
+      )
+    ).toThrowError(/The skill "intimidation" is taken more than once/);
+  });
+
+  it("refuses the same skill from two picks", () => {
+    // Human Skillful and the class pick both take Perception.
+    expect(() =>
+      buildCharacterDefinition(swapping({ kind: "skill", id: "stealth" }, { id: "perception" }), library, defaultPolicy)
+    ).toThrowError(/The skill "perception" is taken more than once/);
+  });
+
+  it("refuses a language the species already speaks", () => {
+    expect(() =>
+      buildCharacterDefinition(swapping({ kind: "language", id: "giant" }, { id: "common" }), library, defaultPolicy)
+    ).toThrowError(/The language "common" is taken more than once/);
+  });
+
+  it("builds the same character with distinct picks", () => {
+    expect(() => buildCharacterDefinition(fighterInput(), library, defaultPolicy)).not.toThrow();
   });
 });

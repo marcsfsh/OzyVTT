@@ -77,7 +77,14 @@ describe("recipient-safe encounter projections", () => {
         }
       ],
       annotations: [],
-      turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 },
+      turn: {
+        actionUsed: false,
+        bonusActionUsed: false,
+        actionInstance: null,
+        bonusActionInstance: null,
+        turnUses: {},
+        movementUsedFeet: 0
+      },
       rulesMode: "strict",
       ruleExceptions: { slots: "assisted" },
       playerDamageMode: "proposal",

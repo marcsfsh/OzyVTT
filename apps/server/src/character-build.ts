@@ -17,7 +17,15 @@ import {
   spellSaveDc,
   type Ability
 } from "@vtt/rules-5e";
-import type { ClassLevelRow, ClassReference, FeatureRecord, Modifier, SpellReference } from "@vtt/content-srd-5.2.1";
+import {
+  cantripScalingOf,
+  cantripTierAt,
+  type ClassLevelRow,
+  type ClassReference,
+  type FeatureRecord,
+  type Modifier,
+  type SpellReference
+} from "@vtt/content-srd-5.2.1";
 import {
   CLASS_CANTRIP_BUDGET,
   CLASS_SPELL_BUDGET,
@@ -165,7 +173,7 @@ function interpretAction(
   action: FeatureRecord["actions"][number],
   context: BuildContext
 ): ActorAction {
-  const { attack, save, damageByLevel, ...carried } = action;
+  const { attack, save, damageByLevel, multiattackByLevel, ...carried } = action;
   const assembled: Record<string, unknown> = { ...carried };
   if (attack) {
     const ability = attack.ability === "spellcasting" ? context.spellcastingAbility : attack.ability;
@@ -199,6 +207,8 @@ function interpretAction(
     if (rows.length > 0)
       assembled.damage = [{ formula: rows[rows.length - 1].formula, type: rows[rows.length - 1].type }];
   }
+  const plan = (multiattackByLevel ?? []).filter((row) => row.level <= context.level).sort((a, b) => a.level - b.level);
+  if (plan.length > 0) assembled.multiattack = plan[plan.length - 1].multiattack;
   // The feature's limited uses ride the action when the action declares none of its own.
   if (feature.uses && assembled.uses === undefined) {
     const limit = resolvedUseLimit(feature.uses, context);
@@ -223,15 +233,18 @@ const DICE_FORMULA = /^\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?$/i;
 /**
  * The server-resolved action for one known cantrip, or null. Cantrips only, since a leveled spell
  * action would need a slot the sheet can't express. A roll counts as damage only with a damage type,
- * and an action is minted only for typed damage or a save (save outranks attack). Not scaled by
- * character level, to match the effect the sheet prints.
+ * and an action is minted only for typed damage or a save (save outranks attack). Scaled by character
+ * level from the printed rows (Fire Bolt's 2d10 at 5, Eldritch Blast's second beam), as the sheet is.
  */
 function cantripActionFor(
   spell: SpellReference,
-  numbers: Readonly<{ attackBonus: number; saveDc: number }>
+  numbers: Readonly<{ attackBonus: number; saveDc: number; characterLevel: number }>
 ): ActorAction | null {
   if (spell.level !== 0) return null;
-  const typedDamage = spell.damage.roll !== null && spell.damage.types.length > 0;
+  const tier = cantripTierAt(cantripScalingOf(spell.castingOptions), numbers.characterLevel);
+  const roll = tier?.damageRoll ?? spell.damage.roll;
+  const beams = tier?.targetCount ?? 1;
+  const typedDamage = roll !== null && spell.damage.types.length > 0;
   if (!typedDamage && spell.save === null) return null;
   const activation: ActorAction["activation"] = /bonus/i.test(spell.castingTime)
     ? "bonus-action"
@@ -245,11 +258,11 @@ function cantripActionFor(
     name: spell.name,
     activation,
     description: spell.description.slice(0, 12000),
-    damage: typedDamage ? [{ formula: spell.damage.roll!, type: spell.damage.types[0] }] : [],
+    damage: typedDamage ? [{ formula: roll, type: spell.damage.types[0] }] : [],
     ...(spell.save !== null
       ? { save: { ...spell.save, dc: numbers.saveDc, spellcasting: true } }
       : spell.attackRoll
-        ? { attack: { bonus: numbers.attackBonus } }
+        ? { attack: { bonus: numbers.attackBonus, ...(beams > 1 ? { count: Math.min(10, beams) } : {}) } }
         : {}),
     // `spell-id-is` riders (Agonizing Blast) match on this field alone.
     spellId: spell.id
@@ -260,7 +273,7 @@ function cantripActionFor(
 function linkCantripActions(
   spells: Array<Record<string, unknown>>,
   into: ActorAction[],
-  numbers: Readonly<{ attackBonus: number; saveDc: number }>,
+  numbers: Readonly<{ attackBonus: number; saveDc: number; characterLevel: number }>,
   library: ContentView
 ): void {
   for (const entry of spells) {
@@ -273,8 +286,14 @@ function linkCantripActions(
 }
 
 /** The Martial Arts unarmed strike from the printed `classResources` column, or null without one. Uses
- *  the better of DEX or STR (SRD Dexterous Attacks). A non-dice amount keeps the generic builtin.
- *  Limitation: Monk weapons don't get the die or DEX, and Flurry of Blows stays prose. */
+ *  the better of DEX or STR (SRD Dexterous Attacks). A non-dice amount keeps the generic builtin. Monk weapons
+ *  get the same rule at read time from `character.martialArts` (see `weaponAction`). */
+/** The printed Martial Arts die at this level ("1d8"), or null when the class prints none. */
+function martialArtsDieOf(context: BuildContext): string | null {
+  const die = context.classResources.find((resource) => resource.id === "martial-arts")?.amount;
+  return typeof die === "string" && /^1d(?:4|6|8|10|12)$/.test(die) ? die : null;
+}
+
 function martialArtsStrike(context: BuildContext): ActorAction | null {
   const die = context.classResources.find((resource) => resource.id === "martial-arts")?.amount;
   if (typeof die !== "string" || !DICE_FORMULA.test(die)) return null;
@@ -551,6 +570,7 @@ export function buildCharacterDefinition(
   for (const { record } of granted) interpretFeature(record, interpreted, context);
   // Martial Arts runs after the features so an id a feature already declared keeps it.
   const strike = martialArtsStrike(context);
+  const martialArtsDie = strike ? martialArtsDieOf(context) : null;
   if (strike && !interpreted.actions.some((existing) => existing.id === strike.id)) interpreted.actions.push(strike);
   // `definition.character.features`, deduped on `{kind, sourceId, id}` so no record gets two carriers.
   // `origin: null` rows are skipped: they are already on `character.feats`.
@@ -589,6 +609,30 @@ export function buildCharacterDefinition(
     ...background.skillProficiencies,
     ...interpreted.grantedSkills
   ];
+  // A pick of something the character already has, or the same pick twice, would be merged away below and the
+  // pick lost; the builder greys these out, so a payload that sends one is refused rather than quietly shortened.
+  const refuseRepeatPicks = (kind: string, picked: readonly string[], fixed: readonly string[]) => {
+    const held = new Set(fixed);
+    for (const id of picked) {
+      if (held.has(id)) reject(`The ${kind} "${id}" is taken more than once; pick a different ${kind}.`);
+      held.add(id);
+    }
+  };
+  refuseRepeatPicks(
+    "skill",
+    [...takenOf("skill"), ...skillOrTool.filter((id) => skillIds.has(id))],
+    [...background.skillProficiencies, ...interpreted.grantedSkills]
+  );
+  refuseRepeatPicks(
+    "tool",
+    [...takenOf("tool"), ...skillOrTool.filter((id) => !skillIds.has(id))],
+    [...classRecord.toolProficiencies, ...background.toolProficiencies, ...interpreted.grantedTools]
+  );
+  refuseRepeatPicks("language", takenOf("language"), [
+    ...species.languages,
+    ...background.languages,
+    ...interpreted.grantedLanguages
+  ]);
   const expertiseTaken = [...takenOf("expertise"), ...interpreted.grantedExpertise];
   for (const skill of expertiseTaken) {
     if (!skillTaken.includes(skill)) reject(`Expertise in "${skill}" requires proficiency in it first.`);
@@ -728,7 +772,7 @@ export function buildCharacterDefinition(
     const saveDc = spellSaveDc(finalScores[casting.ability], proficiencyBonus);
     const attackBonus = spellAttackBonus(finalScores[casting.ability], proficiencyBonus);
     // Cantrips become actions with this caster's numbers; the sheet sends only an id.
-    linkCantripActions(spells, interpreted.actions, { attackBonus, saveDc }, library);
+    linkCantripActions(spells, interpreted.actions, { attackBonus, saveDc, characterLevel: input.level }, library);
     // Top-level fields stay populated (the schema demands the combined pool when per-class slots exist).
     spellcasting = {
       ability: casting.ability,
@@ -768,7 +812,12 @@ export function buildCharacterDefinition(
       const saveDc = spellSaveDc(finalScores[ability], proficiencyBonus);
       const attackBonus = spellAttackBonus(finalScores[ability], proficiencyBonus);
       // A non-caster's cantrip gets an action too, using the fallback ability above.
-      linkCantripActions(extraSpells, interpreted.actions, { attackBonus, saveDc }, library);
+      linkCantripActions(
+        extraSpells,
+        interpreted.actions,
+        { attackBonus, saveDc, characterLevel: input.level },
+        library
+      );
       spellcasting = {
         ability,
         saveDc,
@@ -947,6 +996,7 @@ export function buildCharacterDefinition(
         ...(lineage ? { subrace: { id: lineage.id, name: lineage.name } } : {})
       },
       background: { id: background.id, name: background.name },
+      ...(martialArtsDie ? { martialArts: { die: martialArtsDie } } : {}),
       feats: [
         ...(originFeat
           ? [{ id: originFeat.id, name: originFeat.name, description: originFeat.feature.description.slice(0, 4000) }]

@@ -51,7 +51,7 @@ const warlockInput = (level: number, extra: readonly Row[] = []): CharacterCreat
     { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "warlock", kind: "skill", id: "arcana" },
     { level: 1, classId: "warlock", kind: "skill", id: "deception" },
-    { level: 1, kind: "skill", id: "insight", payload: { featureId: "human-skillful" } },
+    { level: 1, kind: "skill", id: "perception", payload: { featureId: "human-skillful" } },
     { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
     { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
@@ -698,12 +698,13 @@ describe("Warlock invocations: Agonizing Blast adds the caster's Charisma to the
       level: 0,
       actionId: "spell-eldritch-blast"
     });
-    // CHA 17 (+3) + PB 3 = +6, derived by the builder from this character's own scores.
+    // CHA 17 (+3) + PB 3 = +6, derived by the builder from this character's own scores. At level 5 the
+    // printed row fires two beams, each its own attack.
     expect(built.actions.find((action) => action.id === "spell-eldritch-blast")).toMatchObject({
       name: "Eldritch Blast",
       activation: "action",
       spellId: "eldritch-blast",
-      attack: { bonus: 6 },
+      attack: { bonus: 6, count: 2 },
       damage: [{ formula: "1d10", type: "force" }]
     });
     // Cantrips only. A leveled spell mints nothing because no field on the sheet can say which slot it
@@ -836,7 +837,7 @@ const sorcererInput = (level: number, extra: readonly Row[] = []): CharacterCrea
     { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "sorcerer", kind: "skill", id: "arcana" },
     { level: 1, classId: "sorcerer", kind: "skill", id: "deception" },
-    { level: 1, kind: "skill", id: "insight", payload: { featureId: "human-skillful" } },
+    { level: 1, kind: "skill", id: "perception", payload: { featureId: "human-skillful" } },
     { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
     { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
@@ -1257,7 +1258,7 @@ const wizardInput = (): CharacterCreateRequestInput => ({
     { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "wizard", kind: "skill", id: "arcana" },
     { level: 1, classId: "wizard", kind: "skill", id: "investigation" },
-    { level: 1, kind: "skill", id: "insight", payload: { featureId: "human-skillful" } },
+    { level: 1, kind: "skill", id: "perception", payload: { featureId: "human-skillful" } },
     { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
     { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },

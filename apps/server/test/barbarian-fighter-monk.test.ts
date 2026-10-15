@@ -126,7 +126,7 @@ const fighterInput = (level: number): MutableInput => ({
   choices: [
     { level: 1, kind: "language", id: "dwarvish" },
     { level: 1, kind: "language", id: "giant" },
-    { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
+    { level: 1, classId: "fighter", kind: "skill", id: "survival" },
     { level: 1, classId: "fighter", kind: "skill", id: "perception" },
     { level: 1, classId: "fighter", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
     ...masteries("fighter", ["greatsword", "flail", "longbow", "rapier", "handaxe", "maul"], fighterMasteries(level)),
@@ -913,10 +913,66 @@ describe("Monk: Martial Arts is an Unarmed Strike the engine can really roll", (
     expect(swung.damageTotal).toBe(9);
   });
 
+  it("gives a Monk weapon the Martial Arts die and the better of Dex or Str, until a shield comes out", () => {
+    // Dex 19 (+4) over Str 12 (+1), Proficiency 3. The kit's Spear is a Simple melee weapon: 1d6 + Str before.
+    const built = onTheTable(build(monkInput(5)));
+    expect(built.definition.character?.martialArts).toEqual({ die: "1d8" });
+    const spear = built.hero.inventory.find((item) => item.name.toLowerCase() === "spear")!;
+    built.hero.inventory = built.hero.inventory.map((item) =>
+      item.id === spear.id ? { ...item, equipped: true } : item
+    );
+    expect(actionOf(built, `item-${spear.id}`).attack?.bonus).toBe(7);
+    expect(actionOf(built, `item-${spear.id}`).damage).toEqual([{ formula: "1d8 + 4", type: "piercing" }]);
+
+    // A shield ends Martial Arts: back to Strength and the Spear's own die.
+    built.hero.inventory = [
+      ...built.hero.inventory,
+      {
+        ...spear,
+        id: "shield-1",
+        name: "Shield",
+        equipped: true,
+        weapon: undefined,
+        slot: "shield",
+        armor: {
+          acBase: 2,
+          addDexModifier: false,
+          dexModifierCap: null,
+          stealthDisadvantage: false,
+          strengthRequired: null
+        }
+      } as (typeof built.hero.inventory)[number]
+    ];
+    expect(actionOf(built, `item-${spear.id}`).damage).toEqual([{ formula: "1d6 + 1", type: "piercing" }]);
+  });
+
   it("leaves every other class on the generic builtin", () => {
     // A class with no Martial Arts column mints nothing; a Fighter uses the shared builtin Unarmed Strike.
     expect(build(fighterInput(5)).actions.some((action) => action.id === "unarmed-strike")).toBe(false);
     expect(build(barbarianInput(5)).actions.some((action) => action.id === "unarmed-strike")).toBe(false);
+  });
+});
+
+describe("Monk: Flurry of Blows opens its own Unarmed Strikes", () => {
+  it("opens two strikes as a bonus action, each spent by an Unarmed Strike, leaving the Attack action alone", () => {
+    const built = onTheTable(build(monkInput(5)));
+    expect(actionOf(built, "flurry-of-blows").multiattack).toEqual([{ actionId: "unarmed-strike", count: 2 }]);
+    use(built, "flurry-of-blows");
+    expect(built.state.combat.turn.bonusActionUsed).toBe(true);
+    expect(built.state.combat.turn.bonusActionInstance?.components).toEqual({ "unarmed-strike": 2 });
+
+    use(built, "unarmed-strike", [IDS.foe], [17, 5]);
+    use(built, "unarmed-strike", [IDS.foe], [17, 5]);
+    expect(built.state.combat.turn.bonusActionInstance?.components).toEqual({ "unarmed-strike": 0 });
+    // Both strikes came from the Flurry: the action is still free for the Attack action.
+    expect(built.state.combat.turn.actionUsed).toBe(false);
+    use(built, "unarmed-strike", [IDS.foe], [17, 5]);
+    expect(built.state.combat.turn.actionUsed).toBe(true);
+  });
+
+  it("makes it three strikes from Monk level 10", () => {
+    const built = onTheTable(build(monkInput(10)));
+    expect(actionOf(built, "flurry-of-blows").multiattack).toEqual([{ actionId: "unarmed-strike", count: 3 }]);
   });
 });
 

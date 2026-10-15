@@ -86,6 +86,28 @@ export const SpellReferenceSchema = z.object({
 });
 export type SpellReference = z.infer<typeof SpellReferenceSchema>;
 
+/** A cantrip's printed character-level rows (Fire Bolt's 2d10 at 5), from its `player_level_N` casting options. */
+export function cantripScalingOf(
+  options: SpellReference["castingOptions"]
+): Array<{ characterLevel: number; damageRoll: string | null; targetCount: number | null }> {
+  return options
+    .flatMap((option) => {
+      const match = /^player_level_(\d+)$/.exec(option.type);
+      return match
+        ? [{ characterLevel: Number(match[1]), damageRoll: option.damageRoll, targetCount: option.targetCount }]
+        : [];
+    })
+    .sort((left, right) => left.characterLevel - right.characterLevel);
+}
+
+/** The cantrip row in force at a character level: the highest printed level at or below it, or null below the first. */
+export function cantripTierAt<T extends Readonly<{ characterLevel: number }>>(
+  rows: readonly T[],
+  characterLevel: number
+): T | null {
+  return rows.filter((row) => row.characterLevel <= characterLevel).at(-1) ?? null;
+}
+
 export const WeaponReferenceSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   name: z.string().min(1).max(80),

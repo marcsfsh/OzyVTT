@@ -1,6 +1,7 @@
 import { DamageResolveSchema, ReactionAnswerSchema, ReactionDismissSchema } from "@vtt/domain/commands";
 import { damageAdjustmentDetail } from "../hit-points.js";
 import { resolvePendingDamage, type AppliedDamage } from "../player-damage.js";
+import { pushTokenAway } from "../forced-movement.js";
 import { answerReaction, dismissReaction } from "../reactions.js";
 import { initiatorOf, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
@@ -18,7 +19,19 @@ export const reactionCommands = [
     schema: ReactionAnswerSchema,
     malformed: "The reaction answer is malformed.",
     async run({ principal, request, execute }, kit) {
-      const { commandId, reactionId, use, actionId: chosenActionId, commit, rollMode, attackNatural } = request;
+      const {
+        commandId,
+        reactionId,
+        use,
+        actionId: chosenActionId,
+        commit,
+        rollMode,
+        attackNatural,
+        pushFeet
+      } = request;
+      // The grid, fetched up front like `action.resolve`'s, so Push on an opportunity attack moves the token.
+      const mapAssetId = kit.read().combat.mapAssetId;
+      const geometry = mapAssetId ? await kit.context.tokenGeometryFor(mapAssetId) : null;
       let outcome: ReturnType<typeof answerReaction> | undefined;
       const { state, duplicate } = await execute((draft) => {
         outcome = answerReaction(
@@ -34,9 +47,11 @@ export const reactionCommands = [
             random: (sides) => kit.context.random(sides),
             newRollId: kit.context.newId,
             gmSessionId: sessionIdOf(principal),
-            now: () => new Date().toISOString()
+            now: () => new Date().toISOString(),
+            pushToken: (input) =>
+              draft.combat.mapAssetId === mapAssetId ? pushTokenAway(draft, input, geometry) : null
           },
-          { commit, rollMode, attackNatural }
+          { commit, rollMode, attackNatural, ...(pushFeet !== undefined ? { pushFeet } : {}) }
         );
       });
       if (duplicate || !outcome) return;
@@ -62,7 +77,7 @@ export const reactionCommands = [
               actorIds: [outcome.actorId],
               gmOnly: true
             });
-          // The off-turn swing's table lines drain here too (Push moves no token here: no geometry callback).
+          // The off-turn swing's table lines drain here too, an accomplished push included.
           kit.appendTableNarration(outcome.resolution);
         }
       } else if (outcome.used) {

@@ -3,6 +3,7 @@ import { type ActionResolution, type PendingReaction, type PlayerPendingReaction
 import { Button, IconX } from "@vtt/ui";
 import { command } from "../lib/command";
 import { damageAdjustments } from "./format";
+import { PushChoice } from "./AttackPreview";
 import { DieModeButtons, type DieMode } from "./RollControls";
 import "./prompts.css";
 
@@ -30,9 +31,15 @@ export function ReactionPrompt({
   const opportunity = reaction.kind === "leaves-reach";
   // An opportunity attack previewed but not applied: confirm, re-roll adv/disadv, or type a d20,
   // as with a saving throw.
-  const [rolled, setRolled] = useState<{ attack: NonNullable<ActionResolution["attack"]>; mode?: DieMode } | null>(
-    null
-  );
+  const [rolled, setRolled] = useState<{
+    attack: NonNullable<ActionResolution["attack"]>;
+    mode?: DieMode;
+    push?: ActionResolution["push"];
+  } | null>(null);
+  // null means the full distance, so a re-roll that changes the offer never carries a stale pick.
+  const [pushPick, setPushPick] = useState<number | null>(null);
+  const push = rolled?.push ?? null;
+  const pushFeet = push ? Math.min(pushPick ?? push.maxFeet, push.maxFeet) : undefined;
   const [dieEdit, setDieEdit] = useState("");
   const autoRolled = useRef(false);
   const weighed = reaction.weighed;
@@ -40,7 +47,10 @@ export function ReactionPrompt({
     weighed?.use ?? reaction.proposedDamageParts.reduce((sum, part) => sum + Math.floor(part.amount / 2), 0);
   const takeIfDeclined = weighed?.decline ?? reaction.proposedDamage;
   // `use` distinguishes the swing (Attack) from letting the mover go; opts drive the preview flow.
-  const answer = (use: boolean, opts: { commit?: boolean; rollMode?: DieMode; attackNatural?: number } = {}) => {
+  const answer = (
+    use: boolean,
+    opts: { commit?: boolean; rollMode?: DieMode; attackNatural?: number; pushFeet?: number } = {}
+  ) => {
     setBusy(true);
     void command("reaction:answer", { reactionId: reaction.id, use, ...opts }).then((result) => {
       setBusy(false);
@@ -53,7 +63,11 @@ export function ReactionPrompt({
       if (opportunity) {
         // A preview keeps the prompt open to confirm; an applied answer clears it.
         if (outcome.resolution?.preview && outcome.resolution.attack) {
-          setRolled({ attack: outcome.resolution.attack, mode: outcome.resolution.rollMode?.mode });
+          setRolled({
+            attack: outcome.resolution.attack,
+            mode: outcome.resolution.rollMode?.mode,
+            push: outcome.resolution.push
+          });
           return;
         }
         setRolled(null);
@@ -117,6 +131,7 @@ export function ReactionPrompt({
           </>
         )}
       </span>
+      {push && pushFeet !== undefined && <PushChoice push={push} value={pushFeet} busy={busy} onPick={setPushPick} />}
       {opportunity && rolled ? (
         // The swing is rolled: confirm it, re-roll adv/disadv, type a d20, or let them go.
         <span className="save-prompt-confirm">
@@ -136,7 +151,13 @@ export function ReactionPrompt({
             type="button"
             className="encounter-primary"
             disabled={busy}
-            onClick={() => answer(true, { commit: true, attackNatural: rolled.attack.naturalRoll })}
+            onClick={() =>
+              answer(true, {
+                commit: true,
+                attackNatural: rolled.attack.naturalRoll,
+                ...(pushFeet !== undefined ? { pushFeet } : {})
+              })
+            }
           >
             Confirm {hit ? "hit" : "miss"}
           </button>

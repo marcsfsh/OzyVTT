@@ -99,6 +99,7 @@ export type PlayerCombatView = Readonly<{
     actionUsed: boolean;
     bonusActionUsed: boolean;
     actionInstance: { actorId: string; components: Record<string, number> } | null;
+    bonusActionInstance: { actorId: string; components: Record<string, number> } | null;
     turnUses: Record<string, number>;
     movementUsedFeet: number;
   };

@@ -28,6 +28,17 @@ export function weaponAbilityModifierFrom(
   return properties.includes("finesse") ? Math.max(str, dex) : ranged ? dex : str;
 }
 
+/** SRD Monk weapon: a Simple melee weapon, or a Martial melee weapon with the Light property. A thrown weapon
+ *  (Dagger, Handaxe) is still a melee weapon. */
+export function isMonkWeapon(
+  category: string,
+  properties: readonly string[],
+  rangeFeet: number | null | undefined
+): boolean {
+  const melee = rangeFeet === null || rangeFeet === undefined || properties.includes("thrown");
+  return melee && (category === "simple" || (category === "martial" && properties.includes("light")));
+}
+
 /** SRD proficiency bonus by total level: +2 at 1-4, +1 every 4 levels to +6 at 17-20. Clamps level to 1-20. */
 export function proficiencyBonusForLevel(level: number): number {
   const clamped = Math.max(1, Math.min(20, level));

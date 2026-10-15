@@ -6,7 +6,7 @@ import type { DefinitionAction, ResolveContext, ResolveDependencies, ResolveInpu
 import { rollRiderDamage, rollWeaponDamage } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
-import { applyMasteryForces, masterySwingOf } from "./resolution/masteries.js";
+import { applyMasteryForces, masterySwingOf, offeredPush } from "./resolution/masteries.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
 import { parkActionSave, parkReaction } from "./resolution/pending.js";
 import { releaseHideAndReady } from "./resolution/release.js";
@@ -72,6 +72,7 @@ function previewOf(ctx: ResolveContext): ActionResolution {
     componentsRemaining: null,
     ...(ctx.warnings.length > 0 ? { warnings: ctx.warnings } : {}),
     overridden: ctx.overridden,
+    push: offeredPush(ctx),
     preview: true
   };
 }

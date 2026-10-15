@@ -5160,7 +5160,24 @@
       "name": "Flurry of Blows",
       "activation": "bonus-action",
       "description": "Expend 1 Focus Point to make two Unarmed Strikes as a Bonus Action (three at Monk level 10).",
-      "damage": []
+      "damage": [],
+      "multiattack": [
+       {
+        "actionId": "unarmed-strike",
+        "count": 2
+       }
+      ],
+      "multiattackByLevel": [
+       {
+        "level": 10,
+        "multiattack": [
+         {
+          "actionId": "unarmed-strike",
+          "count": 3
+         }
+        ]
+       }
+      ]
      },
      {
       "id": "patient-defense",

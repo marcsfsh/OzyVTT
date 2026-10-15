@@ -1122,6 +1122,12 @@ export const CharacterIdentitySchema = z
       )
       .max(40)
       .default([]),
+    /** Monk Martial Arts at this level (SRD 5.2.1): while unarmoured and without a shield, Monk weapons (Simple melee,
+     * and Martial melee with the Light property) use the better of Str or Dex and may roll `die` in place of their own. */
+    martialArts: z
+      .object({ die: z.string().regex(/^1d(?:4|6|8|10|12)$/) })
+      .strict()
+      .optional(),
     /** Feature records this sheet holds (class, subclass, species, lineage, background, chosen options) so their
      * roll-time riders apply as feats' do. Ids only; riders are recomputed from the catalog on every read.
      * `kind` + `sourceId` locate the record (class feature ids are unique only per class). */

@@ -85,6 +85,7 @@ export function ActionResultCard({
           rollMode={rollMode}
           bonusMode="auto"
           onFeedback={onFeedback}
+          push={result.push}
           resolve={resolve}
         />
       )}
