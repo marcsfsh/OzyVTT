@@ -266,6 +266,7 @@ export const actionCommands = [
       const { commandId, actorId, actionId, targetIds, rollMode, includeDamage, override, expectedRevision } = request;
       if (override && !isGmGrade(principal)) throw new GameAccessDeniedError("Your GM adjudicates rules overrides.");
       const snapshot = kit.read();
+      requireActorAccess(initiatorOf(principal), snapshot, actorId, "attack");
       const actor = snapshot.actors.find((candidate) => candidate.id === actorId);
       if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
       const route = routeForTap(snapshot.combat, actorId);

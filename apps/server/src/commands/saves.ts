@@ -18,9 +18,10 @@ export const saveCommands = [
       "Roll a saving throw: answers a matching pending save when one is open, otherwise rolls a loose, attributed save.",
     schema: SaveRollSchema,
     malformed: "The saving throw is malformed.",
-    async run({ request, dispatch }, kit) {
+    async run({ principal, request, dispatch }, kit) {
       const { commandId, actorId, ability, rollMode, total, expectedRevision } = request;
       const snapshot = kit.read();
+      requireActorAccess(initiatorOf(principal), snapshot, actorId, "save");
       const actor = snapshot.actors.find((candidate) => candidate.id === actorId);
       if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
       // Oldest first: a character owing two saves answers the longest-waiting one.

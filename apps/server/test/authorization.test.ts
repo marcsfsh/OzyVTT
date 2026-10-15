@@ -6,7 +6,7 @@ import {
   GameAccessDeniedError,
   requireActorAccess
 } from "../src/authorization.js";
-import { CommandRejectedError } from "../src/game-store.js";
+import { spendHitDice } from "../src/rests.js";
 
 const playerA = "b539ef5e-16e6-46ce-bf33-3ed4b02997c1";
 const playerB = "65cc7d6b-1150-41c4-aa9f-390439313f53";
@@ -45,13 +45,13 @@ describe("canInitiateForActor", () => {
 
 describe("requireActorAccess", () => {
   const player = { role: "player", sessionId: playerB } as const;
-  it("denies someone else's character with the caller's wording, and treats a missing one as a rejection", () => {
+  it("denies someone else's character and a missing one alike, so a player cannot probe for ids", () => {
     expect(() => requireActorAccess(player, state, mine, "move", "Not your token.")).toThrow(
       new GameAccessDeniedError("Not your token.")
     );
-    const missing = () => requireActorAccess(player, state, "00000000-0000-4000-8000-000000000000", "check");
-    expect(missing).toThrow(CommandRejectedError);
-    expect(missing).not.toThrow(GameAccessDeniedError);
+    expect(() =>
+      requireActorAccess(player, state, "00000000-0000-4000-8000-000000000000", "move", "Not your token.")
+    ).toThrow(new GameAccessDeniedError("Not your token."));
     expect(() => requireActorAccess({ role: "gm" }, state, monster, "attack")).not.toThrow();
   });
 });
@@ -79,5 +79,26 @@ describe("canPlayerTarget", () => {
   it("refuses a hidden (gm-only) combatant and an unknown id (no hidden-actor leak via a supplied target id)", () => {
     expect(canPlayerTarget(withHidden, hidden)).toBe(false);
     expect(canPlayerTarget(withHidden, "00000000-0000-4000-8000-000000000000")).toBe(false);
+  });
+});
+
+describe("refusals never name a hidden actor", () => {
+  it("checks ownership before spending Hit Dice", () => {
+    const hidden = GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [
+        {
+          id: "44444444-4444-4444-8444-444444444444",
+          name: "Unrevealed Tyrant",
+          kind: "monster",
+          visibility: "gm-only",
+          hp: { current: 5, maximum: 9, temporary: 0 }
+        }
+      ]
+    });
+    const player = { role: "player", sessionId: playerA } as const;
+    const spend = () => spendHitDice(hidden, "44444444-4444-4444-8444-444444444444", [4], player, () => undefined);
+    expect(spend).toThrow(GameAccessDeniedError);
+    expect(spend).not.toThrow(/Tyrant/);
   });
 });

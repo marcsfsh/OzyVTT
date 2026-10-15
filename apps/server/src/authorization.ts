@@ -1,5 +1,4 @@
 import type { GameState } from "@vtt/domain";
-import { CommandRejectedError } from "./game-store.js";
 
 /** The principal may not do this: a GM-only command from a player, or a player acting on a character that
  *  is not theirs. Always a 403 over HTTP. */
@@ -11,7 +10,7 @@ export type InitiateKind = "attack" | "check" | "save" | "resource" | "inventory
 /** Who is acting, reduced to what authorization reads: GM-grade (the GM and integrations) or a player session. */
 export type Initiator = Readonly<{ role: "gm" }> | Readonly<{ role: "player"; sessionId: string }>;
 
-export type InitiateVerdict = { ok: true } | { ok: false; missing: boolean; message: string };
+export type InitiateVerdict = { ok: true } | { ok: false; message: string };
 
 const NOT_YOURS = "You can only act on your own character.";
 
@@ -26,13 +25,13 @@ export function canInitiateForActor(
 ): InitiateVerdict {
   if (initiator.role === "gm") return { ok: true };
   const actor = state.actors.find((candidate) => candidate.id === actorId);
-  if (!actor) return { ok: false, missing: true, message: "That combatant no longer exists." };
-  if (actor.kind !== "player-character" || actor.ownerSessionId !== initiator.sessionId)
-    return { ok: false, missing: false, message: NOT_YOURS };
+  // A missing actor and someone else's get the same answer, so a player cannot probe which ids exist.
+  if (!actor || actor.kind !== "player-character" || actor.ownerSessionId !== initiator.sessionId)
+    return { ok: false, message: NOT_YOURS };
   return { ok: true };
 }
 
-/** `canInitiateForActor` as a guard: a missing actor is a rejection, someone else's a denial. `denial`
+/** `canInitiateForActor` as a guard that throws a denial. `denial`
  *  words the refusal for the action at hand. */
 export function requireActorAccess(
   initiator: Initiator,
@@ -43,7 +42,6 @@ export function requireActorAccess(
 ) {
   const verdict = canInitiateForActor(initiator, state, actorId, kind);
   if (verdict.ok) return;
-  if (verdict.missing) throw new CommandRejectedError(verdict.message);
   throw new GameAccessDeniedError(denial);
 }
 
