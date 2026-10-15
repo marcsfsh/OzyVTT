@@ -30,13 +30,13 @@ function requireActiveCombat(state: GameState) {
 export function setTurnSlot(state: GameState, slot: "action" | "bonus-action", used: boolean, initiator: Initiator) {
   requireActiveCombat(state);
   requireOwnTurn(state, initiator);
-  const clearInstance = slot === "action" && !used;
+  // Un-marking a slot clears its open compound instance too.
   state.combat = {
     ...state.combat,
     turn: {
       ...state.combat.turn,
       [slot === "action" ? "actionUsed" : "bonusActionUsed"]: used,
-      ...(clearInstance ? { actionInstance: null } : {})
+      ...(!used ? { [slot === "action" ? "actionInstance" : "bonusActionInstance"]: null } : {})
     }
   };
 }

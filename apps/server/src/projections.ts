@@ -234,10 +234,24 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
                 components: { ...state.combat.turn.actionInstance.components }
               }
             : null,
+          // The same public shape as the action's: who is mid-Flurry and how many strikes are left.
+          bonusActionInstance: state.combat.turn.bonusActionInstance
+            ? {
+                actorId: state.combat.turn.bonusActionInstance.actorId,
+                components: { ...state.combat.turn.bonusActionInstance.components }
+              }
+            : null,
           turnUses: { ...state.combat.turn.turnUses },
           movementUsedFeet: state.combat.turn.movementUsedFeet
         }
-      : { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 },
+      : {
+          actionUsed: false,
+          bonusActionUsed: false,
+          actionInstance: null,
+          bonusActionInstance: null,
+          turnUses: {},
+          movementUsedFeet: 0
+        },
     rulesMode: state.combat.rulesMode,
     // Rules configuration, not secrets: a player's sheet must know whether a tap will be blocked or warned.
     ruleExceptions: { ...state.combat.ruleExceptions },

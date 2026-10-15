@@ -405,12 +405,18 @@ const sceneCombatShape = {
   tokens: z.array(EncounterTokenSchema).max(200).default([]),
   annotations: z.array(AnnotationSchema).max(300).default([]),
   /** Action economy of the current turn's actor, reset on turn change. `actionInstance` holds remaining components
-   * of an open compound action (Extra Attack); `turnUses` is keyed `${actorId}:${actionId}`. */
+   * of an open compound action (Extra Attack) and `bonusActionInstance` those of a compound bonus action (Flurry of
+   * Blows); `turnUses` is keyed `${actorId}:${actionId}`. */
   turn: z
     .object({
       actionUsed: z.boolean().default(false),
       bonusActionUsed: z.boolean().default(false),
       actionInstance: z
+        .object({ actorId: z.uuid(), components: z.record(z.string(), z.number().int().nonnegative()) })
+        .strict()
+        .nullable()
+        .default(null),
+      bonusActionInstance: z
         .object({ actorId: z.uuid(), components: z.record(z.string(), z.number().int().nonnegative()) })
         .strict()
         .nullable()
@@ -421,7 +427,14 @@ const sceneCombatShape = {
       /** Rule families the GM already waved through this turn. Stripped from player projections. */
       rulesOverriddenFamilies: z.array(RuleFamilySchema).max(5).optional()
     })
-    .prefault({ actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }),
+    .prefault({
+      actionUsed: false,
+      bonusActionUsed: false,
+      actionInstance: null,
+      bonusActionInstance: null,
+      turnUses: {},
+      movementUsedFeet: 0
+    }),
   /** How structured action resolution enforces rules (ADR-0020): strict rejects with an override path, assisted warns, freeform stays reference-level. */
   rulesMode: RuleModeSchema.default("strict"),
   /** Per-family overrides of `rulesMode` (see RuleExceptionsSchema). Player-readable; holds no secrets. */

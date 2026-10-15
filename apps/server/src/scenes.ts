@@ -51,7 +51,14 @@ function emptySceneCombat(): SceneCombat {
     initiative: [],
     tokens: [],
     annotations: [],
-    turn: { actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 },
+    turn: {
+      actionUsed: false,
+      bonusActionUsed: false,
+      actionInstance: null,
+      bonusActionInstance: null,
+      turnUses: {},
+      movementUsedFeet: 0
+    },
     rulesMode: "strict",
     ruleExceptions: { ...DEFAULT_RULE_EXCEPTIONS },
     playerDamageMode: "proposal",

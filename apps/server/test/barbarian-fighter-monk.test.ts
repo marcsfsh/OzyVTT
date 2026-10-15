@@ -953,6 +953,29 @@ describe("Monk: Martial Arts is an Unarmed Strike the engine can really roll", (
   });
 });
 
+describe("Monk: Flurry of Blows opens its own Unarmed Strikes", () => {
+  it("opens two strikes as a bonus action, each spent by an Unarmed Strike, leaving the Attack action alone", () => {
+    const built = onTheTable(build(monkInput(5)));
+    expect(actionOf(built, "flurry-of-blows").multiattack).toEqual([{ actionId: "unarmed-strike", count: 2 }]);
+    use(built, "flurry-of-blows");
+    expect(built.state.combat.turn.bonusActionUsed).toBe(true);
+    expect(built.state.combat.turn.bonusActionInstance?.components).toEqual({ "unarmed-strike": 2 });
+
+    use(built, "unarmed-strike", [IDS.foe], [17, 5]);
+    use(built, "unarmed-strike", [IDS.foe], [17, 5]);
+    expect(built.state.combat.turn.bonusActionInstance?.components).toEqual({ "unarmed-strike": 0 });
+    // Both strikes came from the Flurry: the action is still free for the Attack action.
+    expect(built.state.combat.turn.actionUsed).toBe(false);
+    use(built, "unarmed-strike", [IDS.foe], [17, 5]);
+    expect(built.state.combat.turn.actionUsed).toBe(true);
+  });
+
+  it("makes it three strikes from Monk level 10", () => {
+    const built = onTheTable(build(monkInput(10)));
+    expect(actionOf(built, "flurry-of-blows").multiattack).toEqual([{ actionId: "unarmed-strike", count: 3 }]);
+  });
+});
+
 describe("Monk: Focus Points are ONE pool, read off the printed column and really spent", () => {
   it("gives all three activations the same counter, sized by the class table", () => {
     const built = onTheTable(build(monkInput(20)));

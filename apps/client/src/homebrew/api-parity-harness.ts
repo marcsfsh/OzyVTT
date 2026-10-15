@@ -457,6 +457,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].multiattackByLevel[].**",
+    types: FEATURE_CARRIERS,
+    reason:
+      "a compound plan that grows with level (Flurry of Blows' third strike) - feature-carrier actions only, and multiattack itself has no control yet either",
+    status: "gap"
+  },
+  {
     at: "actions[].attack.count",
     types: ACTION_CARRIERS,
     reason:

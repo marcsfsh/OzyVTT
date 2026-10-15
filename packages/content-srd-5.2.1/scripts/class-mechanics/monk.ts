@@ -31,8 +31,8 @@ export const monk: ClassMechanicsModule = {
     /**
      * Focus Points read off the printed column; the shared `pool` lets all three 1-point actions (and
      * Stunning Strike) spend one counter. These are the paid forms; the free Disengage/Dash forms are in
-     * the text. Heightened Focus upgrades stay prose. Flurry's two strikes are not granted via
-     * `multiattack`, which only opens a component pool for `activation: "action"`.
+     * the text. Flurry's strikes are a compound bonus action: resolving it opens a pool of Unarmed Strikes
+     * (two, three from Heightened Focus at 10) that each strike spends. Heightened Focus's other upgrades stay prose.
      */
     "monks-focus": {
       uses: { scaling: { type: "class-resource", id: "focus-points" }, per: "short-rest", pool: "focus-points" },
@@ -42,7 +42,9 @@ export const monk: ClassMechanicsModule = {
           name: "Flurry of Blows",
           activation: "bonus-action",
           description: "Expend 1 Focus Point to make two Unarmed Strikes as a Bonus Action (three at Monk level 10).",
-          damage: []
+          damage: [],
+          multiattack: [{ actionId: "unarmed-strike", count: 2 }],
+          multiattackByLevel: [{ level: 10, multiattack: [{ actionId: "unarmed-strike", count: 3 }] }]
         },
         {
           id: "patient-defense",

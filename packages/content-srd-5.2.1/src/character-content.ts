@@ -152,6 +152,12 @@ export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true 
       z.object({ level: ContentLevelSchema, formula: DiceFormulaSchema, type: z.string().min(1).max(40) }).strict()
     )
     .max(20)
+    .optional(),
+  /** A compound plan that grows with level, replacing `multiattack` at the highest matching level (Flurry of
+   *  Blows' third strike at Monk 10). */
+  multiattackByLevel: z
+    .array(z.object({ level: ContentLevelSchema, multiattack: ActionSchema.shape.multiattack.unwrap() }).strict())
+    .max(20)
     .optional()
 });
 export type FeatureAction = z.infer<typeof FeatureActionSchema>;

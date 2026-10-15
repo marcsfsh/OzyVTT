@@ -56,6 +56,7 @@ describe("turn economy", () => {
       actionUsed: true,
       bonusActionUsed: true,
       actionInstance: null,
+      bonusActionInstance: null,
       turnUses: {},
       movementUsedFeet: 0
     });
@@ -64,6 +65,7 @@ describe("turn economy", () => {
       actionUsed: false,
       bonusActionUsed: false,
       actionInstance: null,
+      bonusActionInstance: null,
       turnUses: {},
       movementUsedFeet: 0
     });
@@ -73,6 +75,7 @@ describe("turn economy", () => {
       actionUsed: false,
       bonusActionUsed: false,
       actionInstance: null,
+      bonusActionInstance: null,
       turnUses: {},
       movementUsedFeet: 0
     });
@@ -115,6 +118,7 @@ describe("turn economy", () => {
       actionUsed: false,
       bonusActionUsed: false,
       actionInstance: null,
+      bonusActionInstance: null,
       turnUses: {},
       movementUsedFeet: 0
     });

@@ -160,7 +160,14 @@ describe("an override waives only its own family", () => {
         turnActorId: HERO,
         rulesMode: "strict",
         initiative: [{ actorId: HERO, score: 10 }],
-        turn: { actionUsed: true, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }
+        turn: {
+          actionUsed: true,
+          bonusActionUsed: false,
+          actionInstance: null,
+          bonusActionInstance: null,
+          turnUses: {},
+          movementUsedFeet: 0
+        }
       }
     });
   let command = 0;

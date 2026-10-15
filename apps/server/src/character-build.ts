@@ -173,7 +173,7 @@ function interpretAction(
   action: FeatureRecord["actions"][number],
   context: BuildContext
 ): ActorAction {
-  const { attack, save, damageByLevel, ...carried } = action;
+  const { attack, save, damageByLevel, multiattackByLevel, ...carried } = action;
   const assembled: Record<string, unknown> = { ...carried };
   if (attack) {
     const ability = attack.ability === "spellcasting" ? context.spellcastingAbility : attack.ability;
@@ -207,6 +207,8 @@ function interpretAction(
     if (rows.length > 0)
       assembled.damage = [{ formula: rows[rows.length - 1].formula, type: rows[rows.length - 1].type }];
   }
+  const plan = (multiattackByLevel ?? []).filter((row) => row.level <= context.level).sort((a, b) => a.level - b.level);
+  if (plan.length > 0) assembled.multiattack = plan[plan.length - 1].multiattack;
   // The feature's limited uses ride the action when the action declares none of its own.
   if (feature.uses && assembled.uses === undefined) {
     const limit = resolvedUseLimit(feature.uses, context);

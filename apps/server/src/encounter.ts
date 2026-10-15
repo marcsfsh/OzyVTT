@@ -29,6 +29,7 @@ const EMPTY_TURN = {
   actionUsed: false,
   bonusActionUsed: false,
   actionInstance: null,
+  bonusActionInstance: null,
   turnUses: {},
   movementUsedFeet: 0
 } as const;
