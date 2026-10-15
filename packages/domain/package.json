@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@vtt/schemas": "*",
-    "zod": "^3.24.2"
+    "zod": "^4.6.0"
   },
   "devDependencies": {
     "typescript": "^5.8.2",
