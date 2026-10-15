@@ -311,13 +311,25 @@ describe("the generated magic-item bundle", () => {
     expect(rows.filter((row) => /^Potion of Healing/.test(row.name))).toEqual([]);
   });
 
+  it("gives every magic shield the plain shield's armor block, so its own bonus stacks on the +2", () => {
+    // AC derivation counts a shield only through its armor block; the rarity bonus is a separate rider.
+    const plain = loadEquipment().find((item) => item.id === "shield")!.armor;
+    expect(plain).toMatchObject({ acBase: 2 });
+    const shields = rows.filter((row) => row.slot === "shield");
+    expect(shields.filter((row) => JSON.stringify(row.armor) !== JSON.stringify(plain)).map((row) => row.id)).toEqual(
+      []
+    );
+    expect(shields.map((row) => row.id)).toContain("shield-2");
+  });
+
   it("reaches the addable catalog through the fourth fold, sorted in with everything else", () => {
     const catalog = loadEquipment();
     expect(catalog.filter((item) => item.isMagic)).toHaveLength(rows.length);
-    // The fold gives every row the uniform `weapon`/`armor`-present shape the other three have.
-    expect(catalog.filter((item) => item.isMagic).every((item) => item.weapon === null && item.armor === null)).toBe(
-      true
-    );
+    // The fold gives every row the uniform `weapon`/`armor`-present shape the other three have; only a
+    // shield carries a block of its own (see below).
+    const magic = catalog.filter((item) => item.isMagic);
+    expect(magic.filter((item) => item.weapon !== null)).toEqual([]);
+    expect(magic.filter((item) => item.armor !== null && item.slot !== "shield")).toEqual([]);
     const wand = catalog.find((item) => item.id === "wand-of-the-war-mage-1")!;
     expect(wand).toMatchObject({
       name: "Wand of the War Mage, +1",
@@ -554,7 +566,7 @@ describe("the eligibility column", () => {
         .sort()
     ).toEqual(["energy-bow", "sun-blade"]);
     expect(rows.filter((row) => row.category !== "weapon" && row.category !== "armor" && row.appliesTo)).toEqual([]);
-    // Magic ammunition is unbound (no ammunition model), and a shield is its own base.
+    // Magic ammunition is unbound (no ammunition model), and a shield carries its own block.
     expect(
       rows
         .filter((row) => row.category === "ammunition")

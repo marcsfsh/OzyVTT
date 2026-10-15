@@ -100,7 +100,7 @@ function deps(faces: number[], definition: ActorDefinition): ResolveDependencies
     catalog
   };
 }
-/** The row the browse-and-add picker mints: id, name, category, equipped, attuned, nothing else. */
+/** The row the browse-and-add picker mints: id, name, category, equipped, attuned, and a shield's armor block. */
 const picked = (id: string, over: Record<string, unknown> = {}): InventoryItem => {
   const row = view.equipmentRecord(id)!;
   return item({
@@ -110,6 +110,7 @@ const picked = (id: string, over: Record<string, unknown> = {}): InventoryItem =
     category: row.category,
     equipped: true,
     attuned: row.attunement?.required === true,
+    ...(row.armor ? { armor: row.armor } : {}),
     ...over
   });
 };

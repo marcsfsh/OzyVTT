@@ -13,10 +13,10 @@ import { applyDamageDetailed } from "../src/hit-points.js";
 // engine outcome: a halved damage total, a moved Armor Class, rolled weapon numbers.
 // `item-riders.test.ts` covers the readers with injected catalogs; this file covers the authored data.
 // Fixture rule: no inventory row may supply a column the shipped row does not carry. Rows are minted
-// as the browse-and-add picker mints them (id, name, category, equipped, attuned), and
-// `mintsTheWayThePickerDoes` guards that. The one exception is `boundTo`, which mints a row as the
-// weapon bind does: the magic item's identity plus the chosen base weapon's block copied verbatim
-// from the shipped equipment catalog.
+// as the browse-and-add picker mints them (id, name, category, equipped, attuned, and the row's own
+// armor block when it has one), and `mintsTheWayThePickerDoes` guards that. The one exception is
+// `boundTo`, which mints a row as the weapon bind does: the magic item's identity plus the chosen
+// base weapon's block copied verbatim from the shipped equipment catalog.
 
 const IDS = {
   hero: "10000000-0000-4000-8000-000000000001",
@@ -50,9 +50,10 @@ function definitionOf(): ActorDefinition {
   } as unknown as ActorDefinition;
 }
 
-// What the browse-and-add picker mints for a magic item: id, name, category and the two booleans.
-// No `weapon` or `armor` block, because the catalog summary it is built from
-// (`apps/client/src/encounter/equipment.tsx`) has none to copy.
+// What the browse-and-add picker mints for a magic item: id, name, category, the two booleans, and
+// the catalog row's `armor` block when it carries one (only shields do), as `addFromCatalog` in
+// `apps/client/src/encounter/CharacterSheet.tsx` copies it. A magic weapon or body armor has no block
+// of its own; it gets one only from the bind.
 const asPicked = (id: string, over: Record<string, unknown> = {}): InventoryItem => {
   const row = shipped(id);
   return InventoryItemSchema.parse({
@@ -62,6 +63,7 @@ const asPicked = (id: string, over: Record<string, unknown> = {}): InventoryItem
     category: row.category,
     equipped: true,
     attuned: (row as { attunement?: { required?: boolean } }).attunement?.required === true,
+    ...(row.armor ? { armor: row.armor } : {}),
     ...over
   });
 };
@@ -208,29 +210,32 @@ describe("Armor of Resistance halves a typed damage total", () => {
   });
 
   it("mintsTheWayThePickerDoes: the far end's own inventory row carries no column the bundle lacks", () => {
-    // Guards the fixture rule in the header: a picker-minted row must not gain a `weapon` or `armor` block.
+    // Guards the fixture rule in the header: a picker-minted row carries only the blocks its row carries.
     const row = asPicked("armor-of-resistance") as unknown as Record<string, unknown>;
     expect(row.weapon, "the picker cannot mint a weapon block the catalog row does not carry").toBeUndefined();
     expect(row.armor, "the picker cannot mint an armor block the catalog row does not carry").toBeUndefined();
+    expect(asPicked("shield-2").armor, "a shield arrives with the shield block its row carries").toEqual(
+      shipped("shield-2").armor
+    );
   });
 });
 
 describe("the armour and shield rows move a real Armor Class", () => {
   it("raises actor.armorClass on equip and gives it back on unequip", () => {
     // `armor-class` is not in `THIS_ITEM_BY_DEFAULT`, so it is a standing bearer rider and needs no
-    // `armor` block.
+    // `armor` block. A shield adds the plain shield's +2 from its block on top of its own bonus: Dex 14
+    // and no body armor make 10 + 2 + 2 = 14 before the rider.
     for (const [id, amount] of [
       ["armor-1", 1],
-      ["shield-2", 2],
+      ["shield-2", 2 + 2],
+      ["sentinel-shield", 2],
       ["dwarven-plate", 2]
     ] as const) {
       const catalog = catalogOf([shipped(id)]);
       const definition = definitionOf();
       const state = stateWith([]);
       setInventoryItem(state, IDS.hero, asPicked(id), () => definition, { catalog });
-      expect(state.actors[0].armorClass, `${id}: the authored +${amount} did not reach the sheet's AC`).toBe(
-        12 + amount
-      );
+      expect(state.actors[0].armorClass, `${id}: +${amount} did not reach the sheet's AC`).toBe(12 + amount);
       setInventoryItem(state, IDS.hero, asPicked(id, { equipped: false }), () => definition, { catalog });
       expect(state.actors[0].armorClass, `${id}: unequipping must be the un-grant`).toBe(12);
     }

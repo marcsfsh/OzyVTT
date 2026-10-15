@@ -319,6 +319,23 @@ const BASE_WEAPONS = z
   .filter((weapon) => !weapon.improvised);
 const BASE_ARMOR = z.array(ArmorReferenceSchema).parse(JSON.parse(readFileSync(join(outDir, "armor.v1.json"), "utf8")));
 
+/**
+ * A magic shield is a shield: its rarity bonus (an authored `armor-class` rider) stacks on the plain
+ * shield's +2, which AC derivation reads from the row's armor block. So every shield row carries the
+ * base shield's block.
+ */
+const SHIELD_ARMOR = ((): EquipmentReference["armor"] => {
+  const shield = BASE_ARMOR.find((piece) => piece.category === "shield");
+  if (!shield) return die("armor.v1.json carries no shield row, so magic shields would add no base AC.");
+  return {
+    acBase: shield.acBase,
+    addDexModifier: shield.addDexModifier,
+    dexModifierCap: shield.dexModifierCap,
+    stealthDisadvantage: shield.stealthDisadvantage,
+    strengthRequired: shield.strengthRequired
+  };
+})();
+
 /** Split "A, B, or C" / "A or B" into its printed parts, in printed order. */
 const namedParts = (qualifier: string): string[] =>
   qualifier
@@ -401,8 +418,9 @@ function armorBaseIds(entry: Entry, qualifier: string): readonly string[] {
 const RESERVED_UNBINDABLE = new Set(["sun-blade", "energy-bow"]);
 
 /**
- * Weapon and body-armor rows get the column; everything else gets null. A magic shield is its own
- * base, so it binds to nothing. Magic ammunition is unbound: there is no ammunition model.
+ * Weapon and body-armor rows get the column; everything else gets null. A magic shield already
+ * carries the shield's block (`SHIELD_ARMOR`), so it binds to nothing. Magic ammunition is unbound:
+ * there is no ammunition model.
  */
 function appliesToOf(entry: Entry, type: TypeLine, slotId: string): ItemAppliesTo | null {
   if (RESERVED_UNBINDABLE.has(slug(entry.name))) return null;
@@ -471,7 +489,7 @@ for (const entry of items) {
         weightLb: null,
         description: description.text,
         weapon: null,
-        armor: null,
+        armor: slotId === "shield" ? SHIELD_ARMOR : null,
         appliesTo,
         isMagic: true,
         rarity,
