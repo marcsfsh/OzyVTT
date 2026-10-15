@@ -7,7 +7,13 @@
  */
 
 import { z } from "zod";
-import { AbilitySchema, ActorDefinitionSchema, ItemSlotSchema, SaveOutcomeFields } from "@vtt/schemas";
+import {
+  AbilitySchema,
+  ActionAreaSchema,
+  ActorDefinitionSchema,
+  ItemSlotSchema,
+  SaveOutcomeFields
+} from "@vtt/schemas";
 import {
   BackgroundReferenceSchema,
   ClassReferenceSchema,
@@ -72,6 +78,9 @@ export const SpellReferenceSchema = z.object({
     .nullable(),
   target: z.object({ type: z.string().nullable(), count: z.number().int().nullable() }),
   shape: z.object({ type: z.string(), size: z.number().nullable(), unit: z.string().nullable() }).nullable(),
+  /** The area a cast covers, for the map template, read from the text at build time. `shape` above is the source's
+   *  own field, which records a line's width as its size and has no emanations. */
+  area: ActionAreaSchema.nullable().default(null),
   classes: z.array(z.string()),
   description: z.string().min(1).max(20000),
   higherLevel: z.string().max(4000).nullable(),

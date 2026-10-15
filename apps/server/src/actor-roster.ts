@@ -11,6 +11,7 @@ import {
   type ClassLevelEntry,
   type UnarmoredDefense
 } from "@vtt/rules-5e";
+import { withProseFacts } from "@vtt/content-srd-5.2.1/action-prose";
 import { endEffectsSustainedBy } from "./effects.js";
 import { deriveEquipment, withResolvedSlots, type EquipmentCatalog } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
@@ -293,8 +294,29 @@ export function importActorDefinition(
     throw new CommandRejectedError("The imported-sheet library is full - remove unused combatants first.");
   const definitionId = `import-${actorId}`;
   const kind = definition.schemaId === "vtt.actor-character" ? ("player-character" as const) : ("monster" as const);
-  instantiate(state, definition, actorId, visibility, kind, definitionId, catalog);
-  state.definitions = [...state.definitions, { id: definitionId, definition }];
+  const filled = withDefinitionProseFacts(definition);
+  instantiate(state, filled, actorId, visibility, kind, definitionId, catalog);
+  state.definitions = [...state.definitions, { id: definitionId, definition: filled }];
+}
+
+/** The definition with its actions' prose facts filled (`withProseFacts`), as it enters the campaign. */
+export function withDefinitionProseFacts(definition: ActorDefinition): ActorDefinition {
+  const actions = definition.actions.map((action) => withProseFacts(action));
+  return actions.every((action, index) => action === definition.actions[index])
+    ? definition
+    : { ...definition, actions };
+}
+
+/** Fills prose facts on stored definitions imported before the fields existed. True when any changed. */
+export function fillStoredProseFacts(state: GameState): boolean {
+  let changed = false;
+  state.definitions = state.definitions.map((entry) => {
+    const definition = withDefinitionProseFacts(entry.definition);
+    if (definition === entry.definition) return entry;
+    changed = true;
+    return { id: entry.id, definition };
+  });
+  return changed;
 }
 
 /** Queue a player-submitted import for GM approval; the definition is pre-validated by the caller. */

@@ -122,6 +122,7 @@ export const barbarian: ClassMechanicsModule = {
             id: "intimidating-presence",
             name: "Intimidating Presence",
             activation: "bonus-action",
+            area: { shape: "emanation", sizeFeet: 30, widthFeet: null },
             description:
               "Each creature of your choice in a 30-foot Emanation makes a Wisdom saving throw. On a failed save, the creature has the Frightened condition for 1 minute; at the end of each of its turns it repeats the save, ending the effect on itself on a success.",
             damage: [],

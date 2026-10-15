@@ -97,7 +97,8 @@ export function setCondition(
       {
         kind: "condition",
         text: `${actor.name} is immune to ${conditionLabel(conditionId)} - not applied.`,
-        actorId: actor.id
+        actorId: actor.id,
+        immune: true
       }
     ];
   }

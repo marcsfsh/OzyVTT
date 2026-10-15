@@ -1,30 +1,7 @@
-import type { AnnotationPoint, AnnotationShapeKind, ContentActionArea, GameState } from "@vtt/domain";
+import type { AnnotationPoint, AnnotationShapeKind, GameState } from "@vtt/domain";
 import { gridToImage, imageToGrid, type GridPoint, type SquareGridCalibration } from "./grid-calibration.js";
 
 const EPSILON = 1e-6;
-
-/**
- * Parse an area of effect out of a stat block's prose. SRD 2024 phrasing is consistent enough to
- * pattern-match ("60-foot Cone", "60-foot-long, 5-foot-wide Line", "20-foot-radius Sphere",
- * "15-foot Emanation", "10-foot Cube"). Returns null when the action names no area - the GM then
- * targets tokens directly. Line wording occasionally omits the width; default to a 5-ft (one-cell) line.
- */
-export function parseAreaProse(description: string): ContentActionArea | null {
-  const line = /(\d+)-foot(?:-long)?(?:,?\s*(\d+)-foot-wide)?\s+Line/i.exec(description);
-  if (line) return { shape: "line", sizeFeet: Number(line[1]), widthFeet: line[2] ? Number(line[2]) : 5 };
-  const cone = /(\d+)-foot\s+Cone/i.exec(description);
-  if (cone) return { shape: "cone", sizeFeet: Number(cone[1]), widthFeet: null };
-  const radial = /(\d+)-foot(?:-radius)?\s+(Sphere|Emanation)/i.exec(description);
-  if (radial)
-    return {
-      shape: radial[2].toLowerCase() === "emanation" ? "emanation" : "sphere",
-      sizeFeet: Number(radial[1]),
-      widthFeet: null
-    };
-  const cube = /(\d+)-foot\s+Cube/i.exec(description);
-  if (cube) return { shape: "cube", sizeFeet: Number(cube[1]), widthFeet: null };
-  return null;
-}
 
 /** The grid-space centers of every cell a token's footprint covers (odd footprints center on a cell, even on an intersection - mirrors token-placement). */
 function footprintCellCenters(

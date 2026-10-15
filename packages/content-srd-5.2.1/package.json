@@ -6,7 +6,8 @@
   "description": "Curated SRD 5.2.1 content bundles (CC BY 4.0) with required attribution, generated from vendored sources by `npm run content`.",
   "exports": {
     ".": "./src/index.ts",
-    "./schemas": "./src/schemas.ts"
+    "./schemas": "./src/schemas.ts",
+    "./action-prose": "./src/action-prose.ts"
   },
   "scripts": {
     "check": "tsc --noEmit",

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema } from "@vtt/domain";
-import { cellCenterImage, parseAreaProse, tokensInTemplate } from "../src/area-targeting.js";
+import { cellCenterImage, tokensInTemplate } from "../src/area-targeting.js";
 import { startEncounter } from "../src/encounter.js";
 import type { SquareGridCalibration } from "../src/grid-calibration.js";
 
@@ -47,15 +47,6 @@ function placed(cells: ReadonlyArray<{ actor: string; column: number; row: numbe
 const at = (column: number, row: number) => cellCenterImage(CAL, column, row);
 
 describe("area-of-effect templates", () => {
-  it("parses the SRD area phrasings, and nothing else", () => {
-    expect(parseAreaProse("each creature in a 60-foot Cone")).toEqual({ shape: "cone", sizeFeet: 60, widthFeet: null });
-    expect(parseAreaProse("a 60-foot-long, 5-foot-wide Line")).toEqual({ shape: "line", sizeFeet: 60, widthFeet: 5 });
-    expect(parseAreaProse("a 20-foot-radius Sphere")).toEqual({ shape: "sphere", sizeFeet: 20, widthFeet: null });
-    expect(parseAreaProse("a 15-foot Emanation")).toEqual({ shape: "emanation", sizeFeet: 15, widthFeet: null });
-    expect(parseAreaProse("a 10-foot Cube")).toEqual({ shape: "cube", sizeFeet: 10, widthFeet: null });
-    expect(parseAreaProse("Melee Attack Roll: +9, reach 10 ft.")).toBeNull();
-  });
-
   it("catches tokens inside a circle and excludes ones outside or in the tray", () => {
     const game = placed([
       { actor: id(1), column: 1, row: 0 },

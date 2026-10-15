@@ -166,6 +166,7 @@ export function castAction(
       : caster.saveDc);
   return {
     ...base,
+    ...(spell.area ? { area: spell.area } : {}),
     ...(spell.attackRoll ? { attack: { bonus: attackBonus } } : {}),
     ...(spell.save
       ? { save: { ...spell.save, dc: clampDc(saveDc), ...(bearersDc ? { spellcasting: true } : {}) } }

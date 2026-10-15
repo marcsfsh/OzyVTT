@@ -2,7 +2,7 @@ import type { RollRecord } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
 import { resolveDefinitionAction } from "../action-resolution.js";
 import { addAnnotation, shapeGeometry } from "../annotations.js";
-import { parseAreaProse, tokensInTemplate } from "../area-targeting.js";
+import { tokensInTemplate } from "../area-targeting.js";
 import { canPlayerTarget, GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { builtinAction } from "../builtin-actions.js";
 import { effectiveActions } from "../effective-actions.js";
@@ -96,7 +96,7 @@ export const actionCommands = [
             calibration,
             snapped,
             template.shape,
-            parseAreaProse(action.description)?.widthFeet ?? null
+            action.area?.widthFeet ?? null
           ).filter((id) => id !== actorId && draft.combat.initiative.some((entry) => entry.actorId === id));
           if (resolvedTargetIds.length === 0) throw new CommandRejectedError("No combatants are inside that area.");
         } else {

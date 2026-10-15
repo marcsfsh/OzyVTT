@@ -15,7 +15,7 @@ import type {
 } from "@vtt/domain";
 import { ACTOR_DEFINITION_SCHEMA_VERSION } from "@vtt/schemas";
 import { nextAnnotationExpiry } from "./annotations.js";
-import { reconcileArmorClasses, storedDefinition } from "./actor-roster.js";
+import { fillStoredProseFacts, reconcileArmorClasses, storedDefinition } from "./actor-roster.js";
 import { createApiV1Router } from "./api-v1.js";
 import { ContentLibrary } from "./content-library.js";
 import { equipmentCatalogOf } from "./equipment-derivation.js";
@@ -184,19 +184,23 @@ export function createServer(options: CreateServerOptions) {
       console.error("re-deriving armor classes failed:", error instanceof Error ? error.message : error)
     );
   }
-  /** Re-derives stored ACs once the content behind them changed (a homebrew write, a content upgrade at start).
-   *  Skipped while the GM has rewound the fight, so a content edit doesn't dirty the timeline; the next change
-   *  or restart catches up. */
+  /** Re-derives stored ACs once the content behind them changed (a homebrew write, a content upgrade at start), and
+   *  fills prose facts on definitions imported before those fields existed. Skipped while the GM has rewound the
+   *  fight, so a content edit doesn't dirty the timeline; the next change or restart catches up. */
   async function reconcileContentDerived() {
     const current = committedState.read();
     if (current.combat.historyCursor !== null) return;
     const catalog = equipmentCatalogOf(contentLibrary.forAudience("gm"));
     const definitionsIn = (state: GameState) => (definitionId: string) =>
       storedDefinition(state, definitionId) ?? contentLibrary.monsterForInstance(definitionId);
+    const reconcile = (state: GameState) => {
+      const filled = fillStoredProseFacts(state);
+      return reconcileArmorClasses(state, definitionsIn(state), catalog) || filled;
+    };
     // A dry run first, so an unchanged campaign takes no revision.
-    if (!reconcileArmorClasses(structuredClone(current), definitionsIn(current), catalog)) return;
+    if (!reconcile(structuredClone(current))) return;
     const { state } = await store.execute({ id: randomUUID(), type: "content.reconcile" }, (draft) => {
-      reconcileArmorClasses(draft, definitionsIn(draft), catalog);
+      reconcile(draft);
     });
     await publishGameState(state);
   }

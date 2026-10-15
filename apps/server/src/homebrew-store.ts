@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { HomebrewContentTypeSchema, type HomebrewContentState, type HomebrewContentType } from "@vtt/api-contract";
-import { type ActorDefinition } from "@vtt/schemas";
+import { type ActorAction, type ActorDefinition } from "@vtt/schemas";
+import { areaOfProse, withProseFacts } from "@vtt/content-srd-5.2.1/action-prose";
 import {
   HOMEBREW_BODY_SCHEMAS,
   type BackgroundReference,
@@ -743,10 +744,29 @@ const BODY_SCHEMAS = HOMEBREW_BODY_SCHEMAS satisfies Record<
 function parseBody(type: HomebrewContentType, json: string): unknown {
   try {
     const parsed = BODY_SCHEMAS[type].safeParse(JSON.parse(json) as unknown);
-    return parsed.success ? parsed.data : undefined;
+    return parsed.success ? withBodyProseFacts(type, parsed.data) : undefined;
   } catch {
     return undefined;
   }
+}
+
+/** What a body's prose says that play needs as data, filled as the content build fills the SRD's: a spell's area,
+ *  and every action's facts wherever the record nests its actions (a monster's list, an item's, a feature's). */
+function withBodyProseFacts(type: HomebrewContentType, body: unknown): unknown {
+  if (type !== "spell") return withActionProseFacts(body);
+  const spell = body as SpellReference;
+  return spell.area === null ? { ...spell, area: areaOfProse(spell.description) } : spell;
+}
+
+function withActionProseFacts(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(withActionProseFacts);
+  if (!node || typeof node !== "object") return node;
+  const record = node as Record<string, unknown>;
+  const filled = Object.fromEntries(Object.entries(record).map(([key, value]) => [key, withActionProseFacts(value)]));
+  // Only an action has all three once parsed (`damage` defaults to []).
+  const isAction =
+    typeof record.activation === "string" && typeof record.description === "string" && Array.isArray(record.damage);
+  return isAction ? withProseFacts(filled as unknown as ActorAction) : filled;
 }
 
 /** The slice under construction - the same nine keys as `HomebrewCatalogSlice`, mutable while filling. */

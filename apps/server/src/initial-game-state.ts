@@ -360,6 +360,7 @@ const LYRA: ActorDefinition = {
       id: "fireball",
       name: "Fireball (3rd)",
       activation: "action",
+      area: { shape: "sphere", sizeFeet: 20, widthFeet: null },
       save: { ability: "dex", dc: 15, successDamage: "half", failureConditions: [] },
       damage: [{ formula: "8d6", type: "fire" }],
       description:
