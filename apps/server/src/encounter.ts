@@ -255,7 +255,10 @@ export function endEncounter(state: GameState) {
   if (!state.combat.active) throw new CommandRejectedError("There is no active encounter to end.");
   // Ending mid-review would strand the timeline pointing at a fight that no longer exists.
   if (state.combat.historyCursor !== null)
-    throw new CommandRejectedError("Finish reviewing the combat history before ending the encounter.");
+    throw new CommandRejectedError(
+      "Finish reviewing the combat history before ending the encounter.",
+      "history_review"
+    );
   // Fog persists: what the party revealed stays revealed after the fight.
   state.combat = {
     ...state.combat,

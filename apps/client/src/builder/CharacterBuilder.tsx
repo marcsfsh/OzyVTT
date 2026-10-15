@@ -1,5 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { BuilderAbilityMethod, ContentFeatureSummary, ContentSpellSummary, GmView, PlayerView } from "@vtt/domain";
+import type {
+  BuilderAbilityMethod,
+  BuilderOffer,
+  ContentFeatureSummary,
+  ContentSpellSummary,
+  GmView,
+  PlayerView
+} from "@vtt/domain";
 import {
   ABILITIES,
   ABILITY_ROLL_FORMULA,
@@ -50,33 +57,33 @@ import {
   baseScoresOf,
   abilityBonusesOf,
   buildCreatePayload,
-  computeOffers,
   emptyDraft,
   FEAT_KINDS,
   isAssignMethod,
   offerContext,
   offerFilled,
+  offersRequestOf,
   pointBuySpent,
-  prunePicks,
   rosterCapacity,
   STEP_IDS,
   STEP_LABELS,
   STEP_SHORT,
   stepBlockedReason,
+  withAnswersFrom,
   type BuilderDraft,
-  type BuilderOffer,
   type StepId
 } from "./build-payload";
 import { clearDraft, describeWhen, draftHasProgress, loadDraft, saveDraft, type StoredDraft } from "./draft";
+import { useBuilderOffers } from "./useBuilderOffers";
 import "./character-builder.css";
 
 /**
  * The guided character-creation wizard: a full page on a laptop, a full-screen sheet on a phone.
  *
- * It renders the picks the content asks for (resolving `fromCatalog` slugs with
- * `resolveCatalogChoice`, the same function the server validates with) and submits one
- * `character.create`. It computes no game outcome: HP, AC, slots and riders are assembled
- * server-side, and a rejection comes back as the server's message on the review step.
+ * It renders the picks the server says the content asks for (`builder:offers`, asked again after every
+ * answer) and submits one `character.create` carrying the ledger rows the server made from them. It
+ * computes no game outcome: HP, AC, slots and riders are assembled server-side, and a rejection comes
+ * back as the server's message on the review step.
  */
 
 type BuilderState = GmView | PlayerView;
@@ -109,6 +116,9 @@ const SEARCH_THRESHOLD = 8;
 
 /** The offer kinds whose options are spells, and therefore have rules worth reading while choosing. */
 const SPELL_KINDS: ReadonlySet<string> = new Set(["spell", "cantrip"]);
+
+/** Before the table's first answer there is nothing to pick. */
+const NO_OFFERS: readonly BuilderOffer[] = [];
 
 const METHOD_LABELS: Readonly<Record<BuilderAbilityMethod, string>> = {
   "standard-array": "Standard array",
@@ -155,8 +165,8 @@ const spellLevelLine = (level: number | null | undefined) =>
   level == null ? undefined : level === 0 ? "Cantrip" : `Level ${level}`;
 
 /**
- * Provenance for an offer option, by id. `resolveCatalogChoice` narrows options to
- * `{ id, name, level? }`, so `source` is looked back up in the catalog the id came from.
+ * Provenance for an offer option, by id. The server's offers carry options as `{ id, name, level? }`,
+ * so `source` is looked back up in the catalog the id came from.
  *
  * Subclasses and feats only: spell, equipment and monster summaries carry no `source`, so a
  * homebrew spell is still unbadged. These catalogs are audience-merged server-side, so nothing a
@@ -444,7 +454,16 @@ export function CharacterBuilder({
   const [pendingCreate, setPendingCreate] = useState<{ actorId: string; typedName: string } | null>(null);
 
   const step: StepId = STEP_IDS[stepIndex];
-  const offers = useMemo(() => computeOffers(draft, catalogs), [draft, catalogs]);
+  /**
+   * The offers come from the table, asked again after each answer. Until the next answer lands the last
+   * offers stay on screen with the new pick already shown, so a tap never waits on the network.
+   */
+  const {
+    reply: offersReply,
+    current: offersCurrent,
+    refusal: offersRefusal
+  } = useBuilderOffers(offersRequestOf(draft));
+  const offers = offersReply?.offers ?? NO_OFFERS;
   const context = useMemo(() => offerContext(draft, catalogs), [draft, catalogs]);
   const abilityCap = useMemo(() => abilityCapPreview(draft, catalogs, offers), [draft, catalogs, offers]);
   // GM-only: `PlayerView` has no sheet library, and its projected actor list could only under-count.
@@ -454,16 +473,14 @@ export function CharacterBuilder({
   );
 
   /**
-   * Keeps the draft consistent as the build changes shape (a Fighter's skills are not a Wizard's).
-   * `draft.picks` is a required dependency: `prunePicks` mirrors the chosen subclass onto
-   * `draft.subclassId`, which `computeOffers` reads to offer the subclass's own choices.
+   * Keeps the draft to what the build still offers as it changes shape (a Fighter's skills are not a
+   * Wizard's): the table's answer drops picks it no longer takes and names the subclass. Only an answer to
+   * this very draft is adopted.
    */
   useEffect(() => {
-    setDraft((current) => {
-      const pruned = prunePicks(current, computeOffers(current, catalogs));
-      return pruned === current ? current : pruned;
-    });
-  }, [draft.classId, draft.speciesId, draft.backgroundId, draft.level, draft.subclassId, draft.picks, catalogs]);
+    if (!offersReply || !offersCurrent) return;
+    setDraft((current) => withAnswersFrom(current, offersReply));
+  }, [offersReply, offersCurrent]);
 
   // Park the draft on every change, except while an unanswered resume offer is on screen: saving then
   // would overwrite the draft the banner offers. Only Resume, Discard or Save & close answer it.
@@ -507,8 +524,13 @@ export function CharacterBuilder({
   /** Every player edit goes through here; the pruning effect does not. */
   const editDraft = (update: (current: BuilderDraft) => BuilderDraft) => setDraft(update);
   const patch = (change: Partial<BuilderDraft>) => editDraft((current) => ({ ...current, ...change }));
+  // A subclass answer shows its detail at once; the table's answer confirms it.
   const setPicks = (offer: BuilderOffer, ids: readonly string[]) =>
-    editDraft((current) => ({ ...current, picks: { ...current.picks, [offer.key]: ids.slice(0, offer.capacity) } }));
+    editDraft((current) => ({
+      ...current,
+      picks: { ...current.picks, [offer.key]: ids.slice(0, offer.capacity) },
+      ...(offer.kind === "subclass" ? { subclassId: ids[0] ?? null } : {})
+    }));
   const setIncreases = (offer: BuilderOffer, increases: ReadonlyArray<{ ability: Ability; amount: number }>) =>
     editDraft((current) => ({ ...current, asiIncreases: { ...current.asiIncreases, [offer.key]: increases } }));
 
@@ -521,24 +543,30 @@ export function CharacterBuilder({
     [draft, catalogs, offers, policy]
   );
   const stepReason = stepReasons[stepIndex];
-  /** How far a resumed draft got: its first unsatisfied step. Earlier steps read as done. */
-  const reachedIn = (resumed: BuilderDraft) => {
-    const resumedOffers = computeOffers(resumed, catalogs);
-    const first = STEP_IDS.findIndex((id) => stepBlockedReason(id, resumed, catalogs, resumedOffers, policy) !== null);
-    return first === -1 ? STEP_IDS.length - 1 : first;
-  };
+  /** A resumed draft reaches its first unsatisfied step, read once the table has answered for it. */
+  const [resuming, setResuming] = useState(false);
+  useEffect(() => {
+    if (!resuming || !offersCurrent || !catalogs.loaded) return;
+    const first = stepReasons.findIndex((reason) => reason !== null);
+    setFurthest(first === -1 ? STEP_IDS.length - 1 : first);
+    setResuming(false);
+  }, [resuming, offersCurrent, catalogs.loaded, stepReasons]);
   /** `.cb-page` is the scroll container, so a step change must reset its scrollTop. */
   const pageRef = useRef<HTMLDivElement | null>(null);
   useLayoutEffect(() => {
     if (pageRef.current) pageRef.current.scrollTop = 0;
   }, [stepIndex]);
-  // A full or offline table blocks only once the character itself is finished.
+  // A full or offline table blocks only once the character itself is finished, and Create waits for the
+  // table's answer to this exact draft, since it sends the ledger rows that answer made.
   const reviewBlock =
     step !== "review"
       ? null
       : connection !== "online"
         ? "The table is offline — reconnecting…"
-        : (capacity?.blockedReason ?? null);
+        : (offersRefusal ??
+          (offersCurrent ? null : "Checking these choices with the table…") ??
+          capacity?.blockedReason ??
+          null);
   const blockedReason = stepReason ?? reviewBlock;
   /**
    * The rail's state machine:
@@ -582,7 +610,8 @@ export function CharacterBuilder({
     setSubmitting(true);
     let payload;
     try {
-      payload = buildCreatePayload(draft, offers);
+      if (!offersCurrent || !offersReply) throw new Error("The table is still checking these choices.");
+      payload = buildCreatePayload(draft, offersReply.choices);
     } catch (error) {
       setSubmitting(false);
       setRejection({
@@ -1465,7 +1494,7 @@ export function CharacterBuilder({
                 size="sm"
                 onClick={() => {
                   setDraft(resumable.draft);
-                  setFurthest(reachedIn(resumable.draft));
+                  setResuming(true);
                   setResumable(null);
                 }}
               >
@@ -1514,6 +1543,11 @@ export function CharacterBuilder({
             </p>
           )}
           {rebuild?.notice}
+          {offersRefusal && (
+            <Alert tone="danger" title="The table could not check these choices">
+              {offersRefusal}
+            </Alert>
+          )}
           {body()}
         </div>
       </WizardShell>

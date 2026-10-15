@@ -93,7 +93,7 @@ export function launchReplay(state: GameState, input: ReplayLaunchInput): Replay
 
   // Scene headroom first: a launch can need two slots, and discovering that mid-way would mangle the table.
   if (sceneHeadroom(state) < sceneSlotsNeededToGoLive(state)) {
-    throw new CommandRejectedError(SCENE_ROOM_REFUSAL);
+    throw new CommandRejectedError(SCENE_ROOM_REFUSAL, "scene_room_full");
   }
 
   const combatantIds = [...new Set(archived.combat.initiative.map((entry) => entry.actorId))];

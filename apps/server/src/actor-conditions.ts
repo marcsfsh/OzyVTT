@@ -1,13 +1,13 @@
 import type { GameState } from "@vtt/domain";
-import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
-import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import type { Initiator } from "./authorization.js";
 import { adjustableActor } from "./hit-points.js";
 import {
+  applyCondition,
   applyExhaustionDeath,
   endConcentrationSustainedBy,
   releaseGrapplesHeldBy,
+  type ConditionImmunitySource,
   type EffectNarration
 } from "./effects.js";
 import {
@@ -29,16 +29,11 @@ export function setCondition(
   active: boolean,
   level: number | undefined,
   scope: Initiator,
-  options?: Readonly<{
-    override?: { reason?: string } | null;
-    resolveDefinition?: (definitionId: string) => ActorDefinition | undefined;
-    catalog?: EquipmentCatalog;
-  }>
+  options?: ConditionImmunitySource & Readonly<{ override?: { reason?: string } | null }>
 ): EffectNarration[] {
   const actor = adjustableActor(state, actorId, scope);
   if (level !== undefined && conditionId !== "exhaustion")
     throw new CommandRejectedError("Only exhaustion has levels.");
-  const remaining = actor.conditions.filter((condition) => condition.id !== conditionId);
   if (!active) {
     const events: EffectNarration[] = [];
     // SRD Prone: standing up costs half your Speed, charged when the current combatant stands on its own
@@ -85,20 +80,14 @@ export function setCondition(
       if (blocked && !options?.override)
         events.push({ kind: "condition", text: `Rules note: ${violation}`, actorId: actor.id });
     }
-    actor.conditions = remaining;
+    actor.conditions = actor.conditions.filter((condition) => condition.id !== conditionId);
     return events;
   }
+  const previousExhaustion = exhaustionLevel(actor);
   // Immunity: skip with narration rather than reject (SRD condition immunity). Innate and item-granted
   // immunities read the same; without a catalog only innate ones apply.
-  const granted = options?.catalog
-    ? deriveEquipment(
-        actor,
-        actor.definitionId ? options.resolveDefinition?.(actor.definitionId) : undefined,
-        options.catalog
-      ).conditionImmunities
-    : [];
-  const grantedImmunity = granted.find((entry) => entry.id === conditionId);
-  if (actor.conditionImmunities.includes(conditionId) || grantedImmunity) {
+  const written = applyCondition(actor, conditionId, { level, immunities: options });
+  if (written === "immune") {
     return [
       {
         kind: "condition",
@@ -107,12 +96,7 @@ export function setCondition(
       }
     ];
   }
-  if (remaining.length >= 20) throw new CommandRejectedError("That combatant already has too many conditions.");
-  const previousExhaustion = exhaustionLevel(actor);
-  actor.conditions = [
-    ...remaining,
-    { id: conditionId, ...(conditionId === "exhaustion" ? { level: level ?? 1 } : {}) }
-  ].sort((left, right) => left.id.localeCompare(right.id));
+  if (written === "full") throw new CommandRejectedError("That combatant already has too many conditions.");
   // SRD: Exhaustion level 6 is death, the same transition the onEnd grant path fires.
   if (conditionId === "exhaustion" && previousExhaustion < 6 && (level ?? 1) >= 6) {
     return applyExhaustionDeath(state, actor);

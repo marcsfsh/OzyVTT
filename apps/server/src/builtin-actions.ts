@@ -9,7 +9,7 @@ type BuiltinAction = ActorDefinition["actions"][number];
  *
  * Ids are a frozen replay contract (journaled payloads reference them); a stat-block action with the
  * same id wins on lookup. What the declarative vocabulary can't express (check rolls, unarmed strike
- * math) is special-cased in resolveDefinitionAction by id. Descriptions quote the SRD rule.
+ * math) is a handler keyed by id in `resolution/builtins.ts`. Descriptions quote the SRD rule.
  */
 export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
   {

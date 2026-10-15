@@ -3,9 +3,10 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import express from "express";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ViewerAccessStore } from "../src/viewer-access.js";
 import { ViewerCoordinator } from "../src/viewer-coordinator.js";
+import { requestConventions } from "../src/http-kit.js";
 import { createViewerRouter } from "../src/viewer-http.js";
 import { ViewerPresentationStore } from "../src/viewer-presentation-store.js";
 
@@ -25,6 +26,8 @@ async function fixture() {
   const authorizeGm = (token: string | undefined) => token === "gm-secret";
   const coordinator = new ViewerCoordinator(access, presentation, authorizeGm, () => now);
   const app = express();
+  // Mirrors server.ts, which stamps the request id once ahead of every /api/v1 router.
+  app.use(requestConventions);
   app.use(express.json());
   app.use(createViewerRouter({ access, presentation, coordinator, authorizeGm, now: () => now }));
   const server = createServer(app);
@@ -276,5 +279,25 @@ describe("viewer HTTP vertical slice", () => {
     expect(conflict.status).toBe(409);
     expect(text).not.toContain("gm-secret");
     expect(JSON.parse(text).error.code).toBe("conflict");
+  });
+
+  it("keeps a refusal's own message but answers a store fault with a fixed one", async () => {
+    const test = await fixture();
+    const gm = { authorization: "Bearer gm-secret" };
+    const refused = await fetch(`${test.base}/api/v1/viewer/access/not-a-uuid`, { method: "DELETE", headers: gm });
+    expect(refused.status).toBe(400);
+    expect((await json(refused)).error.message).toBe("Viewer access ID is malformed.");
+
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    (test.access as unknown as { list: () => never }).list = () => {
+      throw new Error("SQLITE_IOERR: disk I/O error: /srv/vtt/data/vtt.sqlite");
+    };
+    const failed = await fetch(`${test.base}/api/v1/viewer/access`, { headers: gm });
+    expect(failed.status).toBe(500);
+    const text = await failed.text();
+    expect(JSON.parse(text).error).toMatchObject({ code: "internal_error", message: "Viewer request failed." });
+    expect(text).not.toContain("SQLITE");
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
   });
 });

@@ -315,7 +315,10 @@ export function rebuildActorDefinition(
   if (actor.definitionId !== definitionId)
     throw new CommandRejectedError("That character was not built here, so it can't be rebuilt.");
   if (state.combat.historyCursor !== null)
-    throw new CommandRejectedError("Finish reviewing the combat history before rebuilding a character.");
+    throw new CommandRejectedError(
+      "Finish reviewing the combat history before rebuilding a character.",
+      "history_review"
+    );
   if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId)) {
     throw new CommandRejectedError("End the encounter before rebuilding a character who is in it.");
   }
@@ -394,7 +397,10 @@ export function removeActor(state: GameState, actorId: string) {
     throw new CommandRejectedError("Player characters can't be removed from the roster.");
   // A recorded snapshot may reference this actor; make the GM leave history review first.
   if (state.combat.historyCursor !== null)
-    throw new CommandRejectedError("Finish reviewing the combat history before removing a combatant.");
+    throw new CommandRejectedError(
+      "Finish reviewing the combat history before removing a combatant.",
+      "history_review"
+    );
   if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId)) {
     throw new CommandRejectedError("End the encounter before removing a combatant who is in it.");
   }

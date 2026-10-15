@@ -7,7 +7,6 @@ import {
   GAME_COMMANDS,
   GameCommandEnvelopeSchema,
   SESSION_PATHS,
-  type ApiErrorCode,
   type IntegrationScope
 } from "@vtt/api-contract";
 import type { EncounterArchiveSummary } from "./game-store.js";
@@ -20,6 +19,7 @@ import {
   type GameReply
 } from "./commands/index.js";
 import type { EncounterArchiveDocument } from "./encounter-archive.js";
+import { bearerToken, expressPath, issuesOf, pathParam, sendData, sendFailure } from "./http-kit.js";
 import { projectPlayerReplay } from "./replay-projection.js";
 
 /**
@@ -55,56 +55,13 @@ export type GameApiRouterOptions = Readonly<{
   newId?: () => string;
 }>;
 
-const expressPath = (openApiPath: string) => openApiPath.replace(/\{([a-zA-Z]+)\}/g, ":$1");
-
-function bearerToken(req: Request) {
-  const authorization = req.header("authorization");
-  const match = authorization?.match(/^Bearer\s+([^\s]+)$/i);
-  return match?.[1];
-}
-
 export function createGameApiRouter(options: GameApiRouterOptions) {
   const router = Router();
   const newId = options.newId ?? randomUUID;
 
-  // Self-sufficient when mounted standalone; a no-op under api-v1.ts, which already stamped these.
-  router.use((req, res, next) => {
-    if (!res.locals.requestId) {
-      const candidate = req.header("x-request-id");
-      res.locals.requestId =
-        candidate && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidate)
-          ? candidate
-          : newId();
-      res.setHeader("x-request-id", res.locals.requestId);
-      res.setHeader("cache-control", "no-store");
-    }
-    next();
-  });
-
-  function sendError(
-    res: Response,
-    status: number,
-    code: ApiErrorCode,
-    message: string,
-    details?: Readonly<Record<string, unknown>>,
-    currentRevision?: number
-  ) {
-    return res.status(status).json({
-      ok: false,
-      apiVersion: API_VERSION,
-      error: {
-        code,
-        message,
-        requestId: res.locals.requestId,
-        ...(details ? { details } : {}),
-        ...(currentRevision !== undefined ? { currentRevision } : {})
-      }
-    });
-  }
-
   function sendOperationError(res: Response, error: unknown) {
     const failure = describeFailure(error);
-    return sendError(
+    return sendFailure(
       res,
       failure.status,
       failure.code,
@@ -114,14 +71,15 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
     );
   }
 
-  function sendData(res: Response, data: unknown) {
-    return res.json({ ok: true, apiVersion: API_VERSION, data });
-  }
-
   function resolvePrincipal(req: Request, res: Response, scope: IntegrationScope): GamePrincipal | null {
     const token = bearerToken(req);
     if (!token) {
-      sendError(res, 401, "unauthenticated", "A GM session, player session, or integration bearer token is required.");
+      sendFailure(
+        res,
+        401,
+        "unauthenticated",
+        "A GM session, player session, or integration bearer token is required."
+      );
       return null;
     }
     const gm = options.gmSession(token);
@@ -130,7 +88,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
     if (player) return { kind: "player", sessionId: player.sessionId };
     const credential = options.verifyIntegration(token, scope);
     if (credential) return { kind: "integration", credentialId: credential.id, name: credential.name };
-    sendError(res, 403, "forbidden", "The token is invalid, revoked, or missing the required scope.");
+    sendFailure(res, 403, "forbidden", "The token is invalid, revoked, or missing the required scope.");
     return null;
   }
 
@@ -151,7 +109,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   ) {
     try {
       const data = await options.game.dispatch(command.type, principal, payload);
-      return sendData(res, { commandId: payload.commandId, ...echo, ...data });
+      return sendData(res, 200, { commandId: payload.commandId, ...echo, ...data });
     } catch (error) {
       return sendOperationError(res, error);
     }
@@ -170,14 +128,14 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
           : req.query.view === "gm" || req.query.view === undefined
             ? undefined
             : null;
-      if (requested === null) return sendError(res, 400, "validation_failed", 'view must be "gm" or "player".');
+      if (requested === null) return sendFailure(res, 400, "validation_failed", 'view must be "gm" or "player".');
       const projected = game.view(res.locals.principal as GamePrincipal, requested);
       const revision = (projected.game as { revision: number }).revision;
       // Weak because presence and timed-annotation expiry can change content without a revision bump.
       const etag = `W/"game-r${revision}-${projected.view}"`;
       res.setHeader("etag", etag);
       if (req.header("if-none-match") === etag) return res.status(304).end();
-      return sendData(res, { view: projected.view, revision, game: projected.game });
+      return sendData(res, 200, { view: projected.view, revision, game: projected.game });
     } catch (error) {
       return sendOperationError(res, error);
     }
@@ -189,7 +147,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
       try {
         const params = req.params as Record<string, string>;
         const input = read.httpInput ? read.httpInput({ params, query: req.query }) : params;
-        return sendData(res, game.read(read, res.locals.principal as GamePrincipal, input));
+        return sendData(res, 200, game.read(read, res.locals.principal as GamePrincipal, input));
       } catch (error) {
         return sendOperationError(res, error);
       }
@@ -201,18 +159,18 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
     const commands = game.commands
       .map(({ type, summary }) => ({ type, scope: GAME_COMMANDS[type].scope, summary }))
       .sort((a, b) => a.type.localeCompare(b.type));
-    return sendData(res, { commands });
+    return sendData(res, 200, { commands });
   });
 
   router.post(expressPath(GAME_PATHS.commands), async (req, res) => {
     const envelope = GameCommandEnvelopeSchema.safeParse(req.body);
     if (!envelope.success)
-      return sendError(res, 400, "validation_failed", "The command envelope is malformed.", {
-        issues: envelope.error.issues.map((issue) => ({ path: issue.path, message: issue.message }))
+      return sendFailure(res, 400, "validation_failed", "The command envelope is malformed.", {
+        issues: issuesOf(envelope.error)
       });
     const command = commandsByType.get(envelope.data.type);
     if (!command)
-      return sendError(res, 404, "not_found", "That command type is not available over the integration API.", {
+      return sendFailure(res, 404, "not_found", "That command type is not available over the integration API.", {
         availableTypes: [...commandsByType.keys()].sort()
       });
     const principal = resolvePrincipal(req, res, GAME_COMMANDS[command.type].scope);
@@ -246,8 +204,8 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
 
   router.post(expressPath(SESSION_PATHS.player), (_req, res) => {
     const issued = options.sessions.issuePlayer();
-    if (!issued) return sendError(res, 409, "conflict", "The host must complete GM setup before players join.");
-    return res.status(201).json({ ok: true, apiVersion: API_VERSION, data: issued });
+    if (!issued) return sendFailure(res, 409, "conflict", "The host must complete GM setup before players join.");
+    return sendData(res, 201, issued);
   });
 
   // ---------- Encounter archives ----------
@@ -256,17 +214,17 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   function requireGmGradePrincipal(res: Response): GamePrincipal | null {
     const principal = res.locals.principal as GamePrincipal;
     if (!isGmGrade(principal)) {
-      sendError(res, 403, "forbidden", "Only the GM may access encounter archives.");
+      sendFailure(res, 403, "forbidden", "Only the GM may access encounter archives.");
       return null;
     }
     return principal;
   }
 
   function archiveIdParam(req: Request, res: Response): number | null {
-    const raw = req.params.id;
-    const id = typeof raw === "string" && /^[0-9]{1,12}$/.test(raw) ? Number(raw) : NaN;
+    const raw = pathParam(req, "id");
+    const id = /^[0-9]{1,12}$/.test(raw) ? Number(raw) : NaN;
     if (!Number.isInteger(id) || id < 1) {
-      sendError(res, 400, "validation_failed", "The archive id must be a positive integer.");
+      sendFailure(res, 400, "validation_failed", "The archive id must be a positive integer.");
       return null;
     }
     return id;
@@ -277,8 +235,8 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   router.get(expressPath(ENCOUNTER_ARCHIVE_PATHS.collection), authorize("combat:read"), (_req, res) => {
     const principal = res.locals.principal as GamePrincipal;
     if (!isGmGrade(principal))
-      return sendData(res, { encounters: options.archives.list().filter((entry) => entry.playerVisible) });
-    return sendData(res, { encounters: options.archives.list() });
+      return sendData(res, 200, { encounters: options.archives.list().filter((entry) => entry.playerVisible) });
+    return sendData(res, 200, { encounters: options.archives.list() });
   });
 
   router.get(expressPath(ENCOUNTER_ARCHIVE_PATHS.byId), authorize("combat:read"), (req, res) => {
@@ -289,17 +247,17 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
       const shared = options.archives.list().some((entry) => entry.id === id && entry.playerVisible);
       const stored = shared ? options.archives.get(id) : null;
       // Missing and unshared are indistinguishable on purpose.
-      if (stored === null) return sendError(res, 404, "not_found", "No such encounter archive.");
+      if (stored === null) return sendFailure(res, 404, "not_found", "No such encounter archive.");
       let document: EncounterArchiveDocument;
       try {
         document = JSON.parse(stored) as EncounterArchiveDocument;
       } catch {
-        return sendError(res, 404, "not_found", "No such encounter archive.");
+        return sendFailure(res, 404, "not_found", "No such encounter archive.");
       }
-      return sendData(res, { id, document: projectPlayerReplay(id, document) });
+      return sendData(res, 200, { id, document: projectPlayerReplay(id, document) });
     }
     const document = options.archives.get(id);
-    if (document === null) return sendError(res, 404, "not_found", "No such encounter archive.");
+    if (document === null) return sendFailure(res, 404, "not_found", "No such encounter archive.");
     // The stored JSON is spliced in verbatim, avoiding a parse/re-serialize of a potentially large document.
     return res
       .type("application/json")
@@ -316,19 +274,19 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
       unknown
     >;
     if (typeof body.playerVisible !== "boolean")
-      return sendError(res, 400, "validation_failed", "playerVisible must be true or false.");
+      return sendFailure(res, 400, "validation_failed", "playerVisible must be true or false.");
     if (!options.archives.setVisibility(id, body.playerVisible))
-      return sendError(res, 404, "not_found", "No such encounter archive.");
-    return sendData(res, { id, playerVisible: body.playerVisible });
+      return sendFailure(res, 404, "not_found", "No such encounter archive.");
+    return sendData(res, 200, { id, playerVisible: body.playerVisible });
   });
 
   router.delete(expressPath(ENCOUNTER_ARCHIVE_PATHS.byId), authorize("admin"), (req, res) => {
     if (!requireGmGradePrincipal(res)) return;
     const id = archiveIdParam(req, res);
     if (id === null) return;
-    if (options.archives.get(id) === null) return sendError(res, 404, "not_found", "No such encounter archive.");
+    if (options.archives.get(id) === null) return sendFailure(res, 404, "not_found", "No such encounter archive.");
     options.archives.remove(id);
-    return sendData(res, { id, deleted: true });
+    return sendData(res, 200, { id, deleted: true });
   });
 
   return router;

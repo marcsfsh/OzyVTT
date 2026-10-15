@@ -1165,6 +1165,40 @@ describe("public game API over /api/v1", () => {
     expect(bootstrapStatus.headers.get("access-control-allow-origin")).toBeNull();
   });
 
+  // server.ts stamps the request id once for every /api/v1 router, so this is checked at the full server.
+  it("echoes one request id on every /api/v1 surface, a body-parser refusal included", async () => {
+    const { base, gmToken } = await boot();
+    const requestId = "6f9619ff-8b86-4d01-b42d-00cf4fc964ff";
+    const headers = { ...bearer(gmToken), "x-request-id": requestId };
+    for (const path of [
+      "/api/v1/system/health",
+      GAME_PATHS.snapshot,
+      "/api/v1/codex/pages",
+      "/api/v1/homebrew/content",
+      "/api/v1/map-assets",
+      "/api/v1/token-assets",
+      "/api/v1/viewer/access"
+    ]) {
+      const response = await fetch(base + path, { headers });
+      expect(response.status, path).toBe(200);
+      expect(response.headers.get("x-request-id"), path).toBe(requestId);
+      expect(response.headers.get("cache-control"), path).toBe("no-store");
+    }
+
+    const unparsable = await fetch(`${base}/api/v1/game/commands`, { method: "POST", headers, body: "{" });
+    expect(unparsable.status).toBe(400);
+    expect(unparsable.headers.get("x-request-id")).toBe(requestId);
+    expect((await unparsable.json()).error).toEqual({
+      code: "validation_failed",
+      message: "The request body is not valid JSON.",
+      requestId
+    });
+
+    // A bare token is not a bearer token, on the GM session routes too.
+    expect((await fetch(`${base}/api/gm/viewer-urls`, { headers: { authorization: gmToken } })).status).toBe(401);
+    expect((await fetch(`${base}/api/gm/viewer-urls`, { headers: bearer(gmToken) })).status).toBe(200);
+  });
+
   it("serves server-computed action availability with role gating", async () => {
     const { base, server, gmToken } = await boot();
     const playerToken = server.auth.issuePlayerSession();
@@ -1347,7 +1381,7 @@ describe("the command and read tables", () => {
       const ack = await new Promise<{ ok: boolean; message?: string }>((resolve) =>
         (socket.emit as (...args: unknown[]) => void)(event, {}, resolve)
       );
-      expect(ack, event).toEqual({ ok: false, message: "Join a session first." });
+      expect(ack, event).toEqual({ ok: false, code: "not_joined", message: "Join a session first." });
     }
   });
 

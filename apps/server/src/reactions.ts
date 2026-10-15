@@ -9,6 +9,7 @@ import { resolveDefinitionAction } from "./action-resolution.js";
 import { builtinAction } from "./builtin-actions.js";
 import { effectiveActions } from "./effective-actions.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
+import { damagePartsOf } from "./resolution/damage.js";
 
 export type ReactionAnswerDependencies = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
@@ -164,16 +165,12 @@ export function answerReaction(
       (resolution.attack.outcome === "hit" || resolution.attack.outcome === "crit") &&
       resolution.damageTotal > 0
     ) {
-      const parts = [
-        ...resolution.damage.map((part) => ({ amount: part.total, type: part.type })),
-        ...(resolution.bonusDamage ?? []).map((part) => ({ amount: part.amount, type: part.type }))
-      ].filter((part) => part.amount > 0);
       const outcome = applyDamageDetailed(
         state,
         mover.id,
         {
           amount: resolution.damageTotal,
-          parts,
+          parts: damagePartsOf(resolution),
           critical: resolution.crit,
           sourceName: `${reactor.name}'s ${chosen.name} (opportunity attack)`
         },

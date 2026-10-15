@@ -19,7 +19,7 @@ import type { EquipmentDerivation } from "./equipment-derivation.js";
 /** Advantage/disadvantage an ability check collects from the bearer's carriers (items, feats, features).
  *  `narrow` supplies `ability`/`skill` so filtered riders can match; without it filtered riders fail
  *  closed and only unnarrowed ones apply. */
-export function checkRollSources(
+function checkRollSources(
   derivation: EquipmentDerivation,
   narrow: Readonly<{ ability?: RiderAbility; skill?: string }> = {}
 ): { advantage: RollModeSource[]; disadvantage: RollModeSource[] } {
@@ -50,9 +50,4 @@ export function checkRollMode(
 ): AggregatedRollMode {
   const sources = checkRollSources(derivation, narrow);
   return aggregateRollMode(sources.advantage, sources.disadvantage);
-}
-
-/** The d20 expression one aggregated mode rolls (SRD Advantage and Disadvantage: two dice, keep one). */
-export function checkDieFor(mode: AggregatedRollMode["mode"]): string {
-  return mode === "advantage" ? "2d20kh1" : mode === "disadvantage" ? "2d20kl1" : "1d20";
 }

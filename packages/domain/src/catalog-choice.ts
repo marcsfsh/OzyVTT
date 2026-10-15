@@ -10,8 +10,8 @@ import type {
 } from "./index.js";
 
 /**
- * Resolver for `fromCatalog` choice slugs, shared by the wizard (to render a picker) and the server (to
- * validate `character.create`), so both agree on what was offerable.
+ * Resolver for `fromCatalog` choice slugs, shared by the server (to offer and validate a build) and the
+ * homebrew editor (to preview a picker), so both agree on what is offerable.
  *
  * Slug families over open ids:
  *   - `skills`, `weapons`, `tools`, `languages` -> the whole catalog list.
@@ -176,8 +176,8 @@ export type PickSourceReference = Readonly<{ offer: string; where?: string | nul
 /**
  * Resolver for `fromPicks`: the options are the character's own earlier answers ("one of your known Warlock
  * cantrips that deals damage"), narrowed by a closed predicate slug over spell catalog fields (ADR-0008).
- * `answered` is the ledger on the server or the draft in the wizard. Unknown spell ids are dropped. Throws
- * `CatalogChoiceError` when nothing survives, which both consumers treat as "defer", not "reject".
+ * `answered` is the build's ledger. Unknown spell ids are dropped. Throws `CatalogChoiceError` when nothing
+ * survives, which the survey treats as "defer", not "reject".
  */
 export function resolvePickChoice(
   source: PickSourceReference,

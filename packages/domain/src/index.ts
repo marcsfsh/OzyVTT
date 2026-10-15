@@ -6,12 +6,14 @@ import {
   type Actor,
   type ActorDefinition,
   type EffectInstance,
+  type CharacterChoice,
   type EffectModifier,
   type HitDie
 } from "@vtt/schemas";
 
 export * from "./catalog-choice.js";
 export * from "./pick-budget.js";
+import type { CatalogChoiceOption } from "./catalog-choice.js";
 import type { PickBudgetScaling } from "./pick-budget.js";
 
 /** Codex field vocabulary, shared so the GM UI and the server's prune-and-seal read one copy. */
@@ -470,9 +472,6 @@ const sceneCombatShape = {
       turnUses: z.record(z.string(), z.number().int().nonnegative()).default({}),
       /** Feet of movement the current turn's actor has spent (fractional on gridless maps). */
       movementUsedFeet: z.number().nonnegative().max(100000).default(0),
-      /** Legacy economy/range-only override flag, kept so older mid-turn state parses; readers prefer
-       * `rulesOverriddenFamilies`. Stripped from player projections. */
-      rulesOverridden: z.boolean().optional(),
       /** Rule families the GM already waved through this turn. Stripped from player projections. */
       rulesOverriddenFamilies: z.array(RuleFamilySchema).max(5).optional()
     })
@@ -641,6 +640,58 @@ export const BuilderPolicySchema = z
   })
   .strict();
 export type BuilderPolicy = z.infer<typeof BuilderPolicySchema>;
+
+/** Which builder step shows an offer: the step that chose its source. */
+export type BuilderOfferStep = "species" | "background" | "class" | "features" | "equipment";
+
+/** One pick the content asks a build for, as the server works it out for a draft (`builder:offers`). */
+export type BuilderOffer = Readonly<{
+  /** Stable key into the draft's picks. */
+  key: string;
+  step: BuilderOfferStep;
+  /** The feature that offers the pick; a choose-N list (class skills, background languages) has none. */
+  featureId: string | null;
+  kind: string;
+  label: string;
+  help: string | null;
+  capacity: number;
+  options: readonly CatalogChoiceOption[];
+  maxSpellLevel: number | null;
+  /** Character level stamped on this offer's ledger rows. */
+  level: number;
+  classId: string | null;
+  /** Set when the content offers nothing to pick here yet (a catalog gap, or no eligible earlier answer):
+   *  the pick may be left open. */
+  unresolvable: string | null;
+  /** Option id -> why this build cannot usefully take it (already held, or no proficiency to build on).
+   *  Shown disabled rather than hidden, so an earlier answer never vanishes. Null for kinds without the rule. */
+  unavailable: Readonly<Record<string, string>> | null;
+}>;
+
+export type BuilderAbilityIncrease = Readonly<{ ability: AbilityId; amount: number }>;
+
+/** A builder draft as the offers read takes it: the identity chosen so far plus either the answers by offer
+ *  key (the wizard) or a stored ledger (a rebuild reading a character back). */
+export type BuilderOffersRequest = Readonly<{
+  speciesId?: string;
+  backgroundId?: string;
+  classId?: string;
+  level: number;
+  picks?: Readonly<Record<string, readonly string[]>>;
+  asiIncreases?: Readonly<Record<string, readonly BuilderAbilityIncrease[]>>;
+  choices?: readonly CharacterChoice[];
+}>;
+
+/** What the build offers, the answers it still accepts (picks it no longer offers are dropped), and the
+ *  ledger rows those answers make, which `character.create` carries. */
+export type BuilderOffersReply = Readonly<{
+  offers: readonly BuilderOffer[];
+  picks: Readonly<Record<string, readonly string[]>>;
+  asiIncreases: Readonly<Record<string, readonly BuilderAbilityIncrease[]>>;
+  subclassId: string | null;
+  choices: readonly CharacterChoice[];
+}>;
+export type BuilderOffersResult = MutationResult & Partial<BuilderOffersReply>;
 
 /** Standing rules policy each new fight starts from; `combat.rulesMode`/`ruleExceptions` are the live copy. */
 export const RulesPolicySchema = z
@@ -878,11 +929,29 @@ export type SessionJoinResult = {
   token?: string;
   message?: string;
 };
+/**
+ * Why a command or read was refused, stable across rewording: branch on this, show the message. A
+ * rules-mode block's code is instead the id of the rule that blocked it (`blocked.rule`). Over HTTP the
+ * same code is `error.details.reason`, beside the envelope's coarse `error.code`.
+ */
+export type RefusalCode =
+  | "not_joined"
+  | "validation_failed"
+  | "forbidden"
+  | "not_found"
+  | "stale_revision"
+  | "needs_confirm"
+  | "refused"
+  | "history_review"
+  | "scene_room_full"
+  | "internal_error";
 export type MutationResult = {
   ok: boolean;
   revision?: number;
   duplicate?: boolean;
   message?: string;
+  /** Present on every refusal (`ok: false`). */
+  code?: RefusalCode | (string & {});
   needsConfirm?: "rewrite-history" | "discard-changes";
   /** Present when a rules-mode validation blocked the command (ADR-0020); resend with override to bypass. */ blocked?: RulesBlocked;
 };
@@ -1598,6 +1667,7 @@ export interface ClientToServerEvents {
     acknowledgement: (result: MutationResult & { actorId?: string }) => void
   ) => void;
   /** Roll six ability scores server-side for the builder; the set lands in the table feed. */
+  "builder:offers": (payload: BuilderOffersRequest, acknowledgement: (result: BuilderOffersResult) => void) => void;
   "builder:roll-abilities": (
     payload: { commandId: string; method: "roll" | "custom"; expectedRevision?: number },
     acknowledgement: (

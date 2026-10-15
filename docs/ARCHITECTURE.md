@@ -62,8 +62,11 @@ registered by looping over the table, and both run the same pipeline (`commands/
 
 A failure answers through one mapping (`commands/failures.ts`) on both transports: a validation
 failure is 400, a denial 403, a missing read subject 404, a rules or state refusal 409, and anything
-unexpected is logged and answered with a generic 500. The reads both transports serve (content
-catalogs, action availability, the combat log) are a second table in `commands/reads.ts`.
+unexpected is logged and answered with a generic 500. Every refusal also carries a stable code (the
+socket reply's `code`, `error.details.reason` over HTTP; a rules block's code is its rule id), so a
+client branches on the code and only shows the message. The reads both transports serve (content
+catalogs, the character builder's offers, action availability, the combat log) are a second table in
+`commands/reads.ts`.
 
 Commands run one at a time through a promise queue. Add new capability to the command table,
 never to one transport.
@@ -143,7 +146,12 @@ hidden things are stripped by the projections regardless of what fog covers.
 The server owns 5e combat rules (ADR-0020): action resolution, typed damage with resistances,
 effects and conditions, saves, reactions and opportunity attacks, concentration, spell slots,
 rests, death saves, weapon masteries and movement budgets. Entry points are
-`action-resolution.ts` and its neighbours in `apps/server/src`.
+`action-resolution.ts` and its neighbours in `apps/server/src`. Resolving an action runs a fixed
+sequence of steps over one shared context, one module per step in `apps/server/src/resolution/`
+(validation, attack roll, damage, masteries, on-hit effects, grants, pending saves and reactions,
+the action economy, release); builtin actions such as Hide and the unarmed Grapple add their special
+cases through the handler table in `resolution/builtins.ts`. Every condition write goes through
+`applyCondition` in `effects.ts`, which honours innate and item-granted immunities.
 
 How strictly rules are enforced is table policy (`GameState.rulesPolicy`): enforce, advise or
 off, with per-family exceptions (`rules-families.ts`). A player blocked by a rule can ask the GM
@@ -157,7 +165,10 @@ off, with per-family exceptions (`rules-families.ts`). A player blocked by a rul
 - The GM authors homebrew in the app. It is stored in its own store (`homebrew-store.ts`),
   validated against the same schemas, and served through `homebrew-http.ts`.
 - Characters are built server-side (`character-build.ts`) from content and the choices made in
-  the guided builder. A D&D Beyond PDF can be imported as an actor definition.
+  the guided builder. What a build may pick is one survey (`character-offers.ts`): a create
+  validates against it, the random generator answers it, and the builder is served it for each
+  draft (`builder-offers.ts`), so the client holds no copy of the build rules. A D&D Beyond PDF can
+  be imported as an actor definition.
 
 ## Codex
 
@@ -173,7 +184,8 @@ a date reaches players only when it is published.
 `/api/v1` exposes the game commands, the Codex, homebrew and the viewer over versioned
 envelopes, using the same handlers, authorization and projections as the UI. The OpenAPI
 document is `packages/api-contract` and is served at `/api/v1/openapi.json`. Conventions are in
-ADR-0016.
+ADR-0016; every router builds them from `apps/server/src/http-kit.ts` (bearer tokens, request ids,
+envelopes), and a caught error reaches the caller only as a known refusal, never as raw text.
 
 ## Persistence
 

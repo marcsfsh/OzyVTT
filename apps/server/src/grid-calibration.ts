@@ -1,3 +1,5 @@
+import { InvalidRequestError } from "./invalid-request.js";
+
 export type ImagePoint = Readonly<{ x: number; y: number }>;
 export type GridPoint = Readonly<{ column: number; row: number }>;
 export type CalibrationAxis = "horizontal" | "vertical";
@@ -35,13 +37,13 @@ const MAX_CELL_SIZE_PX = 2048;
 const MAX_CELLS_BETWEEN = 500;
 
 function finite(value: number, label: string) {
-  if (!Number.isFinite(value)) throw new Error(`${label} must be a finite number.`);
+  if (!Number.isFinite(value)) throw new InvalidRequestError(`${label} must be a finite number.`);
   return value;
 }
 
 function positive(value: number, label: string) {
   finite(value, label);
-  if (value <= 0) throw new Error(`${label} must be greater than zero.`);
+  if (value <= 0) throw new InvalidRequestError(`${label} must be greater than zero.`);
   return value;
 }
 
@@ -49,7 +51,7 @@ function pointWithinMap(point: ImagePoint, width: number, height: number, label:
   finite(point.x, `${label} x`);
   finite(point.y, `${label} y`);
   if (point.x < 0 || point.x > width || point.y < 0 || point.y > height)
-    throw new Error(`${label} must be inside the map bounds.`);
+    throw new InvalidRequestError(`${label} must be inside the map bounds.`);
 }
 
 export function normalizeRotation(radians: number) {
@@ -61,9 +63,9 @@ export function normalizeRotation(radians: number) {
 
 export function validateSquareGridCalibration(calibration: SquareGridCalibration) {
   pointWithinMap(calibration.origin, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, "Grid origin");
-  if (calibration.kind !== "square") throw new Error("Only square-grid calibration is supported.");
+  if (calibration.kind !== "square") throw new InvalidRequestError("Only square-grid calibration is supported.");
   if (calibration.cellSizePx < MIN_CELL_SIZE_PX || calibration.cellSizePx > MAX_CELL_SIZE_PX)
-    throw new Error(`Grid cell size must be between ${MIN_CELL_SIZE_PX} and ${MAX_CELL_SIZE_PX} pixels.`);
+    throw new InvalidRequestError(`Grid cell size must be between ${MIN_CELL_SIZE_PX} and ${MAX_CELL_SIZE_PX} pixels.`);
   positive(calibration.distancePerCell, "Distance per cell");
   finite(calibration.rotationRadians, "Grid rotation");
   return calibration;
@@ -78,14 +80,14 @@ export function deriveSquareGridFromSegment(input: SegmentCalibrationInput): Squ
   pointWithinMap(input.start, mapWidthPx, mapHeightPx, "Segment start");
   pointWithinMap(input.end, mapWidthPx, mapHeightPx, "Segment end");
   if (!Number.isInteger(input.cellsBetween) || input.cellsBetween < 1 || input.cellsBetween > MAX_CELLS_BETWEEN)
-    throw new Error(`Cells between must be an integer from 1 to ${MAX_CELLS_BETWEEN}.`);
+    throw new InvalidRequestError(`Cells between must be an integer from 1 to ${MAX_CELLS_BETWEEN}.`);
   const dx = input.end.x - input.start.x;
   const dy = input.end.y - input.start.y;
   const length = Math.hypot(dx, dy);
-  if (length === 0) throw new Error("Draw the calibration segment across at least one grid cell.");
+  if (length === 0) throw new InvalidRequestError("Draw the calibration segment across at least one grid cell.");
   const cellSizePx = length / input.cellsBetween;
   if (cellSizePx < MIN_CELL_SIZE_PX || cellSizePx > MAX_CELL_SIZE_PX)
-    throw new Error(
+    throw new InvalidRequestError(
       `The selected segment produces a cell outside the supported ${MIN_CELL_SIZE_PX}–${MAX_CELL_SIZE_PX} pixel range.`
     );
   const segmentAngle = Math.atan2(dy, dx);
@@ -108,15 +110,16 @@ export function deriveSquareGridFromArea(input: AreaCalibrationInput): SquareGri
   pointWithinMap(input.start, mapWidthPx, mapHeightPx, "Area start");
   pointWithinMap(input.end, mapWidthPx, mapHeightPx, "Area end");
   if (!Number.isInteger(input.cellsAcross) || input.cellsAcross < 1 || input.cellsAcross > MAX_CELLS_BETWEEN)
-    throw new Error(`Cells across must be an integer from 1 to ${MAX_CELLS_BETWEEN}.`);
+    throw new InvalidRequestError(`Cells across must be an integer from 1 to ${MAX_CELLS_BETWEEN}.`);
   if (!Number.isInteger(input.cellsDown) || input.cellsDown < 1 || input.cellsDown > MAX_CELLS_BETWEEN)
-    throw new Error(`Cells down must be an integer from 1 to ${MAX_CELLS_BETWEEN}.`);
+    throw new InvalidRequestError(`Cells down must be an integer from 1 to ${MAX_CELLS_BETWEEN}.`);
   const width = Math.abs(input.end.x - input.start.x);
   const height = Math.abs(input.end.y - input.start.y);
-  if (width === 0 || height === 0) throw new Error("Drag across the full calibration area before releasing.");
+  if (width === 0 || height === 0)
+    throw new InvalidRequestError("Drag across the full calibration area before releasing.");
   const cellSizePx = (width / input.cellsAcross + height / input.cellsDown) / 2;
   if (cellSizePx < MIN_CELL_SIZE_PX || cellSizePx > MAX_CELL_SIZE_PX)
-    throw new Error(
+    throw new InvalidRequestError(
       `The selected area produces a cell outside the supported ${MIN_CELL_SIZE_PX}–${MAX_CELL_SIZE_PX} pixel range.`
     );
   const origin = { x: Math.min(input.start.x, input.end.x), y: Math.min(input.start.y, input.end.y) };

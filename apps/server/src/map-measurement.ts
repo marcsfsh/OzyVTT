@@ -5,6 +5,7 @@ import {
   type ImagePoint,
   type SquareGridCalibration
 } from "./grid-calibration.js";
+import { InvalidRequestError } from "./invalid-request.js";
 
 export type GridDistanceRule = "euclidean" | "chebyshev" | "alternating-diagonal";
 export type GridSnapMode = "intersection" | "cell-center";
@@ -42,26 +43,27 @@ export type MapScaleMeasurement = Readonly<{
 const COORDINATE_EPSILON = 1e-8;
 
 function positiveFinite(value: number, label: string) {
-  if (!Number.isFinite(value) || value <= 0) throw new Error(`${label} must be a positive finite number.`);
+  if (!Number.isFinite(value) || value <= 0)
+    throw new InvalidRequestError(`${label} must be a positive finite number.`);
   return value;
 }
 
 function measurementUnit(value: string) {
   const unit = value.trim();
   if (!unit || unit.length > 32 || /[\u0000-\u001f\u007f]/.test(unit))
-    throw new Error("Measurement unit must contain 1 to 32 printable characters.");
+    throw new InvalidRequestError("Measurement unit must contain 1 to 32 printable characters.");
   return unit;
 }
 
 function validatePoint(point: ImagePoint, label: string) {
   if (!Number.isFinite(point.x) || !Number.isFinite(point.y))
-    throw new Error(`${label} must contain finite coordinates.`);
+    throw new InvalidRequestError(`${label} must contain finite coordinates.`);
   return point;
 }
 
 function validatePath(points: readonly ImagePoint[]) {
-  if (points.length < 2) throw new Error("Measurement path requires at least two points.");
-  if (points.length > 1_000) throw new Error("Measurement path cannot exceed 1,000 points.");
+  if (points.length < 2) throw new InvalidRequestError("Measurement path requires at least two points.");
+  if (points.length > 1_000) throw new InvalidRequestError("Measurement path cannot exceed 1,000 points.");
   return points.map((point, index) => ({ ...validatePoint(point, `Measurement point ${index + 1}`) }));
 }
 
@@ -133,7 +135,7 @@ export function deriveMapDistanceScale(
 }
 
 export function validateMapDistanceScale(scale: MapDistanceScale) {
-  if (scale.kind !== "image-scale") throw new Error("Map distance scale kind is unsupported.");
+  if (scale.kind !== "image-scale") throw new InvalidRequestError("Map distance scale kind is unsupported.");
   positiveFinite(scale.distancePerPixel, "Distance per pixel");
   measurementUnit(scale.unit);
   return scale;

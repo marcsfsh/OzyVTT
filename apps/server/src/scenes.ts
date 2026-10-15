@@ -9,8 +9,8 @@ import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.
 
 const MAX_SCENES = 20;
 
-// Go-live refusals, exported because `replay-launch.ts` pre-checks the room refusal and the client's
-// Replays tab classifies both by text (a client mirror test pins the wording).
+// Go-live refusals, exported because `replay-launch.ts` pre-checks the room refusal. The Replays tab
+// routes both by their codes.
 export const SCENE_ROOM_REFUSAL =
   "Remove a prepared scene first - launching needs room to park the table and stage the replay.";
 export const HISTORY_REVIEW_REFUSAL = "Finish reviewing the combat history before switching scenes.";
@@ -224,7 +224,7 @@ export function activateScene(state: GameState, sceneId: string, implicitSceneId
   if (!target) throw new CommandRejectedError("That scene no longer exists.");
   if (state.combat.activeSceneId === sceneId) throw new CommandRejectedError("That scene is already live.");
   // The handler wipes timeline snapshots on a swap, so refuse while the GM is mid-review.
-  if (state.combat.historyCursor !== null) throw new CommandRejectedError(HISTORY_REVIEW_REFUSAL);
+  if (state.combat.historyCursor !== null) throw new CommandRejectedError(HISTORY_REVIEW_REFUSAL, "history_review");
 
   const departingId = state.combat.activeSceneId;
   let scenes = state.combat.scenes;
@@ -288,11 +288,11 @@ export function activateNewScene(
   }>,
   implicitSceneId: string
 ): Scene {
-  if (state.combat.historyCursor !== null) throw new CommandRejectedError(HISTORY_REVIEW_REFUSAL);
+  if (state.combat.historyCursor !== null) throw new CommandRejectedError(HISTORY_REVIEW_REFUSAL, "history_review");
   if (state.combat.scenes.some((scene) => scene.id === input.sceneId))
     throw new CommandRejectedError("That scene already exists.");
   if (sceneHeadroom(state) < sceneSlotsNeededToGoLive(state)) {
-    throw new CommandRejectedError(SCENE_ROOM_REFUSAL);
+    throw new CommandRejectedError(SCENE_ROOM_REFUSAL, "scene_room_full");
   }
 
   const departingId = state.combat.activeSceneId;

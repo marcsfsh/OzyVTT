@@ -1,6 +1,8 @@
 import type { Actor, EffectInstance, GameState } from "@vtt/domain";
+import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { conditionLabel, exhaustionLevel } from "./condition-rules.js";
+import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 
 /** Effect lifecycle (ADR-0020): the engine ends effects on turn boundaries, source defeat and explicit
  *  end, clearing linked conditions and firing onEnd grants. Returns narration events rather than writing
@@ -10,17 +12,64 @@ export type EffectNarration = Readonly<{ kind: "effect" | "condition"; text: str
 
 const MAX_EFFECTS = 20;
 
-/** Direct condition write for engine-owned transitions (no scope check). Returns false when the actor is
- *  immune (SRD condition immunity); the caller decides whether to narrate. */
-export function applyConditionDirect(actor: Actor, conditionId: string, level?: number): boolean {
-  if (actor.conditionImmunities.includes(conditionId)) return false;
+/** What an effect must name; every other field takes `EffectInstanceSchema`'s default. */
+export type EffectSpec = Pick<EffectInstance, "id" | "name" | "duration"> & Partial<EffectInstance>;
+
+/** Builds an effect from the fields it sets, with the schema's defaults (in schema order) for the rest. */
+export function makeEffect({ id, name, duration, ...rest }: EffectSpec): EffectInstance {
+  return {
+    id,
+    name,
+    tags: [],
+    sourceActorId: null,
+    sourceName: null,
+    sourceActionId: null,
+    startedRound: 1,
+    duration,
+    endsWhenSourceDefeated: false,
+    voidWhileIncapacitated: false,
+    concentration: false,
+    endsWithTag: null,
+    modifiers: [],
+    linkedConditionIds: [],
+    escapeDc: null,
+    onEnd: [],
+    ...rest
+  };
+}
+
+/** Where item- and feat-granted condition immunities are read from. Without a catalog only the actor's
+ *  innate immunities apply. */
+export type ConditionImmunitySource = Readonly<{
+  resolveDefinition?: (definitionId: string) => ActorDefinition | undefined;
+  catalog?: EquipmentCatalog;
+}>;
+
+/** SRD condition immunity: innate, or granted by what the actor carries when a catalog is supplied. */
+function immuneToCondition(actor: Actor, conditionId: string, source?: ConditionImmunitySource): boolean {
+  if (actor.conditionImmunities.includes(conditionId)) return true;
+  if (!source?.catalog) return false;
+  const definition = actor.definitionId ? source.resolveDefinition?.(actor.definitionId) : undefined;
+  return deriveEquipment(actor, definition, source.catalog).conditionImmunities.some(
+    (entry) => entry.id === conditionId
+  );
+}
+
+/** The one condition writer, used by every path that sets a condition (no scope check). Refuses an immune
+ *  actor and a full condition list; the caller decides whether to narrate or reject. */
+export function applyCondition(
+  actor: Actor,
+  conditionId: string,
+  options: Readonly<{ level?: number; immunities?: ConditionImmunitySource }> = {}
+): "applied" | "immune" | "full" {
+  if (immuneToCondition(actor, conditionId, options.immunities)) return "immune";
   const remaining = actor.conditions.filter((condition) => condition.id !== conditionId);
-  if (remaining.length >= 20) return false;
+  if (remaining.length >= 20) return "full";
   actor.conditions = [
     ...remaining,
-    { id: conditionId, ...(conditionId === "exhaustion" ? { level: level ?? 1 } : {}) }
+    { id: conditionId, ...(conditionId === "exhaustion" ? { level: options.level ?? 1 } : {}) }
   ].sort((left, right) => left.id.localeCompare(right.id));
-  return true;
+  return "applied";
 }
 
 export function removeConditionDirect(actor: Actor, conditionId: string) {
@@ -32,12 +81,14 @@ export function hasEffectTag(actor: Actor, tag: string): boolean {
 }
 
 /** Adds an effect (idempotent by id). A grant from the same source actor and action replaces the older
- *  instance (a re-declared Rage refreshes rather than stacks). Applies linked conditions. */
+ *  instance (a re-declared Rage refreshes rather than stacks). Applies linked conditions the bearer is not
+ *  immune to. */
 export function addEffect(
   state: GameState,
   actorId: string,
   effect: EffectInstance,
-  events?: EffectNarration[]
+  events?: EffectNarration[],
+  immunities?: ConditionImmunitySource
 ): EffectInstance {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
@@ -63,7 +114,7 @@ export function addEffect(
       throw new CommandRejectedError("That combatant already has too many active effects.");
     actor.effects = [...actor.effects, effect];
   }
-  for (const conditionId of effect.linkedConditionIds) applyConditionDirect(actor, conditionId);
+  for (const conditionId of effect.linkedConditionIds) applyCondition(actor, conditionId, { immunities });
   return effect;
 }
 
@@ -76,10 +127,10 @@ function grantConditionOnEnd(
   if (conditionId === "exhaustion") {
     const existing = actor.conditions.find((condition) => condition.id === "exhaustion")?.level ?? 0;
     const next = Math.min(6, existing + (level ?? 1));
-    const applied = applyConditionDirect(actor, "exhaustion", next);
+    const applied = applyCondition(actor, "exhaustion", { level: next }) === "applied";
     return { level: applied ? next : existing, becameFatal: applied && existing < 6 && next >= 6 };
   }
-  applyConditionDirect(actor, conditionId, level);
+  applyCondition(actor, conditionId, { level });
   return { level, becameFatal: false };
 }
 
@@ -90,8 +141,8 @@ export function applyExhaustionDeath(state: GameState, actor: Actor): EffectNarr
   actor.hp.current = 0;
   if (actor.kind === "player-character") {
     actor.deathSaves = { successes: 0, failures: 3, stable: false };
-    applyConditionDirect(actor, "unconscious");
-    applyConditionDirect(actor, "prone");
+    applyCondition(actor, "unconscious");
+    applyCondition(actor, "prone");
   }
   events.push({ kind: "condition", text: `${actor.name} dies of Exhaustion (level 6).`, actorId: actor.id });
   events.push(...endEffectsSustainedBy(state, actor.id));

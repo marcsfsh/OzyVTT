@@ -1,5 +1,5 @@
-// How many picks an `extraPicks` grant is worth, shared by `build-payload.ts` (wizard) and
-// `character-build.ts` (server) so the wizard offers exactly what the server accepts.
+// How many picks an `extraPicks` grant is worth. The server's offer survey reads it for a create and for
+// the builder's offers alike.
 
 /** The printed-column scaling an extra pick may name. */
 export type PickBudgetScaling = Readonly<{ type: "class-resource-growth"; id: string }>;

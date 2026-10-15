@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { GameStateSchema, rosterActors, type GameState } from "@vtt/domain";
 import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
 import { loadActorFixture } from "@vtt/test-fixtures";
+import { CommandRejectedError } from "../src/game-store.js";
 import { launchReplay } from "../src/replay-launch.js";
 import { activateScene, createScene, removeScene } from "../src/scenes.js";
 import { startEncounter } from "../src/encounter.js";
@@ -150,6 +151,17 @@ function documentWith(turns: readonly { revision: number; state: GameState }[]):
   };
 }
 
+/** The code a refused launch carries; the client branches on it. */
+function refusalCode(run: () => unknown): string {
+  try {
+    run();
+  } catch (error) {
+    if (error instanceof CommandRejectedError) return error.code;
+    throw error;
+  }
+  throw new Error("Expected the launch to be refused, and it was not.");
+}
+
 const launch = (state: GameState, document: EncounterArchiveDocument, turnIndex = 0) =>
   launchReplay(state, {
     archiveId: 7,
@@ -260,6 +272,10 @@ describe("replay.launch - one table, parked and resumed", () => {
     expect(() => launch(reviewing, documentWith([{ revision: 10, state: archivedState() }]))).toThrow(
       /reviewing the combat history/i
     );
+    // The Replays tab routes this refusal by its code, not its wording.
+    expect(refusalCode(() => launch(reviewing, documentWith([{ revision: 10, state: archivedState() }])))).toBe(
+      "history_review"
+    );
 
     expect(() => launch(liveState(), documentWith([]))).toThrow(/no turns to launch/i);
     expect(() => launch(liveState(), documentWith([{ revision: 10, state: archivedState() }]), 5)).toThrow(
@@ -287,6 +303,9 @@ describe("replay.launch - one table, parked and resumed", () => {
     const before = state.actors.length;
     expect(() => launch(state, documentWith([{ revision: 10, state: archivedState() }]))).toThrow(
       /Remove a prepared scene first/i
+    );
+    expect(refusalCode(() => launch(state, documentWith([{ revision: 10, state: archivedState() }])))).toBe(
+      "scene_room_full"
     );
     expect(state.actors).toHaveLength(before);
     expect(state.combat.scenes).toHaveLength(19);

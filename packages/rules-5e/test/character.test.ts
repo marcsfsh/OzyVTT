@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   abilityModifier,
   armorClassFromEquipment,
-  characterLevel,
   proficiencyBonusForLevel,
   saveBonus,
   skillBonus,
@@ -48,14 +47,6 @@ describe("abilityModifier", () => {
     expect(abilityModifier(15)).toBe(2);
     expect(abilityModifier(20)).toBe(5);
     expect(abilityModifier(30)).toBe(10);
-  });
-});
-
-describe("characterLevel", () => {
-  it("sums class levels for multiclass and floors at 1", () => {
-    expect(characterLevel([7])).toBe(7);
-    expect(characterLevel([5, 2])).toBe(7);
-    expect(characterLevel([])).toBe(1);
   });
 });
 

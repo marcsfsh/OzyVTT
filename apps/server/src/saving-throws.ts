@@ -1,8 +1,9 @@
-import type { AbilityId, Actor, DamageApplication, GameState, PendingSave, RollRecord } from "@vtt/domain";
+import type { AbilityId, Actor, DamageApplication, GameState, PendingSave } from "@vtt/domain";
 import {
   abilityModifier as scoreModifier,
   aggregateRollMode,
   collectRiders,
+  d20TestFormula,
   parseDiceFormula,
   rescaleDamageParts,
   resolveDice,
@@ -13,12 +14,12 @@ import {
 } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
-import { recordRoll as recordRollInHistory } from "./roll-history.js";
+import { recordRoll as recordRollInHistory, rolledTerms } from "./roll-history.js";
 import { requireGm, type Initiator } from "./authorization.js";
 import { applyDamageDetailed, adjustableActor } from "./hit-points.js";
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
-import { addEffect, endEffectIfPresent, type EffectNarration } from "./effects.js";
+import { addEffect, endEffectIfPresent, makeEffect, type EffectNarration } from "./effects.js";
 import {
   deriveEquipment,
   EMPTY_DERIVATION,
@@ -152,7 +153,7 @@ export function saveModifierFor(definition: ActorDefinition | undefined, ability
 }
 
 /** Proficiency bonus when an item grants this save's proficiency and the sheet lacks it. */
-export function saveProficiencyFromItems(
+function saveProficiencyFromItems(
   definition: ActorDefinition | undefined,
   derivation: EquipmentDerivation,
   ability: AbilityId
@@ -253,8 +254,7 @@ function recordSaveRoll(
     createdAt: string;
   }>
 ) {
-  let group = 0;
-  const record: RollRecord = {
+  recordRollInHistory(state, {
     id: base.id,
     commandId: base.commandId,
     initiatorSessionId: base.sessionId,
@@ -266,24 +266,10 @@ function recordSaveRoll(
     visibility: base.visibility,
     formula: resolution.expression.source,
     normalizedFormula: resolution.expression.normalized,
-    dice: resolution.terms.flatMap((term) => {
-      if (term.kind !== "dice") return [];
-      const currentGroup = group++;
-      return term.dice.map((die) => ({
-        group: currentGroup,
-        sides: term.sides,
-        face: die.face,
-        kept: die.kept,
-        sign: term.sign
-      }));
-    }),
-    modifiers: resolution.terms
-      .filter((term): term is Extract<typeof term, { kind: "modifier" }> => term.kind === "modifier")
-      .map((term) => ({ value: term.value, sign: term.sign })),
+    ...rolledTerms(resolution),
     total: resolution.total,
     createdAt: base.createdAt
-  };
-  recordRollInHistory(state, record);
+  });
 }
 
 /** Answers a pending save (roll or typed total) and auto-applies it: fail takes full damage and the
@@ -330,11 +316,7 @@ export function answerSave(
     const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
     // An explicit choice (the answerer's button, or a forced "normal") wins over detected sources.
     const mode = explicitRollMode ?? aggregated.mode;
-    const die = mode === "advantage" ? "2d20kh1" : mode === "disadvantage" ? "2d20kl1" : "1d20";
-    const resolution = resolveDice(
-      parseDiceFormula(`${die} ${modifier < 0 ? "-" : "+"} ${Math.abs(modifier)}`),
-      deps.random
-    );
+    const resolution = resolveDice(parseDiceFormula(d20TestFormula(mode, modifier)), deps.random);
     if (mode !== "normal")
       rollMode = {
         mode,
@@ -479,24 +461,24 @@ export function answerSave(
   }
   // A committed failure applies the declared source-linked effect (Unarmed Strike Grapple, ADR-0020).
   if (!success && pending.onFailEffect) {
-    const applied = addEffect(state, target.id, {
-      id: `${commandId}:${saveId}:fail`,
-      name: pending.onFailEffect.name,
-      tags: [...pending.onFailEffect.tags],
-      sourceActorId: pending.onFailEffect.sourceActorId,
-      sourceName: pending.onFailEffect.sourceName,
-      sourceActionId: null,
-      startedRound: state.combat.round,
-      duration: { type: "manual" },
-      endsWhenSourceDefeated: true,
-      voidWhileIncapacitated: false,
-      concentration: false,
-      modifiers: [],
-      linkedConditionIds: [...pending.onFailEffect.linkedConditionIds],
-      escapeDc: pending.onFailEffect.escapeDc,
-      onEnd: [],
-      endsWithTag: null
-    });
+    const applied = addEffect(
+      state,
+      target.id,
+      makeEffect({
+        id: `${commandId}:${saveId}:fail`,
+        name: pending.onFailEffect.name,
+        tags: [...pending.onFailEffect.tags],
+        sourceActorId: pending.onFailEffect.sourceActorId,
+        sourceName: pending.onFailEffect.sourceName,
+        startedRound: state.combat.round,
+        duration: { type: "manual" },
+        endsWhenSourceDefeated: true,
+        linkedConditionIds: [...pending.onFailEffect.linkedConditionIds],
+        escapeDc: pending.onFailEffect.escapeDc
+      }),
+      undefined,
+      deps
+    );
     events.push({ kind: "effect", text: `${target.name} is ${applied.name}.`, actorId: target.id });
   }
   state.combat = { ...state.combat, pendingSaves: state.combat.pendingSaves.filter((entry) => entry.id !== saveId) };

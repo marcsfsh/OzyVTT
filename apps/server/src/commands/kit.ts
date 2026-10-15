@@ -7,7 +7,7 @@ import type {
   RollRecord,
   TableEvent
 } from "@vtt/domain";
-import type { rollDice } from "@vtt/rules-5e";
+import { d20Die } from "@vtt/rules-5e";
 import { storedDefinition } from "../actor-roster.js";
 import type { Initiator } from "../authorization.js";
 import type { CombatLogStore } from "../combat-log.js";
@@ -167,7 +167,7 @@ export function createKit(context: CommandContext) {
       (state: GameState, commandId: string, principal: GamePrincipal): InitiativeRollSink =>
       (roll) => {
         const actor = state.actors.find((candidate) => candidate.id === roll.actorId);
-        const formula = roll.mode === "advantage" ? "2d20kh1" : roll.mode === "disadvantage" ? "2d20kl1" : "1d20";
+        const formula = d20Die(roll.mode);
         const gmGrade = isGmGrade(principal);
         recordRoll(state, {
           id: context.newId(),
@@ -226,26 +226,5 @@ export function createKit(context: CommandContext) {
         });
       }
     }
-  };
-}
-
-/** A resolved formula's dice and flat modifiers, as a roll record stores them. */
-export function rolledTerms(resolution: ReturnType<typeof rollDice>): Pick<RollRecord, "dice" | "modifiers"> {
-  let group = 0;
-  return {
-    dice: resolution.terms.flatMap((term) => {
-      if (term.kind !== "dice") return [];
-      const currentGroup = group++;
-      return term.dice.map((die) => ({
-        group: currentGroup,
-        sides: term.sides,
-        face: die.face,
-        kept: die.kept,
-        sign: term.sign
-      }));
-    }),
-    modifiers: resolution.terms
-      .filter((term): term is Extract<typeof term, { kind: "modifier" }> => term.kind === "modifier")
-      .map((term) => ({ value: term.value, sign: term.sign }))
   };
 }

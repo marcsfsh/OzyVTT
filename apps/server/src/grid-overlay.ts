@@ -5,6 +5,7 @@ import {
   type ImagePoint,
   type SquareGridCalibration
 } from "./grid-calibration.js";
+import { InvalidRequestError } from "./invalid-request.js";
 
 export type ImageViewport = Readonly<{
   minX: number;
@@ -32,7 +33,7 @@ const ABSOLUTE_MAX_LINES = 10_000;
 const CLIP_EPSILON = 1e-9;
 
 function finite(value: number, label: string) {
-  if (!Number.isFinite(value)) throw new Error(`${label} must be a finite number.`);
+  if (!Number.isFinite(value)) throw new InvalidRequestError(`${label} must be a finite number.`);
   return value;
 }
 
@@ -42,19 +43,19 @@ function validateViewport(viewport: ImageViewport) {
   finite(viewport.maxX, "Viewport maximum x");
   finite(viewport.maxY, "Viewport maximum y");
   if (viewport.minX >= viewport.maxX || viewport.minY >= viewport.maxY)
-    throw new Error("Viewport must have positive width and height.");
+    throw new InvalidRequestError("Viewport must have positive width and height.");
   return viewport;
 }
 
 function positiveInteger(value: number, label: string, maximum: number) {
   if (!Number.isInteger(value) || value < 1 || value > maximum)
-    throw new Error(`${label} must be an integer from 1 to ${maximum}.`);
+    throw new InvalidRequestError(`${label} must be an integer from 1 to ${maximum}.`);
   return value;
 }
 
 function nonNegativeInteger(value: number, label: string, maximum: number) {
   if (!Number.isInteger(value) || value < 0 || value > maximum)
-    throw new Error(`${label} must be an integer from 0 to ${maximum}.`);
+    throw new InvalidRequestError(`${label} must be an integer from 0 to ${maximum}.`);
   return value;
 }
 
@@ -129,7 +130,7 @@ export function gridOverlayLines(
   );
   const requested = columns.maximum - columns.minimum + 1 + rows.maximum - rows.minimum + 1;
   if (requested > maxLines)
-    throw new Error(
+    throw new InvalidRequestError(
       `Grid overlay requires ${requested} lines, exceeding the ${maxLines} line safety limit. Zoom in before displaying the grid.`
     );
 

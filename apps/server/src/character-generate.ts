@@ -1,16 +1,16 @@
 import type { BuilderPolicy } from "@vtt/domain";
-import { CatalogChoiceError, resolveCatalogChoice } from "@vtt/domain";
 import type { CharacterChoice } from "@vtt/schemas";
 import { ABILITIES, hitDieFaces, STANDARD_ARRAY, statPriorityFor, type Ability } from "@vtt/rules-5e";
 import type { ClassReference } from "@vtt/content-srd-5.2.1";
+import type { CharacterCreateRequestInput } from "./character-build.js";
 import {
+  classSpellList,
   computeServerOffers,
   levelOfPick,
   withinOfferSpellWindow,
-  type CharacterCreateRequestInput,
   type ChoiceOffer,
   type ServerOfferSurvey
-} from "./character-build.js";
+} from "./character-offers.js";
 import type { ContentView } from "./content-library.js";
 import { CommandRejectedError } from "./game-store.js";
 
@@ -290,23 +290,10 @@ type SpellOption = Readonly<{ id: string; name: string; level?: number }>;
 
 /** The class (or subclass) spell list this build casts from, or null when it casts nothing. */
 function spellListOf(survey: ServerOfferSurvey): { options: readonly SpellOption[]; maxSlotLevel: number } | null {
-  const casting = survey.subclass?.spellcasting ?? survey.classRecord.spellcasting ?? null;
-  if (!casting) return null;
-  const slug = `${casting.spellListId ?? survey.classRecord.id}-spells`;
-  let options: readonly SpellOption[];
-  try {
-    options = resolveCatalogChoice(slug, survey.catalogs);
-  } catch (error) {
-    if (!(error instanceof CatalogChoiceError)) throw error;
-    reject(`The ${survey.classRecord.name} spell list could not be resolved: ${error.message}`);
-  }
-  const row = survey.levelRow;
-  const slots = row.pactSlots
-    ? row.pactSlots.slots > 0
-      ? [{ level: row.pactSlots.level }]
-      : []
-    : (row.spellSlots ?? []).map((count, index) => ({ level: index + 1, count })).filter((slot) => slot.count > 0);
-  return { options, maxSlotLevel: slots.reduce((highest, slot) => Math.max(highest, slot.level), 0) };
+  const list = classSpellList(survey.classRecord, survey.subclass, survey.levelRow, survey.catalogs);
+  if (list?.unresolvable)
+    reject(`The ${survey.classRecord.name} spell list could not be resolved: ${list.unresolvable}`);
+  return list;
 }
 
 /** Fills the class cantrip and prepared-spell budgets to step 9's caps (printed column plus `extraPicks`). */

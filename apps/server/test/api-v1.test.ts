@@ -21,6 +21,7 @@ import {
   SystemVersionResponseSchema
 } from "@vtt/api-contract";
 import { createApiV1Router } from "../src/api-v1.js";
+import { requestConventions } from "../src/http-kit.js";
 import { IntegrationCredentialStore } from "../src/integration-credentials.js";
 
 const servers: Array<ReturnType<ReturnType<typeof express>["listen"]>> = [];
@@ -55,6 +56,8 @@ async function start(
 ) {
   const { store } = await newCredentialStore();
   const app = express();
+  // Mirrors server.ts, which stamps the request id once ahead of every /api/v1 router.
+  app.use(requestConventions);
   app.use(express.json());
   app.use(
     createApiV1Router({
