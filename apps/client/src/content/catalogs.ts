@@ -26,13 +26,19 @@ function makeCatalog<T>(load: () => Promise<CatalogReply<T>>) {
       served until the new one lands, so nothing flashes empty. */
   const request = (force = false) => {
     if (snapshot.loaded && !force) return;
-    inFlight ??= load().then(({ items, attribution }) => {
-      inFlight = null;
-      // Never cache a miss: a refusal, a dropped field, or an empty list all retry next mount.
-      if (!items || items.length === 0) return;
-      snapshot = { items, attribution: attribution ?? null, loaded: true };
-      for (const listener of listeners) listener();
-    });
+    inFlight ??= load()
+      .then(({ items, attribution }) => {
+        // Never cache a miss: a refusal, a dropped field, or an empty list all retry next mount.
+        if (!items || items.length === 0) return;
+        snapshot = { items, attribution: attribution ?? null, loaded: true };
+        for (const listener of listeners) listener();
+      })
+      .catch(() => {
+        /* a failed read is a miss too */
+      })
+      .finally(() => {
+        inFlight = null;
+      });
   };
 
   // A GM can publish content mid-session; a cold cache does nothing (see `content/invalidate.ts`).
