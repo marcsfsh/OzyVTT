@@ -635,6 +635,10 @@ describe("tier 4 - shapes that parse and are then read by nothing", () => {
       validateForPublish("feat", withRider({ type: "extra-damage", formula: "1d6", damageType: "fire" }), contextWith())
         .valid
     ).toBe(true);
+    // With no type it follows the attack's own, so it publishes too.
+    expect(validateForPublish("feat", withRider({ type: "extra-damage", formula: "1d6" }), contextWith()).valid).toBe(
+      true
+    );
     expect(
       validateForPublish(
         "feat",

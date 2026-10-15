@@ -593,6 +593,18 @@ describe("a feature's extra-damage is rolled as its own typed damage entry", () 
     expect(swung.damage.find((entry) => entry.type === "fire")).toEqual({ formula: "1d4", type: "fire", total: 3 });
     expect(swung.damageTotal).toBe(17); // 14 + a 3 actually rolled on the rider's d4
   });
+
+  it("takes the attack's own type when the rider names none", () => {
+    const built = fight(build({ on: "subclass", modifiers: [{ type: "extra-damage", formula: "1d4" }] }));
+    const swung = resolveDefinitionAction(
+      built.state,
+      actionOf(built, "item-greatsword"),
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000042" },
+      deps(built, [15, 5, 6, 3])
+    );
+    expect(swung.damage.map((entry) => entry.type)).toEqual(["slashing", "slashing"]);
+    expect(swung.damageTotal).toBe(17);
+  });
 });
 
 describe("a feature's resource-bonus raises a pool the engine actually spends from", () => {
