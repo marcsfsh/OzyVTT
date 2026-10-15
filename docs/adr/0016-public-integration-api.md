@@ -29,7 +29,7 @@ Defer signed webhooks until realtime subscriptions are proven and a concrete ser
 ## v1 conventions (normative)
 
 This is the statement the ADR promised. It binds every `/api/v1` surface, the table viewer's included, and
-`packages/api-contract/test/contract.test.ts` checks the OpenAPI document against it.
+`apps/server/test/openapi-document.test.ts` checks the OpenAPI document against it.
 
 1. **Envelopes.** Success is `{ ok: true, apiVersion: "1", data }`. Failure is
    `{ ok: false, apiVersion, error: { code, message, requestId, details?, currentRevision?, retryAfterSeconds? } }`.
