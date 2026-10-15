@@ -29,12 +29,6 @@
 .nh-table tbody tr:last-child td {
   border-bottom: 0;
 }
-.nh-table td.nh-num,
-.nh-table th.nh-num {
-  text-align: right;
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-}
 
 /* ---- Stat / definition list (character-sheet vitals, monster meta, key–value data) ---- */
 .nh-statlist {
@@ -232,22 +226,6 @@
 .nh-card-actions > button {
   flex: 1 1 0;
   min-width: 0;
-}
-
-/* Stretched transparent button: the card's hit area and focus target, between content and overlays. */
-.nh-card-open {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-  border-radius: inherit;
-}
-/* -5px so the ring's corner stays inside the card's cut. */
-.nh-card-open:focus-visible {
-  outline: 2px solid var(--focus-ring-color);
-  outline-offset: -5px;
 }
 
 /* Add-new tile: fills its gallery cell like a real card. A button, so edge and hover ride the backing layer

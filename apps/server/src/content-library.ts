@@ -224,7 +224,7 @@ function slotCastingOptions(options: SpellReference["castingOptions"]): ContentS
 // One wire catalog per type, homebrew folded in (ADR-0016). Feature riders stay off the wire: the
 // server applies them when building.
 /** A feature's pick for the wizard: inline options carry their name and any nested pick they owe. */
-type WireChoice = NonNullable<ContentFeatureSummary["choice"]>;
+type WireChoice = ContentFeatureSummary["choices"][number];
 /** `{offer, amount}` or `{offer, scaling}`, filled out for a wire type that has both. */
 const extraPickSummaryOf = (grants: FeatureRecord["extraPicks"]): ContentFeatureSummary["extraPicks"] =>
   grants.map((grant) => ({ offer: grant.offer, amount: grant.amount ?? null, scaling: grant.scaling ?? null }));
@@ -257,7 +257,6 @@ const choiceSummaryOf = (choice: FeatureRecord["choice"]): WireChoice | null =>
             description: option.description,
             // The gate travels so the wizard filters options the way the server will (`FeatureOptionSchema.requires`).
             requires: option.requires ? { offer: option.requires.offer, id: option.requires.id } : null,
-            choice: nested[0] ?? null,
             choices: nested,
             // The budget a chosen option raises, so the wizard lets the player make the extra pick.
             extraPicks: extraPickSummaryOf(option.extraPicks)
@@ -267,7 +266,7 @@ const choiceSummaryOf = (choice: FeatureRecord["choice"]): WireChoice | null =>
     : null;
 
 const featureSummaryOf = (feature: FeatureRecord, grantedAtLevels: readonly number[] = []): ContentFeatureSummary => {
-  // Every pick a record owes; `choice` stays the first for callers that want one.
+  // Every pick a record owes, in order.
   const picks = featurePicks(feature).map((pick) => choiceSummaryOf(pick)!);
   return {
     id: feature.id,
@@ -275,7 +274,6 @@ const featureSummaryOf = (feature: FeatureRecord, grantedAtLevels: readonly numb
     level: feature.level ?? null,
     description: feature.description,
     tags: feature.tags,
-    choice: picks[0] ?? null,
     choices: picks,
     grantedAtLevels,
     extraPicks: extraPickSummaryOf(feature.extraPicks)

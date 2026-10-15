@@ -150,7 +150,8 @@ test("the GM runs a fight on a new scene and the player moves their token", asyn
 test("the GM pairs the table viewer and presents the map", async ({ open, request }) => {
   // Start from a paused presentation of an uploaded map, whichever journeys ran before this one.
   await ensureGmPassword(request);
-  const { token } = await (await request.post("/api/gm/login", { data: { password: GM_PASSWORD } })).json();
+  const { token } = (await (await request.post("/api/v1/host/gm/sign-in", { data: { password: GM_PASSWORD } })).json())
+    .data;
   const headers = { authorization: `Bearer ${token}` };
   const upload = await request.post(`/api/v1/map-assets?name=${encodeURIComponent(MAP_NAME)}&kind=battlemap`, {
     headers: { ...headers, "content-type": "image/png" },

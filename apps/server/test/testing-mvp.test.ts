@@ -46,9 +46,9 @@ describe("testing MVP live server", () => {
     if (!address || typeof address === "string") throw new Error("Live server did not bind.");
     let base = `http://127.0.0.1:${address.port}`;
     const gmHeaders = { authorization: `Bearer ${gmToken}`, "content-type": "application/json" };
-    expect((await fetch(`${base}/api/gm/viewer-urls`)).status).toBe(401);
-    const viewerUrls = await (await fetch(`${base}/api/gm/viewer-urls`, { headers: gmHeaders })).json();
-    expect(viewerUrls.viewerUrls).toEqual([
+    expect((await fetch(`${base}/api/v1/host/gm/viewer-urls`)).status).toBe(401);
+    const viewerUrls = await (await fetch(`${base}/api/v1/host/gm/viewer-urls`, { headers: gmHeaders })).json();
+    expect(viewerUrls.data.viewerUrls).toEqual([
       "http://localhost:5173/viewer.html",
       "http://192.168.50.20:5173/viewer.html"
     ]);

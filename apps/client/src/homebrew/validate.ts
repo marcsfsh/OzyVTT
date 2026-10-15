@@ -16,7 +16,8 @@ import { featurePicks, HOMEBREW_BODY_SCHEMAS } from "@vtt/content-srd-5.2.1/sche
 import { forStorage } from "./defaults";
 import { getAt } from "./paths";
 // The gating vocabulary comes from the form that offers it, so new conditions are checked here too.
-import { modifierLabel, triggerKindOf } from "./RiderEditor";
+import { modifierLabel } from "./riders/modifiers";
+import { triggerKindOf } from "./riders/triggers";
 import { isDiceFormula, namesOwnRecord, type Draft, type SchemaContext } from "./schema";
 import { fieldAt } from "./schemas";
 import { TYPE_WORDS, typeLabel, type HomebrewType } from "./types";

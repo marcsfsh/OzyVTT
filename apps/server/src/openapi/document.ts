@@ -8,6 +8,7 @@ import {
   ENCOUNTER_ARCHIVE_PATHS,
   GAME_PATHS,
   HOMEBREW_PATHS,
+  HOST_PATHS,
   HomebrewContentStateSchema,
   HomebrewContentTypeSchema,
   INTEGRATION_CREDENTIAL_PATHS,
@@ -877,6 +878,97 @@ export const openApiDocument = {
           },
           "401": { $ref: "#/components/responses/ApiError" },
           "403": { $ref: "#/components/responses/ApiError" }
+        }
+      }
+    },
+    // ===== The host's GM account (host-http.ts). Same-origin only: these routes send no CORS headers, so a
+    // web page can't relay password guesses. Not reachable with an integration credential. =====
+    [HOST_PATHS.setup]: {
+      get: {
+        operationId: "getHostSetup",
+        security: [],
+        description: "Whether the GM password has been set on this host.",
+        responses: {
+          "200": {
+            description: "The setup state",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/HostSetupResponse" } } }
+          }
+        }
+      },
+      post: {
+        operationId: "setGmPassword",
+        security: [],
+        description:
+          "Sets the first GM password (at least 12 characters). Accepted only from the host machine itself (loopback); refused once a password is set.",
+        requestBody: jsonBody("HostPasswordRequest"),
+        responses: {
+          "201": {
+            description: "The password is set",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/HostSetupResponse" } } }
+          },
+          "400": apiError,
+          "403": apiError,
+          "409": apiError
+        }
+      }
+    },
+    [HOST_PATHS.gmSignIn]: {
+      post: {
+        operationId: "signInGm",
+        security: [],
+        description:
+          "Exchanges the GM password for a GM session token (12 hours). Repeated failures from one address are rate-limited with 429 and Retry-After.",
+        requestBody: jsonBody("HostPasswordRequest"),
+        responses: {
+          "200": {
+            description: "A GM session token",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/GmSignInResponse" } } }
+          },
+          "400": apiError,
+          "401": apiError,
+          "429": apiError
+        }
+      }
+    },
+    [HOST_PATHS.gmSignOut]: {
+      post: {
+        operationId: "signOutGm",
+        security: [{ gmAuth: [] }],
+        description: "Revokes the GM session that sends it.",
+        responses: {
+          "200": {
+            description: "Signed out",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/GmSignOutResponse" } } }
+          },
+          "401": apiError
+        }
+      }
+    },
+    [HOST_PATHS.gmRevokeAll]: {
+      post: {
+        operationId: "revokeAllGmSessions",
+        security: [{ gmAuth: [] }],
+        description: "Revokes every GM session, this one included.",
+        responses: {
+          "200": {
+            description: "Every GM session revoked",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/GmRevokeAllResponse" } } }
+          },
+          "401": apiError
+        }
+      }
+    },
+    [HOST_PATHS.viewerUrls]: {
+      get: {
+        operationId: "listViewerUrls",
+        security: [{ gmAuth: [] }],
+        description: "The addresses a table viewer on the LAN can open, one per configured host address.",
+        responses: {
+          "200": {
+            description: "Viewer addresses",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerUrlsResponse" } } }
+          },
+          "401": apiError
         }
       }
     },
@@ -2488,6 +2580,48 @@ export const openApiDocument = {
       SystemHealthResponse: envelopeSchema("#/components/schemas/SystemHealth"),
       SystemVersionResponse: envelopeSchema("#/components/schemas/SystemVersion"),
       SystemCapabilitiesResponse: envelopeSchema("#/components/schemas/SystemCapabilities"),
+      HostSetup: {
+        type: "object",
+        additionalProperties: false,
+        required: ["bootstrapped"],
+        properties: { bootstrapped: { type: "boolean" } }
+      },
+      HostSetupResponse: envelopeSchema("#/components/schemas/HostSetup"),
+      HostPasswordRequest: {
+        type: "object",
+        additionalProperties: false,
+        required: ["password"],
+        properties: { password: { type: "string", maxLength: 256 } }
+      },
+      GmSignIn: {
+        type: "object",
+        additionalProperties: false,
+        required: ["token"],
+        properties: { token: { type: "string" } }
+      },
+      GmSignInResponse: envelopeSchema("#/components/schemas/GmSignIn"),
+      GmSignOut: {
+        type: "object",
+        additionalProperties: false,
+        required: ["signedOut"],
+        properties: { signedOut: { const: true } }
+      },
+      GmSignOutResponse: envelopeSchema("#/components/schemas/GmSignOut"),
+      GmRevokeAll: {
+        type: "object",
+        additionalProperties: false,
+        required: ["revoked"],
+        properties: { revoked: { const: true } }
+      },
+      GmRevokeAllResponse: envelopeSchema("#/components/schemas/GmRevokeAll"),
+      ViewerUrls: {
+        type: "object",
+        additionalProperties: false,
+        required: ["viewerUrls"],
+        properties: { viewerUrls: { type: "array", items: { type: "string", format: "uri" } } }
+      },
+      ViewerUrlsResponse: envelopeSchema("#/components/schemas/ViewerUrls"),
+
       IntegrationCredentialMetadata: {
         type: "object",
         additionalProperties: false,
@@ -3558,7 +3692,7 @@ export const openApiDocument = {
       ContentFeature: {
         type: "object",
         additionalProperties: false,
-        required: ["id", "name", "level", "description", "tags", "choice", "choices", "grantedAtLevels", "extraPicks"],
+        required: ["id", "name", "level", "description", "tags", "choices", "grantedAtLevels", "extraPicks"],
         description:
           "The browse-and-pick projection of a bundle FeatureRecord. Prose is the display source of truth; a feature's structured riders (granted actions, effects, modifiers, limited uses) stay server-side - the server applies them when it builds the character, so the wizard never becomes a second rules engine.",
         properties: {
@@ -3577,16 +3711,11 @@ export const openApiDocument = {
             items: contentSlug,
             description: "Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity)"
           },
-          choice: {
-            description:
-              "The FIRST pick this feature asks the player to make - each one writes a row in the character's choice-provenance ledger. null when the feature grants without asking.",
-            oneOf: [{ $ref: "#/components/schemas/ContentFeatureChoice" }, { type: "null" }]
-          },
           choices: {
             type: "array",
             items: { $ref: "#/components/schemas/ContentFeatureChoice" },
             description:
-              "EVERY pick this feature asks for, in authored order - one record may owe more than one, with different kinds and ceilings. Magic Initiate owes two cantrips AND one level-1 spell, and reading only `choice` is what silently dropped the spell. Empty when the feature asks for nothing."
+              "Every pick this feature asks for, in authored order; each writes a row in the character's choice-provenance ledger. One record may owe more than one, with different kinds and ceilings: Magic Initiate owes two cantrips and one level-1 spell. Empty when the feature grants without asking."
           },
           grantedAtLevels: {
             type: "array",
@@ -3668,7 +3797,7 @@ export const openApiDocument = {
       ContentFeatureOption: {
         type: "object",
         additionalProperties: false,
-        required: ["id", "name", "description", "requires", "choice", "choices", "extraPicks"],
+        required: ["id", "name", "description", "requires", "choices", "extraPicks"],
         description:
           "One inline option of a feature's pick. Carries its authored name (an id alone would force the client to titleize) and any SECOND-ORDER pick it owes - Cleric Divine Order's Thaumaturge grants an extra cantrip, so choosing it opens another choice. Riders stay server-side.",
         properties: {
@@ -3695,15 +3824,11 @@ export const openApiDocument = {
               { type: "null" }
             ]
           },
-          choice: {
-            description:
-              "The FIRST nested pick this option owes. Bounded at one level: a nested choice never carries its own options.",
-            oneOf: [{ $ref: "#/components/schemas/ContentFeatureChoice" }, { type: "null" }]
-          },
           choices: {
             type: "array",
             items: { $ref: "#/components/schemas/ContentFeatureChoice" },
-            description: "EVERY nested pick this option owes, in authored order."
+            description:
+              "Every nested pick this option owes, in authored order. Bounded at one level: a nested pick never carries its own options."
           },
           extraPicks: {
             type: "array",

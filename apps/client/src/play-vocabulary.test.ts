@@ -73,7 +73,7 @@ const RETIRED: ReadonlyArray<Readonly<{ pattern: RegExp; use: string; where?: Re
 /** (file, string) exemptions, so a word is excused only where it is correct; each must rescue something. */
 const ALLOWED: ReadonlyArray<readonly [file: string, text: string, why: string]> = [
   [
-    "apps/client/src/homebrew/RiderEditor.tsx",
+    "apps/client/src/homebrew/riders/triggers.ts",
     "Kinds of creature",
     "SRD's own vocabulary: a monster's type line is its “creature type”, and a homebrew rider that " +
       "applies to Undead and Fiends is filtered by exactly that field. Renaming it would make the form " +

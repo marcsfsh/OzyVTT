@@ -1084,13 +1084,13 @@ describe("extra picks raise the budget the server validates against", () => {
       features: readonly {
         id: string;
         extraPicks: readonly { offer: string }[];
-        choice: { options: readonly { id: string; extraPicks: readonly { offer: string }[] }[] } | null;
+        choices: readonly { options: readonly { id: string; extraPicks: readonly { offer: string }[] }[] }[];
       }[]
     ) => {
       for (const feature of features) {
         featureIds.add(feature.id);
         for (const grant of feature.extraPicks) authored.push({ where: `${where}.${feature.id}`, offer: grant.offer });
-        for (const option of feature.choice?.options ?? []) {
+        for (const option of feature.choices.flatMap((pick) => pick.options)) {
           featureIds.add(option.id);
           for (const grant of option.extraPicks)
             authored.push({ where: `${where}.${feature.id}:${option.id}`, offer: grant.offer });

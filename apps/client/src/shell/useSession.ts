@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
 import { useToast } from "@vtt/ui";
 import type { NoticeMessage } from "../components/feedback";
-import { jsonRequest } from "../lib/api";
+import { HOST_PATHS } from "@vtt/api-contract";
+import { apiRequest } from "../lib/api";
 import { joinTable, storedPlayerToken } from "../lib/session";
 import { navigate } from "../router";
 import { socket } from "../socket";
@@ -33,7 +34,7 @@ export function useSession(enter: (commit: () => void) => void) {
   const { toast } = useToast();
 
   useEffect(() => {
-    jsonRequest<{ bootstrapped: boolean }>("/api/bootstrap/status")
+    apiRequest<{ bootstrapped: boolean }>(HOST_PATHS.setup)
       .then((status) => setBootstrapped(status.bootstrapped))
       .catch((error: Error) => setNotice({ tone: "error", text: error.message }));
     const onConnect = () => setConnection("online");
@@ -80,7 +81,7 @@ export function useSession(enter: (commit: () => void) => void) {
   const signInGm = async (password: string) => {
     setBusy(true);
     try {
-      const { token } = await jsonRequest<{ token: string }>("/api/gm/login", { body: { password } });
+      const { token } = await apiRequest<{ token: string }>(HOST_PATHS.gmSignIn, { body: { password } });
       await join("gm", token, "Couldn't sign in as GM.");
     } catch (error) {
       setBusy(false);
@@ -91,7 +92,7 @@ export function useSession(enter: (commit: () => void) => void) {
   const setGmPassword = async (password: string) => {
     setBusy(true);
     try {
-      await jsonRequest("/api/bootstrap", { body: { password } });
+      await apiRequest(HOST_PATHS.setup, { body: { password } });
       setBootstrapped(true);
       toast("GM password set. Enter it to begin.", { tone: "success" });
     } catch (error) {
@@ -109,11 +110,11 @@ export function useSession(enter: (commit: () => void) => void) {
   };
 
   /** Ends this GM session (sign out) or every GM session (revoke all), then returns to the landing. */
-  const endGmSession = async (path: "/api/gm/logout" | "/api/gm/sessions/revoke-all", done: string) => {
+  const endGmSession = async (path: typeof HOST_PATHS.gmSignOut | typeof HOST_PATHS.gmRevokeAll, done: string) => {
     if (signedIn?.role !== "gm") return;
     setBusy(true);
     try {
-      await jsonRequest(path, { token: signedIn.token, method: "POST" });
+      await apiRequest(path, { token: signedIn.token, method: "POST" });
     } catch (error) {
       setBusy(false);
       toast((error as Error).message, { tone: "error" });
@@ -135,9 +136,9 @@ export function useSession(enter: (commit: () => void) => void) {
     joinPlayer,
     signInGm,
     setGmPassword,
-    signOutGm: () => endGmSession("/api/gm/logout", "Signed out."),
+    signOutGm: () => endGmSession(HOST_PATHS.gmSignOut, "Signed out."),
     revokeAllGmSessions: () =>
-      endGmSession("/api/gm/sessions/revoke-all", "All GM sessions revoked. Sign in again to continue."),
+      endGmSession(HOST_PATHS.gmRevokeAll, "All GM sessions revoked. Sign in again to continue."),
     leavePlayer: () => {
       leave();
       setNotice(null);

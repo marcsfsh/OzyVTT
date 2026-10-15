@@ -128,7 +128,7 @@ export async function expectPageFits(page: Page) {
  * run on its own with `--grep`. Players cannot join before it is set.
  */
 export async function ensureGmPassword(request: APIRequestContext) {
-  const response = await request.post("/api/bootstrap", { data: { password: GM_PASSWORD } });
+  const response = await request.post("/api/v1/host/setup", { data: { password: GM_PASSWORD } });
   expect([201, 409]).toContain(response.status());
 }
 

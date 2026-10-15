@@ -108,7 +108,6 @@ const featSummary = (id: string, category: string): ContentFeatSummary => ({
     level: null,
     description: "x",
     tags: [],
-    choice: null,
     choices: [],
     grantedAtLevels: [],
     extraPicks: []
