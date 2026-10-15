@@ -1066,6 +1066,7 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
           proposedDamage: 0,
           proposedDamageParts: [],
           critical: false,
+          weighed: null,
           createdAt: 0
         }
       ]

@@ -1,4 +1,20 @@
 /** Small display formatters shared by the table's sheets, runners and browsers. */
+import type { DamageApplication } from "@vtt/domain";
+
+/**
+ * What the target's defences did to a hit, as the server weighed it: "12 fire became 6 (resistance:
+ * Ring of Fire Resistance); 3 less from damage reduction". Empty when nothing changed the numbers.
+ */
+export function damageAdjustments(parts: DamageApplication["parts"] | undefined, flatReduction = 0): string {
+  const adjusted = (parts ?? [])
+    .filter((part) => part.adjustment !== null)
+    .map(
+      (part) =>
+        `${part.amount} ${part.type} became ${part.adjusted} (${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""})`
+    );
+  if (flatReduction > 0) adjusted.push(`${flatReduction} less from damage reduction`);
+  return adjusted.join("; ");
+}
 
 /** A bonus with its sign: "+3", "-1", "+0". */
 export const signed = (value: number) => (value >= 0 ? `+${value}` : String(value));

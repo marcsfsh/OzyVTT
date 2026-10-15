@@ -198,6 +198,7 @@ describe("player view pending prompts", () => {
         "proposedDamage",
         "proposedDamageParts",
         "critical",
+        "weighed",
         "createdAt",
         "sourceName"
       ].sort()

@@ -256,6 +256,16 @@ export const PendingReactionSchema = z
       .default([]),
     /** The triggering attack was a critical hit (drives death-save failure ticks when the damage lands). */
     critical: z.boolean().default(false),
+    /** hit-by-attack: what each answer takes off hit points after the reactor's defences, weighed when the hit
+     *  landed. Null when nothing was weighed (an opportunity attack). */
+    weighed: z
+      .object({
+        use: z.number().int().nonnegative().max(10000),
+        decline: z.number().int().nonnegative().max(10000)
+      })
+      .strict()
+      .nullable()
+      .default(null),
     createdAt: z.number().int().nonnegative()
   })
   .strict();

@@ -154,19 +154,9 @@ export function standingDefences(
   };
 }
 
-/** The single damage entry point (ADR-0020): typed parts go through definition, effect and item
- *  defences; the untyped amount stays exact. Temp HP absorbs first. At 0 HP player characters start
- *  dying (or die on massive overflow) and any combatant releases the effects it sustains. */
-export function applyDamageDetailed(
-  state: GameState,
-  actorId: string,
-  input: DamageInput,
-  scope: Initiator,
-  deps?: DamageDeps
-): DamageOutcome {
-  const actor = adjustableActor(state, actorId, scope);
-  const events: EffectNarration[] = [];
-
+/** What a hit would come to on this actor: each typed part through its defences, then flat reduction off
+ *  the total. Pure, so a prompt can show the number Confirm will land. */
+function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: DamageDeps): DamageWeighing {
   let totalRequested: number;
   let totalAdjusted: number;
   let flatReduction = 0;
@@ -247,6 +237,53 @@ export function applyDamageDetailed(
     totalRequested = input.damageOverride ?? input.amount;
     totalAdjusted = totalRequested;
   }
+
+  return { totalRequested, totalAdjusted, flatReduction, parts };
+}
+
+type DamageWeighing = Readonly<{
+  totalRequested: number;
+  totalAdjusted: number;
+  flatReduction: number;
+  parts: DamageApplication["parts"];
+}>;
+
+/** Half of each typed part, floored per part (Uncanny Dodge); parts that halve to nothing drop out. */
+export function halvedDamageParts(parts: readonly DamagePart[]): DamagePart[] {
+  return parts.map((part) => ({ ...part, amount: Math.floor(part.amount / 2) })).filter((part) => part.amount > 0);
+}
+
+/** A dry run of `applyDamageDetailed`: the typed breakdown and total it would apply, with nothing moved. */
+export function previewDamage(
+  state: GameState,
+  actorId: string,
+  input: DamageInput,
+  deps?: DamageDeps
+): Pick<DamageApplication, "totalRequested" | "totalApplied" | "parts" | "flatReduction"> {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) throw new CommandRejectedError("That combatant is not on the table.");
+  const weighed = weighDamage(state, actor, input, deps);
+  return {
+    totalRequested: weighed.totalRequested,
+    totalApplied: weighed.totalAdjusted,
+    parts: weighed.parts,
+    ...(weighed.flatReduction > 0 ? { flatReduction: weighed.flatReduction } : {})
+  };
+}
+
+/** The single damage entry point (ADR-0020): typed parts go through definition, effect and item
+ *  defences; the untyped amount stays exact. Temp HP absorbs first. At 0 HP player characters start
+ *  dying (or die on massive overflow) and any combatant releases the effects it sustains. */
+export function applyDamageDetailed(
+  state: GameState,
+  actorId: string,
+  input: DamageInput,
+  scope: Initiator,
+  deps?: DamageDeps
+): DamageOutcome {
+  const actor = adjustableActor(state, actorId, scope);
+  const events: EffectNarration[] = [];
+  const { totalRequested, totalAdjusted, flatReduction, parts } = weighDamage(state, actor, input, deps);
 
   const hpBefore = actor.hp.current;
   const wasAtZero = hpBefore <= 0;

@@ -3,7 +3,7 @@ import type { RandomSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { requireGm, type Initiator } from "./authorization.js";
-import { adjustableActor, applyDamageDetailed } from "./hit-points.js";
+import { adjustableActor, applyDamageDetailed, halvedDamageParts } from "./hit-points.js";
 import type { EffectNarration } from "./effects.js";
 import { resolveDefinitionAction } from "./action-resolution.js";
 import { builtinAction } from "./builtin-actions.js";
@@ -189,11 +189,7 @@ export function answerReaction(
     return { ...base, used: true, appliedDamage, resolution, events, ...detailOf(application) };
   }
 
-  const parts = use
-    ? pending.proposedDamageParts
-        .map((part) => ({ ...part, amount: Math.floor(part.amount / 2) }))
-        .filter((part) => part.amount > 0)
-    : [...pending.proposedDamageParts];
+  const parts = use ? halvedDamageParts(pending.proposedDamageParts) : [...pending.proposedDamageParts];
   const total = parts.reduce((sum, part) => sum + part.amount, 0);
 
   let appliedDamage = 0;

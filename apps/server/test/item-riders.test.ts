@@ -613,6 +613,7 @@ describe("criterion 7: a dagger granting advantage on opportunity attacks", () =
           proposedDamage: 0,
           proposedDamageParts: [],
           critical: false,
+          weighed: null,
           createdAt: 0
         }
       ]

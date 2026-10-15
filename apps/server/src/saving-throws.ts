@@ -15,7 +15,7 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { recordRoll as recordRollInHistory, rolledTerms } from "./roll-history.js";
 import { requireGm, type Initiator } from "./authorization.js";
-import { applyDamageDetailed, adjustableActor } from "./hit-points.js";
+import { applyDamageDetailed, previewDamage, adjustableActor } from "./hit-points.js";
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty } from "./condition-rules.js";
 import { addEffect, endEffectIfPresent, makeEffect, type EffectNarration } from "./effects.js";
@@ -353,21 +353,37 @@ export function answerSave(
   const outcomeCondition = !success && pending.conditionIds.length > 0;
 
   // Preview (commit=false): the roll is recorded so everyone sees it, but nothing is applied and the
-  // save stays open until the answerer confirms.
-  if (!commit)
+  // save stays open until the answerer confirms. The damage is weighed through the target's defences, so the
+  // prompt shows what Confirm will land.
+  if (!commit) {
+    const weighed =
+      outcomeDamage > 0
+        ? previewDamage(
+            state,
+            target.id,
+            outcomeParts !== null ? { amount: outcomeDamage, parts: outcomeParts } : { amount: outcomeDamage },
+            {
+              resolveDefinition: (definitionId) => deps.resolveDefinition(definitionId),
+              ...(deps.catalog ? { catalog: deps.catalog } : {})
+            }
+          )
+        : null;
     return {
       outcome: {
         success,
         total,
         dc: pending.dc,
-        appliedDamage: outcomeDamage,
+        appliedDamage: weighed?.totalApplied ?? 0,
         conditionApplied: outcomeCondition,
         committed: false,
         autoFailed,
-        ...(rollMode ? { rollMode } : {})
+        ...(rollMode ? { rollMode } : {}),
+        ...(weighed && weighed.parts.length > 0 ? { parts: weighed.parts } : {}),
+        ...(weighed?.flatReduction ? { flatReduction: weighed.flatReduction } : {})
       },
       events: []
     };
+  }
 
   const events: EffectNarration[] = [];
   if (legendaryNote !== null) events.push({ kind: "effect", text: legendaryNote, actorId: target.id });

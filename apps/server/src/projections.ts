@@ -180,6 +180,8 @@ const PENDING_REACTION_FIELDS = {
   proposedDamage: "player",
   proposedDamageParts: "player",
   critical: "player",
+  // Weighed through the reactor's own defences, and only the reactor's owner gets the prompt.
+  weighed: "player",
   createdAt: "player",
   sourceName: "derived",
   sourceActorId: "never"

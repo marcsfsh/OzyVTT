@@ -192,25 +192,21 @@ describe("the save prompt's damage field", () => {
     expect(table.hp()).toBe(34);
   });
 
-  /**
-   * Known bug, asserted as it behaves: the preview arm of `answerSave` returns the halved total before
-   * `applyDamageDetailed` runs (`saving-throws.ts`), so resistance, vulnerability, immunity and damage
-   * reduction are invisible to it. The previous case only agrees because its target is not resistant.
-   * The un-amended Roll preview has the same gap. When fixed, these numbers converge.
-   */
-  it("projects the PRE-defence number on a recheck, which is not what the commit applies", () => {
+  /** The preview weighs the damage through the target's defences, so a resistant target sees what it will lose. */
+  it("projects the post-defence number on a recheck, which is what the commit applies", () => {
     const table = tableWith({ resistant: true, halfOnSuccess: true });
     // 18 vs DC 15 succeeds, so 12 halves to 6; the target is fire-resistant, so 6 lands as 3.
     const preview = answerFromThePrompt(table, "12", 18, { role: "gm", sessionId: IDS.gm }, false);
     expect(preview.outcome.committed).toBe(false);
-    expect(preview.outcome.appliedDamage).toBe(6);
+    expect(preview.outcome.appliedDamage).toBe(3);
+    expect(preview.outcome.parts).toEqual([
+      { amount: 6, type: "fire", adjusted: 3, adjustment: "resistance", adjustmentSource: null }
+    ]);
     expect(table.hp()).toBe(40);
 
     const committed = answerFromThePrompt(table, "12", 18);
     expect(committed.outcome.appliedDamage).toBe(3);
     expect(40 - table.hp()).toBe(3);
-    // The prompt showed 6; the target lost 3.
-    expect(preview.outcome.appliedDamage).not.toBe(committed.outcome.appliedDamage);
   });
 
   it("answers a TWO-TYPE save with 5 for an amended 12, which no halving of the total can produce", () => {

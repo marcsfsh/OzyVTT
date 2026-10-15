@@ -2,13 +2,15 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { type ActionResolution, type PendingReaction, type PlayerPendingReaction } from "@vtt/domain";
 import { Button, IconX } from "@vtt/ui";
 import { command } from "../lib/command";
+import { damageAdjustments } from "./format";
 import { DieModeButtons, type DieMode } from "./RollControls";
 import "./prompts.css";
 
 /**
  * A reaction window awaiting an answer (Uncanny Dodge). The triggering hit's damage is parked here,
  * so both buttons apply it: Use spends the reaction and halves each part, Decline applies it in
- * full. Numbers shown are before resistances; the server reports the final total. The GM's dismiss
+ * full. Each button names what the server weighed through the reactor's defences when the hit
+ * landed; a prompt parked before that was recorded falls back to the raw numbers. The GM's dismiss
  * dismisses without applying, for damage already entered by hand.
  */
 export function ReactionPrompt({
@@ -33,7 +35,10 @@ export function ReactionPrompt({
   );
   const [dieEdit, setDieEdit] = useState("");
   const autoRolled = useRef(false);
-  const halved = reaction.proposedDamageParts.reduce((sum, part) => sum + Math.floor(part.amount / 2), 0);
+  const weighed = reaction.weighed;
+  const takeIfUsed =
+    weighed?.use ?? reaction.proposedDamageParts.reduce((sum, part) => sum + Math.floor(part.amount / 2), 0);
+  const takeIfDeclined = weighed?.decline ?? reaction.proposedDamage;
   // `use` distinguishes the swing (Attack) from letting the mover go; opts drive the preview flow.
   const answer = (use: boolean, opts: { commit?: boolean; rollMode?: DieMode; attackNatural?: number } = {}) => {
     setBusy(true);
@@ -59,10 +64,13 @@ export function ReactionPrompt({
             : `${actorName} let ${reaction.sourceName} go.`
         );
       } else {
+        const defences = damageAdjustments(outcome.parts, outcome.flatReduction);
         onFeedback(
-          use
-            ? `${actorName} used ${reaction.actionName} - ${reaction.proposedDamage} damage became ${outcome.appliedDamage}.`
-            : `${actorName} took ${outcome.appliedDamage} damage.`
+          `${
+            use
+              ? `${actorName} used ${reaction.actionName} - ${reaction.proposedDamage} damage became ${outcome.appliedDamage}`
+              : `${actorName} took ${outcome.appliedDamage} damage`
+          }${defences ? ` - ${defences}` : ""}.`
         );
       }
     });
@@ -198,18 +206,18 @@ export function ReactionPrompt({
                 type="button"
                 className="save-prompt-roll"
                 disabled={busy}
-                title="Spend the reaction; halved before resistances"
+                title={`Spend the reaction; half damage${weighed ? ", after your defences" : ", before resistances"}`}
                 onClick={() => answer(true)}
               >
-                Use - take {halved}
+                Use - take {takeIfUsed}
               </button>
               <button
                 type="button"
                 disabled={busy}
-                title="Keep the reaction; full damage before resistances"
+                title={`Keep the reaction; full damage${weighed ? ", after your defences" : ", before resistances"}`}
                 onClick={() => answer(false)}
               >
-                Decline - take {reaction.proposedDamage}
+                Decline - take {takeIfDeclined}
               </button>
             </>
           )}

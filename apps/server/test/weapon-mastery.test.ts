@@ -978,6 +978,7 @@ function parkOpportunityAttack(built: Built): string {
         proposedDamage: 0,
         proposedDamageParts: [],
         critical: false,
+        weighed: null,
         createdAt: 0
       }
     ]

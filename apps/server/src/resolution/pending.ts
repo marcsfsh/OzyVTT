@@ -1,5 +1,6 @@
 import { isIncapacitated } from "../condition-rules.js";
 import { effectiveActions } from "../effective-actions.js";
+import { halvedDamageParts, previewDamage } from "../hit-points.js";
 import { familyModeFor } from "../rules-families.js";
 import { createPendingSaves } from "../saving-throws.js";
 import type { ResolveContext } from "./context.js";
@@ -37,6 +38,12 @@ export function parkReaction(ctx: ResolveContext): void {
     state.combat.pendingReactions.length >= 20
   )
     return;
+  // Both answers weighed through the reactor's defences now, so its buttons name what each would take off.
+  const damageDeps = { resolveDefinition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) };
+  const weigh = (parts: typeof proposedParts) =>
+    previewDamage(state, target.id, { amount: 0, parts }, damageDeps).totalApplied;
+  const halved = halvedDamageParts(proposedParts);
+  const weighed = { use: halved.length > 0 ? weigh(halved) : 0, decline: weigh(proposedParts) };
   state.combat = {
     ...state.combat,
     pendingReactions: [
@@ -54,6 +61,7 @@ export function parkReaction(ctx: ResolveContext): void {
         proposedDamage: proposedTotal,
         proposedDamageParts: proposedParts,
         critical: ctx.crit,
+        weighed,
         createdAt: Date.parse(deps.now())
       }
     ]
