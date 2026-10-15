@@ -64,7 +64,7 @@ const GLYPH_ALLOW: ReadonlyArray<readonly [file: string, glyphs: string]> = [
   ["apps/client/src/encounter/InitiativeList.tsx", "▶"],
   ["apps/client/src/encounter/RollControls.tsx", "✕"],
   ["apps/client/src/integrations/IntegrationsPanel.tsx", "🔌"],
-  ["apps/client/src/maps/MapManager.tsx", "←↑→↓"],
+  ["apps/client/src/maps/CalibrationSteps.tsx", "←↑→↓"],
   ["apps/client/src/scenes/SceneBuilder.tsx", "✎"],
   ["apps/client/src/scenes/SceneGallery.tsx", "←→●✎🗑🗺"],
   ["apps/client/src/viewer/ViewerPreviewPanel.tsx", "✕"],

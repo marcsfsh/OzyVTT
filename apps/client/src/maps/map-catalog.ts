@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { apiRequest } from "../lib/api";
 import type { MapSelection } from "./MapManager";
 import { socket } from "../socket";
 
@@ -8,6 +9,28 @@ import { socket } from "../socket";
  */
 
 export type PickerMap = MapSelection & Readonly<{ folder: string | null }>;
+
+export type Point = Readonly<{ x: number; y: number }>;
+export type MapKind = "battlemap" | "regional" | "world";
+/** One library row as the server sends it. */
+export type MapAsset = Readonly<{
+  id: string;
+  name: string;
+  kind: MapKind;
+  folder: string | null;
+  originalName: string;
+  format: string;
+  mediaType: string;
+  width: number;
+  height: number;
+  byteLength: number;
+  importedAt: string;
+  calibration: Readonly<{
+    calibration: Readonly<{ origin: Point; cellSizePx: number; rotationRadians: number; distancePerCell: number }>;
+    verificationErrorPx: number;
+  }> | null;
+  scale: Readonly<{ kind: "image-scale"; distancePerPixel: number; unit: string }> | null;
+}>;
 
 /**
  * The session's bearer token for the map endpoints. The GM's token lives in shell state and is also
@@ -19,10 +42,25 @@ export function sessionToken(): string | null {
   return typeof auth?.token === "string" && auth.token.length > 0 ? auth.token : null;
 }
 
-async function readBody(response: Response) {
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body?.error?.message ?? body?.message ?? "The map library could not be reached.");
-  return body.data;
+const failure = "The map library could not be reached.";
+type AssetRow = PickerMap & Readonly<{ folder?: string | null }>;
+
+/** The picker's fields of one asset row; the server's row carries more (file details, timestamps). */
+const pickerMapOf = (asset: AssetRow): PickerMap => ({
+  id: asset.id,
+  name: asset.name,
+  kind: asset.kind,
+  folder: asset.folder ?? null,
+  width: asset.width,
+  height: asset.height,
+  calibration: asset.calibration,
+  scale: asset.scale
+});
+
+/** Every map in the library. */
+export async function listMaps(bearer: string): Promise<readonly PickerMap[]> {
+  const data = await apiRequest<{ assets: readonly AssetRow[] }>("/api/v1/map-assets", { token: bearer, failure });
+  return data.assets.map(pickerMapOf);
 }
 
 export type MapCatalog = Readonly<{
@@ -42,21 +80,7 @@ export function useMapCatalog(token?: string | null): MapCatalog {
   const reload = useCallback(
     async (preferId?: string) => {
       if (!bearer) return undefined;
-      const data = await readBody(
-        await fetch("/api/v1/map-assets", { headers: { authorization: `Bearer ${bearer}` } })
-      );
-      const rows: readonly PickerMap[] = (data.assets as readonly (PickerMap & { folder?: string | null })[]).map(
-        (asset) => ({
-          id: asset.id,
-          name: asset.name,
-          kind: asset.kind,
-          folder: asset.folder ?? null,
-          width: asset.width,
-          height: asset.height,
-          calibration: asset.calibration,
-          scale: asset.scale
-        })
-      );
+      const rows = await listMaps(bearer);
       setMaps(rows);
       return preferId ? rows.find((row) => row.id === preferId) : undefined;
     },
@@ -75,25 +99,11 @@ export async function uploadMap(
   kind: MapSelection["kind"]
 ): Promise<{ asset: PickerMap; duplicate: boolean }> {
   const query = new URLSearchParams({ filename: file.name, name: file.name.replace(/\.[^.]+$/, ""), kind });
-  const data = await readBody(
-    await fetch(`/api/v1/map-assets?${query}`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${bearer}`, "content-type": file.type || "application/octet-stream" },
-      body: file
-    })
-  );
-  const asset = data.asset as PickerMap & { folder?: string | null };
-  return {
-    asset: {
-      id: asset.id,
-      name: asset.name,
-      kind: asset.kind,
-      folder: asset.folder ?? null,
-      width: asset.width,
-      height: asset.height,
-      calibration: asset.calibration,
-      scale: asset.scale
-    },
-    duplicate: data.duplicate === true
-  };
+  const data = await apiRequest<{ asset: AssetRow; duplicate?: boolean }>(`/api/v1/map-assets?${query}`, {
+    token: bearer,
+    headers: { "content-type": file.type || "application/octet-stream" },
+    body: file,
+    failure
+  });
+  return { asset: pickerMapOf(data.asset), duplicate: data.duplicate === true };
 }
