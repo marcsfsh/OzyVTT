@@ -316,16 +316,15 @@ export function RecordDetail({
    */
   const remove = async () => {
     const name = nameOf(draft).trim() || `this ${typeLabel(doc.type)}`;
-    // `danger: false`: archiving is reversible, so it is a caution, not destruction.
     const breaks = await dependentsFor("ifRemoved");
+    const breaksLine =
+      breaks.length > 0
+        ? ` ${dependentNames(breaks)} ${breaks.length === 1 ? "depends" : "depend"} on it and would stop working.`
+        : "";
     // `danger` only when a published record would break; otherwise archiving is a reversible caution.
     const confirmed = await confirm({
       title: "Archive this?",
-      body: `"${name}" stops appearing in the character builder, the monster pickers and inventory lists. Characters already built from it are unaffected. You can restore it later.${
-        breaks.length > 0
-          ? ` ${dependentNames(breaks)} ${breaks.length === 1 ? "depends" : "depend"} on it and would stop working.`
-          : ""
-      }`,
+      body: `"${name}" stops appearing in the character builder, the monster pickers and inventory lists. Characters already built from it are unaffected. You can restore it later.${breaksLine}`,
       confirmLabel: "Archive",
       danger: breaks.length > 0
     });

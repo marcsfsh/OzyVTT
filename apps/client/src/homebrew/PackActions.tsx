@@ -150,7 +150,7 @@ export function PackActions({ gmToken, onImported }: Readonly<{ gmToken: string;
               {report.imported.length === 1 ? "record" : "records"} will arrive as drafts only you can see.
             </p>
             {report.imported.length > 0 && (
-              <ul className="hb-pack-list">
+              <ul className="hb-pack-list scroll-y">
                 {report.imported.map((row) => (
                   <li key={row.id}>
                     {row.name} <span className="hb-pack-type">{typeLabel(row.type)}</span>
