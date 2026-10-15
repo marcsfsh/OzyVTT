@@ -131,7 +131,8 @@ const spellSummary = (id: string, level: number, classes: readonly string[]): Co
   damageTypes: [],
   attackRoll: false,
   rangeFeet: null,
-  castingOptions: []
+  castingOptions: [],
+  cantripScaling: []
 });
 const equipmentSummary = (id: string, category: ContentEquipmentSummary["category"]): ContentEquipmentSummary => ({
   id,
