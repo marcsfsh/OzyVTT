@@ -41,7 +41,7 @@ vi.mock("./api", async (importOriginal) => {
 import { ToastProvider } from "@vtt/ui";
 import { AtlasView } from "./AtlasView";
 import { MapSurface } from "./MapSurface";
-import type { CodexMap, CodexMarker } from "./api";
+import type { CodexMap, CodexMarker } from "@vtt/domain";
 
 const MAP: CodexMap = {
   id: "m1",

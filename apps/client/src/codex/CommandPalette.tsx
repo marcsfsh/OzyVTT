@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Modal, Skeleton } from "@vtt/ui";
-import { codexApi, playerCodexApi, SEARCH_HIT_CAP, type CodexSearchHit } from "./api";
+import type { CodexSearchHit } from "@vtt/domain";
+import { codexApi, playerCodexApi, SEARCH_HIT_CAP } from "./api";
 import { SearchResultRow, searchHitKey, useCodexSearch } from "./SearchResults";
 import { GM_SIDEBAR, PLAYER_SIDEBAR, pathForSection } from "./routes";
 

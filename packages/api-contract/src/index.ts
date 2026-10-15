@@ -306,9 +306,9 @@ export const IntegrationScopeSchema = z.enum([
 
 const ApiVersionSchema = z.literal(API_VERSION);
 const RealtimeProtocolVersionSchema = z.literal(REALTIME_PROTOCOL_VERSION);
-const TimestampSchema = z.string().datetime({ offset: true });
+const TimestampSchema = z.iso.datetime({ offset: true });
 
-export function successEnvelopeSchema<T extends z.ZodTypeAny>(data: T) {
+export function successEnvelopeSchema<T extends z.ZodType>(data: T) {
   return z.object({ ok: z.literal(true), apiVersion: ApiVersionSchema, data }).strict();
 }
 
@@ -320,8 +320,8 @@ export const ApiErrorEnvelopeSchema = z
       .object({
         code: ApiErrorCodeSchema,
         message: z.string().min(1).max(500),
-        requestId: z.string().uuid(),
-        details: z.record(z.unknown()).optional(),
+        requestId: z.uuid(),
+        details: z.record(z.string(), z.unknown()).optional(),
         retryAfterSeconds: z.number().int().positive().optional(),
         currentRevision: z.number().int().nonnegative().optional()
       })
@@ -375,10 +375,10 @@ export const SystemCapabilitiesResponseSchema = successEnvelopeSchema(SystemCapa
 
 export const IntegrationCredentialMetadataSchema = z
   .object({
-    id: z.string().uuid(),
+    id: z.uuid(),
     name: z.string().min(1).max(100),
     scopes: z.array(IntegrationScopeSchema).min(1),
-    gameId: z.string().uuid().nullable(),
+    gameId: z.uuid().nullable(),
     createdAt: TimestampSchema,
     expiresAt: TimestampSchema.nullable(),
     lastUsedAt: TimestampSchema.nullable(),
@@ -390,7 +390,7 @@ export const CreateIntegrationCredentialRequestSchema = z
   .object({
     name: z.string().trim().min(1).max(100),
     scopes: z.array(IntegrationScopeSchema).min(1),
-    gameId: z.string().uuid().nullable().optional(),
+    gameId: z.uuid().nullable().optional(),
     expiresAt: TimestampSchema.nullable().optional()
   })
   .strict();
@@ -416,7 +416,7 @@ export const CredentialAuditEventSchema = z
     id: z.number().int().positive(),
     type: CredentialAuditEventTypeSchema,
     occurredAt: TimestampSchema,
-    detail: z.record(z.unknown())
+    detail: z.record(z.string(), z.unknown())
   })
   .strict();
 
@@ -433,23 +433,23 @@ export const IntegrationCredentialAuditResponseSchema = successEnvelopeSchema(In
 export const CommandEnvelopeSchema = z
   .object({
     protocolVersion: RealtimeProtocolVersionSchema,
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     type: z.string().regex(/^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9-]*)+$/),
     expectedRevision: z.number().int().nonnegative().optional(),
     idempotencyKey: z.string().min(1).max(200),
-    payload: z.record(z.unknown())
+    payload: z.record(z.string(), z.unknown())
   })
   .strict();
 
 export const EventEnvelopeSchema = z
   .object({
     protocolVersion: RealtimeProtocolVersionSchema,
-    eventId: z.string().uuid(),
+    eventId: z.uuid(),
     type: z.string().regex(/^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9-]*)+$/),
     sequence: z.number().int().positive(),
     revision: z.number().int().nonnegative(),
     occurredAt: TimestampSchema,
-    data: z.record(z.unknown())
+    data: z.record(z.string(), z.unknown())
   })
   .strict();
 
@@ -567,16 +567,16 @@ export type GameCommandType = keyof typeof GAME_COMMANDS;
 export const GameCommandEnvelopeSchema = z
   .object({
     type: GameCommandTypeSchema,
-    commandId: z.string().uuid().optional(),
+    commandId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional(),
-    payload: z.record(z.unknown()).default({})
+    payload: z.record(z.string(), z.unknown()).default({})
   })
   .strict();
 
 /** Every accepted mutation resolves to at least this; individual commands append extras (rollId, actorId, resolution, ...). */
 export const GameMutationAcceptedSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     revision: z.number().int().nonnegative(),
     duplicate: z.boolean()
   })
@@ -588,7 +588,7 @@ export const GameSnapshotSchema = z
   .object({
     view: GameViewKindSchema,
     revision: z.number().int().nonnegative(),
-    game: z.record(z.unknown())
+    game: z.record(z.string(), z.unknown())
   })
   .strict();
 
@@ -631,7 +631,7 @@ export const EncounterArchiveVisibilitySchema = z
   .strict();
 /** `document` is the stored archive JSON verbatim (archiveSchemaVersion 3); its full shape is documented in apps/server/src/encounter-archive.ts. */
 export const EncounterArchiveDocumentSchema = z
-  .object({ id: z.number().int().positive(), document: z.record(z.unknown()) })
+  .object({ id: z.number().int().positive(), document: z.record(z.string(), z.unknown()) })
   .strict();
 /** What `POST /encounters/{id}/launch` returns: the new live scene and the combatants it cloned. */
 export const EncounterArchiveLaunchSchema = z
@@ -647,7 +647,7 @@ export const EncounterArchiveDeletedSchema = z
   .strict();
 
 /** Issued by POST /sessions/player - the same open, LAN-trust join the socket performs. */
-export const PlayerSessionIssuedSchema = z.object({ token: z.string().min(1), sessionId: z.string().uuid() }).strict();
+export const PlayerSessionIssuedSchema = z.object({ token: z.string().min(1), sessionId: z.uuid() }).strict();
 
 export const GameMutationAcceptedResponseSchema = successEnvelopeSchema(GameMutationAcceptedSchema);
 export const GameSnapshotResponseSchema = successEnvelopeSchema(GameSnapshotSchema);
@@ -698,7 +698,7 @@ export const HomebrewValiditySchema = z
   .object({ valid: z.boolean(), issues: z.array(HomebrewValidationIssueSchema) })
   .strict();
 /** The authored content body only - never row state. Opaque until each type's authored shape lands; see the HomebrewRecord component. */
-export const HomebrewRecordSchema = z.record(z.unknown());
+export const HomebrewRecordSchema = z.record(z.string(), z.unknown());
 export const HomebrewRecordDocumentSchema = z
   .object({
     id: HomebrewIdSchema,
@@ -742,7 +742,7 @@ export const HomebrewDeletedSchema = z
   .strict();
 export const HomebrewUsageSchema = z
   .object({
-    actorId: z.string().uuid(),
+    actorId: z.uuid(),
     actorName: z.string().min(1).max(200),
     kind: z
       .string()

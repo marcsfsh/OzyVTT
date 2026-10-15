@@ -1,3 +1,4 @@
+import type { CodexMap, CodexMapKind, CodexMarker } from "@vtt/domain";
 import { freshId, stamp, write, type CodexDb } from "./db.js";
 import { indexMap, indexMarker, unindex } from "./search.js";
 import {
@@ -14,46 +15,11 @@ import {
   markerLabel,
   optionalId,
   parseStringArray,
-  tags,
-  type CodexMapKind
+  tags
 } from "./validate.js";
 
 /** The atlas: a tree of maps (`codex_maps`) and the pins on them (`codex_markers`). */
 
-export type { CodexMapKind } from "./validate.js";
-export type CodexMapRow = Readonly<{
-  id: string;
-  assetId: string;
-  name: string;
-  kind: CodexMapKind;
-  parentMapId: string | null;
-  revealedToPlayers: boolean;
-  sortKey: number;
-  tags: readonly string[];
-  createdAt: string;
-  updatedAt: string;
-}>;
-export type CodexMarkerLinks = Readonly<{
-  pageIds: string[];
-  subMapId: string | null;
-  sceneIds: string[];
-  actorId: string | null;
-}>;
-export type CodexMarkerRow = Readonly<
-  {
-    id: string;
-    mapId: string;
-    x: number;
-    y: number;
-    iconId: string;
-    iconColor: string;
-    label: string | null;
-    revealedToPlayers: boolean;
-    tags: readonly string[];
-    /** At most one party pin atlas-wide. Player-facing, but grants no visibility. */
-    isParty: boolean;
-  } & CodexMarkerLinks & { createdAt: string; updatedAt: string }
->;
 export type CodexMapCreateInput = Readonly<{
   assetId: string;
   name: string;
@@ -111,7 +77,7 @@ type MarkerRowRaw = {
 const MARKER_COLUMNS =
   "id, map_id, x, y, icon_id, icon_color, label, revealed, page_ids_json, sub_map_id, scene_ids_json, actor_id, tags_json, is_party, created_at, updated_at";
 
-function toMap(row: MapRowRaw): CodexMapRow {
+function toMap(row: MapRowRaw): CodexMap {
   return {
     id: row.id,
     assetId: row.asset_id,
@@ -125,7 +91,7 @@ function toMap(row: MapRowRaw): CodexMapRow {
     updatedAt: row.updated_at
   };
 }
-function toMarker(row: MarkerRowRaw): CodexMarkerRow {
+function toMarker(row: MarkerRowRaw): CodexMarker {
   return {
     id: row.id,
     mapId: row.map_id,
@@ -156,7 +122,7 @@ function markerRow(db: CodexDb, markerId: string): MarkerRowRaw | undefined {
 }
 
 /** Leaf write of a whole, already-validated map row (create and restore). */
-export function insertMap(db: CodexDb, map: CodexMapRow): void {
+export function insertMap(db: CodexDb, map: CodexMap): void {
   db.database
     .prepare(`INSERT INTO codex_maps (${MAP_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(
@@ -175,7 +141,7 @@ export function insertMap(db: CodexDb, map: CodexMapRow): void {
 }
 
 /** Leaf write of a whole, already-validated marker row (create and restore). */
-export function insertMarker(db: CodexDb, marker: CodexMarkerRow): void {
+export function insertMarker(db: CodexDb, marker: CodexMarker): void {
   db.database
     .prepare(`INSERT INTO codex_markers (${MARKER_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(
@@ -201,13 +167,13 @@ export function insertMarker(db: CodexDb, marker: CodexMarkerRow): void {
 
 // Maps
 
-export function createMap(db: CodexDb, input: CodexMapCreateInput): CodexMapRow {
+export function createMap(db: CodexDb, input: CodexMapCreateInput): CodexMap {
   const parentMapId = optionalId(input.parentMapId);
   if (parentMapId && !mapRow(db, parentMapId)) throw new CodexNotFoundError("The parent map no longer exists.");
   const sortKey =
     ((db.database.prepare("SELECT MAX(sort_key) AS m FROM codex_maps").get() as { m: number | null }).m ?? 0) + 1;
   const now = stamp(db);
-  const map: CodexMapRow = {
+  const map: CodexMap = {
     id: freshId(),
     assetId: id(input.assetId),
     name: mapName(input.name),
@@ -227,7 +193,7 @@ export function updateMap(
   db: CodexDb,
   mapId: string,
   input: Readonly<{ name?: string; kind?: CodexMapKind; tags?: readonly string[] }>
-): CodexMapRow {
+): CodexMap {
   const existing = getMap(db, mapId);
   if (!existing) throw new CodexNotFoundError("That map no longer exists.");
   const name = input.name === undefined ? existing.name : mapName(input.name);
@@ -243,7 +209,7 @@ export function updateMap(
 }
 
 /** Re-parent a map, rejecting self-parenting and cycles so world, region and city stay a tree. */
-export function setMapParent(db: CodexDb, mapId: string, parentMapId: string | null): CodexMapRow {
+export function setMapParent(db: CodexDb, mapId: string, parentMapId: string | null): CodexMap {
   if (!mapRow(db, mapId)) throw new CodexNotFoundError("That map no longer exists.");
   const parent = optionalId(parentMapId);
   if (parent !== null) {
@@ -266,7 +232,7 @@ export function setMapParent(db: CodexDb, mapId: string, parentMapId: string | n
   return getMap(db, mapId)!;
 }
 
-export function setMapRevealed(db: CodexDb, mapId: string, revealed: boolean): CodexMapRow {
+export function setMapRevealed(db: CodexDb, mapId: string, revealed: boolean): CodexMap {
   if (!mapRow(db, mapId)) throw new CodexNotFoundError("That map no longer exists.");
   write(db, () => {
     db.database
@@ -295,12 +261,12 @@ export function deleteMap(db: CodexDb, mapId: string): void {
   db.database.prepare("DELETE FROM codex_maps WHERE id = ?").run(mapId);
 }
 
-export function getMap(db: CodexDb, mapId: string): CodexMapRow | null {
+export function getMap(db: CodexDb, mapId: string): CodexMap | null {
   const row = mapRow(db, mapId);
   return row ? toMap(row) : null;
 }
 
-export function listMaps(db: CodexDb): CodexMapRow[] {
+export function listMaps(db: CodexDb): CodexMap[] {
   return (
     db.database
       .prepare(`SELECT ${MAP_COLUMNS} FROM codex_maps ORDER BY sort_key, name COLLATE NOCASE`)
@@ -310,10 +276,10 @@ export function listMaps(db: CodexDb): CodexMapRow[] {
 
 // Markers
 
-export function createMarker(db: CodexDb, mapId: string, input: CodexMarkerCreateInput): CodexMarkerRow {
+export function createMarker(db: CodexDb, mapId: string, input: CodexMarkerCreateInput): CodexMarker {
   if (!mapRow(db, mapId)) throw new CodexNotFoundError("That map no longer exists.");
   const now = stamp(db);
-  const marker: CodexMarkerRow = {
+  const marker: CodexMarker = {
     id: freshId(),
     mapId,
     x: coord(input.x),
@@ -335,7 +301,7 @@ export function createMarker(db: CodexDb, mapId: string, input: CodexMarkerCreat
   return getMarker(db, marker.id)!;
 }
 
-export function updateMarker(db: CodexDb, markerId: string, input: CodexMarkerUpdateInput): CodexMarkerRow {
+export function updateMarker(db: CodexDb, markerId: string, input: CodexMarkerUpdateInput): CodexMarker {
   const existing = getMarker(db, markerId);
   if (!existing) throw new CodexNotFoundError("That marker no longer exists.");
   const next = {
@@ -377,7 +343,7 @@ export function updateMarker(db: CodexDb, markerId: string, input: CodexMarkerUp
 }
 
 /** The drag path: position only. */
-export function moveMarker(db: CodexDb, markerId: string, x: number, y: number): CodexMarkerRow {
+export function moveMarker(db: CodexDb, markerId: string, x: number, y: number): CodexMarker {
   if (!markerRow(db, markerId)) throw new CodexNotFoundError("That marker no longer exists.");
   write(db, () => {
     db.database
@@ -387,7 +353,7 @@ export function moveMarker(db: CodexDb, markerId: string, x: number, y: number):
   return getMarker(db, markerId)!;
 }
 
-export function setMarkerRevealed(db: CodexDb, markerId: string, revealed: boolean): CodexMarkerRow {
+export function setMarkerRevealed(db: CodexDb, markerId: string, revealed: boolean): CodexMarker {
   if (!markerRow(db, markerId)) throw new CodexNotFoundError("That marker no longer exists.");
   write(db, () => {
     db.database
@@ -413,12 +379,12 @@ export function unlinkPageFromMarkers(db: CodexDb, pageId: string): void {
     .run(pageId, stamp(db), pageId);
 }
 
-export function getMarker(db: CodexDb, markerId: string): CodexMarkerRow | null {
+export function getMarker(db: CodexDb, markerId: string): CodexMarker | null {
   const row = markerRow(db, markerId);
   return row ? toMarker(row) : null;
 }
 
-export function listMarkers(db: CodexDb, mapId: string): CodexMarkerRow[] {
+export function listMarkers(db: CodexDb, mapId: string): CodexMarker[] {
   if (!isId(mapId)) return [];
   return (
     db.database
@@ -428,7 +394,7 @@ export function listMarkers(db: CodexDb, mapId: string): CodexMarkerRow[] {
 }
 
 /** Pins linking this page. Ungated: `projectPlayerPageMarker` is the only gate. */
-export function markersForPage(db: CodexDb, pageId: string): CodexMarkerRow[] {
+export function markersForPage(db: CodexDb, pageId: string): CodexMarker[] {
   if (!isId(pageId)) return [];
   return (
     db.database
@@ -440,7 +406,7 @@ export function markersForPage(db: CodexDb, pageId: string): CodexMarkerRow[] {
 }
 
 /** The location pin linked to a prepared scene, if any: a logged fight is pinned there. */
-export function markerForScene(db: CodexDb, sceneId: string): CodexMarkerRow | null {
+export function markerForScene(db: CodexDb, sceneId: string): CodexMarker | null {
   if (!isId(sceneId)) return null;
   const row = db.database
     .prepare(
@@ -451,7 +417,7 @@ export function markerForScene(db: CodexDb, sceneId: string): CodexMarkerRow | n
 }
 
 /** Sets the party pin atlas-wide (`null` clears). Reveal state is untouched: `isParty` is in no visibility rule. */
-export function setPartyMarker(db: CodexDb, markerId: string | null): CodexMarkerRow | null {
+export function setPartyMarker(db: CodexDb, markerId: string | null): CodexMarker | null {
   if (markerId !== null && !markerRow(db, markerId)) throw new CodexNotFoundError("That marker no longer exists.");
   write(db, () => {
     // Clear first: with the partial unique index, setting first fails.
@@ -462,7 +428,7 @@ export function setPartyMarker(db: CodexDb, markerId: string | null): CodexMarke
 }
 
 /** Ungated; `projectPlayerPageMarker` is the gate. */
-export function partyMarker(db: CodexDb): CodexMarkerRow | null {
+export function partyMarker(db: CodexDb): CodexMarker | null {
   const row = db.database.prepare(`SELECT ${MARKER_COLUMNS} FROM codex_markers WHERE is_party = 1 LIMIT 1`).get() as
     MarkerRowRaw | undefined;
   return row ? toMarker(row) : null;

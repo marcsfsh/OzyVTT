@@ -61,7 +61,7 @@ const PackSchema = z
     schemaVersion: z.literal(1),
     name: z.string().min(1).max(120),
     attribution: z.string().max(400).nullable(),
-    exportedAt: z.string().datetime({ offset: true }),
+    exportedAt: z.iso.datetime({ offset: true }),
     records: z.array(RecordBodySchema)
   })
   .strict();

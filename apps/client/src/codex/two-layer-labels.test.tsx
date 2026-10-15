@@ -43,7 +43,7 @@ import { JournalView } from "./JournalView";
 import { QuestsView } from "./QuestsView";
 import { PageEditor } from "./PageEditor";
 import { BackupView } from "./BackupView";
-import type { CodexCalendar, CodexPage, CodexQuest } from "./api";
+import type { CodexCalendar, CodexPage, CodexQuest } from "@vtt/domain";
 
 /**
  * Every surface that offers the two-layer split shows the canonical pair from `BODY_LAYER`. Renders each

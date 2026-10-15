@@ -14,11 +14,12 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { CalendarView, PlayerCalendarView } from "./CalendarView";
-import type { CodexChronicleRecord, GmCodexCalendar } from "./api";
+import type { CodexChronicleRecord, GmCodexCalendar } from "@vtt/domain";
 
 /** Two 10-day months and a 5-day week, so every cell is countable. */
 const CALENDAR: GmCodexCalendar = {
   yearName: "DR",
+  eras: [],
   months: [
     { name: "Hammer", days: 10 },
     { name: "Alturiak", days: 10 }

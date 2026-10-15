@@ -1113,7 +1113,7 @@ const attribution = {
 };
 
 // Fail closed on every bundle, not just monsters: nothing is written unless everything validates.
-const validateBundle = (label: string, schema: z.ZodTypeAny, value: unknown) => {
+const validateBundle = (label: string, schema: z.ZodType, value: unknown) => {
   const parsed = schema.safeParse(value);
   if (!parsed.success) {
     console.error(`REFUSING TO WRITE - ${label} failed validation:`);

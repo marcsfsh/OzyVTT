@@ -34,7 +34,7 @@ const MAP_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
 const FAULT = "Map request failed.";
 const WIZARD_TTL_MS = 30 * 60 * 1_000;
 
-const PointSchema = z.object({ x: z.number().finite(), y: z.number().finite() }).strict();
+const PointSchema = z.object({ x: z.number(), y: z.number() }).strict();
 const StartWizardSchema = z.union([
   z
     .object({
@@ -62,8 +62,8 @@ const WizardActionSchema = z.discriminatedUnion("action", [
       adjustment: z
         .object({
           originDelta: PointSchema.optional(),
-          cellSizeDeltaPx: z.number().finite().optional(),
-          rotationDeltaRadians: z.number().finite().optional(),
+          cellSizeDeltaPx: z.number().optional(),
+          rotationDeltaRadians: z.number().optional(),
           distancePerCell: z.number().positive().optional()
         })
         .strict()

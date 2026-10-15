@@ -87,7 +87,7 @@ import { ToastProvider } from "@vtt/ui";
 import { goTo } from "../../test/route";
 import { CodexShell } from "./CodexShell";
 import { PlayerCodex } from "./PlayerCodex";
-import type { CodexSearchHit } from "./api";
+import type { CodexSearchHit } from "@vtt/domain";
 
 /**
  * The Codex command palette. It is Codex-scoped, not app-global; making it global is a separate decision.

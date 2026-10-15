@@ -18,13 +18,8 @@ import {
   TagInput,
   VisibilityBadge
 } from "@vtt/ui";
-import {
-  questApi,
-  type CodexAutosaveSettings,
-  type CodexQuest,
-  type CodexQuestObjective,
-  type CodexQuestStatus
-} from "./api";
+import type { CodexAutosaveSettings, CodexQuest, CodexQuestObjective, CodexQuestStatus } from "@vtt/domain";
+import { questApi } from "./api";
 import { QUEST_STATUS_LABEL, QUEST_STATUS_ORDER, questProgress, questStatusTone } from "./quests";
 import { createQuest } from "./creates";
 import { CodexEditor } from "./CodexEditor";

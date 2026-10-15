@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { campaignFeedProps, nextSessionCard, pendingDowntime, recordsOnInstant } from "./dashboard";
-import type { CodexChronicleRecord } from "./api";
+import type { CodexChronicleRecord } from "@vtt/domain";
 
 /** The dashboard's pure selection rules. The session card's heading must reflect the record, never a constant. */
 

@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Alert, Badge, Button, HiddenFromPlayers, Input, Skeleton } from "@vtt/ui";
-import { socket } from "../socket";
-import { journalApi, type CodexJournalEntry } from "./api";
+import { journalApi } from "./api";
+import { useCodexQuery } from "./useCodexQuery";
 
 /**
  * A page's campaign history in the editor: journal entries attached to it (including auto-logged battles),
@@ -18,36 +18,19 @@ export function PageTimeline({
   onOpenReplay?: (archiveId: number) => void;
   onOpenEntry?: (entryId: string) => void;
 }>) {
-  const [entries, setEntries] = useState<CodexJournalEntry[]>([]);
+  // An empty list mid-fetch must not read as settled.
+  const {
+    data: entries = [],
+    loading,
+    error: loadError,
+    reload
+  } = useCodexQuery(
+    useCallback(() => journalApi.forPage(gmToken, pageId), [gmToken, pageId]),
+    { failure: "Couldn't load this page's journal entries." }
+  );
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // An empty list mid-fetch must not read as settled.
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  const load = useCallback(() => {
-    void journalApi
-      .forPage(gmToken, pageId)
-      .then((rows) => {
-        setEntries(rows);
-        setLoadError(null);
-      })
-      .catch((failure: unknown) =>
-        setLoadError(failure instanceof Error ? failure.message : "Couldn't load this page's journal entries.")
-      )
-      .finally(() => setLoading(false));
-  }, [gmToken, pageId]);
-  useEffect(() => {
-    load();
-  }, [load]);
-  useEffect(() => {
-    const onChanged = () => load();
-    socket.on("codex:changed", onChanged);
-    return () => {
-      socket.off("codex:changed", onChanged);
-    };
-  }, [load]);
 
   const add = async () => {
     const text = note.trim();
@@ -57,7 +40,7 @@ export function PageTimeline({
     try {
       await journalApi.create(gmToken, { playerText: text, attachPageId: pageId });
       setNote("");
-      load();
+      void reload();
     } catch (addError) {
       setError(addError instanceof Error ? addError.message : "Couldn't log that note.");
     } finally {

@@ -1,7 +1,7 @@
 import { Alert, Badge, Button, Drawer, GmOnlyTag, Skeleton, VisibilityBadge } from "@vtt/ui";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { sessionTitle } from "./sessions";
-import type { CodexSession } from "./api";
+import type { CodexSession } from "@vtt/domain";
 
 /**
  * The session console: tonight's prep, readable from any Codex section. A view only: it fetches and writes

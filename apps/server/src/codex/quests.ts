@@ -1,3 +1,4 @@
+import type { CodexQuest, CodexQuestObjective, CodexQuestStatus } from "@vtt/domain";
 import { resolveNow } from "./calendar.js";
 import { freshId, stamp, write, type CodexDb } from "./db.js";
 import { writeEntry } from "./journal.js";
@@ -16,9 +17,7 @@ import {
   questObjectives,
   questStatus,
   tags,
-  title,
-  type CodexQuestObjective,
-  type CodexQuestStatus
+  title
 } from "./validate.js";
 
 /**
@@ -26,25 +25,6 @@ import {
  * Every status change also writes a hidden `quest` history record to the journal in the same transaction.
  */
 
-export type { CodexQuestObjective, CodexQuestStatus } from "./validate.js";
-export type CodexQuestRow = Readonly<{
-  id: string;
-  title: string;
-  status: CodexQuestStatus;
-  /** The player half, gated by `revealedToPlayers`: what the party has actually been told. */
-  playerBody: string;
-  /** GM-only: never projected to a player. */
-  gmBody: string;
-  /** Ordered: the GM's sequence is the meaning, so nothing sorts, dedupes or re-keys it. */
-  objectives: readonly CodexQuestObjective[];
-  /** Pages this quest concerns, filtered to revealed pages on the way to a player. */
-  entityIds: readonly string[];
-  revealedToPlayers: boolean;
-  tags: readonly string[];
-  rev: number;
-  createdAt: string;
-  updatedAt: string;
-}>;
 export type CodexQuestCreateInput = Readonly<{
   title: string;
   status?: CodexQuestStatus;
@@ -75,7 +55,7 @@ type QuestRowRaw = {
 const QUEST_COLUMNS =
   "id, title, status, player_body, gm_body, objectives_json, entity_ids_json, revealed, tags_json, rev, created_at, updated_at";
 
-function toQuest(row: QuestRowRaw): CodexQuestRow {
+function toQuest(row: QuestRowRaw): CodexQuest {
   return {
     id: row.id,
     title: row.title,
@@ -93,7 +73,7 @@ function toQuest(row: QuestRowRaw): CodexQuestRow {
 }
 
 /** Leaf write of a whole, already-validated quest (create and restore), with its index row and links. */
-export function insertQuest(db: CodexDb, quest: CodexQuestRow): void {
+export function insertQuest(db: CodexDb, quest: CodexQuest): void {
   db.database
     .prepare(`INSERT INTO codex_quests (${QUEST_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(
@@ -131,9 +111,9 @@ function writeQuestEvent(db: CodexDb, questId: string, status: CodexQuestStatus)
   });
 }
 
-export function createQuest(db: CodexDb, input: CodexQuestCreateInput): CodexQuestRow {
+export function createQuest(db: CodexDb, input: CodexQuestCreateInput): CodexQuest {
   const now = stamp(db);
-  const quest: CodexQuestRow = {
+  const quest: CodexQuest = {
     id: freshId(),
     title: title(input.title),
     status: questStatus(input.status),
@@ -162,12 +142,12 @@ export function updateQuest(
   questId: string,
   input: CodexQuestUpdateInput,
   expectedRev: number | undefined
-): CodexQuestRow {
+): CodexQuest {
   const existing = getQuest(db, questId);
   if (!existing) throw new CodexNotFoundError("That quest no longer exists.");
   if (expectedRev !== undefined && expectedRev !== existing.rev)
     throw new CodexRevisionConflictError("This quest was changed somewhere else after you opened it.");
-  const next: CodexQuestRow = {
+  const next: CodexQuest = {
     ...existing,
     title: input.title === undefined ? existing.title : title(input.title),
     status: input.status === undefined ? existing.status : questStatus(input.status),
@@ -206,7 +186,7 @@ export function updateQuest(
 }
 
 /** Revealing is not editing, and needs no reindex: reveal is checked when the index is read. */
-export function setQuestRevealed(db: CodexDb, questId: string, revealed: boolean): CodexQuestRow {
+export function setQuestRevealed(db: CodexDb, questId: string, revealed: boolean): CodexQuest {
   if (!getQuest(db, questId)) throw new CodexNotFoundError("That quest no longer exists.");
   write(db, () => {
     db.database.prepare("UPDATE codex_quests SET revealed = ? WHERE id = ?").run(revealed ? 1 : 0, questId);
@@ -230,7 +210,7 @@ export function unlinkPageFromQuests(db: CodexDb, pageId: string): void {
     .run(pageId, stamp(db), pageId);
 }
 
-export function getQuest(db: CodexDb, questId: string): CodexQuestRow | null {
+export function getQuest(db: CodexDb, questId: string): CodexQuest | null {
   if (!isId(questId)) return null;
   const row = db.database.prepare(`SELECT ${QUEST_COLUMNS} FROM codex_quests WHERE id = ?`).get(questId) as
     QuestRowRaw | undefined;
@@ -238,7 +218,7 @@ export function getQuest(db: CodexDb, questId: string): CodexQuestRow | null {
 }
 
 /** Oldest first; "still open" is a status filter over this. */
-export function listQuests(db: CodexDb): CodexQuestRow[] {
+export function listQuests(db: CodexDb): CodexQuest[] {
   return (
     db.database.prepare(`SELECT ${QUEST_COLUMNS} FROM codex_quests ORDER BY created_at, id`).all() as QuestRowRaw[]
   ).map(toQuest);

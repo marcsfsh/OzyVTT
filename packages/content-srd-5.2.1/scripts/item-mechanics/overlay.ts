@@ -299,7 +299,8 @@ function collectReferences(node: unknown, path: string, into: Reference[]): void
 // ---- The merge ----------------------------------------------------------------------------------
 
 /** Where a Zod issue landed inside the merged row, for the refusal message. "" at the root. */
-const where = (path: ReadonlyArray<string | number>): string => (path.length === 0 ? "" : `${path.join(".")}: `);
+const where = (path: ReadonlyArray<PropertyKey>): string =>
+  path.length === 0 ? "" : `${path.map(String).join(".")}: `;
 
 /** Why a present rider key authors nothing, or null when it authors something (or is undefined). */
 function authorsNothing(value: unknown): string | null {

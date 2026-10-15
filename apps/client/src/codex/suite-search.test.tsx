@@ -85,7 +85,7 @@ import type {
   CodexSearchHit,
   PlayerCodexMap,
   PlayerCodexMarker
-} from "./api";
+} from "@vtt/domain";
 
 /**
  * Suite-wide search on the client: every kind reaches the list and states its kind in text; each hit

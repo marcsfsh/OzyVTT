@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { IconChevron, IconDrag, IconPencil, Menu, MenuItem, VisibilityBadge } from "@vtt/ui";
-import { type CodexPageSummary } from "./api";
+import type { CodexPageSummary } from "@vtt/domain";
 import { CodexIcon, EntityIcon } from "./icons";
 
 /**

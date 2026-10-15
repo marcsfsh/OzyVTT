@@ -8,6 +8,7 @@ import {
   formatWorldDate,
   formatWorldYear,
   instantToDate,
+  weekdayIndex,
   weekdayOf,
   type CodexCalendar
 } from "./codex-calendar.js";
@@ -67,5 +68,6 @@ describe("codex calendar arithmetic", () => {
     // Instant -1 is the day before Sul, so it wraps to the last weekday rather than indexing at -1.
     expect(weekdayOf(CALENDAR, instantToDate(CALENDAR, -1))).toBe("Zor");
     expect(weekdayOf({ ...CALENDAR, weekdays: [] }, { year: 0, month: 0, day: 1 })).toBeNull();
+    expect(weekdayIndex(CALENDAR, instantToDate(CALENDAR, -1))).toBe(CALENDAR.weekdays.length - 1);
   });
 });

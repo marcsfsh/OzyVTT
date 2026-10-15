@@ -25,7 +25,7 @@ vi.mock("./api", async (importOriginal) => {
 
 import { ToastProvider } from "@vtt/ui";
 import { AtlasView } from "./AtlasView";
-import type { CodexMap } from "./api";
+import type { CodexMap } from "@vtt/domain";
 
 /** The "players can't see this map yet" mark is the `IconEyeOff` SVG (inheriting colour) named "GM only" for screen readers. */
 const MAP = (id: string, name: string, revealedToPlayers: boolean, parentMapId: string | null = null): CodexMap => ({

@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Alert, Button, Field, Modal, Panel, PanelHeader, SegmentedControl, useToast } from "@vtt/ui";
-import { codexApi, type CodexImportBundle, type CodexImportCounts } from "./api";
+import type { CodexImportCounts } from "@vtt/domain";
+import { codexApi, type CodexImportBundle } from "./api";
 import { BODY_LAYER, type BodyLayer } from "./TwoLayerBodyTabs";
 import { newId } from "../lib/ids";
 

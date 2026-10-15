@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { playerCodexApi } from "./api";
-import { socket } from "../socket";
+import { useCodexQuery } from "./useCodexQuery";
 
 /**
  * "There is a revealed recap you haven't seen" on the player's Open Codex button. Keyed on session ids,
@@ -27,32 +27,13 @@ export type RecapBadge = Readonly<{
 }>;
 
 export function useRecapBadge(token: string | null): RecapBadge {
-  const [ids, setIds] = useState<readonly string[]>([]);
   const [seen, setSeen] = useState<ReadonlySet<string>>(readSeen);
-
-  useEffect(() => {
-    if (!token) {
-      setIds([]);
-      return;
-    }
-    let live = true;
-    // A failed read means no badge, never an error surface.
-    const load = () => {
-      void playerCodexApi
-        .sessions(token)
-        .then((sessions) => {
-          if (live) setIds(sessions.map((session) => session.id));
-        })
-        .catch(() => undefined);
-    };
-    load();
-    // Refresh on the shared ping so a recap revealed mid-session shows without a reload.
-    socket.on("codex:changed", load);
-    return () => {
-      live = false;
-      socket.off("codex:changed", load);
-    };
-  }, [token]);
+  // Refreshed on the shared ping, so a recap revealed mid-session shows without a reload. A failed read
+  // keeps the last answer: a badge is never an error surface.
+  const { data: sessions } = useCodexQuery(
+    useMemo(() => (token ? () => playerCodexApi.sessions(token) : null), [token])
+  );
+  const ids = useMemo(() => (token && sessions ? sessions.map((session) => session.id) : []), [token, sessions]);
 
   const markSeen = useCallback(() => {
     setSeen((prev) => {

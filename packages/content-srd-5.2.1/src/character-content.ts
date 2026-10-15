@@ -92,7 +92,7 @@ export const FeatureUsesSchema = z
   .superRefine((uses, context) => {
     if (uses.limit === undefined && uses.scaling === undefined)
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         message: "Limited uses need either a flat `limit` or a `scaling` rule."
       });
   });
@@ -205,7 +205,7 @@ export const FeatureGrantsFieldsSchema = z
 export const FeatureGrantsSchema = FeatureGrantsFieldsSchema.superRefine((grants, context) => {
   if (grants.when !== undefined && grants.spells.length > 0) {
     context.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: "custom",
       path: ["spells"],
       message: grantedSpellGateMessage(grants.spells.map((spell) => spell.id))
     });
@@ -283,7 +283,7 @@ export const ExtraPickSchema = z
     // Exactly one of `amount` and `scaling`; `amount` has no default so an authored 1 is never ambiguous.
     if ((grant.amount === undefined) === (grant.scaling === undefined)) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         message: "An extra pick states either a flat `amount` or a `scaling` rule - exactly one."
       });
     }
@@ -352,7 +352,7 @@ const spellLevelWindow = (choice: { minSpellLevel?: number; maxSpellLevel?: numb
     choice.minSpellLevel > choice.maxSpellLevel
   ) {
     context.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: "custom",
       path: ["minSpellLevel"],
       message: `minSpellLevel ${choice.minSpellLevel} is above maxSpellLevel ${choice.maxSpellLevel} - no spell can satisfy both.`
     });
@@ -366,7 +366,7 @@ export const FeatureOptionChoiceSchema = z
   .superRefine((choice, context) => {
     if (!choice.from && !choice.fromCatalog && !choice.fromPicks) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         message: "A choice needs an explicit `from` list, a `fromCatalog` slug, or a `fromPicks` source."
       });
     }
@@ -378,7 +378,7 @@ export type FeatureOptionChoice = z.infer<typeof FeatureOptionChoiceSchema>;
 const oneChoiceForm = (record: { choice?: unknown; choices?: unknown }, context: z.RefinementCtx) => {
   if (record.choice !== undefined && record.choices !== undefined) {
     context.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: "custom",
       path: ["choices"],
       message: "Author `choice` (one pick) or `choices` (several) - never both."
     });
@@ -431,14 +431,14 @@ export const FeatureChoiceSchema = z
   .superRefine((choice, context) => {
     if (!choice.from && !choice.fromCatalog && !choice.options && !choice.fromPicks) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         message:
           "A choice needs an explicit `from` list, inline `options`, a `fromCatalog` slug, or a `fromPicks` source."
       });
     }
     if (choice.from && choice.options) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["from"],
         message: "Author `options` alone - `from` is derived from the option ids."
       });
@@ -449,7 +449,7 @@ export const FeatureChoiceSchema = z
       );
       if (duplicate)
         context.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           path: ["options"],
           message: `Duplicate option id "${duplicate.id}".`
         });
@@ -502,7 +502,7 @@ export const ChoiceListSchema = z
     // A budget with no source can never be satisfied.
     if (list.choose > 0 && list.from.length === 0 && !list.fromCatalog) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         message:
           'A "choose N" list needs a non-empty `from` list or a `fromCatalog` slug - otherwise the pick has no options and the build can never be completed.'
       });
@@ -638,7 +638,7 @@ export const ClassReferenceSchema = z
     entry.levelTable.forEach((row, index) => {
       if (row.level !== index + 1)
         context.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           path: ["levelTable", index, "level"],
           message: `Level table row ${index} must be level ${index + 1}.`
         });
@@ -648,7 +648,7 @@ export const ClassReferenceSchema = z
       row.features.forEach((featureId, featureIndex) => {
         if (!featureIds.has(featureId))
           context.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: "custom",
             path: ["levelTable", rowIndex, "features", featureIndex],
             message: `Level ${row.level} grants unknown feature "${featureId}".`
           });
@@ -659,7 +659,7 @@ export const ClassReferenceSchema = z
     );
     if (duplicate)
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["features"],
         message: `Duplicate feature id "${duplicate.id}".`
       });
@@ -687,7 +687,7 @@ export const SubclassReferenceSchema = z
       row.features.forEach((featureId, featureIndex) => {
         if (!featureIds.has(featureId))
           context.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: "custom",
             path: ["levelTable", rowIndex, "features", featureIndex],
             message: `Level ${row.level} grants unknown feature "${featureId}".`
           });
@@ -759,7 +759,7 @@ export const BackgroundReferenceSchema = z
           .array(z.array(z.number().int().min(1).max(3)).min(1).max(3))
           .min(1)
           .max(4)
-          .default([
+          .prefault([
             [2, 1],
             [1, 1, 1]
           ])

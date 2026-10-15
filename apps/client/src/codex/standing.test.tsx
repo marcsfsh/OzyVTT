@@ -40,7 +40,7 @@ import {
   chronicleRowSummary
 } from "./chronicle";
 import { CODEX_ICONS } from "./icons";
-import type { CodexChronicleRecord, CodexStanding } from "./api";
+import type { CodexChronicleRecord, CodexStanding } from "@vtt/domain";
 
 const STANDING = (value: number, revealed = false): CodexStanding => ({
   id: "s1",

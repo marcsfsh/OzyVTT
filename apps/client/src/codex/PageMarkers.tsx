@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback } from "react";
 import { Alert, HiddenFromPlayers, Skeleton } from "@vtt/ui";
-import { socket } from "../socket";
-import { codexApi, type CodexMarker } from "./api";
+import { codexApi } from "./api";
 import { CodexIcon } from "./icons";
+import { useCodexQuery } from "./useCodexQuery";
 
 /**
  * Where this page sits on the atlas, via `GET /codex/pages/{id}/markers`. Renders what the server sends;
@@ -18,46 +18,15 @@ export function PageMarkers({
   /** The Atlas opens the map, then selects the pin. */
   onOpenMarker?: (markerId: string, mapId: string) => void;
 }>) {
-  const [markers, setMarkers] = useState<CodexMarker[]>([]);
   // An empty list and a failed request must look different.
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Guarded on mount, not per call: `codex:changed` refreshes can resolve after the editor unmounts.
-  const mountedRef = useRef(true);
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-  const load = useCallback(() => {
-    void codexApi
-      .markersForPage(gmToken, pageId)
-      .then((rows) => {
-        if (mountedRef.current) {
-          setMarkers(rows);
-          setError(null);
-        }
-      })
-      .catch((loadError: unknown) => {
-        if (mountedRef.current)
-          setError(loadError instanceof Error ? loadError.message : "Couldn't load this page's map pins.");
-      })
-      .finally(() => {
-        if (mountedRef.current) setLoading(false);
-      });
-  }, [gmToken, pageId]);
-  useEffect(() => {
-    load();
-  }, [load]);
-  useEffect(() => {
-    const onChanged = () => load();
-    socket.on("codex:changed", onChanged);
-    return () => {
-      socket.off("codex:changed", onChanged);
-    };
-  }, [load]);
+  const {
+    data: markers = [],
+    loading,
+    error
+  } = useCodexQuery(
+    useCallback(() => codexApi.markersForPage(gmToken, pageId), [gmToken, pageId]),
+    { failure: "Couldn't load this page's map pins." }
+  );
 
   return (
     <div className="codex-connections-block">

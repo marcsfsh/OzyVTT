@@ -1,4 +1,4 @@
-import type { CodexPageSummary } from "./api";
+import type { CodexPageSummary } from "@vtt/domain";
 
 /**
  * The party as the character pickers offer it: active first, archived last and marked. "Archived" is a

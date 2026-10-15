@@ -1,3 +1,4 @@
+import type { CodexSession, CodexSessionStatus } from "@vtt/domain";
 import { freshId, stamp, write, type CodexDb } from "./db.js";
 import { rebuildLinks, scrubLinks } from "./links.js";
 import { indexSession, unindex } from "./search.js";
@@ -14,8 +15,7 @@ import {
   sessionSceneIds,
   sessionStatus,
   shortLabel,
-  tags,
-  type CodexSessionStatus
+  tags
 } from "./validate.js";
 
 /**
@@ -23,26 +23,6 @@ import {
  * GM half and the recap the player half. Like pages, `rev` is the editor's conflict token.
  */
 
-export type { CodexSessionStatus } from "./validate.js";
-export type CodexSessionRow = Readonly<{
-  id: string;
-  sessionNumber: number | null;
-  /** The real-world date the group met, free text (the calendar is the in-world one). */
-  realDate: string | null;
-  attendees: readonly string[];
-  /** GM-only: never projected to a player. */
-  prepBody: string;
-  /** The player half, gated by `revealedToPlayers`: the recap the table reads before the next session. */
-  recapBody: string;
-  revealedToPlayers: boolean;
-  status: CodexSessionStatus;
-  tags: readonly string[];
-  /** Scenes staged for this session: GM prep, GM-only in every projection. A dangling id is expected. */
-  sceneIds: readonly string[];
-  rev: number;
-  createdAt: string;
-  updatedAt: string;
-}>;
 export type CodexSessionCreateInput = Readonly<{
   sessionNumber?: number | null;
   realDate?: string | null;
@@ -84,7 +64,7 @@ type SessionRowRaw = {
 const SESSION_COLUMNS =
   "id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, tags_json, scene_ids_json, rev, created_at, updated_at";
 
-function toSession(row: SessionRowRaw): CodexSessionRow {
+function toSession(row: SessionRowRaw): CodexSession {
   return {
     id: row.id,
     sessionNumber: row.session_number,
@@ -104,7 +84,7 @@ function toSession(row: SessionRowRaw): CodexSessionRow {
 }
 
 /** Leaf write of a whole, already-validated session (create and restore). */
-export function insertSession(db: CodexDb, session: CodexSessionRow): void {
+export function insertSession(db: CodexDb, session: CodexSession): void {
   db.database
     .prepare(`INSERT INTO codex_sessions (${SESSION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(
@@ -138,9 +118,9 @@ function guardSessionNumber(sessionNumber: number | null, work: () => void): voi
   }
 }
 
-export function createSession(db: CodexDb, input: CodexSessionCreateInput): CodexSessionRow {
+export function createSession(db: CodexDb, input: CodexSessionCreateInput): CodexSession {
   const now = stamp(db);
-  const session: CodexSessionRow = {
+  const session: CodexSession = {
     id: freshId(),
     sessionNumber: sessionNo(input.sessionNumber),
     realDate: shortLabel(input.realDate, 40, "date"),
@@ -165,12 +145,12 @@ export function updateSession(
   sessionId: string,
   input: CodexSessionUpdateInput,
   expectedRev: number | undefined
-): CodexSessionRow {
+): CodexSession {
   const existing = getSession(db, sessionId);
   if (!existing) throw new CodexNotFoundError("That session no longer exists.");
   if (expectedRev !== undefined && expectedRev !== existing.rev)
     throw new CodexRevisionConflictError("This session was changed somewhere else after you opened it.");
-  const next: CodexSessionRow = {
+  const next: CodexSession = {
     ...existing,
     sessionNumber: input.sessionNumber === undefined ? existing.sessionNumber : sessionNo(input.sessionNumber),
     realDate: input.realDate === undefined ? existing.realDate : shortLabel(input.realDate, 40, "date"),
@@ -211,7 +191,7 @@ export function updateSession(
 }
 
 /** Revealing is not editing: neither `rev` nor `updatedAt` moves. */
-export function setSessionRevealed(db: CodexDb, sessionId: string, revealed: boolean): CodexSessionRow {
+export function setSessionRevealed(db: CodexDb, sessionId: string, revealed: boolean): CodexSession {
   if (!getSession(db, sessionId)) throw new CodexNotFoundError("That session no longer exists.");
   write(db, () => {
     db.database.prepare("UPDATE codex_sessions SET revealed = ? WHERE id = ?").run(revealed ? 1 : 0, sessionId);
@@ -227,7 +207,7 @@ export function deleteSession(db: CodexDb, sessionId: string): void {
   db.database.prepare("UPDATE codex_meta SET active_session_id = NULL WHERE active_session_id = ?").run(sessionId);
 }
 
-export function getSession(db: CodexDb, sessionId: string): CodexSessionRow | null {
+export function getSession(db: CodexDb, sessionId: string): CodexSession | null {
   if (!isId(sessionId)) return null;
   const row = db.database.prepare(`SELECT ${SESSION_COLUMNS} FROM codex_sessions WHERE id = ?`).get(sessionId) as
     SessionRowRaw | undefined;
@@ -235,7 +215,7 @@ export function getSession(db: CodexDb, sessionId: string): CodexSessionRow | nu
 }
 
 /** Numbered sessions first in number order, then unnumbered ones oldest-first. */
-export function listSessions(db: CodexDb): CodexSessionRow[] {
+export function listSessions(db: CodexDb): CodexSession[] {
   return (
     db.database
       .prepare(

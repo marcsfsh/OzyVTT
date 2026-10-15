@@ -84,7 +84,7 @@ import type {
   CodexPage,
   CodexPageSummary,
   PlayerCodexPageSummary
-} from "./api";
+} from "@vtt/domain";
 
 /**
  * A page's return edges (journal entries, atlas pins, graph node) and the graph's framing. Each jump is

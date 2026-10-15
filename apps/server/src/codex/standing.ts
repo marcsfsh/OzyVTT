@@ -1,3 +1,4 @@
+import type { CodexStanding } from "@vtt/domain";
 import { resolveNow } from "./calendar.js";
 import { freshId, stamp, write, type CodexDb } from "./db.js";
 import { standingPayload } from "./journal-kinds.js";
@@ -19,17 +20,6 @@ import {
  * value; the history is `standing` journal records. Each is revealed on its own.
  */
 
-export type CodexStandingRow = Readonly<{
-  id: string;
-  factionPageId: string;
-  /** -100 (Hostile) to +100 (Allied), 0 being Neutral. */
-  value: number;
-  /** A standing starts hidden. */
-  revealedToPlayers: boolean;
-  createdAt: string;
-  updatedAt: string;
-}>;
-
 type StandingRowRaw = {
   id: string;
   faction_page_id: string;
@@ -40,7 +30,7 @@ type StandingRowRaw = {
 };
 const STANDING_COLUMNS = "id, faction_page_id, value, revealed, created_at, updated_at";
 
-function toStanding(row: StandingRowRaw): CodexStandingRow {
+function toStanding(row: StandingRowRaw): CodexStanding {
   return {
     id: row.id,
     factionPageId: row.faction_page_id,
@@ -53,7 +43,7 @@ function toStanding(row: StandingRowRaw): CodexStandingRow {
 }
 
 /** Leaf write of a whole, already-validated standing row (restore). */
-export function insertStanding(db: CodexDb, standing: CodexStandingRow): void {
+export function insertStanding(db: CodexDb, standing: CodexStanding): void {
   db.database
     .prepare(`INSERT INTO codex_standing (${STANDING_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?)`)
     .run(
@@ -67,7 +57,7 @@ export function insertStanding(db: CodexDb, standing: CodexStandingRow): void {
 }
 
 /** Oldest first, so a faction does not jump as it is adjusted. */
-export function listStanding(db: CodexDb): CodexStandingRow[] {
+export function listStanding(db: CodexDb): CodexStanding[] {
   return (
     db.database
       .prepare(`SELECT ${STANDING_COLUMNS} FROM codex_standing ORDER BY created_at, id`)
@@ -76,7 +66,7 @@ export function listStanding(db: CodexDb): CodexStandingRow[] {
 }
 
 /** One faction's standing, or null when none was ever set (which reads as Neutral, not as an error). */
-export function getStanding(db: CodexDb, factionPageId: string): CodexStandingRow | null {
+export function getStanding(db: CodexDb, factionPageId: string): CodexStanding | null {
   if (!isId(factionPageId)) return null;
   const row = db.database
     .prepare(`SELECT ${STANDING_COLUMNS} FROM codex_standing WHERE faction_page_id = ?`)
@@ -88,7 +78,7 @@ export function getStanding(db: CodexDb, factionPageId: string): CodexStandingRo
  * Sets the value and appends its `standing` record in one write. The delta is measured from the clamped previous
  * value (0 if none), so the history always sums to the bar; a record is written even when nothing moved.
  */
-export function setStanding(db: CodexDb, factionPageId: string, value: number, reason: string): CodexStandingRow {
+export function setStanding(db: CodexDb, factionPageId: string, value: number, reason: string): CodexStanding {
   const pageId = id(factionPageId);
   const page = getPage(db, pageId);
   if (!page) throw new CodexNotFoundError("That faction page no longer exists.");
@@ -133,7 +123,7 @@ export function setStanding(db: CodexDb, factionPageId: string, value: number, r
 }
 
 /** Revealing is not editing, and writes no history record. */
-export function setStandingRevealed(db: CodexDb, factionPageId: string, revealed: boolean): CodexStandingRow {
+export function setStandingRevealed(db: CodexDb, factionPageId: string, revealed: boolean): CodexStanding {
   const pageId = id(factionPageId);
   if (!getStanding(db, pageId)) throw new CodexNotFoundError("That faction has no standing recorded yet.");
   write(db, () => {

@@ -78,9 +78,15 @@ export function formatWorldDate(calendar: CodexCalendar, date: CodexInWorldDate)
   return `${calendar.months[clamped.month]?.name ?? ""} ${clamped.day}, ${formatWorldYear(calendar, clamped.year)}`;
 }
 
-/** The date's weekday name, or null for a calendar without weekdays. */
-export function weekdayOf(calendar: CodexCalendar, date: CodexInWorldDate): string | null {
+/** The date's place in the week: the week runs on unbroken from instant 0, negative years included. */
+export function weekdayIndex(calendar: CodexCalendar, date: CodexInWorldDate): number | null {
   const count = calendar.weekdays.length;
   if (count === 0) return null;
-  return calendar.weekdays[((dateToInstant(calendar, date) % count) + count) % count];
+  return ((dateToInstant(calendar, date) % count) + count) % count;
+}
+
+/** The date's weekday name, or null for a calendar without weekdays. */
+export function weekdayOf(calendar: CodexCalendar, date: CodexInWorldDate): string | null {
+  const index = weekdayIndex(calendar, date);
+  return index === null ? null : calendar.weekdays[index];
 }

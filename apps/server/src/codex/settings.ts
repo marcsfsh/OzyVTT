@@ -1,5 +1,11 @@
+import type {
+  CodexAutosaveSettings,
+  CodexRevisionHistorySettings,
+  CodexSettings,
+  CodexSettingsInput
+} from "@vtt/domain";
 import type { CodexDb } from "./db.js";
-import { revisionHistoryUsage, type CodexRevisionHistoryUsage } from "./revisions.js";
+import { revisionHistoryUsage } from "./revisions.js";
 import {
   CodexValidationError,
   MAX_AUTOSAVE_INTERVAL_SECONDS,
@@ -12,17 +18,7 @@ import {
 
 /** Codex-wide settings: columns of the `codex_meta` row. */
 
-/** `enabled: false` stops new revisions but deletes none. `windowMinutes` coalesces saves; `0` checkpoints every save. */
-export type CodexRevisionSettings = Readonly<{ enabled: boolean; windowMinutes: number }>;
-/** The revision-history section as a reader sees it: the settable knobs plus what the history costs. */
-export type CodexRevisionHistory = CodexRevisionSettings & CodexRevisionHistoryUsage;
-/** Editor autosave, in seconds; stored here only so it follows the GM across devices. */
-export type CodexAutosaveSettings = Readonly<{ enabled: boolean; intervalSeconds: number }>;
-export type CodexSettings = Readonly<{ revisionHistory: CodexRevisionHistory; autosave: CodexAutosaveSettings }>;
-/** The writable half: usage figures are server facts and cannot be sent. */
-export type CodexSettingsInput = Readonly<{ revisionHistory: CodexRevisionSettings; autosave: CodexAutosaveSettings }>;
-
-export const DEFAULT_REVISION_SETTINGS: CodexRevisionSettings = { enabled: true, windowMinutes: 90 };
+export const DEFAULT_REVISION_SETTINGS: CodexRevisionHistorySettings = { enabled: true, windowMinutes: 90 };
 export const DEFAULT_AUTOSAVE_SETTINGS: CodexAutosaveSettings = { enabled: true, intervalSeconds: 1 };
 
 /**
@@ -54,7 +50,7 @@ function readPair(
 }
 
 /** Read on every page save, so it skips the history scan `getSettings` does. */
-export function revisionSettings(db: CodexDb): CodexRevisionSettings {
+export function revisionSettings(db: CodexDb): CodexRevisionHistorySettings {
   const pair = readPair(
     db,
     { enabled: "revision_history_enabled", amount: "revision_window_minutes" },

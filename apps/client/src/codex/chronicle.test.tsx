@@ -38,7 +38,7 @@ vi.mock("./api", async (importOriginal) => {
 import { JournalView } from "./JournalView";
 import { PageEditor } from "./PageEditor";
 import { groupChronicle } from "./chronicle";
-import type { CodexCalendar, CodexChronicleRecord, CodexPage } from "./api";
+import type { CodexCalendar, CodexChronicleRecord, CodexPage } from "@vtt/domain";
 
 /**
  * One timeline of journal entries and dated `event` pages. Kinds read by icon and label, not colour; the

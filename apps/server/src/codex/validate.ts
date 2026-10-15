@@ -1,4 +1,12 @@
-import { CODEX_SECRET_FIELD_KEYS, isCodexEntityType, type CodexEntityType } from "@vtt/domain";
+import {
+  CODEX_SECRET_FIELD_KEYS,
+  isCodexEntityType,
+  type CodexEntityType,
+  type CodexMapKind,
+  type CodexQuestObjective,
+  type CodexQuestStatus,
+  type CodexSessionStatus
+} from "@vtt/domain";
 
 /**
  * Every Codex input check. The router's Zod schemas reject malformed requests; these run again inside the store
@@ -148,7 +156,6 @@ export function connectionLayer(value: string | null | undefined): "player" | "g
 
 // Atlas
 
-export type CodexMapKind = "battlemap" | "regional" | "world";
 const MAP_KINDS = new Set<string>(["battlemap", "regional", "world"]);
 export function mapName(value: string): string {
   const trimmed = value.trim();
@@ -192,7 +199,6 @@ export function entryGmText(value: string | null | undefined): string | null {
 
 // Sessions
 
-export type CodexSessionStatus = "planned" | "played";
 const MAX_ATTENDEES = 24;
 /** The table's scene cap. */
 const MAX_SESSION_SCENES = 20;
@@ -226,10 +232,6 @@ export function sessionSceneIds(value: readonly string[] | null | undefined): st
 
 // Quests
 
-/** In lifecycle order: `not-started` and `active` are open; the rest are done. */
-export type CodexQuestStatus = "not-started" | "active" | "completed" | "failed" | "canceled";
-/** One checklist line. */
-export type CodexQuestObjective = Readonly<{ text: string; done: boolean }>;
 const QUEST_STATUSES = new Set<string>(["not-started", "active", "completed", "failed", "canceled"]);
 const MAX_OBJECTIVES = 24;
 /** The one-line display bound a marker label and an in-world label share. */

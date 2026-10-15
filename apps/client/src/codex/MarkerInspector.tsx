@@ -16,22 +16,14 @@ import {
   Switch,
   TagInput
 } from "@vtt/ui";
-import {
-  atlasApi,
-  journalApi,
-  type CodexAutosaveSettings,
-  type CodexJournalEntry,
-  type CodexMap,
-  type CodexMarker,
-  type CodexMarkerInput,
-  type CodexPageSummary
-} from "./api";
+import type { CodexAutosaveSettings, CodexMap, CodexMarker, CodexPageSummary } from "@vtt/domain";
+import { atlasApi, journalApi, type CodexMarkerInput } from "./api";
 import { useCodexAutosave } from "./autosave";
+import { useCodexQuery } from "./useCodexQuery";
 import { CodexIcon, IconPicker, EntityIcon, pinSwatchVar } from "./icons";
 
 import { useConfirm } from "../components/feedback";
-import { socket } from "../socket";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 /**
  * The marker inspector: a pin's icon, colour, label and tags, its links (many pages, many scenes, one
@@ -90,24 +82,9 @@ export function MarkerInspector({
   const [tags, setTags] = useState<readonly string[]>(marker.tags);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // This pin's journal history, including auto-logged battles.
-  const [entries, setEntries] = useState<CodexJournalEntry[]>([]);
-  const loadEntries = useCallback(() => {
-    void journalApi
-      .forMarker(gmToken, marker.id)
-      .then(setEntries)
-      .catch(() => setEntries([]));
-  }, [gmToken, marker.id]);
-  useEffect(() => {
-    loadEntries();
-  }, [loadEntries]);
-  useEffect(() => {
-    const onChanged = () => loadEntries();
-    socket.on("codex:changed", onChanged);
-    return () => {
-      socket.off("codex:changed", onChanged);
-    };
-  }, [loadEntries]);
+  // This pin's journal history, including auto-logged battles. A failed read shows none.
+  const history = useCodexQuery(useCallback(() => journalApi.forMarker(gmToken, marker.id), [gmToken, marker.id]));
+  const entries = history.error ? [] : (history.data ?? []);
 
   const patch = async (input: CodexMarkerInput) => {
     setBusy(true);

@@ -22,7 +22,7 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { CodexSettingsView } from "./CodexSettings";
-import type { CodexSettings } from "./api";
+import type { CodexSettings } from "@vtt/domain";
 
 /**
  * The codex settings screen. `0` minutes means keep every save, not off; turning history off never deletes

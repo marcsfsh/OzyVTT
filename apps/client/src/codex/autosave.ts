@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SaveStatus } from "@vtt/ui";
-import { CodexRequestError, type CodexAutosaveSettings } from "./api";
+import type { CodexAutosaveSettings } from "@vtt/domain";
+import { ApiError } from "../lib/api";
 import { registerNavigationGuard } from "../router";
 
 /**
@@ -74,7 +75,7 @@ export function useCodexAutosave<TDraft>(options: UseCodexAutosaveOptions<TDraft
       savedRef.current = snapshot;
       setStatus("saved");
     } catch (error) {
-      if (error instanceof CodexRequestError && error.status === 409) {
+      if (error instanceof ApiError && error.isConflict) {
         setStatus("conflict");
         await conflictRef.current?.();
       } else {

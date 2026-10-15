@@ -1,7 +1,8 @@
 import { useCallback, useMemo } from "react";
 import { GmOnlyTag, MarkdownEditor } from "@vtt/ui";
 import { CodexMarkdown } from "./CodexMarkdown";
-import { uploadCodexAsset, pageLinkKey } from "./api";
+import { pageLinkKey } from "@vtt/domain";
+import { uploadCodexAsset } from "./api";
 
 /**
  * The Codex's wrapper around `MarkdownEditor`: `CodexMarkdown` as the reader (viewer-safe redlinks and

@@ -1,31 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Alert,
-  Badge,
-  Button,
-  Combobox,
-  Field,
-  IconEyeOff,
-  IconPlus,
-  Input,
-  Modal,
-  RevealSwitch,
-  Select,
-  Skeleton,
-  Switch,
-  TagInput,
-  useToast
-} from "@vtt/ui";
-import { socket } from "../socket";
-import {
-  atlasApi,
-  type CodexMap,
-  type CodexMapKind,
-  type CodexMarker,
-  type CodexPageSummary,
-  type MapAsset
-} from "./api";
-import { codexApi } from "./api";
+import { Alert, Button, IconEyeOff, RevealSwitch, Skeleton, useToast } from "@vtt/ui";
+import type { CodexAutosaveSettings, CodexMap, CodexMapKind, CodexMarker, CodexPageSummary } from "@vtt/domain";
+import { atlasApi, codexApi, type MapAsset } from "./api";
+import { MapPicker, MapSettings } from "./AtlasMapDialogs";
+import { AtlasBreadcrumb, AtlasChildren, AtlasRoots, PinFilter, useDimmedPins, useMapTree } from "./AtlasNav";
 import { MapSurface } from "./MapSurface";
 import { MarkerInspector } from "./MarkerInspector";
 import { useConfirm } from "../components/feedback";
@@ -33,19 +11,21 @@ import { DEFAULT_COLOR, DEFAULT_ICON } from "./icons";
 import { CODEX_ROOT, atlasPath } from "./routes";
 import { withQuery } from "../router";
 import type { QuickCreateRequest } from "./QuickCreate";
-import type { CodexAutosaveSettings } from "./api";
+import { useCodexQuery } from "./useCodexQuery";
 
 /**
  * The atlas: a navigable forest of maps (world, region, local) with markers that link to pages and
  * sub-maps. All state is server-owned and refreshed on `codex:changed`.
  */
+/** A stable empty feed, so a list that has not loaded yet keeps one identity across renders. */
+const EMPTY: readonly never[] = [];
 type AtlasScene = Readonly<{ id: string; name: string }>;
+type AtlasMeta = Readonly<{
+  maps: readonly CodexMap[];
+  pages: readonly CodexPageSummary[];
+  assets: readonly MapAsset[];
+}>;
 type AtlasActor = Readonly<{ id: string; name: string }>;
-const MAP_KINDS: ReadonlyArray<{ value: CodexMapKind; label: string }> = [
-  { value: "world", label: "World" },
-  { value: "regional", label: "Regional" },
-  { value: "battlemap", label: "Battle map" }
-];
 /**
  * A request to land somewhere in the atlas. Opening a pin means opening its map first, then selecting the
  * pin. `mapId` may be null (a journal entry only stores the marker); the atlas resolves the map itself.
@@ -97,18 +77,39 @@ export function AtlasView({
 }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const { toast } = useToast();
-  const [maps, setMaps] = useState<CodexMap[]>([]);
-  const [assets, setAssets] = useState<MapAsset[]>([]);
-  const [pages, setPages] = useState<CodexPageSummary[]>([]);
+  /** The map tree, the page list for linking, and the map-image library. */
+  const meta = useCodexQuery(
+    useCallback(async (): Promise<AtlasMeta> => {
+      const [maps, pages, assets] = await Promise.all([
+        atlasApi.listMaps(gmToken),
+        codexApi.listPages(gmToken),
+        atlasApi.listAssets(gmToken).catch(() => [])
+      ]);
+      return { maps, pages, assets };
+    }, [gmToken]),
+    { failure: "Could not load the atlas." }
+  );
+  const maps = meta.data?.maps ?? EMPTY;
+  const pages = meta.data?.pages ?? EMPTY;
+  const assets = meta.data?.assets ?? EMPTY;
+  // Don't show the "first map" invitation before the fetch settles.
+  const loading = meta.loading;
+  const loadMeta = meta.reload;
+  const setMeta = meta.setData;
   /**
-   * The URL is the source of truth; this mirror covers the first load (picking the first root map) and a
-   * `?pin=` link whose map must be resolved first.
+   * The URL is the source of truth; this mirror also holds the map a `?pin=` link resolved to. With
+   * neither, the atlas opens on the first root map.
    */
-  const [currentMapId, setCurrentMapId] = useState<string | null>(mapId);
+  const [chosenMapId, setCurrentMapId] = useState<string | null>(mapId);
   useEffect(() => {
     if (mapId) setCurrentMapId(mapId);
   }, [mapId]);
-  const [markers, setMarkers] = useState<CodexMarker[]>([]);
+  const currentMapId = chosenMapId ?? maps.find((map) => map.parentMapId === null)?.id ?? maps[0]?.id ?? null;
+  const readMarkers = useCallback(() => atlasApi.listMarkers(gmToken, currentMapId ?? ""), [gmToken, currentMapId]);
+  const pins = useCodexQuery(currentMapId ? readMarkers : null);
+  const markers = currentMapId && !pins.error ? (pins.data ?? EMPTY) : EMPTY;
+  const setMarkers = (update: (prev: readonly CodexMarker[]) => readonly CodexMarker[]) =>
+    pins.setData((prev) => [...update(prev ?? EMPTY)]);
   /**
    * The selected pin is the `?pin=` address, so selection survives a refresh and every change goes through
    * `onNavigate`, which runs the unsaved-changes guard for the inspector's draft.
@@ -146,60 +147,11 @@ export function AtlasView({
   // A new map nests under the current one by default; off creates another root map.
   const [nestNew, setNestNew] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsName, setSettingsName] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  // Don't show the "first map" invitation before the fetch settles.
-  const [loading, setLoading] = useState(true);
+  /** A failed write or pin lookup. Fresh atlas data clears it. */
+  const [actionError, setError] = useState<string | null>(null);
+  useEffect(() => setError(null), [meta.data]);
+  const error = actionError ?? meta.error;
 
-  const loadMeta = useCallback(async () => {
-    try {
-      const [nextMaps, nextPages, nextAssets] = await Promise.all([
-        atlasApi.listMaps(gmToken),
-        codexApi.listPages(gmToken),
-        atlasApi.listAssets(gmToken).catch(() => [])
-      ]);
-      setMaps(nextMaps);
-      setPages(nextPages);
-      setAssets(nextAssets);
-      setError(null);
-      setCurrentMapId(
-        (current) => current ?? nextMaps.find((map) => map.parentMapId === null)?.id ?? nextMaps[0]?.id ?? null
-      );
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Could not load the atlas.");
-    } finally {
-      setLoading(false);
-    }
-  }, [gmToken]);
-
-  const loadMarkers = useCallback(
-    async (mapId: string) => {
-      try {
-        setMarkers(await atlasApi.listMarkers(gmToken, mapId));
-      } catch {
-        setMarkers([]);
-      }
-    },
-    [gmToken]
-  );
-
-  useEffect(() => {
-    void loadMeta();
-  }, [loadMeta]);
-  useEffect(() => {
-    if (currentMapId) void loadMarkers(currentMapId);
-    else setMarkers([]);
-  }, [currentMapId, loadMarkers]);
-  useEffect(() => {
-    const onChanged = () => {
-      void loadMeta();
-      if (currentMapId) void loadMarkers(currentMapId);
-    };
-    socket.on("codex:changed", onChanged);
-    return () => {
-      socket.off("codex:changed", onChanged);
-    };
-  }, [loadMeta, loadMarkers, currentMapId]);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -246,68 +198,25 @@ export function AtlasView({
    * nothing when the pin is elsewhere, since only this map's markers are loaded.
    */
   const partyMarker = markers.find((marker) => marker.isParty) ?? null;
-  /** Client-side over this map's pins. Non-matching pins dim rather than disappear. */
-  const pinNeedle = filter.trim().toLowerCase();
-  const matchesFilter = useCallback(
-    (marker: CodexMarker) =>
-      (!pinNeedle ||
-        (marker.label ?? "").toLowerCase().includes(pinNeedle) ||
-        marker.tags.some((tag) => tag.includes(pinNeedle))) &&
-      (!tagFilter || marker.tags.includes(tagFilter)),
-    [pinNeedle, tagFilter]
-  );
-  const filtering = pinNeedle !== "" || Boolean(tagFilter);
-  const matchCount = filtering ? markers.filter(matchesFilter).length : markers.length;
-  const dimmedIds = useMemo(
-    () => (filtering ? new Set(markers.filter((marker) => !matchesFilter(marker)).map((marker) => marker.id)) : null),
-    [filtering, markers, matchesFilter]
-  );
-  const pinTags = useMemo(() => [...new Set(markers.flatMap((marker) => marker.tags))].sort(), [markers]);
+  const dimmedIds = useDimmedPins(markers, filter, tagFilter ?? null);
   // Suggest tags already in use on pages and maps.
   const tagSuggestions = useMemo(
     () => [...new Set([...pages.flatMap((page) => page.tags), ...maps.flatMap((map) => map.tags)])].sort(),
     [pages, maps]
   );
 
-  const breadcrumb = useMemo(() => {
-    const chain: CodexMap[] = [];
-    let cursor = currentMap;
-    const guard = new Set<string>();
-    while (cursor && !guard.has(cursor.id)) {
-      chain.unshift(cursor);
-      guard.add(cursor.id);
-      cursor = maps.find((map) => map.id === cursor!.parentMapId) ?? null;
-    }
-    return chain;
-  }, [currentMap, maps]);
-  // Maps nested directly under this one: the way down, since the breadcrumb only goes up.
-  const childMaps = useMemo(
-    () => (currentMapId ? maps.filter((map) => map.parentMapId === currentMapId) : []),
-    [maps, currentMapId]
-  );
-  // The atlas is a forest; without this row a second root map is unreachable once you leave it.
-  const rootMaps = useMemo(() => maps.filter((map) => map.parentMapId === null), [maps]);
-  const currentRootId = breadcrumb[0]?.id ?? null;
+  const { rootMaps, breadcrumb, childMaps } = useMapTree(maps, currentMapId);
   // Entering a map drops the pin selection; it is a guarded navigation like any other.
   const enterMap = useCallback((next: string) => onNavigate(atlasPath(next)), [onNavigate]);
 
   const [uploading, setUploading] = useState(false);
-  const uploadInputRef = useRef<HTMLInputElement>(null);
-  /** The shared map-asset library, the same route `MapManager` uses. */
-  const uploadAsset = async (file: File | undefined) => {
-    if (!file) return;
+  const uploadAsset = async (file: File) => {
     setUploading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/v1/map-assets?filename=${encodeURIComponent(file.name)}`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${gmToken}`, "content-type": file.type || "application/octet-stream" },
-        body: file
-      });
-      const body = await response.json().catch(() => null);
-      if (!response.ok || !body?.ok) throw new Error(body?.error?.message ?? "The upload failed.");
+      await atlasApi.uploadAsset(gmToken, file);
       const next = await atlasApi.listAssets(gmToken).catch(() => assets);
-      setAssets(next);
+      setMeta((prev) => prev && { ...prev, assets: next });
       toast("Map image uploaded.", { tone: "success" });
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "The upload failed.");
@@ -331,24 +240,8 @@ export function AtlasView({
       setError(createError instanceof Error ? createError.message : "Could not add the map.");
     }
   };
-  // Excluded from "sits inside" so a map can't be moved into its own subtree (the server also guards).
-  const descendantIds = useMemo(() => {
-    if (!currentMapId) return new Set<string>();
-    const out = new Set<string>();
-    const walk = (parentId: string) => {
-      for (const map of maps)
-        if (map.parentMapId === parentId && !out.has(map.id)) {
-          out.add(map.id);
-          walk(map.id);
-        }
-    };
-    walk(currentMapId);
-    return out;
-  }, [maps, currentMapId]);
-  const renameMap = async () => {
+  const renameMap = async (name: string) => {
     if (!currentMap) return;
-    const name = settingsName.trim();
-    if (!name || name === currentMap.name) return;
     try {
       onMapReplace(await atlasApi.updateMap(gmToken, currentMap.id, { name }));
     } catch (renameError) {
@@ -404,7 +297,7 @@ export function AtlasView({
     try {
       await atlasApi.moveMarker(gmToken, markerId, point.x, point.y);
     } catch {
-      void loadMarkers(currentMapId!);
+      void pins.reload();
     }
   };
   const onMarkerUpdated = (marker: CodexMarker) =>
@@ -432,7 +325,9 @@ export function AtlasView({
     clearDeletedPin();
   };
   const onMapReplace = (map: CodexMap) =>
-    setMaps((prev) => prev.map((existing) => (existing.id === map.id ? map : existing)));
+    setMeta(
+      (prev) => prev && { ...prev, maps: prev.maps.map((existing) => (existing.id === map.id ? map : existing)) }
+    );
   const revealMap = async (revealed: boolean) => {
     if (!currentMap) return;
     try {
@@ -460,43 +355,14 @@ export function AtlasView({
 
   return (
     <div className="codex-atlas">
-      {rootMaps.length > 1 && (
-        <nav className="codex-atlas-descend" aria-label="Top-level maps">
-          <span className="codex-descend-label">Top level</span>
-          {rootMaps.map((root) => (
-            <button
-              key={root.id}
-              type="button"
-              className={`codex-descend-chip${root.id === currentRootId ? " is-current" : ""}`}
-              aria-current={root.id === currentRootId ? "true" : undefined}
-              onClick={() => enterMap(root.id)}
-            >
-              {root.name}
-              {!root.revealedToPlayers && <GmOnlyMark />}
-            </button>
-          ))}
-        </nav>
-      )}
+      <AtlasRoots
+        roots={rootMaps}
+        currentRootId={breadcrumb[0]?.id ?? null}
+        onEnter={enterMap}
+        mark={(map) => !map.revealedToPlayers && <GmOnlyMark />}
+      />
       <div className="codex-atlas-bar">
-        <nav className="codex-breadcrumb" aria-label="Map path">
-          {breadcrumb.length === 0 && <span className="codex-crumb is-current">Atlas</span>}
-          {breadcrumb.map((map, index) => (
-            <span key={map.id}>
-              {index > 0 && (
-                <span className="codex-crumb-sep" aria-hidden="true">
-                  ›
-                </span>
-              )}
-              <button
-                type="button"
-                className={`codex-crumb${map.id === currentMapId ? " is-current" : ""}`}
-                onClick={() => enterMap(map.id)}
-              >
-                {map.name}
-              </button>
-            </span>
-          ))}
-        </nav>
+        <AtlasBreadcrumb chain={breadcrumb} currentMapId={currentMapId} onEnter={enterMap} />
         <div className="codex-atlas-actions">
           {currentMap && (
             <RevealSwitch
@@ -526,14 +392,7 @@ export function AtlasView({
             {currentMap ? "Add sub-map" : "New map"}
           </Button>
           {currentMap && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setSettingsName(currentMap.name);
-                setSettingsOpen(true);
-              }}
-            >
+            <Button variant="ghost" size="sm" onClick={() => setSettingsOpen(true)}>
               Map settings
             </Button>
           )}
@@ -541,52 +400,23 @@ export function AtlasView({
       </div>
 
       {currentMap && markers.length > 0 && (
-        <div className="codex-atlas-filter">
-          <Input
-            aria-label="Filter pins"
-            placeholder="Filter pins"
-            value={filter}
-            onChange={(event) =>
-              onReplaceQuery((query) => {
-                if (event.target.value) query.set("q", event.target.value);
-                else query.delete("q");
-              })
-            }
-          />
-          {pinTags.length > 0 && (
-            <Combobox
-              options={pinTags.map((tag) => ({ id: tag, label: `#${tag}` }))}
-              value={tagFilter ?? null}
-              onChange={(tag) =>
-                onReplaceQuery((query) => {
-                  if (tag) query.set("tag", tag);
-                  else query.delete("tag");
-                })
+        <PinFilter
+          pins={markers}
+          text={filter}
+          tag={tagFilter ?? null}
+          dimmed={dimmedIds}
+          onChange={(next) =>
+            onReplaceQuery((query) => {
+              for (const [key, value] of Object.entries(next)) {
+                if (value) query.set(key, value);
+                else query.delete(key);
               }
-              ariaLabel="Filter pins by tag"
-              placeholder="Filter by tag"
-            />
-          )}
-          {filtering && (
-            <span className="codex-atlas-filtercount" role="status">
-              {matchCount} of {markers.length} pins match
-            </span>
-          )}
-        </div>
+            })
+          }
+        />
       )}
 
-      {childMaps.length > 0 && (
-        <nav className="codex-atlas-descend" aria-label="Maps within this one">
-          <span className="codex-descend-label">Drill into</span>
-          {childMaps.map((child) => (
-            <button key={child.id} type="button" className="codex-descend-chip" onClick={() => enterMap(child.id)}>
-              <span className="codex-descend-arrow" aria-hidden="true" />
-              {child.name}
-              {!child.revealedToPlayers && <GmOnlyMark />}
-            </button>
-          ))}
-        </nav>
-      )}
+      <AtlasChildren maps={childMaps} onEnter={enterMap} mark={(map) => !map.revealedToPlayers && <GmOnlyMark />} />
 
       {/* The party's position in words, not only as a ring on the map. */}
       {partyMarker && (
@@ -671,160 +501,38 @@ export function AtlasView({
             onOpenReplay={onOpenReplay}
             /* Setting the party can clear a pin on another map, so re-read this map's pins. */
             onPartyChanged={async () => {
-              if (currentMapId) await loadMarkers(currentMapId);
+              await pins.reload();
             }}
             onClose={deselectPin}
           />
         )}
       </div>
 
-      <Modal
+      <MapPicker
         open={picking}
+        currentMap={currentMap}
+        nest={nestNew}
+        onNestChange={setNestNew}
+        assets={assets}
+        uploading={uploading}
+        onUpload={(file) => void uploadAsset(file)}
+        onPick={(asset) => void createFromAsset(asset)}
         onClose={() => setPicking(false)}
-        title={currentMap && nestNew ? `Add a sub-map under ${currentMap.name}` : "Add a map"}
-        size="md"
-        ariaLabel="Choose a map"
-      >
-        {currentMap && (
-          <div className="codex-atlas-nestrow">
-            <Switch checked={nestNew} onChange={setNestNew} label={`Nest inside “${currentMap.name}”`} />
-            <p className="codex-inspector-hint">
-              {nestNew ? (
-                <>
-                  The new map sits inside <strong>{currentMap.name}</strong>, and you can drill into it from here.
-                </>
-              ) : (
-                <>The new map is added at the top level, not inside any other map.</>
-              )}
-            </p>
-          </div>
-        )}
-        {/* Upload here; it is the same asset library Scenes uses. */}
-        <div className="codex-atlas-upload">
-          <Button variant="secondary" size="sm" disabled={uploading} onClick={() => uploadInputRef.current?.click()}>
-            <IconPlus /> {uploading ? "Uploading…" : "Upload a map image"}
-          </Button>
-          <input
-            ref={uploadInputRef}
-            type="file"
-            accept="image/*"
-            hidden
-            onChange={(event) => {
-              void uploadAsset(event.target.files?.[0]);
-              event.target.value = "";
-            }}
-          />
-        </div>
-        {assetsEmpty(assets) ? (
-          <p className="codex-list-empty">
-            No map images yet. Upload one to start your atlas. Scenes uses the same image library.
-          </p>
-        ) : (
-          <div className="codex-asset-grid">
-            {assets.map((asset) => (
-              <button key={asset.id} type="button" className="codex-asset-card" onClick={() => createFromAsset(asset)}>
-                <span className="codex-asset-name">{asset.name}</span>
-                <Badge tone="neutral">{asset.kind}</Badge>
-              </button>
-            ))}
-          </div>
-        )}
-      </Modal>
-      <Modal
-        open={settingsOpen && !!currentMap}
-        onClose={() => {
-          void renameMap();
-          setSettingsOpen(false);
-        }}
-        title="Map settings"
-        size="sm"
-        ariaLabel="Map settings"
-      >
-        {currentMap && (
-          <div className="codex-map-settings">
-            {/* The page's Alert is behind the overlay, and every write here is immediate, so show errors here too. */}
-            {error && <Alert tone="danger">{error}</Alert>}
-            <Field label="Name" htmlFor="map-name">
-              <Input
-                id="map-name"
-                value={settingsName}
-                onChange={(event) => setSettingsName(event.target.value)}
-                onBlur={renameMap}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") void renameMap();
-                }}
-              />
-            </Field>
-            <Field
-              label="Kind"
-              htmlFor="map-kind"
-              help="Where this map sits in the atlas: a world, a region within a world, or a local place."
-            >
-              <Select
-                id="map-kind"
-                value={currentMap.kind}
-                onChange={(event) => void retypeMap(event.target.value as CodexMapKind)}
-              >
-                {MAP_KINDS.map((kind) => (
-                  <option key={kind.value} value={kind.value}>
-                    {kind.label}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field
-              label="Sits inside"
-              htmlFor="map-parent"
-              help="Move this map elsewhere in the atlas. Any maps nested under it move with it."
-            >
-              <Select
-                id="map-parent"
-                value={currentMap.parentMapId ?? ""}
-                onChange={(event) => void reparentMap(event.target.value || null)}
-              >
-                <option value="">Top level</option>
-                {maps
-                  .filter((map) => map.id !== currentMap.id && !descendantIds.has(map.id))
-                  .map((map) => (
-                    <option key={map.id} value={map.id}>
-                      {map.name}
-                    </option>
-                  ))}
-              </Select>
-            </Field>
-            <Field label="Tags" htmlFor="map-tags">
-              <TagInput
-                id="map-tags"
-                ariaLabel="Tags"
-                placeholder="underdark, faerun"
-                values={currentMap.tags}
-                onChange={(next) => void retagMap(next)}
-                max={24}
-                maxReachedReason="A map may carry at most 24 tags."
-                suggestions={tagSuggestions}
-                /* Default slugify matches the server's tag rule. */
-              />
-            </Field>
-            <div className="codex-inspector-foot">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSettingsOpen(false);
-                  void deleteMap();
-                }}
-              >
-                Delete map
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
+      />
+      <MapSettings
+        open={settingsOpen}
+        map={currentMap}
+        maps={maps}
+        tagSuggestions={tagSuggestions}
+        error={error}
+        onRename={(name) => void renameMap(name)}
+        onRetype={(kind) => void retypeMap(kind)}
+        onReparent={(parentMapId) => void reparentMap(parentMapId)}
+        onRetag={(tags) => void retagMap(tags)}
+        onDelete={() => void deleteMap()}
+        onClose={() => setSettingsOpen(false)}
+      />
       {confirmDialog}
     </div>
   );
-}
-
-function assetsEmpty(assets: readonly MapAsset[]) {
-  return assets.length === 0;
 }

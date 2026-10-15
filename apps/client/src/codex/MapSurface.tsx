@@ -79,10 +79,11 @@ export function MapSurface({
   const width = image.status === "ready" ? image.width : 0;
   const height = image.status === "ready" ? image.height : 0;
 
-  // Fit the map on load (centre, zoom 1 shows the whole image via preserveAspectRatio).
+  // Fit the map on load (centre, zoom 1 shows the whole image via preserveAspectRatio). A new asset passes
+  // through loading, where the size reads 0, so it refits even at the same size.
   useEffect(() => {
-    if (image.status === "ready") setCamera({ cx: image.width / 2, cy: image.height / 2, zoom: 1 });
-  }, [image.status, assetId]);
+    if (width) setCamera({ cx: width / 2, cy: height / 2, zoom: 1 });
+  }, [width, height, assetId]);
 
   /**
    * Centre on the requested pin at the current zoom (never re-scaling the GM's map). Waits for the image,

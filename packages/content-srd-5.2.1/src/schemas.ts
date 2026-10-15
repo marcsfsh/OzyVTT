@@ -272,7 +272,7 @@ export const EquipmentReferenceSchema = z
     // Requiring attunement gives the hiding rule one boundary: hidden until attuned, visible after.
     if (item.cursed && item.attunement?.required !== true) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["cursed"],
         message:
           "A cursed item must require attunement - attunement is both what springs the curse and what reveals it."
@@ -282,7 +282,7 @@ export const EquipmentReferenceSchema = z
     item.modifiers.forEach((modifier, index) => {
       if (ITEM_REFUSED_MODIFIER_TYPES.includes(modifier.type)) {
         context.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           path: ["modifiers", index, "type"],
           message: ITEM_REFUSED_MODIFIER_MESSAGE
         });
