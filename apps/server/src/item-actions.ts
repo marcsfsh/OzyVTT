@@ -187,6 +187,28 @@ export function weaponAbilityModifier(item: InventoryItem, definition: ActorDefi
   );
 }
 
+/**
+ * Whether weapon training covers a weapon: its category, its id, or a qualified slice of Martial read against its
+ * properties ("martial-light" is the Monk's, "martial-finesse-or-light" the Rogue's). A "-weapons" suffix, as an
+ * authored grant spells it ("martial-weapons"), names the same thing.
+ */
+export function trainingCovers(
+  slugs: readonly string[],
+  weapon: Readonly<{ category: string; properties?: readonly string[] }>,
+  ids: readonly string[]
+): boolean {
+  const properties = weapon.properties ?? [];
+  return slugs.some((raw) => {
+    const slug = raw.replace(/-weapons$/, "");
+    if (slug === weapon.category || ids.includes(slug)) return true;
+    if (weapon.category !== "martial") return false;
+    if (slug === "martial-light") return properties.includes("light");
+    if (slug === "martial-finesse") return properties.includes("finesse");
+    if (slug === "martial-finesse-or-light") return properties.includes("finesse") || properties.includes("light");
+    return false;
+  });
+}
+
 /** An attack action for an equipped weapon. Absent `proficiencies.weapons` means "not recorded", so proficient. */
 export function weaponAction(
   item: InventoryItem,
@@ -200,9 +222,8 @@ export function weaponAction(
   const trained = definition.proficiencies?.weapons;
   // A bound template row also answers to its base weapon's id for proficiency.
   const ids = item.baseId !== undefined ? [item.id, item.baseId] : [item.id];
-  const granted = grantedWeapons.includes(weapon.category) || ids.some((id) => grantedWeapons.includes(id));
   const proficient =
-    granted || trained === undefined || trained.includes(weapon.category) || ids.some((id) => trained.includes(id));
+    trained === undefined || trainingCovers(grantedWeapons, weapon, ids) || trainingCovers(trained, weapon, ids);
   const bonus = modifier + (proficient ? definition.proficiencyBonus : 0);
   const damageFormula = `${weapon.damageDice}${modifier === 0 ? "" : modifier > 0 ? ` + ${modifier}` : ` - ${Math.abs(modifier)}`}`;
   return {
