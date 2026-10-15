@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { GmView } from "@vtt/domain";
 import { Modal, Tabs, useToast } from "@vtt/ui";
 import { PartyRosterTab } from "../actors/PartyRosterTab";
@@ -133,30 +133,35 @@ export function GmShell({
   const scenesLoaded = Array.isArray(state.combat.scenes);
   const scenes = useMemo(() => state.combat.scenes ?? [], [state.combat.scenes]);
 
-  // The map library loads with the GM session (refreshed when returning to Table or Scenes), so
-  // starting a fight never needs a visit to the maps library.
+  // The map library loads with the GM session (refreshed when returning to Table or Scenes, and after an
+  // upload from a picker), so starting a fight or the shared screen never needs a visit to the library.
+  const loadMaps = useCallback(
+    (isCancelled: () => boolean = () => false) =>
+      listMaps(token)
+        .then((library) => {
+          if (isCancelled()) return;
+          setMapLibrary(library);
+          // Default to the newest battlemap so Start is one click away on first login.
+          setSelectedMap((current) =>
+            current && library.some((map) => map.id === current.id)
+              ? current
+              : (library.find((map) => map.kind === "battlemap") ?? null)
+          );
+        })
+        .catch(() => {
+          /* the maps view surfaces library errors; setup just stays empty */
+        }),
+    [token]
+  );
   useEffect(() => {
     if (gmTab !== "table" && gmTab !== "scenes") return;
     let cancelled = false;
-    listMaps(token)
-      .then((library) => {
-        if (cancelled) return;
-        setMapLibrary(library);
-        // Default to the newest battlemap so Start is one click away on first login.
-        setSelectedMap((current) =>
-          current && library.some((map) => map.id === current.id)
-            ? current
-            : (library.find((map) => map.kind === "battlemap") ?? null)
-        );
-      })
-      .catch(() => {
-        /* the maps view surfaces library errors; setup just stays empty */
-      });
+    void loadMaps(() => cancelled);
     return () => {
       cancelled = true;
     };
     // Re-fetch when the maps view closes, so a just-uploaded battlemap appears in the scene pickers.
-  }, [token, gmTab, scenesView]);
+  }, [loadMaps, gmTab, scenesView]);
 
   // GM-private scene staging: while previewing a prepared scene, the table map renders that scene for
   // arranging. Players and the shared screen are unaffected.
@@ -323,6 +328,7 @@ export function GmShell({
               setScenePrepOpen(false);
               if (sceneId) setPendingStageSceneId(sceneId);
             }}
+            onMapUploaded={() => void loadMaps()}
           />
         </Modal>
       )}

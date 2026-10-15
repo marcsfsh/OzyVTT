@@ -17,7 +17,8 @@ export function ScenePanel({
   selectedMap,
   mapLibrary,
   stagingDefaults,
-  onCreated
+  onCreated,
+  onMapUploaded
 }: Readonly<{
   actors: readonly GmActor[];
   selectedMap: MapSelection | null;
@@ -27,9 +28,8 @@ export function ScenePanel({
   /** Called after a successful create with the new scene's id; the launcher closes itself and (by
       default) opens the scene for private staging. */
   onCreated?: (sceneId?: string) => void;
-  /** @deprecated The picker uploads in place, so nothing here navigates away. Kept so the shell's
-      call site still typechecks. */
-  onManageMaps?: () => void;
+  /** A map was uploaded from this panel's picker. */
+  onMapUploaded?: (map: PickerMap) => void;
 }>) {
   const [name, setName] = useState("");
   const [message, setMessage] = useState("");
@@ -96,6 +96,7 @@ export function ScenePanel({
           selectedMapId={sceneMap?.id ?? null}
           onSelectMap={setPicked}
           mapFallback={mapLibrary}
+          onMapUploaded={onMapUploaded}
           stagingRevealed={(stagingDefaults?.visibility ?? "public") !== "gm-only"}
           combatActive={false}
           busy={busy}
