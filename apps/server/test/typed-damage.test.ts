@@ -4,7 +4,8 @@ import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@
 import { rescaleDamageParts } from "@vtt/rules-5e";
 import { applyDamageDetailed, damageAdjustmentDetail, isSrdDamageType } from "../src/hit-points.js";
 import { addEffect } from "../src/effects.js";
-import { equipmentCatalogOf, type EquipmentCatalog, type EquipmentRecordLike } from "../src/equipment-derivation.js";
+import { equipmentCatalogOf, type EquipmentCatalog } from "../src/equipment-derivation.js";
+import { featureRecord, testCatalog } from "./catalog-records.js";
 import { ContentLibrary } from "../src/content-library.js";
 
 // Typed damage end to end: every case asserts hit points that moved and the line the table reads,
@@ -40,9 +41,7 @@ function definitionOf(over: Record<string, unknown> = {}): ActorDefinition {
 const item = (over: Record<string, unknown>): InventoryItem =>
   InventoryItemSchema.parse({ id: "worn", name: "Worn", equipped: true, ...over });
 
-function catalogOf(records: readonly EquipmentRecordLike[]): EquipmentCatalog {
-  return { equipmentRecord: (id) => records.find((record) => record.id === id), featRecord: () => undefined };
-}
+const catalogOf = (equipment: readonly object[]): EquipmentCatalog => testCatalog({ equipment });
 
 function stateWith(inventory: InventoryItem[] = [], heroOver: Record<string, unknown> = {}): GameState {
   return GameStateSchema.parse({
@@ -92,15 +91,14 @@ function hit(
 }
 
 describe("gap 1: flat damage-reduction reaches the hit", () => {
-  const reducer = (modifiers: unknown[]): EquipmentRecordLike =>
-    ({
-      id: "plate-of-blunting",
-      name: "Plate of Blunting",
-      category: "armor",
-      slot: "armor",
-      isMagic: true,
-      modifiers
-    }) as unknown as EquipmentRecordLike;
+  const reducer = (modifiers: unknown[]) => ({
+    id: "plate-of-blunting",
+    name: "Plate of Blunting",
+    category: "armor",
+    slot: "armor",
+    isMagic: true,
+    modifiers
+  });
   const worn = () => [item({ id: "plate-of-blunting", name: "Plate of Blunting", category: "armor" })];
 
   it("subtracts a standing reduction from the total, and names it on the line", () => {
@@ -204,12 +202,19 @@ describe("gap 2: anything can make a target vulnerable, not just a stat block", 
       category: "weapon",
       slot: "weapon",
       isMagic: true,
-      effects: [{ name: "Hag's Brand", modifiers: [{ type: "damage-vulnerability", damageTypes: ["cold"] }] }]
-    } as unknown as EquipmentRecordLike;
+      effects: [
+        {
+          name: "Hag's Brand",
+          tags: ["hag-brand"],
+          duration: { type: "manual" },
+          modifiers: [{ type: "damage-vulnerability", damageTypes: ["cold"] }]
+        }
+      ]
+    };
     const state = stateWith([item({ id: "brand-of-the-hag", name: "Brand of the Hag", category: "weapon" })]);
     const result = hit(state, [{ amount: 7, type: "cold" }], definitionOf(), catalogOf([cursedBlade]));
     expect(result.hpLost).toBe(14);
-    expect(result.detail).toContain("7 cold → 14, vulnerability: Brand of the Hag");
+    expect(result.detail).toContain("7 cold → 14, vulnerability: Hag's Brand (Brand of the Hag)");
   });
 });
 
@@ -273,7 +278,7 @@ describe("gap 5: Fiendish Resilience is a real resistance, not a visible one", (
       ...catalog,
       featureRecord: (ref: { id: string; kind: string; sourceId: string }) =>
         ref.id === "fiendish-legacy"
-          ? { id: "fiendish-legacy", name: "Fiendish Legacy", grants: { damageResistances: ["cold"] } }
+          ? featureRecord({ id: "fiendish-legacy", name: "Fiendish Legacy", grants: { damageResistances: ["cold"] } })
           : catalog.featureRecord!(ref as never)
     } as typeof catalog;
     expect(hit(stateWith([], rechosen("fire")), [{ amount: 12, type: "cold" }], tiefling, withRacial).hpLost).toBe(6);

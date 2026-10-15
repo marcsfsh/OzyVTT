@@ -282,7 +282,7 @@ describe("the Pipes of Haunting spend a charge, refuse the fourth press, and for
   });
 });
 
-describe("the Stone of Good Luck - one half whole, one half short of the roll", () => {
+describe("the Stone of Good Luck - both halves reach the roll", () => {
   const ROW = { id: "stone-of-good-luck-luckstone", name: "Stone of Good Luck", category: "wondrous-item" };
 
   it("moves every skill row by +1 and the save the SERVER rolls by +1, and both come off with the stone", () => {
@@ -357,10 +357,8 @@ describe("the Stone of Good Luck - one half whole, one half short of the roll", 
     }
   });
 
-  it("but the SERVER'S OWN ability check does not pay the +1 the sheet promises - the check half is short", () => {
-    // Known limitation: only the save half lands on a roll. `check-bonus` reaches the derived sheet's
-    // skill row via `checkRiderBonus`, but `BUILTIN_CHECKS` resolves from `abilityModifier`,
-    // `skillBonusFromExtension` and `exhaustionPenalty` and never calls it.
+  it("and the SERVER'S OWN ability check pays the +1 the sheet promises", () => {
+    // The builtin checks add `checkRiderBonus`, narrowed to the check's ability and skill as the sheet's row is.
     const definition = definitionOf();
     const state = fight(stateWith([carried("stone-of-good-luck-luckstone", "Stone of Good Luck")]));
     const sheet = deriveActorSheet(
@@ -377,7 +375,7 @@ describe("the Stone of Good Luck - one half whole, one half short of the roll", 
       { actorId: IDS.hero, targetIds: [], commandId: cmd(16), builtin: true },
       deps([10], definition)
     );
-    expect(hide.check!.total).toBe(12); // d20 10 + Dex 2. The stone's +1 is not here.
+    expect(hide.check!.total).toBe(13); // d20 10 + Dex 2 + the stone's 1
   });
 });
 

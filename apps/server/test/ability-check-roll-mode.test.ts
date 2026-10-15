@@ -4,7 +4,8 @@ import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@
 import { checkRollMode } from "../src/ability-checks.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { builtinAction } from "../src/builtin-actions.js";
-import { deriveEquipment, type EquipmentCatalog, type EquipmentRecordLike } from "../src/equipment-derivation.js";
+import { deriveEquipment, type EquipmentCatalog } from "../src/equipment-derivation.js";
+import { testCatalog } from "./catalog-records.js";
 import { startEncounter } from "../src/encounter.js";
 import { addEffect } from "../src/effects.js";
 
@@ -40,9 +41,7 @@ function definitionOf(over: Record<string, unknown> = {}): ActorDefinition {
 const item = (over: Record<string, unknown>): InventoryItem =>
   InventoryItemSchema.parse({ id: "x", name: "X", ...over });
 
-function catalogOf(records: readonly EquipmentRecordLike[]): EquipmentCatalog {
-  return { equipmentRecord: (id) => records.find((record) => record.id === id) };
-}
+const catalogOf = (equipment: readonly object[]): EquipmentCatalog => testCatalog({ equipment });
 
 function stateWith(inventory: InventoryItem[]): GameState {
   const state = GameStateSchema.parse({
@@ -125,7 +124,7 @@ const BOOTS_ROW = {
   category: "wondrous-item"
 };
 /** The modifiers the boots-of-elvenkind bundle row should carry; it has `modifiers: []`. */
-const BOOTS: EquipmentRecordLike = {
+const BOOTS = {
   id: "boots-of-elvenkind",
   name: "Boots of Elvenkind",
   category: "wondrous-item",
@@ -185,7 +184,7 @@ describe("advantage on an ability check reaches the d20", () => {
 
   it("an item with no roll-mode rider rolls exactly as it does today (the backward-compatible case)", () => {
     const definition = definitionOf();
-    const mundane: EquipmentRecordLike = {
+    const mundane = {
       id: "boots-of-elvenkind",
       name: "Boots of Elvenkind",
       category: "wondrous-item",
@@ -220,7 +219,7 @@ describe("which check the rider actually reaches", () => {
 
   it("a STANDING rider (no `when` at all) reaches every check - the moment-less half of the mirror", () => {
     const definition = definitionOf();
-    const luckstone: EquipmentRecordLike = {
+    const luckstone = {
       id: "stone-of-good-luck",
       name: "Stone of Good Luck",
       category: "wondrous-item",
@@ -244,13 +243,14 @@ describe("which check the rider actually reaches", () => {
 
   it("a disadvantage rider keeps the LOWER die, and advantage plus disadvantage cancel", () => {
     const definition = definitionOf();
-    const cursed: EquipmentRecordLike = {
+    const cursed = {
       id: "clumsy-boots",
       name: "Clumsy Boots",
       category: "wondrous-item",
       slot: "feet",
       isMagic: true,
       cursed: true,
+      attunement: { required: true },
       modifiers: [
         {
           type: "roll-mode",
@@ -265,6 +265,7 @@ describe("which check the rider actually reaches", () => {
       name: "Clumsy Boots",
       quantity: 1,
       equipped: true,
+      attuned: true,
       category: "wondrous-item"
     };
 
@@ -287,7 +288,7 @@ describe("which check the rider actually reaches", () => {
   });
 
   it("an unattuned rider contributes nothing until attunement springs it", () => {
-    const attunedBoots: EquipmentRecordLike = {
+    const attunedBoots = {
       ...BOOTS,
       id: "cloak-of-elvenkind",
       name: "Cloak of Elvenkind",
@@ -319,7 +320,7 @@ describe("which check the rider actually reaches", () => {
 });
 
 describe("Escape a Grapple takes the same consumer", () => {
-  const GAUNTLETS: EquipmentRecordLike = {
+  const GAUNTLETS = {
     id: "gauntlets-of-ogre-power",
     name: "Gauntlets of Ogre Power",
     category: "wondrous-item",
@@ -386,7 +387,7 @@ describe("Escape a Grapple takes the same consumer", () => {
   });
 
   it("an Acrobatics-only rider does not help the Athletics branch that actually rolled", () => {
-    const acrobatic: EquipmentRecordLike = {
+    const acrobatic = {
       ...GAUNTLETS,
       modifiers: [
         {

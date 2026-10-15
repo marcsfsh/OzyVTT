@@ -166,6 +166,26 @@ describe("sumRiders", () => {
     expect(sumRiders(riders, "attack-bonus")).toBe(-1);
     expect(sumRiders(riders, "armor-class")).toBe(0);
   });
+
+  it("counts carriers that share a stackKey once, at their most potent (two Slows are -10)", () => {
+    const slow = (label: string, amount: number): RiderCarrier => ({
+      label,
+      modifiers: [{ type: "speed", amount }],
+      stackKey: "mastery:slow"
+    });
+    const riders = collectRiders(
+      [
+        slow("Slowed by A", -10),
+        slow("Slowed by B", -10),
+        { label: "Longstrider", modifiers: [{ type: "speed", amount: 10 }] }
+      ],
+      { ...base, moment: null }
+    );
+    expect(sumRiders(riders, "speed")).toBe(0);
+    // An opposite-sign tie keeps the penalty, so a boon can't displace it.
+    const tie = collectRiders([slow("Slowed", -10), slow("Hastened", 10)], { ...base, moment: null });
+    expect(sumRiders(tie, "speed")).toBe(-10);
+  });
 });
 
 describe("armorWeightOf and effectiveSlot", () => {

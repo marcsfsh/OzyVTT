@@ -7,8 +7,8 @@ import {
   ActionUsesSchema,
   ActorDefinitionSchema,
   EffectGrantSchema,
-  EffectModifierSchema,
   EffectOnEndSchema,
+  ModifierSchema,
   RiderTriggerSchema
 } from "@vtt/schemas";
 import * as contract from "../src/index.js";
@@ -156,8 +156,7 @@ const MIRRORS: ReadonlyArray<{ component: string; schema: z.ZodTypeAny; wireOnly
 
 /** Discriminated unions. Branch names are read from the document, so a dropped `$ref` shows up as a count mismatch. */
 const UNION_MIRRORS: ReadonlyArray<{ label: string; node: UnionNode; schema: z.ZodTypeAny }> = [
-  { label: "FeatureModifierSchema", node: unionNode("HomebrewFeatureModifier"), schema: bundle.FeatureModifierSchema },
-  { label: "EffectModifierSchema", node: unionNode("HomebrewEffectModifier"), schema: EffectModifierSchema },
+  { label: "ModifierSchema", node: unionNode("HomebrewModifier"), schema: ModifierSchema },
   {
     label: "FeatureUsesSchema.scaling",
     node: unionNode("HomebrewFeatureUses", "scaling"),
@@ -409,8 +408,8 @@ describe("Zod / OpenAPI parity", () => {
     // The fold itself, stated once.
     expect(
       [literals.length, branchNames(TRIGGER_NODE).length],
-      "thirty-one trigger names over twenty-one branches"
-    ).toEqual([31, 21]);
+      "twenty-eight trigger names over twenty-one branches"
+    ).toEqual([28, 21]);
   });
 
   it("Direction B: every component's `required` equals its Zod schema's non-optional keys", () => {
@@ -514,14 +513,11 @@ describe("Zod / OpenAPI parity", () => {
       "on-attack-roll": {},
       "on-hit": {},
       "on-critical-hit": {},
-      "on-critical-miss": {},
       "on-damage-roll": {},
       "on-saving-throw": {},
       "on-ability-check": {},
       "on-initiative-roll": {},
-      "on-death-save": {},
       "on-taking-damage": {},
-      "on-spell-cast": {},
       "attack-kind-is": { kinds: ["melee", "thrown"] },
       "weapon-property-is": { properties: ["finesse"] },
       "damage-type-is": { damageTypes: ["fire"] },
@@ -535,7 +531,7 @@ describe("Zod / OpenAPI parity", () => {
       "versus-condition": { conditionIds: ["prone"] }
     };
 
-    /** One payload per feature modifier, including the three shared with EffectModifier. */
+    /** One payload per modifier. */
     const MODIFIERS: Record<string, object> = {
       "ability-score": { ability: "str", amount: 2, maximum: 22 },
       "hit-points-per-level": { amount: 1 },
@@ -569,6 +565,8 @@ describe("Zod / OpenAPI parity", () => {
         amount: 3,
         when: [{ type: "on-taking-damage" }, { type: "damage-type-is", damageTypes: ["cold"] }]
       },
+      "damage-resistance": { damageTypes: ["fire"], when: [{ type: "while-effect-tag", tags: ["raging"] }] },
+      "damage-vulnerability": { damageTypes: ["cold"] },
       sense: { sense: "tremorsense", feet: 30 }
     };
 
@@ -584,21 +582,15 @@ describe("Zod / OpenAPI parity", () => {
       }
     });
 
-    it("validates every feature modifier against the branch its discriminator routes it to", () => {
-      const literals = typeLiterals(unionOptions(bundle.FeatureModifierSchema));
+    it("validates every modifier against the branch its discriminator routes it to", () => {
+      const literals = typeLiterals(unionOptions(ModifierSchema));
       expect(Object.keys(MODIFIERS).sort(), "a modifier with no payload behind it is an unexercised branch").toEqual(
         [...literals].sort()
       );
-      const compiled = validator("HomebrewFeatureModifier");
+      const compiled = validator("HomebrewModifier");
       for (const [type, body] of Object.entries(MODIFIERS)) {
-        const parsed = bundle.FeatureModifierSchema.parse({ type, ...body });
+        const parsed = ModifierSchema.parse({ type, ...body });
         expect(compiled(parsed), `${type}: ${JSON.stringify(compiled.errors)}`).toBe(true);
-      }
-      // The shared branches must also validate as effect modifiers: one component is referenced by both unions.
-      const asEffect = validator("HomebrewEffectModifier");
-      for (const type of ["attack-bonus", "extra-damage", "roll-mode"]) {
-        const parsed = EffectModifierSchema.parse({ type, ...MODIFIERS[type] });
-        expect(asEffect(parsed), `${type} as an effect modifier: ${JSON.stringify(asEffect.errors)}`).toBe(true);
       }
     });
 
@@ -678,10 +670,9 @@ describe("Zod / OpenAPI parity", () => {
       ...UNION_MIRRORS.flatMap((union) => branchNames(union.node)),
       // Trigger branches are collected from the document by name (the fold).
       ...branchNames(TRIGGER_NODE),
-      // The four top-level unions have no `properties`; their branch sets are asserted above.
+      // The three top-level unions have no `properties`; their branch sets are asserted above.
       "HomebrewRecord",
-      "HomebrewFeatureModifier",
-      "HomebrewEffectModifier",
+      "HomebrewModifier",
       "HomebrewRiderTrigger"
     ]);
     const uncovered = Object.keys(components).filter((name) => name.startsWith("Homebrew") && !covered.has(name));

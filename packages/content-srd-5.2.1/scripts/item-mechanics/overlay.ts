@@ -82,6 +82,8 @@ export const CARRIER_RIDER_DISPOSITION_MIRROR: Readonly<
   "check-bonus": "standing",
   "spell-attack-bonus": "unread",
   "damage-reduction": "at-its-moment",
+  "damage-resistance": "standing",
+  "damage-vulnerability": "standing",
   sense: "display-only"
 });
 
@@ -97,10 +99,10 @@ const UNREAD_RIDER_TYPES: ReadonlySet<string> = new Set(
 
 /**
  * Rider types measured inert on an item carrier, kept apart from the mirror so it stays derivable
- * from the server's table: `speed` is summed into `derivation.speed` and never read; `darkvision` and
- * `sense` have no field in `EquipmentDerivation` (the sheet's Senses line comes from the species).
+ * from the server's table: `darkvision` and `sense` have no field in `EquipmentDerivation` (the
+ * sheet's Senses line comes from the species).
  */
-const MEASURED_INERT_RIDER_TYPES: ReadonlySet<string> = new Set(["speed", "darkvision", "sense"]);
+const MEASURED_INERT_RIDER_TYPES: ReadonlySet<string> = new Set(["darkvision", "sense"]);
 
 // ---- Cross-bundle vocabularies (check 3) --------------------------------------------------------
 
@@ -386,7 +388,7 @@ export function applyItemMechanics(
       continue;
     }
 
-    // Only the item's own `modifiers` are `FeatureModifier`s; `effects[].modifiers` are a different union.
+    // The item's own `modifiers`; its `effects[].modifiers` are refused per type by `EffectModifiersSchema`.
     const unread = parsed.data.modifiers
       .map((modifier, index) => ({ index, type: modifier.type }))
       .filter((modifier) => UNREAD_RIDER_TYPES.has(modifier.type));
@@ -402,7 +404,7 @@ export function applyItemMechanics(
       .filter((modifier) => MEASURED_INERT_RIDER_TYPES.has(modifier.type));
     if (inert.length > 0) {
       refused.push(
-        `${itemId} - ${inert.map((modifier) => `modifiers.${modifier.index} is "${modifier.type}"`).join(" and ")}, which reaches NOTHING from an item: derivation.speed is written and never read, and EquipmentDerivation carries no darkvision or senses field at all, so the sheet's Senses line comes from the definition's species extension and never from an item. The rider would parse, ship, and change nothing at the table. Leave the item prose until a consumer reads it`
+        `${itemId} - ${inert.map((modifier) => `modifiers.${modifier.index} is "${modifier.type}"`).join(" and ")}, which reaches NOTHING from an item: EquipmentDerivation carries no darkvision or senses field at all, so the sheet's Senses line comes from the definition's species extension and never from an item. The rider would parse, ship, and change nothing at the table. Leave the item prose until a consumer reads it`
       );
       continue;
     }

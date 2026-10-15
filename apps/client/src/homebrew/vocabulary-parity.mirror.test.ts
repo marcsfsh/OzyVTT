@@ -628,16 +628,18 @@ describe("a two-band range — through both paths", () => {
 
 /**
  * `EffectGrant.modifiers`. The SRD authors it only on features (Reckless Attack, Superior Defense),
- * so the editor half is an item and the SRD half a feature, and they reach the same die by different
- * roads: a feature's effect becomes a live `EffectInstance` read through `toRollModes`, while an
- * equipped item's effect is read as standing riders (`takeEffects`). Either way the swing keeps the
- * higher of two d20s.
+ * so the editor half is an item and the SRD half a feature. Both reach the die through the one rider
+ * evaluator: a feature's effect as a live `EffectInstance` on the actor, an equipped item's as a carrier
+ * while it is worn (`takeEffects`). Either way the swing keeps the higher of two d20s.
  */
 const RECKLESS = {
   classId: "barbarian",
   featureId: "reckless-attack",
   /** The SRD pair on one effect: the benefit and the cost. */
-  srdModifiers: ["attack-advantage", "incoming-attack-advantage"],
+  srdModifiers: [
+    { type: "roll-mode", roll: "attack", mode: "advantage" },
+    { type: "roll-mode", roll: "incoming-attack", mode: "advantage" }
+  ],
   itemId: "hb-bracers-a1b2c3",
   itemName: "Bracers of the Headlong Rush",
   swingId: "item-greataxe",
@@ -684,7 +686,7 @@ type Table = Readonly<{
   catalog: ReturnType<typeof equipmentCatalogOf>;
 }>;
 
-/** The Barbarian on a map, first in the order: `attack-advantage` applies only on the bearer's own turn. */
+/** The Barbarian on a map, first in the order. */
 function barbarianTable(homebrew?: HomebrewContentSource): Table {
   const view = new ContentLibrary(homebrew).forAudience("gm");
   const catalog = equipmentCatalogOf(view);
@@ -749,10 +751,18 @@ function resolveOn(table: Table, actionId: string, faces: readonly number[], tar
 const swingGreataxe = (table: Table, faces: readonly number[]) =>
   resolveOn(table, RECKLESS.swingId, faces, [IDS.target]);
 
-/** An item whose effect carries one `attack-advantage` modifier, authored through the real form. */
+/** An item whose effect carries advantage on attack rolls, authored through the real form. */
 function authoredBracers(): Draft {
   // Nested two containers deep.
-  const modifier = authoredRow("equipment", ["effects", "modifiers"], [["type", "attack-advantage"]]);
+  const modifier = authoredRow(
+    "equipment",
+    ["effects", "modifiers"],
+    [
+      ["type", "roll-mode"],
+      ["roll", "attack"],
+      ["mode", "advantage"]
+    ]
+  );
   const effect = authoredRow(
     "equipment",
     ["effects"],
@@ -812,17 +822,17 @@ describe("what an effect DOES — through both paths, across two carriers", () =
       name: "Headlong Rush",
       tags: ["reckless"],
       duration: { type: "encounter" },
-      modifiers: [{ type: "attack-advantage" }]
+      modifiers: [{ type: "roll-mode", roll: "attack", mode: "advantage" }]
     });
 
     // Looked up in the effect's own fields: a flat lookup would resolve the feature-scope
     // `modifiersField` and falsely report the row authorable.
     expect(hasControl("equipment", "modifiers", ["effects"])).toBe(true);
     expect(hasControl("equipment", "damageTypes", ["effects", "modifiers"])).toBe(true);
-    // The two unions differ: `armor-class` is a feature modifier, not an effect modifier.
+    // One vocabulary, but an effect refuses what the sheet stores: `armor-class` is not offered on one.
     const offered = (kind: string) =>
       (applyField("equipment", { rowId: "r" }, "type", kind, ["effects", "modifiers"]) as { type?: string }).type;
-    expect(offered("attack-advantage")).toBe("attack-advantage");
+    expect(offered("roll-mode")).toBe("roll-mode");
     expect(() => applyField("equipment", {}, "armor-class", 1, ["effects", "modifiers"])).toThrow();
   });
 
@@ -830,9 +840,8 @@ describe("what an effect DOES — through both paths, across two carriers", () =
     const feature = srdRecklessAttack();
     expect(feature.effects[0]).toMatchObject({
       tags: ["reckless-attack"],
-      modifiers: [{ type: "attack-advantage" }, { type: "incoming-attack-advantage" }]
+      modifiers: RECKLESS.srdModifiers
     });
-    expect(feature.effects[0].modifiers.map((modifier) => modifier.type)).toEqual([...RECKLESS.srdModifiers]);
 
     // Only two bundled records (both Barbarian features) author `effects[].modifiers`.
     const library = new ContentLibrary().forAudience("gm");

@@ -46,28 +46,28 @@ describe("builtin action catalog", () => {
     ]);
   });
 
-  // The modifier union is duplicated across schemas / EffectAddSchema / OpenAPI; this pins the
-  // command-side copy against every schema variant so the two can't drift.
-  it("EffectAddSchema accepts every EffectModifierSchema variant", () => {
-    const samples = [
-      { type: "damage-bonus", amount: 2, appliesTo: "melee" },
-      { type: "damage-resistance", damageTypes: ["fire"] },
-      { type: "attack-advantage" },
-      { type: "incoming-attack-advantage" },
-      { type: "attack-disadvantage" },
-      { type: "incoming-attack-disadvantage" },
-      { type: "save-advantage", ability: "dex" },
-      { type: "save-advantage" },
-      { type: "save-disadvantage", ability: "str" }
-    ];
-    for (const sample of samples) {
-      const parsed = EffectAddSchema.safeParse({
+  // The GM's house effect takes the same vocabulary a granted effect does, gates included.
+  it("EffectAddSchema takes the shared effect modifiers and refuses what an effect cannot give back", () => {
+    const accepts = (modifier: object) =>
+      EffectAddSchema.safeParse({
         commandId: "50000000-0000-4000-8000-000000000001",
         actorId: "10000000-0000-4000-8000-000000000001",
         name: "Test",
-        modifiers: [sample]
-      });
-      expect(parsed.success, parsed.success ? JSON.stringify(sample) : JSON.stringify(parsed.error.issues)).toBe(true);
-    }
+        modifiers: [modifier]
+      }).success;
+    expect(
+      accepts({
+        type: "roll-mode",
+        roll: "save",
+        mode: "advantage",
+        when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["dex"] }]
+      })
+    ).toBe(true);
+    expect(accepts({ type: "damage-resistance", damageTypes: ["fire"] })).toBe(true);
+    expect(accepts({ type: "attack-bonus", amount: 1, when: [{ type: "while-effect-tag", tags: ["raging"] }] })).toBe(
+      true
+    );
+    expect(accepts({ type: "armor-class", amount: 2 })).toBe(false);
+    expect(accepts({ type: "attack-advantage" })).toBe(false);
   });
 });

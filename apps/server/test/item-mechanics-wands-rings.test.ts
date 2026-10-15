@@ -335,7 +335,7 @@ describe("a staff's resistance and its shared charge pool", () => {
     const definition = definitionOf();
     const state = fight(stateWith([item(ROW)]));
     const derivation = deriveEquipment(state.actors[0], definition, catalog);
-    expect(derivation.damageResistances).toEqual([{ id: "fire", sourceItemId: "staff-of-fire" }]);
+    expect(derivation.damageResistances).toEqual([{ id: "fire", source: "Staff of Fire" }]);
 
     const cast = effectiveActions(definition, state.actors[0], catalog).find(
       (entry) => entry.id === "item-staff-of-fire-cast-burning-hands"

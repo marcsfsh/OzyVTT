@@ -31,7 +31,7 @@ and a change to one never bumps another. They are constructed together in
 | `apps/server`                | Express + Socket.IO service: stores, command handlers, projections, HTTP routers.                                                 |
 | `apps/client`                | React/Vite UI. Entries: `index.html` (the app), `viewer.html` (table viewer), `sheet.html` (standalone sheet), `styleguide.html`. |
 | `packages/domain`            | The realtime wire contract: `GameState`, socket event maps, projection view types.                                                |
-| `packages/schemas`           | Zod schemas for actors, effects and riders shared by server and content.                                                          |
+| `packages/schemas`           | Zod schemas for actors, effects and the modifier vocabulary, shared by server and content.                                        |
 | `packages/api-contract`      | The public HTTP API: OpenAPI document, path constants, command scopes.                                                            |
 | `packages/rules-5e`          | Pure 5e rules helpers: dice grammar, ability scores, progression tables, rider evaluation.                                        |
 | `packages/content-srd-5.2.1` | SRD 5.2.1 content bundles and the scripts that generate them from vendored sources.                                               |
@@ -153,13 +153,27 @@ the action economy, release); builtin actions such as Hide and the unarmed Grapp
 cases through the handler table in `resolution/builtins.ts`. Every condition write goes through
 `applyCondition` in `effects.ts`, which honours innate and item-granted immunities.
 
+Bonuses, advantage, extra damage and defences are modifiers in one vocabulary (`ModifierSchema` in
+`packages/schemas`), shared by features, feats, chosen options, magic items and live effects, and
+read by one evaluator (`collectRiders` in `packages/rules-5e`). `deriveEquipment`
+(`equipment-derivation.ts`) gathers every carrier an actor has (its active items and the feats
+they grant, its own feats and features, its live effects) with one context of bearer facts, and
+each roll collects the standing modifiers plus those gated on its moment (`on-attack-roll`,
+`on-saving-throw`, ...), so a modifier's `when` gate means the same thing on every carrier. A
+carrier refuses what it cannot give back: an item refuses hit points and ability scores, an effect
+everything the sheet stores (AC, initiative, slots, senses). Riders name damage types and
+conditions from the SRD's closed sets, and the homebrew publish gate (`homebrew-validate.ts`)
+refuses a rider gated on a moment its reader never collects.
+
 What a save does is data on the action's save block, not read from its description: `successDamage`
 (half or none) and the `failureCondition` a failed save imposes. They are written where the content
 is made (the SRD build, the builder, homebrew) and copied onto the pending save prompt.
 
 How strictly rules are enforced is table policy (`GameState.rulesPolicy`): enforce, advise or
 off, with per-family exceptions (`rules-families.ts`). A player blocked by a rule can ask the GM
-(`rules.ask`); the GM allows or denies and the parked command replays.
+(`rules.ask`); the GM allows or denies and the parked command replays with an override of that
+rule's family only, so a block of another family is asked about separately. An override that
+names no family is the GM's own ruling on the whole command.
 
 ## Content and homebrew
 

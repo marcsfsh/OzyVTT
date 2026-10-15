@@ -4,7 +4,14 @@ import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
 import { hasEffectTag } from "../effects.js";
 import { RulesBlockedError } from "../game-store.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
-import { effectiveModeFor, overrideCovers, overrideReason, rememberOverride, type RuleId } from "../rules-families.js";
+import {
+  effectiveModeFor,
+  overrideCovers,
+  overrideReason,
+  overrideWaives,
+  rememberOverride,
+  type RuleId
+} from "../rules-families.js";
 import { builtinHandlerFor } from "./builtins.js";
 import { sizeRank, type DefinitionAction, type LiveActor, type ResolveContext, type ResolveInput } from "./context.js";
 
@@ -410,7 +417,7 @@ function checkRange(
 }
 
 /** Validates against the rules mode and plans the economy commitment (ADR-0020): strict rejects with an
- *  override path, assisted warns, freeform skips. */
+ *  override path, assisted warns, freeform skips. An override waives only the families it names. */
 export function planEconomy(
   state: GameState,
   attacker: LiveActor,
@@ -437,23 +444,23 @@ export function planEconomy(
     (violation) => effectiveModeFor(state.combat, violation.rule) !== "freeform"
   );
   if (policed.length === 0) return { plan, overridden: null };
-  if (input.override) return { plan, overridden: { rule: policed[0].rule, reason: overrideReason(input.override) } };
-  // A GM override earlier this turn covers that family for the rest of the creature's turn; other
-  // families still re-prompt.
-  const covered = (rule: RuleId) => overrideCovers(state.combat.turn, rule);
+  // This command's override, or a GM override earlier this turn, covers its families; other families still
+  // block or warn.
+  const waived = policed.find((violation) => overrideWaives(input.override, violation.rule));
+  const covered = (rule: RuleId) => overrideWaives(input.override, rule) || overrideCovers(state.combat.turn, rule);
   const blocking = violations.filter(
     (violation) => !covered(violation.rule) && effectiveModeFor(state.combat, violation.rule) === "strict"
   );
   if (blocking.length > 0) throw new RulesBlockedError(blocking[0].rule, blocking[0].message);
   warnings.push(...policed.filter((violation) => !covered(violation.rule)).map((violation) => violation.message));
-  if (proseMultiattack && softViolations.length > 0)
+  if (proseMultiattack && softViolations.some((violation) => !covered(violation.rule)))
     warnings.push(`${attacker.name}'s Multiattack is prose-only - extra attacks aren't validated.`);
-  return { plan, overridden: null };
+  return { plan, overridden: waived ? { rule: waived.rule, reason: overrideReason(input.override) } : null };
 }
 
 /** Commits the validated economy plan (ADR-0020): slots, compound instance, limited uses, legendary
  *  actions and spell slots. A GM override covers its rule family for the rest of this creature's turn. */
-export function commitEconomy({ state, attacker, plan, overridden }: ResolveContext): void {
+export function commitEconomy({ state, attacker, input, plan, overridden }: ResolveContext): void {
   const instance = plan.instance
     ? { actorId: plan.instance.actorId, components: { ...plan.instance.components } }
     : null;
@@ -477,7 +484,7 @@ export function commitEconomy({ state, attacker, plan, overridden }: ResolveCont
     };
   }
   // Cleared on turn advance.
-  if (overridden) rememberOverride(state, overridden.rule);
+  if (overridden) rememberOverride(state, overridden.rule, input.override);
   if (plan.spendLegendary) {
     state.combat = {
       ...state.combat,

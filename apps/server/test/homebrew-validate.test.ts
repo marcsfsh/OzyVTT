@@ -645,6 +645,74 @@ describe("tier 4 - shapes that parse and are then read by nothing", () => {
   });
 });
 
+describe("riders that parse and could never take effect", () => {
+  const feat = (modifier: Record<string, unknown>, effect?: Record<string, unknown>) => ({
+    id: "hb-brawler-a1b2c3",
+    name: "Brawler",
+    source: "homebrew",
+    category: "general",
+    feature: {
+      id: "hb-brawler-a1b2c3",
+      name: "Brawler",
+      description: "A homebrew feat.",
+      modifiers: effect ? [] : [modifier],
+      effects: effect ? [{ ...effect, modifiers: [modifier] }] : []
+    }
+  });
+  const onHit = (type: string) => ({ type: "extra-damage", formula: "1d6", damageType: "fire", when: [{ type }] });
+
+  it("refuses a damage rider gated on a moment the damage roll never collects", () => {
+    // The damage roll collects the standing pass, `on-hit`, `on-critical-hit` and `on-damage-roll` only.
+    const riders = [
+      { type: "extra-damage", formula: "1d6", damageType: "fire" },
+      { type: "damage-bonus", amount: 2 }
+    ];
+    for (const { type, ...rest } of riders) {
+      const rider = { type, ...rest, when: [{ type: "on-attack-roll" }] };
+      const refused = validateForPublish("feat", feat(rider), contextWith());
+      expect(refused.valid, type).toBe(false);
+      expect(messages(refused)).toContain(
+        `gates a ${type} on "on-attack-roll", a moment the damage roll never collects`
+      );
+      expect(refused.issues[0].path).toEqual(["feature", "modifiers", 0]);
+    }
+    for (const moment of ["on-hit", "on-critical-hit", "on-damage-roll"])
+      expect(validateForPublish("feat", feat(onHit(moment)), contextWith()).valid, moment).toBe(true);
+  });
+
+  it("checks an effect's modifiers with the same rules, and refuses a defence that waits for a roll", () => {
+    const rage = { tags: ["raging"], duration: { type: "encounter" } };
+    const late = validateForPublish("feat", feat(onHit("on-saving-throw"), rage), contextWith());
+    expect(late.valid).toBe(false);
+    expect(late.issues[0].path).toEqual(["feature", "effects", 0, "modifiers", 0]);
+
+    const resistance = { type: "damage-resistance", damageTypes: ["fire"], when: [{ type: "on-hit" }] };
+    const waiting = validateForPublish("feat", feat(resistance, rage), contextWith());
+    expect(messages(waiting)).toContain("a defence is read before any roll");
+    // Gated on a state, the same resistance publishes.
+    const gated = { ...resistance, when: [{ type: "while-effect-tag", tags: ["raging"] }] };
+    expect(validateForPublish("feat", feat(gated, rage), contextWith()).valid).toBe(true);
+  });
+
+  it("refuses a misspelled damage type or condition in a rider, and anything an effect cannot give back", () => {
+    const typo = validateForPublish("feat", feat({ ...onHit("on-hit"), damageType: "fyre" }), contextWith());
+    expect(typo.valid).toBe(false);
+    const condition = validateForPublish(
+      "feat",
+      feat({ type: "save-bonus", amount: 1, when: [{ type: "while-condition", conditionIds: ["poisonned"] }] }),
+      contextWith()
+    );
+    expect(condition.valid).toBe(false);
+    // An effect refuses what the sheet stores: it could not give the AC back when it ends.
+    const armorOnEffect = validateForPublish(
+      "feat",
+      feat({ type: "armor-class", amount: 2 }, { tags: ["warded"], duration: { type: "encounter" } }),
+      contextWith()
+    );
+    expect(messages(armorOnEffect)).toContain('An effect cannot carry "armor-class"');
+  });
+});
+
 describe("a duplicated SRD record still passes its own gate", () => {
   it("accepts every SRD class taken through the real duplicate path", () => {
     // Duplicating an SRD record must produce a publishable body. Driven through

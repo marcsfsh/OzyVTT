@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { CONDITION_IDS, DAMAGE_TYPE_IDS, MAGIC_SCHOOL_IDS, RARITY_IDS } from "@vtt/content-srd-5.2.1/schemas";
 import { RIDER_FIELDS_FOR_TEST } from "./RiderEditor";
 import { SCHEMAS } from "./schemas";
-import { EMPTY_CONTEXT, resolveSuggestions, type FieldDef, type SchemaContext } from "./schema";
+import { EMPTY_CONTEXT, resolveOptions, resolveSuggestions, type FieldDef, type SchemaContext } from "./schema";
 import type { HomebrewType } from "./types";
 
 const ctx: SchemaContext = EMPTY_CONTEXT;
@@ -34,32 +34,43 @@ function everyField(): ReadonlyArray<{ type: HomebrewType; field: FieldDef }> {
 }
 
 const suggestionsOf = (field: FieldDef): readonly string[] => resolveSuggestions(field, ctx);
+const optionsOf = (field: FieldDef): readonly string[] =>
+  field.options ? resolveOptions(field, ctx, {}).map((option) => option.value) : [];
 
 /** Every field whose suggestions are the damage-type vocabulary, found by identity with the canonical
     array rather than by key name (`damagePartsField`'s row is keyed plainly `type`). */
 const damageTypeFields = () => everyField().filter(({ field }) => suggestionsOf(field) === DAMAGE_TYPE_IDS);
 
 describe("enumerated fields offer the complete SRD list", () => {
-  it("every damage-type field offers the canonical list, and there are ten of them", () => {
+  it("every open damage-type field suggests the canonical list, and there are six of them", () => {
     const fields = damageTypeFields();
-    /** Nine rendered controls, ten entries: `RIDER_FIELDS_FOR_TEST` exports `whenField()` both bare
-        and nested in `modifiersField`, so it counts twice. `GrantsEditor`'s damage kinds have no
-        `FieldDef` and are covered by `pick-fields.test.tsx`. */
+    /** `GrantsEditor`'s damage kinds have no `FieldDef` and are covered by `pick-fields.test.tsx`. */
     expect(fields.map(({ type, field }) => `${type}.${field.key}`)).toEqual([
       "spell.damage.types",
       "equipment.weapon.damageType",
       "monster.damageResistances",
       "monster.damageImmunities",
       "monster.damageVulnerabilities",
-      "equipment.damageTypes",
-      "equipment.damageType",
-      "equipment.damageTypes",
-      "equipment.type",
-      "equipment.damageTypes"
+      "equipment.type"
     ]);
     for (const { type, field } of fields) {
       expect(suggestionsOf(field), `${type}.${field.key}`).toEqual(DAMAGE_TYPE_IDS);
     }
+  });
+
+  it("every rider damage-type field is a closed choice over the canonical list", () => {
+    // A rider names `DamageTypeSchema`, so a homebrew word could never publish there. `whenField()` is walked
+    // three times: bare, inside `modifiersField` and inside an effect's modifiers.
+    const fields = everyField().filter(({ field }) => field.key === "damageType" || field.key === "damageTypes");
+    const closed = fields.filter(({ field }) => field.options !== undefined);
+    expect(closed.map(({ field }) => `${field.kind}.${field.key}`)).toEqual([
+      "multiselect.damageTypes",
+      "select.damageType",
+      "multiselect.damageTypes",
+      "multiselect.damageTypes",
+      "multiselect.damageTypes"
+    ]);
+    for (const { type, field } of closed) expect(optionsOf(field), `${type}.${field.key}`).toEqual(DAMAGE_TYPE_IDS);
   });
 
   it("every damage-type field is a VISIBLE chooser — the client's `3d`", () => {
@@ -76,7 +87,9 @@ describe("enumerated fields offer the complete SRD list", () => {
     );
     expect(fields.length).toBeGreaterThanOrEqual(2);
     for (const { type, field } of fields) {
-      expect(suggestionsOf(field), `${type}.${field.key}`).toEqual(CONDITION_IDS);
+      // A rider's condition is closed (`ConditionSchema`), so it is a choice; a stat block's stays open.
+      const offered = field.options ? optionsOf(field) : suggestionsOf(field);
+      expect(offered, `${type}.${field.key}`).toEqual(CONDITION_IDS);
     }
   });
 
@@ -144,10 +157,10 @@ describe("an open slug always keeps its “other”", () => {
     // `pick` renders `Combobox` only when suggestions resolve non-empty, so a `pick` with no list
     // silently falls back to a bare input.
     const picks = everyField().filter(({ field }) => field.pick === true);
-    // Exact count: 11 (rarity plus the ten damage-type entries) + 5 × 12 (the six feature-panel offer
+    // Exact count: 7 (rarity plus the six open damage-type entries) + 5 × 12 (the six feature-panel offer
     // boxes on five feature carriers, walked at feature scope, via the `choices` aliases, and on the
-    // feature itself) + 1 (weapon `properties`) = 72.
-    expect(picks.length).toBe(72);
+    // feature itself) + 1 (weapon `properties`) = 68.
+    expect(picks.length).toBe(68);
     for (const { type, field } of picks) {
       expect(field.suggestions, `${type}.${field.key} is pick with no suggestions`).toBeDefined();
       // A flag on `text` or `tags`, never its own kind; both keep the column open.

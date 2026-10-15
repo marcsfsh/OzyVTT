@@ -10,26 +10,25 @@ import { z } from "zod";
 import {
   AbilitySchema,
   ActionSchema,
-  AttackBonusVariantSchema,
   DiceFormulaSchema,
   EffectGrantSchema,
-  ExtraDamageVariantSchema,
   GrantWhenSchema,
   HitDieSchema,
-  RollModeVariantSchema,
+  ModifierSchema,
   SaveOutcomeFields,
-  riderGate
+  type Modifier
 } from "@vtt/schemas";
 
 export {
   GrantWhenSchema,
   ItemSlotSchema,
+  ModifierSchema,
   RIDER_TRIGGER_KINDS,
   RiderTriggerSchema,
   RiderWhenSchema,
   riderLayer,
-  riderGate,
   type ItemSlot,
+  type Modifier,
   type RiderTrigger,
   type RiderTriggerKind
 } from "@vtt/schemas";
@@ -214,117 +213,11 @@ export const FeatureGrantsSchema = FeatureGrantsFieldsSchema.superRefine((grants
 });
 
 /**
- * The one typed rider vocabulary, shared by features, feats, options and magic items; a small union
- * grown additively (anything else stays prose, ADR-0008). Amounts are signed, and every variant takes
- * `...riderGate` (`when` + `scope`).
- */
-export const FeatureModifierSchema = z.discriminatedUnion("type", [
-  // ---- core riders ---------------------------------------------------------------------------
-  z
-    .object({
-      type: z.literal("ability-score"),
-      ability: AbilitySchema,
-      amount: z.number().int().min(-5).max(5),
-      maximum: z.number().int().min(1).max(30).optional(),
-      ...riderGate
-    })
-    .strict(),
-  z.object({ type: z.literal("hit-points-per-level"), amount: z.number().int().min(-5).max(5), ...riderGate }).strict(),
-  z.object({ type: z.literal("speed"), amount: z.number().int().min(-30).max(60), ...riderGate }).strict(),
-  /**
-   * Flat AC. `whileArmored` (the Defense fighting style) predates `when: [{type: "while-armored"}]` and
-   * stays because shipped bundles use it.
-   */
-  z
-    .object({
-      type: z.literal("armor-class"),
-      amount: z.number().int().min(-5).max(5),
-      whileArmored: z.boolean().default(false),
-      ...riderGate
-    })
-    .strict(),
-  z.object({ type: z.literal("initiative"), amount: z.number().int().min(-5).max(10), ...riderGate }).strict(),
-  z.object({ type: z.literal("extra-attack"), count: z.number().int().min(1).max(3), ...riderGate }).strict(),
-  /** AC = 10 + DEX + this ability while wearing no armor (Barbarian, Monk, and any homebrew that wants it). */
-  z
-    .object({
-      type: z.literal("unarmored-defense"),
-      ability: AbilitySchema,
-      allowShield: z.boolean().default(false),
-      ...riderGate
-    })
-    .strict(),
-  z.object({ type: z.literal("darkvision"), feet: z.number().int().min(0).max(240), ...riderGate }).strict(),
-  // ---- the three shared with EffectModifierSchema, declared once in @vtt/schemas --------------
-  AttackBonusVariantSchema,
-  ExtraDamageVariantSchema,
-  RollModeVariantSchema,
-  // ---- magic-item riders ---------------------------------------------------------------------
-  /** A flat bonus to saving throws. Narrow it with `when: [{type: "ability-is", abilities: ["dex"]}]`. */
-  z.object({ type: z.literal("save-bonus"), amount: z.number().int().min(-10).max(10), ...riderGate }).strict(),
-  /** A flat bonus to ability and skill checks. Gloves of Thievery (+5 Sleight of Hand) is literally this. */
-  z.object({ type: z.literal("check-bonus"), amount: z.number().int().min(-10).max(10), ...riderGate }).strict(),
-  /**
-   * Flat damage bonus, the other half of a "+1 weapon". Weapon-scoped by default on an item with a
-   * weapon block, so two magic weapons never stack. Distinct from the effect-side `damage-bonus`, whose
-   * reader ignores rider gates.
-   */
-  z.object({ type: z.literal("damage-bonus"), amount: z.number().int().min(-10).max(10), ...riderGate }).strict(),
-  /** `classId` targets one caster on a multiclass sheet; absent = every caster the bearer has. */
-  z
-    .object({
-      type: z.literal("spell-save-dc"),
-      amount: z.number().int().min(-5).max(5),
-      classId: ContentIdSchema.optional(),
-      ...riderGate
-    })
-    .strict(),
-  /** The sibling of the above. A Wand of the War Mage is exactly this and nothing else. */
-  z
-    .object({
-      type: z.literal("spell-attack-bonus"),
-      amount: z.number().int().min(-5).max(5),
-      classId: ContentIdSchema.optional(),
-      ...riderGate
-    })
-    .strict(),
-  /** An extra spell slot of one level. Layered over the single-sourced slot maxima, so the seed, the long rest and the spend-clamp cannot disagree. */
-  z
-    .object({
-      type: z.literal("spell-slot"),
-      level: z.number().int().min(1).max(9),
-      amount: z.number().int().min(-4).max(4),
-      ...riderGate
-    })
-    .strict(),
-  /** One more use of a limited resource. `poolId` is the live `actionUses` key, not a `classResources` column. */
-  z
-    .object({
-      type: z.literal("resource-bonus"),
-      poolId: ContentIdSchema,
-      amount: z.number().int().min(-20).max(20),
-      ...riderGate
-    })
-    .strict(),
-  /** Score a critical hit on this natural roll or higher (19-20 keen weapons). */
-  z.object({ type: z.literal("critical-range"), threshold: z.number().int().min(15).max(20), ...riderGate }).strict(),
-  /** Extra untyped weapon dice on a crit (Savage Attacks). A typed crit-only 1d6 fire is `extra-damage` + `when: [{on-critical-hit}]` instead. */
-  z.object({ type: z.literal("critical-bonus-dice"), count: z.number().int().min(1).max(4), ...riderGate }).strict(),
-  /** Flat reduction of incoming damage. Resistance itself stays `grants.damageResistances`. */
-  z.object({ type: z.literal("damage-reduction"), amount: z.number().int().min(1).max(30), ...riderGate }).strict(),
-  /** The missing sibling of `darkvision`. Display-level, like `darkvision`, until a senses model exists. */
-  z
-    .object({ type: z.literal("sense"), sense: ContentIdSchema, feet: z.number().int().min(0).max(240), ...riderGate })
-    .strict()
-]);
-export type FeatureModifier = z.infer<typeof FeatureModifierSchema>;
-
-/**
  * Rider types an item may not carry: they are baked into the sheet and cannot be reversed on unequip
  * (`hp.maximum` with current HP tracked against it; ability scores feeding everything). Feats and
  * features may use them.
  */
-export const ITEM_REFUSED_MODIFIER_TYPES: readonly FeatureModifier["type"][] = Object.freeze([
+export const ITEM_REFUSED_MODIFIER_TYPES: readonly Modifier["type"][] = Object.freeze([
   "hit-points-per-level",
   "ability-score"
 ]);
@@ -340,7 +233,7 @@ export const featureRiders = {
   effects: z.array(EffectGrantSchema).max(4).default([]),
   uses: FeatureUsesSchema.optional(),
   grants: FeatureGrantsSchema.optional(),
-  modifiers: z.array(FeatureModifierSchema).max(8).default([])
+  modifiers: z.array(ModifierSchema).max(8).default([])
 } as const;
 
 /**

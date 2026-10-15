@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { GameStateSchema, type ContentSkillSummary, type GameState } from "@vtt/domain";
 import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
 import { deriveActorSheet } from "../src/actor-derived.js";
-import { deriveEquipment, type EquipmentCatalog, type EquipmentRecordLike } from "../src/equipment-derivation.js";
+import { deriveEquipment, type EquipmentCatalog } from "../src/equipment-derivation.js";
+import { testCatalog } from "./catalog-records.js";
 import { projectGmView, projectPlayerView } from "../src/projections.js";
 import { saveModifierFor, saveTotalFor } from "../src/saving-throws.js";
 
@@ -42,12 +43,10 @@ function definitionOf(over: Record<string, unknown> = {}): ActorDefinition {
 
 const item = (over: Record<string, unknown>): InventoryItem =>
   InventoryItemSchema.parse({ id: "x", name: "X", ...over });
-const catalogOf = (records: readonly EquipmentRecordLike[]): EquipmentCatalog => ({
-  equipmentRecord: (id) => records.find((record) => record.id === id)
-});
+const catalogOf = (equipment: readonly object[]): EquipmentCatalog => testCatalog({ equipment });
 
 /** A circlet that raises Stealth to expertise and grants Perception outright. */
-const CIRCLET: EquipmentRecordLike = {
+const CIRCLET = {
   id: "circlet-of-shadows",
   name: "Circlet of Shadows",
   category: "wondrous",
@@ -64,7 +63,7 @@ const CIRCLET_ROW = {
   attuned: true
 };
 /** A standing save-bonus rider on the bearer. */
-const AMULET: EquipmentRecordLike = {
+const AMULET = {
   id: "amulet-of-warding",
   name: "Amulet of Warding",
   category: "wondrous",
@@ -201,7 +200,7 @@ describe("the save chip and the rolled save are one number", () => {
 });
 
 describe("check-bonus rides into ability checks and skills", () => {
-  const GLOVES: EquipmentRecordLike = {
+  const GLOVES = {
     id: "gloves-of-surety",
     name: "Gloves of Surety",
     category: "wondrous",

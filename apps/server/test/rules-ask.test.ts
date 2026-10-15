@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GameStateSchema, type PlayerView } from "@vtt/domain";
+import { loadActorFixture } from "@vtt/test-fixtures";
 import { GAME_PATHS } from "@vtt/api-contract";
 import { afterEach, describe, expect, it } from "vitest";
 import { createServer } from "../src/server.js";
@@ -75,7 +76,7 @@ function initialState() {
   });
 }
 
-async function boot() {
+async function boot(state = initialState()) {
   const directory = await mkdtemp(join(tmpdir(), "vtt-rules-ask-"));
   const server = createServer({
     authPath: join(directory, "auth.json"),
@@ -85,7 +86,7 @@ async function boot() {
     webDist: join(directory, "dist"),
     useDevelopmentClient: true,
     developmentClientPort: 5173,
-    initialGameState: initialState()
+    initialGameState: state
   });
   await server.initialize();
   await server.auth.bootstrap("a sufficiently long GM password");
@@ -386,5 +387,86 @@ describe("ask the GM", () => {
     expect(game.combat.pendingRuleAsks[0].id).toBe(ask.id);
     // The scene the fight came from is emptied, as the active-scene invariant requires.
     expect(game.combat.scenes.find((scene) => scene.id === CORRIDOR)?.combat.pendingRuleAsks).toEqual([]);
+  });
+});
+
+describe("an Allow covers the family it was asked about, and no other", () => {
+  // Hero has spent this turn's action and the War Cry's one use: an economy block and a resources block.
+  function spentWarCry() {
+    const state = initialState();
+    const warCry = {
+      id: "war-cry",
+      name: "War Cry",
+      activation: "action",
+      description: "A shout that rallies allies.",
+      damage: [],
+      uses: { limit: 1, per: "long-rest" }
+    };
+    return GameStateSchema.parse({
+      ...state,
+      definitions: [
+        {
+          id: "hero-sheet",
+          definition: {
+            ...(loadActorFixture("player-character") as Record<string, unknown>),
+            actions: [warCry]
+          }
+        }
+      ],
+      actors: state.actors.map((actor) =>
+        actor.id === HERO ? { ...actor, definitionId: "hero-sheet", actionUses: { "war-cry": 1 } } : actor
+      ),
+      combat: { ...state.combat, turn: { ...state.combat.turn, actionUsed: true } }
+    });
+  }
+
+  it("re-asks about a second family's block rather than waving it through on the first Allow", async () => {
+    const running = await boot(spentWarCry());
+    const { base, server, gmToken } = running;
+    const heroSession = server.auth.issuePlayerSession();
+    expect((await post(base, GAME_PATHS.claims, heroSession, { actorId: HERO })).status).toBe(200);
+
+    const asked = await post(base, GAME_PATHS.rulesAsk, heroSession, {
+      commandId: randomUUID(),
+      type: "action.resolve",
+      payload: { commandId: randomUUID(), actorId: HERO, actionId: "war-cry" }
+    });
+    const firstAsk = server.store.snapshot.combat.pendingRuleAsks[0];
+    expect((await asked.json()).data.askId).toBe(firstAsk.id);
+
+    // The GM allows the family they were shown. The action is still blocked by the other one, so it does not
+    // run: the ask comes back, now about that block, under a fresh id.
+    const allowedOnce = await post(base, GAME_PATHS.rulesAnswer, gmToken, {
+      commandId: randomUUID(),
+      askId: firstAsk.id,
+      allow: true
+    });
+    expect(allowedOnce.status).toBe(200);
+    expect((await allowedOnce.json()).data.blocked).toBeTruthy();
+    const secondAsk = server.store.snapshot.combat.pendingRuleAsks[0];
+    expect(secondAsk.id).not.toBe(firstAsk.id);
+    expect(secondAsk.family).not.toBe(firstAsk.family);
+    expect([firstAsk.family, secondAsk.family].sort()).toEqual(["economy", "resources"]);
+    expect(server.store.snapshot.actors.find((actor) => actor.id === HERO)?.actionUses["war-cry"]).toBe(1);
+
+    // Answering the old question again finds nothing; the second Allow runs the action.
+    const stale = await post(base, GAME_PATHS.rulesAnswer, gmToken, {
+      commandId: randomUUID(),
+      askId: firstAsk.id,
+      allow: true
+    });
+    expect(stale.status).toBe(409);
+    const allowedTwice = await post(base, GAME_PATHS.rulesAnswer, gmToken, {
+      commandId: randomUUID(),
+      askId: secondAsk.id,
+      allow: true
+    });
+    expect(allowedTwice.status).toBe(200);
+    expect((await allowedTwice.json()).data.outcome).toBeTruthy();
+    expect(server.store.snapshot.combat.pendingRuleAsks).toEqual([]);
+    expect([...(server.store.snapshot.combat.turn.rulesOverriddenFamilies ?? [])].sort()).toEqual([
+      "economy",
+      "resources"
+    ]);
   });
 });

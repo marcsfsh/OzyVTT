@@ -1,7 +1,7 @@
 /**
- * Pure rider evaluation: the one collector shared by every carrier (item, feature, feat, chosen option) and
- * every consumer (equipment reconciliation, attack, damage, saves). Callers flatten state into a plain
- * `RiderContext`; nothing here parses or evaluates a string (ADR-0008).
+ * Pure rider evaluation: the one collector shared by every carrier (item, feature, feat, chosen option, live
+ * effect) and every consumer (equipment reconciliation, attack, damage, saves, checks, speed). Callers flatten
+ * state into a plain `RiderContext`; nothing here parses or evaluates a string (ADR-0008).
  *
  * Types are structural because this leaf package cannot import `@vtt/schemas` or the content package; their
  * inferred Zod types are assignable to these.
@@ -17,27 +17,21 @@ export type RiderMoment =
   | "on-attack-roll"
   | "on-hit"
   | "on-critical-hit"
-  | "on-critical-miss"
   | "on-damage-roll"
   | "on-saving-throw"
   | "on-ability-check"
   | "on-initiative-roll"
-  | "on-death-save"
-  | "on-taking-damage"
-  | "on-spell-cast";
+  | "on-taking-damage";
 
 const MOMENTS: ReadonlySet<string> = new Set<RiderMoment>([
   "on-attack-roll",
   "on-hit",
   "on-critical-hit",
-  "on-critical-miss",
   "on-damage-roll",
   "on-saving-throw",
   "on-ability-check",
   "on-initiative-roll",
-  "on-death-save",
-  "on-taking-damage",
-  "on-spell-cast"
+  "on-taking-damage"
 ]);
 const FILTERS: ReadonlySet<string> = new Set([
   "attack-kind-is",
@@ -103,31 +97,43 @@ export type RiderModifier = Readonly<{
   /** `extra-damage` may name an ability instead of (or beside) dice: the bearer's modifier, resolved at the roll. */
   abilityModifier?: RiderAbility;
   damageType?: string;
+  /** `damage-resistance` / `damage-vulnerability`. */
+  damageTypes?: readonly string[];
   doubleOnCritical?: boolean;
-  roll?: "attack" | "incoming-attack" | "save" | "check" | "initiative" | "death-save" | "concentration";
+  roll?: "attack" | "incoming-attack" | "save" | "check" | "initiative" | "concentration";
   mode?: "advantage" | "disadvantage";
   classId?: string;
   level?: number;
   poolId?: string;
   threshold?: number;
   sense?: string;
-  appliesTo?: "melee" | "all";
   when?: readonly RiderTrigger[];
   scope?: "bearer" | "this-item";
 }>;
 
-/** One thing that carries riders: an equipped item, a feature, a feat. */
+/** One thing that carries riders: an equipped item, a feature, a feat, a live effect. */
 export type RiderCarrier = Readonly<{
-  /** What the table sees in a roll explanation ("Dagger of Warding"). */
+  /** What the table sees in a roll explanation ("Dagger of Warding", "Raging"). */
   label: string;
   modifiers: readonly RiderModifier[];
   /** Present for an item carrier; drives `scope: "this-item"` and the derivation's provenance. */
   sourceItemId?: string;
+  /** Present for a live effect, so a roll card can name the effect it came from. */
+  sourceEffectId?: string;
   /** Riders on a weapon default to `this-item` for the attack/damage/crit family. */
   isWeapon?: boolean;
+  /** SRD "Combining Game Effects": carriers sharing a key are one game effect, so `sumRiders` takes the most potent
+   * contribution instead of summing (two Slows are -10, not -20). */
+  stackKey?: string;
 }>;
 
-export type ResolvedRider = Readonly<{ modifier: RiderModifier; label: string; sourceItemId?: string }>;
+export type ResolvedRider = Readonly<{
+  modifier: RiderModifier;
+  label: string;
+  sourceItemId?: string;
+  sourceEffectId?: string;
+  stackKey?: string;
+}>;
 
 /** Everything a trigger can be evaluated against. Absent fields make their triggers fail closed. */
 export type RiderContext = Readonly<{
@@ -310,7 +316,9 @@ export function collectRiders(carriers: readonly RiderCarrier[], context: RiderC
       collected.push({
         modifier,
         label: carrier.label,
-        ...(carrier.sourceItemId !== undefined ? { sourceItemId: carrier.sourceItemId } : {})
+        ...(carrier.sourceItemId !== undefined ? { sourceItemId: carrier.sourceItemId } : {}),
+        ...(carrier.sourceEffectId !== undefined ? { sourceEffectId: carrier.sourceEffectId } : {}),
+        ...(carrier.stackKey !== undefined ? { stackKey: carrier.stackKey } : {})
       });
     }
   }
@@ -340,12 +348,31 @@ export function gatePasses(
   return collectRiders([carrier], { ...context, moment: null }).length > 0;
 }
 
-/** Sum the `amount` of every collected rider of one type. Signed, so a curse subtracts. */
+/** The more potent of two contributions from one game effect: the larger magnitude; on an opposite-sign tie the
+ *  minimum, so a boon can't displace a penalty. */
+function morePotent(held: number, candidate: number): number {
+  if (Math.abs(candidate) > Math.abs(held)) return candidate;
+  if (Math.abs(candidate) < Math.abs(held)) return held;
+  return Math.min(held, candidate);
+}
+
+/** Sum the `amount` of every collected rider of one type. Signed, so a curse subtracts. Riders sharing a
+ *  `stackKey` count once, at their most potent. */
 export function sumRiders(riders: readonly ResolvedRider[], type: string): number {
-  return riders.reduce(
-    (total, rider) => (rider.modifier.type === type ? total + (rider.modifier.amount ?? 0) : total),
-    0
-  );
+  let total = 0;
+  const stacked = new Map<string, number>();
+  for (const rider of riders) {
+    if (rider.modifier.type !== type) continue;
+    const amount = rider.modifier.amount ?? 0;
+    if (rider.stackKey === undefined) {
+      total += amount;
+      continue;
+    }
+    const held = stacked.get(rider.stackKey);
+    stacked.set(rider.stackKey, held === undefined ? amount : morePotent(held, amount));
+  }
+  for (const amount of stacked.values()) total += amount;
+  return total;
 }
 
 /** SRD armor weight from the item's AC fields: heavy adds no Dex, medium caps it at +2, light adds it uncapped. */

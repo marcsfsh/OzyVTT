@@ -13,7 +13,8 @@ import { generateCharacterRequest } from "../src/character-generate.js";
 import { ContentLibrary } from "../src/content-library.js";
 import { importActorDefinition } from "../src/actor-roster.js";
 import { actionPools, effectiveActions } from "../src/effective-actions.js";
-import { equipmentCatalogOf, isItemActionId } from "../src/equipment-derivation.js";
+import { equipmentCatalogOf } from "../src/equipment-derivation.js";
+import { isItemActionId } from "../src/item-actions.js";
 import { createServer } from "../src/server.js";
 
 // The random character generator, for twelve classes at levels 1, 5, 11 and 20 against the real

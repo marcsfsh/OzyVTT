@@ -2,7 +2,7 @@ import type { GameState } from "@vtt/domain";
 import { effectiveActions } from "../effective-actions.js";
 import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
-import { effectiveModeFor, overrideCovers, overrideReason } from "../rules-families.js";
+import { effectiveModeFor, overrideCovers, overrideReason, overrideWaives } from "../rules-families.js";
 import { builtinHandlerFor } from "./builtins.js";
 import type { DefinitionAction, LiveActor, ResolveContext, ResolveDependencies, ResolveInput } from "./context.js";
 import { planEconomy } from "./economy.js";
@@ -71,10 +71,10 @@ export function openResolve(
   // half/three-quarters add to AC and Dexterity saves.
   const coverMode = effectiveModeFor(state.combat, "cover.total");
   if (input.cover === "total" && coverMode !== "freeform") {
-    if (coverMode === "strict" && !input.override && !overrideCovers(state.combat.turn, "cover.total"))
+    const waived = overrideWaives(input.override, "cover.total");
+    if (coverMode === "strict" && !waived && !overrideCovers(state.combat.turn, "cover.total"))
       throw new RulesBlockedError("cover.total", "The target has Total Cover and can't be targeted directly.");
-    if (input.override && overridden === null)
-      overridden = { rule: "cover.total", reason: overrideReason(input.override) };
+    if (waived && overridden === null) overridden = { rule: "cover.total", reason: overrideReason(input.override) };
     else warnings.push("The target has Total Cover - allowed per the rules mode.");
   }
 

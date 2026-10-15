@@ -9,15 +9,16 @@ import {
 } from "./equipment-derivation.js";
 
 /** The action list every actor-scoped consumer must read instead of `definition.actions`: item-derived
- *  actions plus standing riders folded into the numbers the resolver reads. Nothing is written back.
- *  Moment-gated riders are collected on the roll path instead (the two sets are disjoint). */
+ *  actions plus standing riders (items, feats, features, live effects) folded into the numbers the resolver
+ *  reads. Nothing is written back. Moment-gated riders are collected on the roll path instead (the two sets
+ *  are disjoint). */
 export function effectiveActions(
   definition: ActorDefinition | undefined,
   actor: Actor | undefined,
   catalog: EquipmentCatalog | undefined
 ): readonly ActorAction[] {
   const base = definition?.actions ?? [];
-  if (!actor || !catalog) return base;
+  if (!actor) return base;
   const derivation = deriveEquipment(actor, definition, catalog);
   if (derivation.carriers.length === 0 && derivation.actions.length === 0) return base;
   return [...base, ...derivation.actions].map((action) => withStandingRiders(action, derivation, actor));

@@ -59,16 +59,32 @@ export function overrideCovers(turn: CombatState["turn"], rule: RuleId): boolean
   return turn.rulesOverriddenFamilies?.includes(familyOf(rule)) ?? false;
 }
 
+/** A GM override as a command carries it. `families` names the kinds of block it waives (an Allow names the one
+ *  the GM was asked about); absent, it is the GM's own ruling on the command and waives every block. */
+export type RulesOverride = Readonly<{ reason?: string; families?: readonly RuleFamily[] }>;
+
+/** Whether an override waives a block of this rule: only one of a family it names, so allowing one kind of block
+ *  never waves another through. */
+export function overrideWaives(override: RulesOverride | null | undefined, rule: RuleId): boolean {
+  if (!override) return false;
+  return override.families === undefined || override.families.includes(familyOf(rule));
+}
+
 /** Records a GM override so the family stops re-prompting for the rest of this turn. Cleared with `turn`
  *  on turn advance. */
-export function rememberOverride(state: GameState, rule: RuleId): void {
-  const family = familyOf(rule);
+export function rememberOverride(state: GameState, rule: RuleId, override?: RulesOverride | null): void {
   const existing = state.combat.turn.rulesOverriddenFamilies ?? [];
-  if (existing.includes(family)) return;
-  state.combat = { ...state.combat, turn: { ...state.combat.turn, rulesOverriddenFamilies: [...existing, family] } };
+  const families = [familyOf(rule), ...(override?.families ?? [])].filter(
+    (family, index, all) => !existing.includes(family) && all.indexOf(family) === index
+  );
+  if (families.length === 0) return;
+  state.combat = {
+    ...state.combat,
+    turn: { ...state.combat.turn, rulesOverriddenFamilies: [...existing, ...families] }
+  };
 }
 
 /** The audited reason for an override; optional, so an override is one tap. */
-export function overrideReason(override: Readonly<{ reason?: string }> | null | undefined): string {
+export function overrideReason(override: RulesOverride | null | undefined): string {
   return override?.reason?.trim() || "GM override";
 }

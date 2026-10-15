@@ -18,17 +18,11 @@ import {
   applyCondition,
   endConcentrationSustainedBy,
   endEffectsSustainedBy,
-  effectDamageDefenses,
   removeConditionDirect,
   type EffectNarration
 } from "./effects.js";
 import { choiceOverrideDefenses } from "./choice-overrides.js";
-import {
-  deriveEquipment,
-  EMPTY_DERIVATION,
-  type EquipmentCatalog,
-  type EquipmentDerivation
-} from "./equipment-derivation.js";
+import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 
 export function healthBandOf(hp: Actor["hp"]): HealthBand {
   if (hp.current <= 0) return "down";
@@ -148,19 +142,18 @@ export function applyDamageDetailed(
     // A rest-time re-choice replaces the build-time pick, so it both adds and subtracts defences.
     const fromChoices = choiceOverrideDefenses(definition, actor.choiceOverrides, deps?.catalog?.featureRecord);
     const innate = definitionDefenses(definition, fromChoices.suppressed);
-    const fromEffects = effectDamageDefenses(actor);
-    // Item grants are derived whole each time, so removing the ring removes the resistance on the next hit.
-    const fromItems = deps?.catalog ? deriveEquipment(actor, definition, deps.catalog) : EMPTY_DERIVATION;
-    const itemResistances = fromItems.damageResistances.map((entry) => entry.id);
-    const itemImmunities = fromItems.damageImmunities.map((entry) => entry.id);
-    const itemVulnerabilities = fromItems.damageVulnerabilities.map((entry) => entry.id);
-    const itemSourceOf = (type: string): string | null => {
-      const source =
-        fromItems.damageImmunities.find((entry) => entry.id.toLowerCase() === type) ??
-        fromItems.damageResistances.find((entry) => entry.id.toLowerCase() === type) ??
-        fromItems.damageVulnerabilities.find((entry) => entry.id.toLowerCase() === type);
-      if (!source) return null;
-      return fromItems.sources.find((row) => row.itemId === source.sourceItemId)?.itemName ?? source.sourceItemId;
+    // Effects, items, feats and features are derived whole each time, so removing the ring or ending the Rage
+    // removes the resistance on the next hit.
+    const derivation = deriveEquipment(actor, definition, deps?.catalog);
+    const ids = (list: EquipmentDerivation["damageResistances"]) => list.map((entry) => entry.id);
+    const derivedSourceOf = (adjustment: "resistance" | "immunity" | "vulnerability", type: string) => {
+      const list =
+        adjustment === "immunity"
+          ? derivation.damageImmunities
+          : adjustment === "vulnerability"
+            ? derivation.damageVulnerabilities
+            : derivation.damageResistances;
+      return list.find((entry) => entry.id === type)?.source ?? null;
     };
     // SRD Petrified: resistance to all damage + immunity to poison, on top of innate/effect defenses.
     const petrified = actor.conditions.some((condition) => condition.id === "petrified");
@@ -170,33 +163,31 @@ export function applyDamageDetailed(
       resistances: [
         ...innate.resistances,
         ...fromChoices.resistances,
-        ...fromEffects.resistances,
-        ...itemResistances,
+        ...ids(derivation.damageResistances),
         ...(underwater ? ["fire"] : [])
       ],
       immunities: [
         ...(petrified ? [...innate.immunities, "poison"] : innate.immunities),
         ...fromChoices.immunities,
-        ...itemImmunities
+        ...ids(derivation.damageImmunities)
       ],
       // Effects and items can make a target vulnerable as a stat block can; a same-type resistance cancels it.
-      vulnerabilities: [...innate.vulnerabilities, ...fromEffects.vulnerabilities, ...itemVulnerabilities],
+      vulnerabilities: [...innate.vulnerabilities, ...ids(derivation.damageVulnerabilities)],
       resistAll: petrified
     });
     parts = adjusted.map((part) => {
       const type = part.type.trim().toLowerCase();
-      const effectSource =
-        part.adjustment === "resistance" || part.adjustment === "vulnerability"
-          ? (fromEffects.sources.get(type) ?? null)
-          : null;
+      // The effect, item or feature's name on the damage line, so a halved hit explains itself.
+      const derivedSource = part.adjustment !== null ? derivedSourceOf(part.adjustment, type) : null;
       // Name the chosen feature on the line, as an effect or item names itself.
       const choiceSource =
-        part.adjustment !== null && effectSource === null ? (fromChoices.sources.get(type) ?? null) : null;
+        part.adjustment !== null && derivedSource === null ? (fromChoices.sources.get(type) ?? null) : null;
       const innateHas = (list: readonly string[]) => list.map((entry) => entry.toLowerCase()).includes(type);
       const petrifiedSource =
         petrified &&
         choiceSource === null &&
-        ((part.adjustment === "resistance" && !innateHas(innate.resistances) && effectSource === null) ||
+        derivedSource === null &&
+        ((part.adjustment === "resistance" && !innateHas(innate.resistances)) ||
           (part.adjustment === "immunity" && type === "poison" && !innateHas(innate.immunities)))
           ? "Petrified"
           : null;
@@ -205,31 +196,12 @@ export function applyDamageDetailed(
         part.adjustment === "resistance" &&
         type === "fire" &&
         !innateHas(innate.resistances) &&
-        effectSource === null &&
+        derivedSource === null &&
         petrifiedSource === null &&
         choiceSource === null
           ? "Underwater"
           : null;
-      // The item's name on the damage line, so a halved hit explains itself.
-      const innateList =
-        part.adjustment === "immunity"
-          ? innate.immunities
-          : part.adjustment === "vulnerability"
-            ? innate.vulnerabilities
-            : innate.resistances;
-      const itemSource =
-        part.adjustment !== null &&
-        effectSource === null &&
-        petrifiedSource === null &&
-        underwaterSource === null &&
-        choiceSource === null &&
-        !innateHas(innateList)
-          ? itemSourceOf(type)
-          : null;
-      return {
-        ...part,
-        adjustmentSource: effectSource ?? choiceSource ?? petrifiedSource ?? underwaterSource ?? itemSource
-      };
+      return { ...part, adjustmentSource: derivedSource ?? choiceSource ?? petrifiedSource ?? underwaterSource };
     });
     totalRequested = typed.reduce((sum, part) => sum + part.amount, 0);
     const afterDefenses = adjusted.reduce((sum, part) => sum + part.adjusted, 0);
@@ -237,7 +209,7 @@ export function applyDamageDetailed(
     flatReduction = Math.max(
       0,
       damageReductionFor(
-        fromItems,
+        derivation,
         adjusted.map((part) => normalizeDamageType(part.type))
       )
     );

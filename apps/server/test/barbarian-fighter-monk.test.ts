@@ -231,7 +231,7 @@ function onTheTable(definition: ActorDefinition, { fight = true } = {}): Built {
     ]
   }) as GameState;
   importActorDefinition(state, definition, IDS.hero, "public", catalog);
-  // The hero goes first: `attack-advantage` is gated to the bearer's own turn.
+  // The hero goes first, so its swings are on its own turn.
   if (fight)
     startEncounter(
       state,
@@ -398,9 +398,9 @@ describe("Barbarian: Reckless Attack is an effect the table can see and swing un
     use(built, "reckless-attack");
     const effect = built.hero.effects.find((entry) => entry.tags.includes("reckless-attack"))!;
     expect(effect).toBeDefined();
-    expect(effect.modifiers.map((modifier) => modifier.type)).toEqual([
-      "attack-advantage",
-      "incoming-attack-advantage"
+    expect(effect.modifiers).toEqual([
+      { type: "roll-mode", roll: "attack", mode: "advantage" },
+      { type: "roll-mode", roll: "incoming-attack", mode: "advantage" }
     ]);
     expect(effect.duration).toEqual({ type: "until-source-next-turn" });
 

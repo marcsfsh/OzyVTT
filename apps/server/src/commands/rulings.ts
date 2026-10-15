@@ -2,7 +2,15 @@ import type { PendingRuleAsk } from "@vtt/domain";
 import { requireActorAccess } from "../authorization.js";
 import { RulesAnswerSchema, RulesAskSchema } from "../game-commands.js";
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
-import { askRerunPayload, clearRuleAsk, findRuleAsk, parkRuleAsk, rerunPayload } from "../rule-asks.js";
+import {
+  allowCovers,
+  askRerunPayload,
+  clearRuleAsk,
+  findRuleAsk,
+  parkRuleAsk,
+  reaskRuleAsk,
+  rerunPayload
+} from "../rule-asks.js";
 import { familyOf, overrideReason } from "../rules-families.js";
 import { initiatorOf } from "./kit.js";
 import { defineCommand, type GameReply } from "./pipeline.js";
@@ -75,14 +83,43 @@ export const rulingCommands = [
     schema: RulesAnswerSchema,
     malformed: "The answer is malformed.",
     gmOnly: "Only the GM can answer a rules question.",
-    // Allow replays the parked command with an override before clearing the ask, so a failed replay leaves it
-    // parked; Deny clears it and tells the player.
+    // Allow replays the parked command with an override of the asked family before clearing the ask, so a
+    // failed replay leaves it parked; a block of another family re-asks rather than riding the same Allow.
+    // Deny clears it and tells the player.
     async run({ request, execute, dispatch }, kit) {
       const { askId, allow, reason } = request;
       const ask = findRuleAsk(kit.read(), askId);
       if (!ask) throw new CommandRejectedError("That question is no longer waiting - the fight moved on.");
       let ran: GameReply | undefined;
-      if (allow) ran = await dispatch(ask.command.type, rerunPayload(ask, reason));
+      let further: RulesBlockedError | undefined;
+      if (allow) {
+        try {
+          ran = await dispatch(ask.command.type, rerunPayload(ask, reason));
+        } catch (error) {
+          if (!(error instanceof RulesBlockedError)) throw error;
+          further = error;
+        }
+      }
+      if (further) {
+        const blocked = further;
+        if (allowCovers(ask, blocked.rule)) throw blocked;
+        await execute(
+          (state) => {
+            reaskRuleAsk(state, ask, blocked, kit.context.newId());
+          },
+          { actorId: ask.actorId }
+        );
+        kit.context.appendLog({
+          kind: "override",
+          text: `The GM allowed ${kit.actorName(ask.actorId)}'s blocked action, but it is also blocked by another rule (${blocked.rule}): ${blocked.message}`,
+          actorId: ask.actorId,
+          gmOnly: true
+        });
+        return {
+          allowed: true,
+          blocked: { rule: blocked.rule, message: blocked.message, overridable: blocked.overridable }
+        };
+      }
       const { duplicate } = await execute((state) => clearRuleAsk(state, askId), { actorId: ask.actorId });
       if (!duplicate) {
         const relaxed = ask.family === null ? "" : ` (${ask.family} checks relaxed for this turn)`;

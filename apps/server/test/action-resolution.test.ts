@@ -166,7 +166,13 @@ describe("definition action resolution", () => {
           endsWhenSourceDefeated: false,
           voidWhileIncapacitated: false,
           concentration: false,
-          modifiers: [{ type: "damage-bonus", amount: 2, appliesTo: "melee" }],
+          modifiers: [
+            {
+              type: "damage-bonus",
+              amount: 2,
+              when: [{ type: "on-damage-roll" }, { type: "attack-kind-is", kinds: ["melee"] }]
+            }
+          ],
           linkedConditionIds: [],
           escapeDc: null,
           onEnd: [],
