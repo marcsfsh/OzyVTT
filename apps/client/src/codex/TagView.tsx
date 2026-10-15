@@ -1,12 +1,12 @@
 import { useCallback, useMemo } from "react";
-import { Badge, Skeleton, VisibilityBadge } from "@vtt/ui";
+import { Badge, Skeleton } from "@vtt/ui";
 import type { CodexJournalPayload, CodexQuestStatus, PlayerCodexJournalPayload } from "@vtt/domain";
 import { codexApi, playerCodexApi } from "./api";
 import { chronicleRowSummary, type ChroniclePayloadRef } from "./chronicle";
 import { sessionTitle, type SessionRef } from "./sessions";
 import { QUEST_STATUS_LABEL, questStatusTone } from "./quests";
 import type { EntityType } from "./entities";
-import { CodexIcon, EntityIcon } from "./icons";
+import { RecordRow } from "./RecordRow";
 import { useCodexSearch } from "./SearchResults";
 import { atlasPath, journalEntryPath, pagePath, questPath, sessionPath } from "./routes";
 
@@ -98,16 +98,13 @@ export function TagView({
           <h4 className="codex-campaign-h">Pages</h4>
           <nav className="codex-campaign-recent" aria-label="Pages with this tag">
             {taggedPages.map((page) => (
-              <button
+              <RecordRow
                 key={page.id}
-                type="button"
-                className="codex-campaign-recentitem"
+                entityType={page.entityType}
+                title={page.title}
+                revealed={page.revealedToPlayers}
                 onClick={() => onNavigate(pagePath(page.id))}
-              >
-                <EntityIcon type={page.entityType} className="codex-campaign-recentglyph" />
-                <span className="codex-list-title">{page.title}</span>
-                {page.revealedToPlayers !== undefined && <VisibilityBadge revealed={page.revealedToPlayers} />}
-              </button>
+              />
             ))}
           </nav>
         </section>
@@ -118,16 +115,13 @@ export function TagView({
           <h4 className="codex-campaign-h">Maps</h4>
           <nav className="codex-campaign-recent" aria-label="Maps with this tag">
             {taggedMaps.map((map) => (
-              <button
+              <RecordRow
                 key={map.id}
-                type="button"
-                className="codex-campaign-recentitem"
+                iconId="compass"
+                title={map.name}
+                revealed={map.revealedToPlayers}
                 onClick={() => onNavigate(atlasPath(map.id))}
-              >
-                <CodexIcon iconId="compass" className="codex-ent-icon codex-campaign-recentglyph" />
-                <span className="codex-list-title">{map.name}</span>
-                {map.revealedToPlayers !== undefined && <VisibilityBadge revealed={map.revealedToPlayers} />}
-              </button>
+              />
             ))}
           </nav>
         </section>
@@ -148,15 +142,12 @@ export function TagView({
         {pins.length > 0 && (
           <nav className="codex-campaign-recent" aria-label="Pins with this tag">
             {pins.map((hit) => (
-              <button
+              <RecordRow
                 key={hit.id}
-                type="button"
-                className="codex-campaign-recentitem"
+                iconId="pin"
+                title={hit.title || "Unlabelled pin"}
                 onClick={() => onNavigate(atlasPath(hit.mapId, hit.id))}
-              >
-                <CodexIcon iconId="pin" className="codex-ent-icon codex-campaign-recentglyph" />
-                <span className="codex-list-title">{hit.title || "Unlabelled pin"}</span>
-              </button>
+              />
             ))}
           </nav>
         )}
@@ -172,16 +163,13 @@ export function TagView({
           <h4 className="codex-campaign-h">Journal entries</h4>
           <nav className="codex-campaign-recent" aria-label="Journal entries with this tag">
             {taggedRecords.map((record) => (
-              <button
+              <RecordRow
                 key={`${record.kind}-${record.id}`}
-                type="button"
-                className="codex-campaign-recentitem"
+                iconId="book"
+                title={chronicleRowSummary(record) || "Untitled entry"}
+                revealed={record.revealedToPlayers}
                 onClick={() => onNavigate(journalEntryPath(record.id))}
-              >
-                <CodexIcon iconId="book" className="codex-ent-icon codex-campaign-recentglyph" />
-                <span className="codex-list-title">{chronicleRowSummary(record) || "Untitled entry"}</span>
-                {record.revealedToPlayers !== undefined && <VisibilityBadge revealed={record.revealedToPlayers} />}
-              </button>
+              />
             ))}
           </nav>
         </section>
@@ -192,16 +180,13 @@ export function TagView({
           <h4 className="codex-campaign-h">Sessions</h4>
           <nav className="codex-campaign-recent" aria-label="Sessions with this tag">
             {taggedSessions.map((session) => (
-              <button
+              <RecordRow
                 key={session.id}
-                type="button"
-                className="codex-campaign-recentitem"
+                iconId="sessions"
+                title={sessionTitle(session)}
+                revealed={session.revealedToPlayers}
                 onClick={() => onNavigate(sessionPath(session.id))}
-              >
-                <CodexIcon iconId="sessions" className="codex-ent-icon codex-campaign-recentglyph" />
-                <span className="codex-list-title">{sessionTitle(session)}</span>
-                {session.revealedToPlayers !== undefined && <VisibilityBadge revealed={session.revealedToPlayers} />}
-              </button>
+              />
             ))}
           </nav>
         </section>
@@ -212,18 +197,16 @@ export function TagView({
           <h4 className="codex-campaign-h">Quests</h4>
           <nav className="codex-campaign-recent" aria-label="Quests with this tag">
             {taggedQuests.map((quest) => (
-              <button
+              <RecordRow
                 key={quest.id}
-                type="button"
-                className="codex-campaign-recentitem"
+                iconId="quest"
+                title={quest.title}
+                revealed={quest.revealedToPlayers}
                 onClick={() => onNavigate(questPath(quest.id))}
               >
-                <CodexIcon iconId="quest" className="codex-ent-icon codex-campaign-recentglyph" />
-                <span className="codex-list-title">{quest.title}</span>
                 {/* The status label, never the wire value. */}
                 <Badge tone={questStatusTone(quest.status)}>{QUEST_STATUS_LABEL[quest.status]}</Badge>
-                {quest.revealedToPlayers !== undefined && <VisibilityBadge revealed={quest.revealedToPlayers} />}
-              </button>
+              </RecordRow>
             ))}
           </nav>
         </section>

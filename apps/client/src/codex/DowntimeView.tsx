@@ -14,6 +14,7 @@ import { journalApi } from "./api";
 import { ARCHIVED_META, charactersFor, type ArchivableActor } from "./characters";
 import { deadlinesPassedBy, downtimeOf, downtimeProposedDate, downtimeSummaryLabel } from "./chronicle";
 import { CodexEditor } from "./CodexEditor";
+import { RecordRow } from "./RecordRow";
 import { CodexIcon, EntityIcon } from "./icons";
 import { newId } from "../lib/ids";
 
@@ -396,9 +397,12 @@ export function DowntimeView({
                   </div>
                 ) : (
                   <>
-                    <button type="button" className="codex-campaign-recentitem" onClick={() => onOpenEntry(record.id)}>
-                      <CodexIcon iconId="campfire" className="codex-ent-icon codex-campaign-recentglyph" />
-                      <span className="codex-list-title">{downtimeSummaryLabel(payload)}</span>
+                    <RecordRow
+                      iconId="campfire"
+                      title={downtimeSummaryLabel(payload)}
+                      when={record.inWorldLabel ?? record.realDate}
+                      onClick={() => onOpenEntry(record.id)}
+                    >
                       {payload.characterPageId ? (
                         <Badge tone="info">{pageTitle(payload.characterPageId) ?? "Linked"}</Badge>
                       ) : (
@@ -409,8 +413,7 @@ export function DowntimeView({
                       ) : (
                         <Badge tone="caution">Pending</Badge>
                       )}
-                      <span className="codex-campaign-recentwhen">{record.inWorldLabel ?? record.realDate ?? ""}</span>
-                    </button>
+                    </RecordRow>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -479,11 +482,12 @@ export function PlayerDowntimeView({
         <ul className="codex-downtime-history">
           {rows.map(({ record, payload }) => (
             <li key={record.id} className="codex-downtime-historyrow">
-              <button type="button" className="codex-campaign-recentitem" onClick={() => onOpenEntry(record.id)}>
-                <CodexIcon iconId="campfire" className="codex-ent-icon codex-campaign-recentglyph" />
-                <span className="codex-list-title">{downtimeSummaryLabel(payload)}</span>
-                <span className="codex-campaign-recentwhen">{record.inWorldLabel ?? record.realDate ?? ""}</span>
-              </button>
+              <RecordRow
+                iconId="campfire"
+                title={downtimeSummaryLabel(payload)}
+                when={record.inWorldLabel ?? record.realDate}
+                onClick={() => onOpenEntry(record.id)}
+              />
             </li>
           ))}
         </ul>

@@ -1,19 +1,18 @@
-import { useMemo, useState } from "react";
-import { Alert, Badge, Button, GmOnlyTag, IconChevron, Input, Skeleton } from "@vtt/ui";
+import { useState } from "react";
+import { Alert, Badge, Button, GmOnlyTag, Input, Skeleton } from "@vtt/ui";
 import {
-  calendarDaysPerYear,
   dateToInstant,
   formatWorldDate,
   formatWorldYear,
-  type CodexCalendarEra,
+  type CodexCalendar,
   type CodexChronicleRecord,
-  type CodexInWorldDate,
   type GmCodexCalendar
 } from "@vtt/domain";
 import { calendarApi } from "./api";
 import { CHRONICLE_KIND_META, chronicleRowSummary, sameInWorldDate } from "./chronicle";
 import { CalendarEditor, CampaignDateEditor } from "./CalendarEditor";
-import { CodexIcon } from "./icons";
+import { MonthBar, MonthGrid, useMonthView } from "./MonthGrid";
+import { RecordRow } from "./RecordRow";
 
 /**
  * The Calendar section: a lens over the chronicle. Records are placed by the server's `calendarInstant`;
@@ -55,58 +54,18 @@ export function CalendarView({
   /** The GM's clock editor, separate from the world's structure. */
   const [dateOpen, setDateOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
-  const [selectedInstant, setSelectedInstant] = useState<number | null>(null);
   const [publishError, setPublishError] = useState<string | null>(null);
 
   const now = calendar?.currentDate ?? null;
   const published = calendar?.publishedDate ?? null;
-  const monthCount = calendar?.months.length ?? 0;
   // The URL wins, else the GM's clock, else the first month of year 0.
-  const viewYear = year !== null && Number.isFinite(Number(year)) ? Math.trunc(Number(year)) : (now?.year ?? 0);
-  const viewMonth =
-    month !== null && Number.isFinite(Number(month))
-      ? Math.max(0, Math.min(Math.trunc(Number(month)), Math.max(0, monthCount - 1)))
-      : (now?.month ?? 0);
-
-  const grid = useMemo(() => {
-    if (!calendar || calendar.months.length === 0) return null;
-    const monthDef = calendar.months[Math.min(viewMonth, calendar.months.length - 1)];
-    const weekdays = calendar.weekdays.length > 0 ? calendar.weekdays : ["Day"];
-    const firstInstant = dateToInstant(calendar, { year: viewYear, month: viewMonth, day: 1 });
-    // The week runs continuously from instant 0, so the first weekday is arithmetic. Normalize the modulo
-    // so negative years don't skew the grid.
-    const lead = ((firstInstant % weekdays.length) + weekdays.length) % weekdays.length;
-    const days = Array.from({ length: monthDef.days }, (_, index) => ({
-      day: index + 1,
-      instant: firstInstant + index
-    }));
-    return { monthDef, weekdays, lead, days };
-  }, [calendar, viewYear, viewMonth]);
-
-  /** Every dated record, bucketed by the server's instant. */
-  const byInstant = useMemo(() => {
-    const map = new Map<number, CodexChronicleRecord[]>();
-    for (const record of records) {
-      if (record.calendarInstant === null) continue;
-      const bucket = map.get(record.calendarInstant) ?? [];
-      bucket.push(record);
-      map.set(record.calendarInstant, bucket);
-    }
-    return map;
-  }, [records]);
+  const { viewYear, viewMonth, grid, byInstant, step, selectedInstant, setSelectedInstant, selectedRecords } =
+    useMonthView(calendar, records, { year, month }, now, onMonthChange);
 
   const nowInstant = calendar && now ? dateToInstant(calendar, now) : null;
   const publishedInstant = calendar && published ? dateToInstant(calendar, published) : null;
   const diverged = !sameInWorldDate(now, published);
 
-  const step = (delta: number) => {
-    if (!calendar || calendar.months.length === 0) return;
-    const total = viewYear * calendar.months.length + viewMonth + delta;
-    const nextYear = Math.floor(total / calendar.months.length);
-    const nextMonth = ((total % calendar.months.length) + calendar.months.length) % calendar.months.length;
-    setSelectedInstant(null);
-    onMonthChange(nextYear, nextMonth);
-  };
   const publish = async () => {
     setPublishing(true);
     setPublishError(null);
@@ -157,8 +116,6 @@ export function CalendarView({
     );
   }
 
-  const selectedRecords = selectedInstant === null ? [] : (byInstant.get(selectedInstant) ?? []);
-
   return (
     <div className="codex-calendar">
       <header className="codex-calendar-clocks">
@@ -199,16 +156,7 @@ export function CalendarView({
       </p>
       {publishError && <Alert tone="danger">{publishError}</Alert>}
 
-      <div className="codex-calendar-monthbar">
-        <Button variant="ghost" size="sm" aria-label="Previous month" onClick={() => step(-1)}>
-          <IconChevron className="codex-chevron-left" />
-        </Button>
-        <h3 className="codex-calendar-monthname">
-          {grid.monthDef.name} {formatWorldYear(calendar, viewYear)}
-        </h3>
-        <Button variant="ghost" size="sm" aria-label="Next month" onClick={() => step(1)}>
-          <IconChevron className="codex-chevron-right" />
-        </Button>
+      <MonthBar title={grid.title} onStep={step}>
         <label className="codex-calendar-yearjump">
           <span className="nh-sr-only">Jump to year</span>
           <Input
@@ -222,55 +170,18 @@ export function CalendarView({
             }}
           />
         </label>
-      </div>
+      </MonthBar>
 
-      <div
-        className="codex-calendar-grid"
-        role="grid"
-        aria-label={`${grid.monthDef.name} ${formatWorldYear(calendar, viewYear)}`}
-        style={{ "--codex-week": String(grid.weekdays.length) } as React.CSSProperties}
-      >
-        {grid.weekdays.map((weekday) => (
-          <div key={weekday} className="codex-calendar-weekday" role="columnheader">
-            <span className="codex-calendar-weekdayfull">{weekday}</span>
-            <span className="codex-calendar-weekdayshort" aria-hidden="true">
-              {weekday.slice(0, 2)}
-            </span>
-          </div>
-        ))}
-        {Array.from({ length: grid.lead }, (_, index) => (
-          <div key={`lead-${index}`} className="codex-calendar-cell is-blank" aria-hidden="true" />
-        ))}
-        {grid.days.map(({ day, instant }) => {
-          const dayRecords = byInstant.get(instant) ?? [];
-          const isNow = nowInstant === instant;
-          const isPublished = publishedInstant === instant;
-          const kinds = [...new Set(dayRecords.map((record) => record.kind))].slice(0, 3);
-          return (
-            /* The cell is the tap target; ::after boxes would overlap across the grid. */
-            <button
-              key={instant}
-              type="button"
-              className={`codex-calendar-cell${isNow ? " is-now" : ""}${isPublished ? " is-published" : ""}${selectedInstant === instant ? " is-selected" : ""}`}
-              aria-pressed={selectedInstant === instant}
-              aria-label={`${grid.monthDef.name} ${day}${dayRecords.length ? `, ${dayRecords.length} record${dayRecords.length === 1 ? "" : "s"}` : ""}${isNow ? ", your date" : ""}${isPublished ? ", players' date" : ""}`}
-              onClick={() => setSelectedInstant(selectedInstant === instant ? null : instant)}
-            >
-              <span className="codex-calendar-daynum">{day}</span>
-              {kinds.length > 0 && (
-                <span className="codex-calendar-marks" aria-hidden="true">
-                  {kinds.map((kind) => (
-                    <CodexIcon key={kind} iconId={CHRONICLE_KIND_META[kind].iconId} className="codex-calendar-mark" />
-                  ))}
-                  {dayRecords.length > kinds.length && (
-                    <span className="codex-calendar-more">+{dayRecords.length - kinds.length}</span>
-                  )}
-                </span>
-              )}
-            </button>
-          );
+      <MonthGrid
+        grid={grid}
+        byInstant={byInstant}
+        selectedInstant={selectedInstant}
+        onSelect={setSelectedInstant}
+        marks={(instant) => ({
+          className: `${nowInstant === instant ? " is-now" : ""}${publishedInstant === instant ? " is-published" : ""}`,
+          label: `${nowInstant === instant ? ", your date" : ""}${publishedInstant === instant ? ", players' date" : ""}`
         })}
-      </div>
+      />
 
       {selectedInstant !== null && (
         <section className="codex-calendar-day" aria-label="Records on this day">
@@ -286,18 +197,14 @@ export function CalendarView({
               {selectedRecords.map((record) => {
                 const meta = CHRONICLE_KIND_META[record.kind];
                 return (
-                  <button
+                  <RecordRow
                     key={`${record.kind}-${record.id}`}
-                    type="button"
-                    className="codex-campaign-recentitem"
+                    iconId={meta.iconId}
+                    title={record.title ?? chronicleRowSummary(record) ?? meta.label}
                     onClick={() => (record.kind === "event" ? onOpenPage(record.id) : onOpenEntry(record.id))}
                   >
-                    <CodexIcon iconId={meta.iconId} className="codex-ent-icon codex-campaign-recentglyph" />
-                    <span className="codex-list-title">
-                      {record.title ?? chronicleRowSummary(record) ?? meta.label}
-                    </span>
                     <Badge tone={meta.tone}>{meta.label}</Badge>
-                  </button>
+                  </RecordRow>
                 );
               })}
             </nav>
@@ -340,13 +247,7 @@ export function PlayerCalendarView({
   onMonthChange,
   onOpenEntry
 }: Readonly<{
-  calendar: Readonly<{
-    yearName: string;
-    eras?: readonly CodexCalendarEra[];
-    months: readonly Readonly<{ name: string; days: number }>[];
-    weekdays: readonly string[];
-    currentDate?: CodexInWorldDate | null;
-  }> | null;
+  calendar: CodexCalendar | null;
   records: ReadonlyArray<
     Readonly<{
       id: string;
@@ -361,39 +262,14 @@ export function PlayerCalendarView({
   onMonthChange: (year: number, month: number) => void;
   onOpenEntry: (entryId: string) => void;
 }>) {
-  const [selectedInstant, setSelectedInstant] = useState<number | null>(null);
   const today = calendar?.currentDate ?? null;
-  const monthCount = calendar?.months.length ?? 0;
-  const viewYear = year !== null && Number.isFinite(Number(year)) ? Math.trunc(Number(year)) : (today?.year ?? 0);
-  const viewMonth =
-    month !== null && Number.isFinite(Number(month))
-      ? Math.max(0, Math.min(Math.trunc(Number(month)), Math.max(0, monthCount - 1)))
-      : (today?.month ?? 0);
-
-  const grid = useMemo(() => {
-    if (!calendar || calendar.months.length === 0 || calendarDaysPerYear(calendar) === 0) return null;
-    const monthDef = calendar.months[Math.min(viewMonth, calendar.months.length - 1)];
-    const weekdays = calendar.weekdays.length > 0 ? calendar.weekdays : ["Day"];
-    const firstInstant = dateToInstant(calendar, { year: viewYear, month: viewMonth, day: 1 });
-    const lead = ((firstInstant % weekdays.length) + weekdays.length) % weekdays.length;
-    return {
-      monthDef,
-      weekdays,
-      lead,
-      days: Array.from({ length: monthDef.days }, (_, index) => ({ day: index + 1, instant: firstInstant + index }))
-    };
-  }, [calendar, viewYear, viewMonth]);
-
-  const byInstant = useMemo(() => {
-    const map = new Map<number, (typeof records)[number][]>();
-    for (const record of records) {
-      if (record.calendarInstant === null) continue;
-      const bucket = map.get(record.calendarInstant) ?? [];
-      bucket.push(record);
-      map.set(record.calendarInstant, bucket);
-    }
-    return map;
-  }, [records]);
+  const { grid, byInstant, step, selectedInstant, setSelectedInstant, selectedRecords } = useMonthView(
+    calendar,
+    records,
+    { year, month },
+    today,
+    onMonthChange
+  );
 
   if (!calendar || !grid)
     return (
@@ -403,15 +279,6 @@ export function PlayerCalendarView({
       </div>
     );
   const todayInstant = today ? dateToInstant(calendar, today) : null;
-  const step = (delta: number) => {
-    const total = viewYear * calendar.months.length + viewMonth + delta;
-    setSelectedInstant(null);
-    onMonthChange(
-      Math.floor(total / calendar.months.length),
-      ((total % calendar.months.length) + calendar.months.length) % calendar.months.length
-    );
-  };
-  const selectedRecords = selectedInstant === null ? [] : (byInstant.get(selectedInstant) ?? []);
 
   return (
     <div className="codex-calendar">
@@ -421,61 +288,17 @@ export function PlayerCalendarView({
           <strong>{today ? formatWorldDate(calendar, today) : "Not shared yet"}</strong>
         </div>
       </header>
-      <div className="codex-calendar-monthbar">
-        <Button variant="ghost" size="sm" aria-label="Previous month" onClick={() => step(-1)}>
-          <IconChevron className="codex-chevron-left" />
-        </Button>
-        <h3 className="codex-calendar-monthname">
-          {grid.monthDef.name} {formatWorldYear(calendar, viewYear)}
-        </h3>
-        <Button variant="ghost" size="sm" aria-label="Next month" onClick={() => step(1)}>
-          <IconChevron className="codex-chevron-right" />
-        </Button>
-      </div>
-      <div
-        className="codex-calendar-grid"
-        role="grid"
-        aria-label={`${grid.monthDef.name} ${formatWorldYear(calendar, viewYear)}`}
-        style={{ "--codex-week": String(grid.weekdays.length) } as React.CSSProperties}
-      >
-        {grid.weekdays.map((weekday) => (
-          <div key={weekday} className="codex-calendar-weekday" role="columnheader">
-            <span className="codex-calendar-weekdayfull">{weekday}</span>
-            <span className="codex-calendar-weekdayshort" aria-hidden="true">
-              {weekday.slice(0, 2)}
-            </span>
-          </div>
-        ))}
-        {Array.from({ length: grid.lead }, (_, index) => (
-          <div key={`lead-${index}`} className="codex-calendar-cell is-blank" aria-hidden="true" />
-        ))}
-        {grid.days.map(({ day, instant }) => {
-          const dayRecords = byInstant.get(instant) ?? [];
-          const kinds = [...new Set(dayRecords.map((record) => record.kind))].slice(0, 3);
-          return (
-            <button
-              key={instant}
-              type="button"
-              className={`codex-calendar-cell${todayInstant === instant ? " is-published" : ""}${selectedInstant === instant ? " is-selected" : ""}`}
-              aria-pressed={selectedInstant === instant}
-              aria-label={`${grid.monthDef.name} ${day}${dayRecords.length ? `, ${dayRecords.length} record${dayRecords.length === 1 ? "" : "s"}` : ""}${todayInstant === instant ? ", today" : ""}`}
-              onClick={() => setSelectedInstant(selectedInstant === instant ? null : instant)}
-            >
-              <span className="codex-calendar-daynum">{day}</span>
-              {kinds.length > 0 && (
-                <span className="codex-calendar-marks" aria-hidden="true">
-                  {kinds.map((kind) => (
-                    <CodexIcon key={kind} iconId={CHRONICLE_KIND_META[kind].iconId} className="codex-calendar-mark" />
-                  ))}
-                  {dayRecords.length > kinds.length && (
-                    <span className="codex-calendar-more">+{dayRecords.length - kinds.length}</span>
-                  )}
-                </span>
-              )}
-            </button>
-          );
+      <MonthBar title={grid.title} onStep={step} />
+      <MonthGrid
+        grid={grid}
+        byInstant={byInstant}
+        selectedInstant={selectedInstant}
+        onSelect={setSelectedInstant}
+        marks={(instant) => ({
+          className: todayInstant === instant ? " is-published" : "",
+          label: todayInstant === instant ? ", today" : ""
         })}
-      </div>
+      />
       {selectedInstant !== null && (
         <section className="codex-calendar-day" aria-label="Records on this day">
           {selectedRecords.length === 0 ? (
@@ -485,16 +308,14 @@ export function PlayerCalendarView({
               {selectedRecords.map((record) => {
                 const meta = CHRONICLE_KIND_META[record.kind];
                 return (
-                  <button
+                  <RecordRow
                     key={`${record.kind}-${record.id}`}
-                    type="button"
-                    className="codex-campaign-recentitem"
+                    iconId={meta.iconId}
+                    title={record.title ?? record.text ?? meta.label}
                     onClick={() => onOpenEntry(record.id)}
                   >
-                    <CodexIcon iconId={meta.iconId} className="codex-ent-icon codex-campaign-recentglyph" />
-                    <span className="codex-list-title">{record.title ?? record.text ?? meta.label}</span>
                     <Badge tone={meta.tone}>{meta.label}</Badge>
-                  </button>
+                  </RecordRow>
                 );
               })}
             </nav>

@@ -1,22 +1,11 @@
-import { useMemo, useState } from "react";
-import { Alert, Badge, Button, Checklist, Meter, Skeleton, VisibilityBadge, type ChecklistItem } from "@vtt/ui";
-import { CodexIcon, EntityIcon } from "./icons";
-import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityColor, type EntityType } from "./entities";
-import { sessionTitle } from "./sessions";
-import { openQuests, questProgress } from "./quests";
-import {
-  CHRONICLE_KIND_META,
-  STANDING_METER_MAX,
-  deadlineStateLabel,
-  deadlineStateTone,
-  standingLabel,
-  standingMeterTone,
-  standingMeterValue,
-  standingTone,
-  standingValueLabel
-} from "./chronicle";
-import { DashCard } from "./DashCard";
+import { useMemo } from "react";
+import { Alert, Badge, Button, Skeleton, type ChecklistItem } from "@vtt/ui";
 import type { CodexChronicleKind, CodexQuestStatus } from "@vtt/domain";
+import type { EntityType } from "./entities";
+import { CHRONICLE_KIND_META, deadlineStateLabel, deadlineStateTone } from "./chronicle";
+import { DashCard } from "./DashCard";
+import { KindsCard, PartyCard, QuestsCard, SessionCard, StandingCard, TagsCard } from "./CampaignCards";
+import { RecordRow } from "./RecordRow";
 
 /**
  * Home: every card is a `DashCard` (heading, bounded body, empty state, link to the full section).
@@ -150,11 +139,6 @@ export function CampaignHome({
   loading?: boolean;
   error?: string | null;
 }>) {
-  const byType = useMemo(() => {
-    const counts = {} as Record<EntityType, number>;
-    for (const page of pages) counts[page.entityType] = (counts[page.entityType] ?? 0) + 1;
-    return counts;
-  }, [pages]);
   const tags = useMemo(() => {
     const counts = new Map<string, number>();
     for (const page of pages) for (const tag of page.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
@@ -162,17 +146,11 @@ export function CampaignHome({
   }, [pages]);
   const recent = useMemo(() => [...pages].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 10), [pages]);
   const revealed = useMemo(() => pages.filter((page) => page.revealedToPlayers).length, [pages]);
-  const recentEntries = useMemo(() => entries.slice(0, 5), [entries]);
-  const openQuestList = useMemo(() => openQuests(quests).slice(0, 5), [quests]);
-  const deadlineList = useMemo(() => deadlines.slice(0, 5), [deadlines]);
-  const downtimeList = useMemo(() => downtimePending.slice(0, 5), [downtimePending]);
-  /** Bounded to five rows, strongest first; "See all" expands in place because Adjust only exists here. */
-  const standingSorted = useMemo(
-    () => [...standing].sort((a, b) => Math.abs(b.value) - Math.abs(a.value) || a.name.localeCompare(b.name)),
-    [standing]
-  );
-  const [standingLimit, setStandingLimit] = useStandingLimit(standingSorted.length);
-  const standingList = standingSorted.slice(0, standingLimit);
+  const recentEntries = entries.slice(0, 5);
+  const deadlineList = deadlines.slice(0, 5);
+  const downtimeList = downtimePending.slice(0, 5);
+  /** A row's reveal badge, for the GM only. */
+  const shown = (value: boolean | undefined) => (showReveal ? value : undefined);
 
   const nothingYet =
     pages.length === 0 &&
@@ -262,57 +240,17 @@ export function CampaignHome({
       <div className="codex-dashgrid">
         {/* 1. Where this campaign is right now. */}
         {session && (
-          <DashCard
-            title={session.heading ?? (onOpenSession ? "Next session" : "Latest recap")}
-            iconId="sessions"
-            seeAll={
-              onSeeAll && onOpenSession ? { label: "See all sessions", onClick: () => onSeeAll("sessions") } : undefined
-            }
-          >
-            <nav className="codex-campaign-recent" aria-label={session.heading ?? "Session"}>
-              {onOpenSession ? (
-                <button type="button" className="codex-campaign-recentitem" onClick={() => onOpenSession(session.id)}>
-                  <CodexIcon iconId="sessions" className="codex-ent-icon codex-campaign-recentglyph" />
-                  <span className="codex-list-title">{sessionTitle(session)}</span>
-                  {/* Every row naming a record states its reveal state; player callers omit the field. */}
-                  {showReveal && session.revealed !== undefined && <VisibilityBadge revealed={session.revealed} />}
-                  {session.realDate && <span className="codex-campaign-recentwhen">{session.realDate}</span>}
-                </button>
-              ) : (
-                <div className="codex-campaign-sessionrow">
-                  <CodexIcon iconId="sessions" className="codex-ent-icon codex-campaign-recentglyph" />
-                  <span className="codex-list-title">{sessionTitle(session)}</span>
-                  {showReveal && session.revealed !== undefined && <VisibilityBadge revealed={session.revealed} />}
-                  {session.realDate && <span className="codex-campaign-recentwhen">{session.realDate}</span>}
-                </div>
-              )}
-            </nav>
-            {session.recap.trim() && <p className="codex-campaign-sessionrecap">{session.recap}</p>}
-          </DashCard>
+          <SessionCard
+            session={session}
+            showReveal={showReveal}
+            onOpenSession={onOpenSession}
+            onSeeAll={onSeeAll && (() => onSeeAll("sessions"))}
+          />
         )}
 
-        {/* 2. Where the party is: only when a pin exists and the reader may see it. */}
-        {party && (
-          <DashCard title="Party location" iconId="pin">
-            <p className="codex-campaign-partyline">
-              The party is at <strong>{party.label?.trim() || "an unlabelled pin"}</strong> on{" "}
-              <strong>{party.mapName}</strong>.
-            </p>
-            {/* The pin's own state; the map's switch lives in the Atlas with it. */}
-            {showReveal && party.revealed !== undefined && (
-              <p className="codex-campaign-partyreveal">
-                <VisibilityBadge revealed={party.revealed} />
-              </p>
-            )}
-            {onOpenParty && (
-              <Button variant="secondary" size="sm" onClick={() => onOpenParty(party.mapId, party.markerId)}>
-                Show the pin
-              </Button>
-            )}
-          </DashCard>
-        )}
+        {/* 2. Where the party is. The GM's empty state links to the Atlas, where pins are placed. */}
+        {party && <PartyCard party={party} showReveal={showReveal} onOpenParty={onOpenParty} />}
         {!party && showReveal && (
-          /* The empty state links to the Atlas, where pins are placed. */
           <DashCard
             title="Party location"
             iconId="pin"
@@ -322,47 +260,12 @@ export function CampaignHome({
         )}
 
         {/* 3. Open quests. */}
-        <DashCard
-          title="Open quests"
-          iconId="quest"
-          count={{ shown: openQuestList.length, total: openQuests(quests).length }}
-          seeAll={onSeeAll ? { label: "See all quests", onClick: () => onSeeAll("quests") } : undefined}
-          empty="No open quests."
-        >
-          {openQuestList.length > 0 ? (
-            <nav className="codex-campaign-recent" aria-label="Open quests">
-              {openQuestList.map((quest) => {
-                const progress = questProgress(quest.objectives);
-                return (
-                  <div key={quest.id} className="codex-campaign-quest">
-                    {onOpenQuest ? (
-                      <button type="button" className="codex-campaign-recentitem" onClick={() => onOpenQuest(quest.id)}>
-                        <CodexIcon iconId="quest" className="codex-ent-icon codex-campaign-recentglyph" />
-                        <span className="codex-list-title">{quest.title}</span>
-                        {progress.total > 0 && <span className="codex-campaign-questprogress">{progress.label}</span>}
-                        {showReveal && quest.revealed !== undefined && <VisibilityBadge revealed={quest.revealed} />}
-                      </button>
-                    ) : (
-                      <div className="codex-campaign-questrow">
-                        <CodexIcon iconId="quest" className="codex-ent-icon codex-campaign-recentglyph" />
-                        <span className="codex-list-title">{quest.title}</span>
-                        {progress.total > 0 && <span className="codex-campaign-questprogress">{progress.label}</span>}
-                      </div>
-                    )}
-                    {/* Read-only for both audiences: no `onChange`, no checkbox. */}
-                    {quest.objectives.length > 0 && (
-                      <Checklist
-                        items={quest.objectives}
-                        ariaLabel={`Objectives for ${quest.title}`}
-                        className="codex-campaign-questlist"
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </nav>
-          ) : null}
-        </DashCard>
+        <QuestsCard
+          quests={quests}
+          showReveal={showReveal}
+          onOpenQuest={onOpenQuest}
+          onSeeAll={onSeeAll && (() => onSeeAll("quests"))}
+        />
 
         {/* 4. Deadlines, passed ones kept. */}
         <DashCard
@@ -375,21 +278,17 @@ export function CampaignHome({
           {deadlineList.length > 0 ? (
             <nav className="codex-campaign-recent" aria-label="Deadlines">
               {deadlineList.map((deadline) => (
-                <button
+                <RecordRow
                   key={deadline.id}
-                  type="button"
-                  className="codex-campaign-recentitem"
+                  iconId={CHRONICLE_KIND_META.deadline.iconId}
+                  title={deadline.summary || "Untitled deadline"}
+                  revealed={shown(deadline.revealed)}
+                  when={deadline.when}
+                  whenClassName="codex-campaign-deadlinewhen"
                   onClick={() => onOpenEntry(deadline.id)}
                 >
-                  <CodexIcon
-                    iconId={CHRONICLE_KIND_META.deadline.iconId}
-                    className="codex-ent-icon codex-campaign-recentglyph"
-                  />
-                  <span className="codex-list-title">{deadline.summary || "Untitled deadline"}</span>
                   <Badge tone={deadlineStateTone(deadline.fired)}>{deadlineStateLabel(deadline.fired)}</Badge>
-                  {showReveal && deadline.revealed !== undefined && <VisibilityBadge revealed={deadline.revealed} />}
-                  {deadline.when && <span className="codex-campaign-deadlinewhen">{deadline.when}</span>}
-                </button>
+                </RecordRow>
               ))}
             </nav>
           ) : null}
@@ -407,20 +306,14 @@ export function CampaignHome({
             {downtimeList.length > 0 ? (
               <nav className="codex-campaign-recent" aria-label="Downtime pending">
                 {downtimeList.map((row) => (
-                  <button
+                  <RecordRow
                     key={row.id}
-                    type="button"
-                    className="codex-campaign-recentitem"
+                    iconId="campfire"
+                    title={`${row.who || "Someone"} · ${row.days} ${row.days === 1 ? "day" : "days"}${row.activity ? `: ${row.activity}` : ""}`}
+                    revealed={shown(row.revealed)}
+                    when={row.when}
                     onClick={() => onOpenEntry(row.id)}
-                  >
-                    <CodexIcon iconId="campfire" className="codex-ent-icon codex-campaign-recentglyph" />
-                    <span className="codex-list-title">
-                      {row.who || "Someone"} · {row.days} {row.days === 1 ? "day" : "days"}
-                      {row.activity ? `: ${row.activity}` : ""}
-                    </span>
-                    {showReveal && row.revealed !== undefined && <VisibilityBadge revealed={row.revealed} />}
-                    {row.when && <span className="codex-campaign-recentwhen">{row.when}</span>}
-                  </button>
+                  />
                 ))}
               </nav>
             ) : null}
@@ -440,18 +333,16 @@ export function CampaignHome({
               {recentEntries.map((entry) => {
                 const meta = CHRONICLE_KIND_META[entry.kind];
                 return (
-                  <button
+                  <RecordRow
                     key={entry.id}
-                    type="button"
-                    className="codex-campaign-recentitem"
+                    iconId={meta.iconId}
+                    title={entry.summary || "Untitled entry"}
+                    revealed={shown(entry.revealed)}
+                    when={entry.when}
                     onClick={() => onOpenEntry(entry.id)}
                   >
-                    <CodexIcon iconId={meta.iconId} className="codex-ent-icon codex-campaign-recentglyph" />
-                    <span className="codex-list-title">{entry.summary || "Untitled entry"}</span>
                     {entry.kind !== "entry" && <Badge tone={meta.tone}>{meta.label}</Badge>}
-                    {showReveal && entry.revealed !== undefined && <VisibilityBadge revealed={entry.revealed} />}
-                    {entry.when && <span className="codex-campaign-recentwhen">{entry.when}</span>}
-                  </button>
+                  </RecordRow>
                 );
               })}
             </nav>
@@ -459,89 +350,15 @@ export function CampaignHome({
         </DashCard>
 
         {/* 7. Faction standing, expanding in place (Adjust lives only here). */}
-        {standingSorted.length > 0 && (
-          <DashCard
-            title="Faction standing"
-            iconId={CHRONICLE_KIND_META.standing.iconId}
-            count={{ shown: standingList.length, total: standingSorted.length }}
-            seeAll={
-              standingSorted.length > standingList.length
-                ? {
-                    label: `See all ${standingSorted.length} factions`,
-                    onClick: () => setStandingLimit(standingSorted.length)
-                  }
-                : standingLimit > 5
-                  ? { label: "Show fewer", onClick: () => setStandingLimit(5) }
-                  : undefined
-            }
-          >
-            <div className="codex-campaign-standings">
-              {standingList.map((faction) => (
-                <div key={faction.factionPageId} className="codex-campaign-standing">
-                  <div className="codex-campaign-standingrow">
-                    <button
-                      type="button"
-                      className="codex-campaign-recentitem codex-campaign-standingname"
-                      onClick={() => onOpenPage(faction.factionPageId)}
-                    >
-                      <CodexIcon
-                        iconId={CHRONICLE_KIND_META.standing.iconId}
-                        className="codex-ent-icon codex-campaign-recentglyph"
-                      />
-                      <span className="codex-list-title">{faction.name}</span>
-                    </button>
-                    <Badge tone={standingTone(faction.value)}>{standingLabel(faction.value)}</Badge>
-                    <span className="codex-campaign-standingvalue">{standingValueLabel(faction.value)}</span>
-                    {showReveal && faction.revealed !== undefined && <VisibilityBadge revealed={faction.revealed} />}
-                    {/* Default-size Button (no ::after): this row wraps and an overhang would hit the next faction's control. */}
-                    {onAdjustStanding && (
-                      <Button variant="ghost" onClick={() => onAdjustStanding(faction.factionPageId)}>
-                        Adjust
-                      </Button>
-                    )}
-                  </div>
-                  {/* Hidden from AT: the word and signed number carry the meaning, and the bar would announce shifted values. */}
-                  <div className="codex-campaign-standingmeter" aria-hidden="true">
-                    <Meter
-                      value={standingMeterValue(faction.value)}
-                      max={STANDING_METER_MAX}
-                      tone={standingMeterTone(faction.value)}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </DashCard>
-        )}
+        <StandingCard
+          standing={standing}
+          showReveal={showReveal}
+          onOpenPage={onOpenPage}
+          onAdjustStanding={onAdjustStanding}
+        />
 
         {/* 8. By kind. */}
-        <DashCard title="By kind" iconId="scroll" empty="No pages yet.">
-          {Object.keys(byType).length > 0 ? (
-            <div className="codex-campaign-types">
-              {ENTITY_TYPE_LIST.filter((type) => byType[type]).map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  className="codex-campaign-typecard"
-                  style={{ borderLeftColor: entityColor(type) }}
-                  onClick={() => onPickType(type)}
-                >
-                  <span
-                    className="codex-campaign-typeicon"
-                    style={{ background: `color-mix(in srgb, ${entityColor(type)} 22%, transparent)` }}
-                    aria-hidden="true"
-                  >
-                    <EntityIcon type={type} className="codex-campaign-typeglyph" />
-                  </span>
-                  <span className="codex-campaign-typelabel">{ENTITY_DEFS[type].label}</span>
-                  <span className="codex-campaign-typecount" style={{ color: entityColor(type) }}>
-                    {byType[type]}
-                  </span>
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </DashCard>
+        <KindsCard pages={pages} onPickType={onPickType} />
 
         {/* 9. Atlas. */}
         <DashCard
@@ -554,18 +371,13 @@ export function CampaignHome({
           {maps.length > 0 ? (
             <nav className="codex-campaign-recent" aria-label="Maps in the atlas">
               {maps.slice(0, 5).map((map) => (
-                <button
+                <RecordRow
                   key={map.id}
-                  type="button"
-                  className="codex-campaign-recentitem"
+                  iconId="compass"
+                  title={map.name}
+                  revealed={shown(map.revealedToPlayers)}
                   onClick={() => onOpenMap(map.id)}
-                >
-                  <CodexIcon iconId="compass" className="codex-ent-icon codex-campaign-recentglyph" />
-                  <span className="codex-list-title">{map.name}</span>
-                  {showReveal && map.revealedToPlayers !== undefined && (
-                    <VisibilityBadge revealed={map.revealedToPlayers} />
-                  )}
-                </button>
+                />
               ))}
             </nav>
           ) : null}
@@ -582,50 +394,21 @@ export function CampaignHome({
           {recent.length > 0 ? (
             <nav className="codex-campaign-recent" aria-label="Recently updated pages">
               {recent.map((page) => (
-                <button
+                <RecordRow
                   key={page.id}
-                  type="button"
-                  className="codex-campaign-recentitem"
+                  entityType={page.entityType}
+                  title={page.title}
+                  revealed={shown(page.revealedToPlayers)}
                   onClick={() => onOpenPage(page.id)}
-                >
-                  <EntityIcon type={page.entityType} className="codex-campaign-recentglyph" />
-                  <span className="codex-list-title">{page.title}</span>
-                  {showReveal && page.revealedToPlayers !== undefined && (
-                    <VisibilityBadge revealed={page.revealedToPlayers} />
-                  )}
-                </button>
+                />
               ))}
             </nav>
           ) : null}
         </DashCard>
 
-        {/* 11. Tags. The empty state links to pages, where tags are added; a populated card is already the full list. */}
-        <DashCard
-          title="Tags"
-          iconId="flag"
-          empty="No tags yet. Tags are added on a page while you write it, and every one you use collects here."
-          seeAll={
-            tags.length === 0 && onSeeAll ? { label: "See all pages", onClick: () => onSeeAll("recent") } : undefined
-          }
-        >
-          {tags.length > 0 ? (
-            <div className="codex-campaign-tags">
-              {tags.map(([tag, count]) => (
-                <button key={tag} type="button" className="codex-tag-chip tap-target" onClick={() => onPickTag(tag)}>
-                  {tag}
-                  <span className="codex-tag-count">{count}</span>
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </DashCard>
+        {/* 11. Tags. */}
+        <TagsCard tags={tags} onPickTag={onPickTag} onSeePages={onSeeAll && (() => onSeeAll("recent"))} />
       </div>
     </div>
   );
-}
-
-/** Five rows by default, expanded in place. Clamped to the live total so a stale expanded limit can't persist. */
-function useStandingLimit(total: number): [number, (next: number) => void] {
-  const [limit, setLimit] = useState(5);
-  return [Math.min(limit, Math.max(total, 5)), setLimit];
 }
