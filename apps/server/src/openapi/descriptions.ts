@@ -1,3 +1,13 @@
+// Prose several Codex writes share.
+const CODEX_COMMAND_ID =
+  "Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay - answering the earlier response would silently skip the later write.";
+const JOURNAL_SESSION_ID =
+  "File this entry under a session BY ID. Omitted on a create auto-files it under the ACTIVE session; explicit `null` files it under none; an id naming no session is a 404. `sessionNumber` is NOT accepted on any write - the number is a display value the server resolves from the linked record, so a body carrying one is a 400 with the key named in `details.issues`.";
+const CODEX_TAGS =
+  "Up to 24 tags, each 1-40 characters, trimmed and lowercased server-side. Replaced wholesale when present.";
+const QUEST_STATUS =
+  "In LIFECYCLE order. `not-started` and `active` are the OPEN states - a quest the party can still do - and `completed`, `failed` and `canceled` are three different ways of being finished with one. `canceled` is not a synonym for `failed`: a lead the party never took up did not fail. A quest created without a status is `not-started`.";
+
 /** Prose for the generated components, keyed by component and then by path: "" is the component itself, "a.b" a
  *  nested property and "a[]" an array's items. A path that no longer exists fails the document build. */
 export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
@@ -731,5 +741,176 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     onIdCollision:
       "How to resolve a collision with an EXISTING HOMEBREW id; an SRD collision is always re-minted regardless.",
     dryRun: "Run the whole collision + rewrite + re-validate pass and return the identical report without writing."
+  },
+  CodexDowntimeInput: {
+    "": "The downtime facts themselves. `applied` is deliberately not an input: confirming the clock move is a separate, explicit act, and accepting it here would let one POST both record the week off and move the campaign clock.",
+    who: "Who spent the time. May be empty: downtime is often party-wide with nobody in particular to name.",
+    activity:
+      "What they did. May be empty, for the same reason as `who` - the record's prose carries it when the fields do not.",
+    days: "The time cost in in-world days. Ten years is already well past the point where a GM would set a date instead of counting days.",
+    characterPageId:
+      "Which character PAGE this downtime belongs to, so the tracker totals a person rather than a spelling of their name. Optional; `who` remains the free-text fallback for anyone with no page, and both may coexist. An id naming no page is a **404**. The page's TYPE is deliberately NOT enforced - a GM may track downtime for an NPC or a hireling - which is the opposite of the standing rule, because standing is *about* a faction while downtime is about someone the GM happens to have a record for."
+  },
+  CodexMilestoneInput: {
+    "": 'The milestone facts themselves. Exactly two - the spec says "milestone / level history … no XP arithmetic", so there is no XP total, no threshold and no next level.',
+    level: "The level the party REACHED. 1-20, the repo's existing character-level bound.",
+    reason:
+      'Why, in one line. Optional and may be empty: "we hit 5" with the why in the record\'s own prose is a legitimate body, and a minimum here would reject a state the composer can reach. Defaults to an empty string.'
+  },
+  CodexQuestObjective: {
+    "": "One tickable step of a quest. Deliberately exactly two keys - a shape richer than `{ text, done }` (assignees, due dates, sub-objectives) is unapproved scope. The text is PLAYER-FACING: it lives beside `playerBody`, never beside `gmBody`, so a GM-only detail belongs in the quest's GM body and never in an objective.",
+    text: "What the party has to do, in one line. Deliberately NOT `minLength: 1`: the checklist's real flow is add-a-row-then-type-into-it and the editor autosaves the whole draft, so a minimum would reject the first save after \"Add item\" — and dropping the blank row server-side would renumber the list under the GM's cursor. A blank objective is a legitimate transient state, not a malformed one. The server accepts it; this says so rather than publishing a rule it does not enforce."
+  },
+  CodexPageCreateRequest: {
+    inWorldDate: "The in-world date that places an `event` page on the chronicle. Omit for undated.",
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexPageUpdateRequest: {
+    inWorldDate: "The in-world date. Omitted leaves the stored date alone; `null` clears it.",
+    expectedRev: "Optimistic concurrency: reject with 409 if the page moved on.",
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexRevealRequest: {
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexConnectionCreateRequest: {
+    label:
+      'Optional. An unlabelled connection is a legitimate "these two are related" - the same thing a `[[wiki link]]` already expresses - so forcing a word would make the declared half of one concept stricter than the derived half.',
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexConnectionUpdateRequest: {
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexFolderPathRequest: {
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexFolderMoveRequest: {
+    to: "Empty string moves the folder to the top level.",
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexMapCreateRequest: {
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexMapUpdateRequest: {
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexMapParentRequest: {
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexMarkerCreateRequest: {
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexMarkerUpdateRequest: {
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexMarkerMoveRequest: {
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexMarkerPartyRequest: {
+    "": "One boolean and nothing else: the pin's position, label, links and reveal state are all set through the routes that already own them, because the party marker is an ordinary marker with a flag.",
+    isParty:
+      "`true` makes this the party's pin and clears the flag from whichever pin held it before, anywhere in the atlas. `false` clears it from THIS pin only and never disturbs a different party pin.",
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexJournalCreateRequest: {
+    sessionId: JOURNAL_SESSION_ID,
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexJournalUpdateRequest: {
+    "": "Edits a journal entry; an omitted field is left alone. Identical to `CodexJournalCreateRequest` plus ONE narrow payload group.",
+    sessionId: JOURNAL_SESSION_ID,
+    downtime:
+      "Edits a DOWNTIME record's own facts. **400 when the entry is not a downtime record** - a caller sending downtime details to a milestone has misunderstood something, and hearing so beats being quietly overruled. This is the adoption path the tracker needs: it is what lets a GM link the free-text rows that already exist to real character pages, so downtime recorded before character links existed can link too. `days` is deliberately NOT a member and sending it is a 400: it is what `apply-downtime` moved the campaign clock by, so editing it afterwards would leave the clock disagreeing with the record that justified it. A typo in `days` is a delete-and-recreate. `applied` is likewise absent - confirming the clock move is its own explicit act.",
+    "downtime.characterPageId":
+      "An id naming no page is a 404; `null` clears the link and leaves `who` as the display fallback.",
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexDeadlineCreateRequest: {
+    "": "Everything `CodexJournalCreateRequest` accepts, with ONE difference: `inWorldDate` is REQUIRED and may not be null. A deadline IS a thing that will happen at a time, and `fired` is derived from that date alone, so an undated one could never fire - it would be a note wearing a deadline's label. There is no `kind` to send (the route says it) and no reveal rule of its own: `revealedToPlayers` behaves exactly as it does on an ordinary entry.",
+    playerText:
+      "The deadline itself, in the party's words - a deadline IS its text, which is why it stores no separate 'what'.",
+    sessionId: JOURNAL_SESSION_ID,
+    inWorldDate:
+      "WHEN it happens - the date the campaign clock has to reach for this to fire. Required, and never null.",
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexDowntimeCreateRequest: {
+    "": "Everything `CodexJournalCreateRequest` accepts, plus the required `downtime` facts. Omitting `inWorldDate` - OR sending it as null - dates the record at the GM's current campaign date, the rule an auto-logged battle already follows, so downtime lands where it happened rather than at the bottom of the timeline. This differs deliberately from every other journal route, where a null clears the date: downtime that happened at no point in time is not downtime.",
+    sessionId: JOURNAL_SESSION_ID,
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexMilestoneCreateRequest: {
+    "": "Everything `CodexJournalCreateRequest` accepts, plus the required `milestone` facts - `CodexDowntimeCreateRequest`'s shape verbatim, because it is the same kind of thing: a structured payload riding beside a record that is prose. Omitting `inWorldDate` dates the record at the GM's current campaign date, so a level-up lands where it happened. Undated is legitimate here where it is not for a deadline: a deadline with no date can never fire, but \"the party reached 5\" is a thing that happened.",
+    sessionId: JOURNAL_SESSION_ID,
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexSessionCreateRequest: {
+    "": "Every field is optional: an empty body opens a blank `planned` session for the GM to prep into.",
+    sessionNumber: "Must not already be in use by another session.",
+    tags: CODEX_TAGS,
+    sceneIds: "Prepared scenes staged for this session. Capped at the table's scene cap.",
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexSessionUpdateRequest: {
+    "": 'An omitted field is left alone - the console PATCHes a whole draft on every autosave, so "absent means clear" would wipe the half of the record the editing surface does not carry. `revealed` is deliberately NOT here: reveal is its own route because it is not an edit (it moves neither `rev` nor `updatedAt`), exactly as on a page.',
+    sessionNumber: "Must not already be in use by another session; `null` clears it.",
+    tags: CODEX_TAGS,
+    sceneIds: "Prepared scenes staged for this session; replaces the stored list.",
+    expectedRev: "Optimistic concurrency: reject with 409 if the session moved on.",
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexQuestCreateRequest: {
+    "": "Only `title` is required - a lead can be named the moment it appears at the table and filled in later.",
+    status: QUEST_STATUS,
+    tags: CODEX_TAGS,
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexQuestUpdateRequest: {
+    "": 'An omitted field is left alone - the console PATCHes a whole draft on every autosave, so "absent means clear" would wipe the half of the record the editing surface does not carry. `objectives` and `entityIds` are REPLACED wholesale when present, and objectives are stored in exactly the order given. `revealed` is deliberately NOT here: reveal is its own route because it is not an edit (it moves neither `rev` nor `updatedAt`), exactly as on a page.',
+    status: QUEST_STATUS,
+    tags: CODEX_TAGS,
+    expectedRev: "Optimistic concurrency: reject with 409 if the quest moved on.",
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexStandingSetRequest: {
+    "": "Sets the RESULTING standing; the server works out the delta and writes it to the chronicle record in the same transaction. There is no separate create: `faction_page_id` is unique, so the first set for a faction creates its row.",
+    value:
+      "The new standing, SIGNED. Rejected outside -100..100 here (the client's control cannot produce a 150, so one is a malformed caller) and clamped to the same range by the store, which is the router-rejects / store-enforces arrangement every bounded field in this surface uses.",
+    reason:
+      "Why it moved, in one line - it lands on the `standing` chronicle record. Optional and may be empty: adjusting a standing mid-session should not be blocked on typing a sentence, and the change is recorded either way. Defaults to an empty string.",
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexCalendarRequest: {
+    eras: "Optional so a caller written before eras existed is not met with a 400. It is replaced like every other field on this route: omitting it CLEARS the stored eras.",
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexSettingsRequest: {
+    revisionHistory:
+      'The two SETTABLE revision-history knobs, and the difference between them is load-bearing: `enabled: false` writes NO new revisions at all, while `windowMinutes: 0` writes one for EVERY save. `0` is therefore not "off" - it is the behaviour every codex had before this setting existed - and the two are separate fields so nothing has to guess which a zero meant. Neither setting ever DELETES a revision: switching history off stops new checkpoints and nothing else, and the existing history stays listable and restorable, because disabling a feature must not destroy the GM\'s only undo. Deleting is a separate, explicit act (`DELETE /codex/page-revisions`).',
+    "revisionHistory.enabled":
+      "Whether a page save may write a new revision at all. Default `true` - every existing codex upgrades with history on, exactly as it was.",
+    "revisionHistory.windowMinutes":
+      'Coalescing window. A save whose page already has a checkpoint younger than this writes no new one, so at most this much authoring can be lost. Measured against WHEN THE CHECKPOINTED CONTENT WAS AUTHORED, not when its row was written, which is what makes the guarantee hold across an idle gap as well as during continuous work. `0` keeps every save; the 10080 ceiling is one week of minutes, past which the window stops coalescing a work session and starts meaning "keep almost nothing" - which `enabled: false` already says more honestly. The owner\'s default is 90.',
+    "": "Every codex-wide setting a caller may SET. Identical to `CodexSettings` except that the server-computed usage figures are absent - not ignored, absent: sending `versionCount` or `versionBytes` is a 400, because they are facts about a table the caller cannot see. Both groups are REQUIRED: this replaces the settings wholesale, so an omitted group would silently reset a setting the caller never mentioned.",
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexRevisionsDeleteRequest: {
+    "": "Which revisions to delete, by age. Required rather than defaulted: the destructive route must not have a meaning when the body is silent.",
+    olderThanDays:
+      "Delete every revision authored more than this many days ago. **`0` deletes them all** - arithmetic, not a magic value, since nothing is younger than zero days old. A negative or fractional value is a 400 rather than a clamp, because this destroys data. The 36500 ceiling (100 years) is a guard, not a policy: a larger value pushes the cutoff date out of the representable range, which would turn a silly request into a 500."
+  },
+  CodexImportRequest: {
+    codex: "The export's `codex` bundle, verbatim.",
+    bundleVersion:
+      'Optional. Absent = a pre-versioning v1 bundle. Anything but 1 is refused: "This backup was made by a newer version of the app. Update, then restore."',
+    exportedAt: "Accepted and IGNORED, so a saved export file can be POSTed without editing.",
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexAutosaveSettings: {
+    "": "Whether the Codex's editors save your work as you type, and how often. The server stores a PREFERENCE and nothing else - there is no server-side draft, so the behaviour (and the explicit Save plus unsaved-changes warning when it is off) is the editor's. Storing it here is what makes the setting follow the GM from a phone to a laptop.",
+    enabled:
+      "Default `true`. `false` does not slow autosave down, it stops it: the editors then require an explicit Save and warn about unsaved changes.",
+    intervalSeconds:
+      'How long the editors wait after you stop typing before saving. SECONDS, and the unit is the same everywhere - wire, column, and store - so nothing converts at a boundary. Default `1`, which is what the shipping editors already did (an 800 ms debounce) expressed on this scale, so an upgraded codex saves exactly as often as it used to. `0` is not in range: a zero-second autosave is a save per keystroke, which is not a cadence anyone means - a GM who wants none says `enabled: false`. The 600 ceiling is ten minutes, past which the setting stops meaning "save while I work".'
   }
 };

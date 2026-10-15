@@ -10,7 +10,7 @@ const TagsSchema = z.array(z.string().trim().min(1).max(40)).max(24);
 /** Optional idempotency key on JSON-body writes, stripped before the store. Body-less POSTs and DELETEs are naturally idempotent. */
 const CommandIdSchema = z.uuid().optional();
 /** A raw in-world date, shared by the journal and page schemas so both accept the same bounds. */
-const InWorldDateFields = z.object({
+export const InWorldDateFields = z.object({
   year: z.number().int().min(-100_000).max(100_000),
   month: z.number().int().min(0).max(23),
   day: z.number().int().min(1).max(400)
@@ -159,7 +159,7 @@ export const JournalWriteSchema = z
 /** A deadline requires `inWorldDate`, since `fired` derives from it. */
 export const DeadlineCreateSchema = JournalWriteSchema.extend({ inWorldDate: InWorldDateFields });
 /** `applied` is not an input (only `apply-downtime` moves the clock). `who`/`activity` may be blank for party-wide downtime. */
-const DowntimeInputSchema = z
+export const DowntimeInputSchema = z
   .object({
     who: z.string().trim().max(120),
     activity: z.string().trim().max(120),
@@ -181,7 +181,7 @@ export const JournalUpdateSchema = JournalWriteSchema.extend({
     .optional()
 });
 /** `level` uses the 1-20 character-level bound; `reason` may be blank. */
-const MilestoneInputSchema = z
+export const MilestoneInputSchema = z
   .object({
     level: z.number().int().min(1).max(20),
     reason: z.string().trim().max(120).default("")
@@ -226,7 +226,7 @@ export const SessionUpdateSchema = z
   .strict();
 /** Bounds mirror the store's. Objective text may be empty (the editor autosaves right after "Add item"). */
 const QuestStatusSchema = z.enum(["not-started", "active", "completed", "failed", "canceled"]);
-const ObjectiveSchema = z.object({ text: z.string().max(120), done: z.boolean() }).strict();
+export const ObjectiveSchema = z.object({ text: z.string().max(120), done: z.boolean() }).strict();
 const ObjectivesSchema = z.array(ObjectiveSchema).max(24);
 const QuestEntityIdsSchema = z.array(z.uuid()).max(24);
 export const QuestCreateSchema = z

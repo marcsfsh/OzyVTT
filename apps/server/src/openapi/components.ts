@@ -9,6 +9,7 @@ import {
   RiderTriggerSchema
 } from "@vtt/schemas";
 import * as content from "@vtt/content-srd-5.2.1";
+import * as codex from "../codex-requests.js";
 import { DESCRIPTIONS } from "./descriptions.js";
 import { commandBodySchemas, gameCommandDocs, type JsonSchema } from "./game-commands.js";
 
@@ -77,6 +78,43 @@ const VOCABULARY: ReadonlyArray<readonly [string, z.ZodType]> = [
   ...branches("Modifier", ModifierSchema),
   ["RiderTrigger", RiderTriggerSchema],
   ...branches("RiderTrigger", RiderTriggerSchema)
+];
+
+/** Each Codex write's body, and the pieces several of them share. */
+const CODEX_BODIES: ReadonlyArray<readonly [string, z.ZodType]> = [
+  ["CodexInWorldDate", codex.InWorldDateFields],
+  ["CodexDowntimeInput", codex.DowntimeInputSchema],
+  ["CodexMilestoneInput", codex.MilestoneInputSchema],
+  ["CodexQuestObjective", codex.ObjectiveSchema],
+  ["CodexAutosaveSettings", shapeOf(codex.CodexSettingsSchema, "autosave")],
+  ["CodexPageCreateRequest", codex.PageCreateSchema],
+  ["CodexPageUpdateRequest", codex.PageUpdateSchema],
+  ["CodexRevealRequest", codex.RevealSchema],
+  ["CodexConnectionCreateRequest", codex.ConnectionCreateSchema],
+  ["CodexConnectionUpdateRequest", codex.ConnectionUpdateSchema],
+  ["CodexFolderPathRequest", codex.FolderPathSchema],
+  ["CodexFolderMoveRequest", codex.FolderMoveSchema],
+  ["CodexMapCreateRequest", codex.MapCreateSchema],
+  ["CodexMapUpdateRequest", codex.MapUpdateSchema],
+  ["CodexMapParentRequest", codex.MapParentSchema],
+  ["CodexMarkerCreateRequest", codex.MarkerCreateSchema],
+  ["CodexMarkerUpdateRequest", codex.MarkerUpdateSchema],
+  ["CodexMarkerMoveRequest", codex.MarkerMoveSchema],
+  ["CodexMarkerPartyRequest", codex.MarkerPartySchema],
+  ["CodexJournalCreateRequest", codex.JournalWriteSchema],
+  ["CodexJournalUpdateRequest", codex.JournalUpdateSchema],
+  ["CodexDeadlineCreateRequest", codex.DeadlineCreateSchema],
+  ["CodexDowntimeCreateRequest", codex.DowntimeCreateSchema],
+  ["CodexMilestoneCreateRequest", codex.MilestoneCreateSchema],
+  ["CodexSessionCreateRequest", codex.SessionCreateSchema],
+  ["CodexSessionUpdateRequest", codex.SessionUpdateSchema],
+  ["CodexQuestCreateRequest", codex.QuestCreateSchema],
+  ["CodexQuestUpdateRequest", codex.QuestUpdateSchema],
+  ["CodexStandingSetRequest", codex.StandingSetSchema],
+  ["CodexCalendarRequest", codex.CalendarSchema],
+  ["CodexSettingsRequest", codex.CodexSettingsSchema],
+  ["CodexRevisionsDeleteRequest", codex.RevisionsDeleteSchema],
+  ["CodexImportRequest", codex.CodexImportSchema]
 ];
 
 /** The record body a homebrew type is authored as; a monster's is an ActorDefinition. */
@@ -152,7 +190,8 @@ function describe(schemas: Record<string, JsonSchema>) {
 
 /**
  * The components generated from the Zod schemas the server parses with: the HTTP contract's shapes, the homebrew
- * authoring vocabulary and record bodies, and each game command's request body, plus the game command operations.
+ * authoring vocabulary and record bodies, the Codex write bodies, and each game command's request body, plus the
+ * game command operations.
  * One registry, so a schema that appears in several places is one `$ref`'d component. Prose comes from
  * `descriptions.ts`.
  */
@@ -166,6 +205,7 @@ export function generatedDocs() {
   for (const [id, schema] of TRANSPORT) register(id, schema);
   register("HomebrewRecord", contract.HomebrewRecordSchema);
   for (const [id, schema] of VOCABULARY) register(id, schema);
+  for (const [id, schema] of CODEX_BODIES) register(id, schema);
   for (const type of RECORD_TYPES) register(recordName(type), content.HOMEBREW_BODY_SCHEMAS[type] as z.ZodType);
   // Commands that share a payload schema (several take only the optional revision) share its generated body.
   const aliases: Array<readonly [string, string]> = [];
