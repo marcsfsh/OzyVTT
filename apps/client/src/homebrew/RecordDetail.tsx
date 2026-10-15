@@ -384,6 +384,15 @@ export function RecordDetail({
           </div>
         )}
 
+        {/* Never blocking: the server names an open slug the SRD does not know, which is legal but often a typo. */}
+        {doc.validity.warnings.length > 0 && !removed && (
+          <ul className="hb-warnings" aria-label="Worth checking">
+            {doc.validity.warnings.map((warning, index) => (
+              <li key={`${warning.path.join(".")}-${index}`}>{warning.message}</li>
+            ))}
+          </ul>
+        )}
+
         {/* "In use" is a count, not a badge: it is a fact about other records. */}
         {usageCount > 0 && !removed && (
           <p className="hb-usage">

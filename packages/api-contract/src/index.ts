@@ -705,8 +705,13 @@ export const HomebrewValidationIssueSchema = z
     recordId: HomebrewIdSchema.nullable()
   })
   .strict();
+/** `warnings` never block publishing: an open slug the SRD does not know, which is legal but often a typo. */
 export const HomebrewValiditySchema = z
-  .object({ valid: z.boolean(), issues: z.array(HomebrewValidationIssueSchema) })
+  .object({
+    valid: z.boolean(),
+    issues: z.array(HomebrewValidationIssueSchema),
+    warnings: z.array(HomebrewValidationIssueSchema)
+  })
   .strict();
 /** The authored content body only - never row state. Opaque until each type's authored shape lands; see the HomebrewRecord component. */
 export const HomebrewRecordSchema = z.record(z.string(), z.unknown());

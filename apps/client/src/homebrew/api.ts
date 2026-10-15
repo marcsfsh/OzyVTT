@@ -19,7 +19,12 @@ export type HomebrewValidationIssue = Readonly<{
   message: string;
   recordId: string | null;
 }>;
-export type HomebrewValidity = Readonly<{ valid: boolean; issues: readonly HomebrewValidationIssue[] }>;
+/** `warnings` never block publishing: an open slug the SRD does not know, which is legal but often a typo. */
+export type HomebrewValidity = Readonly<{
+  valid: boolean;
+  issues: readonly HomebrewValidationIssue[];
+  warnings: readonly HomebrewValidationIssue[];
+}>;
 
 /** Flat list row; the polymorphic body is fetched per record. */
 export type HomebrewRecordSummary = Readonly<{

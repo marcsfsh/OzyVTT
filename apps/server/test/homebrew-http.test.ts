@@ -316,13 +316,18 @@ describe("homebrew HTTP CRUD", () => {
     // The validation seam (`homebrew-validate.ts`) plugs in here.
     const validate: HomebrewValidator = (_type, record) =>
       record.hitDie === "d10"
-        ? { valid: true, issues: [] }
-        : { valid: false, issues: [{ path: ["hitDie"], message: "Choose a hit die.", recordId: null }] };
+        ? { valid: true, issues: [], warnings: [] }
+        : {
+            valid: false,
+            issues: [{ path: ["hitDie"], message: "Choose a hit die.", recordId: null }],
+            warnings: []
+          };
     const { base } = await fixture({ validate });
     const bad = await createRecord(base, { type: "class", name: "Half-Formed" });
     expect(bad.validity).toEqual({
       valid: false,
-      issues: [{ path: ["hitDie"], message: "Choose a hit die.", recordId: null }]
+      issues: [{ path: ["hitDie"], message: "Choose a hit die.", recordId: null }],
+      warnings: []
     });
     const refused = await post(base, sub(HOMEBREW_PATHS.contentPublish, bad.id), GM, {});
     // 409 not 400: the request is well-formed; the stored draft refuses the transition.

@@ -72,7 +72,7 @@ const document = {
   rev: 3,
   createdAt: timestamp,
   updatedAt: timestamp,
-  validity: { valid: false, issues: [issue] },
+  validity: { valid: false, issues: [issue], warnings: [] },
   record
 };
 const summary = {
@@ -100,7 +100,7 @@ const pack = {
 /** Payloads keyed by the Zod export's base name. Every homebrew pair must appear; older surfaces carry a sample. */
 const FIXTURES: Record<string, unknown> = {
   HomebrewValidationIssue: issue,
-  HomebrewValidity: { valid: false, issues: [issue] },
+  HomebrewValidity: { valid: false, issues: [issue], warnings: [issue] },
   HomebrewRecordDocument: document,
   HomebrewRecordSummary: summary,
   HomebrewContent: { record: document },

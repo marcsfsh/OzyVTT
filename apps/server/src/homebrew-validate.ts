@@ -2,6 +2,8 @@ import type { HomebrewContentType, HomebrewValidationIssue, HomebrewValidity } f
 import { CatalogChoiceError, resolveCatalogChoice, type CatalogChoiceCatalogs } from "@vtt/domain";
 import { DAMAGE_ROLL_MOMENTS, RIDER_TRIGGER_KINDS, type ActorDefinition, type Modifier } from "@vtt/schemas";
 import {
+  CONDITION_IDS,
+  DAMAGE_TYPE_IDS,
   featurePicks,
   HOMEBREW_BODY_SCHEMAS,
   resolveSpellLists,
@@ -96,7 +98,7 @@ export function validateForPublish(
         issue.message
       );
     }
-    return { valid: false, issues };
+    return { valid: false, issues, warnings: [] };
   }
 
   // Tier 2: identity. Read the id from the raw body: `ActorDefinitionSchema` strips `id`.
@@ -143,7 +145,71 @@ export function validateForPublish(
       break;
   }
 
-  return { valid: issues.length === 0, issues };
+  return { valid: issues.length === 0, issues, warnings: slugWarnings(record, recordId) };
+}
+
+const SRD_DAMAGE_TYPES: ReadonlySet<string> = new Set(DAMAGE_TYPE_IDS);
+const SRD_CONDITIONS: ReadonlySet<string> = new Set(CONDITION_IDS);
+const DAMAGE_TYPE_LISTS: ReadonlySet<string> = new Set([
+  "damageResistances",
+  "damageImmunities",
+  "damageVulnerabilities"
+]);
+
+/**
+ * Damage-type and condition slugs the SRD does not know. The columns are open, so a homebrew "void" damage type
+ * is legal and publishes, but a typo ("fier") would match nothing at the table, so the GM is told rather than
+ * refused. Walks the parsed record by key, which reaches every grant list, action damage part and on-hit
+ * condition whatever the record type.
+ */
+function slugWarnings(record: unknown, recordId: string | null): Issue[] {
+  const warnings: Issue[] = [];
+  const check = (slug: unknown, path: Path, known: ReadonlySet<string>, kind: string) => {
+    if (typeof slug !== "string" || known.has(slug.trim().toLowerCase())) return;
+    warnings.push({
+      path,
+      recordId,
+      message: `"${slug}" is not an SRD ${kind}. It still publishes, but it only matches a ${kind} spelled exactly the same way, so check the spelling.`
+    });
+  };
+  const walk = (node: unknown, path: Path): void => {
+    if (Array.isArray(node)) {
+      node.forEach((child, index) => walk(child, [...path, index]));
+      return;
+    }
+    if (!node || typeof node !== "object") return;
+    for (const [key, value] of Object.entries(node)) {
+      const at = [...path, key];
+      if (DAMAGE_TYPE_LISTS.has(key) && Array.isArray(value))
+        value.forEach((slug, index) => check(slug, [...at, index], SRD_DAMAGE_TYPES, "damage type"));
+      else if (key === "conditionImmunities" && Array.isArray(value))
+        value.forEach((slug, index) => check(slug, [...at, index], SRD_CONDITIONS, "condition"));
+      // An action's damage parts ({formula, type}) and a spell's damage block ({roll, types}).
+      else if (key === "damage" && Array.isArray(value))
+        value.forEach((part, index) => {
+          if (part && typeof part === "object" && "formula" in part)
+            check((part as { type?: unknown }).type, [...at, index, "type"], SRD_DAMAGE_TYPES, "damage type");
+        });
+      else if (
+        key === "damage" &&
+        value &&
+        typeof value === "object" &&
+        Array.isArray((value as { types?: unknown }).types)
+      )
+        (value as { types: unknown[] }).types.forEach((slug, index) =>
+          check(slug, [...at, "types", index], SRD_DAMAGE_TYPES, "damage type")
+        );
+      // An on-hit rider's conditions ({id, level?}).
+      else if (key === "conditions" && Array.isArray(value))
+        value.forEach((entry, index) => {
+          if (entry && typeof entry === "object" && "id" in entry)
+            check((entry as { id?: unknown }).id, [...at, index, "id"], SRD_CONDITIONS, "condition");
+        });
+      walk(value, at);
+    }
+  };
+  walk(record, []);
+  return warnings;
 }
 
 /** The record's identity as stored: `normalizeBody` forces `body.id` to the row's primary key. */
@@ -320,6 +386,12 @@ function monsterIssues(definition: ActorDefinition, id: string, checks: Checks) 
 /** A template's `appliesTo.baseIds` must resolve to items with the stats the bind copies (weapon or armor). */
 function equipmentIssues(item: EquipmentReference, checks: Checks) {
   riderBlockIssues(item, [], item.name, checks);
+  // An item's riders reach the sheet through equipment derivation, which has no arm for granted spells.
+  if ((item.grants?.spells ?? []).length > 0)
+    checks.add(
+      ["grants", "spells"],
+      `"${item.name}" grants spells, but an item's granted spells never reach a sheet. Give it a "casts" entry instead, which the sheet can cast from.`
+    );
   const appliesTo = item.appliesTo;
   if (!appliesTo) return;
   if (item.category !== "weapon" && item.category !== "armor") {

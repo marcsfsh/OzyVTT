@@ -266,6 +266,13 @@
   color: var(--text-dim);
   font-size: var(--fs-sm);
 }
+.hb-warnings {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
 .hb-create-note {
   margin: 0;
   color: var(--text-dim);

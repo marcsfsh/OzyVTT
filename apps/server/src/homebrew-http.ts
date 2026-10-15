@@ -75,7 +75,7 @@ const MAX_PACK_RECORDS = 500;
 
 /** Publish validation. The always-valid fallback is only for store-only test fixtures. */
 export type HomebrewValidator = (type: HomebrewContentType, body: HomebrewBody) => HomebrewValidity;
-const UNVALIDATED: HomebrewValidator = () => ({ valid: true, issues: [] });
+const UNVALIDATED: HomebrewValidator = () => ({ valid: true, issues: [], warnings: [] });
 
 /** Reference scan over GameState (`homebrew-usages.ts`). */
 export type HomebrewUsageLookup = (
