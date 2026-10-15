@@ -561,7 +561,7 @@ describe("homebrew source discriminator and open item categories", () => {
     weightLb: 2,
     description: null
   };
-  const records: ReadonlyArray<readonly [string, z.ZodTypeAny, Record<string, unknown>]> = [
+  const records: ReadonlyArray<readonly [string, z.ZodType, Record<string, unknown>]> = [
     ["spell", SpellReferenceSchema, spellBody],
     ["equipment", EquipmentReferenceSchema, gearBody],
     [

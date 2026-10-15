@@ -32,4 +32,4 @@ Individual layers are replaceable without breaking the domain contract: the rend
 
 ## Validation evidence
 
-`apps/server` and `apps/client` build and type-check through `npm run check`; `apps/server/package.json` and `apps/client/package.json` pin the concrete dependency versions (Express 5, Socket.IO 4, React 19, Vite 6, Zod 3, TypeScript 5). `apps/server/test/game-store.test.ts` and the `packages/rules-5e` and `packages/schemas` test suites exercise the shared TypeScript contracts directly, without a browser.
+`apps/server` and `apps/client` build and type-check through `npm run check`; `apps/server/package.json` and `apps/client/package.json` pin the concrete dependency versions (Express 5, Socket.IO 4, React 19, Vite 6, Zod 4, TypeScript 5). `apps/server/test/game-store.test.ts` and the `packages/rules-5e` and `packages/schemas` test suites exercise the shared TypeScript contracts directly, without a browser.

@@ -61,43 +61,43 @@ const TRANSPORT_ONLY = new Set(["CommandEnvelope", "EventEnvelope"]);
 const pairs = Object.entries(contract as Record<string, unknown>).flatMap(([name, exported]) => {
   if (!name.endsWith("Schema") || !(exported instanceof z.ZodObject)) return [];
   const base = name.slice(0, -"Schema".length);
-  const schema = exported as z.ZodObject<z.ZodRawShape>;
+  const schema = exported as z.ZodObject;
   return [{ base, schema, component: components[base] ? base : components[`${base}Data`] ? `${base}Data` : null }];
 });
 
-const requiredKeys = (schema: z.ZodObject<z.ZodRawShape>) =>
-  Object.entries(schema.shape)
+const requiredKeys = (schema: z.ZodObject) =>
+  Object.entries(schema.shape as Record<string, z.ZodType>)
     .filter(([, value]) => !value.isOptional())
     .map(([key]) => key)
     .sort();
 
-/** Peel the wrappers Zod puts around an object (`.strict().superRefine()`, `.transform()`, `.optional()`, `.default()`) down to the ZodObject underneath. */
-function unwrap(schema: z.ZodTypeAny): z.ZodTypeAny {
+/** Peel the wrappers Zod puts around an object (`.transform()`, `.optional()`, `.default()`) down to the ZodObject underneath. */
+function unwrap(schema: z.ZodType): z.ZodType {
   let current = schema;
   for (let depth = 0; depth < 8; depth += 1) {
-    const definition = current._def as { schema?: z.ZodTypeAny; innerType?: z.ZodTypeAny };
-    const inner = definition.schema ?? definition.innerType;
+    const definition = current.def as { in?: z.ZodType; innerType?: z.ZodType };
+    const inner = definition.in ?? definition.innerType;
     if (!inner) break;
     current = inner;
   }
   return current;
 }
-const objectOf = (schema: z.ZodTypeAny): z.ZodObject<z.ZodRawShape> => {
+const objectOf = (schema: z.ZodType): z.ZodObject => {
   const inner = unwrap(schema);
   if (!(inner instanceof z.ZodObject)) throw new Error("expected a ZodObject once unwrapped");
   return inner;
 };
-const elementOf = (schema: z.ZodTypeAny): z.ZodTypeAny => {
+const elementOf = (schema: z.ZodType): z.ZodType => {
   const inner = unwrap(schema);
   if (!(inner instanceof z.ZodArray)) throw new Error("expected a ZodArray once unwrapped");
-  return inner.element as z.ZodTypeAny;
+  return inner.element as z.ZodType;
 };
 /** A union's branches in declaration order - the order the component's `oneOf` must mirror. */
-const unionOptions = (schema: z.ZodTypeAny): z.ZodTypeAny[] => {
+const unionOptions = (schema: z.ZodType): z.ZodType[] => {
   const inner = unwrap(schema);
   if (!(inner instanceof z.ZodUnion) && !(inner instanceof z.ZodDiscriminatedUnion))
     throw new Error("expected a Zod union once unwrapped");
-  return [...(inner.options as z.ZodTypeAny[])];
+  return [...(inner.options as z.ZodType[])];
 };
 
 /**
@@ -105,7 +105,7 @@ const unionOptions = (schema: z.ZodTypeAny): z.ZodTypeAny[] => {
  * bodies (stripped before storing, since strict `EquipmentReferenceSchema` would reject it), and `id` on the
  * monster body (the server stamps the row id into it).
  */
-const MIRRORS: ReadonlyArray<{ component: string; schema: z.ZodTypeAny; wireOnly?: readonly string[] }> = [
+const MIRRORS: ReadonlyArray<{ component: string; schema: z.ZodType; wireOnly?: readonly string[] }> = [
   // The nine authored bodies.
   { component: "HomebrewClassRecord", schema: bundle.ClassReferenceSchema, wireOnly: ["type"] },
   { component: "HomebrewSubclassRecord", schema: bundle.SubclassReferenceSchema, wireOnly: ["type"] },
@@ -155,7 +155,7 @@ const MIRRORS: ReadonlyArray<{ component: string; schema: z.ZodTypeAny; wireOnly
 ];
 
 /** Discriminated unions. Branch names are read from the document, so a dropped `$ref` shows up as a count mismatch. */
-const UNION_MIRRORS: ReadonlyArray<{ label: string; node: UnionNode; schema: z.ZodTypeAny }> = [
+const UNION_MIRRORS: ReadonlyArray<{ label: string; node: UnionNode; schema: z.ZodType }> = [
   { label: "ModifierSchema", node: unionNode("HomebrewModifier"), schema: ModifierSchema },
   {
     label: "FeatureUsesSchema.scaling",
@@ -173,8 +173,8 @@ const UNION_MIRRORS: ReadonlyArray<{ label: string; node: UnionNode; schema: z.Z
  * one branch, so a branch count would not match Zod and would miss a renamed trigger. */
 const TRIGGER_NODE = unionNode("HomebrewRiderTrigger");
 /** Each Zod branch's own `type` literal, in declaration order. */
-const typeLiterals = (options: readonly z.ZodTypeAny[]) =>
-  options.map((option) => (objectOf(option).shape.type._def as { value: string }).value);
+const typeLiterals = (options: readonly z.ZodType[]) =>
+  options.map((option) => (objectOf(option).shape.type as z.ZodLiteral<string>).value);
 
 const timestamp = "2026-07-27T12:00:00.000Z";
 const issue = {

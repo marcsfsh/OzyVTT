@@ -87,9 +87,13 @@ export function sendFailure(
   });
 }
 
-/** Every problem a schema found, as `details.issues`. */
+/** Every problem a schema found, as `details.issues`. Zod types path keys as `PropertyKey`; no schema here has a
+ *  symbol key, so the wire path stays strings and indexes. */
 export const issuesOf = (error: z.ZodError) =>
-  error.issues.map((issue) => ({ path: [...issue.path], message: issue.message }));
+  error.issues.map((issue) => ({
+    path: issue.path.map((key) => (typeof key === "symbol" ? String(key) : key)),
+    message: issue.message
+  }));
 
 /** A fault, not a refusal: logged in full for the operator and answered with a fixed message, so driver text,
  *  file paths and stack details never reach a caller. */

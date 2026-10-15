@@ -226,7 +226,10 @@ describe("T2 — the HTTP round trip: the editor reproduces the record the API s
     // 1: `abilityOptions.spreads` is required non-empty, so the untouched record is unpublishable.
     const untouched = publishVerdict("background", bare, "hb-a1-probe");
     expect(untouched.publishable).toBe(false);
-    expect(untouched.why).toContain("Fix spreads — array must contain at least 1");
+    expect(untouched.why).toContain("Fix spreads");
+    expect(untouched.parsed.error?.issues).toContainEqual(
+      expect.objectContaining({ code: "too_small", path: ["abilityOptions", "spreads"] })
+    );
 
     // 2: the only control for that key ("Add a spread") mints `{ amounts, label }`, a shape the
     // schema refuses.
@@ -234,9 +237,14 @@ describe("T2 — the HTTP round trip: the editor reproduces the record the API s
     const tapped = applyField("background", bare, "abilityOptions.spreads", [spread]);
     const verdict = publishVerdict("background", tapped, "hb-a1-probe");
     expect(verdict.publishable).toBe(false);
-    expect(verdict.why, "the tapped refusal is the minted SHAPE's, not the empty array's").toContain(
-      "Fix spreads — expected array, received object"
+    // The tapped refusal is the minted SHAPE's, not the empty array's.
+    expect(verdict.why).toContain("Fix spreads");
+    const spreadIssues = (verdict.parsed.error?.issues ?? []).filter(
+      (issue) => issue.path[0] === "abilityOptions" && issue.path[1] === "spreads"
     );
+    expect(spreadIssues.map((issue) => [issue.code, issue.path])).toEqual([
+      ["invalid_type", ["abilityOptions", "spreads", 0]]
+    ]);
   });
 });
 

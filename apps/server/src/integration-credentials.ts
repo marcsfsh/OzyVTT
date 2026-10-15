@@ -25,8 +25,8 @@ const CreateCredentialSchema = z
       .array(IntegrationScopeSchema)
       .min(1)
       .transform((scopes) => [...new Set(scopes)]),
-    gameId: z.string().uuid().nullable().default(null),
-    expiresAt: z.string().datetime({ offset: true }).nullable().default(null)
+    gameId: z.uuid().nullable().default(null),
+    expiresAt: z.iso.datetime({ offset: true }).nullable().default(null)
   })
   .strict();
 

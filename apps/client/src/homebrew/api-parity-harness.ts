@@ -42,32 +42,30 @@ export type ParityAddress = Readonly<{ type: HomebrewBodyType; within: readonly 
 export const addressId = (address: ParityAddress): string =>
   `${address.type}.${address.within.map((segment) => `${segment}[].`).join("")}${address.key}`;
 
-type Def = Record<string, unknown> & { typeName?: string };
-const defOf = (schema: unknown): Def => ((schema as { _def?: Def })?._def ?? {}) as Def;
+type Def = Record<string, unknown> & { type?: string };
+const defOf = (schema: unknown): Def => ((schema as { _zod?: { def?: Def } })?._zod?.def ?? {}) as Def;
 
-/** Strip wrappers that carry no address of their own. Iterative, because they nest. */
+/** Strip wrappers that carry no address of their own. Iterative, because they nest. Refinements
+    live inside a schema in Zod 4, so only wrappers and pipes remain to peel. */
 function unwrap(schema: unknown): unknown {
   let cursor = schema;
   for (let hops = 0; hops < 32; hops += 1) {
     const def = defOf(cursor);
-    switch (def.typeName) {
-      case "ZodOptional":
-      case "ZodNullable":
-      case "ZodReadonly":
-      case "ZodDefault":
-      case "ZodCatch":
+    switch (def.type) {
+      case "optional":
+      case "nullable":
+      case "readonly":
+      case "default":
+      case "prefault":
+      case "catch":
+      case "nonoptional":
         cursor = def.innerType;
         break;
-      case "ZodEffects":
-        cursor = def.schema;
+      case "pipe":
+        // `.transform()` pipes the schema into a transform; `z.preprocess` pipes a transform into it.
+        cursor = defOf(def.in).type === "transform" ? def.out : def.in;
         break;
-      case "ZodPipeline":
-        cursor = def.in;
-        break;
-      case "ZodBranded":
-        cursor = def.type;
-        break;
-      case "ZodLazy":
+      case "lazy":
         cursor = (def.getter as () => unknown)();
         break;
       default:
@@ -77,17 +75,14 @@ function unwrap(schema: unknown): unknown {
   throw new Error("Schema wrapper nesting exceeded 32 levels — a cycle, not a schema.");
 }
 
-const shapeOf = (schema: unknown): Record<string, unknown> => {
-  const shape = defOf(schema).shape;
-  return (typeof shape === "function" ? shape() : shape) as Record<string, unknown>;
-};
+const shapeOf = (schema: unknown): Record<string, unknown> => defOf(schema).shape as Record<string, unknown>;
 
-const isObjectSchema = (schema: unknown): boolean => defOf(schema).typeName === "ZodObject";
+const isObjectSchema = (schema: unknown): boolean => defOf(schema).type === "object";
 
 /** Every object option of a union, so a variant key is asked once whichever arm declares it. */
 function objectOptions(schema: unknown): readonly unknown[] {
   const def = defOf(schema);
-  if (def.typeName === "ZodUnion" || def.typeName === "ZodDiscriminatedUnion") {
+  if (def.type === "union") {
     return [...(def.options as Iterable<unknown>)].map(unwrap).flatMap((option) => objectOptions(option));
   }
   return isObjectSchema(schema) ? [schema] : [];
@@ -122,8 +117,8 @@ export function walkBodySchemas(): { addresses: readonly ParityAddress[]; stats:
         const child = unwrap(rawChild);
         const def = defOf(child);
         const dotted = [...prefix, key].join(".");
-        if (def.typeName === "ZodArray") {
-          const element = unwrap(def.type);
+        if (def.type === "array") {
+          const element = unwrap(def.element);
           const elementObjects = objectOptions(element);
           if (elementObjects.length > 0) {
             for (const arm of elementObjects) descend(type, arm, [...within, dotted], []);

@@ -402,10 +402,11 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
 }
 
 /** One validity issue (server or shared schema) in the standard sentence shape. The label and
-    section come from the form schema via the issue's `path`, replacing Zod's bare "Required". */
+    section come from the form schema via the issue's `path`. `missing` marks a value the body does
+    not have at all, which reads as "Fill in" rather than as the schema's wording. */
 export function issueReason(
   type: HomebrewType,
-  issue: { path: ReadonlyArray<string | number>; message: string } | undefined,
+  issue: { path: ReadonlyArray<string | number>; message: string; missing?: boolean } | undefined,
   lookup: (
     path: ReadonlyArray<string | number>
   ) => Readonly<{ label: string; sectionId: string; sectionTitle: string }> | null = (path) => fieldAt(type, path)
@@ -417,11 +418,10 @@ export function issueReason(
     // No field owns this path (whole-record rule, extension bag); pass the message through.
     return { text: issue.message, path: dotted || undefined };
   }
-  const required = /required/i.test(issue.message);
   // Zod messages lack terminal punctuation; the template adds it once.
   const detail = issue.message.replace(/[.\s]+$/, "");
   return {
-    text: required
+    text: issue.missing
       ? `Fill in ${found.label}.`
       : `Fix ${found.label} — ${detail.charAt(0).toLowerCase()}${detail.slice(1)}.`,
     sectionId: found.sectionId,
@@ -461,7 +461,8 @@ export function bodyForPublish(type: HomebrewType, draft: Draft, recordId: strin
 function schemaIssues(type: HomebrewType, draft: Draft, recordId: string): readonly BlockedReason[] {
   const schema = HOMEBREW_BODY_SCHEMAS[type];
   if (!schema) return [];
-  const parsed = schema.safeParse(bodyForPublish(type, draft, recordId)) as {
+  const body = bodyForPublish(type, draft, recordId);
+  const parsed = schema.safeParse(body) as {
     success: boolean;
     error?: { issues: ReadonlyArray<{ path: ReadonlyArray<PropertyKey>; message: string }> };
   };
@@ -471,7 +472,8 @@ function schemaIssues(type: HomebrewType, draft: Draft, recordId: string): reado
     const path = issue.path.map((key) => (typeof key === "number" ? key : String(key)));
     // `id` is forced by the store; the server's identity check reports id problems better.
     if (path[0] === "id") continue;
-    const reason = issueReason(type, { path, message: issue.message });
+    const missing = path.length > 0 && getAt(body, path.join(".")) === undefined;
+    const reason = issueReason(type, { path, message: issue.message, missing });
     if (reason) out.push(reason);
   }
   return out;

@@ -7,19 +7,15 @@ import type { ViewerCoordinator } from "./viewer-coordinator.js";
 import { ViewerRevisionConflictError, type ViewerCommand } from "./viewer-presentation.js";
 import type { ViewerPresentationStore } from "./viewer-presentation-store.js";
 
-const PointSchema = z.object({ x: z.number().finite(), y: z.number().finite() }).strict();
-const CameraSchema = z.object({ center: PointSchema, zoom: z.number().finite() }).strict();
+const PointSchema = z.object({ x: z.number(), y: z.number() }).strict();
+const CameraSchema = z.object({ center: PointSchema, zoom: z.number() }).strict();
 const InitiativeSchema = z
   .object({
     visible: z.boolean(),
     round: z.number().int().nonnegative(),
     hiddenTurn: z.boolean().default(false),
     entries: z
-      .array(
-        z
-          .object({ actorId: z.string(), name: z.string(), initiative: z.number().finite(), active: z.boolean() })
-          .strict()
-      )
+      .array(z.object({ actorId: z.string(), name: z.string(), initiative: z.number(), active: z.boolean() }).strict())
       .max(200)
   })
   .strict();

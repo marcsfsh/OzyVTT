@@ -8,7 +8,7 @@ import { CODEX_BUNDLE_VERSION } from "./codex/bundle.js";
 
 const TagsSchema = z.array(z.string().trim().min(1).max(40)).max(24);
 /** Optional idempotency key on JSON-body writes, stripped before the store. Body-less POSTs and DELETEs are naturally idempotent. */
-const CommandIdSchema = z.string().uuid().optional();
+const CommandIdSchema = z.uuid().optional();
 /** A raw in-world date, shared by the journal and page schemas so both accept the same bounds. */
 const InWorldDateFields = z.object({
   year: z.number().int().min(-100_000).max(100_000),
@@ -29,7 +29,7 @@ export const PageCreateSchema = z
     playerBody: z.string().max(100_000).optional(),
     gmBody: z.string().max(100_000).optional(),
     revealedToPlayers: z.boolean().optional(),
-    bannerAssetId: z.string().uuid().nullable().optional(),
+    bannerAssetId: z.uuid().nullable().optional(),
     /** What places an `event` page on the chronicle. Omitted = unchanged/undated; `null` = clear the date. */
     inWorldDate: InWorldDateSchema.optional(),
     commandId: CommandIdSchema
@@ -45,7 +45,7 @@ export const PageUpdateSchema = z
     tags: TagsSchema.optional(),
     playerBody: z.string().max(100_000).optional(),
     gmBody: z.string().max(100_000).optional(),
-    bannerAssetId: z.string().uuid().nullable().optional(),
+    bannerAssetId: z.uuid().nullable().optional(),
     inWorldDate: InWorldDateSchema.optional(),
     expectedRev: z.number().int().nonnegative().optional(),
     commandId: CommandIdSchema
@@ -54,7 +54,7 @@ export const PageUpdateSchema = z
 /** `label` is optional: an unlabelled connection just means "related", as a `[[wiki link]]` does. */
 export const ConnectionCreateSchema = z
   .object({
-    toPageId: z.string().uuid(),
+    toPageId: z.uuid(),
     label: z.string().trim().max(40).nullable().optional(),
     layer: z.enum(["player", "gm"]).optional(),
     commandId: CommandIdSchema
@@ -79,10 +79,10 @@ export const FolderPathSchema = z
 const MapKindSchema = z.enum(["battlemap", "regional", "world"]);
 export const MapCreateSchema = z
   .object({
-    assetId: z.string().uuid(),
+    assetId: z.uuid(),
     name: z.string().trim().min(1).max(120),
     kind: MapKindSchema,
-    parentMapId: z.string().uuid().nullable().optional(),
+    parentMapId: z.uuid().nullable().optional(),
     revealedToPlayers: z.boolean().optional(),
     tags: TagsSchema.optional(),
     commandId: CommandIdSchema
@@ -96,21 +96,19 @@ export const MapUpdateSchema = z
     commandId: CommandIdSchema
   })
   .strict();
-export const MapParentSchema = z
-  .object({ parentMapId: z.string().uuid().nullable(), commandId: CommandIdSchema })
-  .strict();
+export const MapParentSchema = z.object({ parentMapId: z.uuid().nullable(), commandId: CommandIdSchema }).strict();
 
-const Coord = z.number().finite().min(0).max(1_000_000);
+const Coord = z.number().min(0).max(1_000_000);
 const IconColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 const IconId = z
   .string()
   .regex(/^[a-z0-9][a-z0-9-]*$/)
   .max(60);
 const MarkerLinks = {
-  pageIds: z.array(z.string().uuid()).max(24).optional(),
-  subMapId: z.string().uuid().nullable().optional(),
-  sceneIds: z.array(z.string().uuid()).max(24).optional(),
-  actorId: z.string().uuid().nullable().optional()
+  pageIds: z.array(z.uuid()).max(24).optional(),
+  subMapId: z.uuid().nullable().optional(),
+  sceneIds: z.array(z.uuid()).max(24).optional(),
+  actorId: z.uuid().nullable().optional()
 };
 export const MarkerCreateSchema = z
   .object({
@@ -148,10 +146,10 @@ export const JournalWriteSchema = z
     playerText: z.string().max(20_000).optional(),
     gmText: z.string().max(20_000).nullable().optional(),
     revealedToPlayers: z.boolean().optional(),
-    attachMarkerId: z.string().uuid().nullable().optional(),
-    attachPageId: z.string().uuid().nullable().optional(),
+    attachMarkerId: z.uuid().nullable().optional(),
+    attachPageId: z.uuid().nullable().optional(),
     /** By id only (`sessionNumber` is server-resolved and rejected). Omitted on create: active session; `null`: none; unknown: 404. */
-    sessionId: z.string().uuid().nullable().optional(),
+    sessionId: z.uuid().nullable().optional(),
     realDate: z.string().max(40).nullable().optional(),
     inWorldLabel: z.string().max(120).nullable().optional(),
     inWorldDate: InWorldDateSchema.optional(),
@@ -167,7 +165,7 @@ const DowntimeInputSchema = z
     activity: z.string().trim().max(120),
     days: z.number().int().min(0).max(3650),
     /** Links the tracker to a person rather than a spelling; unknown ids 404, page type is not checked. */
-    characterPageId: z.string().uuid().nullable().optional()
+    characterPageId: z.uuid().nullable().optional()
   })
   .strict();
 export const DowntimeCreateSchema = JournalWriteSchema.extend({ downtime: DowntimeInputSchema });
@@ -177,7 +175,7 @@ export const JournalUpdateSchema = JournalWriteSchema.extend({
     .object({
       who: z.string().trim().max(120).optional(),
       activity: z.string().trim().max(120).optional(),
-      characterPageId: z.string().uuid().nullable().optional()
+      characterPageId: z.uuid().nullable().optional()
     })
     .strict()
     .optional()
@@ -195,7 +193,7 @@ const SessionNumberSchema = z.number().int().min(0).max(100_000).nullable();
 const AttendeesSchema = z.array(z.string().trim().min(1).max(40)).max(24);
 const SessionStatusSchema = z.enum(["planned", "played"]);
 /** Scene attachments, capped at the table's own scene cap. */
-const SessionSceneIdsSchema = z.array(z.string().uuid()).max(20);
+const SessionSceneIdsSchema = z.array(z.uuid()).max(20);
 export const SessionCreateSchema = z
   .object({
     sessionNumber: SessionNumberSchema.optional(),
@@ -230,7 +228,7 @@ export const SessionUpdateSchema = z
 const QuestStatusSchema = z.enum(["not-started", "active", "completed", "failed", "canceled"]);
 const ObjectiveSchema = z.object({ text: z.string().max(120), done: z.boolean() }).strict();
 const ObjectivesSchema = z.array(ObjectiveSchema).max(24);
-const QuestEntityIdsSchema = z.array(z.string().uuid()).max(24);
+const QuestEntityIdsSchema = z.array(z.uuid()).max(24);
 export const QuestCreateSchema = z
   .object({
     title: z.string().trim().min(1).max(160),
@@ -295,7 +293,7 @@ export const CodexImportSchema = z
       .number()
       .int()
       .refine((value) => value === CODEX_BUNDLE_VERSION, {
-        message: "This backup was made by a newer version of the app. Update, then restore."
+        error: "This backup was made by a newer version of the app. Update, then restore."
       })
       .optional(),
     exportedAt: z.string().optional(),

@@ -56,7 +56,7 @@ export * from "./schemas.js";
 const require = createRequire(import.meta.url);
 
 const cache = new Map<string, unknown>();
-function loadBundle<S extends z.ZodTypeAny>(file: string, schema: S): z.output<S> {
+function loadBundle<S extends z.ZodType>(file: string, schema: S): z.output<S> {
   if (!cache.has(file)) cache.set(file, schema.parse(require(`../bundles/${file}`)));
   return cache.get(file) as z.output<S>;
 }
