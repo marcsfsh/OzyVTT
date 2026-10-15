@@ -5,7 +5,7 @@ import { RARITY_IDS, WEAPON_MASTERY_IDS, WEAPON_PROPERTY_IDS } from "@vtt/conten
 import { newId } from "../lib/ids";
 import { SUB_OBJECT_DEFAULTS, blankFeature } from "./defaults";
 import { featureFields } from "./feature-fields";
-import { getAt } from "./paths";
+import { getAt, setAt } from "./paths";
 import {
   basicsSection,
   diceValidate,
@@ -468,16 +468,24 @@ const BACKGROUND_SCHEMA: HomebrewSchema = {
           kind: "group",
           rows: [
             { key: "abilityOptions.from", label: "From", kind: "multiselect", wide: true, options: ABILITIES },
+            // The schema stores bare number arrays ([2, 1]), so each chip is one of the SRD's two splits.
             {
               key: "abilityOptions.spreads",
               label: "Spreads",
-              kind: "rows",
-              note: "Not offered in the character builder yet.",
-              addLabel: "Add a spread",
-              emptyText: "No spreads yet.",
-              rowKey: (_row, index) => String(index),
-              newRow: () => ({ amounts: [2, 1] }),
-              rows: [{ key: "label", label: "Label", placeholder: "+2 / +1" }]
+              kind: "multiselect",
+              wide: true,
+              options: [opt("2-1", "+2 / +1"), opt("1-1-1", "+1 / +1 / +1")],
+              help: "The ways the builder lets a player split the increases across the listed abilities.",
+              read: (scope) =>
+                ((getAt(scope, "abilityOptions.spreads") as number[][] | undefined) ?? []).map((spread) =>
+                  spread.join("-")
+                ),
+              write: (next, scope) =>
+                setAt(
+                  scope,
+                  "abilityOptions.spreads",
+                  (next as string[]).map((key) => key.split("-").map(Number))
+                )
             }
           ]
         }
