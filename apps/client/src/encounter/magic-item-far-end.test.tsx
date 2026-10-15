@@ -208,7 +208,7 @@ describe("the far end of the magic-item ETL", () => {
   });
 });
 
-describe("the C9 base chooser", () => {
+describe("the base chooser", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -277,7 +277,7 @@ describe("the C9 base chooser", () => {
   });
 });
 
-describe("the C9 wire seam - the real sheet ships the pick", () => {
+describe("the wire seam - the real sheet ships the pick", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

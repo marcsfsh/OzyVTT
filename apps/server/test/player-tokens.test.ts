@@ -93,7 +93,7 @@ async function uploadToken(
   });
 }
 
-describe("token library curation (R1)", () => {
+describe("token library curation", () => {
   it("defaults to visible, hides per entry and per folder, and only the player list filters", async () => {
     const directory = await mkdtemp(join(tmpdir(), "vtt-token-catalog-"));
     const store = new TokenCatalogStore(join(directory, "vtt.sqlite"));
@@ -119,7 +119,7 @@ describe("token library curation (R1)", () => {
   });
 });
 
-describe("the three player gates (D18)", () => {
+describe("the three player gates", () => {
   it("lets a player browse the offered library, and hides what the GM curated away", async () => {
     const { base, gmToken, playerToken } = await boot();
     await uploadToken(base, gmToken, "Boss", { folder: "Spoilers", size: 64 });

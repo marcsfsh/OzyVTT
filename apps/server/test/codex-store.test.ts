@@ -68,7 +68,7 @@ const playerConnectionContext = (from: CodexStore = store) => ({
   revealedSourceIds: new Set<string>()
 });
 
-describe("CodexStore search — the SQL visibility layer, on its own (CI-1)", () => {
+describe("CodexStore search — the SQL visibility layer, on its own", () => {
   // Player search is gated in SQL (`PLAYER_SEARCH_VISIBLE_SQL`) and again by `projectPlayerSearchHit`; these call
   // `searchAll` directly so each kind's SQL gate is verified on its own.
   it("does not return an unrevealed MAP to a player", () => {
@@ -87,7 +87,7 @@ describe("CodexStore search — the SQL visibility layer, on its own (CI-1)", ()
 
   // The quest arm of `PLAYER_SEARCH_VISIBLE_SQL`, both directions: weakening it (`THEN 1`) surfaces the secret
   // quest, and deleting it (falling to `ELSE 0`) hides a findable one.
-  it("does not return an UNREVEALED quest to a player, and does return a revealed one (M10, at the SQL layer)", () => {
+  it("does not return an UNREVEALED quest to a player, and does return a revealed one (at the SQL layer)", () => {
     const quest = store.createQuest({ title: "The Wyrmwood Contract", playerBody: "Recover the ledger." });
     expect(quest.revealedToPlayers).toBe(false);
     // The GM finds it, so the player's miss below is the visibility arm and not a quest that never indexed.
@@ -121,7 +121,7 @@ describe("CodexStore search — the SQL visibility layer, on its own (CI-1)", ()
   });
 });
 
-describe("CodexStore search matches tags on every kind (CI-1 + CI-2)", () => {
+describe("CodexStore search matches tags on every kind", () => {
   it("finds a PAGE by its tag, the same way it finds a tagged map or marker", () => {
     // Pages index their tags like maps, markers and journal entries do, so a tag query answers the same
     // whichever record carries the tag.
@@ -148,7 +148,7 @@ describe("CodexStore search matches tags on every kind (CI-1 + CI-2)", () => {
   });
 });
 
-describe("CodexStore search ranks the record NAMED for the query first (CI-1)", () => {
+describe("CodexStore search ranks the record NAMED for the query first", () => {
   // A page titled with the query ranks above pages that merely mention it. `toEqual` on the whole array also
   // pins recall, so winning the ranking by dropping results cannot pass.
   const seedNamedVersusMentions = () => {
@@ -254,7 +254,7 @@ describe("CodexStore search ranks the record NAMED for the query first (CI-1)", 
   });
 });
 
-describe("CodexStore tags on every record type (CI-2)", () => {
+describe("CodexStore tags on every record type", () => {
   it("stores, updates and clears tags on maps, markers and journal entries", () => {
     const map = store.createMap({
       assetId: crypto.randomUUID(),
@@ -289,7 +289,7 @@ describe("CodexStore tags on every record type (CI-2)", () => {
   });
 });
 
-describe("CodexStore suite-wide search (CI-1)", () => {
+describe("CodexStore suite-wide search", () => {
   it("keeps the index in step with writes, including markers swept away by a map delete", () => {
     const map = store.createMap({
       assetId: crypto.randomUUID(),
@@ -955,7 +955,7 @@ describe("CodexStore calendar + timeline", () => {
     expect(() => store.setCalendar({ yearName: "", months: [], weekdays: [] })).toThrow(/1 to 24 months/);
   });
 
-  it("dates an `event` page through the SAME contract a journal entry uses (CT-11)", () => {
+  it("dates an `event` page through the SAME contract a journal entry uses", () => {
     const page = store.createPage({
       title: "The Sundering",
       entityType: "event",
@@ -972,7 +972,7 @@ describe("CodexStore calendar + timeline", () => {
     expect(page.inWorldLabel).toBe(entry.inWorldLabel);
   });
 
-  it("puts a dated event page on the chronicle in the right in-world year, interleaved with entries (CT-11)", () => {
+  it("puts a dated event page on the chronicle in the right in-world year, interleaved with entries", () => {
     const early = store.createEntry({ playerText: "Founding.", inWorldDate: { year: 1400, month: 0, day: 1 } });
     const event = store.createPage({
       title: "The Sundering",
@@ -990,7 +990,7 @@ describe("CodexStore calendar + timeline", () => {
     expect(store.dateForInstant(event.calendarInstant!)).toEqual({ year: 1450, month: 0, day: 1 });
   });
 
-  it("keeps an UNDATED event page and a dated non-event page off the chronicle (CT-11)", () => {
+  it("keeps an UNDATED event page and a dated non-event page off the chronicle", () => {
     store.createPage({ title: "A vague legend", entityType: "event" });
     const note = store.createPage({
       title: "Barovia",
@@ -1111,7 +1111,7 @@ describe("CodexStore calendar + timeline", () => {
 
 // `listChronicle()` is ungated and `projectPlayerChronicleRecord` is the only gate; a store-level filter
 // could mask a broken projection in HTTP tests, so these assert the store stays ungated.
-describe("CodexStore chronicle — deliberately ungated (CT-11)", () => {
+describe("CodexStore chronicle — deliberately ungated", () => {
   it("returns UNREVEALED entries and UNREVEALED event pages to the store's caller", () => {
     const entry = store.createEntry({ playerText: "secret", inWorldDate: { year: 1, month: 0, day: 1 } });
     const page = store.createPage({
@@ -1142,7 +1142,7 @@ describe("CodexStore chronicle — deliberately ungated (CT-11)", () => {
 });
 
 // The chronicle's projection layer on its own: the single gate, exercised directly, one property per test.
-describe("Codex chronicle — the projection layer, on its own (CT-11, A-8)", () => {
+describe("Codex chronicle — the projection layer, on its own", () => {
   const playerChronicle = () =>
     store
       .listChronicle()
@@ -1294,7 +1294,7 @@ describe("CodexStore media visibility (page images)", () => {
 
 // The page -> marker lookup is gated by the router (unrevealed page) and by `projectPlayerPageMarker` (each
 // pin); these call the store and projection directly.
-describe("Codex page→marker reverse lookup — the store and projection layers, on their own (CI-4)", () => {
+describe("Codex page→marker reverse lookup — the store and projection layers, on their own", () => {
   const context = (
     marker: ReturnType<CodexStore["getMarker"]>,
     mapRevealed: boolean,
@@ -1390,7 +1390,7 @@ describe("Codex page→marker reverse lookup — the store and projection layers
 
 // The whole-graph connections feed at the store and projection layers. `projectPlayerConnections` decides
 // visibility and the store feeding it is ungated, so each rule is proven at the projection.
-describe("Codex whole-graph connections — the store and projection layers, on their own (D8)", () => {
+describe("Codex whole-graph connections — the store and projection layers, on their own", () => {
   const context = () => playerConnectionContext();
   const mentions = () => store.listAllConnections().filter((edge) => edge.origin === "mention");
   const pair = (edge: { fromId: string; toPageId: string }) => ({ fromPageId: edge.fromId, toPageId: edge.toPageId });
@@ -1540,7 +1540,7 @@ describe("Codex whole-graph connections — the store and projection layers, on 
 
 // Recency means "what have I been writing?": reveals and folder moves do not touch it, adding a
 // relationship does. The clock only moves when the test says so.
-describe("CodexStore recency semantics — what counts as an update (CI-9)", () => {
+describe("CodexStore recency semantics — what counts as an update", () => {
   let recencyDirectory: string;
   let clock: number;
   let recency: CodexStore;
@@ -1646,7 +1646,7 @@ describe("CodexStore recency semantics — what counts as an update (CI-9)", () 
   });
 });
 
-describe("CodexStore sessions (M9)", () => {
+describe("CodexStore sessions", () => {
   let sessionDirectory: string;
   let clock: number;
   let sessions: CodexStore;
@@ -1716,7 +1716,7 @@ describe("CodexStore sessions (M9)", () => {
     expect(sessions.updateSession(session.id, { prepBody: "v3" }, undefined).prepBody).toBe("v3");
   });
 
-  it("does NOT move recency or `rev` on a reveal — but still bumps the codex revision (CI-9)", () => {
+  it("does NOT move recency or `rev` on a reveal — but still bumps the codex revision", () => {
     // The recap badge compares a session's `updatedAt` against a lastSeen stamp, so a reveal sweep that
     // re-stamped every session would light the badge for unchanged recaps.
     const session = sessions.createSession({ sessionNumber: 2, recapBody: "The wolves came at dusk." });
@@ -1900,7 +1900,7 @@ describe("CodexStore sessions (M9)", () => {
   });
 });
 
-describe("CodexStore quests (M10)", () => {
+describe("CodexStore quests", () => {
   let questDirectory: string;
   let clock: number;
   let quests: CodexStore;
@@ -1970,7 +1970,7 @@ describe("CodexStore quests (M10)", () => {
     expect(quests.updateQuest(quest.id, { gmBody: "v3" }, undefined).gmBody).toBe("v3");
   });
 
-  it("does NOT move recency or `rev` on a reveal — but still bumps the codex revision (CI-9)", () => {
+  it("does NOT move recency or `rev` on a reveal — but still bumps the codex revision", () => {
     const quest = quests.createQuest({ title: "The Vault", playerBody: "Open it." });
     const born = quest.updatedAt;
     const revisionBefore = quests.revision;
@@ -2130,7 +2130,7 @@ describe("CodexStore quests (M10)", () => {
 
 // The player search index text: a revealed quest passes the SQL and projection gates, so if `gmBody` reached
 // the player index a GM-only phrase would produce a hit. The quest is revealed so nothing else masks it.
-describe("CodexStore quest search index text — gate 1, with no second line of defence (M10)", () => {
+describe("CodexStore quest search index text — gate 1, with no second line of defence", () => {
   const GM_PHRASE = "the ledger is a forgery";
   const seedRevealed = () => {
     const quest = store.createQuest({
@@ -2184,7 +2184,7 @@ describe("CodexStore quest search index text — gate 1, with no second line of 
 
 // The quest search projection and record projection, called directly. An HTTP test cannot tell a working
 // projection from a SQL predicate that happened to compensate for a broken one.
-describe("Codex quest — the projection layer, on its own (M10, A-8)", () => {
+describe("Codex quest — the projection layer, on its own", () => {
   const GM_PHRASE = "The ledger is a forgery; the real one burned.";
   const seed = () =>
     store.createQuest({
@@ -2524,7 +2524,7 @@ describe("CodexStore eras — additive inside calendar_json, no stored date touc
 
 // The session projection, called directly. An HTTP test cannot tell a working projection from a router
 // that happened to compensate.
-describe("Codex session — the projection layer, on its own (M9, A-8)", () => {
+describe("Codex session — the projection layer, on its own", () => {
   const seed = () =>
     store.createSession({
       sessionNumber: 6,
@@ -2564,7 +2564,7 @@ describe("Codex session — the projection layer, on its own (M9, A-8)", () => {
 
 // A session's existence is GM information, but auto-linking stamps the active session onto entries. An
 // unrevealed record's number is blanked; a revealed record's, or a number with no record, is not.
-describe("Codex journal — the unrevealed-session number gate, on its own (M9 follow-up, A-8)", () => {
+describe("Codex journal — the unrevealed-session number gate, on its own", () => {
   /** An entry a player may read, filed under a session by id, as auto-linking produces. */
   const revealedEntry = (sessionId: string | null) =>
     store.createEntry({ playerText: "We reached Vallaki.", sessionId, revealedToPlayers: true });
@@ -2723,7 +2723,7 @@ describe("Codex journal — the unrevealed-session number gate, on its own (M9 f
   });
 });
 
-describe("CodexStore deadlines + downtime (M11)", () => {
+describe("CodexStore deadlines + downtime", () => {
   // The new kinds insert and read back as themselves; without a real `kind` parse a deadline would silently
   // read back as a note.
   it("stores a deadline and a downtime as THEMSELVES — the widened CHECK, and a kind that is parsed rather than collapsed", () => {
@@ -2788,7 +2788,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
 
   // Creating downtime does not move the clock, `applyDowntime` does, and applying twice is rejected and
   // moves nothing (the double-click case).
-  it("creating downtime does not move the clock, applying it does, and applying it twice is rejected (O-3)", () => {
+  it("creating downtime does not move the clock, applying it does, and applying it twice is rejected", () => {
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 10 } });
     const downtime = store.createDowntime({
       playerText: "Vex brews poison.",
@@ -2835,7 +2835,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
 
   // `applyDowntime` writes the entry and the calendar in one transaction. A SQLite trigger aborts the
   // calendar write (the second write), so separate transactions would leave the entry committed.
-  it("applyDowntime is one transaction: a failed calendar write rolls the entry write back too (D11-F)", () => {
+  it("applyDowntime is one transaction: a failed calendar write rolls the entry write back too", () => {
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 10 } });
     const downtime = store.createDowntime({
       playerText: "Vex brews poison.",
@@ -2869,7 +2869,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
   });
 
   // Moving only `currentDate` leaves dated records byte-identical: instants and labels never read the clock.
-  it("a currentDate-only calendar write leaves every dated record byte-identical (F-3)", () => {
+  it("a currentDate-only calendar write leaves every dated record byte-identical", () => {
     const calendar = {
       yearName: "DR",
       months: [
@@ -2913,7 +2913,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
 
   // Passing time walks months via `dateForInstant(instant + days)`; `normalizeCalendar` does not clamp
   // `currentDate.day` to the month length, so `day + days` would store day 40 of a 30-day month.
-  it("passing time rolls over the month and the year instead of clamping (F-4, F-7)", () => {
+  it("passing time rolls over the month and the year instead of clamping", () => {
     const advance = (from: { year: number; month: number; day: number }, days: number) => {
       store.setCalendar({ ...store.getCalendar(), currentDate: from });
       const downtime = store.createDowntime({
@@ -2947,7 +2947,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
 
   // A deadline's date cannot be edited away. `createDeadline` requires a date, and so must `updateEntry`:
   // a dateless deadline would read "Approaching" everywhere and never fire.
-  it("refuses to edit a deadline's date away, and leaves the record untouched when it refuses (D11-C)", () => {
+  it("refuses to edit a deadline's date away, and leaves the record untouched when it refuses", () => {
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 1 } });
     const deadline = store.createDeadline({
       playerText: "The ultimatum expires.",
@@ -2992,7 +2992,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
 
   // Deleting a page removes it from every quest's linked entities. Quests store links as a JSON array with
   // no foreign key, so `deletePage` must clean them explicitly.
-  it("removes a deleted page from every quest's linked entities (M10 x page deletion)", () => {
+  it("removes a deleted page from every quest's linked entities (page deletion)", () => {
     const doomed = store.createPage({ title: "Volo", entityType: "character" });
     const kept = store.createPage({ title: "Elminster", entityType: "character" });
     const quest = store.createQuest({ title: "Find Volo", entityIds: [doomed.id, kept.id] });
@@ -3006,7 +3006,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
     expect(store.getQuest(quest.id)!.title).toBe("Find Volo");
   });
 
-  it("publishes the first campaign date automatically, and keeps every later move private (O-1)", () => {
+  it("publishes the first campaign date automatically, and keeps every later move private", () => {
     expect(store.getPublishedDate()).toBeNull();
 
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 10 } });
@@ -3030,7 +3030,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
     expect(store.getPublishedDate()).toEqual(store.getCalendar().currentDate);
   });
 
-  it("a deadline's fired state is derived from the clock, in both directions (D11-C)", () => {
+  it("a deadline's fired state is derived from the clock, in both directions", () => {
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 1 } });
     const deadline = store.createDeadline({
       playerText: "The ultimatum expires.",
@@ -3075,7 +3075,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
   });
 
   /** The GM's clock and the published clock stay apart until the GM publishes; advancing by hand or via downtime never copies one to the other. */
-  it("keeps the GM's clock and the published clock apart until the GM publishes (O-1, D11-H)", () => {
+  it("keeps the GM's clock and the published clock apart until the GM publishes", () => {
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 1 } });
     store.publishCampaignDate();
     expect(store.getPublishedDate()).toEqual({ year: 1492, month: 0, day: 1 });
@@ -3103,7 +3103,7 @@ describe("CodexStore deadlines + downtime (M11)", () => {
   });
 
   // The published date lives only in `codex_meta`, so the bundle must carry it. Also checked across a reopen.
-  it("carries a downtime payload and the published date through export and a reopen (T-14)", async () => {
+  it("carries a downtime payload and the published date through export and a reopen", async () => {
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 3, day: 8 } });
     store.publishCampaignDate();
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 9, day: 2 } }); // GM runs ahead
@@ -3159,12 +3159,12 @@ describe("CodexStore deadlines + downtime (M11)", () => {
 });
 
 // Standing, party marker and milestones at the store layer.
-describe("CodexStore standing, party marker + milestones (M12)", () => {
+describe("CodexStore standing, party marker + milestones", () => {
   const faction = (title: string) => store.createPage({ title, entityType: "faction" });
 
   // One party marker atlas-wide (pins on different maps): `setPartyMarker` clears before it sets, and the
   // partial unique index holds even for raw SQL writes around the store.
-  it("only one marker can be the party at a time, atlas-wide (M12-C, T-2)", () => {
+  it("only one marker can be the party at a time, atlas-wide", () => {
     const barovia = store.createMap({ assetId: ASSET, name: "Barovia", kind: "regional" });
     const faerun = store.createMap({ assetId: ASSET, name: "Faerûn", kind: "world" });
     const village = store.createMarker(barovia.id, {
@@ -3242,7 +3242,7 @@ describe("CodexStore standing, party marker + milestones (M12)", () => {
 
   // `setStanding` writes the value and its chronicle record in one transaction. A SQLite trigger aborts the
   // journal write (the second write), so separate transactions would leave the value committed.
-  it("setStanding is one transaction: a failed chronicle write rolls the value back too (F-7, T-3)", () => {
+  it("setStanding is one transaction: a failed chronicle write rolls the value back too", () => {
     const harpers = faction("The Harpers");
     store.setStanding(harpers.id, 40, "Saved the caravan.");
     expect(store.getStanding(harpers.id)!.value).toBe(40);
@@ -3283,7 +3283,7 @@ describe("CodexStore standing, party marker + milestones (M12)", () => {
 
   // Standing is signed and bounded, and its record carries the delta: `+40 then -60` reads as `+40, -60` and
   // leaves the bar at -20.
-  it("standing clamps to -100..100 and its record carries the delta, not the new value (M12-B, T-4)", () => {
+  it("standing clamps to -100..100 and its record carries the delta, not the new value", () => {
     const harpers = faction("The Harpers");
     const standingDeltas = () =>
       store
@@ -3347,7 +3347,7 @@ describe("CodexStore standing, party marker + milestones (M12)", () => {
 
   // A `milestone` and a `standing` row read back as themselves on a second read; an un-widened
   // `JOURNAL_KINDS` would silently show them as notes.
-  it("a milestone and a standing record round-trip as themselves, not as notes (F-3, T-5)", () => {
+  it("a milestone and a standing record round-trip as themselves, not as notes", () => {
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 2, day: 14 } });
     const harpers = faction("The Harpers");
     const milestone = store.createMilestone({
@@ -3433,7 +3433,7 @@ describe("CodexStore standing, party marker + milestones (M12)", () => {
   });
 
   // `codex_standing` exists nowhere else, so the bundle must carry it. Also checked across a reopen.
-  it("carries standing and the party marker through export and a reopen (T-12)", async () => {
+  it("carries standing and the party marker through export and a reopen", async () => {
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 2, day: 14 } });
     const harpers = faction("The Harpers");
     const zhents = faction("The Zhentarim");
@@ -4320,7 +4320,7 @@ describe("every codex write bumps the coarse revision (the ETag's invariant)", (
 
 // Sessions join the suite-wide search index, a three-gate viewer-safety change (see `CodexRecordKind`).
 // The index-text gate has no second line of defence, so each gate is asserted at its own layer.
-describe("CodexStore search — sessions join the one index (D10, three gates)", () => {
+describe("CodexStore search — sessions join the one index (three gates)", () => {
   const seed = () =>
     store.createSession({
       sessionNumber: 4,
@@ -4459,7 +4459,7 @@ describe("CodexStore search — sessions join the one index (D10, three gates)",
 
 // A player chronicle row carries the server's `calendarInstant` alongside `inWorldDate`, so the client never
 // re-derives it (and diverges on a day that overflows its month).
-describe("Codex chronicle — a player's machine-readable dates (D17, R3)", () => {
+describe("Codex chronicle — a player's machine-readable dates", () => {
   it("carries both date forms on a revealed dated row, and the instant is the server's own clamped one", () => {
     // A 30-day month and a date on day 31 of it.
     store.setCalendar({
@@ -4507,7 +4507,7 @@ describe("Codex chronicle — a player's machine-readable dates (D17, R3)", () =
 });
 
 /** Downtime linked to a character page, so the tracker totals a person rather than a spelling of a name. */
-describe("CodexStore downtime — the character link (D12)", () => {
+describe("CodexStore downtime — the character link", () => {
   it("round-trips the link, keeps it through applyDowntime, and refuses an id that names no page", () => {
     const character = store.createPage({ title: "Ireena", entityType: "character" });
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 1 } });
@@ -4644,7 +4644,7 @@ describe("CodexStore downtime — the character link (D12)", () => {
 });
 
 /** Quest status changes write themselves onto the journal, so the timeline answers "what happened to that lead?". */
-describe("CodexStore quest history (D11, R5)", () => {
+describe("CodexStore quest history", () => {
   const questRecords = () => store.listTimeline().filter((entry) => entry.kind === "quest");
 
   it("records a quest's START on create, and every STATUS CHANGE after it — never a prose edit", () => {
@@ -4653,9 +4653,7 @@ describe("CodexStore quest history (D11, R5)", () => {
     store.setActiveSession(session.id);
 
     const quest = store.createQuest({ title: "Find the Sunsword" });
-    expect(questRecords(), "R5: a quest ENTERING THE LOG is an event, and every quest enters at creation").toHaveLength(
-      1
-    );
+    expect(questRecords(), "a quest ENTERING THE LOG is an event, and every quest enters at creation").toHaveLength(1);
     const start = questRecords()[0]!;
     // The status reached is the default `not-started`: writing a lead down is not the party taking it up.
     expect(questEventPayloadOf(start)).toEqual({ questId: quest.id, status: "not-started" });
@@ -4792,7 +4790,7 @@ describe("CodexStore quest history (D11, R5)", () => {
 
 // Backup and restore: a round trip is lossless, a bad bundle leaves the codex exactly as it was, and a
 // backup from before restore existed still restores.
-describe("CodexStore import — replace, all-or-nothing (D16)", () => {
+describe("CodexStore import — replace, all-or-nothing", () => {
   /** A codex with one of everything, so a round trip has something to lose. */
   const populate = () => {
     store.setCalendar({

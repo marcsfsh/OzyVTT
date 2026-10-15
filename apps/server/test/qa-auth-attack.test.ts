@@ -67,7 +67,7 @@ async function twoPlayers() {
   return { ...running, me, you };
 }
 
-describe("QA attack — token image (D18/R1)", () => {
+describe("QA attack — token image", () => {
   it("lets me clear MY claimed character's token but refuses YOURS", async () => {
     const { base, me } = await twoPlayers();
     // Clearing (tokenAssetId: null) exercises the exact `canInitiateForActor(edit)` gate without an asset.
@@ -97,7 +97,7 @@ describe("QA attack — token image (D18/R1)", () => {
   });
 });
 
-describe("QA attack — rules ask/answer (D8/D9)", () => {
+describe("QA attack — rules ask/answer", () => {
   it("refuses a player answering ANY ask — even their own, even a fabricated id", async () => {
     const { base, me } = await twoPlayers();
     const response = await post(base, GAME_PATHS.rulesAnswer, me, {
@@ -128,7 +128,7 @@ describe("QA attack — rules ask/answer (D8/D9)", () => {
   });
 });
 
-describe("QA attack — replays (D26)", () => {
+describe("QA attack — replays", () => {
   it("answers a player 404 (never 403) for an archive read, so existence is never confirmed", async () => {
     // A player must not be able to tell an unshared archive from a missing one: both are 404. A 403 on a
     // player read would alone confirm existence.
@@ -153,7 +153,7 @@ describe("QA attack — replays (D26)", () => {
   });
 });
 
-describe("QA attack — player create/rebuild boundaries (D13)", () => {
+describe("QA attack — player create/rebuild boundaries", () => {
   it("refuses character.create from a player once the GM closes the builder to players", async () => {
     const { base, server, gmToken } = await boot();
     const player = server.auth.issuePlayerSession();

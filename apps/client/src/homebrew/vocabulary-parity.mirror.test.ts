@@ -3181,7 +3181,7 @@ describe("a pick over the character's own earlier answers (`fromPicks`) — thro
     expect(offeredIds(typed, `feature:${LEDGER.featureId}`)).toEqual(["guidance", "light"]);
   });
 
-  it("4. the editor end can finally prove a SPELL LEVEL — the hole U15 measured and left open", () => {
+  it("4. the editor end can finally prove a SPELL LEVEL — the hole the census measured and left open", () => {
     /** Spell bounds compare against `optionLevels`. A typed `from` list has none, but
         `resolvePickChoice` looks every answer up in the spell catalog, so a window over `fromPicks`
         really applies from the editor end. */
@@ -3588,7 +3588,7 @@ describe("the guard itself refuses what the editor cannot author", () => {
   /** `FeatureEditor` is a custom field, so its choice-panel controls are visible to `fieldsOf` only
       through `featureFields()`. Asserted in two halves: the keys resolve on the class form, and the
       values a control writes reach the body the save path sends. */
-  it("R1: the choice panel is reachable from `fieldsOf`, and what it writes reaches the wire", () => {
+  it("the choice panel is reachable from `fieldsOf`, and what it writes reaches the wire", () => {
     // The three bespoke controls (level chips, source switcher, catalog pair) are excluded; see
     // `featureFields()`.
     for (const key of [
@@ -3655,7 +3655,7 @@ describe("the guard itself refuses what the editor cannot author", () => {
 
   /** An inline option is a real row scope, so `FeatureOption.requires` is a `FieldDef` beside `name`
       and `description`. */
-  it("R1: an inline option is a real row scope inside a bespoke component", () => {
+  it("an inline option is a real row scope inside a bespoke component", () => {
     const option = authoredRow(
       "feat",
       ["feature", "choice.options"],
@@ -3792,9 +3792,9 @@ describe("the guard itself refuses what the editor cannot author", () => {
         reachable key is caught by the row tests above. */
     const owed: ReadonlyArray<readonly [HomebrewType, string, readonly string[], string]> = [
       // [type, key, container path, the unit that closes it]
-      ["equipment", "weapon.mastery", [], "U38 — 38 SRD weapons, gated on all eight slugs reaching"],
-      ["monster", "multiattack", ["actions"], "U21 — 126 SRD records author it"],
-      ["class", "widensPicks", [], "U17 — Bard row 55, Magical Secrets"]
+      ["equipment", "weapon.mastery", [], "38 SRD weapons, gated on all eight slugs reaching"],
+      ["monster", "multiattack", ["actions"], "126 SRD records author it"],
+      ["class", "widensPicks", [], "Bard row 55, Magical Secrets"]
     ];
     const stillOwed = owed.filter(([type, key, within]) => !hasControl(type, key, within));
     expect(

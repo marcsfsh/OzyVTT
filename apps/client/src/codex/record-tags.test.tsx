@@ -149,7 +149,7 @@ const openEntryDetails = async (user: ReturnType<typeof userEvent.setup>) => {
   if (details.getAttribute("aria-expanded") !== "true") await user.click(details);
 };
 
-describe("Journal entry tags (CI-2)", () => {
+describe("Journal entry tags", () => {
   const renderJournal = async (records: CodexChronicleRecord[]) => {
     chronicle.mockResolvedValue(records);
     listPages.mockResolvedValue([]);
@@ -203,7 +203,7 @@ describe("Journal entry tags (CI-2)", () => {
 
 // ----- Markers -----
 
-describe("Marker tags (CI-2)", () => {
+describe("Marker tags", () => {
   const renderInspector = (marker: CodexMarker) => {
     forMarker.mockResolvedValue([]);
     return render(
@@ -306,7 +306,7 @@ describe("Marker tags (CI-2)", () => {
 
 // ----- Maps -----
 
-describe("Map tags (CI-2)", () => {
+describe("Map tags", () => {
   const openMapSettings = async (map: CodexMap) => {
     listMaps.mockResolvedValue([map]);
     listAssets.mockResolvedValue([]);

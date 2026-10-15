@@ -96,7 +96,7 @@ const renderAudit = async (audit: unknown = AUDIT) => {
 const sectionOf = (heading: string) =>
   screen.getByRole("heading", { name: new RegExp(`^${heading}`) }).closest("section")!;
 
-describe("The audit lists every Codex record type (CT-9)", () => {
+describe("The audit lists every Codex record type", () => {
   it("names all seven kinds and one record from each", async () => {
     await renderAudit();
 
@@ -118,14 +118,14 @@ describe("The audit lists every Codex record type (CT-9)", () => {
     expect(screen.getByText("7 records are shown to players across the Codex.")).toBeInTheDocument();
   });
 
-  it("says out loud that it covers Codex records only (M12-A)", async () => {
+  it("says out loud that it covers Codex records only", async () => {
     await renderAudit();
     expect(screen.getByText(/Codex records only/)).toBeInTheDocument();
     expect(screen.getByText(/Tokens, fog and the shared table view/)).toBeInTheDocument();
   });
 });
 
-describe("Hiding a faction page takes the standing with it (D23)", () => {
+describe("Hiding a faction page takes the standing with it", () => {
   /** Losing this warning over-hides: the standing silently vanishes from players' view. */
   it("asks first, and hides nothing while the question is open", async () => {
     const user = userEvent.setup();
@@ -224,7 +224,7 @@ describe("A chronicle row says which kind of record it is", () => {
   });
 });
 
-describe("It aggregates; it does not decide (CT-9's stated risk)", () => {
+describe("It aggregates; it does not decide", () => {
   it("renders exactly what the server sent, with no predicate of its own", async () => {
     // Report the server's answer as given: `total` 8 with one row is legitimate (a pin on a hidden map).
     await renderAudit(

@@ -117,7 +117,7 @@ describe("per-turn override memory", () => {
 });
 
 describe("override reason", () => {
-  it("is optional - one tap, never a mandatory modal (D9) - and audits as a plain GM override", () => {
+  it("is optional - one tap, never a mandatory modal - and audits as a plain GM override", () => {
     expect(overrideReason(undefined)).toBe("GM override");
     expect(overrideReason(null)).toBe("GM override");
     expect(overrideReason({})).toBe("GM override");

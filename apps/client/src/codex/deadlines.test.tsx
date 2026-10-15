@@ -145,7 +145,7 @@ const openEntryDetails = async (user: ReturnType<typeof userEvent.setup>) => {
   if (details.getAttribute("aria-expanded") !== "true") await user.click(details);
 };
 
-describe("A new kind reads by icon AND word (R2)", () => {
+describe("A new kind reads by icon AND word", () => {
   it("every chronicle kind names an icon the registry actually has", () => {
     // `iconChildren` silently falls back to `pin` for an unknown id.
     for (const [kind, meta] of Object.entries(CHRONICLE_KIND_META)) {
@@ -167,7 +167,7 @@ describe("A new kind reads by icon AND word (R2)", () => {
   });
 });
 
-describe("A deadline's state is the SERVER's, and it reads as a word (CT-5)", () => {
+describe("A deadline's state is the SERVER's, and it reads as a word", () => {
   it("says Approaching before the campaign passes it and Passed after", async () => {
     await renderJournal([DEADLINE, { ...DEADLINE, id: "d2", fired: true, text: "The comet fell." }]);
 
@@ -184,7 +184,7 @@ describe("A deadline's state is the SERVER's, and it reads as a word (CT-5)", ()
   });
 });
 
-describe("Downtime proposes; the GM confirms (O-3)", () => {
+describe("Downtime proposes; the GM confirms", () => {
   it("logging downtime writes a record and does not touch the clock", async () => {
     await renderJournal([]);
     createDowntime.mockResolvedValue({ entry: {}, proposedDate: { year: 1492, month: 0, day: 10 } });
@@ -344,7 +344,7 @@ describe("Downtime proposes; the GM confirms (O-3)", () => {
   });
 });
 
-describe("A deadline cannot be written without a date (CT-5)", () => {
+describe("A deadline cannot be written without a date", () => {
   it("will not arm until the date is there, then sends the raw date the GM typed", async () => {
     await renderJournal([]);
     createDeadline.mockResolvedValue({});
@@ -371,7 +371,7 @@ describe("A deadline cannot be written without a date (CT-5)", () => {
   });
 });
 
-describe("The prep clock is quiet until it matters (O-1)", () => {
+describe("The prep clock is quiet until it matters", () => {
   it("says nothing at all while the GM's clock and the players' clock agree", async () => {
     await renderJournal([]);
     // While the clocks agree there is no prep-clock UI at all.
@@ -401,7 +401,7 @@ describe("The prep clock is quiet until it matters (O-1)", () => {
   });
 });
 
-describe("The player's chronicle (O-2) and the player's clock (O-1)", () => {
+describe("The player's chronicle and the player's clock", () => {
   const PLAYER_RECORD = (over: Partial<PlayerCodexChronicleRecord> = {}): PlayerCodexChronicleRecord => ({
     kind: "entry",
     id: "j1",
@@ -484,7 +484,7 @@ describe("The player's chronicle (O-2) and the player's clock (O-1)", () => {
   });
 });
 
-describe("The Campaign dashboard's deadlines card (CT-5)", () => {
+describe("The Campaign dashboard's deadlines card", () => {
   const CARDS = [
     { id: "d2", summary: "The comet fell.", when: "Hammer 1, 1492 DR", fired: true },
     { id: "d1", summary: "The duke's ultimatum expires.", when: "Hammer 10, 1492 DR", fired: false }
@@ -538,7 +538,7 @@ describe("The Campaign dashboard's deadlines card (CT-5)", () => {
  * jsdom can't measure 44px, but it can check which tap route each control takes: default-size `Button`
  * grows its paint; `size="sm"` adds an ::after that would overlap neighbours in these stacks.
  */
-describe("The new controls take the tap route §4 requires of a stacked control (P6)", () => {
+describe("The new controls take the tap route a stacked control needs", () => {
   it("Confirm and Publish are route 1, and the card's rows use the route-1 chassis", async () => {
     await renderJournal([DOWNTIME], { ...CALENDAR, currentDate: { year: 1492, month: 0, day: 20 } });
 

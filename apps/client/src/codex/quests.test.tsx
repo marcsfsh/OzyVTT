@@ -203,7 +203,7 @@ describe("What counts as OPEN (the rule, below the components)", () => {
   });
 });
 
-describe("The dashboard's open-quests card (M10)", () => {
+describe("The dashboard's open-quests card", () => {
   it("shows the GM the open quests only, and lands ON one — writing nothing to get there", async () => {
     gmDefaults();
     const user = userEvent.setup();
@@ -312,7 +312,7 @@ describe("The GM can actually pick the new statuses (5d)", () => {
   });
 });
 
-describe("The GM's objective checklist (M10)", () => {
+describe("The GM's objective checklist", () => {
   it("adds a BLANK row and saves it in place — order is content and a blank line is a real state", async () => {
     // Blank objective rows must survive the save; the server accepts them so "Add objective" works.
     gmDefaults([OPEN]);
@@ -435,7 +435,7 @@ const playerDefaults = (quests: readonly unknown[] = [PLAYER_QUEST]) => {
   playerQuests.mockResolvedValue(quests);
 };
 
-describe("The player's copy of the card (M10, viewer safety)", () => {
+describe("The player's copy of the card (viewer safety)", () => {
   beforeEach(() => {
     playerDefaults();
   });
@@ -649,7 +649,7 @@ describe("A quest-history row a player reads (5d)", () => {
   });
 });
 
-describe("A quest in suite-wide search (M10)", () => {
+describe("A quest in suite-wide search", () => {
   // q4, not q1: the log's fallback would land on q1 anyway, so a hit for it couldn't fail.
   const HIT: CodexSearchHit = {
     kind: "quest",

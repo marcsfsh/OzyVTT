@@ -527,7 +527,7 @@ if (missingAppliesTo.length > 0)
 const boundReserved = rows.filter((row) => RESERVED_UNBINDABLE.has(row.id) && row.appliesTo);
 if (boundReserved.length > 0)
   die(
-    `${boundReserved.length} U20-reserved row(s) carry an appliesTo they must not: ${boundReserved.map((row) => row.id).join(", ")}`
+    `${boundReserved.length} reserved unbindable row(s) carry an appliesTo they must not: ${boundReserved.map((row) => row.id).join(", ")}`
   );
 const strayAppliesTo = rows.filter((row) => row.category !== "weapon" && row.category !== "armor" && row.appliesTo);
 if (strayAppliesTo.length > 0)

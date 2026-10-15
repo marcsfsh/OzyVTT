@@ -1,10 +1,10 @@
 /**
  * API-to-editor parity guard, over the real router, store and publish gate.
- * - T1: every key the body schemas accept that no editor control can author must match a reasoned
+ * - The census: every key the body schemas accept that no editor control can author must match a reasoned
  *   exemption row, and every row must still match something. Counts are pinned.
- * - T2: per type, a record authored through the real controls is POSTed, published, read back, and
+ * - The round trip: per type, a record authored through the real controls is POSTed, published, read back, and
  *   must deep-equal the editor's own body. `background` cannot round-trip yet (pinned below).
- * - T3: the guard can fail: a removed row or a mangled value is reported.
+ * - Non-vacuity: the guard can fail: a removed row or a mangled value is reported.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -33,9 +33,9 @@ const { addresses, stats } = walkBodySchemas();
 const results = addresses.map(probeAddress);
 const open = results.filter((result) => !result.covered && !isSystemForced(result.address));
 
-/* ------------------------------------------------------------------ T1: the census ---- */
+/* ---------------------------------------------------------------------- the census ---- */
 
-describe("T1 — the census: every API-authorable key the editor cannot reach, held to a reasoned row", () => {
+describe("the census: every API-authorable key the editor cannot reach, held to a reasoned row", () => {
   it("pins the walk — the plan's two schema-intrinsic counts, and this file's own expansion", () => {
     // `objectSchemas`/`declaredKeys` are properties of the schemas; the counts below are properties
     // of the canonicaliser. When a schema or control change moves them, re-pin in the same change.
@@ -57,12 +57,12 @@ describe("T1 — the census: every API-authorable key the editor cannot reach, h
   });
 });
 
-/* -------------------------------------------------------------- T2: the round trip ---- */
+/* ------------------------------------------------------------------ the round trip ---- */
 
 const GM = { authorization: "Bearer gm-token", "content-type": "application/json" };
 
 /** One record per type, authored through the real controls (`authored`/`authoredRow` throw on a key
-    with no control). Covered fields only; uncovered keys are T1's concern. */
+    with no control). Covered fields only; uncovered keys are the census's concern. */
 const FIXTURES: Record<Exclude<HomebrewBodyType, "background">, () => Draft> = {
   monster: () => {
     const damage = authoredRow(
@@ -168,7 +168,7 @@ const FIXTURES: Record<Exclude<HomebrewBodyType, "background">, () => Draft> = {
   }
 };
 
-describe("T2 — the HTTP round trip: the editor reproduces the record the API stored, field for field", () => {
+describe("the HTTP round trip: the editor reproduces the record the API stored, field for field", () => {
   let api: ApiFixture;
   beforeAll(async () => {
     api = await bootHomebrewApi();
@@ -248,9 +248,9 @@ describe("T2 — the HTTP round trip: the editor reproduces the record the API s
   });
 });
 
-/* --------------------------------------------------- T3: the guard cannot rot green ---- */
+/* ------------------------------------------------------- the guard cannot rot green ---- */
 
-describe("T3 — non-vacuity, by constructed failure (plan §2.2: 'asserted in the file, so the guard cannot rot into a green no-op')", () => {
+describe("non-vacuity, by constructed failure, so the guard cannot rot into a green no-op", () => {
   it("(control) removing an exemption row whose addresses still have no control fails the census, naming them", () => {
     const withoutGrants = EXEMPTIONS.filter((row) => row.at !== "actions[].grants.**");
     const verdict = censusVerdict(open, withoutGrants);
@@ -260,7 +260,7 @@ describe("T3 — non-vacuity, by constructed failure (plan §2.2: 'asserted in t
   });
 
   it("(control, the other direction) a row matching nothing is reported stale, naming the row", () => {
-    const fake = { at: "actions[].neverAKey", types: "*" as const, reason: "probe", owner: "probe" };
+    const fake = { at: "actions[].neverAKey", types: "*" as const, reason: "probe", status: "probe" };
     const verdict = censusVerdict(open, [...EXEMPTIONS, fake]);
     expect(verdict.stale).toEqual(["*.actions[].neverAKey (probe)"]);
     expect(verdict.unmatched).toEqual([]);

@@ -500,7 +500,7 @@ describe("nothing the builder baked is counted a second time as a carrier", () =
   // effect (`EffectGrant.modifiers`), it reaches `actor.effects` through the builder's synthesized
   // activation and is summed by `effectiveSpeedFeet` on every read, so the feet come back when the
   // effect ends. Asserted through the movement refusal a player reads.
-  it("a feat's EFFECT carrying a runtime `speed` modifier reaches the movement refusal (U18)", () => {
+  it("a feat's EFFECT carrying a runtime `speed` modifier reaches the movement refusal", () => {
     const built = fight(
       build({
         effects: [

@@ -114,7 +114,7 @@ describe("tap routing (the seam)", () => {
     expect(offTurnVerdict(fight, { activation: "other", legendary: { cost: 1 } }, "Hero").warning).toBeNull();
   });
 
-  it("stops re-prompting once the GM has waved the economy through this turn (D9)", () => {
+  it("stops re-prompting once the GM has waved the economy through this turn", () => {
     const fight = fightState();
     fight.combat = {
       ...fight.combat,

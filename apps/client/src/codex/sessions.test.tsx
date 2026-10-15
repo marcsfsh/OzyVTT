@@ -205,7 +205,7 @@ describe("Which session is 'now' (the rule, below the components)", () => {
   });
 });
 
-describe("The session console is a VIEW (M9)", () => {
+describe("The session console is a VIEW", () => {
   it("opens from three different modes on one fetch, and writes nothing", async () => {
     gmDefaults();
     const user = userEvent.setup();
@@ -324,7 +324,7 @@ describe("Getting to a session (R1: every jump prepares its destination)", () =>
   });
 });
 
-describe("The player's session card (M9, viewer safety)", () => {
+describe("The player's session card (viewer safety)", () => {
   const PLAYER_SESSION: PlayerCodexSession = {
     id: "s8",
     sessionNumber: 8,
@@ -344,7 +344,7 @@ describe("The player's session card (M9, viewer safety)", () => {
   });
 
   /** The recap row navigates, so the test checks the tap actually lands. */
-  it("names the card for a recap, not a plan, and lands the tap on that session (D4/D14)", async () => {
+  it("names the card for a recap, not a plan, and lands the tap on that session", async () => {
     const user = userEvent.setup();
     (goTo("/codex"), render)(<PlayerCodex token="player" />);
     // Players only see revealed (already played) sessions, so the card says "Latest recap".
@@ -396,7 +396,7 @@ function BadgeProbe({ token }: Readonly<{ token: string | null }>) {
   );
 }
 
-describe("The recap badge keys on session ID (CT-3, correction C2)", () => {
+describe("The recap badge keys on session ID", () => {
   const sessionRow = (id: string, sessionNumber: number): PlayerCodexSession => ({
     id,
     sessionNumber,

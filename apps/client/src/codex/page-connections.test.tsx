@@ -233,7 +233,7 @@ const openPage = async (user: ReturnType<typeof userEvent.setup>) => {
   return within(await screen.findByRole("region", { name: "Connections" }));
 };
 
-describe("Page → its connections, in one place (CI-3 / CI-4 / CI-5)", () => {
+describe("Page → its connections, in one place", () => {
   beforeEach(gmDefaults);
 
   it("groups all three edges under one Connections heading rather than scattering them", async () => {
@@ -251,7 +251,7 @@ describe("Page → its connections, in one place (CI-3 / CI-4 / CI-5)", () => {
     expect(connections.getByRole("button", { name: "Show in graph" })).toBeInTheDocument();
   });
 
-  it("CI-3: a journal row lands on the Journal WITH that entry focused", async () => {
+  it("a journal row lands on the Journal WITH that entry focused", async () => {
     // The page's entry is second, so focusing the first entry fails.
     forPage.mockResolvedValue([ENTRY({ id: "j9", playerText: "The mists closed behind them." })]);
     chronicle.mockResolvedValue([
@@ -269,7 +269,7 @@ describe("Page → its connections, in one place (CI-3 / CI-4 / CI-5)", () => {
     expect(document.getElementById("codex-entry-j0")).not.toHaveAttribute("aria-current");
   });
 
-  it("CI-4: a pin row lands on the Atlas WITH the pin's own map open and the pin selected", async () => {
+  it("a pin row lands on the Atlas WITH the pin's own map open and the pin selected", async () => {
     markersForPage.mockResolvedValue([MARKER]);
     const user = userEvent.setup();
     renderWorkspace();
@@ -287,7 +287,7 @@ describe("Page → its connections, in one place (CI-3 / CI-4 / CI-5)", () => {
     expect(screen.getByLabelText("Label")).toHaveValue("Old Svalich Road");
   });
 
-  it("CI-5: Show in graph lands on the Graph WITH this entity's node focused", async () => {
+  it("Show in graph lands on the Graph WITH this entity's node focused", async () => {
     listRelationships.mockResolvedValue([
       {
         id: null,
@@ -313,7 +313,7 @@ describe("Page → its connections, in one place (CI-3 / CI-4 / CI-5)", () => {
     expect(screen.getByRole("button", { name: "Character: Strahd" })).not.toHaveAttribute("aria-current");
   });
 
-  it("R4: says the pin lookup failed rather than reporting the page has no pins", async () => {
+  it("says the pin lookup failed rather than reporting the page has no pins", async () => {
     markersForPage.mockRejectedValue(new Error("The atlas is unreachable."));
     const user = userEvent.setup();
     renderWorkspace();
@@ -341,7 +341,7 @@ const openGraph = async (user: ReturnType<typeof userEvent.setup>) => {
   await user.click(screen.getByRole("button", { name: "Graph" }));
 };
 
-describe("The Graph tells the truth (CI-8)", () => {
+describe("The Graph tells the truth", () => {
   beforeEach(gmDefaults);
 
   it("draws every connection, whatever its origin — one feed, one count", async () => {
@@ -376,7 +376,7 @@ describe("The Graph tells the truth (CI-8)", () => {
     expect(screen.getByText(/2 connections/)).toBeInTheDocument();
   });
 
-  it("D8: ONE edge style — origin is an attribute on the label, never a second render", async () => {
+  it("ONE edge style — origin is an attribute on the label, never a second render", async () => {
     listRelationships.mockResolvedValue([
       {
         id: "c1",
@@ -438,7 +438,7 @@ describe("The Graph tells the truth (CI-8)", () => {
   });
 });
 
-describe("The player Graph reads the PLAYER links feed (CI-8, viewer safety)", () => {
+describe("The player Graph reads the PLAYER links feed (viewer safety)", () => {
   const PLAYER_PAGES: PlayerCodexPageSummary[] = [
     {
       id: "p1",

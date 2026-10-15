@@ -281,7 +281,7 @@ describe("Collapsing the sidebar is reversible (both directions)", () => {
   });
 });
 
-describe("The player gets the same affordance, in the same words (D1)", () => {
+describe("The player gets the same affordance, in the same words", () => {
   const renderPlayer = async (props: { embedded?: boolean } = {}) => {
     goTo("/codex");
     render(<PlayerCodex token="player" {...props} />);

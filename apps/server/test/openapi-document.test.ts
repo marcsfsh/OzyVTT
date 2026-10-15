@@ -13,7 +13,6 @@ import {
   GAME_COMMANDS,
   HOMEBREW_PATHS,
   HOST_PATHS,
-  HomebrewContentTypeSchema,
   INTEGRATION_CREDENTIAL_PATHS,
   IntegrationScopeSchema,
   MAP_ASSET_PATHS,
@@ -48,9 +47,6 @@ describe("the OpenAPI document", () => {
       ...Object.values(HOST_PATHS)
     ];
     expect(Object.keys(openApiDocument.paths).sort()).toEqual([...new Set(declaredPaths)].sort());
-    expect(openApiDocument.components.schemas.SystemCapabilities.properties.supportedScopes.items.enum).toEqual(
-      IntegrationScopeSchema.options
-    );
     for (const path of Object.values(SYSTEM_PATHS))
       expect(openApiDocument.paths[path].get.responses["200"].content["application/json"].schema.$ref).toMatch(
         /^#\/components\/schemas\//
@@ -329,11 +325,6 @@ describe("the OpenAPI document", () => {
         maxLength: 60
       });
     }
-    // One polymorphic collection serves all nine content types.
-    expect(HomebrewContentTypeSchema.options).toHaveLength(9);
-    expect(openApiDocument.components.schemas.HomebrewRecordSummary.properties.type.enum).toEqual(
-      HomebrewContentTypeSchema.options
-    );
   });
 
   it("scopes every live-game operation to the least-privilege credential scope alongside GM sessions", () => {
@@ -422,7 +413,7 @@ describe("the OpenAPI document", () => {
     // The responses whose purpose is issuing a credential.
     const issuance = new Set([
       "IntegrationCredentialIssued.token",
-      "PlayerSessionIssuedData.token",
+      "PlayerSessionIssued.token",
       "CodexPreviewSessionData.token",
       // The host's own sign-in: the GM password goes in and a GM session token comes out.
       "HostPasswordRequest.password",

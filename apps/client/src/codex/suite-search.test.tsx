@@ -198,7 +198,7 @@ const searchInRail = async (user: ReturnType<typeof userEvent.setup>, query: str
 };
 const railResults = () => screen.getByRole("navigation", { name: "Campaign pages" });
 
-describe("Suite-wide search — the rail result list (CI-1 / R8)", () => {
+describe("Suite-wide search — the rail result list", () => {
   beforeEach(() => {
     listPages.mockResolvedValue([]);
     listRelationships.mockResolvedValue([]);
@@ -222,7 +222,7 @@ describe("Suite-wide search — the rail result list (CI-1 / R8)", () => {
     expect(results.getByText("Old Svalich Road")).toBeInTheDocument();
   });
 
-  it("states each row's kind in TEXT, so kind never reads by colour alone (R2)", async () => {
+  it("states each row's kind in TEXT, so kind never reads by colour alone", async () => {
     const user = userEvent.setup();
     renderWorkspace();
     await searchInRail(user, "barovia");
@@ -235,7 +235,7 @@ describe("Suite-wide search — the rail result list (CI-1 / R8)", () => {
     expect(results.getByText("Pin")).toBeInTheDocument();
   });
 
-  it("says the search FAILED rather than claiming nothing matched (R4)", async () => {
+  it("says the search FAILED rather than claiming nothing matched", async () => {
     search.mockRejectedValue(new Error("The codex request failed (500)."));
     const user = userEvent.setup();
     renderWorkspace();
@@ -257,7 +257,7 @@ describe("Suite-wide search — the rail result list (CI-1 / R8)", () => {
   });
 });
 
-describe("Suite-wide search — every jump prepares its destination (CI-1 / R1)", () => {
+describe("Suite-wide search — every jump prepares its destination", () => {
   beforeEach(() => {
     listPages.mockResolvedValue([]);
     listRelationships.mockResolvedValue([]);
@@ -351,7 +351,7 @@ describe("Suite-wide search — every jump prepares its destination (CI-1 / R1)"
   });
 });
 
-describe("Suite-wide search — the command palette is the SAME search (CI-1 / A-6)", () => {
+describe("Suite-wide search — the command palette is the SAME search", () => {
   beforeEach(() => {
     listPages.mockResolvedValue([]);
     listRelationships.mockResolvedValue([]);
@@ -403,7 +403,7 @@ describe("Suite-wide search — the command palette is the SAME search (CI-1 / A
     expect(surface).toHaveAttribute("data-selected", "k1");
   });
 
-  it("does not answer a failed palette search with 'No matches.' (R4)", async () => {
+  it("does not answer a failed palette search with 'No matches.'", async () => {
     search.mockRejectedValue(new Error("The codex is unreachable."));
     const user = userEvent.setup();
     renderWorkspace();
@@ -414,7 +414,7 @@ describe("Suite-wide search — the command palette is the SAME search (CI-1 / A
   });
 });
 
-describe("Suite-wide search — the player surface (CI-1, viewer safety)", () => {
+describe("Suite-wide search — the player surface (viewer safety)", () => {
   const PLAYER_MAP: PlayerCodexMap = {
     id: "m1",
     assetId: "a1",
@@ -486,7 +486,7 @@ describe("Suite-wide search — the player surface (CI-1, viewer safety)", () =>
     expect(surface).toHaveAttribute("data-selected", "k1");
   });
 
-  it("tells a player the search failed instead of 'nothing matches' (R4)", async () => {
+  it("tells a player the search failed instead of 'nothing matches'", async () => {
     playerSearch.mockRejectedValue(new Error("Couldn't reach the table."));
     const user = userEvent.setup();
     await searchAsPlayer(user, "barovia");

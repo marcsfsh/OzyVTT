@@ -103,7 +103,7 @@ const rowOf = (id: string) => document.getElementById(`codex-entry-${id}`)!;
 // The composer draft persists in sessionStorage, so clear it between tests.
 beforeEach(() => sessionStorage.clear());
 
-describe("The milestone is a FOURTH shape of the one composer (CT-8)", () => {
+describe("The milestone is a FOURTH shape of the one composer", () => {
   it("offers Entry, Deadline, Downtime and Milestone — and never Standing", async () => {
     await renderJournal();
     const switcher = screen.getByRole("group", { name: "What to write" });
@@ -175,7 +175,7 @@ describe("The milestone is a FOURTH shape of the one composer (CT-8)", () => {
   });
 });
 
-describe("A milestone and a standing row read as themselves on the chronicle (R2)", () => {
+describe("A milestone and a standing row read as themselves on the chronicle", () => {
   it("each says its kind in text and carries its own payload line", async () => {
     await renderJournal(
       [

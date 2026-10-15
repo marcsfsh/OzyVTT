@@ -113,7 +113,7 @@ const renderAtlas = async (markers: CodexMarker[]) => {
   await waitFor(() => expect(listMarkers).toHaveBeenCalled());
 };
 
-describe("The party pin says so in words, not only by its ring (CT-7 / R2)", () => {
+describe("The party pin says so in words, not only by its ring", () => {
   it("draws the words on the map and names the pin for a screen reader", () => {
     render(
       <MapSurface
@@ -175,7 +175,7 @@ describe("The party pin says so in words, not only by its ring (CT-7 / R2)", () 
  * "Show the pin" centres the camera and scrolls the map into view. The camera is checked through the
  * `viewBox`; `scrollIntoView` is a jsdom shim, so it is checked as a call.
  */
-describe("Show the pin shows the pin (ux-principles §9)", () => {
+describe("Show the pin shows the pin", () => {
   // The 1000x800 image fits at zoom 1 with the camera centred, so the viewBox is "0 0 1000 800".
   const FIT = "0 0 1000 800";
   const svg = () => document.querySelector(".codex-map-svg")!;
@@ -206,7 +206,7 @@ describe("Show the pin shows the pin (ux-principles §9)", () => {
   });
 });
 
-describe("One party pin for the whole atlas (M12-C)", () => {
+describe("One party pin for the whole atlas", () => {
   it("marks a pin as the party through its own route, and re-reads the map's pins", async () => {
     await renderAtlas([MARKER()]);
     const user = userEvent.setup();

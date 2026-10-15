@@ -206,8 +206,12 @@ the GM calendar are separate clocks; a date reaches players only when it is publ
 
 `/api/v1` exposes the game commands, the Codex, homebrew and the viewer over versioned
 envelopes, using the same handlers, authorization and projections as the UI. The OpenAPI
-document is assembled in `apps/server/src/openapi/` and served at `/api/v1/openapi.json`; each game
-command's operation and request body are generated from the command table. Conventions are in
+document is assembled in `apps/server/src/openapi/` and served at `/api/v1/openapi.json`. The
+components with a Zod schema behind them (the contract's shapes, the homebrew vocabulary and record
+bodies, the Codex write bodies, every game command's request body) are generated from it in
+`components.ts`, with their prose in `descriptions.ts`; each game command's operation comes from the
+command table. The Codex responses and the content and viewer components are still written by hand.
+Conventions are in
 ADR-0016; every router builds them from `apps/server/src/http-kit.ts` (bearer tokens, request ids,
 envelopes), and a caught error reaches the caller only as a known refusal, never as raw text.
 

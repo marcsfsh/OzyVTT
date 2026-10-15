@@ -35,7 +35,7 @@ afterEach(() => {
   goTo("/");
 });
 
-describe("The address table (D3)", () => {
+describe("The address table", () => {
   it("addresses the Viewer tab /viewer-controls, because the server reserves GET /viewer", () => {
     // `GET /viewer` is a 307 to the standalone TV viewer, so the SPA can never receive that address.
     expect(pathForGmTab("viewer")).toBe("/viewer-controls");
@@ -94,7 +94,7 @@ describe("The address table (D3)", () => {
   });
 });
 
-describe("Which addresses exist (D3)", () => {
+describe("Which addresses exist", () => {
   it("knows the codex sections, and rejects a section that does not exist", () => {
     expect(isKnownPath("/codex")).toBe(true);
     for (const section of [
@@ -176,7 +176,7 @@ describe("Which addresses exist (D3)", () => {
   });
 });
 
-describe("Which addresses a player may reach (viewer safety, D3)", () => {
+describe("Which addresses a player may reach (viewer safety)", () => {
   /**
    * The client half of the GM-only rule. The server refuses a player token anyway, but a player who
    * reaches the address has already learned the surface exists; the not-found view prevents that.
@@ -365,7 +365,7 @@ describe("Navigation guards (D6 — autosave off, draft dirty)", () => {
  * back gesture would leave a dirty editor with no prompt. Uses jsdom's real `history.back()`, so the
  * address is really put back.
  */
-describe("Back and forward are guarded too (D6, mobile parity)", () => {
+describe("Back and forward are guarded too (mobile parity)", () => {
   // Released in `afterEach`: a guard left registered by a failing assertion would veto the next test.
   const registered: Array<() => void> = [];
   const guardWith = (answer: boolean) => {
@@ -469,7 +469,7 @@ describe("Transient history (the phone nav drawer)", () => {
   });
 });
 
-describe("Resume-last-location (D2)", () => {
+describe("Resume-last-location", () => {
   beforeEach(() => {
     localStorage.clear();
   });

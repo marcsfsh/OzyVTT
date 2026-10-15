@@ -94,7 +94,7 @@ const snapshot = async (base: string, token: string, view?: "player") =>
   (await (await fetch(base + GAME_PATHS.snapshot + (view ? "?view=player" : ""), { headers: bearer(token) })).json())
     .data.game;
 
-describe("standing rules policy (D6/D7)", () => {
+describe("standing rules policy", () => {
   it("is GM-only, stores per-family exceptions, and does NOT retune the fight in progress", async () => {
     const { base, gmToken, server, mapAssetId } = await boot();
     const playerToken = server.auth.issuePlayerSession();
@@ -178,7 +178,7 @@ describe("standing rules policy (D6/D7)", () => {
   });
 });
 
-describe("staging defaults and the one-command mid-fight add (D2)", () => {
+describe("staging defaults and the one-command mid-fight add", () => {
   it("stores the table's staging default and refuses a player", async () => {
     const { base, gmToken, server } = await boot();
     const playerToken = server.auth.issuePlayerSession();
@@ -232,7 +232,7 @@ describe("staging defaults and the one-command mid-fight add (D2)", () => {
   });
 });
 
-describe("the two doors into a fight (D1/D3)", () => {
+describe("the two doors into a fight", () => {
   it("prepares and goes live in one command", async () => {
     const { base, gmToken, mapAssetId } = await boot();
     const sceneId = randomUUID();
@@ -302,7 +302,7 @@ describe("the two doors into a fight (D1/D3)", () => {
   });
 });
 
-describe("archived characters: sharing and claims (D16/D26)", () => {
+describe("archived characters: sharing and claims", () => {
   it("archiving a claimed character releases the claim, so its player is not locked out invisibly", async () => {
     const { base, gmToken, server } = await boot();
     const playerToken = server.auth.issuePlayerSession();
@@ -355,7 +355,7 @@ describe("archived characters: sharing and claims (D16/D26)", () => {
   });
 });
 
-describe("per-replay sharing (D26)", () => {
+describe("per-replay sharing", () => {
   it("stores an archive's visibility, defaults to hidden, and 404s an unknown archive", async () => {
     const { base, gmToken, server, mapAssetId } = await boot();
     await post(base, GAME_PATHS.encounterStart, gmToken, { mapAssetId, entries: [{ actorId: HERO_ID, score: 10 }] });
