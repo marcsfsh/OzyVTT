@@ -83,7 +83,7 @@ export function renderAppMap(): string {
   lines.push("Curated pointers (verify line numbers before relying on them - code moves):");
   lines.push("");
   lines.push(
-    "- **Wire contract (single source):** `packages/domain/src/index.ts` - `GameState`, projections (`PlayerView`/`GmView`), `ClientToServerEvents`/`ServerToClientEvents`."
+    "- **Wire contract (single source):** `packages/domain/src/` - `GameState` in `state.ts`, projections (`PlayerView`/`GmView`) in `views.ts`, `ClientToServerEvents`/`ServerToClientEvents` in `socket.ts`."
   );
   lines.push("- **Persisted/importable schemas:** `packages/schemas/src/index.ts` - `Actor`, `ActorDefinition`.");
   lines.push("- **Command Zod schemas:** `packages/domain/src/commands.ts`.");

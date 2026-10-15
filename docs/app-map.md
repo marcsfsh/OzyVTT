@@ -336,7 +336,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 
 Curated pointers (verify line numbers before relying on them - code moves):
 
-- **Wire contract (single source):** `packages/domain/src/index.ts` - `GameState`, projections (`PlayerView`/`GmView`), `ClientToServerEvents`/`ServerToClientEvents`.
+- **Wire contract (single source):** `packages/domain/src/` - `GameState` in `state.ts`, projections (`PlayerView`/`GmView`) in `views.ts`, `ClientToServerEvents`/`ServerToClientEvents` in `socket.ts`.
 - **Persisted/importable schemas:** `packages/schemas/src/index.ts` - `Actor`, `ActorDefinition`.
 - **Command Zod schemas:** `packages/domain/src/commands.ts`.
 - **Command table + pipeline:** `apps/server/src/commands/` (`index.ts` lists every command).
