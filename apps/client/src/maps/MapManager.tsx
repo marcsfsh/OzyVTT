@@ -17,7 +17,6 @@ export type MapSelection = Readonly<{
   height: number;
   calibration: MapAsset["calibration"];
   scale: MapAsset["scale"];
-  previewUrl?: string;
 }>;
 
 /**
@@ -91,12 +90,11 @@ export function MapManager({
             width: selected.width,
             height: selected.height,
             calibration: selected.calibration,
-            scale: selected.scale,
-            ...(previewUrl ? { previewUrl } : {})
+            scale: selected.scale
           }
         : null
     );
-  }, [selected, previewUrl, onSelectionChange]);
+  }, [selected, onSelectionChange]);
 
   return (
     <section

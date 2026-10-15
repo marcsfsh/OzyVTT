@@ -265,8 +265,7 @@ export function GmShell({
                   height: selectedMap.height,
                   altText: selectedMap.name,
                   calibration: selectedMap.calibration,
-                  scale: selectedMap.scale,
-                  ...(selectedMap.previewUrl ? { previewUrl: selectedMap.previewUrl } : {})
+                  scale: selectedMap.scale
                 }
               }
             : {})}

@@ -3,7 +3,7 @@ import { Button, Eyebrow, SegmentedControl, Select } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { apiRequest, jsonRequest } from "../lib/api";
 import { newId } from "../lib/ids";
-import { clampPoint, imagePointFromClient } from "../scene/mapImage";
+import { clampPoint, imagePointFromClient, useAuthorizedMapImage } from "../scene/mapImage";
 import "./viewer-controls.css";
 
 type Point = Readonly<{ x: number; y: number }>;
@@ -28,7 +28,6 @@ type ViewerMap = Readonly<{
   width: number;
   height: number;
   altText: string;
-  previewUrl?: string;
   calibration?: Readonly<{ calibration: Readonly<{ cellSizePx: number; distancePerCell: number }> }> | null;
   scale?: Readonly<{ distancePerPixel: number; unit: string }> | null;
 }>;
@@ -63,6 +62,9 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
   const [viewerUrls, setViewerUrls] = useState<readonly string[]>([]);
   const [selectedViewerUrl, setSelectedViewerUrl] = useState("");
   const svgRef = useRef<SVGSVGElement | null>(null);
+  // The map's own image, so the click surface works whether or not the maps library was opened.
+  const image = useAuthorizedMapImage(map?.assetId ?? null, gmToken);
+  const previewUrl = image.status === "ready" ? image.url : null;
   const { confirm, dialog } = useConfirm();
   const suggestedLabel = useMemo(() => measurementLabel(map, draftPoints), [map, draftPoints]);
   const viewerUrl = selectedViewerUrl || viewerUrls[0] || `${window.location.origin}/viewer.html`;
@@ -122,7 +124,7 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
   const requiredPointCount = tool === "measure" ? 2 : 1;
 
   const choosePoint = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!map || !map.previewUrl || busy || !svgRef.current) return;
+    if (!map || !previewUrl || busy || !svgRef.current) return;
     // The preview box is larger than the letterboxed map; ignore clicks outside the map rather than
     // clamping them onto the nearest edge.
     if (!(event.target instanceof Node) || !svgRef.current.contains(event.target)) return;
@@ -218,7 +220,7 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
               />
               {/* The preview box is the click surface; no wrapper in between, since an auto-height intermediate
               breaks the percentage chain that bounds the svg to the canvas. */}
-              {map.previewUrl && (
+              {previewUrl && (
                 <div
                   className="viewer-tool-preview"
                   onClick={choosePoint}
@@ -231,7 +233,7 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
                     height={map.height}
                     preserveAspectRatio="xMidYMid meet"
                   >
-                    <image href={map.previewUrl} width={map.width} height={map.height} role="img" aria-label="" />
+                    <image href={previewUrl} width={map.width} height={map.height} role="img" aria-label="" />
                     {tool === "measure" && draftPoints.length === 2 && (
                       <line x1={draftPoints[0].x} y1={draftPoints[0].y} x2={draftPoints[1].x} y2={draftPoints[1].y} />
                     )}
