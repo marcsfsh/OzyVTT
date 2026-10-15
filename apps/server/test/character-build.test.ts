@@ -7,11 +7,8 @@ import {
   type GameState
 } from "@vtt/domain";
 import { abilityModifier, meetsMulticlassPrerequisites } from "@vtt/rules-5e";
-import {
-  buildCharacterDefinition,
-  NAMED_PICK_BUDGETS,
-  type CharacterCreateRequestInput
-} from "../src/character-build.js";
+import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
+import { NAMED_PICK_BUDGETS } from "../src/character-offers.js";
 import { importActorDefinition } from "../src/actor-roster.js";
 import { ContentLibrary, type ContentView } from "../src/content-library.js";
 import { CommandRejectedError } from "../src/game-store.js";

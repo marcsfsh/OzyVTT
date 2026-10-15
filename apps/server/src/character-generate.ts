@@ -3,14 +3,14 @@ import { CatalogChoiceError, resolveCatalogChoice } from "@vtt/domain";
 import type { CharacterChoice } from "@vtt/schemas";
 import { ABILITIES, hitDieFaces, STANDARD_ARRAY, statPriorityFor, type Ability } from "@vtt/rules-5e";
 import type { ClassReference } from "@vtt/content-srd-5.2.1";
+import type { CharacterCreateRequestInput } from "./character-build.js";
 import {
   computeServerOffers,
   levelOfPick,
   withinOfferSpellWindow,
-  type CharacterCreateRequestInput,
   type ChoiceOffer,
   type ServerOfferSurvey
-} from "./character-build.js";
+} from "./character-offers.js";
 import type { ContentView } from "./content-library.js";
 import { CommandRejectedError } from "./game-store.js";
 

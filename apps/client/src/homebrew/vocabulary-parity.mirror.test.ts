@@ -16,11 +16,8 @@ import { HOMEBREW_BODY_SCHEMAS } from "@vtt/content-srd-5.2.1/schemas";
 import { InventoryItemSchema, type ActorDefinition } from "@vtt/schemas";
 import { resolveDefinitionAction } from "../../../server/src/action-resolution.js";
 import { importActorDefinition } from "../../../server/src/actor-roster.js";
-import {
-  buildCharacterDefinition,
-  computeServerOffers,
-  type CharacterCreateRequestInput
-} from "../../../server/src/character-build.js";
+import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../../../server/src/character-build.js";
+import { computeServerOffers } from "../../../server/src/character-offers.js";
 import { choiceOverrideDefenses, replaceableOffers } from "../../../server/src/choice-overrides.js";
 import {
   ContentLibrary,
