@@ -4,12 +4,13 @@ import type { GmView, PlayerView } from "@vtt/domain";
 import { actionAvailability } from "../action-resolution.js";
 import { deriveActorSheet } from "../actor-derived.js";
 import { storedDefinition } from "../actor-roster.js";
-import { requireActorAccess } from "../authorization.js";
+import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
+import { builderOffers } from "../builder-offers.js";
 import { BUILTIN_ACTIONS, BUILTIN_TARGETING } from "../builtin-actions.js";
 import { actionSummaryOf, type ContentView } from "../content-library.js";
 import { effectiveActions } from "../effective-actions.js";
 import { deriveEquipment } from "../equipment-derivation.js";
-import { ActorAvailableActionsSchema, ContentActionsSchema } from "../game-commands.js";
+import { ActorAvailableActionsSchema, BuilderOffersSchema, ContentActionsSchema } from "../game-commands.js";
 import { GameNotFoundError } from "./failures.js";
 import { initiatorOf, isGmGrade, type GamePrincipal, type Kit } from "./kit.js";
 import type { ReadSpec } from "./pipeline.js";
@@ -148,6 +149,29 @@ export const gameReads = [
           kit.catalogFor(principal).skillSummaries()
         )
       };
+    }
+  },
+
+  {
+    event: "builder:offers",
+    path: GAME_PATHS.builderOffers,
+    scope: "game:read",
+    schema: BuilderOffersSchema,
+    malformed: "The builder draft is malformed.",
+    // Over HTTP the draft is one JSON-encoded `draft` query parameter.
+    httpInput: ({ query }) => {
+      try {
+        return typeof query.draft === "string" ? JSON.parse(query.draft) : undefined;
+      } catch {
+        return undefined;
+      }
+    },
+    // The same gate as `character.create` and `character.rebuild`: a player builds only while the table lets
+    // them. The caller's catalog keeps GM-only homebrew out of a player's offers.
+    run: (principal, input, kit) => {
+      if (!isGmGrade(principal) && kit.read().builderPolicy.playerBuilder !== "open")
+        throw new GameAccessDeniedError("Your GM builds the characters at this table.");
+      return builderOffers(input as z.output<typeof BuilderOffersSchema>, kit.catalogFor(principal));
     }
   },
 

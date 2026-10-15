@@ -192,6 +192,7 @@ export const GAME_PATHS = {
   characters: `${API_NAMESPACE}/game/characters`,
   charactersRandom: `${API_NAMESPACE}/game/characters/random`,
   characterRebuild: `${API_NAMESPACE}/game/actors/{actorId}/rebuild`,
+  builderOffers: `${API_NAMESPACE}/game/builder/offers`,
   builderRollAbilities: `${API_NAMESPACE}/game/builder/ability-rolls`,
   builderPolicy: `${API_NAMESPACE}/game/builder/policy`,
   rulesPolicy: `${API_NAMESPACE}/game/rules/policy`,
@@ -2095,6 +2096,33 @@ export const openApiDocument = {
           "400": apiError,
           "401": apiError,
           "403": apiError
+        }
+      }
+    },
+    [GAME_PATHS.builderOffers]: {
+      get: {
+        operationId: "getBuilderOffers",
+        security: gameSecurityWithPlayer("game:read"),
+        description:
+          "What the content asks a character-builder draft to pick, worked out by the same survey `POST /game/characters` validates against, so a builder offers exactly what a create accepts. Each offer names its builder step, its options (named, with spell levels), its capacity after every feature that raises it, the level its rows are stamped with (one offer per grant level, so each Ability Score Improvement is its own), and the options this build cannot usefully take. The reply also carries the answers the build still accepts (an answer it no longer offers is dropped) and the ledger rows they make, which a create sends as `choices`. Send the answers by offer key, or a stored ledger as `choices` to read a character back for a rebuild. The GM always; a player session while the table's builder policy lets players build.",
+        parameters: [
+          {
+            name: "draft",
+            in: "query",
+            required: true,
+            description: "The draft, JSON-encoded.",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/BuilderOffersDraft" } } }
+          }
+        ],
+        responses: {
+          "200": {
+            description: "The draft's offers, its accepted answers, and their ledger rows",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/BuilderOffersResponse" } } }
+          },
+          "400": apiError,
+          "401": apiError,
+          "403": apiError,
+          "409": apiError
         }
       }
     },
@@ -5842,6 +5870,141 @@ export const openApiDocument = {
         }
       },
       ActorAvailableActionsResponse: envelopeSchema("#/components/schemas/ActorAvailableActionsData"),
+      BuilderOffersDraft: {
+        type: "object",
+        additionalProperties: false,
+        required: ["level"],
+        description:
+          "A character-builder draft: the identity chosen so far, and the answers by offer key or a stored ledger (not both).",
+        properties: {
+          speciesId: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 80 },
+          backgroundId: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 80 },
+          classId: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 80 },
+          level: { type: "integer", minimum: 1, maximum: 20 },
+          picks: {
+            type: "object",
+            maxProperties: 200,
+            additionalProperties: {
+              type: "array",
+              maxItems: 40,
+              items: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 80 }
+            },
+            description: "Offer key -> the option ids chosen for it."
+          },
+          asiIncreases: {
+            type: "object",
+            maxProperties: 40,
+            additionalProperties: { $ref: "#/components/schemas/BuilderAbilityIncreases" },
+            description: "Offer key -> the +2 split, for an Ability Score Improvement answered with `asi`."
+          },
+          choices: {
+            type: "array",
+            maxItems: 200,
+            items: { $ref: "#/components/schemas/BuilderChoiceRow" },
+            description: "A stored choice ledger, read back onto the offers it answers."
+          }
+        }
+      },
+      BuilderAbilityIncreases: {
+        type: "array",
+        maxItems: 2,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["ability", "amount"],
+          properties: {
+            ability: { type: "string", enum: ["str", "dex", "con", "int", "wis", "cha"] },
+            amount: { type: "integer", minimum: 1, maximum: 2 }
+          }
+        }
+      },
+      BuilderChoiceRow: {
+        type: "object",
+        additionalProperties: false,
+        required: ["level", "kind", "id"],
+        properties: {
+          level: { type: "integer", minimum: 1, maximum: 20 },
+          classId: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 60 },
+          kind: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 60 },
+          id: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 80 },
+          payload: { type: "object", additionalProperties: true }
+        }
+      },
+      BuilderOffersData: {
+        type: "object",
+        additionalProperties: false,
+        required: ["offers", "picks", "asiIncreases", "subclassId", "choices"],
+        properties: {
+          offers: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: [
+                "key",
+                "step",
+                "featureId",
+                "kind",
+                "label",
+                "help",
+                "capacity",
+                "options",
+                "maxSpellLevel",
+                "level",
+                "classId",
+                "unresolvable",
+                "unavailable"
+              ],
+              properties: {
+                key: { type: "string", description: "Stable key the draft's answers are filed under" },
+                step: { type: "string", enum: ["species", "background", "class", "features", "equipment"] },
+                featureId: { type: ["string", "null"] },
+                kind: { type: "string" },
+                label: { type: "string" },
+                help: { type: ["string", "null"] },
+                capacity: { type: "integer", minimum: 0 },
+                options: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    additionalProperties: false,
+                    required: ["id", "name"],
+                    properties: { id: { type: "string" }, name: { type: "string" }, level: { type: "integer" } }
+                  }
+                },
+                maxSpellLevel: { type: ["integer", "null"] },
+                level: { type: "integer", minimum: 1, maximum: 20 },
+                classId: { type: ["string", "null"] },
+                unresolvable: {
+                  type: ["string", "null"],
+                  description: "Why nothing can be picked here yet; such an offer may be left open"
+                },
+                unavailable: {
+                  type: ["object", "null"],
+                  additionalProperties: { type: "string" },
+                  description: "Option id -> why this build cannot usefully take it (already held, or no proficiency)"
+                }
+              }
+            }
+          },
+          picks: {
+            type: "object",
+            additionalProperties: { type: "array", items: { type: "string" } },
+            description: "The answers the build still accepts, by offer key"
+          },
+          asiIncreases: {
+            type: "object",
+            additionalProperties: { $ref: "#/components/schemas/BuilderAbilityIncreases" }
+          },
+          subclassId: { type: ["string", "null"], description: "The subclass offer's answer" },
+          choices: {
+            type: "array",
+            items: { $ref: "#/components/schemas/BuilderChoiceRow" },
+            description: "The ledger rows these answers make: a create's `choices`"
+          }
+        }
+      },
+      BuilderOffersResponse: envelopeSchema("#/components/schemas/BuilderOffersData"),
       AnnotationAddRequest: {
         type: "object",
         additionalProperties: false,
