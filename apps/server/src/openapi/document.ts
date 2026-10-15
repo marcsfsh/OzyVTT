@@ -2865,7 +2865,8 @@ export const openApiDocument = {
                 "rangeFeet",
                 "damageRoll",
                 "damageTypes",
-                "castingOptions"
+                "castingOptions",
+                "cantripScaling"
               ],
               properties: {
                 id: { type: "string" },
@@ -2911,6 +2912,21 @@ export const openApiDocument = {
                     required: ["level", "damageRoll", "targetCount"],
                     properties: {
                       level: { type: "integer", minimum: 1, maximum: 9 },
+                      damageRoll: { type: ["string", "null"] },
+                      targetCount: { type: ["integer", "null"] }
+                    }
+                  }
+                },
+                cantripScaling: {
+                  type: "array",
+                  description:
+                    "A cantrip's character-level scaling (Fire Bolt's 2d10 at 5, Eldritch Blast's 2 beams), lowest level first; the row in force is the highest at or below the caster's level. Empty for a leveled spell",
+                  items: {
+                    type: "object",
+                    additionalProperties: false,
+                    required: ["characterLevel", "damageRoll", "targetCount"],
+                    properties: {
+                      characterLevel: { type: "integer", minimum: 1, maximum: 20 },
                       damageRoll: { type: ["string", "null"] },
                       targetCount: { type: ["integer", "null"] }
                     }

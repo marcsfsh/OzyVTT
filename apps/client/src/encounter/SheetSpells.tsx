@@ -6,6 +6,7 @@ import {
   type GmActor,
   type PlayerActor
 } from "@vtt/domain";
+import { cantripTierAt } from "@vtt/content-srd-5.2.1/schemas";
 import { spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
 import { SpellCard, useSpellReference } from "./spells";
 import { ordinal, signed, titleCase } from "./format";
@@ -16,18 +17,25 @@ type SheetSpell = Readonly<{ id: string; name: string; level: number; actionId?:
 
 /**
  * The damage a spell deals when cast at `level`: the single source for both the displayed effect
- * and the rolled formula. Uses the SRD upcast row for that slot if any, else the base damage. For
- * target scaling (N darts/rays) the formula repeats the die `targetCount` times so the full amount
- * is rolled.
+ * and the rolled formula. Uses the SRD upcast row for that slot if any, and a cantrip's row for the
+ * character's level (the server's built action reads the same rows), else the base damage. For
+ * target scaling (N darts/rays/beams) the formula repeats the die `targetCount` times so the full
+ * amount is rolled.
  */
 function spellEffectAt(
   content: ContentSpellSummary | undefined,
   baseLevel: number,
-  level: number
+  level: number,
+  characterLevel = 1
 ): { label: string | null; formula: string | null } {
-  const upcast = level > baseLevel ? content?.castingOptions.find((option) => option.level === level) : undefined;
-  const die = upcast?.damageRoll ?? content?.damageRoll ?? null;
-  const targets = upcast?.targetCount ?? null;
+  const scaled =
+    baseLevel === 0
+      ? cantripTierAt(content?.cantripScaling ?? [], characterLevel)
+      : level > baseLevel
+        ? content?.castingOptions.find((option) => option.level === level)
+        : undefined;
+  const die = scaled?.damageRoll ?? content?.damageRoll ?? null;
+  const targets = scaled?.targetCount ?? null;
   if (die && targets && targets > 1)
     return { label: `${targets}× ${die}`, formula: Array.from({ length: targets }, () => die).join(" + ") };
   if (die) return { label: die, formula: die };
@@ -138,6 +146,11 @@ export function SheetSpells({
   const { rollFlat } = rolls;
   const spellcasting = definition.spellcasting;
   const character = definition.character;
+  // Cantrips scale with the character's total level, not any one class's.
+  const characterLevel = Math.max(
+    1,
+    (character?.classes ?? []).reduce((sum, entry) => sum + entry.level, 0)
+  );
   // SRD spell reference (session-cached): base and upcast damage for the "Cast at" control.
   const spellRef = useSpellReference();
   const [openSpell, setOpenSpell] = useState<ContentSpellSummary | null>(null);
@@ -202,7 +215,7 @@ export function SheetSpells({
     // A cantrip that targets a creature routes through the structured flow on your turn.
     if (routeSpell(spell)) return;
     const content = spellIndex.get(spell.id);
-    const { formula } = spellEffectAt(content, spell.level, spell.level);
+    const { formula } = spellEffectAt(content, spell.level, spell.level, characterLevel);
     if (formula)
       void rollFlat(
         formula,

@@ -50,6 +50,8 @@ export type ContentSpellSummary = Readonly<{
   damageTypes: readonly string[];
   /** Per-slot-level upcast scaling parsed from the SRD (Fireball's 9d6 at 4th); the sheet applies the entry for the cast level. */
   castingOptions: ReadonlyArray<{ level: number; damageRoll: string | null; targetCount: number | null }>;
+  /** A cantrip's character-level scaling (Fire Bolt's 2d10 at 5, Eldritch Blast's 2 beams); empty otherwise. */
+  cantripScaling: ReadonlyArray<{ characterLevel: number; damageRoll: string | null; targetCount: number | null }>;
 }>;
 export type ContentSpellsResult = {
   ok: boolean;

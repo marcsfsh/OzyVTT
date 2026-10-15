@@ -88,7 +88,8 @@ const spell = (name: string, level: number): ContentSpellSummary => ({
   classes: ["cleric"],
   damageRoll: null,
   damageTypes: [],
-  castingOptions: []
+  castingOptions: [],
+  cantripScaling: []
 });
 const spells: readonly ContentSpellSummary[] = [
   ...CANTRIPS.map((name) => spell(name, 0)),
