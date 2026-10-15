@@ -1,5 +1,5 @@
 /* Layout patterns: class-only templates for content-heavy surfaces (stat blocks, content lists, import
-   previews, empty states). Documented in /styleguide. Imported via @vtt/ui/styles.css. */
+   previews, empty states). Imported via @vtt/ui/styles.css. */
 
 /* ---- Data table (content lists, credentials, import previews) ---- */
 .nh-table {

@@ -264,6 +264,27 @@ describe("public API contracts", () => {
     });
   });
 
+  it("answers every viewer JSON route in the standard data envelope", () => {
+    type Op = { responses: Record<string, { content?: Record<string, { schema: { $ref: string } }> }> };
+    const paths = openApiDocument.paths as unknown as Record<string, Record<string, Op>>;
+    const schemas = openApiDocument.components.schemas as unknown as Record<string, { required?: string[] }>;
+    const jsonPaths = Object.values(VIEWER_PATHS).filter((path) => path !== VIEWER_PATHS.events);
+    for (const path of jsonPaths) {
+      for (const [method, operation] of Object.entries(paths[path] ?? {})) {
+        const success = Object.entries(operation.responses).filter(([status]) => status.startsWith("2"));
+        expect(success.length, `${method} ${path}`).toBeGreaterThan(0);
+        for (const [status, response] of success) {
+          const ref = response.content?.["application/json"]?.schema.$ref ?? "";
+          expect(schemas[ref.split("/").pop() ?? ""]?.required, `${method} ${path} ${status}`).toEqual([
+            "ok",
+            "apiVersion",
+            "data"
+          ]);
+        }
+      }
+    }
+  });
+
   /** Codex operations accept scoped credentials, except the one that mints a player session. */
   it("documents the codex surface: GM-grade writes, role-projected reads, and codex:read/codex:write credentials beside the sessions", () => {
     type Op = { security?: ReadonlyArray<Record<string, readonly string[]>>; responses: Record<string, unknown> };

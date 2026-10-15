@@ -33,6 +33,9 @@ export const MAP_ASSET_PATHS = {
   calibrationWizardComplete: `${API_NAMESPACE}/map-assets/{id}/calibration/wizards/{wizardId}/complete`
 } as const;
 
+/** The HttpOnly cookie a paired table viewer (or the GM's preview of it) authenticates with. */
+export const VIEWER_SESSION_COOKIE = "vtt_viewer_session";
+
 /** Documentation-only path constants for `viewer-http.ts`'s router. See the note on MAP_ASSET_PATHS. */
 export const VIEWER_PATHS = {
   pairings: `${API_NAMESPACE}/viewer/pairings`,
@@ -41,6 +44,7 @@ export const VIEWER_PATHS = {
   accessById: `${API_NAMESPACE}/viewer/access/{id}`,
   presentation: `${API_NAMESPACE}/viewer/presentation`,
   presentationCommands: `${API_NAMESPACE}/viewer/presentation/commands`,
+  previewSession: `${API_NAMESPACE}/viewer/preview-session`,
   events: `${API_NAMESPACE}/viewer/events`
 } as const;
 
@@ -2059,18 +2063,30 @@ export const openApiDocument = {
         security: [{ gmAuth: [] }],
         description:
           "Issues a short-lived, one-time pairing code for a second-screen display to exchange for a session.",
-        responses: { "201": { description: "Pairing code issued" }, "401": { $ref: "#/components/responses/ApiError" } }
+        responses: {
+          "201": {
+            description: "Pairing code issued",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerPairingResponse" } } }
+          },
+          "400": { $ref: "#/components/responses/ApiError" },
+          "401": { $ref: "#/components/responses/ApiError" },
+          "429": { $ref: "#/components/responses/ApiError" }
+        }
       }
     },
     [VIEWER_PATHS.pairingsExchange]: {
       post: {
         operationId: "exchangeViewerPairing",
         security: [],
-        description:
-          "Exchanges a pairing code for an HttpOnly, SameSite=Strict `vtt_viewer_session` cookie. No request auth: the code itself is the credential.",
+        description: `Exchanges a pairing code for an HttpOnly, SameSite=Strict \`${VIEWER_SESSION_COOKIE}\` cookie. No request auth: the code itself is the credential.`,
         responses: {
-          "201": { description: "Paired; session cookie set" },
-          "400": { $ref: "#/components/responses/ApiError" }
+          "201": {
+            description: "Paired; session cookie set",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerSessionResponse" } } }
+          },
+          "400": { $ref: "#/components/responses/ApiError" },
+          "401": { $ref: "#/components/responses/ApiError" },
+          "429": { $ref: "#/components/responses/ApiError" }
         }
       }
     },
@@ -2079,7 +2095,10 @@ export const openApiDocument = {
         operationId: "listViewerAccess",
         security: [{ gmAuth: [] }],
         responses: {
-          "200": { description: "Every paired viewer plus which are currently connected" },
+          "200": {
+            description: "Every paired viewer plus which are currently connected",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerAccessListResponse" } } }
+          },
           "401": { $ref: "#/components/responses/ApiError" }
         }
       }
@@ -2090,7 +2109,14 @@ export const openApiDocument = {
         security: [{ gmAuth: [] }],
         description: "Revokes one paired display and immediately disconnects its live event stream.",
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
-        responses: { "200": { description: "Revoked" }, "401": { $ref: "#/components/responses/ApiError" } }
+        responses: {
+          "200": {
+            description: "Revoked",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerSessionResponse" } } }
+          },
+          "400": { $ref: "#/components/responses/ApiError" },
+          "401": { $ref: "#/components/responses/ApiError" }
+        }
       }
     },
     [VIEWER_PATHS.presentation]: {
@@ -2100,7 +2126,8 @@ export const openApiDocument = {
         responses: {
           "200": {
             description:
-              "Current player-safe presentation state (map, camera, measurement, pings, initiative, encounter)"
+              "Current player-safe presentation state (map, camera, measurement, pings, initiative, encounter)",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerPresentationResponse" } } }
           },
           "401": { $ref: "#/components/responses/ApiError" }
         }
@@ -2113,10 +2140,28 @@ export const openApiDocument = {
         description:
           "GM-only optimistic-concurrency command (present/pause map, set camera, ping, set/clear measurement). `expectedRevision` mismatches return 409.",
         responses: {
-          "200": { description: "Command applied" },
+          "200": {
+            description: "Command applied",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerCommandResponse" } } }
+          },
           "400": { $ref: "#/components/responses/ApiError" },
           "401": { $ref: "#/components/responses/ApiError" },
           "409": { $ref: "#/components/responses/ApiError" }
+        }
+      }
+    },
+    [VIEWER_PATHS.previewSession]: {
+      post: {
+        operationId: "createViewerPreviewSession",
+        security: [{ gmAuth: [] }],
+        description:
+          "Sets a read-only viewer cookie for the GM's own preview of the shared screen. It reads the presentation like a paired display.",
+        responses: {
+          "201": {
+            description: "Preview cookie set",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerSessionResponse" } } }
+          },
+          "401": { $ref: "#/components/responses/ApiError" }
         }
       }
     },
@@ -3952,7 +3997,7 @@ export const openApiDocument = {
       viewerCookieAuth: {
         type: "apiKey",
         in: "cookie",
-        name: "vtt_viewer_session",
+        name: VIEWER_SESSION_COOKIE,
         description:
           "Also accepted as a Bearer token; the cookie is what the paired second-screen browser actually sends."
       }
@@ -4248,6 +4293,86 @@ export const openApiDocument = {
         type: "object",
         additionalProperties: false,
         properties: { commandId: { type: "string", format: "uuid" }, expectedRevision: { type: "integer", minimum: 0 } }
+      },
+      ViewerAccess: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "name", "createdAt", "expiresAt", "lastUsedAt", "revokedAt"],
+        properties: {
+          id: { type: "string", format: "uuid" },
+          name: { type: "string" },
+          createdAt: { type: "string", format: "date-time" },
+          expiresAt: { type: ["string", "null"], format: "date-time" },
+          lastUsedAt: { type: ["string", "null"], format: "date-time" },
+          revokedAt: { type: ["string", "null"], format: "date-time" }
+        }
+      },
+      ViewerPairingResponse: envelopeSchema("#/components/schemas/ViewerPairingData"),
+      ViewerPairingData: {
+        type: "object",
+        additionalProperties: false,
+        required: ["pairing"],
+        properties: {
+          pairing: {
+            type: "object",
+            additionalProperties: false,
+            required: ["code", "expiresAt"],
+            properties: { code: { type: "string" }, expiresAt: { type: "string", format: "date-time" } }
+          }
+        }
+      },
+      ViewerSessionResponse: envelopeSchema("#/components/schemas/ViewerSessionData"),
+      ViewerSessionData: {
+        type: "object",
+        additionalProperties: false,
+        required: ["viewer"],
+        properties: { viewer: { $ref: "#/components/schemas/ViewerAccess" } }
+      },
+      ViewerAccessListResponse: envelopeSchema("#/components/schemas/ViewerAccessListData"),
+      ViewerAccessListData: {
+        type: "object",
+        additionalProperties: false,
+        required: ["viewers", "connections"],
+        properties: {
+          viewers: { type: "array", items: { $ref: "#/components/schemas/ViewerAccess" } },
+          connections: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["connectionId", "viewerId", "name", "connectedAt"],
+              properties: {
+                connectionId: { type: "string" },
+                viewerId: { type: "string", format: "uuid" },
+                name: { type: "string" },
+                connectedAt: { type: "string", format: "date-time" }
+              }
+            }
+          }
+        }
+      },
+      ViewerPresentationResponse: envelopeSchema("#/components/schemas/ViewerPresentationData"),
+      ViewerPresentationData: {
+        type: "object",
+        additionalProperties: false,
+        required: ["presentation"],
+        properties: {
+          presentation: {
+            type: "object",
+            additionalProperties: true,
+            description: "The player-safe presentation projection; the same shape the event stream sends."
+          }
+        }
+      },
+      ViewerCommandResponse: envelopeSchema("#/components/schemas/ViewerCommandData"),
+      ViewerCommandData: {
+        type: "object",
+        additionalProperties: false,
+        required: ["revision", "duplicate"],
+        properties: {
+          revision: { type: "integer", minimum: 0 },
+          duplicate: { type: "boolean", description: "True when this command id was already applied." }
+        }
       },
       GameMutationAccepted: {
         type: "object",

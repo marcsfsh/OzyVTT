@@ -162,15 +162,6 @@ export function IconDrag({ className }: Readonly<{ className?: string }>) {
   );
 }
 
-/** Duplicate: "start from a copy of this one". */
-export function IconCopy({ className }: Readonly<{ className?: string }>) {
-  return (
-    <Glyph className={className}>
-      <path fillRule="evenodd" d="M7.6 2.2h13.2v13.2h-2.9V5.1H7.6zM3.2 6.4h13.2v15.4H3.2zm2.9 2.9v9.6h7.4V9.3z" />
-    </Glyph>
-  );
-}
-
 /** Visible to players. Pairs with a word; visibility is never carried by hue alone. */
 export function IconEye({ className }: Readonly<{ className?: string }>) {
   return (
@@ -324,16 +315,6 @@ export function IconScene({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
       <path d="M2.1 6.6 21.2 3.9l.6 4.2-19.1 2.7zM2.8 11.9h18.4v9.5H2.8z" />
-    </Glyph>
-  );
-}
-
-/** Legendary: a monster that breaks the turn order's rules. Always paired with a word (a lone star reads as
-    "favourite"). */
-export function IconStar({ className }: Readonly<{ className?: string }>) {
-  return (
-    <Glyph className={className}>
-      <path d="M12 2.2 14.9 8l6.4 1-4.6 4.5 1.1 6.4L12 16.9l-5.8 3 1.1-6.4L2.7 9l6.4-1z" />
     </Glyph>
   );
 }

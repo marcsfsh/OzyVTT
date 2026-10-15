@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { BuilderOffersReply, BuilderOffersRequest } from "@vtt/domain";
-import { socket } from "../socket";
+import { read } from "../lib/command";
 
 export type BuilderOffers = Readonly<{
   /** The latest answer, kept on screen while the next one is in flight. */
@@ -23,7 +23,7 @@ export function useBuilderOffers(request: BuilderOffersRequest | null): BuilderO
   useEffect(() => {
     latest.current = key;
     if (key === null) return;
-    socket.emit("builder:offers", JSON.parse(key) as BuilderOffersRequest, (result) => {
+    void read("builder:offers", JSON.parse(key) as BuilderOffersRequest).then((result) => {
       if (latest.current !== key) return;
       if (result.ok && result.offers && result.picks && result.asiIncreases && result.choices) {
         const { offers, picks, asiIncreases, choices } = result;

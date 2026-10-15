@@ -158,7 +158,7 @@ export function offerContext(draft: BuilderDraft, catalogs: BuilderCatalogs): Of
 /** The offer kinds answered by a feat, whose grids show each feat's summary. */
 export const FEAT_KINDS: ReadonlySet<string> = new Set(["feat", "fighting-style", "asi-or-feat"]);
 
-const titleize = (id: string) =>
+export const titleize = (id: string) =>
   id
     .split("-")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))

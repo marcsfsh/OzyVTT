@@ -7,7 +7,7 @@
   bottom: 0;
   display: flex;
   flex-direction: column;
-  /* Stated because /styleguide doesn't load the app's `* { box-sizing: border-box }`. */
+  /* Stated so the primitive does not depend on the app's `* { box-sizing: border-box }`. */
   box-sizing: border-box;
   width: min(24rem, 100vw);
   /* Panel material with the brighter rim. Edge-anchored, so no corner cut. */

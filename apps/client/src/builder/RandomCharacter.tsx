@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Button, Field, Modal, Select, Stepper, useToast } from "@vtt/ui";
 import { useClassCatalog } from "../content/catalogs";
-import { newId } from "../lib/ids";
-import { socket } from "../socket";
+import { command } from "../lib/command";
 
 /**
  * Roll a random character: a level and an optional class, then `character:generate`. The server
@@ -27,24 +26,21 @@ export function RandomCharacterModal({
   const [classId, setClassId] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const roll = () => {
+  const roll = async () => {
     setBusy(true);
-    const commandId = newId();
-    socket.emit(
-      "character:generate",
-      { commandId, level: Math.min(level, maxLevel), ...(classId ? { classId } : {}) },
-      (result: { ok: boolean; message?: string; actorId?: string }) => {
-        setBusy(false);
-        if (!result.ok) {
-          toast(result.message ?? "That character could not be rolled up.", { tone: "error" });
-          return;
-        }
-        onClose();
-        // The server renames a clash ("Borin 2"), so the caller reads the name back from the roster,
-        // which the broadcast before this ack has already updated.
-        onRolled?.(result.actorId ?? "");
-      }
-    );
+    const result = await command("character:generate", {
+      level: Math.min(level, maxLevel),
+      ...(classId ? { classId } : {})
+    });
+    setBusy(false);
+    if (!result.ok) {
+      toast(result.message ?? "That character could not be rolled up.", { tone: "error" });
+      return;
+    }
+    onClose();
+    // The server renames a clash ("Borin 2"), so the caller reads the name back from the roster,
+    // which the broadcast before this reply has already updated.
+    onRolled?.(result.actorId ?? "");
   };
 
   return (

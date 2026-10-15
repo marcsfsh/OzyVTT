@@ -2,7 +2,7 @@
 
 The rules a UI change has to follow. Token values live in
 `packages/ui/src/styles/design-tokens.css`; the primitives are exported from
-`packages/ui/src/index.ts` and rendered with every state at `/styleguide.html` in dev.
+`packages/ui/src/index.ts`.
 
 ## Product principles
 
@@ -85,8 +85,8 @@ mouse is a bug.
 
 ## Components
 
-Build from `@vtt/ui`. A new primitive goes into `packages/ui` with `nh-` prefixed CSS and gets a
-demo in the style guide.
+Build from `@vtt/ui`. A new primitive goes into `packages/ui` with `nh-` prefixed CSS and a test
+next to it.
 
 - One primary button per view. Labels are sentence case and name their result ("Roll
   initiative", "End turn").

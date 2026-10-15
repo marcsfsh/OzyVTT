@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 
 /**
  * Runs against `src/` directly (the package is consumed as source). jsdom does no layout, so tests here assert
- * structure; geometry is measured in a browser by `scripts/primitive-align-check.mjs`.
+ * structure.
  */
 export default defineConfig({
   plugins: [react()],

@@ -25,8 +25,7 @@ import {
 import { IntegrationsPanel } from "../integrations/IntegrationsPanel";
 import { TokenLibrary } from "../tokens/TokenLibrary";
 import { useRollPreference } from "../dice/roll-preference";
-import { newId } from "../lib/ids";
-import { socket } from "../socket";
+import { command, type CommandEvent, type CommandPayload } from "../lib/command";
 import { setAutoArrange, useAutoArrange } from "./preferences";
 import "./settings.css";
 
@@ -112,8 +111,6 @@ const HEALTH_STYLES = [
   { value: "ring", label: "Ring" },
   { value: "aura", label: "Aura" }
 ] as const;
-
-type Ack = Readonly<{ ok: boolean; message?: string }>;
 
 /**
  * One settings group. The `--{id}` modifier is what the 1280px two-column layout places by name
@@ -205,15 +202,10 @@ function TableGroup({
   const builder = state.builderPolicy;
   const [formula, setFormula] = useState(builder.customFormula ?? "");
 
-  /** Every write here is the same shape: emit, and say so only when it fails. */
-  const send = (event: string, payload: Record<string, unknown>, failure: string) => {
-    (socket.emit as (event: string, payload: unknown, ack: (result: Ack) => void) => void)(
-      event,
-      { commandId: newId(), ...payload },
-      (result) => {
-        if (!result.ok) toast(result.message ?? failure, { tone: "error" });
-      }
-    );
+  /** Every write here is the same shape: send, and say so only when it fails. */
+  const send = async <E extends CommandEvent>(event: E, payload: CommandPayload<E>, failure: string) => {
+    const result = await command(event, payload);
+    if (!result.ok) toast(result.message ?? failure, { tone: "error" });
   };
 
   const setDial = (dial: RuleMode) =>
@@ -312,7 +304,7 @@ function TableGroup({
             onChange={(event) =>
               send(
                 "encounter:set-health-display",
-                { style: event.target.value, audience: health.audience },
+                { style: event.target.value as typeof health.style, audience: health.audience },
                 "The health display was rejected."
               )
             }
@@ -330,7 +322,7 @@ function TableGroup({
             onChange={(value) =>
               send(
                 "encounter:set-health-display",
-                { style: health.style, audience: value },
+                { style: health.style, audience: value as typeof health.audience },
                 "The health display was rejected."
               )
             }
@@ -347,7 +339,11 @@ function TableGroup({
           value={state.partyVisibility}
           aria-label="What players see of each other"
           onChange={(event) =>
-            send("table:set-party-visibility", { visibility: event.target.value }, "That setting was rejected.")
+            send(
+              "table:set-party-visibility",
+              { visibility: event.target.value as GmView["partyVisibility"] },
+              "That setting was rejected."
+            )
           }
         >
           {PARTY_VISIBILITY_OPTIONS.map((option) => (
@@ -381,7 +377,13 @@ function TableGroup({
         <SegmentedControl
           ariaLabel="Players' hits"
           value={state.combat.playerDamageMode}
-          onChange={(value) => send("encounter:set-player-damage-mode", { mode: value }, "That setting was rejected.")}
+          onChange={(value) =>
+            send(
+              "encounter:set-player-damage-mode",
+              { mode: value as GmView["combat"]["playerDamageMode"] },
+              "That setting was rejected."
+            )
+          }
           options={[
             { value: "proposal", label: "Applied by the GM" },
             { value: "direct", label: "Applied immediately" }
@@ -394,7 +396,11 @@ function TableGroup({
           ariaLabel="When turns start"
           value={state.combat.playerInitiativeMode}
           onChange={(value) =>
-            send("encounter:set-player-initiative-mode", { mode: value }, "That setting was rejected.")
+            send(
+              "encounter:set-player-initiative-mode",
+              { mode: value as GmView["combat"]["playerInitiativeMode"] },
+              "That setting was rejected."
+            )
           }
           options={[
             { value: "immediate", label: "Start turns immediately" },
@@ -475,21 +481,15 @@ function PlayersGroup({
    * fields ride along because `builder.set-policy` requires `allowedAbilityMethods` and keeps omitted
    * keys.
    */
-  const setPlayerRandom = (open: boolean) => {
-    socket.emit(
-      "builder:set-policy",
-      {
-        commandId: newId(),
-        allowedAbilityMethods: builder.allowedAbilityMethods,
-        customFormula: builder.customFormula,
-        maxLevel: builder.maxLevel,
-        playerBuilder: builder.playerBuilder,
-        playerRandom: open ? "open" : "gm-only"
-      },
-      (result: Ack) => {
-        if (!result.ok) toast(result.message ?? "That setting was rejected.", { tone: "error" });
-      }
-    );
+  const setPlayerRandom = async (open: boolean) => {
+    const result = await command("builder:set-policy", {
+      allowedAbilityMethods: builder.allowedAbilityMethods,
+      customFormula: builder.customFormula,
+      maxLevel: builder.maxLevel,
+      playerBuilder: builder.playerBuilder,
+      playerRandom: open ? "open" : "gm-only"
+    });
+    if (!result.ok) toast(result.message ?? "That setting was rejected.", { tone: "error" });
   };
   const [tokenFor, setTokenFor] = useState<Readonly<{
     id: string;
@@ -501,11 +501,10 @@ function PlayersGroup({
     (actor) => actor.kind === "player-character" && !actor.archived && actor.ownerSessionId !== null
   );
 
-  const forceRelease = (actorId: string, name: string) => {
-    socket.emit("character:force-release", { commandId: newId(), actorId }, (result: Ack) => {
-      if (result.ok) toast(`${name} is available to claim again.`, { tone: "success" });
-      else toast(result.message ?? "That claim could not be released.", { tone: "error" });
-    });
+  const forceRelease = async (actorId: string, name: string) => {
+    const result = await command("character:force-release", { actorId });
+    if (result.ok) toast(`${name} is available to claim again.`, { tone: "success" });
+    else toast(result.message ?? "That claim could not be released.", { tone: "error" });
   };
 
   return (

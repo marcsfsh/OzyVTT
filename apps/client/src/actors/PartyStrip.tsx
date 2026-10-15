@@ -31,7 +31,7 @@ export function PartyStrip(props: Props) {
   );
   const openActor = openId ? (actors.find((actor) => actor.id === openId) ?? null) : null;
 
-  // Second guard on `off` (main.tsx also skips the mount), so a new call site cannot leak the party.
+  // Second guard on `off` (the table view also skips the mount), so a new call site cannot leak the party.
   if (tier === "off") return null;
 
   if (actors.length === 0) {

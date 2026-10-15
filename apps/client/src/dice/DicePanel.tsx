@@ -1,9 +1,8 @@
 import { useState } from "react";
 import type { GmView, PlayerView, RollPurpose, RollVisibility } from "@vtt/domain";
 import { Button, Input, SegmentedControl, Select, Stepper } from "@vtt/ui";
-import { newId } from "../lib/ids";
+import { command } from "../lib/command";
 import { useRollPreference } from "./roll-preference";
-import { socket } from "../socket";
 
 const PURPOSE_LABELS: Record<RollPurpose, string> = {
   manual: "Roll",
@@ -71,17 +70,12 @@ export function DicePanel({
   const visibilityOptions = VISIBILITY_OPTIONS[role];
   const visibilityLabel = (value: RollVisibility) => ROLL_VISIBILITY_WORD[value] ?? value;
 
-  const submit = (rollFormula: string, rollPurpose: RollPurpose) => {
+  const submit = async (rollFormula: string, rollPurpose: RollPurpose) => {
     setFeedback("Rolling…");
-    socket.emit(
-      "dice:roll",
-      { commandId: newId(), formula: rollFormula, purpose: rollPurpose, visibility },
-      (result) => {
-        if (!result.ok) return setFeedback(result.message ?? "That roll didn't work. Check the formula and try again.");
-        setFeedback(
-          result.hiddenFromRoller ? "Secret roll sent to the GM." : result.duplicate ? "Already rolled." : "Rolled."
-        );
-      }
+    const result = await command("dice:roll", { formula: rollFormula, purpose: rollPurpose, visibility });
+    if (!result.ok) return setFeedback(result.message ?? "That roll didn't work. Check the formula and try again.");
+    setFeedback(
+      result.hiddenFromRoller ? "Secret roll sent to the GM." : result.duplicate ? "Already rolled." : "Rolled."
     );
   };
   // Advantage/disadvantage arm the next d20 roll only, which clears them. 5e never allows both at
@@ -109,35 +103,28 @@ export function DicePanel({
       const kind = advantage ? "kh1" : "kl1";
       setAdvantage(false);
       setDisadvantage(false);
-      return submit(`2d20${kind}${modifierSuffix(modifier)}`, "manual");
+      return void submit(`2d20${kind}${modifierSuffix(modifier)}`, "manual");
     }
-    submit(`1d${sides}${modifierSuffix(modifier)}`, "manual");
+    void submit(`1d${sides}${modifierSuffix(modifier)}`, "manual");
   };
   const customRoll = () => {
     if (isBareD20(formula) && (advantage || disadvantage)) {
       const kind = advantage ? "kh1" : "kl1";
       setAdvantage(false);
       setDisadvantage(false);
-      return submit(`2d20${kind}`, purpose);
+      return void submit(`2d20${kind}`, purpose);
     }
-    submit(formula, purpose);
+    void submit(formula, purpose);
   };
   // SRD Falling: 1d6 bludgeoning per 10 feet fallen, max 20d6, and the faller lands Prone. The server
   // rolls; this builds the formula and reminds about applying damage and Prone.
   const fallDice = Math.min(Math.floor((Number.parseInt(fallFeet, 10) || 0) / 10), 20);
-  const rollFall = () => {
+  const rollFall = async () => {
     if (fallDice < 1) return setFeedback("Falls under 10 feet deal no damage.");
     setFeedback("Rolling…");
-    socket.emit(
-      "dice:roll",
-      { commandId: newId(), formula: `${fallDice}d6`, purpose: "damage", visibility },
-      (result) => {
-        if (!result.ok) return setFeedback(result.message ?? "That roll didn't work.");
-        setFeedback(
-          `Fall damage rolled (${fallDice}d6 bludgeoning) - apply the total as damage; the faller lands Prone.`
-        );
-      }
-    );
+    const result = await command("dice:roll", { formula: `${fallDice}d6`, purpose: "damage", visibility });
+    if (!result.ok) return setFeedback(result.message ?? "That roll didn't work.");
+    setFeedback(`Fall damage rolled (${fallDice}d6 bludgeoning) - apply the total as damage; the faller lands Prone.`);
   };
 
   return (

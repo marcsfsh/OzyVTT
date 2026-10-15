@@ -5,8 +5,7 @@ import { Avatar, Button, Modal, useToast } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { RandomCharacterModal } from "../builder/RandomCharacter";
 import { CLAIM_WORD, classLine, hpLabel, presenceDot, presenceLabel } from "./actor-display";
-import { newId } from "../lib/ids";
-import { socket } from "../socket";
+import { command } from "../lib/command";
 
 /**
  * The player's "My character" tab: who they play, how they are doing, and the door to the sheet.
@@ -147,11 +146,10 @@ export function MyCharacter({
     )
       return;
     setReleasing(true);
-    socket.emit("character:release", { commandId: newId(), expectedRevision: state.revision }, (result) => {
-      setReleasing(false);
-      if (result.ok) toast(`You released ${name}. Pick another when you're ready.`, { tone: "success" });
-      else toast(result.message ?? "Couldn't release the character.", { tone: "error" });
-    });
+    const result = await command("character:release", { expectedRevision: state.revision });
+    setReleasing(false);
+    if (result.ok) toast(`You released ${name}. Pick another when you're ready.`, { tone: "success" });
+    else toast(result.message ?? "Couldn't release the character.", { tone: "error" });
   };
 
   return (
@@ -160,7 +158,7 @@ export function MyCharacter({
       <div className="my-character-head neon-beam">
         <h2>My character</h2>
         <div className="my-character-head-actions">
-          {/* Always offered: the route answers with the builder or its policy gate (main.tsx). */}
+          {/* Always offered: the route answers with the builder or its policy gate (shell/LayerView.tsx). */}
           <Button variant="secondary" onClick={onCreateCharacter}>
             Create a character
           </Button>

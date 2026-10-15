@@ -26,18 +26,18 @@ and a change to one never bumps another. They are constructed together in
 
 ## Workspaces
 
-| Package                      | What it holds                                                                                                                     |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/server`                | Express + Socket.IO service: stores, command handlers, projections, HTTP routers.                                                 |
-| `apps/client`                | React/Vite UI. Entries: `index.html` (the app), `viewer.html` (table viewer), `sheet.html` (standalone sheet), `styleguide.html`. |
-| `packages/domain`            | The realtime wire contract: `GameState`, socket event maps, projection view types.                                                |
-| `packages/schemas`           | Zod schemas for actors, effects and the modifier vocabulary, shared by server and content.                                        |
-| `packages/api-contract`      | The public HTTP API: OpenAPI document, path constants, command scopes.                                                            |
-| `packages/rules-5e`          | Pure 5e rules helpers: dice grammar, ability scores, progression tables, rider evaluation.                                        |
-| `packages/content-srd-5.2.1` | SRD 5.2.1 content bundles and the scripts that generate them from vendored sources.                                               |
-| `packages/dndbeyond-pdf`     | Turns a D&D Beyond character-sheet PDF into an actor definition (runs in the browser).                                            |
-| `packages/ui`                | Design tokens, fonts and the `nh-` UI primitives.                                                                                 |
-| `packages/test-fixtures`     | Actor fixtures shared by tests.                                                                                                   |
+| Package                      | What it holds                                                                                                  |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `apps/server`                | Express + Socket.IO service: stores, command handlers, projections, HTTP routers.                              |
+| `apps/client`                | React/Vite UI. Entries: `index.html` (the app), `viewer.html` (table viewer), `sheet.html` (standalone sheet). |
+| `packages/domain`            | The realtime wire contract: `GameState`, socket event maps, projection view types.                             |
+| `packages/schemas`           | Zod schemas for actors, effects and the modifier vocabulary, shared by server and content.                     |
+| `packages/api-contract`      | The public HTTP API: OpenAPI document, path constants, command scopes.                                         |
+| `packages/rules-5e`          | Pure 5e rules helpers: dice grammar, ability scores, progression tables, rider evaluation.                     |
+| `packages/content-srd-5.2.1` | SRD 5.2.1 content bundles and the scripts that generate them from vendored sources.                            |
+| `packages/dndbeyond-pdf`     | Turns a D&D Beyond character-sheet PDF into an actor definition (runs in the browser).                         |
+| `packages/ui`                | Design tokens, fonts and the `nh-` UI primitives.                                                              |
+| `packages/test-fixtures`     | Actor fixtures shared by tests.                                                                                |
 
 Packages are consumed as TypeScript source; only the client and server have build steps.
 
@@ -218,7 +218,16 @@ change as a new numbered migration in the owning store.
 
 ## Client
 
-A routed single-page app (`apps/client/src/router.ts`); every surface has an address. The game
-arrives over the socket; the Codex and homebrew are fetched over HTTP. The table viewer is a
-separate bundle that never loads the game client. Rules checks on the client are hints only;
-the server decides.
+A routed single-page app (`apps/client/src/router.ts`); every surface has an address. `main.tsx` only
+mounts `shell/App.tsx`, where `useSession` holds the sign-in, the socket and the projected state, and
+the GM and player shells render the surface the address names. The game arrives over the socket; the
+Codex and homebrew are fetched over HTTP. Socket request/replies go through `lib/command.ts`
+(`command` adds the `commandId`, `read` does not, and a lost reply becomes a refusal) and `/api/v1`
+calls through `lib/api.ts`. The table viewer is a separate bundle that never loads the game client.
+Rules checks on the client are hints only; the server decides.
+
+Surfaces not needed for first paint load on first use (`components/lazySurface.tsx`): the Codex,
+homebrew, settings and the API reference, the character builder and level flow, replays, the map
+library and the shared-screen controls. pdf.js loads with the first imported PDF. The build targets
+current phone and laptop browsers (Chrome and Edge 111, Firefox 121, Safari 16.4; `build.target` in
+`apps/client/vite.config.ts`), the floor the stylesheets' `:has()` and `dvh` already set.

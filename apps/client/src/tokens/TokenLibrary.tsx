@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, Input, Modal, RevealSwitch, Select, useToast } from "@vtt/ui";
-import { newId } from "../lib/ids";
-import { socket } from "../socket";
+import { apiRequest } from "../lib/api";
+import { command } from "../lib/command";
 import { useTokenImageUrl } from "./tokenImages";
 import "./tokens.css";
 
@@ -26,12 +26,7 @@ type TokenAsset = Readonly<{
   hidden?: boolean;
 }>;
 
-async function api(path: string, bearer: string, init: RequestInit = {}) {
-  const response = await fetch(path, { ...init, headers: { authorization: `Bearer ${bearer}`, ...init.headers } });
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error?.message ?? body.message ?? "That token request was refused.");
-  return body.data;
-}
+const failure = "That token request was refused.";
 
 function TokenThumb({
   asset,
@@ -107,17 +102,18 @@ export function TokenLibrary({
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     const query = definitionId && role === "gm" ? `?definitionId=${encodeURIComponent(definitionId)}` : "";
-    const data = await api(`/api/v1/token-assets${query}`, bearer);
+    const data = await apiRequest<{ tokens: readonly TokenAsset[]; rememberedAssetId?: string | null }>(
+      `/api/v1/token-assets${query}`,
+      { token: bearer, failure }
+    );
     setAssets(data.tokens);
     setRemembered(data.rememberedAssetId ?? null);
-  };
+  }, [bearer, definitionId, role]);
   useEffect(() => {
-    void refresh().catch((error: Error) =>
-      setMessage(error.message)
-    ); /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [bearer, definitionId]);
+    void refresh().catch((error: Error) => setMessage(error.message));
+  }, [refresh]);
 
   const folders = useMemo(
     () =>
@@ -136,22 +132,17 @@ export function TokenLibrary({
   }, [assets, search, folder]);
   const rememberedAsset = remembered ? (assets.find((asset) => asset.id === remembered) ?? null) : null;
 
-  const assign = (tokenAssetId: string | null) => {
+  const assign = async (tokenAssetId: string | null) => {
     setBusy(true);
     setMessage("");
-    socket.emit(
-      "actor:set-token-image",
-      { commandId: newId(), actorId, tokenAssetId },
-      (result: { ok: boolean; message?: string }) => {
-        setBusy(false);
-        if (result.ok) {
-          toast(tokenAssetId ? `${actorName}'s token is set.` : `${actorName}'s token image is cleared.`, {
-            tone: "success"
-          });
-          onClose();
-        } else setMessage(result.message ?? "That token image could not be assigned.");
-      }
-    );
+    const result = await command("actor:set-token-image", { actorId, tokenAssetId });
+    setBusy(false);
+    if (result.ok) {
+      toast(tokenAssetId ? `${actorName}'s token is set.` : `${actorName}'s token image is cleared.`, {
+        tone: "success"
+      });
+      onClose();
+    } else setMessage(result.message ?? "That token image could not be assigned.");
   };
 
   /** Upload, assign and close in one gesture. */
@@ -162,13 +153,14 @@ export function TokenLibrary({
       const params = new URLSearchParams({ filename: file.name, name: file.name.replace(/\.[^.]+$/, "") });
       // A player never chooses a folder: the server files their upload on one shelf the GM can curate.
       if (role === "gm" && uploadFolder.trim()) params.set("folder", uploadFolder.trim());
-      const data = await api(`/api/v1/token-assets?${params}`, bearer, {
-        method: "POST",
+      const data = await apiRequest<{ token: TokenAsset }>(`/api/v1/token-assets?${params}`, {
+        token: bearer,
         headers: { "content-type": file.type || "application/octet-stream" },
-        body: file
+        body: file,
+        failure
       });
       await refresh();
-      assign(data.token.id);
+      await assign(data.token.id);
     } catch (error) {
       setBusy(false);
       setMessage((error as Error).message);
@@ -179,10 +171,11 @@ export function TokenLibrary({
   const setHidden = async (asset: TokenAsset, shown: boolean) => {
     setAssets((current) => current.map((entry) => (entry.id === asset.id ? { ...entry, hidden: !shown } : entry)));
     try {
-      await api(`/api/v1/token-assets/${asset.id}`, bearer, {
+      await apiRequest(`/api/v1/token-assets/${asset.id}`, {
+        token: bearer,
         method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ hidden: !shown })
+        body: { hidden: !shown },
+        failure
       });
     } catch (error) {
       setMessage((error as Error).message);

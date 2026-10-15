@@ -65,12 +65,6 @@ export function sendData(response: Response, status: number, data: unknown) {
   return response.status(status).json({ ok: true, apiVersion: API_VERSION, data });
 }
 
-/** The viewer's success shape: its fields sit beside `ok` and `apiVersion`, not under `data`, because the viewer
- *  client reads them there. Every other surface answers with `sendData`. */
-export function sendViewerData(response: Response, status: number, fields: Readonly<Record<string, unknown>>) {
-  return response.status(status).json({ ok: true, apiVersion: API_VERSION, ...fields });
-}
-
 /** `details` and `currentRevision` are omitted when absent: the contract makes them optional, not nullable. */
 export function sendFailure(
   response: Response,
@@ -105,11 +99,12 @@ export function sendInternalError(response: Response, error: unknown, message: s
 }
 
 /**
- * A caught error on a route whose refusals are a schema failure (answered `malformed`) or an
- * `InvalidRequestError` (its own message), both 400. Anything else is a fault.
+ * A caught error on a route whose refusals are a schema failure (answered `malformed`, with every problem in
+ * `details.issues`) or an `InvalidRequestError` (its own message), both 400. Anything else is a fault.
  */
 export function sendRefusal(response: Response, error: unknown, malformed: string, internal: string) {
-  if (error instanceof z.ZodError) return sendFailure(response, 400, "validation_failed", malformed);
+  if (error instanceof z.ZodError)
+    return sendFailure(response, 400, "validation_failed", malformed, { issues: issuesOf(error) });
   if (error instanceof InvalidRequestError) return sendFailure(response, 400, "validation_failed", error.message);
   return sendInternalError(response, error, internal);
 }

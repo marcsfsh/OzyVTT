@@ -6,8 +6,7 @@ import { CharacterSheet } from "../encounter/CharacterSheet";
 import { PdfImportModal } from "./PdfImportModal";
 import { RandomCharacterModal } from "../builder/RandomCharacter";
 import { CLAIM_WORD, claimStateOf, classLine, presenceDot } from "./actor-display";
-import { newId } from "../lib/ids";
-import { socket } from "../socket";
+import { command } from "../lib/command";
 
 /**
  * The GM's Roster tab: create, import, approve, archive, restore and delete characters.
@@ -41,49 +40,32 @@ export function PartyRosterTab({
   const definitionOf = (actor: GmActor): ActorDefinition | undefined =>
     definitions.find((entry) => entry.id === actor.definitionId)?.definition;
 
-  const setArchived = (actor: GmActor, next: boolean) => {
+  const setArchived = async (actor: GmActor, next: boolean) => {
     setBusy(true);
-    socket.emit(
-      "actor:set-archived",
-      { commandId: newId(), actorId: actor.id, archived: next },
-      (result: { ok: boolean; message?: string }) => {
-        setBusy(false);
-        if (!result.ok) {
-          toast(result.message ?? "That change was rejected.", { tone: "error" });
-          return;
-        }
-        toast(
-          next
-            ? `Archived. ${actor.name} is hidden from players — find them under Archived below.`
-            : `${actor.name} is back on the table.`,
-          { tone: "success" }
-        );
-      }
+    const result = await command("actor:set-archived", { actorId: actor.id, archived: next });
+    setBusy(false);
+    if (!result.ok) {
+      toast(result.message ?? "That change was rejected.", { tone: "error" });
+      return;
+    }
+    toast(
+      next
+        ? `Archived. ${actor.name} is hidden from players — find them under Archived below.`
+        : `${actor.name} is back on the table.`,
+      { tone: "success" }
     );
   };
 
-  const setSheetPreview = (actor: GmActor, enabled: boolean) => {
-    socket.emit(
-      "actor:set-sheet-preview",
-      { commandId: newId(), actorId: actor.id, enabled },
-      (result: { ok: boolean; message?: string }) => {
-        if (!result.ok) toast(result.message ?? "That change was rejected.", { tone: "error" });
-      }
-    );
+  const setSheetPreview = async (actor: GmActor, enabled: boolean) => {
+    const result = await command("actor:set-sheet-preview", { actorId: actor.id, enabled });
+    if (!result.ok) toast(result.message ?? "That change was rejected.", { tone: "error" });
   };
 
-  const forceRelease = (actor: GmActor) => {
-    socket.emit(
-      "character:force-release",
-      { commandId: newId(), actorId: actor.id, expectedRevision: state.revision },
-      (result: { ok: boolean; message?: string }) => {
-        toast(
-          result.ok
-            ? `${actor.name} is available again.`
-            : (result.message ?? "The player claim could not be released."),
-          { tone: result.ok ? "success" : "error" }
-        );
-      }
+  const forceRelease = async (actor: GmActor) => {
+    const result = await command("character:force-release", { actorId: actor.id, expectedRevision: state.revision });
+    toast(
+      result.ok ? `${actor.name} is available again.` : (result.message ?? "The player claim could not be released."),
+      { tone: result.ok ? "success" : "error" }
     );
   };
 
@@ -97,16 +79,11 @@ export function PartyRosterTab({
     });
     if (!ok) return;
     setBusy(true);
-    socket.emit(
-      "actor:remove",
-      { commandId: newId(), actorId: actor.id },
-      (result: { ok: boolean; message?: string }) => {
-        setBusy(false);
-        toast(result.ok ? `${actor.name} was deleted.` : (result.message ?? "That character could not be deleted."), {
-          tone: result.ok ? "success" : "error"
-        });
-      }
-    );
+    const result = await command("actor:remove", { actorId: actor.id });
+    setBusy(false);
+    toast(result.ok ? `${actor.name} was deleted.` : (result.message ?? "That character could not be deleted."), {
+      tone: result.ok ? "success" : "error"
+    });
   };
 
   const resolveImport = async (pending: PendingImport, approve: boolean) => {
@@ -120,48 +97,46 @@ export function PartyRosterTab({
     )
       return;
     setBusy(true);
-    socket.emit(
-      "character:resolve-import",
-      { commandId: newId(), importId: pending.id, approve },
-      (result: { ok: boolean; message?: string }) => {
-        setBusy(false);
-        if (!result.ok) {
-          toast(result.message ?? "Couldn't resolve the import.", { tone: "error" });
-          return;
-        }
-        toast(approve ? `${pending.name} joined the roster — ready to claim.` : `Turned away ${pending.name}.`, {
-          tone: "success"
-        });
-        setPreviewImportId(null);
-      }
-    );
+    const result = await command("character:resolve-import", { importId: pending.id, approve });
+    setBusy(false);
+    if (!result.ok) {
+      toast(result.message ?? "Couldn't resolve the import.", { tone: "error" });
+      return;
+    }
+    toast(approve ? `${pending.name} joined the roster — ready to claim.` : `Turned away ${pending.name}.`, {
+      tone: "success"
+    });
+    setPreviewImportId(null);
   };
 
-  const importSheet = (file: File) => {
-    file
-      .text()
-      .then((text) => {
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(text);
-        } catch {
-          toast("That file is not valid JSON.", { tone: "error" });
-          return;
-        }
-        socket.emit("actor:import-definition", { commandId: newId(), definition: parsed }, (result) => {
-          const name =
-            typeof parsed === "object" && parsed !== null && "name" in parsed
-              ? String((parsed as { name: unknown }).name)
-              : file.name;
-          toast(
-            result.ok
-              ? `${name} joined the roster — ready to claim.`
-              : (result.message ?? "The sheet could not be imported."),
-            { tone: result.ok ? "success" : "error" }
-          );
-        });
-      })
-      .catch(() => toast("The file could not be read.", { tone: "error" }));
+  const importSheet = async (file: File) => {
+    let text: string;
+    try {
+      text = await file.text();
+    } catch {
+      toast("The file could not be read.", { tone: "error" });
+      return;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      toast("That file is not valid JSON.", { tone: "error" });
+      return;
+    }
+    const result = await command("actor:import-definition", { definition: parsed });
+    const name =
+      typeof parsed === "object" && parsed !== null && "name" in parsed
+        ? String((parsed as { name: unknown }).name)
+        : file.name;
+    toast(
+      result.ok
+        ? `${name} joined the roster — ready to claim.`
+        : (result.message ?? "The sheet could not be imported."),
+      {
+        tone: result.ok ? "success" : "error"
+      }
+    );
   };
 
   const card = (actor: GmActor, isArchived: boolean) => {
@@ -237,7 +212,7 @@ export function PartyRosterTab({
             hidden
             onChange={(event) => {
               const file = event.target.files?.[0];
-              if (file) importSheet(file);
+              if (file) void importSheet(file);
               event.target.value = "";
             }}
           />

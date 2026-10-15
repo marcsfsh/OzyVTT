@@ -1,5 +1,6 @@
 import express, { Router, type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
+import { VIEWER_SESSION_COOKIE } from "@vtt/api-contract";
 import { apiErrorHandler, bearerToken, cookie, pathParam, sendData, sendFailure, sendRefusal } from "./http-kit.js";
 import type { MapAssetMetadata, MapAssetStore } from "./map-assets.js";
 import type { TokenCatalogEntry, TokenCatalogStore } from "./token-catalog.js";
@@ -65,7 +66,7 @@ export function createTokenRouter(options: TokenRouterOptions) {
     return (
       options.authorizeGm(token) ||
       options.authorizePlayer(token, assetId) ||
-      options.authorizeViewer(cookie(request, "vtt_viewer_session"), assetId)
+      options.authorizeViewer(cookie(request, VIEWER_SESSION_COOKIE), assetId)
     );
   };
 

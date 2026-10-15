@@ -6,7 +6,7 @@ machine-derivable surfaces of the app (state shape, command catalog, HTTP paths)
 file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.
 
 - API version `1` · realtime protocol `1`
-- 11 GameState fields · 88 commands · 194 HTTP paths
+- 11 GameState fields · 88 commands · 195 HTTP paths
 
 ## GameState shape
 
@@ -325,6 +325,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/viewer/pairings/exchange`
 - `GET /api/v1/viewer/presentation`
 - `POST /api/v1/viewer/presentation/commands`
+- `POST /api/v1/viewer/preview-session`
 
 ## Where things live
 
@@ -341,5 +342,5 @@ Curated pointers (verify line numbers before relying on them - code moves):
 - **Rules engine:** `apps/server/src/{action-resolution,saving-throws,hit-points,rests,condition-rules}.ts`.
 - **Shared 5e math:** `packages/rules-5e/src/{dice,combat,character}.ts`.
 - **SRD content bundles:** `packages/content-srd-5.2.1`.
-- **Client entry points:** `apps/client/src/{main,viewer-main,styleguide-main}.tsx`.
-- **Design system:** `packages/ui/src/index.ts` (+ the `/styleguide` route).
+- **Client entry points:** `apps/client/src/{main,viewer-main,sheet-main}.tsx`.
+- **Design system:** `packages/ui/src/index.ts`.

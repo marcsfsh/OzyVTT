@@ -1,15 +1,13 @@
 import { StrictMode, useEffect, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import type { GmActor, GmView, PlayerActor, PlayerView, SessionJoinResult } from "@vtt/domain";
+import type { GmActor, GmView, PlayerActor, PlayerView } from "@vtt/domain";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { CharacterSheet } from "./encounter/CharacterSheet";
+import { joinTable, storedPlayerToken } from "./lib/session";
 import { socket } from "./socket";
 import "@vtt/ui/styles.css";
 import "./styles.css";
 import "./encounter/encounter-panel.css";
-
-/** localStorage key holding the player's session token (shared across same-origin tabs). */
-const PLAYER_TOKEN_KEY = "vtt.player-token";
 
 /**
  * The character sheet in its own browser tab, opened from the sheet's "New tab" button. It rejoins
@@ -30,15 +28,9 @@ function StandaloneSheet() {
     socket.on("state:updated", onState);
     if (!joined.current) {
       joined.current = true;
-      const token = localStorage.getItem(PLAYER_TOKEN_KEY) ?? undefined;
-      socket.auth = { token };
-      socket.connect();
-      socket.emit("session:join", { token }, (result: SessionJoinResult) => {
-        if (result.ok && (result.role === "player" || result.role === "gm")) {
-          if (result.token) localStorage.setItem(PLAYER_TOKEN_KEY, result.token);
-          setStatus("ready");
-        } else setStatus("denied");
-      });
+      void joinTable(storedPlayerToken()).then((result) =>
+        setStatus(result.ok && (result.role === "player" || result.role === "gm") ? "ready" : "denied")
+      );
     }
     return () => {
       socket.off("state:updated", onState);
