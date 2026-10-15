@@ -552,10 +552,10 @@ describe("public game API over /api/v1", () => {
     expect(fighter.savingThrows).toEqual(["str", "con"]);
     const features = fighter.features as ReadonlyArray<Record<string, unknown>>;
     expect(features.length).toBeGreaterThan(0);
-    expect(features.find((feature) => feature.choice)?.choice).toMatchObject({
-      kind: expect.any(String),
-      choose: expect.any(Number)
-    });
+    const picks = features.flatMap((feature) => feature.choices as ReadonlyArray<Record<string, unknown>>);
+    expect(picks[0]).toMatchObject({ kind: expect.any(String), choose: expect.any(Number) });
+    // Only the full list is served; a single `choice` field once hid a feature's second pick.
+    expect(features.every((feature) => !("choice" in feature))).toBe(true);
     // Subclasses key to their parent class, and name pools to their species - both open slugs.
     expect(catalogRows.subclasses.every((entry) => typeof entry.classId === "string")).toBe(true);
     expect(

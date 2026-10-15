@@ -3558,7 +3558,7 @@ export const openApiDocument = {
       ContentFeature: {
         type: "object",
         additionalProperties: false,
-        required: ["id", "name", "level", "description", "tags", "choice", "choices", "grantedAtLevels", "extraPicks"],
+        required: ["id", "name", "level", "description", "tags", "choices", "grantedAtLevels", "extraPicks"],
         description:
           "The browse-and-pick projection of a bundle FeatureRecord. Prose is the display source of truth; a feature's structured riders (granted actions, effects, modifiers, limited uses) stay server-side - the server applies them when it builds the character, so the wizard never becomes a second rules engine.",
         properties: {
@@ -3577,16 +3577,11 @@ export const openApiDocument = {
             items: contentSlug,
             description: "Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity)"
           },
-          choice: {
-            description:
-              "The FIRST pick this feature asks the player to make - each one writes a row in the character's choice-provenance ledger. null when the feature grants without asking.",
-            oneOf: [{ $ref: "#/components/schemas/ContentFeatureChoice" }, { type: "null" }]
-          },
           choices: {
             type: "array",
             items: { $ref: "#/components/schemas/ContentFeatureChoice" },
             description:
-              "EVERY pick this feature asks for, in authored order - one record may owe more than one, with different kinds and ceilings. Magic Initiate owes two cantrips AND one level-1 spell, and reading only `choice` is what silently dropped the spell. Empty when the feature asks for nothing."
+              "Every pick this feature asks for, in authored order; each writes a row in the character's choice-provenance ledger. One record may owe more than one, with different kinds and ceilings: Magic Initiate owes two cantrips and one level-1 spell. Empty when the feature grants without asking."
           },
           grantedAtLevels: {
             type: "array",
@@ -3668,7 +3663,7 @@ export const openApiDocument = {
       ContentFeatureOption: {
         type: "object",
         additionalProperties: false,
-        required: ["id", "name", "description", "requires", "choice", "choices", "extraPicks"],
+        required: ["id", "name", "description", "requires", "choices", "extraPicks"],
         description:
           "One inline option of a feature's pick. Carries its authored name (an id alone would force the client to titleize) and any SECOND-ORDER pick it owes - Cleric Divine Order's Thaumaturge grants an extra cantrip, so choosing it opens another choice. Riders stay server-side.",
         properties: {
@@ -3695,15 +3690,11 @@ export const openApiDocument = {
               { type: "null" }
             ]
           },
-          choice: {
-            description:
-              "The FIRST nested pick this option owes. Bounded at one level: a nested choice never carries its own options.",
-            oneOf: [{ $ref: "#/components/schemas/ContentFeatureChoice" }, { type: "null" }]
-          },
           choices: {
             type: "array",
             items: { $ref: "#/components/schemas/ContentFeatureChoice" },
-            description: "EVERY nested pick this option owes, in authored order."
+            description:
+              "Every nested pick this option owes, in authored order. Bounded at one level: a nested pick never carries its own options."
           },
           extraPicks: {
             type: "array",

@@ -31,7 +31,6 @@ const feature = (
   level: null,
   description: "",
   tags: [],
-  choice: null,
   choices: [],
   grantedAtLevels: [],
   extraPicks: [],
@@ -156,16 +155,18 @@ const cleric = {
       level: 3,
       grantedAtLevels: [3],
       description: "You gain a Cleric subclass of your choice.",
-      choice: {
-        kind: "subclass",
-        choose: 1,
-        from: [],
-        fromCatalog: "cleric-subclasses",
-        maxSpellLevel: null,
-        minSpellLevel: null,
-        fromPicks: null,
-        options: []
-      }
+      choices: [
+        {
+          kind: "subclass",
+          choose: 1,
+          from: [],
+          fromCatalog: "cleric-subclasses",
+          maxSpellLevel: null,
+          minSpellLevel: null,
+          fromPicks: null,
+          options: []
+        }
+      ]
     })
   ]
 } as unknown as ContentClassSummary;
@@ -212,7 +213,7 @@ const elf = {
       id: "elf-keen-senses",
       name: "Keen Senses",
       description: "You have proficiency in the Insight, Perception, or Survival skill.",
-      choice: choice("skill", 1, ["insight", "perception", "survival"])
+      choices: [choice("skill", 1, ["insight", "perception", "survival"])]
     })
   ]
 } as unknown as ContentSpeciesSummary;
@@ -228,7 +229,7 @@ const halfling = {
       id: "halfling-lore",
       name: "Halfling Lore",
       description: "You gain proficiency in two skills of your choice.",
-      choice: choice("skill", 2, ["insight", "perception", "survival"])
+      choices: [choice("skill", 2, ["insight", "perception", "survival"])]
     })
   ]
 } as unknown as ContentSpeciesSummary;
@@ -329,17 +330,18 @@ function offersFor(request: BuilderOffersRequest) {
   const offers: BuilderOffer[] = [];
   const species = [elf, halfling].find((entry) => entry.id === request.speciesId);
   for (const trait of species?.features ?? []) {
-    if (!trait.choice) continue;
+    const pick = trait.choices[0];
+    if (!pick) continue;
     offers.push(
       fixtureOffer({
         key: `feature:${trait.id}`,
         step: "species",
         featureId: trait.id,
-        kind: trait.choice.kind,
+        kind: pick.kind,
         label: trait.name,
         help: trait.description,
-        capacity: trait.choice.choose,
-        options: trait.choice.from.map((id) => ({ id, name: skills.find((skill) => skill.id === id)!.name })),
+        capacity: pick.choose,
+        options: pick.from.map((id) => ({ id, name: skills.find((skill) => skill.id === id)!.name })),
         unavailable: {}
       })
     );

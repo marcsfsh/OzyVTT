@@ -1073,8 +1073,6 @@ export type ContentFeatureOptionSummary = Readonly<{
   /** The earlier pick that makes this option legal (Blessed Strikes), or null. The wizard filters like the server:
    * if gating leaves exactly as many options as picks, the answer is a consequence and no pick is shown. */
   requires: Readonly<{ offer: string; id: string }> | null;
-  /** The first pick this option owes, or null; `choices` is the whole list. */
-  choice: ContentFeatureChoiceSummary | null;
   /** Every pick this option owes, in authored order. */
   choices: readonly ContentFeatureChoiceSummary[];
   extraPicks: readonly ContentExtraPickSummary[];
@@ -1109,7 +1107,6 @@ export type ContentFeatureSummary = Readonly<{
   level: number | null;
   description: string;
   tags: readonly string[];
-  /** The first pick this feature asks for (open `kind` slug), or null. Each pick writes a `choices[]` ledger row. */ choice: ContentFeatureChoiceSummary | null;
   /** Every pick this feature asks for, in authored order (Magic Initiate owes two cantrips and one level-1 spell). */
   choices: readonly ContentFeatureChoiceSummary[]; /** Every class level that grants this feature: the repeat count (server capacity is choose × grants).
    * Empty for features not granted by a class table (species traits, feats, subclass features). */
