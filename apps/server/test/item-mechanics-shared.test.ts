@@ -1,11 +1,9 @@
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { GameStateSchema, type GameState } from "@vtt/domain";
 import { loadMagicItems } from "@vtt/content-srd-5.2.1";
 import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
-// The lane list is authoring-side and outside the package's `exports` map, so it is imported by path.
-import { ITEM_MECHANICS_LANES } from "../../../packages/content-srd-5.2.1/scripts/item-mechanics/index.js";
+// The authored map is authoring-side and outside the package's `exports` map, so it is imported by path.
+import { ITEM_MECHANICS } from "../../../packages/content-srd-5.2.1/scripts/item-mechanics/items.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { builtinAction } from "../src/builtin-actions.js";
 import { ContentLibrary } from "../src/content-library.js";
@@ -14,11 +12,10 @@ import { equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { setInventoryItem } from "../src/inventory.js";
 import { initiativeRollMode, startEncounter } from "../src/encounter.js";
 
-// Program-wide properties no single lane test can hold:
-//   1. Every prose-only item carries a recorded absence (its id in backticks in the module's prose).
-//   2. The four lanes partition the bundle: every row belongs to exactly one lane.
-//   3. The cast sweeps apply to every lane, because `castAction` is lane-blind.
-// Each sweep first pins the size of its population, so a sweep that matches nothing fails.
+// Properties of the authored item mechanics as a whole, which no per-category file can hold: the cast
+// sweeps apply to every authored cast, because `castAction` does not care what kind of item casts, and
+// the rider families shared across categories are driven to an engine outcome. Each sweep first checks
+// its population is not empty, so a sweep that matches nothing fails.
 
 const view = new ContentLibrary().forAudience("gm");
 const catalog = equipmentCatalogOf(view);
@@ -103,7 +100,7 @@ function deps(faces: number[], definition: ActorDefinition): ResolveDependencies
     catalog
   };
 }
-/** The row the browse-and-add picker mints: id, name, category, equipped, attuned, nothing else. */
+/** The row the browse-and-add picker mints: id, name, category, equipped, attuned, and a shield's armor block. */
 const picked = (id: string, over: Record<string, unknown> = {}): InventoryItem => {
   const row = view.equipmentRecord(id)!;
   return item({
@@ -113,6 +110,7 @@ const picked = (id: string, over: Record<string, unknown> = {}): InventoryItem =
     category: row.category,
     equipped: true,
     attuned: row.attunement?.required === true,
+    ...(row.armor ? { armor: row.armor } : {}),
     ...over
   });
 };
@@ -137,169 +135,76 @@ const fromCatalog = (id: string): InventoryItem => {
   });
 };
 
-const WORN_SLOTS = ["neck", "shoulders", "head", "feet", "hands", "belt"];
+/** Every cast the map authors, with the item that casts it. */
+const AUTHORED_CASTS = Object.entries(ITEM_MECHANICS).flatMap(([itemId, mechanics]) =>
+  (mechanics.casts ?? []).map((cast) => ({ itemId, spellId: cast.spellId }))
+);
 
-// Lane ownership from the modules' headers, not `lane.categories` (which overlap): `wands-rods-rings.ts`
-// owns the scroll and `carried-and-potions.ts` the other consumables.
-const LANES: ReadonlyArray<{
-  readonly lane: string;
-  readonly module: string;
-  readonly rows: number;
-  readonly authored: number;
-  readonly owns: (row: (typeof ROWS)[number]) => boolean;
-}> = [
-  {
-    lane: "C7a",
-    module: "weapons-armour.ts",
-    rows: 60,
-    authored: 42,
-    owns: (row) => ["weapon", "armor", "shield", "ammunition"].includes(row.category)
-  },
-  {
-    lane: "C7b",
-    module: "wands-rods-rings.ts",
-    rows: 57,
-    authored: 27,
-    owns: (row) => ["wand", "staff", "rod", "ring"].includes(row.category) || row.id === "spell-scroll"
-  },
-  {
-    lane: "C7c",
-    module: "worn-wondrous.ts",
-    rows: 56,
-    authored: 21,
-    owns: (row) => row.category === "wondrous-item" && WORN_SLOTS.includes(row.slot ?? "")
-  },
-  {
-    lane: "C7d",
-    module: "carried-and-potions.ts",
-    rows: 95,
-    authored: 18,
-    owns: (row) =>
-      ((row.category === "wondrous-item" && row.slot === "wondrous") || row.category === "consumable") &&
-      row.id !== "spell-scroll"
-  }
+// Spells no item may cast, each with what the cast would have done. `castAction` reads
+// `spell.damage.roll` as the cast's damage, `spell.damage.types[0] ?? "force"` as its type, and emits
+// an `attack` block from `spell.attackRoll`; for these records those columns describe the spell's text
+// rather than what one cast rolls at a target.
+const REFUSED_CASTS: ReadonlyArray<readonly [string, string]> = [
+  [
+    "cure-wounds",
+    "{roll: '2d8', types: []} -> a 2d8 FORCE damage action; a Staff of Healing would hit the ally it heals"
+  ],
+  [
+    "heal",
+    "{roll: null, types: []} -> no damage, no save, no attack: a Rod of Resurrection that restores nothing and debits a charge"
+  ],
+  ["magic-missile", "{roll: '1d4 + 1'} is ONE of the THREE darts the SRD prints - ~3.5 where the spell averages ~10.5"],
+  ["web", "{roll: '2d4', types: ['fire']} is the damage of BURNING webs, and the cast rolls it on every press"],
+  [
+    "ray-of-enfeeblement",
+    "attackRoll true + {roll: '1d8', types: []} -> a 1d8 Force SPELL ATTACK; the SRD prints neither, and the 1d8 is what the TARGET subtracts from its own damage rolls"
+  ],
+  ["protection-from-evil-and-good", "attackRoll true on a ward that rolls nothing at anybody"],
+  ["faerie-fire", "attackRoll true on a spell whose only roll is the target's Dexterity save"]
 ];
 
-const moduleSource = (file: string): string =>
-  readFileSync(
-    fileURLToPath(new URL(`../../../packages/content-srd-5.2.1/scripts/item-mechanics/${file}`, import.meta.url)),
-    "utf8"
-  );
-
-describe("the content program: every prose-only item carries a recorded absence", () => {
-  it("covers all 268 rows exactly once - a row nobody owns is a row nobody owes an absence for", () => {
-    const owners = ROWS.map((row) => ({
-      id: row.id,
-      owners: LANES.filter((lane) => lane.owns(row)).map((lane) => lane.lane)
-    }));
-    expect(
-      owners.filter((row) => row.owners.length !== 1),
-      "every row belongs to exactly one lane"
-    ).toEqual([]);
-    expect(LANES.map((lane) => `${lane.lane}:${ROWS.filter(lane.owns).length}`)).toEqual([
-      "C7a:60",
-      "C7b:57",
-      "C7c:56",
-      "C7d:95"
-    ]);
-    expect(LANES.reduce((total, lane) => total + lane.rows, 0)).toBe(ROWS.length);
-    expect(ROWS).toHaveLength(268);
+describe("the cast rules apply to every authored cast", () => {
+  it("walks a real population - the sweeps below are vacuous if it is ever empty", () => {
+    expect(AUTHORED_CASTS.length).toBeGreaterThan(0);
   });
 
-  it.each(LANES)("$lane: every one of its $rows rows is authored or named in $module", (lane) => {
-    const composed = ITEM_MECHANICS_LANES.find((entry) => entry.lane === lane.lane);
-    expect(composed, `no ${lane.lane} lane is composed into ITEM_MECHANICS_LANES at all`).toBeDefined();
-    const authored = new Set(Object.keys(composed!.entries));
-    const mine = ROWS.filter(lane.owns);
-    const source = moduleSource(lane.module);
-
-    // A recorded absence is the id in backticks in the module's prose (authored keys are `"id":`); the backticks
-    // also stop `crystal-ball` matching `crystal-ball-of-telepathy`.
-    const unrecorded = mine
-      .filter((row) => !authored.has(row.id) && !source.includes(`\`${row.id}\``))
-      .map((row) => row.id);
-    expect(
-      { lane: lane.lane, unrecorded },
-      `${lane.lane}: these rows are neither authored nor named as an absence in ${lane.module}. A row that is silently skipped is indistinguishable from one that was decided - name it, with the sentence it could not express and what would unblock it`
-    ).toEqual({ lane: lane.lane, unrecorded: [] });
-
-    // The counts, so "everything is named" cannot be satisfied by a lane that authors nothing.
-    expect({ lane: lane.lane, rows: mine.length, authored: authored.size }).toEqual({
-      lane: lane.lane,
-      rows: lane.rows,
-      authored: lane.authored
-    });
-    expect(mine.length - authored.size, `${lane.lane}'s absence count`).toBe(lane.rows - lane.authored);
-    for (const id of authored)
-      expect(
-        mine.some((row) => row.id === id),
-        `${lane.lane} authors ${id}, which is not one of its own rows`
-      ).toBe(true);
+  it("names none of the seven spells whose record does not describe what a cast rolls", () => {
+    for (const [spellId, why] of REFUSED_CASTS) {
+      const found = AUTHORED_CASTS.filter((cast) => cast.spellId === spellId).map((cast) => cast.itemId);
+      expect(found, `${spellId} is cast by ${found.join(", ")} and it must not be: ${why}`).toEqual([]);
+    }
   });
 
-  it("walks a real population - 108 authored and 160 absences over the four lanes", () => {
-    const authored = ITEM_MECHANICS_LANES.reduce((total, lane) => total + Object.keys(lane.entries).length, 0);
-    expect(authored).toBe(108);
-    expect(ROWS.length - authored).toBe(160);
-  });
-});
-
-// Every cast any lane authors, attributed to its lane so a refusal names both. Lazy so that removing
-// a lane from `index.ts` fails a named test instead of throwing during collection.
-const authoredCasts = () => {
-  expect(ITEM_MECHANICS_LANES.length, "no lane is composed into ITEM_MECHANICS_LANES at all").toBe(4);
-  return ITEM_MECHANICS_LANES.flatMap((lane) =>
-    Object.entries(lane.entries).flatMap(([itemId, mechanics]) =>
-      (mechanics.casts ?? []).map((cast) => ({ lane: lane.lane, itemId, spellId: cast.spellId }))
-    )
-  );
-};
-
-describe("the content program: the two cast rules apply to every lane, not just C7b", () => {
-  it("walks a real population - the two sweeps below are vacuous if this number is ever 0", () => {
-    const casts = authoredCasts();
-    expect(casts).toHaveLength(43);
-    expect(new Set(casts.map((cast) => cast.itemId)).size).toBe(29);
-    expect(
-      Object.fromEntries(
-        ITEM_MECHANICS_LANES.map((lane) => [lane.lane, casts.filter((cast) => cast.lane === lane.lane).length])
-      )
-    ).toEqual({ C7a: 2, C7b: 28, C7c: 6, C7d: 7 });
-  });
-
-  it("names no spell whose damage roll carries no damage type - in ANY lane", () => {
+  it("names no spell whose damage roll carries no damage type", () => {
     // `castAction` types damage as `spell.damage.types[0] ?? "force"`, so a spell with dice and no type would
     // become Force damage; those spells (healing, buffs, choose-your-type) must not be authored as casts.
-    for (const cast of authoredCasts()) {
+    for (const cast of AUTHORED_CASTS) {
       const spell = view.spellRecord!(cast.spellId);
-      expect(
-        spell,
-        `${cast.lane}/${cast.itemId} casts "${cast.spellId}", which resolves to no spell record`
-      ).toBeDefined();
+      expect(spell, `${cast.itemId} casts "${cast.spellId}", which resolves to no spell record`).toBeDefined();
       const offends = spell!.damage?.roll != null && (spell!.damage?.types?.length ?? 0) === 0;
       expect(
         offends,
-        `${cast.lane}/${cast.itemId} casts ${cast.spellId}, whose damage is ${JSON.stringify(spell!.damage)} - castAction types an untyped roll as "force", so this cast would deal Force damage to the ally it is pointed at. Record it as a named absence`
+        `${cast.itemId} casts ${cast.spellId}, whose damage is ${JSON.stringify(spell!.damage)} - castAction types an untyped roll as "force", so this cast would deal Force damage to the ally it is pointed at. Record it as a named absence`
       ).toBe(false);
     }
   });
 
-  it("names no spell the record marks as an attack roll - in ANY lane", () => {
+  it("names no spell the record marks as an attack roll", () => {
     // The `attackRoll` column is set by any mention of an attack roll in the text, including other
     // creatures' attacks, so no authored cast may rely on it.
-    for (const cast of authoredCasts()) {
+    for (const cast of AUTHORED_CASTS) {
       const spell = view.spellRecord!(cast.spellId)!;
       expect(
         spell.attackRoll,
-        `${cast.lane}/${cast.itemId} casts ${cast.spellId}, which the record marks attackRoll - castAction would hang an attack block on it`
+        `${cast.itemId} casts ${cast.spellId}, which the record marks attackRoll - castAction would hang an attack block on it`
       ).toBe(false);
     }
   });
 });
 
-// Rider families that lane tests only check survive into the bundle (`ammunition-3`, `sentinel-shield`,
-// `demon-armor`), driven here to an engine outcome.
-describe("the content program: the rider families held only by a bundle assertion, driven", () => {
+// Rider families the per-category files only check survive into the bundle (`ammunition-3`,
+// `sentinel-shield`, `demon-armor`), driven here to an engine outcome.
+describe("the rider families held only by a bundle assertion, driven", () => {
   it("ammunition's attack-bonus lands on a RANGED to-hit and stays off a MELEE one", () => {
     const definition = definitionOf();
     const shot = (inventory: InventoryItem[], actionId: string) => {

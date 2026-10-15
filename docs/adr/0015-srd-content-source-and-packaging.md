@@ -63,9 +63,12 @@ reference under one permissive license, at the cost of vendoring ~2.7 MB of sour
 plus ~1.6 MB of generated bundles in git. Regenerating after an upstream refresh is a re-run
 of the ETL plus a reviewable diff. Choosing 2024 (SRD 5.2.1) over 2014 (SRD 5.1) means the
 older bestiary is not bundled; a future OGL 5.1 bundle would be a separate package with its
-own license notice, not a mix-in. Classes, species, feats, backgrounds, and magic items are
-deliberately not bundled — character-build and loot content outside the product's "not a
-character builder" scope (revisit only with a concrete consumer).
+own license notice, not a mix-in. Classes, species, feats, backgrounds, and magic items were
+originally left out as outside the product's scope.
+
+**Update, 2026-10-15:** the guided builder and magic items shipped, so all of that content is now
+bundled. `npm run content` rebuilds every bundle from `sources/` (vendored SRD text plus authored
+JSON in `sources/authored/`), and a test checks the committed bundles match byte for byte.
 
 ## Mobile, security, and visibility impact
 

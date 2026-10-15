@@ -9,14 +9,14 @@ import { setInventoryItem } from "../src/inventory.js";
 import { startEncounter } from "../src/encounter.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
 
-// The weapons-and-armour lane, read from the shipped bundle (`loadMagicItems()`) and driven to an
+// Magic weapons, armor, shields and ammunition, read from the shipped bundle (`loadMagicItems()`) and driven to an
 // engine outcome: a halved damage total, a moved Armor Class, rolled weapon numbers.
 // `item-riders.test.ts` covers the readers with injected catalogs; this file covers the authored data.
 // Fixture rule: no inventory row may supply a column the shipped row does not carry. Rows are minted
-// as the browse-and-add picker mints them (id, name, category, equipped, attuned), and
-// `mintsTheWayThePickerDoes` guards that. The one exception is `boundTo`, which mints a row as the
-// weapon bind does: the magic item's identity plus the chosen base weapon's block copied verbatim
-// from the shipped equipment catalog.
+// as the browse-and-add picker mints them (id, name, category, equipped, attuned, and the row's own
+// armor block when it has one), and `mintsTheWayThePickerDoes` guards that. The one exception is
+// `boundTo`, which mints a row as the weapon bind does: the magic item's identity plus the chosen
+// base weapon's block copied verbatim from the shipped equipment catalog.
 
 const IDS = {
   hero: "10000000-0000-4000-8000-000000000001",
@@ -27,12 +27,9 @@ const IDS = {
 const MAGIC_ITEMS = loadMagicItems();
 const shipped = (id: string): EquipmentRecordLike => {
   const row = MAGIC_ITEMS.find((item) => item.id === id);
-  if (!row) throw new Error(`C7a: no row in magic-items.v1.json carries the id "${id}"`);
+  if (!row) throw new Error(`no row in magic-items.v1.json carries the id "${id}"`);
   return row as EquipmentRecordLike;
 };
-
-const LANE_CATEGORIES = ["weapon", "armor", "shield", "ammunition"] as const;
-const laneRows = MAGIC_ITEMS.filter((row) => (LANE_CATEGORIES as readonly string[]).includes(row.category));
 
 const catalogOf = (records: readonly EquipmentRecordLike[]): EquipmentCatalog => ({
   equipmentRecord: (id) => records.find((record) => record.id === id),
@@ -53,9 +50,10 @@ function definitionOf(): ActorDefinition {
   } as unknown as ActorDefinition;
 }
 
-// What the browse-and-add picker mints for a magic item: id, name, category and the two booleans.
-// No `weapon` or `armor` block, because the catalog summary it is built from
-// (`apps/client/src/encounter/equipment.tsx`) has none to copy.
+// What the browse-and-add picker mints for a magic item: id, name, category, the two booleans, and
+// the catalog row's `armor` block when it carries one (only shields do), as `addFromCatalog` in
+// `apps/client/src/encounter/CharacterSheet.tsx` copies it. A magic weapon or body armor has no block
+// of its own; it gets one only from the bind.
 const asPicked = (id: string, over: Record<string, unknown> = {}): InventoryItem => {
   const row = shipped(id);
   return InventoryItemSchema.parse({
@@ -65,6 +63,7 @@ const asPicked = (id: string, over: Record<string, unknown> = {}): InventoryItem
     category: row.category,
     equipped: true,
     attuned: (row as { attunement?: { required?: boolean } }).attunement?.required === true,
+    ...(row.armor ? { armor: row.armor } : {}),
     ...over
   });
 };
@@ -104,7 +103,7 @@ const EQUIPMENT = loadEquipment();
 // `ItemWeaponSchema` does not carry).
 const boundTo = (magicId: string, baseId: string, over: Record<string, unknown> = {}): InventoryItem => {
   const base = EQUIPMENT.find((record) => record.id === baseId)?.weapon;
-  if (!base) throw new Error(`C7a: no shipped equipment row "${baseId}" carries a weapon block to bind`);
+  if (!base) throw new Error(`no shipped equipment row "${baseId}" carries a weapon block to bind`);
   return asPicked(magicId, {
     weapon: {
       category: base.category,
@@ -151,7 +150,7 @@ function deps(faces: number[], catalog: EquipmentCatalog, definition: ActorDefin
   };
 }
 
-describe("C7a far end: Armor of Resistance halves a typed damage total", () => {
+describe("Armor of Resistance halves a typed damage total", () => {
   const ARMOR = shipped("armor-of-resistance");
   const catalog = catalogOf([ARMOR]);
   const definition = definitionOf();
@@ -160,7 +159,7 @@ describe("C7a far end: Armor of Resistance halves a typed damage total", () => {
   it("halves the authored damage type and names the armor on the line", () => {
     const state = worn();
     // The SRD prints a d10 table and no fixed type ("The GM chooses the type or determines it
-    // randomly"); the lane authored lightning.
+    // randomly"); the map authors lightning.
     const outcome = applyDamageDetailed(
       state,
       IDS.hero,
@@ -170,7 +169,7 @@ describe("C7a far end: Armor of Resistance halves a typed damage total", () => {
     );
     expect(
       outcome.application.totalApplied,
-      "C7a/armor-of-resistance: the authored lightning resistance did not halve the total"
+      "armor-of-resistance: the authored lightning resistance did not halve the total"
     ).toBe(6);
     expect(outcome.application.parts[0]).toMatchObject({
       adjustment: "resistance",
@@ -206,43 +205,46 @@ describe("C7a far end: Armor of Resistance halves a typed damage total", () => {
     const unattuned = stateWith([asPicked("armor-of-resistance", { attuned: false })]);
     expect(
       deriveEquipment(unattuned.actors[0], definition, catalog).damageResistances,
-      "C7a/armor-of-resistance: an unattuned armor still granted its resistance"
+      "armor-of-resistance: an unattuned armor still granted its resistance"
     ).toHaveLength(0);
   });
 
   it("mintsTheWayThePickerDoes: the far end's own inventory row carries no column the bundle lacks", () => {
-    // Guards the fixture rule in the header: a picker-minted row must not gain a `weapon` or `armor` block.
+    // Guards the fixture rule in the header: a picker-minted row carries only the blocks its row carries.
     const row = asPicked("armor-of-resistance") as unknown as Record<string, unknown>;
     expect(row.weapon, "the picker cannot mint a weapon block the catalog row does not carry").toBeUndefined();
     expect(row.armor, "the picker cannot mint an armor block the catalog row does not carry").toBeUndefined();
+    expect(asPicked("shield-2").armor, "a shield arrives with the shield block its row carries").toEqual(
+      shipped("shield-2").armor
+    );
   });
 });
 
-describe("C7a: the armour and shield rows move a real Armor Class", () => {
+describe("the armour and shield rows move a real Armor Class", () => {
   it("raises actor.armorClass on equip and gives it back on unequip", () => {
     // `armor-class` is not in `THIS_ITEM_BY_DEFAULT`, so it is a standing bearer rider and needs no
-    // `armor` block.
+    // `armor` block. A shield adds the plain shield's +2 from its block on top of its own bonus: Dex 14
+    // and no body armor make 10 + 2 + 2 = 14 before the rider.
     for (const [id, amount] of [
       ["armor-1", 1],
-      ["shield-2", 2],
+      ["shield-2", 2 + 2],
+      ["sentinel-shield", 2],
       ["dwarven-plate", 2]
     ] as const) {
       const catalog = catalogOf([shipped(id)]);
       const definition = definitionOf();
       const state = stateWith([]);
       setInventoryItem(state, IDS.hero, asPicked(id), () => definition, { catalog });
-      expect(state.actors[0].armorClass, `C7a/${id}: the authored +${amount} did not reach the sheet's AC`).toBe(
-        12 + amount
-      );
+      expect(state.actors[0].armorClass, `${id}: +${amount} did not reach the sheet's AC`).toBe(12 + amount);
       setInventoryItem(state, IDS.hero, asPicked(id, { equipped: false }), () => definition, { catalog });
-      expect(state.actors[0].armorClass, `C7a/${id}: unequipping must be the un-grant`).toBe(12);
+      expect(state.actors[0].armorClass, `${id}: unequipping must be the un-grant`).toBe(12);
     }
   });
 });
 
 // Weapon rows driven from the shipped bundle on a bound base-weapon block to rolled numbers.
 
-describe("C9 far end: the shipped +1 weapon record on a bound base weapon block", () => {
+describe("the shipped +1 weapon record on a bound base weapon block", () => {
   const catalog = catalogOf([shipped("weapon-1")]);
 
   it("(a) on a greatsword: prints 2d6 + 4 at attack bonus 6, and the ROLLED total pays the +1", () => {
@@ -253,7 +255,7 @@ describe("C9 far end: the shipped +1 weapon record on a bound base weapon block"
     const action = effectiveActions(definition, state.actors[0], catalog).find(
       (entry) => entry.id === "item-weapon-1"
     )!;
-    expect(action.damage, "C7a/weapon-1: the shipped damage-bonus did not fold into the greatsword swing").toEqual([
+    expect(action.damage, "weapon-1: the shipped damage-bonus did not fold into the greatsword swing").toEqual([
       { formula: "2d6 + 4", type: "slashing" }
     ]);
     expect(action.attack!.bonus).toBe(6);
@@ -283,7 +285,7 @@ describe("C9 far end: the shipped +1 weapon record on a bound base weapon block"
     const action = effectiveActions(definition, state.actors[0], catalog).find(
       (entry) => entry.id === "item-weapon-1"
     )!;
-    expect(action.damage, "C7a/weapon-1: finesse did not travel with the bound dagger block").toEqual([
+    expect(action.damage, "weapon-1: finesse did not travel with the bound dagger block").toEqual([
       { formula: "1d4 + 3", type: "piercing" }
     ]);
     expect(action.attack!.bonus).toBe(5);
@@ -308,7 +310,7 @@ describe("C9 far end: the shipped +1 weapon record on a bound base weapon block"
   });
 });
 
-describe("C9 far end: the shipped on-hit dice on a bound melee block", () => {
+describe("the shipped on-hit dice on a bound melee block", () => {
   it("(c) flame-tongue on a longsword: the resolution carries TWO typed entries, slashing + 2d6 fire", () => {
     const definition = definitionOf();
     const catalog = catalogOf([shipped("flame-tongue")]);
@@ -326,7 +328,7 @@ describe("C9 far end: the shipped on-hit dice on a bound melee block", () => {
       { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000203" },
       deps([10, 5, 2, 6], catalog, definition)
     );
-    expect(resolution.damage, "C7a/flame-tongue: the shipped 2d6 fire did not land as its own typed entry").toEqual([
+    expect(resolution.damage, "flame-tongue: the shipped 2d6 fire did not land as its own typed entry").toEqual([
       { formula: "1d8 + 3", type: "slashing", total: 8 },
       { formula: "2d6", type: "fire", total: 8 }
     ]);
@@ -348,7 +350,7 @@ describe("C9 far end: the shipped on-hit dice on a bound melee block", () => {
         { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000204" },
         deps([...faces], catalog, definition)
       );
-      expect(resolution.damage, `C7a/${id}: the shipped ${formula} ${type} did not land`).toEqual([
+      expect(resolution.damage, `${id}: the shipped ${formula} ${type} did not land`).toEqual([
         { formula: "1d8 + 3", type: "slashing", total: 8 },
         { formula, type, total }
       ]);
@@ -382,9 +384,9 @@ describe("C9 far end: the shipped on-hit dice on a bound melee block", () => {
   });
 });
 
-describe("C7a: the lane's riders are present in the shipped bundle", () => {
+describe("the authored riders are present in the shipped bundle", () => {
   it("carries the authored riders on the rows that print them", () => {
-    // One representative per rider family the lane authors.
+    // One representative per rider family authored on these rows.
     expect(shipped("armor-2").modifiers).toContainEqual(expect.objectContaining({ type: "armor-class", amount: 2 }));
     expect(shipped("shield-3").modifiers).toContainEqual(expect.objectContaining({ type: "armor-class", amount: 3 }));
     expect(shipped("ammunition-3").modifiers).toContainEqual(
@@ -395,7 +397,7 @@ describe("C7a: the lane's riders are present in the shipped bundle", () => {
       expect.objectContaining({ type: "roll-mode", roll: "initiative", mode: "advantage" })
     );
     // Gated on the ability because `BUILTIN_CHECKS.search` passes no skill and `skill-is` fails closed
-    // without one. Driven to the die in `item-mechanics-program.test.ts`.
+    // without one. Driven to the die in `item-mechanics-shared.test.ts`.
     expect(shipped("sentinel-shield").modifiers).toContainEqual({
       type: "roll-mode",
       roll: "check",
@@ -416,10 +418,9 @@ describe("C7a: the lane's riders are present in the shipped bundle", () => {
 
   it("pins the re-authored weapon rows BY NAME AND VALUE - and every other weapon row to none", () => {
     // Exactly these weapon rows carry exactly these weapon-scoped riders (by name and value), and any
-    // other weapon row carries none. The lane's weapon rows still carry no `weapon` block of their own;
+    // other weapon row carries none. Magic weapon rows still carry no `weapon` block of their own;
     // the swing comes from the base weapon at bind time.
     const weapons = MAGIC_ITEMS.filter((row) => row.category === "weapon");
-    expect(weapons).toHaveLength(33);
     expect(
       weapons.filter((row) => row.weapon != null),
       "the premise moved: a weapon row now carries a weapon block"
@@ -514,24 +515,5 @@ describe("C7a: the lane's riders are present in the shipped bundle", () => {
     expect(vulnerable.modifiers, "armor-of-vulnerability must author nothing until both halves can land").toEqual([]);
     expect(vulnerable.cursed, "a curse with no downside is an inverted item").toBe(false);
     expect((vulnerable.grants as { damageResistances?: string[] } | undefined)?.damageResistances ?? []).toEqual([]);
-  });
-
-  it("holds the module's own counts, so the header cannot drift from the bundle", () => {
-    // `weapons-armour.ts` states "42 of 60 carry a rider - 11 armour, 6 shields, 3 ammunition, 22
-    // weapons" and "18 of 60 are prose-only"; a row moving between groups must move the header too.
-    const carriesRider = (row: (typeof laneRows)[number]) =>
-      (row.modifiers?.length ?? 0) > 0 ||
-      (row.casts?.length ?? 0) > 0 ||
-      row.cursed === true ||
-      (row.grants !== undefined && Object.values(row.grants).some((value) => Array.isArray(value) && value.length > 0));
-
-    expect(laneRows, "the lane's category footprint moved").toHaveLength(60);
-    const authored = laneRows.filter(carriesRider);
-    expect(authored, "the module header says 42 of 60").toHaveLength(42);
-    expect(laneRows.length - authored.length, "the module header says 18 prose-only").toBe(18);
-    const byCategory = Object.fromEntries(
-      LANE_CATEGORIES.map((category) => [category, authored.filter((row) => row.category === category).length])
-    );
-    expect(byCategory).toEqual({ armor: 11, shield: 6, ammunition: 3, weapon: 22 });
   });
 });

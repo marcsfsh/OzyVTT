@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema, type GameState } from "@vtt/domain";
 import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
-// The lane list is authoring-side and outside the package's `exports` map, so it is imported by path;
-// this file checks that the composed lane and the committed bundle agree.
-import { ITEM_MECHANICS_LANES } from "../../../packages/content-srd-5.2.1/scripts/item-mechanics/index.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { setCondition } from "../src/actor-conditions.js";
 import { ContentLibrary } from "../src/content-library.js";
@@ -13,12 +10,13 @@ import { answerSave, createPendingSaves, saveTotalFor } from "../src/saving-thro
 import { startEncounter } from "../src/encounter.js";
 import { applyRest } from "../src/rests.js";
 
-// Wands, staffs, rods, rings and the scroll (`wands-rods-rings.ts`), driven through the real
-// `ContentLibrary` over the committed `magic-items.v1.json`, so an unmerged rider, a renamed item id
-// or a dangling `spellId` fails here. Assertions are numbers a player acts on or refusals they read.
-// A Wand of Fireballs spends a charge, rolls Fireball's 8d6 against the printed DC 15, and refuses by
-// name once the charges are gone. The last two describes pin casts and entries that were removed
-// because they produced the wrong effect at the table.
+// Wands, staffs, rods, rings and the scroll (the wands section of `item-mechanics/items.ts`), driven
+// through the real `ContentLibrary` over the committed `magic-items.v1.json`, so an unmerged rider, a
+// renamed item id or a dangling `spellId` fails here. Assertions are numbers a player acts on or
+// refusals they read. A Wand of Fireballs spends a charge, rolls Fireball's 8d6 against the printed
+// DC 15, and refuses by name once the charges are gone. The last two describes pin entries left out
+// or trimmed because they produced the wrong effect at the table; `item-mechanics-shared.test.ts`
+// holds every cast to the spells a cast can say.
 
 const view = new ContentLibrary().forAudience("gm");
 const catalog = equipmentCatalogOf(view);
@@ -125,7 +123,7 @@ const WAND_ROW = {
 const CAST_ID = "item-wand-of-fireballs-cast-fireball";
 const CHARGES = "wand-of-fireballs-charges";
 
-describe("C7b far end: a Wand of Fireballs spends a charge, rolls real damage, and refuses at zero", () => {
+describe("a Wand of Fireballs spends a charge, rolls real damage, and refuses at zero", () => {
   it("carries the authored cast out of the COMMITTED bundle, through the real content library", () => {
     // The first link: if the overlay did not merge, this fails.
     const record = view.equipmentRecord("wand-of-fireballs")!;
@@ -222,7 +220,7 @@ describe("C7b far end: a Wand of Fireballs spends a charge, rolls real damage, a
   });
 });
 
-describe("C7b: the standing modifiers a ring authors", () => {
+describe("the standing modifiers a ring authors", () => {
   const ROW = {
     id: "ring-of-protection",
     name: "Ring of Protection",
@@ -282,7 +280,7 @@ describe("C7b: the standing modifiers a ring authors", () => {
   });
 });
 
-describe("C7b: an item action with a printed DC, a condition read off its prose, and a daily counter", () => {
+describe("an item action with a printed DC, a condition read off its prose, and a daily counter", () => {
   const ROW = {
     id: "rod-of-rulership",
     name: "Rod of Rulership",
@@ -323,7 +321,7 @@ describe("C7b: an item action with a printed DC, a condition read off its prose,
   });
 });
 
-describe("C7b: a staff's resistance and its shared charge pool", () => {
+describe("a staff's resistance and its shared charge pool", () => {
   const ROW = {
     id: "staff-of-fire",
     name: "Staff of Fire",
@@ -401,43 +399,8 @@ describe("C7b: a staff's resistance and its shared charge pool", () => {
   });
 });
 
-describe("C7b: the lane authors what it claims to author", () => {
-  const lane = ITEM_MECHANICS_LANES.find((entry) => entry.lane === "C7b")!;
-
-  it("is composed into ITEM_MECHANICS_LANES with its own categories", () => {
-    expect(lane).toBeDefined();
-    expect([...lane.categories].sort()).toEqual(["consumable", "ring", "rod", "staff", "wand"]);
-  });
-
-  it("keys 27 real magic items, every one inside the lane's own categories", () => {
-    const ids = Object.keys(lane.entries);
-    expect(ids).toHaveLength(27);
-    for (const id of ids) {
-      const record = view.equipmentRecord(id);
-      expect(record, `${id} is keyed by C7b but no bundle row carries that id`).toBeDefined();
-      expect(lane.categories, `${id} is a "${record!.category}"`).toContain(record!.category);
-    }
-  });
-
-  it("landed every authored rider on the COMMITTED bundle - not one entry merged to nothing", () => {
-    // The build refuses an empty rider; this checks the build was run and its output committed, so a
-    // module edited without regenerating fails here.
-    for (const [id, mechanics] of Object.entries(lane.entries)) {
-      const record = view.equipmentRecord(id)!;
-      for (const key of Object.keys(mechanics) as ReadonlyArray<"casts" | "actions" | "modifiers" | "grants">) {
-        const landed = record[key];
-        const populated = Array.isArray(landed)
-          ? landed.length > 0
-          : landed !== undefined && Object.keys(landed as object).length > 0;
-        expect(
-          populated,
-          `${id}.${key} is authored in the module but empty in magic-items.v1.json - regenerate the bundle`
-        ).toBe(true);
-      }
-    }
-  });
-
-  it("reserves U26's spell-attack-bonus rather than authoring it inert", () => {
+describe("spell attack bonuses stay unauthored", () => {
+  it("leaves spell-attack-bonus off every carrier, since nothing reads it", () => {
     // These carriers need a reader that does not exist yet; `applyItemMechanics` refuses the rider at
     // build time, and this asserts the output.
     for (const id of [
@@ -461,89 +424,14 @@ describe("C7b: the lane authors what it claims to author", () => {
         .modifiers.map((modifier) => modifier.type)
         .sort()
     ).toEqual(["armor-class", "save-bonus"]);
-    // Ring of Warmth is a Ring, so it is this lane's absence.
+    // Ring of Warmth stays prose.
     const warmth = view.equipmentRecord("ring-of-warmth")!;
     expect(warmth.category).toBe("ring");
     expect(warmth.modifiers).toEqual([]);
   });
 });
 
-// Spells this lane may not cast, each with what the cast would have done. `castAction` reads
-// `spell.damage.roll` as the cast's damage, `spell.damage.types[0] ?? "force"` as its type, and emits
-// an `attack` block from `spell.attackRoll`; for these records those columns describe the spell's text
-// rather than what one cast rolls at a target.
-const REFUSED_CASTS: ReadonlyArray<readonly [string, string]> = [
-  [
-    "cure-wounds",
-    "{roll: '2d8', types: []} -> a 2d8 FORCE damage action; a Staff of Healing would hit the ally it heals"
-  ],
-  [
-    "heal",
-    "{roll: null, types: []} -> no damage, no save, no attack: a Rod of Resurrection that restores nothing and debits a charge"
-  ],
-  ["magic-missile", "{roll: '1d4 + 1'} is ONE of the THREE darts the SRD prints - ~3.5 where the spell averages ~10.5"],
-  ["web", "{roll: '2d4', types: ['fire']} is the damage of BURNING webs, and the cast rolls it on every press"],
-  [
-    "ray-of-enfeeblement",
-    "attackRoll true + {roll: '1d8', types: []} -> a 1d8 Force SPELL ATTACK; the SRD prints neither, and the 1d8 is what the TARGET subtracts from its own damage rolls"
-  ],
-  ["protection-from-evil-and-good", "attackRoll true on a ward that rolls nothing at anybody"],
-  ["faerie-fire", "attackRoll true on a spell whose only roll is the target's Dexterity save"]
-];
-
-describe("C7b salvage: the removed casts stay removed", () => {
-  /** Lazy so that removing the lane from `index.ts` fails a named test instead of throwing during collection. */
-  const authoredCasts = () => {
-    const lane = ITEM_MECHANICS_LANES.find((entry) => entry.lane === "C7b");
-    expect(lane, "no C7b lane is composed into ITEM_MECHANICS_LANES at all").toBeDefined();
-    return Object.entries(lane!.entries).flatMap(([itemId, mechanics]) =>
-      (mechanics.casts ?? []).map((cast) => ({ itemId, spellId: cast.spellId }))
-    );
-  };
-
-  it("walks a real population - the two sweeps below are vacuous if this number is ever 0", () => {
-    const authored = authoredCasts();
-    expect(authored).toHaveLength(28);
-    expect(new Set(authored.map((cast) => cast.itemId)).size).toBe(16);
-  });
-
-  it("names none of the seven spells whose record does not describe what a cast rolls", () => {
-    const authored = authoredCasts();
-    for (const [spellId, why] of REFUSED_CASTS) {
-      const found = authored.filter((cast) => cast.spellId === spellId).map((cast) => cast.itemId);
-      expect(found, `${spellId} is cast by ${found.join(", ")} and it must not be: ${why}`).toEqual([]);
-    }
-  });
-
-  // Applied to every cast, not just the named list. A damage roll with an empty type set cannot say what
-  // the cast rolls (those spells are a mix of healing, buffs, temporary hit points and choose-your-type),
-  // and `castAction` would turn it into Force damage.
-  it("names no spell whose damage roll carries no damage type", () => {
-    for (const cast of authoredCasts()) {
-      const spell = view.spellRecord!(cast.spellId)!;
-      expect(spell, `${cast.spellId} resolves to no spell record`).toBeDefined();
-      const offends = spell.damage?.roll != null && (spell.damage?.types?.length ?? 0) === 0;
-      expect(
-        offends,
-        `${cast.itemId} casts ${cast.spellId}, whose damage is ${JSON.stringify(spell.damage)} - castAction types an untyped roll as "force"`
-      ).toBe(false);
-    }
-  });
-
-  // The `attackRoll` column is set by any mention of an attack roll in the text, including other
-  // creatures' attacks, so this lane may not rely on it.
-  it("names no spell the record marks as an attack roll, while that column is untrustworthy", () => {
-    for (const cast of authoredCasts()) {
-      const spell = view.spellRecord!(cast.spellId)!;
-      expect(
-        spell.attackRoll,
-        `${cast.itemId} casts ${cast.spellId}, which the record marks attackRoll - castAction would hang an attack block on it`
-      ).toBe(false);
-    }
-  });
-});
-
-describe("C7b salvage: the five whole-entry absences are absent AT THE ENGINE", () => {
+describe("the whole-entry absences are absent at the engine", () => {
   /** Equipped and attuned, so every gate is open and only the absence explains the result. */
   const worn = (id: string, name: string, category: string) =>
     fight(stateWith([item({ id, name, quantity: 1, equipped: true, attuned: true, category })]));
@@ -595,7 +483,7 @@ describe("C7b salvage: the five whole-entry absences are absent AT THE ENGINE", 
   });
 });
 
-describe("C7b salvage: the two entries that lost a cast and kept the rest", () => {
+describe("the two entries that cast nothing and keep the rest", () => {
   it("leaves Staff of Power its AC and saving-throw halves and NO cast at all", () => {
     const definition = definitionOf();
     const state = fight(

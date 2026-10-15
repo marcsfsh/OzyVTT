@@ -3,9 +3,6 @@ import { GameStateSchema, type GameState } from "@vtt/domain";
 // The shipped bundle, read as every consumer reads it.
 import { loadMagicItems } from "@vtt/content-srd-5.2.1";
 import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
-// The lane list is authoring-side and outside the package's `exports` map, so it is imported by path;
-// this file checks that the composed lane and the committed bundle agree.
-import { ITEM_MECHANICS_LANES } from "../../../packages/content-srd-5.2.1/scripts/item-mechanics/index.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { deriveActorSheet } from "../src/actor-derived.js";
 import { ContentLibrary } from "../src/content-library.js";
@@ -17,7 +14,7 @@ import { startEncounter } from "../src/encounter.js";
 import { builtinAction } from "../src/builtin-actions.js";
 import { looseRollPlan } from "../src/tap-routing.js";
 
-// Carried wondrous items and potions (`carried-and-potions.ts`): the authored rows reach the table, and
+// Carried wondrous items and potions (the carried section of `item-mechanics/items.ts`): the authored rows reach the table, and
 // the absences stay absent for their recorded reasons. Runs the real `ContentLibrary` over the committed
 // `magic-items.v1.json`; inventory rows are minted as the equipment picker mints them.
 // The Pipes of Haunting end at a spent counter, a refusal at zero, and a server-enforced save whose
@@ -123,8 +120,8 @@ const newTurn = (state: GameState) => {
 const carried = (id: string, name: string, over: Record<string, unknown> = {}): InventoryItem =>
   item({ id, name, quantity: 1, equipped: true, attuned: true, category: "wondrous-item", ...over });
 
-/** This lane's rows, from the shipped bundle. */
-const LANE_ROWS = loadMagicItems().filter(
+/** The carried wondrous items, potions and oils, from the shipped bundle. */
+const CARRIED_ROWS = loadMagicItems().filter(
   (row) =>
     ((row.category === "wondrous-item" && row.slot === "wondrous") || row.category === "consumable") &&
     row.id !== "spell-scroll"
@@ -151,7 +148,7 @@ const carries = (row: {
   row.uses !== undefined ||
   row.cursed;
 
-describe("C7d far end: the Pipes of Haunting spend a charge, refuse the fourth press, and force a real save", () => {
+describe("the Pipes of Haunting spend a charge, refuse the fourth press, and force a real save", () => {
   it("carries the authored action out of the COMMITTED bundle, through the real content library", () => {
     // The first link: if the overlay did not merge, this fails.
     const record = view.equipmentRecord("pipes-of-haunting")!;
@@ -286,7 +283,7 @@ describe("C7d far end: the Pipes of Haunting spend a charge, refuse the fourth p
   });
 });
 
-describe("C7d: the Stone of Good Luck - one half whole, one half short of the roll", () => {
+describe("the Stone of Good Luck - one half whole, one half short of the roll", () => {
   const ROW = { id: "stone-of-good-luck-luckstone", name: "Stone of Good Luck", category: "wondrous-item" };
 
   it("moves every skill row by +1 and the save the SERVER rolls by +1, and both come off with the stone", () => {
@@ -385,8 +382,8 @@ describe("C7d: the Stone of Good Luck - one half whole, one half short of the ro
   });
 });
 
-describe("C7d: D8 and D9 - what this lane's buttons do outside an encounter", () => {
-  it("D8: refuses every one of them, by the server's own words", () => {
+describe("what the carried items' buttons do outside an encounter", () => {
+  it("refuses every one of them, by the server's own words", () => {
     // Most authored rows do nothing out of combat, and their printed uses (scrying, messaging, Truesight)
     // are not combat activities. The failure mode is a button that refuses rather than one that lies.
     const definition = definitionOf();
@@ -412,7 +409,7 @@ describe("C7d: D8 and D9 - what this lane's buttons do outside an encounter", ()
     }
   });
 
-  it("D9: except the Iron Bands, which the loose route WILL roll - and it spends no charge", () => {
+  it("except the Iron Bands, which the loose route WILL roll - and it spends no charge", () => {
     // Known limitation: the loose `action.use` path touches no combat state, so `actionUses` is never
     // incremented and outside a fight the bands throw unlimited +5 attacks where the SRD prints one per
     // dawn. Engine-wide, so this pins the leak rather than removing the rider.
@@ -427,7 +424,7 @@ describe("C7d: D8 and D9 - what this lane's buttons do outside an encounter", ()
   });
 });
 
-describe("C7d: the one printed to-hit in the lane that the vocabulary can say", () => {
+describe("the one printed to-hit among carried items that the vocabulary can say", () => {
   it("derives the Iron Bands' attack from Dex + Proficiency, exactly as the SRD prints it", () => {
     const definition = definitionOf();
     // "Iron Bands of Bilarro" is the 2014 name and does not appear in SRD 5.2.1.
@@ -460,7 +457,7 @@ describe("C7d: the one printed to-hit in the lane that the vocabulary can say", 
   });
 });
 
-describe("C7d: the charge-alone items, whose counter is the whole of what they enforce", () => {
+describe("the charge-alone items, whose counter is the whole of what they enforce", () => {
   it("rations the four elemental summons at one a day and the three-charge items at three", () => {
     const definition = definitionOf();
     for (const [id, name, actionId, limit, label] of [
@@ -518,7 +515,7 @@ describe("C7d: the charge-alone items, whose counter is the whole of what they e
   });
 });
 
-describe("C7d: the casts that survived the spell-record check", () => {
+describe("the casts that survived the spell-record check", () => {
   it("holds all four Crystal Balls' Scrying to the orbs' printed DC 17, with nothing else invented", () => {
     const definition = definitionOf();
     for (const id of [
@@ -539,7 +536,7 @@ describe("C7d: the casts that survived the spell-record check", () => {
     }
   });
 
-  it("D7: the two SENSOR-GATED casts are absent, and a re-author would land a real Charm on any target", () => {
+  it("the two SENSOR-GATED casts are absent, and a re-author would land a real Charm on any target", () => {
     // The SRD casts these through an active Scrying sensor ("targeting creatures you can see within 30 feet
     // of the spell's sensor"), which no trigger can express, so the derived buttons would have no
     // prerequisite. Suggestion resolved at a foe in melee would write a charmed pending save.
@@ -596,7 +593,7 @@ describe("C7d: the casts that survived the spell-record check", () => {
   });
 });
 
-describe("C7d: a save with no charge behind it, because the SRD prints no limit", () => {
+describe("a save with no charge behind it, because the SRD prints no limit", () => {
   it("gives the Rope of Entanglement an unlimited DC 15 Dex save that names Restrained", () => {
     const definition = definitionOf();
     const state = fight(stateWith([carried("rope-of-entanglement", "Rope of Entanglement", { attuned: false })]));
@@ -637,81 +634,24 @@ describe("C7d: a save with no charge behind it, because the SRD prints no limit"
 
 // The absences, pinned so none is authored by accident.
 
-describe("C7d: the lane's counts, measured against the shipped bundle rather than asserted", () => {
-  it("owns 95 rows - 71 carried wondrous and 24 consumables - and the scroll is not one of them", () => {
-    expect(LANE_ROWS).toHaveLength(95);
-    expect(LANE_ROWS.filter((row) => row.category === "wondrous-item")).toHaveLength(71);
-    expect(LANE_ROWS.filter((row) => row.category === "consumable")).toHaveLength(24);
-    expect(LANE_ROWS.filter((row) => row.attunement?.required === true)).toHaveLength(15);
-    const lane = ITEM_MECHANICS_LANES.find((entry) => entry.lane === "C7d")!;
-    expect(lane.slots).toEqual(["wondrous", "consumable"]);
-  });
-
-  it("pins the one row no lane-level check separates - `spell-scroll`, which NEITHER lane authors", () => {
-    // Two lanes declare the `consumable` category and the scroll's slot is `consumable`, so both pass every
-    // lane-level check for it, and the duplicate-id refusal cannot help because one lane records it as an
-    // absence. It stays safe only while neither lane has an entry.
-    const scroll = loadMagicItems().find((row) => row.id === "spell-scroll")!;
-    expect({ category: scroll.category, slot: scroll.slot }).toEqual({ category: "consumable", slot: "consumable" });
-    for (const name of ["C7b", "C7d"]) {
-      expect({
-        name,
-        claims: Object.keys(ITEM_MECHANICS_LANES.find((entry) => entry.lane === name)!.entries).includes("spell-scroll")
-      }).toEqual({ name, claims: false });
-    }
-    expect(ITEM_MECHANICS_LANES.find((entry) => entry.lane === "C7b")!.slots).toBeUndefined();
-  });
-
-  it("authors 18 and leaves 77 as prose - and the 18 are exactly the module's list", () => {
-    const lane = ITEM_MECHANICS_LANES.find((entry) => entry.lane === "C7d")!;
-    expect(Object.keys(lane.entries).sort()).toEqual([
-      "bag-of-tricks",
-      "bowl-of-commanding-water-elementals",
-      "brazier-of-commanding-fire-elementals",
-      "censer-of-controlling-air-elementals",
-      "crystal-ball",
-      "crystal-ball-of-mind-reading",
-      "crystal-ball-of-telepathy",
-      "crystal-ball-of-true-seeing",
-      "cubic-gate",
-      "gem-of-seeing",
-      "iron-bands",
-      "iron-flask",
-      "pipes-of-haunting",
-      "pipes-of-the-sewers",
-      "rope-of-entanglement",
-      "sending-stones",
-      "stone-of-controlling-earth-elementals",
-      "stone-of-good-luck-luckstone"
-    ]);
-    // The bundle agrees: 18 rows carry a rider and 77 do not.
-    expect(LANE_ROWS.filter(carries)).toHaveLength(18);
-    expect(LANE_ROWS.filter((row) => !carries(row))).toHaveLength(77);
-    // The module header's grouping of the absences cannot be pinned, but its total can.
-    const absent = LANE_ROWS.filter((row) => !carries(row));
-    expect({
-      consumables: absent.filter((row) => row.category === "consumable").length,
-      carriedWondrous: absent.filter((row) => row.category === "wondrous-item").length
-    }).toEqual({ consumables: 24, carriedWondrous: 53 });
-  });
-
-  it("D1: NOT ONE of the 24 consumables carries a rider, because a consumed item is unsayable", () => {
-    const consumables = LANE_ROWS.filter((row) => row.category === "consumable");
-    expect(consumables).toHaveLength(24);
+describe("what no carried item can carry", () => {
+  it("no potion or oil carries a rider, because a consumed item is unsayable", () => {
+    const consumables = CARRIED_ROWS.filter((row) => row.category === "consumable");
+    expect(consumables.length).toBeGreaterThan(0);
     expect(consumables.filter(carries).map((row) => row.id)).toEqual([]);
   });
 
-  it("owns `cursed` and authors none - and could not have, since no lane row requires attunement AND prints a curse", () => {
-    expect(LANE_ROWS.filter((row) => row.cursed).map((row) => row.id)).toEqual([]);
-    // `mysterious-deck` is the lane's only row whose prose says "cursed", and `schemas.ts` would refuse a
+  it("authors no curse, and could not have, since no carried row requires attunement AND prints a curse", () => {
+    expect(CARRIED_ROWS.filter((row) => row.cursed).map((row) => row.id)).toEqual([]);
+    // `mysterious-deck` is the only carried row whose prose says "cursed", and `schemas.ts` would refuse a
     // curse on it anyway because it requires no attunement.
-    const deck = LANE_ROWS.find((row) => row.id === "mysterious-deck")!;
+    const deck = CARRIED_ROWS.find((row) => row.id === "mysterious-deck")!;
     expect(deck.attunement?.required).toBe(false);
     expect(carries(deck)).toBe(false);
   });
 });
 
-describe("C7d: the absences that were measured and must stay absent", () => {
+describe("the absences that were measured and must stay absent", () => {
   it("the briefed far end - Potion of Resistance - carries no rider, because 'for 1 hour' cannot be said", () => {
     const potion = view.equipmentRecord("potion-of-resistance")!;
     expect(potion.description).toContain("Resistance to one type of damage for 1 hour");
@@ -728,7 +668,7 @@ describe("C7d: the absences that were measured and must stay absent", () => {
     expect(invulnerability.grants).toBeUndefined();
   });
 
-  it("D6: every row whose printed effect restores or grants hit points is prose", () => {
+  it("every row whose printed effect restores or grants hit points is prose", () => {
     for (const id of [
       "potions-of-healing",
       "potion-of-vitality",
@@ -742,7 +682,7 @@ describe("C7d: the absences that were measured and must stay absent", () => {
     }
   });
 
-  it("D5: the two rows whose save-or-damage sentence the engine misreads carry no damage action", () => {
+  it("the two rows whose save-or-damage sentence the engine misreads carry no damage action", () => {
     // `halfOnSuccessFrom` reads both as "half on a success"; the SRD gives neither any damage there.
     for (const id of ["decanter-of-endless-water", "bead-of-force"]) {
       expect(view.equipmentRecord(id)!.actions).toEqual([]);
@@ -753,7 +693,7 @@ describe("C7d: the absences that were measured and must stay absent", () => {
     expect(carries(horn)).toBe(false);
   });
 
-  it("the seven ability-score refusals in this lane stay prose, and so do the reserved and multi-cost rows", () => {
+  it("the seven ability-score refusals stay prose, and so do the reserved and multi-cost rows", () => {
     // `ability-score` is refused on an item carrier: one potion, three manuals, three tomes.
     for (const id of [
       "potion-of-giant-strength",

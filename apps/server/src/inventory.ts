@@ -138,9 +138,20 @@ export function bindTemplateItem(item: InventoryItem, deps: InventoryDeps, store
   const record = deps.catalog?.equipmentRecord(item.id);
   const appliesTo = record?.appliesTo;
   if (!record || !appliesTo) {
-    if (item.baseId === undefined) return item;
-    const { baseId: _forged, ...rest } = item;
-    return rest;
+    // A non-template row never carries a baseId (it would self-grant proficiency and mastery). Its stats
+    // come from the catalog; only a GM may give stats to an item the catalog does not know.
+    const { baseId: _forged, weapon, armor, ...rest } = item;
+    if (!record) {
+      const trusted = deps.role === "gm" || deps.catalog === undefined;
+      return trusted ? { ...rest, ...(weapon ? { weapon } : {}), ...(armor ? { armor } : {}) } : rest;
+    }
+    const catalogWeapon = weaponStatsFrom(record.weapon);
+    const catalogArmor = armorStatsFrom(record.armor);
+    return {
+      ...rest,
+      ...(catalogWeapon ? { weapon: catalogWeapon } : {}),
+      ...(catalogArmor ? { armor: catalogArmor } : {})
+    };
   }
   const baseId = item.baseId ?? stored?.baseId ?? (appliesTo.baseIds.length === 1 ? appliesTo.baseIds[0] : undefined);
   if (baseId === undefined) {
@@ -183,32 +194,34 @@ export function bindTemplateItem(item: InventoryItem, deps: InventoryDeps, store
     );
   }
   const { weapon: _clientWeapon, armor: _clientArmor, ...bare } = item;
-  if (record.category === "weapon") {
-    const weaponStats = base!.weapon!;
-    return {
-      ...bare,
-      baseId,
-      weapon: {
-        category: weaponStats.category === "martial" ? "martial" : "simple",
-        damageDice: weaponStats.damageDice!,
-        damageType: weaponStats.damageType!,
-        rangeFeet: weaponStats.rangeFeet ?? null,
-        longRangeFeet: weaponStats.longRangeFeet ?? null,
-        ...(weaponStats.properties !== undefined ? { properties: [...weaponStats.properties] } : {})
-      }
-    };
-  }
-  const armorStats = base!.armor!;
+  return record.category === "weapon"
+    ? { ...bare, baseId, weapon: weaponStatsFrom(base!.weapon)! }
+    : { ...bare, baseId, armor: armorStatsFrom(base!.armor)! };
+}
+
+type CatalogRecord = NonNullable<ReturnType<NonNullable<InventoryDeps["catalog"]>["equipmentRecord"]>>;
+
+/** An inventory row's weapon block from a catalog record, or undefined when the record has no usable one. */
+function weaponStatsFrom(stats: CatalogRecord["weapon"]): InventoryItem["weapon"] {
+  if (!stats?.damageDice || !stats.damageType || !stats.category) return undefined;
   return {
-    ...bare,
-    baseId,
-    armor: {
-      acBase: armorStats.acBase,
-      addDexModifier: armorStats.addDexModifier,
-      dexModifierCap: armorStats.dexModifierCap,
-      stealthDisadvantage: armorStats.stealthDisadvantage,
-      strengthRequired: armorStats.strengthRequired
-    }
+    category: stats.category === "martial" ? "martial" : "simple",
+    damageDice: stats.damageDice,
+    damageType: stats.damageType,
+    rangeFeet: stats.rangeFeet ?? null,
+    longRangeFeet: stats.longRangeFeet ?? null,
+    ...(stats.properties !== undefined ? { properties: [...stats.properties] } : {})
+  };
+}
+
+function armorStatsFrom(stats: CatalogRecord["armor"]): InventoryItem["armor"] {
+  if (!stats) return undefined;
+  return {
+    acBase: stats.acBase,
+    addDexModifier: stats.addDexModifier,
+    dexModifierCap: stats.dexModifierCap,
+    stealthDisadvantage: stats.stealthDisadvantage,
+    strengthRequired: stats.strengthRequired
   };
 }
 

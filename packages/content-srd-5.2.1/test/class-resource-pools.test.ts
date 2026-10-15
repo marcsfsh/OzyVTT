@@ -136,9 +136,10 @@ describe("the mechanics overlay merges over generated prose", () => {
   });
 
   it("leaves every class NOBODY authored untouched, so the overlay is opt-in per feature", () => {
-    // A class may carry riders only if its overlay module authored some or its riders are hand-authored in the bundle.
-    const HAND_AUTHORED = ["cleric", "fighter", "wizard"];
-    const permitted = new Set([...Object.keys(CLASS_MECHANICS), ...HAND_AUTHORED]);
+    // A class may carry riders only if its overlay module authored some or it is hand-authored in
+    // `sources/authored/classes.json`, riders included.
+    const handAuthored = ["cleric", "fighter", "wizard"];
+    const permitted = new Set([...Object.keys(CLASS_MECHANICS), ...handAuthored]);
     const withMechanics = classes
       .filter((entry) => entry.features.some((feature) => feature.actions.length > 0 || feature.uses !== undefined))
       .map((entry) => entry.id)

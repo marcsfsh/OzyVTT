@@ -1,39 +1,38 @@
 /**
  * Class/subclass ETL. Reads `sources/dnd-5e-srd-markdown/classes.md` (CC BY 4.0 SRD 5.2.1; see that
- * directory's PROVENANCE.json) and emits records for the classes that are not hand-authored.
+ * directory's PROVENANCE.json) and emits `classes.v1.json` and `subclasses.v1.json`.
  *
- * Fighter, Wizard and Cleric are hand-authored with riders the prose cannot express, so they are
- * copied through and used as an oracle: `crossCheck` re-parses them from the source and fails the
- * build on a mechanical disagreement.
+ * Fighter, Wizard and Cleric (and their subclasses) are transcribed by hand in
+ * `sources/authored/classes.json` and `subclasses.json`, so they are copied through and used as an
+ * oracle: the cross-check re-parses them from the source and fails the build on a mechanical
+ * disagreement. Every other class is generated. The mechanics overlay applies to both.
  *
- * Run with `npm run build-class-bundle -w @vtt/content-srd-5.2.1`.
+ * Step 3 of `npm run content`: starting equipment resolves against the equipment, weapons and armor
+ * bundles the earlier steps wrote.
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import {
-  CLASS_MECHANICS,
-  HAND_AUTHORED,
-  LIVE_CLASS_RESOURCES,
-  SUBCLASS_MECHANICS,
-  applyMechanics
-} from "./class-mechanics/index.js";
+import { CLASS_MECHANICS, LIVE_CLASS_RESOURCES, SUBCLASS_MECHANICS, applyMechanics } from "./class-mechanics/index.js";
 import { slug, strip, withTables } from "./markdown.js";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { z } from "zod";
 import { statPriorityFor } from "@vtt/rules-5e";
 import {
   ClassReferenceSchema,
   SubclassReferenceSchema,
   type ClassReference,
-  type ClassLevelRow
+  type ClassLevelRow,
+  type SubclassReference
 } from "../src/character-content.js";
+import { outDir, sourcePath } from "./paths.js";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const root = join(here, "..");
-const bundles = join(root, "bundles");
-const source = readFileSync(join(root, "sources/dnd-5e-srd-markdown/classes.md"), "utf8");
+const source = readFileSync(sourcePath("dnd-5e-srd-markdown", "classes.md"), "utf8");
 
-// `HAND_AUTHORED` lives in `class-mechanics/overlay.ts` because it is a property of the overlay merge.
+/** The hand-transcribed records, before the overlay merge below. */
+const authoredClasses: ClassReference[] = JSON.parse(readFileSync(sourcePath("authored", "classes.json"), "utf8"));
+const authoredSubclasses: SubclassReference[] = JSON.parse(
+  readFileSync(sourcePath("authored", "subclasses.json"), "utf8")
+);
+const AUTHORED_IDS: ReadonlySet<string> = new Set(authoredClasses.map((record) => record.id));
 
 // ---- Markdown/HTML parsing helpers (shared ones live in `./markdown.ts`) ------------------------
 
@@ -513,7 +512,7 @@ type CatalogIndex = Map<string, string>;
 function catalogIndex(): CatalogIndex {
   const index: CatalogIndex = new Map();
   for (const file of ["equipment.v1.json", "weapons.v1.json", "armor.v1.json"]) {
-    for (const row of JSON.parse(readFileSync(join(bundles, file), "utf8")) as { id: string; name: string }[]) {
+    for (const row of JSON.parse(readFileSync(join(outDir, file), "utf8")) as { id: string; name: string }[]) {
       index.set(row.id, row.name);
       index.set(slug(row.name), row.id === slug(row.name) ? row.id : row.id);
     }
@@ -661,7 +660,7 @@ const report: string[] = [];
 const overlayMisses: string[] = [];
 
 for (const [id, entry] of parsed) {
-  if (HAND_AUTHORED.has(id)) continue;
+  if (AUTHORED_IDS.has(id)) continue;
   const config = CONFIG[id];
   if (!config) throw new Error(`no CONFIG for class "${id}"`);
   const { traits } = entry;
@@ -749,7 +748,7 @@ if (unresolvedItems.length) {
 // ---- Subclasses ---------------------------------------------------------------------------------
 
 /**
- * Bundle features with no counterpart heading in the source. Life Domain prints one spells entry
+ * Authored features with no counterpart heading in the source. Life Domain prints one spells entry
  * with a table; the hand-authored record splits it into staged grants at Cleric levels 3/5/7/9.
  * Anything else the source does not print is a real defect.
  */
@@ -803,7 +802,7 @@ function parseSubclass(entry: ReturnType<typeof parseClass>): ParsedSubclass {
 }
 
 for (const [id, entry] of parsed) {
-  if (HAND_AUTHORED.has(id)) continue;
+  if (AUTHORED_IDS.has(id)) continue;
   const { title, intro, features } = parseSubclass(entry);
   const subclassId = slug(title);
   const record = {
@@ -825,34 +824,19 @@ for (const [id, entry] of parsed) {
   if (overlaid) console.log(`${title}: ${features.length} features, ${overlaid} with mechanics`);
 }
 
-// ---- Cross-check: the hand-authored three, re-parsed from this source ---------------------------
-
-// Only the hand-authored records are carried over: the script writes over its own input and must be idempotent.
-const existingClasses = (JSON.parse(readFileSync(join(bundles, "classes.v1.json"), "utf8")) as ClassReference[]).filter(
-  (record) => HAND_AUTHORED.has(record.id)
-);
-// Read before the write below, and typed for the feature comparison.
-const existingSubclassRecords = (
-  JSON.parse(readFileSync(join(bundles, "subclasses.v1.json"), "utf8")) as {
-    id: string;
-    name: string;
-    classId: string;
-    features: { id: string; level?: number }[];
-  }[]
-).filter((record) => HAND_AUTHORED.has(record.classId));
+// ---- The hand-authored three: overlay, then cross-check against this source ----------------------
 
 /**
- * The overlay also applies to the hand-authored classes. Their records are read from and written
- * back to `classes.v1.json`, so `applyMechanics` refuses to overwrite a value already on the record
- * (unless the overlay `clears` it); a disagreement stops the build naming both homes.
+ * The overlay applies to the hand-authored records too. `applyMechanics` refuses a rider the record
+ * already carries, so each rider has one home: the authored file or the class module.
  */
-for (const record of existingClasses) {
+for (const record of authoredClasses) {
   overlayMisses.push(...applyMechanics(record.id, record.features, CLASS_MECHANICS));
   ClassReferenceSchema.parse(record);
   const overlaid = Object.keys(CLASS_MECHANICS[record.id] ?? {}).length;
   if (overlaid) console.log(`${record.name} (hand-authored): ${overlaid} feature(s) with overlay mechanics`);
 }
-for (const record of existingSubclassRecords) {
+for (const record of authoredSubclasses) {
   overlayMisses.push(...applyMechanics(record.id, record.features, SUBCLASS_MECHANICS));
   SubclassReferenceSchema.parse(record);
 }
@@ -864,7 +848,7 @@ if (overlayMisses.length) {
 }
 
 const disagreements: string[] = [];
-for (const record of existingClasses) {
+for (const record of authoredClasses) {
   const entry = parsed.get(record.id);
   if (!entry) {
     disagreements.push(`${record.id}: not present in the source at all`);
@@ -872,20 +856,20 @@ for (const record of existingClasses) {
   }
   const traits = entry.traits;
   const die = (traits["Hit Point Die"] ?? "").match(/[Dd](\d+)/)?.[0].toLowerCase();
-  if (die !== record.hitDie) disagreements.push(`${record.id}.hitDie: source ${die} vs bundle ${record.hitDie}`);
+  if (die !== record.hitDie) disagreements.push(`${record.id}.hitDie: source ${die} vs authored ${record.hitDie}`);
   const saves = abilitiesIn(traits["Saving Throw Proficiencies"] ?? "");
   if (saves.join() !== [...record.savingThrows].sort((a, b) => saves.indexOf(a) - saves.indexOf(b)).join()) {
     if ([...saves].sort().join() !== [...record.savingThrows].sort().join()) {
-      disagreements.push(`${record.id}.savingThrows: source ${saves} vs bundle ${record.savingThrows}`);
+      disagreements.push(`${record.id}.savingThrows: source ${saves} vs authored ${record.savingThrows}`);
     }
   }
   const skills = skillsOf(traits["Skill Proficiencies"] ?? "");
   if (skills.choose !== record.skillChoices.choose)
     disagreements.push(
-      `${record.id}.skillChoices.choose: source ${skills.choose} vs bundle ${record.skillChoices.choose}`
+      `${record.id}.skillChoices.choose: source ${skills.choose} vs authored ${record.skillChoices.choose}`
     );
   if ([...skills.from].sort().join() !== [...record.skillChoices.from].sort().join()) {
-    disagreements.push(`${record.id}.skillChoices.from: source ${skills.from} vs bundle ${record.skillChoices.from}`);
+    disagreements.push(`${record.id}.skillChoices.from: source ${skills.from} vs authored ${record.skillChoices.from}`);
   }
   const config: ClassConfig = { subclassLevel: record.subclassLevel, columns: {} };
   for (const column of entry.table.columns) {
@@ -902,37 +886,39 @@ for (const record of existingClasses) {
     const mine = record.levelTable[index];
     if (row.proficiencyBonus !== mine.proficiencyBonus)
       disagreements.push(
-        `${record.id}.L${row.level}.proficiencyBonus: source ${row.proficiencyBonus} vs bundle ${mine.proficiencyBonus}`
+        `${record.id}.L${row.level}.proficiencyBonus: source ${row.proficiencyBonus} vs authored ${mine.proficiencyBonus}`
       );
     const a = JSON.stringify(row.spellSlots ?? null);
     const b = JSON.stringify(mine.spellSlots ?? null);
-    if (a !== b) disagreements.push(`${record.id}.L${row.level}.spellSlots: source ${a} vs bundle ${b}`);
+    if (a !== b) disagreements.push(`${record.id}.L${row.level}.spellSlots: source ${a} vs authored ${b}`);
   });
 
   // Subclass features: ids and levels are compared, not prose (descriptions are reworded in places).
-  const authoredSubclass = existingSubclassRecords.find((sub) => sub.classId === record.id);
+  const authoredSubclass = authoredSubclasses.find((sub) => sub.classId === record.id);
   if (authoredSubclass) {
     const fromSource = parseSubclass(entry);
     if (slug(fromSource.title) !== authoredSubclass.id) {
       disagreements.push(
-        `${record.id}: source prints subclass "${fromSource.title}" vs bundle "${authoredSubclass.name}"`
+        `${record.id}: source prints subclass "${fromSource.title}" vs authored "${authoredSubclass.name}"`
       );
     } else {
       const sourceLevels = new Map(fromSource.features.map((feature) => [feature.id, feature.level]));
-      const bundleLevels = new Map(authoredSubclass.features.map((feature) => [feature.id, feature.level]));
+      const authoredLevels = new Map(authoredSubclass.features.map((feature) => [feature.id, feature.level]));
       for (const [id, level] of sourceLevels) {
-        if (!bundleLevels.has(id))
+        if (!authoredLevels.has(id))
           disagreements.push(
-            `${authoredSubclass.id}: source has "${id}" at level ${level}; the bundle does not have it at all`
+            `${authoredSubclass.id}: source has "${id}" at level ${level}; the authored record does not have it at all`
           );
-        else if (bundleLevels.get(id) !== level)
+        else if (authoredLevels.get(id) !== level)
           disagreements.push(
-            `${authoredSubclass.id}.${id}: source level ${level} vs bundle level ${bundleLevels.get(id)}`
+            `${authoredSubclass.id}.${id}: source level ${level} vs authored level ${authoredLevels.get(id)}`
           );
       }
-      for (const id of bundleLevels.keys()) {
+      for (const id of authoredLevels.keys()) {
         if (!sourceLevels.has(id) && !STAGED_FEATURES.has(id)) {
-          disagreements.push(`${authoredSubclass.id}: bundle has "${id}", which the source does not print`);
+          disagreements.push(
+            `${authoredSubclass.id}: the authored record has "${id}", which the source does not print`
+          );
         }
       }
     }
@@ -940,21 +926,20 @@ for (const record of existingClasses) {
 }
 if (disagreements.length) {
   console.error(
-    `\nCROSS-CHECK: ${disagreements.length} disagreement(s) between the source and the hand-authored bundle:`
+    `\nCROSS-CHECK: ${disagreements.length} disagreement(s) between the source and the hand-authored records:`
   );
   for (const line of disagreements) console.error(`  ${line}`);
   console.error("Resolve against the SRD text before trusting this source for new content.");
   process.exit(1);
 }
-console.log(`cross-check: ${existingClasses.length} hand-authored classes agree with the source.`);
+console.log(`cross-check: ${authoredClasses.length} hand-authored classes agree with the source.`);
 
 // ---- Validate and write -------------------------------------------------------------------------
 
-const allClasses = [...existingClasses, ...built].sort((left, right) =>
+const allClasses = [...authoredClasses, ...built].sort((left, right) =>
   (left as ClassReference).name.localeCompare((right as ClassReference).name)
 );
-const existingSubclasses = existingSubclassRecords;
-const allSubclasses = [...existingSubclasses, ...builtSubclasses].sort((left, right) =>
+const allSubclasses = [...authoredSubclasses, ...builtSubclasses].sort((left, right) =>
   (left as { name: string }).name.localeCompare((right as { name: string }).name)
 );
 
@@ -996,6 +981,6 @@ if (stubs.length) {
   process.exit(1);
 }
 
-writeFileSync(join(bundles, "classes.v1.json"), `${JSON.stringify(allClasses, null, 1)}\n`);
-writeFileSync(join(bundles, "subclasses.v1.json"), `${JSON.stringify(allSubclasses, null, 1)}\n`);
+writeFileSync(join(outDir, "classes.v1.json"), `${JSON.stringify(allClasses, null, 1)}\n`);
+writeFileSync(join(outDir, "subclasses.v1.json"), `${JSON.stringify(allSubclasses, null, 1)}\n`);
 console.log(`\nwrote ${allClasses.length} classes, ${allSubclasses.length} subclasses.`);

@@ -3,9 +3,6 @@ import { GameStateSchema, type GameState } from "@vtt/domain";
 // The shipped bundle, read as every consumer reads it.
 import { loadMagicItems } from "@vtt/content-srd-5.2.1";
 import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
-// The lane list is authoring-side and outside the package's `exports` map, so it is imported by path;
-// this file checks that the composed lane and the committed bundle agree.
-import { ITEM_MECHANICS_LANES } from "../../../packages/content-srd-5.2.1/scripts/item-mechanics/index.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { deriveActorSheet } from "../src/actor-derived.js";
 import { builtinAction } from "../src/builtin-actions.js";
@@ -18,12 +15,12 @@ import { setInventoryItem } from "../src/inventory.js";
 import { answerSave, createPendingSaves, saveTotalFor } from "../src/saving-throws.js";
 import { startEncounter } from "../src/encounter.js";
 
-// Worn wondrous items (`worn-wondrous.ts`), driven through the real `ContentLibrary` over the committed
+// Worn wondrous items (the worn section of `item-mechanics/items.ts`), driven through the real `ContentLibrary` over the committed
 // `magic-items.v1.json`, so an unmerged rider, a renamed id or a dangling `skill-is` slug fails here.
 // Inventory rows are minted as the equipment picker mints them; the Bracers of Archery's longbow comes
 // from the shipped equipment catalog via `fromCatalog`, never a hand-written weapon block.
 // A Cloak of Protection moves the sheet's AC and the save the server rolls, and both come off with it.
-// The last describe pins the lane's counts and every removed cast or rider, so none returns.
+// The last describe pins every removed cast or rider, so none returns.
 
 const view = new ContentLibrary().forAudience("gm");
 const catalog = equipmentCatalogOf(view);
@@ -148,7 +145,7 @@ const fromCatalog = (id: string): InventoryItem => {
   });
 };
 
-describe("C7c far end: a Cloak of Protection moves AC and a rolled save, and both come off with it", () => {
+describe("a Cloak of Protection moves AC and a rolled save, and both come off with it", () => {
   const ROW = { id: "cloak-of-protection", name: "Cloak of Protection", category: "wondrous-item" };
 
   it("carries the two authored riders out of the COMMITTED bundle, through the real content library", () => {
@@ -270,7 +267,7 @@ describe("C7c far end: a Cloak of Protection moves AC and a rolled save, and bot
 // Boots and Cloak of Elvenkind and Cloak of the Bat, read from the committed bundle and driven to the
 // die: the same fixed pair (3, 17) is queued into `resolveDefinitionAction`'s `random`, and each case
 // asserts which face survived and whether the total cleared Hide's DC 15.
-describe("C7c harvest far end: Boots of Elvenkind make a Stealth check keep the higher die", () => {
+describe("Boots of Elvenkind make a Stealth check keep the higher die", () => {
   /** Resolve one builtin action exactly as the `action.resolve` handler does. */
   const check = (state: GameState, actionId: string, definition: ActorDefinition, faces: number[], n = 1) =>
     resolveDefinitionAction(
@@ -384,7 +381,7 @@ describe("C7c harvest far end: Boots of Elvenkind make a Stealth check keep the 
   });
 });
 
-describe("C7c: an AC bonus the SRD gates on wearing nothing", () => {
+describe("an AC bonus the SRD gates on wearing nothing", () => {
   it("gives Bracers of Defense +2 bare, and takes it away the moment a Shield is equipped", () => {
     const definition = definitionOf();
     const state = stateWith([]);
@@ -416,7 +413,7 @@ describe("C7c: an AC bonus the SRD gates on wearing nothing", () => {
   });
 });
 
-describe("C7c: a +5 that lands on ONE skill row", () => {
+describe("a +5 that lands on ONE skill row", () => {
   it("puts Gloves of Thievery on Sleight of Hand and nowhere else, including the same ability's other skills", () => {
     const definition = definitionOf();
     // No attunement on this item, so it is live merely worn.
@@ -433,7 +430,7 @@ describe("C7c: a +5 that lands on ONE skill row", () => {
   });
 });
 
-describe("C7c: a proficiency an item hands out, on the swing", () => {
+describe("a proficiency an item hands out, on the swing", () => {
   it("makes a Longbow proficient through Bracers of Archery and drops it when they come off", () => {
     const definition = definitionOf();
     // The bow's stats come from the shipped catalog, not this file.
@@ -469,7 +466,7 @@ describe("C7c: a proficiency an item hands out, on the swing", () => {
   });
 });
 
-describe("C7c: resistance and immunity, at the damage pipeline", () => {
+describe("resistance and immunity, at the damage pipeline", () => {
   it("halves Cold through Boots of the Winterlands and names the boots on the line", () => {
     const definition = definitionOf();
     const state = stateWith([worn("boots-of-the-winterlands", "Boots of the Winterlands")]);
@@ -556,7 +553,7 @@ describe("C7c: resistance and immunity, at the damage pipeline", () => {
   });
 });
 
-describe("C7c: the charges a worn item rations", () => {
+describe("the charges a worn item rations", () => {
   it("spends the Robe of Scintillating Colors' charge, holds the target to DC 15, names Stunned, and refuses the fourth press", () => {
     const definition = definitionOf();
     const state = fight(stateWith([worn("robe-of-scintillating-colors", "Robe of Scintillating Colors")]));
@@ -617,7 +614,7 @@ describe("C7c: the charges a worn item rations", () => {
   });
 });
 
-describe("C7c: the casts that survived the spell-record check", () => {
+describe("the casts that survived the spell-record check", () => {
   it("gives the Helm of Telepathy TWO independent daily pools, at the helm's printed DC 13", () => {
     const definition = definitionOf();
     const state = fight(stateWith([worn("helm-of-telepathy", "Helm of Telepathy")]));
@@ -697,7 +694,7 @@ describe("C7c: the casts that survived the spell-record check", () => {
   });
 });
 
-describe("C7c: the spell save DC a legendary robe does NOT raise - W8, added by review", () => {
+describe("the spell save DC a legendary robe does NOT raise", () => {
   // The Robe of the Archmagi's "spell save DC ... increases by 2" cannot be authored as `spell-save-dc`:
   // that rider raises `action.save.dc` on every action carrying a save (`effective-actions.ts` sums and
   // folds it without asking whether the action is a spell), including DCs printed on other items. The
@@ -772,66 +769,11 @@ describe("C7c: the spell save DC a legendary robe does NOT raise - W8, added by 
   });
 });
 
-describe("C7c: the lane's own shape, machine-checked against the bundle", () => {
+describe("the worn items left as prose, by name", () => {
   const rows = loadMagicItems();
-  const lane = ITEM_MECHANICS_LANES.find((entry) => entry.lane === "C7c")!;
-  const WORN_SLOTS = ["neck", "shoulders", "head", "feet", "hands", "belt"];
-  const mine = rows.filter((row) => row.category === "wondrous-item" && WORN_SLOTS.includes(row.slot ?? ""));
+  const worn = rows.filter((row) => row.category === "wondrous-item" && row.slot !== "wondrous");
 
-  it("is the 56 rows the plan measured, 46 of them attuned, and the lane declares exactly those slots", () => {
-    expect(mine).toHaveLength(56);
-    expect(mine.filter((row) => row.attunement?.required === true)).toHaveLength(46);
-    expect([...(lane.slots ?? [])].sort()).toEqual([...WORN_SLOTS].sort());
-    const bySlot = Object.fromEntries(WORN_SLOTS.map((slot) => [slot, mine.filter((row) => row.slot === slot).length]));
-    expect(bySlot).toEqual({ neck: 15, shoulders: 15, head: 11, feet: 7, hands: 6, belt: 2 });
-  });
-
-  it("authors exactly 21 of the 56 and names the other 35 as absences - the two add to the lane", () => {
-    const authored = Object.keys(lane.entries).sort();
-    expect(authored).toEqual([
-      "boots-of-elvenkind",
-      "boots-of-the-winterlands",
-      "bracers-of-archery",
-      "bracers-of-defense",
-      "brooch-of-shielding",
-      "cloak-of-arachnida",
-      "cloak-of-elvenkind",
-      "cloak-of-invisibility",
-      "cloak-of-protection",
-      "cloak-of-the-bat",
-      "eyes-of-charming",
-      "gloves-of-thievery",
-      "hat-of-disguise",
-      "helm-of-comprehending-languages",
-      "helm-of-telepathy",
-      "medallion-of-thoughts",
-      "periapt-of-proof-against-poison",
-      "robe-of-scintillating-colors",
-      "robe-of-stars",
-      "scarab-of-protection",
-      "winged-boots"
-    ]);
-    expect(authored).toHaveLength(21);
-    expect(mine.length - authored.length).toBe(35);
-    // Every authored id is one of the lane's own rows, and every one really carries a rider.
-    for (const id of authored) {
-      const row = mine.find((entry) => entry.id === id);
-      expect(row, `${id} is not one of C7c's 56 rows`).toBeDefined();
-      const carries =
-        (row!.modifiers?.length ?? 0) +
-        (row!.casts?.length ?? 0) +
-        (row!.actions?.length ?? 0) +
-        (row!.grants ? Object.values(row!.grants).flat().length : 0);
-      expect(carries, `${id} merged into the bundle carrying nothing`).toBeGreaterThan(0);
-      // Per-slot totals, so a row cannot move group without the module header moving with it.
-    }
-    const bySlot = Object.fromEntries(
-      WORN_SLOTS.map((slot) => [slot, authored.filter((id) => mine.find((row) => row.id === id)!.slot === slot).length])
-    );
-    expect(bySlot).toEqual({ shoulders: 7, head: 4, neck: 4, hands: 3, feet: 3, belt: 0 });
-  });
-
-  it("leaves the FIVE casts W6 measured producing the wrong thing unauthored, by name", () => {
+  it("leaves the five casts that produced the wrong thing unauthored, by name", () => {
     // Each of these produced the wrong effect when driven (e.g. a Helm of Teleportation dealing 1d100
     // Force damage). Re-authoring one adds a `casts` entry and fails here.
     for (const [id, why] of [
@@ -878,7 +820,7 @@ describe("C7c: the lane's own shape, machine-checked against the bundle", () => 
   it("splits the eight 'Advantage on a check' rows 3 authored / 5 prose, and says why for each", () => {
     // Of the eight "Advantage on ... checks" rows, only those whose clause the engine can express exactly
     // are authored; authoring the rest would over-grant.
-    const advantageOnChecks = mine
+    const advantageOnChecks = worn
       .filter((row) => /Advantage on [^.]*\bchecks?\b/i.test(row.description ?? ""))
       .map((row) => row.id)
       .sort();
@@ -918,14 +860,15 @@ describe("C7c: the lane's own shape, machine-checked against the bundle", () => 
       ["robe-of-eyes", "Perception 'that rely on sight', on a robe whose own Drawbacks Blind you"],
       ["talisman-of-the-sphere", "Arcana to control a Sphere of Annihilation, which the engine does not hold"]
     ] as const) {
-      expect(Object.keys(lane.entries), `${id} must stay prose: ${why}`).not.toContain(id);
+      const advantage = view.equipmentRecord(id)!.modifiers.filter((modifier) => modifier.type === "roll-mode");
+      expect(advantage, `${id} must stay prose: ${why}`).toEqual([]);
     }
   });
 
-  it("authors no curse, because no row in this lane prints one", () => {
-    // The lane owns `cursed` and has no carrier. `Robe of Eyes` prints a Drawbacks clause but is not
-    // cursed: it comes off, and a curse would lock its benefits on.
-    expect(mine.filter((row) => row.cursed === true)).toEqual([]);
+  it("authors no curse on a worn item, because none prints one", () => {
+    // `Robe of Eyes` prints a Drawbacks clause but is not cursed: it comes off, and a curse would lock
+    // its benefits on.
+    expect(worn.filter((row) => row.cursed === true)).toEqual([]);
     const speakOfCurses = rows
       .filter((row) => /\bcursed\b/i.test(row.description ?? ""))
       .map((row) => row.id)
@@ -937,12 +880,6 @@ describe("C7c: the lane's own shape, machine-checked against the bundle", () => 
       "mysterious-deck",
       "shield-of-missile-attraction"
     ]);
-    expect(speakOfCurses.filter((id) => mine.some((row) => row.id === id))).toEqual([]);
-  });
-
-  it("claims no row outside its own slots - the boundary the seam now enforces", () => {
-    const carried = rows.filter((row) => row.category === "wondrous-item" && row.slot === "wondrous");
-    expect(carried.length).toBe(71); // the consumables lane's half of the shared category
-    for (const id of Object.keys(lane.entries)) expect(carried.some((row) => row.id === id)).toBe(false);
+    expect(speakOfCurses.filter((id) => worn.some((row) => row.id === id))).toEqual([]);
   });
 });
