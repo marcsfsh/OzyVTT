@@ -1,7 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { Modal, Button, Input } from "@vtt/ui";
 import { validateDraft, type ImportResult } from "@vtt/dndbeyond-pdf";
-import { extractCharacterFromFile } from "../pdfImport/loadPdf";
 import { useSpellReference } from "../encounter/spells";
 import { command } from "../lib/command";
 import "./pdf-import.css";
@@ -37,7 +36,9 @@ export function PdfImportModal({ open, onClose, role, onImported }: Props) {
     setError("");
     setSaveMsg("");
     setFileName(file.name);
-    extractCharacterFromFile(file, knownSpellIds)
+    // pdf.js is most of a megabyte, so it loads with the first PDF rather than with the app.
+    import("../pdfImport/loadPdf")
+      .then(({ extractCharacterFromFile }) => extractCharacterFromFile(file, knownSpellIds))
       .then(setResult)
       .catch((e: unknown) =>
         setError(
