@@ -455,99 +455,107 @@ export const GameCommandTypeSchema = z
   .regex(/^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$/)
   .max(200);
 
-/** Each game command's required integration-credential scope. The server's command registry enforces these, the
- * OpenAPI operations declare them per route, and tests pin the views together. Types use the dot-separated form. */
-export const GAME_COMMAND_SCOPES = {
-  "encounter.start": "combat:write",
-  "encounter.end": "combat:write",
-  "encounter.add-combatant": "combat:write",
-  "initiative.set": "combat:write",
-  "initiative.next": "combat:write",
-  "initiative.previous": "combat:write",
-  "initiative.roll-self": "combat:write",
-  "initiative.roll-remaining": "combat:write",
-  "turn.end": "combat:write",
-  "turn.use": "combat:write",
-  "turn.use-reaction": "combat:write",
-  "turn.use-legendary": "combat:write",
-  "token.move": "combat:write",
-  "actor.add-from-definition": "actor:write",
-  "actor.import-definition": "actor:write",
-  "character.submit-import": "actor:write",
-  "character.resolve-import": "actor:write",
-  "actor.remove": "actor:write",
-  "actor.apply-damage": "actor:write",
-  "actor.heal": "actor:write",
-  "actor.set-temp-hp": "actor:write",
-  "actor.set-hp": "actor:write",
-  "actor.set-condition": "actor:write",
-  "dice.roll": "roll:create",
-  "action.resolve": "combat:write",
-  "save.answer": "combat:write",
-  "save.dismiss": "combat:write",
-  "reaction.answer": "combat:write",
-  "reaction.dismiss": "combat:write",
-  "damage.resolve": "combat:write",
-  "effect.add": "combat:write",
-  "effect.end": "combat:write",
-  "death-save.roll": "combat:write",
-  "encounter.set-rules-mode": "combat:write",
-  "rules.set-policy": "combat:write",
-  "action.use": "combat:write",
-  "save.roll": "combat:write",
-  "rules.ask": "combat:write",
-  "rules.answer": "combat:write",
-  "table.set-staging-defaults": "combat:write",
-  "table.set-party-visibility": "combat:write",
-  "encounter.set-player-damage-mode": "combat:write",
-  "encounter.set-player-initiative-mode": "combat:write",
-  "encounter.set-health-display": "combat:write",
-  "encounter.set-environment": "combat:write",
-  "actor.rest": "actor:write",
-  "actor.rechoose": "actor:write",
-  "actor.spend-hit-dice": "actor:write",
-  "character.set-slot": "actor:write",
-  "character.set-prepared": "actor:write",
-  "character.set-inventory": "actor:write",
-  "character.set-currency": "actor:write",
-  "character.set-identity": "actor:write",
-  "character.set-proficiencies": "actor:write",
-  "character.create": "actor:write",
-  "character.generate": "actor:write",
-  "builder.set-policy": "actor:write",
-  "annotation.add": "combat:write",
-  "annotation.ping": "combat:write",
-  "annotation.move": "combat:write",
-  "annotation.remove": "combat:write",
-  "annotation.set-color": "combat:write",
-  "annotation.set-visibility": "combat:write",
-  "annotation.set-movable": "combat:write",
-  "annotation.clear": "combat:write",
-  "character.claim": "actor:write",
-  "character.release": "actor:write",
-  "character.force-release": "actor:write",
-  "actor.set-token-image": "actor:write",
-  "actor.set-size": "actor:write",
-  "actor.set-health-display": "actor:write",
-  "actor.set-visibility": "actor:write",
-  "actor.set-archived": "actor:write",
-  "actor.set-sheet-preview": "actor:write",
-  "actor.set-speed": "actor:write",
-  "scene.create": "scene:write",
-  "scene.rename": "scene:write",
-  "scene.remove": "scene:write",
-  "scene.activate": "scene:write",
-  "scene.set-combatants": "scene:write",
-  "scene.duplicate": "scene:write",
-  "scene.reorder": "scene:write",
-  "replay.launch": "combat:write",
-  "character.rebuild": "actor:write",
-  "builder.roll-abilities": "actor:write",
-  "fog.set-enabled": "scene:write",
-  "fog.paint": "scene:write",
-  "fog.reset": "scene:write"
-} as const satisfies Record<string, z.infer<typeof IntegrationScopeSchema>>;
-export type GameCommandType = keyof typeof GAME_COMMAND_SCOPES;
+/** Each game command's typed HTTP route and the integration-credential scope it requires: the one source the
+ * server's command table, its typed routes and the OpenAPI operations read. Types use the dot-separated form; the
+ * Socket.IO event is the same name with its first `.` as `:`. */
+export const GAME_COMMANDS = {
+  "encounter.start": { scope: "combat:write", method: "post", path: GAME_PATHS.encounterStart },
+  "encounter.end": { scope: "combat:write", method: "post", path: GAME_PATHS.encounterEnd },
+  "encounter.add-combatant": { scope: "combat:write", method: "post", path: GAME_PATHS.encounterCombatants },
+  "initiative.set": { scope: "combat:write", method: "post", path: GAME_PATHS.initiativeSet },
+  "initiative.next": { scope: "combat:write", method: "post", path: GAME_PATHS.initiativeNext },
+  "initiative.previous": { scope: "combat:write", method: "post", path: GAME_PATHS.initiativePrevious },
+  "initiative.roll-self": { scope: "combat:write", method: "post", path: GAME_PATHS.initiativeRollSelf },
+  "initiative.roll-remaining": { scope: "combat:write", method: "post", path: GAME_PATHS.initiativeRollRemaining },
+  "turn.end": { scope: "combat:write", method: "post", path: GAME_PATHS.turnEnd },
+  "turn.use": { scope: "combat:write", method: "post", path: GAME_PATHS.turnUse },
+  "turn.use-reaction": { scope: "combat:write", method: "post", path: GAME_PATHS.turnReaction },
+  "turn.use-legendary": { scope: "combat:write", method: "post", path: GAME_PATHS.turnLegendary },
+  "token.move": { scope: "combat:write", method: "post", path: GAME_PATHS.tokenMove },
+  "actor.add-from-definition": { scope: "actor:write", method: "post", path: GAME_PATHS.actors },
+  "actor.import-definition": { scope: "actor:write", method: "post", path: GAME_PATHS.definitionsImport },
+  "character.submit-import": { scope: "actor:write", method: "post", path: GAME_PATHS.characterImports },
+  "character.resolve-import": { scope: "actor:write", method: "post", path: GAME_PATHS.characterImportResolve },
+  "actor.remove": { scope: "actor:write", method: "delete", path: GAME_PATHS.actorById },
+  "actor.apply-damage": { scope: "actor:write", method: "post", path: GAME_PATHS.actorDamage },
+  "actor.heal": { scope: "actor:write", method: "post", path: GAME_PATHS.actorHeal },
+  "actor.set-temp-hp": { scope: "actor:write", method: "post", path: GAME_PATHS.actorTempHp },
+  "actor.set-hp": { scope: "actor:write", method: "post", path: GAME_PATHS.actorHp },
+  "actor.set-condition": { scope: "actor:write", method: "post", path: GAME_PATHS.actorConditions },
+  "dice.roll": { scope: "roll:create", method: "post", path: GAME_PATHS.rolls },
+  "action.resolve": { scope: "combat:write", method: "post", path: GAME_PATHS.actionResolve },
+  "save.answer": { scope: "combat:write", method: "post", path: GAME_PATHS.saveAnswer },
+  "save.dismiss": { scope: "combat:write", method: "post", path: GAME_PATHS.saveDismiss },
+  "reaction.answer": { scope: "combat:write", method: "post", path: GAME_PATHS.reactionAnswer },
+  "reaction.dismiss": { scope: "combat:write", method: "post", path: GAME_PATHS.reactionDismiss },
+  "damage.resolve": { scope: "combat:write", method: "post", path: GAME_PATHS.damageResolve },
+  "effect.add": { scope: "combat:write", method: "post", path: GAME_PATHS.effects },
+  "effect.end": { scope: "combat:write", method: "post", path: GAME_PATHS.effectEnd },
+  "death-save.roll": { scope: "combat:write", method: "post", path: GAME_PATHS.deathSaveRoll },
+  "encounter.set-rules-mode": { scope: "combat:write", method: "post", path: GAME_PATHS.rulesMode },
+  "rules.set-policy": { scope: "combat:write", method: "post", path: GAME_PATHS.rulesPolicy },
+  "action.use": { scope: "combat:write", method: "post", path: GAME_PATHS.actionUse },
+  "save.roll": { scope: "combat:write", method: "post", path: GAME_PATHS.saveRoll },
+  "rules.ask": { scope: "combat:write", method: "post", path: GAME_PATHS.rulesAsk },
+  "rules.answer": { scope: "combat:write", method: "post", path: GAME_PATHS.rulesAnswer },
+  "table.set-staging-defaults": { scope: "combat:write", method: "post", path: GAME_PATHS.stagingDefaults },
+  "table.set-party-visibility": { scope: "combat:write", method: "post", path: GAME_PATHS.partyVisibility },
+  "encounter.set-player-damage-mode": { scope: "combat:write", method: "post", path: GAME_PATHS.playerDamageMode },
+  "encounter.set-player-initiative-mode": {
+    scope: "combat:write",
+    method: "post",
+    path: GAME_PATHS.playerInitiativeMode
+  },
+  "encounter.set-health-display": { scope: "combat:write", method: "post", path: GAME_PATHS.healthDisplay },
+  "encounter.set-environment": { scope: "combat:write", method: "post", path: GAME_PATHS.environment },
+  "actor.rest": { scope: "actor:write", method: "post", path: GAME_PATHS.actorRest },
+  "actor.rechoose": { scope: "actor:write", method: "post", path: GAME_PATHS.actorRechoose },
+  "actor.spend-hit-dice": { scope: "actor:write", method: "post", path: GAME_PATHS.actorSpendHitDice },
+  "character.set-slot": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetSlot },
+  "character.set-prepared": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetPrepared },
+  "character.set-inventory": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetInventory },
+  "character.set-currency": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetCurrency },
+  "character.set-identity": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetIdentity },
+  "character.set-proficiencies": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetProficiencies },
+  "character.create": { scope: "actor:write", method: "post", path: GAME_PATHS.characters },
+  "character.generate": { scope: "actor:write", method: "post", path: GAME_PATHS.charactersRandom },
+  "builder.set-policy": { scope: "actor:write", method: "post", path: GAME_PATHS.builderPolicy },
+  "annotation.add": { scope: "combat:write", method: "post", path: GAME_PATHS.annotations },
+  "annotation.ping": { scope: "combat:write", method: "post", path: GAME_PATHS.annotationsPing },
+  "annotation.move": { scope: "combat:write", method: "post", path: GAME_PATHS.annotationMove },
+  "annotation.remove": { scope: "combat:write", method: "delete", path: GAME_PATHS.annotationById },
+  "annotation.set-color": { scope: "combat:write", method: "post", path: GAME_PATHS.annotationColor },
+  "annotation.set-visibility": { scope: "combat:write", method: "post", path: GAME_PATHS.annotationVisibility },
+  "annotation.set-movable": { scope: "combat:write", method: "post", path: GAME_PATHS.annotationMovable },
+  "annotation.clear": { scope: "combat:write", method: "post", path: GAME_PATHS.annotationsClear },
+  "character.claim": { scope: "actor:write", method: "post", path: GAME_PATHS.claims },
+  "character.release": { scope: "actor:write", method: "post", path: GAME_PATHS.claimsRelease },
+  "character.force-release": { scope: "actor:write", method: "post", path: GAME_PATHS.claimForceRelease },
+  "actor.set-token-image": { scope: "actor:write", method: "post", path: GAME_PATHS.actorTokenImage },
+  "actor.set-size": { scope: "actor:write", method: "post", path: GAME_PATHS.actorSize },
+  "actor.set-health-display": { scope: "actor:write", method: "post", path: GAME_PATHS.actorHealthDisplay },
+  "actor.set-visibility": { scope: "actor:write", method: "post", path: GAME_PATHS.actorVisibility },
+  "actor.set-archived": { scope: "actor:write", method: "post", path: GAME_PATHS.actorArchived },
+  "actor.set-sheet-preview": { scope: "actor:write", method: "post", path: GAME_PATHS.actorSheetPreview },
+  "actor.set-speed": { scope: "actor:write", method: "post", path: GAME_PATHS.actorSpeed },
+  "scene.create": { scope: "scene:write", method: "post", path: GAME_PATHS.scenes },
+  "scene.rename": { scope: "scene:write", method: "post", path: GAME_PATHS.sceneRename },
+  "scene.remove": { scope: "scene:write", method: "delete", path: GAME_PATHS.sceneById },
+  "scene.activate": { scope: "scene:write", method: "post", path: GAME_PATHS.sceneActivate },
+  "scene.set-combatants": { scope: "scene:write", method: "post", path: GAME_PATHS.sceneCombatants },
+  "scene.duplicate": { scope: "scene:write", method: "post", path: GAME_PATHS.sceneDuplicate },
+  "scene.reorder": { scope: "scene:write", method: "post", path: GAME_PATHS.sceneReorder },
+  "replay.launch": { scope: "combat:write", method: "post", path: ENCOUNTER_ARCHIVE_PATHS.launch },
+  "character.rebuild": { scope: "actor:write", method: "post", path: GAME_PATHS.characterRebuild },
+  "builder.roll-abilities": { scope: "actor:write", method: "post", path: GAME_PATHS.builderRollAbilities },
+  "fog.set-enabled": { scope: "scene:write", method: "post", path: GAME_PATHS.fogEnabled },
+  "fog.paint": { scope: "scene:write", method: "post", path: GAME_PATHS.fogPaint },
+  "fog.reset": { scope: "scene:write", method: "post", path: GAME_PATHS.fogReset }
+} as const satisfies Record<
+  string,
+  Readonly<{ scope: z.infer<typeof IntegrationScopeSchema>; method: "post" | "delete"; path: string }>
+>;
+export type GameCommandType = keyof typeof GAME_COMMANDS;
 
 /** The generic command tunnel's request (dot-separated command types). `commandId` is the idempotency key: resend
  * it to retry safely; omit it and the server mints one. */
@@ -881,22 +889,28 @@ const mutationResponses = {
     content: { "application/json": { schema: { $ref: "#/components/schemas/ApiErrorEnvelope" } } }
   }
 } as const;
+/** A command's path item, keyed by its route in `GAME_COMMANDS` so the path, verb and scope are written once. */
+const gameCommandPath = <Operation>(type: GameCommandType, operation: (scope: IntegrationScope) => Operation) => {
+  const { path, method, scope } = GAME_COMMANDS[type];
+  return { [path]: { [method]: operation(scope) } };
+};
 const gameCommandOperation = (
+  type: GameCommandType,
   operationId: string,
-  scope: IntegrationScope,
   description: string,
   requestRef?: string,
   parameters?: readonly unknown[],
   requiredBody = true,
   playerAllowed = false
-) => ({
-  operationId,
-  description,
-  security: playerAllowed ? gameSecurityWithPlayer(scope) : gameSecurity(scope),
-  ...(parameters ? { parameters } : {}),
-  ...(requestRef ? { requestBody: jsonBody(requestRef, requiredBody) } : {}),
-  responses: mutationResponses
-});
+) =>
+  gameCommandPath(type, (scope) => ({
+    operationId,
+    description,
+    security: playerAllowed ? gameSecurityWithPlayer(scope) : gameSecurity(scope),
+    ...(parameters ? { parameters } : {}),
+    ...(requestRef ? { requestBody: jsonBody(requestRef, requiredBody) } : {}),
+    responses: mutationResponses
+  }));
 
 /** A bundled-content catalog read: public SRD rules reference, so it also accepts a player session. The bestiary
  * is the exception and uses the GM-only `gameSecurity`. */
@@ -2108,305 +2122,245 @@ export const openApiDocument = {
         responses: { ...mutationResponses, "404": apiError }
       }
     },
-    [GAME_PATHS.encounterStart]: {
-      post: gameCommandOperation(
-        "startEncounter",
-        "combat:write",
-        "Starts an encounter on a calibrated battlemap with initial combatants (GM-grade only). Missing initiative scores are rolled server-side.",
-        "EncounterStartRequest"
-      )
-    },
-    [GAME_PATHS.encounterEnd]: {
-      post: gameCommandOperation(
-        "endEncounter",
-        "combat:write",
-        "Ends the encounter (GM-grade only). The whole fight auto-archives permanently (see /encounters) in the same transaction.",
-        "CommandControlRequest",
-        undefined,
-        false
-      )
-    },
-    [GAME_PATHS.encounterCombatants]: {
-      post: gameCommandOperation(
-        "addEncounterCombatant",
-        "combat:write",
-        "Adds a rostered actor to the running encounter (GM-grade only); rolls initiative when no score is given.",
-        "AddCombatantRequest"
-      )
-    },
-    [GAME_PATHS.initiativeSet]: {
-      post: gameCommandOperation(
-        "setInitiativeScore",
-        "combat:write",
-        "Sets a combatant's initiative score (GM-grade only).",
-        "InitiativeSetRequest"
-      )
-    },
-    [GAME_PATHS.initiativeRollSelf]: {
-      post: gameCommandOperation(
-        "rollOwnInitiative",
-        "combat:write",
-        "Rolls initiative for a character (server rolls the d20 unless a manual `natural` is supplied; `rollMode` gives advantage/disadvantage), adds its initiative modifier, sets its score, and clears its pending flag. GM-grade for anyone; a player session only for their own claimed character. When the encounter runs in `wait` mode, the last pending roll begins turns.",
-        "InitiativeRollSelfRequest",
-        undefined,
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.initiativeRollRemaining]: {
-      post: gameCommandOperation(
-        "rollRemainingInitiative",
-        "combat:write",
-        "Rolls initiative for every combatant still pending a player roll (GM-grade only), beginning a `wait`-mode fight.",
-        "CommandControlRequest",
-        undefined,
-        false
-      )
-    },
-    [GAME_PATHS.initiativeNext]: {
-      post: gameCommandOperation(
-        "nextTurn",
-        "combat:write",
-        'Advances the turn (GM-grade only). While the table is rewound this steps forward through recorded history; a 409 with `needsConfirm: "rewrite-history"` asks for `confirmRewrite: true` to truncate the undone future.',
-        "InitiativeNextRequest",
-        undefined,
-        false
-      )
-    },
-    [GAME_PATHS.initiativePrevious]: {
-      post: gameCommandOperation(
-        "previousTurn",
-        "combat:write",
-        'Rewinds the whole table to the previous turn boundary (GM-grade only). A 409 with `needsConfirm: "discard-changes"` asks for `confirmDiscard: true` to drop changes made while rewound.',
-        "InitiativePreviousRequest",
-        undefined,
-        false
-      )
-    },
-    [GAME_PATHS.turnEnd]: {
-      post: gameCommandOperation(
-        "endTurn",
-        "combat:write",
-        "Ends the current turn and advances. The GM (or an integration) may end anyone's turn; a player session only their own claimed character's.",
-        "CommandControlRequest",
-        undefined,
-        false,
-        true
-      )
-    },
-    [GAME_PATHS.turnUse]: {
-      post: gameCommandOperation(
-        "useTurnSlot",
-        "combat:write",
-        "Marks the current turn's action or bonus action used/unused. A free manual toggle (never blocks); structured action resolution validates against this state per the encounter's rules mode, and un-marking the action slot also clears any open compound-action instance.",
-        "TurnUseRequest",
-        undefined,
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.turnReaction]: {
-      post: gameCommandOperation(
-        "useReaction",
-        "combat:write",
-        "Marks a combatant's reaction used/unused; reactions refresh at the start of their own turn.",
-        "TurnReactionRequest",
-        undefined,
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.turnLegendary]: {
-      post: gameCommandOperation(
-        "useLegendaryActions",
-        "combat:write",
-        "Sets a legendary creature's spent legendary actions this round (GM-grade only; 0 clears). Structured legendary action resolves spend the pool automatically; it refills at the creature's own turn start.",
-        "TurnLegendaryRequest"
-      )
-    },
-    [GAME_PATHS.tokenMove]: {
-      post: gameCommandOperation(
-        "moveToken",
-        "combat:write",
-        "Moves a combatant's token; the server snaps to the calibrated grid. `position: null` returns the token to the tray. Player sessions may move only their claimed character. `sceneId` targets a prepared (GM-private) scene instead of the live table.",
-        "TokenMoveRequest",
-        [uuidParam("actorId")],
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.actors]: {
-      post: gameCommandOperation(
-        "addActorFromDefinition",
-        "actor:write",
-        "Instantiates a bundled SRD monster onto the roster (GM-grade only). The response's `actorId` equals the commandId.",
-        "ActorAddRequest"
-      )
-    },
-    [GAME_PATHS.actorById]: {
-      delete: gameCommandOperation(
-        "removeActor",
-        "actor:write",
-        "Removes an actor from the roster (GM-grade only); rejected for claimed characters and, while rewound, for combatants in the fight.",
-        "CommandControlRequest",
-        [uuidParam("actorId")],
-        false
-      )
-    },
-    [GAME_PATHS.actorDamage]: {
-      post: gameCommandOperation(
-        "applyDamage",
-        "actor:write",
-        "Applies damage (temporary hit points absorb first). Optional typed `parts` run the defense pipeline - immunity, then resistance (half, rounded down), then vulnerability (double) - from the target's definition and active effects, with the per-part breakdown returned in `applied`; the bare `amount` is the manual path (no defense math). Dropping a player character to 0 starts the dying state (Unconscious + Prone + death saves; `critical: true` while dying adds two failures). Player sessions may target only their claimed character.",
-        "DamageRequest",
-        [uuidParam("actorId")],
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.actorHeal]: {
-      post: gameCommandOperation(
-        "healActor",
-        "actor:write",
-        "Heals hit points up to the maximum. Player sessions may target only their claimed character.",
-        "HpAmountRequest",
-        [uuidParam("actorId")],
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.actorTempHp]: {
-      post: gameCommandOperation(
-        "setTemporaryHp",
-        "actor:write",
-        "Sets temporary hit points (replaces, 5e-style). Player sessions may target only their claimed character.",
-        "TempHpRequest",
-        [uuidParam("actorId")],
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.actorHp]: {
-      post: gameCommandOperation(
-        "setCurrentHp",
-        "actor:write",
-        "Sets current hit points directly (GM-grade only).",
-        "SetHpRequest",
-        [uuidParam("actorId")]
-      )
-    },
-    [GAME_PATHS.actorConditions]: {
-      post: gameCommandOperation(
-        "setCondition",
-        "actor:write",
-        "Applies or clears a bundled SRD condition (exhaustion carries a level). Player sessions may target only their claimed character.",
-        "ConditionRequest",
-        [uuidParam("actorId")],
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.definitionsImport]: {
-      post: gameCommandOperation(
-        "importActorDefinition",
-        "actor:write",
-        "Imports a canonical ActorDefinition JSON as a claimable actor with a full sheet (GM-grade only). The response's `actorId` equals the commandId.",
-        "ActorImportRequest"
-      )
-    },
-    [GAME_PATHS.characterImports]: {
-      post: gameCommandOperation(
-        "submitCharacterImport",
-        "actor:write",
-        "Submits a character sheet into the GM's approval queue instead of importing it directly - the player path (a GM importing their own sheet uses the definitions import). Any joined session may submit; nothing reaches the roster until the GM resolves it. The queued entry's `importId` is this call's commandId, so keep it to resolve or re-send the submission idempotently.",
-        "CharacterSubmitImportRequest",
-        undefined,
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.characterImportResolve]: {
-      post: gameCommandOperation(
-        "resolveCharacterImport",
-        "actor:write",
-        "Approves (`approve: true`) or rejects a queued character submission (GM-grade only). Either decision removes it from the queue; approving instantiates the claimable actor, whose id equals THIS call's commandId (returned as `actorId`).",
-        "CharacterResolveImportRequest",
-        [{ name: "importId", in: "path", required: true, schema: { type: "string", maxLength: 120 } }]
-      )
-    },
-    [GAME_PATHS.rolls]: {
-      post: gameCommandOperation(
-        "rollDice",
-        "roll:create",
-        "Rolls dice into the shared, auditable roll history; the response carries `rollId`. Player sessions cannot roll gm-only, and rolling for an actor requires owning it.",
-        "DiceRollRequest",
-        undefined,
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.actionResolve]: {
-      post: gameCommandOperation(
-        "resolveAction",
-        "combat:write",
-        "Runs a stat-block action: attack vs target AC with 2024 crit doubling, or save-DC surfacing with proposed damage. GM-grade for any combatant; a player session only for their own claimed character (area templates, cover, and rules overrides stay GM-only). A player's hit is handed to the GM as a damage proposal, or applied directly when the table's player-damage-mode is `direct`. Targets are explicit ids or an area template (never both); rolls are recorded in the shared history and the response carries the `resolution`.",
-        "ActionResolveRequest",
-        undefined,
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.saveAnswer]: {
-      post: gameCommandOperation(
-        "answerSave",
-        "combat:write",
-        "Answers a pending saving throw by server roll or manual total; on commit the outcome auto-applies damage/conditions. Player sessions may answer only their claimed character's saves. The response carries the `outcome`.",
-        "SaveAnswerRequest",
-        [uuidParam("saveId")],
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.saveDismiss]: {
-      post: gameCommandOperation(
-        "dismissSave",
-        "combat:write",
-        "Dismisses a pending saving throw without resolving it (GM-grade, or the owing player).",
-        "CommandControlRequest",
-        [uuidParam("saveId")],
-        false,
-        true
-      )
-    },
-    [GAME_PATHS.reactionAnswer]: {
-      post: gameCommandOperation(
-        "answerReaction",
-        "combat:write",
-        "Answers a pending reaction prompt (Uncanny Dodge). The triggering attack's damage was parked on the prompt, so both answers apply it here: `use: true` spends the reaction and halves each typed part first; `use: false` applies it in full. Player sessions may answer only their claimed character's prompts. The response carries the `outcome`.",
-        "ReactionAnswerRequest",
-        [uuidParam("reactionId")],
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.reactionDismiss]: {
-      post: gameCommandOperation(
-        "dismissReaction",
-        "combat:write",
-        "Dismisses a pending reaction prompt WITHOUT applying its parked damage (GM-grade only) - for when the damage was already applied manually.",
-        "CommandControlRequest",
-        [uuidParam("reactionId")],
-        false
-      )
-    },
-    [GAME_PATHS.damageResolve]: {
-      post: gameCommandOperation(
-        "resolveProposedDamage",
-        "combat:write",
-        "Applies or dismisses a parked player-hit damage proposal (proposal mode; GM-grade only). `apply: true` reduces the target's HP through the typed-defense pipeline (an optional `amount` overrides the total as a bare number, no defense math); `apply: false` discards it. Either way the proposal clears.",
-        "DamageResolveRequest"
-      )
-    },
+    ...gameCommandOperation(
+      "encounter.start",
+      "startEncounter",
+      "Starts an encounter on a calibrated battlemap with initial combatants (GM-grade only). Missing initiative scores are rolled server-side.",
+      "EncounterStartRequest"
+    ),
+    ...gameCommandOperation(
+      "encounter.end",
+      "endEncounter",
+      "Ends the encounter (GM-grade only). The whole fight auto-archives permanently (see /encounters) in the same transaction.",
+      "CommandControlRequest",
+      undefined,
+      false
+    ),
+    ...gameCommandOperation(
+      "encounter.add-combatant",
+      "addEncounterCombatant",
+      "Adds a rostered actor to the running encounter (GM-grade only); rolls initiative when no score is given.",
+      "AddCombatantRequest"
+    ),
+    ...gameCommandOperation(
+      "initiative.set",
+      "setInitiativeScore",
+      "Sets a combatant's initiative score (GM-grade only).",
+      "InitiativeSetRequest"
+    ),
+    ...gameCommandOperation(
+      "initiative.roll-self",
+      "rollOwnInitiative",
+      "Rolls initiative for a character (server rolls the d20 unless a manual `natural` is supplied; `rollMode` gives advantage/disadvantage), adds its initiative modifier, sets its score, and clears its pending flag. GM-grade for anyone; a player session only for their own claimed character. When the encounter runs in `wait` mode, the last pending roll begins turns.",
+      "InitiativeRollSelfRequest",
+      undefined,
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "initiative.roll-remaining",
+      "rollRemainingInitiative",
+      "Rolls initiative for every combatant still pending a player roll (GM-grade only), beginning a `wait`-mode fight.",
+      "CommandControlRequest",
+      undefined,
+      false
+    ),
+    ...gameCommandOperation(
+      "initiative.next",
+      "nextTurn",
+      'Advances the turn (GM-grade only). While the table is rewound this steps forward through recorded history; a 409 with `needsConfirm: "rewrite-history"` asks for `confirmRewrite: true` to truncate the undone future.',
+      "InitiativeNextRequest",
+      undefined,
+      false
+    ),
+    ...gameCommandOperation(
+      "initiative.previous",
+      "previousTurn",
+      'Rewinds the whole table to the previous turn boundary (GM-grade only). A 409 with `needsConfirm: "discard-changes"` asks for `confirmDiscard: true` to drop changes made while rewound.',
+      "InitiativePreviousRequest",
+      undefined,
+      false
+    ),
+    ...gameCommandOperation(
+      "turn.end",
+      "endTurn",
+      "Ends the current turn and advances. The GM (or an integration) may end anyone's turn; a player session only their own claimed character's.",
+      "CommandControlRequest",
+      undefined,
+      false,
+      true
+    ),
+    ...gameCommandOperation(
+      "turn.use",
+      "useTurnSlot",
+      "Marks the current turn's action or bonus action used/unused. A free manual toggle (never blocks); structured action resolution validates against this state per the encounter's rules mode, and un-marking the action slot also clears any open compound-action instance.",
+      "TurnUseRequest",
+      undefined,
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "turn.use-reaction",
+      "useReaction",
+      "Marks a combatant's reaction used/unused; reactions refresh at the start of their own turn.",
+      "TurnReactionRequest",
+      undefined,
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "turn.use-legendary",
+      "useLegendaryActions",
+      "Sets a legendary creature's spent legendary actions this round (GM-grade only; 0 clears). Structured legendary action resolves spend the pool automatically; it refills at the creature's own turn start.",
+      "TurnLegendaryRequest"
+    ),
+    ...gameCommandOperation(
+      "token.move",
+      "moveToken",
+      "Moves a combatant's token; the server snaps to the calibrated grid. `position: null` returns the token to the tray. Player sessions may move only their claimed character. `sceneId` targets a prepared (GM-private) scene instead of the live table.",
+      "TokenMoveRequest",
+      [uuidParam("actorId")],
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "actor.add-from-definition",
+      "addActorFromDefinition",
+      "Instantiates a bundled SRD monster onto the roster (GM-grade only). The response's `actorId` equals the commandId.",
+      "ActorAddRequest"
+    ),
+    ...gameCommandOperation(
+      "actor.remove",
+      "removeActor",
+      "Removes an actor from the roster (GM-grade only); rejected for claimed characters and, while rewound, for combatants in the fight.",
+      "CommandControlRequest",
+      [uuidParam("actorId")],
+      false
+    ),
+    ...gameCommandOperation(
+      "actor.apply-damage",
+      "applyDamage",
+      "Applies damage (temporary hit points absorb first). Optional typed `parts` run the defense pipeline - immunity, then resistance (half, rounded down), then vulnerability (double) - from the target's definition and active effects, with the per-part breakdown returned in `applied`; the bare `amount` is the manual path (no defense math). Dropping a player character to 0 starts the dying state (Unconscious + Prone + death saves; `critical: true` while dying adds two failures). Player sessions may target only their claimed character.",
+      "DamageRequest",
+      [uuidParam("actorId")],
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "actor.heal",
+      "healActor",
+      "Heals hit points up to the maximum. Player sessions may target only their claimed character.",
+      "HpAmountRequest",
+      [uuidParam("actorId")],
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "actor.set-temp-hp",
+      "setTemporaryHp",
+      "Sets temporary hit points (replaces, 5e-style). Player sessions may target only their claimed character.",
+      "TempHpRequest",
+      [uuidParam("actorId")],
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "actor.set-hp",
+      "setCurrentHp",
+      "Sets current hit points directly (GM-grade only).",
+      "SetHpRequest",
+      [uuidParam("actorId")]
+    ),
+    ...gameCommandOperation(
+      "actor.set-condition",
+      "setCondition",
+      "Applies or clears a bundled SRD condition (exhaustion carries a level). Player sessions may target only their claimed character.",
+      "ConditionRequest",
+      [uuidParam("actorId")],
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "actor.import-definition",
+      "importActorDefinition",
+      "Imports a canonical ActorDefinition JSON as a claimable actor with a full sheet (GM-grade only). The response's `actorId` equals the commandId.",
+      "ActorImportRequest"
+    ),
+    ...gameCommandOperation(
+      "character.submit-import",
+      "submitCharacterImport",
+      "Submits a character sheet into the GM's approval queue instead of importing it directly - the player path (a GM importing their own sheet uses the definitions import). Any joined session may submit; nothing reaches the roster until the GM resolves it. The queued entry's `importId` is this call's commandId, so keep it to resolve or re-send the submission idempotently.",
+      "CharacterSubmitImportRequest",
+      undefined,
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "character.resolve-import",
+      "resolveCharacterImport",
+      "Approves (`approve: true`) or rejects a queued character submission (GM-grade only). Either decision removes it from the queue; approving instantiates the claimable actor, whose id equals THIS call's commandId (returned as `actorId`).",
+      "CharacterResolveImportRequest",
+      [{ name: "importId", in: "path", required: true, schema: { type: "string", maxLength: 120 } }]
+    ),
+    ...gameCommandOperation(
+      "dice.roll",
+      "rollDice",
+      "Rolls dice into the shared, auditable roll history; the response carries `rollId`. Player sessions cannot roll gm-only, and rolling for an actor requires owning it.",
+      "DiceRollRequest",
+      undefined,
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "action.resolve",
+      "resolveAction",
+      "Runs a stat-block action: attack vs target AC with 2024 crit doubling, or save-DC surfacing with proposed damage. GM-grade for any combatant; a player session only for their own claimed character (area templates, cover, and rules overrides stay GM-only). A player's hit is handed to the GM as a damage proposal, or applied directly when the table's player-damage-mode is `direct`. Targets are explicit ids or an area template (never both); rolls are recorded in the shared history and the response carries the `resolution`.",
+      "ActionResolveRequest",
+      undefined,
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "save.answer",
+      "answerSave",
+      "Answers a pending saving throw by server roll or manual total; on commit the outcome auto-applies damage/conditions. Player sessions may answer only their claimed character's saves. The response carries the `outcome`.",
+      "SaveAnswerRequest",
+      [uuidParam("saveId")],
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "save.dismiss",
+      "dismissSave",
+      "Dismisses a pending saving throw without resolving it (GM-grade, or the owing player).",
+      "CommandControlRequest",
+      [uuidParam("saveId")],
+      false,
+      true
+    ),
+    ...gameCommandOperation(
+      "reaction.answer",
+      "answerReaction",
+      "Answers a pending reaction prompt (Uncanny Dodge). The triggering attack's damage was parked on the prompt, so both answers apply it here: `use: true` spends the reaction and halves each typed part first; `use: false` applies it in full. Player sessions may answer only their claimed character's prompts. The response carries the `outcome`.",
+      "ReactionAnswerRequest",
+      [uuidParam("reactionId")],
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "reaction.dismiss",
+      "dismissReaction",
+      "Dismisses a pending reaction prompt WITHOUT applying its parked damage (GM-grade only) - for when the damage was already applied manually.",
+      "CommandControlRequest",
+      [uuidParam("reactionId")],
+      false
+    ),
+    ...gameCommandOperation(
+      "damage.resolve",
+      "resolveProposedDamage",
+      "Applies or dismisses a parked player-hit damage proposal (proposal mode; GM-grade only). `apply: true` reduces the target's HP through the typed-defense pipeline (an optional `amount` overrides the total as a bare number, no defense math); `apply: false` discards it. Either way the proposal clears.",
+      "DamageResolveRequest"
+    ),
     [GAME_PATHS.actorAvailableActions]: {
       get: {
         operationId: "getActorAvailableActions",
@@ -2425,526 +2379,420 @@ export const openApiDocument = {
         }
       }
     },
-    [GAME_PATHS.effects]: {
-      post: gameCommandOperation(
-        "addEffect",
-        "combat:write",
-        "Adds a rules-engine effect to a combatant (GM-grade only): a named, tagged state with an optional duration and typed modifiers (damage bonus, damage resistance, advantage). Structured actions create richer effects via their own declarations; this is the house-rule/manual path. The response's `effectId` equals the commandId.",
-        "EffectAddRequest",
-        [uuidParam("actorId")]
-      )
-    },
-    [GAME_PATHS.effectEnd]: {
-      post: gameCommandOperation(
-        "endEffect",
-        "combat:write",
-        "Ends an effect: linked conditions clear (a released grapple removes Grappled/Restrained) and its on-end grants fire (a Frenzied Rage ending adds Exhaustion). GM-grade anyone; a player session only their claimed character.",
-        "CommandControlRequest",
-        [
-          uuidParam("actorId"),
-          { name: "effectId", in: "path", required: true, schema: { type: "string", maxLength: 120 } }
-        ],
-        false,
-        true
-      )
-    },
-    [GAME_PATHS.deathSaveRoll]: {
-      post: gameCommandOperation(
-        "rollDeathSave",
-        "combat:write",
-        "Rolls a death saving throw for a dying character (at 0 HP): natural 20 regains 1 HP, natural 1 counts two failures, 10+ succeeds (three stabilize), otherwise a failure (three kill). Default applies in one step; pass `commit: false` to preview the projected pips first (honoring `rollMode` adv/disadv), then confirm with `commit: true` and the shown `naturalRoll`. The roll is recorded in the shared history and the response carries `deathSave`. GM-grade anyone; a player session only their claimed character.",
-        "DeathSaveRollRequest",
-        [uuidParam("actorId")],
-        false,
-        true
-      )
-    },
-    [GAME_PATHS.rulesMode]: {
-      post: gameCommandOperation(
-        "setRulesMode",
-        "combat:write",
-        "Sets the rules-engine enforcement mode (GM-grade only): `strict` rejects invalid structured actions with an overridable `error.details.blocked`, `assisted` allows them with logged warnings, `freeform` skips validation. Also settable at encounter start.",
-        "RulesModeRequest"
-      )
-    },
-    [GAME_PATHS.playerDamageMode]: {
-      post: gameCommandOperation(
-        "setPlayerDamageMode",
-        "combat:write",
-        "Sets how a player's own confirmed hit reaches an enemy's HP (GM-grade only): `proposal` parks a GM-confirmed damage proposal (the default), `direct` applies the typed damage immediately server-side.",
-        "PlayerDamageModeRequest"
-      )
-    },
-    [GAME_PATHS.playerInitiativeMode]: {
-      post: gameCommandOperation(
-        "setPlayerInitiativeMode",
-        "combat:write",
-        "Sets how player-rolled initiative behaves (GM-grade only): `immediate` begins turns at once on a provisional order that re-sorts as players roll in, `wait` holds turn advancement until every player has rolled (or the GM rolls the rest).",
-        "PlayerInitiativeModeRequest"
-      )
-    },
-    [GAME_PATHS.healthDisplay]: {
-      post: gameCommandOperation(
-        "setHealthDisplay",
-        "combat:write",
-        "Sets the table-wide default for how token health shows on the map (GM-grade only): `band` a coarse status badge, `bar` a thin HP bar, or `ring` a green-to-red ring; `audience` `gm` keeps a bar/ring on the GM map only, `all` shows it to players and the shared screen. Exact hit points never leave the GM - non-owners see only a coarse band-fraction. A single token can override this via the actor health-display command.",
-        "HealthDisplayRequest"
-      )
-    },
-    [GAME_PATHS.environment]: {
-      post: gameCommandOperation(
-        "setEnvironment",
-        "combat:write",
-        "Toggles the underwater environment on the live encounter (GM-grade only; SRD Underwater Combat): melee attacks take Disadvantage unless they deal piercing damage, ranged attacks automatically miss beyond normal range, and every combatant resists fire damage.",
-        "EnvironmentRequest"
-      )
-    },
-    [GAME_PATHS.actorRechoose]: {
-      post: gameCommandOperation(
-        "rechooseActorPick",
-        "actor:write",
-        "Re-makes a pick the character's content says may be re-made on a rest (Circle of the Land's land type on a Long Rest; Fiendish Resilience's damage type on either). The answer is NOT written to the character's choices ledger - it is runtime state on the actor, cleared by the matching rest - so a re-choice between fights needs no rebuild. A player session may re-choose only on their claimed character, the GM on anyone. Which offers are re-choosable, and what each may become, are both decided from the content: a client cannot widen either.",
-        "ActorRechooseRequest",
-        [uuidParam("actorId")],
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.actorRest]: {
-      post: gameCommandOperation(
-        "restActor",
-        "actor:write",
-        "Applies a rest to a rostered actor outside combat; a player session may rest only their claimed character, the GM anyone. Long: remaining effects end (their on-end grants fire first), hit points restore to maximum, temporary HP clears, the dying state resets, limited-use pools refresh, all spent Hit Point Dice restore, spell slots and prepared spells reset to the sheet defaults, and Exhaustion drops one level. Short: per-short-rest and recharge pools re-arm; healing is the separate spend-hit-dice call.",
-        "ActorRestRequest",
-        [uuidParam("actorId")],
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.actorSpendHitDice]: {
-      post: gameCommandOperation(
-        "spendHitDice",
-        "actor:write",
-        "Spends Hit Point Dice to heal (SRD Short Rest: each die heals its roll + Con modifier, minimum 1). Rejected while the actor is in an active encounter. Player sessions may target only their claimed character; the dice land in the shared roll history.",
-        "ActorSpendHitDiceRequest",
-        [uuidParam("actorId")],
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.characterSetSlot]: {
-      post: gameCommandOperation(
-        "setSpellSlot",
-        "actor:write",
-        "Sets a character's remaining spell slots for one level (clamped to the sheet maximum) - spend or restore a slot during play. Player sessions may target only their claimed character.",
-        "CharacterSetSlotRequest",
-        [uuidParam("actorId")],
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.characterSetPrepared]: {
-      post: gameCommandOperation(
-        "setPreparedSpell",
-        "actor:write",
-        "Prepares or un-prepares one of a character's known spells (cantrips and always-prepared spells can't be toggled). Player sessions may target only their claimed character.",
-        "CharacterSetPreparedRequest",
-        [uuidParam("actorId")],
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.characterSetInventory]: {
-      post: gameCommandOperation(
-        "setInventory",
-        "actor:write",
-        "Adds, updates, or removes (quantity 0) one of a character's inventory items and toggles equipped/attuned. Player sessions may target only their claimed character.",
-        "CharacterSetInventoryRequest",
-        [uuidParam("actorId")],
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.characterSetCurrency]: {
-      post: gameCommandOperation(
-        "setCurrency",
-        "actor:write",
-        "Sets a character's coin purse (cp/sp/ep/gp/pp). Player sessions may target only their claimed character.",
-        "CharacterSetCurrencyRequest",
-        [uuidParam("actorId")],
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.characterSetIdentity]: {
-      post: gameCommandOperation(
-        "setIdentity",
-        "actor:write",
-        "Sets a character's identity (class/level/race/background/feats) on its editable imported sheet - a light hand-edit, not a guided builder. Player sessions may target only their claimed character.",
-        "CharacterSetIdentityRequest",
-        [uuidParam("actorId")],
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.characters]: {
-      post: gameCommandOperation(
-        "createCharacter",
-        "actor:write",
-        "Creates a character from CHOICES rather than a finished sheet - the GM always, and a player when the table's builderPolicy.playerBuilder is open (D13), in which case the new character is auto-claimed by its creator and a per-session daily cap applies: identity ids (species/background/class/subclass), base ability scores plus the background's +2/+1 or +1/+1/+1 allocation, per-level hit-point entries (or the fixed average), and the choice-provenance ledger as the literal build input. The server validates every id against the content catalogs, resolves every catalog-driven choice through the same resolver the wizard uses, interprets the content features' structured riders into sheet actions, assembles the canonical ActorDefinition, and lands it through the import path - the new claimable actor's id equals this call's commandId and its editable sheet is keyed import-<actorId>.",
-        "CharacterCreateRequest",
-        undefined,
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.charactersRandom]: {
-      post: gameCommandOperation(
-        "generateCharacter",
-        "actor:write",
-        "Rolls a complete, playable, single-class character at a level and lands it on the roster - the GM always, and a player when the table's builderPolicy.playerRandom is open, which unlike playerBuilder is CLOSED by default. The request carries only the level, an optional class (omitted means one is drawn) and an optional name; every other decision is made server-side from the same dice authority as every other roll: the standard array distributed by the class's own stat priority, the background's printed spread aimed the same way, and species, lineage, background, subclass, size, skills, tools, languages, feats, fighting styles, spells and starting equipment drawn at random from the offers the character builder itself computes. The result is assembled, validated and imported exactly as `POST /game/characters` is - same ActorDefinition, same choice ledger, so it levels up and respecs like a hand-built character - and the hit-point dice are recorded in the table feed. Auto-claimed by a player caller, with the same per-session daily cap.",
-        "CharacterGenerateRequest",
-        undefined,
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.characterRebuild]: {
-      post: gameCommandOperation(
-        "rebuildCharacter",
-        "actor:write",
-        "Rebuilds one character at a new level - up OR down - or respecs it outright: the same build input `POST /game/characters` takes, minus the name (kept from the live actor), re-run through the identical validation. The GM may rebuild anyone; a player only their own claimed character, and only while the table's builder is open. Rolled hit points recorded in the choice ledger are reused, so a level-down/level-up round trip restores the same maximum; a sheet with no recorded rolls rebuilds on the average. Refused while the character is in a live (or paused) fight.",
-        "CharacterRebuildRequest",
-        [uuidParam("actorId")],
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.builderRollAbilities]: {
-      post: gameCommandOperation(
-        "rollBuilderAbilities",
-        "actor:write",
-        "Rolls six ability scores SERVER-SIDE for the character builder (D14), through the table's allowed method and the GM's formula. The set is recorded as one public roll in the table feed. Character creation still bound-checks submitted scores rather than binding them to this roll: physical dice at the table stay a supported path.",
-        "BuilderRollAbilitiesRequest",
-        undefined,
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.rulesPolicy]: {
-      post: gameCommandOperation(
-        "setRulesPolicy",
-        "combat:write",
-        "Sets the table's STANDING rules policy (GM-grade only): the dial every new fight starts from, plus per-family exceptions (movement, economy, resources, targeting, slots). This is campaign policy, not the live fight - use the rules-mode command to change the fight in progress. Omitting `exceptions` keeps the stored ones. The `slots` family ships as `assisted` so slot tracking advises rather than blocks until a GM opts in.",
-        "RulesPolicyRequest"
-      )
-    },
-    [GAME_PATHS.stagingDefaults]: {
-      post: gameCommandOperation(
-        "setStagingDefaults",
-        "combat:write",
-        'Sets the table\'s staging defaults (GM-grade only): the token visibility a newly staged combatant starts at. A surface initializes its "Shown to players / GM only" toggle from this; the per-add `visibility` argument stays explicit on the wire, so a command still says exactly what it did.',
-        "StagingDefaultsRequest"
-      )
-    },
-    [GAME_PATHS.partyVisibility]: {
-      post: gameCommandOperation(
-        "setPartyVisibility",
-        "combat:write",
-        "Sets how much a player sees of ANOTHER player's character (GM-grade only): `off` (no party surface - the combatant still appears on the map and in the turn order, but carries no class, no sheet and no resources), `name-and-class` (the identity card - the default), `full-sheet` (plus their read-only imported sheet) or `sheet-and-resources` (plus live spell slots, prepared spells, inventory, currency, hit dice and limited uses). The tier subtracts FIELDS, never combatants, and is applied SERVER-SIDE in the player projection - a withheld field is never sent. A player's own claimed character is unaffected at every tier.",
-        "PartyVisibilityRequest"
-      )
-    },
-    [GAME_PATHS.builderPolicy]: {
-      post: gameCommandOperation(
-        "setBuilderPolicy",
-        "actor:write",
-        "Sets the character-builder table policy (GM-grade only; task-packet decision 10): which ability-score generation methods the wizard offers players (standard-array, point-buy, roll, custom - all four by default) and the GM's custom roll formula. A supplied formula is validated through the server's own dice grammar and bounds (a formula that can roll outside 1-30 is rejected); allowing \"custom\" is only actionable while a formula is set. The stored policy is projected to every player verbatim.",
-        "BuilderSetPolicyRequest"
-      )
-    },
-    [GAME_PATHS.characterSetProficiencies]: {
-      post: gameCommandOperation(
-        "setProficiencies",
-        "actor:write",
-        "Sets a character's save and skill proficiency selections on its editable imported sheet. Player sessions may target only their claimed character.",
-        "CharacterSetProficienciesRequest",
-        [uuidParam("actorId")],
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.annotations]: {
-      post: gameCommandOperation(
-        "addAnnotation",
-        "combat:write",
-        "Draws a measurement or area shape on the encounter map; the server snaps geometry to the grid. The response's `annotationId` equals the commandId.",
-        "AnnotationAddRequest",
-        undefined,
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.annotationsPing]: {
-      post: gameCommandOperation(
-        "pingMap",
-        "combat:write",
-        "Pings a point on the encounter map (ephemeral, labeled with the sender).",
-        "AnnotationPingRequest",
-        undefined,
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.annotationsClear]: {
-      post: gameCommandOperation(
-        "clearAnnotations",
-        "combat:write",
-        "Clears drawn shapes: your own, all player shapes (GM-grade), or everything (GM-grade).",
-        "AnnotationClearRequest",
-        undefined,
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.annotationById]: {
-      delete: gameCommandOperation(
-        "removeAnnotation",
-        "combat:write",
-        "Removes one annotation (owners, the GM, and GM-grade integrations).",
-        "CommandControlRequest",
-        [uuidParam("id")],
-        false,
-        true
-      )
-    },
-    [GAME_PATHS.annotationMove]: {
-      post: gameCommandOperation(
-        "moveAnnotation",
-        "combat:write",
-        "Moves/resizes an annotation; the server re-snaps geometry.",
-        "AnnotationMoveRequest",
-        [uuidParam("id")],
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.annotationColor]: {
-      post: gameCommandOperation(
-        "setAnnotationColor",
-        "combat:write",
-        "Changes an annotation's color.",
-        "AnnotationColorRequest",
-        [uuidParam("id")],
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.annotationVisibility]: {
-      post: gameCommandOperation(
-        "setAnnotationVisibility",
-        "combat:write",
-        "Changes who can see an annotation (public, gm-only, owner-only, owner-gm, gm-actor).",
-        "AnnotationVisibilityRequest",
-        [uuidParam("id")],
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.annotationMovable]: {
-      post: gameCommandOperation(
-        "setAnnotationMovable",
-        "combat:write",
-        "Allows or disallows other players moving a shape.",
-        "AnnotationMovableRequest",
-        [uuidParam("id")],
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.claims]: {
-      post: gameCommandOperation(
-        "claimCharacter",
-        "actor:write",
-        "Claims an unclaimed player character for the calling session. Player sessions only - GM sessions and integration credentials are refused (an integration wanting a seat at the table should hold a player session from POST /sessions/player).",
-        "ClaimRequest",
-        undefined,
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.claimsRelease]: {
-      post: gameCommandOperation(
-        "releaseCharacters",
-        "actor:write",
-        "Releases every character claimed by the calling player session.",
-        "CommandControlRequest",
-        undefined,
-        false,
-        true
-      )
-    },
-    [GAME_PATHS.claimForceRelease]: {
-      post: gameCommandOperation(
-        "forceReleaseCharacter",
-        "actor:write",
-        "Force-releases a claimed character (GM-grade only) - the recovery path for a lost player device.",
-        "CommandControlRequest",
-        [uuidParam("actorId")],
-        false
-      )
-    },
-    [GAME_PATHS.actorTokenImage]: {
-      post: gameCommandOperation(
-        "setActorTokenImage",
-        "actor:write",
-        "Sets or clears (null) a combatant's token image from the uploaded token library: the GM for any combatant, a player for their own claimed character (D18).",
-        "TokenImageRequest",
-        [uuidParam("actorId")]
-      )
-    },
-    [GAME_PATHS.actorSize]: {
-      post: gameCommandOperation(
-        "setActorSize",
-        "actor:write",
-        "Sets a combatant's creature size; large+ tokens size to their grid footprint and re-snap (GM-grade only).",
-        "ActorSizeRequest",
-        [uuidParam("actorId")]
-      )
-    },
-    [GAME_PATHS.actorVisibility]: {
-      post: gameCommandOperation(
-        "setActorVisibility",
-        "actor:write",
-        "Moves a combatant between the shared layer (public) and the GM-only layer (GM-grade only).",
-        "ActorVisibilityRequest",
-        [uuidParam("actorId")]
-      )
-    },
-    [GAME_PATHS.actorArchived]: {
-      post: gameCommandOperation(
-        "setActorArchived",
-        "actor:write",
-        "Archives or restores a character (GM-grade only). Archived characters are hidden from players, refused by claim, and rejected server-side by scene staging and encounter start/add; a character in the running encounter must be removed first. Archiving a CLAIMED character releases the claim in the same mutation, so its player is not left holding an invisible claim.",
-        "ActorArchivedRequest",
-        [uuidParam("actorId")]
-      )
-    },
-    [GAME_PATHS.actorSheetPreview]: {
-      post: gameCommandOperation(
-        "setActorSheetPreview",
-        "actor:write",
-        "Shares (or un-shares) an ARCHIVED character's sheet with players as a read-only keepsake (GM-grade only). Default hidden - a retired character stays private until the GM shares it. Meaningless while the character is not archived. Players receive only the character's id and name in their projection.",
-        "ActorSheetPreviewRequest",
-        [uuidParam("actorId")]
-      )
-    },
-    [GAME_PATHS.actorHealthDisplay]: {
-      post: gameCommandOperation(
-        "setActorHealthDisplay",
-        "actor:write",
-        "Overrides how one combatant's token health shows on the map (GM-grade only), or clears the override (`display: null`) so the token follows the table-wide default. Same style/audience choices as the table-wide health-display command.",
-        "ActorHealthDisplayRequest",
-        [uuidParam("actorId")]
-      )
-    },
-    [GAME_PATHS.actorSpeed]: {
-      post: gameCommandOperation(
-        "setActorSpeed",
-        "actor:write",
-        "Sets a combatant's walking speed in feet (GM-grade only); null clears it to unknown, which skips the movement rules for that combatant. Speed seeds from the imported definition automatically.",
-        "ActorSpeedRequest",
-        [uuidParam("actorId")]
-      )
-    },
-    [GAME_PATHS.scenes]: {
-      post: gameCommandOperation(
-        "createScene",
-        "scene:write",
-        "Prepares a staged scene on a battlemap, privately, without touching the live table (GM-grade only). The response's `sceneId` equals the commandId.",
-        "SceneCreateRequest"
-      )
-    },
-    [GAME_PATHS.sceneById]: {
-      delete: gameCommandOperation(
-        "removeScene",
-        "scene:write",
-        "Removes a prepared scene (GM-grade only); the active scene cannot be removed.",
-        "CommandControlRequest",
-        [uuidParam("sceneId")],
-        false
-      )
-    },
-    [GAME_PATHS.sceneRename]: {
-      post: gameCommandOperation(
-        "renameScene",
-        "scene:write",
-        "Renames a prepared scene (GM-grade only).",
-        "SceneRenameRequest",
-        [uuidParam("sceneId")]
-      )
-    },
-    [GAME_PATHS.sceneActivate]: {
-      post: gameCommandOperation(
-        "activateScene",
-        "scene:write",
-        "Switches the live table to a prepared scene, parking the current one non-destructively (GM-grade only). Rejected while the timeline is rewound; the turn-snapshot timeline restarts for the newly live scene.",
-        "CommandControlRequest",
-        [uuidParam("sceneId")],
-        false
-      )
-    },
-    [GAME_PATHS.sceneCombatants]: {
-      post: gameCommandOperation(
-        "setSceneCombatants",
-        "scene:write",
-        "Replaces a prepared scene's combatant list (GM-grade only).",
-        "SceneCombatantsRequest",
-        [uuidParam("sceneId")]
-      )
-    },
-    [GAME_PATHS.sceneDuplicate]: {
-      post: gameCommandOperation(
-        "duplicateScene",
-        "scene:write",
-        "Duplicates a prepared scene as a new staged copy carrying the same map and staged combatants/tokens (GM-grade only). Duplicating the live scene snapshots its current combat into the copy; the copy is always parked, next to the original. The response's `sceneId` equals the commandId.",
-        "CommandControlRequest",
-        [uuidParam("sceneId")],
-        false
-      )
-    },
-    [GAME_PATHS.sceneReorder]: {
-      post: gameCommandOperation(
-        "reorderScenes",
-        "scene:write",
-        "Reorders the prepared-scene list to the given permutation of every scene id (GM-grade only). Does not change which scene is live.",
-        "SceneReorderRequest"
-      )
-    },
-    [GAME_PATHS.fogEnabled]: {
-      post: gameCommandOperation(
-        "setFogEnabled",
-        "scene:write",
-        "Turns manual fog of war on/off (GM-grade only). Enabled fog with no reveal strokes hides the whole map from players and the shared screen; `sceneId` targets a prepared scene's private prep instead of the live table.",
-        "FogEnabledRequest"
-      )
-    },
-    [GAME_PATHS.fogPaint]: {
-      post: gameCommandOperation(
-        "paintFog",
-        "scene:write",
-        "Paints one reveal/hide fog rect (GM-grade only). The server snaps to whole grid cells on calibrated unrotated maps and clamps to the map bounds; a stroke covering the whole map replaces all prior strokes. `sceneId` targets a prepared scene.",
-        "FogPaintRequest"
-      )
-    },
-    [GAME_PATHS.fogReset]: {
-      post: gameCommandOperation(
-        "resetFog",
-        "scene:write",
-        "Clears every fog stroke - with fog enabled the whole map is hidden again (GM-grade only). `sceneId` targets a prepared scene.",
-        "FogResetRequest"
-      )
-    },
+    ...gameCommandOperation(
+      "effect.add",
+      "addEffect",
+      "Adds a rules-engine effect to a combatant (GM-grade only): a named, tagged state with an optional duration and typed modifiers (damage bonus, damage resistance, advantage). Structured actions create richer effects via their own declarations; this is the house-rule/manual path. The response's `effectId` equals the commandId.",
+      "EffectAddRequest",
+      [uuidParam("actorId")]
+    ),
+    ...gameCommandOperation(
+      "effect.end",
+      "endEffect",
+      "Ends an effect: linked conditions clear (a released grapple removes Grappled/Restrained) and its on-end grants fire (a Frenzied Rage ending adds Exhaustion). GM-grade anyone; a player session only their claimed character.",
+      "CommandControlRequest",
+      [
+        uuidParam("actorId"),
+        { name: "effectId", in: "path", required: true, schema: { type: "string", maxLength: 120 } }
+      ],
+      false,
+      true
+    ),
+    ...gameCommandOperation(
+      "death-save.roll",
+      "rollDeathSave",
+      "Rolls a death saving throw for a dying character (at 0 HP): natural 20 regains 1 HP, natural 1 counts two failures, 10+ succeeds (three stabilize), otherwise a failure (three kill). Default applies in one step; pass `commit: false` to preview the projected pips first (honoring `rollMode` adv/disadv), then confirm with `commit: true` and the shown `naturalRoll`. The roll is recorded in the shared history and the response carries `deathSave`. GM-grade anyone; a player session only their claimed character.",
+      "DeathSaveRollRequest",
+      [uuidParam("actorId")],
+      false,
+      true
+    ),
+    ...gameCommandOperation(
+      "encounter.set-rules-mode",
+      "setRulesMode",
+      "Sets the rules-engine enforcement mode (GM-grade only): `strict` rejects invalid structured actions with an overridable `error.details.blocked`, `assisted` allows them with logged warnings, `freeform` skips validation. Also settable at encounter start.",
+      "RulesModeRequest"
+    ),
+    ...gameCommandOperation(
+      "encounter.set-player-damage-mode",
+      "setPlayerDamageMode",
+      "Sets how a player's own confirmed hit reaches an enemy's HP (GM-grade only): `proposal` parks a GM-confirmed damage proposal (the default), `direct` applies the typed damage immediately server-side.",
+      "PlayerDamageModeRequest"
+    ),
+    ...gameCommandOperation(
+      "encounter.set-player-initiative-mode",
+      "setPlayerInitiativeMode",
+      "Sets how player-rolled initiative behaves (GM-grade only): `immediate` begins turns at once on a provisional order that re-sorts as players roll in, `wait` holds turn advancement until every player has rolled (or the GM rolls the rest).",
+      "PlayerInitiativeModeRequest"
+    ),
+    ...gameCommandOperation(
+      "encounter.set-health-display",
+      "setHealthDisplay",
+      "Sets the table-wide default for how token health shows on the map (GM-grade only): `band` a coarse status badge, `bar` a thin HP bar, or `ring` a green-to-red ring; `audience` `gm` keeps a bar/ring on the GM map only, `all` shows it to players and the shared screen. Exact hit points never leave the GM - non-owners see only a coarse band-fraction. A single token can override this via the actor health-display command.",
+      "HealthDisplayRequest"
+    ),
+    ...gameCommandOperation(
+      "encounter.set-environment",
+      "setEnvironment",
+      "Toggles the underwater environment on the live encounter (GM-grade only; SRD Underwater Combat): melee attacks take Disadvantage unless they deal piercing damage, ranged attacks automatically miss beyond normal range, and every combatant resists fire damage.",
+      "EnvironmentRequest"
+    ),
+    ...gameCommandOperation(
+      "actor.rechoose",
+      "rechooseActorPick",
+      "Re-makes a pick the character's content says may be re-made on a rest (Circle of the Land's land type on a Long Rest; Fiendish Resilience's damage type on either). The answer is NOT written to the character's choices ledger - it is runtime state on the actor, cleared by the matching rest - so a re-choice between fights needs no rebuild. A player session may re-choose only on their claimed character, the GM on anyone. Which offers are re-choosable, and what each may become, are both decided from the content: a client cannot widen either.",
+      "ActorRechooseRequest",
+      [uuidParam("actorId")],
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "actor.rest",
+      "restActor",
+      "Applies a rest to a rostered actor outside combat; a player session may rest only their claimed character, the GM anyone. Long: remaining effects end (their on-end grants fire first), hit points restore to maximum, temporary HP clears, the dying state resets, limited-use pools refresh, all spent Hit Point Dice restore, spell slots and prepared spells reset to the sheet defaults, and Exhaustion drops one level. Short: per-short-rest and recharge pools re-arm; healing is the separate spend-hit-dice call.",
+      "ActorRestRequest",
+      [uuidParam("actorId")],
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "actor.spend-hit-dice",
+      "spendHitDice",
+      "Spends Hit Point Dice to heal (SRD Short Rest: each die heals its roll + Con modifier, minimum 1). Rejected while the actor is in an active encounter. Player sessions may target only their claimed character; the dice land in the shared roll history.",
+      "ActorSpendHitDiceRequest",
+      [uuidParam("actorId")],
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "character.set-slot",
+      "setSpellSlot",
+      "Sets a character's remaining spell slots for one level (clamped to the sheet maximum) - spend or restore a slot during play. Player sessions may target only their claimed character.",
+      "CharacterSetSlotRequest",
+      [uuidParam("actorId")],
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "character.set-prepared",
+      "setPreparedSpell",
+      "Prepares or un-prepares one of a character's known spells (cantrips and always-prepared spells can't be toggled). Player sessions may target only their claimed character.",
+      "CharacterSetPreparedRequest",
+      [uuidParam("actorId")],
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "character.set-inventory",
+      "setInventory",
+      "Adds, updates, or removes (quantity 0) one of a character's inventory items and toggles equipped/attuned. Player sessions may target only their claimed character.",
+      "CharacterSetInventoryRequest",
+      [uuidParam("actorId")],
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "character.set-currency",
+      "setCurrency",
+      "Sets a character's coin purse (cp/sp/ep/gp/pp). Player sessions may target only their claimed character.",
+      "CharacterSetCurrencyRequest",
+      [uuidParam("actorId")],
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "character.set-identity",
+      "setIdentity",
+      "Sets a character's identity (class/level/race/background/feats) on its editable imported sheet - a light hand-edit, not a guided builder. Player sessions may target only their claimed character.",
+      "CharacterSetIdentityRequest",
+      [uuidParam("actorId")],
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "character.create",
+      "createCharacter",
+      "Creates a character from CHOICES rather than a finished sheet - the GM always, and a player when the table's builderPolicy.playerBuilder is open (D13), in which case the new character is auto-claimed by its creator and a per-session daily cap applies: identity ids (species/background/class/subclass), base ability scores plus the background's +2/+1 or +1/+1/+1 allocation, per-level hit-point entries (or the fixed average), and the choice-provenance ledger as the literal build input. The server validates every id against the content catalogs, resolves every catalog-driven choice through the same resolver the wizard uses, interprets the content features' structured riders into sheet actions, assembles the canonical ActorDefinition, and lands it through the import path - the new claimable actor's id equals this call's commandId and its editable sheet is keyed import-<actorId>.",
+      "CharacterCreateRequest",
+      undefined,
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "character.generate",
+      "generateCharacter",
+      "Rolls a complete, playable, single-class character at a level and lands it on the roster - the GM always, and a player when the table's builderPolicy.playerRandom is open, which unlike playerBuilder is CLOSED by default. The request carries only the level, an optional class (omitted means one is drawn) and an optional name; every other decision is made server-side from the same dice authority as every other roll: the standard array distributed by the class's own stat priority, the background's printed spread aimed the same way, and species, lineage, background, subclass, size, skills, tools, languages, feats, fighting styles, spells and starting equipment drawn at random from the offers the character builder itself computes. The result is assembled, validated and imported exactly as `POST /game/characters` is - same ActorDefinition, same choice ledger, so it levels up and respecs like a hand-built character - and the hit-point dice are recorded in the table feed. Auto-claimed by a player caller, with the same per-session daily cap.",
+      "CharacterGenerateRequest",
+      undefined,
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "character.rebuild",
+      "rebuildCharacter",
+      "Rebuilds one character at a new level - up OR down - or respecs it outright: the same build input `POST /game/characters` takes, minus the name (kept from the live actor), re-run through the identical validation. The GM may rebuild anyone; a player only their own claimed character, and only while the table's builder is open. Rolled hit points recorded in the choice ledger are reused, so a level-down/level-up round trip restores the same maximum; a sheet with no recorded rolls rebuilds on the average. Refused while the character is in a live (or paused) fight.",
+      "CharacterRebuildRequest",
+      [uuidParam("actorId")],
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "builder.roll-abilities",
+      "rollBuilderAbilities",
+      "Rolls six ability scores SERVER-SIDE for the character builder (D14), through the table's allowed method and the GM's formula. The set is recorded as one public roll in the table feed. Character creation still bound-checks submitted scores rather than binding them to this roll: physical dice at the table stay a supported path.",
+      "BuilderRollAbilitiesRequest",
+      undefined,
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "rules.set-policy",
+      "setRulesPolicy",
+      "Sets the table's STANDING rules policy (GM-grade only): the dial every new fight starts from, plus per-family exceptions (movement, economy, resources, targeting, slots). This is campaign policy, not the live fight - use the rules-mode command to change the fight in progress. Omitting `exceptions` keeps the stored ones. The `slots` family ships as `assisted` so slot tracking advises rather than blocks until a GM opts in.",
+      "RulesPolicyRequest"
+    ),
+    ...gameCommandOperation(
+      "table.set-staging-defaults",
+      "setStagingDefaults",
+      'Sets the table\'s staging defaults (GM-grade only): the token visibility a newly staged combatant starts at. A surface initializes its "Shown to players / GM only" toggle from this; the per-add `visibility` argument stays explicit on the wire, so a command still says exactly what it did.',
+      "StagingDefaultsRequest"
+    ),
+    ...gameCommandOperation(
+      "table.set-party-visibility",
+      "setPartyVisibility",
+      "Sets how much a player sees of ANOTHER player's character (GM-grade only): `off` (no party surface - the combatant still appears on the map and in the turn order, but carries no class, no sheet and no resources), `name-and-class` (the identity card - the default), `full-sheet` (plus their read-only imported sheet) or `sheet-and-resources` (plus live spell slots, prepared spells, inventory, currency, hit dice and limited uses). The tier subtracts FIELDS, never combatants, and is applied SERVER-SIDE in the player projection - a withheld field is never sent. A player's own claimed character is unaffected at every tier.",
+      "PartyVisibilityRequest"
+    ),
+    ...gameCommandOperation(
+      "builder.set-policy",
+      "setBuilderPolicy",
+      "Sets the character-builder table policy (GM-grade only; task-packet decision 10): which ability-score generation methods the wizard offers players (standard-array, point-buy, roll, custom - all four by default) and the GM's custom roll formula. A supplied formula is validated through the server's own dice grammar and bounds (a formula that can roll outside 1-30 is rejected); allowing \"custom\" is only actionable while a formula is set. The stored policy is projected to every player verbatim.",
+      "BuilderSetPolicyRequest"
+    ),
+    ...gameCommandOperation(
+      "character.set-proficiencies",
+      "setProficiencies",
+      "Sets a character's save and skill proficiency selections on its editable imported sheet. Player sessions may target only their claimed character.",
+      "CharacterSetProficienciesRequest",
+      [uuidParam("actorId")],
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "annotation.add",
+      "addAnnotation",
+      "Draws a measurement or area shape on the encounter map; the server snaps geometry to the grid. The response's `annotationId` equals the commandId.",
+      "AnnotationAddRequest",
+      undefined,
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "annotation.ping",
+      "pingMap",
+      "Pings a point on the encounter map (ephemeral, labeled with the sender).",
+      "AnnotationPingRequest",
+      undefined,
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "annotation.clear",
+      "clearAnnotations",
+      "Clears drawn shapes: your own, all player shapes (GM-grade), or everything (GM-grade).",
+      "AnnotationClearRequest",
+      undefined,
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "annotation.remove",
+      "removeAnnotation",
+      "Removes one annotation (owners, the GM, and GM-grade integrations).",
+      "CommandControlRequest",
+      [uuidParam("id")],
+      false,
+      true
+    ),
+    ...gameCommandOperation(
+      "annotation.move",
+      "moveAnnotation",
+      "Moves/resizes an annotation; the server re-snaps geometry.",
+      "AnnotationMoveRequest",
+      [uuidParam("id")],
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "annotation.set-color",
+      "setAnnotationColor",
+      "Changes an annotation's color.",
+      "AnnotationColorRequest",
+      [uuidParam("id")],
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "annotation.set-visibility",
+      "setAnnotationVisibility",
+      "Changes who can see an annotation (public, gm-only, owner-only, owner-gm, gm-actor).",
+      "AnnotationVisibilityRequest",
+      [uuidParam("id")],
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "annotation.set-movable",
+      "setAnnotationMovable",
+      "Allows or disallows other players moving a shape.",
+      "AnnotationMovableRequest",
+      [uuidParam("id")],
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "character.claim",
+      "claimCharacter",
+      "Claims an unclaimed player character for the calling session. Player sessions only - GM sessions and integration credentials are refused (an integration wanting a seat at the table should hold a player session from POST /sessions/player).",
+      "ClaimRequest",
+      undefined,
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "character.release",
+      "releaseCharacters",
+      "Releases every character claimed by the calling player session.",
+      "CommandControlRequest",
+      undefined,
+      false,
+      true
+    ),
+    ...gameCommandOperation(
+      "character.force-release",
+      "forceReleaseCharacter",
+      "Force-releases a claimed character (GM-grade only) - the recovery path for a lost player device.",
+      "CommandControlRequest",
+      [uuidParam("actorId")],
+      false
+    ),
+    ...gameCommandOperation(
+      "actor.set-token-image",
+      "setActorTokenImage",
+      "Sets or clears (null) a combatant's token image from the uploaded token library: the GM for any combatant, a player for their own claimed character (D18).",
+      "TokenImageRequest",
+      [uuidParam("actorId")]
+    ),
+    ...gameCommandOperation(
+      "actor.set-size",
+      "setActorSize",
+      "Sets a combatant's creature size; large+ tokens size to their grid footprint and re-snap (GM-grade only).",
+      "ActorSizeRequest",
+      [uuidParam("actorId")]
+    ),
+    ...gameCommandOperation(
+      "actor.set-visibility",
+      "setActorVisibility",
+      "Moves a combatant between the shared layer (public) and the GM-only layer (GM-grade only).",
+      "ActorVisibilityRequest",
+      [uuidParam("actorId")]
+    ),
+    ...gameCommandOperation(
+      "actor.set-archived",
+      "setActorArchived",
+      "Archives or restores a character (GM-grade only). Archived characters are hidden from players, refused by claim, and rejected server-side by scene staging and encounter start/add; a character in the running encounter must be removed first. Archiving a CLAIMED character releases the claim in the same mutation, so its player is not left holding an invisible claim.",
+      "ActorArchivedRequest",
+      [uuidParam("actorId")]
+    ),
+    ...gameCommandOperation(
+      "actor.set-sheet-preview",
+      "setActorSheetPreview",
+      "Shares (or un-shares) an ARCHIVED character's sheet with players as a read-only keepsake (GM-grade only). Default hidden - a retired character stays private until the GM shares it. Meaningless while the character is not archived. Players receive only the character's id and name in their projection.",
+      "ActorSheetPreviewRequest",
+      [uuidParam("actorId")]
+    ),
+    ...gameCommandOperation(
+      "actor.set-health-display",
+      "setActorHealthDisplay",
+      "Overrides how one combatant's token health shows on the map (GM-grade only), or clears the override (`display: null`) so the token follows the table-wide default. Same style/audience choices as the table-wide health-display command.",
+      "ActorHealthDisplayRequest",
+      [uuidParam("actorId")]
+    ),
+    ...gameCommandOperation(
+      "actor.set-speed",
+      "setActorSpeed",
+      "Sets a combatant's walking speed in feet (GM-grade only); null clears it to unknown, which skips the movement rules for that combatant. Speed seeds from the imported definition automatically.",
+      "ActorSpeedRequest",
+      [uuidParam("actorId")]
+    ),
+    ...gameCommandOperation(
+      "scene.create",
+      "createScene",
+      "Prepares a staged scene on a battlemap, privately, without touching the live table (GM-grade only). The response's `sceneId` equals the commandId.",
+      "SceneCreateRequest"
+    ),
+    ...gameCommandOperation(
+      "scene.remove",
+      "removeScene",
+      "Removes a prepared scene (GM-grade only); the active scene cannot be removed.",
+      "CommandControlRequest",
+      [uuidParam("sceneId")],
+      false
+    ),
+    ...gameCommandOperation(
+      "scene.rename",
+      "renameScene",
+      "Renames a prepared scene (GM-grade only).",
+      "SceneRenameRequest",
+      [uuidParam("sceneId")]
+    ),
+    ...gameCommandOperation(
+      "scene.activate",
+      "activateScene",
+      "Switches the live table to a prepared scene, parking the current one non-destructively (GM-grade only). Rejected while the timeline is rewound; the turn-snapshot timeline restarts for the newly live scene.",
+      "CommandControlRequest",
+      [uuidParam("sceneId")],
+      false
+    ),
+    ...gameCommandOperation(
+      "scene.set-combatants",
+      "setSceneCombatants",
+      "Replaces a prepared scene's combatant list (GM-grade only).",
+      "SceneCombatantsRequest",
+      [uuidParam("sceneId")]
+    ),
+    ...gameCommandOperation(
+      "scene.duplicate",
+      "duplicateScene",
+      "Duplicates a prepared scene as a new staged copy carrying the same map and staged combatants/tokens (GM-grade only). Duplicating the live scene snapshots its current combat into the copy; the copy is always parked, next to the original. The response's `sceneId` equals the commandId.",
+      "CommandControlRequest",
+      [uuidParam("sceneId")],
+      false
+    ),
+    ...gameCommandOperation(
+      "scene.reorder",
+      "reorderScenes",
+      "Reorders the prepared-scene list to the given permutation of every scene id (GM-grade only). Does not change which scene is live.",
+      "SceneReorderRequest"
+    ),
+    ...gameCommandOperation(
+      "fog.set-enabled",
+      "setFogEnabled",
+      "Turns manual fog of war on/off (GM-grade only). Enabled fog with no reveal strokes hides the whole map from players and the shared screen; `sceneId` targets a prepared scene's private prep instead of the live table.",
+      "FogEnabledRequest"
+    ),
+    ...gameCommandOperation(
+      "fog.paint",
+      "paintFog",
+      "Paints one reveal/hide fog rect (GM-grade only). The server snaps to whole grid cells on calibrated unrotated maps and clamps to the map bounds; a stroke covering the whole map replaces all prior strokes. `sceneId` targets a prepared scene.",
+      "FogPaintRequest"
+    ),
+    ...gameCommandOperation(
+      "fog.reset",
+      "resetFog",
+      "Clears every fog stroke - with fog enabled the whole map is hidden again (GM-grade only). `sceneId` targets a prepared scene.",
+      "FogResetRequest"
+    ),
     [SESSION_PATHS.player]: {
       post: {
         operationId: "issuePlayerSession",
@@ -2960,47 +2808,39 @@ export const openApiDocument = {
         }
       }
     },
-    [GAME_PATHS.actionUse]: {
-      post: gameCommandOperation(
-        "useAction",
-        "combat:write",
-        'Uses an action and lets the SERVER decide what that means (D10 - the routing used to be a client-side boolean, so the same tap meant different things on different clients). In the fight on this creature\'s turn it delegates to the full structured resolution and acks `route: "resolved"`. Off turn it is refused with the overridable, askable rules block `economy.not-your-turn` (reactions and legendary actions are exempt - taking those off turn is the point); under an `economy` exception of advise/off it resolves, with a GM-only warning line under advise. With no fight running - or with this creature not in the turn order - the server rolls the action\'s own attack die (and, only with `includeDamage`, its damage parts) as attributed rolls, touches no combat state, and acks `route: "loose"` with the roll ids. No hit points ever move on the loose route. GM-grade for any combatant, including a monster\'s sheet; a player session only for their own claimed character.',
-        "ActionUseRequest",
-        undefined,
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.saveRoll]: {
-      post: gameCommandOperation(
-        "rollSave",
-        "combat:write",
-        'Rolls a saving throw for one character (D10). When a pending save is open for that character and ability, this ANSWERS it through the same path the encounter tracker uses - the damage and condition apply and the prompt closes - and acks `route: "answered"` with the `saveId`; the sheet\'s save chip used to roll a loose die that ignored the open prompt entirely. With nothing open it rolls a loose, attributed save at the same modifier the resolver would use, and acks `route: "loose"`. Supply `total` for an off-screen die. GM-grade for anyone; a player session only for their own claimed character.',
-        "SaveRollRequest",
-        undefined,
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.rulesAsk]: {
-      post: gameCommandOperation(
-        "askTheGm",
-        "combat:write",
-        "Asks the GM to allow a command the rules engine just blocked (D8 - a blocked player is never a silent dead end). Send the ORIGINAL request as `payload`; the server revalidates it with that command's own schema and re-runs it under YOUR authority with no override, so an action that would now succeed simply succeeds (`ran: true`) and nothing is parked. A still-blocked command is parked as one question per character (a second replaces the first, up to ten at the table) and the response carries `askId` plus the `blocked` details. Player sessions may ask only about their own claimed character.",
-        "RulesAskRequest",
-        undefined,
-        true,
-        true
-      )
-    },
-    [GAME_PATHS.rulesAnswer]: {
-      post: gameCommandOperation(
-        "answerRulesAsk",
-        "combat:write",
-        "Answers a parked question in one tap (GM-grade only, D9). `allow: true` re-runs the parked command under GM authority with an injected override - the `reason` is optional and the audit line falls back to \"GM override\" - and the rules engine remembers the rule's FAMILY for the rest of that character's turn, so the same kind of block stops re-prompting. The replay runs against CURRENT state and passes full validation, so a stale question (the target moved, the target died) fails loudly and stays parked for another look. `allow: false` clears it and tells the player. A question that no longer exists is a 409.",
-        "RulesAnswerRequest"
-      )
-    },
+    ...gameCommandOperation(
+      "action.use",
+      "useAction",
+      'Uses an action and lets the SERVER decide what that means (D10 - the routing used to be a client-side boolean, so the same tap meant different things on different clients). In the fight on this creature\'s turn it delegates to the full structured resolution and acks `route: "resolved"`. Off turn it is refused with the overridable, askable rules block `economy.not-your-turn` (reactions and legendary actions are exempt - taking those off turn is the point); under an `economy` exception of advise/off it resolves, with a GM-only warning line under advise. With no fight running - or with this creature not in the turn order - the server rolls the action\'s own attack die (and, only with `includeDamage`, its damage parts) as attributed rolls, touches no combat state, and acks `route: "loose"` with the roll ids. No hit points ever move on the loose route. GM-grade for any combatant, including a monster\'s sheet; a player session only for their own claimed character.',
+      "ActionUseRequest",
+      undefined,
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "save.roll",
+      "rollSave",
+      'Rolls a saving throw for one character (D10). When a pending save is open for that character and ability, this ANSWERS it through the same path the encounter tracker uses - the damage and condition apply and the prompt closes - and acks `route: "answered"` with the `saveId`; the sheet\'s save chip used to roll a loose die that ignored the open prompt entirely. With nothing open it rolls a loose, attributed save at the same modifier the resolver would use, and acks `route: "loose"`. Supply `total` for an off-screen die. GM-grade for anyone; a player session only for their own claimed character.',
+      "SaveRollRequest",
+      undefined,
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "rules.ask",
+      "askTheGm",
+      "Asks the GM to allow a command the rules engine just blocked (D8 - a blocked player is never a silent dead end). Send the ORIGINAL request as `payload`; the server revalidates it with that command's own schema and re-runs it under YOUR authority with no override, so an action that would now succeed simply succeeds (`ran: true`) and nothing is parked. A still-blocked command is parked as one question per character (a second replaces the first, up to ten at the table) and the response carries `askId` plus the `blocked` details. Player sessions may ask only about their own claimed character.",
+      "RulesAskRequest",
+      undefined,
+      true,
+      true
+    ),
+    ...gameCommandOperation(
+      "rules.answer",
+      "answerRulesAsk",
+      "Answers a parked question in one tap (GM-grade only, D9). `allow: true` re-runs the parked command under GM authority with an injected override - the `reason` is optional and the audit line falls back to \"GM override\" - and the rules engine remembers the rule's FAMILY for the rest of that character's turn, so the same kind of block stops re-prompting. The replay runs against CURRENT state and passes full validation, so a stale question (the target moved, the target died) fails loudly and stays parked for another look. `allow: false` clears it and tells the player. A question that no longer exists is a 409.",
+      "RulesAnswerRequest"
+    ),
     [CONTENT_PATHS.monsters]: {
       get: {
         operationId: "listContentMonsters",
@@ -3234,30 +3074,28 @@ export const openApiDocument = {
         }
       }
     },
-    [ENCOUNTER_ARCHIVE_PATHS.launch]: {
-      post: {
-        operationId: "launchEncounterArchive",
-        security: gameSecurity("combat:write"),
-        description:
-          "Launch-from-here (D25): parks the live table exactly as a scene switch does and makes one recorded moment of this archive live on it. The moment's combatants are CLONED under new ids (tonight's characters are never rewritten) and the parked scene resumes any time through scene.activate. GM-grade only.",
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer", minimum: 1 } }],
-        requestBody: {
-          required: true,
-          content: { "application/json": { schema: { $ref: "#/components/schemas/EncounterArchiveLaunchRequest" } } }
+    ...gameCommandPath("replay.launch", (scope) => ({
+      operationId: "launchEncounterArchive",
+      security: gameSecurity(scope),
+      description:
+        "Launch-from-here (D25): parks the live table exactly as a scene switch does and makes one recorded moment of this archive live on it. The moment's combatants are CLONED under new ids (tonight's characters are never rewritten) and the parked scene resumes any time through scene.activate. GM-grade only.",
+      parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer", minimum: 1 } }],
+      requestBody: {
+        required: true,
+        content: { "application/json": { schema: { $ref: "#/components/schemas/EncounterArchiveLaunchRequest" } } }
+      },
+      responses: {
+        "200": {
+          description: "The launched scene and the cloned combatants",
+          content: { "application/json": { schema: { $ref: "#/components/schemas/EncounterArchiveLaunchResponse" } } }
         },
-        responses: {
-          "200": {
-            description: "The launched scene and the cloned combatants",
-            content: { "application/json": { schema: { $ref: "#/components/schemas/EncounterArchiveLaunchResponse" } } }
-          },
-          "400": apiError,
-          "401": apiError,
-          "403": apiError,
-          "404": apiError,
-          "409": apiError
-        }
+        "400": apiError,
+        "401": apiError,
+        "403": apiError,
+        "404": apiError,
+        "409": apiError
       }
-    },
+    })),
     // ===== Codex: worldbuilding wiki / atlas / journal / calendar (codex-http.ts). Reads project per role; writes
     // are GM-grade. Scoped credentials act at GM grade except on `POST /codex/preview-session`. Every codex GET
     // answers a conditional request with 304. =====

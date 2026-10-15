@@ -3,8 +3,9 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { GAME_COMMAND_SCOPES, openApiDocument } from "@vtt/api-contract";
+import { GAME_COMMANDS, openApiDocument } from "@vtt/api-contract";
 import { GameStateSchema } from "@vtt/domain";
+import { gameCommands } from "../src/commands/index.js";
 
 const HERO = "40000000-0000-4000-8000-000000000001";
 const MAP = "50000000-0000-5000-8000-000000000001";
@@ -53,15 +54,11 @@ describe("the retired table-wide roll mode", () => {
     expect(parsed.revision).toBe(12);
   });
 
-  it("is gone from the command catalog, the handler, and the registry", () => {
-    expect(Object.keys(GAME_COMMAND_SCOPES)).not.toContain("encounter.set-roll-mode");
-    // The registry row and its handler live in one file; the catalog above cannot see a leftover
-    // handler that is no longer in `GAME_COMMAND_SCOPES`.
-    const operations = source("../src/game-operations.ts");
-    expect(operations).not.toContain("encounterSetRollMode");
-    expect(operations).not.toContain("SetRollModeSchema");
+  it("is gone from the command catalog, the command table, and the schemas", () => {
+    expect(Object.keys(GAME_COMMANDS)).not.toContain("encounter.set-roll-mode");
+    // The socket handlers and typed routes are registered from the table, so it is the one place left.
+    expect(gameCommands.map((command) => command.type)).not.toContain("encounter.set-roll-mode");
     expect(source("../src/game-commands.ts")).not.toContain("SetRollModeSchema");
-    expect(source("../src/server.ts")).not.toContain("encounter:set-roll-mode");
   });
 
   it("is gone from the OpenAPI document", () => {

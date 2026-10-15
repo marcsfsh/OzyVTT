@@ -430,4 +430,30 @@ describe("codex:changed on the wire (D22, socket half)", () => {
       await server.close();
     }
   });
+
+  it("keeps serving after a malformed handshake token, a bare join and an emit without an acknowledgement", async () => {
+    const server = await startTestServer();
+    try {
+      await bootstrapGm(server.url);
+      // Each of these once threw out of a socket handler, which takes the whole process down.
+      const odd = ioClient(server.url, {
+        auth: { token: 5 },
+        transports: ["websocket"],
+        forceNew: true,
+        reconnection: false
+      });
+      openSockets.push(odd);
+      await new Promise<void>((resolve) => odd.once("connect", () => resolve()));
+      const refused = await new Promise<{ ok: boolean; message?: string }>((resolve) =>
+        odd.emit("content:skills", {}, resolve)
+      );
+      expect(refused).toEqual({ ok: false, message: "Join a session first." });
+      odd.emit("session:join");
+      odd.emit("content:skills", {});
+      const { join } = await connectAndJoin(server.url, await loginGm(server.url));
+      expect(join).toMatchObject({ ok: true, role: "gm" });
+    } finally {
+      await server.close();
+    }
+  });
 });

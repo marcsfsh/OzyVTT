@@ -21,15 +21,16 @@ import {
   type HomebrewCatalogSlice,
   type HomebrewContentSource
 } from "../src/content-library.js";
+import { GameAccessDeniedError } from "../src/authorization.js";
 import {
-  createGameOperations,
-  GameAccessDeniedError,
-  type GameOperations,
-  type GameOperationsContext,
+  createGameCommands,
+  type CommandContext,
+  type GameCommands,
   type GamePrincipal
-} from "../src/game-operations.js";
+} from "../src/commands/index.js";
 import { GameStore } from "../src/game-store.js";
 import { HomebrewStore } from "../src/homebrew-store.js";
+import { createStateReader } from "../src/state-reader.js";
 
 // Every content read must respect the caller's audience once homebrew merges in. Against a fake
 // `HomebrewContentSource`: drafts reach no catalog, published-but-hidden records reach only the GM, and
@@ -201,7 +202,7 @@ function fakeHomebrew(revision = 1): HomebrewContentSource {
   };
 }
 
-// ---------- The operations under test ----------
+// ---------- The reads under test ----------
 
 const GM: GamePrincipal = { kind: "gm", sessionId: "11111111-1111-4111-8111-111111111111" };
 const PLAYER: GamePrincipal = { kind: "player", sessionId: "22222222-2222-4222-8222-222222222222" };
@@ -212,13 +213,15 @@ const INTEGRATION: GamePrincipal = {
 };
 
 /** Content reads touch neither persistence nor projections, so everything else in the context is an unused stub. */
-function operationsWith(contentLibrary: ContentLibrary): GameOperations {
+function readsWith(contentLibrary: ContentLibrary): GameCommands {
   const unused = () => {
     throw new Error("a content read must not touch this");
   };
-  return createGameOperations({
-    // Never initialized, so nothing is written: `snapshot` still serves the parsed default state.
-    store: new GameStore(join(tmpdir(), "vtt-homebrew-visibility-unused.sqlite")),
+  // Never initialized, so nothing is written: `snapshot` still serves the parsed default state.
+  const store = new GameStore(join(tmpdir(), "vtt-homebrew-visibility-unused.sqlite"));
+  return createGameCommands({
+    store,
+    readState: createStateReader(store).read,
     combatLog: new CombatLogStore(join(tmpdir(), "vtt-homebrew-visibility-unused-log.sqlite")),
     contentLibrary,
     mapCatalog: { get: () => undefined },
@@ -235,31 +238,33 @@ function operationsWith(contentLibrary: ContentLibrary): GameOperations {
     playerView: unused,
     random: () => 1,
     newId: () => "44444444-4444-4444-8444-444444444444"
-  } as unknown as GameOperationsContext);
+  } as unknown as CommandContext);
 }
 
-// The classification every `content*` operation must appear in. These two lists are checked against
-// the operations object itself, so a new content read cannot be added without a decision here.
-const PLAYER_READABLE_CONTENT_OPS = [
-  "contentConditions",
-  "contentSkills",
-  "contentLanguages",
-  "contentSpells",
-  "contentEquipment",
-  "contentClasses",
-  "contentSubclasses",
-  "contentSpecies",
-  "contentBackgrounds",
-  "contentFeats",
-  "contentNames"
+// The classification every `content:*` read must appear in. These two lists are checked against the read
+// table itself, so a new content read cannot be added without a decision here.
+const PLAYER_READABLE_CONTENT_READS = [
+  "content:conditions",
+  "content:skills",
+  "content:languages",
+  "content:spells",
+  "content:equipment",
+  "content:classes",
+  "content:subclasses",
+  "content:species",
+  "content:backgrounds",
+  "content:feats",
+  "content:names"
 ] as const;
 /** The bestiary and stat blocks: GM-grade only, and that gate is asserted below rather than assumed. */
-const GM_ONLY_CONTENT_OPS = ["contentMonsters", "contentMonsterActions", "contentMonsterSheet"] as const;
+const GM_ONLY_CONTENT_READS = ["content:monsters", "content:monster-actions", "content:monster-sheet"] as const;
 
-const readAs = (operations: GameOperations, name: string, principal: GamePrincipal) =>
-  (operations[name as keyof GameOperations] as (principal: GamePrincipal, raw?: unknown) => unknown)(principal, {
-    definitionId: "hb-m-playersafe"
-  });
+const readAs = (game: GameCommands, event: string, principal: GamePrincipal) =>
+  game.read(
+    game.reads.find((read) => read.event === event)!,
+    principal,
+    { definitionId: "hb-m-playersafe" }
+  );
 
 // Markers are matched over the serialized payload, so it works for any catalog shape. Reduced to a
 // boolean so a failure does not print a 300-spell catalog.
@@ -267,29 +272,31 @@ const carries = (payload: unknown, marker: string) => JSON.stringify(payload).to
 
 describe("homebrew never reaches an audience it was not published to", () => {
   it("classifies every content operation, and the GM-only ones really are gated", () => {
-    const operations = operationsWith(new ContentLibrary(fakeHomebrew()));
-    const declared = new Set<string>([...PLAYER_READABLE_CONTENT_OPS, ...GM_ONLY_CONTENT_OPS]);
-    const actual = Object.keys(operations).filter((name) => name.startsWith("content"));
+    const game = readsWith(new ContentLibrary(fakeHomebrew()));
+    const declared = new Set<string>([...PLAYER_READABLE_CONTENT_READS, ...GM_ONLY_CONTENT_READS]);
+    const actual = game.reads.map((read) => read.event).filter((event) => event.startsWith("content:"));
     // Set equality both ways: an uncovered new content read fails here, and a stale entry fails too.
     expect(new Set(actual)).toEqual(declared);
 
-    for (const name of GM_ONLY_CONTENT_OPS) {
-      expect(() => readAs(operations, name, PLAYER), name).toThrow(GameAccessDeniedError);
+    for (const name of GM_ONLY_CONTENT_READS) {
+      expect(() => readAs(game, name, PLAYER), name).toThrow(GameAccessDeniedError);
     }
-    for (const name of PLAYER_READABLE_CONTENT_OPS) {
-      expect(() => readAs(operations, name, PLAYER), name).not.toThrow();
+    for (const name of PLAYER_READABLE_CONTENT_READS) {
+      expect(() => readAs(game, name, PLAYER), name).not.toThrow();
     }
   });
 
   it("keeps a DRAFT out of both audiences' catalogs", () => {
-    const operations = operationsWith(new ContentLibrary(fakeHomebrew()));
+    const game = readsWith(new ContentLibrary(fakeHomebrew()));
     for (const principal of [GM, INTEGRATION, PLAYER]) {
       const reachable =
-        principal === PLAYER ? PLAYER_READABLE_CONTENT_OPS : [...PLAYER_READABLE_CONTENT_OPS, ...GM_ONLY_CONTENT_OPS];
+        principal === PLAYER
+          ? PLAYER_READABLE_CONTENT_READS
+          : [...PLAYER_READABLE_CONTENT_READS, ...GM_ONLY_CONTENT_READS];
       for (const name of reachable) {
-        if (name === "contentMonsterSheet") continue; // resolves a live instance regardless of status; covered separately below
+        if (name === "content:monster-sheet") continue; // resolves a live instance regardless of status; covered separately below
         expect(
-          carries(readAs(operations, name, principal), "draftonly"),
+          carries(readAs(game, name, principal), "draftonly"),
           `${name} served a DRAFT to a ${principal.kind}`
         ).toBe(false);
       }
@@ -297,33 +304,33 @@ describe("homebrew never reaches an audience it was not published to", () => {
   });
 
   it("keeps a PUBLISHED but player-invisible record out of every player-readable catalog", () => {
-    const operations = operationsWith(new ContentLibrary(fakeHomebrew()));
-    for (const name of PLAYER_READABLE_CONTENT_OPS) {
+    const game = readsWith(new ContentLibrary(fakeHomebrew()));
+    for (const name of PLAYER_READABLE_CONTENT_READS) {
       expect(
-        carries(readAs(operations, name, PLAYER), "gmonly"),
+        carries(readAs(game, name, PLAYER), "gmonly"),
         `${name} served a GM-only homebrew record to a player`
       ).toBe(false);
     }
     // ...while the GM and the GM's integration credential see it.
     for (const principal of [GM, INTEGRATION]) {
-      expect(carries(operations.contentClasses(principal), "gmonly"), principal.kind).toBe(true);
-      expect(carries(operations.contentMonsters(principal), "gmonly"), principal.kind).toBe(true);
+      expect(carries(readAs(game, "content:classes", principal), "gmonly"), principal.kind).toBe(true);
+      expect(carries(readAs(game, "content:monsters", principal), "gmonly"), principal.kind).toBe(true);
     }
   });
 
   it("serves the player-visible homebrew record to players, so the merge is really happening", () => {
-    const operations = operationsWith(new ContentLibrary(fakeHomebrew()));
+    const game = readsWith(new ContentLibrary(fakeHomebrew()));
     // Each builder catalog plus spells and equipment carries its own homebrew record, so the merge is
     // shown to happen and the not-contain checks are not vacuous.
-    expect(carries(operations.contentClasses(PLAYER), "playersafe class")).toBe(true);
-    expect(carries(operations.contentSubclasses(PLAYER), "playersafe subclass")).toBe(true);
-    expect(carries(operations.contentSpecies(PLAYER), "playersafe species")).toBe(true);
-    expect(carries(operations.contentBackgrounds(PLAYER), "playersafe background")).toBe(true);
-    expect(carries(operations.contentFeats(PLAYER), "playersafe feat")).toBe(true);
-    expect(carries(operations.contentSpells(PLAYER), "playersafe spell")).toBe(true);
-    expect(carries(operations.contentEquipment(PLAYER), "playersafe item")).toBe(true);
+    expect(carries(readAs(game, "content:classes", PLAYER), "playersafe class")).toBe(true);
+    expect(carries(readAs(game, "content:subclasses", PLAYER), "playersafe subclass")).toBe(true);
+    expect(carries(readAs(game, "content:species", PLAYER), "playersafe species")).toBe(true);
+    expect(carries(readAs(game, "content:backgrounds", PLAYER), "playersafe background")).toBe(true);
+    expect(carries(readAs(game, "content:feats", PLAYER), "playersafe feat")).toBe(true);
+    expect(carries(readAs(game, "content:spells", PLAYER), "playersafe spell")).toBe(true);
+    expect(carries(readAs(game, "content:equipment", PLAYER), "playersafe item")).toBe(true);
     // Monsters are GM-only to browse regardless of publication state.
-    expect(carries(operations.contentMonsters(GM), "playersafe monster")).toBe(true);
+    expect(carries(readAs(game, "content:monsters", GM), "playersafe monster")).toBe(true);
   });
 
   it("lands a homebrew class in the summaries, the record map AND the progression table", () => {
@@ -394,7 +401,7 @@ describe("homebrew never reaches an audience it was not published to", () => {
 
 // The fake above pins the contract; these pin `HomebrewStore` as an implementation of it. A store
 // that filtered nothing would pass the fake-driven suite.
-describe("HomebrewStore.publishedFor, end to end through the content operations", () => {
+describe("HomebrewStore.publishedFor, end to end through the content reads", () => {
   const directories: string[] = [];
   const stores: HomebrewStore[] = [];
   afterEach(async () => {
@@ -434,23 +441,24 @@ describe("HomebrewStore.publishedFor, end to end through the content operations"
 
   it("keeps a draft out of both catalogs, a published-invisible record out of the player's, and serves the visible one", async () => {
     const { store } = await seededStore();
-    const operations = operationsWith(new ContentLibrary(store));
+    const game = readsWith(new ContentLibrary(store));
 
     // The draft is in no merged catalog for any principal.
     for (const principal of [GM, INTEGRATION, PLAYER]) {
-      expect(carries(operations.contentClasses(principal), "draftonly class"), `${principal.kind} saw a draft`).toBe(
-        false
-      );
+      expect(
+        carries(readAs(game, "content:classes", principal), "draftonly class"),
+        `${principal.kind} saw a draft`
+      ).toBe(false);
     }
-    expect(carries(operations.contentMonsters(GM), "draftonly monster")).toBe(false);
+    expect(carries(readAs(game, "content:monsters", GM), "draftonly monster")).toBe(false);
 
     // Published without player visibility is the GM's alone.
-    expect(carries(operations.contentClasses(PLAYER), "gmonly class")).toBe(false);
-    expect(carries(operations.contentClasses(GM), "gmonly class")).toBe(true);
-    expect(carries(operations.contentClasses(INTEGRATION), "gmonly class")).toBe(true);
+    expect(carries(readAs(game, "content:classes", PLAYER), "gmonly class")).toBe(false);
+    expect(carries(readAs(game, "content:classes", GM), "gmonly class")).toBe(true);
+    expect(carries(readAs(game, "content:classes", INTEGRATION), "gmonly class")).toBe(true);
 
-    expect(carries(operations.contentClasses(PLAYER), "playersafe class")).toBe(true);
-    expect(carries(operations.contentMonsters(GM), "playersafe monster")).toBe(true);
+    expect(carries(readAs(game, "content:classes", PLAYER), "playersafe class")).toBe(true);
+    expect(carries(readAs(game, "content:monsters", GM), "playersafe monster")).toBe(true);
   });
 
   it("drops a record from both catalogs on soft delete while its live tokens keep resolving", async () => {

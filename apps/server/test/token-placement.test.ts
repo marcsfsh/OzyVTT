@@ -1,12 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema } from "@vtt/domain";
 import { gridToImage } from "../src/grid-calibration.js";
-import {
-  createEncounterTokens,
-  encounterTokenAppearance,
-  ensureEncounterTokens,
-  moveEncounterToken
-} from "../src/token-placement.js";
+import { createEncounterTokens, encounterTokenAppearance, moveEncounterToken } from "../src/token-placement.js";
 
 const ACTOR = "60000000-0000-4000-8000-000000000001";
 const SECOND = "60000000-0000-4000-8000-000000000002";
@@ -98,12 +93,8 @@ describe("authoritative encounter token placement", () => {
     expect(state.combat.tokens[0].position).toEqual({ x: 579.5, y: 20.5 });
   });
 
-  it("upgrades old active encounters with missing tokens and rejects invalid sequences", () => {
+  it("rejects a move once the encounter has ended", () => {
     const state = activeState();
-    state.combat = { ...state.combat, tokens: state.combat.tokens.slice(0, 1) };
-    expect(ensureEncounterTokens(state, geometry)).toBe(true);
-    expect(state.combat.tokens.map((token) => token.actorId)).toEqual([ACTOR, SECOND]);
-    expect(ensureEncounterTokens(state, geometry)).toBe(false);
     state.combat = { ...state.combat, active: false, turnActorId: null };
     expect(() => moveEncounterToken(state, ACTOR, { x: 50, y: 50 }, geometry)).toThrow("Start an encounter");
   });

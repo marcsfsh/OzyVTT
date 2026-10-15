@@ -6,7 +6,8 @@ import { CommandRejectedError } from "./game-store.js";
 import { effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { endEffect, removeConditionDirect, type EffectNarration } from "./effects.js";
-import { healActor, type ActorScope } from "./hit-points.js";
+import { requireActorAccess, type Initiator } from "./authorization.js";
+import { healActor } from "./hit-points.js";
 
 /** Takes `count` dice off a multiclass pool, biggest die first (the order the roll uses). The caller has
  *  already checked the pool holds enough. */
@@ -28,9 +29,10 @@ export function spendHitDice(
   state: GameState,
   actorId: string,
   faces: readonly number[],
-  scope: ActorScope,
+  scope: Initiator,
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined
 ): { healed: number; events: EffectNarration[]; conModifier: number } {
+  requireActorAccess(scope, state, actorId, "resource");
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))

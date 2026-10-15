@@ -569,37 +569,6 @@
   min-height: 8rem;
 }
 /* Read mode is not pinned to the frame: a reader takes its content height and scrolls in `.codex-main`. */
-.codex-outline-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-/* 44px min-height, not an ::after hit area, in a stacked list. */
-.codex-outline-item {
-  display: flex;
-  align-items: center;
-  min-height: var(--tap-min);
-  width: 100%;
-  text-align: left;
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  background: transparent;
-  color: var(--text-dim);
-  padding: 3px var(--space-2);
-  border-radius: 0;
-  cursor: pointer;
-  font-size: var(--fs-sm);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.codex-outline-item:hover {
-  color: var(--text);
-  border-bottom-color: var(--line-hover);
-}
 .codex-tree-folder-row {
   display: flex;
   align-items: center;
@@ -656,11 +625,6 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  flex-wrap: wrap;
-}
-.codex-toolbar {
-  display: flex;
-  gap: var(--space-1);
   flex-wrap: wrap;
 }
 .codex-tool-glyph {
@@ -950,46 +914,6 @@
 }
 .codex-tree-icon {
   flex-shrink: 0;
-}
-.codex-rels {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.codex-rels-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-.codex-rels-item {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-1);
-  font-size: var(--fs-sm);
-}
-.codex-rels-label {
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-.codex-rels-target {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.codex-rels-add {
-  display: flex;
-  gap: var(--space-1);
-  align-items: center;
-  flex-wrap: wrap;
-}
-.codex-rels-add > :nth-child(1),
-.codex-rels-add > :nth-child(2) {
-  flex: 1 1 40%;
-  min-width: 0;
 }
 .codex-reader-fields {
   display: grid;
@@ -1674,50 +1598,11 @@
 .codex-graph-edge.is-dim {
   opacity: 0.15;
 }
-/* `.is-link` edges differ by dash and weight, not colour. Placed after `.is-lit` so equal specificity wins. */
-.codex-graph-edge.is-link line {
-  stroke-width: 0.9;
-  stroke-dasharray: 6 5;
-  opacity: 0.42;
-}
-.codex-graph-edge.is-link.is-lit line {
-  stroke: var(--cyan);
-  stroke-width: 1.4;
-  opacity: 0.95;
-}
 .codex-graph-edgelabel {
   fill: var(--text-dim);
   font-size: 9px;
   font-family: var(--font-mono);
   pointer-events: none;
-}
-.codex-graph-edgekey {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-.codex-graph-edgekey-item {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  font-size: var(--fs-2xs);
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-.codex-graph-edgekey-swatch {
-  width: 26px;
-  height: 4px;
-  flex: 0 0 auto;
-  overflow: visible;
-}
-.codex-graph-edgekey-line {
-  stroke: var(--line-strong);
-  stroke-width: 1.4;
-}
-.codex-graph-edgekey-line.is-link {
-  stroke-width: 1;
-  stroke-dasharray: 6 5;
 }
 .codex-graph-node {
   cursor: pointer;
@@ -2391,18 +2276,6 @@
 }
 
 /* Asset picker */
-.codex-asset-picker {
-  border: 1px solid transparent;
-  padding: var(--space-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-.codex-asset-picker-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
 .codex-asset-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -3728,7 +3601,6 @@
 .codex-downtime-section,
 .codex-pindetails,
 .codex-campaign-typecard,
-.codex-asset-picker,
 .codex-asset-card,
 .codex-quest-link-open,
 .codex-marker-link-open,
@@ -3756,7 +3628,6 @@
 .codex-downtime-section::before,
 .codex-pindetails::before,
 .codex-campaign-typecard::before,
-.codex-asset-picker::before,
 .codex-asset-card::before,
 .codex-quest-link-open::before,
 .codex-marker-link-open::before,
@@ -3800,7 +3671,6 @@
 }
 /* Nested: rim and bezel over a flat plate, no texture. */
 .codex-campaign-typecard,
-.codex-asset-picker,
 .codex-asset-card,
 .codex-quest-link-open,
 .codex-marker-link-open,

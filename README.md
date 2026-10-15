@@ -42,7 +42,8 @@ This builds the client and serves everything on port 3001. Players join at
 to the internet; use a VPN for remote players.
 
 `data/` holds the GM password hash and all campaign data. It is git-ignored, so back it up
-separately.
+separately. A `data/` directory from a build before the October 2026 cleanup is refused at startup;
+move it aside to start fresh.
 
 ## Commands
 

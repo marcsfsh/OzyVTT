@@ -281,7 +281,7 @@ describe("the save prompt's damage field", () => {
     expect(saveDamageAmend(17, "9999")).toBe(9999);
 
     // Assert the message, not the path: `save.answer` surfaces `issues[0].message` verbatim
-    // (`preferIssueMessage`, game-operations.ts).
+    // (`issueMessage`, apps/server/src/commands/saves.ts).
     for (const typed of ["9999", "1001"]) {
       const refusal = SaveAnswerSchema.safeParse(
         saveAnswerPayload({

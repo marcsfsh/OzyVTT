@@ -1,5 +1,6 @@
 /** Bearer-authorized fetch helpers for `/api/v1/codex/*`. The server projects every response by role (`codex-projections.ts`). */
 
+import type { CodexCalendar, CodexInWorldDate } from "@vtt/domain";
 import { type EntityType } from "./entities";
 
 export type CodexPageSummary = Readonly<{
@@ -299,10 +300,8 @@ export type CodexImportCounts = Readonly<{
   revisions: number;
 }>;
 
-/** A page title reduced to a stable [[wiki-link]] key (must match the server's `pageLinkKey`). */
-export function pageLinkKey(title: string): string {
-  return title.trim().toLowerCase().replace(/\s+/g, " ");
-}
+/** Shared with the server, so a link the editor marks as known resolves to the same page there. */
+export { pageLinkKey } from "@vtt/domain";
 
 /** Sends raw bytes with the file's content-type (not JSON, so express.raw handles it). */
 export async function uploadCodexAsset(
@@ -588,7 +587,6 @@ export type CodexJournalEntry = Readonly<{
   createdAt: string;
   updatedAt: string;
 }>;
-export type CodexInWorldDate = Readonly<{ year: number; month: number; day: number }>;
 export type CodexJournalInput = Readonly<{
   playerText?: string;
   gmText?: string | null;
@@ -615,69 +613,23 @@ export type CodexDowntimeInput = Readonly<{
 export type CodexMilestoneInput = Readonly<{ level: number; reason: string }>;
 
 // ----- Calendar (the world's own months / weekdays / eras) -----
-export type CodexCalendarMonth = Readonly<{ name: string; days: number }>;
-/** Runs from `startYear` until the next era. Derived from a date's year, never stored on it. */
-export type CodexCalendarEra = Readonly<{ name: string; startYear: number }>;
-export type CodexCalendar = Readonly<{
-  yearName: string;
-  eras?: readonly CodexCalendarEra[];
-  months: readonly CodexCalendarMonth[];
-  weekdays: readonly string[];
-  currentDate?: CodexInWorldDate | null;
-}>;
+// The types and arithmetic are shared with the server, which writes the stored instants and labels.
+export {
+  calendarDaysPerYear,
+  calendarYearOf,
+  clampToCalendar,
+  dateToInstant,
+  eraForYear,
+  formatWorldDate,
+  formatWorldYear,
+  instantToDate
+} from "@vtt/domain";
+export type { CodexCalendar, CodexCalendarEra, CodexCalendarMonth, CodexInWorldDate } from "@vtt/domain";
 /**
  * The calendar as the GM reads it. `currentDate` is the GM's clock; `publishedDate` is what players see as
  * their `currentDate`. Separate from `CodexCalendar` because that is the strict PUT body.
  */
 export type GmCodexCalendar = CodexCalendar & Readonly<{ publishedDate: CodexInWorldDate | null }>;
-export function calendarDaysPerYear(calendar: CodexCalendar): number {
-  return calendar.months.reduce((sum, month) => sum + month.days, 0);
-}
-/**
- * Inverse of `instantToDate`. Clamps the day into its month at both ends, matching the server's
- * `calendarInstantOf`. Prefer a server-computed `calendarInstant` wherever one exists.
- */
-export function dateToInstant(calendar: CodexCalendar, date: CodexInWorldDate): number {
-  const monthIdx = Math.max(0, Math.min(Math.trunc(date.month), calendar.months.length - 1));
-  let dayOfYear = 0;
-  for (let i = 0; i < monthIdx; i += 1) dayOfYear += calendar.months[i].days;
-  const daysInMonth = calendar.months[monthIdx]?.days ?? 1;
-  const day = Math.min(Math.max(1, Math.trunc(date.day)), Math.max(1, daysInMonth));
-  return Math.trunc(date.year) * (calendarDaysPerYear(calendar) || 1) + dayOfYear + (day - 1);
-}
-export function calendarYearOf(calendar: CodexCalendar, instant: number): number {
-  const perYear = calendarDaysPerYear(calendar) || 1;
-  return Math.floor(instant / perYear);
-}
-/** Mirrors the server's `eraForYear`; eras arrive sorted ascending. */
-export function eraForYear(calendar: CodexCalendar, year: number): CodexCalendarEra | null {
-  let found: CodexCalendarEra | null = null;
-  for (const era of calendar.eras ?? []) {
-    if (Math.trunc(year) >= era.startYear) found = era;
-    else break;
-  }
-  return found;
-}
-/** "Third Age 1492 DR": era leading, `yearName` trailing. Must match the server's `formatWorldYear`. */
-export function formatWorldYear(calendar: CodexCalendar, year: number): string {
-  const era = eraForYear(calendar, year);
-  return `${era ? `${era.name} ` : ""}${year}${calendar.yearName ? ` ${calendar.yearName}` : ""}`;
-}
-export function formatWorldDate(calendar: CodexCalendar, date: CodexInWorldDate): string {
-  const month = calendar.months[Math.max(0, Math.min(date.month, calendar.months.length - 1))];
-  return `${month?.name ?? ""} ${date.day}, ${formatWorldYear(calendar, date.year)}`;
-}
-export function instantToDate(calendar: CodexCalendar, instant: number): CodexInWorldDate {
-  const perYear = calendarDaysPerYear(calendar) || 1;
-  const year = Math.floor(instant / perYear);
-  let remainder = instant - year * perYear;
-  let month = 0;
-  while (month < calendar.months.length - 1 && remainder >= calendar.months[month].days) {
-    remainder -= calendar.months[month].days;
-    month += 1;
-  }
-  return { year, month, day: remainder + 1 };
-}
 export const calendarApi = {
   /** The GM's clock plus `publishedDate`. Players read the same route via `playerCodexApi.calendar`. */
   get: (token: string) => request<{ calendar: GmCodexCalendar }>(token, "/calendar").then((data) => data.calendar),

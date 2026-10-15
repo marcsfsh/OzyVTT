@@ -114,21 +114,6 @@ export class ViewerCoordinator {
     this.pingTimers.clear();
   }
 
-  async synchronizeInitiative(sourceRevision: number, initiative: ViewerInitiative) {
-    const current = this.presentation.snapshot;
-    if (JSON.stringify(current.initiative) === JSON.stringify(initiative)) return false;
-    const result = await this.presentation.execute(
-      {
-        id: `encounter-initiative:${sourceRevision}:${current.revision}`,
-        role: "gm",
-        payload: { type: "viewer.initiative.set", initiative }
-      },
-      this.now()
-    );
-    if (!result.duplicate) this.broadcast();
-    return !result.duplicate;
-  }
-
   async synchronizeEncounter(
     sourceRevision: number,
     projection: Readonly<{ initiative: ViewerInitiative; encounter: ViewerEncounterScene }>

@@ -340,7 +340,7 @@ describe("action.use over the API", () => {
       actionId: "swing",
       targetIds: [GOBLIN]
     });
-    expect(stolen.status).toBe(409);
+    expect(stolen.status).toBe(403);
   });
 });
 

@@ -15,7 +15,7 @@ import {
   GameCommandEnvelopeSchema,
   GameMutationAcceptedSchema,
   GameSnapshotSchema,
-  GAME_COMMAND_SCOPES,
+  GAME_COMMANDS,
   HOMEBREW_PATHS,
   HomebrewContentTypeSchema,
   INTEGRATION_CREDENTIAL_PATHS,
@@ -469,7 +469,7 @@ describe("public API contracts", () => {
     // No IntegrationScope was added for homebrew.
     expect(IntegrationScopeSchema.options).not.toContain("content:read");
     // Homebrew rows are not GameState, so none of them is a game command.
-    expect(Object.keys(GAME_COMMAND_SCOPES).filter((type) => type.startsWith("homebrew."))).toEqual([]);
+    expect(Object.keys(GAME_COMMANDS).filter((type) => type.startsWith("homebrew."))).toEqual([]);
     // The id budget is 60, not contentSlug's 80 (persisted ActorDefinition ids cap at 60).
     for (const path of homebrewPaths.filter((path) => path.includes("{id}"))) {
       const parameter = Object.values(paths[path])[0]?.parameters?.find(

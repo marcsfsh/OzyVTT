@@ -1,6 +1,5 @@
-import { mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync } from "node:sqlite";
+import { migrate, openDatabase, type Migration } from "./database.js";
 import { validateSquareGridCalibration, type ImagePoint, type SquareGridCalibration } from "./grid-calibration.js";
 import { validateMapDistanceScale, type MapDistanceScale } from "./map-measurement.js";
 
@@ -102,6 +101,25 @@ function rowToEntry(row: CatalogRow): MapCatalogEntry {
   };
 }
 
+const MIGRATIONS: readonly Migration[] = [
+  {
+    version: 1,
+    up: (database) =>
+      database.exec(`
+        CREATE TABLE map_catalog (
+          asset_id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          kind TEXT NOT NULL CHECK (kind IN ('battlemap', 'regional', 'world')),
+          folder TEXT,
+          calibration_json TEXT,
+          scale_json TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        ) STRICT;
+      `)
+  }
+];
+
 export class MapCatalogStore {
   private database?: DatabaseSync;
 
@@ -112,32 +130,14 @@ export class MapCatalogStore {
 
   async initialize() {
     if (this.database) return;
-    await mkdir(dirname(this.databasePath), { recursive: true });
-    const database = new DatabaseSync(this.databasePath, { enableForeignKeyConstraints: true });
+    const database = openDatabase(this.databasePath);
     try {
-      database.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;");
-      database.exec(`
-        CREATE TABLE IF NOT EXISTS map_catalog (
-          asset_id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          kind TEXT NOT NULL CHECK (kind IN ('battlemap', 'regional', 'world')),
-          calibration_json TEXT,
-          scale_json TEXT,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL
-        ) STRICT;
-      `);
-      // Additive upgrade for catalogs created before folders existed (no migration table by design).
-      const columns = database.prepare("PRAGMA table_info(map_catalog)").all() as ReadonlyArray<
-        Record<string, unknown>
-      >;
-      if (!columns.some((column) => column.name === "folder"))
-        database.exec("ALTER TABLE map_catalog ADD COLUMN folder TEXT");
-      this.database = database;
+      migrate(database, "map-catalog", MIGRATIONS, { path: this.databasePath });
     } catch (error) {
       database.close();
       throw error;
     }
+    this.database = database;
   }
 
   register(assetIdInput: string, nameInput: string, kindInput: MapKind) {

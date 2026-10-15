@@ -1,4 +1,4 @@
-import type { ClientRole, GameState } from "@vtt/domain";
+import type { GameState } from "@vtt/domain";
 import { CommandRejectedError } from "./game-store.js";
 
 export function claimCharacter(state: GameState, actorId: string, sessionId: string) {
@@ -22,8 +22,8 @@ export function releaseCharactersForSession(state: GameState, sessionId: string)
   });
 }
 
-export function forceReleaseCharacter(state: GameState, actorId: string, role: ClientRole) {
-  if (role !== "gm") throw new CommandRejectedError("Only the GM can force-release a character.");
+/** GM-only, gated by the command: a reducer that trusts its caller. */
+export function forceReleaseCharacter(state: GameState, actorId: string) {
   const actor = state.actors.find((item) => item.id === actorId && item.kind === "player-character");
   if (!actor) throw new CommandRejectedError("Character is unavailable.");
   if (!actor.ownerSessionId) throw new CommandRejectedError("That character is not currently claimed.");

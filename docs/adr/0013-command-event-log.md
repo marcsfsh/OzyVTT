@@ -28,3 +28,10 @@ to the end state of a prior turn and re-plans forward. That is a different featu
 per-command undo: it is scoped to combat, its unit is a turn rather than a command, and it
 prompts before discarding a rewritten future. A general per-command undo remains **undecided**
 — if it is wanted, it needs its own ADR rather than being read out of this one.
+
+## Update — 2026-10-14
+
+The `domain_events` table and the periodic `snapshots` were removed (issue #101). Both were
+written on every command and read only by a test, and snapshots were never pruned. A command
+now commits its idempotency receipt and the new state in one transaction. The receipts, the
+per-turn timeline (`turn_snapshots`) and the live-fight command journal remain.

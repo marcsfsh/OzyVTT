@@ -1,6 +1,5 @@
-import { mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync } from "node:sqlite";
+import { migrate, openDatabase, type Migration } from "./database.js";
 
 /** `hidden` is the GM's curation flag: a token the shared library does not offer players (spoiler art).
  *  Not an approval queue; players still pick from what is offered and upload their own freely. */
@@ -55,6 +54,28 @@ function rowToEntry(row: CatalogRow): TokenCatalogEntry {
   };
 }
 
+const MIGRATIONS: readonly Migration[] = [
+  {
+    version: 1,
+    up: (database) =>
+      database.exec(`
+        CREATE TABLE token_catalog (
+          asset_id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          folder TEXT,
+          created_at TEXT NOT NULL,
+          last_used_at TEXT,
+          hidden INTEGER NOT NULL DEFAULT 0
+        ) STRICT;
+        CREATE TABLE token_definition_images (
+          definition_id TEXT PRIMARY KEY,
+          asset_id TEXT NOT NULL,
+          used_at TEXT NOT NULL
+        ) STRICT;
+      `)
+  }
+];
+
 /** Names/folders for uploaded token images, plus a small per-definition memory of the last image used
  *  so re-adding the same creature can offer it as a quick option. Lives on the game SQLite, alongside
  *  the map catalog. Folders are implicit - they exist while a row references them. */
@@ -67,27 +88,14 @@ export class TokenCatalogStore {
 
   async initialize() {
     if (this.database) return;
-    await mkdir(dirname(this.databasePath), { recursive: true });
-    const database = new DatabaseSync(this.databasePath, { enableForeignKeyConstraints: true });
+    const database = openDatabase(this.databasePath);
     try {
-      database.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;");
-      database.exec(`
-        CREATE TABLE IF NOT EXISTS token_catalog (asset_id TEXT PRIMARY KEY, name TEXT NOT NULL, folder TEXT, created_at TEXT NOT NULL, last_used_at TEXT) STRICT;
-        CREATE TABLE IF NOT EXISTS token_definition_images (definition_id TEXT PRIMARY KEY, asset_id TEXT NOT NULL, used_at TEXT NOT NULL) STRICT;
-      `);
-      // Additive migration: existing rows read back `hidden = 0`.
-      const columns = new Set(
-        (database.prepare("PRAGMA table_info(token_catalog)").all() as unknown as ReadonlyArray<{ name: string }>).map(
-          (column) => column.name
-        )
-      );
-      if (!columns.has("hidden"))
-        database.exec("ALTER TABLE token_catalog ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0;");
-      this.database = database;
+      migrate(database, "token-catalog", MIGRATIONS, { path: this.databasePath });
     } catch (error) {
       database.close();
       throw error;
     }
+    this.database = database;
   }
 
   register(assetIdInput: string, nameInput: string, folderInput: string | null) {

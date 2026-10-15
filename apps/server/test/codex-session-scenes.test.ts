@@ -1,4 +1,3 @@
-import { DatabaseSync } from "node:sqlite";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -37,12 +36,12 @@ describe("session scene attachments", () => {
     expect(store.getSession(session.id)!.sceneIds).toEqual([SCENE_A, SCENE_B]);
 
     // Omitted means unchanged: the console PATCHes a whole draft on every autosave.
-    const edited = store.updateSession(session.id, { prepBody: "Ambush at the ford." }, session.rev, "gm");
+    const edited = store.updateSession(session.id, { prepBody: "Ambush at the ford." }, session.rev);
     expect(edited.sceneIds).toEqual([SCENE_A, SCENE_B]);
     // Supplied means replaced, as with markers.
-    const detached = store.updateSession(session.id, { sceneIds: [SCENE_B] }, edited.rev, "gm");
+    const detached = store.updateSession(session.id, { sceneIds: [SCENE_B] }, edited.rev);
     expect(detached.sceneIds).toEqual([SCENE_B]);
-    expect(store.updateSession(session.id, { sceneIds: [] }, detached.rev, "gm").sceneIds).toEqual([]);
+    expect(store.updateSession(session.id, { sceneIds: [] }, detached.rev).sceneIds).toEqual([]);
   });
 
   it("caps at the table's own scene cap", () => {
@@ -80,28 +79,5 @@ describe("session scene attachments", () => {
     store.setSessionRevealed(session.id, true);
     expect(store.searchAll("gm", SCENE_A).hits).toHaveLength(0);
     expect(store.searchAll("player", SCENE_A).hits).toHaveLength(0);
-  });
-
-  it("adds the column to a codex created before it existed, with no scenes attached", async () => {
-    const older = await mkdtemp(join(tmpdir(), "vtt-codex-scenes-old-"));
-    const path = join(older, "vtt.sqlite");
-    const first = new CodexStore(path);
-    await first.initialize();
-    const before = first.createSession({ sessionNumber: 1, prepBody: "Written before scenes existed." });
-    first.close();
-
-    // Simulate a database from before the column existed: drop it and forget the migration ran.
-    const raw = new DatabaseSync(path);
-    raw.exec("ALTER TABLE codex_sessions DROP COLUMN scene_ids_json;");
-    raw.prepare("DELETE FROM codex_schema_migrations WHERE version = ?").run(25);
-    raw.close();
-
-    const reopened = new CodexStore(path);
-    await reopened.initialize();
-    expect(reopened.getSession(before.id)!.sceneIds).toEqual([]);
-    // And the column is usable immediately afterwards.
-    expect(reopened.updateSession(before.id, { sceneIds: [SCENE_A] }, undefined, "gm").sceneIds).toEqual([SCENE_A]);
-    reopened.close();
-    await rm(older, { recursive: true, force: true });
   });
 });

@@ -20,12 +20,11 @@ import { createApiV1Router } from "./api-v1.js";
 import { ContentLibrary } from "./content-library.js";
 import { AuthService } from "./auth.js";
 import { developmentClientUrl } from "./client-hosting.js";
-import { migrateToScene } from "./scenes.js";
 import { CombatLogStore, projectFeedRow } from "./combat-log.js";
 import { timelineDirtied, type TimelineOutcome } from "./combat-history.js";
 import { createGameApiRouter } from "./game-http.js";
-import { createGameOperations, gameCommandRegistry, type GamePrincipal } from "./game-operations.js";
-import { CommandRejectedError, GameStore, RulesBlockedError, TimelineConfirmationRequired } from "./game-store.js";
+import { createGameCommands, describeFailure, socketEventOf, type GamePrincipal } from "./commands/index.js";
+import { CommandRejectedError, GameStore } from "./game-store.js";
 import { CodexStore } from "./codex-store.js";
 import { createCodexImportGuard, createCodexRouter } from "./codex-http.js";
 import { HomebrewStore } from "./homebrew-store.js";
@@ -34,6 +33,7 @@ import { createHomebrewValidator } from "./homebrew-validate.js";
 import { buildHomebrewUsageIndex } from "./homebrew-usages.js";
 import { findCatalogRecord } from "./homebrew-srd-copy.js";
 import { createInitialGameState } from "./initial-game-state.js";
+import { createStateReader } from "./state-reader.js";
 import { IntegrationCredentialStore } from "./integration-credentials.js";
 import { LoginRateLimiter } from "./login-rate-limit.js";
 import { MapAssetStore } from "./map-assets.js";
@@ -45,7 +45,7 @@ import { PresenceRegistry } from "./presence.js";
 import { projectGmView, projectPlayerView } from "./projections.js";
 import { playerReplayMapAssetIds } from "./replay-projection.js";
 import type { EncounterArchiveDocument } from "./encounter-archive.js";
-import { ensureEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
+import type { TokenMapGeometry } from "./token-placement.js";
 import { ViewerAccessStore } from "./viewer-access.js";
 import { ViewerCoordinator } from "./viewer-coordinator.js";
 import { createViewerRouter } from "./viewer-http.js";
@@ -83,6 +83,8 @@ export function createServer(options: CreateServerOptions) {
   const store = new GameStore(options.databasePath, options.initialGameState ?? createInitialGameState(), {
     timelineDirtied
   });
+  // Every read of the game state outside a command's own transaction goes through here.
+  const committedState = createStateReader(store);
   const combatLog = new CombatLogStore(options.databasePath);
   const credentials = new IntegrationCredentialStore(options.integrationCredentialsPath);
   const mapAssets = new MapAssetStore(options.mapAssetsPath ?? join(dirname(options.databasePath), "map-assets"));
@@ -125,12 +127,12 @@ export function createServer(options: CreateServerOptions) {
     // One pending timer, re-armed from the callback so staggered annotations each expire on time.
     for (const timer of annotationExpiryTimers) clearTimeout(timer);
     annotationExpiryTimers.clear();
-    const soonest = nextAnnotationExpiry(store.snapshot, Date.now());
+    const soonest = nextAnnotationExpiry(committedState.read(), Date.now());
     if (soonest === null) return;
     const timer = setTimeout(
       () => {
         annotationExpiryTimers.delete(timer);
-        void publishGameState(store.snapshot);
+        void publishGameState(committedState.read());
         scheduleAnnotationExpiry();
       },
       Math.max(0, soonest - Date.now())
@@ -145,7 +147,7 @@ export function createServer(options: CreateServerOptions) {
   }
   /** Also reauthorizes every connected socket, so a revoked GM client is downgraded or disconnected promptly. */
   function broadcast() {
-    const state = store.snapshot;
+    const current = committedState.read();
     for (const socket of io.sockets.sockets.values()) {
       const token = socket.handshake.auth?.token;
       const gm = auth.verify(token);
@@ -154,7 +156,7 @@ export function createServer(options: CreateServerOptions) {
         socket.disconnect(true);
         continue;
       }
-      socket.emit("state:updated", gm ? gmView(state) : projectPlayerView(state, player?.sessionId, presenceFor));
+      socket.emit("state:updated", gm ? gmView(current) : projectPlayerView(current, player?.sessionId, presenceFor));
     }
   }
   /** Tells every client the codex changed so it refetches its own projected view. Content-free (only a
@@ -167,12 +169,12 @@ export function createServer(options: CreateServerOptions) {
   function notifyHomebrewChanged() {
     io.emit("homebrew:changed", { revision: homebrewStore.revision });
   }
-  // Homebrew usage lookup, memoised for one microtask: the library list asks per row and every
-  // `store.snapshot` clones the campaign. Gone before the next request, so never stale.
+  // Homebrew usage lookup, memoised for one microtask: the library list asks per row and building the
+  // index walks the whole campaign. Gone before the next request, so never stale.
   let usageIndex: ReturnType<typeof buildHomebrewUsageIndex> | undefined;
   const homebrewUsagesFor = (type: Parameters<ReturnType<typeof buildHomebrewUsageIndex>["of"]>[0], id: string) => {
     if (!usageIndex) {
-      usageIndex = buildHomebrewUsageIndex(store.snapshot);
+      usageIndex = buildHomebrewUsageIndex(committedState.read());
       queueMicrotask(() => {
         usageIndex = undefined;
       });
@@ -190,10 +192,10 @@ export function createServer(options: CreateServerOptions) {
       logged?: boolean;
     }>
   ) {
-    const state = store.snapshot;
+    const { actors } = committedState.read();
     const actorIds = event.actorIds ?? [];
     const publicToPlayers =
-      !event.gmOnly && actorIds.every((id) => state.actors.find((actor) => actor.id === id)?.visibility === "public");
+      !event.gmOnly && actorIds.every((id) => actors.find((actor) => actor.id === id)?.visibility === "public");
     const payload: TableEvent = { id: randomUUID(), kind: event.kind, text: event.text, actorIds, at: Date.now() };
     for (const socket of io.sockets.sockets.values()) {
       const token = socket.handshake.auth?.token;
@@ -216,16 +218,16 @@ export function createServer(options: CreateServerOptions) {
       roll?: RollRecord | null;
     }>
   ) {
-    const state = store.snapshot;
+    const current = committedState.read();
     const actorIds = entry.actorIds ?? [];
     const gmOnly =
       entry.gmOnly === true ||
-      actorIds.some((id) => state.actors.find((actor) => actor.id === id)?.visibility !== "public");
+      actorIds.some((id) => current.actors.find((actor) => actor.id === id)?.visibility !== "public");
     const row = combatLog.append({
       kind: entry.kind,
       text: entry.text,
       gmOnly,
-      revision: state.revision,
+      revision: current.revision,
       actorId: entry.actorId ?? null,
       roll: entry.roll ?? null
     });
@@ -311,7 +313,7 @@ export function createServer(options: CreateServerOptions) {
     try {
       const geometry = await tokenGeometryFor(mapAssetId);
       const entry = mapCatalog.get(mapAssetId);
-      await viewerCoordinator.presentMap(store.snapshot.revision, {
+      await viewerCoordinator.presentMap(store.revision, {
         assetId: mapAssetId,
         altText: entry?.name ?? "Battle map",
         camera: { center: { x: geometry.width / 2, y: geometry.height / 2 }, zoom: 1 }
@@ -326,9 +328,10 @@ export function createServer(options: CreateServerOptions) {
     }
   }
 
-  // The shared game capabilities, used by both the Socket.IO handlers below and the HTTP API (ADR-0016).
-  const operations = createGameOperations({
+  // The game commands and reads, served by both the Socket.IO handlers below and the HTTP API (ADR-0016).
+  const game = createGameCommands({
     store,
+    readState: committedState.read,
     combatLog,
     contentLibrary,
     mapCatalog,
@@ -370,7 +373,6 @@ export function createServer(options: CreateServerOptions) {
       }
     }
   });
-  const commandRegistry = gameCommandRegistry(operations);
 
   // Open CORS for /api/v1 only: credentials there are bearer headers (or SameSite=Strict cookies), so a
   // wildcard origin grants nothing a token doesn't, and browser integrations can call it. The legacy
@@ -409,7 +411,6 @@ export function createServer(options: CreateServerOptions) {
       }
     });
   });
-  app.get("/api/health", (_req, res) => res.json({ ok: true, bootstrapped: auth.isBootstrapped }));
   app.get("/api/bootstrap/status", (_req, res) => res.json({ bootstrapped: auth.isBootstrapped }));
   app.post("/api/bootstrap", async (req, res) => {
     if (!isLoopback(req.ip))
@@ -457,13 +458,6 @@ export function createServer(options: CreateServerOptions) {
     broadcast();
     return res.json({ ok: true });
   });
-  app.get("/api/state", (req, res) => {
-    const token = req.header("authorization")?.replace("Bearer ", "");
-    const state = store.snapshot;
-    res.json(
-      auth.verify(token) ? gmView(state) : projectPlayerView(state, auth.verifyPlayer(token)?.sessionId, presenceFor)
-    );
-  });
   app.get("/api/gm/viewer-urls", (req, res) => {
     const token = req.header("authorization")?.replace("Bearer ", "");
     if (!auth.verify(token)) return res.status(401).json({ message: "A valid GM session is required." });
@@ -471,28 +465,6 @@ export function createServer(options: CreateServerOptions) {
       ...new Set((options.viewerBaseUrls ?? []).map((url) => `${url.replace(/\/$/, "")}/viewer.html`))
     ];
     return res.json({ viewerUrls });
-  });
-  // Encounter archives: permanent turn-by-turn records saved at encounter end. GM-only: a document holds
-  // full state (hidden combatants) and GM-only log lines. Shape documented in encounter-archive.ts.
-  app.get("/api/gm/encounters", (req, res) => {
-    const token = req.header("authorization")?.replace("Bearer ", "");
-    if (!auth.verify(token)) return res.status(401).json({ message: "A valid GM session is required." });
-    return res.json({ encounters: store.listEncounterArchives() });
-  });
-  app.get("/api/gm/encounters/:id", (req, res) => {
-    const token = req.header("authorization")?.replace("Bearer ", "");
-    if (!auth.verify(token)) return res.status(401).json({ message: "A valid GM session is required." });
-    const id = Number(req.params.id);
-    const document = Number.isInteger(id) ? store.getEncounterArchive(id) : null;
-    if (document === null) return res.status(404).json({ message: "No such encounter archive." });
-    return res.type("application/json").send(document); // raw stored JSON - no re-serialization
-  });
-  app.delete("/api/gm/encounters/:id", (req, res) => {
-    const token = req.header("authorization")?.replace("Bearer ", "");
-    if (!auth.verify(token)) return res.status(401).json({ message: "A valid GM session is required." });
-    const id = Number(req.params.id);
-    if (Number.isInteger(id)) store.deleteEncounterArchive(id);
-    return res.json({ ok: true });
   });
   app.use(
     createViewerRouter({
@@ -533,7 +505,7 @@ export function createServer(options: CreateServerOptions) {
       authorizeGm,
       authorizePlayer: (token, assetId) => {
         if (auth.verifyPlayer(token) === null) return false;
-        const combat = store.snapshot.combat;
+        const { combat } = committedState.read();
         // A player may load the active battle map, any revealed atlas map, or the map of a replay the GM shared.
         return (
           (combat.active && combat.mapAssetId === assetId) ||
@@ -562,14 +534,16 @@ export function createServer(options: CreateServerOptions) {
       playerSession: (token) => auth.verifyPlayer(token),
       authorizePlayer: (token, assetId) =>
         auth.verifyPlayer(token) !== null &&
-        store.snapshot.actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId),
+        committedState.read().actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId),
       authorizeViewer: (token, assetId) => {
         if (!token) return false;
         try {
           viewerAccess.verify(token);
           return (
             viewerPresentation.project().enabled &&
-            store.snapshot.actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId)
+            committedState
+              .read()
+              .actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId)
           );
         } catch {
           return false;
@@ -606,8 +580,7 @@ export function createServer(options: CreateServerOptions) {
     })
   );
   const gameApiRouter = createGameApiRouter({
-    operations,
-    registry: commandRegistry,
+    game,
     gmSession: (token) => auth.verify(token),
     playerSession: (token) => auth.verifyPlayer(token),
     verifyIntegration: (token, scope) => credentials.verify(token, scope),
@@ -660,7 +633,12 @@ export function createServer(options: CreateServerOptions) {
 
   io.on("connection", (socket) => {
     let joinedSession: { sessionId: string; role: ClientRole } | null = null;
-    socket.on("session:join", ({ token }, acknowledge) => {
+    socket.on("session:join", (payload, ack) => {
+      // Client input: a join without a payload or an acknowledgement must not throw out of the handler.
+      const token = typeof payload?.token === "string" ? payload.token : undefined;
+      const acknowledge: typeof ack = (result) => {
+        if (typeof ack === "function") ack(result);
+      };
       socket.handshake.auth.token = token;
       const gm = auth.verify(token);
       if (gm) {
@@ -703,745 +681,47 @@ export function createServer(options: CreateServerOptions) {
       const player = auth.verifyPlayer(token);
       return player ? { kind: "player", sessionId: player.sessionId } : null;
     };
-    /** Socket adapter: resolve the principal, run the operation, map the outcome to the ack (a timeline
-     *  confirmation bounce is an ok:true ack). */
-    const respond = async <Result extends { ok: boolean }>(
-      acknowledge: (result: Result) => void,
-      unauthenticatedMessage: string,
-      fallbackMessage: string,
+    /** Socket adapter: resolve the principal, run the work, and answer through the same failure mapping as
+     *  HTTP. A timeline confirmation bounce is an ok:true ack, and an emit without an acknowledgement still
+     *  runs. */
+    const respond = async (
+      acknowledge: unknown,
       work: (principal: GamePrincipal) => Promise<Record<string, unknown>> | Record<string, unknown>
     ) => {
+      const reply = (result: Record<string, unknown>) => {
+        if (typeof acknowledge === "function") acknowledge(result);
+      };
       const principal = principalOf();
-      if (!principal) return acknowledge({ ok: false, message: unauthenticatedMessage } as unknown as Result);
+      if (!principal) return reply({ ok: false, message: "Join a session first." });
+      let outcome: Record<string, unknown>;
       try {
-        acknowledge({ ok: true, ...(await work(principal)) } as unknown as Result);
+        outcome = { ok: true, ...(await work(principal)) };
       } catch (error) {
-        if (error instanceof TimelineConfirmationRequired)
-          return acknowledge({ ok: true, needsConfirm: error.confirm, message: error.message } as unknown as Result);
-        // Rules-mode rejections carry machine-readable details for the one-tap audited override (ADR-0020).
-        if (error instanceof RulesBlockedError)
-          return acknowledge({
-            ok: false,
-            message: error.message,
-            blocked: { rule: error.rule, message: error.message, overridable: error.overridable }
-          } as unknown as Result);
-        acknowledge({
-          ok: false,
-          message: error instanceof Error ? error.message : fallbackMessage
-        } as unknown as Result);
+        const failure = describeFailure(error);
+        const { needsConfirm, blocked } = failure.details ?? {};
+        outcome = needsConfirm
+          ? { ok: true, needsConfirm, message: failure.message }
+          : { ok: false, message: failure.message, ...(blocked ? { blocked } : {}) };
       }
+      reply(outcome);
     };
-    socket.on("character:claim", (payload, acknowledge) =>
-      respond(acknowledge, "Join a session first.", "The character claim failed.", (principal) =>
-        operations.characterClaim(principal, payload)
-      )
-    );
-    socket.on("character:release", (payload, acknowledge) =>
-      respond(acknowledge, "Join a session first.", "The character release failed.", (principal) =>
-        operations.characterRelease(principal, payload)
-      )
-    );
-    socket.on("character:force-release", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Only the GM can force-release a character.",
-        "The character force-release failed.",
-        (principal) => operations.characterForceRelease(principal, payload)
-      )
-    );
-    socket.on("content:monsters", (_payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Only the GM can browse bundled content.",
-        "The bundled content is unavailable.",
-        (principal) => operations.contentMonsters(principal)
-      )
-    );
-    socket.on("actor:add-from-definition", (payload, acknowledge) =>
-      respond(acknowledge, "Only the GM can add combatants.", "The combatant could not be added.", (principal) =>
-        operations.actorAddFromDefinition(principal, payload)
-      )
-    );
-    socket.on("actor:import-definition", (payload, acknowledge) =>
-      respond(acknowledge, "Only the GM can import sheets.", "The sheet could not be imported.", (principal) =>
-        operations.actorImportDefinition(principal, payload)
-      )
-    );
-    socket.on("character:submit-import", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before submitting a sheet.",
-        "The sheet could not be submitted.",
-        (principal) => operations.characterSubmitImport(principal, payload)
-      )
-    );
-    socket.on("character:resolve-import", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Only the GM can approve imported sheets.",
-        "The import could not be resolved.",
-        (principal) => operations.characterResolveImport(principal, payload)
-      )
-    );
-    socket.on("character:create", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Only the GM can create characters directly.",
-        "The character could not be created.",
-        (principal) => operations.characterCreate(principal, payload)
-      )
-    );
-    socket.on("character:generate", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Your GM rolls the random characters at this table.",
-        "The character could not be rolled up.",
-        (principal) => operations.characterGenerate(principal, payload)
-      )
-    );
-    socket.on("builder:set-policy", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Only the GM can set the character-builder policy.",
-        "The builder policy could not be changed.",
-        (principal) => operations.builderSetPolicy(principal, payload)
-      )
-    );
-    socket.on("character:rebuild", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "You can only rebuild your own character.",
-        "That character could not be rebuilt.",
-        (principal) => operations.characterRebuild(principal, payload)
-      )
-    );
-    socket.on("builder:roll-abilities", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Your GM builds the characters at this table.",
-        "The ability scores could not be rolled.",
-        (principal) => operations.builderRollAbilities(principal, payload)
-      )
-    );
-    socket.on("actor:remove", (payload, acknowledge) =>
-      respond(acknowledge, "Only the GM can remove combatants.", "The combatant could not be removed.", (principal) =>
-        operations.actorRemove(principal, payload)
-      )
-    );
-    socket.on("actor:set-token-image", (payload, acknowledge) =>
-      respond(acknowledge, "Only the GM can set token images.", "The token image could not be set.", (principal) =>
-        operations.actorSetTokenImage(principal, payload)
-      )
-    );
-    socket.on("actor:set-size", (payload, acknowledge) =>
-      respond(acknowledge, "Only the GM can resize tokens.", "The token could not be resized.", (principal) =>
-        operations.actorSetSize(principal, payload)
-      )
-    );
-    socket.on("actor:set-visibility", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Only the GM can change token visibility.",
-        "The token visibility could not be changed.",
-        (principal) => operations.actorSetVisibility(principal, payload)
-      )
-    );
-    socket.on("actor:set-archived", (payload, acknowledge) =>
-      respond(acknowledge, "Only the GM can archive characters.", "The character could not be archived.", (principal) =>
-        operations.actorSetArchived(principal, payload)
-      )
-    );
-    socket.on("actor:set-sheet-preview", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Only the GM can share an archived character's sheet.",
-        "The archived sheet could not be shared.",
-        (principal) => operations.actorSetSheetPreview(principal, payload)
-      )
-    );
-    socket.on("actor:set-speed", (payload, acknowledge) =>
-      respond(acknowledge, "Only the GM can set movement speed.", "The speed could not be set.", (principal) =>
-        operations.actorSetSpeed(principal, payload)
-      )
-    );
-    socket.on("actor:apply-damage", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before tracking hit points.",
-        "The damage could not be applied.",
-        (principal) => operations.actorApplyDamage(principal, payload)
-      )
-    );
-    socket.on("actor:heal", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before tracking hit points.",
-        "The healing could not be applied.",
-        (principal) => operations.actorHeal(principal, payload)
-      )
-    );
-    socket.on("actor:set-temp-hp", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before tracking hit points.",
-        "The temporary hit points could not be set.",
-        (principal) => operations.actorSetTempHp(principal, payload)
-      )
-    );
-    socket.on("content:conditions", (_payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before browsing reference content.",
-        "The reference content is unavailable.",
-        (principal) => operations.contentConditions(principal)
-      )
-    );
-    socket.on("content:skills", (_payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before browsing reference content.",
-        "The reference content is unavailable.",
-        (principal) => operations.contentSkills(principal)
-      )
-    );
-    socket.on("content:languages", (_payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before browsing reference content.",
-        "The reference content is unavailable.",
-        (principal) => operations.contentLanguages(principal)
-      )
-    );
-    socket.on("content:spells", (_payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before browsing reference content.",
-        "The reference content is unavailable.",
-        (principal) => operations.contentSpells(principal)
-      )
-    );
-    socket.on("content:equipment", (_payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before browsing reference content.",
-        "The reference content is unavailable.",
-        (principal) => operations.contentEquipment(principal)
-      )
-    );
-    // Character-builder catalogs: readable by any joined session, each mirrored by a GET under
-    // /api/v1/content (ADR-0016).
-    socket.on("content:classes", (_payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before browsing reference content.",
-        "The reference content is unavailable.",
-        (principal) => operations.contentClasses(principal)
-      )
-    );
-    socket.on("content:subclasses", (_payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before browsing reference content.",
-        "The reference content is unavailable.",
-        (principal) => operations.contentSubclasses(principal)
-      )
-    );
-    socket.on("content:species", (_payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before browsing reference content.",
-        "The reference content is unavailable.",
-        (principal) => operations.contentSpecies(principal)
-      )
-    );
-    socket.on("content:backgrounds", (_payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before browsing reference content.",
-        "The reference content is unavailable.",
-        (principal) => operations.contentBackgrounds(principal)
-      )
-    );
-    socket.on("content:feats", (_payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before browsing reference content.",
-        "The reference content is unavailable.",
-        (principal) => operations.contentFeats(principal)
-      )
-    );
-    socket.on("content:names", (_payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before browsing reference content.",
-        "The reference content is unavailable.",
-        (principal) => operations.contentNames(principal)
-      )
-    );
-    socket.on("actor:set-condition", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before tracking conditions.",
-        "The condition could not be updated.",
-        (principal) => operations.actorSetCondition(principal, payload)
-      )
-    );
-    socket.on("content:monster-actions", (payload, acknowledge) =>
-      respond(acknowledge, "Only the GM can browse stat blocks.", "The stat block is unavailable.", (principal) =>
-        operations.contentMonsterActions(principal, payload)
-      )
-    );
-    socket.on("content:monster-sheet", (payload, acknowledge) =>
-      respond(acknowledge, "Only the GM can read stat blocks.", "The stat block is unavailable.", (principal) =>
-        operations.contentMonsterSheet(principal, payload)
-      )
-    );
-    socket.on("action:resolve", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before resolving actions.",
-        "The action could not be resolved.",
-        (principal) => operations.actionResolve(principal, payload)
-      )
-    );
-    socket.on("action:use", (payload, acknowledge) =>
-      respond(acknowledge, "Join the table before using actions.", "The action could not be used.", (principal) =>
-        operations.actionUse(principal, payload)
-      )
-    );
-    socket.on("save:roll", (payload, acknowledge) =>
-      respond(acknowledge, "Join the table before rolling saving throws.", "The saving throw failed.", (principal) =>
-        operations.saveRoll(principal, payload)
-      )
-    );
-    socket.on("save:answer", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before answering saving throws.",
-        "The saving throw could not be answered.",
-        (principal) => operations.saveAnswer(principal, payload)
-      )
-    );
-    socket.on("save:dismiss", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before managing saving throws.",
-        "The saving throw could not be dismissed.",
-        (principal) => operations.saveDismiss(principal, payload)
-      )
-    );
-    socket.on("reaction:answer", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before answering reactions.",
-        "The reaction could not be answered.",
-        (principal) => operations.reactionAnswer(principal, payload)
-      )
-    );
-    socket.on("reaction:dismiss", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before managing reactions.",
-        "The reaction prompt could not be dismissed.",
-        (principal) => operations.reactionDismiss(principal, payload)
-      )
-    );
-    socket.on("damage:resolve", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Only the GM can apply proposed damage.",
-        "The damage proposal could not be resolved.",
-        (principal) => operations.damageResolve(principal, payload)
-      )
-    );
-    socket.on("actor:available-actions", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before checking actions.",
-        "The action availability is unavailable.",
-        (principal) => operations.actorAvailableActions(principal, payload)
-      )
-    );
-    socket.on("effect:add", (payload, acknowledge) =>
-      respond(acknowledge, "Only the GM can add effects.", "The effect could not be added.", (principal) =>
-        operations.effectAdd(principal, payload)
-      )
-    );
-    socket.on("effect:end", (payload, acknowledge) =>
-      respond(acknowledge, "Join the table before managing effects.", "The effect could not be ended.", (principal) =>
-        operations.effectEnd(principal, payload)
-      )
-    );
-    socket.on("death-save:roll", (payload, acknowledge) =>
-      respond(acknowledge, "Join the table before rolling death saves.", "The death save failed.", (principal) =>
-        operations.deathSaveRoll(principal, payload)
-      )
-    );
-    socket.on("encounter:set-rules-mode", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Only the GM can change the rules mode.",
-        "The rules mode could not be changed.",
-        (principal) => operations.encounterSetRulesMode(principal, payload)
-      )
-    );
-    socket.on("rules:set-policy", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Only the GM can set the rules policy.",
-        "The rules policy could not be changed.",
-        (principal) => operations.rulesSetPolicy(principal, payload)
-      )
-    );
-    socket.on("rules:ask", (payload, acknowledge) =>
-      respond(acknowledge, "Join the table before asking the GM.", "The question could not be sent.", (principal) =>
-        operations.rulesAsk(principal, payload)
-      )
-    );
-    socket.on("rules:answer", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Only the GM can answer a rules question.",
-        "The answer could not be recorded.",
-        (principal) => operations.rulesAnswer(principal, payload)
-      )
-    );
-    socket.on("table:set-staging-defaults", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Only the GM can set the table's staging defaults.",
-        "The staging defaults could not be changed.",
-        (principal) => operations.tableSetStagingDefaults(principal, payload)
-      )
-    );
-    socket.on("table:set-party-visibility", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Only the GM can set what players see of each other.",
-        "The party visibility could not be changed.",
-        (principal) => operations.tableSetPartyVisibility(principal, payload)
-      )
-    );
-    socket.on("encounter:set-player-damage-mode", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Only the GM can change how players' hits apply damage.",
-        "The player damage mode could not be changed.",
-        (principal) => operations.encounterSetPlayerDamageMode(principal, payload)
-      )
-    );
-    socket.on("encounter:set-player-initiative-mode", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Only the GM can change how player initiative works.",
-        "The player initiative mode could not be changed.",
-        (principal) => operations.encounterSetPlayerInitiativeMode(principal, payload)
-      )
-    );
-    socket.on("encounter:set-health-display", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Only the GM can change how health is shown.",
-        "The health display could not be changed.",
-        (principal) => operations.encounterSetHealthDisplay(principal, payload)
-      )
-    );
-    socket.on("actor:set-health-display", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Only the GM can change how health is shown.",
-        "The health display could not be changed.",
-        (principal) => operations.actorSetHealthDisplay(principal, payload)
-      )
-    );
-    socket.on("encounter:set-environment", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Only the GM can change the encounter environment.",
-        "The environment could not be changed.",
-        (principal) => operations.encounterSetEnvironment(principal, payload)
-      )
-    );
-    socket.on("actor:rest", (payload, acknowledge) =>
-      respond(acknowledge, "Join the table before resting.", "The rest could not be applied.", (principal) =>
-        operations.actorRest(principal, payload)
-      )
-    );
-    socket.on("actor:rechoose", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before changing a character's choices.",
-        "The choice could not be changed.",
-        (principal) => operations.actorRechoose(principal, payload)
-      )
-    );
-    socket.on("actor:spend-hit-dice", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before spending Hit Dice.",
-        "The Hit Dice could not be spent.",
-        (principal) => operations.actorSpendHitDice(principal, payload)
-      )
-    );
-    socket.on("character:set-slot", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before managing spell slots.",
-        "The spell slot could not be updated.",
-        (principal) => operations.characterSetSlot(principal, payload)
-      )
-    );
-    socket.on("character:set-prepared", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before preparing spells.",
-        "The prepared spell could not be updated.",
-        (principal) => operations.characterSetPrepared(principal, payload)
-      )
-    );
-    socket.on("character:set-inventory", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before managing inventory.",
-        "The inventory could not be updated.",
-        (principal) => operations.characterSetInventory(principal, payload)
-      )
-    );
-    socket.on("character:set-currency", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before managing currency.",
-        "The currency could not be updated.",
-        (principal) => operations.characterSetCurrency(principal, payload)
-      )
-    );
-    socket.on("character:set-identity", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before editing a character.",
-        "The identity could not be updated.",
-        (principal) => operations.characterSetIdentity(principal, payload)
-      )
-    );
-    socket.on("character:set-proficiencies", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before editing a character.",
-        "The proficiencies could not be updated.",
-        (principal) => operations.characterSetProficiencies(principal, payload)
-      )
-    );
-    socket.on("turn:use", (payload, acknowledge) =>
-      respond(acknowledge, "Join the table before tracking turns.", "The turn could not be updated.", (principal) =>
-        operations.turnUse(principal, payload)
-      )
-    );
-    socket.on("turn:use-reaction", (payload, acknowledge) =>
-      respond(acknowledge, "Join the table before tracking turns.", "The reaction could not be updated.", (principal) =>
-        operations.turnUseReaction(principal, payload)
-      )
-    );
-    socket.on("turn:use-legendary", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before tracking turns.",
-        "The legendary actions could not be updated.",
-        (principal) => operations.turnUseLegendary(principal, payload)
-      )
-    );
-    socket.on("turn:end", (payload, acknowledge) =>
-      respond(acknowledge, "Join the table before ending a turn.", "The turn could not end.", (principal) =>
-        operations.turnEnd(principal, payload)
-      )
-    );
-    socket.on("actor:set-hp", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Only the GM can set hit points directly.",
-        "The hit points could not be set.",
-        (principal) => operations.actorSetHp(principal, payload)
-      )
-    );
-    socket.on("dice:roll", (payload, acknowledge) =>
-      respond(acknowledge, "Join a session before rolling.", "The roll failed.", (principal) =>
-        operations.diceRoll(principal, payload)
-      )
-    );
-    socket.on("encounter:start", (payload, acknowledge) =>
-      respond(acknowledge, "Only the GM can start an encounter.", "The encounter could not start.", (principal) =>
-        operations.encounterStart(principal, payload)
-      )
-    );
-    socket.on("encounter:end", (payload, acknowledge) =>
-      respond(acknowledge, "Only the GM can end an encounter.", "The encounter could not end.", (principal) =>
-        operations.encounterEnd(principal, payload)
-      )
-    );
-    socket.on("encounter:add-combatant", (payload, acknowledge) =>
-      respond(acknowledge, "Only the GM can add a combatant.", "The combatant could not be added.", (principal) =>
-        operations.encounterAddCombatant(principal, payload)
-      )
-    );
-    socket.on("initiative:set", (payload, acknowledge) =>
-      respond(acknowledge, "Only the GM can change Initiative.", "Initiative could not be updated.", (principal) =>
-        operations.initiativeSet(principal, payload)
-      )
-    );
-    socket.on("initiative:roll-self", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join the table before rolling initiative.",
-        "Initiative could not be rolled.",
-        (principal) => operations.initiativeRollSelf(principal, payload)
-      )
-    );
-    socket.on("initiative:roll-remaining", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Only the GM can roll for the rest of the table.",
-        "Initiative could not be rolled.",
-        (principal) => operations.initiativeRollRemaining(principal, payload)
-      )
-    );
-    socket.on("initiative:next", (payload, acknowledge) =>
-      respond(acknowledge, "Only the GM can advance Initiative.", "Initiative could not advance.", (principal) =>
-        operations.initiativeNext(principal, payload)
-      )
-    );
-    socket.on("initiative:previous", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Only the GM can move Initiative backward.",
-        "Initiative could not move backward.",
-        (principal) => operations.initiativePrevious(principal, payload)
-      )
-    );
-    socket.on("log:read", (_payload, acknowledge) =>
-      respond(acknowledge, "Join the table to read the combat log.", "The combat log is unavailable.", (principal) => ({
-        entries: operations.logEntries(principal)
-      }))
-    );
-    socket.on("token:move", (payload, acknowledge) =>
-      respond(acknowledge, "Join a session before moving tokens.", "The token could not be moved.", (principal) =>
-        operations.tokenMove(principal, payload)
-      )
-    );
-    socket.on("scene:create", (payload, acknowledge) =>
-      respond(acknowledge, "Only the GM can prepare scenes.", "The scene could not be created.", (principal) =>
-        operations.sceneCreate(principal, payload)
-      )
-    );
-    socket.on("scene:rename", (payload, acknowledge) =>
-      respond(acknowledge, "Only the GM can rename scenes.", "The scene could not be renamed.", (principal) =>
-        operations.sceneRename(principal, payload)
-      )
-    );
-    socket.on("scene:remove", (payload, acknowledge) =>
-      respond(acknowledge, "Only the GM can remove scenes.", "The scene could not be removed.", (principal) =>
-        operations.sceneRemove(principal, payload)
-      )
-    );
-    socket.on("scene:activate", (payload, acknowledge) =>
-      respond(acknowledge, "Only the GM can switch scenes.", "The scene could not be switched.", (principal) =>
-        operations.sceneActivate(principal, payload)
-      )
-    );
-    socket.on("replay:launch", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Only the GM can launch a replay.",
-        "That recorded moment could not be launched.",
-        (principal) => operations.replayLaunch(principal, payload)
-      )
-    );
-    socket.on("scene:set-combatants", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Only the GM can change a scene's combatants.",
-        "The scene could not be updated.",
-        (principal) => operations.sceneSetCombatants(principal, payload)
-      )
-    );
-    socket.on("scene:duplicate", (payload, acknowledge) =>
-      respond(acknowledge, "Only the GM can duplicate scenes.", "The scene could not be duplicated.", (principal) =>
-        operations.sceneDuplicate(principal, payload)
-      )
-    );
-    socket.on("scene:reorder", (payload, acknowledge) =>
-      respond(acknowledge, "Only the GM can reorder scenes.", "The scenes could not be reordered.", (principal) =>
-        operations.sceneReorder(principal, payload)
-      )
-    );
-    socket.on("fog:set-enabled", (payload, acknowledge) =>
-      respond(acknowledge, "Only the GM controls the fog of war.", "The fog could not be updated.", (principal) =>
-        operations.fogSetEnabled(principal, payload)
-      )
-    );
-    socket.on("fog:paint", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Only the GM controls the fog of war.",
-        "The fog stroke could not be painted.",
-        (principal) => operations.fogPaint(principal, payload)
-      )
-    );
-    socket.on("fog:reset", (payload, acknowledge) =>
-      respond(acknowledge, "Only the GM controls the fog of war.", "The fog could not be reset.", (principal) =>
-        operations.fogReset(principal, payload)
-      )
-    );
-    socket.on("annotation:add", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join a session before adding to the map.",
-        "That could not be added to the map.",
-        (principal) => operations.annotationAdd(principal, payload)
-      )
-    );
-    socket.on("annotation:ping", (payload, acknowledge) =>
-      respond(acknowledge, "Join a session before pinging the map.", "The ping could not be sent.", (principal) =>
-        operations.annotationPing(principal, payload)
-      )
-    );
-    socket.on("annotation:set-color", (payload, acknowledge) =>
-      respond(acknowledge, "Join a session before editing the map.", "The color could not be changed.", (principal) =>
-        operations.annotationSetColor(principal, payload)
-      )
-    );
-    socket.on("annotation:move", (payload, acknowledge) =>
-      respond(acknowledge, "Join a session before editing the map.", "That could not be moved.", (principal) =>
-        operations.annotationMove(principal, payload)
-      )
-    );
-    socket.on("annotation:remove", (payload, acknowledge) =>
-      respond(acknowledge, "Join a session before editing the map.", "That could not be removed.", (principal) =>
-        operations.annotationRemove(principal, payload)
-      )
-    );
-    socket.on("annotation:set-visibility", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join a session before editing the map.",
-        "The visibility could not be changed.",
-        (principal) => operations.annotationSetVisibility(principal, payload)
-      )
-    );
-    socket.on("annotation:set-movable", (payload, acknowledge) =>
-      respond(
-        acknowledge,
-        "Join a session before editing the map.",
-        "Move control could not be changed.",
-        (principal) => operations.annotationSetMovable(principal, payload)
-      )
-    );
-    socket.on("annotation:clear", (payload, acknowledge) =>
-      respond(acknowledge, "Join a session before editing the map.", "Shapes could not be removed.", (principal) =>
-        operations.annotationClear(principal, payload)
-      )
-    );
+    // Every command and read is registered from its table entry; the event names are typed against the
+    // domain's `ClientToServerEvents` in `commands/index.ts`.
+    const on = socket.on.bind(socket) as unknown as (
+      event: string,
+      listener: (payload: unknown, acknowledge?: unknown) => void
+    ) => void;
+    for (const command of game.commands)
+      on(socketEventOf(command.type), (payload, acknowledge) =>
+        respond(acknowledge, (principal) => game.dispatch(command.type, principal, payload))
+      );
+    for (const read of game.reads)
+      on(read.event, (payload, acknowledge) =>
+        respond(acknowledge, (principal) => game.read(read, principal, payload))
+      );
     socket.emit(
       "state:updated",
-      projectPlayerView(store.snapshot, auth.verifyPlayer(socket.handshake.auth.token)?.sessionId, presenceFor)
+      projectPlayerView(committedState.read(), auth.verifyPlayer(socket.handshake.auth.token)?.sessionId, presenceFor)
     );
   });
 
@@ -1461,39 +741,9 @@ export function createServer(options: CreateServerOptions) {
       codexAssets.initialize(),
       homebrewStore.initialize()
     ]);
-    const persisted = store.snapshot;
-    if (
-      persisted.combat.active &&
-      persisted.combat.mapAssetId &&
-      persisted.combat.initiative.some(
-        (entry) => !persisted.combat.tokens.some((token) => token.actorId === entry.actorId)
-      )
-    ) {
-      try {
-        const geometry = await tokenGeometryFor(persisted.combat.mapAssetId);
-        await store.execute(
-          {
-            id: `encounter.tokens.prepare:${persisted.revision}`,
-            type: "encounter.tokens.prepare",
-            principal: "system:startup"
-          },
-          (state) => {
-            ensureEncounterTokens(state, geometry);
-          }
-        );
-      } catch {
-        /* Preserve startup for an old encounter whose map asset was removed; the GM can end it and start a new encounter. */
-      }
-    }
-    // Bind a pre-scenes encounter/map to one implicit active scene so park-and-resume has a home.
-    const beforeScenes = store.snapshot;
-    if (beforeScenes.combat.scenes.length === 0 && beforeScenes.combat.mapAssetId !== null) {
-      await store.execute(
-        { id: `scene.migrate:${beforeScenes.revision}`, type: "scene.migrate", principal: "system:startup" },
-        (state) => migrateToScene(state, randomUUID())
-      );
-    }
-    await viewerCoordinator.synchronizeEncounter(store.snapshot.revision, projectViewerEncounter(store.snapshot));
+    // The store's startup seeds may change the state without a revision bump.
+    committedState.reset();
+    await viewerCoordinator.synchronizeEncounter(store.revision, projectViewerEncounter(committedState.read()));
   }
   function close() {
     presence.dispose();

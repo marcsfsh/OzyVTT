@@ -276,7 +276,7 @@ describe("ask the GM", () => {
       type: "actor.set-condition",
       payload: body
     });
-    expect(impostor.status).toBe(409);
+    expect(impostor.status).toBe(403);
     expect(server.store.snapshot.combat.pendingRuleAsks).toEqual([]);
 
     // A payload that is not a valid token.move at all is that command's own validation failure.

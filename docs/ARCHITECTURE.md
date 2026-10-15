@@ -44,17 +44,28 @@ Packages are consumed as TypeScript source; only the client and server have buil
 ## The command pipeline
 
 A command is a named socket event (or an HTTP call to `/api/v1/game/...`) carrying a UUID
-`commandId` and an optional `expectedRevision`. Both transports call the same handler in
-`apps/server/src/game-operations.ts`:
+`commandId` and an optional `expectedRevision`. Each command is one entry in the command table
+(`apps/server/src/commands/`, listed in `index.ts`): its type, Zod schema, GM-only refusal and run
+function. Its scope and typed HTTP route come from `GAME_COMMANDS` in `packages/api-contract`, and its
+socket event is its type with the first `.` as `:`. The socket handlers and the HTTP routes are
+registered by looping over the table, and both run the same pipeline (`commands/pipeline.ts`):
 
-1. Validate the payload with a strict Zod schema (`game-commands.ts`).
-2. Authorize from the signed token, per command. Role is never cached at connect.
-3. `store.execute` commits the idempotency receipt, the domain event and the new state in one
-   SQLite transaction and bumps the revision. A repeated `commandId` returns the earlier result
+1. Refuse a GM-only command from a player, then validate the payload with its strict Zod schema
+   (`game-commands.ts`). Role comes from the signed token, per command; it is never cached at connect.
+2. Run the command. Whether a player may act on a given actor is decided in one place,
+   `canInitiateForActor` in `authorization.ts`, against live state.
+3. `store.execute` commits the idempotency receipt and the new state in one SQLite
+   transaction and bumps the revision. A repeated `commandId` returns the earlier result
    with `duplicate: true` and changes nothing. A stale `expectedRevision` is rejected.
 4. Broadcast `state:updated` with a projection computed separately for each socket's role.
+5. Reply through `projectReply`, which strips GM-only narration from a player's reply.
 
-Commands run one at a time through a promise queue. Add new capability to the operations layer,
+A failure answers through one mapping (`commands/failures.ts`) on both transports: a validation
+failure is 400, a denial 403, a missing read subject 404, a rules or state refusal 409, and anything
+unexpected is logged and answered with a generic 500. The reads both transports serve (content
+catalogs, action availability, the combat log) are a second table in `commands/reads.ts`.
+
+Commands run one at a time through a promise queue. Add new capability to the command table,
 never to one transport.
 
 ## Realtime
@@ -102,9 +113,10 @@ audience. There are four:
   paused. The fields that may cross are the `ViewerEncounterScene` and
   `ViewerPresentationProjection` types.
 - **Codex** (`codex-projections.ts`): a player gets the player half of a revealed record and
-  nothing else. Reveal is a graph: a child never leaks an unrevealed parent or target. Some
-  fields (staged scene ids on markers and sessions) are GM-only even when revealed. A hidden
-  record is a 404, never a 403, and ETags are computed after every gate.
+  nothing else. Reveal is a graph: a child never leaks an unrevealed parent or target, and
+  `codex/visibility.ts` resolves a record's neighbours for the projection. Some fields (staged
+  scene ids on markers and sessions) are GM-only even when revealed. A hidden record is a 404,
+  never a 403, and ETags are computed after every gate.
 - **Replay** (`replay-projection.ts`): a shared fight archive is rebuilt per turn from an
   allow-list. It carries no session ids, notes, stat blocks, or rolls that were not public.
 
@@ -149,11 +161,12 @@ off, with per-family exceptions (`rules-families.ts`). A player blocked by a rul
 
 ## Codex
 
-The worldbuilding Codex has its own store (`codex-store.ts`), router (`codex-http.ts`) and
-projection module, and does not go through the game command pipeline. Every record has a
-player half, a GM half and a reveal flag. The GM can preview the player view through
-`POST /api/v1/codex/preview-session`, which mints a real player session. The player calendar
-and the GM calendar are separate clocks; a date reaches players only when it is published.
+The worldbuilding Codex has its own store (`codex-store.ts`, a facade over one module per
+aggregate in `apps/server/src/codex/`), router (`codex-http.ts`) and projection module, and does
+not go through the game command pipeline. Every record has a player half, a GM half and a
+reveal flag. The GM can preview the player view through `POST /api/v1/codex/preview-session`,
+which mints a real player session. The player calendar and the GM calendar are separate clocks;
+a date reaches players only when it is published.
 
 ## Public HTTP API
 
@@ -167,6 +180,11 @@ ADR-0016.
 All stores share `data/vtt.sqlite` (WAL). Integration credentials have their own SQLite file;
 GM auth is `data/auth.json`; map, token and Codex images are files under `data/`. Paths are
 chosen in `apps/server/src/index.ts`. `data/` is git-ignored.
+
+Every store opens its database and runs its migrations through `apps/server/src/database.ts`. Each
+store's history starts from one baseline migration recorded in the shared `migrations` table; a file
+created before that reset is refused at startup with a message to move `data/` aside. Add a schema
+change as a new numbered migration in the owning store.
 
 ## Client
 

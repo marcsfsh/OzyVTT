@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { GameStateSchema, type MutationResult } from "@vtt/domain";
 import { io as connect, type Socket } from "socket.io-client";
 import { describe, expect, it } from "vitest";
+import { ENCOUNTER_ARCHIVE_PATHS, GAME_PATHS } from "@vtt/api-contract";
 import { createServer } from "../src/server.js";
 
 const HERO_ID = "10000000-0000-4000-8000-000000000001";
@@ -219,9 +220,11 @@ describe("live authoritative encounter workflow", () => {
       });
       expect(stale).toMatchObject({ ok: false });
       expect(stale.message).toContain("outdated");
-      const safeHttpState = await (
-        await fetch(`${base}/api/state`, { headers: { authorization: `Bearer ${playerToken}` } })
-      ).json();
+      const safeHttpState = (
+        await (
+          await fetch(`${base}${GAME_PATHS.snapshot}`, { headers: { authorization: `Bearer ${playerToken}` } })
+        ).json()
+      ).data.game;
       expect(safeHttpState).toMatchObject({
         revision: 2,
         combat: { active: true, turnActorId: HERO_ID, hiddenTurn: false }
@@ -357,11 +360,12 @@ describe("live authoritative encounter workflow", () => {
       const base = `http://127.0.0.1:${address.port}`;
       const gmHeaders = { authorization: `Bearer ${gmToken}` };
 
+      const archives = `${base}${ENCOUNTER_ARCHIVE_PATHS.collection}`;
+      const archive = (id: number | string) => `${base}${ENCOUNTER_ARCHIVE_PATHS.byId.replace("{id}", String(id))}`;
+
       // Empty to begin with, and GM-gated.
-      expect((await fetch(`${base}/api/gm/encounters`)).status).toBe(401);
-      expect(await (await fetch(`${base}/api/gm/encounters`, { headers: gmHeaders })).json()).toEqual({
-        encounters: []
-      });
+      expect((await fetch(archives)).status).toBe(401);
+      expect((await (await fetch(archives, { headers: gmHeaders })).json()).data).toEqual({ encounters: [] });
 
       gmSocket = await joinSocket(base, gmToken);
       const started = await emitCommand(gmSocket, "encounter:start", {
@@ -383,14 +387,13 @@ describe("live authoritative encounter workflow", () => {
       expect(ended).toMatchObject({ ok: true, revision: 3 });
 
       // The fight is archived permanently even though the live buffer was wiped.
-      const list = await (await fetch(`${base}/api/gm/encounters`, { headers: gmHeaders })).json();
+      const list = (await (await fetch(archives, { headers: gmHeaders })).json()).data;
       expect(list.encounters).toHaveLength(1);
       expect(list.encounters[0].turnCount).toBeGreaterThan(0);
       expect(typeof list.encounters[0].endedAt).toBe("string");
 
-      const document = await (
-        await fetch(`${base}/api/gm/encounters/${list.encounters[0].id}`, { headers: gmHeaders })
-      ).json();
+      const document = (await (await fetch(archive(list.encounters[0].id), { headers: gmHeaders })).json()).data
+        .document;
       expect(document.archiveSchemaVersion).toBe(3);
       expect(document.turns.length).toBe(list.encounters[0].turnCount);
       expect(document.turns[0].state.actors.some((actor: { id: string }) => actor.id === HERO_ID)).toBe(true); // full machine-readable state per turn
@@ -411,14 +414,10 @@ describe("live authoritative encounter workflow", () => {
       expect(Array.isArray(document.definitions)).toBe(true);
 
       // 404 for an unknown id; delete removes it.
-      expect((await fetch(`${base}/api/gm/encounters/99999`, { headers: gmHeaders })).status).toBe(404);
-      expect((await fetch(`${base}/api/gm/encounters/${list.encounters[0].id}`, { method: "DELETE" })).status).toBe(
-        401
-      );
-      await fetch(`${base}/api/gm/encounters/${list.encounters[0].id}`, { method: "DELETE", headers: gmHeaders });
-      expect(await (await fetch(`${base}/api/gm/encounters`, { headers: gmHeaders })).json()).toEqual({
-        encounters: []
-      });
+      expect((await fetch(archive(99999), { headers: gmHeaders })).status).toBe(404);
+      expect((await fetch(archive(list.encounters[0].id), { method: "DELETE" })).status).toBe(401);
+      await fetch(archive(list.encounters[0].id), { method: "DELETE", headers: gmHeaders });
+      expect((await (await fetch(archives, { headers: gmHeaders })).json()).data).toEqual({ encounters: [] });
     } finally {
       gmSocket?.disconnect();
       running.close();
@@ -555,9 +554,11 @@ describe("live authoritative encounter workflow", () => {
           expectedRevision: 3
         })
       ).toMatchObject({ ok: true, revision: 4, duplicate: true });
-      const safeState = await (
-        await fetch(`${base}/api/state`, { headers: { authorization: `Bearer ${ownerToken}` } })
-      ).json();
+      const safeState = (
+        await (
+          await fetch(`${base}${GAME_PATHS.snapshot}`, { headers: { authorization: `Bearer ${ownerToken}` } })
+        ).json()
+      ).data.game;
       expect(JSON.stringify(safeState)).not.toContain(SECRET_ID);
       expect(running.viewerPresentation.snapshot.encounter.tokens).toHaveLength(1);
 

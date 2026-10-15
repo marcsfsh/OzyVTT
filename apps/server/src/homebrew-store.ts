@@ -1,6 +1,4 @@
-import { mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync } from "node:sqlite";
 import { HomebrewContentTypeSchema, type HomebrewContentState, type HomebrewContentType } from "@vtt/api-contract";
 import { type ActorDefinition } from "@vtt/schemas";
 import {
@@ -20,6 +18,7 @@ import {
   type HomebrewCatalogSlice,
   type HomebrewContentSource
 } from "./content-library.js";
+import { migrate, openDatabase, transaction, type Migration } from "./database.js";
 import { mintHomebrewId } from "./homebrew-ids.js";
 
 /**
@@ -116,41 +115,43 @@ const MAX_LIMIT = 200;
 /** Literal because migration SQL must be frozen; a test asserts it still matches the contract. */
 const TYPE_CHECK_LIST = "'class','subclass','species','background','feat','spell','equipment','monster','spell-list'";
 
-export const MIGRATIONS = [
+const MIGRATIONS: readonly Migration[] = [
   {
     version: 1,
-    sql: `
-    CREATE TABLE homebrew_meta (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
-      homebrew_revision INTEGER NOT NULL
-    ) STRICT;
-    CREATE TABLE homebrew_records (
-      id TEXT PRIMARY KEY,
-      type TEXT NOT NULL CHECK (type IN (${TYPE_CHECK_LIST})),
-      name TEXT NOT NULL,
-      state TEXT NOT NULL DEFAULT 'draft' CHECK (state IN ('draft', 'published')),
-      visible_to_players INTEGER NOT NULL DEFAULT 0,
-      deleted_at TEXT,
-      body_json TEXT NOT NULL,
-      rev INTEGER NOT NULL,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    ) STRICT;
-    CREATE INDEX homebrew_records_catalog ON homebrew_records (type, state, visible_to_players, deleted_at);
-    CREATE INDEX homebrew_records_name ON homebrew_records (name);
-    CREATE TABLE homebrew_record_revisions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      record_id TEXT NOT NULL REFERENCES homebrew_records(id) ON DELETE CASCADE,
-      rev INTEGER NOT NULL,
-      name TEXT NOT NULL,
-      state TEXT NOT NULL,
-      visible_to_players INTEGER NOT NULL,
-      body_json TEXT NOT NULL,
-      authored_at TEXT NOT NULL,
-      author_tag TEXT NOT NULL
-    ) STRICT;
-    CREATE INDEX homebrew_record_revisions_record ON homebrew_record_revisions (record_id, rev DESC);
-  `
+    up: (database) =>
+      database.exec(`
+        CREATE TABLE homebrew_meta (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          homebrew_revision INTEGER NOT NULL
+        ) STRICT;
+        INSERT INTO homebrew_meta (id, homebrew_revision) VALUES (1, 0);
+        CREATE TABLE homebrew_records (
+          id TEXT PRIMARY KEY,
+          type TEXT NOT NULL CHECK (type IN (${TYPE_CHECK_LIST})),
+          name TEXT NOT NULL,
+          state TEXT NOT NULL DEFAULT 'draft' CHECK (state IN ('draft', 'published')),
+          visible_to_players INTEGER NOT NULL DEFAULT 0,
+          deleted_at TEXT,
+          body_json TEXT NOT NULL,
+          rev INTEGER NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        ) STRICT;
+        CREATE INDEX homebrew_records_catalog ON homebrew_records (type, state, visible_to_players, deleted_at);
+        CREATE INDEX homebrew_records_name ON homebrew_records (name);
+        CREATE TABLE homebrew_record_revisions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          record_id TEXT NOT NULL REFERENCES homebrew_records(id) ON DELETE CASCADE,
+          rev INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          state TEXT NOT NULL,
+          visible_to_players INTEGER NOT NULL,
+          body_json TEXT NOT NULL,
+          authored_at TEXT NOT NULL,
+          author_tag TEXT NOT NULL
+        ) STRICT;
+        CREATE INDEX homebrew_record_revisions_record ON homebrew_record_revisions (record_id, rev DESC);
+      `)
   }
 ];
 
@@ -185,25 +186,21 @@ export class HomebrewStore implements HomebrewContentSource {
 
   async initialize() {
     if (this.database) return;
-    await mkdir(dirname(this.databasePath), { recursive: true });
-    const database = new DatabaseSync(this.databasePath, { enableForeignKeyConstraints: true });
+    const database = openDatabase(this.databasePath);
     try {
-      database.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;");
-      database.exec(
-        "CREATE TABLE IF NOT EXISTS homebrew_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL) STRICT;"
-      );
-      this.database = database;
-      this.migrate();
-      const meta = database.prepare("SELECT homebrew_revision FROM homebrew_meta WHERE id = 1").get() as
-        { homebrew_revision: number } | undefined;
-      if (!meta) database.prepare("INSERT INTO homebrew_meta (id, homebrew_revision) VALUES (1, 0)").run();
-      this.revisionValue = meta?.homebrew_revision ?? 0;
+      migrate(database, "homebrew", MIGRATIONS, {
+        path: this.databasePath,
+        legacyTables: ["homebrew_schema_migrations"]
+      });
+      const meta = database.prepare("SELECT homebrew_revision FROM homebrew_meta WHERE id = 1").get() as {
+        homebrew_revision: number;
+      };
+      this.revisionValue = meta.homebrew_revision;
     } catch (error) {
       database.close();
-      this.database = undefined;
-      this.revisionValue = -1;
       throw error;
     }
+    this.database = database;
   }
 
   close() {
@@ -659,40 +656,14 @@ export class HomebrewStore implements HomebrewContentSource {
     this.revisionValue = next;
   }
 
+  /** Restores the in-memory counter on rollback, so it cannot run ahead of the stored one. */
   private transaction(work: () => void) {
-    const database = this.requireDatabase();
     const before = this.revisionValue;
-    database.exec("BEGIN IMMEDIATE");
     try {
-      work();
-      database.exec("COMMIT");
+      transaction(this.requireDatabase(), work);
     } catch (error) {
-      database.exec("ROLLBACK");
       this.revisionValue = before;
       throw error;
-    }
-  }
-
-  private migrate() {
-    const database = this.requireDatabase();
-    const applied = new Set(
-      (database.prepare("SELECT version FROM homebrew_schema_migrations").all() as Array<{ version: number }>).map(
-        ({ version }) => version
-      )
-    );
-    for (const migration of MIGRATIONS) {
-      if (applied.has(migration.version)) continue;
-      database.exec("BEGIN IMMEDIATE");
-      try {
-        database.exec(migration.sql);
-        database
-          .prepare("INSERT INTO homebrew_schema_migrations (version, applied_at) VALUES (?, ?)")
-          .run(migration.version, this.stamp());
-        database.exec("COMMIT");
-      } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
-      }
     }
   }
 
