@@ -262,11 +262,11 @@
 .action-damage {
   margin: 0.35rem 0 0;
   font-size: var(--fs-sm);
-  color: var(--danger-hi);
+  color: var(--danger-text);
 }
 .action-damage strong {
   font-size: 1rem;
-  color: var(--danger-hi);
+  color: var(--danger-text);
 }
 .action-preview {
   display: flex;
@@ -391,7 +391,7 @@
   border: 1px solid var(--danger);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--surface-2) 82%, var(--danger));
-  color: var(--danger-hi);
+  color: var(--danger-text);
   font-weight: 700;
   text-align: center;
   font-size: var(--fs-body);
@@ -404,7 +404,7 @@
   border: 1px solid var(--danger);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--surface-2) 78%, var(--danger));
-  color: var(--danger-hi);
+  color: var(--danger-text);
   font-weight: 700;
   text-align: center;
   cursor: pointer;

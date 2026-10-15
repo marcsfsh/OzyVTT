@@ -272,7 +272,7 @@
   border: 1px solid var(--danger);
   border-radius: var(--radius-md);
   background: transparent;
-  color: var(--danger-hi);
+  color: var(--danger-text);
   font-size: var(--fs-sm);
   font-weight: 700;
   cursor: pointer;
@@ -697,10 +697,10 @@
   color: var(--cyan-hi);
 }
 .initiative-hp-text.hp-bloodied {
-  color: var(--magenta-hi);
+  color: var(--magenta-text);
 }
 .initiative-hp-text.hp-down {
-  color: var(--danger-hi);
+  color: var(--danger-text);
 }
 .initiative-hpbar {
   display: block;

@@ -55,7 +55,7 @@
   cursor: pointer;
 }
 .viewer-preview-close:hover {
-  color: var(--danger-hi);
+  color: var(--danger-text);
 }
 .viewer-preview-body {
   position: relative;

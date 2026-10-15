@@ -28,13 +28,17 @@ used with restraint.
 
 Never hard-code a colour in a component; add a token first and use `var(--...)`.
 
-| Meaning                        | Token                                               |
-| ------------------------------ | --------------------------------------------------- |
-| Primary action, attention      | `--magenta`                                         |
-| Positive, heal, confirm, focus | `--success` / `--cyan`                              |
-| Caution, "not finished"        | `--caution` (warm orange; text uses `--caution-hi`) |
-| Damage, destroy                | `--danger` (rose; text uses `--danger-hi`)          |
-| GM-only content                | `--violet` (reserved for this)                      |
+| Meaning                        | Token                                                   |
+| ------------------------------ | ------------------------------------------------------- |
+| Primary action, attention      | `--magenta` (text uses `--magenta-text`)                |
+| Positive, heal, confirm, focus | `--success` / `--cyan` (text uses `--cyan-hi`)          |
+| Caution, "not finished"        | `--caution` (warm orange; text uses `--caution-hi`)     |
+| Damage, destroy                | `--danger` (rose; text uses `--danger-text`)            |
+| Information                    | `--info` / `--indigo` (text uses `--indigo-text`)       |
+| GM-only content                | `--violet` (reserved for this; text uses `--violet-hi`) |
+
+A hue painted as words uses its text token, which clears 4.5:1 on that theme's surfaces; the hue
+itself is for edges and fills.
 
 Every state carries an icon or a text label as well as a colour. The palette sits in the band
 that is hardest for red-green colour blindness, and green is absent on purpose.

@@ -44,14 +44,14 @@
 .nh-card-actions .nh-btn--primary:not(:hover):not(:active):not(:focus-visible) {
   --nh-fill: transparent;
   --nh-rim: var(--magenta);
-  color: var(--magenta-hi);
+  color: var(--magenta-text);
 }
 
 .scene-live-note {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  color: var(--magenta);
+  color: var(--magenta-text);
   font-size: var(--fs-xs);
   font-weight: 700;
   letter-spacing: 0.02em;

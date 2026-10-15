@@ -15,7 +15,7 @@
   flex: 1 1 12rem;
 }
 .dying-label {
-  color: var(--danger-hi);
+  color: var(--danger-text);
   font-size: var(--fs-sm);
   font-weight: 700;
   text-transform: uppercase;

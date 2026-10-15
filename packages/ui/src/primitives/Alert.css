@@ -79,7 +79,7 @@
   --nh-rule: var(--danger);
 }
 .nh-alert--danger .nh-alert-icon {
-  color: var(--danger-hi);
+  color: var(--danger-text);
   background: color-mix(in srgb, var(--danger) 20%, transparent);
 }
 :root[data-theme="light"] .nh-alert--info .nh-alert-icon {

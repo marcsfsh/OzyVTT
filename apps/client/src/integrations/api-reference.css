@@ -33,7 +33,7 @@
   font-size: 0.8rem;
 }
 .api-reference-error {
-  color: var(--danger-hi);
+  color: var(--danger-text);
 }
 .api-reference-group {
   margin-top: var(--space-5);

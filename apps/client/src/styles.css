@@ -476,7 +476,7 @@ textarea:focus {
 .danger {
   background: transparent;
   border: 1px solid var(--danger);
-  color: var(--danger-hi);
+  color: var(--danger-text);
 }
 .danger:hover:not(:disabled) {
   background: var(--danger);

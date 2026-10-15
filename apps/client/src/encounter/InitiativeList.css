@@ -41,7 +41,7 @@
    encounter-map.css), so a player watching the map also notices. */
 .init-row-caret {
   flex: none;
-  color: var(--magenta-hi);
+  color: var(--magenta-text);
   font-size: 0.85em;
   animation: init-turn-flare 0.6s var(--ease-settle, ease-out) 1;
 }
@@ -93,10 +93,10 @@
   font-weight: 800;
 }
 .init-row-health.hp-bloodied {
-  color: var(--magenta-hi);
+  color: var(--magenta-text);
 }
 .init-row-health.hp-down {
-  color: var(--danger-hi);
+  color: var(--danger-text);
 }
 .init-row-dots {
   display: inline-flex;

@@ -63,7 +63,7 @@
   border: 1px solid var(--danger);
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--danger-hi);
+  color: var(--danger-text);
   text-align: center;
   cursor: pointer;
 }

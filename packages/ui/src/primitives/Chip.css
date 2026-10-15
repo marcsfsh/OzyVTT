@@ -66,7 +66,7 @@
   color: var(--text-dim);
 }
 .nh-chip--harmful .nh-chip-icon {
-  color: var(--danger-hi);
+  color: var(--danger-text);
 }
 .nh-chip--beneficial .nh-chip-icon {
   color: var(--cyan);

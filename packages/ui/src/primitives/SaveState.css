@@ -42,7 +42,7 @@
   color: var(--caution-hi);
 }
 .nh-savestate--danger {
-  color: var(--danger-hi);
+  color: var(--danger-text);
 }
 
 /* On a phone the label stops reserving width; nothing beside it needs to stay still. */

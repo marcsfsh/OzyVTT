@@ -155,7 +155,7 @@
   color: var(--cyan-hi);
 }
 .save-prompt-confirm .save-fail {
-  color: var(--danger-hi);
+  color: var(--danger-text);
 }
 .save-prompt-effect {
   color: var(--text-dim);

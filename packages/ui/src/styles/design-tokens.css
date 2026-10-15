@@ -66,6 +66,11 @@
   --danger: #ff2d5e;
   --danger-hi: #ff6b8e;
   --info: var(--indigo);
+  /* Each hue as words: the ink that clears 4.5:1 on this theme's surfaces, where the hue itself (for edges
+     and fills) or its -hi twin (for glows) may not. */
+  --magenta-text: var(--magenta-hi);
+  --indigo-text: #94a3ff;
+  --danger-text: var(--danger-hi);
 
   /* ---- State: on ----
      The segmented control's on fill; each theme defines its own value. Literals, not aliases, so
@@ -479,6 +484,9 @@
   --violet-hi: #d3aeff;
   /* Lifted so --indigo (and --info, which aliases it) clears AA on dusk's surfaces. */
   --indigo: #93a4ff;
+  --magenta-text: #ff8fd0;
+  --indigo-text: #b3bfff;
+  --danger-text: #ff97ad;
 
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.34);
   --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.42);
@@ -528,6 +536,9 @@
   --danger: #c8143e;
   --danger-hi: #e24c6c;
   --info: var(--indigo);
+  --magenta-text: #b3186f;
+  --indigo-text: var(--indigo);
+  --danger-text: #b52a4a;
 
   /* State on: a deepened cyan, because no ink reaches 4.5:1 on --cyan itself. */
   --state-on: #0b6497;

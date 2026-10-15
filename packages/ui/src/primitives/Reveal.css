@@ -41,7 +41,7 @@
 }
 .nh-reveal-toggle.is-revealed:hover:not(:disabled),
 .nh-reveal-toggle.is-revealed:active:not(:disabled) {
-  color: var(--magenta-hi);
+  color: var(--magenta-text);
 }
 .nh-reveal-toggle:disabled {
   color: var(--text-muted);

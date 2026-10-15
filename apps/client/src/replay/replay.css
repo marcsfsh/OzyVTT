@@ -51,7 +51,7 @@
   font-size: 0.9rem;
 }
 .replay-error {
-  color: var(--danger-hi);
+  color: var(--danger-text);
 }
 
 /* A refused launch and its way out: a chrome row that takes its own height, so appearing never
