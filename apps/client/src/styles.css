@@ -430,11 +430,15 @@ textarea:focus {
 .card button:not(.nh-btn):hover:not(:disabled) {
   background: var(--magenta-hi);
 }
+/* A ghost action in a card is text only: `.card button` above would otherwise give it the primary fill. */
 .card .link {
+  --nh-fill: transparent;
+  --nh-rim: transparent;
   background: transparent;
   color: var(--text-dim);
 }
 .card .link:hover:not(:disabled) {
+  --nh-fill: transparent;
   color: var(--text);
   box-shadow: none;
 }
