@@ -38,33 +38,33 @@ export const RulesOverrideSchema = z
 /** Per-family exceptions on the wire are strict: a misspelled family is a rejection, never a silent no-op. */
 export const WireRuleExceptionsSchema = RuleExceptionsSchema.strict();
 export const CommandIdentitySchema = z
-  .object({ commandId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() })
+  .object({ commandId: z.uuid(), expectedRevision: z.number().int().nonnegative().optional() })
   .strict();
 // Turn navigation carries an optional confirmation flag: Next may rewrite history, Previous may discard an in-place change.
 export const InitiativeNextSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     confirmRewrite: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const InitiativePreviousSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     confirmDiscard: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const EncounterStartSchema = z
   .object({
-    commandId: z.string().uuid(),
-    mapAssetId: z.string().uuid(),
+    commandId: z.uuid(),
+    mapAssetId: z.uuid(),
     /** Omitted means the server derives combatants from the live scene's staged list rather than trusting the client's copy. */
     entries: z
       .array(
         z
           .object({
-            actorId: z.string().uuid(),
+            actorId: z.uuid(),
             score: z.number().int().min(-1000).max(1000).optional(),
             /** 2024 surprise: the combatant rolls initiative with disadvantage (SRD Surprise). */ surprised: z
               .boolean()
@@ -86,8 +86,8 @@ export const EncounterStartSchema = z
   .strict();
 export const InitiativeScoreSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     score: z.number().int().min(-1000).max(1000),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -95,8 +95,8 @@ export const InitiativeScoreSchema = z
 /** A player rolls their own initiative (server rolls unless a manual d20 `natural` is given; adv/disadv supported). */
 export const InitiativeRollSelfSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     natural: z.number().int().min(1).max(20).optional(),
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -104,20 +104,20 @@ export const InitiativeRollSelfSchema = z
   .strict();
 /** GM rolls initiative for everyone still pending (begins a wait-mode fight). */
 export const InitiativeRollRemainingSchema = z
-  .object({ commandId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional() })
+  .object({ commandId: z.uuid(), expectedRevision: z.number().int().nonnegative().optional() })
   .strict();
 /** Table-wide policy for player-rolled initiative: begin immediately (roll in) or wait for all players first (GM). */
 export const SetPlayerInitiativeModeSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     mode: z.enum(["immediate", "wait"]),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const AddCombatantSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     score: z.number().int().min(-1000).max(1000).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -125,7 +125,7 @@ export const AddCombatantSchema = z
 /** `joinEncounter` lands the new combatant in the running fight (roster + initiative + tray token) in one command; ignored when no fight is running. */
 export const ActorAddFromDefinitionSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     definitionId: z
       .string()
       .regex(/^[a-z0-9-]+$/)
@@ -137,7 +137,7 @@ export const ActorAddFromDefinitionSchema = z
   .strict();
 export const ActorImportDefinitionSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     definition: z.unknown(),
     visibility: z.enum(["public", "gm-only"]).default("public"),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -145,14 +145,14 @@ export const ActorImportDefinitionSchema = z
   .strict();
 export const CharacterSubmitImportSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     definition: z.unknown(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const CharacterResolveImportSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     importId: z.string().max(120),
     approve: z.boolean(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -160,39 +160,39 @@ export const CharacterResolveImportSchema = z
   .strict();
 export const ActorRemoveSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const SetTokenImageSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
-    tokenAssetId: z.string().uuid().nullable(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    tokenAssetId: z.uuid().nullable(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const SetActorSizeSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     size: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const SetActorVisibilitySchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     visibility: z.enum(["public", "gm-only"]),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const SetActorArchivedSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     archived: z.boolean(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -200,16 +200,16 @@ export const SetActorArchivedSchema = z
 /** GM shares (or un-shares) an archived character's sheet with players as a read-only keepsake; default hidden. */
 export const SetActorSheetPreviewSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     enabled: z.boolean(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const HpAmountSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     amount: z.number().int().min(1).max(1000),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -218,8 +218,8 @@ export const HpAmountSchema = z
  *  and the crit flag that drives death-save failures. */
 export const ApplyDamageSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     amount: z.number().int().min(1).max(1000),
     parts: z
       .array(z.object({ amount: z.number().int().min(0).max(1000), type: z.string().min(1).max(40) }).strict())
@@ -230,7 +230,7 @@ export const ApplyDamageSchema = z
     damageType: z.string().trim().min(1).max(40).optional(),
     /** A hand-entered total that replaces what was rolled while keeping its types (the server re-weights `parts`). */
     damageOverride: z.number().int().min(0).max(1000).optional(),
-    sourceActorId: z.string().uuid().optional(),
+    sourceActorId: z.uuid().optional(),
     sourceActionId: z
       .string()
       .regex(/^[a-z0-9-]+$/)
@@ -245,24 +245,24 @@ export const ApplyDamageSchema = z
   .strict();
 export const TempHpSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     amount: z.number().int().min(0).max(1000),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const SetHpSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     current: z.number().int().min(0).max(10000),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const SetConditionSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     conditionId: z
       .string()
       .regex(/^[a-z0-9-]+$/)
@@ -276,7 +276,7 @@ export const SetConditionSchema = z
   .strict();
 export const TurnUseSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     slot: z.enum(["action", "bonus-action"]),
     used: z.boolean(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -284,13 +284,13 @@ export const TurnUseSchema = z
   .strict();
 export const ActionResolveSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     actionId: z
       .string()
       .regex(/^[a-z0-9-]+$/)
       .max(120),
-    targetIds: z.array(z.string().uuid()).min(1).max(20).optional(),
+    targetIds: z.array(z.uuid()).min(1).max(20).optional(),
     template: z
       .object({ shape: AnnotationShapeKindSchema, origin: AnnotationPointSchema, target: AnnotationPointSchema })
       .strict()
@@ -322,17 +322,17 @@ export const ActionResolveSchema = z
   })
   .strict()
   .refine((payload) => payload.targetIds === undefined || payload.template === undefined, {
-    message: "Provide either explicit targets or an area template, not both."
+    error: "Provide either explicit targets or an area template, not both."
   })
   .refine((payload) => payload.attackNatural === undefined || payload.attackTotal === undefined, {
-    message: "Supply either a natural d20 or a final total, not both."
+    error: "Supply either a natural d20 or a final total, not both."
   });
 // The message `save.answer` surfaces for out-of-bounds hand-entered damage (it reports the zod issue's own text).
 const SAVE_DAMAGE_BOUND = "Enter the damage as a whole number from 0 to 1000.";
 export const SaveAnswerSchema = z
   .object({
-    commandId: z.string().uuid(),
-    saveId: z.string().uuid(),
+    commandId: z.uuid(),
+    saveId: z.uuid(),
     method: z.enum(["roll", "manual"]),
     total: z.number().int().min(-20).max(60).optional(),
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
@@ -340,7 +340,7 @@ export const SaveAnswerSchema = z
     legendaryResistance: z.boolean().default(false),
     /** Hand-entered damage, applied before success halving with the proposal's types kept; a player may amend only their own character's save. */ damageOverride:
       z
-        .number({ invalid_type_error: SAVE_DAMAGE_BOUND })
+        .number({ error: SAVE_DAMAGE_BOUND })
         .int(SAVE_DAMAGE_BOUND)
         .min(0, SAVE_DAMAGE_BOUND)
         .max(1000, SAVE_DAMAGE_BOUND)
@@ -349,20 +349,20 @@ export const SaveAnswerSchema = z
   })
   .strict()
   .refine((payload) => payload.method !== "manual" || payload.total !== undefined, {
-    message: "A manual answer needs the rolled total."
+    error: "A manual answer needs the rolled total."
   });
 export const SaveDismissSchema = z
   .object({
-    commandId: z.string().uuid(),
-    saveId: z.string().uuid(),
+    commandId: z.uuid(),
+    saveId: z.uuid(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 /** Answer a pending reaction prompt: use (halve the parked damage, or swing the opportunity attack) or decline. `actionId` picks the melee action for a leaves-reach answer (default: first melee attack, else Unarmed Strike). */
 export const ReactionAnswerSchema = z
   .object({
-    commandId: z.string().uuid(),
-    reactionId: z.string().uuid(),
+    commandId: z.uuid(),
+    reactionId: z.uuid(),
     use: z.boolean(),
     actionId: z
       .string()
@@ -378,13 +378,13 @@ export const ReactionAnswerSchema = z
   .strict();
 export const ReactionDismissSchema = z
   .object({
-    commandId: z.string().uuid(),
-    reactionId: z.string().uuid(),
+    commandId: z.uuid(),
+    reactionId: z.uuid(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 /** Read-only availability lookup (no commandId - nothing mutates). */
-export const ActorAvailableActionsSchema = z.object({ actorId: z.string().uuid() }).strict();
+export const ActorAvailableActionsSchema = z.object({ actorId: z.uuid() }).strict();
 export const ContentActionsSchema = z
   .object({
     definitionId: z
@@ -395,8 +395,8 @@ export const ContentActionsSchema = z
   .strict();
 export const TurnReactionSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     used: z.boolean(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -404,8 +404,8 @@ export const TurnReactionSchema = z
 /** GM absolute set of a creature's spent legendary actions this round (manual escape hatch; structured resolves spend automatically). */
 export const TurnLegendarySchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     spent: z.number().int().min(0).max(10),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -413,8 +413,8 @@ export const TurnLegendarySchema = z
 /** GM-added house effect (ADR-0020); structured actions create richer instances via their `grants`/`onHit` declarations. */
 export const EffectAddSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     name: z.string().trim().min(1).max(120),
     tags: z
       .array(
@@ -442,8 +442,8 @@ export const EffectAddSchema = z
   .strict();
 export const EffectEndSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     effectId: z.string().min(1).max(120),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -452,8 +452,8 @@ export const EffectEndSchema = z
  *  physical) `naturalRoll` applies it; `commit: true` alone rolls and applies. */
 export const DeathSaveRollSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     commit: z.boolean().default(true),
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
     naturalRoll: z.number().int().min(1).max(20).optional(),
@@ -463,7 +463,7 @@ export const DeathSaveRollSchema = z
 /** Change the live fight's rules mode and optionally its per-family exceptions. Omitted `exceptions` leaves the stored ones. */
 export const SetRulesModeSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     mode: RuleModeSchema,
     exceptions: WireRuleExceptionsSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -473,13 +473,13 @@ export const SetRulesModeSchema = z
  *  so a sheet with its own damage chip can't roll damage twice. */
 export const ActionUseSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     actionId: z
       .string()
       .regex(/^[a-z0-9-]+$/)
       .max(120),
-    targetIds: z.array(z.string().uuid()).min(1).max(20).optional(),
+    targetIds: z.array(z.uuid()).min(1).max(20).optional(),
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
     /** Loose route only: also roll the action's damage parts in the same tap. Ignored in the fight, where the resolver rolls damage. */
     includeDamage: z.boolean().optional(),
@@ -492,8 +492,8 @@ export const ActionUseSchema = z
 /** A sheet save chip: answers a matching pending save, or with none open is a loose, attributed save roll. */
 export const SaveRollSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     ability: AbilitySchema,
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
     /** A hand-entered final total (the off-screen die), used verbatim instead of rolling. */
@@ -505,7 +505,7 @@ export const SaveRollSchema = z
 /** Ask the GM. `payload` is the original command, revalidated with its own schema before use. */
 export const RulesAskSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     type: AskableCommandSchema,
     payload: z.unknown(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -514,8 +514,8 @@ export const RulesAskSchema = z
 /** GM answers a parked ask: Allow re-runs the command with an override, Deny tells the player. Reason optional. */
 export const RulesAnswerSchema = z
   .object({
-    commandId: z.string().uuid(),
-    askId: z.string().uuid(),
+    commandId: z.uuid(),
+    askId: z.uuid(),
     allow: z.boolean(),
     reason: z.string().trim().min(1).max(300).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -524,7 +524,7 @@ export const RulesAnswerSchema = z
 /** GM sets the standing rules policy every new fight inherits. Omitted `exceptions` keeps the stored ones. */
 export const RulesSetPolicySchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     dial: RuleModeSchema,
     exceptions: WireRuleExceptionsSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -533,7 +533,7 @@ export const RulesSetPolicySchema = z
 /** GM sets the table's staging defaults: the visibility a newly staged combatant's token starts at. */
 export const TableSetStagingDefaultsSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     visibility: z.enum(["public", "gm-only"]),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -541,7 +541,7 @@ export const TableSetStagingDefaultsSchema = z
 /** GM sets how much a player sees of another player's character (tiers in `PartyVisibilitySchema`). */
 export const TableSetPartyVisibilitySchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     visibility: PartyVisibilitySchema,
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -549,7 +549,7 @@ export const TableSetPartyVisibilitySchema = z
 /** Table-wide policy for how a player's own confirmed hit reaches an enemy's HP (GM): a GM-confirmed proposal, or direct server-side apply. */
 export const SetPlayerDamageModeSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     mode: z.enum(["proposal", "direct"]),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -557,8 +557,8 @@ export const SetPlayerDamageModeSchema = z
 /** GM resolves a parked player-hit damage proposal: apply it (optionally overriding the total) or dismiss it. */
 export const DamageResolveSchema = z
   .object({
-    commandId: z.string().uuid(),
-    proposalId: z.string().uuid(),
+    commandId: z.uuid(),
+    proposalId: z.uuid(),
     apply: z.boolean(),
     amount: z.number().int().min(0).max(1000).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -567,7 +567,7 @@ export const DamageResolveSchema = z
 /** Table-wide default for how token health shows on the map (GM). */
 export const SetHealthDisplaySchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     style: z.enum(["band", "bar", "ring", "aura"]),
     audience: z.enum(["gm", "all"]),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -576,8 +576,8 @@ export const SetHealthDisplaySchema = z
 /** Per-token health-display override (GM); `display: null` clears the override so the token follows the table default. */
 export const SetActorHealthDisplaySchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     display: z
       .object({ style: z.enum(["band", "bar", "ring", "aura"]), audience: z.enum(["gm", "all"]) })
       .strict()
@@ -587,7 +587,7 @@ export const SetActorHealthDisplaySchema = z
   .strict();
 export const SetEnvironmentSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     underwater: z.boolean(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -595,39 +595,39 @@ export const SetEnvironmentSchema = z
 /** Manual fog of war (GM-only). `sceneId` targets a parked scene's private prep instead of the live table. */
 export const FogSetEnabledSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     enabled: z.boolean(),
-    sceneId: z.string().uuid().optional(),
+    sceneId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const FogPaintSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     op: z.enum(["reveal", "hide"]),
     rect: z
       .object({
-        x: z.number().finite().min(-100000).max(1_000_000),
-        y: z.number().finite().min(-100000).max(1_000_000),
-        width: z.number().finite().positive().max(1_000_000),
-        height: z.number().finite().positive().max(1_000_000)
+        x: z.number().min(-100000).max(1_000_000),
+        y: z.number().min(-100000).max(1_000_000),
+        width: z.number().positive().max(1_000_000),
+        height: z.number().positive().max(1_000_000)
       })
       .strict(),
-    sceneId: z.string().uuid().optional(),
+    sceneId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const FogResetSchema = z
   .object({
-    commandId: z.string().uuid(),
-    sceneId: z.string().uuid().optional(),
+    commandId: z.uuid(),
+    sceneId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const ActorRestSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     kind: z.enum(["long", "short"]),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -635,8 +635,8 @@ export const ActorRestSchema = z
 /** Re-make a pick a feature allows on a rest (`replaces`); `id` must be one the original pick allowed. */
 export const ActorRechooseSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     offer: z
       .string()
       .regex(/^[a-z0-9-]+(:[a-z0-9-]+)?$/)
@@ -651,16 +651,16 @@ export const ActorRechooseSchema = z
 /** Spend Hit Point Dice to heal on a short rest (SRD 5.2.1: each die heals its roll + Con modifier, minimum 1). GM any actor; a player only their claimed character. */
 export const ActorSpendHitDiceSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     count: z.number().int().min(1).max(40),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const CharacterSetSlotSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     level: z.number().int().min(1).max(9),
     remaining: z.number().int().min(0).max(9),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -668,8 +668,8 @@ export const CharacterSetSlotSchema = z
   .strict();
 export const CharacterSetPreparedSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     spellId: z.string().min(1).max(80),
     prepared: z.boolean(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -677,32 +677,32 @@ export const CharacterSetPreparedSchema = z
   .strict();
 export const CharacterSetInventorySchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     item: InventoryItemSchema,
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const CharacterSetCurrencySchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     currency: CurrencySchema,
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const CharacterSetIdentitySchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     character: CharacterIdentitySchema,
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const CharacterSetProficienciesSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     proficiencies: ProficienciesSchema,
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -710,7 +710,7 @@ export const CharacterSetProficienciesSchema = z
 /** Create a character from choices, not a finished sheet; `character-build.ts` validates and assembles it. */
 export const CharacterCreateSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     name: z.string().trim().min(1).max(120),
     speciesId: z
       .string()
@@ -783,14 +783,12 @@ export const BuilderOffersSchema = z
   .refine((draft) => !(draft.picks && draft.choices), "Send the answers as picks or as a ledger, not both.");
 
 /** Level up/down or respec: `CharacterCreateSchema` minus the name, plus the actor. Fully re-validated. */
-export const CharacterRebuildSchema = CharacterCreateSchema.omit({ name: true })
-  .extend({ actorId: z.string().uuid() })
-  .strict();
+export const CharacterRebuildSchema = CharacterCreateSchema.omit({ name: true }).extend({ actorId: z.uuid() }).strict();
 
 /** Roll a whole character: only class (or none) and level cross the wire; everything else is drawn server-side. */
 export const CharacterGenerateSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     level: z.number().int().min(1).max(20),
     classId: z
       .string()
@@ -805,7 +803,7 @@ export const CharacterGenerateSchema = z
 /** Roll six ability scores server-side; they land in the table feed like any roll. */
 export const BuilderRollAbilitiesSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     method: z.enum(["roll", "custom"]),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -814,7 +812,7 @@ export const BuilderRollAbilitiesSchema = z
 /** GM builder policy. `customFormula`: omitted keeps it, null clears it, a string is validated and stored. */
 export const BuilderSetPolicySchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     allowedAbilityMethods: z.array(BuilderAbilityMethodSchema).min(1).max(4),
     customFormula: z.string().trim().min(1).max(160).nullable().optional(),
     /** Highest level this table builds to; omitted keeps the stored cap. */
@@ -829,7 +827,7 @@ export const BuilderSetPolicySchema = z
   .superRefine((payload, context) => {
     if (new Set(payload.allowedAbilityMethods).size !== payload.allowedAbilityMethods.length) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["allowedAbilityMethods"],
         message: "Each ability method may be listed once."
       });
@@ -837,21 +835,21 @@ export const BuilderSetPolicySchema = z
   });
 export const DiceRollSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     formula: z.string().min(1).max(160),
     purpose: RollPurposeSchema,
     visibility: RollVisibilitySchema,
     label: z.string().min(1).max(80).optional(),
-    actorId: z.string().uuid().optional(),
+    actorId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const TokenMoveSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     position: EncounterTokenPositionSchema.nullable(),
-    sceneId: z.string().uuid().optional(),
+    sceneId: z.uuid().optional(),
     /** GM-grade bypass of a movement-rule rejection (speed budget); audited like every override. */
     override: RulesOverrideSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -860,8 +858,8 @@ export const TokenMoveSchema = z
 /** GM-set walking speed; null clears to unknown (movement rules then skip for that combatant). */
 export const ActorSetSpeedSchema = z
   .object({
-    commandId: z.string().uuid(),
-    actorId: z.string().uuid(),
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     speedFeet: z.number().int().min(0).max(500).nullable(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -870,33 +868,33 @@ export const SceneNameSchema = z.string().trim().min(1).max(120);
 /** `activate: true` goes live on the new scene in the same command, parking whatever was live (as `scene.activate` does). */
 export const SceneCreateSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     name: SceneNameSchema,
-    mapAssetId: z.string().uuid(),
-    combatantIds: z.array(z.string().uuid()).max(200),
+    mapAssetId: z.uuid(),
+    combatantIds: z.array(z.uuid()).max(200),
     activate: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const SceneRenameSchema = z
   .object({
-    commandId: z.string().uuid(),
-    sceneId: z.string().uuid(),
+    commandId: z.uuid(),
+    sceneId: z.uuid(),
     name: SceneNameSchema,
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const SceneIdSchema = z
   .object({
-    commandId: z.string().uuid(),
-    sceneId: z.string().uuid(),
+    commandId: z.uuid(),
+    sceneId: z.uuid(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 /** Make one recorded moment live. `turnIndex` indexes the archive document's `turns`, not a timeline revision. */
 export const ReplayLaunchSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     archiveId: z.number().int().positive(),
     turnIndex: z.number().int().min(0).max(999),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -904,17 +902,17 @@ export const ReplayLaunchSchema = z
   .strict();
 export const SceneSetCombatantsSchema = z
   .object({
-    commandId: z.string().uuid(),
-    sceneId: z.string().uuid(),
-    combatantIds: z.array(z.string().uuid()).max(200),
+    commandId: z.uuid(),
+    sceneId: z.uuid(),
+    combatantIds: z.array(z.uuid()).max(200),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 /** Reorder the prepared-scene list to a permutation of the current scene ids (GM). Bounded by the domain scenes cap (20). */
 export const SceneReorderSchema = z
   .object({
-    commandId: z.string().uuid(),
-    order: z.array(z.string().uuid()).min(1).max(20),
+    commandId: z.uuid(),
+    order: z.array(z.uuid()).min(1).max(20),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -924,12 +922,12 @@ export const AnnotationGeometryInputSchema = z
 export const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 export const AnnotationAddSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     kind: z.enum(["measurement", "shape"]),
     shape: AnnotationShapeKindSchema.optional(),
     geometry: AnnotationGeometryInputSchema,
     visibility: AnnotationVisibilitySchema.optional(),
-    visibleToActorId: z.string().uuid().nullable().optional(),
+    visibleToActorId: z.uuid().nullable().optional(),
     movableByOthers: z.boolean().optional(),
     color: HexColorSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -937,7 +935,7 @@ export const AnnotationAddSchema = z
   .strict();
 export const AnnotationPingSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     point: AnnotationPointSchema,
     color: HexColorSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -945,47 +943,47 @@ export const AnnotationPingSchema = z
   .strict();
 export const AnnotationColorSetSchema = z
   .object({
-    commandId: z.string().uuid(),
-    id: z.string().uuid(),
+    commandId: z.uuid(),
+    id: z.uuid(),
     color: HexColorSchema,
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const AnnotationMoveSchema = z
   .object({
-    commandId: z.string().uuid(),
-    id: z.string().uuid(),
+    commandId: z.uuid(),
+    id: z.uuid(),
     geometry: AnnotationGeometryInputSchema,
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const AnnotationRemoveSchema = z
   .object({
-    commandId: z.string().uuid(),
-    id: z.string().uuid(),
+    commandId: z.uuid(),
+    id: z.uuid(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const AnnotationVisibilitySetSchema = z
   .object({
-    commandId: z.string().uuid(),
-    id: z.string().uuid(),
+    commandId: z.uuid(),
+    id: z.uuid(),
     visibility: AnnotationVisibilitySchema,
-    visibleToActorId: z.string().uuid().nullable().optional(),
+    visibleToActorId: z.uuid().nullable().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const AnnotationMovableSetSchema = z
   .object({
-    commandId: z.string().uuid(),
-    id: z.string().uuid(),
+    commandId: z.uuid(),
+    id: z.uuid(),
     movableByOthers: z.boolean(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const AnnotationClearSchema = z
   .object({
-    commandId: z.string().uuid(),
+    commandId: z.uuid(),
     scope: z.enum(["mine", "players", "all"]),
     expectedRevision: z.number().int().nonnegative().optional()
   })

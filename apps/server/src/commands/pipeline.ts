@@ -3,6 +3,7 @@ import type { GameCommandType, IntegrationScope } from "@vtt/api-contract";
 import type { ClientToServerEvents, GameState } from "@vtt/domain";
 import { GameAccessDeniedError } from "../authorization.js";
 import type { GameStore, TimelineOps } from "../game-store.js";
+import { issuesOf } from "../http-kit.js";
 import { GameInputError } from "./failures.js";
 import { isGmGrade, principalTag, type CommandContext, type GamePrincipal, type Kit } from "./kit.js";
 
@@ -30,7 +31,7 @@ export type CommandCall<Request> = Readonly<{
   dispatch: (type: GameCommandType, payload: unknown) => Promise<GameReply>;
 }>;
 
-export type CommandSpec<Schema extends z.ZodTypeAny> = Readonly<{
+export type CommandSpec<Schema extends z.ZodType> = Readonly<{
   type: GameCommandType;
   /** One line for the command catalog (`GET /game/commands`). */
   summary: string;
@@ -48,9 +49,9 @@ export type CommandSpec<Schema extends z.ZodTypeAny> = Readonly<{
   /** The command itself. Whatever it returns is added to the reply after the revision and duplicate flag. */
   run(call: CommandCall<z.output<Schema>>, kit: Kit): Promise<GameReply | void>;
 }>;
-export type AnyCommand = CommandSpec<z.ZodTypeAny>;
+export type AnyCommand = CommandSpec<z.ZodType>;
 
-export function defineCommand<Schema extends z.ZodTypeAny>(spec: CommandSpec<Schema>): AnyCommand {
+export function defineCommand<Schema extends z.ZodType>(spec: CommandSpec<Schema>): AnyCommand {
   return spec;
 }
 
@@ -61,7 +62,7 @@ export type ReadSpec = Readonly<{
   scope: IntegrationScope;
   gmOnly?: string;
   /** Validates the input; absent, the read takes none. */
-  schema?: z.ZodTypeAny;
+  schema?: z.ZodType;
   malformed?: string;
   /** The read's input from an HTTP request: its path parameters unless given. */
   httpInput?: (request: Readonly<{ params: Record<string, string>; query: Record<string, unknown> }>) => unknown;
@@ -74,7 +75,7 @@ export function socketEventOf<Type extends GameCommandType>(type: Type) {
   return type.replace(".", ":") as SocketEventOf<Type>;
 }
 
-export function parse<Schema extends z.ZodTypeAny>(
+export function parse<Schema extends z.ZodType>(
   schema: Schema,
   raw: unknown,
   malformedMessage: string,
@@ -82,7 +83,7 @@ export function parse<Schema extends z.ZodTypeAny>(
 ): z.output<Schema> {
   const result = schema.safeParse(raw);
   if (result.success) return result.data;
-  const issues = result.error.issues.map((issue) => ({ path: issue.path, message: issue.message }));
+  const issues = issuesOf(result.error);
   const message = preferIssueMessage ? (issues[0]?.message ?? malformedMessage) : malformedMessage;
   throw new GameInputError(message, issues);
 }

@@ -92,15 +92,15 @@ export type PendingImport = z.infer<typeof PendingImportSchema>;
 export const RollVisibilitySchema = z.enum(["public", "gm-only", "blind", "self-only"]);
 export const RollPurposeSchema = z.enum(["attack", "save", "check", "damage", "manual"]);
 export const RollRecordSchema = z.object({
-  id: z.string().uuid(),
-  commandId: z.string().uuid(),
-  initiatorSessionId: z.string().uuid(),
+  id: z.uuid(),
+  commandId: z.uuid(),
+  initiatorSessionId: z.uuid(),
   initiatorRole: z.enum(["gm", "player"]),
   /** Who rolled: "GM" or the player's character name at roll time. Optional for older persisted rolls. */
   initiatorLabel: z.string().min(1).max(120).optional(),
   /** What was rolled ("Athletics check", "DEX save", a weapon or spell name); the UI falls back to the purpose. */
   label: z.string().min(1).max(80).optional(),
-  actorId: z.string().uuid().nullable(),
+  actorId: z.uuid().nullable(),
   purpose: RollPurposeSchema,
   visibility: RollVisibilitySchema,
   formula: z.string(),
@@ -116,7 +116,7 @@ export const RollRecordSchema = z.object({
   ),
   modifiers: z.array(z.object({ value: z.number().int().nonnegative(), sign: z.union([z.literal(1), z.literal(-1)]) })),
   total: z.number().int(),
-  createdAt: z.string().datetime()
+  createdAt: z.iso.datetime()
 });
 export type RollVisibility = z.infer<typeof RollVisibilitySchema>;
 export type RollPurpose = z.infer<typeof RollPurposeSchema>;
@@ -124,7 +124,7 @@ export type RollRecord = z.infer<typeof RollRecordSchema>;
 export type PlayerRollRecord = Omit<RollRecord, "initiatorSessionId">;
 
 export const InitiativeEntrySchema = z.object({
-  actorId: z.string().uuid(),
+  actorId: z.uuid(),
   score: z.number().int().min(-1000).max(1000),
   tieBreaker: z.number().int().min(-1000).max(1000).default(0)
 });
@@ -132,17 +132,17 @@ export type InitiativeEntry = z.infer<typeof InitiativeEntrySchema>;
 
 export const EncounterTokenPositionSchema = z
   .object({
-    x: z.number().finite().nonnegative().max(1_000_000),
-    y: z.number().finite().nonnegative().max(1_000_000)
+    x: z.number().nonnegative().max(1_000_000),
+    y: z.number().nonnegative().max(1_000_000)
   })
   .strict();
 export const EncounterTokenSchema = z
   .object({
-    actorId: z.string().uuid(),
+    actorId: z.uuid(),
     position: EncounterTokenPositionSchema.nullable().default(null),
-    sizePx: z.number().finite().positive().max(4096),
-    gridSizePx: z.number().finite().positive().max(4096).nullable().default(null),
-    gridRotationRadians: z.number().finite().min(-Math.PI).max(Math.PI).nullable().default(null),
+    sizePx: z.number().positive().max(4096),
+    gridSizePx: z.number().positive().max(4096).nullable().default(null),
+    gridRotationRadians: z.number().min(-Math.PI).max(Math.PI).nullable().default(null),
     /** Footprint in cells per side; even sizes snap to grid intersections instead of cell centers. */
     sizeCells: z.number().int().min(1).max(4).default(1)
   })
@@ -158,8 +158,8 @@ export type AnnotationShapeKind = z.infer<typeof AnnotationShapeKindSchema>;
 
 export const AnnotationPointSchema = z
   .object({
-    x: z.number().finite().nonnegative().max(1_000_000),
-    y: z.number().finite().nonnegative().max(1_000_000)
+    x: z.number().nonnegative().max(1_000_000),
+    y: z.number().nonnegative().max(1_000_000)
   })
   .strict();
 export type AnnotationPoint = z.infer<typeof AnnotationPointSchema>;
@@ -171,7 +171,7 @@ export const AnnotationGeometrySchema = z
     origin: AnnotationPointSchema,
     target: AnnotationPointSchema,
     // Nonnegative: a ping is stored with sizeFeet 0 and must re-parse when the GameState loads.
-    sizeFeet: z.number().finite().nonnegative().max(2000)
+    sizeFeet: z.number().nonnegative().max(2000)
   })
   .strict();
 export type AnnotationGeometry = z.infer<typeof AnnotationGeometrySchema>;
@@ -179,15 +179,15 @@ export type AnnotationGeometry = z.infer<typeof AnnotationGeometrySchema>;
 export const AnnotationColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Color must be a #RRGGBB hex value.");
 export const AnnotationSchema = z
   .object({
-    id: z.string().uuid(),
+    id: z.uuid(),
     kind: z.enum(["measurement", "shape", "ping"]),
     shape: AnnotationShapeKindSchema.nullable().default(null),
     geometry: AnnotationGeometrySchema,
-    ownerSessionId: z.string().uuid(),
+    ownerSessionId: z.uuid(),
     createdByRole: z.enum(["gm", "player"]),
     visibility: AnnotationVisibilitySchema.default("public"),
     /** For `gm-actor` visibility: the actor whose owning player sees this alongside the GM. Null otherwise. */
-    visibleToActorId: z.string().uuid().nullable().default(null),
+    visibleToActorId: z.uuid().nullable().default(null),
     /** When true, any player (not just the owner) may move/resize this shape. The GM and owner always can. */
     movableByOthers: z.boolean().default(false),
     color: AnnotationColorSchema.default("#58c3ff"),
@@ -200,25 +200,25 @@ export const AnnotationSchema = z
   .superRefine((annotation, context) => {
     if (annotation.kind === "shape" && annotation.shape === null)
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["shape"],
         message: "A shape annotation must specify a shape kind."
       });
     if (annotation.kind !== "shape" && annotation.shape !== null)
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["shape"],
         message: "Only shape annotations specify a shape kind."
       });
     if (annotation.visibility === "gm-actor" && annotation.visibleToActorId === null)
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["visibleToActorId"],
         message: "gm-actor visibility requires a target actor."
       });
     if (annotation.visibility !== "gm-actor" && annotation.visibleToActorId !== null)
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["visibleToActorId"],
         message: "Only gm-actor visibility carries a target actor."
       });
@@ -231,12 +231,12 @@ export type AbilityId = z.infer<typeof AbilityIdSchema>;
  * answer auto-applies: fail = full damage + condition, success = half or none (ADR-0008 carve-out). */
 export const PendingSaveSchema = z
   .object({
-    id: z.string().uuid(),
-    targetActorId: z.string().uuid(),
+    id: z.uuid(),
+    targetActorId: z.uuid(),
     ability: AbilityIdSchema,
     dc: z.number().int().min(1).max(40),
     /** Source actor for GM bookkeeping; stripped from player projections. */
-    sourceActorId: z.string().uuid().nullable().default(null),
+    sourceActorId: z.uuid().nullable().default(null),
     sourceName: z.string().min(1).max(120),
     actionName: z.string().min(1).max(120),
     proposedDamage: z.number().int().nonnegative().max(10000).default(0),
@@ -256,7 +256,7 @@ export const PendingSaveSchema = z
     saveBonus: z.number().int().min(0).max(10).default(0),
     /** Concentration check (SRD): effects ended when this save fails. Stripped from player projections. */
     endsEffects: z
-      .array(z.object({ actorId: z.string().uuid(), effectId: z.string().min(1).max(120) }).strict())
+      .array(z.object({ actorId: z.uuid(), effectId: z.string().min(1).max(120) }).strict())
       .max(8)
       .optional(),
     /** Effect applied on a failed save, e.g. Grappled with its escape DC from an Unarmed Strike grapple. */
@@ -282,7 +282,7 @@ export const PendingSaveSchema = z
           .max(4)
           .default([]),
         escapeDc: z.number().int().min(1).max(40).nullable().default(null),
-        sourceActorId: z.string().uuid().nullable().default(null),
+        sourceActorId: z.uuid().nullable().default(null),
         sourceName: z.string().max(120).nullable().default(null)
       })
       .strict()
@@ -296,21 +296,21 @@ export type PendingSave = z.infer<typeof PendingSaveSchema>;
  * ("use" = halved, "decline" = full, or GM dismiss) and persists until answered so it is never lost. */
 export const PendingReactionSchema = z
   .object({
-    id: z.string().uuid(),
+    id: z.uuid(),
     /** What opened the window: an attack that hit the reactor, or an enemy leaving its reach (opportunity attack). */
     kind: z.enum(["hit-by-attack", "leaves-reach"]).default("hit-by-attack"),
-    actorId: z.string().uuid(),
+    actorId: z.uuid(),
     actionId: z
       .string()
       .regex(/^[a-z0-9-]+$/)
       .max(120),
     actionName: z.string().min(1).max(120),
     /** leaves-reach: the mover the reaction would strike. */
-    targetActorId: z.string().uuid().nullable().default(null),
+    targetActorId: z.uuid().nullable().default(null),
     /** Source actor for GM bookkeeping; stripped from player projections. */
-    sourceActorId: z.string().uuid().nullable().default(null),
+    sourceActorId: z.uuid().nullable().default(null),
     sourceName: z.string().min(1).max(120),
-    triggerCommandId: z.string().uuid(),
+    triggerCommandId: z.uuid(),
     proposedDamage: z.number().int().nonnegative().max(10000).default(0),
     proposedDamageParts: z
       .array(z.object({ amount: z.number().int().nonnegative().max(10000), type: z.string().min(1).max(40) }).strict())
@@ -327,11 +327,11 @@ export type PendingReaction = z.infer<typeof PendingReactionSchema>;
  * they don't own. GM-only: never projected to players or the viewer. */
 export const PendingDamageSchema = z
   .object({
-    id: z.string().uuid(),
-    sourceActorId: z.string().uuid(),
+    id: z.uuid(),
+    sourceActorId: z.uuid(),
     sourceName: z.string().min(1).max(120),
     actionName: z.string().min(1).max(120),
-    targetActorId: z.string().uuid(),
+    targetActorId: z.uuid(),
     targetName: z.string().min(1).max(120),
     proposedDamageParts: z
       .array(z.object({ amount: z.number().int().nonnegative().max(10000), type: z.string().min(1).max(40) }).strict())
@@ -359,7 +359,7 @@ function refineCombatContext(
   for (const [index, entry] of combat.initiative.entries()) {
     if (actorIds.has(entry.actorId))
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["initiative", index, "actorId"],
         message: "Initiative actor IDs must be unique."
       });
@@ -367,19 +367,19 @@ function refineCombatContext(
   }
   if (combat.active && combat.initiative.length === 0)
     context.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: "custom",
       path: ["initiative"],
       message: "An active encounter requires at least one combatant."
     });
   if (combat.active && combat.turnActorId === null)
     context.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: "custom",
       path: ["turnActorId"],
       message: "An active encounter requires a current turn."
     });
   if (combat.turnActorId !== null && !actorIds.has(combat.turnActorId))
     context.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: "custom",
       path: ["turnActorId"],
       message: "The current turn actor must be in Initiative."
     });
@@ -387,14 +387,14 @@ function refineCombatContext(
   for (const [index, token] of combat.tokens.entries()) {
     if (tokenActorIds.has(token.actorId))
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["tokens", index, "actorId"],
         message: "Encounter token actor IDs must be unique."
       });
     tokenActorIds.add(token.actorId);
     if (!actorIds.has(token.actorId))
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["tokens", index, "actorId"],
         message: "Encounter tokens must belong to actors in Initiative."
       });
@@ -433,9 +433,9 @@ export type AskableCommand = z.infer<typeof AskableCommandSchema>;
  * revalidated against its own schema before the replay and never reaches a player (it can name hidden ids). */
 export const PendingRuleAskSchema = z
   .object({
-    id: z.string().uuid(),
+    id: z.uuid(),
     /** The character the blocked command was for; also decides which player may see this ask. */
-    actorId: z.string().uuid(),
+    actorId: z.uuid(),
     /** The machine-readable rule that blocked it (e.g. `economy.action-used`). */
     rule: z.string().min(1).max(120),
     family: RuleFamilySchema.nullable().default(null),
@@ -443,7 +443,7 @@ export const PendingRuleAskSchema = z
     message: z.string().min(1).max(300),
     /** The parked command, replayed verbatim on Allow. GM-only - never projected to any player. */
     command: z.object({ type: AskableCommandSchema, payload: z.unknown() }).strict(),
-    createdAt: z.string().datetime()
+    createdAt: z.iso.datetime()
   })
   .strict();
 export type PendingRuleAsk = z.infer<typeof PendingRuleAskSchema>;
@@ -452,7 +452,7 @@ export type PendingRuleAsk = z.infer<typeof PendingRuleAskSchema>;
 const sceneCombatShape = {
   active: z.boolean().default(false),
   round: z.number().int().positive().default(1),
-  turnActorId: z.string().uuid().nullable().default(null),
+  turnActorId: z.uuid().nullable().default(null),
   initiative: z.array(InitiativeEntrySchema).max(200).default([]),
   tokens: z.array(EncounterTokenSchema).max(200).default([]),
   annotations: z.array(AnnotationSchema).max(300).default([]),
@@ -463,7 +463,7 @@ const sceneCombatShape = {
       actionUsed: z.boolean().default(false),
       bonusActionUsed: z.boolean().default(false),
       actionInstance: z
-        .object({ actorId: z.string().uuid(), components: z.record(z.string(), z.number().int().nonnegative()) })
+        .object({ actorId: z.uuid(), components: z.record(z.string(), z.number().int().nonnegative()) })
         .strict()
         .nullable()
         .default(null),
@@ -473,7 +473,7 @@ const sceneCombatShape = {
       /** Rule families the GM already waved through this turn. Stripped from player projections. */
       rulesOverriddenFamilies: z.array(RuleFamilySchema).max(5).optional()
     })
-    .default({ actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }),
+    .prefault({ actionUsed: false, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }),
   /** How structured action resolution enforces rules (ADR-0020): strict rejects with an override path, assisted warns, freeform stays reference-level. */
   rulesMode: RuleModeSchema.default("strict"),
   /** Per-family overrides of `rulesMode` (see RuleExceptionsSchema). Player-readable; holds no secrets. */
@@ -490,7 +490,7 @@ const sceneCombatShape = {
   /** SRD Underwater Combat: melee disadvantage unless piercing, ranged auto-miss beyond normal range, everyone resists fire. */
   underwater: z.boolean().default(false),
   /** Combatants whose reaction is spent; an actor's id is removed when their own turn starts (5e refresh timing). */
-  reactionsUsed: z.array(z.string().uuid()).max(200).default([]),
+  reactionsUsed: z.array(z.uuid()).max(200).default([]),
   /** Legendary actions spent since each creature's last turn start (SRD refresh). Stripped from the player projection. */
   legendaryUsed: z.record(z.string(), z.number().int().nonnegative()).default({}),
   /** Manual fog of war (ADR-0022): an ordered list of reveal/hide rects applied over "all hidden"; enabled with
@@ -504,7 +504,7 @@ const sceneCombatShape = {
           z
             .object({
               kind: z.literal("rect"),
-              id: z.string().uuid(),
+              id: z.uuid(),
               op: z.enum(["reveal", "hide"]),
               x: z.number().min(0).max(100000),
               y: z.number().min(0).max(100000),
@@ -517,7 +517,7 @@ const sceneCombatShape = {
         .default([])
     })
     .strict()
-    .default({ enabled: false, shapes: [] }),
+    .prefault({ enabled: false, shapes: [] }),
   pendingSaves: z.array(PendingSaveSchema).max(100).default([]),
   pendingReactions: z.array(PendingReactionSchema).max(20).default([]),
   /** GM-only (see PendingDamageSchema). */
@@ -525,7 +525,7 @@ const sceneCombatShape = {
   /** A player sees only their own (see PendingRuleAskSchema). */
   pendingRuleAsks: z.array(PendingRuleAskSchema).max(10).default([]),
   /** Claimed-PC actorIds whose owner still owes an initiative roll. */
-  pendingInitiative: z.array(z.string().uuid()).max(200).default([])
+  pendingInitiative: z.array(z.uuid()).max(200).default([])
 };
 
 /** A parked scene's frozen combat - same fields and invariants as the live combat, minus the map (the Scene owns that). */
@@ -535,16 +535,16 @@ export type SceneCombat = z.infer<typeof SceneCombatSchema>;
 /** A prepared encounter the GM can switch to: its map plus a frozen combat context that resumes exactly when activated. */
 export const SceneSchema = z
   .object({
-    id: z.string().uuid(),
+    id: z.uuid(),
     name: z.string().min(1).max(120),
-    mapAssetId: z.string().uuid(),
-    combat: SceneCombatSchema.default({}),
+    mapAssetId: z.uuid(),
+    combat: SceneCombatSchema.prefault({}),
     /** Set when this scene is a launched replay. Such scenes are disposable: `scenes.ts` drops the scene and its
      * cloned combatants (`Actor.replaySceneId`) when the table leaves it. GM-only. */
     replayOf: z
       .object({
         archiveId: z.number().int().nonnegative(),
-        actorIds: z.array(z.string().uuid()).max(200)
+        actorIds: z.array(z.uuid()).max(200)
       })
       .strict()
       .optional()
@@ -563,10 +563,10 @@ export function rosterActors<T extends { readonly replaySceneId?: string | undef
 export const CombatStateSchema = z
   .object({
     ...sceneCombatShape,
-    mapAssetId: z.string().uuid().nullable().default(null),
+    mapAssetId: z.uuid().nullable().default(null),
     /** Prepared scenes the GM parks and resumes. The active scene's own `combat` stays empty; its live copy is the top-level fields. */
     scenes: z.array(SceneSchema).max(20).default([]),
-    activeSceneId: z.string().uuid().nullable().default(null),
+    activeSceneId: z.uuid().nullable().default(null),
     /** Turn time-travel (live fight only): `historyCursor` is the snapshot index being viewed (null = live);
      * `historyDirty` means state changed while rewound, so moving on needs GM confirmation. */
     historyCursor: z.number().int().nonnegative().nullable().default(null),
@@ -578,7 +578,7 @@ export const CombatStateSchema = z
     for (const [index, scene] of combat.scenes.entries()) {
       if (sceneIds.has(scene.id))
         context.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           path: ["scenes", index, "id"],
           message: "Scene IDs must be unique."
         });
@@ -586,7 +586,7 @@ export const CombatStateSchema = z
     }
     if (combat.activeSceneId !== null && !sceneIds.has(combat.activeSceneId))
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["activeSceneId"],
         message: "The active scene must be one of the prepared scenes."
       });
@@ -609,7 +609,7 @@ export const CombatStateSchema = z
         active.combat.pendingInitiative.length > 0)
     ) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["scenes"],
         message: "The active scene's stored combat must be empty - its live copy is the top-level combat."
       });
@@ -723,7 +723,7 @@ export const GameStateSchema = z.object({
   revision: z.number().int().nonnegative().default(0),
   actors: z.array(ActorSchema).default([]),
   rolls: z.array(RollRecordSchema).default([]),
-  combat: CombatStateSchema.default({
+  combat: CombatStateSchema.prefault({
     active: false,
     round: 1,
     turnActorId: null,
@@ -737,11 +737,11 @@ export const GameStateSchema = z.object({
   /** Player-submitted PDF imports awaiting GM approval. GM-only: excluded from PlayerView and the viewer (ADR-0018). */
   pendingImports: z.array(PendingImportSchema).max(20).default([]),
   /** Character-builder table policy. GM-set, player-read. */
-  builderPolicy: BuilderPolicySchema.default({}),
+  builderPolicy: BuilderPolicySchema.prefault({}),
   /** Standing rules policy every new fight starts from. GM-set, player-read. */
-  rulesPolicy: RulesPolicySchema.default({}),
+  rulesPolicy: RulesPolicySchema.prefault({}),
   /** Table defaults for staging new combatants. GM-set, GM-read. */
-  stagingDefaults: StagingDefaultsSchema.default({}),
+  stagingDefaults: StagingDefaultsSchema.prefault({}),
   /** How much a player sees of another player's character (see PartyVisibilitySchema). GM-set; player-read via `PlayerView`. */
   partyVisibility: PartyVisibilitySchema.default("name-and-class")
 });

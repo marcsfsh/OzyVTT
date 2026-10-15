@@ -240,7 +240,7 @@ function checkSharedTriggerRules(triggers: readonly RiderTrigger[], context: z.R
   );
   if (identity)
     context.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: "custom",
       message: "`while-character-is` needs at least one class or species."
     });
   const duplicate = triggers.find(
@@ -248,7 +248,7 @@ function checkSharedTriggerRules(triggers: readonly RiderTrigger[], context: z.R
   );
   if (duplicate)
     context.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: "custom",
       message: `Two "${duplicate.type}" triggers on one rider - list the values in a single entry instead.`
     });
 }
@@ -260,11 +260,11 @@ export const RiderWhenSchema = z
   .superRefine((triggers, context) => {
     const kinds = triggers.map((trigger) => RIDER_TRIGGER_KINDS[trigger.type]);
     if (kinds.filter((kind) => kind === "moment").length > 1) {
-      context.addIssue({ code: z.ZodIssueCode.custom, message: "A rider fires at one moment, not two." });
+      context.addIssue({ code: "custom", message: "A rider fires at one moment, not two." });
     }
     if (kinds.includes("filter") && !kinds.includes("moment")) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         message: "A filter needs a moment to narrow - add the roll or event it applies to."
       });
     }
@@ -283,7 +283,7 @@ export const GrantWhenSchema = z
     );
     if (offender) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         message: `A grant is a standing fact, so it cannot wait for a roll: "${offender.type}" is only knowable during one, and the grant has been collected before any roll starts. Gate it on a state instead - attuned, while-armored, while-unarmored, while-shield, while-character-is, while-proficient-with, while-effect-tag, while-hp-at-or-below, while-condition - or move the mechanic to a modifier, where a moment IS read.`
       });
     }
@@ -464,7 +464,7 @@ export const EffectModifiersSchema = z
     modifiers.forEach((modifier, index) => {
       if (EFFECT_REFUSED_MODIFIER_TYPES.includes(modifier.type))
         context.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           path: [index, "type"],
           message: `An effect cannot carry "${modifier.type}": it is written onto the sheet, so it would outlast the effect. Put it on a feature, a feat or an item instead.`
         });
@@ -488,7 +488,7 @@ export const EffectInstanceSchema = z
     name: z.string().min(1).max(120),
     tags: z.array(EffectTagSchema).max(8).default([]),
     /** Who sustains/caused it; stripped from player projections. Null for GM-added house effects. */
-    sourceActorId: z.string().uuid().nullable().default(null),
+    sourceActorId: z.uuid().nullable().default(null),
     sourceName: z.string().max(120).nullable().default(null),
     sourceActionId: z.string().max(120).nullable().default(null),
     startedRound: z.number().int().positive().default(1),
@@ -731,7 +731,7 @@ export function makeHitDicePool(entries: readonly HitDiceEntry[]): HitDicePool |
 }
 
 export const ActorSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   name: z.string().min(1).max(120),
   kind: z.enum(["player-character", "monster", "npc"]),
   visibility: z.enum(["public", "gm-only"]).default("public"),
@@ -742,7 +742,7 @@ export const ActorSchema = z.object({
   }),
   armorClass: z.number().int().positive().optional(),
   initiative: z.number().int().optional(),
-  ownerSessionId: z.string().uuid().nullable().default(null),
+  ownerSessionId: z.uuid().nullable().default(null),
   notes: z.string().max(10000).optional(),
   /** Slug of the definition this actor was instantiated from (content-bundle or imported id); absent for seeded actors. */
   definitionId: z
@@ -755,7 +755,7 @@ export const ActorSchema = z.object({
   /** D&D creature size label; drives sizeCells and lets the GM pick Tiny/Small/Medium (all 1×1). Absent means Medium. */
   size: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
   /** Custom uploaded token image (a token-asset id); absent means the initials glyph. */
-  tokenAssetId: z.string().uuid().optional(),
+  tokenAssetId: z.uuid().optional(),
   /** Active conditions by content-bundle id; `level` applies only to exhaustion (1-6). Set by the GM or by the rules engine (ADR-0020). */
   conditions: z
     .array(
@@ -824,12 +824,12 @@ export const ActorSchema = z.object({
   /** Carried inventory, seeded from the definition's starting loadout. Owner-only. */
   inventory: z.array(InventoryItemSchema).max(200).default([]),
   /** Coin purse, seeded from the definition's starting currency. Owner-only. */
-  currency: CurrencySchema.default({}),
+  currency: CurrencySchema.prefault({}),
   /** GM-archived: hidden from players and excluded from the encounter builder and party. Never projected to players or the viewer. */
   archived: z.boolean().default(false),
   /** Set on a launched replay's cloned combatant: the replay scene's id. `rosterActors` hides these from management
    * surfaces; they are deleted with the replay scene. */
-  replaySceneId: z.string().uuid().optional(),
+  replaySceneId: z.uuid().optional(),
   /** The GM shared this archived character's sheet with players as a read-only keepsake. The flag itself is
    * stripped from player projections; players get only the id-and-name `PlayerView.archivedCharacters`. */
   sheetPreview: z.boolean().default(false)
@@ -884,13 +884,13 @@ export const ActionUsesSchema = z
   .superRefine((uses, context) => {
     if (uses.per === "recharge" && uses.recharge === undefined)
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["recharge"],
         message: 'Recharge uses need the d6 threshold (e.g. 5 for "Recharge 5-6").'
       });
     if (uses.per !== "recharge" && uses.recharge !== undefined)
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["recharge"],
         message: 'The recharge threshold only applies when per is "recharge".'
       });
@@ -1148,7 +1148,7 @@ export const ProficienciesSchema = z
       .array(z.object({ id: SkillIdSchema, proficiency: z.enum(["proficient", "expertise"]) }).strict())
       .max(40)
       .default([]),
-    saveOverrides: z.record(AbilitySchema, z.number().int().min(-20).max(30)).optional(),
+    saveOverrides: z.partialRecord(AbilitySchema, z.number().int().min(-20).max(30)).optional(),
     skillOverrides: z.record(SkillIdSchema, z.number().int().min(-20).max(30)).optional(),
     /** Armor/weapon/tool/language training as open slugs. Absent means "not recorded", not "none": an import that
      * never listed armor training must not read as untrained. */
@@ -1228,7 +1228,7 @@ const SpellcastingSchema = z
     const perClassSlots = (spellcasting.classes ?? []).some((entry) => (entry.slots ?? []).length > 0);
     if (perClassSlots && spellcasting.slots.length === 0) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["slots"],
         message:
           "A sheet with per-class spell slots must also carry the combined top-level slots (the character's single live pool)."
@@ -1299,7 +1299,7 @@ export const ActorDefinitionSchema = z
           .object({ width: z.number().int().positive().max(4), height: z.number().int().positive().max(4) })
           .default({ width: 1, height: 1 })
       })
-      .default({ disposition: "neutral", footprint: { width: 1, height: 1 } }),
+      .prefault({ disposition: "neutral", footprint: { width: 1, height: 1 } }),
     extensions: z.record(z.string(), z.unknown()).default({}),
     /** Typed defenses by damage-type id, applied immunity → resistance → vulnerability. Absent = none known. */
     damageResistances: z.array(DamageTypeIdSchema).max(20).optional(),
@@ -1327,7 +1327,7 @@ export const ActorDefinitionSchema = z
   .superRefine((actor, context) => {
     if (actor.schemaId === "vtt.actor-character" && actor.token.disposition !== "friendly")
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["token", "disposition"],
         message: "Player-character definitions must use the friendly disposition."
       });

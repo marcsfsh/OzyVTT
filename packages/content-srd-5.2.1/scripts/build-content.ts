@@ -24,7 +24,7 @@ import {
 import { outDir, packageRoot, sourcePath } from "./paths.js";
 
 /** Bundles with no source to generate them from: `sources/authored/<name>.json` -> `<name>.v1.json`. */
-const AUTHORED: ReadonlyArray<readonly [name: string, schema: z.ZodTypeAny]> = [
+const AUTHORED: ReadonlyArray<readonly [name: string, schema: z.ZodType]> = [
   ["equipment", EquipmentReferenceSchema],
   ["species", SpeciesReferenceSchema],
   ["backgrounds", BackgroundReferenceSchema],
