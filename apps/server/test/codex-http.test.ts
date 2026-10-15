@@ -2001,8 +2001,8 @@ describe("Codex routes vs the published contract", () => {
     const byPath = new Map<string, Set<string>>();
     for (const layer of router.stack) {
       if (!layer.route) continue;
-      // Reads Express's route table rather than probing over HTTP: the router's header middleware runs for
-      // every request, so a probe would pass for any path. Express writes `:id`; OpenAPI writes `{id}`.
+      // Reads Express's route table rather than probing over HTTP, so an unmounted documented path cannot
+      // hide. Express writes `:id`; OpenAPI writes `{id}`.
       const path = layer.route.path.replace(/:([A-Za-z0-9_]+)/g, "{$1}");
       const methods = byPath.get(path) ?? new Set<string>();
       for (const [method, on] of Object.entries(layer.route.methods)) if (on) methods.add(method.toLowerCase());

@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { migrate, openDatabase, type Migration } from "./database.js";
 import { validateSquareGridCalibration, type ImagePoint, type SquareGridCalibration } from "./grid-calibration.js";
 import { validateMapDistanceScale, type MapDistanceScale } from "./map-measurement.js";
+import { InvalidRequestError } from "./invalid-request.js";
 
 export type MapKind = "battlemap" | "regional" | "world";
 
@@ -37,20 +38,20 @@ type CatalogRow = Readonly<{
 const ASSET_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 function assetId(value: string) {
-  if (!ASSET_ID.test(value)) throw new Error("Map asset ID is malformed.");
+  if (!ASSET_ID.test(value)) throw new InvalidRequestError("Map asset ID is malformed.");
   return value;
 }
 
 function mapName(value: string) {
   const name = value.trim();
   if (!name || name.length > 120 || /[\u0000-\u001f\u007f]/.test(name))
-    throw new Error("Map name must contain 1 to 120 printable characters.");
+    throw new InvalidRequestError("Map name must contain 1 to 120 printable characters.");
   return name;
 }
 
 function mapKind(value: string): MapKind {
   if (value !== "battlemap" && value !== "regional" && value !== "world")
-    throw new Error("Map kind must be battlemap, regional, or world.");
+    throw new InvalidRequestError("Map kind must be battlemap, regional, or world.");
   return value;
 }
 
@@ -60,13 +61,13 @@ export function mapFolder(value: string | null | undefined): string | null {
   const folder = value.trim();
   if (folder === "") return null;
   if (folder.length > 60 || folder.includes("/") || /[\u0000-\u001f\u007f]/.test(folder))
-    throw new Error("Folder must be one level: up to 60 printable characters, no slashes.");
+    throw new InvalidRequestError("Folder must be one level: up to 60 printable characters, no slashes.");
   return folder;
 }
 
 function finitePoint(value: ImagePoint) {
   if (!Number.isFinite(value.x) || !Number.isFinite(value.y))
-    throw new Error("Grid verification point must contain finite coordinates.");
+    throw new InvalidRequestError("Grid verification point must contain finite coordinates.");
   return { x: value.x, y: value.y };
 }
 
@@ -74,16 +75,16 @@ function calibration(value: StoredGridCalibration) {
   validateSquareGridCalibration(value.calibration);
   const verified = value.verifiedAt !== null || value.verificationPoint !== null || value.verificationErrorPx !== null;
   if (verified) {
-    if (value.verificationPoint === null) throw new Error("Grid verification point is missing.");
+    if (value.verificationPoint === null) throw new InvalidRequestError("Grid verification point is missing.");
     finitePoint(value.verificationPoint);
     if (
       value.verificationErrorPx === null ||
       !Number.isFinite(value.verificationErrorPx) ||
       value.verificationErrorPx < 0
     )
-      throw new Error("Grid verification error must be a non-negative finite number.");
+      throw new InvalidRequestError("Grid verification error must be a non-negative finite number.");
     if (value.verifiedAt === null || !Number.isFinite(Date.parse(value.verifiedAt)))
-      throw new Error("Grid verification timestamp is invalid.");
+      throw new InvalidRequestError("Grid verification timestamp is invalid.");
   }
   return value;
 }
@@ -157,7 +158,7 @@ export class MapCatalogStore {
   updateDetails(assetIdInput: string, input: Readonly<{ name?: string; kind?: MapKind; folder?: string | null }>) {
     const database = this.requireDatabase();
     const existing = this.get(assetIdInput);
-    if (!existing) throw new Error("Map asset is not registered.");
+    if (!existing) throw new InvalidRequestError("Map asset is not registered.");
     const name = input.name === undefined ? existing.name : mapName(input.name);
     const kind = input.kind === undefined ? existing.kind : mapKind(input.kind);
     const folder = input.folder === undefined ? existing.folder : mapFolder(input.folder);
@@ -169,7 +170,7 @@ export class MapCatalogStore {
 
   renameFolder(from: string, to: string | null) {
     const source = mapFolder(from);
-    if (source === null) throw new Error("Choose a folder to rename.");
+    if (source === null) throw new InvalidRequestError("Choose a folder to rename.");
     this.requireDatabase()
       .prepare("UPDATE map_catalog SET folder = ?, updated_at = ? WHERE folder = ?")
       .run(mapFolder(to), new Date(this.now()).toISOString(), source);
@@ -178,7 +179,7 @@ export class MapCatalogStore {
   saveCalibration(assetIdInput: string, value: StoredGridCalibration) {
     const database = this.requireDatabase();
     const id = assetId(assetIdInput);
-    if (!this.get(id)) throw new Error("Map asset is not registered.");
+    if (!this.get(id)) throw new InvalidRequestError("Map asset is not registered.");
     const checked = calibration(value);
     database
       .prepare("UPDATE map_catalog SET calibration_json = ?, updated_at = ? WHERE asset_id = ?")
@@ -189,7 +190,7 @@ export class MapCatalogStore {
   saveScale(assetIdInput: string, value: MapDistanceScale) {
     const database = this.requireDatabase();
     const id = assetId(assetIdInput);
-    if (!this.get(id)) throw new Error("Map asset is not registered.");
+    if (!this.get(id)) throw new InvalidRequestError("Map asset is not registered.");
     const checked = validateMapDistanceScale(value);
     database
       .prepare("UPDATE map_catalog SET scale_json = ?, updated_at = ? WHERE asset_id = ?")

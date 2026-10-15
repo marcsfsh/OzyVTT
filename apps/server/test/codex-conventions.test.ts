@@ -9,6 +9,7 @@ import { CODEX_PATHS, openApiDocument } from "@vtt/api-contract";
 import { CodexStore } from "../src/codex-store.js";
 import { MapAssetStore } from "../src/map-assets.js";
 import { createCodexRouter } from "../src/codex-http.js";
+import { requestConventions } from "../src/http-kit.js";
 
 // The codex router's cross-cutting contract, tested at the HTTP boundary: request-id echo, the
 // 401/403 split, integration-credential scopes, structured validation issues,
@@ -35,6 +36,8 @@ async function fixture() {
   await store.initialize();
   await assets.initialize();
   const app = express();
+  // Mirrors server.ts, which stamps the request id once ahead of every /api/v1 router.
+  app.use(requestConventions);
   app.use(express.json());
   app.use(
     createCodexRouter({

@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import express from "express";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   HOMEBREW_PATHS,
   HomebrewContentListResponseSchema,
@@ -28,6 +28,7 @@ import { ContentLibrary } from "../src/content-library.js";
 import { findCatalogRecord } from "../src/homebrew-srd-copy.js";
 import { createHomebrewValidator } from "../src/homebrew-validate.js";
 import { buildHomebrewUsageIndex } from "../src/homebrew-usages.js";
+import { requestConventions } from "../src/http-kit.js";
 
 // HTTP-boundary tests for the homebrew router. This surface is the only way to read a draft or a
 // published-but-hidden record, so every route being GM-only is part of the visibility guarantee (drafts
@@ -48,7 +49,8 @@ async function fixture(options: { validate?: HomebrewValidator; realValidation?:
   // primary entry point.
   const contentLibrary = new ContentLibrary(store);
   const app = express();
-  // Mirrors server.ts: the pack parser runs first, so its larger limit wins for that one route.
+  // Mirrors server.ts: one request-id stamp, then the pack parser, so its larger limit wins for that one route.
+  app.use(requestConventions);
   app.use(HOMEBREW_PACK_IMPORT_PATH, homebrewPackBodyParser());
   app.use(express.json({ limit: "512kb" }));
   app.use(
@@ -182,9 +184,8 @@ describe("homebrew HTTP authorization gate", () => {
         .filter((path) => path.startsWith("/api/v1/homebrew"))
         .sort()
     ).toEqual([...declared].sort());
-    // Read Express's route table rather than probing over HTTP: the router's header middleware runs for every
-    // request, so a probe would pass for any path. The route table is exactly what was registered, so a
-    // documented-but-unmounted path cannot hide. Same shape as `codex-http.test.ts`'s mount check.
+    // Read Express's route table rather than probing over HTTP: the route table is exactly what was registered,
+    // so a documented-but-unmounted path cannot hide. Same shape as `codex-http.test.ts`'s mount check.
     const directory = await mkdtemp(join(tmpdir(), "vtt-homebrew-mount-"));
     const store = new HomebrewStore(join(directory, "vtt.sqlite"));
     await store.initialize();
@@ -817,6 +818,38 @@ describe("homebrew HTTP envelope conventions", () => {
     expect(minted.headers.get("x-request-id")).toMatch(/^[0-9a-f-]{36}$/);
     const failure = await body(await get(base, byId("hb-missing-000000"), { ...GM, "x-request-id": supplied }));
     expect(failure.error.requestId).toBe(supplied);
+  });
+
+  it("answers a store fault with a fixed message, never the driver's text, and logs the real error", async () => {
+    const { base, store } = await fixture();
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    const secret = "SQLITE_IOERR: disk I/O error: /srv/vtt/data/vtt.sqlite";
+    const fault = () => {
+      throw new Error(secret);
+    };
+    (store as unknown as { list: () => never }).list = fault;
+    const listed = await get(base, CONTENT, GM);
+    expect(listed.status).toBe(500);
+    expect((await body(listed)).error).toMatchObject({
+      code: "internal_error",
+      message: "The homebrew request failed."
+    });
+
+    // In a pack, one record's fault rejects that record with a fixed message; the rest still import.
+    (store as unknown as { importRecord: () => never }).importRecord = fault;
+    const pack = {
+      schemaId: "vtt.homebrew-pack",
+      schemaVersion: 1,
+      name: "Faulty",
+      attribution: null,
+      exportedAt: "2026-07-27T03:00:00.000Z",
+      records: [{ type: "feat", name: "Fine" }]
+    };
+    const imported = await body(await post(base, HOMEBREW_PATHS.packsImport, GM, { pack }));
+    expect(imported.data.rejected[0].issues[0].message).toBe("That record could not be imported.");
+    expect(JSON.stringify(imported)).not.toContain("SQLITE");
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
   });
 
   it("pings clients on every write and never on a read or a refused write", async () => {

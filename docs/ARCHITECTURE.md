@@ -173,7 +173,8 @@ a date reaches players only when it is published.
 `/api/v1` exposes the game commands, the Codex, homebrew and the viewer over versioned
 envelopes, using the same handlers, authorization and projections as the UI. The OpenAPI
 document is `packages/api-contract` and is served at `/api/v1/openapi.json`. Conventions are in
-ADR-0016.
+ADR-0016; every router builds them from `apps/server/src/http-kit.ts` (bearer tokens, request ids,
+envelopes), and a caught error reaches the caller only as a known refusal, never as raw text.
 
 ## Persistence
 

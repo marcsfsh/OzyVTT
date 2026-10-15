@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { migrate, openDatabase, type Migration } from "./database.js";
+import { InvalidRequestError } from "./invalid-request.js";
 
 export type ViewerAccessMetadata = Readonly<{
   id: string;
@@ -54,18 +55,19 @@ function hash(value: string) {
 function safeName(value: string) {
   const name = value.trim();
   if (!name || name.length > 100 || /[\u0000-\u001f\u007f]/.test(name))
-    throw new Error("Viewer name must contain 1 to 100 printable characters.");
+    throw new InvalidRequestError("Viewer name must contain 1 to 100 printable characters.");
   return name;
 }
 
 function safeId(value: string) {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value))
-    throw new Error("Viewer access ID is malformed.");
+    throw new InvalidRequestError("Viewer access ID is malformed.");
   return value;
 }
 
 function timestamp(value: number, label: string) {
-  if (!Number.isFinite(value) || value < 0) throw new Error(`${label} must be a non-negative finite number.`);
+  if (!Number.isFinite(value) || value < 0)
+    throw new InvalidRequestError(`${label} must be a non-negative finite number.`);
   return new Date(value).toISOString();
 }
 
@@ -114,9 +116,11 @@ export class ViewerAccessStore {
     const now = this.now();
     this.prunePairings(now);
     if (!Number.isInteger(ttlMs) || ttlMs < 30_000 || ttlMs > PAIRING_TTL_MS)
-      throw new Error(`Pairing lifetime must be an integer from 30000 to ${PAIRING_TTL_MS} milliseconds.`);
+      throw new InvalidRequestError(
+        `Pairing lifetime must be an integer from 30000 to ${PAIRING_TTL_MS} milliseconds.`
+      );
     if (this.pairingCodes.size >= MAX_OUTSTANDING_PAIRINGS)
-      throw new Error("Too many viewer pairing codes are active. Wait for one to expire.");
+      throw new InvalidRequestError("Too many viewer pairing codes are active. Wait for one to expire.");
     const code = this.entropy(6).toString("hex").toUpperCase();
     this.pairingCodes.set(hash(code), now + ttlMs);
     return {
@@ -147,7 +151,7 @@ export class ViewerAccessStore {
     const name = safeName(nameInput);
     const expiresAtMs = options.expiresAt ?? null;
     if (expiresAtMs !== null && (!Number.isFinite(expiresAtMs) || expiresAtMs <= now))
-      throw new Error("Viewer access expiration must be in the future.");
+      throw new InvalidRequestError("Viewer access expiration must be in the future.");
     const token = `${TOKEN_PREFIX}${this.entropy(32).toString("base64url")}`;
     const id = randomUUID();
     const createdAt = timestamp(now, "Viewer creation time");
@@ -170,7 +174,7 @@ export class ViewerAccessStore {
     const now = this.now();
     const name = safeName(nameInput);
     if (!Number.isInteger(ttlMs) || ttlMs < 60_000 || ttlMs > 24 * 60 * 60 * 1_000)
-      throw new Error("Preview session lifetime must be an integer from 1 minute to 24 hours.");
+      throw new InvalidRequestError("Preview session lifetime must be an integer from 1 minute to 24 hours.");
     const token = `${TOKEN_PREFIX}${this.entropy(32).toString("base64url")}`;
     const id = randomUUID();
     const createdAt = timestamp(now, "Preview session creation time");
@@ -222,7 +226,7 @@ export class ViewerAccessStore {
     const result = database
       .prepare("UPDATE viewer_access_tokens SET revoked_at = COALESCE(revoked_at, ?) WHERE id = ?")
       .run(revokedAt, id);
-    if (result.changes !== 1) throw new Error("Viewer access entry was not found.");
+    if (result.changes !== 1) throw new InvalidRequestError("Viewer access entry was not found.");
     return this.list().find((item) => item.id === id)!;
   }
 
