@@ -14,12 +14,12 @@ import {
   IntegrationCredentialListResponseSchema,
   IntegrationCredentialResponseSchema,
   OPENAPI_DOCUMENT_PATH,
-  openApiDocument,
   SYSTEM_PATHS,
   SystemCapabilitiesResponseSchema,
   SystemHealthResponseSchema,
   SystemVersionResponseSchema
 } from "@vtt/api-contract";
+import { openApiDocument } from "../src/openapi/document.js";
 import { createApiV1Router } from "../src/api-v1.js";
 import { requestConventions } from "../src/http-kit.js";
 import { IntegrationCredentialStore } from "../src/integration-credentials.js";

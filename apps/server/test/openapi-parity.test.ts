@@ -11,7 +11,10 @@ import {
   ModifierSchema,
   RiderTriggerSchema
 } from "@vtt/schemas";
-import * as contract from "../src/index.js";
+import * as contractModule from "@vtt/api-contract";
+import { openApiDocument as servedDocument } from "../src/openapi/document.js";
+
+const contract = { ...contractModule, openApiDocument: servedDocument };
 
 /**
  * Zod and the hand-written OpenAPI literal are independent representations of the same wire shapes; this checks

@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { GAME_COMMANDS, openApiDocument } from "@vtt/api-contract";
+import { GAME_COMMANDS } from "@vtt/api-contract";
+import { openApiDocument } from "../src/openapi/document.js";
 import { GameStateSchema } from "@vtt/domain";
 import { renderAppMap } from "../src/app-map.js";
 

@@ -14,10 +14,10 @@ import {
   GameMutationAcceptedResponseSchema,
   GameSnapshotResponseSchema,
   EncounterArchiveListResponseSchema,
-  openApiDocument,
   PlayerSessionIssuedResponseSchema,
   SESSION_PATHS
 } from "@vtt/api-contract";
+import { openApiDocument } from "../src/openapi/document.js";
 import { io as connect } from "socket.io-client";
 import { afterEach, describe, expect, it } from "vitest";
 import { gameCommands, gameReads, socketEventOf } from "../src/commands/index.js";

@@ -9,7 +9,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { CodexStore } from "../src/codex-store.js";
 import { MapAssetStore } from "../src/map-assets.js";
 import { createCodexRouter } from "../src/codex-http.js";
-import { CODEX_ASSET_PATHS, CODEX_PATHS, openApiDocument } from "@vtt/api-contract";
+import { CODEX_ASSET_PATHS, CODEX_PATHS } from "@vtt/api-contract";
+import { openApiDocument } from "../src/openapi/document.js";
 
 // HTTP-boundary tests for the codex router, which enforces viewer safety by choosing a GM or player
 // projection per role. These confirm the wiring: unrevealed = 404 not 403, gmBody never reaches a
