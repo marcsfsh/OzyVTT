@@ -66,11 +66,23 @@ function parkMasterySaves(ctx: ResolveContext): void {
   }
 }
 
-/** Mastery forced movement (Push). Failures degrade to a GM-only sentence, never a rejection; only an
- *  accomplished push is narrated to the table. */
+/** The push a hit's mastery would offer, for the preview to name; null when none would (a miss, no Push, too big). */
+export function offeredPush(ctx: ResolveContext): Readonly<{ targetName: string; maxFeet: number }> | null {
+  const forced = masteryHitPushes(masterySwingOf(ctx))[0];
+  if (!forced || !sizeAtMost(ctx.targets[0]?.size, forced.maxTargetSize)) return null;
+  return { targetName: forced.targetName, maxFeet: forced.distanceFeet };
+}
+
+/** Mastery forced movement (Push), as far as the attacker chose (SRD "up to"). Failures degrade to a GM-only
+ *  sentence, never a rejection; only an accomplished push is narrated to the table. */
 function pushMasteryTargets(ctx: ResolveContext): void {
-  const { attacker, targets, deps, tableNarration, warnings } = ctx;
-  for (const forced of masteryHitPushes(ctx.masterySwing)) {
+  const { attacker, targets, deps, input, tableNarration, warnings } = ctx;
+  for (const offered of masteryHitPushes(ctx.masterySwing)) {
+    const forced = { ...offered, distanceFeet: Math.min(offered.distanceFeet, input.pushFeet ?? offered.distanceFeet) };
+    if (forced.distanceFeet <= 0) {
+      warnings.push(`${attacker.name} chose not to push ${forced.targetName}.`);
+      continue;
+    }
     if (!sizeAtMost(targets[0].size, forced.maxTargetSize)) {
       // Capitalised to match how the SRD prints a creature size in prose ("Large or smaller").
       warnings.push(

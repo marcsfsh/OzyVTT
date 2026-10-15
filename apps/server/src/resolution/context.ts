@@ -53,6 +53,8 @@ export type ResolveInput = Readonly<{
   /** How this attack is made, for `attack-kind-is` riders. Melee/ranged/thrown are derived; opportunity and
    *  reaction can't be, so `reactions.ts` announces them here. */
   attackKinds?: readonly AttackKind[];
+  /** Push mastery's chosen distance (0 declines); absent pushes the most the mastery allows. */
+  pushFeet?: number;
 }>;
 
 export type ResolveDependencies = Readonly<{
@@ -72,7 +74,7 @@ export type ResolveDependencies = Readonly<{
   /** The item catalog where magic-item riders live; absent means every item is mundane. GM audience. */
   catalog?: EquipmentCatalog;
   /** SRD forced movement (Push): moves a combatant straight away from another and reports the distance, or
-   *  null. Built by the operation layer, which has the grid; absent for reaction resolves. */
+   *  null. Built by the operation layer, which has the grid (an opportunity attack's too). */
   pushToken?: (
     input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number }>
   ) => Readonly<{ value: number; unit: string }> | null;

@@ -96,6 +96,23 @@
   align-items: center;
   gap: var(--space-2);
 }
+.push-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.push-choice-label {
+  margin-right: auto;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+/* The confirm row's tap height, since these sit outside it. */
+.push-choice .save-die-mode {
+  min-height: var(--tap-min);
+  padding: 0.4rem 0.8rem;
+  font-size: var(--fs-sm);
+}
 .reaction-prompt {
   border-color: var(--indigo);
   background: color-mix(in srgb, var(--surface-2) 85%, var(--indigo));

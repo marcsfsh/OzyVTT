@@ -132,6 +132,8 @@ export type ResolveOptions = Readonly<{
   attackTotal?: number;
   /** Declares a natural 20 (crit) for the hand-entered-total path, where the natural die is unknown. */
   critical?: boolean;
+  /** How far Push mastery shoves on the confirmed hit (0 declines); absent pushes the full distance. */
+  pushFeet?: number;
 }>;
 
 export function resolveTargeting(
@@ -152,6 +154,7 @@ export function resolveTargeting(
     ...(opts.attackNatural !== undefined ? { attackNatural: opts.attackNatural } : {}),
     ...(opts.attackTotal !== undefined ? { attackTotal: opts.attackTotal } : {}),
     ...(opts.critical !== undefined ? { critical: opts.critical } : {}),
+    ...(opts.pushFeet !== undefined ? { pushFeet: opts.pushFeet } : {}),
     commit,
     ...(revision !== undefined ? { expectedRevision: revision } : {})
   };

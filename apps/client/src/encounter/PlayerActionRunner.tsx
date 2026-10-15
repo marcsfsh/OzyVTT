@@ -168,6 +168,7 @@ export function PlayerActionRunner({
               rollMode={rollMode}
               bonusMode={bonusMode}
               onFeedback={onFeedback}
+              push={result.push}
               resolve={(options) => resolveTargeting(revision, onOutcome, options)}
             />
           )}
