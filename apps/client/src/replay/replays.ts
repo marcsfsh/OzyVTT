@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { CombatLogEntry, GameState, PlayerCombatView, PlayerHp } from "@vtt/domain";
 import { apiRequest } from "../lib/api";
+import { downloadJson } from "../lib/download";
 
 /**
  * Replays: every finished fight is kept. The GM gets the list (with a per-replay reveal control,
@@ -79,12 +80,7 @@ export function durationOf(startedAt: string | null, endedAt: string): string | 
 /** Saves an archive document as JSON, the same record the API serves. */
 export function exportDocument(id: number, endedAt: string, document: unknown) {
   const stamp = endedAt.slice(0, 16).replace("T", "-").replaceAll(":", "");
-  const url = URL.createObjectURL(new Blob([JSON.stringify(document, null, 2)], { type: "application/json" }));
-  const anchor = window.document.createElement("a");
-  anchor.href = url;
-  anchor.download = `encounter-replay-${id}-${stamp}.json`;
-  anchor.click();
-  URL.revokeObjectURL(url);
+  downloadJson(`encounter-replay-${id}-${stamp}.json`, document);
 }
 
 /**

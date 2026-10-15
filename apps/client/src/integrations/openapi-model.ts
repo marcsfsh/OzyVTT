@@ -1,3 +1,5 @@
+import { downloadJson } from "../lib/download";
+
 /**
  * Reading the served OpenAPI document for the API reference: its shapes, the groups the reference
  * lists, field tables, example bodies and the code samples in each language.
@@ -304,10 +306,5 @@ export function responseDataSchema(schemaRef: Schema | undefined, components: Co
 
 /** Downloads the full OpenAPI 3.1 spec (for Postman, openapi-generator, etc.). */
 export function exportSpec(document: OpenApiDocument) {
-  const url = URL.createObjectURL(new Blob([JSON.stringify(document, null, 2)], { type: "application/json" }));
-  const anchor = window.document.createElement("a");
-  anchor.href = url;
-  anchor.download = `vtt-openapi-v${(document.info as { version?: string }).version ?? "1"}.json`;
-  anchor.click();
-  URL.revokeObjectURL(url);
+  downloadJson(`vtt-openapi-v${(document.info as { version?: string }).version ?? "1"}.json`, document);
 }
