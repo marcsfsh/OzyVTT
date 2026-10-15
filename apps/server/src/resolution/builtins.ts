@@ -3,6 +3,7 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { checkRollMode } from "../ability-checks.js";
 import { exhaustionPenalty } from "../condition-rules.js";
 import { addEffect, endEffect, makeEffect } from "../effects.js";
+import { checkRiderBonus } from "../equipment-derivation.js";
 import { CommandRejectedError } from "../game-store.js";
 import { createPendingSaves, saveModifierFor } from "../saving-throws.js";
 import { abilityModifier, naturalFace, recordRoll, type DefinitionAction, type ResolveContext } from "./context.js";
@@ -38,9 +39,9 @@ function skillBonusFromExtension(definition: ActorDefinition | undefined, skill:
   return null;
 }
 
-/** One d20 plus `modifier` and Exhaustion, with `roll-mode {roll: "check"}` riders narrowed to the check's
- *  ability and skill (Boots of Elvenkind on Hide), recorded like any roll. Null success: no DC, the GM
- *  adjudicates. */
+/** One d20 plus `modifier`, Exhaustion and the check-bonus riders, with `roll-mode {roll: "check"}` riders, both
+ *  narrowed to the check's ability and skill (Boots of Elvenkind on Hide) as the sheet's rows are, recorded like
+ *  any roll. Null success: no DC, the GM adjudicates. */
 function rollCheck(
   ctx: ResolveContext,
   label: string,
@@ -48,7 +49,7 @@ function rollCheck(
   modifier: number,
   dc: number | null
 ): boolean | null {
-  const total = modifier + exhaustionPenalty(ctx.attacker);
+  const total = modifier + exhaustionPenalty(ctx.attacker) + checkRiderBonus(ctx.derivation, narrow);
   const aggregated = checkRollMode(ctx.derivation, narrow);
   if (aggregated.mode !== "normal") ctx.rollMode = aggregated;
   const resolution = resolveDice(parseDiceFormula(d20TestFormula(aggregated.mode, total)), ctx.deps.random);

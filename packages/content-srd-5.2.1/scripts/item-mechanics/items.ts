@@ -1295,10 +1295,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  /**
-   * "+1 bonus to ability checks and saving throws". The save half reaches the server's roll; the check
-   * half reaches the sheet's skill rows but not the server's own builtin check rolls (Hide, Search...).
-   */
+  /** "+1 bonus to ability checks and saving throws": the sheet's rows, the server's saves and its builtin checks. */
   "stone-of-good-luck-luckstone": {
     modifiers: [
       { type: "check-bonus", amount: 1 },
