@@ -1,19 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Button, Drawer, IconButton, Kbd, Modal, useToast } from "@vtt/ui";
-import { socket } from "../socket";
-import type {
-  CodexChronicleRecord,
-  CodexConnection,
-  CodexMap,
-  CodexMarker,
-  CodexPage,
-  CodexPageSummary,
-  CodexQuest,
-  CodexSession,
-  CodexSettings,
-  CodexStanding,
-  GmCodexCalendar
-} from "@vtt/domain";
+import type { CodexPage } from "@vtt/domain";
 import {
   atlasApi,
   AUTOSAVE_DEFAULT,
@@ -72,6 +59,7 @@ import { CommandPalette } from "./CommandPalette";
 import { ConnectionGraph } from "./RelationshipGraph";
 import { PlayerCodex } from "./PlayerCodex";
 import { campaignFeedProps } from "./dashboard";
+import { useCodexQuery } from "./useCodexQuery";
 import "./codex.css";
 
 /**
@@ -83,6 +71,16 @@ import "./codex.css";
 const CONSOLE_KEY = "codex-session-console";
 const SIDEBAR_KEY = "codex-sidebar";
 const DRAWER_TRANSIENT = "codex-nav";
+
+/** Stable empty feeds, so a list that has not loaded yet keeps one identity across renders. */
+const EMPTY: readonly never[] = [];
+const EMPTY_CAMPAIGN = {
+  records: EMPTY,
+  maps: EMPTY,
+  calendar: null,
+  standing: EMPTY,
+  party: null
+} as const;
 
 type WorkspaceScene = Readonly<{ id: string; name: string }>;
 /** `archived` and `kind` are optional; the character pickers read them (see `characters.ts`). */
@@ -161,142 +159,74 @@ export function CodexShell({
   }, [consoleOpen]);
 
   // ----- Feeds, one owner each -----
-  const [pages, setPages] = useState<CodexPageSummary[]>([]);
-  const [folders, setFolders] = useState<string[]>([]);
-  /** One edge list for the whole graph. */
-  const [connections, setConnections] = useState<CodexConnection[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const refreshList = useCallback(async () => {
-    try {
-      const [nextPages, nextFolders, nextConnections] = await Promise.all([
+  /** Pages, folders and the one edge list the whole graph draws. */
+  const list = useCodexQuery(
+    useCallback(async () => {
+      const [pages, folders, connections] = await Promise.all([
         codexApi.listPages(gmToken),
         codexApi.listFolders(gmToken).catch(() => []),
         codexApi.listConnections(gmToken)
       ]);
-      setPages(nextPages);
-      setFolders(nextFolders);
-      setConnections(nextConnections);
-      setError(null);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Could not load the codex.");
-    } finally {
-      setLoading(false);
-    }
-  }, [gmToken]);
-  useEffect(() => {
-    void refreshList();
-  }, [refreshList]);
+      return { pages, folders, connections };
+    }, [gmToken]),
+    { failure: "Could not load the codex." }
+  );
+  const pages = list.data?.pages ?? EMPTY;
+  const folders = list.data?.folders ?? EMPTY;
+  const connections = list.data?.connections ?? EMPTY;
+  const loading = list.loading;
+  const refreshList = list.reload;
+  /** A failed create or move, reported by whichever surface tried it. Fresh data clears it. */
+  const [actionError, setActionError] = useState<string | null>(null);
+  useEffect(() => setActionError(null), [list.data]);
 
-  const [sessions, setSessions] = useState<readonly CodexSession[]>([]);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [sessionsLoading, setSessionsLoading] = useState(true);
-  const [sessionsError, setSessionsError] = useState<string | null>(null);
-  const loadSessions = useCallback(async () => {
-    try {
-      const data = await sessionApi.list(gmToken);
-      setSessions(data.sessions);
-      setActiveSessionId(data.activeSessionId);
-      setSessionsError(null);
-    } catch (loadError) {
-      setSessionsError(loadError instanceof Error ? loadError.message : "Could not load the sessions.");
-    } finally {
-      setSessionsLoading(false);
-    }
-  }, [gmToken]);
-  useEffect(() => {
-    void loadSessions();
-  }, [loadSessions]);
+  const sessionFeed = useCodexQuery(
+    useCallback(() => sessionApi.list(gmToken), [gmToken]),
+    { failure: "Could not load the sessions." }
+  );
+  const sessions = sessionFeed.data?.sessions ?? EMPTY;
+  const activeSessionId = sessionFeed.data?.activeSessionId ?? null;
+  const loadSessions = sessionFeed.reload;
 
-  const [quests, setQuests] = useState<readonly CodexQuest[]>([]);
-  const [questsLoading, setQuestsLoading] = useState(true);
-  const [questsError, setQuestsError] = useState<string | null>(null);
-  const loadQuests = useCallback(async () => {
-    try {
-      setQuests(await questApi.list(gmToken));
-      setQuestsError(null);
-    } catch (loadError) {
-      setQuestsError(loadError instanceof Error ? loadError.message : "Could not load the quests.");
-    } finally {
-      setQuestsLoading(false);
-    }
-  }, [gmToken]);
-  useEffect(() => {
-    void loadQuests();
-  }, [loadQuests]);
+  const questFeed = useCodexQuery(
+    useCallback(() => questApi.list(gmToken), [gmToken]),
+    { failure: "Could not load the quests." }
+  );
+  const quests = questFeed.data ?? EMPTY;
+  const loadQuests = questFeed.reload;
 
   /** The autosave preference, read once here and handed to every editor so they share one cadence. */
-  const [settings, setSettings] = useState<CodexSettings | null>(null);
-  const loadSettings = useCallback(async () => {
-    try {
-      setSettings(await codexApi.getSettings(gmToken));
-    } catch {
-      /* the editors fall back to the default cadence */
-    }
-  }, [gmToken]);
-  useEffect(() => {
-    void loadSettings();
-  }, [loadSettings]);
-  const autosave = settings?.autosave ?? AUTOSAVE_DEFAULT;
+  const settingsFeed = useCodexQuery(
+    useCallback(() => codexApi.getSettings(gmToken), [gmToken]),
+    { live: false }
+  );
+  // A failed read leaves the editors on the default cadence.
+  const autosave = settingsFeed.data?.autosave ?? AUTOSAVE_DEFAULT;
 
   /**
    * The campaign feed (chronicle, maps, calendar, standing, party pin). Loaded lazily, only for the
    * sections that read it.
    */
-  const [campaign, setCampaign] = useState<{
-    records: readonly CodexChronicleRecord[];
-    maps: readonly CodexMap[];
-    calendar: GmCodexCalendar | null;
-    party: { marker: CodexMarker; mapName: string } | null;
-  }>({ records: [], maps: [], calendar: null, party: null });
-  const [standing, setStanding] = useState<readonly CodexStanding[]>([]);
-  const [campaignLoading, setCampaignLoading] = useState(true);
-  const [campaignError, setCampaignError] = useState<string | null>(null);
-  const loadCampaign = useCallback(async () => {
-    try {
-      const [records, maps, calendar, nextStanding, party] = await Promise.all([
-        journalApi.chronicle(gmToken),
-        atlasApi.listMaps(gmToken),
-        calendarApi.get(gmToken),
-        standingApi.list(gmToken),
-        // Not caught separately: a silently missing card is worse than the shared error Alert.
-        codexApi.party(gmToken)
-      ]);
-      setCampaign({ records, maps, calendar, party });
-      setStanding(nextStanding);
-      setCampaignError(null);
-    } catch (loadError) {
-      setCampaignError(loadError instanceof Error ? loadError.message : "Could not load the campaign dashboard.");
-    } finally {
-      setCampaignLoading(false);
-    }
-  }, [gmToken]);
   const needsCampaign = section === "home" || section === "calendar" || section === "downtime" || section === "tags";
-  useEffect(() => {
-    if (!needsCampaign) return;
-    void loadCampaign();
-    const onChanged = () => {
-      void loadCampaign();
-    };
-    socket.on("codex:changed", onChanged);
-    return () => {
-      socket.off("codex:changed", onChanged);
-    };
-  }, [needsCampaign, loadCampaign]);
-
-  // Any codex write pings every client.
-  useEffect(() => {
-    const onChanged = () => {
-      void refreshList();
-      void loadSessions();
-      void loadQuests();
-    };
-    socket.on("codex:changed", onChanged);
-    return () => {
-      socket.off("codex:changed", onChanged);
-    };
-  }, [refreshList, loadSessions, loadQuests]);
+  const loadCampaignFeed = useCallback(async () => {
+    const [records, maps, calendar, standing, party] = await Promise.all([
+      journalApi.chronicle(gmToken),
+      atlasApi.listMaps(gmToken),
+      calendarApi.get(gmToken),
+      standingApi.list(gmToken),
+      // Not caught separately: a silently missing card is worse than the shared error Alert.
+      codexApi.party(gmToken)
+    ]);
+    return { records, maps, calendar, standing, party };
+  }, [gmToken]);
+  const campaignFeed = useCodexQuery(needsCampaign ? loadCampaignFeed : null, {
+    failure: "Could not load the campaign dashboard."
+  });
+  const campaign = campaignFeed.data ?? EMPTY_CAMPAIGN;
+  const standing = campaign.standing;
+  const campaignLoading = campaignFeed.loading;
+  const campaignError = campaignFeed.error;
+  const loadCampaign = campaignFeed.reload;
 
   // Cmd/Ctrl-K opens the palette. Codex-scoped by design, so the shortcut leaves with the section.
   useEffect(() => {
@@ -310,24 +240,31 @@ export function CodexShell({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const onPageChanged = useCallback((page: CodexPage) => {
-    setPages((prev) =>
-      prev.map((row) =>
-        row.id === page.id
-          ? {
-              ...row,
-              title: page.title,
-              folder: page.folder,
-              tags: page.tags,
-              entityType: page.entityType,
-              revealedToPlayers: page.revealedToPlayers,
-              rev: page.rev,
-              updatedAt: page.updatedAt
-            }
-          : row
-      )
-    );
-  }, []);
+  const setList = list.setData;
+  const onPageChanged = useCallback(
+    (page: CodexPage) =>
+      setList(
+        (prev) =>
+          prev && {
+            ...prev,
+            pages: prev.pages.map((row) =>
+              row.id === page.id
+                ? {
+                    ...row,
+                    title: page.title,
+                    folder: page.folder,
+                    tags: page.tags,
+                    entityType: page.entityType,
+                    revealedToPlayers: page.revealedToPlayers,
+                    rev: page.rev,
+                    updatedAt: page.updatedAt
+                  }
+                : row
+            )
+          }
+      ),
+    [setList]
+  );
 
   const openPlayerPreview = useCallback(async () => {
     setPreviewError(null);
@@ -371,7 +308,7 @@ export function CodexShell({
       await loadSessions();
       void navigate(sessionPath(session.id));
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : "Couldn't create the session.");
+      setActionError(createError instanceof Error ? createError.message : "Couldn't create the session.");
     }
   }, [gmToken, sessions, loadSessions]);
   const newQuest = useCallback(async () => {
@@ -380,7 +317,7 @@ export function CodexShell({
       await loadQuests();
       void navigate(questPath(quest.id));
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : "Couldn't create the quest.");
+      setActionError(createError instanceof Error ? createError.message : "Couldn't create the quest.");
     }
   }, [gmToken, loadQuests]);
 
@@ -488,11 +425,12 @@ export function CodexShell({
           </div>
         </div>
 
-        {error && (
+        {list.error && (
           <Alert tone="danger" title="Couldn't load the Codex">
-            {error}
+            {list.error}
           </Alert>
         )}
+        {actionError && <Alert tone="danger">{actionError}</Alert>}
         {previewError && <Alert tone="danger">{previewError}</Alert>}
 
         {/* The one scroll region. */}
@@ -558,7 +496,7 @@ export function CodexShell({
               onRefresh={refreshList}
               onPageChanged={onPageChanged}
               onQuickCreate={setQuickCreate}
-              onError={setError}
+              onError={setActionError}
               onOpenReplay={onOpenReplay}
             />
           )}
@@ -598,8 +536,8 @@ export function CodexShell({
               gmToken={gmToken}
               sessions={sessions}
               activeSessionId={activeSessionId}
-              loading={sessionsLoading}
-              error={sessionsError}
+              loading={sessionFeed.loading}
+              error={sessionFeed.error}
               onChanged={loadSessions}
               autosave={autosave}
               pages={pages}
@@ -618,8 +556,8 @@ export function CodexShell({
               gmToken={gmToken}
               quests={quests}
               pages={pages}
-              loading={questsLoading}
-              error={questsError}
+              loading={questFeed.loading}
+              error={questFeed.error}
               onChanged={loadQuests}
               autosave={autosave}
               openQuestId={recordId}
@@ -714,7 +652,7 @@ export function CodexShell({
               }}
             />
           )}
-          {section === "settings" && <CodexSettingsView gmToken={gmToken} onSettingsChanged={setSettings} />}
+          {section === "settings" && <CodexSettingsView gmToken={gmToken} onSettingsChanged={settingsFeed.setData} />}
         </div>
       </div>
 
@@ -724,8 +662,8 @@ export function CodexShell({
         onClose={() => setConsoleOpen(false)}
         gmToken={gmToken}
         session={sessions.find((session) => session.id === activeSessionId) ?? null}
-        loading={sessionsLoading}
-        error={sessionsError}
+        loading={sessionFeed.loading}
+        error={sessionFeed.error}
         onOpenSession={(sessionId) => {
           setConsoleOpen(false);
           navigate(sessionPath(sessionId));

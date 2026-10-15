@@ -16,7 +16,6 @@ import {
   Skeleton,
   TagInput
 } from "@vtt/ui";
-import { socket } from "../socket";
 import {
   calendarYearOf,
   dateToInstant,
@@ -25,8 +24,7 @@ import {
   type CodexChronicleKind,
   type CodexChronicleRecord,
   type CodexPageSummary,
-  type CodexSession,
-  type GmCodexCalendar
+  type CodexSession
 } from "@vtt/domain";
 import { calendarApi, codexApi, journalApi } from "./api";
 import {
@@ -59,6 +57,7 @@ import { CodexEditor } from "./CodexEditor";
 import { BODY_LAYER, TwoLayerBodyTabs, type BodyLayer } from "./TwoLayerBodyTabs";
 import { sessionByNumber, sessionTitle } from "./sessions";
 import { Notice, useConfirm, type NoticeMessage } from "../components/feedback";
+import { useCodexQuery } from "./useCodexQuery";
 
 /**
  * The campaign chronicle: one timeline of two-layer journal entries and dated `event` pages, read by
@@ -126,6 +125,8 @@ const EMPTY: Draft = {
   level: "",
   reason: ""
 };
+/** A stable empty feed, so a list that has not loaded yet keeps one identity across renders. */
+const NO_ROWS: readonly never[] = [];
 const DRAFT_KEY = "codex-journal-draft";
 const LENS_KEY = "codex-chronicle-lens";
 const JOURNAL_DETAILS_KEY = "codex-journal-details";
@@ -188,9 +189,27 @@ export function JournalView({
   onOpenSession?: (sessionId: string) => void;
 }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [records, setRecords] = useState<CodexChronicleRecord[]>([]);
-  const [pages, setPages] = useState<CodexPageSummary[]>([]);
-  const [calendar, setCalendar] = useState<GmCodexCalendar | null>(null);
+  // Until the first read settles, an empty list is not "no entries".
+  const journal = useCodexQuery(
+    useCallback(async () => {
+      const [records, pages, calendar] = await Promise.all([
+        journalApi.chronicle(gmToken),
+        codexApi.listPages(gmToken),
+        calendarApi.get(gmToken)
+      ]);
+      return { records, pages, calendar };
+    }, [gmToken]),
+    { failure: "Could not load the journal." }
+  );
+  const records = journal.data?.records ?? NO_ROWS;
+  const pages = journal.data?.pages ?? NO_ROWS;
+  const calendar = journal.data?.calendar ?? null;
+  const loading = journal.loading;
+  const load = journal.reload;
+  /** A failed write. Fresh data clears it. */
+  const [actionError, setActionError] = useState<string | null>(null);
+  useEffect(() => setActionError(null), [journal.data]);
+  const error = actionError ?? journal.error;
   const [calendarOpen, setCalendarOpen] = useState(false);
   // Older drafts may lack `tags` or `kind`; fall back to safe defaults.
   const [draft, setDraft] = useState<Draft>(() => {
@@ -212,9 +231,6 @@ export function JournalView({
   const [editingKind, setEditingKind] = useState<CodexChronicleKind | null>(null);
   // A new entry set aside while the composer edits an existing one, so Edit never destroys it.
   const [stashedDraft, setStashedDraft] = useState<Draft | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  // Until the first fetch settles, an empty list is not "no entries".
-  const [loading, setLoading] = useState(true);
   /** Acknowledges a publish, since the prep-clock row disappears once the clocks agree. */
   const [notice, setNotice] = useState<NoticeMessage>(null);
   /** State rather than a raw read, so turning it back on takes effect without a reload. */
@@ -256,36 +272,6 @@ export function JournalView({
     }
   }, [lens]);
 
-  const load = useCallback(async () => {
-    try {
-      const [nextRecords, nextPages, nextCalendar] = await Promise.all([
-        journalApi.chronicle(gmToken),
-        codexApi.listPages(gmToken),
-        calendarApi.get(gmToken)
-      ]);
-      setRecords(nextRecords);
-      setPages(nextPages);
-      setCalendar(nextCalendar);
-      setError(null);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Could not load the journal.");
-    } finally {
-      setLoading(false);
-    }
-  }, [gmToken]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-  useEffect(() => {
-    const onChanged = () => {
-      void load();
-    };
-    socket.on("codex:changed", onChanged);
-    return () => {
-      socket.off("codex:changed", onChanged);
-    };
-  }, [load]);
   // Persist an in-progress new entry across tab switches. While editing, the stash is what's worth keeping.
   useEffect(() => {
     try {
@@ -355,7 +341,7 @@ export function JournalView({
       else if (draft.kind === "deadline") {
         // Also guarded by the disabled button.
         if (!inWorldDate) {
-          setError("A deadline needs a date. Set the year, month and day above.");
+          setActionError("A deadline needs a date. Set the year, month and day above.");
           return;
         }
         await journalApi.createDeadline(gmToken, { ...input, inWorldDate });
@@ -389,7 +375,7 @@ export function JournalView({
       setEditingKind(null);
       await load();
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Could not save the entry.");
+      setActionError(submitError instanceof Error ? submitError.message : "Could not save the entry.");
     }
   };
   const edit = (record: CodexChronicleRecord) => {
@@ -433,7 +419,7 @@ export function JournalView({
       await journalApi.applyDowntime(gmToken, record.id);
       await load();
     } catch (applyError) {
-      setError(applyError instanceof Error ? applyError.message : "Could not advance the campaign clock.");
+      setActionError(applyError instanceof Error ? applyError.message : "Could not advance the campaign clock.");
     }
   };
   /** Publish the GM's clock to players. Nothing else on this client does. */
@@ -448,7 +434,7 @@ export function JournalView({
         text: published ? `Players now see ${published}.` : "The date is published to players."
       });
     } catch (publishError) {
-      setError(publishError instanceof Error ? publishError.message : "Could not publish the date.");
+      setActionError(publishError instanceof Error ? publishError.message : "Could not publish the date.");
     }
   };
   const cancelEdit = () => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Button,
   Chip,
@@ -12,7 +12,7 @@ import {
   Skeleton,
   VisibilityBadge
 } from "@vtt/ui";
-import type { CodexAutosaveSettings, CodexPage, CodexPageConnection, CodexPageSummary } from "@vtt/domain";
+import type { CodexAutosaveSettings, CodexPage, CodexPageSummary } from "@vtt/domain";
 import { codexApi } from "./api";
 import { PageEditor } from "./PageEditor";
 import { NotebookTree, buildFolderTree, type NotebookSort } from "./NotebookTree";
@@ -23,6 +23,7 @@ import { navigate, replaceQuery, withQuery } from "../router";
 import { atlasPath, graphPath, pagePath, pathForHit, pathForSection, tagPath } from "./routes";
 import { useConfirm, usePrompt } from "../components/feedback";
 import type { QuickCreateRequest } from "./QuickCreate";
+import { useCodexQuery } from "./useCodexQuery";
 
 /** Pages: the notebook rail and the two-layer editor. Selection, filters and search live in the URL. */
 export type PagesViewProps = Readonly<{
@@ -56,10 +57,12 @@ export function PagesView({
   onOpenReplay
 }: PagesViewProps) {
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<{ page: CodexPage; connections: readonly CodexPageConnection[] } | null>(
-    null
-  );
-  const [missing, setMissing] = useState(false);
+  /** The open page. Not refetched on the ping: the editor adopts outside changes through its `page` prop. */
+  const readSelected = useCallback(() => codexApi.getPage(gmToken, selectedId ?? ""), [gmToken, selectedId]);
+  const opened = useCodexQuery(selectedId ? readSelected : null, { live: false });
+  // Missing means this page never loaded; a failed refresh of an open page keeps it on screen.
+  const missing = selectedId !== null && opened.error !== null && opened.data?.page.id !== selectedId;
+  const selected = selectedId && !missing ? (opened.data ?? null) : null;
   const [movingPageId, setMovingPageId] = useState<string | null>(null);
   const [sort, setSort] = useState<NotebookSort>(() => {
     try {
@@ -82,41 +85,8 @@ export function PagesView({
   const typeFilter = (query.get("type") as EntityType | null) ?? null;
   const tagFilter = query.get("tag");
 
-  useEffect(() => {
-    if (!selectedId) {
-      setSelected(null);
-      setMissing(false);
-      return;
-    }
-    let live = true;
-    setMissing(false);
-    void codexApi
-      .getPage(gmToken, selectedId)
-      .then((result) => {
-        if (live) {
-          setSelected(result);
-          setMissing(false);
-        }
-      })
-      .catch(() => {
-        if (live) {
-          setSelected(null);
-          setMissing(true);
-        }
-      });
-    return () => {
-      live = false;
-    };
-  }, [gmToken, selectedId]);
-
   /** Refetch the open page after a connection edit, to pull its fresh rows. */
-  const refreshSelected = useCallback(() => {
-    if (!selectedId) return;
-    void codexApi
-      .getPage(gmToken, selectedId)
-      .then(setSelected)
-      .catch(() => undefined);
-  }, [gmToken, selectedId]);
+  const refreshSelected = opened.reload;
 
   const runSearch = useCallback((text: string) => codexApi.search(gmToken, text).then((result) => result), [gmToken]);
   const searchState = useCodexSearch(search, runSearch, pages);

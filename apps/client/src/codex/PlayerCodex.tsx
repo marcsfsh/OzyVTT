@@ -14,18 +14,14 @@ import {
   Select,
   Skeleton
 } from "@vtt/ui";
-import { socket } from "../socket";
 import {
   formatWorldDate,
   formatWorldYear,
   type CodexCalendar,
   type CodexSearchHit,
   type PlayerCodexChronicleRecord,
-  type PlayerCodexConnection,
   type PlayerCodexMap,
   type PlayerCodexMarker,
-  type PlayerCodexPage,
-  type PlayerCodexPageConnection,
   type PlayerCodexPageSummary,
   type PlayerCodexQuest,
   type PlayerCodexSession,
@@ -68,6 +64,7 @@ import { TagView } from "./TagView";
 import { NotFoundView } from "../components/NotFoundView";
 import { TagChip } from "./TagChip";
 import { playerCampaignFeedProps } from "./dashboard";
+import { useCodexQuery } from "./useCodexQuery";
 import {
   PLAYER_SIDEBAR,
   SECTION_TITLE,
@@ -103,6 +100,8 @@ import "./codex.css";
  * journals agree on what a row says.
  */
 const PLAYER_SIDEBAR_KEY = "codex-player-sidebar";
+/** A stable empty feed, so a list that has not loaded yet keeps one identity across renders. */
+const EMPTY: readonly never[] = [];
 
 export function PlayerCodex({ token, embedded = false }: Readonly<{ token: string; embedded?: boolean }>) {
   /**
@@ -144,21 +143,37 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
   /** A GM-only address renders the not-found view, identical to an unknown address, so it confirms nothing. */
   const gmOnly = section === "audit" || section === "backup" || section === "settings";
 
-  const [pages, setPages] = useState<PlayerCodexPageSummary[]>([]);
-  const [connections, setConnections] = useState<PlayerCodexConnection[]>([]);
-  const [page, setPage] = useState<PlayerCodexPage | null>(null);
-  const [pageConnections, setPageConnections] = useState<PlayerCodexPageConnection[]>([]);
-  const [maps, setMaps] = useState<PlayerCodexMap[]>([]);
-  const [markers, setMarkers] = useState<PlayerCodexMarker[]>([]);
-  const [timeline, setTimeline] = useState<PlayerCodexChronicleRecord[]>([]);
-  const [calendar, setCalendar] = useState<CodexCalendar | null>(null);
-  const [sessions, setSessions] = useState<PlayerCodexSession[]>([]);
-  const [quests, setQuests] = useState<PlayerCodexQuest[]>([]);
-  const [standing, setStanding] = useState<PlayerCodexStanding[]>([]);
-  const [party, setParty] = useState<{ marker: PlayerCodexMarker; mapName: string } | null>(null);
+  /** Every player feed at once, refreshed on the shared ping. */
+  const feed = useCodexQuery(
+    useCallback(async () => {
+      const [pages, maps, timeline, connections, calendar, sessions, quests, standing, party] = await Promise.all([
+        playerCodexApi.listPages(token),
+        playerCodexApi.listMaps(token),
+        playerCodexApi.chronicle(token),
+        playerCodexApi.listConnections(token),
+        // A missing calendar shouldn't cost the player the whole codex.
+        playerCodexApi.calendar(token).catch(() => null),
+        playerCodexApi.sessions(token).catch(() => []),
+        playerCodexApi.quests(token).catch(() => []),
+        playerCodexApi.standing(token).catch(() => []),
+        // null covers both "no party pin" and "hidden from you", deliberately indistinguishable.
+        playerCodexApi.party(token).catch(() => null)
+      ]);
+      return { pages, maps, timeline, connections, calendar, sessions, quests, standing, party };
+    }, [token])
+  );
+  const pages = feed.data?.pages ?? EMPTY;
+  const maps = feed.data?.maps ?? EMPTY;
+  const timeline = feed.data?.timeline ?? EMPTY;
+  const connections = feed.data?.connections ?? EMPTY;
+  const calendar = feed.data?.calendar ?? null;
+  const sessions = feed.data?.sessions ?? EMPTY;
+  const quests = feed.data?.quests ?? EMPTY;
+  const standing = feed.data?.standing ?? EMPTY;
+  const party = feed.data?.party ?? null;
+  const loading = feed.loading;
+  const error = feed.error && "Couldn't load the Codex. Check your connection and try again.";
   const [search, setSearch] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   /** Filters live in the address like the GM's, via `setQuery` so the embedded preview keeps its own route. */
@@ -178,109 +193,19 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
     [setQuery]
   );
 
-  const load = useCallback(async () => {
-    try {
-      const [
-        nextPages,
-        nextMaps,
-        nextTimeline,
-        nextConnections,
-        nextCalendar,
-        nextSessions,
-        nextQuests,
-        nextStanding,
-        nextParty
-      ] = await Promise.all([
-        playerCodexApi.listPages(token),
-        playerCodexApi.listMaps(token),
-        playerCodexApi.chronicle(token),
-        playerCodexApi.listConnections(token),
-        // A missing calendar shouldn't cost the player the whole codex.
-        playerCodexApi.calendar(token).catch(() => null),
-        playerCodexApi.sessions(token).catch(() => []),
-        playerCodexApi.quests(token).catch(() => []),
-        playerCodexApi.standing(token).catch(() => []),
-        // null covers both "no party pin" and "hidden from you", deliberately indistinguishable.
-        playerCodexApi.party(token).catch(() => null)
-      ]);
-      setPages(nextPages);
-      setMaps(nextMaps);
-      setTimeline(nextTimeline);
-      setConnections(nextConnections);
-      setCalendar(nextCalendar);
-      setSessions(nextSessions);
-      setQuests(nextQuests);
-      setStanding(nextStanding);
-      setParty(nextParty);
-      setError(null);
-    } catch {
-      setError("Couldn't load the Codex. Check your connection and try again.");
-    } finally {
-      setLoading(false);
-    }
-  }, [token]);
-
-  useEffect(() => {
-    void load().catch(() => undefined);
-  }, [load]);
-  useEffect(() => {
-    const onChanged = () => {
-      void load().catch(() => undefined);
-    };
-    socket.on("codex:changed", onChanged);
-    return () => {
-      socket.off("codex:changed", onChanged);
-    };
-  }, [load]);
-
   // ----- Pages -----
-  useEffect(() => {
-    if (section !== "pages" || !recordId) {
-      setPage(null);
-      setPageConnections([]);
-      return;
-    }
-    let live = true;
-    void playerCodexApi
-      .getPage(token, recordId)
-      .then((result) => {
-        if (live) {
-          setPage(result.page);
-          setPageConnections(result.connections);
-        }
-      })
-      .catch(() => {
-        if (live) {
-          setPage(null);
-          setPageConnections([]);
-        }
-      });
-    return () => {
-      live = false;
-    };
-  }, [token, section, recordId]);
+  const readPage = useCallback(() => playerCodexApi.getPage(token, recordId ?? ""), [token, recordId]);
+  const opened = useCodexQuery(section === "pages" && recordId ? readPage : null);
+  // A page the player can't see is a 404, which reads the same as no page.
+  const page = section === "pages" && recordId && !opened.error ? (opened.data?.page ?? null) : null;
+  const pageConnections = page ? (opened.data?.connections ?? EMPTY) : EMPTY;
 
   // ----- Atlas -----
   const rootMaps = useMemo(() => maps.filter((map) => map.parentMapId === null), [maps]);
   const currentMapId = section === "atlas" ? (recordId ?? rootMaps[0]?.id ?? maps[0]?.id ?? null) : null;
-  useEffect(() => {
-    if (!currentMapId) {
-      setMarkers([]);
-      return;
-    }
-    let live = true;
-    void playerCodexApi
-      .listMarkers(token, currentMapId)
-      .then((next) => {
-        if (live) setMarkers(next);
-      })
-      .catch(() => {
-        if (live) setMarkers([]);
-      });
-    return () => {
-      live = false;
-    };
-  }, [token, currentMapId]);
+  const readMarkers = useCallback(() => playerCodexApi.listMarkers(token, currentMapId ?? ""), [token, currentMapId]);
+  const pins = useCodexQuery(currentMapId ? readMarkers : null);
+  const markers = currentMapId && !pins.error ? (pins.data ?? EMPTY) : EMPTY;
   const currentMap = maps.find((map) => map.id === currentMapId) ?? null;
   /** Client-side over this map's pins. */
   const pinTags = useMemo(() => [...new Set(markers.flatMap((pin) => pin.tags))].sort(), [markers]);

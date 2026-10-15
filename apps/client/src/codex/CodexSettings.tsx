@@ -10,6 +10,7 @@ import {
   REVISION_WINDOW_MIN
 } from "./api";
 import { useConfirm } from "../components/feedback";
+import { useCodexQuery } from "./useCodexQuery";
 
 /**
  * Codex-wide settings: autosave and version history. Holds settings only, never records; its one
@@ -20,31 +21,27 @@ export function CodexSettingsView({
   onSettingsChanged
 }: Readonly<{ gmToken: string; onSettingsChanged?: (settings: CodexSettings) => void }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [settings, setSettings] = useState<CodexSettings | null>(null);
   // Until the first read settles, don't show a guessed state.
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data: settings,
+    setData: setSettings,
+    loading,
+    error: loadError,
+    reload
+  } = useCodexQuery(
+    useCallback(() => codexApi.getSettings(gmToken), [gmToken]),
+    { failure: "Couldn't read the codex settings.", live: false }
+  );
+  // The shell hands the autosave cadence to every editor, so it hears each value this screen shows.
+  useEffect(() => {
+    if (settings) onSettingsChanged?.(settings);
+  }, [settings, onSettingsChanged]);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const error = actionError ?? loadError;
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   /** Days of history to keep when trimming. Local to the action, not a stored setting. */
   const [trimDays, setTrimDays] = useState("30");
-
-  const load = useCallback(async () => {
-    try {
-      const next = await codexApi.getSettings(gmToken);
-      setSettings(next);
-      onSettingsChanged?.(next);
-      setError(null);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Couldn't read the codex settings.");
-    } finally {
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gmToken]);
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   /** Written through on change; the response carries the clamped value the server stored. */
   const save = async (
@@ -65,21 +62,12 @@ export function CodexSettingsView({
       // The PUT is wholesale, so send both groups every time.
       const next = await codexApi.setSettings(gmToken, { revisionHistory, autosave });
       // Keep the optimistic value if the answer is unusable, rather than blanking the screen.
-      if (next) {
-        setSettings(next);
-        onSettingsChanged?.(next);
-      }
-      setError(null);
+      if (next) setSettings(next);
+      setActionError(null);
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "That setting could not be saved.");
+      setActionError(saveError instanceof Error ? saveError.message : "That setting could not be saved.");
       // Re-read so the control shows what the codex actually holds.
-      try {
-        const fresh = await codexApi.getSettings(gmToken);
-        setSettings(fresh);
-        onSettingsChanged?.(fresh);
-      } catch {
-        /* the error above already says it did not save */
-      }
+      await reload();
     }
   };
 
@@ -107,10 +95,10 @@ export function CodexSettingsView({
     try {
       const { deleted } = await codexApi.deleteRevisions(gmToken, olderThanDays);
       setNotice(`Deleted ${deleted.toLocaleString()} saved version${deleted === 1 ? "" : "s"}.`);
-      await load();
-      setError(null);
+      await reload();
+      setActionError(null);
     } catch (trimError) {
-      setError(trimError instanceof Error ? trimError.message : "Those versions could not be deleted.");
+      setActionError(trimError instanceof Error ? trimError.message : "Those versions could not be deleted.");
     } finally {
       setBusy(false);
     }

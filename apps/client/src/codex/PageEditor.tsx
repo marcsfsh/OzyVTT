@@ -14,15 +14,7 @@ import {
   TagInput,
   Textarea
 } from "@vtt/ui";
-import type {
-  CodexAutosaveSettings,
-  CodexCalendar,
-  CodexPage,
-  CodexPageConnection,
-  CodexPageRevision,
-  CodexPageSummary,
-  CodexSettings
-} from "@vtt/domain";
+import type { CodexAutosaveSettings, CodexPage, CodexPageConnection, CodexPageSummary } from "@vtt/domain";
 import { calendarApi, codexApi, uploadCodexAsset } from "./api";
 import { CodexImage } from "./CodexImage";
 import { CodexEditor } from "./CodexEditor";
@@ -32,6 +24,7 @@ import { PageMarkers } from "./PageMarkers";
 import { ConnectionsPanel } from "./ConnectionsPanel";
 import { useCodexAutosave } from "./autosave";
 import { useConfirm } from "../components/feedback";
+import { useCodexQuery } from "./useCodexQuery";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityDef, splitEntityFields, type EntityType } from "./entities";
 
 /**
@@ -117,8 +110,6 @@ export function PageEditor({
   const [revealed, setRevealed] = useState(page.revealedToPlayers);
   const [tab, setTab] = useState<BodyLayer>("player");
   const [revisionsOpen, setRevisionsOpen] = useState(false);
-  const [revisions, setRevisions] = useState<CodexPageRevision[]>([]);
-  const [settings, setSettings] = useState<CodexSettings | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const revRef = useRef(page.rev);
   const bannerInputRef = useRef<HTMLInputElement>(null);
@@ -213,27 +204,18 @@ export function PageEditor({
   const typeDef = entityDef(draft.entityType);
 
   const isEvent = draft.entityType === "event";
-  const [calendar, setCalendar] = useState<CodexCalendar | null>(null);
-  useEffect(() => {
-    if (!isEvent || calendar) return;
-    let live = true;
-    void calendarApi
-      .get(gmToken)
-      .then((next) => {
-        if (live) setCalendar(next);
-      })
-      .catch(() => undefined);
-    return () => {
-      live = false;
-    };
-  }, [isEvent, calendar, gmToken]);
-  // The kind-change copy names the history setting, so read it once when the editor mounts.
-  useEffect(() => {
-    void codexApi
-      .getSettings(gmToken)
-      .then(setSettings)
-      .catch(() => undefined);
-  }, [gmToken]);
+  const readCalendar = useCallback(() => calendarApi.get(gmToken), [gmToken]);
+  const calendar = useCodexQuery(isEvent ? readCalendar : null, { live: false }).data ?? null;
+  // The kind-change copy and the History hint name the history setting. A failed read hides the hint.
+  const settingsQuery = useCodexQuery(
+    useCallback(() => codexApi.getSettings(gmToken), [gmToken]),
+    { live: false }
+  );
+  const settings = settingsQuery.error ? null : (settingsQuery.data ?? null);
+  // Read each time History opens.
+  const readRevisions = useCallback(() => codexApi.listRevisions(gmToken, page.id), [gmToken, page.id]);
+  const revisionsQuery = useCodexQuery(revisionsOpen ? readRevisions : null, { live: false });
+  const revisions = revisionsQuery.error ? [] : (revisionsQuery.data ?? []);
 
   /**
    * Changing a page's kind always confirms, since a conditional dialog gets dismissed unread. A
@@ -281,18 +263,9 @@ export function PageEditor({
     }
   };
 
-  const openRevisions = async () => {
+  const openRevisions = () => {
     setRevisionsOpen(true);
-    try {
-      setRevisions(await codexApi.listRevisions(gmToken, page.id));
-    } catch {
-      setRevisions([]);
-    }
-    try {
-      setSettings(await codexApi.getSettings(gmToken));
-    } catch {
-      setSettings(null);
-    }
+    void settingsQuery.reload();
   };
   const restore = async (revisionId: number) => {
     try {

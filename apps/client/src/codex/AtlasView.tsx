@@ -16,7 +16,6 @@ import {
   TagInput,
   useToast
 } from "@vtt/ui";
-import { socket } from "../socket";
 import type { CodexAutosaveSettings, CodexMap, CodexMapKind, CodexMarker, CodexPageSummary } from "@vtt/domain";
 import { atlasApi, codexApi, type MapAsset } from "./api";
 import { MapSurface } from "./MapSurface";
@@ -26,12 +25,20 @@ import { DEFAULT_COLOR, DEFAULT_ICON } from "./icons";
 import { CODEX_ROOT, atlasPath } from "./routes";
 import { withQuery } from "../router";
 import type { QuickCreateRequest } from "./QuickCreate";
+import { useCodexQuery } from "./useCodexQuery";
 
 /**
  * The atlas: a navigable forest of maps (world, region, local) with markers that link to pages and
  * sub-maps. All state is server-owned and refreshed on `codex:changed`.
  */
+/** A stable empty feed, so a list that has not loaded yet keeps one identity across renders. */
+const EMPTY: readonly never[] = [];
 type AtlasScene = Readonly<{ id: string; name: string }>;
+type AtlasMeta = Readonly<{
+  maps: readonly CodexMap[];
+  pages: readonly CodexPageSummary[];
+  assets: readonly MapAsset[];
+}>;
 type AtlasActor = Readonly<{ id: string; name: string }>;
 const MAP_KINDS: ReadonlyArray<{ value: CodexMapKind; label: string }> = [
   { value: "world", label: "World" },
@@ -89,18 +96,39 @@ export function AtlasView({
 }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const { toast } = useToast();
-  const [maps, setMaps] = useState<CodexMap[]>([]);
-  const [assets, setAssets] = useState<MapAsset[]>([]);
-  const [pages, setPages] = useState<CodexPageSummary[]>([]);
+  /** The map tree, the page list for linking, and the map-image library. */
+  const meta = useCodexQuery(
+    useCallback(async (): Promise<AtlasMeta> => {
+      const [maps, pages, assets] = await Promise.all([
+        atlasApi.listMaps(gmToken),
+        codexApi.listPages(gmToken),
+        atlasApi.listAssets(gmToken).catch(() => [])
+      ]);
+      return { maps, pages, assets };
+    }, [gmToken]),
+    { failure: "Could not load the atlas." }
+  );
+  const maps = meta.data?.maps ?? EMPTY;
+  const pages = meta.data?.pages ?? EMPTY;
+  const assets = meta.data?.assets ?? EMPTY;
+  // Don't show the "first map" invitation before the fetch settles.
+  const loading = meta.loading;
+  const loadMeta = meta.reload;
+  const setMeta = meta.setData;
   /**
-   * The URL is the source of truth; this mirror covers the first load (picking the first root map) and a
-   * `?pin=` link whose map must be resolved first.
+   * The URL is the source of truth; this mirror also holds the map a `?pin=` link resolved to. With
+   * neither, the atlas opens on the first root map.
    */
-  const [currentMapId, setCurrentMapId] = useState<string | null>(mapId);
+  const [chosenMapId, setCurrentMapId] = useState<string | null>(mapId);
   useEffect(() => {
     if (mapId) setCurrentMapId(mapId);
   }, [mapId]);
-  const [markers, setMarkers] = useState<CodexMarker[]>([]);
+  const currentMapId = chosenMapId ?? maps.find((map) => map.parentMapId === null)?.id ?? maps[0]?.id ?? null;
+  const readMarkers = useCallback(() => atlasApi.listMarkers(gmToken, currentMapId ?? ""), [gmToken, currentMapId]);
+  const pins = useCodexQuery(currentMapId ? readMarkers : null);
+  const markers = currentMapId && !pins.error ? (pins.data ?? EMPTY) : EMPTY;
+  const setMarkers = (update: (prev: readonly CodexMarker[]) => readonly CodexMarker[]) =>
+    pins.setData((prev) => [...update(prev ?? EMPTY)]);
   /**
    * The selected pin is the `?pin=` address, so selection survives a refresh and every change goes through
    * `onNavigate`, which runs the unsaved-changes guard for the inspector's draft.
@@ -139,59 +167,11 @@ export function AtlasView({
   const [nestNew, setNestNew] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsName, setSettingsName] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  // Don't show the "first map" invitation before the fetch settles.
-  const [loading, setLoading] = useState(true);
+  /** A failed write or pin lookup. Fresh atlas data clears it. */
+  const [actionError, setError] = useState<string | null>(null);
+  useEffect(() => setError(null), [meta.data]);
+  const error = actionError ?? meta.error;
 
-  const loadMeta = useCallback(async () => {
-    try {
-      const [nextMaps, nextPages, nextAssets] = await Promise.all([
-        atlasApi.listMaps(gmToken),
-        codexApi.listPages(gmToken),
-        atlasApi.listAssets(gmToken).catch(() => [])
-      ]);
-      setMaps(nextMaps);
-      setPages(nextPages);
-      setAssets(nextAssets);
-      setError(null);
-      setCurrentMapId(
-        (current) => current ?? nextMaps.find((map) => map.parentMapId === null)?.id ?? nextMaps[0]?.id ?? null
-      );
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Could not load the atlas.");
-    } finally {
-      setLoading(false);
-    }
-  }, [gmToken]);
-
-  const loadMarkers = useCallback(
-    async (mapId: string) => {
-      try {
-        setMarkers(await atlasApi.listMarkers(gmToken, mapId));
-      } catch {
-        setMarkers([]);
-      }
-    },
-    [gmToken]
-  );
-
-  useEffect(() => {
-    void loadMeta();
-  }, [loadMeta]);
-  useEffect(() => {
-    if (currentMapId) void loadMarkers(currentMapId);
-    else setMarkers([]);
-  }, [currentMapId, loadMarkers]);
-  useEffect(() => {
-    const onChanged = () => {
-      void loadMeta();
-      if (currentMapId) void loadMarkers(currentMapId);
-    };
-    socket.on("codex:changed", onChanged);
-    return () => {
-      socket.off("codex:changed", onChanged);
-    };
-  }, [loadMeta, loadMarkers, currentMapId]);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -293,7 +273,7 @@ export function AtlasView({
     try {
       await atlasApi.uploadAsset(gmToken, file);
       const next = await atlasApi.listAssets(gmToken).catch(() => assets);
-      setAssets(next);
+      setMeta((prev) => prev && { ...prev, assets: next });
       toast("Map image uploaded.", { tone: "success" });
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "The upload failed.");
@@ -390,7 +370,7 @@ export function AtlasView({
     try {
       await atlasApi.moveMarker(gmToken, markerId, point.x, point.y);
     } catch {
-      void loadMarkers(currentMapId!);
+      void pins.reload();
     }
   };
   const onMarkerUpdated = (marker: CodexMarker) =>
@@ -418,7 +398,9 @@ export function AtlasView({
     clearDeletedPin();
   };
   const onMapReplace = (map: CodexMap) =>
-    setMaps((prev) => prev.map((existing) => (existing.id === map.id ? map : existing)));
+    setMeta(
+      (prev) => prev && { ...prev, maps: prev.maps.map((existing) => (existing.id === map.id ? map : existing)) }
+    );
   const revealMap = async (revealed: boolean) => {
     if (!currentMap) return;
     try {
@@ -657,7 +639,7 @@ export function AtlasView({
             onOpenReplay={onOpenReplay}
             /* Setting the party can clear a pin on another map, so re-read this map's pins. */
             onPartyChanged={async () => {
-              if (currentMapId) await loadMarkers(currentMapId);
+              await pins.reload();
             }}
             onClose={deselectPin}
           />

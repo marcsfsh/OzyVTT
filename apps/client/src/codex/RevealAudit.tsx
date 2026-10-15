@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Alert, Badge, Button, Modal, RevealSwitch, Skeleton } from "@vtt/ui";
-import { socket } from "../socket";
-import type { CodexRevealAudit, CodexRevealAuditKind, CodexRevealAuditSection } from "@vtt/domain";
+import type { CodexRevealAuditKind, CodexRevealAuditSection } from "@vtt/domain";
 import { atlasApi, codexApi, journalApi, questApi, revealAuditApi, sessionApi, standingApi } from "./api";
 import { CHRONICLE_KIND_META, chronicleKindOfJournal } from "./chronicle";
 import { CodexIcon } from "./icons";
+import { useCodexQuery } from "./useCodexQuery";
 
 /**
  * The reveal audit: what can the players see right now? Every row comes from the server, which decides
@@ -82,36 +82,20 @@ const AUDIT_KINDS: Readonly<
 const KIND_ORDER = Object.keys(AUDIT_KINDS) as readonly CodexRevealAuditKind[];
 
 export function RevealAudit({ gmToken }: Readonly<{ gmToken: string }>) {
-  const [audit, setAudit] = useState<CodexRevealAudit | null>(null);
-  // Until the first read settles, "nothing is revealed" isn't a claim this screen can make.
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Edits elsewhere must reach this list; a stale audit is worse than none. Until the first read settles,
+  // "nothing is revealed" isn't a claim this screen can make.
+  const {
+    data: audit,
+    loading,
+    error: loadError,
+    reload
+  } = useCodexQuery(
+    useCallback(() => revealAuditApi.get(gmToken), [gmToken]),
+    { failure: "Couldn't read what players can see." }
+  );
+  const [writeError, setWriteError] = useState<string | null>(null);
+  const error = writeError ?? loadError;
   const [pendingFaction, setPendingFaction] = useState<{ id: string; title: string } | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      setAudit(await revealAuditApi.get(gmToken));
-      setError(null);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Couldn't read what players can see.");
-    } finally {
-      setLoading(false);
-    }
-  }, [gmToken]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-  // Edits elsewhere must reach this list; a stale audit is worse than none.
-  useEffect(() => {
-    const onChanged = () => {
-      void load();
-    };
-    socket.on("codex:changed", onChanged);
-    return () => {
-      socket.off("codex:changed", onChanged);
-    };
-  }, [load]);
 
   /**
    * Flipping a row off keeps it rendered (dimmed) until the refetch settles, so flipping it back on is
@@ -120,7 +104,7 @@ export function RevealAudit({ gmToken }: Readonly<{ gmToken: string }>) {
   const [justHidden, setJustHidden] = useState<ReadonlySet<string>>(new Set());
   const setRevealed = async (kind: CodexRevealAuditKind, id: string, title: string, revealed: boolean) => {
     const key = `${kind}:${id}`;
-    setError(null);
+    setWriteError(null);
     try {
       await AUDIT_KINDS[kind].setRevealed(gmToken, id, revealed);
       setJustHidden((prev) => {
@@ -132,9 +116,9 @@ export function RevealAudit({ gmToken }: Readonly<{ gmToken: string }>) {
       setAnnouncement(
         revealed ? `${title} is shown to players again.` : `${title} is hidden from players. Flip to undo.`
       );
-      await load();
-    } catch (writeError) {
-      setError(writeError instanceof Error ? writeError.message : "Couldn't change who can see that.");
+      await reload();
+    } catch (failure) {
+      setWriteError(failure instanceof Error ? failure.message : "Couldn't change who can see that.");
     }
   };
   const [announcement, setAnnouncement] = useState("");
