@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema, type ActionResolution, type GameState } from "@vtt/domain";
+import type { ActorDefinition } from "@vtt/schemas";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { startEncounter } from "../src/encounter.js";
 import { playerHitOwesDamage, resolvePendingDamage, settlePlayerHit } from "../src/player-damage.js";
@@ -145,6 +146,26 @@ describe("player damage settlement", () => {
     expect(applied).toBeNull();
     expect(dismissGame.combat.pendingDamage).toHaveLength(0);
     expect(goblinHp(dismissGame)).toBe(15); // untouched
+  });
+
+  it("keeps the damage type when the GM edits the number, so resistance still halves it", () => {
+    const game = combat();
+    game.actors = game.actors.map((actor) =>
+      actor.id === IDS.monster ? { ...actor, definitionId: "resistant-goblin" } : actor
+    );
+    const resistant = {
+      abilityScores: { str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 8 },
+      damageResistances: ["slashing"],
+      extensions: {}
+    } as unknown as ActorDefinition;
+    const deps = { ...damageDeps(5), resolveDefinition: () => resistant };
+    settlePlayerHit(game, resolveHit(game), "Alpha", IDS.attacker, "proposal", damageDeps());
+    // The parked 7 slashing is edited to 12; resistance makes it 6.
+    const applied = resolvePendingDamage(game, game.combat.pendingDamage[0].id, true, 12, deps);
+    expect(applied?.outcome.application.parts).toEqual([
+      { amount: 12, type: "slashing", adjusted: 6, adjustment: "resistance", adjustmentSource: null }
+    ]);
+    expect(goblinHp(game)).toBe(9);
   });
 
   it("treats resolving an unknown proposal id as a no-op (idempotent retry)", () => {
