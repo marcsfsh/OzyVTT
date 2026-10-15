@@ -729,7 +729,8 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   },
   HomebrewPackImport: {
     "": "The import plan or its result - byte-for-byte the same report either way, which is what makes `dryRun` trustworthy.",
-    "reminted[].reason": "An SRD collision is ALWAYS re-minted; a homebrew collision follows onIdCollision"
+    "reminted[].reason":
+      "Why the id changed. srd-collision: outside `hb-`, the bundle's namespace, ALWAYS re-minted. homebrew-collision: an existing row or an earlier record in the pack holds it; follows onIdCollision. foreign-shape: an `hb-` id this table would not mint for that type, ALWAYS re-minted"
   },
   HomebrewCreateRequest: {
     "": "The authored body only. Row state is never client-supplied: a new record is always a draft, invisible to players."

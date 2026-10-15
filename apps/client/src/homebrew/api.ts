@@ -84,7 +84,11 @@ export type HomebrewPack = Readonly<{
 
 export type HomebrewPackImportReport = Readonly<{
   imported: ReadonlyArray<{ id: string; type: HomebrewType; name: string; originalId: string }>;
-  reminted: ReadonlyArray<{ originalId: string; id: string; reason: "srd-collision" | "homebrew-collision" }>;
+  reminted: ReadonlyArray<{
+    originalId: string;
+    id: string;
+    reason: "srd-collision" | "homebrew-collision" | "foreign-shape";
+  }>;
   overwritten: ReadonlyArray<{ id: string; type: HomebrewType; name: string }>;
   rejected: ReadonlyArray<{ originalId: string; issues: readonly HomebrewValidationIssue[] }>;
   dryRun: boolean;

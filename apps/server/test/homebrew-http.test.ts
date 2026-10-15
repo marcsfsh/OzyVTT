@@ -700,6 +700,13 @@ describe("homebrew HTTP packs", () => {
     expect(applied.data.reminted.map((entry: Json) => entry.originalId).sort()).toEqual(
       [existing.id, "brand-new-feat", "hb-not-ours"].sort()
     );
+    // Each says why, in the report's own words.
+    const reasons = Object.fromEntries(applied.data.reminted.map((entry: Json) => [entry.originalId, entry.reason]));
+    expect(reasons).toEqual({
+      [existing.id]: "homebrew-collision",
+      "hb-not-ours": "foreign-shape",
+      "brand-new-feat": "srd-collision"
+    });
     for (const entry of applied.data.imported) expect(entry.id).toMatch(/^hb-[a-z0-9-]+-[0-9a-f]{6}$/);
     // Everything lands as an invisible draft, which is what makes importing an invalid pack harmless.
     for (const row of store.list().rows) expect(row).toMatchObject({ state: "draft", visibleToPlayers: false });

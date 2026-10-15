@@ -398,7 +398,11 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
       }
       const { pack, onIdCollision, dryRun } = HomebrewPackImportRequestSchema.parse(request.body);
       const imported: Array<{ id: string; type: HomebrewContentType; name: string; originalId: string }> = [];
-      const reminted: Array<{ originalId: string; id: string; reason: "srd-collision" | "homebrew-collision" }> = [];
+      const reminted: Array<{
+        originalId: string;
+        id: string;
+        reason: "srd-collision" | "homebrew-collision" | "foreign-shape";
+      }> = [];
       const overwritten: Array<{ id: string; type: HomebrewContentType; name: string }> = [];
       const rejected: Array<{ originalId: string; issues: HomebrewValidationIssue[] }> = [];
       // Ids claimed earlier in this pack count as taken, so two records cannot land on one row.
@@ -423,12 +427,15 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
           const id = needsMint
             ? mintHomebrewId(type, name, (candidate) => claimed.has(candidate) || store.get(candidate) !== undefined)
             : originalId;
-          // The contract allows two reasons: outside `hb-` is the bundle's reserved namespace, inside is ours.
           if (needsMint && originalId !== "") {
             reminted.push({
               originalId: reportedId,
               id,
-              reason: originalId.startsWith(HOMEBREW_ID_PREFIX) ? "homebrew-collision" : "srd-collision"
+              reason: !originalId.startsWith(HOMEBREW_ID_PREFIX)
+                ? "srd-collision"
+                : foreign
+                  ? "foreign-shape"
+                  : "homebrew-collision"
             });
           }
           claimed.add(id);

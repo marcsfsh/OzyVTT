@@ -819,7 +819,9 @@ export const HomebrewPackImportSchema = z
         .object({
           originalId: HomebrewIdSchema,
           id: HomebrewIdSchema,
-          reason: z.enum(["srd-collision", "homebrew-collision"])
+          /** srd-collision: outside `hb-`, the bundle's namespace; homebrew-collision: an existing row or an
+           *  earlier record in this pack holds it; foreign-shape: an `hb-` id not shaped as this table mints. */
+          reason: z.enum(["srd-collision", "homebrew-collision", "foreign-shape"])
         })
         .strict()
     ),

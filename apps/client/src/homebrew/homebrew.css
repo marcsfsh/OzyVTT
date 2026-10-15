@@ -21,6 +21,29 @@
   margin-bottom: var(--space-3);
   min-height: var(--tap-min);
 }
+.hb-pack-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+.hb-pack-plan {
+  display: grid;
+  gap: var(--space-3);
+  overflow-wrap: anywhere;
+}
+.hb-pack-plan p {
+  margin: 0;
+}
+.hb-pack-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  max-height: 12rem;
+  overflow-y: auto;
+  font-size: var(--fs-sm);
+}
+.hb-pack-type {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
 .hb-count {
   margin: 0;
   color: var(--text-dim);
