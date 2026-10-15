@@ -441,7 +441,11 @@ describe("the eleventh list: `spells` beside a `when` is refused, never silently
     });
     // The same record without the gate publishes, so the refusal below is the only thing wrong with it.
     const { when: _gate, ...ungated } = GATED_FIREBALL;
-    expect(validateForPublish("species", species(ungated), publishContext())).toEqual({ valid: true, issues: [] });
+    expect(validateForPublish("species", species(ungated), publishContext())).toEqual({
+      valid: true,
+      issues: [],
+      warnings: []
+    });
 
     const validity = validateForPublish("species", species(GATED_FIREBALL), publishContext());
     expect(validity.valid).toBe(false);

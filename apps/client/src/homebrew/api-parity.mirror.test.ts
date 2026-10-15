@@ -45,7 +45,7 @@ describe("the census: every API-authorable key the editor cannot reach, held to 
       covered: results.filter((result) => result.covered).length,
       forced: results.filter((result) => !result.covered && isSystemForced(result.address)).length,
       open: open.length
-    }).toEqual({ asked: 5494, covered: 3243, forced: 106, open: 2145 });
+    }).toEqual({ asked: 5494, covered: 3244, forced: 106, open: 2144 });
   });
 
   it("holds the open set to the exemption table exactly, in both directions", () => {
@@ -215,35 +215,23 @@ describe("the HTTP round trip: the editor reproduces the record the API stored, 
     });
   }
 
-  it("background: CANNOT round-trip today — D3's measured defect, pinned until its unit lands", () => {
-    // No editor path reaches a publishable background yet, for the two reasons below. When that is
-    // fixed, replace this with a real round trip.
+  it("background: round-trips through the editor, the spread chips writing the bare arrays the schema stores", () => {
     const bare = authored("background", "Lamplighter", [
       ["summary", "You kept the streets lit."],
-      ["description", "Every alley knows your ladder and your flame."]
+      ["description", "Every alley knows your ladder and your flame."],
+      ["originFeatId", "alert"],
+      ["abilityOptions.from", ["str", "dex", "wis"]]
     ]);
-
-    // 1: `abilityOptions.spreads` is required non-empty, so the untouched record is unpublishable.
+    // A new background starts with the SRD's two splits.
     const untouched = publishVerdict("background", bare, "hb-a1-probe");
-    expect(untouched.publishable).toBe(false);
-    expect(untouched.why).toContain("Fix spreads");
-    expect(untouched.parsed.error?.issues).toContainEqual(
-      expect.objectContaining({ code: "too_small", path: ["abilityOptions", "spreads"] })
-    );
+    expect(untouched.publishable, untouched.why).toBe(true);
 
-    // 2: the only control for that key ("Add a spread") mints `{ amounts, label }`, a shape the
-    // schema refuses.
-    const spread = authoredRow("background", ["abilityOptions.spreads"], [["label", "Standard"]]);
-    const tapped = applyField("background", bare, "abilityOptions.spreads", [spread]);
-    const verdict = publishVerdict("background", tapped, "hb-a1-probe");
-    expect(verdict.publishable).toBe(false);
-    // The tapped refusal is the minted SHAPE's, not the empty array's.
-    expect(verdict.why).toContain("Fix spreads");
-    const spreadIssues = (verdict.parsed.error?.issues ?? []).filter(
-      (issue) => issue.path[0] === "abilityOptions" && issue.path[1] === "spreads"
-    );
-    expect(spreadIssues.map((issue) => [issue.code, issue.path])).toEqual([
-      ["invalid_type", ["abilityOptions", "spreads", 0]]
+    // Unpressing +1 / +1 / +1 leaves only the +2 / +1 split, as a number array.
+    const twoOne = applyField("background", bare, "abilityOptions.spreads", ["2-1"]);
+    const verdict = publishVerdict("background", twoOne, "hb-a1-probe");
+    expect(verdict.publishable, verdict.why).toBe(true);
+    expect((verdict.parsed.data as { abilityOptions?: { spreads?: number[][] } }).abilityOptions?.spreads).toEqual([
+      [2, 1]
     ]);
   });
 });

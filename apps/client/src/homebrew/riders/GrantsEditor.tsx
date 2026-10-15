@@ -55,9 +55,17 @@ export function grantsFromRows(
   previous: Record<string, unknown>
 ): Record<string, unknown> | undefined {
   const bag: Record<string, unknown> = {};
+  // A granted spell keeps the details the row cannot show (level, ability, alwaysPrepared); only the id list changes.
+  const spellsBefore = new Map(
+    (Array.isArray(previous.spells) ? (previous.spells as Array<Record<string, unknown>>) : []).map((spell) => [
+      String(spell?.id ?? ""),
+      spell
+    ])
+  );
   for (const row of rows) {
     if (!row.kind) continue;
-    bag[row.kind] = row.kind === "spells" ? row.values.map((id) => ({ id, alwaysPrepared: true })) : row.values;
+    bag[row.kind] =
+      row.kind === "spells" ? row.values.map((id) => spellsBefore.get(id) ?? { id, alwaysPrepared: true }) : row.values;
   }
   for (const [key, carried] of Object.entries(previous)) {
     if (!GRANT_KINDS.some((kind) => kind.key === key)) bag[key] = carried;

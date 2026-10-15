@@ -200,7 +200,8 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "hitPoints.formula":
       'One die term plus at most one flat modifier ("1d8 + 3"). Anything richer stays prose (ADR-0008)',
     token: "The battlemap PIECE - disposition and grid footprint. Nothing to do with credentials",
-    extensions: "Free-form passthrough an importer may carry; the engine reads nothing from it",
+    extensions:
+      'Free-form passthrough an importer may carry. One bag is read: publishing needs `extensions["open5e.srd-2024"]` to hold a numeric `challengeRating` (0.125 for CR 1/8) and a non-empty `type` ("dragon"), because the bestiary lists, sorts and searches by them. Example: `{"open5e.srd-2024": {"challengeRating": 5, "type": "giant"}}`. Everything else is carried and never read',
     conditionImmunities: "Reference-level for now: displayed, not yet enforced on actor.set-condition",
     legendary:
       "SRD 2024 legendary resources: actions spent on other creatures' turns, and Legendary Resistance uses that re-arm on a long rest",
@@ -697,7 +698,9 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   HomebrewRecordDocument: {
     "": "One stored row: the authored body plus the three orthogonal row-state fields. `state` is set only by /publish and /unpublish, `visibleToPlayers` only by /visibility, `deletedAt` only by DELETE and /restore. A player sees a record only when it is published AND visible AND not deleted - and even then only through the merged CONTENT_PATHS catalogs, never through this component.",
     visibleToPlayers: "Publishing does not reveal: this is the separate, deliberate second step",
-    deletedAt: "Soft delete; a deleted row leaves every merged catalog at once and is restorable"
+    deletedAt: "Soft delete; a deleted row leaves every merged catalog at once and is restorable",
+    pendingChanges:
+      "A published record has edits that are not live yet. `record` and `validity` describe the pending body; the catalogs still serve the live one until /publish"
   },
   HomebrewRecordSummary: {
     "": "The flat, deliberately NON-polymorphic list row: a name and a badge. Carries `valid` alone - the issue list costs a GET - so listing a 300-record library never ships a 20-row level table.",
@@ -713,7 +716,12 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   },
   HomebrewUsages: {
     safeToDelete:
-      "Always true: a built character carries a flattened, self-contained ActorDefinition, so deleting a homebrew record never breaks an existing character. The usage list is context, not a blocker"
+      "False when removing this record would break a published one (`dependents.ifRemoved`). Characters never count: a built character carries a flattened, self-contained ActorDefinition, so the usage list is context, not a blocker",
+    dependents:
+      "Published records that publish now and would not: `ifRemoved` once this one is removed or unpublished, `ifUpdated` once its pending edits go live. A warning to show before the action, never a refusal"
+  },
+  HomebrewDependent: {
+    "": "A published record another record's removal or edit would break: enough to name it and open it."
   },
   HomebrewPack: {
     "": "The GM-to-GM interchange format (ADR-0007 schemaId + integer schemaVersion). One FLAT record array rather than a by-type object: the body already carries `type`, so a by-type map would duplicate the discriminator for nothing. No checksum field by design.",
@@ -721,7 +729,8 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   },
   HomebrewPackImport: {
     "": "The import plan or its result - byte-for-byte the same report either way, which is what makes `dryRun` trustworthy.",
-    "reminted[].reason": "An SRD collision is ALWAYS re-minted; a homebrew collision follows onIdCollision"
+    "reminted[].reason":
+      "Why the id changed. srd-collision: outside `hb-`, the bundle's namespace, ALWAYS re-minted. homebrew-collision: an existing row or an earlier record in the pack holds it; follows onIdCollision. foreign-shape: an `hb-` id this table would not mint for that type, ALWAYS re-minted"
   },
   HomebrewCreateRequest: {
     "": "The authored body only. Row state is never client-supplied: a new record is always a draft, invisible to players."

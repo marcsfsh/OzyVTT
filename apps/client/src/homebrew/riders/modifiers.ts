@@ -76,7 +76,7 @@ function blankModifier(type: string): Draft {
     case "check-bonus":
       return { type, amount: 1 };
     case "extra-damage":
-      return { type, formula: "1d6", damageType: "", doubleOnCritical: false };
+      return { type, formula: "1d6", doubleOnCritical: false };
     case "roll-mode":
       return { type, roll: "attack", mode: "advantage" };
     case "spell-save-dc":
@@ -303,8 +303,10 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       label: "Damage type",
       kind: "select",
       options: DAMAGE_TYPES,
-      placeholder: "Choose a type",
-      visibleWhen: hasType("extra-damage")
+      placeholder: "Same as the attack",
+      emptyValue: "omit",
+      visibleWhen: hasType("extra-damage"),
+      help: "Leave it on “Same as the attack” for damage that follows the weapon or spell."
     },
     {
       key: "doubleOnCritical",

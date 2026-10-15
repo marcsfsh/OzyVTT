@@ -11,6 +11,7 @@ import { IconChevron } from "@vtt/ui";
 import { socket } from "../socket";
 import { CreateRecordModal, type CreateRequest } from "./CreateRecordModal";
 import { HomebrewRail, EMPTY_FILTERS, type RailFilters } from "./HomebrewRail";
+import { PackActions } from "./PackActions";
 import { RecordDetail } from "./RecordDetail";
 import { homebrewApi, listAllHomebrew, type HomebrewRecordDocument, type HomebrewRecordSummary } from "./api";
 import { ApiError } from "../lib/api";
@@ -75,7 +76,8 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
         deletedAt: next.deletedAt,
         rev: next.rev,
         updatedAt: next.updatedAt,
-        valid: next.validity.valid
+        // Pending edits' validity says nothing about the live record the rail marks.
+        valid: next.pendingChanges ? rows[index].valid : next.validity.valid
       };
       const copy = rows.slice();
       copy[index] = merged;
@@ -239,6 +241,7 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
             </>
           )}
         </p>
+        <PackActions gmToken={gmToken} onImported={() => void refresh()} />
       </div>
 
       <div className={`hb-workspace frame-fill${hasSelection ? " has-selection" : ""}`}>

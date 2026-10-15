@@ -739,12 +739,6 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
-    at: "weapon.mastery",
-    types: ["equipment"],
-    reason: "owned outside this program (census row at vocabulary-parity.mirror.test.ts:3415)",
-    status: "gap"
-  },
-  {
     at: "prerequisite.**",
     types: ["feat"],
     reason:

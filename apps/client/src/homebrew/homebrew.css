@@ -21,6 +21,28 @@
   margin-bottom: var(--space-3);
   min-height: var(--tap-min);
 }
+.hb-pack-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+.hb-pack-plan {
+  display: grid;
+  gap: var(--space-3);
+  overflow-wrap: anywhere;
+}
+.hb-pack-plan p {
+  margin: 0;
+}
+.hb-pack-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  max-height: 12rem;
+  font-size: var(--fs-sm);
+}
+.hb-pack-type {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
 .hb-count {
   margin: 0;
   color: var(--text-dim);
@@ -122,6 +144,8 @@
   border-bottom: 0;
 }
 .hb-row-name {
+  /* Takes the slack, so a second badge sits beside the state badge rather than mid-row. */
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -265,6 +289,13 @@
   margin: 0;
   color: var(--text-dim);
   font-size: var(--fs-sm);
+}
+.hb-warnings {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
 }
 .hb-create-note {
   margin: 0;

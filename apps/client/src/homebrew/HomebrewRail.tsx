@@ -99,6 +99,9 @@ export function HomebrewRail({
       onClick={() => onSelect(record.id)}
     >
       <span className="hb-row-name">{record.name}</span>
+      {/* A published record that no longer validates: something it names is gone, or it stopped parsing and
+          fell out of the catalogs. */}
+      {record.state === "published" && !record.valid && !record.deletedAt && <Badge tone="danger">Needs fixing</Badge>}
       <StateBadge record={record} />
     </button>
   );

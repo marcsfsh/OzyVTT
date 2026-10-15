@@ -3774,6 +3774,9 @@ describe("the guard itself refuses what the editor cannot author", () => {
     // The written value reaches the save body too.
     const weapon = applyField("equipment", { name: "Mace of Storms" }, "weapon.damageType", "lightning");
     expect((storedBody("equipment", weapon, RECORD_ID).weapon as { damageType?: string }).damageType).toBe("lightning");
+    // So does a mastery, which the editor offers as a closed select of the eight the engine runs.
+    const hookblade = applyField("equipment", { name: "Hookblade" }, "weapon.mastery", "graze");
+    expect((storedBody("equipment", hookblade, RECORD_ID).weapon as { mastery?: string }).mastery).toBe("graze");
     // An open slug stays open to the wire: `DamageTypeIdSchema` is a string, so "void" is valid.
     const homebrewType = authoredRow(
       "equipment",
@@ -3792,7 +3795,6 @@ describe("the guard itself refuses what the editor cannot author", () => {
         reachable key is caught by the row tests above. */
     const owed: ReadonlyArray<readonly [HomebrewType, string, readonly string[], string]> = [
       // [type, key, container path, the unit that closes it]
-      ["equipment", "weapon.mastery", [], "38 SRD weapons, gated on all eight slugs reaching"],
       ["monster", "multiattack", ["actions"], "126 SRD records author it"],
       ["class", "widensPicks", [], "Bard row 55, Magical Secrets"]
     ];

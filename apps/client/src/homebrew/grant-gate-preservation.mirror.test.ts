@@ -257,7 +257,8 @@ describe("FAR END: the Berserker a GM duplicated, edited and published is still 
     const { validity, view } = await publish(edited, id);
     expect(validity, "a body the editor produced must publish - the gate is not what makes it invalid").toEqual({
       valid: true,
-      issues: []
+      issues: [],
+      warnings: []
     });
 
     // Read back through the merged catalog the builder consults.

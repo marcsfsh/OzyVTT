@@ -44,10 +44,12 @@ export type HomebrewRecordRow = Readonly<{
   updatedAt: string;
   /** Parsed `body_json`. Carries `id` (forced to the row id) but not `type`; see `create`. */
   body: HomebrewBody;
+  /** A published record's edits that are not live yet; null when there are none. See `update`. */
+  pendingBody: HomebrewBody | null;
 }>;
 
-/** The list row: everything but the authored body, so a few-hundred-record library is a small payload. */
-export type HomebrewSummaryRow = Omit<HomebrewRecordRow, "body">;
+/** The list row: everything but the authored bodies, so a few-hundred-record library is a small payload. */
+export type HomebrewSummaryRow = Omit<HomebrewRecordRow, "body" | "pendingBody">;
 
 export type HomebrewCreateInput = Readonly<{ type: HomebrewContentType; body: HomebrewBody }>;
 
@@ -65,8 +67,6 @@ export const EMPTY_AUTHORED_INDEX: HomebrewAuthoredIndex = Object.freeze({
   subclassIdsFor: () => new Set<string>()
 });
 
-/** Whether a body about to replace a published one would still publish. See `HomebrewStore.update`. */
-export type HomebrewRevalidator = (type: HomebrewContentType, body: HomebrewBody) => boolean;
 export type HomebrewListFilter = Readonly<{
   type?: HomebrewContentType;
   state?: HomebrewContentState;
@@ -152,6 +152,10 @@ const MIGRATIONS: readonly Migration[] = [
         ) STRICT;
         CREATE INDEX homebrew_record_revisions_record ON homebrew_record_revisions (record_id, rev DESC);
       `)
+  },
+  {
+    version: 2,
+    up: (database) => database.exec("ALTER TABLE homebrew_records ADD COLUMN pending_body_json TEXT;")
   }
 ];
 
@@ -163,6 +167,7 @@ type RecordRow = {
   visible_to_players: number;
   deleted_at: string | null;
   body_json: string;
+  pending_body_json: string | null;
   rev: number;
   created_at: string;
   updated_at: string;
@@ -330,6 +335,15 @@ export class HomebrewStore implements HomebrewContentSource {
     return row ? projectRecord(row) : undefined;
   }
 
+  /** Every published, live record with its bodies, for checks across the whole published table (its dependents). */
+  listPublished(): readonly HomebrewRecordRow[] {
+    return (
+      this.requireDatabase()
+        .prepare("SELECT * FROM homebrew_records WHERE state = 'published' AND deleted_at IS NULL")
+        .all() as RecordRow[]
+    ).map(projectRecord);
+  }
+
   /** Keyset paging by `LOWER(name), id` (not `updated_at`), so publishing mid-scroll cannot skip or repeat rows. */
   list(filter: HomebrewListFilter = {}): HomebrewListPage {
     const database = this.requireDatabase();
@@ -447,16 +461,11 @@ export class HomebrewStore implements HomebrewContentSource {
   }
 
   /**
-   * Replace the whole body. The patch always lands (drafts may be invalid, the editor autosaves), but a published
-   * record whose new body would not publish is demoted to an invisible draft in the same transaction.
+   * Replace the whole body. The patch always lands (drafts may be invalid, the editor autosaves). A draft is edited
+   * in place; a published record's edit is held as its pending body, so the live body and visibility stay as they
+   * are mid-edit until `publish` validates and swaps it in. An edit back to the live body clears the pending one.
    */
-  update(
-    id: string,
-    body: HomebrewBody,
-    expectedRev: number | undefined,
-    authorTag: string,
-    revalidate?: HomebrewRevalidator
-  ): HomebrewRecordRow {
+  update(id: string, body: HomebrewBody, expectedRev: number | undefined, authorTag: string): HomebrewRecordRow {
     const database = this.requireDatabase();
     const existing = this.requireRow(id, expectedRev);
     const type = existing.type as HomebrewContentType;
@@ -464,27 +473,80 @@ export class HomebrewStore implements HomebrewContentSource {
     const nextBody = normalizeBody(body, id, type);
     const rev = existing.rev + 1;
     const stamp = this.stamp();
-    let state = existing.state as HomebrewContentState;
-    let visible = existing.visible_to_players === 1;
+    const published = existing.state === "published";
     this.transaction(() => {
-      database
-        .prepare("UPDATE homebrew_records SET name = ?, body_json = ?, rev = ?, updated_at = ? WHERE id = ?")
-        .run(name, nextBody, rev, stamp, id);
+      if (published)
+        database
+          .prepare("UPDATE homebrew_records SET pending_body_json = ?, rev = ?, updated_at = ? WHERE id = ?")
+          .run(nextBody === existing.body_json ? null : nextBody, rev, stamp, id);
+      else
+        database
+          .prepare("UPDATE homebrew_records SET name = ?, body_json = ?, rev = ?, updated_at = ? WHERE id = ?")
+          .run(name, nextBody, rev, stamp, id);
       this.bumpRevision();
-      // Re-validated after the write: the gate reads a catalog built from published rows, so validating
-      // first would check against the record's own previous body. This connection sees its uncommitted row.
-      if (state === "published" && revalidate !== undefined && !stillPublishable(revalidate, type, nextBody, id)) {
-        state = "draft";
-        visible = false;
-        database.prepare("UPDATE homebrew_records SET state = 'draft', visible_to_players = 0 WHERE id = ?").run(id);
-        // Bump again so cached slices that still hold this record as published are invalidated.
-        this.bumpRevision();
-      }
       this.snapshotRevision(
         id,
-        { rev, name, state, visibleToPlayers: visible, bodyJson: nextBody, at: stamp },
-        state === existing.state ? authorTag : `${authorTag}:demoted`
+        {
+          rev,
+          name,
+          state: existing.state as HomebrewContentState,
+          visibleToPlayers: existing.visible_to_players === 1,
+          bodyJson: nextBody,
+          at: stamp
+        },
+        published ? `${authorTag}:pending` : authorTag
       );
+    });
+    return this.get(id)!;
+  }
+
+  /** Publish, or put a published record's pending edits live. The caller validates `pendingBody ?? body` first. */
+  publish(id: string, expectedRev: number | undefined): HomebrewRecordRow {
+    const database = this.requireDatabase();
+    const existing = this.requireRow(id, expectedRev);
+    const stamp = this.stamp();
+    const bodyJson = existing.pending_body_json ?? existing.body_json;
+    const name = recordName(JSON.parse(bodyJson) as HomebrewBody);
+    this.transaction(() => {
+      database
+        .prepare(
+          "UPDATE homebrew_records SET state = 'published', name = ?, body_json = ?, pending_body_json = NULL, rev = rev + 1, updated_at = ? WHERE id = ?"
+        )
+        .run(name, bodyJson, stamp, id);
+      this.bumpRevision();
+    });
+    return this.get(id)!;
+  }
+
+  /** Back to a draft, which is edited in place, so any pending edits become the body. Visibility is kept. */
+  unpublish(id: string, expectedRev: number | undefined): HomebrewRecordRow {
+    const database = this.requireDatabase();
+    const existing = this.requireRow(id, expectedRev);
+    const stamp = this.stamp();
+    const bodyJson = existing.pending_body_json ?? existing.body_json;
+    const name = recordName(JSON.parse(bodyJson) as HomebrewBody);
+    this.transaction(() => {
+      database
+        .prepare(
+          "UPDATE homebrew_records SET state = 'draft', name = ?, body_json = ?, pending_body_json = NULL, rev = rev + 1, updated_at = ? WHERE id = ?"
+        )
+        .run(name, bodyJson, stamp, id);
+      this.bumpRevision();
+    });
+    return this.get(id)!;
+  }
+
+  /** Drops a published record's pending edits, leaving the live body as it is. A no-op without any. */
+  discardPending(id: string, expectedRev: number | undefined): HomebrewRecordRow {
+    const database = this.requireDatabase();
+    const existing = this.requireRow(id, expectedRev);
+    if (existing.pending_body_json === null) return this.get(id)!;
+    const stamp = this.stamp();
+    this.transaction(() => {
+      database
+        .prepare("UPDATE homebrew_records SET pending_body_json = NULL, rev = rev + 1, updated_at = ? WHERE id = ?")
+        .run(stamp, id);
+      this.bumpRevision();
     });
     return this.get(id)!;
   }
@@ -521,16 +583,7 @@ export class HomebrewStore implements HomebrewContentSource {
 
   /** Publishing does not show a record to players (`setVisibility` does). Unpublishing keeps the visibility choice. */
   setState(id: string, state: HomebrewContentState, expectedRev: number | undefined): HomebrewRecordRow {
-    const database = this.requireDatabase();
-    this.requireRow(id, expectedRev);
-    const stamp = this.stamp();
-    this.transaction(() => {
-      database
-        .prepare("UPDATE homebrew_records SET state = ?, rev = rev + 1, updated_at = ? WHERE id = ?")
-        .run(state, stamp, id);
-      this.bumpRevision();
-    });
-    return this.get(id)!;
+    return state === "published" ? this.publish(id, expectedRev) : this.unpublish(id, expectedRev);
   }
 
   /** Draft + visible is refused. This is library visibility only; `Actor.visibility` governs the table separately. */
@@ -553,8 +606,9 @@ export class HomebrewStore implements HomebrewContentSource {
   duplicate(id: string, name?: string): HomebrewRecordRow {
     const existing = this.recordRow(id);
     if (!existing) throw new HomebrewNotFoundError("That record no longer exists.");
+    // What the GM sees in the editor, pending edits included.
     const body = {
-      ...(JSON.parse(existing.body_json) as Record<string, unknown>),
+      ...(JSON.parse(existing.pending_body_json ?? existing.body_json) as Record<string, unknown>),
       name: copyName(name ?? existing.name)
     };
     return this.create({ type: existing.type as HomebrewContentType, body });
@@ -585,7 +639,7 @@ export class HomebrewStore implements HomebrewContentSource {
         // `overwriteRefusal` already refused a deleted row; this is the second check.
         database
           .prepare(
-            "UPDATE homebrew_records SET name = ?, body_json = ?, state = 'draft', visible_to_players = 0, rev = ?, updated_at = ? WHERE id = ?"
+            "UPDATE homebrew_records SET name = ?, body_json = ?, pending_body_json = NULL, state = 'draft', visible_to_players = 0, rev = ?, updated_at = ? WHERE id = ?"
           )
           .run(name, nextBody, rev, stamp, id);
       } else {
@@ -733,6 +787,34 @@ const BUCKETS = {
   "spell-list": "spellLists"
 } as const satisfies Record<HomebrewContentType, keyof DraftSlice>;
 
+/**
+ * A published slice with one record left out and, optionally, a body in its place (parsed as the catalogs parse
+ * it; an unparseable one is left out, as `publishedFor` would). For the publish gate's "what if" catalogs.
+ */
+export function sliceReplacing(
+  slice: HomebrewCatalogSlice,
+  id: string,
+  replacement?: Readonly<{ type: HomebrewContentType; body: HomebrewBody }>
+): HomebrewCatalogSlice {
+  const keep = (record: Readonly<{ id: string }>) => record.id !== id;
+  const draft: DraftSlice = {
+    classes: slice.classes.filter(keep),
+    subclasses: slice.subclasses.filter(keep),
+    species: slice.species.filter(keep),
+    backgrounds: slice.backgrounds.filter(keep),
+    feats: slice.feats.filter(keep),
+    spells: slice.spells.filter(keep),
+    equipment: slice.equipment.filter(keep),
+    monsters: slice.monsters.filter((monster) => monster.source?.externalId !== id),
+    spellLists: slice.spellLists.filter(keep)
+  };
+  if (replacement) {
+    const parsed = parseBody(replacement.type, JSON.stringify(replacement.body));
+    if (parsed) pushInto(draft, replacement.type, parsed);
+  }
+  return draft;
+}
+
 function pushInto(draft: DraftSlice, type: HomebrewContentType, record: unknown) {
   // The type column is CHECK-constrained and contract-parsed on write, so this cast is safe.
   (draft[BUCKETS[type]] as unknown[]).push(record);
@@ -755,25 +837,11 @@ function projectSummary(row: RecordRow): HomebrewSummaryRow {
 }
 
 function projectRecord(row: RecordRow): HomebrewRecordRow {
-  return { ...projectSummary(row), body: JSON.parse(row.body_json) as HomebrewBody };
-}
-
-/** A throwing validator counts as "no": on the autosave path, demoting is safer than failing or staying published. */
-function stillPublishable(
-  revalidate: HomebrewRevalidator,
-  type: HomebrewContentType,
-  bodyJson: string,
-  id: string
-): boolean {
-  try {
-    return revalidate(type, JSON.parse(bodyJson) as HomebrewBody);
-  } catch (error) {
-    console.error(
-      `[homebrew] could not re-validate ${type} "${id}" on save; demoting it to a draft rather than leaving it published:`,
-      error
-    );
-    return false;
-  }
+  return {
+    ...projectSummary(row),
+    body: JSON.parse(row.body_json) as HomebrewBody,
+    pendingBody: row.pending_body_json === null ? null : (JSON.parse(row.pending_body_json) as HomebrewBody)
+  };
 }
 
 /**
@@ -814,6 +882,7 @@ export function recordName(body: unknown): string {
 /**
  * Serialize with `id` forced to the row id (the client's is never trusted) and `type` stripped. A monster's
  * `source.externalId` is forced too: it becomes `Actor.definitionId`, and an arbitrary value would break the next boot.
+ * Every other type's `source` is forced to "homebrew", so an API body or a pack that omits it is never badged SRD.
  */
 function normalizeBody(body: HomebrewBody, id: string, type: HomebrewContentType): string {
   const { type: _type, ...rest } = body as Record<string, unknown>;
@@ -830,7 +899,7 @@ function normalizeBody(body: HomebrewBody, id: string, type: HomebrewContentType
             externalId: id
           }
         }
-      : { ...rest, id };
+      : { ...rest, id, source: "homebrew" };
   const json = JSON.stringify(withIdentity);
   if (json.length > MAX_BODY_BYTES) throw new HomebrewStateError("That record is too large to store.");
   return json;

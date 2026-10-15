@@ -72,7 +72,8 @@ const document = {
   rev: 3,
   createdAt: timestamp,
   updatedAt: timestamp,
-  validity: { valid: false, issues: [issue] },
+  validity: { valid: false, issues: [issue], warnings: [] },
+  pendingChanges: false,
   record
 };
 const summary = {
@@ -100,7 +101,7 @@ const pack = {
 /** Payloads keyed by the Zod export's base name. Every homebrew pair must appear; older surfaces carry a sample. */
 const FIXTURES: Record<string, unknown> = {
   HomebrewValidationIssue: issue,
-  HomebrewValidity: { valid: false, issues: [issue] },
+  HomebrewValidity: { valid: false, issues: [issue], warnings: [issue] },
   HomebrewRecordDocument: document,
   HomebrewRecordSummary: summary,
   HomebrewContent: { record: document },
@@ -117,8 +118,13 @@ const FIXTURES: Record<string, unknown> = {
     usages: [
       { actorId: "f84d13cb-a7da-4ef2-9f2f-53d38e49d862", actorName: "Brenna", kind: "character-choice", detail: null }
     ],
-    safeToDelete: true
+    safeToDelete: false,
+    dependents: {
+      ifRemoved: [{ id: "hb-sentinel-feat-a1b2c3", type: "background", name: "Sentinel" }],
+      ifUpdated: []
+    }
   },
+  HomebrewDependent: { id: "hb-sentinel-feat-a1b2c3", type: "background", name: "Sentinel" },
   HomebrewPack: pack,
   HomebrewPackExport: { pack },
   HomebrewPackImport: {
@@ -147,7 +153,12 @@ const FIXTURES: Record<string, unknown> = {
   HomebrewUsagesResponse: {
     ok: true,
     apiVersion: "1",
-    data: { id: "hb-shield-master-a1b2c3", usages: [], safeToDelete: true }
+    data: {
+      id: "hb-shield-master-a1b2c3",
+      usages: [],
+      safeToDelete: true,
+      dependents: { ifRemoved: [], ifUpdated: [] }
+    }
   },
   HomebrewPackExportResponse: { ok: true, apiVersion: "1", data: { pack } },
   HomebrewPackImportResponse: {
@@ -433,5 +444,15 @@ describe("generated OpenAPI components", () => {
       .map((pair) => pair.base);
     expect(missing).toEqual([]);
     expect(pairs.filter((pair) => pair.base.startsWith("Homebrew")).length).toBeGreaterThanOrEqual(23);
+  });
+});
+
+describe("the homebrew monster contract names what publishing needs", () => {
+  it("documents the challenge rating and creature type keys the publish gate refuses without", () => {
+    const extensions = (components.HomebrewMonsterRecord.properties as Record<string, { description?: string }>)
+      .extensions;
+    expect(extensions.description).toContain('extensions["open5e.srd-2024"]');
+    expect(extensions.description).toContain("`challengeRating`");
+    expect(extensions.description).toContain("`type`");
   });
 });

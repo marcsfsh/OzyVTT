@@ -166,6 +166,16 @@ export class ContentLibrary {
     return view;
   }
 
+  /** This audience's catalog over an adjusted homebrew slice, built uncached: the "what if" a publish gate asks
+   *  (a record's pending edits without its live body, the table after a record is removed). */
+  forAudienceAdjusted(
+    audience: ContentAudience,
+    adjust: (slice: HomebrewCatalogSlice) => HomebrewCatalogSlice
+  ): ContentView {
+    const adjusted = adjust(this.homebrew?.publishedFor(audience) ?? EMPTY_HOMEBREW_SLICE);
+    return viewOf(audience, sliceIsEmpty(adjusted) ? SRD_ONLY_CATALOG : buildCatalogData(adjusted), this.attribution);
+  }
+
   /** Play-time only and audience-free: resolves any homebrew monster row (even draft or deleted) so a live
    *  actor keeps its actions mid-fight. Never use it for browse. */
   monsterForInstance(definitionId: string): ActorDefinition | undefined {

@@ -19,7 +19,12 @@ export type HomebrewValidationIssue = Readonly<{
   message: string;
   recordId: string | null;
 }>;
-export type HomebrewValidity = Readonly<{ valid: boolean; issues: readonly HomebrewValidationIssue[] }>;
+/** `warnings` never block publishing: an open slug the SRD does not know, which is legal but often a typo. */
+export type HomebrewValidity = Readonly<{
+  valid: boolean;
+  issues: readonly HomebrewValidationIssue[];
+  warnings: readonly HomebrewValidationIssue[];
+}>;
 
 /** Flat list row; the polymorphic body is fetched per record. */
 export type HomebrewRecordSummary = Readonly<{
@@ -47,6 +52,8 @@ export type HomebrewRecordDocument = Readonly<{
   createdAt: string;
   updatedAt: string;
   validity: HomebrewValidity;
+  /** A published record's edits are held until Update puts them live; `record` and `validity` describe them. */
+  pendingChanges: boolean;
   record: Readonly<Record<string, unknown>>;
 }>;
 
@@ -57,7 +64,14 @@ export type HomebrewContentList = Readonly<{
 }>;
 
 export type HomebrewUsage = Readonly<{ actorId: string; actorName: string; kind: string; detail: string | null }>;
-export type HomebrewUsages = Readonly<{ id: string; usages: readonly HomebrewUsage[]; safeToDelete: boolean }>;
+/** A published record another record's removal or edit would break. */
+export type HomebrewDependent = Readonly<{ id: string; type: HomebrewType; name: string }>;
+export type HomebrewUsages = Readonly<{
+  id: string;
+  usages: readonly HomebrewUsage[];
+  safeToDelete: boolean;
+  dependents: Readonly<{ ifRemoved: readonly HomebrewDependent[]; ifUpdated: readonly HomebrewDependent[] }>;
+}>;
 
 export type HomebrewPack = Readonly<{
   schemaId: "vtt.homebrew-pack";
@@ -70,7 +84,11 @@ export type HomebrewPack = Readonly<{
 
 export type HomebrewPackImportReport = Readonly<{
   imported: ReadonlyArray<{ id: string; type: HomebrewType; name: string; originalId: string }>;
-  reminted: ReadonlyArray<{ originalId: string; id: string; reason: "srd-collision" | "homebrew-collision" }>;
+  reminted: ReadonlyArray<{
+    originalId: string;
+    id: string;
+    reason: "srd-collision" | "homebrew-collision" | "foreign-shape";
+  }>;
   overwritten: ReadonlyArray<{ id: string; type: HomebrewType; name: string }>;
   rejected: ReadonlyArray<{ originalId: string; issues: readonly HomebrewValidationIssue[] }>;
   dryRun: boolean;
@@ -165,6 +183,13 @@ export const homebrewApi = {
       body: withRev(expectedRev)
     }).then((data) => data.record),
 
+  /** POST /content/{id}/discard — drops a published record's pending edits; the live body stays. */
+  discard: (token: string, id: string, expectedRev?: number) =>
+    request<{ record: HomebrewRecordDocument }>(token, `/content/${encodeURIComponent(id)}/discard`, {
+      method: "POST",
+      body: withRev(expectedRev)
+    }).then((data) => data.record),
+
   /** POST /content/{id}/unpublish — back to draft; it leaves the merged catalogs at once. */
   unpublish: (token: string, id: string, expectedRev?: number) =>
     request<{ record: HomebrewRecordDocument }>(token, `/content/${encodeURIComponent(id)}/unpublish`, {
@@ -179,7 +204,7 @@ export const homebrewApi = {
       body: { visibleToPlayers, ...withRev(expectedRev) }
     }).then((data) => data.record),
 
-  /** GET /content/{id}/usages — which characters took this, computed on demand. */
+  /** GET /content/{id}/usages — which characters took this, and which published records depend on it. */
   usages: (token: string, id: string) => request<HomebrewUsages>(token, `/content/${encodeURIComponent(id)}/usages`),
 
   /** GET /packs/export — published, non-deleted records as a shareable pack. */

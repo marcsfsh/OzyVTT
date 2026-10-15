@@ -295,9 +295,9 @@ describe("the OpenAPI document", () => {
     const operations = homebrewPaths.flatMap((path) =>
       Object.entries(paths[path]).map(([method, op]) => [`${method} ${path}`, op] as const)
     );
-    // 10 paths, 13 operations: one polymorphic surface, not one endpoint per content type.
-    expect(homebrewPaths).toHaveLength(10);
-    expect(operations).toHaveLength(13);
+    // 11 paths, 14 operations: one polymorphic surface, not one endpoint per content type.
+    expect(homebrewPaths).toHaveLength(11);
+    expect(operations).toHaveLength(14);
     for (const [label, op] of operations) {
       // No player read at all: players reach homebrew only through the merged catalogs, after the audience filter.
       expect(op.security, `${label} must be GM-session-only`).toEqual([{ gmAuth: [] }]);

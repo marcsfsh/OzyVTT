@@ -73,7 +73,14 @@ const DEFAULTS: Readonly<Record<HomebrewType, () => Draft>> = {
 
   background: () => ({
     ...BASE,
-    abilityOptions: { from: [], spreads: [] },
+    // The SRD's two splits, so a new background only needs its three abilities.
+    abilityOptions: {
+      from: [],
+      spreads: [
+        [2, 1],
+        [1, 1, 1]
+      ]
+    },
     skillProficiencies: [],
     toolProficiencies: [],
     startingEquipment: [],

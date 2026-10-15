@@ -33,7 +33,6 @@ import {
   recordName,
   type HomebrewBody,
   type HomebrewRecordRow,
-  type HomebrewRevalidator,
   type HomebrewStore,
   type HomebrewSummaryRow
 } from "./homebrew-store.js";
@@ -45,6 +44,7 @@ import {
   HOMEBREW_ID_PREFIX
 } from "./homebrew-ids.js";
 import { rewriteForNewId, type HomebrewSourceRecord } from "./homebrew-srd-copy.js";
+import type { HomebrewValidationScenario } from "./homebrew-validate.js";
 
 /**
  * Homebrew authoring REST (`/api/v1/homebrew/*`). Every route is GM-only: players see homebrew only through the
@@ -74,8 +74,13 @@ export const HOMEBREW_PACK_BODY_LIMIT = "4mb";
 const MAX_PACK_RECORDS = 500;
 
 /** Publish validation. The always-valid fallback is only for store-only test fixtures. */
-export type HomebrewValidator = (type: HomebrewContentType, body: HomebrewBody) => HomebrewValidity;
-const UNVALIDATED: HomebrewValidator = () => ({ valid: true, issues: [] });
+/** `scenario` asks about the table as it would be; see `createHomebrewValidator`. */
+export type HomebrewValidator = (
+  type: HomebrewContentType,
+  body: HomebrewBody,
+  scenario?: HomebrewValidationScenario
+) => HomebrewValidity;
+const UNVALIDATED: HomebrewValidator = () => ({ valid: true, issues: [], warnings: [] });
 
 /** Reference scan over GameState (`homebrew-usages.ts`). */
 export type HomebrewUsageLookup = (
@@ -152,8 +157,10 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
     rev: row.rev,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-    validity: validate(row.type, row.body),
-    record: { ...row.body, type: row.type }
+    // A published record's editor works on its pending edits, so the report describes what Publish would put live.
+    validity: row.pendingBody ? validate(row.type, row.pendingBody, { without: row.id }) : validate(row.type, row.body),
+    pendingChanges: row.pendingBody !== null,
+    record: { ...(row.pendingBody ?? row.body), type: row.type }
   });
   const summaryOf = (row: HomebrewSummaryRow, record: HomebrewRecordRow | undefined) => ({
     id: row.id,
@@ -212,12 +219,11 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
     return sendData(response, 200, { record: documentOf(row) });
   });
 
-  // Always lands (autosave); the store demotes a published record whose new body would not publish.
+  // Always lands (autosave); a published record's edit is held as pending until Publish puts it live.
   router.patch(expressPath(HOMEBREW_PATHS.contentById), requireGm, (request, response) => {
     try {
       const { record, expectedRev } = HomebrewUpdateRequestSchema.parse(request.body);
-      const revalidate: HomebrewRevalidator = (type, body) => validate(type, body).valid;
-      return sent(response, store.update(pathParam(request, "id"), record, expectedRev, "gm", revalidate));
+      return sent(response, store.update(pathParam(request, "id"), record, expectedRev, "gm"));
     } catch (error) {
       return storeError(response, error);
     }
@@ -272,12 +278,20 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
       const id = pathParam(request, "id");
       const existing = store.get(id);
       if (!existing) return sendFailure(response, 404, "not_found", "That record was not found.");
-      const validity = validate(existing.type, existing.body);
+      const validity = existing.pendingBody
+        ? validate(existing.type, existing.pendingBody, { without: existing.id })
+        : validate(existing.type, existing.body);
       if (!validity.valid)
-        return sendFailure(response, 409, "conflict", "This draft cannot be published until it is valid.", {
-          invalid: { issues: validity.issues }
-        });
-      return sent(response, store.setState(id, "published", expectedRev));
+        return sendFailure(
+          response,
+          409,
+          "conflict",
+          existing.pendingBody
+            ? "These changes cannot go live until they are valid; the published version is unchanged."
+            : "This draft cannot be published until it is valid.",
+          { invalid: { issues: validity.issues } }
+        );
+      return sent(response, store.publish(id, expectedRev));
     } catch (error) {
       return storeError(response, error);
     }
@@ -286,7 +300,16 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
   router.post(expressPath(HOMEBREW_PATHS.contentUnpublish), requireGm, (request, response) => {
     try {
       const { expectedRev } = HomebrewStateChangeRequestSchema.parse(request.body ?? {});
-      return sent(response, store.setState(pathParam(request, "id"), "draft", expectedRev));
+      return sent(response, store.unpublish(pathParam(request, "id"), expectedRev));
+    } catch (error) {
+      return storeError(response, error);
+    }
+  });
+
+  router.post(expressPath(HOMEBREW_PATHS.contentDiscard), requireGm, (request, response) => {
+    try {
+      const { expectedRev } = HomebrewStateChangeRequestSchema.parse(request.body ?? {});
+      return sent(response, store.discardPending(pathParam(request, "id"), expectedRev));
     } catch (error) {
       return storeError(response, error);
     }
@@ -301,12 +324,35 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
     }
   });
 
-  // Always `safeToDelete`: built characters are self-contained, so the count is informational.
+  /** Published records that publish now and would not in `scenario`: what removing or updating a record breaks. */
+  const dependentsIn = (scenario: HomebrewValidationScenario) =>
+    store
+      .listPublished()
+      .filter(
+        (other) =>
+          other.id !== scenario.without &&
+          validate(other.type, other.body).valid &&
+          !validate(other.type, other.body, scenario).valid
+      )
+      .map((other) => ({ id: other.id, type: other.type, name: other.name }));
+
+  // Built characters are self-contained, so `usages` never makes a removal unsafe; a published dependent does.
   router.get(expressPath(HOMEBREW_PATHS.contentUsages), requireGm, (request, response) => {
     const id = pathParam(request, "id");
     const row = store.get(id);
     if (!row) return sendFailure(response, 404, "not_found", "That record was not found.");
-    return sendData(response, 200, { id, usages: usagesOf(row.type, id), safeToDelete: true });
+    // A draft can break a published record too: a class publishes on the strength of a draft subclass.
+    const ifRemoved = dependentsIn({ without: id, archived: true });
+    const ifUpdated =
+      row.pendingBody !== null
+        ? dependentsIn({ without: id, replacement: { type: row.type, body: row.pendingBody } })
+        : [];
+    return sendData(response, 200, {
+      id,
+      usages: usagesOf(row.type, id),
+      safeToDelete: ifRemoved.length === 0,
+      dependents: { ifRemoved, ifUpdated }
+    });
   });
 
   // Packs (GM-to-GM interchange)
@@ -352,7 +398,11 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
       }
       const { pack, onIdCollision, dryRun } = HomebrewPackImportRequestSchema.parse(request.body);
       const imported: Array<{ id: string; type: HomebrewContentType; name: string; originalId: string }> = [];
-      const reminted: Array<{ originalId: string; id: string; reason: "srd-collision" | "homebrew-collision" }> = [];
+      const reminted: Array<{
+        originalId: string;
+        id: string;
+        reason: "srd-collision" | "homebrew-collision" | "foreign-shape";
+      }> = [];
       const overwritten: Array<{ id: string; type: HomebrewContentType; name: string }> = [];
       const rejected: Array<{ originalId: string; issues: HomebrewValidationIssue[] }> = [];
       // Ids claimed earlier in this pack count as taken, so two records cannot land on one row.
@@ -377,12 +427,15 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
           const id = needsMint
             ? mintHomebrewId(type, name, (candidate) => claimed.has(candidate) || store.get(candidate) !== undefined)
             : originalId;
-          // The contract allows two reasons: outside `hb-` is the bundle's reserved namespace, inside is ours.
           if (needsMint && originalId !== "") {
             reminted.push({
               originalId: reportedId,
               id,
-              reason: originalId.startsWith(HOMEBREW_ID_PREFIX) ? "homebrew-collision" : "srd-collision"
+              reason: !originalId.startsWith(HOMEBREW_ID_PREFIX)
+                ? "srd-collision"
+                : foreign
+                  ? "foreign-shape"
+                  : "homebrew-collision"
             });
           }
           claimed.add(id);

@@ -144,6 +144,7 @@ export const HOMEBREW_PATHS = {
   contentDuplicate: `${API_NAMESPACE}/homebrew/content/{id}/duplicate`,
   contentPublish: `${API_NAMESPACE}/homebrew/content/{id}/publish`,
   contentUnpublish: `${API_NAMESPACE}/homebrew/content/{id}/unpublish`,
+  contentDiscard: `${API_NAMESPACE}/homebrew/content/{id}/discard`,
   contentVisibility: `${API_NAMESPACE}/homebrew/content/{id}/visibility`,
   contentUsages: `${API_NAMESPACE}/homebrew/content/{id}/usages`,
   packsExport: `${API_NAMESPACE}/homebrew/packs/export`,
@@ -705,8 +706,13 @@ export const HomebrewValidationIssueSchema = z
     recordId: HomebrewIdSchema.nullable()
   })
   .strict();
+/** `warnings` never block publishing: an open slug the SRD does not know, which is legal but often a typo. */
 export const HomebrewValiditySchema = z
-  .object({ valid: z.boolean(), issues: z.array(HomebrewValidationIssueSchema) })
+  .object({
+    valid: z.boolean(),
+    issues: z.array(HomebrewValidationIssueSchema),
+    warnings: z.array(HomebrewValidationIssueSchema)
+  })
   .strict();
 /** The authored content body only - never row state. Opaque until each type's authored shape lands; see the HomebrewRecord component. */
 export const HomebrewRecordSchema = z.record(z.string(), z.unknown());
@@ -721,6 +727,8 @@ export const HomebrewRecordDocumentSchema = z
     createdAt: TimestampSchema,
     updatedAt: TimestampSchema,
     validity: HomebrewValiditySchema,
+    /** A published record has edits that are not live yet; `record` and `validity` describe them. */
+    pendingChanges: z.boolean(),
     record: HomebrewRecordSchema
   })
   .strict();
@@ -762,8 +770,25 @@ export const HomebrewUsageSchema = z
     detail: z.string().max(300).nullable()
   })
   .strict();
+/** A published record that is publishable now and would stop being so. */
+export const HomebrewDependentSchema = z
+  .object({ id: HomebrewIdSchema, type: HomebrewContentTypeSchema, name: z.string().min(1).max(120) })
+  .strict();
 export const HomebrewUsagesSchema = z
-  .object({ id: HomebrewIdSchema, usages: z.array(HomebrewUsageSchema), safeToDelete: z.boolean() })
+  .object({
+    id: HomebrewIdSchema,
+    usages: z.array(HomebrewUsageSchema),
+    /** False when removing this record would break a published one; built characters never break. */
+    safeToDelete: z.boolean(),
+    dependents: z
+      .object({
+        /** Broken by removing or unpublishing this record. */
+        ifRemoved: z.array(HomebrewDependentSchema),
+        /** Broken by putting this record's pending edits live; empty when nothing is pending. */
+        ifUpdated: z.array(HomebrewDependentSchema)
+      })
+      .strict()
+  })
   .strict();
 /** The GM-to-GM interchange format: authored bodies only, so an import can never inherit the exporter's visibility policy. */
 export const HomebrewPackSchema = z
@@ -794,7 +819,9 @@ export const HomebrewPackImportSchema = z
         .object({
           originalId: HomebrewIdSchema,
           id: HomebrewIdSchema,
-          reason: z.enum(["srd-collision", "homebrew-collision"])
+          /** srd-collision: outside `hb-`, the bundle's namespace; homebrew-collision: an existing row or an
+           *  earlier record in this pack holds it; foreign-shape: an `hb-` id not shaped as this table mints. */
+          reason: z.enum(["srd-collision", "homebrew-collision", "foreign-shape"])
         })
         .strict()
     ),

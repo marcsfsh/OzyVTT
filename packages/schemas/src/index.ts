@@ -378,13 +378,14 @@ export const ModifierSchema = z.discriminatedUnion("type", [
    * magic weapons never stack. Standing, it folds into the action's damage formula; on a moment it is its own line. */
   z.object({ type: z.literal("damage-bonus"), amount: z.number().int().min(-10).max(10), ...riderGate }).strict(),
   /** Extra typed damage as dice (`formula`), the bearer's ability modifier (`abilityModifier`), or both.
-   * `doubleOnCritical` defaults false: 5e does not double dice added after the attack. */
+   * `damageType` absent takes the attack's own type (Empowered Evocation follows the spell). `doubleOnCritical`
+   * defaults false: 5e does not double dice added after the attack. */
   z
     .object({
       type: z.literal("extra-damage"),
       formula: DiceFormulaSchema.optional(),
       abilityModifier: AbilitySchema.optional(),
-      damageType: DamageTypeSchema,
+      damageType: DamageTypeSchema.optional(),
       doubleOnCritical: z.boolean().default(false),
       ...riderGate
     })

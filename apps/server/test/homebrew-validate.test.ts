@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { HomebrewContentType } from "@vtt/api-contract";
+import * as bundle from "@vtt/content-srd-5.2.1";
 import {
   SpellListReferenceSchema,
   SubclassReferenceSchema,
@@ -87,7 +88,7 @@ describe("tier 1 - the record's own schema", () => {
   });
 
   it("passes a complete record and says so with no issues at all", () => {
-    expect(validateForPublish("class", classBody(), contextWith())).toEqual({ valid: true, issues: [] });
+    expect(validateForPublish("class", classBody(), contextWith())).toEqual({ valid: true, issues: [], warnings: [] });
   });
 
   it("stops after a schema failure rather than piling cross-reference noise on top", () => {
@@ -110,7 +111,7 @@ describe("tier 1 - the record's own schema", () => {
       // Null ranges are a melee weapon: every SRD melee row has exactly this shape.
       weapon: { category: "simple", damageDice: "1d6", damageType: "bludgeoning", rangeFeet: null, longRangeFeet: null }
     };
-    expect(validateForPublish("equipment", mace, contextWith())).toEqual({ valid: true, issues: [] });
+    expect(validateForPublish("equipment", mace, contextWith())).toEqual({ valid: true, issues: [], warnings: [] });
   });
 
   it("accepts armour seeded from one touched control, and an item with the optional enums absent", () => {
@@ -199,7 +200,8 @@ describe("a class and its subclass publish in either order", () => {
     const drafted = authoredWith([{ type: "subclass", id: "hb-mutant-a1b2c3", classId: "hb-blood-hunter-a1b2c3" }]);
     expect(validateForPublish("class", classBody(subclassPick), contextWith({}, drafted))).toEqual({
       valid: true,
-      issues: []
+      issues: [],
+      warnings: []
     });
     // With nothing naming it, the refusal stands, and says the subclass need not be published.
     const alone = validateForPublish("class", classBody(subclassPick), contextWith());
@@ -209,7 +211,11 @@ describe("a class and its subclass publish in either order", () => {
 
   it("publishes the SUBCLASS first, on the strength of a class that is still a draft", () => {
     const drafted = authoredWith([{ type: "class", id: "hb-blood-hunter-a1b2c3" }]);
-    expect(validateForPublish("subclass", mutant, contextWith({}, drafted))).toEqual({ valid: true, issues: [] });
+    expect(validateForPublish("subclass", mutant, contextWith({}, drafted))).toEqual({
+      valid: true,
+      issues: [],
+      warnings: []
+    });
   });
 
   it("counts a published subclass and a drafted one once each, never twice", () => {
@@ -635,6 +641,10 @@ describe("tier 4 - shapes that parse and are then read by nothing", () => {
       validateForPublish("feat", withRider({ type: "extra-damage", formula: "1d6", damageType: "fire" }), contextWith())
         .valid
     ).toBe(true);
+    // With no type it follows the attack's own, so it publishes too.
+    expect(validateForPublish("feat", withRider({ type: "extra-damage", formula: "1d6" }), contextWith()).valid).toBe(
+      true
+    );
     expect(
       validateForPublish(
         "feat",
@@ -713,6 +723,67 @@ describe("riders that parse and could never take effect", () => {
   });
 });
 
+describe("open slugs the SRD does not know", () => {
+  const feat = (grants: Record<string, unknown>, actions: unknown[] = []) => ({
+    id: "hb-warded-a1b2c3",
+    name: "Warded",
+    source: "homebrew",
+    category: "general",
+    feature: { id: "hb-warded-a1b2c3", name: "Warded", description: "A homebrew feat.", grants, actions }
+  });
+
+  it("warns, without refusing, about a damage type or condition that is probably a typo", () => {
+    const validity = validateForPublish(
+      "feat",
+      feat({ damageResistances: ["fier", "cold"], conditionImmunities: ["poisonned"] }, [
+        {
+          id: "lash",
+          name: "Lash",
+          activation: "action",
+          description: "A lash of void.",
+          damage: [{ formula: "1d6", type: "void" }]
+        }
+      ]),
+      contextWith()
+    );
+    expect(validity.valid).toBe(true);
+    expect(validity.warnings.map((warning) => warning.path)).toEqual([
+      ["feature", "actions", 0, "damage", 0, "type"],
+      ["feature", "grants", "damageResistances", 0],
+      ["feature", "grants", "conditionImmunities", 0]
+    ]);
+    expect(validity.warnings[1].message).toContain('"fier" is not an SRD damage type');
+  });
+
+  it("says nothing about the SRD's own slugs", () => {
+    const validity = validateForPublish(
+      "feat",
+      feat({ damageImmunities: ["poison"], conditionImmunities: ["charmed"] }),
+      contextWith()
+    );
+    expect(validity.warnings).toEqual([]);
+  });
+});
+
+describe("an item that grants spells", () => {
+  it("is refused, because an item's granted spells never reach the sheet", () => {
+    const amulet = {
+      id: "hb-amulet-of-echoes-a1b2c3",
+      name: "Amulet of Echoes",
+      source: "homebrew",
+      category: "wondrous",
+      costGp: 0,
+      weightLb: 0,
+      description: null,
+      grants: { spells: [{ id: "misty-step", alwaysPrepared: true }] }
+    };
+    const refused = validateForPublish("equipment", amulet, contextWith());
+    expect(refused.valid).toBe(false);
+    expect(refused.issues[0].path).toEqual(["grants", "spells"]);
+    expect(messages(refused)).toContain('Give it a "casts" entry instead');
+  });
+});
+
 describe("a duplicated SRD record still passes its own gate", () => {
   it("accepts every SRD class taken through the real duplicate path", () => {
     // Duplicating an SRD record must produce a publishable body. Driven through
@@ -752,7 +823,7 @@ describe("a duplicated SRD record still passes its own gate", () => {
     // Keeping `elf-lineages` would resolve against the elf's lineage rows, so lineages added to the copy
     // would never be offered.
     expect((copy.traits as any[]).map((trait) => trait.choice?.fromCatalog)).toContain("hb-shadar-kai-a1b2c3-lineages");
-    expect(validateForPublish("species", copy, context)).toEqual({ valid: true, issues: [] });
+    expect(validateForPublish("species", copy, context)).toEqual({ valid: true, issues: [], warnings: [] });
   });
 
   it("keeps every SRD spell list non-empty, so an SRD caster copy is always creatable", () => {
@@ -764,5 +835,29 @@ describe("a duplicated SRD record still passes its own gate", () => {
         entry.id
       ).toBe(true);
     }
+  });
+});
+
+describe("the SRD's own slugs", () => {
+  it("raise no warning anywhere in the bundle, so a warning always means something", () => {
+    const records: ReadonlyArray<readonly [HomebrewContentType, readonly unknown[]]> = [
+      ["class", bundle.loadClasses()],
+      ["subclass", bundle.loadSubclasses()],
+      ["species", bundle.loadSpecies()],
+      ["background", bundle.loadBackgrounds()],
+      ["feat", bundle.loadFeats()],
+      ["spell", bundle.loadSpells()],
+      ["equipment", bundle.loadEquipment()],
+      ["monster", bundle.loadMonsterDefinitions()]
+    ];
+    const warned = records.flatMap(([type, rows]) =>
+      rows.flatMap((row) =>
+        validateForPublish(type, row, contextWith()).warnings.map(
+          (warning) =>
+            `${type} ${(row as { id?: string; name?: string }).id ?? (row as { name?: string }).name}: ${warning.message}`
+        )
+      )
+    );
+    expect(warned).toEqual([]);
   });
 });

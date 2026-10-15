@@ -13,6 +13,7 @@ import {
   homebrewApi,
   invalidIssuesOf,
   listAllHomebrew,
+  type HomebrewDependent,
   type HomebrewRecordDocument,
   type HomebrewRecordSummary
 } from "./api";
@@ -238,26 +239,94 @@ export function RecordDetail({
     }
   };
 
-  const publish = () => runStateChange(() => homebrewApi.publish(gmToken, docRef.current.id, docRef.current.rev));
-  const unpublish = () => runStateChange(() => homebrewApi.unpublish(gmToken, docRef.current.id, docRef.current.rev));
+  /** The published records an action would break, asked of the server first. Best-effort: a failed read
+      never blocks the action itself. */
+  const dependentsFor = async (which: "ifRemoved" | "ifUpdated"): Promise<readonly HomebrewDependent[]> => {
+    try {
+      await autosave.flush();
+      return (await homebrewApi.usages(gmToken, docRef.current.id)).dependents[which];
+    } catch {
+      return [];
+    }
+  };
+
+  const publish = async () => {
+    if (docRef.current.state === "published" && docRef.current.pendingChanges) {
+      const breaks = await dependentsFor("ifUpdated");
+      if (
+        breaks.length > 0 &&
+        !(await confirm({
+          title: "Put these changes live?",
+          body: `${dependentNames(breaks)} ${breaks.length === 1 ? "depends" : "depend"} on this as it is now and would stop working.`,
+          confirmLabel: "Update anyway",
+          danger: true
+        }))
+      )
+        return;
+    }
+    await runStateChange(() => homebrewApi.publish(gmToken, docRef.current.id, docRef.current.rev));
+  };
+  const discard = async () => {
+    const confirmed = await confirm({
+      title: "Discard these changes?",
+      body: "The published version stays as it is, and the editor goes back to it.",
+      confirmLabel: "Discard",
+      danger: true
+    });
+    if (!confirmed) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      // Flushed first, so a save still in flight cannot land after the discard and re-create the changes.
+      await autosave.flush();
+      const next = await homebrewApi.discard(gmToken, docRef.current.id, docRef.current.rev);
+      adopt(next);
+      // The editor goes back to the live body, which is now the saved baseline.
+      const filled = withDefaults(next.type, next.record);
+      setDraft(filled);
+      autosave.markSaved(next.rev, filled);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Couldn't discard those changes.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const unpublish = async () => {
+    const breaks = await dependentsFor("ifRemoved");
+    if (
+      breaks.length > 0 &&
+      !(await confirm({
+        title: "Unpublish this?",
+        body: `${dependentNames(breaks)} ${breaks.length === 1 ? "depends" : "depend"} on it and would stop working until it is published again.`,
+        confirmLabel: "Unpublish anyway",
+        danger: true
+      }))
+    )
+      return;
+    await runStateChange(() => homebrewApi.unpublish(gmToken, docRef.current.id, docRef.current.rev));
+  };
   const setVisible = (visible: boolean) =>
     void runStateChange(() => homebrewApi.setVisibility(gmToken, docRef.current.id, visible, docRef.current.rev));
   const restore = () => runStateChange(() => homebrewApi.restore(gmToken, docRef.current.id));
 
   /**
-   * Removing a record can invalidate another (e.g. a published class losing its only subclass),
-   * which the server then demotes to Draft on its next write. To report this when it happens,
-   * re-list after the delete and diff the server-computed `valid` against what was
-   * published-and-valid before.
+   * Removing a record can invalidate another (e.g. a published class losing its only subclass).
+   * To report this when it happens, re-list after the delete and diff the server-computed `valid`
+   * against what was published-and-valid before.
    */
   const remove = async () => {
     const name = nameOf(draft).trim() || `this ${typeLabel(doc.type)}`;
-    // `danger: false`: archiving is reversible, so it is a caution, not destruction.
+    const breaks = await dependentsFor("ifRemoved");
+    const breaksLine =
+      breaks.length > 0
+        ? ` ${dependentNames(breaks)} ${breaks.length === 1 ? "depends" : "depend"} on it and would stop working.`
+        : "";
+    // `danger` only when a published record would break; otherwise archiving is a reversible caution.
     const confirmed = await confirm({
       title: "Archive this?",
-      body: `"${name}" stops appearing in the character builder, the monster pickers and inventory lists. Characters already built from it are unaffected. You can restore it later.`,
+      body: `"${name}" stops appearing in the character builder, the monster pickers and inventory lists. Characters already built from it are unaffected. You can restore it later.${breaksLine}`,
       confirmLabel: "Archive",
-      danger: false
+      danger: breaks.length > 0
     });
     if (!confirmed) return;
     setBusy(true);
@@ -294,6 +363,8 @@ export function RecordDetail({
 
   const removed = !!doc.deletedAt;
   const published = doc.state === "published";
+  // A published record's edits wait for Update, so players never lose it mid-edit.
+  const pending = published && doc.pendingChanges;
 
   return (
     <article className="hb-detail scroll-y">
@@ -306,7 +377,10 @@ export function RecordDetail({
           {removed ? (
             <Badge tone="neutral">Archived</Badge>
           ) : published ? (
-            <Badge tone="neutral">Published</Badge>
+            <>
+              <Badge tone="neutral">Published</Badge>
+              {pending && <Badge tone="caution">Changes not live</Badge>}
+            </>
           ) : (
             <Badge tone="caution">Draft</Badge>
           )}
@@ -314,14 +388,14 @@ export function RecordDetail({
           <SaveState status={autosave.status} onReload={() => void reload()} onRetry={autosave.retry} />
 
           <div className="hb-state-actions">
-            {!removed && !published && (
+            {!removed && (!published || pending) && (
               <Button
                 variant="primary"
                 onClick={() => void publish()}
                 disabled={checklist.length > 0 || busy}
                 aria-describedby={blockedReason || actionError ? reasonId : undefined}
               >
-                Publish
+                {pending ? "Update" : "Publish"}
               </Button>
             )}
             {!removed && published && (
@@ -333,6 +407,11 @@ export function RecordDetail({
             )}
             {!removed && (
               <Menu trigger="⋯" label={`More actions for this ${typeLabel(doc.type)}`} icon align="end">
+                {pending && (
+                  <MenuItem onClick={() => void discard()} disabled={busy}>
+                    Discard changes
+                  </MenuItem>
+                )}
                 {published && (
                   <MenuItem onClick={() => void unpublish()} disabled={busy}>
                     Unpublish
@@ -362,11 +441,11 @@ export function RecordDetail({
               </p>
             ) : (
               <>
-                {/* A published record with outstanding issues is still live, and the store demotes
-                    it to Draft on the next re-validating write. */}
+                {/* A published record's edits are held until Update, so outstanding issues never take it
+                    away from the players. */}
                 <p className="hb-blocked-count">
                   {published
-                    ? `${checklist.length} things need fixing, or the next edit puts this back to Draft.`
+                    ? `${checklist.length} things need fixing before these changes can go live. Players keep the published version.`
                     : `${checklist.length} things left before this can be published.`}
                 </p>
                 <ul className="hb-blocked-list">
@@ -382,6 +461,15 @@ export function RecordDetail({
               </>
             )}
           </div>
+        )}
+
+        {/* Never blocking: the server names an open slug the SRD does not know, which is legal but often a typo. */}
+        {doc.validity.warnings.length > 0 && !removed && (
+          <ul className="hb-warnings" aria-label="Worth checking">
+            {doc.validity.warnings.map((warning, index) => (
+              <li key={`${warning.path.join(".")}-${index}`}>{warning.message}</li>
+            ))}
+          </ul>
         )}
 
         {/* "In use" is a count, not a badge: it is a fact about other records. */}
@@ -410,11 +498,9 @@ export function RecordDetail({
         >
           <p>
             {brokeOthers.length === 1
-              ? "It's still published, but it can't be published as it stands"
-              : "They're still published, but they can't be published as they stand"}
-            , so the next edit to {brokeOthers.length === 1 ? "it" : "them"} puts{" "}
-            {brokeOthers.length === 1 ? "it" : "them"} back to Draft. Restore this one, or fix{" "}
-            {brokeOthers.length === 1 ? "it" : "them"}.
+              ? "It's still published, but it names something that's gone, so it won't work as it stands"
+              : "They're still published, but they name something that's gone, so they won't work as they stand"}
+            . Restore this one, or fix {brokeOthers.length === 1 ? "it" : "them"}.
           </p>
           <div className="hb-broke-list">
             {brokeOthers.map((row) => (
@@ -455,4 +541,12 @@ export function RecordDetail({
       {dialog}
     </article>
   );
+}
+
+/** "Hemomancy", "Hemomancy and Bloodline" or "Hemomancy, Bloodline and 2 more", quoted. */
+function dependentNames(dependents: readonly HomebrewDependent[]): string {
+  const quoted = dependents.map((dependent) => `"${dependent.name}"`);
+  if (quoted.length === 1) return quoted[0];
+  if (quoted.length <= 3) return `${quoted.slice(0, -1).join(", ")} and ${quoted.at(-1)}`;
+  return `${quoted.slice(0, 2).join(", ")} and ${quoted.length - 2} more`;
 }
