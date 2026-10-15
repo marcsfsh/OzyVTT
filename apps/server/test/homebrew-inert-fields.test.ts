@@ -3,12 +3,8 @@ import { GameStateSchema, type GameState } from "@vtt/domain";
 import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { effectiveActions } from "../src/effective-actions.js";
-import {
-  deriveEquipment,
-  type EquipmentCatalog,
-  type EquipmentRecordLike,
-  type SpellRecordLike
-} from "../src/equipment-derivation.js";
+import { deriveEquipment, type EquipmentCatalog } from "../src/equipment-derivation.js";
+import { testCatalog } from "./catalog-records.js";
 import { deriveActorSheet } from "../src/actor-derived.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
 import { setCondition } from "../src/actor-conditions.js";
@@ -45,13 +41,8 @@ function definitionOf(over: Record<string, unknown> = {}): ActorDefinition {
 const item = (over: Record<string, unknown>): InventoryItem =>
   InventoryItemSchema.parse({ id: "x", name: "X", ...over });
 
-function catalogOf(records: readonly EquipmentRecordLike[], spells: readonly SpellRecordLike[] = []): EquipmentCatalog {
-  return {
-    equipmentRecord: (id) => records.find((record) => record.id === id),
-    featRecord: () => undefined,
-    spellRecord: (id) => spells.find((spell) => spell.id === id)
-  };
-}
+const catalogOf = (equipment: readonly object[], spells: readonly object[] = []): EquipmentCatalog =>
+  testCatalog({ equipment, spells });
 
 function stateWith(inventory: InventoryItem[], extra: Record<string, unknown> = {}): GameState {
   return GameStateSchema.parse({
@@ -115,7 +106,7 @@ function deps(faces: number[], catalog?: EquipmentCatalog, definition?: ActorDef
 const cmd = (n: number) => `50000000-0000-4000-8000-0000000000${String(n).padStart(2, "0")}`;
 
 describe("row 1: an item that grants a saving-throw proficiency", () => {
-  const AMULET: EquipmentRecordLike = {
+  const AMULET = {
     id: "amulet-of-health",
     name: "Amulet of Health",
     category: "wondrous",
@@ -196,7 +187,7 @@ describe("row 1: an item that grants a saving-throw proficiency", () => {
 });
 
 describe("row 2: an item that grants damage resistance", () => {
-  const RING: EquipmentRecordLike = {
+  const RING = {
     id: "ring-of-fire-resistance",
     name: "Ring of Fire Resistance",
     category: "ring",
@@ -294,7 +285,7 @@ describe("row 3: the four dropped grant kinds", () => {
       category: "weapon",
       weapon: { category: "martial", damageDice: "1d12", damageType: "slashing", rangeFeet: null, longRangeFeet: null }
     };
-    const GAUNTLETS: EquipmentRecordLike = {
+    const GAUNTLETS = {
       id: "gauntlets-of-training",
       name: "Gauntlets of Training",
       category: "wondrous",
@@ -312,16 +303,16 @@ describe("row 3: the four dropped grant kinds", () => {
       item({ id: "gauntlets-of-training", name: "Gauntlets of Training", equipped: true, category: "wondrous" })
     ]);
     const trained = deriveEquipment(state.actors[0], definition, catalogOf([GAUNTLETS]));
-    expect(trained.weaponProficiencies).toEqual([{ id: "martial", sourceItemId: "gauntlets-of-training" }]);
+    expect(trained.context.proficientWeapons).toContain("martial");
     expect(trained.actions.find((action) => action.id === "item-greataxe")!.attack!.bonus).toBe(5);
   });
 
   it("armor: granted training reaches the rider gates as real proficiency", () => {
-    const ROBE: EquipmentRecordLike = {
+    const ROBE = {
       id: "robe-of-the-drilled",
       name: "Robe of the Drilled",
       category: "wondrous",
-      slot: "body",
+      slot: "wondrous",
       isMagic: true,
       grants: { armor: ["heavy"] }
     };
@@ -329,16 +320,15 @@ describe("row 3: the four dropped grant kinds", () => {
       item({ id: "robe-of-the-drilled", name: "Robe of the Drilled", equipped: true, category: "wondrous" })
     ]);
     const derivation = deriveEquipment(state.actors[0], definitionOf(), catalogOf([ROBE]));
-    expect(derivation.armorProficiencies).toEqual([{ id: "heavy", sourceItemId: "robe-of-the-drilled" }]);
     expect(derivation.context.proficientArmor).toContain("heavy");
   });
 
   it("damageImmunities: the granted type is ignored entirely", () => {
-    const CLOAK: EquipmentRecordLike = {
+    const CLOAK = {
       id: "cloak-of-the-frozen",
       name: "Cloak of the Frozen",
       category: "wondrous",
-      slot: "back",
+      slot: "shoulders",
       isMagic: true,
       attunement: { required: true },
       grants: { damageImmunities: ["cold"] }
@@ -368,7 +358,7 @@ describe("row 3: the four dropped grant kinds", () => {
   });
 
   it("conditionImmunities: the condition narrates the skip instead of landing", () => {
-    const PERIAPT: EquipmentRecordLike = {
+    const PERIAPT = {
       id: "periapt-of-clarity",
       name: "Periapt of Clarity",
       category: "wondrous",
@@ -417,7 +407,7 @@ describe("row 3: the four dropped grant kinds", () => {
   });
 
   it("conditionImmunities: a condition an on-hit rider applies is refused the same way", () => {
-    const PERIAPT: EquipmentRecordLike = {
+    const PERIAPT = {
       id: "periapt-of-clarity",
       name: "Periapt of Clarity",
       category: "wondrous",
@@ -470,18 +460,31 @@ describe("row 3: the four dropped grant kinds", () => {
 });
 
 describe("row 4: an item action's attack and save halves", () => {
-  const ROD: EquipmentRecordLike = {
+  const ROD = {
     id: "rod-of-blasting",
     name: "Rod of Blasting",
     category: "held",
     slot: "held",
     isMagic: true,
     actions: [
-      { id: "zap", name: "Zap", attack: { ability: "dex" }, damage: [{ formula: "1d8", type: "force" }] },
+      {
+        id: "zap",
+        name: "Zap",
+        activation: "action",
+        description: "A bolt of force.",
+        attack: { ability: "dex" },
+        damage: [{ formula: "1d8", type: "force" }]
+      },
       {
         id: "burst",
         name: "Burst",
-        save: { ability: "dex", dc: { base: 8, ability: "cha", proficiencyBonus: true } },
+        activation: "action",
+        save: {
+          ability: "dex",
+          dc: { base: 8, ability: "cha", proficiencyBonus: true },
+          successDamage: "half",
+          failureCondition: null
+        },
         damage: [{ formula: "2d6", type: "thunder" }],
         description: "Failure: 2d6 thunder. Success: Half damage."
       }
@@ -514,7 +517,7 @@ describe("row 4: an item action's attack and save halves", () => {
       (entry) => entry.id === "item-rod-of-blasting-burst"
     )!;
     // 8 + cha 10 (+0) + proficiency 2 = 10.
-    expect(burst.save).toEqual({ ability: "dex", dc: 10 });
+    expect(burst.save).toEqual({ ability: "dex", dc: 10, successDamage: "half", failureCondition: null });
     resolveDefinitionAction(
       state,
       burst,
@@ -532,7 +535,7 @@ describe("row 4: an item action's attack and save halves", () => {
   });
 
   it("resolves a flat printed DC and a spellcasting-powered attack from the wielder's own numbers", () => {
-    const WAND: EquipmentRecordLike = {
+    const WAND = {
       id: "wand-of-the-schooled",
       name: "Wand of the Schooled",
       category: "held",
@@ -542,8 +545,10 @@ describe("row 4: an item action's attack and save halves", () => {
         {
           id: "bolt",
           name: "Bolt",
+          activation: "action",
+          description: "A schooled bolt.",
           attack: { ability: "spellcasting" },
-          save: { ability: "wis", dc: 15 },
+          save: { ability: "wis", dc: 15, successDamage: "none", failureCondition: "charmed" },
           damage: [{ formula: "1d10", type: "force" }]
         }
       ]
@@ -558,12 +563,12 @@ describe("row 4: an item action's attack and save halves", () => {
       (entry) => entry.id === "item-wand-of-the-schooled-bolt"
     )!;
     expect(bolt.attack).toMatchObject({ bonus: 6 });
-    expect(bolt.save).toEqual({ ability: "wis", dc: 15 });
+    expect(bolt.save).toEqual({ ability: "wis", dc: 15, successDamage: "none", failureCondition: "charmed" });
   });
 });
 
 describe("row 5: an item's effects rider", () => {
-  const BLADE: EquipmentRecordLike = {
+  const BLADE = {
     id: "blade-of-certainty",
     name: "Blade of Certainty",
     category: "weapon",
@@ -574,7 +579,11 @@ describe("row 5: an item's effects rider", () => {
       {
         name: "Certain Strike",
         tags: ["blessed"],
-        modifiers: [{ type: "attack-advantage" }, { type: "damage-resistance", damageTypes: ["necrotic"] }]
+        duration: { type: "manual" },
+        modifiers: [
+          { type: "roll-mode", roll: "attack", mode: "advantage" },
+          { type: "damage-resistance", damageTypes: ["necrotic"] }
+        ]
       }
     ]
   };
@@ -622,7 +631,7 @@ describe("row 5: an item's effects rider", () => {
   it("applies an effect-declared damage resistance and publishes its tags to the rider gates", () => {
     const state = stateWith([item(ROW)]);
     const derivation = deriveEquipment(state.actors[0], definition, catalog);
-    expect(derivation.damageResistances).toEqual([{ id: "necrotic", sourceItemId: "blade-of-certainty" }]);
+    expect(derivation.damageResistances).toEqual([{ id: "necrotic", source: "Certain Strike (Blade of Certainty)" }]);
     expect(derivation.context.effectTags).toContain("blessed");
     const outcome = applyDamageDetailed(
       state,
@@ -636,20 +645,20 @@ describe("row 5: an item's effects rider", () => {
 });
 
 describe("row 6: an item that casts a spell, with its cast details", () => {
-  const FIREBALL: SpellRecordLike = {
+  const FIREBALL = {
     id: "fireball",
     name: "Fireball",
     level: 3,
     attackRoll: false,
     damage: { roll: "8d6", types: ["fire"] },
-    save: "dex",
-    description: "A bright streak flashes from you. Success: Half damage.",
+    save: { ability: "dex", successDamage: "half", failureCondition: null },
+    description: "A bright streak flashes from you.",
     castingOptions: [
-      { type: "slot_level_4", damageRoll: "9d6", targetCount: null },
-      { type: "slot_level_5", damageRoll: "10d6", targetCount: null }
+      { type: "slot_level_4", damageRoll: "9d6", targetCount: null, description: null },
+      { type: "slot_level_5", damageRoll: "10d6", targetCount: null, description: null }
     ]
   };
-  const wandOf = (cast: Record<string, unknown>): EquipmentRecordLike => ({
+  const wandOf = (cast: Record<string, unknown>) => ({
     id: "wand-of-fireballs",
     name: "Wand of Fireballs",
     category: "held",
@@ -676,7 +685,7 @@ describe("row 6: an item that casts a spell, with its cast details", () => {
     expect(cast.name).toBe("Cast Fireball (Wand of Fireballs)");
     expect(cast.damage).toEqual([{ formula: "8d6", type: "fire" }]);
     // No authored ability or DC: the wielder is no caster, so 8 + cha/int modifier 0 + proficiency 2.
-    expect(cast.save).toEqual({ ability: "dex", dc: 10 });
+    expect(cast.save).toEqual({ ability: "dex", dc: 10, successDamage: "half", failureCondition: null });
     expect(cast.uses).toEqual({ limit: 3, per: "long-rest" });
 
     resolveDefinitionAction(
@@ -695,7 +704,7 @@ describe("row 6: an item that casts a spell, with its cast details", () => {
       (entry) => entry.id === "item-wand-of-fireballs-cast-fireball"
     )!;
     expect(cast.damage).toEqual([{ formula: "10d6", type: "fire" }]);
-    expect(cast.save).toEqual({ ability: "dex", dc: 15 });
+    expect(cast.save).toEqual({ ability: "dex", dc: 15, successDamage: "half", failureCondition: null });
   });
 
   it("spends the wearer's own spell slot when the item says it does, and refuses when the pool is empty", () => {

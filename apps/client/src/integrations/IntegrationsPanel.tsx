@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   IntegrationScopeSchema,
   type CredentialAuditEvent,
@@ -8,18 +8,11 @@ import {
 import { Button, Input } from "@vtt/ui";
 import { ApiReference } from "./ApiReference";
 import { useConfirm } from "../components/feedback";
+import { apiRequest } from "../lib/api";
 
 const SCOPES = IntegrationScopeSchema.options;
-
-async function api(path: string, token: string, init?: RequestInit) {
-  const response = await fetch(path, {
-    headers: { "content-type": "application/json", authorization: `Bearer ${token}`, ...init?.headers },
-    ...init
-  });
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error?.message ?? "Request failed");
-  return body;
-}
+const CREDENTIALS = "/api/v1/gm/integration-credentials";
+type Issued = Readonly<{ credential: IntegrationCredentialMetadata; token: string }>;
 
 function formatTimestamp(value: string | null) {
   return <span className="tabular">{value ? new Date(value).toLocaleString() : "-"}</span>;
@@ -44,12 +37,12 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
     nameField.current?.focus();
   };
 
-  const loadCredentials = () => {
-    api("/api/v1/gm/integration-credentials", gmToken)
-      .then((body) => setCredentials(body.data.credentials))
-      .catch((error) => setFeedback((error as Error).message));
-  };
-  useEffect(loadCredentials, [gmToken]);
+  const loadCredentials = useCallback(() => {
+    apiRequest<{ credentials: IntegrationCredentialMetadata[] }>(CREDENTIALS, { token: gmToken })
+      .then((data) => setCredentials(data.credentials))
+      .catch((error: Error) => setFeedback(error.message));
+  }, [gmToken]);
+  useEffect(loadCredentials, [loadCredentials]);
 
   const toggleScope = (scope: IntegrationScope) => {
     setScopes((current) => {
@@ -64,17 +57,17 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
     event.preventDefault();
     if (scopes.size === 0) return setFeedback("Select at least one scope.");
     try {
-      const body = await api("/api/v1/gm/integration-credentials", gmToken, {
-        method: "POST",
+      const data = await apiRequest<Issued>(CREDENTIALS, {
+        token: gmToken,
         // No gameId: nothing verifies game-bound credentials yet, so binding one would make it permanently
         // unusable. The field stays out of the UI until that exists.
-        body: JSON.stringify({
+        body: {
           name,
           scopes: [...scopes],
           expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null
-        })
+        }
       });
-      setIssued({ name: body.data.credential.name, token: body.data.token, rotated: false });
+      setIssued({ name: data.credential.name, token: data.token, rotated: false });
       setCopyConfirmed(false);
       setName("");
       setScopes(new Set());
@@ -97,11 +90,8 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
     )
       return;
     try {
-      const body = await api(`/api/v1/gm/integration-credentials/${credential.id}/rotate`, gmToken, {
-        method: "POST",
-        body: JSON.stringify({})
-      });
-      setIssued({ name: credential.name, token: body.data.token, rotated: true });
+      const data = await apiRequest<Issued>(`${CREDENTIALS}/${credential.id}/rotate`, { token: gmToken, body: {} });
+      setIssued({ name: credential.name, token: data.token, rotated: true });
       setCopyConfirmed(false);
       loadCredentials();
     } catch (error) {
@@ -120,7 +110,7 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
     )
       return;
     try {
-      await api(`/api/v1/gm/integration-credentials/${credential.id}/revoke`, gmToken, { method: "POST" });
+      await apiRequest(`${CREDENTIALS}/${credential.id}/revoke`, { token: gmToken, method: "POST" });
       setFeedback(`"${credential.name}" revoked.`);
       loadCredentials();
     } catch (error) {
@@ -134,8 +124,10 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
       return;
     }
     try {
-      const body = await api(`/api/v1/gm/integration-credentials/${credential.id}/audit`, gmToken);
-      setAuditEvents(body.data.events);
+      const data = await apiRequest<{ events: CredentialAuditEvent[] }>(`${CREDENTIALS}/${credential.id}/audit`, {
+        token: gmToken
+      });
+      setAuditEvents(data.events);
       setAuditFor(credential.id);
     } catch (error) {
       setFeedback((error as Error).message);

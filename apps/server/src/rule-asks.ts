@@ -1,5 +1,6 @@
-import type { GameState, PendingRuleAsk } from "@vtt/domain";
-import { CommandRejectedError } from "./game-store.js";
+import type { GameState, PendingRuleAsk, RuleFamily } from "@vtt/domain";
+import { CommandRejectedError, type RulesBlockedError } from "./game-store.js";
+import { familyOf, type RuleId, type RulesOverride } from "./rules-families.js";
 
 /**
  * The ask-the-GM queue for actions the rules engine refused. Follows the `pendingSaves` /
@@ -43,13 +44,55 @@ export function clearRuleAsk(state: GameState, askId: string): PendingRuleAsk {
  *   Allow would 409. Idempotency comes from the commandId instead.
  * - `commandId` becomes the ask's server-minted id, so a duplicated `rules.answer` returns the stored
  *   outcome instead of firing the action twice.
+ * - The override waives only the family the GM was asked about, plus any an earlier Allow on this ask
+ *   already covered, so allowing one kind of block never waves another through.
  */
 export function rerunPayload(ask: PendingRuleAsk, reason: string | undefined): Record<string, unknown> {
+  const payload = withoutStaleRevision(ask.command.payload);
+  const families = allowedFamilies(ask);
   return {
-    ...withoutStaleRevision(ask.command.payload),
+    ...payload,
     commandId: ask.id,
-    override: { ...(reason === undefined ? {} : { reason }) }
+    override: {
+      ...(reason === undefined ? {} : { reason }),
+      ...(families.length > 0 ? { families } : {})
+    }
   };
+}
+
+/** The families an Allow on this ask covers: the one it asks about and those earlier Allows covered. */
+function allowedFamilies(ask: PendingRuleAsk): readonly RuleFamily[] {
+  const earlier = ((ask.command.payload as { override?: RulesOverride } | null)?.override?.families ?? []).filter(
+    (family) => family !== ask.family
+  );
+  return ask.family === null ? earlier : [...earlier, ask.family];
+}
+
+/** Whether an Allow on this ask already covers a block of this rule; a block it covers is the command's own
+ *  refusal, which no further Allow could get past. */
+export function allowCovers(ask: PendingRuleAsk, rule: RuleId): boolean {
+  return allowedFamilies(ask).includes(familyOf(rule));
+}
+
+/** Re-asks a command an Allow let past one block only for it to hit a block of another family: a new ask about
+ *  the new block, carrying the families already allowed so the next Allow adds to them. The fresh id means a
+ *  retried answer to the old ask finds nothing, rather than running the command on an Allow the GM never gave. */
+export function reaskRuleAsk(
+  state: GameState,
+  ask: PendingRuleAsk,
+  blocked: RulesBlockedError,
+  id: string
+): PendingRuleAsk {
+  const allowed = allowedFamilies(ask);
+  const payload = (ask.command.payload ?? {}) as Record<string, unknown>;
+  return parkRuleAsk(state, {
+    ...ask,
+    id,
+    rule: blocked.rule,
+    family: familyOf(blocked.rule),
+    message: blocked.message,
+    command: { type: ask.command.type, payload: { ...payload, override: { families: allowed } } }
+  });
 }
 
 /** The payload to re-run when the ask arrives. `expectedRevision` is stripped for the same reason: the

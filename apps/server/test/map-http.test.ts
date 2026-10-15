@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import express from "express";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { VIEWER_SESSION_COOKIE } from "@vtt/api-contract";
 import { MapAssetStore } from "../src/map-assets.js";
 import { MapCatalogStore } from "../src/map-catalog.js";
 import { createMapRouter } from "../src/map-http.js";
@@ -92,7 +93,7 @@ describe("map asset HTTP workflow", () => {
     expect(Buffer.from(await whole.arrayBuffer())).toEqual(test.input);
     expect(whole.headers.get("cache-control")).toBe("private, no-store");
     const range = await fetch(contentPath, {
-      headers: { cookie: "vtt_viewer_session=viewer-token", range: "bytes=0-7" }
+      headers: { cookie: `${VIEWER_SESSION_COOKIE}=viewer-token`, range: "bytes=0-7" }
     });
     expect(range.status).toBe(206);
     expect(range.headers.get("content-range")).toBe(`bytes 0-7/${test.input.length}`);
@@ -119,7 +120,7 @@ describe("map asset HTTP workflow", () => {
       (await body(await fetch(gridPath, { headers: { authorization: "Bearer gm-token" } }))).data.calibration
     ).toBeNull();
     expect((await fetch(gridPath, { headers: { authorization: "Bearer player-token" } })).status).toBe(200);
-    expect((await fetch(gridPath, { headers: { cookie: "vtt_viewer_session=viewer-token" } })).status).toBe(200);
+    expect((await fetch(gridPath, { headers: { cookie: `${VIEWER_SESSION_COOKIE}=viewer-token` } })).status).toBe(200);
 
     const started = await body(
       await fetch(`${test.base}/api/v1/map-assets/${id}/calibration/wizards`, {

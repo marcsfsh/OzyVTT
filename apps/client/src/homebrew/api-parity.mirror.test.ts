@@ -39,13 +39,13 @@ describe("T1 — the census: every API-authorable key the editor cannot reach, h
   it("pins the walk — the plan's two schema-intrinsic counts, and this file's own expansion", () => {
     // `objectSchemas`/`declaredKeys` are properties of the schemas; the counts below are properties
     // of the canonicaliser. When a schema or control change moves them, re-pin in the same change.
-    expect(stats).toEqual({ objectSchemas: 165, declaredKeys: 720 });
+    expect(stats).toEqual({ objectSchemas: 155, declaredKeys: 715 });
     expect({
       asked: results.length,
       covered: results.filter((result) => result.covered).length,
       forced: results.filter((result) => !result.covered && isSystemForced(result.address)).length,
       open: open.length
-    }).toEqual({ asked: 5081, covered: 2820, forced: 106, open: 2155 });
+    }).toEqual({ asked: 5493, covered: 3242, forced: 106, open: 2145 });
   });
 
   it("holds the open set to the exemption table exactly, in both directions", () => {
@@ -247,7 +247,7 @@ describe("T3 — non-vacuity, by constructed failure (plan §2.2: 'asserted in t
     const withoutGrants = EXEMPTIONS.filter((row) => row.at !== "actions[].grants.**");
     const verdict = censusVerdict(open, withoutGrants);
     // `modifiers[].**` still covers the nested modifiers slice, but the grant's own keys orphan.
-    expect(verdict.unmatched.length).toBe(111);
+    expect(verdict.unmatched.length).toBe(120);
     expect(verdict.unmatched.some((line) => line.includes("monster.actions[].grants.name"))).toBe(true);
   });
 

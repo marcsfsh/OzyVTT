@@ -2,7 +2,7 @@
  * The label band: in a `FieldGrid` row, a Field-wrapped input's well starts one label line plus one row-gap
  * below the cell top, so `Stepper` and `Switch` must reserve the same band. jsdom has no layout, so this checks
  * structure and the CSS source wiring (`--nh-label-band` is declared from `.nh-field`'s metrics and the modifiers
- * use it); `scripts/primitive-align-check.mjs` measures the geometry in a browser.
+ * use it).
  */
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";

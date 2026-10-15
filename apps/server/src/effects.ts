@@ -285,25 +285,3 @@ export function endEncounterEffects(state: GameState, combatantIds: readonly str
   }
   return events;
 }
-
-/** Damage defences from active effects, merged with the definition's by the caller. One `sources` map
- *  serves both lists, since a type is never both (they cancel). */
-export function effectDamageDefenses(actor: Actor): {
-  resistances: string[];
-  vulnerabilities: string[];
-  sources: Map<string, string>;
-} {
-  const resistances: string[] = [];
-  const vulnerabilities: string[] = [];
-  const sources = new Map<string, string>();
-  for (const effect of actor.effects) {
-    for (const modifier of effect.modifiers) {
-      if (modifier.type !== "damage-resistance" && modifier.type !== "damage-vulnerability") continue;
-      for (const damageType of modifier.damageTypes) {
-        (modifier.type === "damage-resistance" ? resistances : vulnerabilities).push(damageType);
-        if (!sources.has(damageType.toLowerCase())) sources.set(damageType.toLowerCase(), effect.name);
-      }
-    }
-  }
-  return { resistances, vulnerabilities, sources };
-}

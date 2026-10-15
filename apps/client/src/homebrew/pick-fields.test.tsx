@@ -151,8 +151,9 @@ describe("3a — the rarity control is a visible chooser that still takes a word
  * 3. `GrantsEditor`'s bespoke "Which" box, which no census can see.
  * Each checks: the list renders unprompted, a listed value lands as its slug, an unknown word
  * survives, and the value reaches the published body. `DamageTypeIdSchema` stays an open string.
+ * A rider's damage type is the exception: it names one of the SRD's thirteen, so its sites are closed choices.
  */
-describe("3d — every damage-type control is a visible chooser that still takes a homebrew type", () => {
+describe("3d — every damage-type control is a visible chooser; the open ones still take a homebrew type", () => {
   const NAMES = DAMAGE_TYPE_IDS.map(suggestionLabel);
 
   it("kind 1, text: the weapon's damage type shows the whole vocabulary, not eight of it", async () => {
@@ -217,7 +218,7 @@ describe("3d — every damage-type control is a visible chooser that still takes
     expect(form.body().damageImmunities).toEqual(["necrotic"]);
   });
 
-  it("both rider sites, in the nested rows they really live in", async () => {
+  it("both rider sites offer the closed SRD list, in the nested rows they really live in", async () => {
     const user = userEvent.setup();
     let value: Draft = {};
     function Harness() {
@@ -240,34 +241,31 @@ describe("3d — every damage-type control is a visible chooser that still takes
 
     /** Sites inside `RowEditor` rows: the `extra-damage` rider one row deep and the `damage-type-is`
         gate two deep. Row fields are re-keyed by position with a per-row `idPrefix`, so they need
-        their own check. */
+        their own check. A rider's damage type is closed (`DamageTypeSchema`), so these are choices,
+        not free text. */
     await user.click(screen.getByRole("button", { name: "Add a modifier" }));
     await user.selectOptions(screen.getByLabelText("What it changes"), "extra-damage");
 
-    // The `extra-damage` rider, one row deep.
-    await user.click(screen.getByRole("combobox", { name: "Damage type" }));
-    expect(
-      within(screen.getByRole("listbox", { name: "Damage type" }))
-        .getAllByRole("option")
-        .map((option) => option.textContent)
-    ).toEqual(NAMES);
-    await user.click(screen.getByRole("option", { name: "Lightning" }));
+    // The `extra-damage` rider, one row deep: a select over the thirteen, after its empty prompt.
+    const damageType = screen.getByRole("combobox", { name: "Damage type" }) as HTMLSelectElement;
+    expect([...damageType.options].slice(1).map((option) => option.textContent)).toEqual(NAMES);
+    await user.selectOptions(damageType, "lightning");
     expect((value.modifiers as Array<Record<string, unknown>>)[0]).toMatchObject({
       type: "extra-damage",
       damageType: "lightning"
     });
 
-    // The `damage-type-is` gate, two rows deep; a mistyped slug here means the rider never fires.
+    // The `damage-type-is` gate, two rows deep: one chip per type.
     await user.click(screen.getByRole("button", { name: "Add a condition" }));
     await user.selectOptions(screen.getByLabelText("Condition"), "damage-type-is");
-    await user.click(screen.getByRole("combobox", { name: "Damage types" }));
+    const types = screen.getByRole("group", { name: "Damage types" });
     expect(
-      within(screen.getByRole("listbox", { name: "Damage types" }))
-        .getAllByRole("option")
-        .map((option) => option.textContent)
+      within(types)
+        .getAllByRole("button")
+        .map((chip) => chip.textContent)
     ).toEqual(NAMES);
 
-    await user.click(screen.getByRole("option", { name: "Cold" }));
+    await user.click(within(types).getByRole("button", { name: "Cold" }));
     const when = ((value.modifiers as Array<Record<string, unknown>>)[0].when as Array<Record<string, unknown>>)[0];
     expect(when).toMatchObject({ type: "damage-type-is", damageTypes: ["cold"] });
   });

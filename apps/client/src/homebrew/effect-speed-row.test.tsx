@@ -1,9 +1,8 @@
 /**
- * The runtime `speed` row in `effectModifiersField` (distinct from the build-time `speed` modifier,
- * with the same ±30/60 ft bounds). Client half only: the row exists, writes the shape
- * `EffectModifierSchema` accepts, and on an item (where effects become standing riders whose speed
- * nothing reads) shows a note. The movement far end is tested server-side in
- * `apps/server/test/combat-rules-regression.test.ts` and `apps/server/test/feat-riders.test.ts`.
+ * The runtime `speed` row in `effectModifiersField` (the build-time `speed` modifier's sibling, with the same
+ * ±30/60 ft bounds). Client half only: the row exists and writes the shape `EffectModifiersSchema` accepts, on
+ * a feature's effect and an item's alike, since both reach the movement budget. The movement far end is tested
+ * server-side in `apps/server/test/combat-rules-regression.test.ts` and `apps/server/test/effect-riders.test.ts`.
  */
 
 import { useState } from "react";
@@ -93,22 +92,19 @@ describe("the runtime speed effect-modifier row", () => {
     expect(form.stored().amount).toBe(-30);
   });
 
-  /** On an item the speed rider lands in `EquipmentDerivation.speed`, which nothing reads, so the note
-      appears there. */
-  it("names the absence on an item, and stays silent on a feature where the reader is real", async () => {
+  /** An item's effect speed reaches the movement budget as a feature's does, so neither carrier warns. */
+  it("reads the same on an item as on a feature, with no 'not read' note on either", async () => {
     const item = mount("item", withModifier({ type: "speed", amount: 10 }));
     await item.openBoth(/Speed \+10 ft/);
     expect(item.amount()).toBeTruthy();
-    expect(item.container.textContent).toContain("Not read on an item");
-    // The note supplements the help; it doesn't replace it.
+    expect(item.container.textContent).not.toContain("Not read on an item");
     expect(item.container.textContent).toContain("given back when it ends");
 
     const feature = mount("feature", withModifier({ type: "speed", amount: 10 }));
     await feature.openBoth(/Speed \+10 ft/);
     expect(feature.container.textContent).not.toContain("Not read on an item");
 
-    // The note is prose in the help slot, so it adds no tap target.
     expect(item.controls()).toBe(feature.controls());
-    expect(item.controls()).toBe(24); // a fixed count, so an empty render cannot pass the line above
+    expect(item.controls()).toBe(25); // a fixed count, so an empty render cannot pass the line above
   });
 });

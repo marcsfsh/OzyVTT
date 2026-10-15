@@ -1,6 +1,6 @@
 import type { HomebrewContentType, HomebrewValidationIssue, HomebrewValidity } from "@vtt/api-contract";
 import { CatalogChoiceError, resolveCatalogChoice, type CatalogChoiceCatalogs } from "@vtt/domain";
-import { type ActorDefinition } from "@vtt/schemas";
+import { DAMAGE_ROLL_MOMENTS, RIDER_TRIGGER_KINDS, type ActorDefinition, type Modifier } from "@vtt/schemas";
 import {
   featurePicks,
   HOMEBREW_BODY_SCHEMAS,
@@ -12,14 +12,15 @@ import {
   type EquipmentReference,
   type FeatReference,
   type FeatureChoice,
-  type FeatureModifier,
+  type FeatureOption,
   type FeatureOptionChoice,
   type FeatureRecord,
   type SpeciesReference,
   type SpellListReference,
   type SubclassReference
 } from "@vtt/content-srd-5.2.1";
-import { STATBLOCK_EXTENSION, statblockFacts, type ContentView } from "./content-library.js";
+import type { ContentView } from "./content-library.js";
+import { STATBLOCK_EXTENSION, statblockFacts } from "./statblock-facts.js";
 import { homebrewIdProblem } from "./homebrew-ids.js";
 import type { HomebrewAuthoredIndex } from "./homebrew-store.js";
 
@@ -286,6 +287,9 @@ function featIssues(entry: FeatReference, checks: Checks) {
 }
 
 function monsterIssues(definition: ActorDefinition, id: string, checks: Checks) {
+  definition.actions.forEach((action, index) =>
+    riderIssues(action.grants?.modifiers, ["actions", index, "grants", "modifiers"], action.name, checks)
+  );
   if (definition.schemaId !== "vtt.actor-monster") {
     checks.add(
       ["schemaId"],
@@ -315,7 +319,7 @@ function monsterIssues(definition: ActorDefinition, id: string, checks: Checks) 
 
 /** A template's `appliesTo.baseIds` must resolve to items with the stats the bind copies (weapon or armor). */
 function equipmentIssues(item: EquipmentReference, checks: Checks) {
-  damageBonusMomentIssues(item.modifiers, ["modifiers"], item.name, checks);
+  riderBlockIssues(item, [], item.name, checks);
   const appliesTo = item.appliesTo;
   if (!appliesTo) return;
   if (item.category !== "weapon" && item.category !== "armor") {
@@ -432,57 +436,53 @@ function featureIssues(
           self
         );
       });
-      riderIssues(
-        option.modifiers,
-        [...pickPath, "options", index, "modifiers"],
-        `${feature.name} / ${option.name}`,
-        checks
-      );
+      riderBlockIssues(option, [...pickPath, "options", index], `${feature.name} / ${option.name}`, checks);
     });
   });
-  riderIssues(feature.modifiers, [...path, "modifiers"], feature.name, checks);
+  riderBlockIssues(feature, path, feature.name, checks);
 }
 
-/** Moments the damage pass collects. Riders that would add nothing are refused here: Zod cannot refine inside a discriminated union. */
-const DAMAGE_PASS_MOMENTS = new Set(["on-hit", "on-damage-roll", "on-critical-hit", "on-critical-miss"]);
-const RIDER_MOMENTS = new Set([
-  "on-attack-roll",
-  "on-hit",
-  "on-critical-hit",
-  "on-critical-miss",
-  "on-damage-roll",
-  "on-saving-throw",
-  "on-ability-check",
-  "on-initiative-roll",
-  "on-death-save",
-  "on-taking-damage",
-  "on-spell-cast"
-]);
-function damageBonusMomentIssues(
-  modifiers: readonly FeatureModifier[] | undefined,
+/** The modifiers a rider block carries: its own, its effects', and the effects its actions grant. */
+function riderBlockIssues(
+  block: FeatureRecord | FeatureOption | EquipmentReference,
   path: Path,
   label: string,
   checks: Checks
 ) {
-  (modifiers ?? []).forEach((modifier, index) => {
-    if (modifier.type !== "damage-bonus") return;
-    const moment = (modifier.when ?? [])
-      .map((trigger) => trigger.type)
-      .find((type) => RIDER_MOMENTS.has(type) && !DAMAGE_PASS_MOMENTS.has(type));
-    if (moment !== undefined) {
-      checks.add(
-        [...path, index],
-        `"${label}" gates a damage-bonus on "${moment}", a moment the damage roll never collects - it would publish and then add nothing, ever. Gate it on "on-hit", "on-damage-roll" or "on-critical-hit" instead (or drop the moment for an always-on bonus).`
-      );
-    }
-  });
+  riderIssues(block.modifiers, [...path, "modifiers"], label, checks);
+  block.effects.forEach((effect, index) =>
+    riderIssues(effect.modifiers, [...path, "effects", index, "modifiers"], label, checks)
+  );
+  block.actions.forEach((action, index) =>
+    riderIssues(action.grants?.modifiers, [...path, "actions", index, "grants", "modifiers"], label, checks)
+  );
 }
 
-function riderIssues(modifiers: readonly FeatureModifier[] | undefined, path: Path, label: string, checks: Checks) {
-  damageBonusMomentIssues(modifiers, path, label, checks);
+/** The moments each reader collects, for the modifiers whose reader is narrower than the vocabulary: a damage
+ *  rider fires only inside the damage roll, and a defence is read standing. A gate on any other moment would
+ *  publish and then never apply. */
+const MOMENTS_READ: Partial<Record<Modifier["type"], readonly string[]>> = {
+  "damage-bonus": DAMAGE_ROLL_MOMENTS,
+  "extra-damage": DAMAGE_ROLL_MOMENTS,
+  "damage-resistance": [],
+  "damage-vulnerability": []
+};
+
+/** Riders that parse but would never take effect. Checked here because Zod cannot refine inside a
+ *  discriminated union. */
+function riderIssues(modifiers: readonly Modifier[] | undefined, path: Path, label: string, checks: Checks) {
   (modifiers ?? []).forEach((modifier, index) => {
-    if (modifier.type !== "extra-damage") return;
-    if (modifier.formula === undefined && modifier.abilityModifier === undefined) {
+    const read = MOMENTS_READ[modifier.type];
+    const moment = (modifier.when ?? []).find((trigger) => RIDER_TRIGGER_KINDS[trigger.type] === "moment")?.type;
+    if (read !== undefined && moment !== undefined && !read.includes(moment)) {
+      checks.add(
+        [...path, index],
+        read.length === 0
+          ? `"${label}" gates a ${modifier.type} on "${moment}", but a defence is read before any roll, so it would publish and then never apply. Drop the moment, or gate it on a state (while-effect-tag, while-condition, ...).`
+          : `"${label}" gates a ${modifier.type} on "${moment}", a moment the damage roll never collects - it would publish and then add nothing, ever. Gate it on ${read.map((entry) => `"${entry}"`).join(", ")} instead (or drop the moment for an always-on bonus).`
+      );
+    }
+    if (modifier.type === "extra-damage" && modifier.formula === undefined && modifier.abilityModifier === undefined) {
       checks.add(
         [...path, index],
         `"${label}" has an extra-damage rider with neither a dice \`formula\` nor an \`abilityModifier\`, so it would add nothing.`

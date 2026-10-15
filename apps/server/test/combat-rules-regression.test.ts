@@ -8,6 +8,7 @@ import { answerReaction, dismissReaction } from "../src/reactions.js";
 import { applyDamageDetailed, healActor } from "../src/hit-points.js";
 import { setCondition } from "../src/actor-conditions.js";
 import { answerSave, saveRollSources } from "../src/saving-throws.js";
+import { deriveEquipment } from "../src/equipment-derivation.js";
 import { rollDeathSave } from "../src/death-saves.js";
 import { builtinAction } from "../src/builtin-actions.js";
 import { addEffect, endEffect, endEncounterEffects, expireEffectsAtTurnStart, hasEffectTag } from "../src/effects.js";
@@ -64,7 +65,6 @@ function deps(
     newRollId: () => `40000000-0000-4000-8000-${String(rollIndex++).padStart(12, "0")}`,
     gmSessionId: IDS.gmSession,
     now: () => "2026-07-18T00:00:00.000Z",
-    hasCondition: () => true,
     definition,
     distanceFeet
   };
@@ -1462,12 +1462,14 @@ describe("SRD generic actions - builtin catalog (rules glossary [Action] entries
     );
     expect(bite.rollMode?.disadvantage).toContain("Target: Dodging");
     // Dex saves gain advantage from the same effect.
-    expect(saveRollSources(pip, "dex").advantage.map((entry) => entry.label)).toContain("Dodging");
-    expect(saveRollSources(pip, "str").advantage).toHaveLength(0);
+    const sources = (ability: "dex" | "str") =>
+      saveRollSources(pip, ability, deriveEquipment(pip, undefined, undefined)).advantage;
+    expect(sources("dex").map((entry) => entry.label)).toContain("Dodging");
+    expect(sources("str")).toHaveLength(0);
 
     // SRD: the benefits lapse while incapacitated (voidWhileIncapacitated).
     pip.conditions = [{ id: "stunned" }];
-    expect(saveRollSources(pip, "dex").advantage).toHaveLength(0);
+    expect(sources("dex")).toHaveLength(0);
   });
 
   it("a second builtin action strict-blocks on the spent slot, like any stat-block action", () => {

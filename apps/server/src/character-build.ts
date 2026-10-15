@@ -17,13 +17,7 @@ import {
   spellSaveDc,
   type Ability
 } from "@vtt/rules-5e";
-import type {
-  ClassLevelRow,
-  ClassReference,
-  FeatureModifier,
-  FeatureRecord,
-  SpellReference
-} from "@vtt/content-srd-5.2.1";
+import type { ClassLevelRow, ClassReference, FeatureRecord, Modifier, SpellReference } from "@vtt/content-srd-5.2.1";
 import {
   CLASS_CANTRIP_BUDGET,
   CLASS_SPELL_BUDGET,
@@ -31,11 +25,8 @@ import {
   type CharacterFeatureOrigin
 } from "./character-offers.js";
 import type { ContentView } from "./content-library.js";
-import {
-  BUILDER_BAKED_MODIFIER_TYPES,
-  UNARMED_STRIKE_ACTION_ID,
-  type CharacterFeatureRef
-} from "./equipment-derivation.js";
+import { BUILDER_BAKED_MODIFIER_TYPES, type CharacterFeatureRef } from "./equipment-derivation.js";
+import { UNARMED_STRIKE_ACTION_ID } from "./item-actions.js";
 import { bindTemplateItem } from "./inventory.js";
 import { CommandRejectedError } from "./game-store.js";
 
@@ -116,13 +107,9 @@ type InterpretedFeatures = {
   unarmoredDefense: { ability: Ability; allowShield: boolean } | null;
 };
 
-// Rider ownership: of the `FeatureModifierSchema` variants, this fold bakes some and the roll-time
-// collector owns the rest. Both halves are named so neither can grow a hole.
-
-// Compile-time check that every literal in `BUILDER_BAKED_MODIFIER_TYPES` is in the vocabulary
-// (`equipment-derivation.ts` cannot name `FeatureModifier`).
-BUILDER_BAKED_MODIFIER_TYPES satisfies readonly FeatureModifier["type"][];
-type CarrierRiderType = Exclude<FeatureModifier["type"], (typeof BUILDER_BAKED_MODIFIER_TYPES)[number]>;
+// Rider ownership: of the `ModifierSchema` variants, this fold bakes some and the roll-time collector owns
+// the rest. Both halves are named so neither can grow a hole.
+type CarrierRiderType = Exclude<Modifier["type"], (typeof BUILDER_BAKED_MODIFIER_TYPES)[number]>;
 
 /** The roll-time half of the rider partition; a `Record` so a new variant must be assigned or the build
  *  fails. These reach the table as rider carriers via `deriveEquipment`. Values record where each is
@@ -138,12 +125,14 @@ const CARRIER_RIDER_DISPOSITION: Readonly<
   "critical-range": "standing", // effective-actions criticalThreshold
   "critical-bonus-dice": "standing", // effective-actions folds it into attack.criticalBonusDice
   "extra-attack": "standing", // effective-actions extraAttacksFor raises attack.count on a weapon swing
-  "roll-mode": "at-its-moment", // attacks (action-resolution), saves (saving-throws), initiative (encounter)
-  "extra-damage": "at-its-moment", // action-resolution rolls it as its own typed damage entry
-  "damage-bonus": "standing", // effective-actions folds it into the first damage part's formula; a moment-gated one lands as a bonusDamage line in action-resolution
-  "check-bonus": "standing", // actor-derived.ts checkRiderBonus, into every check and skill row
-  "spell-attack-bonus": "unread", // reaches derivation.spellAttackBonus; no spell-attack path reads it yet
+  "roll-mode": "at-its-moment", // rollModeClaims: attacks, saves, checks, initiative
+  "extra-damage": "at-its-moment", // resolution/damage.ts rolls it as its own typed damage entry
+  "damage-bonus": "standing", // effective-actions folds it into the first damage part's formula; a moment-gated one lands as a bonusDamage line in resolution/damage.ts
+  "check-bonus": "standing", // checkRiderBonus, into every check and skill row and the builtin checks
+  "spell-attack-bonus": "unread", // no spell-attack path reads it yet
   "damage-reduction": "at-its-moment", // hit-points.ts damageReductionFor, applied to the total after resistances
+  "damage-resistance": "standing", // derivation.damageResistances, beside the definition's own
+  "damage-vulnerability": "standing", // derivation.damageVulnerabilities, beside the definition's own
   sense: "display-only" // like `darkvision`: the trait prose carries it; no definition field models senses
 };
 
@@ -201,7 +190,7 @@ function interpretAction(
           : save.dc.base +
             abilityModifier(context.finalScores[save.dc.ability]) +
             (save.dc.proficiencyBonus ? context.proficiencyBonus : 0);
-    assembled.save = { ability: save.ability, dc };
+    assembled.save = { ...save, dc };
   }
   if (damageByLevel && damageByLevel.length > 0) {
     const rows = [...damageByLevel]
@@ -258,7 +247,7 @@ function cantripActionFor(
     description: spell.description.slice(0, 12000),
     damage: typedDamage ? [{ formula: spell.damage.roll!, type: spell.damage.types[0] }] : [],
     ...(spell.save !== null
-      ? { save: { ability: spell.save, dc: numbers.saveDc } }
+      ? { save: { ...spell.save, dc: numbers.saveDc } }
       : spell.attackRoll
         ? { attack: { bonus: numbers.attackBonus } }
         : {}),

@@ -148,7 +148,7 @@ describe("a Wand of Fireballs spends a charge, rolls real damage, and refuses at
     // The spell bundle supplies the dice and save ability; the item supplies the DC. The wielder has no
     // spellcasting block, so DC 15 can only come from the authored `saveDc`.
     expect(cast.damage).toEqual([{ formula: "8d6", type: "fire" }]);
-    expect(cast.save).toEqual({ ability: "dex", dc: 15 });
+    expect(cast.save).toEqual({ ability: "dex", dc: 15, successDamage: "half", failureCondition: null });
     expect(cast.uses).toEqual({ limit: 7, per: "long-rest", pool: CHARGES });
 
     // The roll: eight d6 faces of 5 -> 40 Fire, offered to the target as a pending save.
@@ -297,7 +297,7 @@ describe("an item action with a printed DC, a condition read off its prose, and 
     const action = effectiveActions(definition, actor, catalog).find(
       (entry) => entry.id === "item-rod-of-rulership-command-obedience"
     )!;
-    expect(action.save).toEqual({ ability: "wis", dc: 15 });
+    expect(action.save).toEqual({ ability: "wis", dc: 15, successDamage: "none", failureCondition: "charmed" });
     expect(action.uses).toEqual({ limit: 1, per: "long-rest" });
 
     resolveDefinitionAction(
@@ -306,7 +306,7 @@ describe("an item action with a printed DC, a condition read off its prose, and 
       { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(5) },
       deps([], definition)
     );
-    // The condition is not an authored field: `conditionFrom` reads it from the description.
+    // The prompt carries the condition the action's save block declares.
     expect(state.combat.pendingSaves[0]).toMatchObject({ ability: "wis", dc: 15, conditionId: "charmed" });
 
     newTurn(state);
@@ -335,7 +335,7 @@ describe("a staff's resistance and its shared charge pool", () => {
     const definition = definitionOf();
     const state = fight(stateWith([item(ROW)]));
     const derivation = deriveEquipment(state.actors[0], definition, catalog);
-    expect(derivation.damageResistances).toEqual([{ id: "fire", sourceItemId: "staff-of-fire" }]);
+    expect(derivation.damageResistances).toEqual([{ id: "fire", source: "Staff of Fire" }]);
 
     const cast = effectiveActions(definition, state.actors[0], catalog).find(
       (entry) => entry.id === "item-staff-of-fire-cast-burning-hands"
@@ -559,7 +559,7 @@ describe("the two entries that cast nothing and keep the rest", () => {
     ]);
     // Shooting Stars is the ring's own printed effect: DC 15, 5d4 Radiant.
     const stars = actions.find((entry) => entry.id === "item-ring-of-shooting-stars-shooting-stars")!;
-    expect(stars.save).toEqual({ ability: "dex", dc: 15 });
+    expect(stars.save).toEqual({ ability: "dex", dc: 15, successDamage: "half", failureCondition: null });
     expect(stars.damage).toEqual([{ formula: "5d4", type: "radiant" }]);
     // None of the surviving actions carries an attack roll.
     expect(actions.filter((entry) => entry.attack !== undefined)).toEqual([]);
@@ -584,8 +584,13 @@ describe("the two entries that cast nothing and keep the rest", () => {
     );
     expect(actions).toHaveLength(3);
     const dcOf = (spellId: string) => actions.find((entry) => entry.id.endsWith(`cast-${spellId}`))!.save;
-    expect(dcOf("animal-friendship")).toEqual({ ability: "wis", dc: 13 });
-    expect(dcOf("fear")).toEqual({ ability: "wis", dc: 13 });
+    expect(dcOf("animal-friendship")).toEqual({
+      ability: "wis",
+      dc: 13,
+      successDamage: "none",
+      failureCondition: "charmed"
+    });
+    expect(dcOf("fear")).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureCondition: "frightened" });
     // Speak with Animals forces no save, so a `saveDc` would have no reader.
     expect(dcOf("speak-with-animals")).toBeUndefined();
     expect(

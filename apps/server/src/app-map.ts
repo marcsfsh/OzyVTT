@@ -94,8 +94,8 @@ export function renderAppMap(): string {
   );
   lines.push("- **Shared 5e math:** `packages/rules-5e/src/{dice,combat,character}.ts`.");
   lines.push("- **SRD content bundles:** `packages/content-srd-5.2.1`.");
-  lines.push("- **Client entry points:** `apps/client/src/{main,viewer-main,styleguide-main}.tsx`.");
-  lines.push("- **Design system:** `packages/ui/src/index.ts` (+ the `/styleguide` route).");
+  lines.push("- **Client entry points:** `apps/client/src/{main,viewer-main,sheet-main}.tsx`.");
+  lines.push("- **Design system:** `packages/ui/src/index.ts`.");
   lines.push("");
 
   return lines.join("\n");

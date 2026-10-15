@@ -33,6 +33,9 @@ export const MAP_ASSET_PATHS = {
   calibrationWizardComplete: `${API_NAMESPACE}/map-assets/{id}/calibration/wizards/{wizardId}/complete`
 } as const;
 
+/** The HttpOnly cookie a paired table viewer (or the GM's preview of it) authenticates with. */
+export const VIEWER_SESSION_COOKIE = "vtt_viewer_session";
+
 /** Documentation-only path constants for `viewer-http.ts`'s router. See the note on MAP_ASSET_PATHS. */
 export const VIEWER_PATHS = {
   pairings: `${API_NAMESPACE}/viewer/pairings`,
@@ -41,6 +44,7 @@ export const VIEWER_PATHS = {
   accessById: `${API_NAMESPACE}/viewer/access/{id}`,
   presentation: `${API_NAMESPACE}/viewer/presentation`,
   presentationCommands: `${API_NAMESPACE}/viewer/presentation/commands`,
+  previewSession: `${API_NAMESPACE}/viewer/preview-session`,
   events: `${API_NAMESPACE}/viewer/events`
 } as const;
 
@@ -1267,6 +1271,15 @@ const homebrewDataObject = (key: string, valueSchema: unknown) => ({
 //   1. Absent, never null: Zod `.optional()` rejects null. `required` is exactly the Zod schema's non-optional
 //      keys; a field with a Zod `.default()` is optional on the wire.
 //   2. Riders are hoisted into named components, because `reference.ts` flattens only one level of nesting.
+/** The rule families an override waives; absent, it waives every block on the command (the GM's own ruling). */
+const rulesOverrideFamilies = {
+  type: "array",
+  minItems: 1,
+  maxItems: 5,
+  items: { type: "string", enum: ["movement", "economy", "resources", "targeting", "slots"] },
+  description:
+    "Limit the override to these kinds of block, so allowing one kind never waves another through. Absent, it waives every block on the command."
+} as const;
 const homebrewAbility = { type: "string", enum: ["str", "dex", "con", "int", "wis", "cha"] } as const;
 const homebrewLevel = { type: "integer", minimum: 1, maximum: 20 } as const;
 const homebrewSize = { type: "string", enum: ["tiny", "small", "medium", "large", "huge", "gargantuan"] } as const;
@@ -1278,6 +1291,77 @@ const homebrewDiceFormula = {
 } as const;
 const homebrewDamageType = { type: "string", minLength: 1, maxLength: 40 } as const;
 const homebrewConditionId = { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 60 } as const;
+/** `SaveOutcomeFields`: what a save does, as data. Every save block (stat block, feature, spell) carries both. */
+const homebrewSaveOutcome = {
+  successDamage: {
+    type: "string",
+    enum: ["half", "none"],
+    default: "half",
+    description: 'The damage a successful save takes: "half" (Fireball) or "none" (Sacred Flame)'
+  },
+  failureCondition: {
+    type: ["string", "null"],
+    enum: [
+      "blinded",
+      "charmed",
+      "deafened",
+      "frightened",
+      "grappled",
+      "incapacitated",
+      "paralyzed",
+      "petrified",
+      "poisoned",
+      "prone",
+      "restrained",
+      "stunned",
+      "unconscious",
+      null
+    ],
+    default: null,
+    description:
+      "The condition a failed save imposes, offered on the save prompt; null for none. Exhaustion is not offered: it stacks by level"
+  }
+} as const;
+/** The SRD's 13 damage types and 15 conditions: closed in the rider vocabulary, so a typo is refused at publish
+ * rather than stored to match nothing. Elsewhere (a stat block's defences, an action's damage) they stay open. */
+const homebrewRiderDamageType = {
+  type: "string",
+  enum: [
+    "acid",
+    "bludgeoning",
+    "cold",
+    "fire",
+    "force",
+    "lightning",
+    "necrotic",
+    "piercing",
+    "poison",
+    "psychic",
+    "radiant",
+    "slashing",
+    "thunder"
+  ]
+} as const;
+const homebrewRiderCondition = {
+  type: "string",
+  enum: [
+    "blinded",
+    "charmed",
+    "deafened",
+    "exhaustion",
+    "frightened",
+    "grappled",
+    "incapacitated",
+    "invisible",
+    "paralyzed",
+    "petrified",
+    "poisoned",
+    "prone",
+    "restrained",
+    "stunned",
+    "unconscious"
+  ]
+} as const;
 const homebrewEffectTag = { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 40 } as const;
 const homebrewActionId = { type: "string", pattern: "^[a-z0-9-]+$" } as const;
 const homebrewRef = (schemaRef: string) => ({ $ref: `#/components/schemas/${schemaRef}` });
@@ -1344,16 +1428,15 @@ const homebrewItemSlot = {
     "none"
   ]
 } as const;
-/** The gate fields every rider carries (Zod's `riderGate`). `when` defaults to `[]`, so it is never required, but
- * it appears on every parsed rider and `additionalProperties: false` means every variant must declare it. */
+/** The gate fields every rider carries (Zod's `riderGate`); `additionalProperties: false` means every variant must
+ * declare them. */
 const homebrewRiderGate = {
   when: {
     type: "array",
     maxItems: 4,
-    default: [],
     items: { $ref: "#/components/schemas/HomebrewRiderTrigger" },
     description:
-      "AND-list of at most four triggers gating this rider, with at most ONE moment. Empty = always. A filter with no moment is rejected: it has nothing to narrow"
+      "AND-list of at most four triggers gating this rider, with at most ONE moment. Absent or empty = always. A filter with no moment is rejected: it has nothing to narrow"
   },
   scope: {
     type: "string",
@@ -1419,7 +1502,7 @@ const homebrewFeatureRiders = {
   },
   uses: { ...homebrewRef("HomebrewFeatureUses"), description: "Limited uses recovered on a rest" },
   grants: { ...homebrewRef("HomebrewFeatureGrants"), description: "Flat proficiency/language/spell grants" },
-  modifiers: { ...homebrewRefArray("HomebrewFeatureModifier", 8), description: "Typed numeric riders" }
+  modifiers: { ...homebrewRefArray("HomebrewModifier", 8), description: "Typed numeric riders" }
 } as const;
 /** Extra picks, kept out of `homebrewFeatureRiders` because that block also goes on equipment, and an item must
  * never carry a pick budget (removing it would strand a chosen pick). Attached only to features and options. */
@@ -1980,18 +2063,30 @@ export const openApiDocument = {
         security: [{ gmAuth: [] }],
         description:
           "Issues a short-lived, one-time pairing code for a second-screen display to exchange for a session.",
-        responses: { "201": { description: "Pairing code issued" }, "401": { $ref: "#/components/responses/ApiError" } }
+        responses: {
+          "201": {
+            description: "Pairing code issued",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerPairingResponse" } } }
+          },
+          "400": { $ref: "#/components/responses/ApiError" },
+          "401": { $ref: "#/components/responses/ApiError" },
+          "429": { $ref: "#/components/responses/ApiError" }
+        }
       }
     },
     [VIEWER_PATHS.pairingsExchange]: {
       post: {
         operationId: "exchangeViewerPairing",
         security: [],
-        description:
-          "Exchanges a pairing code for an HttpOnly, SameSite=Strict `vtt_viewer_session` cookie. No request auth: the code itself is the credential.",
+        description: `Exchanges a pairing code for an HttpOnly, SameSite=Strict \`${VIEWER_SESSION_COOKIE}\` cookie. No request auth: the code itself is the credential.`,
         responses: {
-          "201": { description: "Paired; session cookie set" },
-          "400": { $ref: "#/components/responses/ApiError" }
+          "201": {
+            description: "Paired; session cookie set",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerSessionResponse" } } }
+          },
+          "400": { $ref: "#/components/responses/ApiError" },
+          "401": { $ref: "#/components/responses/ApiError" },
+          "429": { $ref: "#/components/responses/ApiError" }
         }
       }
     },
@@ -2000,7 +2095,10 @@ export const openApiDocument = {
         operationId: "listViewerAccess",
         security: [{ gmAuth: [] }],
         responses: {
-          "200": { description: "Every paired viewer plus which are currently connected" },
+          "200": {
+            description: "Every paired viewer plus which are currently connected",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerAccessListResponse" } } }
+          },
           "401": { $ref: "#/components/responses/ApiError" }
         }
       }
@@ -2011,7 +2109,14 @@ export const openApiDocument = {
         security: [{ gmAuth: [] }],
         description: "Revokes one paired display and immediately disconnects its live event stream.",
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
-        responses: { "200": { description: "Revoked" }, "401": { $ref: "#/components/responses/ApiError" } }
+        responses: {
+          "200": {
+            description: "Revoked",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerSessionResponse" } } }
+          },
+          "400": { $ref: "#/components/responses/ApiError" },
+          "401": { $ref: "#/components/responses/ApiError" }
+        }
       }
     },
     [VIEWER_PATHS.presentation]: {
@@ -2021,7 +2126,8 @@ export const openApiDocument = {
         responses: {
           "200": {
             description:
-              "Current player-safe presentation state (map, camera, measurement, pings, initiative, encounter)"
+              "Current player-safe presentation state (map, camera, measurement, pings, initiative, encounter)",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerPresentationResponse" } } }
           },
           "401": { $ref: "#/components/responses/ApiError" }
         }
@@ -2034,10 +2140,28 @@ export const openApiDocument = {
         description:
           "GM-only optimistic-concurrency command (present/pause map, set camera, ping, set/clear measurement). `expectedRevision` mismatches return 409.",
         responses: {
-          "200": { description: "Command applied" },
+          "200": {
+            description: "Command applied",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerCommandResponse" } } }
+          },
           "400": { $ref: "#/components/responses/ApiError" },
           "401": { $ref: "#/components/responses/ApiError" },
           "409": { $ref: "#/components/responses/ApiError" }
+        }
+      }
+    },
+    [VIEWER_PATHS.previewSession]: {
+      post: {
+        operationId: "createViewerPreviewSession",
+        security: [{ gmAuth: [] }],
+        description:
+          "Sets a read-only viewer cookie for the GM's own preview of the shared screen. It reads the presentation like a paired display.",
+        responses: {
+          "201": {
+            description: "Preview cookie set",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerSessionResponse" } } }
+          },
+          "401": { $ref: "#/components/responses/ApiError" }
         }
       }
     },
@@ -2866,7 +2990,7 @@ export const openApiDocument = {
     ...gameCommandOperation(
       "rules.answer",
       "answerRulesAsk",
-      "Answers a parked question in one tap (GM-grade only, D9). `allow: true` re-runs the parked command under GM authority with an injected override - the `reason` is optional and the audit line falls back to \"GM override\" - and the rules engine remembers the rule's FAMILY for the rest of that character's turn, so the same kind of block stops re-prompting. The replay runs against CURRENT state and passes full validation, so a stale question (the target moved, the target died) fails loudly and stays parked for another look. `allow: false` clears it and tells the player. A question that no longer exists is a 409.",
+      "Answers a parked question in one tap (GM-grade only, D9). `allow: true` re-runs the parked command under GM authority with an injected override of the asked rule's FAMILY only - the `reason` is optional and the audit line falls back to \"GM override\" - and the rules engine remembers that family for the rest of that character's turn, so the same kind of block stops re-prompting. The replay runs against CURRENT state and passes full validation, so a stale question (the target moved, the target died) fails loudly and stays parked for another look. A replay stopped by a block of ANOTHER family does not ride the same Allow: the question is re-asked about that block under a fresh `askId` (the reply carries `blocked`), and the next Allow covers both families. `allow: false` clears it and tells the player. A question that no longer exists is a 409.",
       "RulesAnswerRequest"
     ),
     [CONTENT_PATHS.monsters]: {
@@ -3873,7 +3997,7 @@ export const openApiDocument = {
       viewerCookieAuth: {
         type: "apiKey",
         in: "cookie",
-        name: "vtt_viewer_session",
+        name: VIEWER_SESSION_COOKIE,
         description:
           "Also accepted as a Bearer token; the cookie is what the paired second-screen browser actually sends."
       }
@@ -4170,6 +4294,86 @@ export const openApiDocument = {
         additionalProperties: false,
         properties: { commandId: { type: "string", format: "uuid" }, expectedRevision: { type: "integer", minimum: 0 } }
       },
+      ViewerAccess: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "name", "createdAt", "expiresAt", "lastUsedAt", "revokedAt"],
+        properties: {
+          id: { type: "string", format: "uuid" },
+          name: { type: "string" },
+          createdAt: { type: "string", format: "date-time" },
+          expiresAt: { type: ["string", "null"], format: "date-time" },
+          lastUsedAt: { type: ["string", "null"], format: "date-time" },
+          revokedAt: { type: ["string", "null"], format: "date-time" }
+        }
+      },
+      ViewerPairingResponse: envelopeSchema("#/components/schemas/ViewerPairingData"),
+      ViewerPairingData: {
+        type: "object",
+        additionalProperties: false,
+        required: ["pairing"],
+        properties: {
+          pairing: {
+            type: "object",
+            additionalProperties: false,
+            required: ["code", "expiresAt"],
+            properties: { code: { type: "string" }, expiresAt: { type: "string", format: "date-time" } }
+          }
+        }
+      },
+      ViewerSessionResponse: envelopeSchema("#/components/schemas/ViewerSessionData"),
+      ViewerSessionData: {
+        type: "object",
+        additionalProperties: false,
+        required: ["viewer"],
+        properties: { viewer: { $ref: "#/components/schemas/ViewerAccess" } }
+      },
+      ViewerAccessListResponse: envelopeSchema("#/components/schemas/ViewerAccessListData"),
+      ViewerAccessListData: {
+        type: "object",
+        additionalProperties: false,
+        required: ["viewers", "connections"],
+        properties: {
+          viewers: { type: "array", items: { $ref: "#/components/schemas/ViewerAccess" } },
+          connections: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["connectionId", "viewerId", "name", "connectedAt"],
+              properties: {
+                connectionId: { type: "string" },
+                viewerId: { type: "string", format: "uuid" },
+                name: { type: "string" },
+                connectedAt: { type: "string", format: "date-time" }
+              }
+            }
+          }
+        }
+      },
+      ViewerPresentationResponse: envelopeSchema("#/components/schemas/ViewerPresentationData"),
+      ViewerPresentationData: {
+        type: "object",
+        additionalProperties: false,
+        required: ["presentation"],
+        properties: {
+          presentation: {
+            type: "object",
+            additionalProperties: true,
+            description: "The player-safe presentation projection; the same shape the event stream sends."
+          }
+        }
+      },
+      ViewerCommandResponse: envelopeSchema("#/components/schemas/ViewerCommandData"),
+      ViewerCommandData: {
+        type: "object",
+        additionalProperties: false,
+        required: ["revision", "duplicate"],
+        properties: {
+          revision: { type: "integer", minimum: 0 },
+          duplicate: { type: "boolean", description: "True when this command id was already applied." }
+        }
+      },
       GameMutationAccepted: {
         type: "object",
         additionalProperties: true,
@@ -4418,7 +4622,7 @@ export const openApiDocument = {
             type: "object",
             additionalProperties: false,
             required: ["reason"],
-            properties: { reason: { type: "string", minLength: 1, maxLength: 300 } },
+            properties: { reason: { type: "string", minLength: 1, maxLength: 300 }, families: rulesOverrideFamilies },
             description: "GM-grade bypass of a movement-budget rejection; audited in the combat log"
           }
         }
@@ -4511,11 +4715,9 @@ export const openApiDocument = {
           modifiers: {
             type: "array",
             maxItems: 8,
-            items: {
-              type: "object",
-              description:
-                "damage-bonus {amount, appliesTo} | damage-resistance {damageTypes} | attack-advantage | incoming-attack-advantage | attack-disadvantage | incoming-attack-disadvantage | save-advantage {ability?} | save-disadvantage {ability?}"
-            }
+            items: { $ref: "#/components/schemas/HomebrewModifier" },
+            description:
+              "What the effect does, in the shared rider vocabulary with its gates; the modifiers the sheet stores (armor-class, initiative, spell-slot, ...) are refused, as on any effect"
           },
           concentration: {
             type: "boolean",
@@ -4589,7 +4791,7 @@ export const openApiDocument = {
           override: {
             type: "object",
             additionalProperties: false,
-            properties: { reason: { type: "string", minLength: 1, maxLength: 300 } },
+            properties: { reason: { type: "string", minLength: 1, maxLength: 300 }, families: rulesOverrideFamilies },
             description:
               "GM-grade only: waves the off-turn refusal (and the resolver's own economy blocks) through, remembers the family for the rest of the turn, and audits the line. The reason is optional."
           }
@@ -5387,7 +5589,7 @@ export const openApiDocument = {
             type: "object",
             additionalProperties: false,
             required: ["reason"],
-            properties: { reason: { type: "string", minLength: 1, maxLength: 300 } },
+            properties: { reason: { type: "string", minLength: 1, maxLength: 300 }, families: rulesOverrideFamilies },
             description: "GM-grade bypass of the stand-up movement cost rejection; audited"
           }
         }
@@ -5508,7 +5710,7 @@ export const openApiDocument = {
             type: "object",
             additionalProperties: false,
             required: ["reason"],
-            properties: { reason: { type: "string", minLength: 1, maxLength: 300 } },
+            properties: { reason: { type: "string", minLength: 1, maxLength: 300 }, families: rulesOverrideFamilies },
             description: "Bypasses a rules-mode rejection; audited in the combat log and journal"
           },
           effectId: {
@@ -10072,8 +10274,8 @@ export const openApiDocument = {
             }
           },
           save: {
-            description: "Which save the target rolls; null when the spell forces none",
-            oneOf: [homebrewAbility, { type: "null" }]
+            description: "The save the spell forces; null when it forces none",
+            oneOf: [{ $ref: "#/components/schemas/HomebrewSpellSave" }, { type: "null" }]
           },
           target: {
             type: "object",
@@ -10570,6 +10772,14 @@ export const openApiDocument = {
           }
         }
       },
+      HomebrewSpellSave: {
+        type: "object",
+        additionalProperties: false,
+        required: ["ability"],
+        description:
+          "The save a spell forces: the ability the target rolls and what the save does. The caster supplies the DC.",
+        properties: { ability: homebrewAbility, ...homebrewSaveOutcome }
+      },
       HomebrewSpellShape: {
         type: "object",
         additionalProperties: false,
@@ -10828,8 +11038,12 @@ export const openApiDocument = {
             type: "object",
             additionalProperties: false,
             required: ["ability", "dc"],
-            description: "A printed save DC",
-            properties: { ability: homebrewAbility, dc: { type: "integer", minimum: 1, maximum: 40 } }
+            description: "A printed save DC, and what the save does",
+            properties: {
+              ability: homebrewAbility,
+              dc: { type: "integer", minimum: 1, maximum: 40 },
+              ...homebrewSaveOutcome
+            }
           }
         }
       },
@@ -10853,7 +11067,8 @@ export const openApiDocument = {
         type: "object",
         additionalProperties: false,
         required: ["ability", "dc"],
-        description: "A save a feature forces. `ability` is what the TARGET rolls; `dc` is how the number is derived.",
+        description:
+          "A save a feature forces. `ability` is what the TARGET rolls; `dc` is how the number is derived; the outcome fields are a stat block's.",
         properties: {
           ability: homebrewAbility,
           dc: {
@@ -10864,7 +11079,8 @@ export const openApiDocument = {
               { type: "integer", minimum: 1, maximum: 40 },
               { $ref: "#/components/schemas/HomebrewFeatureSaveDc" }
             ]
-          }
+          },
+          ...homebrewSaveOutcome
         }
       },
       HomebrewFeatureSaveDc: {
@@ -10992,8 +11208,8 @@ export const openApiDocument = {
           }
         }
       },
-      HomebrewFeatureModifier: homebrewUnion(
-        'THE authored rider vocabulary, and the same one a magic ITEM carries - a feat is a HomebrewFeature, a chosen option carries the identical rider block, and HomebrewEquipmentRecord spreads that block too, so "a feat carries the same buffs and debuffs an item does" is true by construction rather than by convention. Bounded and grown additively; anything not modeled stays prose (ADR-0008). Every amount is a SIGNED integer, so a curse is this vocabulary with a negative number rather than a second one, and every branch carries the `when`/`scope` gate. Two branches are refused on an ITEM carrier (`hit-points-per-level` and `ability-score`) because both bake into the sheet and cannot be un-granted when the item comes off; both stay available on a feat. HomebrewEffectModifier remains the separate, smaller vocabulary a live EFFECT contributes - the two share exactly three branches and are otherwise not merged.',
+      HomebrewModifier: homebrewUnion(
+        "THE rider vocabulary: what a feature, a feat, a chosen option, a magic ITEM and a live EFFECT contribute to the rules engine, one union for every carrier and read by one evaluator against one context, so a bonus means the same thing wherever it is authored. Bounded and grown additively; anything not modeled stays prose (ADR-0008). Every amount is a SIGNED integer, so a curse is this vocabulary with a negative number rather than a second one, and every branch carries the `when`/`scope` gate. Carriers refuse what they cannot honour: an ITEM refuses `hit-points-per-level` and `ability-score` (both bake into the sheet and cannot be un-granted when the item comes off), and an EFFECT refuses every number stored on the sheet or the actor (`ability-score`, `hit-points-per-level`, `armor-class`, `initiative`, `unarmored-defense`, `darkvision`, `sense`, `spell-slot`), which an effect that ends could never give back.",
         {
           "ability-score": "HomebrewModifierAbilityScore",
           "hit-points-per-level": "HomebrewModifierHitPointsPerLevel",
@@ -11003,20 +11219,22 @@ export const openApiDocument = {
           "extra-attack": "HomebrewModifierExtraAttack",
           "unarmored-defense": "HomebrewModifierUnarmoredDefense",
           darkvision: "HomebrewModifierDarkvision",
-          "attack-bonus": "HomebrewRiderAttackBonus",
-          "extra-damage": "HomebrewRiderExtraDamage",
-          "roll-mode": "HomebrewRiderRollMode",
+          sense: "HomebrewModifierSense",
+          "resource-bonus": "HomebrewModifierResourceBonus",
+          "attack-bonus": "HomebrewModifierAttackBonus",
           "save-bonus": "HomebrewModifierSaveBonus",
           "check-bonus": "HomebrewModifierCheckBonus",
+          "roll-mode": "HomebrewModifierRollMode",
           "damage-bonus": "HomebrewModifierDamageBonus",
-          "spell-save-dc": "HomebrewModifierSpellSaveDc",
-          "spell-attack-bonus": "HomebrewModifierSpellAttackBonus",
-          "spell-slot": "HomebrewModifierSpellSlot",
-          "resource-bonus": "HomebrewModifierResourceBonus",
+          "extra-damage": "HomebrewModifierExtraDamage",
           "critical-range": "HomebrewModifierCriticalRange",
           "critical-bonus-dice": "HomebrewModifierCriticalBonusDice",
           "damage-reduction": "HomebrewModifierDamageReduction",
-          sense: "HomebrewModifierSense"
+          "damage-resistance": "HomebrewModifierDamageResistance",
+          "damage-vulnerability": "HomebrewModifierDamageVulnerability",
+          "spell-save-dc": "HomebrewModifierSpellSaveDc",
+          "spell-attack-bonus": "HomebrewModifierSpellAttackBonus",
+          "spell-slot": "HomebrewModifierSpellSlot"
         }
       ),
       HomebrewModifierAbilityScore: homebrewRiderVariant(
@@ -11035,9 +11253,12 @@ export const openApiDocument = {
         ["amount"],
         { amount: { type: "integer", minimum: -5, maximum: 5 } }
       ),
-      HomebrewModifierSpeed: homebrewRiderVariant("speed", "Change walking speed in feet.", ["amount"], {
-        amount: { type: "integer", minimum: -30, maximum: 60 }
-      }),
+      HomebrewModifierSpeed: homebrewRiderVariant(
+        "speed",
+        "Change walking speed in feet, signed (Longstrider +10, the `slow` mastery -10). On a feature it is baked into the sheet's speed when the character is built; on an item or an effect it is summed live into the movement budget, so the feet come back when the item comes off or the effect ends.",
+        ["amount"],
+        { amount: { type: "integer", minimum: -30, maximum: 60 } }
+      ),
       HomebrewModifierArmorClass: homebrewRiderVariant(
         "armor-class",
         'A flat AC rider. `whileArmored` is the ONE bounded condition the SRD\'s printed bonuses need (the Defense fighting style reads "While you\'re wearing Light, Medium, or Heavy armor"); it is a boolean, not a condition language, and defaults to the unconditional bonus every earlier record meant. `when: [{"type": "while-armored"}]` now says the same thing in the general vocabulary - the boolean STAYS because shipped bundles author it, and a collector normalises it into that trigger.',
@@ -11076,7 +11297,7 @@ export const openApiDocument = {
       ),
       HomebrewModifierDamageBonus: homebrewRiderVariant(
         "damage-bonus",
-        'A flat bonus to damage rolls - the other half of a "+1 weapon" (`attack-bonus` is the to-hit half). Standing, it folds into the swing\'s printed damage formula; gated on a moment ("+7 on a critical hit") it lands as its own labelled line at resolution. Weapon-scoped by default on an item with a weapon block, so two magic weapons never stack. This is the FEATURE/ITEM branch; the effect vocabulary keeps its older, differently-shaped `damage-bonus` ({amount, appliesTo}) on HomebrewEffectModifier.',
+        'A flat bonus to damage rolls - the other half of a "+1 weapon" (`attack-bonus` is the to-hit half). Standing, it folds into the swing\'s printed damage formula; gated on a moment ("+7 on a critical hit", Rage\'s "+2 on a melee damage roll") it lands as its own labelled line at resolution, and only the damage roll\'s moments (`on-hit`, `on-critical-hit`, `on-damage-roll`) are accepted. Weapon-scoped by default on an item with a weapon block, so two magic weapons never stack.',
         ["amount"],
         { amount: { type: "integer", minimum: -10, maximum: 10 } }
       ),
@@ -11118,7 +11339,7 @@ export const openApiDocument = {
       ),
       HomebrewModifierDamageReduction: homebrewRiderVariant(
         "damage-reduction",
-        "Flat reduction of incoming damage. Resistance itself stays `grants.damageResistances`.",
+        "Flat reduction of incoming damage, applied after resistance.",
         ["amount"],
         { amount: { type: "integer", minimum: 1, maximum: 30 } }
       ),
@@ -11127,6 +11348,47 @@ export const openApiDocument = {
         "The missing sibling of `darkvision`: any named sense in feet. Display-level, like `darkvision`, until a senses model exists.",
         ["sense", "feet"],
         { sense: contentSlug, feet: { type: "integer", minimum: 0, maximum: 240 } }
+      ),
+      HomebrewModifierAttackBonus: homebrewRiderVariant(
+        "attack-bonus",
+        "A flat bonus to the bearer's attack rolls. THE missing channel: the resolver's to-hit was the action's printed bonus plus exhaustion and nothing else could reach it.",
+        ["amount"],
+        { amount: { type: "integer", minimum: -10, maximum: 10 } }
+      ),
+      HomebrewModifierExtraDamage: homebrewRiderVariant(
+        "extra-damage",
+        'Extra TYPED damage, in one of the 13 SRD damage types. An attack\'s `criticalBonusDice` is a bare count applied to the first damage part, so it cannot carry a type. TWO independent ways to say how much, and a rider may use either or both: `formula` is dice ("an extra 1d6 fire"), and `abilityModifier` adds the BEARER\'s modifier in that ability as a flat number resolved at the roll ("add your Charisma modifier to the damage") - a printed wording that no authored constant can express, because the amount depends on the character. Agonizing Blast is `abilityModifier: "cha"` plus a `spell-id-is` gate. A rider with NEITHER is refused at publish rather than stored to silently add nothing, and so is one gated on a moment the damage roll never collects (only `on-hit`, `on-critical-hit` and `on-damage-roll` are). `doubleOnCritical` defaults false because 5e does not double dice added after the attack, and an ability modifier is never doubled at all.',
+        ["damageType"],
+        {
+          formula: homebrewDiceFormula,
+          abilityModifier: homebrewAbility,
+          damageType: homebrewRiderDamageType,
+          doubleOnCritical: { type: "boolean", default: false }
+        }
+      ),
+      HomebrewModifierRollMode: homebrewRiderVariant(
+        "roll-mode",
+        'Advantage or disadvantage on a NAMED roll: one branch with a `mode` field rather than two per roll kind. It feeds the same aggregation that already implements 5e cancellation (any advantage plus any disadvantage is normal) and labels each source on the roll card, so a curse is `mode: "disadvantage"` and needs no separate machinery. `concentration` is the Constitution save that keeps a spell going; `incoming-attack` is attacks made against the bearer (Dodge).',
+        ["roll", "mode"],
+        {
+          roll: {
+            type: "string",
+            enum: ["attack", "incoming-attack", "save", "check", "initiative", "concentration"]
+          },
+          mode: { type: "string", enum: ["advantage", "disadvantage"] }
+        }
+      ),
+      HomebrewModifierDamageResistance: homebrewRiderVariant(
+        "damage-resistance",
+        "Resistance to the listed damage types (Rage). Read standing, before any roll, so a moment gate is refused at publish; gate it on a state (`while-effect-tag`) instead.",
+        ["damageTypes"],
+        { damageTypes: { type: "array", minItems: 1, maxItems: 13, items: homebrewRiderDamageType } }
+      ),
+      HomebrewModifierDamageVulnerability: homebrewRiderVariant(
+        "damage-vulnerability",
+        "Vulnerability to the listed damage types - double damage, and the mirror of `damage-resistance`. Resistance and vulnerability to the SAME type cancel to normal damage rather than compounding (SRD 5.2.1).",
+        ["damageTypes"],
+        { damageTypes: { type: "array", minItems: 1, maxItems: 13, items: homebrewRiderDamageType } }
       ),
       HomebrewActionOnHit: {
         type: "object",
@@ -11201,7 +11463,11 @@ export const openApiDocument = {
               { $ref: "#/components/schemas/HomebrewEffectDurationManual" }
             ]
           },
-          modifiers: homebrewRefArray("HomebrewEffectModifier", 8),
+          modifiers: {
+            ...homebrewRefArray("HomebrewModifier", 8),
+            description:
+              "What the effect does while it lasts, gates included, in the shared rider vocabulary. Refused here: every modifier the sheet or the actor stores (ability-score, hit-points-per-level, armor-class, initiative, unarmored-defense, darkvision, sense, spell-slot), which an effect that ends could not give back."
+          },
           onEnd: homebrewRefArray("HomebrewEffectOnEnd", 2),
           endsWithTag: {
             ...homebrewEffectTag,
@@ -11238,119 +11504,9 @@ export const openApiDocument = {
         ["conditionId"],
         { conditionId: homebrewConditionId, level: { type: "integer", minimum: 1, maximum: 6 } }
       ),
-      HomebrewEffectModifier: homebrewUnion(
-        "What an active EFFECT contributes to the rules engine. Still a DIFFERENT and smaller vocabulary than HomebrewFeatureModifier (which is what a feature or an item contributes); the two are deliberately not merged. They do SHARE their last three branches - `attack-bonus`, `extra-damage` and `roll-mode` are one component each, referenced by both unions, because a bonus that meant one thing on an item and another on an effect is exactly the drift a second copy produces. `attack-advantage` is evaluated only on the bearer's own turn (Reckless Attack semantics); the six legacy advantage/disadvantage branches stay as they are, with `roll-mode` as the general form that also covers checks, initiative, death saves and concentration.",
-        {
-          "damage-bonus": "HomebrewEffectDamageBonus",
-          "damage-resistance": "HomebrewEffectDamageResistance",
-          "damage-vulnerability": "HomebrewEffectDamageVulnerability",
-          "attack-advantage": "HomebrewEffectAttackAdvantage",
-          "incoming-attack-advantage": "HomebrewEffectIncomingAttackAdvantage",
-          "attack-disadvantage": "HomebrewEffectAttackDisadvantage",
-          "incoming-attack-disadvantage": "HomebrewEffectIncomingAttackDisadvantage",
-          "save-advantage": "HomebrewEffectSaveAdvantage",
-          "save-disadvantage": "HomebrewEffectSaveDisadvantage",
-          speed: "HomebrewEffectSpeed",
-          "attack-bonus": "HomebrewRiderAttackBonus",
-          "extra-damage": "HomebrewRiderExtraDamage",
-          "roll-mode": "HomebrewRiderRollMode"
-        }
-      ),
-      HomebrewEffectDamageBonus: homebrewVariant(
-        "damage-bonus",
-        "Flat damage added to the bearer's hits.",
-        ["amount"],
-        {
-          amount: { type: "integer", minimum: -20, maximum: 20 },
-          appliesTo: { type: "string", enum: ["melee", "all"], default: "all" }
-        }
-      ),
-      HomebrewEffectDamageResistance: homebrewVariant(
-        "damage-resistance",
-        "Resistance to the listed damage types.",
-        ["damageTypes"],
-        { damageTypes: { type: "array", minItems: 1, maxItems: 20, items: homebrewDamageType } }
-      ),
-      HomebrewEffectDamageVulnerability: homebrewVariant(
-        "damage-vulnerability",
-        "Vulnerability to the listed damage types - double damage, and the mirror of `damage-resistance`. Resistance and vulnerability to the SAME type cancel to normal damage rather than compounding (SRD 5.2.1).",
-        ["damageTypes"],
-        { damageTypes: { type: "array", minItems: 1, maxItems: 20, items: homebrewDamageType } }
-      ),
-      HomebrewEffectAttackAdvantage: homebrewVariant(
-        "attack-advantage",
-        "The bearer's attack rolls have advantage, on its own turn only.",
-        []
-      ),
-      HomebrewEffectIncomingAttackAdvantage: homebrewVariant(
-        "incoming-attack-advantage",
-        "Attack rolls against the bearer have advantage.",
-        []
-      ),
-      HomebrewEffectAttackDisadvantage: homebrewVariant(
-        "attack-disadvantage",
-        "The bearer's attack rolls have disadvantage, always-on.",
-        []
-      ),
-      HomebrewEffectIncomingAttackDisadvantage: homebrewVariant(
-        "incoming-attack-disadvantage",
-        "Attack rolls against the bearer have disadvantage (Dodge).",
-        []
-      ),
-      HomebrewEffectSaveAdvantage: homebrewVariant(
-        "save-advantage",
-        "The bearer's saving throws have advantage; omit `ability` for all saves (Dodge grants Dex only).",
-        [],
-        { ability: homebrewAbility }
-      ),
-      HomebrewEffectSaveDisadvantage: homebrewVariant(
-        "save-disadvantage",
-        "The bearer's saving throws have disadvantage; omit `ability` for all saves.",
-        [],
-        { ability: homebrewAbility }
-      ),
-      HomebrewEffectSpeed: homebrewVariant(
-        "speed",
-        "The bearer's Speed while the effect lasts, in feet - signed, so Longstrider is +10 and the `slow` weapon mastery is -10. THE RUNTIME half of speed, and distinct from HomebrewFeatureModifier's `speed`: that one is BAKED into the sheet's own speedFeet at build time, which an effect that ends could never give back. This one is summed off the bearer's live effects on every read of the movement budget, so the feet return the moment the effect does. Same bounds as the build-time rider (-30..60) because the same GM authors both. NOTE the one carrier it does not reach: an ITEM's effect is read as a standing rider rather than as a live effect, and a rider's speed has no consumer, so this modifier moves no feet when an equipment record carries it.",
-        ["amount"],
-        { amount: { type: "integer", minimum: -30, maximum: 60 } }
-      ),
-
-      // ---- Riders both vocabularies carry, one component each (as in Zod), so an item's +1 and an effect's +1 mean
-      // the same thing.
-      HomebrewRiderAttackBonus: homebrewRiderVariant(
-        "attack-bonus",
-        "A flat bonus to the bearer's attack rolls. THE missing channel: the resolver's to-hit was the action's printed bonus plus exhaustion and nothing else could reach it.",
-        ["amount"],
-        { amount: { type: "integer", minimum: -10, maximum: 10 } }
-      ),
-      HomebrewRiderExtraDamage: homebrewRiderVariant(
-        "extra-damage",
-        'Extra TYPED damage. Neither older channel can serve it: the effect-side `damage-bonus` is a flat integer with no type, and an attack\'s `criticalBonusDice` is a bare count applied to the first damage part, so it cannot carry one either. TWO independent ways to say how much, and a rider may use either or both: `formula` is dice ("an extra 1d6 fire"), and `abilityModifier` adds the BEARER\'s modifier in that ability as a flat number resolved at the roll ("add your Charisma modifier to the damage") - a printed wording that no authored constant can express, because the amount depends on the character. Agonizing Blast is `abilityModifier: "cha"` plus a `spell-id-is` gate. A rider with NEITHER is refused at publish rather than stored to silently add nothing. `doubleOnCritical` defaults false because 5e does not double dice added after the attack, and an ability modifier is never doubled at all.',
-        ["damageType"],
-        {
-          formula: homebrewDiceFormula,
-          abilityModifier: homebrewAbility,
-          damageType: homebrewDamageType,
-          doubleOnCritical: { type: "boolean", default: false }
-        }
-      ),
-      HomebrewRiderRollMode: homebrewRiderVariant(
-        "roll-mode",
-        'Advantage or disadvantage on a NAMED roll: one branch with a `mode` field rather than two per roll kind. It feeds the same aggregation that already implements 5e cancellation (any advantage plus any disadvantage is normal) and labels each source on the roll card, so a curse is `mode: "disadvantage"` and needs no separate machinery.',
-        ["roll", "mode"],
-        {
-          roll: {
-            type: "string",
-            enum: ["attack", "incoming-attack", "save", "check", "initiative", "death-save", "concentration"]
-          },
-          mode: { type: "string", enum: ["advantage", "disadvantage"] }
-        }
-      ),
-
       // ---- When a rider applies: named triggers in four kinds ----
       HomebrewRiderTrigger: homebrewFoldedUnion(
-        "WHEN a rider applies. Thirty-one named triggers in four KINDS, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. This is DATA, not an expression language - every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). The eleven parameterless MOMENTS share one component (HomebrewTriggerMoment) carrying an eleven-value `type` enum, so the twenty-one branches below cover all thirty-one names.",
+        "WHEN a rider applies. Twenty-eight named triggers in four KINDS, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. Every trigger has a reader in the engine. This is DATA, not an expression language - every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). The eight parameterless MOMENTS share one component (HomebrewTriggerMoment) carrying an eight-value `type` enum, so the twenty-one branches below cover all twenty-eight names.",
         {
           attuned: "HomebrewTriggerAttuned",
           "while-armored": "HomebrewTriggerWhileArmored",
@@ -11364,14 +11520,11 @@ export const openApiDocument = {
           "on-attack-roll": "HomebrewTriggerMoment",
           "on-hit": "HomebrewTriggerMoment",
           "on-critical-hit": "HomebrewTriggerMoment",
-          "on-critical-miss": "HomebrewTriggerMoment",
           "on-damage-roll": "HomebrewTriggerMoment",
           "on-saving-throw": "HomebrewTriggerMoment",
           "on-ability-check": "HomebrewTriggerMoment",
           "on-initiative-roll": "HomebrewTriggerMoment",
-          "on-death-save": "HomebrewTriggerMoment",
           "on-taking-damage": "HomebrewTriggerMoment",
-          "on-spell-cast": "HomebrewTriggerMoment",
           "attack-kind-is": "HomebrewTriggerAttackKindIs",
           "weapon-property-is": "HomebrewTriggerWeaponPropertyIs",
           "damage-type-is": "HomebrewTriggerDamageTypeIs",
@@ -11447,7 +11600,7 @@ export const openApiDocument = {
         "DYNAMIC GATE. The bearer has (or, with `present: false`, lacks) any of these conditions.",
         ["conditionIds"],
         {
-          conditionIds: { type: "array", minItems: 1, maxItems: 6, items: homebrewConditionId },
+          conditionIds: { type: "array", minItems: 1, maxItems: 6, items: homebrewRiderCondition },
           present: { type: "boolean", default: true }
         }
       ),
@@ -11456,28 +11609,25 @@ export const openApiDocument = {
         additionalProperties: false,
         required: ["type"],
         description:
-          "MOMENT. The named roll or event the rider fires at. All eleven moments are parameterless, so they are ONE component with an eleven-value `type` enum rather than eleven byte-identical components documenting nothing eleven times - the union's discriminator still maps each name individually. A `when` list may carry at most one moment: a rider fires at one moment, not two.",
+          "MOMENT. The named roll or event the rider fires at. All eight moments are parameterless, so they are ONE component with an eight-value `type` enum rather than eight byte-identical components documenting nothing eight times - the union's discriminator still maps each name individually. A `when` list may carry at most one moment: a rider fires at one moment, not two.",
         properties: {
           type: {
             enum: [
               "on-attack-roll",
               "on-hit",
               "on-critical-hit",
-              "on-critical-miss",
               "on-damage-roll",
               "on-saving-throw",
               "on-ability-check",
               "on-initiative-roll",
-              "on-death-save",
-              "on-taking-damage",
-              "on-spell-cast"
+              "on-taking-damage"
             ]
           }
         }
       },
       HomebrewTriggerAttackKindIs: homebrewTrigger(
         "attack-kind-is",
-        "FILTER. Narrows a moment to these attack kinds. `reaction` and `opportunity` require the resolver to ANNOUNCE the trigger; until it does, they never match.",
+        "FILTER. Narrows a moment to these attack kinds. melee, ranged and thrown come from the attack's reach, range and distance; `spell` is an attack that casts a spell (its action names a `spellId`); `reaction` and `opportunity` require the resolver to ANNOUNCE the trigger.",
         ["kinds"],
         {
           kinds: {
@@ -11499,9 +11649,9 @@ export const openApiDocument = {
       ),
       HomebrewTriggerDamageTypeIs: homebrewTrigger(
         "damage-type-is",
-        "FILTER. Narrows to these damage types.",
+        "FILTER. Narrows to these damage types, from the 13 SRD types.",
         ["damageTypes"],
-        { damageTypes: { type: "array", minItems: 1, maxItems: 12, items: homebrewDamageType } }
+        { damageTypes: { type: "array", minItems: 1, maxItems: 12, items: homebrewRiderDamageType } }
       ),
       HomebrewTriggerAbilityIs: homebrewTrigger(
         "ability-is",
@@ -11517,13 +11667,13 @@ export const openApiDocument = {
       ),
       HomebrewTriggerSpellSchoolIs: homebrewTrigger(
         "spell-school-is",
-        "FILTER. Narrows a spell moment to these schools.",
+        "FILTER. Narrows a moment to actions casting a spell of these schools (the action's `spellId`, looked up in the catalog).",
         ["schools"],
         { schools: { type: "array", minItems: 1, maxItems: 8, items: contentSlug } }
       ),
       HomebrewTriggerSpellLevelIs: homebrewTrigger(
         "spell-level-is",
-        "FILTER. Narrows a spell moment to these slot levels (0 is a cantrip).",
+        "FILTER. Narrows a moment to actions casting a spell of these levels (the spell's own level; 0 is a cantrip).",
         ["levels"],
         { levels: { type: "array", minItems: 1, maxItems: 10, items: { type: "integer", minimum: 0, maximum: 9 } } }
       ),
@@ -11535,7 +11685,7 @@ export const openApiDocument = {
       ),
       HomebrewTriggerVersusCreatureType: homebrewTrigger(
         "versus-creature-type",
-        "FILTER. Narrows to targets of these creature types. Authorable but INERT until an actor definition carries a creature type - it parses and stores, and starts matching the day that field lands.",
+        "FILTER. Narrows to targets of these creature types, read from the target's stat block. A character records no creature type, so it never matches one.",
         ["creatureTypes"],
         { creatureTypes: { type: "array", minItems: 1, maxItems: 12, items: contentSlug } }
       ),
@@ -11549,7 +11699,7 @@ export const openApiDocument = {
         "versus-condition",
         "FILTER. Narrows to targets currently under any of these conditions.",
         ["conditionIds"],
-        { conditionIds: { type: "array", minItems: 1, maxItems: 6, items: homebrewConditionId } }
+        { conditionIds: { type: "array", minItems: 1, maxItems: 6, items: homebrewRiderCondition } }
       ),
       HomebrewRecordDocument: {
         type: "object",

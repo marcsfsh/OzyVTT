@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import express, { Router, type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
+import { VIEWER_SESSION_COOKIE } from "@vtt/api-contract";
 import {
   adjustWizardGrid,
   completeGridCalibrationWizard,
@@ -133,7 +134,7 @@ export function createMapRouter(options: MapRouterOptions) {
   };
   const canReadContent = (request: Request, assetId: string) => {
     const token = bearerToken(request);
-    const viewer = cookie(request, "vtt_viewer_session");
+    const viewer = cookie(request, VIEWER_SESSION_COOKIE);
     return (
       options.authorizeGm(token) || options.authorizePlayer(token, assetId) || options.authorizeViewer(viewer, assetId)
     );

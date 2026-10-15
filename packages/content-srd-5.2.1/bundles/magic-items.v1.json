@@ -516,8 +516,7 @@
    {
     "type": "armor-class",
     "amount": 1,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -565,8 +564,7 @@
    {
     "type": "armor-class",
     "amount": 2,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -614,8 +612,7 @@
    {
     "type": "armor-class",
     "amount": 3,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -906,13 +903,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    },
    {
     "type": "damage-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    }
   ]
  },
@@ -1661,13 +1656,11 @@
    {
     "type": "armor-class",
     "amount": 1,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    },
    {
     "type": "save-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    }
   ]
  },
@@ -1977,13 +1970,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    },
    {
     "type": "damage-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    }
   ]
  },
@@ -2044,7 +2035,26 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "geyser",
+    "name": "Geyser",
+    "activation": "action",
+    "description": "Remove the stopper and speak the command word: 30 gallons of water gush forth in a Line 30 feet long and 1 foot wide. One creature of your choice in the Line must succeed on a DC 13 Strength saving throw or take 1d4 Bludgeoning damage and have the Prone condition. Instead of a creature, you can target one object in the Line that isn't being worn or carried and that weighs no more than 200 pounds; the object is knocked over.",
+    "damage": [
+     {
+      "formula": "1d4",
+      "type": "bludgeoning"
+     }
+    ],
+    "save": {
+     "ability": "str",
+     "dc": 13,
+     "successDamage": "none",
+     "failureCondition": "prone"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -2133,13 +2143,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 3,
-    "when": []
+    "amount": 3
    },
    {
     "type": "damage-bonus",
-    "amount": 3,
-    "when": []
+    "amount": 3
    }
   ]
  },
@@ -2187,8 +2195,7 @@
    {
     "type": "armor-class",
     "amount": 1,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -2292,8 +2299,7 @@
    {
     "type": "armor-class",
     "amount": 1,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -2366,13 +2372,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    },
    {
     "type": "damage-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    }
   ]
  },
@@ -2488,8 +2492,7 @@
    {
     "type": "armor-class",
     "amount": 2,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -2528,13 +2531,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 3,
-    "when": []
+    "amount": 3
    },
    {
     "type": "damage-bonus",
-    "amount": 3,
-    "when": []
+    "amount": 3
    }
   ]
  },
@@ -2676,8 +2677,7 @@
    {
     "type": "armor-class",
     "amount": 1,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -2935,8 +2935,7 @@
     "type": "extra-damage",
     "formula": "2d6",
     "damageType": "fire",
-    "doubleOnCritical": true,
-    "when": []
+    "doubleOnCritical": true
    }
   ]
  },
@@ -3020,8 +3019,7 @@
     "type": "extra-damage",
     "formula": "1d6",
     "damageType": "cold",
-    "doubleOnCritical": true,
-    "when": []
+    "doubleOnCritical": true
    }
   ]
  },
@@ -3185,13 +3183,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    },
    {
     "type": "damage-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    }
   ]
  },
@@ -3228,8 +3224,7 @@
    {
     "type": "armor-class",
     "amount": 1,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -3386,13 +3381,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    },
    {
     "type": "damage-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    }
   ]
  },
@@ -3708,13 +3701,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 3,
-    "when": []
+    "amount": 3
    },
    {
     "type": "damage-bonus",
-    "amount": 3,
-    "when": []
+    "amount": 3
    }
   ]
  },
@@ -3975,7 +3966,9 @@
     "damage": [],
     "save": {
      "ability": "wis",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "none",
+     "failureCondition": null
     }
    }
   ],
@@ -4077,18 +4070,15 @@
   "modifiers": [
    {
     "type": "save-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    },
    {
     "type": "attack-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    },
    {
     "type": "damage-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    }
   ]
  },
@@ -4155,13 +4145,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    },
    {
     "type": "damage-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    }
   ]
  },
@@ -4630,13 +4618,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 2,
-    "when": []
+    "amount": 2
    },
    {
     "type": "damage-bonus",
-    "amount": 2,
-    "when": []
+    "amount": 2
    }
   ]
  },
@@ -4935,7 +4921,9 @@
     },
     "save": {
      "ability": "wis",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "frightened"
     }
    }
   ],
@@ -5574,13 +5562,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 2,
-    "when": []
+    "amount": 2
    },
    {
     "type": "damage-bonus",
-    "amount": 2,
-    "when": []
+    "amount": 2
    }
   ]
  },
@@ -5894,13 +5880,11 @@
    {
     "type": "armor-class",
     "amount": 1,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    },
    {
     "type": "save-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    }
   ]
  },
@@ -6021,7 +6005,9 @@
     },
     "save": {
      "ability": "dex",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "half",
+     "failureCondition": null
     }
    }
   ],
@@ -6334,7 +6320,9 @@
     },
     "save": {
      "ability": "wis",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "stunned"
     }
    }
   ],
@@ -6368,8 +6356,7 @@
   "modifiers": [
    {
     "type": "save-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    }
   ]
  },
@@ -6512,8 +6499,7 @@
    {
     "type": "roll-mode",
     "roll": "initiative",
-    "mode": "advantage",
-    "when": []
+    "mode": "advantage"
    },
    {
     "type": "roll-mode",
@@ -6620,7 +6606,9 @@
     },
     "save": {
      "ability": "wis",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "charmed"
     }
    }
   ],
@@ -6710,7 +6698,9 @@
     "damage": [],
     "save": {
      "ability": "dex",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "restrained"
     }
    }
   ],
@@ -6745,8 +6735,7 @@
    {
     "type": "armor-class",
     "amount": 1,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -6782,13 +6771,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 2,
-    "when": []
+    "amount": 2
    },
    {
     "type": "damage-bonus",
-    "amount": 2,
-    "when": []
+    "amount": 2
    }
   ]
  },
@@ -6862,8 +6849,7 @@
    {
     "type": "roll-mode",
     "roll": "initiative",
-    "mode": "advantage",
-    "when": []
+    "mode": "advantage"
    },
    {
     "type": "roll-mode",
@@ -6949,8 +6935,7 @@
    {
     "type": "armor-class",
     "amount": 2,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -6988,8 +6973,7 @@
    {
     "type": "armor-class",
     "amount": 1,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -7027,8 +7011,7 @@
    {
     "type": "armor-class",
     "amount": 2,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -7066,8 +7049,7 @@
    {
     "type": "armor-class",
     "amount": 3,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -7442,13 +7424,11 @@
    {
     "type": "armor-class",
     "amount": 2,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    },
    {
     "type": "save-bonus",
-    "amount": 2,
-    "when": []
+    "amount": 2
    }
   ]
  },
@@ -7697,7 +7677,9 @@
     },
     "save": {
      "ability": "dex",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "half",
+     "failureCondition": null
     }
    },
    {
@@ -7717,7 +7699,9 @@
     },
     "save": {
      "ability": "con",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "half",
+     "failureCondition": "deafened"
     }
    }
   ],
@@ -7816,13 +7800,11 @@
   "modifiers": [
    {
     "type": "check-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    },
    {
     "type": "save-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    }
   ]
  },
@@ -7961,8 +7943,7 @@
     "type": "extra-damage",
     "formula": "2d6",
     "damageType": "necrotic",
-    "doubleOnCritical": true,
-    "when": []
+    "doubleOnCritical": true
    }
   ]
  },
@@ -8326,13 +8307,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 3,
-    "when": []
+    "amount": 3
    },
    {
     "type": "damage-bonus",
-    "amount": 3,
-    "when": []
+    "amount": 3
    }
   ]
  },
@@ -8616,7 +8595,9 @@
     },
     "save": {
      "ability": "con",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "paralyzed"
     }
    }
   ],
@@ -8922,8 +8903,7 @@
    {
     "type": "roll-mode",
     "roll": "initiative",
-    "mode": "advantage",
-    "when": []
+    "mode": "advantage"
    }
   ]
  },
@@ -8996,13 +8976,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    },
    {
     "type": "damage-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    }
   ]
  },
@@ -9075,13 +9053,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 2,
-    "when": []
+    "amount": 2
    },
    {
     "type": "damage-bonus",
-    "amount": 2,
-    "when": []
+    "amount": 2
    }
   ]
  },
@@ -9154,13 +9130,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 3,
-    "when": []
+    "amount": 3
    },
    {
     "type": "damage-bonus",
-    "amount": 3,
-    "when": []
+    "amount": 3
    }
   ]
  },

@@ -4,13 +4,8 @@ import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@
 import { FeatureGrantsSchema, grantedSpellGateMessage } from "@vtt/content-srd-5.2.1";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { ContentLibrary, type ContentView } from "../src/content-library.js";
-import {
-  deriveEquipment,
-  equipmentCatalogOf,
-  type EquipmentCatalog,
-  type EquipmentRecordLike,
-  type FeatureRecordLike
-} from "../src/equipment-derivation.js";
+import { deriveEquipment, equipmentCatalogOf, type EquipmentCatalog } from "../src/equipment-derivation.js";
+import { testCatalog } from "./catalog-records.js";
 import { applyDamageDetailed, damageAdjustmentDetail } from "../src/hit-points.js";
 import { setCondition } from "../src/actor-conditions.js";
 import { validateForPublish, type HomebrewValidationContext } from "../src/homebrew-validate.js";
@@ -48,16 +43,8 @@ function definitionOf(speciesId: string): ActorDefinition {
   } as unknown as ActorDefinition;
 }
 
-function catalogOf(
-  records: readonly EquipmentRecordLike[],
-  features: readonly FeatureRecordLike[] = []
-): EquipmentCatalog {
-  return {
-    equipmentRecord: (id) => records.find((record) => record.id === id),
-    featRecord: () => undefined,
-    featureRecord: (ref) => features.find((record) => record.id === ref.id)
-  };
-}
+const catalogOf = (equipment: readonly object[], features: readonly object[] = []): EquipmentCatalog =>
+  testCatalog({ equipment, features });
 
 function stateWith(inventory: InventoryItem[], extra: Record<string, unknown> = {}): GameState {
   return GameStateSchema.parse({
@@ -121,7 +108,7 @@ const FORGE_HELM_GRANTS = FeatureGrantsSchema.parse({
   when: [{ type: "while-character-is", speciesIds: ["dwarf"] }]
 });
 
-const FORGE_HELM: EquipmentRecordLike = {
+const FORGE_HELM = {
   id: "helm-of-the-forge",
   name: "Helm of the Forge",
   category: "wondrous",
@@ -165,18 +152,19 @@ describe("W3 far end: a gated grant on an item halves one hit and not the other"
     const worn = [item({ id: "helm-of-the-forge", name: "Helm of the Forge", equipped: true, category: "wondrous" })];
     const dwarf = deriveEquipment(stateWith(worn).actors[0], definitionOf("dwarf"), catalog);
     expect(dwarf.damageResistances.map((entry) => entry.id)).toEqual(["fire"]);
-    expect(dwarf.weaponProficiencies.map((entry) => entry.id)).toEqual(["martial-weapons"]);
+    expect(dwarf.context.proficientWeapons).toContain("martial-weapons");
 
     const elf = deriveEquipment(stateWith(worn).actors[1], definitionOf("elf"), catalog);
     expect(elf.damageResistances).toEqual([]);
-    expect(elf.weaponProficiencies, "a failed gate must withhold the training too, not only the resistance").toEqual(
-      []
-    );
+    expect(
+      elf.context.proficientWeapons,
+      "a failed gate must withhold the training too, not only the resistance"
+    ).not.toContain("martial-weapons");
   });
 });
 
 describe("an ungated grant is untouched", () => {
-  const BOOTS: EquipmentRecordLike = {
+  const BOOTS = {
     id: "boots-of-the-winterlands",
     name: "Boots of the Winterlands",
     category: "feet",
@@ -248,7 +236,7 @@ describe("the gate vocabulary is narrowed to what a derivation can answer", () =
 });
 
 describe("a gated condition immunity refuses the condition only while the gate holds", () => {
-  const WARD: EquipmentRecordLike = {
+  const WARD = {
     id: "bloodied-ward",
     name: "Bloodied Ward",
     category: "neck",

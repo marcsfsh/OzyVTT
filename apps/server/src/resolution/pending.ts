@@ -1,7 +1,7 @@
 import { isIncapacitated } from "../condition-rules.js";
 import { effectiveActions } from "../effective-actions.js";
 import { familyModeFor } from "../rules-families.js";
-import { conditionFrom, createPendingSaves, halfOnSuccessFrom } from "../saving-throws.js";
+import { createPendingSaves } from "../saving-throws.js";
 import type { ResolveContext } from "./context.js";
 import { damagePartsOf } from "./damage.js";
 
@@ -65,8 +65,6 @@ export function parkReaction(ctx: ResolveContext): void {
 export function parkActionSave(ctx: ResolveContext): void {
   const { state, action, attacker, targets, input, deps, damage } = ctx;
   if (!action.save) return;
-  // The GM's explicit choice wins; otherwise detect a condition from the action prose ("...or be Poisoned").
-  const detected = conditionFrom(action.description);
   createPendingSaves(state, {
     sourceActorId: attacker.id,
     sourceName: attacker.name,
@@ -78,9 +76,9 @@ export function parkActionSave(ctx: ResolveContext): void {
     proposedDamageParts: damage.map((part) => ({ amount: part.total, type: part.type })),
     // Cover adds to Dexterity saving throws (SRD Cover) - carried on the prompt.
     saveBonus: action.save.ability === "dex" ? ctx.coverBonus : 0,
-    halfOnSuccess: halfOnSuccessFrom(action.description),
-    conditionId:
-      input.conditionId ?? (detected && (!deps.hasCondition || deps.hasCondition(detected)) ? detected : null),
+    halfOnSuccess: action.save.successDamage === "half",
+    // The GM's explicit choice wins over the condition the action declares.
+    conditionId: input.conditionId ?? action.save.failureCondition,
     newSaveId: deps.newRollId,
     createdAt: Date.parse(deps.now())
   });

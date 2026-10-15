@@ -1,10 +1,8 @@
 import { useMemo, useRef, useState } from "react";
 import { Modal, Button, Input } from "@vtt/ui";
 import { validateDraft, type ImportResult } from "@vtt/dndbeyond-pdf";
-import { extractCharacterFromFile } from "../pdfImport/loadPdf";
 import { useSpellReference } from "../encounter/spells";
-import { socket } from "../socket";
-import { newId } from "../lib/ids";
+import { command } from "../lib/command";
 import "./pdf-import.css";
 
 const ABIL = ["str", "dex", "con", "int", "wis", "cha"] as const;
@@ -38,7 +36,9 @@ export function PdfImportModal({ open, onClose, role, onImported }: Props) {
     setError("");
     setSaveMsg("");
     setFileName(file.name);
-    extractCharacterFromFile(file, knownSpellIds)
+    // pdf.js is most of a megabyte, so it loads with the first PDF rather than with the app.
+    import("../pdfImport/loadPdf")
+      .then(({ extractCharacterFromFile }) => extractCharacterFromFile(file, knownSpellIds))
       .then(setResult)
       .catch((e: unknown) =>
         setError(
@@ -57,22 +57,22 @@ export function PdfImportModal({ open, onClose, role, onImported }: Props) {
     setResult(validateDraft(draft, result.warnings));
   };
 
-  const confirmImport = () => {
+  const confirmImport = async () => {
     if (!result?.definition) return;
     const name = result.definition.name;
     const definition = result.definition;
     setSaving(true);
     setSaveMsg("");
-    const ack = (res: { ok: boolean; message?: string }) => {
-      setSaving(false);
-      if (res.ok) {
-        onImported?.(name);
-        close();
-      } else setSaveMsg(res.message ?? "The server rejected the import.");
-    };
     // GMs create the actor directly; a player submits it for GM approval (server re-validates either way).
-    if (role === "gm") socket.emit("actor:import-definition", { commandId: newId(), definition }, ack);
-    else socket.emit("character:submit-import", { commandId: newId(), definition }, ack);
+    const reply =
+      role === "gm"
+        ? await command("actor:import-definition", { definition })
+        : await command("character:submit-import", { definition });
+    setSaving(false);
+    if (reply.ok) {
+      onImported?.(name);
+      close();
+    } else setSaveMsg(reply.message ?? "The server rejected the import.");
   };
 
   // Prefer validated data for display; fall back to the raw draft when a required field is missing.

@@ -109,7 +109,7 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
           startedRound: swing.round,
           duration: { type: "until-source-next-turn" },
           stackKey: "mastery:sap",
-          modifiers: [{ type: "attack-disadvantage" }]
+          modifiers: [{ type: "roll-mode", roll: "attack", mode: "disadvantage" }]
         }
       }
     ]

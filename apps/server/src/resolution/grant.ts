@@ -1,5 +1,6 @@
-import { currentSpeedFeet } from "../condition-rules.js";
 import { addEffect, makeEffect, type EffectNarration } from "../effects.js";
+import { deriveEquipment } from "../equipment-derivation.js";
+import { currentSpeedFeet } from "../speed.js";
 import type { ResolveContext } from "./context.js";
 
 /** Granted effects (Rage, Reckless Attack on self; Help on an ally): replace-on-refresh, ending when the
@@ -13,7 +14,18 @@ export function applyGrant(ctx: ResolveContext): void {
   const replaced: EffectNarration[] = [];
   // Dash grants a quantity measured now, so a later Slow this turn doesn't shrink it. Keyed on the
   // `dashing` tag so homebrew actions match.
-  const grantedMovement = grant.tags.includes("dashing") ? { movementGrantFeet: currentSpeedFeet(recipient) ?? 0 } : {};
+  const recipientDefinition =
+    recipient.id === attacker.id
+      ? deps.definition
+      : recipient.definitionId
+        ? deps.resolveDefinition?.(recipient.definitionId)
+        : undefined;
+  const grantedMovement = grant.tags.includes("dashing")
+    ? {
+        movementGrantFeet:
+          currentSpeedFeet(recipient, deriveEquipment(recipient, recipientDefinition, deps.catalog)) ?? 0
+      }
+    : {};
   const effect = addEffect(
     state,
     recipient.id,

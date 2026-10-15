@@ -18,7 +18,7 @@ import { looseRollPlan } from "../src/tap-routing.js";
 // the absences stay absent for their recorded reasons. Runs the real `ContentLibrary` over the committed
 // `magic-items.v1.json`; inventory rows are minted as the equipment picker mints them.
 // The Pipes of Haunting end at a spent counter, a refusal at zero, and a server-enforced save whose
-// Frightened condition `conditionFrom` reads from the shipped description. The Potion of Resistance is
+// Frightened condition the save block declares. The Potion of Resistance is
 // an absence: `itemAction` drops an item action's `grants`, and an item's `effects` rider ignores
 // `duration`, so "for 1 hour" cannot be expressed. Both halves are pinned below.
 
@@ -233,8 +233,7 @@ describe("the Pipes of Haunting spend a charge, refuse the fourth press, and for
       { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(5) },
       deps([], definition)
     );
-    // `conditionId` is not an authored field: `conditionFrom` reads it from the shipped description,
-    // which is why the module keeps the SRD's word "Frightened" verbatim.
+    // `conditionId` is the save block's declared condition.
     expect(state.combat.pendingSaves).toHaveLength(1);
     expect(state.combat.pendingSaves[0]).toMatchObject({
       targetActorId: IDS.foe,
@@ -283,7 +282,7 @@ describe("the Pipes of Haunting spend a charge, refuse the fourth press, and for
   });
 });
 
-describe("the Stone of Good Luck - one half whole, one half short of the roll", () => {
+describe("the Stone of Good Luck - both halves reach the roll", () => {
   const ROW = { id: "stone-of-good-luck-luckstone", name: "Stone of Good Luck", category: "wondrous-item" };
 
   it("moves every skill row by +1 and the save the SERVER rolls by +1, and both come off with the stone", () => {
@@ -358,10 +357,8 @@ describe("the Stone of Good Luck - one half whole, one half short of the roll", 
     }
   });
 
-  it("but the SERVER'S OWN ability check does not pay the +1 the sheet promises - the check half is short", () => {
-    // Known limitation: only the save half lands on a roll. `check-bonus` reaches the derived sheet's
-    // skill row via `checkRiderBonus`, but `BUILTIN_CHECKS` resolves from `abilityModifier`,
-    // `skillBonusFromExtension` and `exhaustionPenalty` and never calls it.
+  it("and the SERVER'S OWN ability check pays the +1 the sheet promises", () => {
+    // The builtin checks add `checkRiderBonus`, narrowed to the check's ability and skill as the sheet's row is.
     const definition = definitionOf();
     const state = fight(stateWith([carried("stone-of-good-luck-luckstone", "Stone of Good Luck")]));
     const sheet = deriveActorSheet(
@@ -378,7 +375,7 @@ describe("the Stone of Good Luck - one half whole, one half short of the roll", 
       { actorId: IDS.hero, targetIds: [], commandId: cmd(16), builtin: true },
       deps([10], definition)
     );
-    expect(hide.check!.total).toBe(12); // d20 10 + Dex 2. The stone's +1 is not here.
+    expect(hide.check!.total).toBe(13); // d20 10 + Dex 2 + the stone's 1
   });
 });
 
@@ -529,7 +526,7 @@ describe("the casts that survived the spell-record check", () => {
         (entry) => entry.id === `item-${id}-cast-scrying`
       )!;
       // The save Scrying's own target makes, at the item's printed DC, not the wearer's derived one.
-      expect(cast.save).toEqual({ ability: "wis", dc: 17 });
+      expect(cast.save).toEqual({ ability: "wis", dc: 17, successDamage: "none", failureCondition: null });
       expect(cast.damage).toEqual([]);
       expect(cast.attack).toBeUndefined();
       expect(cast.uses).toBeUndefined(); // no charge limit is printed on any of the four
@@ -600,9 +597,9 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
     const action = effectiveActions(definition, state.actors[0], catalog).find(
       (entry) => entry.id === "item-rope-of-entanglement-entangle"
     )!;
-    expect(action.save).toEqual({ ability: "dex", dc: 15 });
+    expect(action.save).toEqual({ ability: "dex", dc: 15, successDamage: "none", failureCondition: "restrained" });
     expect(action.uses).toBeUndefined(); // unlimited is the printed item
-    expect(action.damage).toEqual([]); // no damage authored, so no half-on-success to misread
+    expect(action.damage).toEqual([]);
 
     resolveDefinitionAction(
       state,
@@ -619,7 +616,7 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
     const action = effectiveActions(definition, state.actors[0], catalog).find(
       (entry) => entry.id === "item-iron-flask-trap"
     )!;
-    expect(action.save).toEqual({ ability: "wis", dc: 17 });
+    expect(action.save).toEqual({ ability: "wis", dc: 17, successDamage: "none", failureCondition: null });
     expect(action.damage).toEqual([]);
 
     resolveDefinitionAction(
@@ -629,6 +626,34 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
       deps([], definition)
     );
     expect(state.combat.pendingSaves[0]).toMatchObject({ ability: "wis", dc: 17, conditionId: null });
+  });
+
+  it("gives the Decanter's Geyser a DC 13 Str save: no damage on a success, Prone on a failure", () => {
+    const definition = definitionOf();
+    const state = fight(
+      stateWith([carried("decanter-of-endless-water", "Decanter of Endless Water", { attuned: false })])
+    );
+    const action = effectiveActions(definition, state.actors[0], catalog).find(
+      (entry) => entry.id === "item-decanter-of-endless-water-geyser"
+    )!;
+    // The SRD's "must succeed ... or take 1d4" means nothing on a success, which prose reading got wrong.
+    expect(action.save).toEqual({ ability: "str", dc: 13, successDamage: "none", failureCondition: "prone" });
+    expect(action.damage).toEqual([{ formula: "1d4", type: "bludgeoning" }]);
+    expect(action.uses).toBeUndefined();
+
+    resolveDefinitionAction(
+      state,
+      action,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(18) },
+      deps([3], definition)
+    );
+    expect(state.combat.pendingSaves[0]).toMatchObject({
+      ability: "str",
+      dc: 13,
+      proposedDamage: 3,
+      halfOnSuccess: false,
+      conditionId: "prone"
+    });
   });
 });
 
@@ -682,12 +707,10 @@ describe("the absences that were measured and must stay absent", () => {
     }
   });
 
-  it("the two rows whose save-or-damage sentence the engine misreads carry no damage action", () => {
-    // `halfOnSuccessFrom` reads both as "half on a success"; the SRD gives neither any damage there.
-    for (const id of ["decanter-of-endless-water", "bead-of-force"]) {
-      expect(view.equipmentRecord(id)!.actions).toEqual([]);
-    }
-    // The Horn of Blasting is read correctly, but is absent for its 20% explosion chance.
+  it("the Bead of Force and the Horn of Blasting carry no action", () => {
+    // The bead is destroyed on use, which no `per` value can say.
+    expect(view.equipmentRecord("bead-of-force")!.actions).toEqual([]);
+    // The horn is absent for its 20% explosion chance.
     const horn = view.equipmentRecord("horn-of-blasting")!;
     expect(horn.description).toContain("20 percent chance of causing the horn to explode");
     expect(carries(horn)).toBe(false);

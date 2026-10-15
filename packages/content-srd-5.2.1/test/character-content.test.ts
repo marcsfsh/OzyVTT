@@ -15,7 +15,7 @@ import {
   EquipmentReferenceSchema,
   FeatReferenceSchema,
   FeatureChoiceSchema,
-  FeatureModifierSchema,
+  ModifierSchema,
   FeatureRecordSchema,
   NamePoolReferenceSchema,
   RiderWhenSchema,
@@ -151,7 +151,7 @@ describe("character-builder content records", () => {
     expect(style.choice).toMatchObject({ kind: "fighting-style", choose: 1, fromCatalog: "fighting-style-feats" });
     // Extra Attack is a typed modifier, not a special case in the engine.
     expect(fighter.features.find((feature) => feature.id === "extra-attack")!.modifiers).toEqual([
-      { type: "extra-attack", count: 1, when: [] }
+      { type: "extra-attack", count: 1 }
     ]);
     // Second Wind is a rollable action with scaling uses.
     const secondWind = fighter.features.find((feature) => feature.id === "second-wind")!;
@@ -242,7 +242,12 @@ describe("character-builder content records", () => {
       }
     });
     expect(channel.actions.map((action) => action.id)).toEqual(["divine-spark", "turn-undead"]);
-    expect(channel.actions[1].save).toEqual({ ability: "wis", dc: "spellcasting" });
+    expect(channel.actions[1].save).toEqual({
+      ability: "wis",
+      dc: "spellcasting",
+      successDamage: "none",
+      failureCondition: "frightened"
+    });
     // Divine Order is a level-1 choice between the two printed sacred roles.
     const order = cleric.features.find((feature) => feature.id === "divine-order")!;
     expect(order.level).toBe(1);
@@ -351,7 +356,7 @@ describe("character-builder content records", () => {
     expect(elf.darkvisionFeet).toBe(60);
     expect(elf.lineages.map((lineage) => lineage.id)).toEqual(["drow", "high-elf", "wood-elf"]);
     expect(elf.lineages.find((lineage) => lineage.id === "drow")!.traits[0].modifiers).toEqual([
-      { type: "darkvision", feet: 120, when: [] }
+      { type: "darkvision", feet: 120 }
     ]);
     const human = species.find((entry) => entry.id === "human")!;
     expect(human.darkvisionFeet).toBeNull();
@@ -410,7 +415,7 @@ describe("character-builder content records", () => {
       "poison"
     ]);
     expect(dwarf.traits.find((trait) => trait.id === "dwarf-toughness")!.modifiers).toEqual([
-      { type: "hit-points-per-level", amount: 1, when: [] }
+      { type: "hit-points-per-level", amount: 1 }
     ]);
     expect(dwarf.traits.find((trait) => trait.id === "dwarf-stonecunning")!.uses).toMatchObject({
       per: "long-rest",
@@ -891,7 +896,7 @@ describe("character-builder content records", () => {
   it("gives the Defense fighting style the +1 AC it only gets WHILE ARMORED", () => {
     const defense = feats.find((feat) => feat.id === "defense")!;
     expect(defense.category).toBe("fighting-style");
-    expect(defense.feature.modifiers).toEqual([{ type: "armor-class", amount: 1, whileArmored: true, when: [] }]);
+    expect(defense.feature.modifiers).toEqual([{ type: "armor-class", amount: 1, whileArmored: true }]);
     // Every other SRD fighting style stays prose - none of the three has a modeled rider.
     for (const id of ["archery", "great-weapon-fighting", "two-weapon-fighting"]) {
       expect(feats.find((feat) => feat.id === id)!.feature.modifiers, id).toEqual([]);
@@ -903,7 +908,7 @@ describe("character-builder content records", () => {
       description: "d",
       modifiers: [{ type: "armor-class", amount: 1 }]
     });
-    expect(always.modifiers[0]).toEqual({ type: "armor-class", amount: 1, whileArmored: false, when: [] });
+    expect(always.modifiers[0]).toEqual({ type: "armor-class", amount: 1, whileArmored: false });
   });
 
   it("derives the Breath Weapon save DC from an ability, and gives it the printed damage", () => {
@@ -926,7 +931,9 @@ describe("character-builder content records", () => {
       // DC 8 + Constitution modifier + Proficiency Bonus, as data - the target rolls Dexterity.
       expect(action.save, lineage.id).toEqual({
         ability: "dex",
-        dc: { base: 8, ability: "con", proficiencyBonus: true }
+        dc: { base: 8, ability: "con", proficiencyBonus: true },
+        successDamage: "half",
+        failureCondition: null
       });
       // 1d10, rising by 1d10 at character levels 5, 11, and 17 - in the ancestry's own damage type.
       const type = expectedTypes[lineage.id];
@@ -945,7 +952,7 @@ describe("character-builder content records", () => {
       .find((entry) => entry.id === "cleric")!
       .features.find((feature) => feature.id === "channel-divinity")!
       .actions.find((action) => action.id === "divine-spark")!;
-    expect(spark.save).toEqual({ ability: "con", dc: "spellcasting" });
+    expect(spark.save).toEqual({ ability: "con", dc: "spellcasting", successDamage: "half", failureCondition: null });
     expect(spark.damage).toEqual([{ formula: "1d8", type: "radiant" }]);
     expect(spark.damageByLevel).toEqual([
       { level: 2, formula: "1d8", type: "radiant" },
@@ -1090,7 +1097,7 @@ describe("the subclass authoring surface, and the tables the parser used to thro
     // Draconic Sorcery is ETL-generated, so this rider can only come from SUBCLASS_MECHANICS.
     const resilience = featureOf(subclasses, "draconic-sorcery", "draconic-resilience");
     // `allowShield: true` is authored: the printed sentence restricts only wearing armor.
-    expect(resilience.modifiers).toEqual([{ type: "unarmored-defense", ability: "cha", allowShield: true, when: [] }]);
+    expect(resilience.modifiers).toEqual([{ type: "unarmored-defense", ability: "cha", allowShield: true }]);
   });
 
   it("carries the spell tables of the four subclass spell features into their descriptions", () => {
@@ -1280,7 +1287,7 @@ describe("content-record schema guards", () => {
     // Defaults fill in identically to a FeatureRecord's, so a consumer reads both unconditionally.
     expect(option.actions[0].damage).toEqual([{ formula: "1d8", type: "radiant" }]);
     expect(option.effects[0].target).toBe("self");
-    expect(option.modifiers[0]).toEqual({ type: "armor-class", amount: 1, whileArmored: true, when: [] });
+    expect(option.modifiers[0]).toEqual({ type: "armor-class", amount: 1, whileArmored: true });
     expect(option.grants!.skills).toEqual([]);
     const asFeature: FeatureRecord = option;
     expect(FeatureRecordSchema.safeParse(asFeature).success).toBe(true);
@@ -1358,7 +1365,11 @@ describe("content-record schema guards", () => {
           tags: ["raging"],
           duration: { type: "rounds", rounds: 10 },
           modifiers: [
-            { type: "damage-bonus", amount: 2, appliesTo: "melee" },
+            {
+              type: "damage-bonus",
+              amount: 2,
+              when: [{ type: "on-damage-roll" }, { type: "attack-kind-is", kinds: ["melee"] }]
+            },
             { type: "damage-resistance", damageTypes: ["bludgeoning", "piercing", "slashing"] }
           ]
         }
@@ -1383,7 +1394,7 @@ describe("content-record schema guards", () => {
     expect(rich.actions[0].attack).toEqual({ ability: "str", proficient: true, reachFeet: 5 });
     expect(rich.grants!.tools).toEqual([]);
     expect(rich.grants!.spells[0]).toEqual({ id: "guidance", level: 0, alwaysPrepared: true });
-    expect(rich.modifiers[0]).toEqual({ type: "unarmored-defense", ability: "con", allowShield: false, when: [] });
+    expect(rich.modifiers[0]).toEqual({ type: "unarmored-defense", ability: "con", allowShield: false });
     expect(rich.effects[0].target).toBe("self");
   });
 });
@@ -1554,7 +1565,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
     });
     // A moment plus a filter narrowing it - the only legal way to write "on opportunity attacks".
     expect(riderLayer(dagger.modifiers[0].when)).toBe("momentary");
-    expect(dagger.modifiers[0].when.map((trigger) => trigger.type)).toEqual(["on-attack-roll", "attack-kind-is"]);
+    expect(dagger.modifiers[0].when?.map((trigger) => trigger.type)).toEqual(["on-attack-roll", "attack-kind-is"]);
   });
 
   it("8. an amulet granting one extra 1st-level spell slot", () => {
@@ -1592,7 +1603,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
     expect(rider).toMatchObject({ doubleOnCritical: false });
     expect(riderLayer(rider.when)).toBe("momentary");
     // `critical-bonus-dice` is an untyped count of extra weapon dice, a different thing from typed extra damage.
-    expect(FeatureModifierSchema.parse({ type: "critical-bonus-dice", count: 2 })).toMatchObject({ count: 2 });
+    expect(ModifierSchema.parse({ type: "critical-bonus-dice", count: 2 })).toMatchObject({ count: 2 });
   });
 
   it("10. half-plate that raises the wearer's spell save DC", () => {
@@ -1700,7 +1711,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
   });
 
   it("14. a FEAT carries every one of these riders, by construction rather than by duplication", () => {
-    // Item riders extend `FeatureModifierSchema`, which feats already carry, so feats get every rider too.
+    // Items, feats, features and effects share `ModifierSchema`, so feats get every rider too.
     const everyRider = [
       { type: "attack-bonus", amount: 1 },
       { type: "extra-damage", formula: "1d6", damageType: "fire", when: [{ type: "on-critical-hit" }] },
@@ -1738,7 +1749,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
     expect(
       FeatureRecordSchema.parse({ id: "f", name: "F", description: "d", modifiers: everyRider }).modifiers
     ).toHaveLength(8);
-    expect(FeatureModifierSchema.options).toHaveLength(22);
+    expect(ModifierSchema.options).toHaveLength(24);
   });
 
   it("15. an item that grants a feat", () => {
@@ -1778,14 +1789,14 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
       );
       // The same rider on a feat is fine: a feat is never un-granted, so baking it in is correct.
       expect(feat([modifier]).feature.modifiers, modifier.type).toHaveLength(1);
-      expect(FeatureModifierSchema.safeParse(modifier).success, modifier.type).toBe(true);
+      expect(ModifierSchema.safeParse(modifier).success, modifier.type).toBe(true);
     }
     // A flat `hit-points` maximum is not in the vocabulary at all, so every carrier refuses it.
-    expect(FeatureModifierSchema.safeParse({ type: "hit-points", amount: 5 }).success).toBe(false);
+    expect(ModifierSchema.safeParse({ type: "hit-points", amount: 5 }).success).toBe(false);
   });
 
   it("keeps `when` an AND-list, not an expression language", () => {
-    // Thirty triggers in four kinds, and the kind is what decides the evaluation layer.
+    // Twenty-eight triggers in four kinds, and the kind is what decides the evaluation layer.
     expect(riderLayer([])).toBe("standing");
     expect(riderLayer([{ type: "while-hp-at-or-below", percent: 50 }])).toBe("conditional");
     expect(riderLayer([{ type: "attuned" }, { type: "while-shield", wielding: true }])).toBe("standing");

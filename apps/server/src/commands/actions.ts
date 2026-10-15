@@ -13,7 +13,7 @@ import { damageAdjustmentDetail } from "../hit-points.js";
 import { tokenCreatureDistance } from "../movement-narration.js";
 import { settlePlayerHit, type AppliedDamage } from "../player-damage.js";
 import { recordRoll, rolledTerms } from "../roll-history.js";
-import { overrideReason, rememberOverride } from "../rules-families.js";
+import { overrideReason, overrideWaives, rememberOverride } from "../rules-families.js";
 import { looseRollPlan, NOT_YOUR_TURN, offTurnVerdict, routeForTap } from "../tap-routing.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, principalTag, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
@@ -137,7 +137,6 @@ export const actionCommands = [
             initiatorRole: initiator.role,
             initiatorSessionId: sessionIdOf(principal),
             now: () => new Date().toISOString(),
-            hasCondition: (id) => kit.catalogFor(principal).hasCondition(id),
             definition,
             distanceFeet,
             resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
@@ -297,8 +296,9 @@ export const actionCommands = [
           snapshot.combat.turnActorId === null ? "Someone else" : kit.actorName(snapshot.combat.turnActorId);
         // A GM Allow waves the refusal through and remembers the family so the rest of this creature's
         // off-turn actions stop re-prompting. The memory write is its own small mutation.
-        const verdict = override ? { warning: null } : offTurnVerdict(snapshot, action, currentName);
-        if (override) {
+        const waived = overrideWaives(override, NOT_YOUR_TURN);
+        const verdict = waived ? { warning: null } : offTurnVerdict(snapshot, action, currentName);
+        if (waived) {
           await kit.store.execute(
             {
               id: kit.context.newId(),
@@ -308,7 +308,7 @@ export const actionCommands = [
               principal: principalTag(principal)
             },
             (state) => {
-              rememberOverride(state, NOT_YOUR_TURN);
+              rememberOverride(state, NOT_YOUR_TURN, override);
             }
           );
           kit.context.appendLog({

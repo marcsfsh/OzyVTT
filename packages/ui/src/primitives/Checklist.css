@@ -4,8 +4,7 @@
      button { padding: 1.3rem; border: 1px solid var(--line-strong); background: … }   (0,0,1)
      button:hover:not(:disabled) { border-color: … }                                   (0,2,1)
    `.nh-checklist-tick input` (0,1,1) beats the first. The remove button's hover is written at (0,3,0) because
-   a single class at (0,2,0) loses to (0,2,1); don't simplify it. /styleguide doesn't load the app's styles, so
-   only the app shows these problems. */
+   a single class at (0,2,0) loses to (0,2,1); don't simplify it. */
 
 /* `minmax(0, 1fr)` and `min-width: 0` throughout so a long objective can't widen the container. */
 .nh-checklist {

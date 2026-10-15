@@ -202,11 +202,18 @@ describe("the same repair, on the other type that had it", () => {
   });
 
   it("a spell's saving throw cleared back to none stays null, because that column is nullable", () => {
-    // `save` is nullable and required, so clearing keeps the key as `null`. The `"null"` fields are
-    // exactly the required-but-nullable columns.
+    // `save` is nullable and required, so clearing the ability keeps the key as `null`. Picking one
+    // writes the whole block, with what the save does at its defaults until the GM says otherwise.
     let spell: Draft = { ...blankDraft("spell"), name: "Blast", description: "A blast." };
-    spell = applyField("spell", spell, "save", "dex");
-    spell = clearField("spell", spell, "save");
+    spell = applyField("spell", spell, "save.ability", "dex");
+    expect((spell as Record<string, unknown>).save).toEqual({
+      ability: "dex",
+      successDamage: "half",
+      failureCondition: null
+    });
+    spell = applyField("spell", spell, "save.failureCondition", "prone");
+    expectPublishable("spell", spell);
+    spell = clearField("spell", spell, "save.ability");
     expect((spell as Record<string, unknown>).save).toBeNull();
     expectPublishable("spell", spell);
   });

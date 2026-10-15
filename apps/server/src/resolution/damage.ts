@@ -1,6 +1,5 @@
 import type { ActionResolution, ActionResolutionAttack } from "@vtt/domain";
 import { collectRiders, parseDiceFormula, resolveDice, type DiceExpression, type RiderMoment } from "@vtt/rules-5e";
-import { attackUsedAsRanged } from "./attack.js";
 import { abilityModifier, recordRoll, type ResolveContext } from "./context.js";
 
 /** 2024 crit rule: double every dice term (modifiers once); `extraFirstTermDice` adds Savage Attacks dice. */
@@ -36,10 +35,9 @@ export function damagePartsOf(
   ].filter((part) => part.amount > 0);
 }
 
-/** The action's own damage dice (crit-doubled, Savage Attacks on the first part), then flat damage
- *  bonuses from active effects (Rage) as their own explainable lines. */
+/** The action's own damage dice: crit-doubled, Savage Attacks on the first part. */
 export function rollWeaponDamage(ctx: ResolveContext): void {
-  const { action, attacker, targets, deps, damage, bonusDamage } = ctx;
+  const { action, deps, damage } = ctx;
   if (action.damage.length === 0 || !rollsDamage(ctx.attack)) return;
   action.damage.forEach((part, index) => {
     const expression = parseDiceFormula(part.formula);
@@ -48,28 +46,19 @@ export function rollWeaponDamage(ctx: ResolveContext): void {
     recordRoll(ctx, rolled, "damage");
     damage.push({ formula: rolled.expression.source, type: part.type, total: rolled.total });
   });
-  if (!action.attack) return;
-  const melee = !attackUsedAsRanged(action.attack, deps.distanceFeet?.(attacker.id, targets[0].id) ?? null);
-  for (const effect of attacker.effects) {
-    for (const modifier of effect.modifiers) {
-      if (modifier.type === "damage-bonus" && (modifier.appliesTo === "all" || melee)) {
-        bonusDamage.push({ amount: modifier.amount, type: damage[0]?.type ?? "untyped", source: effect.name });
-      }
-    }
-  }
 }
 
-/** Item, feat and feature riders that add damage: typed `extra-damage` as its own `damage[]` entry
- *  (crit-doubled only with `doubleOnCritical`, since 5e doesn't double dice added after the attack) and
- *  moment-gated flat `damage-bonus` as a bonus line. A rider with no `when` fires on every damage roll of
- *  its action; `on-hit`/`on-critical-hit` narrow it. */
+/** Riders that add damage, from every carrier (items, feats, features, live effects): typed `extra-damage` as
+ *  its own `damage[]` entry (crit-doubled only with `doubleOnCritical`, since 5e doesn't double dice added
+ *  after the attack) and moment-gated flat `damage-bonus` as a bonus line. A rider with no `when` fires on
+ *  every damage roll of its action; `on-hit`/`on-critical-hit` narrow it. The moments collected here are
+ *  `DAMAGE_ROLL_MOMENTS`. */
 export function rollRiderDamage(ctx: ResolveContext): void {
   const { attack, crit, derivation, riderFilters, deps, damage, bonusDamage, warnings } = ctx;
   if (!rollsDamage(attack)) return;
   const passes: Array<RiderMoment | null> = [null, "on-damage-roll"];
   if (attack === null || attack.outcome === "hit" || attack.outcome === "crit") passes.push("on-hit");
   if (crit) passes.push("on-critical-hit");
-  if (attack !== null && attack.outcome === "fumble") passes.push("on-critical-miss");
   const already = new Set<unknown>();
   for (const moment of passes) {
     for (const rider of collectRiders(derivation.carriers, { ...derivation.context, ...riderFilters, moment })) {

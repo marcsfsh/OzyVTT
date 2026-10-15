@@ -4,6 +4,7 @@
  * Uses count one per spend, so only options costing exactly 1 Sorcery Point ride the
  * `sorcery-points` pool. Heightened and Quickened Spell cost 2 and keep their price in prose.
  */
+import type { DamageType } from "@vtt/schemas";
 import type { ClassMechanicsModule } from "./overlay.js";
 
 // One debit off the shared pool, which reads the printed Sorcery Points column.
@@ -16,7 +17,7 @@ const ONE_SORCERY_POINT = {
 };
 
 /** The five damage types Elemental Affinity prints, with the prose each option carries on the sheet. */
-const AFFINITY_TYPES: ReadonlyArray<readonly [id: string, name: string]> = [
+const AFFINITY_TYPES: ReadonlyArray<readonly [id: DamageType, name: string]> = [
   ["acid", "Acid"],
   ["cold", "Cold"],
   ["fire", "Fire"],
@@ -109,9 +110,7 @@ export const sorcerer: ClassMechanicsModule = {
       },
       /**
        * Five inline options, each granting its resistance and an `extra-damage` rider of the Charisma
-       * modifier for its own type. Gated on `damage-type-is`, since no "spell" attack kind is ever
-       * announced. It fires only for attack-roll spells against one target (the resolver sets damage
-       * types only there), not save spells like Fireball; it can also fire on a weapon of that type.
+       * modifier for its own type, gated on `damage-type-is`. It can also fire on a weapon of that type.
        */
       "elemental-affinity": {
         choice: {

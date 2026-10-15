@@ -43,13 +43,15 @@ import {
   type ContentSpellcasting,
   type EquipmentReference,
   type FeatReference,
+  type FeatureOption,
   type FeatureRecord,
   type SpeciesReference,
   type SpellListReference,
   type SpellReference,
   type SubclassReference
 } from "@vtt/content-srd-5.2.1";
-import type { CharacterFeatureRef, FeatureRecordLike } from "./equipment-derivation.js";
+import type { CharacterFeatureRef } from "./equipment-derivation.js";
+import { statblockFacts } from "./statblock-facts.js";
 import { parseAreaProse } from "./area-targeting.js";
 
 /** Who reads a catalog. GM-grade principals also see published homebrew that isn't player-visible.
@@ -128,7 +130,7 @@ export interface ContentView {
   backgroundRecord(id: string): BackgroundReference | undefined;
   featRecord(id: string): FeatReference | undefined;
   /** The feature or inline option a sheet's `character.features` entry names, so its roll-time riders reach the table. */
-  featureRecord(ref: CharacterFeatureRef): FeatureRecordLike | undefined;
+  featureRecord(ref: CharacterFeatureRef): FeatureRecord | FeatureOption | undefined;
   equipmentRecord(id: string): EquipmentReference | undefined;
   spellRecord(id: string): SpellReference | undefined;
 }
@@ -325,25 +327,6 @@ const levelRowOf = (row: ClassLevelRow): ContentClassLevelRow => ({
   }))
 });
 const byName = <T extends { name: string }>(left: T, right: T) => left.name.localeCompare(right.name);
-
-/** The extension key challenge rating and creature type actually live under. */
-export const STATBLOCK_EXTENSION = "open5e.srd-2024";
-/** A creature's bestiary facts from its extension bag; exported so the publish gate checks the same thing. */
-export function statblockFacts(definition: ActorDefinition): {
-  challengeRating: number | null;
-  creatureType: string | null;
-} {
-  const extension = (definition.extensions ?? {})[STATBLOCK_EXTENSION];
-  const bag = (extension && typeof extension === "object" ? extension : {}) as {
-    challengeRating?: unknown;
-    type?: unknown;
-  };
-  // Narrowed, not cast: the bag is untyped. Null means "nothing to show", which the publish gate refuses.
-  return {
-    challengeRating: typeof bag.challengeRating === "number" ? bag.challengeRating : null,
-    creatureType: typeof bag.type === "string" && bag.type.length > 0 ? bag.type : null
-  };
-}
 
 /** A bundle "choose N from" list as the wire shape (null when the record offers no such choice). */
 const choiceListOf = (
@@ -647,15 +630,15 @@ function featureIndexOf(
   subclasses: readonly SubclassReference[],
   species: readonly SpeciesReference[],
   backgrounds: readonly BackgroundReference[]
-): Map<string, FeatureRecordLike> {
-  const index = new Map<string, FeatureRecordLike>();
+): Map<string, FeatureRecord | FeatureOption> {
+  const index = new Map<string, FeatureRecord | FeatureOption>();
   const put = (kind: CharacterFeatureRef["kind"], sourceId: string, feature: FeatureRecord) => {
     const key = featureKey({ kind, sourceId, id: feature.id });
-    if (!index.has(key)) index.set(key, feature as FeatureRecordLike);
+    if (!index.has(key)) index.set(key, feature);
     // Inline options use the same rider vocabulary; recorded as kind "option" under the parent feature's id.
     for (const option of feature.choice?.options ?? []) {
       const optionKey = featureKey({ kind: "option", sourceId: feature.id, id: option.id });
-      if (!index.has(optionKey)) index.set(optionKey, option as unknown as FeatureRecordLike);
+      if (!index.has(optionKey)) index.set(optionKey, option);
     }
   };
   for (const entry of classes) for (const feature of entry.features) put("class", entry.id, feature);

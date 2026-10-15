@@ -1,7 +1,6 @@
 /**
  * A control whose label is its state must not resize when the state changes. jsdom has no layout, so this checks
- * that the reservation exists, carries the other state's exact string and is out of the accessibility tree;
- * `scripts/primitive-align-check.mjs` checks the box doesn't move in a browser.
+ * that the reservation exists, carries the other state's exact string and is out of the accessibility tree.
  */
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";

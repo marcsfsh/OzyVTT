@@ -561,7 +561,7 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "modifiers[].**",
     types: FEATURE_CARRIERS,
     reason:
-      "the modifier rows beyond U6's type control — neither union's per-key internals (appliesTo/damageTypes on effects; the feature union's filters) have fields",
+      "the modifier rows beyond the editor's offered subset — a type the form does not offer has no field for its keys",
     owner: "unowned: recorded by this census, owned by no plan"
   },
 

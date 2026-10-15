@@ -4,7 +4,8 @@ import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@
 import { loadEquipment, loadMagicItems } from "@vtt/content-srd-5.2.1";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { effectiveActions } from "../src/effective-actions.js";
-import { deriveEquipment, type EquipmentCatalog, type EquipmentRecordLike } from "../src/equipment-derivation.js";
+import type { EquipmentReference } from "@vtt/content-srd-5.2.1";
+import { deriveEquipment, type EquipmentCatalog } from "../src/equipment-derivation.js";
 import { setInventoryItem } from "../src/inventory.js";
 import { startEncounter } from "../src/encounter.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
@@ -25,13 +26,13 @@ const IDS = {
 
 /** The shipped rows; the bundle the app loads. */
 const MAGIC_ITEMS = loadMagicItems();
-const shipped = (id: string): EquipmentRecordLike => {
+const shipped = (id: string) => {
   const row = MAGIC_ITEMS.find((item) => item.id === id);
   if (!row) throw new Error(`no row in magic-items.v1.json carries the id "${id}"`);
-  return row as EquipmentRecordLike;
+  return row;
 };
 
-const catalogOf = (records: readonly EquipmentRecordLike[]): EquipmentCatalog => ({
+const catalogOf = (records: readonly EquipmentReference[]): EquipmentCatalog => ({
   equipmentRecord: (id) => records.find((record) => record.id === id),
   featRecord: () => undefined
 });
@@ -478,7 +479,7 @@ describe("the authored riders are present in the shipped bundle", () => {
     for (const row of weapons) {
       for (const modifier of row.modifiers ?? []) {
         if (!WEAPON_SCOPED.includes(modifier.type)) continue;
-        expect((modifier as { when?: unknown[] }).when, `${row.id}/${modifier.type} must stay ungated`).toEqual([]);
+        expect(modifier.when, `${row.id}/${modifier.type} must stay ungated`).toBeUndefined();
         expect(
           (modifier as { scope?: string }).scope,
           `${row.id}/${modifier.type} must not set an explicit scope`

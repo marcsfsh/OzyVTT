@@ -113,7 +113,11 @@
     "acid"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -350,7 +354,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": "charmed"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -441,7 +449,11 @@
    "roll": null,
    "types": []
   },
-  "save": "cha",
+  "save": {
+   "ability": "cha",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -792,7 +804,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -1231,7 +1247,11 @@
    "roll": "1d4",
    "types": []
   },
-  "save": "cha",
+  "save": {
+   "ability": "cha",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -1322,7 +1342,11 @@
    "roll": null,
    "types": []
   },
-  "save": "cha",
+  "save": {
+   "ability": "cha",
+   "successDamage": "none",
+   "failureCondition": "incapacitated"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -1438,7 +1462,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -1480,7 +1508,11 @@
     "psychic"
    ]
   },
-  "save": "int",
+  "save": {
+   "ability": "int",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -1525,7 +1557,11 @@
     "necrotic"
    ]
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -1606,7 +1642,11 @@
     "bludgeoning"
    ]
   },
-  "save": "str",
+  "save": {
+   "ability": "str",
+   "successDamage": "none",
+   "failureCondition": "restrained"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -1648,7 +1688,11 @@
     "force"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -1780,7 +1824,11 @@
     "necrotic"
    ]
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -1854,7 +1902,11 @@
    "roll": null,
    "types": []
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "none",
+   "failureCondition": "blinded"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -2024,7 +2076,11 @@
     "fire"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -2120,7 +2176,11 @@
     "lightning"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -2197,7 +2257,11 @@
    "roll": null,
    "types": []
   },
-  "save": "cha",
+  "save": {
+   "ability": "cha",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -2244,7 +2308,11 @@
     "lightning"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -2285,7 +2353,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": "charmed"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -2360,7 +2432,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": "charmed"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -2608,7 +2684,11 @@
     "necrotic"
    ]
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -2758,7 +2838,11 @@
     "poison"
    ]
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -2828,7 +2912,11 @@
    "roll": null,
    "types": []
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "none",
+   "failureCondition": "blinded"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -2874,7 +2962,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -3089,7 +3181,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": "charmed"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -3131,7 +3227,11 @@
     "cold"
    ]
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -3202,7 +3302,11 @@
    "roll": "1d10",
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -3282,7 +3386,11 @@
     "slashing"
    ]
   },
-  "save": "str",
+  "save": {
+   "ability": "str",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -3413,7 +3521,11 @@
    "roll": "8d8",
    "types": []
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "none",
+   "failureCondition": "restrained"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -3614,7 +3726,11 @@
     "force"
    ]
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -3688,7 +3804,11 @@
     "psychic"
    ]
   },
-  "save": "int",
+  "save": {
+   "ability": "int",
+   "successDamage": "none",
+   "failureCondition": "incapacitated"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -3731,7 +3851,11 @@
     "necrotic"
    ]
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "none",
+   "failureCondition": "poisoned"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -3938,7 +4062,11 @@
    "roll": null,
    "types": []
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -4557,7 +4685,11 @@
     "fire"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -4788,7 +4920,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -4919,7 +5055,11 @@
     "force"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -5112,7 +5252,11 @@
     "psychic"
    ]
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -5327,7 +5471,11 @@
    "roll": null,
    "types": []
   },
-  "save": "cha",
+  "save": {
+   "ability": "cha",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -5367,7 +5515,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": "charmed"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -5440,7 +5592,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": "charmed"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -5490,7 +5646,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": "charmed"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -5557,7 +5717,11 @@
    "roll": "3d6",
    "types": []
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -5647,7 +5811,11 @@
     "psychic"
    ]
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -5731,7 +5899,11 @@
     "bludgeoning"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "half",
+   "failureCondition": "prone"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -5968,7 +6140,11 @@
    "roll": null,
    "types": []
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -6013,7 +6189,11 @@
     "piercing"
    ]
   },
-  "save": "str",
+  "save": {
+   "ability": "str",
+   "successDamage": "none",
+   "failureCondition": "restrained"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -6102,7 +6282,11 @@
    "roll": null,
    "types": []
   },
-  "save": "str",
+  "save": {
+   "ability": "str",
+   "successDamage": "none",
+   "failureCondition": "restrained"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -6143,7 +6327,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -6285,7 +6473,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -6372,7 +6564,11 @@
    "roll": null,
    "types": []
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -6419,7 +6615,11 @@
     "force"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -6549,7 +6749,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": "frightened"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -6847,7 +7051,11 @@
     "necrotic"
    ]
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -6998,7 +7206,11 @@
     "fire"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -7046,7 +7258,11 @@
     "fire"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -7217,7 +7433,11 @@
     "radiant"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -7284,7 +7504,11 @@
     "fire"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -7369,7 +7593,11 @@
    "roll": null,
    "types": []
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "none",
+   "failureCondition": "restrained"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -7668,7 +7896,11 @@
    "roll": null,
    "types": []
   },
-  "save": "cha",
+  "save": {
+   "ability": "cha",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -7755,7 +7987,11 @@
     "cold"
    ]
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -7835,7 +8071,11 @@
     "cold"
    ]
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "point",
    "count": 1
@@ -7901,7 +8141,11 @@
     "slashing"
    ]
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -8025,7 +8269,11 @@
     "psychic"
    ]
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": "charmed"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -8416,7 +8664,11 @@
    "roll": null,
    "types": []
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "none",
+   "failureCondition": "prone"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -8545,7 +8797,11 @@
     "radiant"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -8758,7 +9014,11 @@
    "roll": null,
    "types": []
   },
-  "save": "str",
+  "save": {
+   "ability": "str",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -8890,7 +9150,11 @@
     "necrotic"
    ]
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -8930,7 +9194,11 @@
    "roll": null,
    "types": []
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -9124,7 +9392,11 @@
     "fire"
    ]
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -9210,7 +9482,11 @@
     "fire"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -9528,7 +9804,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": "prone"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -9619,7 +9899,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": "paralyzed"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -9687,7 +9971,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": "paralyzed"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -9900,7 +10188,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": "charmed"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -9950,7 +10242,11 @@
     "cold"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -10044,7 +10340,11 @@
     "cold"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -10200,7 +10500,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -10243,7 +10547,11 @@
     "fire"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -10291,7 +10599,11 @@
     "necrotic"
    ]
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -10382,7 +10694,11 @@
     "piercing"
    ]
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -10579,7 +10895,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": "charmed"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -10840,7 +11160,11 @@
    "roll": null,
    "types": []
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -10926,7 +11250,11 @@
     "lightning"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -11316,7 +11644,11 @@
    "roll": null,
    "types": []
   },
-  "save": "cha",
+  "save": {
+   "ability": "cha",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -11396,7 +11728,11 @@
    "roll": null,
    "types": []
   },
-  "save": "cha",
+  "save": {
+   "ability": "cha",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -11973,7 +12309,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": "charmed"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -12208,7 +12548,11 @@
     "bludgeoning"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -12298,7 +12642,11 @@
     "psychic"
    ]
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -12595,7 +12943,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": "charmed"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -12663,7 +13015,11 @@
     "radiant"
    ]
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -12913,7 +13269,11 @@
     "psychic"
    ]
   },
-  "save": "int",
+  "save": {
+   "ability": "int",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -12961,7 +13321,11 @@
     "psychic"
    ]
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -13113,7 +13477,11 @@
    "roll": null,
    "types": []
   },
-  "save": "cha",
+  "save": {
+   "ability": "cha",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -13332,7 +13700,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -13461,7 +13833,11 @@
    "roll": null,
    "types": []
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -13637,7 +14013,11 @@
     "cold"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -13690,7 +14070,11 @@
     "cold"
    ]
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "half",
+   "failureCondition": "blinded"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -14170,7 +14554,11 @@
    "roll": "1d8",
    "types": []
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -14490,7 +14878,11 @@
    "roll": null,
    "types": []
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -14612,7 +15004,11 @@
    "roll": null,
    "types": []
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -14739,7 +15135,11 @@
     "radiant"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -14798,7 +15198,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -14924,7 +15328,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -14970,7 +15378,11 @@
     "fire"
    ]
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -15141,7 +15553,11 @@
    "roll": null,
    "types": []
   },
-  "save": "cha",
+  "save": {
+   "ability": "cha",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -15308,7 +15724,11 @@
     "thunder"
    ]
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -15821,7 +16241,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": "incapacitated"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -15867,7 +16291,11 @@
    "roll": null,
    "types": []
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "none",
+   "failureCondition": "prone"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -15909,7 +16337,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -16336,7 +16768,11 @@
     "necrotic"
    ]
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -16560,7 +16996,11 @@
    "roll": null,
    "types": []
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "none",
+   "failureCondition": "poisoned"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -16695,7 +17135,11 @@
     "thunder"
    ]
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "none",
+   "failureCondition": "deafened"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -16735,7 +17179,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": "charmed"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -16845,7 +17293,11 @@
     "radiant"
    ]
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "half",
+   "failureCondition": "blinded"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -16890,7 +17342,11 @@
     "radiant"
    ]
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "half",
+   "failureCondition": "blinded"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -16984,7 +17440,11 @@
    "roll": null,
    "types": []
   },
-  "save": "str",
+  "save": {
+   "ability": "str",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -17197,7 +17657,11 @@
     "thunder"
    ]
   },
-  "save": "con",
+  "save": {
+   "ability": "con",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -17500,7 +17964,11 @@
    "roll": null,
    "types": []
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -17693,7 +18161,11 @@
     "bludgeoning"
    ]
   },
-  "save": "str",
+  "save": {
+   "ability": "str",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -17858,7 +18330,11 @@
     "psychic"
    ]
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -17919,7 +18395,11 @@
     "acid"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -17997,7 +18477,11 @@
     "fire"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -18114,7 +18598,11 @@
     "cold"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -18175,7 +18663,11 @@
     "psychic"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -18220,7 +18712,11 @@
     "piercing"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -18408,7 +18904,11 @@
     "fire"
    ]
   },
-  "save": "dex",
+  "save": {
+   "ability": "dex",
+   "successDamage": "none",
+   "failureCondition": "restrained"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -18455,7 +18955,11 @@
     "psychic"
    ]
   },
-  "save": "wis",
+  "save": {
+   "ability": "wis",
+   "successDamage": "half",
+   "failureCondition": "frightened"
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -18544,7 +19048,11 @@
     "bludgeoning"
    ]
   },
-  "save": "str",
+  "save": {
+   "ability": "str",
+   "successDamage": "half",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1
@@ -18668,7 +19176,11 @@
    "roll": null,
    "types": []
   },
-  "save": "cha",
+  "save": {
+   "ability": "cha",
+   "successDamage": "none",
+   "failureCondition": null
+  },
   "target": {
    "type": "creature",
    "count": 1

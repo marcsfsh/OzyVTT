@@ -75,7 +75,7 @@ export const paladin: ClassMechanicsModule = {
           description:
             "As a Magic action, you expend one use of this class's Channel Divinity and target a number of creatures equal to your Charisma modifier (minimum of one) that you can see within 60 feet. Each target must succeed on a Wisdom saving throw or have the Frightened condition for 1 minute or until it takes any damage. While Frightened this way, a target can do only one of the following on its turns: move, take an action, or take a Bonus Action.",
           damage: [],
-          save: { ability: "wis", dc: "spellcasting" }
+          save: { ability: "wis", dc: "spellcasting", successDamage: "none", failureCondition: "frightened" }
         }
       ]
     },

@@ -6,6 +6,7 @@
  * showing an empty library.
  */
 
+import { apiRequest, type ApiError, type ApiRequest } from "../lib/api";
 import type { HomebrewType } from "./types";
 
 const BASE = "/api/v1/homebrew";
@@ -87,55 +88,14 @@ export type HomebrewListQuery = Readonly<{
   cursor?: string;
 }>;
 
-/** A failed homebrew request: HTTP status (404 = surface not mounted), stable error code, the
-    row's revision on a 409, and the raw `details` (where `invalid.issues` lives on a rejected publish). */
-export class HomebrewRequestError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-    readonly code: string,
-    readonly currentRevision: number | null = null,
-    readonly details: Readonly<Record<string, unknown>> | null = null
-  ) {
-    super(message);
-    this.name = "HomebrewRequestError";
-  }
-
-  /** Optimistic-concurrency conflict: the row changed under us. */
-  get isConflict(): boolean {
-    return this.status === 409;
-  }
-
-  /** A publish the stored state refuses: `details.invalid.issues` lists every blocker. */
-  get invalidIssues(): readonly HomebrewValidationIssue[] {
-    const invalid = this.details?.invalid as { issues?: readonly HomebrewValidationIssue[] } | undefined;
-    return invalid?.issues ?? [];
-  }
+/** A publish the stored state refuses carries every blocker in `details.invalid.issues`. */
+export function invalidIssuesOf(error: ApiError): readonly HomebrewValidationIssue[] {
+  const invalid = error.details?.invalid as { issues?: readonly HomebrewValidationIssue[] } | undefined;
+  return invalid?.issues ?? [];
 }
 
-async function request<T>(token: string, path: string, init: RequestInit = {}): Promise<T> {
-  let response: Response;
-  try {
-    response = await fetch(`${BASE}${path}`, {
-      ...init,
-      headers: { authorization: `Bearer ${token}`, "content-type": "application/json", ...init.headers }
-    });
-  } catch {
-    // A network failure has no status or message; report it plainly.
-    throw new HomebrewRequestError("Couldn't reach the server.", 0, "offline");
-  }
-  const body = await response.json().catch(() => null);
-  if (!response.ok || !body?.ok) {
-    throw new HomebrewRequestError(
-      body?.error?.message ?? `The homebrew request failed (${response.status}).`,
-      response.status,
-      body?.error?.code ?? "error",
-      typeof body?.error?.currentRevision === "number" ? body.error.currentRevision : null,
-      body?.error?.details ?? null
-    );
-  }
-  return body.data as T;
-}
+const request = <T>(token: string, path: string, init: Omit<ApiRequest, "token" | "failure"> = {}) =>
+  apiRequest<T>(`${BASE}${path}`, { ...init, token, failure: "The homebrew request failed." });
 
 function query(params: HomebrewListQuery): string {
   const search = new URLSearchParams();
@@ -162,7 +122,7 @@ export const homebrewApi = {
   create: (token: string, record: Readonly<Record<string, unknown>>) =>
     request<{ record: HomebrewRecordDocument }>(token, "/content", {
       method: "POST",
-      body: JSON.stringify({ record })
+      body: { record }
     }).then((data) => data.record),
 
   /** GET /content/{id} — the record plus its full validity report. */
@@ -176,7 +136,7 @@ export const homebrewApi = {
   update: (token: string, id: string, record: Readonly<Record<string, unknown>>, expectedRev?: number) =>
     request<{ record: HomebrewRecordDocument }>(token, `/content/${encodeURIComponent(id)}`, {
       method: "PATCH",
-      body: JSON.stringify({ record, ...withRev(expectedRev) })
+      body: { record, ...withRev(expectedRev) }
     }).then((data) => data.record),
 
   /** DELETE /content/{id} — soft delete, idempotent. Restorable; nothing is destroyed. */
@@ -195,28 +155,28 @@ export const homebrewApi = {
   duplicate: (token: string, id: string, name?: string) =>
     request<{ record: HomebrewRecordDocument }>(token, `/content/${encodeURIComponent(id)}/duplicate`, {
       method: "POST",
-      body: JSON.stringify(name === undefined ? {} : { name })
+      body: name === undefined ? {} : { name }
     }).then((data) => data.record),
 
   /** POST /content/{id}/publish — requires validity. Publishing does not show it to players. */
   publish: (token: string, id: string, expectedRev?: number) =>
     request<{ record: HomebrewRecordDocument }>(token, `/content/${encodeURIComponent(id)}/publish`, {
       method: "POST",
-      body: JSON.stringify(withRev(expectedRev))
+      body: withRev(expectedRev)
     }).then((data) => data.record),
 
   /** POST /content/{id}/unpublish — back to draft; it leaves the merged catalogs at once. */
   unpublish: (token: string, id: string, expectedRev?: number) =>
     request<{ record: HomebrewRecordDocument }>(token, `/content/${encodeURIComponent(id)}/unpublish`, {
       method: "POST",
-      body: JSON.stringify(withRev(expectedRev))
+      body: withRev(expectedRev)
     }).then((data) => data.record),
 
   /** POST /content/{id}/visibility — orthogonal to `state`; asking for it on a draft is a loud 409. */
   setVisibility: (token: string, id: string, visibleToPlayers: boolean, expectedRev?: number) =>
     request<{ record: HomebrewRecordDocument }>(token, `/content/${encodeURIComponent(id)}/visibility`, {
       method: "POST",
-      body: JSON.stringify({ visibleToPlayers, ...withRev(expectedRev) })
+      body: { visibleToPlayers, ...withRev(expectedRev) }
     }).then((data) => data.record),
 
   /** GET /content/{id}/usages — which characters took this, computed on demand. */
@@ -240,7 +200,7 @@ export const homebrewApi = {
   ) =>
     request<HomebrewPackImportReport>(token, "/packs/import", {
       method: "POST",
-      body: JSON.stringify({ pack, onIdCollision: options.onIdCollision ?? "remint", dryRun: options.dryRun ?? false })
+      body: { pack, onIdCollision: options.onIdCollision ?? "remint", dryRun: options.dryRun ?? false }
     })
 };
 

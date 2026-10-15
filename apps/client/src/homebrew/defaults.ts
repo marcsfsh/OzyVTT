@@ -164,7 +164,7 @@ export const SUB_OBJECT_DEFAULTS: Readonly<
 
 /**
  * Editor-only keys stripped before a draft becomes a request body. The rider forms mint a
- * `rowId` per row for stable `RowEditor` keys, but `FeatureModifierSchema` and
+ * `rowId` per row for stable `RowEditor` keys, but `ModifierSchema` and
  * `RiderTriggerSchema` are `.strict()`, so the key would fail the parse. The draft keeps its ids
  * because `useAutosave` re-baselines from the draft it sent.
  */

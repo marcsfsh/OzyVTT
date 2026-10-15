@@ -14,6 +14,7 @@ import {
   WEAPON_MASTERY_IDS,
   WEAPON_PROPERTY_IDS
 } from "@vtt/content-srd-5.2.1/schemas";
+import { SaveConditionSchema } from "@vtt/schemas";
 import { setAt } from "./paths";
 import type { HomebrewType } from "./types";
 
@@ -233,6 +234,28 @@ export function damagePartsField(
       { key: "type", label: "Damage type", pick: true, placeholder: "fire", suggestions: (ctx) => ctx.damageTypes }
     ]
   };
+}
+
+/** What a save does (`SaveOutcomeFields`), for the save group keyed `prefix`. Both are data the save prompt
+    applies; an unset success takes the schema's default, half damage. */
+export function saveOutcomeFields(prefix: string): readonly FieldDef[] {
+  return [
+    {
+      key: `${prefix}.successDamage`,
+      label: "On a success",
+      kind: "select",
+      placeholder: "Half damage (default)",
+      options: [opt("half", "Half damage"), opt("none", "No damage")]
+    },
+    {
+      key: `${prefix}.failureCondition`,
+      label: "On a failure, also",
+      kind: "select",
+      placeholder: "No condition",
+      emptyValue: "null",
+      options: SaveConditionSchema.options.map((id) => opt(id, `${id[0].toUpperCase()}${id.slice(1)}`))
+    }
+  ];
 }
 
 /**

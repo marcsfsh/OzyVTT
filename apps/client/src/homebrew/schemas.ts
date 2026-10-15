@@ -12,6 +12,7 @@ import {
   humanise,
   inContainer,
   opt,
+  saveOutcomeFields,
   type Draft,
   type FieldDef,
   type HomebrewSchema,
@@ -619,7 +620,25 @@ const SPELL_SCHEMA: HomebrewSchema = {
       title: "Effect",
       fields: [
         { key: "attackRoll", label: "Needs an attack roll", kind: "switch" },
-        { key: "save", label: "Saving throw", kind: "select", emptyValue: "null", options: [...ABILITIES] },
+        {
+          key: "save.ability",
+          label: "Saving throw",
+          kind: "select",
+          placeholder: "None",
+          options: [...ABILITIES],
+          // `save` is one nullable block: picking an ability writes it, keeping what it does; clearing writes null.
+          write: (next, scope) => ({
+            ...scope,
+            save:
+              typeof next === "string"
+                ? { successDamage: "half", failureCondition: null, ...(scope.save as Draft | null), ability: next }
+                : null
+          })
+        },
+        ...saveOutcomeFields("save").map((field) => ({
+          ...field,
+          visibleWhen: (scope: Draft) => scope.save !== null && scope.save !== undefined
+        })),
         {
           key: "damage",
           label: "Damage",

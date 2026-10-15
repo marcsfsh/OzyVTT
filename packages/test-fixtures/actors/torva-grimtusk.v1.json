@@ -79,7 +79,17 @@
      {
       "type": "damage-bonus",
       "amount": 2,
-      "appliesTo": "all"
+      "when": [
+       {
+        "type": "on-damage-roll"
+       },
+       {
+        "type": "attack-kind-is",
+        "kinds": [
+         "melee"
+        ]
+       }
+      ]
      },
      {
       "type": "damage-resistance",
@@ -147,10 +157,14 @@
     },
     "modifiers": [
      {
-      "type": "attack-advantage"
+      "type": "roll-mode",
+      "roll": "attack",
+      "mode": "advantage"
      },
      {
-      "type": "incoming-attack-advantage"
+      "type": "roll-mode",
+      "roll": "incoming-attack",
+      "mode": "advantage"
      }
     ]
    }

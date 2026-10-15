@@ -47,7 +47,10 @@ scratch directory and requires every committed bundle back byte for byte, so edi
   ADR-0008), and maps the spell/equipment/rules fixtures into typed reference records. Attack
   actions with no structured row upstream (33, mostly animals) are recovered from the standardized
   2024 statblock prose by a deterministic parser; a flat-damage primary keeps its damage prose-only
-  so structure never misrepresents the text. Upstream data bugs are fixed via reviewed
+  so structure never misrepresents the text. What each monster and spell save does (half or no
+  damage on a success, the condition a failure imposes) is read from the text once here by
+  `scripts/save-outcomes.ts`, with reviewed overrides, so the engine never reads prose; authored
+  mechanics (classes, species, items) state it explicitly. Upstream data bugs are fixed via reviewed
   `CORRECTIONS` tables (never by editing sources); fixtures open5e mislabels as SRD are dropped via
   `EXCLUSIONS`.
 - `scripts/build-class-bundle.ts`: generates the other nine classes and their subclasses from
@@ -123,7 +126,7 @@ mis-encoded into a rider that means something else:
 
 - **Weapon Mastery** (Fighter level 1). The pick is real and lands in the choice ledger, but
   the eight mastery properties (Cleave, Graze, Nick, Push, Sap, Slow, Topple, Vex) are combat
-  behaviors with no counterpart in `EffectModifier`/`onHit`, and the SRD's per-weapon mastery
+  behaviors with no counterpart in `Modifier`/`onHit`, and the SRD's per-weapon mastery
   column is not in the vendored fixtures. The chosen weapons are provenance and display only.
 - **Potent Spellcasting** (Cleric Blessed Strikes) — "add your Wisdom modifier to Cleric cantrip
   damage": `damage-bonus` carries a flat integer for weapon attacks, not an ability-derived

@@ -10,12 +10,13 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { Alert, Badge, Button, IconChevron, Menu, MenuItem, RevealSwitch, SaveState } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import {
-  HomebrewRequestError,
   homebrewApi,
+  invalidIssuesOf,
   listAllHomebrew,
   type HomebrewRecordDocument,
   type HomebrewRecordSummary
 } from "./api";
+import { ApiError } from "../lib/api";
 import { FeatureEditor } from "./FeatureEditor";
 import { LevelTableEditor } from "./LevelTableEditor";
 import { ITEM_RIDERS, RiderEditor } from "./RiderEditor";
@@ -128,7 +129,7 @@ export function RecordDetail({
       return next.rev;
     },
     resync: async () => (await homebrewApi.get(gmToken, docRef.current.id)).rev,
-    isConflict: (error) => error instanceof HomebrewRequestError && error.isConflict
+    isConflict: (error) => error instanceof ApiError && error.isConflict
   });
 
   /** Conflict reload: replace the draft with the server copy wholesale, since two authored bodies
@@ -225,10 +226,10 @@ export function RecordDetail({
       adopt(next);
       autosave.markSaved(next.rev, draftRef.current);
     } catch (error) {
-      if (error instanceof HomebrewRequestError) {
+      if (error instanceof ApiError) {
         // A refused publish is a 409 carrying every blocking issue; it shares the local
         // reason's message slot.
-        setActionError(error.invalidIssues[0]?.message ?? error.message);
+        setActionError(invalidIssuesOf(error)[0]?.message ?? error.message);
       } else {
         setActionError(error instanceof Error ? error.message : "That didn't work.");
       }

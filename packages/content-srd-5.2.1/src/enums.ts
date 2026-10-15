@@ -6,44 +6,16 @@
  * slugs, so controls over them must also accept free text.
  */
 
+import { ConditionSchema, DamageTypeSchema } from "@vtt/schemas";
+
 // Declared in `@vtt/rules-5e` and re-exported; declaring it here would create a dependency cycle.
 export { normalizeDamageType } from "@vtt/rules-5e";
 
-/** The 13 SRD damage types, in bundle order. */
-export const DAMAGE_TYPE_IDS: readonly string[] = Object.freeze([
-  "acid",
-  "bludgeoning",
-  "cold",
-  "fire",
-  "force",
-  "lightning",
-  "necrotic",
-  "piercing",
-  "poison",
-  "psychic",
-  "radiant",
-  "slashing",
-  "thunder"
-]);
+/** The 13 SRD damage types, in bundle order. Declared once, as the closed enum riders use. */
+export const DAMAGE_TYPE_IDS: readonly string[] = Object.freeze([...DamageTypeSchema.options]);
 
 /** The 15 SRD conditions, in bundle order. Exhaustion is a condition here, levels and all. */
-export const CONDITION_IDS: readonly string[] = Object.freeze([
-  "blinded",
-  "charmed",
-  "deafened",
-  "exhaustion",
-  "frightened",
-  "grappled",
-  "incapacitated",
-  "invisible",
-  "paralyzed",
-  "petrified",
-  "poisoned",
-  "prone",
-  "restrained",
-  "stunned",
-  "unconscious"
-]);
+export const CONDITION_IDS: readonly string[] = Object.freeze([...ConditionSchema.options]);
 
 /** The 8 schools of magic. Derived from the spell bundle - `SpellReference.school` is an open string. */
 export const MAGIC_SCHOOL_IDS: readonly string[] = Object.freeze([

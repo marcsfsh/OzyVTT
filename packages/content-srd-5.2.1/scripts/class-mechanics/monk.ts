@@ -71,9 +71,9 @@ export const monk: ClassMechanicsModule = {
       modifiers: [{ type: "extra-attack", count: 1 }]
     },
     /**
-     * DC is 8 + Wisdom + Proficiency Bonus; the Focus Point comes off the shared pool. Stunned is read
-     * from the prose by the resolver on a failed save. "Once per turn" is not expressible alongside the
-     * pool, so the scarcer Focus Point is what is tracked.
+     * DC is 8 + Wisdom + Proficiency Bonus; the Focus Point comes off the shared pool. A failed save is
+     * Stunned; the success rider (halved Speed, Advantage) stays prose. "Once per turn" is not expressible
+     * alongside the pool, so the scarcer Focus Point is what is tracked.
      */
     "stunning-strike": {
       uses: { scaling: { type: "class-resource", id: "focus-points" }, per: "short-rest", pool: "focus-points" },
@@ -85,7 +85,12 @@ export const monk: ClassMechanicsModule = {
           description:
             "Once per turn, when you hit a creature with a Monk weapon or an Unarmed Strike, expend 1 Focus Point: the target makes a Constitution saving throw or has the Stunned condition until the start of your next turn. On a success its Speed is halved until the start of your next turn and the next attack roll against it before then has Advantage.",
           damage: [],
-          save: { ability: "con", dc: { base: 8, ability: "wis", proficiencyBonus: true } }
+          save: {
+            ability: "con",
+            dc: { base: 8, ability: "wis", proficiencyBonus: true },
+            successDamage: "none",
+            failureCondition: "stunned"
+          }
         }
       ]
     },
@@ -146,7 +151,12 @@ export const monk: ClassMechanicsModule = {
             description:
               "End the vibrations you set in a creature. The target makes a Constitution saving throw, taking 10d12 Force damage on a failed save or half as much damage on a successful one.",
             damage: [{ formula: "10d12", type: "force" }],
-            save: { ability: "con", dc: { base: 8, ability: "wis", proficiencyBonus: true } }
+            save: {
+              ability: "con",
+              dc: { base: 8, ability: "wis", proficiencyBonus: true },
+              successDamage: "half",
+              failureCondition: null
+            }
           }
         ]
       }

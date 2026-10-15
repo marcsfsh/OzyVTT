@@ -10,15 +10,16 @@ import jsonSchema from "../json/actor-definition.v1.schema.json" with { type: "j
 import {
   ActorDefinitionSchema,
   ActorSchema,
-  EffectModifierSchema,
+  EFFECT_REFUSED_MODIFIER_TYPES,
+  EffectModifiersSchema,
+  ModifierSchema,
   RIDER_TRIGGER_KINDS,
   RiderTriggerSchema,
   RiderWhenSchema,
   characterChoices,
   makeHitDicePool,
   resolveSpellcasting,
-  riderLayer,
-  toRollModes
+  riderLayer
 } from "../src/index.js";
 
 describe("actor definition v1", () => {
@@ -416,7 +417,7 @@ describe("actor definition v1", () => {
 
   // ---- shared rider vocabulary (magic items, feats, effects); the JSON twin must keep pace ----
 
-  it("carries the three shared riders through BOTH schemas, gates and all", () => {
+  it("carries gated modifiers on an effect through BOTH schemas", () => {
     const withRiders = structuredClone(legacyDefinition) as Record<string, any>;
     withRiders.actions = [
       {
@@ -442,9 +443,8 @@ describe("actor definition v1", () => {
               mode: "advantage",
               when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["dex"] }]
             },
-            // The legacy advantage/disadvantage variants keep working beside `roll-mode`.
-            { type: "attack-advantage" },
-            { type: "save-disadvantage", ability: "con" }
+            { type: "roll-mode", roll: "incoming-attack", mode: "disadvantage" },
+            { type: "damage-resistance", damageTypes: ["fire"], when: [{ type: "while-effect-tag", tags: ["ember"] }] }
           ]
         }
       }
@@ -452,37 +452,37 @@ describe("actor definition v1", () => {
     const parsed = ActorDefinitionSchema.safeParse(withRiders);
     expect(parsed.success, parsed.success ? undefined : JSON.stringify(parsed.error.issues)).toBe(true);
     expect(jsonValidate(withRiders), JSON.stringify(jsonValidate.errors)).toBe(true);
-    expect(EffectModifierSchema.options).toHaveLength(13);
-    // The JSON twin must declare exactly as many branches.
-    expect((jsonSchema as any).$defs.effectModifier.oneOf).toHaveLength(13);
+    // The JSON twin declares every branch an effect may carry: the shared union minus the refused ones.
+    const effectTypes = ModifierSchema.options
+      .map((option) => option.shape.type.value)
+      .filter((type) => !EFFECT_REFUSED_MODIFIER_TYPES.includes(type));
+    expect(
+      (jsonSchema as any).$defs.effectModifier.oneOf.map((branch: any) => branch.properties.type.const).sort()
+    ).toEqual([...effectTypes].sort());
     // A branch only Zod knows about is a stored effect the JSON validator would reject on load.
-    expect(EffectModifierSchema.safeParse({ type: "speed", amount: -10 }).success).toBe(true);
-    expect(EffectModifierSchema.safeParse({ type: "speed", amount: 61 }).success).toBe(false);
+    expect(EffectModifiersSchema.safeParse([{ type: "speed", amount: -10 }]).success).toBe(true);
+    expect(EffectModifiersSchema.safeParse([{ type: "speed", amount: 61 }]).success).toBe(false);
     const striding = structuredClone(withRiders) as Record<string, any>;
     striding.actions[0].grants.modifiers = [{ type: "speed", amount: -10 }];
     expect(ActorDefinitionSchema.safeParse(striding).success).toBe(true);
     expect(jsonValidate(striding), JSON.stringify(jsonValidate.errors)).toBe(true);
   });
 
-  it("normalises every advantage shape through ONE function, so no consumer branches on eleven", () => {
-    // Legacy variants and `roll-mode` normalise to the same claim.
-    expect(toRollModes(EffectModifierSchema.parse({ type: "attack-advantage" }))).toEqual([
-      { roll: "attack", mode: "advantage" }
-    ]);
-    expect(toRollModes(EffectModifierSchema.parse({ type: "roll-mode", roll: "attack", mode: "advantage" }))).toEqual([
-      { roll: "attack", mode: "advantage" }
-    ]);
-    expect(toRollModes(EffectModifierSchema.parse({ type: "save-advantage", ability: "dex" }))).toEqual([
-      { roll: "save", mode: "advantage", ability: "dex" }
-    ]);
-    expect(toRollModes(EffectModifierSchema.parse({ type: "incoming-attack-disadvantage" }))).toEqual([
-      { roll: "incoming-attack", mode: "disadvantage" }
-    ]);
-    expect(toRollModes(EffectModifierSchema.parse({ type: "damage-bonus", amount: 2 }))).toEqual([]);
-    expect(toRollModes(EffectModifierSchema.parse({ type: "attack-bonus", amount: 1 }))).toEqual([]);
+  it("refuses on an effect what the sheet stores, and an unknown damage type or condition anywhere", () => {
+    // Stored numbers would outlast the effect, so the effect carrier refuses them; the vocabulary itself has them.
+    for (const type of EFFECT_REFUSED_MODIFIER_TYPES)
+      expect(ModifierSchema.options.some((option) => option.shape.type.value === type)).toBe(true);
+    const armor = EffectModifiersSchema.safeParse([{ type: "armor-class", amount: 2 }]);
+    expect(armor.success).toBe(false);
+    expect(armor.error?.issues[0].message).toContain('An effect cannot carry "armor-class"');
+    expect(EffectModifiersSchema.safeParse([{ type: "save-bonus", amount: 1 }]).success).toBe(true);
+    // Damage types and conditions in riders are the SRD's closed sets, so a typo cannot publish.
+    expect(ModifierSchema.safeParse({ type: "extra-damage", formula: "1d6", damageType: "fyre" }).success).toBe(false);
+    expect(ModifierSchema.safeParse({ type: "damage-resistance", damageTypes: ["fire"] }).success).toBe(true);
+    expect(RiderWhenSchema.safeParse([{ type: "while-condition", conditionIds: ["poisonned"] }]).success).toBe(false);
   });
 
-  it("declares thirty-one named triggers, every one classified and accepted by the JSON twin", () => {
+  it("declares twenty-eight named triggers, every one classified and accepted by the JSON twin", () => {
     // One sample per trigger: the JSON twin folds parameterless moments into one enum branch, so a branch count would
     // not prove agreement.
     const samples: Record<string, Record<string, unknown>> = {
@@ -498,14 +498,11 @@ describe("actor definition v1", () => {
       "on-attack-roll": {},
       "on-hit": {},
       "on-critical-hit": {},
-      "on-critical-miss": {},
       "on-damage-roll": {},
       "on-saving-throw": {},
       "on-ability-check": {},
       "on-initiative-roll": {},
-      "on-death-save": {},
       "on-taking-damage": {},
-      "on-spell-cast": {},
       "attack-kind-is": { kinds: ["opportunity"] },
       "weapon-property-is": { properties: ["finesse"] },
       "damage-type-is": { damageTypes: ["fire"] },
@@ -519,14 +516,14 @@ describe("actor definition v1", () => {
       "versus-condition": { conditionIds: ["prone"] }
     };
     const declared = RiderTriggerSchema.options.map((option) => option.shape.type.value as string);
-    expect(declared).toHaveLength(31);
+    expect(declared).toHaveLength(28);
     expect(Object.keys(samples).sort()).toEqual([...declared].sort());
     // Every trigger must be classified, or it would evaluate in the wrong layer.
     const kinds = declared.map((type) => RIDER_TRIGGER_KINDS[type as keyof typeof RIDER_TRIGGER_KINDS]);
     expect(kinds.filter((kind) => kind === undefined)).toEqual([]);
     expect(kinds.filter((kind) => kind === "static-gate")).toHaveLength(6);
     expect(kinds.filter((kind) => kind === "dynamic-gate")).toHaveLength(3);
-    expect(kinds.filter((kind) => kind === "moment")).toHaveLength(11);
+    expect(kinds.filter((kind) => kind === "moment")).toHaveLength(8);
     expect(kinds.filter((kind) => kind === "filter")).toHaveLength(11);
 
     for (const type of declared) {

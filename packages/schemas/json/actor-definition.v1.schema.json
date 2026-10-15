@@ -344,6 +344,44 @@
       "maxItems": 20
     },
     "damageTypeId": { "type": "string", "minLength": 1, "maxLength": 40 },
+    "damageType": {
+      "$comment": "The SRD's 13 damage types: the closed set a rider may name.",
+      "enum": [
+        "acid",
+        "bludgeoning",
+        "cold",
+        "fire",
+        "force",
+        "lightning",
+        "necrotic",
+        "piercing",
+        "poison",
+        "psychic",
+        "radiant",
+        "slashing",
+        "thunder"
+      ]
+    },
+    "condition": {
+      "$comment": "The SRD's 15 conditions: the closed set a rider may name.",
+      "enum": [
+        "blinded",
+        "charmed",
+        "deafened",
+        "exhaustion",
+        "frightened",
+        "grappled",
+        "incapacitated",
+        "invisible",
+        "paralyzed",
+        "petrified",
+        "poisoned",
+        "prone",
+        "restrained",
+        "stunned",
+        "unconscious"
+      ]
+    },
     "itemSlot": {
       "enum": [
         "weapon",
@@ -365,7 +403,7 @@
     },
     "slugList": { "type": "array", "minItems": 1, "maxItems": 12, "items": { "$ref": "#/$defs/slug" } },
     "riderTrigger": {
-      "$comment": "Thirty named triggers in four kinds (static gate, dynamic gate, moment, filter). The AND-list rules Zod enforces in RiderWhenSchema - at most one moment, a filter needs a moment, no repeated type - are structural refinements this document deliberately does not restate.",
+      "$comment": "Twenty-eight named triggers in four kinds (static gate, dynamic gate, moment, filter). The AND-list rules Zod enforces in RiderWhenSchema - at most one moment, a filter needs a moment, no repeated type - are structural refinements this document deliberately does not restate.",
       "oneOf": [
         {
           "type": "object",
@@ -446,7 +484,7 @@
               "type": "array",
               "minItems": 1,
               "maxItems": 6,
-              "items": { "$ref": "#/$defs/conditionId" }
+              "items": { "$ref": "#/$defs/condition" }
             },
             "present": { "type": "boolean" }
           },
@@ -461,14 +499,11 @@
                 "on-attack-roll",
                 "on-hit",
                 "on-critical-hit",
-                "on-critical-miss",
                 "on-damage-roll",
                 "on-saving-throw",
                 "on-ability-check",
                 "on-initiative-roll",
-                "on-death-save",
-                "on-taking-damage",
-                "on-spell-cast"
+                "on-taking-damage"
               ]
             }
           },
@@ -503,7 +538,7 @@
               "type": "array",
               "minItems": 1,
               "maxItems": 12,
-              "items": { "$ref": "#/$defs/damageTypeId" }
+              "items": { "$ref": "#/$defs/damageType" }
             }
           },
           "additionalProperties": false
@@ -579,7 +614,7 @@
               "type": "array",
               "minItems": 1,
               "maxItems": 6,
-              "items": { "$ref": "#/$defs/conditionId" }
+              "items": { "$ref": "#/$defs/condition" }
             }
           },
           "additionalProperties": false
@@ -589,83 +624,39 @@
     "riderWhen": { "type": "array", "maxItems": 4, "items": { "$ref": "#/$defs/riderTrigger" } },
     "riderScope": { "enum": ["bearer", "this-item"] },
     "effectModifier": {
+      "$comment": "The shared modifier vocabulary (Zod ModifierSchema) minus EFFECT_REFUSED_MODIFIER_TYPES, which an effect could not give back when it ends.",
       "oneOf": [
         {
           "type": "object",
           "required": ["type", "amount"],
           "properties": {
-            "type": { "const": "damage-bonus" },
-            "amount": { "type": "integer", "minimum": -20, "maximum": 20 },
-            "appliesTo": { "enum": ["melee", "all"] }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "damageTypes"],
-          "properties": {
-            "type": { "const": "damage-resistance" },
-            "damageTypes": { "$ref": "#/$defs/damageTypeList" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "damageTypes"],
-          "properties": {
-            "type": { "const": "damage-vulnerability" },
-            "damageTypes": { "$ref": "#/$defs/damageTypeList" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type"],
-          "properties": { "type": { "const": "attack-advantage" } },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type"],
-          "properties": { "type": { "const": "incoming-attack-advantage" } },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type"],
-          "properties": { "type": { "const": "attack-disadvantage" } },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type"],
-          "properties": { "type": { "const": "incoming-attack-disadvantage" } },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type"],
-          "properties": {
-            "type": { "const": "save-advantage" },
-            "ability": { "enum": ["str", "dex", "con", "int", "wis", "cha"] }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type"],
-          "properties": {
-            "type": { "const": "save-disadvantage" },
-            "ability": { "enum": ["str", "dex", "con", "int", "wis", "cha"] }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "amount"],
-          "properties": {
             "type": { "const": "speed" },
-            "amount": { "type": "integer", "minimum": -30, "maximum": 60 }
+            "amount": { "type": "integer", "minimum": -30, "maximum": 60 },
+            "when": { "$ref": "#/$defs/riderWhen" },
+            "scope": { "$ref": "#/$defs/riderScope" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "count"],
+          "properties": {
+            "type": { "const": "extra-attack" },
+            "count": { "type": "integer", "minimum": 1, "maximum": 3 },
+            "when": { "$ref": "#/$defs/riderWhen" },
+            "scope": { "$ref": "#/$defs/riderScope" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "poolId", "amount"],
+          "properties": {
+            "type": { "const": "resource-bonus" },
+            "poolId": { "$ref": "#/$defs/slug" },
+            "amount": { "type": "integer", "minimum": -20, "maximum": 20 },
+            "when": { "$ref": "#/$defs/riderWhen" },
+            "scope": { "$ref": "#/$defs/riderScope" }
           },
           "additionalProperties": false
         },
@@ -682,13 +673,21 @@
         },
         {
           "type": "object",
-          "required": ["type", "damageType"],
+          "required": ["type", "amount"],
           "properties": {
-            "type": { "const": "extra-damage" },
-            "formula": { "$ref": "#/$defs/dice" },
-            "abilityModifier": { "$ref": "#/$defs/abilityId" },
-            "damageType": { "$ref": "#/$defs/damageTypeId" },
-            "doubleOnCritical": { "type": "boolean" },
+            "type": { "const": "save-bonus" },
+            "amount": { "type": "integer", "minimum": -10, "maximum": 10 },
+            "when": { "$ref": "#/$defs/riderWhen" },
+            "scope": { "$ref": "#/$defs/riderScope" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "amount"],
+          "properties": {
+            "type": { "const": "check-bonus" },
+            "amount": { "type": "integer", "minimum": -10, "maximum": 10 },
             "when": { "$ref": "#/$defs/riderWhen" },
             "scope": { "$ref": "#/$defs/riderScope" }
           },
@@ -699,10 +698,122 @@
           "required": ["type", "roll", "mode"],
           "properties": {
             "type": { "const": "roll-mode" },
-            "roll": {
-              "enum": ["attack", "incoming-attack", "save", "check", "initiative", "death-save", "concentration"]
-            },
+            "roll": { "enum": ["attack", "incoming-attack", "save", "check", "initiative", "concentration"] },
             "mode": { "enum": ["advantage", "disadvantage"] },
+            "when": { "$ref": "#/$defs/riderWhen" },
+            "scope": { "$ref": "#/$defs/riderScope" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "amount"],
+          "properties": {
+            "type": { "const": "damage-bonus" },
+            "amount": { "type": "integer", "minimum": -10, "maximum": 10 },
+            "when": { "$ref": "#/$defs/riderWhen" },
+            "scope": { "$ref": "#/$defs/riderScope" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "damageType"],
+          "properties": {
+            "type": { "const": "extra-damage" },
+            "formula": { "$ref": "#/$defs/dice" },
+            "abilityModifier": { "$ref": "#/$defs/abilityId" },
+            "damageType": { "$ref": "#/$defs/damageType" },
+            "doubleOnCritical": { "type": "boolean" },
+            "when": { "$ref": "#/$defs/riderWhen" },
+            "scope": { "$ref": "#/$defs/riderScope" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "threshold"],
+          "properties": {
+            "type": { "const": "critical-range" },
+            "threshold": { "type": "integer", "minimum": 15, "maximum": 20 },
+            "when": { "$ref": "#/$defs/riderWhen" },
+            "scope": { "$ref": "#/$defs/riderScope" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "count"],
+          "properties": {
+            "type": { "const": "critical-bonus-dice" },
+            "count": { "type": "integer", "minimum": 1, "maximum": 4 },
+            "when": { "$ref": "#/$defs/riderWhen" },
+            "scope": { "$ref": "#/$defs/riderScope" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "amount"],
+          "properties": {
+            "type": { "const": "damage-reduction" },
+            "amount": { "type": "integer", "minimum": 1, "maximum": 30 },
+            "when": { "$ref": "#/$defs/riderWhen" },
+            "scope": { "$ref": "#/$defs/riderScope" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "damageTypes"],
+          "properties": {
+            "type": { "const": "damage-resistance" },
+            "damageTypes": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 13,
+              "items": { "$ref": "#/$defs/damageType" }
+            },
+            "when": { "$ref": "#/$defs/riderWhen" },
+            "scope": { "$ref": "#/$defs/riderScope" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "damageTypes"],
+          "properties": {
+            "type": { "const": "damage-vulnerability" },
+            "damageTypes": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 13,
+              "items": { "$ref": "#/$defs/damageType" }
+            },
+            "when": { "$ref": "#/$defs/riderWhen" },
+            "scope": { "$ref": "#/$defs/riderScope" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "amount"],
+          "properties": {
+            "type": { "const": "spell-save-dc" },
+            "amount": { "type": "integer", "minimum": -5, "maximum": 5 },
+            "classId": { "$ref": "#/$defs/slug" },
+            "when": { "$ref": "#/$defs/riderWhen" },
+            "scope": { "$ref": "#/$defs/riderScope" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "amount"],
+          "properties": {
+            "type": { "const": "spell-attack-bonus" },
+            "amount": { "type": "integer", "minimum": -5, "maximum": 5 },
+            "classId": { "$ref": "#/$defs/slug" },
             "when": { "$ref": "#/$defs/riderWhen" },
             "scope": { "$ref": "#/$defs/riderScope" }
           },
@@ -736,7 +847,27 @@
           "required": ["ability", "dc"],
           "properties": {
             "ability": { "enum": ["str", "dex", "con", "int", "wis", "cha"] },
-            "dc": { "type": "integer", "minimum": 1, "maximum": 40 }
+            "dc": { "type": "integer", "minimum": 1, "maximum": 40 },
+            "successDamage": { "enum": ["half", "none"], "default": "half" },
+            "failureCondition": {
+              "enum": [
+                "blinded",
+                "charmed",
+                "deafened",
+                "frightened",
+                "grappled",
+                "incapacitated",
+                "paralyzed",
+                "petrified",
+                "poisoned",
+                "prone",
+                "restrained",
+                "stunned",
+                "unconscious",
+                null
+              ],
+              "default": null
+            }
           },
           "additionalProperties": false
         },

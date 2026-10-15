@@ -138,13 +138,12 @@ describe("The play glossary (D28)", () => {
       expect(dirs.has(dir), `apps/client/src/${dir}/ is not in the scan`).toBe(true);
     }
     expect(dirs.has("codex"), "codex/ has its own lock and must stay out of this one").toBe(false);
-    expect(dirs.has("styleguide"), "styleguide/ must be able to demo a retired word").toBe(false);
   });
 
   it("sees the copy shapes a naive scanner is blind to", () => {
     // Named strings, so a narrowed scanner fails by name: an object-literal confirm title, an
     // object-literal confirm body, and a template literal.
-    expect(at("apps/client/src/replay/ReplayPanel.tsx", "Delete this replay?"), "object-literal confirm title").toBe(
+    expect(at("apps/client/src/replay/ReplayList.tsx", "Delete this replay?"), "object-literal confirm title").toBe(
       true
     );
     expect(
@@ -243,12 +242,16 @@ describe("The structured copy, pinned at its one definition (D28)", () => {
   });
 
   it("calls the place the Table and never the Encounter", () => {
-    // "Encounter" is a fight, not a place. `main.tsx` calls `createRoot` at import, so its tab table is
-    // checked through the scan (its rows are `label: "…"`); the order is not pinned here.
+    // "Encounter" is a fight, not a place. The GM tab table is checked through the scan (its rows are
+    // `label: "…"`); the order is not pinned here.
     for (const label of ["Table", "Scenes", "Roster", "Codex", "Homebrew", "Settings"]) {
-      expect(at("apps/client/src/main.tsx", label), `the GM tab bar no longer has a "${label}" tab`).toBe(true);
+      expect(at("apps/client/src/shell/GmShell.tsx", label), `the GM tab bar no longer has a "${label}" tab`).toBe(
+        true
+      );
     }
-    expect(at("apps/client/src/main.tsx", "Encounter"), 'the table tab is labelled "Encounter" again').toBe(false);
+    expect(at("apps/client/src/shell/GmShell.tsx", "Encounter"), 'the table tab is labelled "Encounter" again').toBe(
+      false
+    );
   });
 });
 

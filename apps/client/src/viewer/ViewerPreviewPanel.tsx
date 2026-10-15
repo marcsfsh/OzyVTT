@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { apiRequest } from "../lib/api";
 import "./viewer-preview.css";
 
 type Rect = Readonly<{ x: number; y: number; width: number; height: number }>;
@@ -21,9 +22,9 @@ export function ViewerPreviewPanel({ gmToken, onClose }: Readonly<{ gmToken: str
   // Set the preview cookie before loading the iframe, so it authenticates without pairing.
   useEffect(() => {
     let cancelled = false;
-    void fetch("/api/v1/viewer/preview-session", { method: "POST", headers: { authorization: `Bearer ${gmToken}` } })
-      .then((response) => {
-        if (!cancelled) setSession(response.ok ? "ready" : "error");
+    apiRequest("/api/v1/viewer/preview-session", { token: gmToken, method: "POST" })
+      .then(() => {
+        if (!cancelled) setSession("ready");
       })
       .catch(() => {
         if (!cancelled) setSession("error");

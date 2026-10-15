@@ -9,8 +9,7 @@ import {
   resolveDice,
   sumRiders,
   type AggregatedRollMode,
-  type RandomSource,
-  type RollModeSource
+  type RandomSource
 } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
@@ -18,13 +17,14 @@ import { recordRoll as recordRollInHistory, rolledTerms } from "./roll-history.j
 import { requireGm, type Initiator } from "./authorization.js";
 import { applyDamageDetailed, adjustableActor } from "./hit-points.js";
 import { setCondition } from "./actor-conditions.js";
-import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
+import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty } from "./condition-rules.js";
 import { addEffect, endEffectIfPresent, makeEffect, type EffectNarration } from "./effects.js";
 import {
   deriveEquipment,
-  EMPTY_DERIVATION,
+  rollModeClaims,
   type EquipmentCatalog,
-  type EquipmentDerivation
+  type EquipmentDerivation,
+  type RollModeClaims
 } from "./equipment-derivation.js";
 
 export type SaveAnswerDependencies = Readonly<{
@@ -53,43 +53,31 @@ export type SaveOutcome = Readonly<{
   rollMode?: AggregatedRollMode;
 }>;
 
-/** Advantage/disadvantage sources for a save (SRD: Restrained gives disadvantage on DEX saves; Dodge, item
- *  riders). Mirrors attackRollSources. */
+/** Advantage/disadvantage sources for a save: Restrained gives disadvantage on DEX saves (SRD), and every
+ *  carrier's `roll-mode` riders (Dodge, Rage, items), narrowed by `ability-is`. A concentration check also
+ *  collects `roll: "concentration"`. Mirrors attackRollSources. */
 export function saveRollSources(
   target: Actor,
   ability: AbilityId,
-  derivation: EquipmentDerivation = EMPTY_DERIVATION
-): { advantage: RollModeSource[]; disadvantage: RollModeSource[] } {
-  const advantage: RollModeSource[] = [];
-  const disadvantage: RollModeSource[] = [];
+  derivation: EquipmentDerivation,
+  concentration = false
+): RollModeClaims {
+  const claims: RollModeClaims = { advantage: [], disadvantage: [] };
   if (ability === "dex" && target.conditions.some((condition) => condition.id === "restrained")) {
-    disadvantage.push({ source: "target-restrained", label: "Restrained (Dex saves)" });
+    claims.disadvantage.push({ source: "target-restrained", label: "Restrained (Dex saves)" });
   }
-  // Effect modifiers (Dodge's Dex-save advantage); voidWhileIncapacitated effects lapse per the SRD.
-  const incapacitated = isIncapacitated(target);
-  for (const effect of target.effects) {
-    if (effect.voidWhileIncapacitated && incapacitated) continue;
-    for (const modifier of effect.modifiers) {
-      if (modifier.type === "save-advantage" && (modifier.ability === undefined || modifier.ability === ability))
-        advantage.push({ source: effect.id, label: effect.name });
-      if (modifier.type === "save-disadvantage" && (modifier.ability === undefined || modifier.ability === ability))
-        disadvantage.push({ source: effect.id, label: effect.name });
-    }
-  }
-  // Item riders: standing ones (no `when`) and `on-saving-throw` ones narrowed by `ability-is`; disjoint passes.
-  for (const moment of [null, "on-saving-throw"] as const) {
-    for (const rider of collectRiders(derivation.carriers, { ...derivation.context, ability, moment })) {
-      if (rider.modifier.type !== "roll-mode" || rider.modifier.roll !== "save") continue;
-      (rider.modifier.mode === "advantage" ? advantage : disadvantage).push({
-        source: `item:${rider.sourceItemId ?? rider.label}`,
-        label: rider.label
-      });
-    }
-  }
-  return { advantage, disadvantage };
+  return rollModeClaims(
+    derivation,
+    concentration ? ["save", "concentration"] : ["save"],
+    "on-saving-throw",
+    {
+      ability
+    },
+    claims
+  );
 }
 
-/** The flat item bonus to one saving throw: standing plus momentary. */
+/** The flat rider bonus to one saving throw: standing plus momentary. */
 export function saveRiderBonus(derivation: EquipmentDerivation, ability: AbilityId): number {
   const momentary = collectRiders(derivation.carriers, { ...derivation.context, ability, moment: "on-saving-throw" });
   // `derivation.saveBonus` is the summed standing half; only momentary riders are added here.
@@ -97,32 +85,6 @@ export function saveRiderBonus(derivation: EquipmentDerivation, ability: Ability
 }
 
 const ABILITIES: readonly AbilityId[] = ["str", "dex", "con", "int", "wis", "cha"];
-
-/** SRD 2024 stat blocks print "Success: Half damage."; without an explicit "no damage" success line, default to half. */
-export function halfOnSuccessFrom(description: string): boolean {
-  return !/success:?\s*(the target )?(takes? )?no\b/i.test(description);
-}
-
-const CONDITION_WORDS: ReadonlyArray<readonly [RegExp, string]> = [
-  [/\bprone\b/i, "prone"],
-  [/\bpoisoned\b/i, "poisoned"],
-  [/\bparalyzed\b/i, "paralyzed"],
-  [/\bstunned\b/i, "stunned"],
-  [/\brestrained\b/i, "restrained"],
-  [/\bgrappled\b/i, "grappled"],
-  [/\bfrightened\b/i, "frightened"],
-  [/\bblinded\b/i, "blinded"],
-  [/\bcharmed\b/i, "charmed"],
-  [/\bdeafened\b/i, "deafened"],
-  [/\bincapacitated\b/i, "incapacitated"],
-  [/\bpetrified\b/i, "petrified"],
-  [/\bunconscious\b/i, "unconscious"]
-];
-/** Best-guess condition a failed save imposes, from the prose ("...or be Poisoned"); the answerer confirms it. */
-export function conditionFrom(description: string): string | null {
-  for (const [pattern, id] of CONDITION_WORDS) if (pattern.test(description)) return id;
-  return null;
-}
 
 /** Save modifier without situational terms. Precedence: GM-typed `saveOverrides`, the sheet's
  *  `proficiencies.saves`, the open5e extension's monster totals, then the bare ability modifier. */
@@ -312,7 +274,8 @@ export function answerSave(
     // Exhaustion (-2 x level, SRD 5.2.1) and item save bonuses come through `saveTotalFor`, shared with
     // the sheet's chip; cover's per-save bonus is added on top.
     const modifier = saveTotalFor(definition, target, pending.ability, derivation) + pending.saveBonus;
-    const sources = saveRollSources(target, pending.ability, derivation);
+    // A save that ends effects when failed is a concentration check.
+    const sources = saveRollSources(target, pending.ability, derivation, pending.endsEffects !== undefined);
     const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
     // An explicit choice (the answerer's button, or a forced "normal") wins over detected sources.
     const mode = explicitRollMode ?? aggregated.mode;

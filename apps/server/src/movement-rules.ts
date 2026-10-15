@@ -1,11 +1,20 @@
 import type { EncounterTokenPosition, GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { RulesBlockedError } from "./game-store.js";
-import { effectiveSpeedFeet, isIncapacitated } from "./condition-rules.js";
+import { isIncapacitated } from "./condition-rules.js";
 import { effectiveActions } from "./effective-actions.js";
-import type { EquipmentCatalog } from "./equipment-derivation.js";
+import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
+import { effectiveSpeedFeet } from "./speed.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
-import { effectiveModeFor, familyModeFor, overrideCovers, overrideReason, rememberOverride } from "./rules-families.js";
+import {
+  effectiveModeFor,
+  familyModeFor,
+  overrideCovers,
+  overrideReason,
+  overrideWaives,
+  rememberOverride,
+  type RulesOverride
+} from "./rules-families.js";
 
 type Point = Readonly<{ x: number; y: number }>;
 
@@ -19,7 +28,7 @@ export type MovementRulesInput = Readonly<{
   distance: (a: Point, b: Point) => number | null;
   /** Footprint-aware feet between an enemy and the mover at `point` (SRD: nearest point of each space); center-to-center when absent. Used for reach. */
   creatureDistance?: (enemy: Readonly<{ actorId: string; position: Point }>, moverPoint: Point) => number | null;
-  override: Readonly<{ reason?: string }> | null;
+  override: RulesOverride | null;
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
   /** The item catalog, so a reach-granting item widens the opportunity-attack trigger. */
   catalog?: EquipmentCatalog;
@@ -70,12 +79,14 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   }
 
   const moved = input.distance(from, to);
-  const effective = effectiveSpeedFeet(mover);
+  const moverDefinition = mover.definitionId ? input.resolveDefinition(mover.definitionId) : undefined;
+  const effective = effectiveSpeedFeet(mover, deriveEquipment(mover, moverDefinition, input.catalog));
   if (moved !== null && effective !== null && moved > 0.05) {
     const used = state.combat.turn.movementUsedFeet;
     const overrun = used + moved > effective + 1e-6;
     const rule = effective === 0 ? "movement.no-movement-remaining" : "movement.exceeds-speed";
-    if (overrun && !input.override) {
+    const waived = overrideWaives(input.override, rule);
+    if (overrun && !waived) {
       const message =
         effective === 0
           ? `${mover.name} can't move - its Speed is 0.`
@@ -85,9 +96,9 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
         throw new RulesBlockedError(rule, message);
       warning = message;
     }
-    if (overrun && input.override) {
+    if (overrun && waived) {
       overridden = overrideReason(input.override);
-      rememberOverride(state, rule);
+      rememberOverride(state, rule, input.override);
     }
     state.combat = { ...state.combat, turn: { ...state.combat.turn, movementUsedFeet: used + moved } };
   }
