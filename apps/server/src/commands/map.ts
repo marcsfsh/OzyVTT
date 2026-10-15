@@ -20,7 +20,7 @@ import {
   AnnotationRemoveSchema,
   AnnotationVisibilitySetSchema,
   TokenMoveSchema
-} from "../game-commands.js";
+} from "@vtt/domain/commands";
 import { CommandRejectedError } from "../game-store.js";
 import { applyMovementRules } from "../movement-rules.js";
 import { creatureDistance, mapDistance, narrateTokenMove, type MovementNarration } from "../movement-narration.js";

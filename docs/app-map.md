@@ -29,7 +29,7 @@ single JSON blob the server persists and projects per role.
 
 The mutation surface shared by both transports (Socket.IO + HTTP `/api/v1`); each requires the
 listed integration scope. Adding one: its typed socket event in domain `ClientToServerEvents`, its
-schema in `game-commands.ts`, its route and scope in `GAME_COMMANDS` (`packages/api-contract`) with an
+schema in `packages/domain/src/commands.ts`, its route and scope in `GAME_COMMANDS` (`packages/api-contract`) with an
 OpenAPI operation, and one table entry under `apps/server/src/commands/`, which both transports
 register from. Then the projection decision.
 
@@ -338,7 +338,7 @@ Curated pointers (verify line numbers before relying on them - code moves):
 
 - **Wire contract (single source):** `packages/domain/src/index.ts` - `GameState`, projections (`PlayerView`/`GmView`), `ClientToServerEvents`/`ServerToClientEvents`.
 - **Persisted/importable schemas:** `packages/schemas/src/index.ts` - `Actor`, `ActorDefinition`.
-- **Command Zod schemas:** `apps/server/src/game-commands.ts`.
+- **Command Zod schemas:** `packages/domain/src/commands.ts`.
 - **Command table + pipeline:** `apps/server/src/commands/` (`index.ts` lists every command).
 - **Scopes + OpenAPI:** `packages/api-contract/src/index.ts`.
 - **Projections (GM/player security boundary):** `apps/server/src/projections.ts`.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
-import { ApplyDamageSchema } from "../../../server/src/game-commands";
+import { ApplyDamageSchema } from "@vtt/domain/commands";
 import { applyDamageDetailed, damageAdjustmentDetail, isSrdDamageType } from "../../../server/src/hit-points";
 import { manualDamagePayload, manualDamageType } from "./manual-damage";
 

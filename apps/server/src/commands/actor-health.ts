@@ -12,7 +12,7 @@ import {
   SetConditionSchema,
   SetHpSchema,
   TempHpSchema
-} from "../game-commands.js";
+} from "@vtt/domain/commands";
 import { CommandRejectedError } from "../game-store.js";
 import {
   applyDamageDetailed,

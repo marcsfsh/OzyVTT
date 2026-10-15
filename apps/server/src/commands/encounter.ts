@@ -24,7 +24,7 @@ import {
   TurnLegendarySchema,
   TurnReactionSchema,
   TurnUseSchema
-} from "../game-commands.js";
+} from "@vtt/domain/commands";
 import { CommandRejectedError, type JournalEntry } from "../game-store.js";
 import { endTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "../turn-economy.js";
 import { initiatorOf, principalTag } from "./kit.js";

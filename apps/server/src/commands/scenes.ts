@@ -10,7 +10,7 @@ import {
   SceneRenameSchema,
   SceneReorderSchema,
   SceneSetCombatantsSchema
-} from "../game-commands.js";
+} from "@vtt/domain/commands";
 import { CommandRejectedError } from "../game-store.js";
 import { launchReplay } from "../replay-launch.js";
 import {

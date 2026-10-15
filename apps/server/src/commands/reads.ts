@@ -10,7 +10,7 @@ import { BUILTIN_ACTIONS, BUILTIN_TARGETING } from "../builtin-actions.js";
 import { actionSummaryOf, type ContentView } from "../content-library.js";
 import { effectiveActions } from "../effective-actions.js";
 import { deriveEquipment } from "../equipment-derivation.js";
-import { ActorAvailableActionsSchema, BuilderOffersSchema, ContentActionsSchema } from "../game-commands.js";
+import { ActorAvailableActionsSchema, BuilderOffersSchema, ContentActionsSchema } from "@vtt/domain/commands";
 import { GameNotFoundError } from "./failures.js";
 import { initiatorOf, isGmGrade, type GamePrincipal, type Kit } from "./kit.js";
 import type { ReadSpec } from "./pipeline.js";

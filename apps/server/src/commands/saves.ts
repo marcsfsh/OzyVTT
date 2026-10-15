@@ -3,7 +3,7 @@ import { requireActorAccess } from "../authorization.js";
 import { rollDeathSave } from "../death-saves.js";
 import type { EffectNarration } from "../effects.js";
 import { deriveEquipment } from "../equipment-derivation.js";
-import { DeathSaveRollSchema, SaveAnswerSchema, SaveDismissSchema, SaveRollSchema } from "../game-commands.js";
+import { DeathSaveRollSchema, SaveAnswerSchema, SaveDismissSchema, SaveRollSchema } from "@vtt/domain/commands";
 import { CommandRejectedError } from "../game-store.js";
 import { damageAdjustmentDetail, healActor } from "../hit-points.js";
 import { answerSave, dismissSave, saveTotalFor } from "../saving-throws.js";

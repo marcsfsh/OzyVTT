@@ -10,7 +10,7 @@ import {
   CharacterSetProficienciesSchema,
   CharacterSetSlotSchema,
   CommandIdentitySchema
-} from "../game-commands.js";
+} from "@vtt/domain/commands";
 import { setCurrency, setInventoryItem } from "../inventory.js";
 import { setPreparedSpell, setSpellSlotRemaining } from "../spellcasting.js";
 import { initiatorOf, sessionIdOf } from "./kit.js";

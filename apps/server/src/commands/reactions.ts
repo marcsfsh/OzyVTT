@@ -1,4 +1,4 @@
-import { DamageResolveSchema, ReactionAnswerSchema, ReactionDismissSchema } from "../game-commands.js";
+import { DamageResolveSchema, ReactionAnswerSchema, ReactionDismissSchema } from "@vtt/domain/commands";
 import { damageAdjustmentDetail } from "../hit-points.js";
 import { resolvePendingDamage, type AppliedDamage } from "../player-damage.js";
 import { answerReaction, dismissReaction } from "../reactions.js";

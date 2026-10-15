@@ -18,7 +18,7 @@ import { socket } from "../socket";
 import { TokenContextMenu } from "../scene/TokenContextMenu";
 import { EncounterPanel } from "./EncounterPanel";
 import { HpAdjust } from "./HpAdjust";
-import { ApplyDamageSchema } from "../../../server/src/game-commands";
+import { ApplyDamageSchema } from "@vtt/domain/commands";
 
 /**
  * Each hand-entry damage door (token menu, tracker popover, sheet HP box) sends the picked damage

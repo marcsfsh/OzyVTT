@@ -6,15 +6,98 @@ import {
   type Actor,
   type ActorDefinition,
   type EffectInstance,
-  type CharacterChoice,
-  type HitDie,
-  type Modifier
+  type CharacterChoice
 } from "@vtt/schemas";
 
 export * from "./catalog-choice.js";
 export * from "./pick-budget.js";
 import type { CatalogChoiceOption } from "./catalog-choice.js";
 import type { PickBudgetScaling } from "./pick-budget.js";
+// Type-only: commands.ts imports this module at runtime, so a value import here would be a cycle.
+import type {
+  ActionResolveSchema,
+  ActionUseSchema,
+  ActorAddFromDefinitionSchema,
+  ActorImportDefinitionSchema,
+  ActorRechooseSchema,
+  ActorRemoveSchema,
+  ActorRestSchema,
+  ActorSetSpeedSchema,
+  ActorSpendHitDiceSchema,
+  AddCombatantSchema,
+  AnnotationAddSchema,
+  AnnotationClearSchema,
+  AnnotationColorSetSchema,
+  AnnotationMovableSetSchema,
+  AnnotationMoveSchema,
+  AnnotationPingSchema,
+  AnnotationRemoveSchema,
+  AnnotationVisibilitySetSchema,
+  ApplyDamageSchema,
+  BuilderRollAbilitiesSchema,
+  BuilderSetPolicySchema,
+  CharacterCreateSchema,
+  CharacterGenerateSchema,
+  CharacterRebuildSchema,
+  CharacterResolveImportSchema,
+  CharacterSetCurrencySchema,
+  CharacterSetIdentitySchema,
+  CharacterSetInventorySchema,
+  CharacterSetPreparedSchema,
+  CharacterSetProficienciesSchema,
+  CharacterSetSlotSchema,
+  CharacterSubmitImportSchema,
+  CommandIdentitySchema,
+  DamageResolveSchema,
+  DeathSaveRollSchema,
+  DiceRollSchema,
+  EffectAddSchema,
+  EffectEndSchema,
+  EncounterStartSchema,
+  FogPaintSchema,
+  FogResetSchema,
+  FogSetEnabledSchema,
+  HpAmountSchema,
+  InitiativeNextSchema,
+  InitiativePreviousSchema,
+  InitiativeRollRemainingSchema,
+  InitiativeRollSelfSchema,
+  InitiativeScoreSchema,
+  ReactionAnswerSchema,
+  ReactionDismissSchema,
+  ReplayLaunchSchema,
+  RulesAnswerSchema,
+  RulesAskSchema,
+  RulesSetPolicySchema,
+  SaveAnswerSchema,
+  SaveDismissSchema,
+  SaveRollSchema,
+  SceneCreateSchema,
+  SceneIdSchema,
+  SceneRenameSchema,
+  SceneReorderSchema,
+  SceneSetCombatantsSchema,
+  SetActorArchivedSchema,
+  SetActorHealthDisplaySchema,
+  SetActorSheetPreviewSchema,
+  SetActorSizeSchema,
+  SetActorVisibilitySchema,
+  SetConditionSchema,
+  SetEnvironmentSchema,
+  SetHealthDisplaySchema,
+  SetHpSchema,
+  SetPlayerDamageModeSchema,
+  SetPlayerInitiativeModeSchema,
+  SetRulesModeSchema,
+  SetTokenImageSchema,
+  TableSetPartyVisibilitySchema,
+  TableSetStagingDefaultsSchema,
+  TempHpSchema,
+  TokenMoveSchema,
+  TurnLegendarySchema,
+  TurnReactionSchema,
+  TurnUseSchema
+} from "./commands.js";
 
 /** Codex field vocabulary, shared so the GM UI and the server's prune-and-seal read one copy. */
 export * from "./codex-entities.js";
@@ -1551,18 +1634,28 @@ export type ActorActionsAvailabilityResult = {
   actions?: readonly ActionAvailability[];
   derived?: ActorDerivedSheet;
 };
+/** JSON a caller may build from readonly data: arrays and objects at any depth may be readonly. */
+type ReadonlyJson<T> = T extends readonly (infer Item)[]
+  ? readonly ReadonlyJson<Item>[]
+  : T extends object
+    ? { readonly [Key in keyof T]: ReadonlyJson<T[Key]> }
+    : T;
+/** A command's payload as a caller writes it: the input of the schema the server parses it with, so defaults
+ *  may be left out and a field the server adds can't be missed here. */
+type CommandPayload<Schema extends z.ZodType> = ReadonlyJson<z.input<Schema>>;
+
 export interface ClientToServerEvents {
   "session:join": (payload: { token?: string }, acknowledgement: (result: SessionJoinResult) => void) => void;
   "character:claim": (
-    payload: { commandId: string; actorId: string; expectedRevision?: number },
+    payload: CommandPayload<typeof ActorRemoveSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "character:release": (
-    payload: { commandId: string; expectedRevision?: number },
+    payload: CommandPayload<typeof CommandIdentitySchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "character:force-release": (
-    payload: { commandId: string; actorId: string; expectedRevision?: number },
+    payload: CommandPayload<typeof ActorRemoveSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "content:monsters": (
@@ -1571,231 +1664,136 @@ export interface ClientToServerEvents {
   ) => void;
   /** `joinEncounter` also adds the new combatant to the running fight (initiative + tray token) in the same command. Ignored when no fight is running. */
   "actor:add-from-definition": (
-    payload: {
-      commandId: string;
-      definitionId: string;
-      visibility?: "public" | "gm-only";
-      joinEncounter?: boolean;
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof ActorAddFromDefinitionSchema>,
     acknowledgement: (result: ActorAddResult) => void
   ) => void;
   "actor:remove": (
-    payload: { commandId: string; actorId: string; expectedRevision?: number },
+    payload: CommandPayload<typeof ActorRemoveSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "actor:import-definition": (
-    payload: { commandId: string; definition: unknown; visibility?: "public" | "gm-only"; expectedRevision?: number },
+    payload: CommandPayload<typeof ActorImportDefinitionSchema>,
     acknowledgement: (result: ActorAddResult) => void
   ) => void;
   "character:submit-import": (
-    payload: { commandId: string; definition: unknown; expectedRevision?: number },
+    payload: CommandPayload<typeof CharacterSubmitImportSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "character:resolve-import": (
-    payload: { commandId: string; importId: string; approve: boolean; expectedRevision?: number },
+    payload: CommandPayload<typeof CharacterResolveImportSchema>,
     acknowledgement: (result: ActorAddResult) => void
   ) => void;
   /** Roll a whole character server-side. The caller picks the level and optionally the class; the server makes every other pick. */
   "character:generate": (
-    payload: { commandId: string; level: number; classId?: string; name?: string; expectedRevision?: number },
+    payload: CommandPayload<typeof CharacterGenerateSchema>,
     acknowledgement: (result: ActorAddResult) => void
   ) => void;
   /** Create a character from choices; the server's feature-rider interpreter builds and imports the ActorDefinition. */
   "character:create": (
-    payload: {
-      commandId: string;
-      name: string;
-      speciesId: string;
-      backgroundId: string;
-      classId: string;
-      level: number;
-      subclassId?: string;
-      abilityMethod: BuilderAbilityMethod;
-      baseScores: Record<AbilityId, number>;
-      backgroundBonusAllocation: ReadonlyArray<{ ability: AbilityId; amount: number }>;
-      hp: { mode: "average" | "entries"; entries?: readonly number[] };
-      choices: ReadonlyArray<{
-        level: number;
-        classId?: string;
-        kind: string;
-        id: string;
-        payload?: Record<string, unknown>;
-      }>;
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof CharacterCreateSchema>,
     acknowledgement: (result: ActorAddResult) => void
   ) => void;
   "builder:set-policy": (
-    payload: {
-      commandId: string;
-      allowedAbilityMethods: readonly BuilderAbilityMethod[];
-      customFormula?: string | null;
-      maxLevel?: number;
-      playerBuilder?: "open" | "gm-only";
-      playerRandom?: "open" | "gm-only";
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof BuilderSetPolicySchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** Rebuild or respec a character. The GM may rebuild anyone; a player only their own while the builder is open. */
   "character:rebuild": (
-    payload: {
-      commandId: string;
-      actorId: string;
-      speciesId: string;
-      backgroundId: string;
-      classId: string;
-      level: number;
-      subclassId?: string;
-      abilityMethod: BuilderAbilityMethod;
-      baseScores: Record<AbilityId, number>;
-      backgroundBonusAllocation: ReadonlyArray<{ ability: AbilityId; amount: number }>;
-      hp: { mode: "average" | "entries"; entries?: readonly number[] };
-      choices: ReadonlyArray<{
-        level: number;
-        classId?: string;
-        kind: string;
-        id: string;
-        payload?: Record<string, unknown>;
-      }>;
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof CharacterRebuildSchema>,
     acknowledgement: (result: MutationResult & { actorId?: string }) => void
   ) => void;
   /** Roll six ability scores server-side for the builder; the set lands in the table feed. */
   "builder:offers": (payload: BuilderOffersRequest, acknowledgement: (result: BuilderOffersResult) => void) => void;
   "builder:roll-abilities": (
-    payload: { commandId: string; method: "roll" | "custom"; expectedRevision?: number },
+    payload: CommandPayload<typeof BuilderRollAbilitiesSchema>,
     acknowledgement: (
       result: MutationResult & { scores?: readonly number[]; dice?: ReadonlyArray<readonly number[]>; rollId?: string }
     ) => void
   ) => void;
   /** GM sets the standing rules policy every new fight inherits. Omitted `exceptions` keeps the stored ones. */
   "rules:set-policy": (
-    payload: { commandId: string; dial: RuleMode; exceptions?: RuleExceptions; expectedRevision?: number },
+    payload: CommandPayload<typeof RulesSetPolicySchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** `route` is `resolved` (on this creature's turn in the fight) or `loose` (no fight). Off turn it returns `blocked`. */
   "action:use": (
-    payload: {
-      commandId: string;
-      actorId: string;
-      actionId: string;
-      targetIds?: readonly string[];
-      rollMode?: "advantage" | "disadvantage" | "normal";
-      includeDamage?: boolean;
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof ActionUseSchema>,
     acknowledgement: (
       result: MutationResult & { route?: "resolved" | "loose"; rollIds?: readonly string[]; warning?: string }
     ) => void
   ) => void;
   /** Roll a saving throw: answers a matching pending save (`route: "answered"`), else a loose attributed save. */
   "save:roll": (
-    payload: {
-      commandId: string;
-      actorId: string;
-      ability: AbilityId;
-      rollMode?: "advantage" | "disadvantage" | "normal";
-      total?: number;
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof SaveRollSchema>,
     acknowledgement: (
       result: MutationResult & { route?: "answered" | "loose"; saveId?: string; rollId?: string }
     ) => void
   ) => void;
   /** The server first re-runs the command as the player; only a still-blocked one is parked for the GM (`askId`). */
   "rules:ask": (
-    payload: { commandId: string; type: AskableCommand; payload: unknown; expectedRevision?: number },
+    payload: CommandPayload<typeof RulesAskSchema>,
     acknowledgement: (result: MutationResult & { askId?: string; ran?: boolean }) => void
   ) => void;
   /** GM answers a parked ask: Allow re-runs the parked command with an override (reason optional), Deny tells the player. */
   "rules:answer": (
-    payload: { commandId: string; askId: string; allow: boolean; reason?: string; expectedRevision?: number },
+    payload: CommandPayload<typeof RulesAnswerSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** GM sets the table's staging defaults (the visibility a newly staged combatant's token starts at). */
   "table:set-staging-defaults": (
-    payload: { commandId: string; visibility: "public" | "gm-only"; expectedRevision?: number },
+    payload: CommandPayload<typeof TableSetStagingDefaultsSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** GM sets how much a player sees of another player's character; enforced in the projection, never client-side. */
   "table:set-party-visibility": (
-    payload: { commandId: string; visibility: PartyVisibility; expectedRevision?: number },
+    payload: CommandPayload<typeof TableSetPartyVisibilitySchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "actor:set-token-image": (
-    payload: { commandId: string; actorId: string; tokenAssetId: string | null; expectedRevision?: number },
+    payload: CommandPayload<typeof SetTokenImageSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "actor:set-size": (
-    payload: {
-      commandId: string;
-      actorId: string;
-      size: "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan";
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof SetActorSizeSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "actor:set-visibility": (
-    payload: { commandId: string; actorId: string; visibility: "public" | "gm-only"; expectedRevision?: number },
+    payload: CommandPayload<typeof SetActorVisibilitySchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "actor:set-archived": (
-    payload: { commandId: string; actorId: string; archived: boolean; expectedRevision?: number },
+    payload: CommandPayload<typeof SetActorArchivedSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** GM shares (or un-shares) an archived character's sheet with players as a read-only keepsake. Default hidden. */
   "actor:set-sheet-preview": (
-    payload: { commandId: string; actorId: string; enabled: boolean; expectedRevision?: number },
+    payload: CommandPayload<typeof SetActorSheetPreviewSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "actor:set-speed": (
-    payload: { commandId: string; actorId: string; speedFeet: number | null; expectedRevision?: number },
+    payload: CommandPayload<typeof ActorSetSpeedSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** `damageType` types a bare manual `amount` (ignored when `parts` is present); `damageOverride` replaces a
    * rolled total while keeping its types. */
   "actor:apply-damage": (
-    payload: {
-      commandId: string;
-      actorId: string;
-      amount: number;
-      parts?: ReadonlyArray<{ amount: number; type: string }>;
-      damageType?: string;
-      damageOverride?: number;
-      sourceActorId?: string;
-      sourceActionId?: string;
-      sourceName?: string;
-      critical?: boolean;
-      nonlethal?: boolean;
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof ApplyDamageSchema>,
     acknowledgement: (result: DamageApplyResult) => void
   ) => void;
   "actor:heal": (
-    payload: { commandId: string; actorId: string; amount: number; expectedRevision?: number },
+    payload: CommandPayload<typeof HpAmountSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "actor:set-temp-hp": (
-    payload: { commandId: string; actorId: string; amount: number; expectedRevision?: number },
+    payload: CommandPayload<typeof TempHpSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "actor:set-hp": (
-    payload: { commandId: string; actorId: string; current: number; expectedRevision?: number },
+    payload: CommandPayload<typeof SetHpSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "actor:set-condition": (
-    payload: {
-      commandId: string;
-      actorId: string;
-      conditionId: string;
-      active: boolean;
-      level?: number;
-      override?: { reason?: string };
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof SetConditionSchema>,
     acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
   ) => void;
   "content:conditions": (
@@ -1833,230 +1831,103 @@ export interface ClientToServerEvents {
     acknowledgement: (result: ContentSheetResult) => void
   ) => void;
   "action:resolve": (
-    payload: {
-      commandId: string;
-      actorId: string;
-      actionId: string;
-      targetIds?: readonly string[];
-      template?: { shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint };
-      conditionId?: string;
-      rollMode?: "advantage" | "disadvantage" | "normal";
-      override?: { reason?: string };
-      effectId?: string;
-      note?: string;
-      cover?: "half" | "three-quarters" | "total";
-      commit?: boolean;
-      attackNatural?: number;
-      attackTotal?: number;
-      critical?: boolean;
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof ActionResolveSchema>,
     acknowledgement: (result: ActionResolveResult) => void
   ) => void;
   "effect:add": (
-    payload: {
-      commandId: string;
-      actorId: string;
-      name: string;
-      tags?: readonly string[];
-      duration?:
-        | { type: "rounds"; rounds: number }
-        | { type: "until-source-next-turn" }
-        | { type: "encounter" }
-        | { type: "manual" };
-      modifiers?: readonly Modifier[];
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof EffectAddSchema>,
     acknowledgement: (result: MutationResult & { effectId?: string }) => void
   ) => void;
   "effect:end": (
-    payload: { commandId: string; actorId: string; effectId: string; expectedRevision?: number },
+    payload: CommandPayload<typeof EffectEndSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "death-save:roll": (
-    payload: {
-      commandId: string;
-      actorId: string;
-      commit?: boolean;
-      rollMode?: "advantage" | "disadvantage" | "normal";
-      naturalRoll?: number;
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof DeathSaveRollSchema>,
     acknowledgement: (result: DeathSaveResult) => void
   ) => void;
   "encounter:set-rules-mode": (
-    payload: { commandId: string; mode: RuleMode; exceptions?: RuleExceptions; expectedRevision?: number },
+    payload: CommandPayload<typeof SetRulesModeSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "encounter:set-player-damage-mode": (
-    payload: { commandId: string; mode: "proposal" | "direct"; expectedRevision?: number },
+    payload: CommandPayload<typeof SetPlayerDamageModeSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "encounter:set-player-initiative-mode": (
-    payload: { commandId: string; mode: "immediate" | "wait"; expectedRevision?: number },
+    payload: CommandPayload<typeof SetPlayerInitiativeModeSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "encounter:set-health-display": (
-    payload: {
-      commandId: string;
-      style: "band" | "bar" | "ring" | "aura";
-      audience: "gm" | "all";
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof SetHealthDisplaySchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "actor:set-health-display": (
-    payload: {
-      commandId: string;
-      actorId: string;
-      display: { style: "band" | "bar" | "ring" | "aura"; audience: "gm" | "all" } | null;
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof SetActorHealthDisplaySchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "encounter:set-environment": (
-    payload: { commandId: string; underwater: boolean; expectedRevision?: number },
+    payload: CommandPayload<typeof SetEnvironmentSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "actor:rest": (
-    payload: { commandId: string; actorId: string; kind: "long" | "short"; expectedRevision?: number },
+    payload: CommandPayload<typeof ActorRestSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** Re-make a pick a feature says may be re-made on a rest (Circle of the Land's land type, Fiendish Resilience's damage type). `offer` is the offer key the build already uses. */
   "actor:rechoose": (
-    payload: { commandId: string; actorId: string; offer: string; id: string; expectedRevision?: number },
+    payload: CommandPayload<typeof ActorRechooseSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "actor:spend-hit-dice": (
-    payload: { commandId: string; actorId: string; count: number; expectedRevision?: number },
+    payload: CommandPayload<typeof ActorSpendHitDiceSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "character:set-slot": (
-    payload: { commandId: string; actorId: string; level: number; remaining: number; expectedRevision?: number },
+    payload: CommandPayload<typeof CharacterSetSlotSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "character:set-prepared": (
-    payload: { commandId: string; actorId: string; spellId: string; prepared: boolean; expectedRevision?: number },
+    payload: CommandPayload<typeof CharacterSetPreparedSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   // Optional item keys are declared so the type states the whole wire contract; the server validates `baseId`.
   "character:set-inventory": (
-    payload: {
-      commandId: string;
-      actorId: string;
-      item: {
-        id: string;
-        name: string;
-        quantity?: number;
-        equipped?: boolean;
-        attuned?: boolean;
-        weightEach?: number;
-        description?: string;
-        category?: string;
-        baseId?: string;
-        weapon?: Readonly<{
-          category: "simple" | "martial";
-          damageDice: string;
-          damageType: string;
-          rangeFeet: number | null;
-          longRangeFeet: number | null;
-          properties?: readonly string[];
-        }>;
-        armor?: Readonly<{
-          acBase: number;
-          addDexModifier: boolean;
-          dexModifierCap: number | null;
-          stealthDisadvantage: boolean;
-          strengthRequired: number | null;
-        }>;
-        magic?: Readonly<{ isMagic?: boolean; attunementRequired?: boolean; slot?: string }>;
-      };
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof CharacterSetInventorySchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "character:set-currency": (
-    payload: {
-      commandId: string;
-      actorId: string;
-      currency: { cp?: number; sp?: number; ep?: number; gp?: number; pp?: number };
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof CharacterSetCurrencySchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   // `classes[].hitDie` lets an identity edit rebuild the multiclass hit-dice pool (Fighter 3 / Wizard 2 is 3d10 + 2d6).
   "character:set-identity": (
-    payload: {
-      commandId: string;
-      actorId: string;
-      character: {
-        classes: ReadonlyArray<{
-          id: string;
-          name: string;
-          subclass?: { id: string; name: string };
-          level: number;
-          hitDie?: HitDie;
-        }>;
-        race?: { id: string; name: string; subrace?: { id: string; name: string } };
-        background?: { id: string; name: string };
-        feats: ReadonlyArray<{ id: string; name: string; description?: string }>;
-      };
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof CharacterSetIdentitySchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "character:set-proficiencies": (
-    payload: {
-      commandId: string;
-      actorId: string;
-      proficiencies: {
-        saves: ReadonlyArray<"str" | "dex" | "con" | "int" | "wis" | "cha">;
-        skills: ReadonlyArray<{ id: string; proficiency: "proficient" | "expertise" }>;
-        saveOverrides?: Record<string, number>;
-        skillOverrides?: Record<string, number>;
-      };
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof CharacterSetProficienciesSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** `damageOverride` is the pre-halving damage the answerer means to apply, kept in the proposal's damage types. A player may amend only their own claimed character's save. */
   "save:answer": (
-    payload: {
-      commandId: string;
-      saveId: string;
-      method: "roll" | "manual";
-      total?: number;
-      rollMode?: "advantage" | "disadvantage" | "normal";
-      commit?: boolean;
-      legendaryResistance?: boolean;
-      damageOverride?: number;
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof SaveAnswerSchema>,
     acknowledgement: (result: SaveAnswerResult) => void
   ) => void;
   "save:dismiss": (
-    payload: { commandId: string; saveId: string; expectedRevision?: number },
+    payload: CommandPayload<typeof SaveDismissSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "reaction:answer": (
-    payload: {
-      commandId: string;
-      reactionId: string;
-      use: boolean;
-      actionId?: string;
-      commit?: boolean;
-      rollMode?: "advantage" | "disadvantage" | "normal";
-      attackNatural?: number;
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof ReactionAnswerSchema>,
     acknowledgement: (result: ReactionAnswerResult) => void
   ) => void;
   "reaction:dismiss": (
-    payload: { commandId: string; reactionId: string; expectedRevision?: number },
+    payload: CommandPayload<typeof ReactionDismissSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "damage:resolve": (
-    payload: { commandId: string; proposalId: string; apply: boolean; amount?: number; expectedRevision?: number },
+    payload: CommandPayload<typeof DamageResolveSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "actor:available-actions": (
@@ -2064,75 +1935,55 @@ export interface ClientToServerEvents {
     acknowledgement: (result: ActorActionsAvailabilityResult) => void
   ) => void;
   "turn:use": (
-    payload: { commandId: string; slot: "action" | "bonus-action"; used: boolean; expectedRevision?: number },
+    payload: CommandPayload<typeof TurnUseSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "turn:use-reaction": (
-    payload: { commandId: string; actorId: string; used: boolean; expectedRevision?: number },
+    payload: CommandPayload<typeof TurnReactionSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "turn:use-legendary": (
-    payload: { commandId: string; actorId: string; spent: number; expectedRevision?: number },
+    payload: CommandPayload<typeof TurnLegendarySchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "turn:end": (
-    payload: { commandId: string; expectedRevision?: number },
+    payload: CommandPayload<typeof CommandIdentitySchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "dice:roll": (
-    payload: {
-      commandId: string;
-      formula: string;
-      purpose: RollPurpose;
-      visibility: RollVisibility;
-      label?: string;
-      actorId?: string;
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof DiceRollSchema>,
     acknowledgement: (result: DiceRollResult) => void
   ) => void;
   "encounter:start": (
-    payload: {
-      commandId: string;
-      mapAssetId: string;
-      /** Omit while a prepared scene is live to start on exactly its staged combatants (the server owns that list). */ entries?: readonly EncounterStartEntry[];
-      playersRollInitiative?: boolean;
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof EncounterStartSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "encounter:end": (
-    payload: { commandId: string; expectedRevision?: number },
+    payload: CommandPayload<typeof CommandIdentitySchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "encounter:add-combatant": (
-    payload: { commandId: string; actorId: string; score?: number; expectedRevision?: number },
+    payload: CommandPayload<typeof AddCombatantSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "initiative:set": (
-    payload: { commandId: string; actorId: string; score: number; expectedRevision?: number },
+    payload: CommandPayload<typeof InitiativeScoreSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "initiative:roll-self": (
-    payload: {
-      commandId: string;
-      actorId: string;
-      natural?: number;
-      rollMode?: "advantage" | "disadvantage" | "normal";
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof InitiativeRollSelfSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "initiative:roll-remaining": (
-    payload: { commandId: string; expectedRevision?: number },
+    payload: CommandPayload<typeof InitiativeRollRemainingSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "initiative:next": (
-    payload: { commandId: string; confirmRewrite?: boolean; expectedRevision?: number },
+    payload: CommandPayload<typeof InitiativeNextSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "initiative:previous": (
-    payload: { commandId: string; confirmDiscard?: boolean; expectedRevision?: number },
+    payload: CommandPayload<typeof InitiativePreviousSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "log:read": (
@@ -2140,120 +1991,84 @@ export interface ClientToServerEvents {
     acknowledgement: (result: { ok: boolean; message?: string; entries?: readonly CombatLogEntry[] }) => void
   ) => void;
   "token:move": (
-    payload: {
-      commandId: string;
-      actorId: string;
-      position: EncounterTokenPosition | null;
-      sceneId?: string;
-      override?: { reason?: string };
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof TokenMoveSchema>,
     acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
   ) => void;
   "scene:create": (
-    payload: {
-      commandId: string;
-      name: string;
-      mapAssetId: string;
-      combatantIds: readonly string[];
-      /** Go live on the new scene in the same command (prepare-and-go), parking whatever was live. */ activate?: boolean;
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof SceneCreateSchema>,
     acknowledgement: (result: SceneCreateResult) => void
   ) => void;
   "scene:rename": (
-    payload: { commandId: string; sceneId: string; name: string; expectedRevision?: number },
+    payload: CommandPayload<typeof SceneRenameSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "scene:remove": (
-    payload: { commandId: string; sceneId: string; expectedRevision?: number },
+    payload: CommandPayload<typeof SceneIdSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "scene:activate": (
-    payload: { commandId: string; sceneId: string; expectedRevision?: number },
+    payload: CommandPayload<typeof SceneIdSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** Launch one recorded moment of an archived fight; combatants are cloned so live characters are never rewritten. GM only. */
   "replay:launch": (
-    payload: { commandId: string; archiveId: number; turnIndex: number; expectedRevision?: number },
+    payload: CommandPayload<typeof ReplayLaunchSchema>,
     acknowledgement: (result: MutationResult & { sceneId?: string; actorIds?: readonly string[] }) => void
   ) => void;
   "scene:set-combatants": (
-    payload: { commandId: string; sceneId: string; combatantIds: readonly string[]; expectedRevision?: number },
+    payload: CommandPayload<typeof SceneSetCombatantsSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "scene:duplicate": (
-    payload: { commandId: string; sceneId: string; expectedRevision?: number },
+    payload: CommandPayload<typeof SceneIdSchema>,
     acknowledgement: (result: SceneCreateResult) => void
   ) => void;
   "scene:reorder": (
-    payload: { commandId: string; order: readonly string[]; expectedRevision?: number },
+    payload: CommandPayload<typeof SceneReorderSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "fog:set-enabled": (
-    payload: { commandId: string; enabled: boolean; sceneId?: string; expectedRevision?: number },
+    payload: CommandPayload<typeof FogSetEnabledSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "fog:paint": (
-    payload: {
-      commandId: string;
-      op: "reveal" | "hide";
-      rect: { x: number; y: number; width: number; height: number };
-      sceneId?: string;
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof FogPaintSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "fog:reset": (
-    payload: { commandId: string; sceneId?: string; expectedRevision?: number },
+    payload: CommandPayload<typeof FogResetSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "annotation:add": (
-    payload: {
-      commandId: string;
-      kind: "measurement" | "shape";
-      shape?: AnnotationShapeKind;
-      geometry: AnnotationGeometryInput;
-      visibility?: AnnotationVisibility;
-      visibleToActorId?: string | null;
-      movableByOthers?: boolean;
-      color?: string;
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof AnnotationAddSchema>,
     acknowledgement: (result: AnnotationAddResult) => void
   ) => void;
   "annotation:ping": (
-    payload: { commandId: string; point: AnnotationPoint; color?: string; expectedRevision?: number },
+    payload: CommandPayload<typeof AnnotationPingSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "annotation:set-color": (
-    payload: { commandId: string; id: string; color: string; expectedRevision?: number },
+    payload: CommandPayload<typeof AnnotationColorSetSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "annotation:move": (
-    payload: { commandId: string; id: string; geometry: AnnotationGeometryInput; expectedRevision?: number },
+    payload: CommandPayload<typeof AnnotationMoveSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "annotation:remove": (
-    payload: { commandId: string; id: string; expectedRevision?: number },
+    payload: CommandPayload<typeof AnnotationRemoveSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "annotation:set-visibility": (
-    payload: {
-      commandId: string;
-      id: string;
-      visibility: AnnotationVisibility;
-      visibleToActorId?: string | null;
-      expectedRevision?: number;
-    },
+    payload: CommandPayload<typeof AnnotationVisibilitySetSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "annotation:set-movable": (
-    payload: { commandId: string; id: string; movableByOthers: boolean; expectedRevision?: number },
+    payload: CommandPayload<typeof AnnotationMovableSetSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "annotation:clear": (
-    payload: { commandId: string; scope: "mine" | "players" | "all"; expectedRevision?: number },
+    payload: CommandPayload<typeof AnnotationClearSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
 }

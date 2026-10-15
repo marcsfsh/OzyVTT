@@ -12,7 +12,7 @@ import {
   RuleExceptionsSchema,
   RuleFamilySchema,
   RuleModeSchema
-} from "@vtt/domain";
+} from "./index.js";
 import {
   AbilitySchema,
   CharacterChoiceSchema,

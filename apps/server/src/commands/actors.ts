@@ -13,7 +13,7 @@ import {
   SetActorSizeSchema,
   SetActorVisibilitySchema,
   SetTokenImageSchema
-} from "../game-commands.js";
+} from "@vtt/domain/commands";
 import { CommandRejectedError } from "../game-store.js";
 import { setActorSize, setActorVisibility } from "../token-placement.js";
 import { importedDefinition } from "./characters.js";

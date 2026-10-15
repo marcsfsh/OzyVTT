@@ -59,7 +59,7 @@ describe("the retired table-wide roll mode", () => {
     expect(Object.keys(GAME_COMMANDS)).not.toContain("encounter.set-roll-mode");
     // The socket handlers and typed routes are registered from the table, so it is the one place left.
     expect(gameCommands.map((command) => command.type)).not.toContain("encounter.set-roll-mode");
-    expect(source("../src/game-commands.ts")).not.toContain("SetRollModeSchema");
+    expect(source("../../../packages/domain/src/commands.ts")).not.toContain("SetRollModeSchema");
   });
 
   it("is gone from the OpenAPI document", () => {
