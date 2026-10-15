@@ -342,14 +342,12 @@
   overflow: hidden;
   flex-wrap: nowrap;
 }
+/* Wraps: at 390px the three buttons' labels are wider than the popover. */
 .initiative-row-tools {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.4rem;
-}
-.initiative-row-tools .secondary {
-  padding: 0.3rem 0.7rem;
-  font-size: var(--fs-xs);
 }
 .encounter-overlay-backdrop {
   position: fixed;
