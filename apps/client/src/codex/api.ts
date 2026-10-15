@@ -1,4 +1,7 @@
-/** Bearer-authorized fetch helpers for `/api/v1/codex/*`. The server projects every response by role (`codex-projections.ts`). */
+/**
+ * The `/api/v1/codex` client, typed by `@vtt/domain`'s `codex-wire.ts`. The server projects every response
+ * for the token's role, so a player token gets the player shapes from the same routes.
+ */
 
 import type {
   CodexAutosaveSettings,
@@ -40,6 +43,7 @@ import type {
   PlayerCodexSession,
   PlayerCodexStanding
 } from "@vtt/domain";
+import { apiBlob, apiRequest, type ApiRequest } from "../lib/api";
 
 /** Restated from the server so an input can refuse rather than earn a 400. */
 export const CONNECTION_LABEL_MAX = 40;
@@ -75,30 +79,8 @@ export type CodexPageInput = Readonly<{
 
 const BASE = "/api/v1/codex";
 
-export class CodexRequestError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number,
-    public readonly code: string
-  ) {
-    super(message);
-  }
-}
-
-async function request<T>(token: string, path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${BASE}${path}`, {
-    ...init,
-    headers: { authorization: `Bearer ${token}`, "content-type": "application/json", ...init.headers }
-  });
-  const body = await response.json().catch(() => null);
-  if (!response.ok || !body?.ok) {
-    throw new CodexRequestError(
-      body?.error?.message ?? `The codex request failed (${response.status}).`,
-      response.status,
-      body?.error?.code ?? "error"
-    );
-  }
-  return body.data as T;
+function request<T>(token: string, path: string, init: Omit<ApiRequest, "token" | "failure"> = {}): Promise<T> {
+  return apiRequest<T>(`${BASE}${path}`, { ...init, token, failure: "The codex request failed." });
 }
 
 export const codexApi = {
@@ -114,7 +96,7 @@ export const codexApi = {
   ) =>
     request<{ connection: CodexConnection }>(token, `/pages/${pageId}/connections`, {
       method: "POST",
-      body: JSON.stringify(input)
+      body: input
     }).then((data) => data.connection),
   /** Mentions have no id and are not patchable. */
   updateConnection: (
@@ -124,7 +106,7 @@ export const codexApi = {
   ) =>
     request<{ connection: CodexConnection }>(token, `/connections/${id}`, {
       method: "PATCH",
-      body: JSON.stringify(input)
+      body: input
     }).then((data) => data.connection),
   removeConnection: (token: string, id: string) =>
     request<{ deleted: boolean }>(token, `/connections/${id}`, { method: "DELETE" }),
@@ -140,30 +122,24 @@ export const codexApi = {
   markersForPage: (token: string, pageId: string) =>
     request<{ markers: CodexMarker[] }>(token, `/pages/${pageId}/markers`).then((data) => data.markers),
   createPage: (token: string, input: CodexPageInput) =>
-    request<{ page: CodexPage }>(token, "/pages", { method: "POST", body: JSON.stringify(input) }).then(
-      (data) => data.page
-    ),
+    request<{ page: CodexPage }>(token, "/pages", { method: "POST", body: input }).then((data) => data.page),
   updatePage: (token: string, id: string, input: CodexPageInput) =>
-    request<{ page: CodexPage }>(token, `/pages/${id}`, { method: "PATCH", body: JSON.stringify(input) }).then(
-      (data) => data.page
-    ),
+    request<{ page: CodexPage }>(token, `/pages/${id}`, { method: "PATCH", body: input }).then((data) => data.page),
   revealPage: (token: string, id: string, revealed: boolean) =>
     request<{ page: CodexPage }>(token, `/pages/${id}/reveal`, {
       method: "POST",
-      body: JSON.stringify({ revealed })
+      body: { revealed }
     }).then((data) => data.page),
   deletePage: (token: string, id: string) => request<{ deleted: boolean }>(token, `/pages/${id}`, { method: "DELETE" }),
   moveFolder: (token: string, from: string, to: string) =>
-    request<{ moved: number }>(token, "/folders/move", { method: "POST", body: JSON.stringify({ from, to }) }).then(
+    request<{ moved: number }>(token, "/folders/move", { method: "POST", body: { from, to } }).then(
       (data) => data.moved
     ),
   listFolders: (token: string) => request<{ folders: string[] }>(token, "/folders").then((data) => data.folders),
   createFolder: (token: string, path: string) =>
-    request<{ path: string }>(token, "/folders", { method: "POST", body: JSON.stringify({ path }) }).then(
-      (data) => data.path
-    ),
+    request<{ path: string }>(token, "/folders", { method: "POST", body: { path } }).then((data) => data.path),
   deleteFolder: (token: string, path: string) =>
-    request<{ deleted: boolean }>(token, "/folders/delete", { method: "POST", body: JSON.stringify({ path }) }),
+    request<{ deleted: boolean }>(token, "/folders/delete", { method: "POST", body: { path } }),
   listRevisions: (token: string, id: string) =>
     request<{ revisions: CodexPageRevision[] }>(token, `/pages/${id}/revisions`).then((data) => data.revisions),
   restoreRevision: (token: string, id: string, revisionId: number) =>
@@ -173,14 +149,14 @@ export const codexApi = {
   getSettings: (token: string) =>
     request<{ settings: CodexSettings }>(token, "/settings").then((data) => data.settings),
   setSettings: (token: string, input: CodexSettingsInput) =>
-    request<{ settings: CodexSettings }>(token, "/settings", { method: "PUT", body: JSON.stringify(input) }).then(
+    request<{ settings: CodexSettings }>(token, "/settings", { method: "PUT", body: input }).then(
       (data) => data.settings
     ),
   /** Destructive and irreversible. `olderThanDays: 0` deletes every version; current pages are untouched. */
   deleteRevisions: (token: string, olderThanDays: number) =>
     request<{ deleted: number }>(token, "/page-revisions", {
       method: "DELETE",
-      body: JSON.stringify({ olderThanDays })
+      body: { olderThanDays }
     }),
   /** A short-lived player token so the GM can preview the player Codex through the real player projection. */
   createPreviewSession: (token: string) =>
@@ -194,7 +170,7 @@ export const codexApi = {
   importBundle: (token: string, bundle: CodexImportBundle) =>
     request<{ replaced: true; counts: CodexImportCounts }>(token, "/import", {
       method: "POST",
-      body: JSON.stringify(bundle)
+      body: bundle
     })
 };
 
@@ -207,25 +183,22 @@ export type CodexImportBundle = Readonly<{
   commandId?: string;
 }>;
 
-/** Sends raw bytes with the file's content-type (not JSON, so express.raw handles it). */
-export async function uploadCodexAsset(
-  token: string,
-  file: File
-): Promise<{ id: string; width: number; height: number }> {
-  const response = await fetch(`/api/v1/codex-assets?filename=${encodeURIComponent(file.name)}`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${token}`, "content-type": file.type || "application/octet-stream" },
-    body: file
-  });
-  const body = await response.json().catch(() => null);
-  if (!response.ok || !body?.ok)
-    throw new CodexRequestError(
-      body?.error?.message ?? "The image upload failed.",
-      response.status,
-      body?.error?.code ?? "error"
-    );
-  return body.data.asset as { id: string; width: number; height: number };
-}
+/** Sends the file's bytes with its own content-type; the server stores them content-addressed. */
+export const uploadCodexAsset = (token: string, file: File) =>
+  apiRequest<{ asset: Readonly<{ id: string; width: number; height: number }> }>(
+    `/api/v1/codex-assets?filename=${encodeURIComponent(file.name)}`,
+    {
+      token,
+      method: "POST",
+      body: file,
+      headers: { "content-type": file.type || "application/octet-stream" },
+      failure: "The image upload failed."
+    }
+  ).then((data) => data.asset);
+
+/** A Codex image's bytes. Bearer tokens can't ride an `<img src>`, so the caller renders an object URL. */
+export const codexAssetContent = (token: string, assetId: string, signal?: AbortSignal) =>
+  apiBlob(`/api/v1/codex-assets/${encodeURIComponent(assetId)}/content`, { token, signal });
 
 // ----- Player reads: the same routes, projected by the server for a player token -----
 
@@ -288,36 +261,34 @@ export type CodexMarkerInput = Readonly<{
 export type MapAsset = Readonly<{ id: string; name: string; kind: CodexMapKind; width: number; height: number }>;
 
 export const atlasApi = {
-  listAssets: async (token: string): Promise<MapAsset[]> => {
-    const response = await fetch("/api/v1/map-assets", { headers: { authorization: `Bearer ${token}` } });
-    const body = await response.json().catch(() => null);
-    if (!response.ok || !body?.ok)
-      throw new CodexRequestError(
-        body?.error?.message ?? "Could not load your maps.",
-        response.status,
-        body?.error?.code ?? "error"
-      );
-    return body.data.assets as MapAsset[];
-  },
+  /** The shared map-image library (`/api/v1/map-assets`), the same one Scenes uses. */
+  listAssets: (token: string) =>
+    apiRequest<{ assets: MapAsset[] }>("/api/v1/map-assets", { token, failure: "Could not load your maps." }).then(
+      (data) => data.assets
+    ),
+  uploadAsset: (token: string, file: File) =>
+    apiRequest<unknown>(`/api/v1/map-assets?filename=${encodeURIComponent(file.name)}`, {
+      token,
+      method: "POST",
+      body: file,
+      headers: { "content-type": file.type || "application/octet-stream" },
+      failure: "The upload failed."
+    }),
   listMaps: (token: string) => request<{ maps: CodexMap[] }>(token, "/maps").then((data) => data.maps),
   createMap: (token: string, input: CodexMapInput & { assetId: string; name: string; kind: CodexMapKind }) =>
-    request<{ map: CodexMap }>(token, "/maps", { method: "POST", body: JSON.stringify(input) }).then(
-      (data) => data.map
-    ),
+    request<{ map: CodexMap }>(token, "/maps", { method: "POST", body: input }).then((data) => data.map),
   // Narrower than CodexMapInput: the server's MapUpdateSchema is strict.
   updateMap: (token: string, id: string, input: { name?: string; kind?: CodexMapKind; tags?: readonly string[] }) =>
-    request<{ map: CodexMap }>(token, `/maps/${id}`, { method: "PATCH", body: JSON.stringify(input) }).then(
-      (data) => data.map
-    ),
+    request<{ map: CodexMap }>(token, `/maps/${id}`, { method: "PATCH", body: input }).then((data) => data.map),
   setMapParent: (token: string, id: string, parentMapId: string | null) =>
     request<{ map: CodexMap }>(token, `/maps/${id}/parent`, {
       method: "POST",
-      body: JSON.stringify({ parentMapId })
+      body: { parentMapId }
     }).then((data) => data.map),
   revealMap: (token: string, id: string, revealed: boolean) =>
     request<{ map: CodexMap }>(token, `/maps/${id}/reveal`, {
       method: "POST",
-      body: JSON.stringify({ revealed })
+      body: { revealed }
     }).then((data) => data.map),
   deleteMap: (token: string, id: string) => request<{ deleted: boolean }>(token, `/maps/${id}`, { method: "DELETE" }),
   listMarkers: (token: string, mapId: string) =>
@@ -329,27 +300,27 @@ export const atlasApi = {
   ) =>
     request<{ marker: CodexMarker }>(token, `/maps/${mapId}/markers`, {
       method: "POST",
-      body: JSON.stringify(input)
+      body: input
     }).then((data) => data.marker),
   updateMarker: (token: string, id: string, input: CodexMarkerInput) =>
-    request<{ marker: CodexMarker }>(token, `/markers/${id}`, { method: "PATCH", body: JSON.stringify(input) }).then(
+    request<{ marker: CodexMarker }>(token, `/markers/${id}`, { method: "PATCH", body: input }).then(
       (data) => data.marker
     ),
   moveMarker: (token: string, id: string, x: number, y: number) =>
     request<{ marker: CodexMarker }>(token, `/markers/${id}/move`, {
       method: "POST",
-      body: JSON.stringify({ x, y })
+      body: { x, y }
     }).then((data) => data.marker),
   revealMarker: (token: string, id: string, revealed: boolean) =>
     request<{ marker: CodexMarker }>(token, `/markers/${id}/reveal`, {
       method: "POST",
-      body: JSON.stringify({ revealed })
+      body: { revealed }
     }).then((data) => data.marker),
   /** Clears any previous party pin server-side, so callers re-read the markers. Move the party with `moveMarker`. */
   setPartyMarker: (token: string, id: string, isParty: boolean) =>
     request<{ marker: CodexMarker }>(token, `/markers/${id}/party`, {
       method: "PUT",
-      body: JSON.stringify({ isParty })
+      body: { isParty }
     }).then((data) => data.marker),
   deleteMarker: (token: string, id: string) =>
     request<{ deleted: boolean }>(token, `/markers/${id}`, { method: "DELETE" })
@@ -389,7 +360,7 @@ export const calendarApi = {
   get: (token: string) => request<{ calendar: GmCodexCalendar }>(token, "/calendar").then((data) => data.calendar),
   /** Replaces the structure and the GM's clock; it never publishes. */
   set: (token: string, calendar: CodexCalendar) =>
-    request<{ calendar: GmCodexCalendar }>(token, "/calendar", { method: "PUT", body: JSON.stringify(calendar) }).then(
+    request<{ calendar: GmCodexCalendar }>(token, "/calendar", { method: "PUT", body: calendar }).then(
       (data) => data.calendar
     ),
   /** Copy the GM's clock onto the players' clock. Nothing else publishes it. */
@@ -408,26 +379,26 @@ export const journalApi = {
   forMarker: (token: string, markerId: string) =>
     request<{ entries: CodexJournalEntry[] }>(token, `/journal?markerId=${markerId}`).then((data) => data.entries),
   create: (token: string, input: CodexJournalInput) =>
-    request<{ entry: CodexJournalEntry }>(token, "/journal", { method: "POST", body: JSON.stringify(input) }).then(
+    request<{ entry: CodexJournalEntry }>(token, "/journal", { method: "POST", body: input }).then(
       (data) => data.entry
     ),
   /** A deadline's date is when it fires, so `inWorldDate` is required. */
   createDeadline: (token: string, input: CodexJournalInput & { inWorldDate: CodexInWorldDate }) =>
     request<{ entry: CodexJournalEntry }>(token, "/journal/deadline", {
       method: "POST",
-      body: JSON.stringify(input)
+      body: input
     }).then((data) => data.entry),
   /** Never moves the clock; returns the proposed date. `applyDowntime` moves it. */
   createDowntime: (token: string, input: CodexJournalInput & { downtime: CodexDowntimeInput }) =>
     request<{ entry: CodexJournalEntry; proposedDate: CodexInWorldDate | null }>(token, "/journal/downtime", {
       method: "POST",
-      body: JSON.stringify(input)
+      body: input
     }),
   /** Undated is fine: the store dates it at the GM's clock. */
   createMilestone: (token: string, input: CodexJournalInput & { milestone: CodexMilestoneInput }) =>
     request<{ entry: CodexJournalEntry }>(token, "/journal/milestone", {
       method: "POST",
-      body: JSON.stringify(input)
+      body: input
     }).then((data) => data.entry),
   /** Marks the downtime applied and advances the clock in one transaction; applying twice is rejected. */
   applyDowntime: (token: string, id: string) =>
@@ -437,12 +408,12 @@ export const journalApi = {
   update: (token: string, id: string, input: CodexJournalInput & { downtime?: CodexDowntimeEditInput }) =>
     request<{ entry: CodexJournalEntry }>(token, `/journal/${id}`, {
       method: "PATCH",
-      body: JSON.stringify(input)
+      body: input
     }).then((data) => data.entry),
   reveal: (token: string, id: string, revealed: boolean) =>
     request<{ entry: CodexJournalEntry }>(token, `/journal/${id}/reveal`, {
       method: "POST",
-      body: JSON.stringify({ revealed })
+      body: { revealed }
     }).then((data) => data.entry),
   remove: (token: string, id: string) => request<{ deleted: boolean }>(token, `/journal/${id}`, { method: "DELETE" })
 };
@@ -468,17 +439,17 @@ export const sessionApi = {
   get: (token: string, id: string) =>
     request<{ session: CodexSession }>(token, `/sessions/${id}`).then((data) => data.session),
   create: (token: string, input: CodexSessionInput & { revealedToPlayers?: boolean }) =>
-    request<{ session: CodexSession }>(token, "/sessions", { method: "POST", body: JSON.stringify(input) }).then(
+    request<{ session: CodexSession }>(token, "/sessions", { method: "POST", body: input }).then(
       (data) => data.session
     ),
   update: (token: string, id: string, input: CodexSessionInput & { expectedRev?: number }) =>
-    request<{ session: CodexSession }>(token, `/sessions/${id}`, { method: "PATCH", body: JSON.stringify(input) }).then(
+    request<{ session: CodexSession }>(token, `/sessions/${id}`, { method: "PATCH", body: input }).then(
       (data) => data.session
     ),
   reveal: (token: string, id: string, revealed: boolean) =>
     request<{ session: CodexSession }>(token, `/sessions/${id}/reveal`, {
       method: "POST",
-      body: JSON.stringify({ revealed })
+      body: { revealed }
     }).then((data) => data.session),
   /** Activation does not change the session row, so only the pointer returns. */
   activate: (token: string, id: string) =>
@@ -506,17 +477,13 @@ export const questApi = {
   list: (token: string) => request<{ quests: CodexQuest[] }>(token, "/quests").then((data) => data.quests),
   get: (token: string, id: string) => request<{ quest: CodexQuest }>(token, `/quests/${id}`).then((data) => data.quest),
   create: (token: string, input: CodexQuestInput & { title: string; revealedToPlayers?: boolean }) =>
-    request<{ quest: CodexQuest }>(token, "/quests", { method: "POST", body: JSON.stringify(input) }).then(
-      (data) => data.quest
-    ),
+    request<{ quest: CodexQuest }>(token, "/quests", { method: "POST", body: input }).then((data) => data.quest),
   update: (token: string, id: string, input: CodexQuestInput & { expectedRev?: number }) =>
-    request<{ quest: CodexQuest }>(token, `/quests/${id}`, { method: "PATCH", body: JSON.stringify(input) }).then(
-      (data) => data.quest
-    ),
+    request<{ quest: CodexQuest }>(token, `/quests/${id}`, { method: "PATCH", body: input }).then((data) => data.quest),
   reveal: (token: string, id: string, revealed: boolean) =>
     request<{ quest: CodexQuest }>(token, `/quests/${id}/reveal`, {
       method: "POST",
-      body: JSON.stringify({ revealed })
+      body: { revealed }
     }).then((data) => data.quest),
   remove: (token: string, id: string) => request<{ deleted: boolean }>(token, `/quests/${id}`, { method: "DELETE" })
 };
@@ -529,12 +496,12 @@ export const standingApi = {
   set: (token: string, factionPageId: string, value: number, reason: string) =>
     request<{ standing: CodexStanding }>(token, `/standing/${factionPageId}`, {
       method: "PUT",
-      body: JSON.stringify({ value, reason })
+      body: { value, reason }
     }).then((data) => data.standing),
   reveal: (token: string, factionPageId: string, revealed: boolean) =>
     request<{ standing: CodexStanding }>(token, `/standing/${factionPageId}/reveal`, {
       method: "POST",
-      body: JSON.stringify({ revealed })
+      body: { revealed }
     }).then((data) => data.standing)
 };
 

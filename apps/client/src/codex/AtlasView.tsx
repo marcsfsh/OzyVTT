@@ -291,13 +291,7 @@ export function AtlasView({
     setUploading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/v1/map-assets?filename=${encodeURIComponent(file.name)}`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${gmToken}`, "content-type": file.type || "application/octet-stream" },
-        body: file
-      });
-      const body = await response.json().catch(() => null);
-      if (!response.ok || !body?.ok) throw new Error(body?.error?.message ?? "The upload failed.");
+      await atlasApi.uploadAsset(gmToken, file);
       const next = await atlasApi.listAssets(gmToken).catch(() => assets);
       setAssets(next);
       toast("Map image uploaded.", { tone: "success" });

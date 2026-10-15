@@ -12,7 +12,7 @@ vi.mock("../socket", () => ({
 }));
 
 const { command, read, TIMEOUT_MESSAGE } = await import("./command");
-const { ApiError, apiRequest } = await import("./api");
+const { ApiError, apiBlob, apiRequest } = await import("./api");
 
 afterEach(() => {
   sent.length = 0;
@@ -75,5 +75,33 @@ describe("apiRequest", () => {
       })
     );
     await expect(apiRequest("/api/v1/x")).rejects.toMatchObject({ status: 0, code: "offline" });
+  });
+});
+
+describe("apiBlob", () => {
+  it("returns the bytes and sends the bearer token", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("png-bytes", { status: 200 }))
+    );
+    const blob = await apiBlob("/api/v1/x/content", { token: "t" });
+    expect(await blob.text()).toBe("png-bytes");
+    const [, init] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
+    expect(init.headers).toMatchObject({ authorization: "Bearer t" });
+  });
+
+  it("throws the envelope's error on a refusal", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ ok: false, error: { code: "forbidden", message: "No." } }), { status: 403 })
+      )
+    );
+    await expect(apiBlob("/api/v1/x/content")).rejects.toMatchObject({
+      status: 403,
+      code: "forbidden",
+      message: "No."
+    });
   });
 });

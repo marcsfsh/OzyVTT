@@ -25,7 +25,7 @@ vi.mock("./api", async (importOriginal) => {
 
 import { PageEditor } from "./PageEditor";
 import type { CodexPage } from "@vtt/domain";
-import { CodexRequestError } from "./api";
+import { ApiError } from "../lib/api";
 
 /**
  * `PageEditor`'s save path: debounced autosave, serialized saves, and revision resync on 409. The Codex is
@@ -106,7 +106,7 @@ describe("PageEditor save/conflict path", () => {
   });
 
   it("on a 409 it surfaces the conflict and resyncs the revision from the server", async () => {
-    updatePage.mockRejectedValueOnce(new CodexRequestError("This page changed since you opened it.", 409, "conflict"));
+    updatePage.mockRejectedValueOnce(new ApiError("This page changed since you opened it.", 409, "conflict"));
     const user = userEvent.setup();
     renderEditor();
     await user.type(screen.getByLabelText(/title/i), "!");

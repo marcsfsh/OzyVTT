@@ -1,9 +1,10 @@
 import { Skeleton } from "@vtt/ui";
 import { useEffect, useState } from "react";
+import { codexAssetContent } from "./api";
 
 /**
- * A codex media image. Bearer tokens can't ride an <img src>, so the asset is fetched with the caller's
- * token and rendered from an object URL. The server gates player access to media on revealed pages.
+ * A codex media image, fetched with the caller's token and rendered from an object URL. The server gates
+ * player access to media on revealed pages.
  */
 export function CodexImage({
   assetId,
@@ -19,17 +20,14 @@ export function CodexImage({
     setFailed(false);
     const controller = new AbortController();
     let objectUrl: string | null = null;
-    fetch(`/api/v1/codex-assets/${encodeURIComponent(assetId)}/content`, {
-      headers: { authorization: `Bearer ${token}` },
-      signal: controller.signal
-    })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("unavailable");
-        objectUrl = URL.createObjectURL(await response.blob());
+    void codexAssetContent(token, assetId, controller.signal)
+      .then((blob) => {
+        if (controller.signal.aborted) return;
+        objectUrl = URL.createObjectURL(blob);
         setUrl(objectUrl);
       })
-      .catch((error) => {
-        if (error.name !== "AbortError") setFailed(true);
+      .catch(() => {
+        if (!controller.signal.aborted) setFailed(true);
       });
     return () => {
       controller.abort();

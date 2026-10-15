@@ -59,3 +59,18 @@ export async function apiRequest<T>(path: string, request: ApiRequest = {}): Pro
   }
   return envelope.data as T;
 }
+
+/** Reads a binary `/api/v1` resource, such as an uploaded image's bytes, or throws an ApiError. */
+export async function apiBlob(path: string, request: Pick<ApiRequest, "token" | "signal" | "failure"> = {}) {
+  const { token, signal, failure = "The request failed." } = request;
+  let response: Response;
+  try {
+    response = await fetch(path, { signal, headers: token ? { authorization: `Bearer ${token}` } : {} });
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    throw new ApiError("Couldn't reach the server.", 0, "offline");
+  }
+  if (response.ok) return response.blob();
+  const error = (await response.json().catch(() => null))?.error;
+  throw new ApiError(error?.message ?? `${failure} (${response.status})`, response.status, error?.code ?? "error");
+}
