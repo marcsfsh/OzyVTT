@@ -2,8 +2,14 @@ import express, { Router, type NextFunction, type Request, type Response } from 
 import { z } from "zod";
 import {
   HOMEBREW_PATHS,
-  HomebrewContentTypeSchema,
   HomebrewContentStateSchema,
+  HomebrewContentTypeSchema,
+  HomebrewCreateRequestSchema,
+  HomebrewDuplicateRequestSchema,
+  HomebrewPackImportRequestSchema,
+  HomebrewStateChangeRequestSchema,
+  HomebrewUpdateRequestSchema,
+  HomebrewVisibilityRequestSchema,
   type HomebrewContentType,
   type HomebrewValidationIssue,
   type HomebrewValidity
@@ -44,34 +50,6 @@ import { rewriteForNewId, type HomebrewSourceRecord } from "./homebrew-srd-copy.
  * Homebrew authoring REST (`/api/v1/homebrew/*`). Every route is GM-only: players see homebrew only through the
  * merged `CONTENT_PATHS` catalogs (published, visible, not deleted). Writes emit a content-free `homebrew:changed`.
  */
-
-const RecordBodySchema = z.record(z.string(), z.unknown());
-const CreateSchema = z.object({ record: RecordBodySchema }).strict();
-const UpdateSchema = z
-  .object({ record: RecordBodySchema, expectedRev: z.number().int().nonnegative().optional() })
-  .strict();
-const DuplicateSchema = z.object({ name: z.string().min(1).max(120).optional() }).strict();
-const StateChangeSchema = z.object({ expectedRev: z.number().int().nonnegative().optional() }).strict();
-const VisibilitySchema = z
-  .object({ visibleToPlayers: z.boolean(), expectedRev: z.number().int().nonnegative().optional() })
-  .strict();
-const PackSchema = z
-  .object({
-    schemaId: z.literal("vtt.homebrew-pack"),
-    schemaVersion: z.literal(1),
-    name: z.string().min(1).max(120),
-    attribution: z.string().max(400).nullable(),
-    exportedAt: z.iso.datetime({ offset: true }),
-    records: z.array(RecordBodySchema)
-  })
-  .strict();
-const PackImportSchema = z
-  .object({
-    pack: PackSchema,
-    onIdCollision: z.enum(["remint", "overwrite"]).default("remint"),
-    dryRun: z.boolean().default(false)
-  })
-  .strict();
 
 /** Query booleans arrive as strings; accept the two spellings a browser or curl actually sends. */
 const QueryBoolean = z.enum(["true", "false", "1", "0"]).transform((value) => value === "true" || value === "1");
@@ -221,7 +199,7 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
 
   router.post(expressPath(HOMEBREW_PATHS.content), requireGm, (request, response) => {
     try {
-      const { record } = CreateSchema.parse(request.body);
+      const { record } = HomebrewCreateRequestSchema.parse(request.body);
       return sent(response, store.create({ type: typeOf(record), body: record }), 201);
     } catch (error) {
       return storeError(response, error);
@@ -237,7 +215,7 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
   // Always lands (autosave); the store demotes a published record whose new body would not publish.
   router.patch(expressPath(HOMEBREW_PATHS.contentById), requireGm, (request, response) => {
     try {
-      const { record, expectedRev } = UpdateSchema.parse(request.body);
+      const { record, expectedRev } = HomebrewUpdateRequestSchema.parse(request.body);
       const revalidate: HomebrewRevalidator = (type, body) => validate(type, body).valid;
       return sent(response, store.update(pathParam(request, "id"), record, expectedRev, "gm", revalidate));
     } catch (error) {
@@ -270,7 +248,7 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
   // Homebrew row first, else an SRD record; the reserved `hb-` prefix means they cannot collide.
   router.post(expressPath(HOMEBREW_PATHS.contentDuplicate), requireGm, (request, response) => {
     try {
-      const { name } = DuplicateSchema.parse(request.body ?? {});
+      const { name } = HomebrewDuplicateRequestSchema.parse(request.body ?? {});
       const id = pathParam(request, "id");
       if (store.get(id)) return sent(response, store.duplicate(id, name), 201);
 
@@ -290,7 +268,7 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
   /** Publishing requires validity. 409, not 400: the request is fine, the stored draft is not. */
   router.post(expressPath(HOMEBREW_PATHS.contentPublish), requireGm, (request, response) => {
     try {
-      const { expectedRev } = StateChangeSchema.parse(request.body ?? {});
+      const { expectedRev } = HomebrewStateChangeRequestSchema.parse(request.body ?? {});
       const id = pathParam(request, "id");
       const existing = store.get(id);
       if (!existing) return sendFailure(response, 404, "not_found", "That record was not found.");
@@ -307,7 +285,7 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
 
   router.post(expressPath(HOMEBREW_PATHS.contentUnpublish), requireGm, (request, response) => {
     try {
-      const { expectedRev } = StateChangeSchema.parse(request.body ?? {});
+      const { expectedRev } = HomebrewStateChangeRequestSchema.parse(request.body ?? {});
       return sent(response, store.setState(pathParam(request, "id"), "draft", expectedRev));
     } catch (error) {
       return storeError(response, error);
@@ -316,7 +294,7 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
 
   router.post(expressPath(HOMEBREW_PATHS.contentVisibility), requireGm, (request, response) => {
     try {
-      const { visibleToPlayers, expectedRev } = VisibilitySchema.parse(request.body);
+      const { visibleToPlayers, expectedRev } = HomebrewVisibilityRequestSchema.parse(request.body);
       return sent(response, store.setVisibility(pathParam(request, "id"), visibleToPlayers, expectedRev));
     } catch (error) {
       return storeError(response, error);
@@ -372,7 +350,7 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
       if (Array.isArray(rawRecords) && rawRecords.length > MAX_PACK_RECORDS) {
         return sendFailure(response, 413, "bad_request", `A pack carries at most ${MAX_PACK_RECORDS} records.`);
       }
-      const { pack, onIdCollision, dryRun } = PackImportSchema.parse(request.body);
+      const { pack, onIdCollision, dryRun } = HomebrewPackImportRequestSchema.parse(request.body);
       const imported: Array<{ id: string; type: HomebrewContentType; name: string; originalId: string }> = [];
       const reminted: Array<{ originalId: string; id: string; reason: "srd-collision" | "homebrew-collision" }> = [];
       const overwritten: Array<{ id: string; type: HomebrewContentType; name: string }> = [];

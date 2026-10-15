@@ -185,11 +185,17 @@ export function authChips(operation: Operation): readonly string[] {
   });
 }
 
+/** A union's branches: `oneOf` for a discriminated union, `anyOf` for any other (`X | null` among them). */
+function unionBranches(schema: Schema): Schema[] | undefined {
+  const branches = schema.oneOf ?? schema.anyOf;
+  return Array.isArray(branches) ? branches : undefined;
+}
+
 export function typeLabel(schema: Schema | undefined, components: Components): string {
   if (!schema) return "unknown";
   if (typeof schema.$ref === "string") return refName(schema.$ref);
-  if (Array.isArray(schema.oneOf))
-    return schema.oneOf.map((branch: Schema) => typeLabel(branch, components)).join(" | ");
+  const branches = unionBranches(schema);
+  if (branches) return branches.map((branch) => typeLabel(branch, components)).join(" | ");
   if (schema.const !== undefined) return `const ${JSON.stringify(schema.const)}`;
   if (Array.isArray(schema.enum)) return schema.enum.map((value: unknown) => String(value)).join(" | ");
   if (schema.type === "array") return `${typeLabel(schema.items, components)}[]`;
@@ -260,7 +266,11 @@ function exampleValue(
     if (seen.has(schema.$ref)) return {};
     return exampleValue(resolveRef(schema.$ref, components), components, depth + 1, new Set([...seen, schema.$ref]));
   }
-  if (Array.isArray(schema.oneOf)) return exampleValue(schema.oneOf[0], components, depth + 1, seen);
+  const branches = unionBranches(schema);
+  if (branches) {
+    const example = branches.find((branch) => branch.type !== "null") ?? branches[0];
+    return exampleValue(example, components, depth + 1, seen);
+  }
   if (schema.const !== undefined) return schema.const;
   if (Array.isArray(schema.enum)) return schema.enum[0];
   const type = Array.isArray(schema.type)
