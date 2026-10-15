@@ -39,7 +39,6 @@ export function GmEncounterPanel({
         )
   );
   const liveMapRef = useRef(state.combat.mapAssetId);
-  const [scores, setScores] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   // The GM's rolls follow the shared per-browser dice-input preference.
@@ -70,10 +69,6 @@ export function GmEncounterPanel({
     activeRowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [state.combat.turnActorId]);
 
-  useEffect(() => {
-    if (state.combat.active)
-      setScores(Object.fromEntries(state.combat.initiative.map((entry) => [entry.actorId, String(entry.score)])));
-  }, [state.combat.active, state.combat.initiative]);
   useEffect(() => {
     // When a prepared scene goes live, pre-select its staged combatants.
     if (state.combat.mapAssetId !== liveMapRef.current) {
@@ -121,12 +116,10 @@ export function GmEncounterPanel({
             ? "Pick a battle map before starting the fight. Regional and world maps stay available outside fights."
             : "Pick a battle map first, or make a scene live from the Scenes tab."
         );
+      // No scores: the server rolls every staged combatant, so a previous fight's order never carries over.
       const entries = rosterActors(state.actors)
         .filter((actor) => selectedActors.has(actor.id))
-        .map((actor) => {
-          const value = scores[actor.id]?.trim();
-          return { actorId: actor.id, ...(value ? { score: Number(value) } : {}) };
-        });
+        .map((actor) => ({ actorId: actor.id }));
       if (entries.length === 0) throw new Error("Stage at least one character or monster.");
       return command("encounter:start", {
         mapAssetId: startMapId,
@@ -134,7 +127,7 @@ export function GmEncounterPanel({
         playersRollInitiative,
         expectedRevision: state.revision
       });
-    }, "The fight has started. Blank Initiative scores were rolled, and every token is ready in the tray above.");
+    }, "The fight has started. Initiative was rolled, and every token is ready in the tray above.");
   const changeScore = (actorId: string, score: number) =>
     void run(
       () => command("initiative:set", { actorId, score, expectedRevision: state.revision }),
