@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Input } from "@vtt/ui";
+import { ApiError, apiRequest } from "../lib/api";
 import {
   bandFraction,
   FogOverlay,
@@ -78,11 +79,9 @@ export type Presentation = Readonly<{
 
 type ConnectionState = "pairing" | "connecting" | "live" | "reconnecting";
 
-async function responseJson(response: Response) {
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error?.message ?? "Viewer request failed.");
-  return body;
-}
+const PRESENTATION_PATH = "/api/v1/viewer/presentation";
+const failure = "Viewer request failed.";
+const isUnpaired = (error: unknown) => error instanceof ApiError && error.status === 401;
 
 function imageUrl(assetId: string) {
   return `/api/v1/map-assets/${encodeURIComponent(assetId)}/content`;
@@ -98,12 +97,7 @@ function Pairing({ onPaired }: Readonly<{ onPaired: () => void }>) {
     setBusy(true);
     setMessage("");
     try {
-      const response = await fetch("/api/v1/viewer/pairings/exchange", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ code, name })
-      });
-      await responseJson(response);
+      await apiRequest("/api/v1/viewer/pairings/exchange", { body: { code, name }, failure });
       onPaired();
     } catch (error) {
       setMessage((error as Error).message);
@@ -232,29 +226,34 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
   useEffect(() => {
     setLocalCamera(null);
   }, [presentation.activeMap?.assetId]);
-  const camera: LocalCamera = localCamera ??
-    presentation.camera ?? { center: { x: size.width / 2, y: size.height / 2 }, zoom: 1 };
+  const camera: LocalCamera = useMemo(
+    () => localCamera ?? presentation.camera ?? { center: { x: size.width / 2, y: size.height / 2 }, zoom: 1 },
+    [localCamera, presentation.camera, size]
+  );
   const viewBox = useMemo(() => {
     const width = size.width / camera.zoom;
     const height = size.height / camera.zoom;
     return `${camera.center.x - width / 2} ${camera.center.y - height / 2} ${width} ${height}`;
   }, [camera, size]);
 
-  const zoomAt = (clientX: number, clientY: number, factor: number) => {
-    const svg = svgRef.current;
-    if (!svg) return;
-    const rect = svg.getBoundingClientRect();
-    const fx = (clientX - rect.left) / rect.width;
-    const fy = (clientY - rect.top) / rect.height;
-    const width = size.width / camera.zoom,
-      height = size.height / camera.zoom;
-    const imageX = camera.center.x - width / 2 + fx * width;
-    const imageY = camera.center.y - height / 2 + fy * height;
-    const nextZoom = Math.max(LOCAL_MIN_ZOOM, Math.min(LOCAL_MAX_ZOOM, camera.zoom * factor));
-    const width2 = size.width / nextZoom,
-      height2 = size.height / nextZoom;
-    setLocalCamera({ zoom: nextZoom, center: { x: imageX + width2 * (0.5 - fx), y: imageY + height2 * (0.5 - fy) } });
-  };
+  const zoomAt = useCallback(
+    (clientX: number, clientY: number, factor: number) => {
+      const svg = svgRef.current;
+      if (!svg) return;
+      const rect = svg.getBoundingClientRect();
+      const fx = (clientX - rect.left) / rect.width;
+      const fy = (clientY - rect.top) / rect.height;
+      const width = size.width / camera.zoom,
+        height = size.height / camera.zoom;
+      const imageX = camera.center.x - width / 2 + fx * width;
+      const imageY = camera.center.y - height / 2 + fy * height;
+      const nextZoom = Math.max(LOCAL_MIN_ZOOM, Math.min(LOCAL_MAX_ZOOM, camera.zoom * factor));
+      const width2 = size.width / nextZoom,
+        height2 = size.height / nextZoom;
+      setLocalCamera({ zoom: nextZoom, center: { x: imageX + width2 * (0.5 - fx), y: imageY + height2 * (0.5 - fy) } });
+    },
+    [camera, size]
+  );
   // React's onWheel is passive, so wheel-to-zoom needs a native listener to preventDefault.
   useEffect(() => {
     const stage = stageRef.current;
@@ -266,8 +265,7 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
     };
     stage.addEventListener("wheel", onWheel, { passive: false });
     return () => stage.removeEventListener("wheel", onWheel);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [camera, size]);
+  }, [zoomAt]);
   const beginPan = (event: React.PointerEvent<HTMLElement>) => {
     // Let the zoom buttons' onClick run; starting a pan would capture the pointer and swallow the click.
     if ((event.target as Element).closest("button")) return;
@@ -466,18 +464,13 @@ export function ViewerApp() {
     localStorage.setItem("vtt.viewer-initiative-width", String(Math.round(width)));
   };
 
-  const connect = async () => {
+  const connect = useCallback(async () => {
     setConnection("connecting");
     setMessage("");
     sourceRef.current?.close();
     try {
-      const response = await fetch("/api/v1/viewer/presentation");
-      if (response.status === 401) {
-        setConnection("pairing");
-        return;
-      }
-      const body = await responseJson(response);
-      setPresentation(body.presentation);
+      const { presentation } = await apiRequest<{ presentation: Presentation }>(PRESENTATION_PATH, { failure });
+      setPresentation(presentation);
       setConnection("live");
       const source = new EventSource("/api/v1/viewer/events");
       sourceRef.current = source;
@@ -488,25 +481,29 @@ export function ViewerApp() {
       source.onerror = async () => {
         setConnection("reconnecting");
         try {
-          const check = await fetch("/api/v1/viewer/presentation");
-          if (check.status === 401) {
+          await apiRequest(PRESENTATION_PATH, { failure });
+        } catch (error) {
+          // Anything but a revoked session leaves EventSource to its own bounded reconnect loop.
+          if (isUnpaired(error)) {
             source.close();
             setConnection("pairing");
           }
-        } catch {
-          /* EventSource continues its bounded browser-managed reconnect loop. */
         }
       };
     } catch (error) {
+      if (isUnpaired(error)) {
+        setConnection("pairing");
+        return;
+      }
       setMessage((error as Error).message);
       setConnection("reconnecting");
     }
-  };
+  }, []);
 
   useEffect(() => {
     void connect();
     return () => sourceRef.current?.close();
-  }, []);
+  }, [connect]);
   if (connection === "pairing") return <Pairing onPaired={() => void connect()} />;
   if (!presentation)
     return (

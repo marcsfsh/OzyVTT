@@ -78,7 +78,7 @@ describe("viewer HTTP vertical slice", () => {
     });
     expect(pairingResponse.status).toBe(201);
     expect(pairingResponse.headers.get("x-request-id")).toBe(correlationId);
-    const code = (await json(pairingResponse)).pairing.code as string;
+    const code = (await json(pairingResponse)).data.pairing.code as string;
 
     // A non-UUID token is replaced, not echoed.
     const substituted = await fetch(`${test.base}/api/v1/viewer/presentation`, {
@@ -96,7 +96,8 @@ describe("viewer HTTP vertical slice", () => {
     });
     const exchangeBody = await json(exchange);
     expect(exchange.status).toBe(201);
-    expect(exchangeBody).not.toHaveProperty("token");
+    expect(exchangeBody.data).not.toHaveProperty("token");
+    expect(exchangeBody.data.viewer).toMatchObject({ name: "Table TV" });
     expect(exchange.headers.get("set-cookie")).toContain("HttpOnly");
     expect(exchange.headers.get("set-cookie")).toContain("SameSite=Strict");
     const cookie = exchange.headers.get("set-cookie")!.split(";", 1)[0];
@@ -116,8 +117,9 @@ describe("viewer HTTP vertical slice", () => {
       })
     });
     expect(begin.status).toBe(200);
+    expect((await json(begin)).data).toEqual({ revision: 1, duplicate: false });
     const snapshot = await fetch(`${test.base}/api/v1/viewer/presentation`, { headers: { cookie } });
-    expect((await json(snapshot)).presentation).toMatchObject({
+    expect((await json(snapshot)).data.presentation).toMatchObject({
       revision: 1,
       enabled: true,
       activeMap: { assetId: "map-1" }
@@ -126,7 +128,7 @@ describe("viewer HTTP vertical slice", () => {
     const accessList = await fetch(`${test.base}/api/v1/viewer/access`, {
       headers: { authorization: "Bearer gm-secret" }
     });
-    const viewerId = (await json(accessList)).viewers[0].id;
+    const viewerId = (await json(accessList)).data.viewers[0].id;
     const revoked = await fetch(`${test.base}/api/v1/viewer/access/${viewerId}`, {
       method: "DELETE",
       headers: { authorization: "Bearer gm-secret" }
@@ -259,7 +261,12 @@ describe("viewer HTTP vertical slice", () => {
     expect(await json(malformed)).toEqual({
       ok: false,
       apiVersion: "1",
-      error: { code: "validation_failed", message: "Viewer request body is invalid.", requestId: callerId }
+      error: {
+        code: "validation_failed",
+        message: "Viewer request body is invalid.",
+        requestId: callerId,
+        details: { issues: [{ path: ["payload", "camera", "zoom"], message: expect.any(String) }] }
+      }
     });
 
     await test.coordinator.executeGm("gm-secret", {

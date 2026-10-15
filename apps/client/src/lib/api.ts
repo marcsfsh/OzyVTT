@@ -26,13 +26,11 @@ export type ApiRequest = Readonly<{
   failure?: string;
 }>;
 
-/** Calls `/api/v1` and returns the envelope's `data`, or throws an ApiError. */
-export async function apiRequest<T>(path: string, request: ApiRequest = {}): Promise<T> {
-  const { token, method, body, headers, signal, failure = "The request failed." } = request;
+async function send(path: string, request: ApiRequest): Promise<Response> {
+  const { token, method, body, headers, signal } = request;
   const isBlob = body instanceof Blob;
-  let response: Response;
   try {
-    response = await fetch(path, {
+    return await fetch(path, {
       method: method ?? (body === undefined ? "GET" : "POST"),
       signal,
       headers: {
@@ -46,16 +44,49 @@ export async function apiRequest<T>(path: string, request: ApiRequest = {}): Pro
     if (signal?.aborted) throw error;
     throw new ApiError("Couldn't reach the server.", 0, "offline");
   }
+}
+
+function failureOf(response: Response, envelope: unknown, failure: string): ApiError {
+  const error = (envelope as { error?: Record<string, unknown> } | null)?.error;
+  return new ApiError(
+    typeof error?.message === "string" ? error.message : `${failure} (${response.status})`,
+    response.status,
+    typeof error?.code === "string" ? error.code : "error",
+    typeof error?.currentRevision === "number" ? error.currentRevision : null,
+    (error?.details as Record<string, unknown> | undefined) ?? null
+  );
+}
+
+const DEFAULT_FAILURE = "The request failed.";
+
+/** Calls `/api/v1` and returns the envelope's `data`, or throws an ApiError. */
+export async function apiRequest<T>(path: string, request: ApiRequest = {}): Promise<T> {
+  const response = await send(path, request);
   const envelope = await response.json().catch(() => null);
-  if (!response.ok || !envelope?.ok) {
-    const error = envelope?.error;
-    throw new ApiError(
-      error?.message ?? `${failure} (${response.status})`,
-      response.status,
-      error?.code ?? "error",
-      typeof error?.currentRevision === "number" ? error.currentRevision : null,
-      error?.details ?? null
-    );
-  }
+  if (!response.ok || !envelope?.ok) throw failureOf(response, envelope, request.failure ?? DEFAULT_FAILURE);
   return envelope.data as T;
+}
+
+/** Fetches binary content under `/api/v1` (an image), or throws an ApiError. */
+export async function apiBlob(path: string, request: Omit<ApiRequest, "body" | "method"> = {}): Promise<Blob> {
+  const response = await send(path, request);
+  if (!response.ok) {
+    const envelope = await response.json().catch(() => null);
+    throw failureOf(response, envelope, request.failure ?? DEFAULT_FAILURE);
+  }
+  return response.blob();
+}
+
+/**
+ * Calls one of the host's own routes outside `/api/v1` (GM password setup, sign-in and sessions, the
+ * viewer addresses). They answer bare JSON and put a failure's text in `message`.
+ */
+export async function hostRequest<T>(path: string, request: ApiRequest = {}): Promise<T> {
+  const response = await send(path, request);
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message = typeof body?.message === "string" ? body.message : (request.failure ?? DEFAULT_FAILURE);
+    throw new ApiError(message, response.status, "error");
+  }
+  return body as T;
 }

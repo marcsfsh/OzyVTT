@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Eyebrow, SegmentedControl, Select } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
+import { apiRequest, hostRequest } from "../lib/api";
 import { newId } from "../lib/ids";
 import { clampPoint, imagePointFromClient } from "../scene/mapImage";
 import "./viewer-controls.css";
@@ -35,15 +36,7 @@ type ViewerMap = Readonly<{
 type ViewerControlsProps = Readonly<{ gmToken: string; map?: ViewerMap }>;
 type PresentationTool = "focus" | "ping" | "measure";
 
-async function api(path: string, token: string, init: RequestInit = {}) {
-  const response = await fetch(path, {
-    ...init,
-    headers: { authorization: `Bearer ${token}`, "content-type": "application/json", ...init.headers }
-  });
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error?.message ?? "Viewer request failed.");
-  return body;
-}
+type AccessList = Readonly<{ viewers: readonly ViewerMetadata[]; connections: readonly ViewerConnection[] }>;
 
 const rounded = (value: number) => Math.round(value * 100) / 100;
 
@@ -74,11 +67,11 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
   const suggestedLabel = useMemo(() => measurementLabel(map, draftPoints), [map, draftPoints]);
   const viewerUrl = selectedViewerUrl || viewerUrls[0] || `${window.location.origin}/viewer.html`;
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     const [state, access, addresses] = await Promise.all([
-      api("/api/v1/viewer/presentation", gmToken),
-      api("/api/v1/viewer/access", gmToken),
-      api("/api/gm/viewer-urls", gmToken)
+      apiRequest<{ presentation: PresentationSummary }>("/api/v1/viewer/presentation", { token: gmToken }),
+      apiRequest<AccessList>("/api/v1/viewer/access", { token: gmToken }),
+      hostRequest<{ viewerUrls: readonly string[] }>("/api/gm/viewer-urls", { token: gmToken })
     ]);
     setPresentation(state.presentation);
     setViewers(access.viewers);
@@ -90,14 +83,14 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
     setSelectedViewerUrl((current) =>
       current && availableUrls.includes(current)
         ? current
-        : (availableUrls.find((url: string) => !url.includes("localhost")) ?? availableUrls[0])
+        : (availableUrls.find((url) => !url.includes("localhost")) ?? availableUrls[0])
     );
-  };
+  }, [gmToken]);
   useEffect(() => {
     void refresh().catch((error) => setMessage(error.message));
     const interval = window.setInterval(() => void refresh().catch(() => {}), 5_000);
     return () => window.clearInterval(interval);
-  }, [gmToken]);
+  }, [refresh]);
   useEffect(() => {
     setDraftPoints([]);
     setLabelOverride("");
@@ -118,9 +111,9 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
   };
   const command = async (payload: Record<string, unknown>) => {
     if (!presentation) throw new Error("Viewer presentation state is still loading.");
-    return api("/api/v1/viewer/presentation/commands", gmToken, {
-      method: "POST",
-      body: JSON.stringify({ id: newId(), expectedRevision: presentation.revision, payload })
+    await apiRequest("/api/v1/viewer/presentation/commands", {
+      token: gmToken,
+      body: { id: newId(), expectedRevision: presentation.revision, payload }
     });
   };
   const connectedIds = new Set(connections.map((connection) => connection.viewerId));
@@ -360,8 +353,11 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
               disabled={busy}
               onClick={() =>
                 void run(async () => {
-                  const body = await api("/api/v1/viewer/pairings", gmToken, { method: "POST", body: "{}" });
-                  setPairing(body.pairing);
+                  const data = await apiRequest<{ pairing: Readonly<{ code: string; expiresAt: string }> }>(
+                    "/api/v1/viewer/pairings",
+                    { token: gmToken, body: {} }
+                  );
+                  setPairing(data.pairing);
                 })
               }
             >
@@ -373,13 +369,13 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
               onClick={() =>
                 void run(() =>
                   presentationHasMap
-                    ? command({ type: "viewer.enabled.set", enabled: false }).then(() => undefined)
+                    ? command({ type: "viewer.enabled.set", enabled: false })
                     : command({
                         type: "viewer.presentation.begin",
                         assetId: map!.assetId,
                         altText: map!.altText,
                         camera: { center: { x: map!.width / 2, y: map!.height / 2 }, zoom: 1 }
-                      }).then(() => undefined)
+                      })
                 )
               }
             >
@@ -395,7 +391,7 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
                     assetId: map!.assetId,
                     altText: map!.altText,
                     camera: { center: { x: map!.width / 2, y: map!.height / 2 }, zoom: 1 }
-                  }).then(() => undefined)
+                  })
                 )
               }
             >
@@ -446,7 +442,10 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
                             })
                           )
                             void run(async () => {
-                              await api(`/api/v1/viewer/access/${viewer.id}`, gmToken, { method: "DELETE" });
+                              await apiRequest(`/api/v1/viewer/access/${viewer.id}`, {
+                                token: gmToken,
+                                method: "DELETE"
+                              });
                             });
                         }}
                       >

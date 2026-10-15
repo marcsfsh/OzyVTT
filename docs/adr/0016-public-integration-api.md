@@ -28,13 +28,13 @@ Defer signed webhooks until realtime subscriptions are proven and a concrete ser
 
 ## v1 conventions (normative)
 
-This is the statement the ADR promised. It binds every `/api/v1` surface; `docs/api-reference.md` restates
-it for readers and `packages/api-contract/test/reference.test.ts` pins the load-bearing phrases in both, so
-the two cannot drift.
+This is the statement the ADR promised. It binds every `/api/v1` surface, the table viewer's included, and
+`packages/api-contract/test/contract.test.ts` checks the OpenAPI document against it.
 
 1. **Envelopes.** Success is `{ ok: true, apiVersion: "1", data }`. Failure is
    `{ ok: false, apiVersion, error: { code, message, requestId, details?, currentRevision?, retryAfterSeconds? } }`.
-   There is no third shape.
+   There is no third shape. Only non-JSON answers stand outside it: binary asset content and the viewer's
+   Server-Sent Events stream.
 2. **Request correlation.** Every `/api/v1` router echoes a caller-supplied UUID-v4 `X-Request-Id` on the
    response header and in the error body, minting one when the caller sends none. A value that is not a
    UUID v4 is replaced rather than echoed.
@@ -63,8 +63,8 @@ the two cannot drift.
    opaque keyset cursors. A consumer must not assume codex pagination will appear in v1.
 8. **Compatibility.** v1 is stable by intent for external consumers, but this instance ships client and
    server from one repo in lockstep and there are no known external consumers. Breaking changes that buy
-   coherence are therefore permitted inside v1 while the product is pre-1.0, each recorded in
-   `docs/ai-ledger/decision-log.md`. A public or multi-tenant posture would require a major version. This
+   coherence are therefore permitted inside v1 while the product is pre-1.0, each changing the server, the client
+   and the OpenAPI document together. A public or multi-tenant posture would require a major version. This
    supersedes the ADR's earlier silence on what "compatibility/deprecation policy" meant.
 
 ## Consequences and tradeoffs

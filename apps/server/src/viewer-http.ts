@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
-import { bearerToken, cookie, pathParam, sendFailure, sendInternalError, sendViewerData } from "./http-kit.js";
-import { InvalidRequestError } from "./invalid-request.js";
+import { VIEWER_SESSION_COOKIE } from "@vtt/api-contract";
+import { bearerToken, cookie, pathParam, sendData, sendFailure, sendRefusal } from "./http-kit.js";
 import { ViewerAccessDeniedError, ViewerPairingRateLimitError, type ViewerAccessStore } from "./viewer-access.js";
 import type { ViewerCoordinator } from "./viewer-coordinator.js";
 import { ViewerRevisionConflictError, type ViewerCommand } from "./viewer-presentation.js";
@@ -94,17 +94,21 @@ type ViewerRouterOptions = Readonly<{
 }>;
 
 function viewerToken(request: Request) {
-  return bearerToken(request) ?? cookie(request, "vtt_viewer_session");
+  return bearerToken(request) ?? cookie(request, VIEWER_SESSION_COOKIE);
+}
+
+function setViewerCookie(response: Response, token: string, maxAgeSeconds: number) {
+  response.setHeader(
+    "set-cookie",
+    `${VIEWER_SESSION_COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAgeSeconds}`
+  );
 }
 
 function errorResponse(error: unknown, response: Response) {
   if (error instanceof ViewerPairingRateLimitError) return sendFailure(response, 429, "rate_limited", error.message);
   if (error instanceof ViewerRevisionConflictError) return sendFailure(response, 409, "conflict", error.message);
   if (error instanceof ViewerAccessDeniedError) return sendFailure(response, 401, "unauthenticated", error.message);
-  if (error instanceof z.ZodError)
-    return sendFailure(response, 400, "validation_failed", "Viewer request body is invalid.");
-  if (error instanceof InvalidRequestError) return sendFailure(response, 400, "validation_failed", error.message);
-  return sendInternalError(response, error, "Viewer request failed.");
+  return sendRefusal(response, error, "Viewer request body is invalid.", "Viewer request failed.");
 }
 
 export function createViewerRouter(options: ViewerRouterOptions) {
@@ -127,7 +131,7 @@ export function createViewerRouter(options: ViewerRouterOptions) {
       requireGm(request);
       const input = PairingSchema.parse(request.body);
       const pairing = options.access.createPairingCode(input.ttlMs);
-      return sendViewerData(response, 201, { pairing });
+      return sendData(response, 201, { pairing });
     } catch (error) {
       return errorResponse(error, response);
     }
@@ -142,11 +146,8 @@ export function createViewerRouter(options: ViewerRouterOptions) {
         result.viewer.expiresAt === null
           ? 60 * 60 * 24 * 365
           : Math.max(1, Math.floor((Date.parse(result.viewer.expiresAt) - now()) / 1_000));
-      response.setHeader(
-        "set-cookie",
-        `vtt_viewer_session=${encodeURIComponent(result.token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}`
-      );
-      return sendViewerData(response, 201, { viewer: result.viewer });
+      setViewerCookie(response, result.token, maxAge);
+      return sendData(response, 201, { viewer: result.viewer });
     } catch (error) {
       return errorResponse(error, response);
     }
@@ -155,7 +156,7 @@ export function createViewerRouter(options: ViewerRouterOptions) {
   router.get("/api/v1/viewer/access", (request, response) => {
     try {
       requireGm(request);
-      return sendViewerData(response, 200, {
+      return sendData(response, 200, {
         viewers: options.access.list(),
         connections: options.coordinator.activeViewers()
       });
@@ -169,7 +170,7 @@ export function createViewerRouter(options: ViewerRouterOptions) {
       requireGm(request);
       const viewer = options.access.revoke(pathParam(request, "id"));
       options.coordinator.disconnectViewerAccess(viewer.id);
-      return sendViewerData(response, 200, { viewer });
+      return sendData(response, 200, { viewer });
     } catch (error) {
       return errorResponse(error, response);
     }
@@ -181,11 +182,8 @@ export function createViewerRouter(options: ViewerRouterOptions) {
       requireGm(request);
       const result = options.access.mintPreviewSession("GM preview", 12 * 60 * 60 * 1_000);
       const maxAge = Math.max(1, Math.floor((Date.parse(result.viewer.expiresAt!) - now()) / 1_000));
-      response.setHeader(
-        "set-cookie",
-        `vtt_viewer_session=${encodeURIComponent(result.token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}`
-      );
-      return sendViewerData(response, 201, { viewer: result.viewer });
+      setViewerCookie(response, result.token, maxAge);
+      return sendData(response, 201, { viewer: result.viewer });
     } catch (error) {
       return errorResponse(error, response);
     }
@@ -194,7 +192,7 @@ export function createViewerRouter(options: ViewerRouterOptions) {
   router.get("/api/v1/viewer/presentation", (request, response) => {
     try {
       if (!options.authorizeGm(bearerToken(request))) requireViewer(request);
-      return sendViewerData(response, 200, { presentation: options.presentation.project(now()) });
+      return sendData(response, 200, { presentation: options.presentation.project(now()) });
     } catch (error) {
       return errorResponse(error, response);
     }
@@ -205,7 +203,7 @@ export function createViewerRouter(options: ViewerRouterOptions) {
       const token = requireGm(request);
       const command = CommandSchema.parse(request.body) as Omit<ViewerCommand, "role">;
       const result = await options.coordinator.executeGm(token, command);
-      return sendViewerData(response, 200, { revision: result.state.revision, duplicate: result.duplicate });
+      return sendData(response, 200, { revision: result.state.revision, duplicate: result.duplicate });
     } catch (error) {
       return errorResponse(error, response);
     }

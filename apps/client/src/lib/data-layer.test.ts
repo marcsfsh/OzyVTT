@@ -12,7 +12,7 @@ vi.mock("../socket", () => ({
 }));
 
 const { command, read, TIMEOUT_MESSAGE } = await import("./command");
-const { ApiError, apiRequest } = await import("./api");
+const { ApiError, apiBlob, apiRequest, hostRequest } = await import("./api");
 
 afterEach(() => {
   sent.length = 0;
@@ -75,5 +75,47 @@ describe("apiRequest", () => {
       })
     );
     await expect(apiRequest("/api/v1/x")).rejects.toMatchObject({ status: 0, code: "offline" });
+  });
+});
+
+describe("apiBlob", () => {
+  it("returns the body as a Blob, and the envelope's error on failure", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("png", { status: 200 }))
+    );
+    await expect((await apiBlob("/api/v1/x/content", { token: "t" })).text()).resolves.toBe("png");
+    const [, init] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
+    expect(init.headers).toMatchObject({ authorization: "Bearer t" });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ ok: false, error: { code: "forbidden", message: "No." } }), { status: 403 })
+      )
+    );
+    await expect(apiBlob("/api/v1/x/content")).rejects.toMatchObject({
+      status: 403,
+      code: "forbidden",
+      message: "No."
+    });
+  });
+});
+
+describe("hostRequest", () => {
+  it("returns the bare body, and the server's message on failure", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ bootstrapped: true }), { status: 200 }))
+    );
+    await expect(hostRequest("/api/bootstrap/status")).resolves.toEqual({ bootstrapped: true });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ message: "Invalid GM password." }), { status: 401 }))
+    );
+    await expect(hostRequest("/api/gm/login", { body: { password: "x" } })).rejects.toMatchObject({
+      status: 401,
+      message: "Invalid GM password."
+    });
   });
 });

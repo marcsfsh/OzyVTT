@@ -75,7 +75,7 @@ describe("testing MVP live server", () => {
       body: "{}"
     });
     expect(pairingResponse.status).toBe(201);
-    const pairingCode = (await pairingResponse.json()).pairing.code;
+    const pairingCode = (await pairingResponse.json()).data.pairing.code;
     const exchange = await fetch(`${base}/api/v1/viewer/pairings/exchange`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -111,7 +111,7 @@ describe("testing MVP live server", () => {
     const viewerState = await (
       await fetch(`${base}/api/v1/viewer/presentation`, { headers: { cookie: viewerCookie } })
     ).json();
-    expect(viewerState.presentation).toMatchObject({
+    expect(viewerState.data.presentation).toMatchObject({
       enabled: true,
       activeMap: { assetId },
       camera: { center: { x: 400, y: 300 } }
@@ -154,7 +154,7 @@ describe("testing MVP live server", () => {
     base = `http://127.0.0.1:${restartedAddress.port}`;
     const recoveredViewer = await fetch(`${base}/api/v1/viewer/presentation`, { headers: { cookie: viewerCookie } });
     expect(recoveredViewer.status).toBe(200);
-    expect((await recoveredViewer.json()).presentation).toMatchObject({ revision: 2, activeMap: { assetId } });
+    expect((await recoveredViewer.json()).data.presentation).toMatchObject({ revision: 2, activeMap: { assetId } });
     const newGmToken = (await running.auth.login("a sufficiently long GM password"))!;
     const recoveredMaps = await fetch(`${base}/api/v1/map-assets`, {
       headers: { authorization: `Bearer ${newGmToken}` }
