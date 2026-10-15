@@ -1,13 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { ItemSlotSchema } from "@vtt/schemas";
-import { ITEM_MECHANICS_LANES } from "../scripts/item-mechanics/index.js";
+import { ITEM_MECHANICS } from "../scripts/item-mechanics/items.js";
 import { loadArmor, loadEquipment, loadMagicItems, loadWeapons } from "../src/index.js";
 import { RARITY_IDS } from "../src/enums.js";
 
 /**
  * Guards the output of `scripts/build-magic-items.ts`; `magic-item-source.test.ts` guards its input.
- * The worn/carried `slot` split is one reading of the SRD among several, and the lanes are scoped
- * off it, so it is pinned per slot.
+ * The worn/carried `slot` split is one reading of the SRD among several, so it is pinned per slot.
  */
 
 const rows = loadMagicItems();
@@ -278,11 +277,11 @@ describe("the generated magic-item bundle", () => {
 
   it("carries no mechanics the overlay did not author - the ETL itself emits none", () => {
     /**
-     * Every rider in the generated bundle must come from `scripts/item-mechanics/`; one hand-edited into
-     * `magic-items.v1.json` would be destroyed by the next build. `item-mechanics.test.ts` covers the
-     * other direction.
+     * Every rider in the generated bundle must come from `scripts/item-mechanics/items.ts`; one
+     * hand-edited into `magic-items.v1.json` would be destroyed by the next build.
+     * `item-mechanics.test.ts` covers the other direction.
      */
-    const authored = new Set(ITEM_MECHANICS_LANES.flatMap((lane) => Object.keys(lane.entries)));
+    const authored = new Set(Object.keys(ITEM_MECHANICS));
     const withMechanics = rows.filter(
       (row) =>
         row.modifiers.length > 0 ||
@@ -295,7 +294,7 @@ describe("the generated magic-item bundle", () => {
     );
     expect(
       withMechanics.filter((row) => !authored.has(row.id)).map((row) => row.name),
-      "a rider in the generated bundle that no lane authored was hand-edited in, and the next build destroys it"
+      "a rider in the generated bundle that items.ts does not author was hand-edited in, and the next build destroys it"
     ).toEqual([]);
     expect(rows.every((row) => row.isMagic)).toBe(true);
     expect(rows.every((row) => row.source === "srd")).toBe(true);

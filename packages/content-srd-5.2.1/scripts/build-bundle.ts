@@ -1,15 +1,14 @@
 /**
- * One-time ETL: vendored open5e `srd-2024` Django fixtures -> curated, validated content bundles.
+ * ETL: vendored open5e `srd-2024` Django fixtures -> curated, validated content bundles.
  *
  * Reads `sources/open5e-srd-2024/*.json`, joins Creature + CreatureAction + CreatureActionAttack +
  * CreatureTrait, adapts each stat block into a canonical `ActorDefinition` (ADR-0007: adapters map
  * external formats into the canonical shape; ADR-0008: structured core, inert text fallback), and
  * writes deterministic `bundles/*.json` bundles plus the required CC BY 4.0 attribution manifest.
- * Run with `npm run build-bundle -w @vtt/content-srd-5.2.1`; output diffs are reviewable in git.
+ * Step 2 of `npm run content` (`build-content.ts`); output diffs are reviewable in git.
  */
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { z } from "zod";
 import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
 import {
@@ -21,10 +20,9 @@ import {
   WeaponPropertyReferenceSchema,
   WeaponReferenceSchema
 } from "../src/index.js";
+import { outDir, sourcePath } from "./paths.js";
 
-const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const sourceDir = join(root, "sources", "open5e-srd-2024");
-const outDir = join(root, "bundles");
+const sourceDir = sourcePath("open5e-srd-2024");
 
 type Fixture<T> = { model: string; pk: string; fields: T };
 type CreatureFields = {
@@ -453,9 +451,8 @@ const EXCLUSIONS = new Set(["srd-2024_giant-fly"]);
 
 /**
  * Creatures the SRD prints as Tiny but open5e stores as "small" (its srd-2024 fixtures carry
- * no tiny size at all). List obtained by cross-validating every bundled statblock against an
- * independent CC-BY copy of the SRD text; footprints are unaffected (tiny and small are both
- * one cell), but display and future size-based rules need the real value.
+ * no tiny size at all). Footprints are unaffected (tiny and small are both one cell), but display
+ * and size-based rules need the real value.
  */
 const TINY_PER_SRD = [
   "badger",
@@ -881,7 +878,7 @@ const weaponPropertyRecords = onlySrd(weaponProperties).map((property) => ({
  * A property cell's parenthetical is dropped (`Versatile (1d10)` -> `versatile`): riders match the
  * bare slug, and `EquipmentWeaponStatsSchema` has nowhere to put a second damage die.
  */
-const weaponTableSource = readFileSync(join(root, "sources", "dnd-5e-srd-markdown", "equipment.md"), "utf8");
+const weaponTableSource = readFileSync(sourcePath("dnd-5e-srd-markdown", "equipment.md"), "utf8");
 const stripTags = (value: string) =>
   value
     .replace(/<[^>]+>/g, "")

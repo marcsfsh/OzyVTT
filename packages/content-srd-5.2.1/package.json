@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Curated SRD 5.2.1 content bundles (CC BY 4.0) with required attribution, generated from vendored open5e srd-2024 fixtures.",
+  "description": "Curated SRD 5.2.1 content bundles (CC BY 4.0) with required attribution, generated from vendored sources by `npm run content`.",
   "exports": {
     ".": "./src/index.ts",
     "./schemas": "./src/schemas.ts"
@@ -11,9 +11,7 @@
   "scripts": {
     "check": "tsc --noEmit",
     "test": "vitest run",
-    "build-bundle": "node --import tsx scripts/build-bundle.ts",
-    "build-class-bundle": "node --import tsx scripts/build-class-bundle.ts",
-    "build-magic-item-bundle": "node --import tsx scripts/build-magic-items.ts"
+    "content": "node --import tsx scripts/build-content.ts"
   },
   "dependencies": {
     "@vtt/rules-5e": "*",

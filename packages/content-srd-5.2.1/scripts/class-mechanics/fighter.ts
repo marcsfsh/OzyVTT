@@ -1,6 +1,6 @@
 /**
- * Fighter and Champion mechanics. Fighter is HAND_AUTHORED, so this overlay may only add to the
- * records, except where an entry uses `clears` (`champion.remarkable-athlete`).
+ * Fighter and Champion mechanics. Fighter is hand-transcribed in `sources/authored/classes.json`;
+ * riders already there are not restated here.
  */
 import type { ClassMechanicsModule } from "./overlay.js";
 
@@ -34,12 +34,8 @@ export const fighter: ClassMechanicsModule = {
       /**
        * "You have Advantage on Initiative rolls and Strength (Athletics) checks." The check half fires via
        * `ability-checks.ts` (e.g. Escape a Grapple with Athletics). The move-after-a-crit clause is prose.
-       *
-       * `clears` is needed because the record in `subclasses.v1.json` already carries the initiative
-       * modifier; both riders are re-supplied here.
        */
       "remarkable-athlete": {
-        clears: ["modifiers"],
         modifiers: [
           { type: "roll-mode", roll: "initiative", mode: "advantage" },
           {

@@ -1,6 +1,6 @@
 /**
- * Wizard and Evoker mechanics. Wizard is HAND_AUTHORED, so this overlay may only add to the record
- * in `classes.v1.json`, except Spell Mastery, which supersedes the record's `choice` via `clears`.
+ * Wizard and Evoker mechanics. Wizard is hand-transcribed in `sources/authored/classes.json`; riders
+ * already there are not restated here.
  */
 import type { ClassMechanicsModule } from "./overlay.js";
 
@@ -14,15 +14,10 @@ export const wizard: ClassMechanicsModule = {
     "signature-spells": { uses: { limit: 2, per: "short-rest" } },
 
     /**
-     * "Choose a level 1 and a level 2 spell": two blocks with exact level windows, replacing the
-     * record's single choose-2 pick. "In your spellbook" and "casting time of an action" are not
-     * expressible (no spellbook model, no casting-time filter).
+     * "Choose a level 1 and a level 2 spell": two blocks with exact level windows. "In your spellbook"
+     * and "casting time of an action" are not expressible (no spellbook model, no casting-time filter).
      */
     "spell-mastery": {
-      // `choices` is cleared too: the bundle is this ETL's input, so after the first run the record already
-      // carries `choices`, and changing the authored value would otherwise collide. Re-authoring an identical
-      // value is a no-op.
-      clears: ["choice", "choices"],
       choices: [
         // Both blocks need a floor: `wizard-spells` includes cantrips, and the server checks only min/max.
         { kind: "spell", choose: 1, fromCatalog: "wizard-spells", minSpellLevel: 1, maxSpellLevel: 1 },

@@ -1,0 +1,580 @@
+[
+  {
+    "speciesId": "dragonborn",
+    "source": "srd",
+    "pools": [
+      {
+        "id": "dragonborn-masculine",
+        "label": "Masculine",
+        "names": [
+          "Akkarn",
+          "Bezrahn",
+          "Dathrek",
+          "Ezkarn",
+          "Ghorvan",
+          "Hessarn",
+          "Jharvex",
+          "Kezrath",
+          "Morvash",
+          "Nazrekk",
+          "Othrenn",
+          "Ravazan",
+          "Sorvekk",
+          "Tarvokk",
+          "Uzarhen",
+          "Vezzar",
+          "Zorvakh"
+        ]
+      },
+      {
+        "id": "dragonborn-feminine",
+        "label": "Feminine",
+        "names": [
+          "Azkira",
+          "Cezanna",
+          "Dravna",
+          "Eskarra",
+          "Ghavia",
+          "Hevrash",
+          "Ithara",
+          "Javessa",
+          "Kyrash",
+          "Myrzeth",
+          "Nekarra",
+          "Ovashi",
+          "Rezena",
+          "Sivrash",
+          "Vazira",
+          "Zovanna"
+        ]
+      },
+      {
+        "id": "dragonborn-clan",
+        "label": "Clan",
+        "names": [
+          "Balkorrimesh",
+          "Dravendazzurn",
+          "Ferrakandrios",
+          "Ghezmarrakan",
+          "Ithrenvakoth",
+          "Karrnavezzin",
+          "Lothmarrandiv",
+          "Nezkarothian",
+          "Sarrvenkalash",
+          "Vorzhandimyr"
+        ]
+      }
+    ]
+  },
+  {
+    "speciesId": "dwarf",
+    "source": "srd",
+    "pools": [
+      {
+        "id": "dwarf-masculine",
+        "label": "Masculine",
+        "names": [
+          "Baldrin",
+          "Brenmar",
+          "Corvek",
+          "Dargan",
+          "Durnik",
+          "Edrom",
+          "Fenrik",
+          "Galdur",
+          "Grimnur",
+          "Hodrek",
+          "Jorvald",
+          "Kelgrim",
+          "Malrik",
+          "Norduk",
+          "Olvar",
+          "Skardun",
+          "Thurvok",
+          "Varrik",
+          "Yorvin"
+        ]
+      },
+      {
+        "id": "dwarf-feminine",
+        "label": "Feminine",
+        "names": [
+          "Astrin",
+          "Baldra",
+          "Dagmara",
+          "Edrika",
+          "Fenna",
+          "Gerdrun",
+          "Helda",
+          "Ingra",
+          "Katla",
+          "Nerta",
+          "Ottila",
+          "Runa",
+          "Thordis",
+          "Ulla",
+          "Vestra"
+        ]
+      },
+      {
+        "id": "dwarf-clan",
+        "label": "Clan",
+        "names": [
+          "Ambervein",
+          "Boulderhelm",
+          "Coalbraid",
+          "Deepdelve",
+          "Emberpick",
+          "Flintbrow",
+          "Graniteshield",
+          "Hearthforge",
+          "Ironvein",
+          "Kegbrand",
+          "Oreseeker",
+          "Runehollow",
+          "Stonemantle",
+          "Tunneltrue"
+        ]
+      }
+    ]
+  },
+  {
+    "speciesId": "elf",
+    "source": "srd",
+    "pools": [
+      {
+        "id": "elf-given",
+        "label": "Given",
+        "names": [
+          "Aethril",
+          "Belanor",
+          "Caranthel",
+          "Duvien",
+          "Elowir",
+          "Faelith",
+          "Gwynor",
+          "Ilthoren",
+          "Lorvael",
+          "Maelien",
+          "Nyvorin",
+          "Olthir",
+          "Pherenil",
+          "Quelith",
+          "Selvarin",
+          "Thessalyn",
+          "Vaelith",
+          "Yrsalor"
+        ]
+      },
+      {
+        "id": "elf-family",
+        "label": "Family",
+        "names": [
+          "Brightbough",
+          "Duskmere",
+          "Everveil",
+          "Gladewind",
+          "Moonsedge",
+          "Silverbrook",
+          "Starhollow",
+          "Summervale",
+          "Thornweave",
+          "Willowmere"
+        ]
+      },
+      {
+        "id": "elf-child",
+        "label": "Child",
+        "names": [
+          "Ael",
+          "Bre",
+          "Cyl",
+          "Dae",
+          "Els",
+          "Fyn",
+          "Ila",
+          "Kel",
+          "Lir",
+          "Mev",
+          "Nyl",
+          "Ors",
+          "Tev",
+          "Wyn"
+        ]
+      }
+    ]
+  },
+  {
+    "speciesId": "gnome",
+    "source": "srd",
+    "pools": [
+      {
+        "id": "gnome-masculine",
+        "label": "Masculine",
+        "names": [
+          "Attlin",
+          "Bozzik",
+          "Cogwin",
+          "Fizwick",
+          "Glimmo",
+          "Hexle",
+          "Jinko",
+          "Kellwin",
+          "Mizzen",
+          "Nockle",
+          "Ozwin",
+          "Pindle",
+          "Quizzle",
+          "Snellig",
+          "Tinwick",
+          "Varnik",
+          "Zibbler"
+        ]
+      },
+      {
+        "id": "gnome-feminine",
+        "label": "Feminine",
+        "names": [
+          "Azzie",
+          "Brimble",
+          "Dazzlyn",
+          "Emzie",
+          "Fipsy",
+          "Ivetta",
+          "Jilly",
+          "Kettlin",
+          "Lunetta",
+          "Minka",
+          "Orissa",
+          "Pillywig",
+          "Quilla",
+          "Tizzy",
+          "Wixie",
+          "Zinnia"
+        ]
+      },
+      {
+        "id": "gnome-clan",
+        "label": "Clan",
+        "names": [
+          "Brasslatch",
+          "Coppercog",
+          "Fiddlefen",
+          "Gearwhistle",
+          "Glowlamp",
+          "Humblebolt",
+          "Inkwhirl",
+          "Latchspring",
+          "Quickspark",
+          "Silverspool",
+          "Thistlegear",
+          "Wickbright"
+        ]
+      }
+    ]
+  },
+  {
+    "speciesId": "goliath",
+    "source": "srd",
+    "pools": [
+      {
+        "id": "goliath-given",
+        "label": "Given",
+        "names": [
+          "Danuk",
+          "Ganta",
+          "Hokal",
+          "Ithka",
+          "Jorra",
+          "Kavuk",
+          "Lomak",
+          "Nokha",
+          "Ormun",
+          "Ruthak",
+          "Sekka",
+          "Tovan",
+          "Ulaka",
+          "Vedak",
+          "Yatuk",
+          "Zerrak"
+        ]
+      },
+      {
+        "id": "goliath-clan",
+        "label": "Clan",
+        "names": [
+          "Cloudcarver",
+          "Frostwalker",
+          "Peakfather",
+          "Rimeholder",
+          "Skyladder",
+          "Stoneshoulder",
+          "Stormheld",
+          "Summitborn",
+          "Thunderstride",
+          "Windterrace"
+        ]
+      }
+    ]
+  },
+  {
+    "speciesId": "halfling",
+    "source": "srd",
+    "pools": [
+      {
+        "id": "halfling-masculine",
+        "label": "Masculine",
+        "names": [
+          "Alby",
+          "Benno",
+          "Cordo",
+          "Dilby",
+          "Fenno",
+          "Gilby",
+          "Haddo",
+          "Jerrin",
+          "Kipp",
+          "Lonno",
+          "Marlow",
+          "Nibs",
+          "Oatley",
+          "Quillby",
+          "Rollo",
+          "Tobbin",
+          "Wick"
+        ]
+      },
+      {
+        "id": "halfling-feminine",
+        "label": "Feminine",
+        "names": [
+          "Belka",
+          "Cindra",
+          "Dovie",
+          "Elsbet",
+          "Ferna",
+          "Hattie",
+          "Lolly",
+          "Maribel",
+          "Nona",
+          "Opaline",
+          "Pemma",
+          "Rosie",
+          "Sorrel",
+          "Tansy",
+          "Wren"
+        ]
+      },
+      {
+        "id": "halfling-family",
+        "label": "Family",
+        "names": [
+          "Applebrook",
+          "Bramblewick",
+          "Copperkettle",
+          "Dewmeadow",
+          "Fernwhistle",
+          "Gladhollow",
+          "Honeyfield",
+          "Kettlewell",
+          "Longbarrow",
+          "Mossbottom",
+          "Nutbrown",
+          "Puddlewick",
+          "Summerhill",
+          "Thistledown",
+          "Warmhearth"
+        ]
+      }
+    ]
+  },
+  {
+    "speciesId": "human",
+    "source": "srd",
+    "pools": [
+      {
+        "id": "human-given",
+        "label": "Given",
+        "names": [
+          "Adran",
+          "Bram",
+          "Cora",
+          "Darvin",
+          "Elda",
+          "Farrow",
+          "Gwen",
+          "Hale",
+          "Ilsa",
+          "Joss",
+          "Kera",
+          "Lorin",
+          "Mira",
+          "Neal",
+          "Orin",
+          "Pell",
+          "Quinn",
+          "Rilla",
+          "Soren",
+          "Tessa",
+          "Ulric",
+          "Vera",
+          "Wend",
+          "Yara"
+        ]
+      },
+      {
+        "id": "human-family",
+        "label": "Family",
+        "names": [
+          "Ashdown",
+          "Brightwater",
+          "Carrow",
+          "Delvin",
+          "Emberly",
+          "Fairwind",
+          "Grayford",
+          "Holloway",
+          "Ironmond",
+          "Kestrel",
+          "Lockwood",
+          "Marsh",
+          "Northgate",
+          "Ostler",
+          "Pike",
+          "Ravensford",
+          "Stonewell",
+          "Thatcher",
+          "Underhill",
+          "Vance",
+          "Whitlock"
+        ]
+      }
+    ]
+  },
+  {
+    "speciesId": "orc",
+    "source": "srd",
+    "pools": [
+      {
+        "id": "orc-masculine",
+        "label": "Masculine",
+        "names": [
+          "Argash",
+          "Bhorug",
+          "Dorgul",
+          "Ghazek",
+          "Hrukag",
+          "Jargul",
+          "Kargun",
+          "Lorgak",
+          "Morzug",
+          "Norgash",
+          "Ogruk",
+          "Rugmar",
+          "Skarn",
+          "Thruk",
+          "Urgan",
+          "Vorruk",
+          "Yazgash",
+          "Zogdan"
+        ]
+      },
+      {
+        "id": "orc-feminine",
+        "label": "Feminine",
+        "names": [
+          "Aruga",
+          "Bashka",
+          "Drenna",
+          "Ghaska",
+          "Horga",
+          "Karnza",
+          "Lugna",
+          "Mazgha",
+          "Orzha",
+          "Razka",
+          "Shorga",
+          "Thazra",
+          "Ulgra",
+          "Vazka",
+          "Yagra",
+          "Zhagra"
+        ]
+      }
+    ]
+  },
+  {
+    "speciesId": "tiefling",
+    "source": "srd",
+    "pools": [
+      {
+        "id": "tiefling-masculine",
+        "label": "Masculine",
+        "names": [
+          "Azreth",
+          "Cazrek",
+          "Dremos",
+          "Ezmirath",
+          "Farros",
+          "Karzeth",
+          "Malrek",
+          "Nethros",
+          "Orzeth",
+          "Ravzek",
+          "Sethrim",
+          "Thavros",
+          "Vazrin",
+          "Zorvath"
+        ]
+      },
+      {
+        "id": "tiefling-feminine",
+        "label": "Feminine",
+        "names": [
+          "Azari",
+          "Belzira",
+          "Cindrel",
+          "Dezmara",
+          "Ephira",
+          "Izelle",
+          "Kalthea",
+          "Levanna",
+          "Mezriel",
+          "Nyzara",
+          "Ophira",
+          "Sarizel",
+          "Thezra",
+          "Velzara",
+          "Yezrith",
+          "Zephira"
+        ]
+      },
+      {
+        "id": "tiefling-virtue",
+        "label": "Virtue",
+        "names": [
+          "Ardor",
+          "Candor",
+          "Clemency",
+          "Courage",
+          "Fortune",
+          "Grace",
+          "Havoc",
+          "Justice",
+          "Lament",
+          "Mercy",
+          "Paradox",
+          "Penance",
+          "Requiem",
+          "Rue",
+          "Solace",
+          "Tempest",
+          "Valor",
+          "Vigil",
+          "Whisper",
+          "Zeal"
+        ]
+      }
+    ]
+  }
+]
