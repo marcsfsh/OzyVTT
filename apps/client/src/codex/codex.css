@@ -20,9 +20,9 @@
   border: 1px solid transparent;
   padding: var(--space-3);
 }
-/* The rail's isolation creates a stacking context, so an open combobox list would lose to the pane beside
-   it. Lift the rail only while a list is open. Does not fix the folder `Menu` popover. */
-.codex-rail:has(.nh-combobox-list) {
+/* The rail's isolation creates a stacking context, so an open combobox list or folder menu would lose to the
+   pane beside it. Lift the rail only while one is open. */
+.codex-rail:has(.nh-combobox-list, .nh-menu[open]) {
   z-index: 1;
 }
 /* The small buttons grow to the 44px floor so they line up with the search field. */
