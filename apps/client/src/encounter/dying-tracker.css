@@ -1,0 +1,51 @@
+.dying-tracker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0.35rem 0 0;
+  padding: 0.35rem 0.55rem;
+  border: 0;
+  border-left: 2px solid var(--danger);
+  border-radius: 0;
+  background: var(--surface-2);
+}
+.dying-tracker .save-prompt-actions,
+.dying-tracker .save-prompt-confirm {
+  flex: 1 1 12rem;
+}
+.dying-label {
+  color: var(--danger-hi);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.dying-label.dead {
+  color: var(--danger);
+}
+.dying-pips {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+}
+.pip {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line-strong);
+}
+.pip.success.filled {
+  background: var(--success);
+  border-color: var(--success);
+}
+.pip.failure.filled {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+.pip-divider {
+  width: 1px;
+  height: 0.7rem;
+  background: var(--line);
+  margin: 0 0.2rem;
+}

@@ -2,6 +2,7 @@ import { IconX } from "@vtt/ui";
 import { useState } from "react";
 import { type PendingDamage } from "@vtt/domain";
 import { command } from "../lib/command";
+import "./prompts.css";
 
 /**
  * A player's hit awaiting the GM's Apply (proposal mode, the default). The rolled total is editable;

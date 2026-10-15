@@ -54,24 +54,6 @@
   letter-spacing: 0.02em;
 }
 
-.scenes-open-row {
-  display: flex;
-  margin-bottom: var(--space-3);
-}
-.scenes-open {
-  max-width: 100%;
-}
-.scenes-open .scenes-open-icon {
-  margin-right: var(--space-1);
-  font-size: 1.05em;
-  line-height: 1;
-}
-.scenes-open .scenes-open-caret {
-  margin-left: var(--space-1);
-  font-size: 0.8em;
-  opacity: 0.7;
-}
-
 /* Square cards in the hub and the picker: the thumbnail flexes to fill the space above the title and
    actions. `align-items: start` stops the grid stretching the aspect ratio. */
 .scene-gallery-hub .nh-gallery {

@@ -1,4 +1,5 @@
 import { type ReactNode } from "react";
+import "./rich-text.css";
 
 /**
  * Renders the markdown subset the SRD reference text uses (***bold-italic***, **bold**, *italic*,

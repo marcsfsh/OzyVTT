@@ -21,6 +21,7 @@ import { SheetVitals } from "./SheetVitals";
 import { useSheetDefinition } from "./useSheetDefinition";
 import { useSheetEdit } from "./useSheetEdit";
 import { useSheetRolls } from "./useSheetRolls";
+import "./character-sheet.css";
 
 /** Per-browser storage for the sheet's dice dock (private-mode safe). */
 const readSetting = (key: string): string | null => {

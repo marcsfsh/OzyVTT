@@ -1,11 +1,12 @@
 import { StrictMode, useEffect, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import type { GmActor, GmView, PlayerActor, PlayerView, SessionJoinResult } from "@vtt/domain";
+// The global styles load before any component's own stylesheet, as in main.tsx: CSS lands in import order.
+import "@vtt/ui/styles.css";
+import "./styles.css";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { CharacterSheet } from "./encounter/CharacterSheet";
 import { socket } from "./socket";
-import "@vtt/ui/styles.css";
-import "./styles.css";
 import "./encounter/encounter-panel.css";
 
 /** localStorage key holding the player's session token (shared across same-origin tabs). */

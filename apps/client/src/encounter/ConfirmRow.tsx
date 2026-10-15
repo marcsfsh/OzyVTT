@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Button } from "@vtt/ui";
+import "./confirm-row.css";
 
 /**
  * A question that needs a yes before anything happens (a rules override, a history rewrite): the

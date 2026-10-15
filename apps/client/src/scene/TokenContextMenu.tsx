@@ -8,6 +8,7 @@ import { HealthAudienceOptions, HealthStyleOptions, type HealthStyle } from "../
 import { command } from "../lib/command";
 import { TokenLibrary } from "../tokens/TokenLibrary";
 import { titleCase } from "../encounter/format";
+import "./token-menu.css";
 
 type Actor = GmActor | PlayerActor;
 

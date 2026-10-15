@@ -21,6 +21,7 @@ import {
 import { useRollPreference } from "../dice/roll-preference";
 import { command, read } from "../lib/command";
 import { registerContentCache } from "../content/invalidate";
+import "./action-runner.css";
 
 /** Per-definition action cache. Cleared on `homebrew:changed` (`content/invalidate.ts`), since a GM
     can republish a creature mid-session and a stale entry would show the wrong attack. */

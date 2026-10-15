@@ -73,7 +73,7 @@ export const CONVENTION_SHAPE = {
   /** Floor on the client stylesheets (g) and (h) read; `packages/ui`'s `dvh` uses are the lock itself. */
   appCssSourceFloor: 22,
   /** (g) Conforming viewport-unit uses (landing clamps, overlay caps, the viewer's portrait band). */
-  viewportConformingFiles: 3,
+  viewportConformingFiles: 5,
   viewportConformingTotal: 8,
   /** (g) Legacy viewport-fraction caps on in-flow content, which frames replace. Shrink-only. */
   viewportLegacyFiles: 0,

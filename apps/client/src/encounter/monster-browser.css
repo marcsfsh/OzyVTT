@@ -1,0 +1,100 @@
+/* Monster browser in the shared Modal. `.nh-modal-body` is `display: block`, so it is made the flex
+   column here: the list (`.scroll-y` in the markup) scrolls within the surface's own max-height, and
+   the search, target line, confirmation and attribution stay pinned. No extra cap needed. */
+.monster-browser .nh-modal-body {
+  display: flex;
+  flex-direction: column;
+}
+.monster-browser-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: 0.2rem;
+}
+.monster-browser-controls input[type="search"] {
+  margin-top: 0;
+  padding: 0.6rem 0.8rem;
+}
+.monster-browser-target {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.monster-browser-target strong {
+  color: var(--text);
+}
+.monster-browser-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  list-style: none;
+  margin: 0.8rem 0 0;
+  padding: 0 var(--space-1) 0 0;
+  border-top: 1px solid var(--line);
+}
+.monster-browser-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0.55rem 0.1rem;
+  border-bottom: 1px solid var(--line);
+}
+.monster-browser-name {
+  min-width: 0;
+}
+.monster-browser-name strong {
+  display: block;
+}
+.monster-browser-name small {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--text-muted);
+}
+.monster-browser-added {
+  margin-inline-start: var(--space-2);
+  color: var(--cyan);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+/* Reserves the wider label ("Adding…") so the button does not shift. `StableSwap` would be the right
+   tool but is not exported from `@vtt/ui`. */
+.monster-browser-add {
+  flex: none;
+  min-width: 5.65rem;
+  padding: var(--space-2) 0.95rem;
+  /* Fill, rim and corners come from the controls' material in encounter-panel.css. Only the border
+     box is set here, so the paint does not depend on which stylesheet loads first. */
+  border: 1px solid transparent;
+  color: var(--text);
+  text-align: center;
+  cursor: pointer;
+}
+.monster-browser-add:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
+}
+.monster-browser-none {
+  color: var(--text-muted);
+}
+.monster-browser-status {
+  color: var(--text-dim);
+  margin: var(--space-4) 0 0;
+}
+.monster-browser-feedback {
+  min-height: 1.2rem;
+  margin: 0.6rem 0 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.monster-browser-attribution {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+}
+@media (max-width: 560px) {
+  .monster-browser {
+    max-height: 92vh;
+  }
+}

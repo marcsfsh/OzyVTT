@@ -2,6 +2,7 @@ import { useState } from "react";
 import { type PlayerEffect } from "@vtt/domain";
 import { Chip } from "@vtt/ui";
 import { command } from "../lib/command";
+import "./effect-chips.css";
 
 /**
  * Active rules-engine effects (Rage, a grapple) as chips beside the condition chips. Ending one is

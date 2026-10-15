@@ -1,0 +1,10 @@
+.effect-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.3rem 0 0;
+}
+.effect-chips .nh-chip small {
+  color: var(--text-muted);
+  font-weight: 400;
+}

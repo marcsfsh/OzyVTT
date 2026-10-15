@@ -4,6 +4,7 @@ import { rosterActors, type GmActor, type GmView, type MutationResult } from "@v
 import { Select, Switch } from "@vtt/ui";
 import { command } from "../lib/command";
 import { HealthAudienceOptions, HealthStyleOptions, healthStylePhrase, type HealthStyle } from "./health-display";
+import "./fight-menu.css";
 
 /* The ⋯ fight menu's geometry: margin from viewport edges, gap from the trigger, and box width. */
 const MENU_MARGIN = 8;

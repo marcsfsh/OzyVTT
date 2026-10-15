@@ -2,6 +2,7 @@ import { useState } from "react";
 import { type DeathSaveResult, type DeathSaves } from "@vtt/domain";
 import { command } from "../lib/command";
 import { RollControls, type DieMode } from "./RollControls";
+import "./dying-tracker.css";
 
 type DeathPreview = NonNullable<DeathSaveResult["deathSave"]>;
 

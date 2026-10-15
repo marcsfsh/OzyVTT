@@ -3,6 +3,7 @@ import { Button, Input } from "@vtt/ui";
 import { command } from "../lib/command";
 import { useRollPreference } from "../dice/roll-preference";
 import { DieModeButtons, type DieMode } from "./RollControls";
+import "./prompts.css";
 
 /**
  * A player's "roll for initiative" prompt while their id is in `combat.pendingInitiative`. Digital

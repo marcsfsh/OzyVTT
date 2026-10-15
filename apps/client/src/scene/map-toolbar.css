@@ -1,0 +1,338 @@
+/* The bar, panel, rail and Tools button take the full material. The cut is a `mask-image`, not the
+   `.chamfer` backing layer, because the panel and rail scroll and an absolute backing layer would
+   scroll away with their content; a mask also does not clip hit-testing. The stop is `--chamfer / √2`
+   (stops run along the gradient axis). Masked elements show no box-shadow, so the plate is 94% opaque
+   and the rim separates them from the map. */
+.map-toolbar,
+.map-toolbar-panel,
+.map-toolbar-rail,
+.map-toolbar-toggle {
+  --chamfer-mask-stop: calc(var(--chamfer) / 1.4142);
+  -webkit-mask-image:
+    linear-gradient(135deg, transparent 0 var(--chamfer-mask-stop), currentColor var(--chamfer-mask-stop)),
+    linear-gradient(315deg, transparent 0 var(--chamfer-mask-stop), currentColor var(--chamfer-mask-stop));
+  mask-image:
+    linear-gradient(135deg, transparent 0 var(--chamfer-mask-stop), currentColor var(--chamfer-mask-stop)),
+    linear-gradient(315deg, transparent 0 var(--chamfer-mask-stop), currentColor var(--chamfer-mask-stop));
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+  border: var(--rim-w) solid var(--rim-color);
+  outline: 1px solid var(--bezel-color);
+  outline-offset: calc(-1 * var(--bezel-inset));
+  transition:
+    border-color var(--dur-hover),
+    background var(--dur-hover);
+}
+.map-toolbar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  background:
+    var(--material-scanline),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-2) 94%, transparent),
+      color-mix(in srgb, var(--surface-1) 94%, transparent)
+    );
+}
+/* The rim brightens on hover, focus and press (touch has no hover). Only the phone's Tools button is
+   a control here; the bar itself is not. */
+.map-toolbar-toggle:hover,
+.map-toolbar-toggle:focus-visible,
+.map-toolbar-toggle:active,
+.map-toolbar-toggle[aria-expanded="true"] {
+  border-color: var(--rim-color-hi);
+}
+/* The 44px floor as real paint, not an overhang, so neighbours can never steal taps at any gap. */
+.map-toolbar .nh-iconbtn {
+  width: 2.75rem;
+  height: 2.75rem;
+  background: transparent;
+  border-color: transparent;
+  font-size: 1.15rem;
+}
+.map-toolbar .nh-iconbtn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
+}
+.map-toolbar .nh-iconbtn[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta));
+  border-color: var(--magenta);
+}
+/* The three constant tools. `.encounter-map-tools` keeps its name and .35rem gap (codex.css cites it). */
+.encounter-map-tools {
+  display: flex;
+  gap: 0.35rem;
+}
+.map-toolbar-divider {
+  align-self: stretch;
+  width: 1px;
+  margin: 0.2rem 0.1rem;
+  background: var(--line-strong);
+}
+/* A group button is icon + word at every width above the collapse: a phone has no hover. */
+.map-toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 2.75rem;
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.map-toolbar-group:hover {
+  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
+}
+.map-toolbar-group[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta));
+  border-color: var(--magenta);
+}
+.map-toolbar-group-icon {
+  display: grid;
+  place-items: center;
+  font-size: 1.05rem;
+}
+.map-toolbar-caret {
+  display: grid;
+  place-items: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  transition: transform 0.16s ease;
+}
+.map-toolbar-caret.open {
+  transform: rotate(180deg);
+}
+/* One open group at a time, in one bounded surface that shrinks to the stage and scrolls itself
+   (`.scroll-y` in the markup). Rim, bezel and cut on a flat opaque plate: no texture behind fields
+   being edited, and no shadow (it is masked). */
+.map-toolbar-panel {
+  min-height: 0;
+  width: min(19rem, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0.6rem 0.7rem;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  overscroll-behavior: contain;
+}
+.map-toolbar-panel-title {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.map-toolbar-panel .nh-field,
+.map-toolbar-panel-body .nh-field {
+  gap: 0.2rem;
+}
+.map-toolbar-field {
+  font-size: 0.78rem;
+}
+.map-toolbar-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.1rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.map-toolbar-label span {
+  display: grid;
+  place-items: center;
+  font-size: 0.95rem;
+}
+.map-toolbar-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+.map-toolbar-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3rem;
+}
+.map-toolbar-choice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  min-height: 2.5rem;
+  padding: 0.3rem var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.map-toolbar-choice:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
+}
+.map-toolbar-choice[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta));
+  border-color: var(--magenta);
+}
+.map-toolbar-choice:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+.map-toolbar-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.map-toolbar-actions-row {
+  flex-direction: row;
+}
+.map-toolbar-actions-row .nh-btn {
+  flex: 1;
+}
+/* Switches stack, so their paint grows to 44px rather than overlapping `::after` hit boxes. */
+.map-toolbar-switch {
+  align-self: flex-start;
+  min-height: var(--tap-min);
+  font-size: 0.78rem;
+}
+.map-toolbar-segmented {
+  width: 100%;
+}
+.map-toolbar-segmented .nh-segmented-option {
+  min-height: var(--tap-min);
+}
+.map-toolbar-custom-colour {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 2.75rem;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+}
+.map-toolbar-custom-colour input {
+  width: 3rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+}
+/* The phone's one door onto the toolbar: masked, with 2.75rem of real paint (`tap-audit.mjs 375`). */
+.map-toolbar-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 2.75rem;
+  padding: 0 0.7rem;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-1) 94%, transparent);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.map-toolbar-toggle[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta));
+}
+.map-toolbar-rail {
+  min-height: 0;
+  width: min(17rem, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.4rem;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  overscroll-behavior: contain;
+}
+.map-toolbar-rail-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--line);
+}
+.map-toolbar-rail-section + .map-toolbar-rail-section {
+  border-top: 1px solid var(--line);
+}
+.map-toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.3rem var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.map-toolbar-row:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+.map-toolbar-row[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta));
+  border-color: var(--magenta);
+}
+.map-toolbar-row-icon {
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+}
+.map-toolbar-rail-head .map-toolbar-caret {
+  margin-left: auto;
+}
+.map-toolbar-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0.1rem var(--space-2) var(--space-2);
+}
+/* The rail scrolls when the stage is shorter than it (`.scroll-y` in the markup); a newly opened
+   section is scrolled into view. */
+.map-toolbar-rail {
+  scroll-behavior: smooth;
+}
+/* Swatches: 2.25rem of paint plus `.tap-target` reaches 44px, and the .3rem gap clears the 4px
+   overhang per side. They wrap rather than shrink. */
+.encounter-map-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  max-width: 100%;
+}
+.encounter-map-swatches button {
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.encounter-map-swatches button.selected {
+  outline: 2px solid var(--cyan-hi);
+  outline-offset: 1px;
+}

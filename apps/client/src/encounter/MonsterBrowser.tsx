@@ -3,6 +3,7 @@ import type { ContentMonsterSummary } from "@vtt/domain";
 import { Modal, Input } from "@vtt/ui";
 import { command, read } from "../lib/command";
 import { formatChallenge, titleCase } from "./format";
+import "./monster-browser.css";
 
 /**
  * The bestiary browser. It adds monsters; visibility comes from the staging tray (`visibility`),

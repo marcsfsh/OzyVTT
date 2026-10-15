@@ -3,6 +3,7 @@ import type { ActionResolution } from "@vtt/domain";
 import { Button } from "@vtt/ui";
 import { DieModeButtons, type DieMode } from "./RollControls";
 import type { ResolveOptions } from "./targeting";
+import "./prompts.css";
 
 type Attack = NonNullable<ActionResolution["attack"]>;
 

@@ -3,6 +3,7 @@ import { type PendingSave, type PlayerPendingSave } from "@vtt/domain";
 import { command } from "../lib/command";
 import { RollControls, type DieMode } from "./RollControls";
 import { saveAnswerPayload, saveDamageAmend } from "./save-answer";
+import "./prompts.css";
 
 /**
  * Debounce before the save prompt re-asks the server what an amended damage would apply

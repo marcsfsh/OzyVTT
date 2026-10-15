@@ -3,6 +3,7 @@ import { type ActionResolution, type PendingReaction, type PlayerPendingReaction
 import { Button, IconX } from "@vtt/ui";
 import { command } from "../lib/command";
 import { DieModeButtons, type DieMode } from "./RollControls";
+import "./prompts.css";
 
 /**
  * A reaction window awaiting an answer (Uncanny Dodge). The triggering hit's damage is parked here,

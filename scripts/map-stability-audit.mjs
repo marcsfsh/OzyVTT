@@ -413,7 +413,7 @@ async function measureDock(testCase) {
  *      (`content-visibility: hidden` keeps layout and skips paint), so all ten Recent rows report a
  *      31px box while being genuinely unrendered — the same trap `tap-audit.mjs`'s docblock records.
  *  (4) `.row-tools-popover` SHARES THE PSEUDO AND MUST NOT SHARE THE TRAP. It is in the same selector
- *      list at `encounter-panel.css:1539`; it is safe only because it is not a scroll container, and
+ *      list in `encounter-panel.css`; it is safe only because it is not a scroll container, and
  *      that is a fact worth asserting rather than assuming, since giving it a `max-height` some day
  *      would silently re-open this.
  */

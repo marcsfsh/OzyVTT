@@ -12,6 +12,7 @@ import {
 } from "@vtt/ui";
 import { NEEDS_GRID, type MapTool, type MapToolbarProps } from "./mapTools";
 import { DrawGroup, FogGroup, ViewGroup } from "./MapToolGroups";
+import "./map-toolbar.css";
 
 /**
  * The map toolbar. Always visible: the constant tools (Select · Ping · Measure) and three labelled

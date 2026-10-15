@@ -3,6 +3,7 @@ import type { AskableCommand, GmView, PlayerView } from "@vtt/domain";
 import { Button } from "@vtt/ui";
 import { command } from "../lib/command";
 import { clearBlockedPrompt, useTargetingBlocked } from "./targeting";
+import "./rule-ask.css";
 
 /**
  * Asking the GM. With the rules assistant on Enforce the server refuses an illegal move, and

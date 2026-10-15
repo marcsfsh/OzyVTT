@@ -546,9 +546,19 @@ const VIEWPORT_UNIT = /\b\d+(?:\.\d+)?(?:d|s)?vh\b/g;
 /** Reasoned survivors: rows carry a why, and growth must be argued. */
 const VIEWPORT_CONFORMING: ReadonlyArray<readonly [file: string, values: readonly string[], why: string]> = [
   [
-    "apps/client/src/encounter/encounter-panel.css",
-    ["85vh", "52vh", "94vh", "92vh"],
-    "overlay caps bounding fixed/modal layers (⋯-menu, sheet modal + its capped picker, monster browser) — §8 reference implementations"
+    "apps/client/src/encounter/character-sheet.css",
+    ["52vh", "94vh"],
+    "overlay caps bounding modal layers (sheet modal + its capped picker) — §8 reference implementations"
+  ],
+  [
+    "apps/client/src/encounter/fight-menu.css",
+    ["85vh"],
+    "overlay cap bounding the fixed ⋯-menu — §8 reference implementation"
+  ],
+  [
+    "apps/client/src/encounter/monster-browser.css",
+    ["92vh"],
+    "overlay cap bounding the monster browser modal — §8 reference implementation"
   ],
   [
     "apps/client/src/styles.css",

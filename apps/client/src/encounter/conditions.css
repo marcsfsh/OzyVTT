@@ -1,0 +1,37 @@
+/* Pressable chips each carry a 44px hit area around 2rem of paint (Chip.css), so --space-3 is the
+   minimum gap that keeps neighbours from stealing taps. */
+.condition-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-left: 0.45rem;
+  vertical-align: middle;
+}
+.condition-add {
+  min-width: 1.5rem;
+  text-align: center;
+  background: transparent;
+  color: var(--text-muted);
+  border-style: dashed;
+}
+.condition-editor {
+  margin-top: 0.35rem;
+}
+.initiative-list.gm .condition-editor {
+  margin-top: 0.3rem;
+}
+.condition-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: 0.45rem;
+  padding: 0.55rem;
+  border: 1px solid transparent;
+}
+.condition-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}

@@ -4,6 +4,7 @@ import { Modal } from "@vtt/ui";
 import { read } from "../lib/command";
 import { registerContentCache } from "../content/invalidate";
 import { RichText } from "./RichText";
+import "./spell-card.css";
 
 /**
  * One shared, session-cached fetch of the spell reference (rules text and header fields). Failures

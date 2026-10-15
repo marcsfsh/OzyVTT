@@ -1,6 +1,7 @@
 import type { GmActor, PlayerActor } from "@vtt/domain";
 import { Button, IconArrow } from "@vtt/ui";
 import { clearTargeting, resolveTargeting, useTargetingBusy, type TargetingSession } from "../encounter/targeting";
+import "./target-bar.css";
 
 /**
  * The confirm bar over the map while the GM picks targets for an action: who is targeted (or how to

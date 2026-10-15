@@ -4,6 +4,7 @@ import type { GmActor, GmView, MutationResult } from "@vtt/domain";
 import { command } from "../lib/command";
 import { ActionRunner } from "./ActionRunner";
 import { DyingTracker } from "./DyingTracker";
+import "./acting-console.css";
 
 /**
  * The acting creature's console under the active row: its turn economy and its action runner. A

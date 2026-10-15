@@ -1,3 +1,5 @@
+import "./dock-picker.css";
+
 export const DOCK_POSITIONS = ["sidebar", "left", "right"] as const;
 export type DockPosition = (typeof DOCK_POSITIONS)[number];
 export type DockControl = Readonly<{ position: DockPosition; onChange: (position: DockPosition) => void }>;

@@ -3,6 +3,7 @@ import { Input } from "@vtt/ui";
 import { command } from "../lib/command";
 import { DamageTypeField } from "./DamageTypeField";
 import { manualDamagePayload, manualDamageType } from "./manual-damage";
+import "./hp-adjust.css";
 
 /** The hit point changes a door offers: damage, a nonlethal knock-out, heal, temporary HP, and an exact value. */
 export type HpControl = "damage" | "nonlethal" | "heal" | "temp" | "set";

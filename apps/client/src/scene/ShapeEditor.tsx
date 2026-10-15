@@ -3,6 +3,7 @@ import { Button, Switch } from "@vtt/ui";
 import { annotationCenter } from "./annotationGlyph";
 import { drawingAudienceOptions } from "./mapTools";
 import type { MapCommands } from "./useMapCommands";
+import "./shape-editor.css";
 
 /** The short reveal words, for the read-only line a shape shows to someone who cannot manage it. */
 const VISIBILITY_SHORT: Record<AnnotationVisibility, string> = {

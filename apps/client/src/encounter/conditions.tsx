@@ -3,6 +3,7 @@ import type { Actor, ContentConditionSummary } from "@vtt/domain";
 import { Chip, Stepper, type ChipTone } from "@vtt/ui";
 import { command, read } from "../lib/command";
 import { CONDITION_GLYPHS } from "../scene/tokenGlyph";
+import "./conditions.css";
 
 type ConditionInstance = Actor["conditions"][number];
 
