@@ -2051,7 +2051,9 @@
      "ability": "str",
      "dc": 13,
      "successDamage": "none",
-     "failureCondition": "prone"
+     "failureConditions": [
+      "prone"
+     ]
     }
    }
   ],
@@ -3968,7 +3970,7 @@
      "ability": "wis",
      "dc": 17,
      "successDamage": "none",
-     "failureCondition": null
+     "failureConditions": []
     }
    }
   ],
@@ -4923,7 +4925,9 @@
      "ability": "wis",
      "dc": 15,
      "successDamage": "none",
-     "failureCondition": "frightened"
+     "failureConditions": [
+      "frightened"
+     ]
     }
    }
   ],
@@ -6007,7 +6011,7 @@
      "ability": "dex",
      "dc": 15,
      "successDamage": "half",
-     "failureCondition": null
+     "failureConditions": []
     }
    }
   ],
@@ -6322,7 +6326,9 @@
      "ability": "wis",
      "dc": 15,
      "successDamage": "none",
-     "failureCondition": "stunned"
+     "failureConditions": [
+      "stunned"
+     ]
     }
    }
   ],
@@ -6608,7 +6614,9 @@
      "ability": "wis",
      "dc": 15,
      "successDamage": "none",
-     "failureCondition": "charmed"
+     "failureConditions": [
+      "charmed"
+     ]
     }
    }
   ],
@@ -6700,7 +6708,9 @@
      "ability": "dex",
      "dc": 15,
      "successDamage": "none",
-     "failureCondition": "restrained"
+     "failureConditions": [
+      "restrained"
+     ]
     }
    }
   ],
@@ -7679,7 +7689,7 @@
      "ability": "dex",
      "dc": 17,
      "successDamage": "half",
-     "failureCondition": null
+     "failureConditions": []
     }
    },
    {
@@ -7701,7 +7711,9 @@
      "ability": "con",
      "dc": 17,
      "successDamage": "half",
-     "failureCondition": "deafened"
+     "failureConditions": [
+      "deafened"
+     ]
     }
    }
   ],
@@ -8597,7 +8609,9 @@
      "ability": "con",
      "dc": 15,
      "successDamage": "none",
-     "failureCondition": "paralyzed"
+     "failureConditions": [
+      "paralyzed"
+     ]
     }
    }
   ],

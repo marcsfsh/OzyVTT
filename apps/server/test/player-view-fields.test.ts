@@ -179,7 +179,7 @@ describe("player view pending prompts", () => {
         "actionName",
         "proposedDamage",
         "halfOnSuccess",
-        "conditionId",
+        "conditionIds",
         "saveBonus",
         "createdAt",
         "sourceName",

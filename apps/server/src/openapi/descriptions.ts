@@ -257,8 +257,8 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   SpellSave: {
     "": "The save a spell forces: the ability the target rolls and what the save does. The caster supplies the DC.",
     successDamage: 'The damage a successful save takes: "half" (Fireball) or "none" (Sacred Flame)',
-    failureCondition:
-      "The condition a failed save imposes, offered on the save prompt; null for none. Exhaustion is not offered: it stacks by level"
+    failureConditions:
+      "Every condition a failed save imposes (Turn Undead: Frightened and Incapacitated); empty for none. Exhaustion is not offered: it stacks by level"
   },
   SpellShape: {
     "": "A spell's area of effect."
@@ -405,8 +405,8 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       'Normal range for a two-range weapon ("80/320" -> 80); attacks beyond it up to rangeFeet roll at disadvantage',
     save: "A printed save DC, and what the save does",
     "save.successDamage": 'The damage a successful save takes: "half" (Fireball) or "none" (Sacred Flame)',
-    "save.failureCondition":
-      "The condition a failed save imposes, offered on the save prompt; null for none. Exhaustion is not offered: it stacks by level"
+    "save.failureConditions":
+      "Every condition a failed save imposes (Turn Undead: Frightened and Incapacitated); empty for none. Exhaustion is not offered: it stacks by level"
   },
   FeatureAttack: {
     "": 'An attack a FEATURE grants. Same vocabulary as a stat block\'s attack except the to-hit bonus is DERIVED: the feature names the ability (or "spellcasting") and the builder resolves the number.'
@@ -415,8 +415,8 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "": "A save a feature forces. `ability` is what the TARGET rolls; `dc` is how the number is derived; the outcome fields are a stat block's.",
     dc: "Three forms, all of them data rather than a formula language (ADR-0008): the character's own spell save DC, a printed constant, or the SRD's \"DC 8 plus your <ability> modifier and Proficiency Bonus\" wording as three bounded fields.",
     successDamage: 'The damage a successful save takes: "half" (Fireball) or "none" (Sacred Flame)',
-    failureCondition:
-      "The condition a failed save imposes, offered on the save prompt; null for none. Exhaustion is not offered: it stacks by level"
+    failureConditions:
+      "Every condition a failed save imposes (Turn Undead: Frightened and Incapacitated); empty for none. Exhaustion is not offered: it stacks by level"
   },
   FeatureSaveDcDerived: {
     "": "A DERIVED save DC: `base` plus the CASTER's ability modifier, plus proficiency bonus. Every SRD 5.2.1 printing uses base 8 with proficiency, which is why both default.",

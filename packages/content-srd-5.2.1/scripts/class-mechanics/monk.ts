@@ -89,7 +89,7 @@ export const monk: ClassMechanicsModule = {
             ability: "con",
             dc: { base: 8, ability: "wis", proficiencyBonus: true },
             successDamage: "none",
-            failureCondition: "stunned"
+            failureConditions: ["stunned"]
           }
         }
       ]
@@ -155,7 +155,7 @@ export const monk: ClassMechanicsModule = {
               ability: "con",
               dc: { base: 8, ability: "wis", proficiencyBonus: true },
               successDamage: "half",
-              failureCondition: null
+              failureConditions: []
             }
           }
         ]

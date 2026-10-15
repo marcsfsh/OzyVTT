@@ -129,7 +129,7 @@ export const barbarian: ClassMechanicsModule = {
               ability: "wis",
               dc: { base: 8, ability: "str", proficiencyBonus: true },
               successDamage: "none",
-              failureCondition: "frightened"
+              failureConditions: ["frightened"]
             }
           }
         ]

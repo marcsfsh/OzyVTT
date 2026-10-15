@@ -586,7 +586,7 @@ describe("Barbarian: Intimidating Presence holds the target to the Barbarian's o
       ability: "wis",
       dc: 18,
       successDamage: "none",
-      failureCondition: "frightened"
+      failureConditions: ["frightened"]
     });
     const resolution = use(built, "intimidating-presence", [IDS.foe]);
     expect(resolution.save).toMatchObject({ ability: "wis", dc: 18 });
@@ -597,7 +597,7 @@ describe("Barbarian: Intimidating Presence holds the target to the Barbarian's o
       ability: "wis",
       dc: 19,
       successDamage: "none",
-      failureCondition: "frightened"
+      failureConditions: ["frightened"]
     });
   });
 
@@ -611,7 +611,7 @@ describe("Barbarian: Intimidating Presence holds the target to the Barbarian's o
       ability: "wis",
       dc: 21,
       successDamage: "none",
-      failureCondition: "frightened"
+      failureConditions: ["frightened"]
     });
     // The number the target is held to, not just the one printed on the sheet.
     expect(use(capstone, "intimidating-presence", [IDS.foe]).save).toMatchObject({ ability: "wis", dc: 21 });
@@ -960,7 +960,7 @@ describe("Monk: Stunning Strike holds the target to the Monk's own DC", () => {
       ability: "con",
       dc: 15,
       successDamage: "none",
-      failureCondition: "stunned"
+      failureConditions: ["stunned"]
     });
     const resolution = use(built, "stunning-strike", [IDS.foe]);
     expect(resolution.save).toMatchObject({ ability: "con", dc: 15 });
@@ -977,7 +977,7 @@ describe("Monk: Stunning Strike holds the target to the Monk's own DC", () => {
       ability: "con",
       dc: 21,
       successDamage: "none",
-      failureCondition: "stunned"
+      failureConditions: ["stunned"]
     });
     expect(use(capstone, "stunning-strike", [IDS.foe]).save).toMatchObject({ ability: "con", dc: 21 });
   });

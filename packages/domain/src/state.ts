@@ -180,12 +180,16 @@ export const PendingSaveSchema = z
       .max(9)
       .optional(),
     halfOnSuccess: z.boolean().default(true),
-    conditionId: z
-      .string()
-      .regex(/^[a-z0-9-]+$/)
-      .max(60)
-      .nullable()
-      .default(null),
+    /** Conditions a failed save imposes. */
+    conditionIds: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(60)
+      )
+      .max(4)
+      .default([]),
     /** Flat bonus to the save roll (GM-adjudicated cover: +2/+5 on Dex saves, SRD Cover). */
     saveBonus: z.number().int().min(0).max(10).default(0),
     /** Concentration check (SRD): effects ended when this save fails. Stripped from player projections. */

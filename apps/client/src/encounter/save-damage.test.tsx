@@ -34,7 +34,7 @@ const SAVE: PendingSave = {
   proposedDamage: 17,
   proposedDamageParts: [{ amount: 17, type: "fire" }],
   halfOnSuccess: true,
-  conditionId: null,
+  conditionIds: [],
   saveBonus: 0,
   createdAt: 0
 };

@@ -422,7 +422,7 @@ describe("Topple forces a Constitution save, and a failure lands Prone", () => {
         targetActorId: IDS.foe,
         ability: "con",
         dc: 13,
-        conditionId: "prone",
+        conditionIds: ["prone"],
         proposedDamage: 0,
         halfOnSuccess: false,
         actionName: "Topple",
@@ -477,8 +477,8 @@ describe("Topple forces a Constitution save, and a failure lands Prone", () => {
     ]);
     // Two live rows in the tracker: the second hit parks beside the first instead of evicting it.
     expect(built.state.combat.pendingSaves).toMatchObject([
-      { targetActorId: IDS.foe, ability: "con", dc: 15, conditionId: "prone", actionName: "Topple" },
-      { targetActorId: IDS.foe, ability: "con", dc: 15, conditionId: "prone", actionName: "Topple" }
+      { targetActorId: IDS.foe, ability: "con", dc: 15, conditionIds: ["prone"], actionName: "Topple" },
+      { targetActorId: IDS.foe, ability: "con", dc: 15, conditionIds: ["prone"], actionName: "Topple" }
     ]);
 
     // The foe makes the first save (17 + 2 = 19), then fails the second (3 + 2 = 5 < 15) and is knocked prone.

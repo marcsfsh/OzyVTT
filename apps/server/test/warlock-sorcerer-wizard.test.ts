@@ -543,7 +543,12 @@ describe("Fiend Patron: Hurl Through Hell rolls its 8d10 and holds the target to
     const built = level14();
     // CHA 20 (+5) and proficiency +5 at level 14: DC 8 + 5 + 5 = 18, derived rather than authored.
     const action = actionOf(built, "hurl-through-hell");
-    expect(action.save).toEqual({ ability: "cha", dc: 18, successDamage: "none", failureCondition: "incapacitated" });
+    expect(action.save).toEqual({
+      ability: "cha",
+      dc: 18,
+      successDamage: "none",
+      failureConditions: ["incapacitated"]
+    });
     expect(built.definition.spellcasting!.saveDc).toBe(18);
 
     const hurled = resolveDefinitionAction(
@@ -1154,7 +1159,7 @@ describe("Draconic Sorcery: the level-3 spells and the affinity (audit rows 26, 
       activation: "action" as const,
       description: "A thin sheet of flames shoots forth from you.",
       damage: [{ formula: "3d6", type: "fire" }],
-      save: { ability: "dex" as const, dc: 14, successDamage: "half" as const, failureCondition: null },
+      save: { ability: "dex" as const, dc: 14, successDamage: "half" as const, failureConditions: [] },
       spellId: "burning-hands"
     };
     const swept = resolveDefinitionAction(

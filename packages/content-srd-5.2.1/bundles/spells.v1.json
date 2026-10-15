@@ -116,7 +116,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -357,7 +357,9 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": "charmed"
+   "failureConditions": [
+    "charmed"
+   ]
   },
   "target": {
    "type": "creature",
@@ -452,7 +454,7 @@
   "save": {
    "ability": "cha",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -807,7 +809,7 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -1250,7 +1252,7 @@
   "save": {
    "ability": "cha",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -1345,7 +1347,9 @@
   "save": {
    "ability": "cha",
    "successDamage": "none",
-   "failureCondition": "incapacitated"
+   "failureConditions": [
+    "incapacitated"
+   ]
   },
   "target": {
    "type": "creature",
@@ -1465,7 +1469,7 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -1511,7 +1515,7 @@
   "save": {
    "ability": "int",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -1560,7 +1564,7 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -1645,7 +1649,9 @@
   "save": {
    "ability": "str",
    "successDamage": "none",
-   "failureCondition": "restrained"
+   "failureConditions": [
+    "restrained"
+   ]
   },
   "target": {
    "type": "creature",
@@ -1691,7 +1697,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -1827,7 +1833,7 @@
   "save": {
    "ability": "con",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -1905,7 +1911,9 @@
   "save": {
    "ability": "con",
    "successDamage": "none",
-   "failureCondition": "blinded"
+   "failureConditions": [
+    "blinded"
+   ]
   },
   "target": {
    "type": "creature",
@@ -2079,7 +2087,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -2179,7 +2187,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -2260,7 +2268,7 @@
   "save": {
    "ability": "cha",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -2311,7 +2319,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -2356,7 +2364,9 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": "charmed"
+   "failureConditions": [
+    "charmed"
+   ]
   },
   "target": {
    "type": "creature",
@@ -2435,7 +2445,9 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": "charmed"
+   "failureConditions": [
+    "charmed"
+   ]
   },
   "target": {
    "type": "creature",
@@ -2687,7 +2699,7 @@
   "save": {
    "ability": "con",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -2841,7 +2853,7 @@
   "save": {
    "ability": "con",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -2915,7 +2927,9 @@
   "save": {
    "ability": "con",
    "successDamage": "none",
-   "failureCondition": "blinded"
+   "failureConditions": [
+    "blinded"
+   ]
   },
   "target": {
    "type": "creature",
@@ -2965,7 +2979,7 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -3184,7 +3198,9 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": "charmed"
+   "failureConditions": [
+    "charmed"
+   ]
   },
   "target": {
    "type": "creature",
@@ -3230,7 +3246,7 @@
   "save": {
    "ability": "con",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -3305,7 +3321,7 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -3389,7 +3405,7 @@
   "save": {
    "ability": "str",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -3524,7 +3540,9 @@
   "save": {
    "ability": "dex",
    "successDamage": "none",
-   "failureCondition": "restrained"
+   "failureConditions": [
+    "restrained"
+   ]
   },
   "target": {
    "type": "creature",
@@ -3729,7 +3747,7 @@
   "save": {
    "ability": "wis",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -3807,7 +3825,9 @@
   "save": {
    "ability": "int",
    "successDamage": "none",
-   "failureCondition": "incapacitated"
+   "failureConditions": [
+    "incapacitated"
+   ]
   },
   "target": {
    "type": "creature",
@@ -3854,7 +3874,9 @@
   "save": {
    "ability": "con",
    "successDamage": "none",
-   "failureCondition": "poisoned"
+   "failureConditions": [
+    "poisoned"
+   ]
   },
   "target": {
    "type": "creature",
@@ -4065,7 +4087,7 @@
   "save": {
    "ability": "con",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -4688,7 +4710,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -4923,7 +4945,7 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -5058,7 +5080,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -5255,7 +5277,7 @@
   "save": {
    "ability": "wis",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -5474,7 +5496,7 @@
   "save": {
    "ability": "cha",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -5518,7 +5540,9 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": "charmed"
+   "failureConditions": [
+    "charmed"
+   ]
   },
   "target": {
    "type": "creature",
@@ -5595,7 +5619,9 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": "charmed"
+   "failureConditions": [
+    "charmed"
+   ]
   },
   "target": {
    "type": "creature",
@@ -5649,7 +5675,9 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": "charmed"
+   "failureConditions": [
+    "charmed"
+   ]
   },
   "target": {
    "type": "creature",
@@ -5720,7 +5748,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -5814,7 +5842,7 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -5902,7 +5930,9 @@
   "save": {
    "ability": "dex",
    "successDamage": "half",
-   "failureCondition": "prone"
+   "failureConditions": [
+    "prone"
+   ]
   },
   "target": {
    "type": "creature",
@@ -6143,7 +6173,7 @@
   "save": {
    "ability": "con",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -6192,7 +6222,9 @@
   "save": {
    "ability": "str",
    "successDamage": "none",
-   "failureCondition": "restrained"
+   "failureConditions": [
+    "restrained"
+   ]
   },
   "target": {
    "type": "creature",
@@ -6285,7 +6317,9 @@
   "save": {
    "ability": "str",
    "successDamage": "none",
-   "failureCondition": "restrained"
+   "failureConditions": [
+    "restrained"
+   ]
   },
   "target": {
    "type": "creature",
@@ -6330,7 +6364,7 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -6476,7 +6510,7 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -6567,7 +6601,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -6618,7 +6652,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -6752,7 +6786,9 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": "frightened"
+   "failureConditions": [
+    "frightened"
+   ]
   },
   "target": {
    "type": "creature",
@@ -7054,7 +7090,7 @@
   "save": {
    "ability": "con",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -7209,7 +7245,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -7261,7 +7297,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -7436,7 +7472,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -7507,7 +7543,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -7596,7 +7632,9 @@
   "save": {
    "ability": "con",
    "successDamage": "none",
-   "failureCondition": "restrained"
+   "failureConditions": [
+    "restrained"
+   ]
   },
   "target": {
    "type": "creature",
@@ -7899,7 +7937,7 @@
   "save": {
    "ability": "cha",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -7990,7 +8028,7 @@
   "save": {
    "ability": "con",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -8074,7 +8112,7 @@
   "save": {
    "ability": "con",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "point",
@@ -8144,7 +8182,7 @@
   "save": {
    "ability": "con",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -8272,7 +8310,9 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": "charmed"
+   "failureConditions": [
+    "charmed"
+   ]
   },
   "target": {
    "type": "creature",
@@ -8667,7 +8707,9 @@
   "save": {
    "ability": "dex",
    "successDamage": "none",
-   "failureCondition": "prone"
+   "failureConditions": [
+    "prone"
+   ]
   },
   "target": {
    "type": "creature",
@@ -8800,7 +8842,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -9017,7 +9059,7 @@
   "save": {
    "ability": "str",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -9153,7 +9195,7 @@
   "save": {
    "ability": "con",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -9197,7 +9239,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -9395,7 +9437,7 @@
   "save": {
    "ability": "con",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -9485,7 +9527,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -9807,7 +9849,10 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": "prone"
+   "failureConditions": [
+    "prone",
+    "incapacitated"
+   ]
   },
   "target": {
    "type": "creature",
@@ -9902,7 +9947,9 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": "paralyzed"
+   "failureConditions": [
+    "paralyzed"
+   ]
   },
   "target": {
    "type": "creature",
@@ -9974,7 +10021,9 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": "paralyzed"
+   "failureConditions": [
+    "paralyzed"
+   ]
   },
   "target": {
    "type": "creature",
@@ -10191,7 +10240,9 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": "charmed"
+   "failureConditions": [
+    "charmed"
+   ]
   },
   "target": {
    "type": "creature",
@@ -10245,7 +10296,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -10343,7 +10394,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -10503,7 +10554,7 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -10550,7 +10601,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -10602,7 +10653,7 @@
   "save": {
    "ability": "con",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -10697,7 +10748,7 @@
   "save": {
    "ability": "con",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -10898,7 +10949,9 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": "charmed"
+   "failureConditions": [
+    "charmed"
+   ]
   },
   "target": {
    "type": "creature",
@@ -11163,7 +11216,7 @@
   "save": {
    "ability": "con",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -11253,7 +11306,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -11647,7 +11700,7 @@
   "save": {
    "ability": "cha",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -11731,7 +11784,7 @@
   "save": {
    "ability": "cha",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -12312,7 +12365,9 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": "charmed"
+   "failureConditions": [
+    "charmed"
+   ]
   },
   "target": {
    "type": "creature",
@@ -12551,7 +12606,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -12645,7 +12700,7 @@
   "save": {
    "ability": "wis",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -12946,7 +13001,9 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": "charmed"
+   "failureConditions": [
+    "charmed"
+   ]
   },
   "target": {
    "type": "creature",
@@ -13018,7 +13075,7 @@
   "save": {
    "ability": "con",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -13272,7 +13329,7 @@
   "save": {
    "ability": "int",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -13324,7 +13381,7 @@
   "save": {
    "ability": "wis",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -13480,7 +13537,7 @@
   "save": {
    "ability": "cha",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -13703,7 +13760,7 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -13836,7 +13893,7 @@
   "save": {
    "ability": "con",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -14016,7 +14073,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -14073,7 +14130,9 @@
   "save": {
    "ability": "con",
    "successDamage": "half",
-   "failureCondition": "blinded"
+   "failureConditions": [
+    "blinded"
+   ]
   },
   "target": {
    "type": "creature",
@@ -14557,7 +14616,7 @@
   "save": {
    "ability": "con",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -14881,7 +14940,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -15007,7 +15066,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -15138,7 +15197,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -15201,7 +15260,7 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -15331,7 +15390,7 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -15381,7 +15440,7 @@
   "save": {
    "ability": "con",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -15556,7 +15615,7 @@
   "save": {
    "ability": "cha",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -15727,7 +15786,7 @@
   "save": {
    "ability": "con",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -16244,7 +16303,9 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": "incapacitated"
+   "failureConditions": [
+    "incapacitated"
+   ]
   },
   "target": {
    "type": "creature",
@@ -16294,7 +16355,9 @@
   "save": {
    "ability": "dex",
    "successDamage": "none",
-   "failureCondition": "prone"
+   "failureConditions": [
+    "prone"
+   ]
   },
   "target": {
    "type": "creature",
@@ -16340,7 +16403,7 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -16771,7 +16834,7 @@
   "save": {
    "ability": "wis",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -16999,7 +17062,9 @@
   "save": {
    "ability": "con",
    "successDamage": "none",
-   "failureCondition": "poisoned"
+   "failureConditions": [
+    "poisoned"
+   ]
   },
   "target": {
    "type": "creature",
@@ -17138,7 +17203,9 @@
   "save": {
    "ability": "con",
    "successDamage": "none",
-   "failureCondition": "deafened"
+   "failureConditions": [
+    "deafened"
+   ]
   },
   "target": {
    "type": "creature",
@@ -17182,7 +17249,9 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": "charmed"
+   "failureConditions": [
+    "charmed"
+   ]
   },
   "target": {
    "type": "creature",
@@ -17296,7 +17365,9 @@
   "save": {
    "ability": "con",
    "successDamage": "half",
-   "failureCondition": "blinded"
+   "failureConditions": [
+    "blinded"
+   ]
   },
   "target": {
    "type": "creature",
@@ -17345,7 +17416,9 @@
   "save": {
    "ability": "con",
    "successDamage": "half",
-   "failureCondition": "blinded"
+   "failureConditions": [
+    "blinded"
+   ]
   },
   "target": {
    "type": "creature",
@@ -17443,7 +17516,7 @@
   "save": {
    "ability": "str",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -17660,7 +17733,7 @@
   "save": {
    "ability": "con",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -17967,7 +18040,7 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -18164,7 +18237,7 @@
   "save": {
    "ability": "str",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -18333,7 +18406,7 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -18398,7 +18471,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -18480,7 +18553,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -18601,7 +18674,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -18666,7 +18739,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -18715,7 +18788,7 @@
   "save": {
    "ability": "dex",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -18907,7 +18980,9 @@
   "save": {
    "ability": "dex",
    "successDamage": "none",
-   "failureCondition": "restrained"
+   "failureConditions": [
+    "restrained"
+   ]
   },
   "target": {
    "type": "creature",
@@ -18958,7 +19033,9 @@
   "save": {
    "ability": "wis",
    "successDamage": "half",
-   "failureCondition": "frightened"
+   "failureConditions": [
+    "frightened"
+   ]
   },
   "target": {
    "type": "creature",
@@ -19051,7 +19128,7 @@
   "save": {
    "ability": "str",
    "successDamage": "half",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -19179,7 +19256,7 @@
   "save": {
    "ability": "cha",
    "successDamage": "none",
-   "failureCondition": null
+   "failureConditions": []
   },
   "target": {
    "type": "creature",

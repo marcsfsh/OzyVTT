@@ -103,7 +103,7 @@ describe("SRD 5.2.1 monster bundle", () => {
     expect(tentacle?.attack).toEqual({ bonus: 9, reachFeet: 15 });
     expect(tentacle?.damage[0]).toEqual({ formula: "2d6 + 5", type: "bludgeoning" });
     const consume = aboleth!.actions.find((action) => action.id === "consume-memories");
-    expect(consume?.save).toEqual({ ability: "int", dc: 16, successDamage: "half", failureCondition: null });
+    expect(consume?.save).toEqual({ ability: "int", dc: 16, successDamage: "half", failureConditions: [] });
   });
 
   it("carries structured rules mechanics for the giant crocodile (ADR-0020 golden check)", () => {
@@ -274,7 +274,7 @@ describe("SRD 5.2.1 reference bundles", () => {
       concentration: false,
       ritual: false,
       attackRoll: false,
-      save: { ability: "dex", successDamage: "half", failureCondition: null },
+      save: { ability: "dex", successDamage: "half", failureConditions: [] },
       damage: { roll: "8d6", types: ["fire"] },
       shape: { type: "sphere", size: 20, unit: "feet" },
       classes: ["sorcerer", "wizard"]

@@ -327,7 +327,7 @@ export function applyDamageDetailed(
             actionName: "Concentration check",
             proposedDamage: 0,
             halfOnSuccess: false,
-            conditionId: null,
+            conditionIds: [],
             saveBonus: 0,
             endsEffects: sustained,
             createdAt: deps.now ? Date.parse(deps.now()) : Date.now()

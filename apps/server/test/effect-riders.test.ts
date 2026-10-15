@@ -174,7 +174,7 @@ function owe(built: Table, ability: "str" | "dex" | "con") {
     targetIds: [IDS.hero],
     proposedDamage: 0,
     halfOnSuccess: false,
-    conditionId: null,
+    conditionIds: [],
     newSaveId: () => "60000000-0000-4000-8000-000000000001",
     createdAt: 0
   });

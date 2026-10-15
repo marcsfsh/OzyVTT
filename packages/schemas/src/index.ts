@@ -922,7 +922,8 @@ export type SaveCondition = z.infer<typeof SaveConditionSchema>;
  */
 export const SaveOutcomeFields = {
   successDamage: z.enum(["half", "none"]).default("half"),
-  failureCondition: SaveConditionSchema.nullable().default(null)
+  /** Every condition a failed save imposes (Turn Undead: Frightened and Incapacitated). */
+  failureConditions: z.array(SaveConditionSchema).max(4).default([])
 };
 
 /** Mechanics fields are optional (ADR-0020): absent means prose only. Descriptions stay the display source of truth. */

@@ -86,7 +86,7 @@ function tableWith(
     proposedDamage: 17,
     proposedDamageParts: [...(options.parts ?? [{ amount: 17, type: "fire" }])],
     halfOnSuccess: options.halfOnSuccess,
-    conditionId: null,
+    conditionIds: [],
     newSaveId: () => IDS.save,
     createdAt: 0
   });

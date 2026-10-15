@@ -354,7 +354,7 @@ describe("Land's Aid - a Circle of the Land action spending the CLASS's Wild Sha
       ability: "con",
       dc: 13,
       successDamage: "half",
-      failureCondition: null
+      failureConditions: []
     });
     expect(actionOf(definition, "lands-aid")?.damage).toEqual([{ formula: "2d6", type: "necrotic" }]);
     expect(

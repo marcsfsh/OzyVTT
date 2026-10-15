@@ -151,7 +151,7 @@ const PENDING_SAVE_FIELDS = {
   proposedDamage: "player",
   proposedDamageParts: "player",
   halfOnSuccess: "player",
-  conditionId: "player",
+  conditionIds: "player",
   saveBonus: "player",
   createdAt: "player",
   sourceName: "derived",

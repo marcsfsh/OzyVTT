@@ -852,7 +852,7 @@ describe("criterion 10: half-plate that raises the spell save DC", () => {
           name: "Scorching Ray",
           activation: "action",
           description: "Dexterity Saving Throw: DC 14.",
-          save: { ability: "dex", dc: 14 },
+          save: { ability: "dex", dc: 14, successDamage: "half", failureConditions: [] },
           damage: [{ formula: "2d6", type: "fire" }]
         }
       ]
