@@ -100,6 +100,11 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.65rem;
 }
+/* The labels name a map, so they wrap inside their button rather than run into the next one. */
+.viewer-control-actions .nh-btn {
+  white-space: normal;
+  text-wrap: balance;
+}
 .viewer-pairing-code {
   display: grid;
   grid-template-columns: 1fr auto;

@@ -314,7 +314,9 @@ p {
    theme. Reduced motion freezes the motion rather than hiding the scene. */
 .landing {
   position: relative;
-  overflow: hidden;
+  /* `clip`, not `hidden`: the scene overflows the frame, and a hidden box still scrolls when focus moves
+     into it, which pushed the sign-in card off a phone screen. */
+  overflow: clip;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1431,13 +1433,10 @@ button.party-strip-entry:hover {
   max-height: 19rem;
   padding-right: var(--space-1);
   margin-top: var(--space-2);
-  overflow-x: clip;
 }
 /* `min-width: 0` stops a long roll line (e.g. a player's self-only roll with its audience text)
    widening the single auto track past the dock: `min-width: 0` on the children alone does not lower
-   the nowrap row's min-content contribution. `overflow-x: clip` above is the backstop, because
-   `.scroll-y` only sets `overflow-y` and x would compute to `auto`. Next to a scrolling axis `clip`
-   computes to `hidden`; that is expected. */
+   the nowrap row's min-content contribution. */
 .roll-card {
   min-width: 0;
   padding: var(--space-2) 0.7rem;

@@ -63,6 +63,7 @@
 .monster-browser-add {
   flex: none;
   min-width: 5.65rem;
+  min-height: var(--tap-min);
   padding: var(--space-2) 0.95rem;
   /* Fill, rim and corners come from the controls' material in encounter-panel.css. Only the border
      box is set here, so the paint does not depend on which stylesheet loads first. */

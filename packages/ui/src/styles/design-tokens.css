@@ -882,7 +882,10 @@ a:focus-visible .nav-arrow {
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
+/* A region scrolls on y only; wide content gets its own horizontal scroller. Hiding x keeps a hit-area
+   `::after` or a hidden tooltip at the region's edge from making the whole region scroll sideways. */
 .scroll-y {
+  overflow-x: hidden;
   overflow-y: auto;
   scrollbar-gutter: stable;
   scrollbar-width: thin; /* restated so a region never falls back to the 15px bar */
