@@ -36,6 +36,9 @@ function audit(kit: Kit, committed: Committed, text: string, gmOnly = true) {
 export const tableSettingCommands = [
   defineCommand({
     type: "encounter.set-rules-mode",
+    operationId: "setRulesMode",
+    description:
+      "Sets the rules-engine enforcement mode (GM-grade only): `strict` rejects invalid structured actions with an overridable `error.details.blocked`, `assisted` allows them with logged warnings, `freeform` skips validation. Also settable at encounter start.",
     summary:
       "Set the LIVE fight's rules-engine enforcement mode (strict, assisted, freeform) and, optionally, its per-family exceptions (GM).",
     schema: SetRulesModeSchema,
@@ -61,6 +64,9 @@ export const tableSettingCommands = [
 
   defineCommand({
     type: "rules.set-policy",
+    operationId: "setRulesPolicy",
+    description:
+      "Sets the table's STANDING rules policy (GM-grade only): the dial every new fight starts from, plus per-family exceptions (movement, economy, resources, targeting, slots). This is campaign policy, not the live fight - use the rules-mode command to change the fight in progress. Omitting `exceptions` keeps the stored ones. The `slots` family ships as `assisted` so slot tracking advises rather than blocks until a GM opts in.",
     summary:
       "Set the table's standing rules policy - the dial and per-family exceptions every new fight starts from (GM).",
     schema: RulesSetPolicySchema,
@@ -85,6 +91,9 @@ export const tableSettingCommands = [
 
   defineCommand({
     type: "table.set-staging-defaults",
+    operationId: "setStagingDefaults",
+    description:
+      'Sets the table\'s staging defaults (GM-grade only): the token visibility a newly staged combatant starts at. A surface initializes its "Shown to players / GM only" toggle from this; the per-add `visibility` argument stays explicit on the wire, so a command still says exactly what it did.',
     summary: "Set the table's staging defaults: the token visibility a newly staged combatant starts at (GM).",
     schema: TableSetStagingDefaultsSchema,
     malformed: "The staging-defaults command is malformed.",
@@ -105,6 +114,9 @@ export const tableSettingCommands = [
 
   defineCommand({
     type: "table.set-party-visibility",
+    operationId: "setPartyVisibility",
+    description:
+      "Sets how much a player sees of ANOTHER player's character (GM-grade only): `off` (no party surface - the combatant still appears on the map and in the turn order, but carries no class, no sheet and no resources), `name-and-class` (the identity card - the default), `full-sheet` (plus their read-only imported sheet) or `sheet-and-resources` (plus live spell slots, prepared spells, inventory, currency, hit dice and limited uses). The tier subtracts FIELDS, never combatants, and is applied SERVER-SIDE in the player projection - a withheld field is never sent. A player's own claimed character is unaffected at every tier.",
     summary:
       "Set how much a player sees of another player's character: nothing, name and class, the full sheet, or the sheet plus live resources (GM).",
     schema: TableSetPartyVisibilitySchema,
@@ -121,6 +133,9 @@ export const tableSettingCommands = [
 
   defineCommand({
     type: "encounter.set-player-damage-mode",
+    operationId: "setPlayerDamageMode",
+    description:
+      "Sets how a player's own confirmed hit reaches an enemy's HP (GM-grade only): `proposal` parks a GM-confirmed damage proposal (the default), `direct` applies the typed damage immediately server-side.",
     summary:
       "Set how a player's own hit reaches an enemy's HP: a GM-confirmed proposal or direct server-side apply (GM).",
     schema: SetPlayerDamageModeSchema,
@@ -141,6 +156,9 @@ export const tableSettingCommands = [
 
   defineCommand({
     type: "encounter.set-player-initiative-mode",
+    operationId: "setPlayerInitiativeMode",
+    description:
+      "Sets how player-rolled initiative behaves (GM-grade only): `immediate` begins turns at once on a provisional order that re-sorts as players roll in, `wait` holds turn advancement until every player has rolled (or the GM rolls the rest).",
     summary: "Set whether player-rolled initiative begins turns immediately or waits for all players to roll (GM).",
     schema: SetPlayerInitiativeModeSchema,
     malformed: "The initiative-mode command is malformed.",
@@ -160,6 +178,9 @@ export const tableSettingCommands = [
 
   defineCommand({
     type: "encounter.set-health-display",
+    operationId: "setHealthDisplay",
+    description:
+      "Sets the table-wide default for how token health shows on the map (GM-grade only): `band` a coarse status badge, `bar` a thin HP bar, or `ring` a green-to-red ring; `audience` `gm` keeps a bar/ring on the GM map only, `all` shows it to players and the shared screen. Exact hit points never leave the GM - non-owners see only a coarse band-fraction. A single token can override this via the actor health-display command.",
     summary:
       "Set the table-wide default for how token health shows on the map: status badge, HP bar, or health ring, for the GM only or everyone (GM).",
     schema: SetHealthDisplaySchema,
@@ -180,6 +201,9 @@ export const tableSettingCommands = [
 
   defineCommand({
     type: "encounter.set-environment",
+    operationId: "setEnvironment",
+    description:
+      "Toggles the underwater environment on the live encounter (GM-grade only; SRD Underwater Combat): melee attacks take Disadvantage unless they deal piercing damage, ranged attacks automatically miss beyond normal range, and every combatant resists fire damage.",
     summary:
       "Toggle the underwater environment: melee disadvantage unless piercing, ranged auto-miss beyond normal range, fire resistance for all (GM).",
     schema: SetEnvironmentSchema,

@@ -15,6 +15,9 @@ import { defineCommand } from "./pipeline.js";
 export const saveCommands = [
   defineCommand({
     type: "save.roll",
+    operationId: "rollSave",
+    description:
+      'Rolls a saving throw for one character. When a pending save is open for that character and ability, this ANSWERS it through the same path the encounter tracker uses - the damage and condition apply and the prompt closes - and acks `route: "answered"` with the `saveId`; the sheet\'s save chip used to roll a loose die that ignored the open prompt entirely. With nothing open it rolls a loose, attributed save at the same modifier the resolver would use, and acks `route: "loose"`. Supply `total` for an off-screen die. GM-grade for anyone; a player session only for their own claimed character.',
     summary:
       "Roll a saving throw: answers a matching pending save when one is open, otherwise rolls a loose, attributed save.",
     schema: SaveRollSchema,
@@ -68,6 +71,9 @@ export const saveCommands = [
 
   defineCommand({
     type: "save.answer",
+    operationId: "answerSave",
+    description:
+      "Answers a pending saving throw by server roll or manual total; on commit the outcome auto-applies damage/conditions. Player sessions may answer only their claimed character's saves. The response carries the `outcome`.",
     summary: "Answer a pending saving throw by rolling or entering a total.",
     schema: SaveAnswerSchema,
     malformed: "The saving-throw answer is malformed.",
@@ -123,6 +129,8 @@ export const saveCommands = [
 
   defineCommand({
     type: "save.dismiss",
+    operationId: "dismissSave",
+    description: "Dismisses a pending saving throw without resolving it (GM-grade, or the owing player).",
     summary: "Dismiss a pending saving throw without resolving it.",
     schema: SaveDismissSchema,
     malformed: "The dismissal is malformed.",
@@ -133,6 +141,9 @@ export const saveCommands = [
 
   defineCommand({
     type: "death-save.roll",
+    operationId: "rollDeathSave",
+    description:
+      "Rolls a death saving throw for a dying character (at 0 HP): natural 20 regains 1 HP, natural 1 counts two failures, 10+ succeeds (three stabilize), otherwise a failure (three kill). Default applies in one step; pass `commit: false` to preview the projected pips first (honoring `rollMode` adv/disadv), then confirm with `commit: true` and the shown `naturalRoll`. The roll is recorded in the shared history and the response carries `deathSave`. GM-grade anyone; a player session only their claimed character.",
     summary: "Roll a death saving throw for a dying character (GM anyone; a player their claimed character).",
     schema: DeathSaveRollSchema,
     malformed: "The death save is malformed.",

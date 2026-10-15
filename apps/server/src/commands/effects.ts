@@ -9,6 +9,9 @@ import { defineCommand } from "./pipeline.js";
 export const effectCommands = [
   defineCommand({
     type: "effect.add",
+    operationId: "addEffect",
+    description:
+      "Adds a rules-engine effect to a combatant (GM-grade only): a named, tagged state with an optional duration and typed modifiers (damage bonus, damage resistance, advantage). Structured actions create richer effects via their own declarations; this is the house-rule/manual path. The response's `effectId` equals the commandId.",
     summary: "Add a rules-engine effect to a combatant (GM).",
     schema: EffectAddSchema,
     malformed: "The effect command is malformed.",
@@ -55,6 +58,9 @@ export const effectCommands = [
 
   defineCommand({
     type: "effect.end",
+    operationId: "endEffect",
+    description:
+      "Ends an effect: linked conditions clear (a released grapple removes Grappled/Restrained) and its on-end grants fire (a Frenzied Rage ending adds Exhaustion). GM-grade anyone; a player session only their claimed character.",
     summary:
       "End an effect (GM anyone; a player their claimed character), clearing linked conditions and firing its on-end grants.",
     schema: EffectEndSchema,

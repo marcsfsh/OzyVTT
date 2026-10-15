@@ -49,6 +49,9 @@ function requireSameMap(mapAssetId: string | null, expected: string) {
 export const mapCommands = [
   defineCommand({
     type: "token.move",
+    operationId: "moveToken",
+    description:
+      "Moves a combatant's token; the server snaps to the calibrated grid. `position: null` returns the token to the tray. Player sessions may move only their claimed character. `sceneId` targets a prepared (GM-private) scene instead of the live table.",
     summary: "Move a combatant's token (server-snapped); position null returns it to the tray.",
     schema: TokenMoveSchema,
     malformed: "The token move is malformed.",
@@ -146,6 +149,9 @@ export const mapCommands = [
 
   defineCommand({
     type: "annotation.add",
+    operationId: "addAnnotation",
+    description:
+      "Draws a measurement or area shape on the encounter map; the server snaps geometry to the grid. The response's `annotationId` equals the commandId.",
     summary: "Draw a measurement or area shape on the encounter map.",
     schema: AnnotationAddSchema,
     malformed: "The annotation is malformed.",
@@ -179,6 +185,8 @@ export const mapCommands = [
 
   defineCommand({
     type: "annotation.ping",
+    operationId: "pingMap",
+    description: "Pings a point on the encounter map (ephemeral, labeled with the sender).",
     summary: "Ping a point on the encounter map.",
     schema: AnnotationPingSchema,
     malformed: "The ping is malformed.",
@@ -202,6 +210,8 @@ export const mapCommands = [
 
   defineCommand({
     type: "annotation.move",
+    operationId: "moveAnnotation",
+    description: "Moves/resizes an annotation; the server re-snaps geometry.",
     summary: "Move or resize an annotation you may edit.",
     schema: AnnotationMoveSchema,
     malformed: "The annotation update is malformed.",
@@ -216,6 +226,8 @@ export const mapCommands = [
 
   defineCommand({
     type: "annotation.remove",
+    operationId: "removeAnnotation",
+    description: "Removes one annotation (owners, the GM, and GM-grade integrations).",
     summary: "Remove an annotation you may edit.",
     schema: AnnotationRemoveSchema,
     malformed: "The annotation command is malformed.",
@@ -228,6 +240,8 @@ export const mapCommands = [
 
   defineCommand({
     type: "annotation.set-color",
+    operationId: "setAnnotationColor",
+    description: "Changes an annotation's color.",
     summary: "Change an annotation's color.",
     schema: AnnotationColorSetSchema,
     malformed: "The color change is malformed.",
@@ -240,6 +254,8 @@ export const mapCommands = [
 
   defineCommand({
     type: "annotation.set-visibility",
+    operationId: "setAnnotationVisibility",
+    description: "Changes who can see an annotation (public, gm-only, owner-only, owner-gm, gm-actor).",
     summary: "Change who can see an annotation.",
     schema: AnnotationVisibilitySetSchema,
     malformed: "The visibility change is malformed.",
@@ -253,6 +269,8 @@ export const mapCommands = [
 
   defineCommand({
     type: "annotation.set-movable",
+    operationId: "setAnnotationMovable",
+    description: "Allows or disallows other players moving a shape.",
     summary: "Allow or disallow other players moving a shape.",
     schema: AnnotationMovableSetSchema,
     malformed: "The move-control change is malformed.",
@@ -265,6 +283,8 @@ export const mapCommands = [
 
   defineCommand({
     type: "annotation.clear",
+    operationId: "clearAnnotations",
+    description: "Clears drawn shapes: your own, all player shapes (GM-grade), or everything (GM-grade).",
     summary: "Clear drawn shapes by scope (mine/players/all).",
     schema: AnnotationClearSchema,
     malformed: "The clear command is malformed.",

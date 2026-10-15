@@ -31,6 +31,9 @@ type GraphEdge = Readonly<{
 }>;
 const MENTION_LABEL = "mentions";
 const VB = { minX: -520, minY: -390, w: 1040, h: 780 };
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 3;
+const clampZoom = (k: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, k));
 
 function hashOf(id: string): number {
   let hash = 0;
@@ -284,6 +287,20 @@ export function ConnectionGraph({
     const cap = (nearestNeighbour.get(id) ?? Infinity) / 2;
     return Math.max(radiusOf(id), Math.min(wanted, cap));
   };
+  /**
+   * The zoom the graph opens at: 1, or on a narrow screen enough that the two closest nodes sit a tap
+   * apart, since the hit areas are capped at half that distance. The rest of the web is a pan away.
+   */
+  const homeK = useMemo(() => {
+    const closest = Math.min(...nearestNeighbour.values());
+    if (!Number.isFinite(closest) || closest <= 0) return 1;
+    return Math.min(MAX_ZOOM, Math.max(1, tapMin / (closest * fitScale)));
+  }, [nearestNeighbour, fitScale, tapMin]);
+  /** Once the user pans, zooms or jumps, a resize or a new layout no longer moves the view. */
+  const viewTouched = useRef(false);
+  useEffect(() => {
+    if (!viewTouched.current) setView({ x: 0, y: 0, k: homeK });
+  }, [homeK]);
 
   /**
    * Consume a focus request: pin the node and centre the view on it at 1x. The latch is only claimed once
@@ -301,10 +318,11 @@ export function ConnectionGraph({
     handledFocusRef.current = focusPageId;
     if (point) {
       setPinned(focusPageId);
-      setView({ k: 1, x: -point.x, y: -point.y });
+      viewTouched.current = true;
+      setView({ k: homeK, x: -point.x * homeK, y: -point.y * homeK });
     }
     onFocused();
-  }, [focusPageId, loading, pos, nodes.length, onFocused]);
+  }, [focusPageId, loading, pos, nodes.length, onFocused, homeK]);
 
   const toggleType = (type: EntityType) =>
     setHidden((prev) => {
@@ -328,9 +346,10 @@ export function ConnectionGraph({
   };
 
   const onWheel = (event: ReactWheelEvent) => {
+    viewTouched.current = true;
     const { vx, vy } = toViewBox(event.clientX, event.clientY);
     setView((prev) => {
-      const k = Math.max(0.25, Math.min(3, prev.k * (1 - event.deltaY * 0.0016)));
+      const k = clampZoom(prev.k * (1 - event.deltaY * 0.0016));
       const worldX = (vx - prev.x) / prev.k,
         worldY = (vy - prev.y) / prev.k;
       return { k, x: vx - worldX * k, y: vy - worldY * k };
@@ -343,6 +362,7 @@ export function ConnectionGraph({
   const onPointerDown = (event: ReactPointerEvent) => {
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (pointers.current.size === 2) {
+      viewTouched.current = true;
       pinch.current = { startDist: pinchDistance() || 1, startK: view.k };
       drag.current = null;
       return;
@@ -356,7 +376,7 @@ export function ConnectionGraph({
       pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (pinch.current && pointers.current.size >= 2) {
       const dist = pinchDistance();
-      const k = Math.max(0.25, Math.min(3, pinch.current.startK * (dist / pinch.current.startDist)));
+      const k = clampZoom(pinch.current.startK * (dist / pinch.current.startDist));
       const [a, b] = [...pointers.current.values()];
       const { vx, vy } = toViewBox((a.x + b.x) / 2, (a.y + b.y) / 2); // zoom around the pinch midpoint
       setView((prev) => {
@@ -370,7 +390,10 @@ export function ConnectionGraph({
     const factor = 1 / scaleAt();
     const dx = (event.clientX - drag.current.x) * factor,
       dy = (event.clientY - drag.current.y) * factor;
-    if (Math.abs(event.clientX - drag.current.x) + Math.abs(event.clientY - drag.current.y) > 3) moved.current = true;
+    if (Math.abs(event.clientX - drag.current.x) + Math.abs(event.clientY - drag.current.y) > 3) {
+      moved.current = true;
+      viewTouched.current = true;
+    }
     drag.current.x = event.clientX;
     drag.current.y = event.clientY;
     setView((prev) => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
@@ -390,13 +413,15 @@ export function ConnectionGraph({
     if (!moved.current) onOpen(id);
   };
 
-  const zoomBy = (factor: number) =>
+  const zoomBy = (factor: number) => {
+    viewTouched.current = true;
     setView((prev) => {
-      const k = Math.max(0.25, Math.min(3, prev.k * factor));
+      const k = clampZoom(prev.k * factor);
       const worldX = -prev.x / prev.k,
         worldY = -prev.y / prev.k; // keep the viewBox centre fixed
       return { k, x: -worldX * k, y: -worldY * k };
     });
+  };
 
   if (loading && nodes.length === 0)
     return (
@@ -451,7 +476,8 @@ export function ConnectionGraph({
             variant="ghost"
             size="sm"
             onClick={() => {
-              setView({ x: 0, y: 0, k: 1 });
+              viewTouched.current = false;
+              setView({ x: 0, y: 0, k: homeK });
               setPinned(null);
             }}
           >

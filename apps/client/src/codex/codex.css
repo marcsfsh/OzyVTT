@@ -20,9 +20,9 @@
   border: 1px solid transparent;
   padding: var(--space-3);
 }
-/* The rail's isolation creates a stacking context, so an open combobox list would lose to the pane beside
-   it. Lift the rail only while a list is open. Does not fix the folder `Menu` popover. */
-.codex-rail:has(.nh-combobox-list) {
+/* The rail's isolation creates a stacking context, so an open combobox list or folder menu would lose to the
+   pane beside it. Lift the rail only while one is open. */
+.codex-rail:has(.nh-combobox-list, .nh-menu[open]) {
   z-index: 1;
 }
 /* The small buttons grow to the 44px floor so they line up with the search field. */
@@ -1611,27 +1611,21 @@
 .codex-graph-node:focus {
   outline: none;
 }
-.codex-graph-node circle {
+/* Rings go on the painted node only: the invisible hit circle is tap-sized, so a ring there would float
+   away from the node. */
+.codex-graph-node circle:not(.codex-graph-nodehit) {
   stroke: var(--void);
   stroke-width: 2;
   transition: stroke var(--dur-hover) var(--ease-settle);
 }
-.codex-graph-node.is-hover circle {
+.codex-graph-node.is-hover circle:not(.codex-graph-nodehit) {
   stroke: var(--text);
   stroke-width: 2.5;
 }
-.codex-graph-node:focus-visible circle {
+.codex-graph-node:focus-visible circle:not(.codex-graph-nodehit),
+.codex-graph-node.is-focus circle:not(.codex-graph-nodehit) {
   stroke: var(--cyan);
   stroke-width: 3;
-}
-/* The node a jump landed on stays marked after the pointer leaves. */
-.codex-graph-node.is-focus circle {
-  stroke: var(--cyan);
-  stroke-width: 3;
-}
-/* ...but never on the invisible 44px hit circle, which would draw the ring at tap radius. */
-.codex-graph-node.is-focus circle.codex-graph-nodehit {
-  stroke: none;
 }
 .codex-graph-node.is-dim {
   opacity: 0.28;

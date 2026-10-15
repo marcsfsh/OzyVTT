@@ -32,7 +32,7 @@ and a change to one never bumps another. They are constructed together in
 | `apps/client`                | React/Vite UI. Entries: `index.html` (the app), `viewer.html` (table viewer), `sheet.html` (standalone sheet). |
 | `packages/domain`            | The wire contract: `GameState`, socket event maps, projection view types, the Codex's HTTP shapes.             |
 | `packages/schemas`           | Zod schemas for actors, effects and the modifier vocabulary, shared by server and content.                     |
-| `packages/api-contract`      | The public HTTP API: OpenAPI document, path constants, command scopes.                                         |
+| `packages/api-contract`      | The public HTTP API: path constants, command scopes and the wire schemas both sides share.                     |
 | `packages/rules-5e`          | Pure 5e rules helpers: dice grammar, ability scores, progression tables, rider evaluation.                     |
 | `packages/content-srd-5.2.1` | SRD 5.2.1 content bundles and the scripts that generate them from vendored sources.                            |
 | `packages/dndbeyond-pdf`     | Turns a D&D Beyond character-sheet PDF into an actor definition (runs in the browser).                         |
@@ -45,8 +45,8 @@ Packages are consumed as TypeScript source; only the client and server have buil
 
 A command is a named socket event (or an HTTP call to `/api/v1/game/...`) carrying a UUID
 `commandId` and an optional `expectedRevision`. Each command is one entry in the command table
-(`apps/server/src/commands/`, listed in `index.ts`): its type, Zod schema, GM-only refusal and run
-function. Its scope and typed HTTP route come from `GAME_COMMANDS` in `packages/api-contract`, and its
+(`apps/server/src/commands/`, listed in `index.ts`): its type, Zod schema, GM-only refusal, run
+function, and the operation id and description its HTTP route is documented with. Its scope and typed HTTP route come from `GAME_COMMANDS` in `packages/api-contract`, and its
 socket event is its type with the first `.` as `:`. The socket handlers and the HTTP routes are
 registered by looping over the table, and both run the same pipeline (`commands/pipeline.ts`):
 
@@ -203,7 +203,8 @@ the GM calendar are separate clocks; a date reaches players only when it is publ
 
 `/api/v1` exposes the game commands, the Codex, homebrew and the viewer over versioned
 envelopes, using the same handlers, authorization and projections as the UI. The OpenAPI
-document is `packages/api-contract` and is served at `/api/v1/openapi.json`. Conventions are in
+document is assembled in `apps/server/src/openapi/` and served at `/api/v1/openapi.json`; each game
+command's operation and request body are generated from the command table. Conventions are in
 ADR-0016; every router builds them from `apps/server/src/http-kit.ts` (bearer tokens, request ids,
 envelopes), and a caught error reaches the caller only as a known refusal, never as raw text.
 

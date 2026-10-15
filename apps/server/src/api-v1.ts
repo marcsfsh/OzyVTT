@@ -5,12 +5,12 @@ import {
   INTEGRATION_CREDENTIAL_PATHS,
   IntegrationScopeSchema,
   OPENAPI_DOCUMENT_PATH,
-  openApiDocument,
   REALTIME_PROTOCOL_VERSION,
   RotateIntegrationCredentialRequestSchema,
   SYSTEM_PATHS,
   type IntegrationScope
 } from "@vtt/api-contract";
+import { openApiDocument } from "./openapi/document.js";
 import {
   apiErrorHandler,
   bearerToken,

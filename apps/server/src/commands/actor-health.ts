@@ -33,6 +33,9 @@ import { defineCommand } from "./pipeline.js";
 export const actorHealthCommands = [
   defineCommand({
     type: "actor.apply-damage",
+    operationId: "applyDamage",
+    description:
+      "Applies damage (temporary hit points absorb first). Optional typed `parts` run the defense pipeline - immunity, then resistance (half, rounded down), then vulnerability (double) - from the target's definition and active effects, with the per-part breakdown returned in `applied`; the bare `amount` is the manual path (no defense math). Dropping a player character to 0 starts the dying state (Unconscious + Prone + death saves; `critical: true` while dying adds two failures). Player sessions may target only their claimed character.",
     summary: "Apply damage (GM anyone; a player their claimed character).",
     schema: ApplyDamageSchema,
     malformed: "The damage command is malformed.",
@@ -83,6 +86,8 @@ export const actorHealthCommands = [
 
   defineCommand({
     type: "actor.heal",
+    operationId: "healActor",
+    description: "Heals hit points up to the maximum. Player sessions may target only their claimed character.",
     summary: "Heal hit points (GM anyone; a player their claimed character).",
     schema: HpAmountSchema,
     malformed: "The healing command is malformed.",
@@ -104,6 +109,9 @@ export const actorHealthCommands = [
 
   defineCommand({
     type: "actor.set-temp-hp",
+    operationId: "setTemporaryHp",
+    description:
+      "Sets temporary hit points (replaces, 5e-style). Player sessions may target only their claimed character.",
     summary: "Set temporary hit points (GM anyone; a player their claimed character).",
     schema: TempHpSchema,
     malformed: "The temporary hit point command is malformed.",
@@ -114,6 +122,8 @@ export const actorHealthCommands = [
 
   defineCommand({
     type: "actor.set-hp",
+    operationId: "setCurrentHp",
+    description: "Sets current hit points directly (GM-grade only).",
     summary: "Set current hit points directly (GM).",
     schema: SetHpSchema,
     malformed: "The hit point command is malformed.",
@@ -129,6 +139,9 @@ export const actorHealthCommands = [
 
   defineCommand({
     type: "actor.set-condition",
+    operationId: "setCondition",
+    description:
+      "Applies or clears a bundled SRD condition (exhaustion carries a level). Player sessions may target only their claimed character.",
     summary: "Apply or clear an SRD condition, with exhaustion levels.",
     schema: SetConditionSchema,
     malformed: "The condition command is malformed.",
@@ -168,6 +181,9 @@ export const actorHealthCommands = [
 
   defineCommand({
     type: "actor.rechoose",
+    operationId: "rechooseActorPick",
+    description:
+      "Re-makes a pick the character's content says may be re-made on a rest (Circle of the Land's land type on a Long Rest; Fiendish Resilience's damage type on either). The answer is NOT written to the character's choices ledger - it is runtime state on the actor, cleared by the matching rest - so a re-choice between fights needs no rebuild. A player session may re-choose only on their claimed character, the GM on anyone. Which offers are re-choosable, and what each may become, are both decided from the content: a client cannot widen either.",
     summary:
       "Re-make a pick a feature says may be re-made on a rest (Circle of the Land's land type on a Long Rest, Fiendish Resilience's damage type on either). Your own character; the GM anyone.",
     schema: ActorRechooseSchema,
@@ -214,6 +230,9 @@ export const actorHealthCommands = [
 
   defineCommand({
     type: "actor.rest",
+    operationId: "restActor",
+    description:
+      "Applies a rest to a rostered actor outside combat; a player session may rest only their claimed character, the GM anyone. Long: remaining effects end (their on-end grants fire first), hit points restore to maximum, temporary HP clears, the dying state resets, limited-use pools refresh, all spent Hit Point Dice restore, spell slots and prepared spells reset to the sheet defaults, and Exhaustion drops one level. Short: per-short-rest and recharge pools re-arm; healing is the separate spend-hit-dice call.",
     summary:
       "Take a rest on your own character (GM: anyone): short re-arms short-rest uses; long restores HP, hit dice, spell slots, prepared spells, limited uses, clears dying, and drops one Exhaustion level.",
     schema: ActorRestSchema,
@@ -240,6 +259,9 @@ export const actorHealthCommands = [
 
   defineCommand({
     type: "actor.spend-hit-dice",
+    operationId: "spendHitDice",
+    description:
+      "Spends Hit Point Dice to heal (SRD Short Rest: each die heals its roll + Con modifier, minimum 1). Rejected while the actor is in an active encounter. Player sessions may target only their claimed character; the dice land in the shared roll history.",
     summary: "Spend Hit Point Dice to heal on a short rest (roll + Con modifier each, minimum 1).",
     schema: ActorSpendHitDiceSchema,
     malformed: "The hit-dice command is malformed.",

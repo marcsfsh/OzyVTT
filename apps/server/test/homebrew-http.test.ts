@@ -11,9 +11,9 @@ import {
   HomebrewDeletedResponseSchema,
   HomebrewPackExportResponseSchema,
   HomebrewPackImportResponseSchema,
-  HomebrewUsagesResponseSchema,
-  openApiDocument
+  HomebrewUsagesResponseSchema
 } from "@vtt/api-contract";
+import { openApiDocument } from "../src/openapi/document.js";
 import { BuilderPolicySchema, GameStateSchema } from "@vtt/domain";
 import { buildCharacterDefinition } from "../src/character-build.js";
 import { createServer as createAppServer } from "../src/server.js";

@@ -35,6 +35,9 @@ export type CommandSpec<Schema extends z.ZodType> = Readonly<{
   type: GameCommandType;
   /** One line for the command catalog (`GET /game/commands`). */
   summary: string;
+  /** The typed HTTP route's OpenAPI operation id and its full description; its request body is `schema`. */
+  operationId: string;
+  description: string;
   schema: Schema;
   /** The refusal for a payload the schema rejects. */
   malformed: string;

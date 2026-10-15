@@ -10,6 +10,9 @@ import { defineCommand } from "./pipeline.js";
 export const reactionCommands = [
   defineCommand({
     type: "reaction.answer",
+    operationId: "answerReaction",
+    description:
+      "Answers a pending reaction prompt (Uncanny Dodge). The triggering attack's damage was parked on the prompt, so both answers apply it here: `use: true` spends the reaction and halves each typed part first; `use: false` applies it in full. Player sessions may answer only their claimed character's prompts. The response carries the `outcome`.",
     summary:
       "Answer a pending reaction prompt: use it (spend the reaction, halve the parked damage) or decline (apply it in full).",
     schema: ReactionAnswerSchema,
@@ -84,6 +87,9 @@ export const reactionCommands = [
 
   defineCommand({
     type: "reaction.dismiss",
+    operationId: "dismissReaction",
+    description:
+      "Dismisses a pending reaction prompt WITHOUT applying its parked damage (GM-grade only) - for when the damage was already applied manually.",
     summary: "Dismiss a pending reaction prompt without applying its damage (GM).",
     schema: ReactionDismissSchema,
     malformed: "The dismissal is malformed.",
@@ -95,6 +101,9 @@ export const reactionCommands = [
 
   defineCommand({
     type: "damage.resolve",
+    operationId: "resolveProposedDamage",
+    description:
+      "Applies or dismisses a parked player-hit damage proposal (proposal mode; GM-grade only). `apply: true` reduces the target's HP through the typed-defense pipeline (an optional `amount` overrides the total as a bare number, no defense math); `apply: false` discards it. Either way the proposal clears.",
     summary: "Apply or dismiss a player-hit damage proposal parked in proposal mode (GM).",
     schema: DamageResolveSchema,
     malformed: "The damage-resolution command is malformed.",

@@ -1,5 +1,6 @@
 import { GameStateSchema } from "@vtt/domain";
-import { API_VERSION, GAME_COMMANDS, REALTIME_PROTOCOL_VERSION, openApiDocument } from "@vtt/api-contract";
+import { API_VERSION, GAME_COMMANDS, REALTIME_PROTOCOL_VERSION } from "@vtt/api-contract";
+import { openApiDocument } from "./openapi/document.js";
 
 /**
  * Renders the generated app map (`docs/app-map.md`). Pure: reads the `GameState` schema, the api-contract

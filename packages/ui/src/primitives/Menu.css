@@ -108,24 +108,18 @@
 }
 
 /* ---- Popover ----
-   Kept inside the viewport (no horizontal overflow down to 320px), wherever the trigger sits:
-     1. `max-width` caps the box to the viewport minus a gutter; `min-width` relaxes only below ~216px.
-     2. Menu.tsx writes `--nh-menu-shift` on open and resize to slide the box back inside. It uses the
-        `translate` property because `.anim-popover`'s keyframes own `transform`.
-   Panel material with a brighter rim, which signals "on top" without a drop shadow; on a backing layer
+   Fixed to the viewport so no scrolling ancestor clips it; Menu.tsx writes `top` and `left` from the trigger.
+   `max-width` caps the box to the viewport minus a gutter; `min-width` relaxes only below ~216px. Panel material with a brighter rim, which signals "on top" without a drop shadow; on a backing layer
    because the popover is a list of tap targets. */
 .nh-menu-popover {
   --nh-menu-gutter: var(--space-2);
-  /* A token because Menu.tsx reads it to decide which side has room (`nh-menu--up`). */
+  /* Tokens because Menu.tsx reads them to place the box. */
   --nh-menu-gap: var(--space-1);
-  position: absolute;
+  position: fixed;
   isolation: isolate;
   z-index: 40;
-  top: calc(100% + var(--nh-menu-gap));
-  left: 0;
   min-width: min(12rem, calc(100vw - 2 * var(--nh-menu-gutter)));
   max-width: calc(100vw - 2 * var(--nh-menu-gutter));
-  translate: var(--nh-menu-shift, 0) 0;
   padding: var(--space-1);
   border: 0;
   border-radius: 0;
@@ -158,15 +152,6 @@
     100% 100%;
   background-origin: border-box;
   background-clip: border-box;
-}
-.nh-menu--end .nh-menu-popover {
-  left: auto;
-  right: 0;
-}
-/* Opens upward when there's no room below; set by Menu.tsx on open and on resize/rotate. */
-.nh-menu--up .nh-menu-popover {
-  top: auto;
-  bottom: calc(100% + var(--nh-menu-gap));
 }
 
 .nh-menu-item {

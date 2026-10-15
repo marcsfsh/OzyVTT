@@ -46,57 +46,42 @@ export function Menu({
         el.querySelector<HTMLElement>("summary")?.focus();
       }
     };
-    /* Keep the open popover inside the viewport horizontally, measured on open and on resize/rotate. When it can't
-       fit, the left edge wins. Uses offsetLeft/offsetWidth rather than getBoundingClientRect(), which includes
-       `.anim-popover`'s entrance transform and would misplace the box by 10px. Resetting the shift first keeps it
-       idempotent. */
-    const clampToViewport = () => {
+    /* The popover is `position: fixed`, placed from the trigger on open and on resize, rotate or scroll, so a
+       scrolling ancestor can't clip it (a menu in a scrolled list would otherwise lose its lower items to the page
+       behind). It lines up with the trigger's start or end edge inside the viewport, and opens below unless there
+       is more room above. offsetWidth/offsetHeight ignore `.anim-popover`'s entrance transform. A Menu must not sit
+       inside a transformed or filtered ancestor, which would become the fixed box's containing block. */
+    const place = () => {
       const pop = popoverRef.current;
-      if (!el.open || !pop) return;
-      pop.style.setProperty("--nh-menu-shift", "0px");
-      const gutter = parseFloat(getComputedStyle(pop).getPropertyValue("--nh-menu-gutter")) || 0;
-      const viewport = document.documentElement.clientWidth;
-      const host = pop.offsetParent as HTMLElement | null;
-      const left = (host ? host.getBoundingClientRect().left + host.clientLeft : 0) + pop.offsetLeft;
-      const right = left + pop.offsetWidth;
-      let shift = 0;
-      if (right > viewport - gutter) shift = viewport - gutter - right;
-      if (left + shift < gutter) shift = gutter - left;
-      if (shift) pop.style.setProperty("--nh-menu-shift", `${Math.round(shift)}px`);
-
-      /* Vertically, flip to whichever side has visible room. Room is bounded by every clipping ancestor, not just
-         the window (e.g. the map stage's `overflow: hidden`); a `position: fixed` ancestor ends the walk. If neither
-         side fits, take the side with more room. The trigger's rect is transform-free, and `offsetHeight` avoids the
-         popover's entrance transform. */
       const trigger = el.querySelector("summary");
-      if (!trigger) return;
-      let top = 0;
-      let bottom = document.documentElement.clientHeight;
-      for (let node: HTMLElement | null = el; node && node !== document.body; node = node.parentElement) {
-        const style = getComputedStyle(node);
-        if (style.overflowY !== "visible" || style.overflowX !== "visible") {
-          const box = node.getBoundingClientRect();
-          top = Math.max(top, box.top);
-          bottom = Math.min(bottom, box.bottom);
-        }
-        if (style.position === "fixed") break;
-      }
+      if (!el.open || !pop || !trigger) return;
+      const style = getComputedStyle(pop);
+      const gutter = parseFloat(style.getPropertyValue("--nh-menu-gutter")) || 0;
+      const gap = parseFloat(style.getPropertyValue("--nh-menu-gap")) || 0;
       const rect = trigger.getBoundingClientRect();
+      const viewportWidth = document.documentElement.clientWidth;
+      const viewportHeight = document.documentElement.clientHeight;
+      const width = pop.offsetWidth;
       const height = pop.offsetHeight;
-      const gap = parseFloat(getComputedStyle(pop).getPropertyValue("--nh-menu-gap")) || 0;
-      const roomBelow = bottom - rect.bottom - gutter - gap;
-      const roomAbove = rect.top - top - gutter - gap;
-      el.classList.toggle("nh-menu--up", height > roomBelow && roomAbove > roomBelow);
+      const start = el.classList.contains("nh-menu--end") ? rect.right - width : rect.left;
+      const roomBelow = viewportHeight - rect.bottom - gutter - gap;
+      const roomAbove = rect.top - gutter - gap;
+      const up = height > roomBelow && roomAbove > roomBelow;
+      pop.style.left = `${Math.round(Math.max(gutter, Math.min(start, viewportWidth - gutter - width)))}px`;
+      pop.style.top = `${Math.round(up ? rect.top - gap - height : rect.bottom + gap)}px`;
     };
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
-    el.addEventListener("toggle", clampToViewport);
-    window.addEventListener("resize", clampToViewport);
+    el.addEventListener("toggle", place);
+    window.addEventListener("resize", place);
+    // Capture, because the list the menu sits in scrolls, not the window.
+    window.addEventListener("scroll", place, true);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
-      el.removeEventListener("toggle", clampToViewport);
-      window.removeEventListener("resize", clampToViewport);
+      el.removeEventListener("toggle", place);
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
     };
   }, []);
 

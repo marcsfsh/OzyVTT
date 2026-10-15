@@ -23,6 +23,9 @@ import { defineCommand } from "./pipeline.js";
 export const actionCommands = [
   defineCommand({
     type: "action.resolve",
+    operationId: "resolveAction",
+    description:
+      "Runs a stat-block action: attack vs target AC with 2024 crit doubling, or save-DC surfacing with proposed damage. GM-grade for any combatant; a player session only for their own claimed character (area templates, cover, and rules overrides stay GM-only). A player's hit is handed to the GM as a damage proposal, or applied directly when the table's player-damage-mode is `direct`. Targets are explicit ids or an area template (never both); rolls are recorded in the shared history and the response carries the `resolution`.",
     summary:
       "Run a stat-block action: attack vs AC or save-DC with typed damage (GM anyone; a player their own claimed character).",
     schema: ActionResolveSchema,
@@ -256,6 +259,9 @@ export const actionCommands = [
 
   defineCommand({
     type: "action.use",
+    operationId: "useAction",
+    description:
+      'Uses an action and lets the SERVER decide what that means. In the fight on this creature\'s turn it delegates to the full structured resolution and acks `route: "resolved"`. Off turn it is refused with the overridable, askable rules block `economy.not-your-turn` (reactions and legendary actions are exempt - taking those off turn is the point); under an `economy` exception of advise/off it resolves, with a GM-only warning line under advise. With no fight running - or with this creature not in the turn order - the server rolls the action\'s own attack die (and, only with `includeDamage`, its damage parts) as attributed rolls, touches no combat state, and acks `route: "loose"` with the roll ids. No hit points ever move on the loose route. GM-grade for any combatant, including a monster\'s sheet; a player session only for their own claimed character.',
     summary:
       "Use an action and let the SERVER route it: resolved in the fight on your turn, refused off turn, loose dice outside a fight (GM anyone; a player their own claimed character).",
     schema: ActionUseSchema,
@@ -366,6 +372,9 @@ export const actionCommands = [
 
   defineCommand({
     type: "dice.roll",
+    operationId: "rollDice",
+    description:
+      "Rolls dice into the shared, auditable roll history; the response carries `rollId`. Player sessions cannot roll gm-only, and rolling for an actor requires owning it.",
     summary: "Roll dice into the shared, auditable roll history.",
     schema: DiceRollSchema,
     malformed: "The roll request is malformed.",

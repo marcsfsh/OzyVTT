@@ -75,6 +75,9 @@ export function importedDefinition(definition: unknown, kind: "actor definition"
 export const characterCommands = [
   defineCommand({
     type: "character.create",
+    operationId: "createCharacter",
+    description:
+      "Creates a character from CHOICES rather than a finished sheet - the GM always, and a player when the table's builderPolicy.playerBuilder is open, in which case the new character is auto-claimed by its creator and a per-session daily cap applies: identity ids (species/background/class/subclass), base ability scores plus the background's +2/+1 or +1/+1/+1 allocation, per-level hit-point entries (or the fixed average), and the choice-provenance ledger as the literal build input. The server validates every id against the content catalogs, resolves every catalog-driven choice through the same resolver the wizard uses, interprets the content features' structured riders into sheet actions, assembles the canonical ActorDefinition, and lands it through the import path - the new claimable actor's id equals this call's commandId and its editable sheet is keyed import-<actorId>.",
     summary:
       "Create a character from choices (ids, scores, HP entries, the choices ledger); the server assembles and imports the sheet (GM). The actor's id equals the commandId.",
     schema: CharacterCreateSchema,
@@ -112,6 +115,9 @@ export const characterCommands = [
 
   defineCommand({
     type: "character.generate",
+    operationId: "generateCharacter",
+    description:
+      "Rolls a complete, playable, single-class character at a level and lands it on the roster - the GM always, and a player when the table's builderPolicy.playerRandom is open, which unlike playerBuilder is CLOSED by default. The request carries only the level, an optional class (omitted means one is drawn) and an optional name; every other decision is made server-side from the same dice authority as every other roll: the standard array distributed by the class's own stat priority, the background's printed spread aimed the same way, and species, lineage, background, subclass, size, skills, tools, languages, feats, fighting styles, spells and starting equipment drawn at random from the offers the character builder itself computes. The result is assembled, validated and imported exactly as `POST /game/characters` is - same ActorDefinition, same choice ledger, so it levels up and respecs like a hand-built character - and the hit-point dice are recorded in the table feed. Auto-claimed by a player caller, with the same per-session daily cap.",
     summary:
       "Roll a complete, playable, single-class character at a level: the standard array by the class's stat priority and every other pick drawn server-side - the GM always, a player when builderPolicy.playerRandom is open (deny by default). The actor's id equals the commandId.",
     schema: CharacterGenerateSchema,
@@ -178,8 +184,11 @@ export const characterCommands = [
 
   defineCommand({
     type: "character.rebuild",
+    operationId: "rebuildCharacter",
+    description:
+      "Rebuilds one character at a new level - up OR down - or respecs it outright: the same build input `POST /game/characters` takes, minus the name (kept from the live actor), re-run through the identical validation. The GM may rebuild anyone; a player only their own claimed character, and only while the table's builder is open. Rolled hit points recorded in the choice ledger are reused, so a level-down/level-up round trip restores the same maximum; a sheet with no recorded rolls rebuilds on the average. Refused while the character is in a live (or paused) fight.",
     summary:
-      "Rebuild one character at a new level (up or down) or respec it, re-running the whole build from the choice ledger - the GM for anyone, a player for their own claimed character when the table's builder is open (D13).",
+      "Rebuild one character at a new level (up or down) or respec it, re-running the whole build from the choice ledger - the GM for anyone, a player for their own claimed character when the table's builder is open.",
     schema: CharacterRebuildSchema,
     malformed: "The character-rebuild command is malformed.",
     // Level up/down and respec re-run and re-validate the full build, then `rebuildActorDefinition`.
@@ -214,7 +223,10 @@ export const characterCommands = [
 
   defineCommand({
     type: "builder.roll-abilities",
-    summary: "Roll six ability scores server-side for the character builder, recorded in the table feed (D14).",
+    operationId: "rollBuilderAbilities",
+    description:
+      "Rolls six ability scores SERVER-SIDE for the character builder, through the table's allowed method and the GM's formula. The set is recorded as one public roll in the table feed. Character creation still bound-checks submitted scores rather than binding them to this roll: physical dice at the table stay a supported path.",
+    summary: "Roll six ability scores server-side for the character builder, recorded in the table feed.",
     schema: BuilderRollAbilitiesSchema,
     malformed: "The ability-roll command is malformed.",
     // `character.create` still only bound-checks scores, since physical dice are supported.
@@ -271,6 +283,9 @@ export const characterCommands = [
 
   defineCommand({
     type: "builder.set-policy",
+    operationId: "setBuilderPolicy",
+    description:
+      "Sets the character-builder table policy (GM-grade only; task-packet decision 10): which ability-score generation methods the wizard offers players (standard-array, point-buy, roll, custom - all four by default) and the GM's custom roll formula. A supplied formula is validated through the server's own dice grammar and bounds (a formula that can roll outside 1-30 is rejected); allowing \"custom\" is only actionable while a formula is set. The stored policy is projected to every player verbatim.",
     summary: "Set the character-builder policy: allowed ability-score methods and the GM's custom roll formula (GM).",
     schema: BuilderSetPolicySchema,
     malformed: "The builder-policy command is malformed.",
@@ -305,6 +320,9 @@ export const characterCommands = [
 
   defineCommand({
     type: "character.submit-import",
+    operationId: "submitCharacterImport",
+    description:
+      "Submits a character sheet into the GM's approval queue instead of importing it directly - the player path (a GM importing their own sheet uses the definitions import). Any joined session may submit; nothing reaches the roster until the GM resolves it. The queued entry's `importId` is this call's commandId, so keep it to resolve or re-send the submission idempotently.",
     summary:
       "Submit a character sheet into the GM's approval queue (anyone at the table); the queued importId equals the commandId.",
     schema: CharacterSubmitImportSchema,
@@ -318,6 +336,9 @@ export const characterCommands = [
 
   defineCommand({
     type: "character.resolve-import",
+    operationId: "resolveCharacterImport",
+    description:
+      "Approves (`approve: true`) or rejects a queued character submission (GM-grade only). Either decision removes it from the queue; approving instantiates the claimable actor, whose id equals THIS call's commandId (returned as `actorId`).",
     summary:
       "Approve or reject a queued character submission (GM); approving instantiates the actor, whose id equals the commandId.",
     schema: CharacterResolveImportSchema,
