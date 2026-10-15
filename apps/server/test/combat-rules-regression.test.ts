@@ -654,16 +654,16 @@ describe("report test 12 - GM override", () => {
       { actorId: IDS.torva, targetIds: [IDS.croc1], override: { reason: "haste variant" } },
       [15, 6]
     );
-    expect(game.combat.turn.rulesOverridden).toBe(true);
+    expect(game.combat.turn.rulesOverriddenFamilies).toEqual(["economy"]);
     // A third bonus action the same turn needs no fresh override (nat-1 keeps it a harmless miss): the
     // override is once per turn, not once per action.
     expect(() =>
       resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [1, 6])
     ).not.toThrow();
-    expect(game.combat.turn.rulesOverridden).toBe(true);
+    expect(game.combat.turn.rulesOverriddenFamilies).toEqual(["economy"]);
     // The standing override evaporates on turn advance (cleared with the rest of `turn`).
     nextInitiativeTurn(game);
-    expect(game.combat.turn.rulesOverridden).toBeFalsy();
+    expect(game.combat.turn.rulesOverriddenFamilies ?? []).toEqual([]);
   });
 
   it("blocks a down creature (0 HP) from acting, and a standing override does not bypass it", () => {
@@ -673,8 +673,8 @@ describe("report test 12 - GM override", () => {
     expect(() =>
       resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6])
     ).toThrow(/is down/);
-    // A standing economy/range override this turn must not let a down creature act; it re-prompts.
-    game.combat = { ...game.combat, turn: { ...game.combat.turn, rulesOverridden: true } };
+    // A standing range override this turn must not let a down creature act; it re-prompts.
+    game.combat = { ...game.combat, turn: { ...game.combat.turn, rulesOverriddenFamilies: ["targeting"] } };
     expect(() =>
       resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6])
     ).toThrow(RulesBlockedError);

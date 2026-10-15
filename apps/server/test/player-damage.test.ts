@@ -2,12 +2,8 @@ import { describe, expect, it } from "vitest";
 import { GameStateSchema, type ActionResolution, type GameState } from "@vtt/domain";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { startEncounter } from "../src/encounter.js";
-import {
-  playerHitOwesDamage,
-  resolutionDamageParts,
-  resolvePendingDamage,
-  settlePlayerHit
-} from "../src/player-damage.js";
+import { playerHitOwesDamage, resolvePendingDamage, settlePlayerHit } from "../src/player-damage.js";
+import { damagePartsOf } from "../src/resolution/damage.js";
 
 const IDS = {
   attacker: "10000000-0000-4000-8000-000000000001",
@@ -190,7 +186,7 @@ describe("player damage part/reaction helpers", () => {
   });
 
   it("combines attack damage with bonus-damage parts and drops zero amounts", () => {
-    const parts = resolutionDamageParts(
+    const parts = damagePartsOf(
       resolutionOf({
         damage: [{ formula: "1d6", type: "slashing", total: 5 }],
         bonusDamage: [

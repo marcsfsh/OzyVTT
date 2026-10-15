@@ -5,12 +5,20 @@ import type { Actor } from "@vtt/domain";
 /** Conditions that include Incapacitated (SRD 2024): no actions, bonus actions, or reactions while any is active. */
 export const INCAPACITATING_CONDITIONS = ["incapacitated", "paralyzed", "petrified", "stunned", "unconscious"] as const;
 
+/** The first incapacitating condition the actor has, so a refusal can name it; null when none. */
+export function incapacitatingCondition(actor: Actor): string | null {
+  return (
+    actor.conditions.find((condition) => (INCAPACITATING_CONDITIONS as readonly string[]).includes(condition.id))?.id ??
+    null
+  );
+}
+
 export function isIncapacitated(actor: Actor): boolean {
-  return actor.conditions.some((condition) => (INCAPACITATING_CONDITIONS as readonly string[]).includes(condition.id));
+  return incapacitatingCondition(actor) !== null;
 }
 
 /** While Paralyzed/Petrified/Stunned/Unconscious a creature automatically fails Strength and Dexterity saves (SRD conditions appendix). */
-export const AUTO_FAIL_PHYSICAL_SAVES = ["paralyzed", "petrified", "stunned", "unconscious"] as const;
+const AUTO_FAIL_PHYSICAL_SAVES = ["paralyzed", "petrified", "stunned", "unconscious"] as const;
 
 export function autoFailsPhysicalSaves(actor: Actor): string | null {
   return (
@@ -36,14 +44,7 @@ export function conditionLabel(conditionId: string): string {
 }
 
 /** Conditions that set Speed to 0 (SRD conditions appendix). */
-export const SPEED_ZERO_CONDITIONS = [
-  "grappled",
-  "restrained",
-  "unconscious",
-  "paralyzed",
-  "petrified",
-  "stunned"
-] as const;
+const SPEED_ZERO_CONDITIONS = ["grappled", "restrained", "unconscious", "paralyzed", "petrified", "stunned"] as const;
 
 /** True while a condition that sets Speed to 0 is active (SRD: "your Speed is 0 and can't increase"). */
 function speedZeroed(actor: Actor): boolean {

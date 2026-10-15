@@ -1,0 +1,111 @@
+import type { ActionResolution, ActionResolutionAttack } from "@vtt/domain";
+import { collectRiders, parseDiceFormula, resolveDice, type DiceExpression, type RiderMoment } from "@vtt/rules-5e";
+import { attackUsedAsRanged } from "./attack.js";
+import { abilityModifier, recordRoll, type ResolveContext } from "./context.js";
+
+/** 2024 crit rule: double every dice term (modifiers once); `extraFirstTermDice` adds Savage Attacks dice. */
+function criticalExpression(expression: DiceExpression, extraFirstTermDice = 0): DiceExpression {
+  let firstDice = true;
+  const terms = expression.terms.map((term) => {
+    if (term.kind !== "dice") return term;
+    const extra = firstDice ? extraFirstTermDice : 0;
+    firstDice = false;
+    return { ...term, count: term.count * 2 + extra };
+  });
+  const source = terms
+    .map((term, index) => {
+      const sign = term.sign === -1 ? "- " : index === 0 ? "" : "+ ";
+      return `${sign}${term.kind === "dice" ? `${term.count}d${term.sides}` : term.value}`;
+    })
+    .join(" ");
+  return { source, normalized: source.replace(/\s+/g, "").toLowerCase(), terms };
+}
+
+/** Damage rolls unless the attack whiffed outright: no attack roll, a hit, a crit, or no AC to judge. */
+function rollsDamage(attack: ActionResolutionAttack | null): boolean {
+  return attack === null || attack.outcome === "crit" || attack.outcome === "hit" || attack.outcome === "unknown";
+}
+
+/** Typed damage parts (rolled dice and flat bonus lines) of a resolution, for parking or applying. */
+export function damagePartsOf(
+  resolution: Pick<ActionResolution, "damage" | "bonusDamage">
+): Array<{ amount: number; type: string }> {
+  return [
+    ...resolution.damage.map((part) => ({ amount: part.total, type: part.type })),
+    ...(resolution.bonusDamage ?? []).map((part) => ({ amount: part.amount, type: part.type }))
+  ].filter((part) => part.amount > 0);
+}
+
+/** The action's own damage dice (crit-doubled, Savage Attacks on the first part), then flat damage
+ *  bonuses from active effects (Rage) as their own explainable lines. */
+export function rollWeaponDamage(ctx: ResolveContext): void {
+  const { action, attacker, targets, deps, damage, bonusDamage } = ctx;
+  if (action.damage.length === 0 || !rollsDamage(ctx.attack)) return;
+  action.damage.forEach((part, index) => {
+    const expression = parseDiceFormula(part.formula);
+    const extraCritDice = index === 0 ? (action.attack?.criticalBonusDice ?? 0) : 0;
+    const rolled = resolveDice(ctx.crit ? criticalExpression(expression, extraCritDice) : expression, deps.random);
+    recordRoll(ctx, rolled, "damage");
+    damage.push({ formula: rolled.expression.source, type: part.type, total: rolled.total });
+  });
+  if (!action.attack) return;
+  const melee = !attackUsedAsRanged(action.attack, deps.distanceFeet?.(attacker.id, targets[0].id) ?? null);
+  for (const effect of attacker.effects) {
+    for (const modifier of effect.modifiers) {
+      if (modifier.type === "damage-bonus" && (modifier.appliesTo === "all" || melee)) {
+        bonusDamage.push({ amount: modifier.amount, type: damage[0]?.type ?? "untyped", source: effect.name });
+      }
+    }
+  }
+}
+
+/** Item, feat and feature riders that add damage: typed `extra-damage` as its own `damage[]` entry
+ *  (crit-doubled only with `doubleOnCritical`, since 5e doesn't double dice added after the attack) and
+ *  moment-gated flat `damage-bonus` as a bonus line. A rider with no `when` fires on every damage roll of
+ *  its action; `on-hit`/`on-critical-hit` narrow it. */
+export function rollRiderDamage(ctx: ResolveContext): void {
+  const { attack, crit, derivation, riderFilters, deps, damage, bonusDamage, warnings } = ctx;
+  if (!rollsDamage(attack)) return;
+  const passes: Array<RiderMoment | null> = [null, "on-damage-roll"];
+  if (attack === null || attack.outcome === "hit" || attack.outcome === "crit") passes.push("on-hit");
+  if (crit) passes.push("on-critical-hit");
+  if (attack !== null && attack.outcome === "fumble") passes.push("on-critical-miss");
+  const already = new Set<unknown>();
+  for (const moment of passes) {
+    for (const rider of collectRiders(derivation.carriers, { ...derivation.context, ...riderFilters, moment })) {
+      const modifier = rider.modifier;
+      // Standing flat bonuses (moment null) were already folded into the formula by `withStandingRiders`.
+      if (modifier.type === "damage-bonus") {
+        if (moment === null || already.has(modifier)) continue;
+        const amount = modifier.amount ?? 0;
+        if (amount === 0 || damage.length === 0) continue;
+        already.add(modifier);
+        bonusDamage.push({ amount, type: damage[0].type, source: rider.label });
+        continue;
+      }
+      if (modifier.type !== "extra-damage" || already.has(modifier)) continue;
+      if (modifier.formula === undefined && modifier.abilityModifier === undefined) continue;
+      already.add(modifier);
+      // An ability-modifier amount (Agonizing Blast's "add your Charisma modifier") resolves against the
+      // bearer's sheet; it rolls no die and is never crit-doubled.
+      const abilityAmount =
+        modifier.abilityModifier === undefined ? 0 : abilityModifier(deps.definition, modifier.abilityModifier);
+      const type = modifier.damageType ?? damage[0]?.type ?? "untyped";
+      if (modifier.formula === undefined) {
+        if (abilityAmount === 0) continue; // a +0 modifier adds no entry and no noise to the card
+        damage.push({ formula: String(abilityAmount), type, total: abilityAmount });
+        warnings.push(`${rider.label}: +${abilityAmount} ${type} (${modifier.abilityModifier!.toUpperCase()}).`);
+        continue;
+      }
+      const expression = parseDiceFormula(modifier.formula);
+      const rolled = resolveDice(
+        crit && modifier.doubleOnCritical === true ? criticalExpression(expression) : expression,
+        deps.random
+      );
+      recordRoll(ctx, rolled, "damage");
+      const total = rolled.total + abilityAmount;
+      damage.push({ formula: rolled.expression.source, type, total });
+      warnings.push(`${rider.label}: +${total} ${type}.`);
+    }
+  }
+}

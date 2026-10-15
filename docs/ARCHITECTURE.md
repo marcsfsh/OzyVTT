@@ -143,7 +143,12 @@ hidden things are stripped by the projections regardless of what fog covers.
 The server owns 5e combat rules (ADR-0020): action resolution, typed damage with resistances,
 effects and conditions, saves, reactions and opportunity attacks, concentration, spell slots,
 rests, death saves, weapon masteries and movement budgets. Entry points are
-`action-resolution.ts` and its neighbours in `apps/server/src`.
+`action-resolution.ts` and its neighbours in `apps/server/src`. Resolving an action runs a fixed
+sequence of steps over one shared context, one module per step in `apps/server/src/resolution/`
+(validation, attack roll, damage, masteries, on-hit effects, grants, pending saves and reactions,
+the action economy, release); builtin actions such as Hide and the unarmed Grapple add their special
+cases through the handler table in `resolution/builtins.ts`. Every condition write goes through
+`applyCondition` in `effects.ts`, which honours innate and item-granted immunities.
 
 How strictly rules are enforced is table policy (`GameState.rulesPolicy`): enforce, advise or
 off, with per-family exceptions (`rules-families.ts`). A player blocked by a rule can ask the GM

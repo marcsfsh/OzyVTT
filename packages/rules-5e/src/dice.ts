@@ -112,3 +112,15 @@ export function resolveDice(expression: DiceExpression, random: RandomSource): D
 export function rollDice(formula: string, random: RandomSource) {
   return resolveDice(parseDiceFormula(formula), random);
 }
+
+type RollMode = "advantage" | "disadvantage" | "normal" | null | undefined;
+
+/** The d20 a roll mode rolls (SRD Advantage and Disadvantage: roll two, keep the higher or the lower). */
+export function d20Die(mode: RollMode): string {
+  return mode === "advantage" ? "2d20kh1" : mode === "disadvantage" ? "2d20kl1" : "1d20";
+}
+
+/** A D20 Test's formula: the mode's die plus the modifier, written out even at +0 so the roll shows it. */
+export function d20TestFormula(mode: RollMode, modifier: number): string {
+  return `${d20Die(mode)} ${modifier < 0 ? "-" : "+"} ${Math.abs(modifier)}`;
+}

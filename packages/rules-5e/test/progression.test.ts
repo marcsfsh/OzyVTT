@@ -1,12 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  EPIC_BOON_LEVEL,
-  SRD_CLASS_IDS,
   SRD_CLASS_PROGRESSION,
   asiLevelsFor,
   casterProgressionFor,
   hitDieFor,
-  isAsiLevel,
   meetsMulticlassPrerequisites,
   statPriorityFor
 } from "../src/class-data.js";
@@ -27,7 +24,8 @@ import { proficiencyBonusForLevel } from "../src/character.js";
 
 describe("SRD class data", () => {
   it("covers the twelve SRD classes with a complete stat priority each", () => {
-    expect(SRD_CLASS_IDS).toEqual([
+    const classIds = Object.keys(SRD_CLASS_PROGRESSION).sort();
+    expect(classIds).toEqual([
       "barbarian",
       "bard",
       "cleric",
@@ -41,7 +39,7 @@ describe("SRD class data", () => {
       "warlock",
       "wizard"
     ]);
-    for (const classId of SRD_CLASS_IDS) {
+    for (const classId of classIds) {
       const priority = statPriorityFor(classId);
       expect(priority.length, classId).toBe(6);
       expect(new Set(priority).size, classId).toBe(6);
@@ -74,9 +72,7 @@ describe("SRD class data", () => {
     expect(asiLevelsFor("wizard")).toEqual([4, 8, 12, 16]);
     expect(asiLevelsFor("fighter")).toEqual([4, 6, 8, 12, 14, 16]);
     expect(asiLevelsFor("rogue")).toEqual([4, 8, 10, 12, 16]);
-    expect(isAsiLevel("fighter", 6)).toBe(true);
-    expect(isAsiLevel("wizard", 6)).toBe(false);
-    expect(asiLevelsFor("wizard")).not.toContain(EPIC_BOON_LEVEL);
+    expect(asiLevelsFor("wizard")).not.toContain(19);
     // An unknown class gets the standard cadence.
     expect(asiLevelsFor("moon-warden")).toEqual([4, 8, 12, 16]);
   });

@@ -1,8 +1,9 @@
-import type { AbilityId, ActionResolutionAttack, EffectInstance } from "@vtt/domain";
+import type { AbilityId, ActionResolutionAttack } from "@vtt/domain";
+import type { EffectSpec } from "./effects.js";
 
 /** Weapon mastery dispatch: one registry keyed by SRD mastery slug, one hook per moment of a swing.
  *  No runtime imports, and keep it that way: `equipment-derivation.ts` imports this and is a leaf for
- *  the builder and resolver. Handlers return what should happen; `action-resolution.ts` applies it. */
+ *  the builder and resolver. Handlers return what should happen; the resolver (`resolution/`) applies it. */
 
 /** One swing's mastery, with the ability modifier `weaponAction` chose (Graze and Topple use it). */
 export type MasteryInForce = Readonly<{ id: string; abilityModifier: number }>;
@@ -25,8 +26,8 @@ export type MasterySwing = Readonly<{
 /** A flat, labelled damage line (`ActionResolution.bonusDamage`), rendered on its own row. */
 export type MasteryBonusDamage = Readonly<{ amount: number; type: string; source: string }>;
 
-/** An effect for the caller to add, with the target it belongs on. */
-export type MasteryAppliedEffect = Readonly<{ targetId: string; targetName: string; effect: EffectInstance }>;
+/** An effect for the caller to build (`makeEffect`) and add, with the target it belongs on. */
+export type MasteryAppliedEffect = Readonly<{ targetId: string; targetName: string; effect: EffectSpec }>;
 
 /** A saving throw for the caller to park (`createPendingSaves`), with the condition a failure imposes. */
 export type MasteryPendingSave = Readonly<{
@@ -107,15 +108,8 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
           sourceActionId: `${swing.actionId}:sap`,
           startedRound: swing.round,
           duration: { type: "until-source-next-turn" },
-          endsWhenSourceDefeated: false,
-          voidWhileIncapacitated: false,
-          concentration: false,
           stackKey: "mastery:sap",
-          modifiers: [{ type: "attack-disadvantage" }],
-          linkedConditionIds: [],
-          escapeDc: null,
-          onEnd: [],
-          endsWithTag: null
+          modifiers: [{ type: "attack-disadvantage" }]
         }
       }
     ]
@@ -141,17 +135,11 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
           sourceActionId: `${swing.actionId}:slow`,
           startedRound: swing.round,
           duration: { type: "until-source-next-turn" },
-          endsWhenSourceDefeated: false,
           // A penalty, so it must not lapse while the target is incapacitated (that only applies to benefits).
           voidWhileIncapacitated: false,
-          concentration: false,
           // Names the game effect, so every Slow is one reduction (SRD "Combining Game Effects").
           stackKey: "mastery:slow",
-          modifiers: [{ type: "speed", amount: -10 }],
-          linkedConditionIds: [],
-          escapeDc: null,
-          onEnd: [],
-          endsWithTag: null
+          modifiers: [{ type: "speed", amount: -10 }]
         }
       }
     ]

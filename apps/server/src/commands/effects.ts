@@ -1,5 +1,5 @@
 import { requireActorAccess } from "../authorization.js";
-import { addEffect, endEffect, type EffectNarration } from "../effects.js";
+import { addEffect, endEffect, makeEffect, type EffectNarration } from "../effects.js";
 import { EffectAddSchema, EffectEndSchema } from "../game-commands.js";
 import { initiatorOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
@@ -21,14 +21,12 @@ export const effectCommands = [
         addEffect(
           state,
           actorId,
-          {
+          makeEffect({
             id: commandId,
             name,
             tags: tags ? [...tags] : [],
             // A GM-added concentration effect is sustained by its bearer (damage to them prompts the CON save).
             sourceActorId: concentration ? actorId : null,
-            sourceName: null,
-            sourceActionId: null,
             startedRound: state.combat.round,
             duration:
               duration === undefined
@@ -36,15 +34,9 @@ export const effectCommands = [
                 : duration.type === "rounds"
                   ? { type: "rounds", remaining: duration.rounds }
                   : duration,
-            endsWhenSourceDefeated: false,
-            voidWhileIncapacitated: false,
             concentration: concentration ?? false,
-            modifiers: modifiers ? [...modifiers] : [],
-            linkedConditionIds: [],
-            escapeDc: null,
-            onEnd: [],
-            endsWithTag: null
-          },
+            modifiers: modifiers ? [...modifiers] : []
+          }),
           events
         );
       });

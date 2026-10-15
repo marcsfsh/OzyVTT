@@ -470,9 +470,6 @@ const sceneCombatShape = {
       turnUses: z.record(z.string(), z.number().int().nonnegative()).default({}),
       /** Feet of movement the current turn's actor has spent (fractional on gridless maps). */
       movementUsedFeet: z.number().nonnegative().max(100000).default(0),
-      /** Legacy economy/range-only override flag, kept so older mid-turn state parses; readers prefer
-       * `rulesOverriddenFamilies`. Stripped from player projections. */
-      rulesOverridden: z.boolean().optional(),
       /** Rule families the GM already waved through this turn. Stripped from player projections. */
       rulesOverriddenFamilies: z.array(RuleFamilySchema).max(5).optional()
     })

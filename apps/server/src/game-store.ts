@@ -1,13 +1,14 @@
 import type { DatabaseSync } from "node:sqlite";
 import { GameStateSchema, type GameState, type TurnHistoryEntry } from "@vtt/domain";
 import { migrate, openDatabase, transaction, type Migration } from "./database.js";
+import type { RuleId } from "./rules-families.js";
 
 export class CommandRejectedError extends Error {}
 /** A rules-mode rejection (ADR-0020); rolls back without burning the commandId and carries the rule id and
  *  whether `override: {reason}` may bypass it. */
 export class RulesBlockedError extends CommandRejectedError {
   constructor(
-    public readonly rule: string,
+    public readonly rule: RuleId,
     message: string,
     public readonly overridable: boolean = true
   ) {

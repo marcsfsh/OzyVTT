@@ -34,11 +34,10 @@ export type ClassProgression = Readonly<{
 }>;
 
 /** SRD 5.2.1 ASI levels: 4/8/12/16, plus Fighter 6 and 14 and Rogue 10. Level 19 grants an Epic Boon feat
- * instead (`EPIC_BOON_LEVEL`), modelled as an ordinary feature with a `feat` choice. */
+ * instead, modelled as an ordinary feature with a `feat` choice. */
 const ASI_STANDARD: readonly number[] = [4, 8, 12, 16];
 const ASI_FIGHTER: readonly number[] = [4, 6, 8, 12, 14, 16];
 const ASI_ROGUE: readonly number[] = [4, 8, 10, 12, 16];
-export const EPIC_BOON_LEVEL = 19;
 
 const requireAll = (...minimums: readonly (readonly [Ability, number])[]): MulticlassRequirement => ({
   mode: "all",
@@ -184,18 +183,7 @@ export const SRD_CLASS_PROGRESSION: Readonly<Record<string, ClassProgression>> =
   }
 });
 
-/** Every class id the built-in table knows, in a stable order. */
-export const SRD_CLASS_IDS: readonly string[] = Object.freeze(Object.keys(SRD_CLASS_PROGRESSION).sort());
-
 export type ClassProgressionTable = Readonly<Record<string, ClassProgression>>;
-
-/** The progression row for a class id, or undefined when the caller must fall back to bundle data. */
-export function classProgression(
-  classId: string,
-  table: ClassProgressionTable = SRD_CLASS_PROGRESSION
-): ClassProgression | undefined {
-  return table[classId];
-}
 
 /** Which abilities matter most to this class, best first; unknown classes fall back to sheet order. */
 export function statPriorityFor(
@@ -213,15 +201,6 @@ export function hitDieFor(classId: string, table: ClassProgressionTable = SRD_CL
 /** Levels at which this class grants an Ability Score Improvement (or a feat instead). */
 export function asiLevelsFor(classId: string, table: ClassProgressionTable = SRD_CLASS_PROGRESSION): readonly number[] {
   return table[classId]?.asiLevels ?? ASI_STANDARD;
-}
-
-/** True when `level` is one of this class's ASI levels. */
-export function isAsiLevel(
-  classId: string,
-  level: number,
-  table: ClassProgressionTable = SRD_CLASS_PROGRESSION
-): boolean {
-  return asiLevelsFor(classId, table).includes(level);
 }
 
 /** How this class's levels count toward the shared multiclass caster level. */

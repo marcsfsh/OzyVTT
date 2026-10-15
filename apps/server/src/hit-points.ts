@@ -15,7 +15,7 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { requireActorAccess, requireGm, type Initiator } from "./authorization.js";
 import { CommandRejectedError } from "./game-store.js";
 import {
-  applyConditionDirect,
+  applyCondition,
   endConcentrationSustainedBy,
   endEffectsSustainedBy,
   effectDamageDefenses,
@@ -268,14 +268,14 @@ export function applyDamageDetailed(
     actor.deathSaves = outcome.state;
     deathSaveFailuresAdded = outcome.failuresAdded;
     instantDeath = outcome.dead && damageToHp >= actor.hp.maximum;
-    applyConditionDirect(actor, "unconscious");
-    applyConditionDirect(actor, "prone");
+    applyCondition(actor, "unconscious", { immunities: deps });
+    applyCondition(actor, "prone", { immunities: deps });
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0) {
     if (input.nonlethal === true) {
       // Knocking out (SRD): the target drops to 0, Unconscious and stable (no death saves, no defeat).
       if (isPlayerCharacter) actor.deathSaves = { successes: 0, failures: 0, stable: true };
-      applyConditionDirect(actor, "unconscious");
-      applyConditionDirect(actor, "prone");
+      applyCondition(actor, "unconscious", { immunities: deps });
+      applyCondition(actor, "prone", { immunities: deps });
       events.push({
         kind: "condition",
         text: `${actor.name} was knocked out - Unconscious and stable at 0 HP.`,
@@ -286,8 +286,8 @@ export function applyDamageDetailed(
       const outcome = droppedToZero(overflow, actor.hp.maximum);
       actor.deathSaves = outcome.state;
       instantDeath = outcome.instantDeath;
-      applyConditionDirect(actor, "unconscious");
-      applyConditionDirect(actor, "prone");
+      applyCondition(actor, "unconscious", { immunities: deps });
+      applyCondition(actor, "prone", { immunities: deps });
       events.push({
         kind: "condition",
         text: instantDeath ? `${actor.name} was killed outright.` : `${actor.name} fell Unconscious and is dying.`,
@@ -400,8 +400,8 @@ export function setCurrentHp(state: GameState, actorId: string, current: number,
   } else if (actor.hp.current === 0 && before > 0) {
     if (actor.kind === "player-character" && actor.deathSaves === null) {
       actor.deathSaves = { successes: 0, failures: 0, stable: false };
-      applyConditionDirect(actor, "unconscious");
-      applyConditionDirect(actor, "prone");
+      applyCondition(actor, "unconscious");
+      applyCondition(actor, "prone");
       events.push({ kind: "condition", text: `${actor.name} fell Unconscious and is dying.`, actorId });
     }
     events.push(...endEffectsSustainedBy(state, actor.id));

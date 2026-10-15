@@ -1,6 +1,6 @@
-import type { Actor, GameState, RollRecord } from "@vtt/domain";
-import { parseDiceFormula, resolveDeathSave, resolveDice, type RandomSource } from "@vtt/rules-5e";
-import { recordRoll as recordRollInHistory } from "./roll-history.js";
+import type { Actor, GameState } from "@vtt/domain";
+import { d20Die, parseDiceFormula, resolveDeathSave, resolveDice, type RandomSource } from "@vtt/rules-5e";
+import { recordRoll as recordRollInHistory, rolledTerms } from "./roll-history.js";
 
 export type DeathSaveMode = "advantage" | "disadvantage" | "normal";
 
@@ -43,13 +43,12 @@ export function rollDeathSave(
     face = options.naturalRoll;
   } else {
     const chosen = options.rollMode ?? "normal";
-    const formula = chosen === "advantage" ? "2d20kh1" : chosen === "disadvantage" ? "2d20kl1" : "1d20";
+    const formula = d20Die(chosen);
     const resolution = resolveDice(parseDiceFormula(formula), deps.random);
     face = resolution.total;
     if (chosen !== "normal") mode = chosen;
     // Recorded under the dying character with the real initiator role; hidden combatants stay GM-only.
-    let group = 0;
-    const record: RollRecord = {
+    recordRollInHistory(state, {
       id: deps.rollId,
       commandId: deps.commandId,
       initiatorSessionId: deps.sessionId,
@@ -60,22 +59,10 @@ export function rollDeathSave(
       visibility: actor.visibility === "gm-only" ? "gm-only" : "public",
       formula,
       normalizedFormula: resolution.expression.normalized,
-      dice: resolution.terms.flatMap((term) => {
-        if (term.kind !== "dice") return [];
-        const currentGroup = group++;
-        return term.dice.map((die) => ({
-          group: currentGroup,
-          sides: term.sides,
-          face: die.face,
-          kept: die.kept,
-          sign: term.sign
-        }));
-      }),
-      modifiers: [],
+      ...rolledTerms(resolution),
       total: resolution.total,
       createdAt: deps.now()
-    };
-    recordRollInHistory(state, record);
+    });
   }
   const outcome = resolveDeathSave(actor.deathSaves, face);
   if (options.commit) actor.deathSaves = outcome.state;

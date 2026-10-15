@@ -1,4 +1,5 @@
 import type { GameState, RollRecord } from "@vtt/domain";
+import type { DiceResolution } from "@vtt/rules-5e";
 
 /** The single roll writer: every die the server rolls (tray rolls, attacks, damage, saves, death saves,
  *  Hit Dice, initiative) lands here, so the live roll window and the feed cannot disagree. */
@@ -11,6 +12,27 @@ export function recordRoll(state: GameState, record: RollRecord): RollRecord {
   state.rolls.push(record);
   if (state.rolls.length > ROLL_WINDOW) state.rolls.splice(0, state.rolls.length - ROLL_WINDOW);
   return record;
+}
+
+/** A resolved formula's dice and flat modifiers, as a roll record stores them. */
+export function rolledTerms(resolution: DiceResolution): Pick<RollRecord, "dice" | "modifiers"> {
+  let group = 0;
+  return {
+    dice: resolution.terms.flatMap((term) => {
+      if (term.kind !== "dice") return [];
+      const currentGroup = group++;
+      return term.dice.map((die) => ({
+        group: currentGroup,
+        sides: term.sides,
+        face: die.face,
+        kept: die.kept,
+        sign: term.sign
+      }));
+    }),
+    modifiers: resolution.terms
+      .filter((term): term is Extract<typeof term, { kind: "modifier" }> => term.kind === "modifier")
+      .map((term) => ({ value: term.value, sign: term.sign }))
+  };
 }
 
 /** Every roll one command produced, read off committed state. Each `RollRecord` carries its `commandId`,
