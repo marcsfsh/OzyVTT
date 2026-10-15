@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { migrate, openDatabase, type Migration } from "./database.js";
+import { InvalidRequestError } from "./invalid-request.js";
 
 /** `hidden` is the GM's curation flag: a token the shared library does not offer players (spoiler art).
  *  Not an approval queue; players still pick from what is offered and upload their own freely. */
@@ -24,13 +25,13 @@ const ASSET_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const DEFINITION_ID = /^[a-z0-9-]+$/;
 
 function assetId(value: string) {
-  if (!ASSET_ID.test(value)) throw new Error("Token asset ID is malformed.");
+  if (!ASSET_ID.test(value)) throw new InvalidRequestError("Token asset ID is malformed.");
   return value;
 }
 function tokenName(value: string) {
   const name = value.trim();
   if (!name || name.length > 120 || /[\u0000-\u001f\u007f]/.test(name))
-    throw new Error("Token name must contain 1 to 120 printable characters.");
+    throw new InvalidRequestError("Token name must contain 1 to 120 printable characters.");
   return name;
 }
 /** One flat level of folders: a printable label with no slashes. Empty/undefined means "unfiled". */
@@ -39,7 +40,7 @@ export function tokenFolder(value: string | null | undefined): string | null {
   const folder = value.trim();
   if (folder === "") return null;
   if (folder.length > 60 || folder.includes("/") || /[\u0000-\u001f\u007f]/.test(folder))
-    throw new Error("Folder must be one level: up to 60 printable characters, no slashes.");
+    throw new InvalidRequestError("Folder must be one level: up to 60 printable characters, no slashes.");
   return folder;
 }
 
@@ -112,7 +113,7 @@ export class TokenCatalogStore {
 
   updateDetails(assetIdInput: string, input: Readonly<{ name?: string; folder?: string | null; hidden?: boolean }>) {
     const existing = this.get(assetIdInput);
-    if (!existing) throw new Error("Token asset is not registered.");
+    if (!existing) throw new InvalidRequestError("Token asset is not registered.");
     const name = input.name === undefined ? existing.name : tokenName(input.name);
     const folder = input.folder === undefined ? existing.folder : tokenFolder(input.folder);
     const hidden = input.hidden === undefined ? existing.hidden : input.hidden;
@@ -133,7 +134,7 @@ export class TokenCatalogStore {
 
   renameFolder(from: string, to: string | null) {
     const source = tokenFolder(from);
-    if (source === null) throw new Error("Choose a folder to rename.");
+    if (source === null) throw new InvalidRequestError("Choose a folder to rename.");
     this.requireDatabase().prepare("UPDATE token_catalog SET folder = ? WHERE folder = ?").run(tokenFolder(to), source);
   }
 

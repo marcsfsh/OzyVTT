@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { InvalidRequestError } from "./invalid-request.js";
 
 export type MapImageFormat = "png" | "jpeg" | "webp" | "gif" | "bmp";
 export type MapImageInspection = Readonly<{
@@ -52,7 +53,8 @@ function ascii(buffer: Buffer, start: number, end: number) {
 
 function inspectPng(buffer: Buffer): MapImageInspection | null {
   if (!matches(buffer, PNG_SIGNATURE)) return null;
-  if (buffer.length < 24 || ascii(buffer, 12, 16) !== "IHDR") throw new Error("PNG is missing a valid IHDR header.");
+  if (buffer.length < 24 || ascii(buffer, 12, 16) !== "IHDR")
+    throw new InvalidRequestError("PNG is missing a valid IHDR header.");
   return {
     format: "png",
     mediaType: "image/png",
@@ -74,9 +76,10 @@ function inspectJpeg(buffer: Buffer): MapImageInspection | null {
     if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
     if (offset + 2 > buffer.length) break;
     const length = buffer.readUInt16BE(offset);
-    if (length < 2 || offset + length > buffer.length) throw new Error("JPEG contains a malformed segment length.");
+    if (length < 2 || offset + length > buffer.length)
+      throw new InvalidRequestError("JPEG contains a malformed segment length.");
     if (JPEG_SOF.has(marker)) {
-      if (length < 7) throw new Error("JPEG frame header is incomplete.");
+      if (length < 7) throw new InvalidRequestError("JPEG frame header is incomplete.");
       return {
         format: "jpeg",
         mediaType: "image/jpeg",
@@ -89,7 +92,7 @@ function inspectJpeg(buffer: Buffer): MapImageInspection | null {
     }
     offset += length;
   }
-  throw new Error("JPEG dimensions could not be read from a supported frame header.");
+  throw new InvalidRequestError("JPEG dimensions could not be read from a supported frame header.");
 }
 
 function uint24le(buffer: Buffer, offset: number) {
@@ -109,7 +112,7 @@ function inspectWebp(buffer: Buffer): MapImageInspection | null {
       animated: (buffer[20] & 0x02) !== 0
     };
   if (chunk === "VP8L") {
-    if (buffer[20] !== 0x2f || buffer.length < 25) throw new Error("WebP lossless header is malformed.");
+    if (buffer[20] !== 0x2f || buffer.length < 25) throw new InvalidRequestError("WebP lossless header is malformed.");
     const width = 1 + buffer[21] + ((buffer[22] & 0x3f) << 8);
     const height = 1 + ((buffer[22] & 0xc0) >> 6) + (buffer[23] << 2) + ((buffer[24] & 0x0f) << 10);
     return {
@@ -124,7 +127,7 @@ function inspectWebp(buffer: Buffer): MapImageInspection | null {
   }
   if (chunk === "VP8 ") {
     if (buffer.length < 30 || buffer[23] !== 0x9d || buffer[24] !== 0x01 || buffer[25] !== 0x2a)
-      throw new Error("WebP lossy frame header is malformed.");
+      throw new InvalidRequestError("WebP lossy frame header is malformed.");
     return {
       format: "webp",
       mediaType: "image/webp",
@@ -135,13 +138,13 @@ function inspectWebp(buffer: Buffer): MapImageInspection | null {
       animated: false
     };
   }
-  throw new Error("WebP uses an unsupported frame header.");
+  throw new InvalidRequestError("WebP uses an unsupported frame header.");
 }
 
 function inspectGif(buffer: Buffer): MapImageInspection | null {
   const header = ascii(buffer, 0, 6);
   if (header !== "GIF87a" && header !== "GIF89a") return null;
-  if (buffer.length < 10) throw new Error("GIF logical screen descriptor is incomplete.");
+  if (buffer.length < 10) throw new InvalidRequestError("GIF logical screen descriptor is incomplete.");
   let frames = 0;
   for (let index = 10; index < buffer.length && frames < 2; index++) if (buffer[index] === 0x2c) frames++;
   return {
@@ -168,7 +171,7 @@ function inspectBmp(buffer: Buffer): MapImageInspection | null {
       byteLength: buffer.length,
       animated: false
     };
-  if (dibSize < 40 || buffer.length < 26) throw new Error("BMP uses an unsupported information header.");
+  if (dibSize < 40 || buffer.length < 26) throw new InvalidRequestError("BMP uses an unsupported information header.");
   return {
     format: "bmp",
     mediaType: "image/bmp",
@@ -183,12 +186,12 @@ function inspectBmp(buffer: Buffer): MapImageInspection | null {
 export function inspectMapImage(input: Uint8Array, policy: MapImagePolicy = {}): MapImageInspection {
   const buffer = Buffer.from(input);
   const maxBytes = policy.maxBytes ?? DEFAULT_MAX_BYTES;
-  if (buffer.length === 0) throw new Error("Map image is empty.");
-  if (buffer.length > maxBytes) throw new Error(`Map image exceeds the ${maxBytes} byte upload limit.`);
+  if (buffer.length === 0) throw new InvalidRequestError("Map image is empty.");
+  if (buffer.length > maxBytes) throw new InvalidRequestError(`Map image exceeds the ${maxBytes} byte upload limit.`);
   const inspection =
     inspectPng(buffer) ?? inspectJpeg(buffer) ?? inspectWebp(buffer) ?? inspectGif(buffer) ?? inspectBmp(buffer);
   if (!inspection)
-    throw new Error(
+    throw new InvalidRequestError(
       "Unsupported map image. Use a valid PNG, JPEG, WebP, GIF, or BMP; additional normalized formats are planned."
     );
   if (
@@ -197,15 +200,15 @@ export function inspectMapImage(input: Uint8Array, policy: MapImagePolicy = {}):
     inspection.width < 1 ||
     inspection.height < 1
   )
-    throw new Error("Map image dimensions are invalid.");
+    throw new InvalidRequestError("Map image dimensions are invalid.");
   const maxDimension = policy.maxDimensionPx ?? DEFAULT_MAX_DIMENSION;
   if (inspection.width > maxDimension || inspection.height > maxDimension)
-    throw new Error(`Map image dimensions exceed the ${maxDimension} pixel limit.`);
+    throw new InvalidRequestError(`Map image dimensions exceed the ${maxDimension} pixel limit.`);
   const maxPixels = policy.maxPixels ?? DEFAULT_MAX_PIXELS;
   if (inspection.width * inspection.height > maxPixels)
-    throw new Error(`Map image exceeds the ${maxPixels} pixel safety limit.`);
+    throw new InvalidRequestError(`Map image exceeds the ${maxPixels} pixel safety limit.`);
   if (inspection.animated && !policy.allowAnimation)
-    throw new Error("Animated maps require an explicit frame-selection or flattening step.");
+    throw new InvalidRequestError("Animated maps require an explicit frame-selection or flattening step.");
   return inspection;
 }
 

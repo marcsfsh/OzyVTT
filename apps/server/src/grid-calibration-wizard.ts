@@ -10,6 +10,7 @@ import {
   type ImagePoint,
   type SquareGridCalibration
 } from "./grid-calibration.js";
+import { InvalidRequestError } from "./invalid-request.js";
 
 export type GridCalibrationWizardStep = "measure" | "refine" | "verify" | "complete";
 
@@ -45,17 +46,19 @@ export type WizardCalibrationAdjustment = Readonly<{
 const MAX_HISTORY = 50;
 
 function positiveFinite(value: number, label: string) {
-  if (!Number.isFinite(value) || value <= 0) throw new Error(`${label} must be a positive finite number.`);
+  if (!Number.isFinite(value) || value <= 0)
+    throw new InvalidRequestError(`${label} must be a positive finite number.`);
   return value;
 }
 
 function active(state: GridCalibrationWizardState) {
   if (state.step === "complete")
-    throw new Error("Completed grid calibration must be reopened before it can be changed.");
+    throw new InvalidRequestError("Completed grid calibration must be reopened before it can be changed.");
 }
 
 function calibrationFrom(state: GridCalibrationWizardState) {
-  if (!state.calibration) throw new Error("Measure a known grid span before refining or verifying the grid.");
+  if (!state.calibration)
+    throw new InvalidRequestError("Measure a known grid span before refining or verifying the grid.");
   return state.calibration;
 }
 
@@ -71,7 +74,7 @@ export function createGridCalibrationWizard(
   input: Readonly<{ assetId: string; mapWidthPx: number; mapHeightPx: number }>
 ): GridCalibrationWizardState {
   const assetId = input.assetId.trim();
-  if (!assetId) throw new Error("A map asset ID is required.");
+  if (!assetId) throw new InvalidRequestError("A map asset ID is required.");
   return {
     schemaVersion: 1,
     assetId,
@@ -209,7 +212,7 @@ export function verifyWizardIntersection(
     imagePoint.y < 0 ||
     imagePoint.y > state.mapHeightPx
   ) {
-    throw new Error("Verification point must be inside the map bounds.");
+    throw new InvalidRequestError("Verification point must be inside the map bounds.");
   }
   const tolerance = tolerancePx ?? Math.min(8, Math.max(2, calibration.cellSizePx * 0.08));
   positiveFinite(tolerance, "Verification tolerance");

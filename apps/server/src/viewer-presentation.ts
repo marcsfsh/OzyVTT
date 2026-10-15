@@ -1,4 +1,5 @@
 import type { ImagePoint } from "./grid-calibration.js";
+import { InvalidRequestError } from "./invalid-request.js";
 
 export type ViewerCamera = Readonly<{
   center: ImagePoint;
@@ -142,25 +143,27 @@ const MAX_PING_DURATION_MS = 30_000;
 function safeText(value: string, label: string, maximum: number, allowEmpty = false) {
   const text = value.trim();
   if ((!allowEmpty && !text) || text.length > maximum || /[\u0000-\u001f\u007f]/.test(text))
-    throw new Error(`${label} must contain ${allowEmpty ? "0" : "1"} to ${maximum} printable characters.`);
+    throw new InvalidRequestError(
+      `${label} must contain ${allowEmpty ? "0" : "1"} to ${maximum} printable characters.`
+    );
   return text;
 }
 
 function point(value: ImagePoint, label: string) {
   if (!Number.isFinite(value.x) || !Number.isFinite(value.y))
-    throw new Error(`${label} must contain finite coordinates.`);
+    throw new InvalidRequestError(`${label} must contain finite coordinates.`);
   return { x: value.x, y: value.y };
 }
 
 function camera(value: ViewerCamera) {
   if (!Number.isFinite(value.zoom) || value.zoom < 0.01 || value.zoom > 64)
-    throw new Error("Viewer camera zoom must be between 0.01 and 64.");
+    throw new InvalidRequestError("Viewer camera zoom must be between 0.01 and 64.");
   return { center: point(value.center, "Viewer camera center"), zoom: value.zoom };
 }
 
 function measurement(value: ViewerMeasurement): ViewerMeasurement {
   if (value.points.length < 2 || value.points.length > 1_000)
-    throw new Error("Viewer measurement requires 2 to 1,000 points.");
+    throw new InvalidRequestError("Viewer measurement requires 2 to 1,000 points.");
   return {
     id: safeText(value.id, "Measurement ID", 128),
     points: value.points.map((item, index) => point(item, `Measurement point ${index + 1}`)),
@@ -170,15 +173,15 @@ function measurement(value: ViewerMeasurement): ViewerMeasurement {
 
 function initiative(value: ViewerInitiative): ViewerInitiative {
   if (!Number.isInteger(value.round) || value.round < 0)
-    throw new Error("Initiative round must be a non-negative integer.");
-  if (value.entries.length > 200) throw new Error("Viewer initiative cannot exceed 200 entries.");
+    throw new InvalidRequestError("Initiative round must be a non-negative integer.");
+  if (value.entries.length > 200) throw new InvalidRequestError("Viewer initiative cannot exceed 200 entries.");
   const actorIds = new Set<string>();
   let activeEntries = 0;
   const entries = value.entries.map((entry) => {
     const actorId = safeText(entry.actorId, "Initiative actor ID", 128);
-    if (actorIds.has(actorId)) throw new Error("Viewer initiative actor IDs must be unique.");
+    if (actorIds.has(actorId)) throw new InvalidRequestError("Viewer initiative actor IDs must be unique.");
     actorIds.add(actorId);
-    if (!Number.isFinite(entry.initiative)) throw new Error("Initiative value must be finite.");
+    if (!Number.isFinite(entry.initiative)) throw new InvalidRequestError("Initiative value must be finite.");
     if (entry.active) activeEntries++;
     return {
       actorId,
@@ -190,10 +193,10 @@ function initiative(value: ViewerInitiative): ViewerInitiative {
       ...(entry.conditionIds ? { conditionIds: conditionIdList(entry.conditionIds) } : {})
     };
   });
-  if (activeEntries > 1) throw new Error("Viewer initiative can have at most one active entry.");
+  if (activeEntries > 1) throw new InvalidRequestError("Viewer initiative can have at most one active entry.");
   const hiddenTurn = value.hiddenTurn ?? false;
   if (hiddenTurn && activeEntries > 0)
-    throw new Error("Viewer initiative cannot expose a public active entry during a hidden turn.");
+    throw new InvalidRequestError("Viewer initiative cannot expose a public active entry during a hidden turn.");
   return { visible: value.visible, round: value.round, hiddenTurn, entries };
 }
 
@@ -210,7 +213,8 @@ function conditionIdList(value: unknown): readonly string[] {
   if (!Array.isArray(value)) return [];
   return value.slice(0, 20).map((id) => {
     const text = String(id);
-    if (!/^[a-z0-9-]{1,60}$/.test(text)) throw new Error("Condition ids must be lowercase content-bundle slugs.");
+    if (!/^[a-z0-9-]{1,60}$/.test(text))
+      throw new InvalidRequestError("Condition ids must be lowercase content-bundle slugs.");
     return text;
   });
 }
@@ -218,23 +222,23 @@ function conditionIdList(value: unknown): readonly string[] {
 /** Only the bar/ring/aura styles are ever sent; band is a table-client fallback. */
 function healthDisplayStyle(value: unknown): "bar" | "ring" | "aura" {
   if (value === "bar" || value === "ring" || value === "aura") return value;
-  throw new Error('Viewer token health display style must be "bar" or "ring".');
+  throw new InvalidRequestError('Viewer token health display style must be "bar" or "ring".');
 }
 
 function encounter(value: ViewerEncounterScene): ViewerEncounterScene {
   const mapAssetId = value.mapAssetId === null ? null : safeText(value.mapAssetId, "Encounter map asset ID", 128);
-  if (value.tokens.length > 200) throw new Error("Viewer encounter cannot exceed 200 tokens.");
+  if (value.tokens.length > 200) throw new InvalidRequestError("Viewer encounter cannot exceed 200 tokens.");
   const actorIds = new Set<string>();
   let activeTokens = 0;
   const tokens = value.tokens.map((token) => {
     const actorId = safeText(token.actorId, "Viewer token actor ID", 128);
-    if (actorIds.has(actorId)) throw new Error("Viewer token actor IDs must be unique.");
+    if (actorIds.has(actorId)) throw new InvalidRequestError("Viewer token actor IDs must be unique.");
     actorIds.add(actorId);
     if (token.active) activeTokens++;
     if (token.kind !== "player-character" && token.kind !== "monster" && token.kind !== "npc")
-      throw new Error("Viewer token kind is invalid.");
+      throw new InvalidRequestError("Viewer token kind is invalid.");
     if (!Number.isFinite(token.sizePx) || token.sizePx <= 0 || token.sizePx > 4096)
-      throw new Error("Viewer token size is invalid.");
+      throw new InvalidRequestError("Viewer token size is invalid.");
     return {
       actorId,
       name: safeText(token.name, "Viewer token name", 120),
@@ -248,23 +252,24 @@ function encounter(value: ViewerEncounterScene): ViewerEncounterScene {
       ...(token.healthDisplay ? { healthDisplay: { style: healthDisplayStyle(token.healthDisplay.style) } } : {})
     };
   });
-  if (activeTokens > 1) throw new Error("Viewer encounter can have at most one active token.");
-  if (mapAssetId === null && tokens.length) throw new Error("Viewer tokens require an active encounter map.");
+  if (activeTokens > 1) throw new InvalidRequestError("Viewer encounter can have at most one active token.");
+  if (mapAssetId === null && tokens.length)
+    throw new InvalidRequestError("Viewer tokens require an active encounter map.");
   const rawAnnotations = value.annotations ?? [];
-  if (rawAnnotations.length > 300) throw new Error("Viewer encounter cannot exceed 300 annotations.");
+  if (rawAnnotations.length > 300) throw new InvalidRequestError("Viewer encounter cannot exceed 300 annotations.");
   const annotationIds = new Set<string>();
   const annotations = rawAnnotations.map((annotation) => {
     const id = safeText(annotation.id, "Viewer annotation ID", 128);
-    if (annotationIds.has(id)) throw new Error("Viewer annotation IDs must be unique.");
+    if (annotationIds.has(id)) throw new InvalidRequestError("Viewer annotation IDs must be unique.");
     annotationIds.add(id);
     if (annotation.kind !== "measurement" && annotation.kind !== "shape" && annotation.kind !== "ping")
-      throw new Error("Viewer annotation kind is invalid.");
+      throw new InvalidRequestError("Viewer annotation kind is invalid.");
     if (annotation.shape !== null && !(["circle", "cone", "line", "square"] as const).includes(annotation.shape))
-      throw new Error("Viewer annotation shape is invalid.");
+      throw new InvalidRequestError("Viewer annotation shape is invalid.");
     if (!Number.isFinite(annotation.sizeFeet) || annotation.sizeFeet < 0 || annotation.sizeFeet > 100_000)
-      throw new Error("Viewer annotation size is invalid.");
+      throw new InvalidRequestError("Viewer annotation size is invalid.");
     if (typeof annotation.color !== "string" || !/^#[0-9a-fA-F]{6}$/.test(annotation.color))
-      throw new Error("Viewer annotation color is invalid.");
+      throw new InvalidRequestError("Viewer annotation color is invalid.");
     const label =
       annotation.label === null || annotation.label === undefined
         ? null
@@ -280,20 +285,22 @@ function encounter(value: ViewerEncounterScene): ViewerEncounterScene {
       label
     };
   });
-  if (mapAssetId === null && annotations.length) throw new Error("Viewer annotations require an active encounter map.");
+  if (mapAssetId === null && annotations.length)
+    throw new InvalidRequestError("Viewer annotations require an active encounter map.");
   const fog = value.fog === undefined ? undefined : sanitizedFog(value.fog);
   return { mapAssetId, tokens, annotations, ...(fog ? { fog } : {}) };
 }
 
 function sanitizedFog(value: ViewerFog): ViewerFog {
-  if (typeof value.enabled !== "boolean") throw new Error("Viewer fog enabled flag is invalid.");
+  if (typeof value.enabled !== "boolean") throw new InvalidRequestError("Viewer fog enabled flag is invalid.");
   const rawShapes = value.shapes ?? [];
-  if (rawShapes.length > 200) throw new Error("Viewer fog cannot exceed 200 shapes.");
+  if (rawShapes.length > 200) throw new InvalidRequestError("Viewer fog cannot exceed 200 shapes.");
   const shapes = rawShapes.map((shape) => {
     if (shape.kind !== "rect" || (shape.op !== "reveal" && shape.op !== "hide"))
-      throw new Error("Viewer fog shape is invalid.");
+      throw new InvalidRequestError("Viewer fog shape is invalid.");
     for (const bound of [shape.x, shape.y, shape.width, shape.height])
-      if (!Number.isFinite(bound) || bound < 0 || bound > 1_000_000) throw new Error("Viewer fog geometry is invalid.");
+      if (!Number.isFinite(bound) || bound < 0 || bound > 1_000_000)
+        throw new InvalidRequestError("Viewer fog geometry is invalid.");
     return {
       kind: "rect" as const,
       id: safeText(shape.id, "Viewer fog shape ID", 128),
@@ -357,17 +364,19 @@ export function applyViewerCommand(state: ViewerPresentationState, command: View
       pings: []
     };
   else if (payload.type === "viewer.camera.set") {
-    if (!state.activeMap) throw new Error("Select a viewer map before moving its camera.");
+    if (!state.activeMap) throw new InvalidRequestError("Select a viewer map before moving its camera.");
     next = { ...state, camera: camera(payload.camera) };
   } else if (payload.type === "viewer.measurement.set") {
-    if (!state.activeMap) throw new Error("Select a viewer map before showing a measurement.");
+    if (!state.activeMap) throw new InvalidRequestError("Select a viewer map before showing a measurement.");
     next = { ...state, measurement: measurement(payload.measurement) };
   } else if (payload.type === "viewer.measurement.clear") next = { ...state, measurement: null };
   else if (payload.type === "viewer.ping") {
-    if (!state.activeMap) throw new Error("Select a viewer map before showing a ping.");
+    if (!state.activeMap) throw new InvalidRequestError("Select a viewer map before showing a ping.");
     const durationMs = payload.durationMs ?? DEFAULT_PING_DURATION_MS;
     if (!Number.isInteger(durationMs) || durationMs < 250 || durationMs > MAX_PING_DURATION_MS)
-      throw new Error(`Viewer ping duration must be an integer from 250 to ${MAX_PING_DURATION_MS} milliseconds.`);
+      throw new InvalidRequestError(
+        `Viewer ping duration must be an integer from 250 to ${MAX_PING_DURATION_MS} milliseconds.`
+      );
     const ping: ViewerPing = {
       id: safeText(payload.id, "Ping ID", 128),
       point: point(payload.point, "Ping point"),

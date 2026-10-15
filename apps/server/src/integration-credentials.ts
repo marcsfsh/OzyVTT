@@ -8,6 +8,7 @@ import {
 } from "@vtt/api-contract";
 import { z } from "zod";
 import { migrate, openDatabase, transaction, type Migration } from "./database.js";
+import { InvalidRequestError } from "./invalid-request.js";
 
 const TOKEN_PREFIX = "vtt_int_";
 /**
@@ -126,7 +127,7 @@ export class IntegrationCredentialStore {
     const parsed = CreateCredentialSchema.parse(input);
     const now = this.timestamp();
     if (parsed.expiresAt && Date.parse(parsed.expiresAt) <= this.now())
-      throw new Error("Credential expiration must be in the future.");
+      throw new InvalidRequestError("Credential expiration must be in the future.");
     const id = randomUUID();
     const secret = randomBytes(32).toString("base64url");
     const database = this.requireDatabase();
@@ -216,7 +217,7 @@ export class IntegrationCredentialStore {
     if (!row || row.revoked_at) return null;
     const resolvedExpiration = expiresAt === undefined ? row.expires_at : expiresAt;
     if (resolvedExpiration && Date.parse(resolvedExpiration) <= this.now())
-      throw new Error("Credential expiration must be in the future.");
+      throw new InvalidRequestError("Credential expiration must be in the future.");
     const secret = randomBytes(32).toString("base64url");
     const now = this.timestamp();
     const database = this.requireDatabase();
