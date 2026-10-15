@@ -99,7 +99,13 @@ export {
   IconStar,
   IconWarning,
   IconTrash,
-  IconCopy
+  IconCopy,
+  IconRepeat,
+  IconPlug,
+  IconDockLeft,
+  IconDockRight,
+  IconDockSidebar,
+  IconSparkle
 } from "./primitives/icons";
 export { Combobox, type ComboboxProps, type ComboboxOption } from "./primitives/Combobox";
 // The editor's two pure rules, exported for direct testing.

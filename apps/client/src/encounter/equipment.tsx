@@ -318,7 +318,7 @@ export function EquipmentPicker({
       ariaLabel="Browse the SRD equipment catalog"
     >
       <div className="sheet-picker-controls">
-        <input
+        <Input
           type="search"
           className="sheet-picker-search"
           value={query}

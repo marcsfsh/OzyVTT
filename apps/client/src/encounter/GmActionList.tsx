@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ContentActionSummary, GmActor, GmView } from "@vtt/domain";
+import { IconChevron, IconSparkle } from "@vtt/ui";
 import { ActionRow } from "./ActionRow";
 import { actionSummaryParts, tagLabel } from "./action-summary";
 import { RichText } from "./RichText";
@@ -145,7 +146,7 @@ export function GmActionList({
                   aria-expanded={moreBuiltins}
                   onClick={() => setMoreBuiltins((current) => !current)}
                 >
-                  {moreBuiltins ? "Less ▴" : `More ▾`}
+                  {moreBuiltins ? "Less" : "More"} <IconChevron className="builtin-more-caret" />
                 </button>
               )}
             </div>
@@ -154,7 +155,7 @@ export function GmActionList({
       {spellcasting && (
         <div className="action-spellcasting" role="group" aria-label="Spellcasting">
           <div className="action-spellcasting-head">
-            <span aria-hidden="true">✦</span> <strong>{spellcasting.name}</strong>
+            <IconSparkle /> <strong>{spellcasting.name}</strong>
           </div>
           <SpellcastingText text={spellcasting.description} />
         </div>

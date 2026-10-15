@@ -68,7 +68,16 @@
 /* Solid border: dashed edges mean a state (at will vs prepared) elsewhere in this file, not a
    secondary control. */
 .builtin-more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   color: var(--text-muted);
+}
+.builtin-more-caret {
+  transition: transform var(--dur-hover) var(--ease-settle);
+}
+.builtin-more[aria-expanded="true"] .builtin-more-caret {
+  transform: rotate(180deg);
 }
 
 .legendary-strip {

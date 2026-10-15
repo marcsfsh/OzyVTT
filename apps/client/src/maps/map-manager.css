@@ -434,6 +434,16 @@
   padding-inline: var(--space-2);
   font-size: var(--fs-sm);
 }
+/* One arrow icon, turned to the direction each nudge moves the overlay. */
+.map-nudge-left {
+  transform: rotate(180deg);
+}
+.map-nudge-up {
+  transform: rotate(-90deg);
+}
+.map-nudge-down {
+  transform: rotate(90deg);
+}
 .wizard-fields {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));

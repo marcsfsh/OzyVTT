@@ -1,7 +1,7 @@
 import type { ComponentType, ReactNode } from "react";
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import { cx } from "./util";
-import { IconCheck, IconInfo, IconWarning } from "./icons";
+import { IconCheck, IconInfo, IconWarning, IconX } from "./icons";
 import "./Toast.css";
 
 export type ToastTone = "success" | "error" | "info";
@@ -87,7 +87,7 @@ export function ToastProvider({ children, duration = 3200 }: { children: ReactNo
                 aria-label="Dismiss"
                 onClick={() => dismiss(t.id)}
               >
-                ✕
+                <IconX />
               </button>
             </div>
           );

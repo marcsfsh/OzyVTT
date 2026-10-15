@@ -337,3 +337,95 @@ export function IconStar({ className }: Readonly<{ className?: string }>) {
     </Glyph>
   );
 }
+
+/** Again: repeat the action just taken. */
+export function IconRepeat({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M18.7 12a6.7 6.7 0 1 1-2-4.8" fill="none" stroke="currentColor" strokeWidth="2.8" />
+      <path d="M21 3v7.2h-7.2z" />
+    </Glyph>
+  );
+}
+
+/** Integrations: a credential another tool plugs into the game with. */
+export function IconPlug({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M8 2h2.8v5H8zm5.2 0H16v5h-2.8z" />
+      <path d="M5.5 7h13v4.2a5.5 5.5 0 0 1-5.1 5.5V22h-2.8v-5.3a5.5 5.5 0 0 1-5.1-5.5z" />
+    </Glyph>
+  );
+}
+
+/* The dock marks: a frame with the shaded part where the panel goes. */
+const DOCK_FRAME = "M3 3h18v18H3zm2.8 2.8v12.4h12.4V5.8z";
+
+/** Dock the panel on the map's left edge. */
+export function IconDockLeft({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path fillRule="evenodd" d={DOCK_FRAME} />
+      <path d="M3 3h9v18H3z" />
+    </Glyph>
+  );
+}
+
+/** Dock the panel on the map's right edge. */
+export function IconDockRight({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path fillRule="evenodd" d={DOCK_FRAME} />
+      <path d="M12 3h9v18h-9z" />
+    </Glyph>
+  );
+}
+
+/** Put the panel back in its own column beside the map. */
+export function IconDockSidebar({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path fillRule="evenodd" d={DOCK_FRAME} />
+      <path d="M14.2 3H17v18h-2.8z" />
+    </Glyph>
+  );
+}
+
+/** Spellcasting: a spell or a spell-like ability. */
+export function IconSparkle({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M12 2.5 14.2 9.8 21.5 12l-7.3 2.2L12 21.5l-2.2-7.3L2.5 12l7.3-2.2z" />
+    </Glyph>
+  );
+}
+
+/* The theme marks: how much of the disc is dark. */
+const THEME_RING =
+  "M12 2.6a9.4 9.4 0 1 0 0 18.8 9.4 9.4 0 0 0 0-18.8zm0 2.8a6.6 6.6 0 1 1 0 13.2 6.6 6.6 0 0 1 0-13.2z";
+
+export function IconThemeDark({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path fillRule="evenodd" d={THEME_RING} />
+      <path d="M12 2.6a9.4 9.4 0 0 1 0 18.8z" />
+    </Glyph>
+  );
+}
+
+export function IconThemeDusk({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path fillRule="evenodd" d={THEME_RING} />
+      <path d="M12 2.6a9.4 9.4 0 0 0 0 18.8z" />
+    </Glyph>
+  );
+}
+
+export function IconThemeLight({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path fillRule="evenodd" d={THEME_RING} />
+    </Glyph>
+  );
+}

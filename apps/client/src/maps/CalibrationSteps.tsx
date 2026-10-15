@@ -1,4 +1,5 @@
-import { Button, ChoiceGrid, Input } from "@vtt/ui";
+import type { ReactNode } from "react";
+import { Button, ChoiceGrid, IconArrow, Input } from "@vtt/ui";
 import { CrosshairControls, type Crosshair } from "./calibration-overlays";
 import type { MapKind, Point } from "./map-catalog";
 
@@ -161,7 +162,7 @@ export function TuneGridStep({
   onPointChange: (index: number, coordinate: "x" | "y", value: number) => void;
   onRemeasure: () => void;
 }>) {
-  const nudge = (adjustment: Record<string, unknown>, label: string) => (
+  const nudge = (adjustment: Record<string, unknown>, label: ReactNode) => (
     <Button variant="secondary" block disabled={busy} onClick={() => onAction({ action: "adjust", adjustment })}>
       {label}
     </Button>
@@ -178,10 +179,30 @@ export function TuneGridStep({
       <div className="adjustment-groups">
         <fieldset>
           <legend>Move overlay</legend>
-          {nudge({ originDelta: { x: -1, y: 0 } }, "← Left")}
-          {nudge({ originDelta: { x: 1, y: 0 } }, "Right →")}
-          {nudge({ originDelta: { x: 0, y: -1 } }, "↑ Up")}
-          {nudge({ originDelta: { x: 0, y: 1 } }, "Down ↓")}
+          {nudge(
+            { originDelta: { x: -1, y: 0 } },
+            <>
+              <IconArrow className="map-nudge-left" /> Left
+            </>
+          )}
+          {nudge(
+            { originDelta: { x: 1, y: 0 } },
+            <>
+              Right <IconArrow />
+            </>
+          )}
+          {nudge(
+            { originDelta: { x: 0, y: -1 } },
+            <>
+              <IconArrow className="map-nudge-up" /> Up
+            </>
+          )}
+          {nudge(
+            { originDelta: { x: 0, y: 1 } },
+            <>
+              Down <IconArrow className="map-nudge-down" />
+            </>
+          )}
         </fieldset>
         <fieldset>
           <legend>Square size</legend>

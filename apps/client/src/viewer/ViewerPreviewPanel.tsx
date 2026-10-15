@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { IconX } from "@vtt/ui";
 import { apiRequest } from "../lib/api";
 import "./viewer-preview.css";
 
@@ -74,8 +75,13 @@ export function ViewerPreviewPanel({ gmToken, onClose }: Readonly<{ gmToken: str
         <button type="button" className="viewer-preview-action" onClick={popOut}>
           Pop out
         </button>
-        <button type="button" className="viewer-preview-close" aria-label="Close viewer preview" onClick={onClose}>
-          ✕
+        <button
+          type="button"
+          className="viewer-preview-close tap-target"
+          aria-label="Close viewer preview"
+          onClick={onClose}
+        >
+          <IconX />
         </button>
       </div>
       <div className="viewer-preview-body">

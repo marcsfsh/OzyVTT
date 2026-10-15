@@ -5,7 +5,7 @@ import {
   type IntegrationCredentialMetadata,
   type IntegrationScope
 } from "@vtt/api-contract";
-import { Button, Input } from "@vtt/ui";
+import { Button, Eyebrow, IconPlug, Input } from "@vtt/ui";
 import { ApiReference } from "./ApiReference";
 import { useConfirm } from "../components/feedback";
 import { apiRequest } from "../lib/api";
@@ -154,7 +154,7 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
     <section className="integrations" aria-labelledby="integrations-heading">
       <div className="roster-heading">
         <div>
-          <span className="eyebrow">GM INTEGRATIONS</span>
+          <Eyebrow>GM INTEGRATIONS</Eyebrow>
           <h2 id="integrations-heading">Scoped API credentials.</h2>
         </div>
         <p>
@@ -220,7 +220,7 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
       {credentials.length === 0 ? (
         <div className="nh-empty">
           <span className="nh-empty-icon" aria-hidden="true">
-            🔌
+            <IconPlug />
           </span>
           <span className="nh-empty-title">Issue your first credential</span>
           <span className="nh-empty-text">

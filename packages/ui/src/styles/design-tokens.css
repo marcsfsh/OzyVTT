@@ -675,7 +675,7 @@ summary {
   transform: translateY(0);
 }
 
-/* Forward-nav nudge: put <span class="nav-arrow">→</span> at the end of the label. `color: inherit` is
+/* Forward-nav nudge: end the label with `<IconArrow className="nav-arrow" />`. `color: inherit` is
    needed because the client's `button span { color: var(--text-dim) }` would otherwise paint the arrow
    unreadably on a primary button's fill. */
 .nav-arrow {

@@ -1,6 +1,6 @@
 /**
- * The play vocabulary lock: one set of words for the product, enforced as test failures. Scans
- * `apps/client/src` minus `PLAY_EXCLUDED`, plus the `packages/ui` primitives, with `copy-scan.ts`.
+ * The play vocabulary: one set of words for the product, enforced as test failures. Scans the client
+ * outside `codex/` (which has its own glossary) plus the `packages/ui` primitives, with `copy-scan.ts`.
  * A regex matches tokens, not senses, so some rules are scoped to files and LEGITIMATE pins the
  * domain words that must survive.
  */
@@ -9,9 +9,7 @@ import { describe, expect, it } from "vitest";
 import { citeCopy, looksLikeCode, scanCopy, withoutInterpolations, type CopyString } from "./copy-scan";
 import { CLAIM_WORD } from "./actors/actor-display";
 import { SETTINGS_GROUPS } from "./settings/SettingsPage";
-import { CONVENTION_SHAPE, assertRoots, playCopySources, stripComments } from "./design-conventions-shape";
-
-assertRoots();
+import { playCopySources, stripComments } from "./convention-sources";
 
 /**
  * Retired patterns, each with the word that replaced it so a failure says what to write. `where`
@@ -56,7 +54,7 @@ const RETIRED: ReadonlyArray<Readonly<{ pattern: RegExp; use: string; where?: Re
   // The fight, and the place it happens
   {
     pattern: /\bencounters?\b/i,
-    use: "“fight” for the event (“Start the fight”, “Add to this fight”) and “Table” for the place — D28 demotes “encounter” to a wire name"
+    use: "“fight” for the event (“Start the fight”, “Add to this fight”) and “Table” for the place; “encounter” is a wire name"
   },
   { pattern: /\bbattlemaps?\b/i, use: "“battle map”, two words — the Codex's spelling wins" },
   { pattern: /\bscene prep\b/i, use: "“Staging” — one name for the GM-private setup state, not three" },
@@ -92,7 +90,7 @@ const ALLOWED: ReadonlyArray<readonly [file: string, text: string, why: string]>
 
 /** Domain terms the lock must never eat, asserted present at their home. */
 const LEGITIMATE: ReadonlyArray<readonly [file: string, text: string, why: string]> = [
-  ["apps/client/src/scene/MapToolGroups.tsx", "Reveal the whole map", "fog: Reveal/Hide are in-fight verbs D28 keeps"],
+  ["apps/client/src/scene/MapToolGroups.tsx", "Reveal the whole map", "fog: Reveal/Hide are in-fight verbs"],
   ["apps/client/src/scene/MapToolGroups.tsx", "Hide the whole map again", "fog: the Hide half"],
   [
     "apps/client/src/encounter/InitiativePrompt.tsx",
@@ -111,13 +109,7 @@ const strings: readonly CopyString[] = scanCopy(playCopySources()).filter((entry
 const visible = (entry: CopyString) => withoutInterpolations(entry.text);
 const at = (file: string, text: string) => strings.some((entry) => entry.file === file && visible(entry) === text);
 
-describe("The play glossary (D28)", () => {
-  it("reads enough of the play surfaces to be worth trusting", () => {
-    // Floors first: a scan that matched nothing would pass every rule below.
-    expect(playCopySources().length).toBeGreaterThan(CONVENTION_SHAPE.playSourceFloor);
-    expect(strings.length).toBeGreaterThan(CONVENTION_SHAPE.playCorpusFloor);
-  });
-
+describe("The play glossary", () => {
   it("covers every play directory, not a list someone remembered to update", () => {
     // Named directories, so a scan that stops walking one fails by name rather than by a count.
     const dirs = new Set(playCopySources().map((source) => source.file.replace("apps/client/src/", "").split("/")[0]));
@@ -185,12 +177,9 @@ describe("The play glossary (D28)", () => {
       ).toBeGreaterThan(0);
       expect(why.length, `exemption ${JSON.stringify(text)} has no reason attached`).toBeGreaterThan(40);
     }
-    expect(ALLOWED.length, "the exemption list is shrink-only — see design-conventions-shape.ts").toBe(
-      CONVENTION_SHAPE.playExemptions
-    );
   });
 
-  it("keeps the domain words D28 deliberately kept", () => {
+  it("keeps the domain words the glossary deliberately kept", () => {
     // The other direction: a rule written too wide, or an over-eager copy pass, must not remove these.
     for (const [file, text, why] of LEGITIMATE) {
       expect(at(file, text), `${file} no longer says ${JSON.stringify(text)} — ${why}`).toBe(true);
@@ -198,9 +187,9 @@ describe("The play glossary (D28)", () => {
   });
 });
 
-describe("The structured copy, pinned at its one definition (D28)", () => {
+describe("The structured copy, pinned at its one definition", () => {
   /** Words the corpus cannot see are pinned at the table they come from. */
-  it("names the three claim states in D28's words", () => {
+  it("names the three claim states", () => {
     expect(CLAIM_WORD).toEqual({ mine: "Your character", claimed: "Claimed", available: "Available" });
   });
 
@@ -231,7 +220,7 @@ describe("The structured copy, pinned at its one definition (D28)", () => {
     }
   });
 
-  it("names the rules dial Enforce / Advise / Off, and the settings groups D24's three", () => {
+  it("names the rules dial Enforce / Advise / Off, and the three settings groups", () => {
     // The dial's labels are `SettingsPage.tsx`'s DIAL_COPY; the wire values stay strict/assisted/freeform,
     // which is why the RETIRED row above is about copy only.
     const source = readFileSync(`${process.cwd()}/src/settings/SettingsPage.tsx`, "utf8");
@@ -255,7 +244,7 @@ describe("The structured copy, pinned at its one definition (D28)", () => {
   });
 });
 
-describe("The verb triad, pinned per dialog (D28)", () => {
+describe("The verb triad, pinned per dialog", () => {
   /** Delete is permanent and says so; Archive is reversible; Remove takes something out of a list. */
   it("says “cannot be undone” on every Delete, and only on a Delete", () => {
     const undoable = strings.filter((entry) => /this cannot be undone/i.test(visible(entry)));

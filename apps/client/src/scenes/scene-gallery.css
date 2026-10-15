@@ -48,6 +48,9 @@
 }
 
 .scene-live-note {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   color: var(--magenta);
   font-size: var(--fs-xs);
   font-weight: 700;

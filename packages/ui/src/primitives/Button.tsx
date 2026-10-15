@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode, Ref } from "react";
 import { cx } from "./util";
+import { IconArrow } from "./icons";
 import "./Button.css";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive";
@@ -12,7 +13,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   block?: boolean;
   /** Add a hover-lift, for card-like / CTA buttons, not dense toolbars. */
   lift?: boolean;
-  /** Append a forward → that nudges on hover, for navigational actions. */
+  /** Append a forward arrow that nudges on hover, for navigational actions. */
   arrow?: boolean;
   ref?: Ref<HTMLButtonElement>;
 }
@@ -46,11 +47,7 @@ export function Button({
       {...rest}
     >
       {children}
-      {arrow && (
-        <span className="nav-arrow" aria-hidden="true">
-          →
-        </span>
-      )}
+      {arrow && <IconArrow className="nav-arrow" />}
     </button>
   );
 }
