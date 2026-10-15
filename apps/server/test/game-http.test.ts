@@ -686,7 +686,7 @@ describe("public game API over /api/v1", () => {
       choices: [
         { level: 1, kind: "language", id: "dwarvish" },
         { level: 1, kind: "language", id: "giant" },
-        { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
+        { level: 1, classId: "fighter", kind: "skill", id: "survival" },
         { level: 1, classId: "fighter", kind: "skill", id: "perception" },
         { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
         { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },

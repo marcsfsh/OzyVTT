@@ -225,6 +225,9 @@ describe("one card per decision", () => {
   it("greys a proficiency the background already grants, saying so", () => {
     const reply = offers({ speciesId: "human", backgroundId: "soldier", classId: "fighter", level: 1 });
     expect(offerNamed(reply, "class-skills")?.unavailable?.athletics).toBe("already granted by Soldier");
+    // Every fixed source the build refuses a repeat of greys too: the species' own language here.
+    const languages = reply.offers.find((offer) => offer.kind === "language");
+    expect(languages?.unavailable?.common).toMatch(/^already granted by /);
   });
 });
 

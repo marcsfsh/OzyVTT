@@ -938,7 +938,7 @@ const paladinInput = (): CharacterCreateRequestInput =>
     choices: [
       { level: 1, kind: "language", id: "dwarvish" },
       { level: 1, kind: "language", id: "giant" },
-      { level: 1, classId: "paladin", kind: "skill", id: "athletics" },
+      { level: 1, classId: "paladin", kind: "skill", id: "medicine" },
       { level: 1, classId: "paladin", kind: "skill", id: "persuasion" },
       { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
       { level: 1, kind: "feat", id: GRANTED.featId, payload: { featureId: "human-versatile" } },
@@ -1544,7 +1544,7 @@ const initiateInput = (
     choices: [
       { level: 1, kind: "language", id: "dwarvish" },
       { level: 1, kind: "language", id: "giant" },
-      { level: 1, classId: "paladin", kind: "skill", id: "athletics" },
+      { level: 1, classId: "paladin", kind: "skill", id: "medicine" },
       { level: 1, classId: "paladin", kind: "skill", id: "persuasion" },
       { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
       { level: 1, kind: "feat", id: featId, payload: { featureId: "human-versatile" } },
@@ -2083,7 +2083,7 @@ const emberkinInput = (): CharacterCreateRequestInput =>
     hp: { mode: "average" },
     choices: [
       { level: 1, kind: "damage-type", id: REOPENED.built, payload: { featureId: REOPENED.traitId } },
-      { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
+      { level: 1, classId: "fighter", kind: "skill", id: "history" },
       { level: 1, classId: "fighter", kind: "skill", id: "survival" },
       { level: 1, classId: "fighter", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
       { level: 1, classId: "fighter", kind: "weapon-mastery", id: "longsword" },
@@ -2432,7 +2432,7 @@ const wardenInput = (level: 1 | 2): CharacterCreateRequestInput =>
     choices: [
       { level: 1, kind: "language", id: "dwarvish" },
       { level: 1, kind: "language", id: "giant" },
-      { level: 1, classId: REOPENED.classId, kind: "skill", id: "athletics" },
+      { level: 1, classId: REOPENED.classId, kind: "skill", id: "perception" },
       { level: 1, classId: REOPENED.classId, kind: "skill", id: "survival" },
       { level: 1, kind: "tool", id: "gaming-set-dice" },
       { level: 1, kind: "equipment", id: "soldier-a" }
@@ -2458,7 +2458,7 @@ const fighterInput = (level: 5 | 11): CharacterCreateRequestInput =>
     choices: [
       { level: 1, kind: "language", id: "dwarvish" },
       { level: 1, kind: "language", id: "giant" },
-      { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
+      { level: 1, classId: "fighter", kind: "skill", id: "survival" },
       { level: 1, classId: "fighter", kind: "skill", id: "perception" },
       { level: 1, classId: "fighter", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
       ...["greatsword", "flail", "longbow", "rapier", "handaxe"]
@@ -3358,7 +3358,7 @@ const echokinInput = (heritage: string): CharacterCreateRequestInput =>
     choices: [
       // The earlier answer the ward reads.
       { level: 1, kind: "heritage", id: heritage, payload: { featureId: GATED.heritageId } },
-      { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
+      { level: 1, classId: "fighter", kind: "skill", id: "history" },
       { level: 1, classId: "fighter", kind: "skill", id: "survival" },
       { level: 1, classId: "fighter", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
       ...["longsword", "javelin", "greatsword"].map((id) => ({

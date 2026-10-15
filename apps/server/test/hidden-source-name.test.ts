@@ -45,7 +45,7 @@ const attackerBuild = (): CharacterCreateRequestInput => ({
   ],
   hp: { mode: "average" },
   choices: [
-    { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
+    { level: 1, classId: "fighter", kind: "skill", id: "survival" },
     { level: 1, classId: "fighter", kind: "skill", id: "perception" },
     { level: 1, classId: "fighter", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
     { level: 1, classId: "fighter", kind: "weapon-mastery", id: "club" },

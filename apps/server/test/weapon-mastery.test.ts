@@ -72,7 +72,7 @@ const fighter = (masteries: readonly string[], level: 3 | 5 = 3): MutableInput =
   ],
   hp: { mode: "average" },
   choices: [
-    { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
+    { level: 1, classId: "fighter", kind: "skill", id: "survival" },
     { level: 1, classId: "fighter", kind: "skill", id: "perception" },
     { level: 1, classId: "fighter", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
     ...masteries.slice(0, 3).map((id) => ({ level: 1, classId: "fighter", kind: "weapon-mastery", id }) as Row),

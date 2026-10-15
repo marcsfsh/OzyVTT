@@ -141,16 +141,25 @@ function proficientSkills(survey: ServerOfferSurvey): Set<string> {
   return held;
 }
 
-/** Proficiencies/languages already held of one kind; picking one again spends a budget for nothing. */
-function heldOfKind(survey: ServerOfferSurvey, kind: string): Set<string> {
+/** Offer kinds whose answers the build refuses to repeat. */
+const PROFICIENCY_KINDS: ReadonlySet<string> = new Set(["skill", "tool", "language", "skill-or-tool"]);
+
+/** Proficiencies/languages already held of one kind, from the same fixed sources the build merges and every pick
+ *  so far (the survey's and this run's), since the build refuses a repeat. */
+function heldOfKind(survey: ServerOfferSurvey, kind: string, choices: readonly CharacterChoice[]): Set<string> {
   const held = new Set<string>();
   if (kind === "skill") for (const skill of survey.background.skillProficiencies) held.add(skill);
-  if (kind === "tool") for (const tool of survey.background.toolProficiencies) held.add(tool);
-  if (kind === "language") for (const language of survey.species.languages) held.add(language);
+  if (kind === "tool")
+    for (const tool of [...survey.classRecord.toolProficiencies, ...survey.background.toolProficiencies])
+      held.add(tool);
+  if (kind === "language")
+    for (const language of [...survey.species.languages, ...survey.background.languages]) held.add(language);
   for (const offer of survey.offers) if (offer.kind === kind) for (const id of offer.taken) held.add(id);
+  for (const row of choices) if (row.kind === kind || row.kind === "skill-or-tool") held.add(row.id);
   for (const { record } of survey.granted) {
     const grants = record.grants;
-    if (!grants) continue;
+    // Only ungated grants are baked into the sheet.
+    if (!grants || (grants.when?.length ?? 0) > 0) continue;
     for (const id of kind === "skill"
       ? grants.skills
       : kind === "tool"
@@ -265,9 +274,10 @@ function answerOffer(
     offer.kind === "language" ||
     offer.kind === "skill-or-tool"
   ) {
-    // A duplicate proficiency is legal and worthless: it spends the pick and merges into one entry.
-    const held = heldOfKind(survey, offer.kind === "skill-or-tool" ? "skill" : offer.kind);
-    preferred = legal.filter((id) => !held.has(id));
+    // A repeat proficiency is refused by the build, so it is a hard filter.
+    const held = heldOfKind(survey, offer.kind === "skill-or-tool" ? "skill" : offer.kind, choices);
+    candidates = legal.filter((id) => !held.has(id));
+    preferred = candidates;
   } else if (offer.kind === "weapon-mastery") {
     // Mastery in an uncarried weapon is legal but useless, so carried weapons come first.
     const carried = carriedWeaponIds(survey, choices);
@@ -427,9 +437,15 @@ export function generateCharacterRequest(
       choices.push(...spells);
       continue;
     }
-    const open = survey.offers.find(
+    const pending = survey.offers.filter(
       (offer) => offer.unresolvable === null && offer.kind !== "subclass" && offer.taken.length < offer.capacity
     );
+    // The narrowest proficiency pick goes first (Keen Senses' three skills before a class's six), so a broad pick
+    // cannot take the only options a narrow one has; repeats are refused.
+    const narrowest = pending
+      .filter((offer) => PROFICIENCY_KINDS.has(offer.kind))
+      .sort((left, right) => left.options.size - right.options.size)[0];
+    const open = narrowest ?? pending[0];
     if (!open) {
       return { request: { ...identity, choices }, hitPointRolls, hitDieFaces: faces, summary: summaryOf(survey) };
     }

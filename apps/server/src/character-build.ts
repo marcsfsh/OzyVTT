@@ -607,6 +607,30 @@ export function buildCharacterDefinition(
     ...background.skillProficiencies,
     ...interpreted.grantedSkills
   ];
+  // A pick of something the character already has, or the same pick twice, would be merged away below and the
+  // pick lost; the builder greys these out, so a payload that sends one is refused rather than quietly shortened.
+  const refuseRepeatPicks = (kind: string, picked: readonly string[], fixed: readonly string[]) => {
+    const held = new Set(fixed);
+    for (const id of picked) {
+      if (held.has(id)) reject(`The ${kind} "${id}" is taken more than once; pick a different ${kind}.`);
+      held.add(id);
+    }
+  };
+  refuseRepeatPicks(
+    "skill",
+    [...takenOf("skill"), ...skillOrTool.filter((id) => skillIds.has(id))],
+    [...background.skillProficiencies, ...interpreted.grantedSkills]
+  );
+  refuseRepeatPicks(
+    "tool",
+    [...takenOf("tool"), ...skillOrTool.filter((id) => !skillIds.has(id))],
+    [...classRecord.toolProficiencies, ...background.toolProficiencies, ...interpreted.grantedTools]
+  );
+  refuseRepeatPicks("language", takenOf("language"), [
+    ...species.languages,
+    ...background.languages,
+    ...interpreted.grantedLanguages
+  ]);
   const expertiseTaken = [...takenOf("expertise"), ...interpreted.grantedExpertise];
   for (const skill of expertiseTaken) {
     if (!skillTaken.includes(skill)) reject(`Expertise in "${skill}" requires proficiency in it first.`);

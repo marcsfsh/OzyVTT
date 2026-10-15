@@ -73,7 +73,7 @@ const monkInput = (level = 1): MutableInput => ({
     { level: 1, kind: "language", id: "dwarvish" },
     { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "monk", kind: "skill", id: "acrobatics" },
-    { level: 1, classId: "monk", kind: "skill", id: "insight" },
+    { level: 1, classId: "monk", kind: "skill", id: "stealth" },
     { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
@@ -131,7 +131,7 @@ const fighterInput = (): MutableInput => ({
   choices: [
     { level: 1, kind: "language", id: "dwarvish" },
     { level: 1, kind: "language", id: "giant" },
-    { level: 1, classId: "fighter", kind: "skill", id: "athletics" },
+    { level: 1, classId: "fighter", kind: "skill", id: "survival" },
     { level: 1, classId: "fighter", kind: "skill", id: "perception" },
     // Archery carries no modifier; Defense would add a +1 armor-class rider to the number under test.
     { level: 1, classId: "fighter", kind: "fighting-style", id: "archery", payload: { featureId: "fighting-style" } },
