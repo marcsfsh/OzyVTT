@@ -3,7 +3,16 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ContentActionSummary } from "@vtt/domain";
 
-vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
+// `command()` and `read()` send through `socket.timeout(ms).emit` with an error-first ack; it is routed to
+// `socket.emit` here so the assertions read one call list.
+vi.mock("../socket", () => {
+  const emit = vi.fn();
+  const timed = {
+    emit: (event: string, payload: unknown, ack: (error: null, reply: unknown) => void) =>
+      emit(event, payload, (reply: unknown) => ack(null, reply))
+  };
+  return { socket: { on: vi.fn(), off: vi.fn(), emit, timeout: () => timed } };
+});
 
 import { socket } from "../socket";
 import { AskTheGmPrompt } from "./RuleAsk";
@@ -59,13 +68,15 @@ const emitted = () => (socket.emit as unknown as { mock: { calls: EmitCall[] } }
  * ack is always delivered: the store's `busy` flag is module state, and an un-acked resolve would
  * make the next test's `resolveTargeting` a no-op.
  */
-function refuseTheAttack(): Record<string, unknown> {
+async function refuseTheAttack(): Promise<Record<string, unknown>> {
   beginTargeting(ATTACK, ATTACKER);
   toggleTarget(TARGET);
   resolveTargeting(7, () => {});
   const [event, payload, acknowledge] = emitted().at(-1)!;
   expect(event).toBe("action:resolve");
   acknowledge(BLOCK);
+  // The reply settles a promise, so the store updates on the next microtask.
+  await Promise.resolve();
   return payload;
 }
 
@@ -75,12 +86,12 @@ describe("asking the GM about a refused move", () => {
     vi.clearAllMocks();
   });
 
-  it("still sends the attack itself as a preview, so the player keeps their confirm step", () => {
-    expect(refuseTheAttack().commit).toBe(false);
+  it("still sends the attack itself as a preview, so the player keeps their confirm step", async () => {
+    expect((await refuseTheAttack()).commit).toBe(false);
   });
 
   it("parks a COMMITTING command, because an allowed preview would change nothing", async () => {
-    refuseTheAttack();
+    await refuseTheAttack();
     render(<AskTheGmPrompt onFeedback={() => {}} />);
     // On the action path this is the only place the refusal appears.
     expect(screen.getByText(BLOCK.blocked.message)).toBeInTheDocument();

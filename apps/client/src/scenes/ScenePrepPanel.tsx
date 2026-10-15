@@ -1,12 +1,11 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { rosterActors, type GmActor, type MutationResult } from "@vtt/domain";
+import { rosterActors, type GmActor } from "@vtt/domain";
 import { Button, IconPlus, useToast } from "@vtt/ui";
 import { MonsterBrowser } from "../encounter/MonsterBrowser";
 import { MapPicker, type PickerMap } from "../maps/MapPicker";
 import type { MapSelection } from "../maps/MapManager";
 import { StagingTray, type StagingEntry } from "./StagingTray";
-import { newId } from "../lib/ids";
-import { socket } from "../socket";
+import { command } from "../lib/command";
 import { useConfirm } from "../components/feedback";
 import "./scene-prep.css";
 
@@ -19,16 +18,6 @@ import "./scene-prep.css";
  */
 
 const RECENT_COUNT = 10;
-
-const emit = (event: string, payload: Record<string, unknown>, onError: (message: string) => void, failure: string) => {
-  (socket.emit as (event: string, payload: unknown, ack: (result: MutationResult) => void) => void)(
-    event,
-    { commandId: newId(), ...payload },
-    (result) => {
-      if (!result.ok) onError(result.message ?? failure);
-    }
-  );
-};
 
 export function ScenePrepPanel({
   heading,
@@ -116,22 +105,16 @@ export function ScenePrepPanel({
   /** The tray-level choice is the table's standing default, so every door agrees. */
   const setTrayReveal = (revealed: boolean) => {
     setRevealNew(revealed);
-    emit(
-      "table:set-staging-defaults",
-      { visibility: revealed ? "public" : "gm-only" },
-      fail,
-      "The staging default could not be changed."
-    );
+    void command("table:set-staging-defaults", { visibility: revealed ? "public" : "gm-only" }).then((result) => {
+      if (!result.ok) fail(result.message ?? "The staging default could not be changed.");
+    });
     // The toast repeats exactly what the control now reads.
     toast(revealed ? "Shown to players." : "Hidden from players.", { tone: "info" });
   };
   const setEntryReveal = (actorId: string, revealed: boolean) => {
-    emit(
-      "actor:set-visibility",
-      { actorId, visibility: revealed ? "public" : "gm-only" },
-      fail,
-      "The token's visibility could not be changed."
-    );
+    void command("actor:set-visibility", { actorId, visibility: revealed ? "public" : "gm-only" }).then((result) => {
+      if (!result.ok) fail(result.message ?? "The token's visibility could not be changed.");
+    });
   };
   /** Remove: out of this list, still on the roster. Mid-fight it is disruptive, so it asks. */
   const removeEntry = async (entry: StagingEntry) => {

@@ -399,17 +399,19 @@ function offersFor(request: BuilderOffersRequest) {
   };
 }
 
-vi.mock("../socket", () => ({
-  socket: {
-    on: vi.fn(),
-    off: vi.fn(),
-    emit: vi.fn((event: string, payload: unknown, ack?: (result: unknown) => void) => {
-      if (!ack) return;
-      if (event === "builder:offers") ack(offersFor(payload as BuilderOffersRequest));
-      else ack((CATALOG_ANSWERS as Record<string, unknown>)[event] ?? { ok: false });
-    })
-  }
-}));
+vi.mock("../socket", () => {
+  const emit = vi.fn((event: string, payload: unknown, ack?: (result: unknown) => void) => {
+    if (!ack) return;
+    if (event === "builder:offers") ack(offersFor(payload as BuilderOffersRequest));
+    else ack((CATALOG_ANSWERS as Record<string, unknown>)[event] ?? { ok: false });
+  });
+  // `read()` sends through `socket.timeout(ms).emit` with an error-first ack; route it to `emit`.
+  const timed = {
+    emit: (event: string, payload: unknown, ack: (error: null, reply: unknown) => void) =>
+      emit(event, payload, (reply: unknown) => ack(null, reply))
+  };
+  return { socket: { on: vi.fn(), off: vi.fn(), emit, timeout: () => timed } };
+});
 
 import { ToastProvider } from "@vtt/ui";
 import { socket } from "../socket";

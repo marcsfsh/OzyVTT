@@ -1,15 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import type { Scene } from "@vtt/domain";
+import type { MutationResult, Scene } from "@vtt/domain";
 import { Badge, Button, Menu, MenuItem } from "@vtt/ui";
 import type { MapSelection } from "../maps/MapManager";
-import { newId } from "../lib/ids";
-import { socket } from "../socket";
+import { command } from "../lib/command";
 import { useCachedMapThumbnail } from "../scene/mapImage";
 import { setPreviewScene } from "./scenePreview";
 import { useConfirm, usePrompt } from "../components/feedback";
 import "./scene-gallery.css";
-
-type Ack = (result: { ok: boolean; message?: string }) => void;
 
 /** Cover-cropped map preview in a card. A neutral glyph shows while the cached fetch lands or if the
     image cannot be decoded (never a broken-image icon). */
@@ -73,14 +70,9 @@ export function SceneGallery({
 }>) {
   const { confirm, dialog } = useConfirm();
   const { prompt, dialog: promptDialog } = usePrompt();
-  const emit = (event: string, payload: Record<string, unknown>, failure: string) => {
-    (socket.emit as (event: string, payload: unknown, ack: Ack) => void)(
-      event,
-      { commandId: newId(), ...payload },
-      (result) => {
-        if (!result.ok) onFeedback?.(result.message ?? failure);
-      }
-    );
+  /** A failed command's message goes to the surface's feedback line, with `failure` as the fallback. */
+  const report = (failure: string) => (result: MutationResult) => {
+    if (!result.ok) onFeedback?.(result.message ?? failure);
   };
   const mapName = (mapAssetId: string) => (mapLibrary ?? []).find((map) => map.id === mapAssetId)?.name ?? "Battle map";
 
@@ -94,7 +86,7 @@ export function SceneGallery({
       }))
     ) {
       setPreviewScene(null);
-      emit("scene:activate", { sceneId: scene.id }, "The scene could not be switched.");
+      void command("scene:activate", { sceneId: scene.id }).then(report("The scene could not be switched."));
       onClose?.();
     }
   };
@@ -106,7 +98,7 @@ export function SceneGallery({
   const rename = async (scene: Scene) => {
     const next = await prompt({ title: "Rename scene", defaultValue: scene.name, confirmLabel: "Rename" });
     if (next && next !== scene.name)
-      emit("scene:rename", { sceneId: scene.id, name: next }, "The scene could not be renamed.");
+      void command("scene:rename", { sceneId: scene.id, name: next }).then(report("The scene could not be renamed."));
   };
   // Permanent, so it is "Delete" and says so.
   const remove = async (scene: Scene) => {
@@ -119,7 +111,7 @@ export function SceneGallery({
       })
     ) {
       if (scene.id === previewingSceneId) setPreviewScene(null);
-      emit("scene:remove", { sceneId: scene.id }, "The scene could not be removed.");
+      void command("scene:remove", { sceneId: scene.id }).then(report("The scene could not be removed."));
     }
   };
   // Reorder by dragging a card's grip (pointer and touch), or Move earlier/later from the ⋯ menu
@@ -130,7 +122,7 @@ export function SceneGallery({
     const target = index + delta;
     if (index === -1 || target < 0 || target >= order.length) return;
     [order[index], order[target]] = [order[target], order[index]];
-    emit("scene:reorder", { order }, "The scenes could not be reordered.");
+    void command("scene:reorder", { order }).then(report("The scenes could not be reordered."));
   };
   const galleryRef = useRef<HTMLUListElement>(null);
   const drag = useRef<{ id: string; order: string[]; start: string; commit: (order: string[]) => void } | null>(null);
@@ -147,7 +139,8 @@ export function SceneGallery({
       id: sceneId,
       order,
       start: order.join(),
-      commit: (next) => emit("scene:reorder", { order: next }, "The scenes could not be reordered.")
+      commit: (next) =>
+        void command("scene:reorder", { order: next }).then(report("The scenes could not be reordered."))
     };
     setDragId(sceneId);
     setDragOrder(order);
@@ -288,7 +281,9 @@ export function SceneGallery({
                       <MenuItem
                         icon="⧉"
                         onClick={() =>
-                          emit("scene:duplicate", { sceneId: scene.id }, "The scene could not be duplicated.")
+                          void command("scene:duplicate", { sceneId: scene.id }).then(
+                            report("The scene could not be duplicated.")
+                          )
                         }
                       >
                         Duplicate

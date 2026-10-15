@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   Annotation,
-  AnnotationAddResult,
   AnnotationShapeKind,
   AnnotationVisibility,
-  ClientToServerEvents,
   EncounterToken,
   EncounterTokenPosition,
   GmActor,
@@ -47,8 +45,7 @@ import {
 } from "../encounter/targeting";
 import { TokenContextMenu } from "./TokenContextMenu";
 import type { DockPosition } from "../encounter/EncounterPanel";
-import { newId } from "../lib/ids";
-import { socket } from "../socket";
+import { command } from "../lib/command";
 import "./encounter-map.css";
 
 type Actor = GmActor | PlayerActor;
@@ -112,43 +109,6 @@ const VISIBILITY_SHORT: Record<AnnotationVisibility, string> = {
   "owner-gm": "Only me and the GM",
   "gm-actor": "GM and one character"
 };
-
-function emitMove(payload: Parameters<ClientToServerEvents["token:move"]>[0]) {
-  return new Promise<MutationResult>((resolve) => socket.emit("token:move", payload, resolve));
-}
-function emitAnnotationAdd(payload: Parameters<ClientToServerEvents["annotation:add"]>[0]) {
-  return new Promise<AnnotationAddResult>((resolve) => socket.emit("annotation:add", payload, resolve));
-}
-function emitAnnotationMove(payload: Parameters<ClientToServerEvents["annotation:move"]>[0]) {
-  return new Promise<MutationResult>((resolve) => socket.emit("annotation:move", payload, resolve));
-}
-function emitAnnotationRemove(payload: Parameters<ClientToServerEvents["annotation:remove"]>[0]) {
-  return new Promise<MutationResult>((resolve) => socket.emit("annotation:remove", payload, resolve));
-}
-function emitAnnotationSetVisibility(payload: Parameters<ClientToServerEvents["annotation:set-visibility"]>[0]) {
-  return new Promise<MutationResult>((resolve) => socket.emit("annotation:set-visibility", payload, resolve));
-}
-function emitAnnotationSetMovable(payload: Parameters<ClientToServerEvents["annotation:set-movable"]>[0]) {
-  return new Promise<MutationResult>((resolve) => socket.emit("annotation:set-movable", payload, resolve));
-}
-function emitAnnotationClear(payload: Parameters<ClientToServerEvents["annotation:clear"]>[0]) {
-  return new Promise<MutationResult>((resolve) => socket.emit("annotation:clear", payload, resolve));
-}
-function emitAnnotationPing(payload: Parameters<ClientToServerEvents["annotation:ping"]>[0]) {
-  return new Promise<MutationResult>((resolve) => socket.emit("annotation:ping", payload, resolve));
-}
-function emitAnnotationSetColor(payload: Parameters<ClientToServerEvents["annotation:set-color"]>[0]) {
-  return new Promise<MutationResult>((resolve) => socket.emit("annotation:set-color", payload, resolve));
-}
-function emitFogSetEnabled(payload: Parameters<ClientToServerEvents["fog:set-enabled"]>[0]) {
-  return new Promise<MutationResult>((resolve) => socket.emit("fog:set-enabled", payload, resolve));
-}
-function emitFogPaint(payload: Parameters<ClientToServerEvents["fog:paint"]>[0]) {
-  return new Promise<MutationResult>((resolve) => socket.emit("fog:paint", payload, resolve));
-}
-function emitFogReset(payload: Parameters<ClientToServerEvents["fog:reset"]>[0]) {
-  return new Promise<MutationResult>((resolve) => socket.emit("fog:reset", payload, resolve));
-}
 
 // On-brand annotation swatches. Concrete hexes, not theme vars: the colour travels over the wire and
 // must read the same on every screen.
@@ -482,8 +442,7 @@ export function EncounterMap({
     setBusyActorId(actorId);
     setMessage("");
     try {
-      const result = await emitMove({
-        commandId: newId(),
+      const result = await command("token:move", {
         actorId,
         position,
         ...(moveSceneId ? { sceneId: moveSceneId } : {}),
@@ -522,12 +481,10 @@ export function EncounterMap({
     origin: Point,
     target: Point
   ) => {
-    const commandId = newId();
     await runAnnotation(
       "new",
       async () => {
-        const result = await emitAnnotationAdd({
-          commandId,
+        const result = await command("annotation:add", {
           kind,
           shape,
           geometry: { origin, target },
@@ -539,7 +496,7 @@ export function EncounterMap({
         });
         if (result.ok && kind === "shape") {
           setTool("select");
-          setSelectedId(commandId);
+          setSelectedId(result.annotationId ?? null);
         }
         return result;
       },
@@ -549,33 +506,32 @@ export function EncounterMap({
   const submitPing = (point: Point) =>
     runAnnotation(
       "ping",
-      () => emitAnnotationPing({ commandId: newId(), point, color: sessionColor, expectedRevision: revision }),
+      () => command("annotation:ping", { point, color: sessionColor, expectedRevision: revision }),
       "The ping could not be sent."
     );
   const setColor = (id: string, color: string) =>
     runAnnotation(
       id,
-      () => emitAnnotationSetColor({ commandId: newId(), id, color, expectedRevision: revision }),
+      () => command("annotation:set-color", { id, color, expectedRevision: revision }),
       "The color could not be changed."
     );
   const submitAnnotationMove = (id: string, origin: Point, target: Point) =>
     runAnnotation(
       id,
-      () => emitAnnotationMove({ commandId: newId(), id, geometry: { origin, target }, expectedRevision: revision }),
+      () => command("annotation:move", { id, geometry: { origin, target }, expectedRevision: revision }),
       "That could not be moved."
     );
   const removeAnnotation = (id: string) =>
     runAnnotation(
       id,
-      () => emitAnnotationRemove({ commandId: newId(), id, expectedRevision: revision }),
+      () => command("annotation:remove", { id, expectedRevision: revision }),
       "That could not be removed."
     );
   const setVisibility = (id: string, visibility: AnnotationVisibility, visibleToActorId: string | null) =>
     runAnnotation(
       id,
       () =>
-        emitAnnotationSetVisibility({
-          commandId: newId(),
+        command("annotation:set-visibility", {
           id,
           visibility,
           visibleToActorId,
@@ -586,13 +542,13 @@ export function EncounterMap({
   const setMovable = (id: string, movableByOthers: boolean) =>
     runAnnotation(
       id,
-      () => emitAnnotationSetMovable({ commandId: newId(), id, movableByOthers, expectedRevision: revision }),
+      () => command("annotation:set-movable", { id, movableByOthers, expectedRevision: revision }),
       "Move control could not be changed."
     );
   const clearAnnotations = (scope: "mine" | "players" | "all") => {
     void runAnnotation(
       "clear",
-      () => emitAnnotationClear({ commandId: newId(), scope, expectedRevision: revision }),
+      () => command("annotation:clear", { scope, expectedRevision: revision }),
       "Shapes could not be removed."
     );
   };
@@ -618,7 +574,7 @@ export function EncounterMap({
       return;
     }
     runFog(
-      () => emitFogPaint({ commandId: newId(), op, rect, ...fogTarget, expectedRevision: revision }),
+      () => command("fog:paint", { op, rect, ...fogTarget, expectedRevision: revision }),
       "The fog stroke could not be painted."
     );
   };
@@ -1181,15 +1137,14 @@ export function EncounterMap({
               fogBusy={fogBusy}
               onFogEnabledChange={(enabled) =>
                 runFog(
-                  () => emitFogSetEnabled({ commandId: newId(), enabled, ...fogTarget, expectedRevision: revision }),
+                  () => command("fog:set-enabled", { enabled, ...fogTarget, expectedRevision: revision }),
                   "The fog could not be toggled."
                 )
               }
               onRevealAll={() =>
                 runFog(
                   () =>
-                    emitFogPaint({
-                      commandId: newId(),
+                    command("fog:paint", {
                       op: "reveal",
                       rect: { x: 0, y: 0, width: size.width, height: size.height },
                       ...fogTarget,
@@ -1200,7 +1155,7 @@ export function EncounterMap({
               }
               onHideAll={() =>
                 runFog(
-                  () => emitFogReset({ commandId: newId(), ...fogTarget, expectedRevision: revision }),
+                  () => command("fog:reset", { ...fogTarget, expectedRevision: revision }),
                   "The fog could not be reset."
                 )
               }

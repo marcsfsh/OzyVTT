@@ -1,8 +1,7 @@
 import { useState } from "react";
 import type { GmActor, StagingDefaults } from "@vtt/domain";
 import { Button, Input } from "@vtt/ui";
-import { newId } from "../lib/ids";
-import { socket } from "../socket";
+import { command } from "../lib/command";
 import type { MapSelection } from "../maps/MapManager";
 import type { PickerMap } from "../maps/MapPicker";
 import { ScenePrepPanel } from "./ScenePrepPanel";
@@ -53,17 +52,13 @@ export function ScenePanel({
     const sceneName = (name.trim() || sceneMap.name).slice(0, 120);
     setBusy(true);
     setMessage("");
-    socket.emit(
-      "scene:create",
-      { commandId: newId(), name: sceneName, mapAssetId: sceneMap.id, combatantIds: staged },
-      (result) => {
-        setBusy(false);
-        if (result.ok) {
-          setName("");
-          onCreated?.(result.sceneId);
-        } else setMessage(result.message ?? "The scene could not be created.");
-      }
-    );
+    void command("scene:create", { name: sceneName, mapAssetId: sceneMap.id, combatantIds: staged }).then((result) => {
+      setBusy(false);
+      if (result.ok) {
+        setName("");
+        onCreated?.(result.sceneId);
+      } else setMessage(result.message ?? "The scene could not be created.");
+    });
   };
 
   return (

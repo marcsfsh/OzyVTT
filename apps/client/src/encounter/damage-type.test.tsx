@@ -1,9 +1,18 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GameStateSchema, type GmActor, type GmView } from "@vtt/domain";
 
-vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn(), connected: true } }));
+// `command()` and `read()` send through `socket.timeout(ms).emit` with an error-first ack; it is routed to
+// `socket.emit` here so the assertions read one call list.
+vi.mock("../socket", () => {
+  const emit = vi.fn();
+  const timed = {
+    emit: (event: string, payload: unknown, ack: (error: null, reply: unknown) => void) =>
+      emit(event, payload, (reply: unknown) => ack(null, reply))
+  };
+  return { socket: { on: vi.fn(), off: vi.fn(), emit, connected: true, timeout: () => timed } };
+});
 
 import { socket } from "../socket";
 import { TokenContextMenu } from "../scene/TokenContextMenu";
@@ -174,9 +183,9 @@ describe("the sheet's HP box carries the type too", () => {
     await user.type(screen.getByLabelText("Amount"), "10");
     await chooseType(user, "Cold");
     await user.click(screen.getByRole("button", { name: "Dmg" }));
-    // Drive the ack: the feedback line is written from inside it.
+    // Drive the ack: the feedback line is written from inside it, once the reply settles.
     lastHpCall()[2]({ ok: true });
-    expect(said.at(-1)).toBe("Damaged 10 cold.");
+    await waitFor(() => expect(said.at(-1)).toBe("Damaged 10 cold."));
   });
 });
 

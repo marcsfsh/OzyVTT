@@ -4,7 +4,6 @@ import {
   rosterActors,
   type ActionResolution,
   type ActorDefinition,
-  type ClientToServerEvents,
   type ContentActionSummary,
   type DeathSaveResult,
   type DeathSaves,
@@ -17,13 +16,11 @@ import {
   type PlayerEffect,
   type PlayerPendingReaction,
   type PlayerPendingSave,
-  type ReactionAnswerResult,
-  type SaveAnswerResult,
   type PlayerView
 } from "@vtt/domain";
 import type { MapSelection } from "../maps/MapManager";
 import { Chip, Button, Select, Input, Switch } from "@vtt/ui";
-import { newId } from "../lib/ids";
+import { command } from "../lib/command";
 import { ActionRunner } from "./ActionRunner";
 import { AskTheGmPrompt, MyPendingAsks, PendingAsksForGm } from "./RuleAsk";
 import {
@@ -49,38 +46,8 @@ import { initialsOf } from "../scene/mapImage";
 import { MonsterBrowser } from "./MonsterBrowser";
 import { ScenePrepPanel } from "../scenes/ScenePrepPanel";
 import type { PickerMap } from "../maps/MapPicker";
-import { socket } from "../socket";
 import "./encounter-panel.css";
 import { useConfirm } from "../components/feedback";
-
-type CommandEvent =
-  | "encounter:start"
-  | "encounter:end"
-  | "encounter:add-combatant"
-  | "initiative:set"
-  | "initiative:next"
-  | "initiative:previous"
-  | "actor:remove"
-  | "actor:apply-damage"
-  | "actor:heal"
-  | "actor:set-temp-hp"
-  | "actor:set-hp"
-  | "turn:use"
-  | "turn:use-reaction"
-  | "turn:use-legendary"
-  | "turn:end"
-  | "scene:activate"
-  | "scene:create";
-type CommandPayload = Parameters<ClientToServerEvents[CommandEvent]>[0];
-const emitMutation = socket.emit.bind(socket) as unknown as (
-  event: CommandEvent,
-  payload: CommandPayload,
-  acknowledgement: (result: MutationResult) => void
-) => void;
-
-function emitCommand(event: CommandEvent, payload: CommandPayload) {
-  return new Promise<MutationResult>((resolve) => emitMutation(event, payload, resolve));
-}
 
 const validInitiativeScore = (value: string | undefined) =>
   value !== undefined &&
@@ -271,10 +238,9 @@ export function SavePrompt({
   ) => {
     setBusy(true);
     // The amend rides every send (preview, manual apply, Confirm, Legendary Resistance).
-    socket.emit(
+    void command(
       "save:answer",
       saveAnswerPayload({
-        commandId: newId(),
         saveId: save.id,
         method,
         commit,
@@ -282,35 +248,34 @@ export function SavePrompt({
         ...(total !== undefined ? { total } : {}),
         ...(dieMode ? { dieMode } : {}),
         ...(damageOverride !== undefined ? { damageOverride } : {})
-      }),
-      (result: SaveAnswerResult) => {
-        setBusy(false);
-        if (!result.ok) {
-          onFeedback(result.message ?? "The saving throw could not be answered.");
-          return;
-        }
-        const outcome = result.outcome;
-        if (!outcome) return;
-        if (!outcome.committed) {
-          setRolled({
-            total: outcome.total,
-            success: outcome.success,
-            damage: outcome.appliedDamage,
-            condition: outcome.conditionApplied,
-            mode: outcome.rollMode?.mode,
-            basis: proposal
-          });
-          return;
-        }
-        onFeedback(
-          `${targetName} ${outcome.success ? "succeeded" : "failed"} (${outcome.total} vs DC ${outcome.dc})${outcome.appliedDamage > 0 ? ` - ${outcome.appliedDamage} damage applied` : ""}${outcome.conditionApplied ? " - condition applied" : ""}.`
-        );
+      })
+    ).then((result) => {
+      setBusy(false);
+      if (!result.ok) {
+        onFeedback(result.message ?? "The saving throw could not be answered.");
+        return;
       }
-    );
+      const outcome = result.outcome;
+      if (!outcome) return;
+      if (!outcome.committed) {
+        setRolled({
+          total: outcome.total,
+          success: outcome.success,
+          damage: outcome.appliedDamage,
+          condition: outcome.conditionApplied,
+          mode: outcome.rollMode?.mode,
+          basis: proposal
+        });
+        return;
+      }
+      onFeedback(
+        `${targetName} ${outcome.success ? "succeeded" : "failed"} (${outcome.total} vs DC ${outcome.dc})${outcome.appliedDamage > 0 ? ` - ${outcome.appliedDamage} damage applied` : ""}${outcome.conditionApplied ? " - condition applied" : ""}.`
+      );
+    });
   };
   const dismiss = () => {
     setBusy(true);
-    socket.emit("save:dismiss", { commandId: newId(), saveId: save.id }, (result: MutationResult) => {
+    void command("save:dismiss", { saveId: save.id }).then((result) => {
       setBusy(false);
       onFeedback(
         result.ok ? "Saving throw dismissed." : (result.message ?? "The saving throw could not be dismissed.")
@@ -328,40 +293,38 @@ export function SavePrompt({
     const basis = proposal;
     const timer = setTimeout(() => {
       setRecheck("pending");
-      socket.emit(
+      void command(
         "save:answer",
         saveAnswerPayload({
-          commandId: newId(),
           saveId: save.id,
           method: "manual",
           commit: false,
           total,
           ...(damageOverride !== undefined ? { damageOverride } : {})
-        }),
-        (result: SaveAnswerResult) => {
-          if (!mounted.current) return;
-          if (!result.ok || !result.outcome) {
-            setRecheck("failed");
-            if (!result.ok) feedbackRef.current(result.message ?? "The amended damage could not be checked.");
-            return;
-          }
-          const outcome = result.outcome;
-          setRecheck("idle");
-          // `basis` is the proposal this answer was asked about; if typing continued meanwhile, the line is
-          // stale again and this effect asks again.
-          setRolled((current) =>
-            current === null
-              ? null
-              : {
-                  ...current,
-                  success: outcome.success,
-                  damage: outcome.appliedDamage,
-                  condition: outcome.conditionApplied,
-                  basis
-                }
-          );
+        })
+      ).then((result) => {
+        if (!mounted.current) return;
+        if (!result.ok || !result.outcome) {
+          setRecheck("failed");
+          if (!result.ok) feedbackRef.current(result.message ?? "The amended damage could not be checked.");
+          return;
         }
-      );
+        const outcome = result.outcome;
+        setRecheck("idle");
+        // `basis` is the proposal this answer was asked about; if typing continued meanwhile, the line is
+        // stale again and this effect asks again.
+        setRolled((current) =>
+          current === null
+            ? null
+            : {
+                ...current,
+                success: outcome.success,
+                damage: outcome.appliedDamage,
+                condition: outcome.conditionApplied,
+                basis
+              }
+        );
+      });
     }, RECHECK_AMEND_MS);
     return () => clearTimeout(timer);
   }, [rolled, stale, busy, recheck, proposal, damageOverride, save.id]);
@@ -476,39 +439,35 @@ function ReactionPrompt({
   // `use` distinguishes the swing (Attack) from letting the mover go; opts drive the preview flow.
   const answer = (use: boolean, opts: { commit?: boolean; rollMode?: DieMode; attackNatural?: number } = {}) => {
     setBusy(true);
-    socket.emit(
-      "reaction:answer",
-      { commandId: newId(), reactionId: reaction.id, use, ...opts },
-      (result: ReactionAnswerResult) => {
-        setBusy(false);
-        if (!result.ok) {
-          onFeedback(result.message ?? "The reaction could not be answered.");
+    void command("reaction:answer", { reactionId: reaction.id, use, ...opts }).then((result) => {
+      setBusy(false);
+      if (!result.ok) {
+        onFeedback(result.message ?? "The reaction could not be answered.");
+        return;
+      }
+      const outcome = result.outcome;
+      if (!outcome) return;
+      if (opportunity) {
+        // A preview keeps the prompt open to confirm; an applied answer clears it.
+        if (outcome.resolution?.preview && outcome.resolution.attack) {
+          setRolled({ attack: outcome.resolution.attack, mode: outcome.resolution.rollMode?.mode });
           return;
         }
-        const outcome = result.outcome;
-        if (!outcome) return;
-        if (opportunity) {
-          // A preview keeps the prompt open to confirm; an applied answer clears it.
-          if (outcome.resolution?.preview && outcome.resolution.attack) {
-            setRolled({ attack: outcome.resolution.attack, mode: outcome.resolution.rollMode?.mode });
-            return;
-          }
-          setRolled(null);
-          const attack = outcome.resolution?.attack;
-          onFeedback(
-            use
-              ? `${actorName}'s opportunity attack: ${attack ? `${attack.outcome.toUpperCase()} (${attack.total})` : "resolved"}${outcome.appliedDamage > 0 ? ` - ${outcome.appliedDamage} damage` : ""}.`
-              : `${actorName} let ${reaction.sourceName} go.`
-          );
-        } else {
-          onFeedback(
-            use
-              ? `${actorName} used ${reaction.actionName} - ${reaction.proposedDamage} damage became ${outcome.appliedDamage}.`
-              : `${actorName} took ${outcome.appliedDamage} damage.`
-          );
-        }
+        setRolled(null);
+        const attack = outcome.resolution?.attack;
+        onFeedback(
+          use
+            ? `${actorName}'s opportunity attack: ${attack ? `${attack.outcome.toUpperCase()} (${attack.total})` : "resolved"}${outcome.appliedDamage > 0 ? ` - ${outcome.appliedDamage} damage` : ""}.`
+            : `${actorName} let ${reaction.sourceName} go.`
+        );
+      } else {
+        onFeedback(
+          use
+            ? `${actorName} used ${reaction.actionName} - ${reaction.proposedDamage} damage became ${outcome.appliedDamage}.`
+            : `${actorName} took ${outcome.appliedDamage} damage.`
+        );
       }
-    );
+    });
   };
   // Auto mode rolls the opportunity swing as soon as the prompt appears (still a preview).
   useEffect(() => {
@@ -528,7 +487,7 @@ function ReactionPrompt({
   };
   const dismiss = () => {
     setBusy(true);
-    socket.emit("reaction:dismiss", { commandId: newId(), reactionId: reaction.id }, (result: MutationResult) => {
+    void command("reaction:dismiss", { reactionId: reaction.id }).then((result) => {
       setBusy(false);
       onFeedback(
         result.ok
@@ -742,7 +701,7 @@ function EffectChips({
           : "until ended";
   const end = (effectId: string, name: string) => {
     setBusy(true);
-    socket.emit("effect:end", { commandId: newId(), actorId, effectId }, (result: MutationResult) => {
+    void command("effect:end", { actorId, effectId }).then((result) => {
       setBusy(false);
       onFeedback(result.ok ? `${name} ended.` : (result.message ?? "The effect could not be ended."));
     });
@@ -801,7 +760,7 @@ function DyingTracker({
   const dead = deathSaves.failures >= 3;
   const send = (commit: boolean, extra: { rollMode?: DieMode; naturalRoll?: number }) => {
     setBusy(true);
-    socket.emit("death-save:roll", { commandId: newId(), actorId, commit, ...extra }, (result: DeathSaveResult) => {
+    void command("death-save:roll", { actorId, commit, ...extra }).then((result) => {
       setBusy(false);
       if (!result.ok) {
         onFeedback(result.message ?? "The death save failed.");
@@ -1516,7 +1475,7 @@ function PlayerTurnEconomy({
             disabled={busy}
             onClick={() =>
               emit(
-                () => emitCommand("turn:use", { commandId: newId(), slot: "action", used: !combat.turn.actionUsed }),
+                () => command("turn:use", { slot: "action", used: !combat.turn.actionUsed }),
                 "The action could not be updated."
               )
             }
@@ -1531,8 +1490,7 @@ function PlayerTurnEconomy({
             onClick={() =>
               emit(
                 () =>
-                  emitCommand("turn:use", {
-                    commandId: newId(),
+                  command("turn:use", {
                     slot: "bonus-action",
                     used: !combat.turn.bonusActionUsed
                   }),
@@ -1552,7 +1510,7 @@ function PlayerTurnEconomy({
         title="Reactions refresh when your turn starts"
         onClick={() =>
           emit(
-            () => emitCommand("turn:use-reaction", { commandId: newId(), actorId: myId, used: !reactionUsed }),
+            () => command("turn:use-reaction", { actorId: myId, used: !reactionUsed }),
             "The reaction could not be updated."
           )
         }
@@ -1569,7 +1527,7 @@ function PlayerTurnEconomy({
           type="button"
           className="encounter-primary turn-end"
           disabled={busy}
-          onClick={() => emit(() => emitCommand("turn:end", { commandId: newId() }), "The turn could not end.")}
+          onClick={() => emit(() => command("turn:end", {}), "The turn could not end.")}
         >
           End turn
         </button>
@@ -1599,14 +1557,14 @@ function PendingDamagePrompt({
     const typed = amount !== null && amount.trim() !== "" ? Number(amount) : undefined;
     const override =
       apply && typed !== undefined && Number.isFinite(typed) && typed !== proposal.proposedTotal ? typed : undefined;
-    socket.emit(
-      "damage:resolve",
-      { commandId: newId(), proposalId: proposal.id, apply, ...(override !== undefined ? { amount: override } : {}) },
-      (result: MutationResult) => {
-        setBusy(false);
-        if (!result.ok) onFeedback(result.message ?? "The damage could not be resolved.");
-      }
-    );
+    void command("damage:resolve", {
+      proposalId: proposal.id,
+      apply,
+      ...(override !== undefined ? { amount: override } : {})
+    }).then((result) => {
+      setBusy(false);
+      if (!result.ok) onFeedback(result.message ?? "The damage could not be resolved.");
+    });
   };
   return (
     <div
@@ -1659,19 +1617,14 @@ function InitiativePrompt({ actorId }: Readonly<{ actorId: string }>) {
   const [feedback, setFeedback] = useState("");
   const roll = (payload: { natural?: number; rollMode?: DieMode }) => {
     setBusy(true);
-    socket.emit(
-      "initiative:roll-self",
-      {
-        commandId: newId(),
-        actorId,
-        ...(payload.natural !== undefined ? { natural: payload.natural } : {}),
-        ...(payload.rollMode ? { rollMode: payload.rollMode } : {})
-      },
-      (result: MutationResult) => {
-        setBusy(false);
-        if (!result.ok) setFeedback(result.message ?? "Initiative could not be rolled.");
-      }
-    );
+    void command("initiative:roll-self", {
+      actorId,
+      ...(payload.natural !== undefined ? { natural: payload.natural } : {}),
+      ...(payload.rollMode ? { rollMode: payload.rollMode } : {})
+    }).then((result) => {
+      setBusy(false);
+      if (!result.ok) setFeedback(result.message ?? "Initiative could not be rolled.");
+    });
   };
   const submitManual = () => {
     const value = Number(manual.trim());
@@ -2106,8 +2059,7 @@ function GmEncounterPanel({
           return { actorId: actor.id, ...(value ? { score: Number(value) } : {}) };
         });
       if (entries.length === 0) throw new Error("Stage at least one character or monster.");
-      return emitCommand("encounter:start", {
-        commandId: newId(),
+      return command("encounter:start", {
         mapAssetId: startMapId,
         entries,
         playersRollInitiative,
@@ -2126,8 +2078,7 @@ function GmEncounterPanel({
     if (!validInitiativeScore(trimmed) || Number(trimmed) === previous) return;
     void run(
       () =>
-        emitCommand("initiative:set", {
-          commandId: newId(),
+        command("initiative:set", {
           actorId,
           score: Number(trimmed),
           expectedRevision: state.revision
@@ -2173,18 +2124,16 @@ function GmEncounterPanel({
   };
   const next = () =>
     void runTurn(
-      () => emitCommand("initiative:next", { commandId: newId(), expectedRevision: state.revision }),
+      () => command("initiative:next", { expectedRevision: state.revision }),
       reviewing?.resumeNext ? "Resumed live play." : "Advanced to the next turn.",
-      () =>
-        emitCommand("initiative:next", { commandId: newId(), confirmRewrite: true, expectedRevision: state.revision })
+      () => command("initiative:next", { confirmRewrite: true, expectedRevision: state.revision })
     );
   const previous = () =>
     void runTurn(
-      () => emitCommand("initiative:previous", { commandId: newId(), expectedRevision: state.revision }),
+      () => command("initiative:previous", { expectedRevision: state.revision }),
       "Moved to the previous turn.",
       () =>
-        emitCommand("initiative:previous", {
-          commandId: newId(),
+        command("initiative:previous", {
           confirmDiscard: true,
           expectedRevision: state.revision
         })
@@ -2199,10 +2148,7 @@ function GmEncounterPanel({
       }))
     )
       return;
-    void run(
-      () => emitCommand("encounter:end", { commandId: newId(), expectedRevision: state.revision }),
-      "Fight ended."
-    );
+    void run(() => command("encounter:end", { expectedRevision: state.revision }), "Fight ended.");
   };
   const adjustHp = (
     event: "actor:apply-damage" | "actor:heal" | "actor:set-temp-hp" | "actor:set-hp",
@@ -2231,12 +2177,11 @@ function GmEncounterPanel({
     void run(
       () =>
         event === "actor:set-hp"
-          ? emitCommand(event, { commandId: newId(), actorId, current: value, expectedRevision: state.revision })
+          ? command(event, { actorId, current: value, expectedRevision: state.revision })
           : event === "actor:apply-damage"
-            ? emitCommand(
+            ? command(
                 event,
                 manualDamagePayload({
-                  commandId: newId(),
                   actorId,
                   amount: value,
                   damageType,
@@ -2244,7 +2189,7 @@ function GmEncounterPanel({
                   expectedRevision: state.revision
                 })
               )
-            : emitCommand(event, { commandId: newId(), actorId, amount: value, expectedRevision: state.revision }),
+            : command(event, { actorId, amount: value, expectedRevision: state.revision }),
       verbs[event]
     );
   };
@@ -2284,8 +2229,7 @@ function GmEncounterPanel({
     if (!sceneLive || map.id === state.combat.mapAssetId) return;
     void run(
       () =>
-        emitCommand("scene:create", {
-          commandId: newId(),
+        command("scene:create", {
           name: map.name.slice(0, 120),
           mapAssetId: map.id,
           combatantIds: stagedIds,
@@ -2418,8 +2362,7 @@ function GmEncounterPanel({
                   onClick={() =>
                     void run(
                       () =>
-                        emitCommand("turn:use-legendary", {
-                          commandId: newId(),
+                        command("turn:use-legendary", {
                           actorId: actor.id,
                           spent: Math.max(0, legendarySpent - 1),
                           expectedRevision: state.revision
@@ -2444,8 +2387,7 @@ function GmEncounterPanel({
                   onClick={() =>
                     void run(
                       () =>
-                        emitCommand("turn:use", {
-                          commandId: newId(),
+                        command("turn:use", {
                           slot: "action",
                           used: !state.combat.turn.actionUsed,
                           expectedRevision: state.revision
@@ -2464,8 +2406,7 @@ function GmEncounterPanel({
                   onClick={() =>
                     void run(
                       () =>
-                        emitCommand("turn:use", {
-                          commandId: newId(),
+                        command("turn:use", {
                           slot: "bonus-action",
                           used: !state.combat.turn.bonusActionUsed,
                           expectedRevision: state.revision
@@ -2485,8 +2426,7 @@ function GmEncounterPanel({
                   onClick={() =>
                     void run(
                       () =>
-                        emitCommand("turn:use-reaction", {
-                          commandId: newId(),
+                        command("turn:use-reaction", {
                           actorId: actor.id,
                           used: !state.combat.reactionsUsed.includes(actor.id),
                           expectedRevision: state.revision
@@ -2671,15 +2611,12 @@ function GmEncounterPanel({
                           disabled={busy}
                           onChange={(event) => {
                             const mode = event.target.value as "strict" | "assisted" | "freeform";
-                            socket.emit(
-                              "encounter:set-rules-mode",
-                              { commandId: newId(), mode },
-                              (result: MutationResult) =>
-                                setMessage(
-                                  result.ok
-                                    ? `Rules assistant: ${mode === "strict" ? "Enforce" : mode === "assisted" ? "Advise" : "Off"}.`
-                                    : (result.message ?? "The rules assistant could not be changed.")
-                                )
+                            void command("encounter:set-rules-mode", { mode }).then((result) =>
+                              setMessage(
+                                result.ok
+                                  ? `Rules assistant: ${mode === "strict" ? "Enforce" : mode === "assisted" ? "Advise" : "Off"}.`
+                                  : (result.message ?? "The rules assistant could not be changed.")
+                              )
                             );
                           }}
                         >
@@ -2695,15 +2632,12 @@ function GmEncounterPanel({
                           disabled={busy}
                           onChange={(event) => {
                             const mode = event.target.value as "proposal" | "direct";
-                            socket.emit(
-                              "encounter:set-player-damage-mode",
-                              { commandId: newId(), mode },
-                              (result: MutationResult) =>
-                                setMessage(
-                                  result.ok
-                                    ? `Players' hits ${mode === "direct" ? "apply directly." : "wait for your OK."}`
-                                    : (result.message ?? "The player damage mode could not be changed.")
-                                )
+                            void command("encounter:set-player-damage-mode", { mode }).then((result) =>
+                              setMessage(
+                                result.ok
+                                  ? `Players' hits ${mode === "direct" ? "apply directly." : "wait for your OK."}`
+                                  : (result.message ?? "The player damage mode could not be changed.")
+                              )
                             );
                           }}
                         >
@@ -2718,15 +2652,12 @@ function GmEncounterPanel({
                           disabled={busy}
                           onChange={(event) => {
                             const mode = event.target.value as "immediate" | "wait";
-                            socket.emit(
-                              "encounter:set-player-initiative-mode",
-                              { commandId: newId(), mode },
-                              (result: MutationResult) =>
-                                setMessage(
-                                  result.ok
-                                    ? `Player initiative ${mode === "wait" ? "waits for everyone." : "begins immediately."}`
-                                    : (result.message ?? "The player initiative mode could not be changed.")
-                                )
+                            void command("encounter:set-player-initiative-mode", { mode }).then((result) =>
+                              setMessage(
+                                result.ok
+                                  ? `Player initiative ${mode === "wait" ? "waits for everyone." : "begins immediately."}`
+                                  : (result.message ?? "The player initiative mode could not be changed.")
+                              )
                             );
                           }}
                         >
@@ -2741,15 +2672,15 @@ function GmEncounterPanel({
                           disabled={busy}
                           onChange={(event) => {
                             const style = event.target.value as "band" | "bar" | "ring" | "aura";
-                            socket.emit(
-                              "encounter:set-health-display",
-                              { commandId: newId(), style, audience: state.combat.healthDisplay.audience },
-                              (result: MutationResult) =>
-                                setMessage(
-                                  result.ok
-                                    ? `Health shows as ${style === "band" ? "a status badge" : style === "bar" ? "an HP bar" : style === "ring" ? "a health ring" : "a health aura"}.`
-                                    : (result.message ?? "The health display could not be changed.")
-                                )
+                            void command("encounter:set-health-display", {
+                              style,
+                              audience: state.combat.healthDisplay.audience
+                            }).then((result) =>
+                              setMessage(
+                                result.ok
+                                  ? `Health shows as ${style === "band" ? "a status badge" : style === "bar" ? "an HP bar" : style === "ring" ? "a health ring" : "a health aura"}.`
+                                  : (result.message ?? "The health display could not be changed.")
+                              )
                             );
                           }}
                         >
@@ -2766,15 +2697,15 @@ function GmEncounterPanel({
                           disabled={busy || state.combat.healthDisplay.style === "band"}
                           onChange={(event) => {
                             const audience = event.target.value as "gm" | "all";
-                            socket.emit(
-                              "encounter:set-health-display",
-                              { commandId: newId(), style: state.combat.healthDisplay.style, audience },
-                              (result: MutationResult) =>
-                                setMessage(
-                                  result.ok
-                                    ? `Health is ${audience === "all" ? "shown to players" : "GM only"}.`
-                                    : (result.message ?? "The health display could not be changed.")
-                                )
+                            void command("encounter:set-health-display", {
+                              style: state.combat.healthDisplay.style,
+                              audience
+                            }).then((result) =>
+                              setMessage(
+                                result.ok
+                                  ? `Health is ${audience === "all" ? "shown to players" : "GM only"}.`
+                                  : (result.message ?? "The health display could not be changed.")
+                              )
                             );
                           }}
                         >
@@ -2788,17 +2719,14 @@ function GmEncounterPanel({
                         checked={state.combat.underwater}
                         disabled={busy}
                         onChange={(underwater) =>
-                          socket.emit(
-                            "encounter:set-environment",
-                            { commandId: newId(), underwater },
-                            (result: MutationResult) =>
-                              setMessage(
-                                result.ok
-                                  ? underwater
-                                    ? "The fight is now underwater."
-                                    : "The fight is no longer underwater."
-                                  : (result.message ?? "The environment could not be changed.")
-                              )
+                          void command("encounter:set-environment", { underwater }).then((result) =>
+                            setMessage(
+                              result.ok
+                                ? underwater
+                                  ? "The fight is now underwater."
+                                  : "The fight is no longer underwater."
+                                : (result.message ?? "The environment could not be changed.")
+                            )
                           )
                         }
                       />
@@ -2831,8 +2759,7 @@ function GmEncounterPanel({
                                 onClick={() =>
                                   void run(
                                     () =>
-                                      emitCommand("encounter:add-combatant", {
-                                        commandId: newId(),
+                                      command("encounter:add-combatant", {
                                         actorId: actor.id,
                                         expectedRevision: state.revision
                                       }),
@@ -2931,7 +2858,7 @@ function GmEncounterPanel({
                 disabled={busy}
                 onClick={() => {
                   setBusy(true);
-                  socket.emit("initiative:roll-remaining", { commandId: newId() }, (result: MutationResult) => {
+                  void command("initiative:roll-remaining", {}).then((result) => {
                     setBusy(false);
                     setMessage(
                       result.ok
@@ -3135,8 +3062,7 @@ function GmEncounterPanel({
                               onClick={() =>
                                 void run(
                                   () =>
-                                    emitCommand("turn:use-reaction", {
-                                      commandId: newId(),
+                                    command("turn:use-reaction", {
                                       actorId: actor.id,
                                       used: !state.combat.reactionsUsed.includes(actor.id),
                                       expectedRevision: state.revision

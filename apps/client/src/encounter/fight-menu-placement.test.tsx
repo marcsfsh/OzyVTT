@@ -1,6 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn(), connected: true } }));
+// `command()` and `read()` send through `socket.timeout(ms).emit` with an error-first ack; it is routed to
+// `socket.emit` here so the assertions read one call list.
+vi.mock("../socket", () => {
+  const emit = vi.fn();
+  const timed = {
+    emit: (event: string, payload: unknown, ack: (error: null, reply: unknown) => void) =>
+      emit(event, payload, (reply: unknown) => ack(null, reply))
+  };
+  return { socket: { on: vi.fn(), off: vi.fn(), emit, connected: true, timeout: () => timed } };
+});
 
 import { placeFightMenu } from "./EncounterPanel";
 

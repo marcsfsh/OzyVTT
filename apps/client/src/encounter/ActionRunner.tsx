@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { usePrompt } from "../components/feedback";
-import type { ContentActionSummary, DamageApplyResult, GmActor, GmView } from "@vtt/domain";
+import type { ContentActionSummary, GmActor, GmView } from "@vtt/domain";
 import { Button } from "@vtt/ui";
 import { RichText } from "./RichText";
 import { SpellcastingText } from "./spells";
@@ -19,8 +19,7 @@ import {
   type ResolveOptions
 } from "./targeting";
 import { useRollPreference } from "../dice/roll-preference";
-import { newId } from "../lib/ids";
-import { socket } from "../socket";
+import { command, read } from "../lib/command";
 import { registerContentCache } from "../content/invalidate";
 
 /** Per-definition action cache. Cleared on `homebrew:changed` (`content/invalidate.ts`), since a GM
@@ -170,7 +169,7 @@ export function ActionRunner({
       return;
     }
     setActions(null);
-    socket.emit("content:monster-actions", { definitionId }, (response) => {
+    void read("content:monster-actions", { definitionId }).then((response) => {
       if (response.ok && response.actions) {
         actionCache.set(definitionId, response.actions);
         setActions(response.actions);
@@ -230,40 +229,35 @@ export function ActionRunner({
       ...(result.bonusDamage ?? []).map((part) => ({ amount: part.amount, type: part.type }))
     ].filter((part) => part.amount > 0);
     const useOverride = overrideAmount !== undefined && overrideAmount !== result.damageTotal;
-    socket.emit(
-      "actor:apply-damage",
-      {
-        commandId: newId(),
-        actorId: targetId,
-        amount: overrideAmount ?? result.damageTotal,
-        parts,
-        ...(useOverride ? { damageOverride: overrideAmount } : {}),
-        sourceActorId: actor.id,
-        sourceName: `${actor.name}'s ${result.actionName}`,
-        critical: result.crit
-      },
-      (response: DamageApplyResult) => {
-        setBusy(false);
-        if (!response.ok) {
-          onFeedback(response.message ?? "The damage could not be applied.");
-          return;
-        }
-        setApplied((current) => new Set([...current, key]));
-        const application = response.applied;
-        if (application && application.totalApplied !== application.totalRequested) {
-          const adjusted = application.parts
-            .filter((part) => part.adjustment !== null)
-            .map(
-              (part) =>
-                `${part.amount} ${part.type} → ${part.adjusted} (${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""})`
-            )
-            .join("; ");
-          onFeedback(`${targetName} took ${application.totalApplied} damage - ${adjusted}.`);
-        } else {
-          onFeedback(`${targetName} took ${application?.totalApplied ?? result.damageTotal} damage.`);
-        }
+    void command("actor:apply-damage", {
+      actorId: targetId,
+      amount: overrideAmount ?? result.damageTotal,
+      parts,
+      ...(useOverride ? { damageOverride: overrideAmount } : {}),
+      sourceActorId: actor.id,
+      sourceName: `${actor.name}'s ${result.actionName}`,
+      critical: result.crit
+    }).then((response) => {
+      setBusy(false);
+      if (!response.ok) {
+        onFeedback(response.message ?? "The damage could not be applied.");
+        return;
       }
-    );
+      setApplied((current) => new Set([...current, key]));
+      const application = response.applied;
+      if (application && application.totalApplied !== application.totalRequested) {
+        const adjusted = application.parts
+          .filter((part) => part.adjustment !== null)
+          .map(
+            (part) =>
+              `${part.amount} ${part.type} → ${part.adjusted} (${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""})`
+          )
+          .join("; ");
+        onFeedback(`${targetName} took ${application.totalApplied} damage - ${adjusted}.`);
+      } else {
+        onFeedback(`${targetName} took ${application?.totalApplied ?? result.damageTotal} damage.`);
+      }
+    });
   };
 
   const instance =

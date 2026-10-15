@@ -8,6 +8,7 @@ import {
   type ContentSpellSummary,
   type GmActor,
   type GmView,
+  type MutationResult,
   type PlayerActor,
   type PlayerView
 } from "@vtt/domain";
@@ -33,7 +34,7 @@ import { PlayerActionRunner, summaryOfOwnAction } from "./EncounterPanel";
 import { beginTargeting, setTargetingResult, useTargeting } from "./targeting";
 import { usePrompt } from "../components/feedback";
 import { newId } from "../lib/ids";
-import { socket } from "../socket";
+import { command, read } from "../lib/command";
 import { registerContentCache } from "../content/invalidate";
 
 /** One fetch per stat block per session. Cleared on `homebrew:changed` (`content/invalidate.ts`),
@@ -181,13 +182,13 @@ export function SheetHpControls({
     setBusy(true);
     // Only Dmg carries a type; Heal, Temp and Set share the row and have none.
     const typed = event === "actor:apply-damage" ? manualDamageType(damageType) : undefined;
-    const payload =
+    const sent =
       event === "actor:set-hp"
-        ? { commandId: newId(), actorId, current: value }
+        ? command(event, { actorId, current: value })
         : event === "actor:apply-damage"
-          ? manualDamagePayload({ commandId: newId(), actorId, amount: value, damageType: typed })
-          : { commandId: newId(), actorId, amount: value };
-    socket.emit(event, payload as never, (result: { ok: boolean; message?: string }) => {
+          ? command(event, manualDamagePayload({ actorId, amount: value, damageType: typed }))
+          : command(event, { actorId, amount: value });
+    void sent.then((result) => {
       setBusy(false);
       onFeedback(
         result.ok
@@ -246,26 +247,22 @@ function SheetRest({
   const chosen = hitDice ? Math.max(1, Math.min(count, Math.max(1, hitDice.remaining))) : 1;
   const rest = (kind: "short" | "long") => {
     setBusy(true);
-    socket.emit("actor:rest", { commandId: newId(), actorId, kind }, (result: { ok: boolean; message?: string }) => {
+    void command("actor:rest", { actorId, kind }).then((result) => {
       setBusy(false);
       onFeedback(result.ok ? `Completed a ${kind} rest.` : (result.message ?? "The rest could not be applied."));
     });
   };
   const spendDice = () => {
     setBusy(true);
-    socket.emit(
-      "actor:spend-hit-dice",
-      { commandId: newId(), actorId, count: chosen },
-      (result: { ok: boolean; message?: string }) => {
-        setBusy(false);
-        onFeedback(
-          result.ok
-            ? `Spent ${chosen} Hit ${chosen === 1 ? "Die" : "Dice"} - the heal is in the dice log.`
-            : (result.message ?? "The Hit Dice could not be spent.")
-        );
-        if (result.ok) setCount(1);
-      }
-    );
+    void command("actor:spend-hit-dice", { actorId, count: chosen }).then((result) => {
+      setBusy(false);
+      onFeedback(
+        result.ok
+          ? `Spent ${chosen} Hit ${chosen === 1 ? "Die" : "Dice"} - the heal is in the dice log.`
+          : (result.message ?? "The Hit Dice could not be spent.")
+      );
+      if (result.ok) setCount(1);
+    });
   };
   return (
     <div className="sheet-rest">
@@ -475,7 +472,7 @@ export function CharacterSheet({
   const [feedback, setFeedback] = useState("");
   const [rolling, setRolling] = useState(false);
   const [busy, setBusy] = useState(false);
-  const ack = (result: { ok: boolean; message?: string }) => {
+  const ack = (result: MutationResult) => {
     setBusy(false);
     if (!result.ok) setFeedback(result.message ?? "That change was rejected.");
   };
@@ -589,16 +586,18 @@ export function CharacterSheet({
     setRolling(true);
     // The specific label ("Athletics check", "Fireball at 3rd") lets the log show the roll's kind.
     // Capped to the record's 80-char limit.
-    socket.emit(
-      "dice:roll",
-      { commandId: newId(), formula, purpose, visibility: "public", label: label.slice(0, 80), actorId: actor.id },
-      (result: { ok: boolean; message?: string }) => {
-        setRolling(false);
-        setFeedback(
-          result.ok ? `Rolled ${label} (${formula}) - see the dice log.` : (result.message ?? "The roll was rejected.")
-        );
-      }
-    );
+    void command("dice:roll", {
+      formula,
+      purpose,
+      visibility: "public",
+      label: label.slice(0, 80),
+      actorId: actor.id
+    }).then((result) => {
+      setRolling(false);
+      setFeedback(
+        result.ok ? `Rolled ${label} (${formula}) - see the dice log.` : (result.message ?? "The roll was rejected.")
+      );
+    });
   };
   // Manual entry: the typed die result is recorded as a flat roll (constants are valid dice), so it
   // lands in the log like any roll. `bonusMode` "auto" adds the bonus ("15 + 7"); "total" sends it as is.
@@ -719,17 +718,14 @@ export function CharacterSheet({
       return;
     }
     let live = true;
-    socket.emit(
-      "actor:available-actions",
-      { actorId: actor.id },
-      (result: { ok: boolean; actions?: readonly AvailabilityRow[]; derived?: ActorDerivedSheet }) => {
-        // Failures are silent: every caller has a fallback, and the user did not ask for this lookup.
-        if (!live || !result.ok) return;
-        if (result.actions) setServerActions(result.actions.filter((row) => !row.builtin).map(summaryOfAvailability));
-        // Absent only from an older server; the fallback covers that.
-        if (result.derived) setDerived(result.derived);
-      }
-    );
+    void read("actor:available-actions", { actorId: actor.id }).then((result) => {
+      // Failures are silent: every caller has a fallback, and the user did not ask for this lookup.
+      if (!live || !result.ok) return;
+      const rows: readonly AvailabilityRow[] | undefined = result.actions;
+      if (rows) setServerActions(rows.filter((row) => !row.builtin).map(summaryOfAvailability));
+      // Absent only from an older server; the fallback covers that.
+      if (result.derived) setDerived(result.derived);
+    });
     return () => {
       live = false;
     };
@@ -739,7 +735,7 @@ export function CharacterSheet({
 
   useEffect(() => {
     if (role !== "gm" || !definitionId || ownDefinition || sheetCache.has(definitionId)) return;
-    socket.emit("content:monster-sheet", { definitionId }, (result) => {
+    void read("content:monster-sheet", { definitionId }).then((result) => {
       if (result.ok && result.definition) {
         sheetCache.set(definitionId, result.definition);
         setFetched(result.definition);
@@ -821,30 +817,26 @@ export function CharacterSheet({
     const { formula } = spellEffectAt(content, spell.level, level);
     const types = content && content.damageTypes.length ? ` ${content.damageTypes.join("/")}` : "";
     setBusy(true);
-    socket.emit(
-      "character:set-slot",
-      { commandId: newId(), actorId: actor.id, level, remaining: rem - 1 },
-      (result: { ok: boolean; message?: string }) => {
-        setBusy(false);
-        if (!result.ok) {
-          setFeedback(result.message ?? "The slot could not be spent.");
-          return;
-        }
-        // The slot is spent; on your turn a spell that targets a creature goes through the structured flow.
-        // A utility spell stays a plain note. Known limitation: an upcast spell resolves at its base dice
-        // here; the GM can adjust the parked damage.
-        const structured = structuredAttacks
-          ? structuredActionFor({ actionId: spell.actionId ?? undefined, name: spell.name })
-          : null;
-        if (structured) {
-          routeAttack(structured);
-          return;
-        }
-        // Digital rolls the damage; manual prompts for the physical total.
-        if (formula) void rollFlat(formula, "damage", `${spell.name} at ${ordinal(level)}${types}`);
-        else setFeedback(`Cast ${spell.name} at ${ordinal(level)} - spent a ${ordinal(level)}-level slot.`);
+    void command("character:set-slot", { actorId: actor.id, level, remaining: rem - 1 }).then((result) => {
+      setBusy(false);
+      if (!result.ok) {
+        setFeedback(result.message ?? "The slot could not be spent.");
+        return;
       }
-    );
+      // The slot is spent; on your turn a spell that targets a creature goes through the structured flow.
+      // A utility spell stays a plain note. Known limitation: an upcast spell resolves at its base dice
+      // here; the GM can adjust the parked damage.
+      const structured = structuredAttacks
+        ? structuredActionFor({ actionId: spell.actionId ?? undefined, name: spell.name })
+        : null;
+      if (structured) {
+        routeAttack(structured);
+        return;
+      }
+      // Digital rolls the damage; manual prompts for the physical total.
+      if (formula) void rollFlat(formula, "damage", `${spell.name} at ${ordinal(level)}${types}`);
+      else setFeedback(`Cast ${spell.name} at ${ordinal(level)} - spent a ${ordinal(level)}-level slot.`);
+    });
   };
   // Cantrips cost no slot: roll a damaging cantrip's die, or note a utility cast.
   const castCantrip = (spell: Readonly<{ id: string; name: string; level: number; actionId?: string | null }>) => {
@@ -933,30 +925,25 @@ export function CharacterSheet({
   const addFromCatalog = (item: ContentEquipmentSummary, baseId?: string) => {
     const existing = inventory.find((entry) => entry.id === item.id);
     setBusy(true);
-    socket.emit(
-      "character:set-inventory",
-      {
-        commandId: newId(),
-        actorId: actor.id,
-        item: {
-          id: item.id,
-          name: item.name,
-          quantity: (existing?.quantity ?? 0) + 1,
-          category: item.category,
-          ...(existing ? { equipped: existing.equipped, attuned: existing.attuned } : {}),
-          // The template pick from the chooser, or the one the owned row already has (a re-add must not
-          // unbind it). The server validates the pick and copies the base's stats.
-          ...(baseId ? { baseId } : existing?.baseId ? { baseId: existing.baseId } : {}),
-          ...(item.weightLb != null ? { weightEach: item.weightLb } : {}),
-          ...(item.description ? { description: item.description } : {}),
-          // Carry the weapon/armor stats so equipping matters. The weapon block is narrowed, not spread: the
-          // browse summary's `mastery` is refused by the strict wire schema (see `inventoryWeaponFrom`).
-          ...(item.weapon ? { weapon: inventoryWeaponFrom(item.weapon) } : {}),
-          ...(item.armor ? { armor: item.armor } : {})
-        }
-      },
-      ack
-    );
+    void command("character:set-inventory", {
+      actorId: actor.id,
+      item: {
+        id: item.id,
+        name: item.name,
+        quantity: (existing?.quantity ?? 0) + 1,
+        category: item.category,
+        ...(existing ? { equipped: existing.equipped, attuned: existing.attuned } : {}),
+        // The template pick from the chooser, or the one the owned row already has (a re-add must not
+        // unbind it). The server validates the pick and copies the base's stats.
+        ...(baseId ? { baseId } : existing?.baseId ? { baseId: existing.baseId } : {}),
+        ...(item.weightLb != null ? { weightEach: item.weightLb } : {}),
+        ...(item.description ? { description: item.description } : {}),
+        // Carry the weapon/armor stats so equipping matters. The weapon block is narrowed, not spread: the
+        // browse summary's `mastery` is refused by the strict wire schema (see `inventoryWeaponFrom`).
+        ...(item.weapon ? { weapon: inventoryWeaponFrom(item.weapon) } : {}),
+        ...(item.armor ? { armor: item.armor } : {})
+      }
+    }).then(ack);
   };
   // Keep the coin editor in sync with the authoritative purse.
   useEffect(() => {
@@ -989,7 +976,7 @@ export function CharacterSheet({
       setFetched(next);
     }
     setBusy(true);
-    socket.emit("character:set-proficiencies", { commandId: newId(), actorId: actor.id, proficiencies }, ack);
+    void command("character:set-proficiencies", { actorId: actor.id, proficiencies }).then(ack);
   };
   const toggleSave = (ability: string) => {
     const next = {
@@ -1055,7 +1042,7 @@ export function CharacterSheet({
       setFetched(nextDef);
     }
     setBusy(true);
-    socket.emit("character:set-identity", { commandId: newId(), actorId: actor.id, character: next }, (result) => {
+    void command("character:set-identity", { actorId: actor.id, character: next }).then((result) => {
       ack(result);
       if (result.ok) setEditMode(null);
     });
@@ -1460,16 +1447,11 @@ export function CharacterSheet({
                                   aria-label={`${index < remaining ? "Spend" : "Restore"} a level ${level} slot`}
                                   onClick={() => {
                                     setBusy(true);
-                                    socket.emit(
-                                      "character:set-slot",
-                                      {
-                                        commandId: newId(),
-                                        actorId: actor.id,
-                                        level,
-                                        remaining: index < remaining ? index : index + 1
-                                      },
-                                      ack
-                                    );
+                                    void command("character:set-slot", {
+                                      actorId: actor.id,
+                                      level,
+                                      remaining: index < remaining ? index : index + 1
+                                    }).then(ack);
                                   }}
                                 />
                               ))}
@@ -1495,16 +1477,11 @@ export function CharacterSheet({
                                     title={isPrepared ? "Prepared - tap to unprepare" : "Not prepared - tap to prepare"}
                                     onClick={() => {
                                       setBusy(true);
-                                      socket.emit(
-                                        "character:set-prepared",
-                                        {
-                                          commandId: newId(),
-                                          actorId: actor.id,
-                                          spellId: spell.id,
-                                          prepared: !isPrepared
-                                        },
-                                        ack
-                                      );
+                                      void command("character:set-prepared", {
+                                        actorId: actor.id,
+                                        spellId: spell.id,
+                                        prepared: !isPrepared
+                                      }).then(ack);
                                     }}
                                   >
                                     {isPrepared ? "Prepared" : "Prepare"}
@@ -1566,11 +1543,10 @@ export function CharacterSheet({
                   const name = newItem.trim();
                   if (!name) return;
                   setBusy(true);
-                  socket.emit(
-                    "character:set-inventory",
-                    { commandId: newId(), actorId: actor.id, item: { id: slugify(name), name, quantity: 1 } },
-                    ack
-                  );
+                  void command("character:set-inventory", {
+                    actorId: actor.id,
+                    item: { id: slugify(name), name, quantity: 1 }
+                  }).then(ack);
                   setNewItem("");
                 }}
               >
@@ -1635,11 +1611,10 @@ export function CharacterSheet({
                         aria-label={`Quantity of ${item.name}`}
                         onChange={(quantity) => {
                           setBusy(true);
-                          socket.emit(
-                            "character:set-inventory",
-                            { commandId: newId(), actorId: actor.id, item: { ...item, quantity } },
-                            ack
-                          );
+                          void command("character:set-inventory", {
+                            actorId: actor.id,
+                            item: { ...item, quantity }
+                          }).then(ack);
                         }}
                       />
                       <button
@@ -1649,11 +1624,10 @@ export function CharacterSheet({
                         aria-pressed={item.equipped}
                         onClick={() => {
                           setBusy(true);
-                          socket.emit(
-                            "character:set-inventory",
-                            { commandId: newId(), actorId: actor.id, item: { ...item, equipped: !item.equipped } },
-                            ack
-                          );
+                          void command("character:set-inventory", {
+                            actorId: actor.id,
+                            item: { ...item, equipped: !item.equipped }
+                          }).then(ack);
                         }}
                       >
                         {item.equipped ? "Equipped" : "Equip"}
@@ -1665,11 +1639,10 @@ export function CharacterSheet({
                         aria-pressed={item.attuned}
                         onClick={() => {
                           setBusy(true);
-                          socket.emit(
-                            "character:set-inventory",
-                            { commandId: newId(), actorId: actor.id, item: { ...item, attuned: !item.attuned } },
-                            ack
-                          );
+                          void command("character:set-inventory", {
+                            actorId: actor.id,
+                            item: { ...item, attuned: !item.attuned }
+                          }).then(ack);
                         }}
                       >
                         {item.attuned ? "Attuned" : "Attune"}
@@ -1681,11 +1654,10 @@ export function CharacterSheet({
                         disabled={busy}
                         onClick={() => {
                           setBusy(true);
-                          socket.emit(
-                            "character:set-inventory",
-                            { commandId: newId(), actorId: actor.id, item: { ...item, quantity: 0 } },
-                            ack
-                          );
+                          void command("character:set-inventory", {
+                            actorId: actor.id,
+                            item: { ...item, quantity: 0 }
+                          }).then(ack);
                         }}
                       >
                         ✕
@@ -1720,9 +1692,7 @@ export function CharacterSheet({
                     onClose={() => setBindingRowId(null)}
                     onPick={(baseId) => {
                       setBusy(true);
-                      socket.emit(
-                        "character:set-inventory",
-                        { commandId: newId(), actorId: actor.id, item: { ...rowItem, baseId } },
+                      void command("character:set-inventory", { actorId: actor.id, item: { ...rowItem, baseId } }).then(
                         ack
                       );
                       setBindingRowId(null);
@@ -1753,11 +1723,7 @@ export function CharacterSheet({
                   disabled={busy}
                   onClick={() => {
                     setBusy(true);
-                    socket.emit(
-                      "character:set-currency",
-                      { commandId: newId(), actorId: actor.id, currency: coins },
-                      ack
-                    );
+                    void command("character:set-currency", { actorId: actor.id, currency: coins }).then(ack);
                   }}
                 >
                   Save coins

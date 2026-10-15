@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { ContentSpellSummary } from "@vtt/domain";
 import { Modal } from "@vtt/ui";
-import { socket } from "../socket";
+import { read } from "../lib/command";
 import { registerContentCache } from "../content/invalidate";
 import { RichText } from "./RichText";
 
@@ -15,15 +15,12 @@ let spellInFlight: Promise<void> | null = null;
 const spellListeners = new Set<(spells: readonly ContentSpellSummary[]) => void>();
 export function requestSpellReference(force = false) {
   if (spellCache && !force) return;
-  spellInFlight ??= new Promise((resolve) => {
-    socket.emit("content:spells", {}, (result) => {
-      spellInFlight = null;
-      if (result.ok && result.spells && result.spells.length > 0) {
-        spellCache = result.spells;
-        for (const listener of spellListeners) listener(spellCache);
-      }
-      resolve();
-    });
+  spellInFlight ??= read("content:spells", {}).then((result) => {
+    spellInFlight = null;
+    if (result.ok && result.spells && result.spells.length > 0) {
+      spellCache = result.spells;
+      for (const listener of spellListeners) listener(spellCache);
+    }
   });
 }
 

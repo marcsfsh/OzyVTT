@@ -114,14 +114,16 @@ function answerFromThePrompt(
   who: Readonly<{ role: "gm" | "player"; sessionId: string }> = { role: "gm", sessionId: IDS.gm },
   commit = true
 ) {
-  const payload = saveAnswerPayload({
+  const payload = {
     commandId: command,
-    saveId: IDS.save,
-    method: "manual",
-    commit,
-    total: rolledTotal,
-    ...(saveDamageAmend(17, typedDamage) !== undefined ? { damageOverride: saveDamageAmend(17, typedDamage) } : {})
-  });
+    ...saveAnswerPayload({
+      saveId: IDS.save,
+      method: "manual",
+      commit,
+      total: rolledTotal,
+      ...(saveDamageAmend(17, typedDamage) !== undefined ? { damageOverride: saveDamageAmend(17, typedDamage) } : {})
+    })
+  };
   const request = SaveAnswerSchema.parse(payload);
   const scope = who.role === "gm" ? { role: "gm" as const } : { role: "player" as const, sessionId: who.sessionId };
   return {
@@ -283,31 +285,31 @@ describe("the save prompt's damage field", () => {
     // Assert the message, not the path: `save.answer` surfaces `issues[0].message` verbatim
     // (`issueMessage`, apps/server/src/commands/saves.ts).
     for (const typed of ["9999", "1001"]) {
-      const refusal = SaveAnswerSchema.safeParse(
-        saveAnswerPayload({
-          commandId: command,
+      const refusal = SaveAnswerSchema.safeParse({
+        commandId: command,
+        ...saveAnswerPayload({
           saveId: IDS.save,
           method: "manual",
           commit: true,
           total: 5,
           damageOverride: saveDamageAmend(17, typed)
         })
-      );
+      });
       expect(refusal.success, `${typed} was accepted`).toBe(false);
       expect(refusal.error!.issues[0].message).toBe("Enter the damage as a whole number from 0 to 1000.");
     }
     // 1000 is inside the bound, so the sentence is a refusal and not a wall.
     expect(
-      SaveAnswerSchema.safeParse(
-        saveAnswerPayload({
-          commandId: command,
+      SaveAnswerSchema.safeParse({
+        commandId: command,
+        ...saveAnswerPayload({
           saveId: IDS.save,
           method: "manual",
           commit: true,
           total: 5,
           damageOverride: 1000
         })
-      ).success
+      }).success
     ).toBe(true);
 
     expect(() => answerFromThePrompt(table, "9999", 5)).toThrow();

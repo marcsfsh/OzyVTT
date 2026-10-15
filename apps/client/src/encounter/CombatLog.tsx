@@ -1,6 +1,7 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { CombatLogEntry } from "@vtt/domain";
 import { Drawer } from "@vtt/ui";
+import { read } from "../lib/command";
 import { socket } from "../socket";
 import "./combat-log.css";
 
@@ -33,7 +34,7 @@ function push(entry: CombatLogEntry) {
   emit();
 }
 function load() {
-  socket.emit("log:read", {}, (result: { ok: boolean; entries?: readonly CombatLogEntry[] }) => {
+  void read("log:read", {}).then((result) => {
     if (result.ok && result.entries) replace(result.entries);
   });
 }

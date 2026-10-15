@@ -5,8 +5,7 @@ import { IconButton, IconX } from "@vtt/ui";
 import { ConditionEditor } from "../encounter/conditions";
 import { DamageTypeField } from "../encounter/DamageTypeField";
 import { manualDamagePayload, manualDamageType } from "../encounter/manual-damage";
-import { newId } from "../lib/ids";
-import { socket } from "../socket";
+import { command } from "../lib/command";
 import { TokenLibrary } from "../tokens/TokenLibrary";
 
 type Actor = GmActor | PlayerActor;
@@ -99,11 +98,11 @@ export function TokenContextMenu({
     setBusy(true);
     // Only the damage action carries a type; Heal shares this row and has none.
     const typed = event === "actor:apply-damage" ? manualDamageType(damageType) : undefined;
-    const payload =
+    const sent =
       event === "actor:apply-damage"
-        ? manualDamagePayload({ commandId: newId(), actorId: actor.id, amount: value, damageType: typed })
-        : { commandId: newId(), actorId: actor.id, amount: value };
-    socket.emit(event, payload, (result: { ok: boolean; message?: string }) => {
+        ? command(event, manualDamagePayload({ actorId: actor.id, amount: value, damageType: typed }))
+        : command(event, { actorId: actor.id, amount: value });
+    void sent.then((result) => {
       setBusy(false);
       setFeedback(
         result.ok ? `${verb} ${typed ? `${value} ${typed}` : value}.` : (result.message ?? "That change was rejected.")
@@ -113,40 +112,27 @@ export function TokenContextMenu({
   };
   const toggleReaction = () => {
     setBusy(true);
-    socket.emit(
-      "turn:use-reaction",
-      { commandId: newId(), actorId: actor.id, used: !reactionUsed },
-      (result: { ok: boolean; message?: string }) => {
-        setBusy(false);
-        if (!result.ok) setFeedback(result.message ?? "The reaction could not be updated.");
-      }
-    );
+    void command("turn:use-reaction", { actorId: actor.id, used: !reactionUsed }).then((result) => {
+      setBusy(false);
+      if (!result.ok) setFeedback(result.message ?? "The reaction could not be updated.");
+    });
   };
   const setSize = (size: string) => {
     setBusy(true);
-    socket.emit(
-      "actor:set-size",
-      {
-        commandId: newId(),
-        actorId: actor.id,
-        size: size as "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan"
-      },
-      (result: { ok: boolean; message?: string }) => {
-        setBusy(false);
-        if (!result.ok) setFeedback(result.message ?? "The token could not be resized.");
-      }
-    );
+    void command("actor:set-size", {
+      actorId: actor.id,
+      size: size as "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan"
+    }).then((result) => {
+      setBusy(false);
+      if (!result.ok) setFeedback(result.message ?? "The token could not be resized.");
+    });
   };
   const setHealthDisplay = (display: { style: "band" | "bar" | "ring" | "aura"; audience: "gm" | "all" } | null) => {
     setBusy(true);
-    socket.emit(
-      "actor:set-health-display",
-      { commandId: newId(), actorId: actor.id, display },
-      (result: { ok: boolean; message?: string }) => {
-        setBusy(false);
-        if (!result.ok) setFeedback(result.message ?? "The health display could not be changed.");
-      }
-    );
+    void command("actor:set-health-display", { actorId: actor.id, display }).then((result) => {
+      setBusy(false);
+      if (!result.ok) setFeedback(result.message ?? "The health display could not be changed.");
+    });
   };
   // GM-only control: the token's per-token override (undefined = follows the table default).
   const healthOverride = role === "gm" ? (actor as GmActor).healthDisplay : undefined;
@@ -155,20 +141,16 @@ export function TokenContextMenu({
   const toggleReveal = () => {
     const visibility = hiddenFromPlayers ? "public" : "gm-only";
     setBusy(true);
-    socket.emit(
-      "actor:set-visibility",
-      { commandId: newId(), actorId: actor.id, visibility },
-      (result: { ok: boolean; message?: string }) => {
-        setBusy(false);
-        setFeedback(
-          result.ok
-            ? visibility === "gm-only"
-              ? "Hidden from players."
-              : "Shown to players."
-            : (result.message ?? "That could not be changed.")
-        );
-      }
-    );
+    void command("actor:set-visibility", { actorId: actor.id, visibility }).then((result) => {
+      setBusy(false);
+      setFeedback(
+        result.ok
+          ? visibility === "gm-only"
+            ? "Hidden from players."
+            : "Shown to players."
+          : (result.message ?? "That could not be changed.")
+      );
+    });
   };
   const SIZES = ["tiny", "small", "medium", "large", "huge", "gargantuan"] as const;
   const cap = (value: string) => `${value[0].toUpperCase()}${value.slice(1)}`;

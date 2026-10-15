@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Actor, ContentConditionSummary } from "@vtt/domain";
 import { Chip, Stepper, type ChipTone } from "@vtt/ui";
-import { newId } from "../lib/ids";
-import { socket } from "../socket";
+import { command, read } from "../lib/command";
 import { CONDITION_GLYPHS } from "../scene/mapImage";
 
 type ConditionInstance = Actor["conditions"][number];
@@ -29,15 +28,12 @@ let referenceInFlight: Promise<void> | null = null;
 const referenceListeners = new Set<(reference: readonly ContentConditionSummary[]) => void>();
 export function requestConditionReference() {
   if (referenceCache) return;
-  referenceInFlight ??= new Promise((resolve) => {
-    socket.emit("content:conditions", {}, (result) => {
-      referenceInFlight = null;
-      if (result.ok && result.conditions && result.conditions.length > 0) {
-        referenceCache = result.conditions;
-        for (const listener of referenceListeners) listener(referenceCache);
-      }
-      resolve();
-    });
+  referenceInFlight ??= read("content:conditions", {}).then((result) => {
+    referenceInFlight = null;
+    if (result.ok && result.conditions && result.conditions.length > 0) {
+      referenceCache = result.conditions;
+      for (const listener of referenceListeners) listener(referenceCache);
+    }
   });
 }
 
@@ -140,14 +136,15 @@ export function ConditionEditor({
 
   const send = (conditionId: string, active: boolean, level?: number) => {
     setBusy(true);
-    socket.emit(
-      "actor:set-condition",
-      { commandId: newId(), actorId, conditionId, active, ...(level !== undefined ? { level } : {}) },
-      (result) => {
-        setBusy(false);
-        if (!result.ok) onFeedback(result.message ?? "The condition could not be updated.");
-      }
-    );
+    void command("actor:set-condition", {
+      actorId,
+      conditionId,
+      active,
+      ...(level !== undefined ? { level } : {})
+    }).then((result) => {
+      setBusy(false);
+      if (!result.ok) onFeedback(result.message ?? "The condition could not be updated.");
+    });
   };
 
   return (
