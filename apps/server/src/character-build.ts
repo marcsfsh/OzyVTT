@@ -273,8 +273,14 @@ function linkCantripActions(
 }
 
 /** The Martial Arts unarmed strike from the printed `classResources` column, or null without one. Uses
- *  the better of DEX or STR (SRD Dexterous Attacks). A non-dice amount keeps the generic builtin.
- *  Limitation: Monk weapons don't get the die or DEX, and Flurry of Blows stays prose. */
+ *  the better of DEX or STR (SRD Dexterous Attacks). A non-dice amount keeps the generic builtin. Monk weapons
+ *  get the same rule at read time from `character.martialArts` (see `weaponAction`). */
+/** The printed Martial Arts die at this level ("1d8"), or null when the class prints none. */
+function martialArtsDieOf(context: BuildContext): string | null {
+  const die = context.classResources.find((resource) => resource.id === "martial-arts")?.amount;
+  return typeof die === "string" && /^1d(?:4|6|8|10|12)$/.test(die) ? die : null;
+}
+
 function martialArtsStrike(context: BuildContext): ActorAction | null {
   const die = context.classResources.find((resource) => resource.id === "martial-arts")?.amount;
   if (typeof die !== "string" || !DICE_FORMULA.test(die)) return null;
@@ -551,6 +557,7 @@ export function buildCharacterDefinition(
   for (const { record } of granted) interpretFeature(record, interpreted, context);
   // Martial Arts runs after the features so an id a feature already declared keeps it.
   const strike = martialArtsStrike(context);
+  const martialArtsDie = strike ? martialArtsDieOf(context) : null;
   if (strike && !interpreted.actions.some((existing) => existing.id === strike.id)) interpreted.actions.push(strike);
   // `definition.character.features`, deduped on `{kind, sourceId, id}` so no record gets two carriers.
   // `origin: null` rows are skipped: they are already on `character.feats`.
@@ -947,6 +954,7 @@ export function buildCharacterDefinition(
         ...(lineage ? { subrace: { id: lineage.id, name: lineage.name } } : {})
       },
       background: { id: background.id, name: background.name },
+      ...(martialArtsDie ? { martialArts: { die: martialArtsDie } } : {}),
       feats: [
         ...(originFeat
           ? [{ id: originFeat.id, name: originFeat.name, description: originFeat.feature.description.slice(0, 4000) }]
