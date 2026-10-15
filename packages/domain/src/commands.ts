@@ -12,7 +12,7 @@ import {
   RuleExceptionsSchema,
   RuleFamilySchema,
   RuleModeSchema
-} from "./index.js";
+} from "./state.js";
 import {
   AbilitySchema,
   CharacterChoiceSchema,

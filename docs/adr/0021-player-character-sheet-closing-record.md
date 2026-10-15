@@ -20,7 +20,7 @@ The next roadmap update arrived. The guided builder shipped on 2026-07-28 in com
 - `apps/server/src/character-build.ts` — server-side assembly for `character.create`: ability
   method validation, per-level HP, feature-rider interpretation, and re-validation against
   `ActorDefinitionSchema`.
-- `GameState.builderPolicy` (`packages/domain/src/index.ts`) — a GM-set, player-read table
+- `GameState.builderPolicy` (`packages/domain/src/state.ts`) — a GM-set, player-read table
   policy for which ability-score methods are allowed, carried verbatim into the player
   projection.
 - `packages/content-srd-5.2.1` — the classes, subclasses, species, backgrounds and feats the
