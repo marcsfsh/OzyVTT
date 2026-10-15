@@ -15,8 +15,8 @@ import { registerContentCache } from "./invalidate";
 type CatalogRead<T> = Readonly<{ items: readonly T[]; attribution: string | null; loaded: boolean }>;
 type CatalogReply<T> = Readonly<{ items?: readonly T[]; attribution?: string }>;
 
-/** Builds one cached catalog and its hook. `fetch` reads the catalog from the server. */
-function makeCatalog<T>(fetch: () => Promise<CatalogReply<T>>) {
+/** Builds one cached catalog and its hook. `load` reads the catalog from the server. */
+function makeCatalog<T>(load: () => Promise<CatalogReply<T>>) {
   // Replaced, never mutated, so a consumer can memoize on its identity.
   let snapshot: CatalogRead<T> = { items: [], attribution: null, loaded: false };
   let inFlight: Promise<void> | null = null;
@@ -26,7 +26,7 @@ function makeCatalog<T>(fetch: () => Promise<CatalogReply<T>>) {
       served until the new one lands, so nothing flashes empty. */
   const request = (force = false) => {
     if (snapshot.loaded && !force) return;
-    inFlight ??= fetch().then(({ items, attribution }) => {
+    inFlight ??= load().then(({ items, attribution }) => {
       inFlight = null;
       // Never cache a miss: a refusal, a dropped field, or an empty list all retry next mount.
       if (!items || items.length === 0) return;
