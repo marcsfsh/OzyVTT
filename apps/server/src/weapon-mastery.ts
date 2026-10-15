@@ -3,7 +3,7 @@ import type { EffectSpec } from "./effects.js";
 
 /** Weapon mastery dispatch: one registry keyed by SRD mastery slug, one hook per moment of a swing.
  *  No runtime imports, and keep it that way: `equipment-derivation.ts` imports this and is a leaf for
- *  the builder and resolver. Handlers return what should happen; `action-resolution.ts` applies it. */
+ *  the builder and resolver. Handlers return what should happen; the resolver (`resolution/`) applies it. */
 
 /** One swing's mastery, with the ability modifier `weaponAction` chose (Graze and Topple use it). */
 export type MasteryInForce = Readonly<{ id: string; abilityModifier: number }>;

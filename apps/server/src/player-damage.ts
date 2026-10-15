@@ -2,6 +2,7 @@ import type { ActionResolution, GameState } from "@vtt/domain";
 import { applyDamageDetailed, type DamageOutcome } from "./hit-points.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import type { ActorDefinition } from "@vtt/schemas";
+import { damagePartsOf } from "./resolution/damage.js";
 
 /** A player's confirmed hit never touches an enemy's HP through the client. The server is the only
  *  writer: in "proposal" mode (default) the typed damage is parked for the GM to confirm; in "direct"
@@ -25,14 +26,6 @@ export type AppliedDamage = Readonly<{
   sourceActorId: string;
   label: string;
 }>;
-
-/** Typed damage components (attack dice + bonus lines) of a resolution, for parking or applying. */
-export function resolutionDamageParts(resolution: ActionResolution): Array<{ amount: number; type: string }> {
-  return [
-    ...resolution.damage.map((part) => ({ amount: part.total, type: part.type })),
-    ...(resolution.bonusDamage ?? []).map((part) => ({ amount: part.amount, type: part.type }))
-  ].filter((part) => part.amount > 0);
-}
 
 /** A committed hit that still owes damage: a real (non-preview) hit that rolled damage not already parked
  *  on a reaction window (Uncanny Dodge applies it there). */
@@ -64,7 +57,7 @@ export function settlePlayerHit(
 ): AppliedDamage | null {
   const attack = resolution.attack;
   if (!attack || !playerHitOwesDamage(resolution)) return null;
-  const parts = resolutionDamageParts(resolution);
+  const parts = damagePartsOf(resolution);
   const label = `${attackerName}'s ${resolution.actionName}`;
   if (mode === "direct") {
     const outcome = applyDamageDetailed(

@@ -21,7 +21,9 @@ const SOURCE_DIR = new URL("../src/", import.meta.url).pathname;
 /** Every `rule: "..."` violation id and every `RulesBlockedError("...")` id the server can raise. */
 function thrownRuleIds(): readonly string[] {
   const ids = new Set<string>();
-  for (const file of readdirSync(SOURCE_DIR).filter((name) => name.endsWith(".ts"))) {
+  for (const file of readdirSync(SOURCE_DIR, { recursive: true, encoding: "utf8" }).filter((name) =>
+    name.endsWith(".ts")
+  )) {
     const text = readFileSync(join(SOURCE_DIR, file), "utf8");
     for (const match of text.matchAll(/rule: "([a-z]+\.[a-z-]+)"/g)) ids.add(match[1]);
     for (const match of text.matchAll(/RulesBlockedError\("([a-z]+\.[a-z-]+)"/g)) ids.add(match[1]);
