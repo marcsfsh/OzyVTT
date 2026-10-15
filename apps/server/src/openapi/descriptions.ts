@@ -200,7 +200,8 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "hitPoints.formula":
       'One die term plus at most one flat modifier ("1d8 + 3"). Anything richer stays prose (ADR-0008)',
     token: "The battlemap PIECE - disposition and grid footprint. Nothing to do with credentials",
-    extensions: "Free-form passthrough an importer may carry; the engine reads nothing from it",
+    extensions:
+      'Free-form passthrough an importer may carry. One bag is read: publishing needs `extensions["open5e.srd-2024"]` to hold a numeric `challengeRating` (0.125 for CR 1/8) and a non-empty `type` ("dragon"), because the bestiary lists, sorts and searches by them. Example: `{"open5e.srd-2024": {"challengeRating": 5, "type": "giant"}}`. Everything else is carried and never read',
     conditionImmunities: "Reference-level for now: displayed, not yet enforced on actor.set-condition",
     legendary:
       "SRD 2024 legendary resources: actions spent on other creatures' turns, and Legendary Resistance uses that re-arm on a long rest",

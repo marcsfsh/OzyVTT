@@ -435,3 +435,13 @@ describe("generated OpenAPI components", () => {
     expect(pairs.filter((pair) => pair.base.startsWith("Homebrew")).length).toBeGreaterThanOrEqual(23);
   });
 });
+
+describe("the homebrew monster contract names what publishing needs", () => {
+  it("documents the challenge rating and creature type keys the publish gate refuses without", () => {
+    const extensions = (components.HomebrewMonsterRecord.properties as Record<string, { description?: string }>)
+      .extensions;
+    expect(extensions.description).toContain('extensions["open5e.srd-2024"]');
+    expect(extensions.description).toContain("`challengeRating`");
+    expect(extensions.description).toContain("`type`");
+  });
+});
