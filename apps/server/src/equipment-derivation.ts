@@ -13,7 +13,6 @@ import {
   effectiveSlot,
   gatePasses,
   sumRiders,
-  type ArmorWeight,
   type RiderAbility,
   type RiderCarrier,
   type RiderContext,
@@ -32,9 +31,6 @@ import {
   weaponAction
 } from "./item-actions.js";
 import { IMPLEMENTED_MASTERIES, type MasteryInForce } from "./weapon-mastery.js";
-
-/** Re-exported so importers keep one name; declared beside the mastery handlers that read it. */
-export type { MasteryInForce };
 
 /**
  * Every rider contribution is a pure function of (actor, definition, catalog), recomputed whole on every read
@@ -84,7 +80,7 @@ export type EquipmentCatalog = Readonly<{
   spellRecord?: (id: string) => SpellReference | undefined;
 }>;
 
-/** The four hooks off a content view. */
+/** Narrows a content view to the four hooks the derivation reads. */
 export function equipmentCatalogOf(view: EquipmentCatalog): EquipmentCatalog {
   return {
     equipmentRecord: view.equipmentRecord,
@@ -546,5 +542,3 @@ export function weaponPropertiesOf(itemId: string | null, inventory: readonly In
   if (itemId === null) return [];
   return inventory.find((item) => item.id === itemId)?.weapon?.properties ?? [];
 }
-
-export type { ArmorWeight };
