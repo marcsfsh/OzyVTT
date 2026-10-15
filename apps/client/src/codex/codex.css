@@ -91,19 +91,6 @@
   font-size: var(--fs-sm);
   padding: var(--space-3) var(--space-2);
 }
-.codex-list-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-.codex-list-folder {
-  font-family: var(--font-display);
-  font-size: var(--fs-2xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  padding: var(--space-1) var(--space-2);
-}
 /* 44px min-height rather than an ::after hit area, which would overhang neighbouring rows in a vertical list. */
 .codex-list-item {
   display: flex;
@@ -260,10 +247,6 @@
   height: 0.82em;
   margin-right: 0.28em;
   vertical-align: -0.02em;
-}
-.codex-tool-ic {
-  width: 1.05em;
-  height: 1.05em;
 }
 .codex-campaign-typeglyph {
   width: 20px;
@@ -627,11 +610,6 @@
   gap: var(--space-3);
   flex-wrap: wrap;
 }
-.codex-tool-glyph {
-  font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: var(--fs-sm);
-}
 
 .codex-preview-empty {
   color: var(--text-muted);
@@ -744,11 +722,6 @@
   letter-spacing: 0.08em;
   color: var(--text-muted);
   margin: 0 0 var(--space-2);
-}
-.codex-backlinks-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
 }
 
 /* A page's return edges as one bordered section with a sub-heading per kind. */
@@ -881,27 +854,6 @@
   border-left: 2px solid var(--violet);
   background: color-mix(in srgb, var(--violet) 7%, var(--surface-2));
   border-radius: 0;
-}
-.codex-gm-pill {
-  font-family: var(--font-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.codex-gm-pill.is-floating {
-  position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
-  pointer-events: none;
-}
-/* Record visibility (`HiddenFromPlayers`) is muted, not violet: violet means GM-only content. */
-.codex-hidden-pill {
-  font-family: var(--font-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.codex-visibility-badge svg {
-  width: 0.9em;
-  height: 0.9em;
 }
 .codex-fields-secret {
   margin-top: var(--space-3);
@@ -1301,19 +1253,6 @@
 
 /* ----- Sessions: the log destination and the console drawer ----- */
 
-/* Reuses the notebook's two-pane chassis, including its narrow-screen list-then-detail swap. */
-.codex-sessions-exit {
-  display: flex;
-  margin-bottom: var(--space-2);
-}
-.codex-sessions-railtitle {
-  font-family: var(--font-display);
-  font-size: var(--fs-2xs);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-  flex: 1 1 auto;
-}
 /* 44px min-height, not an ::after hit area, in a stacked list. */
 .codex-session-row {
   min-height: var(--tap-min);
@@ -1497,16 +1436,6 @@
 
 /* ----- The player's quest reader (reuses the GM log's chassis and rows) ----- */
 
-/* 44px min-height: an ::after hit area here would swallow taps on the content just below. */
-.codex-questreader .codex-back {
-  min-height: var(--tap-min);
-}
-/* `pre-wrap`: the GM's blank lines are the paragraphing; there is no markdown pass. */
-.codex-quest-readerbody {
-  margin: 0;
-  white-space: pre-wrap;
-}
-
 /* Relationship graph: fills its region, bar on top, canvas takes the rest. */
 .codex-graph {
   display: flex;
@@ -1642,9 +1571,6 @@
   stroke: var(--void);
   stroke-width: 3px;
 }
-.codex-editor-foot {
-  display: flex;
-}
 
 /* Settings: a column, so every control grows its own 44px paint instead of squeezing below the floor at 320px. */
 .codex-settings {
@@ -1752,59 +1678,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-}
-/* A bordered sub-toolbar so it doesn't read as part of the tab bar above. */
-.codex-modebar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  border: 1px solid transparent;
-  padding: var(--space-1) var(--space-2);
-  margin-bottom: var(--space-3);
-}
-/* Small buttons overhang 6px per side, so neighbours need a 12px gap. */
-.codex-modebar-ops {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-/* An arrow marks each end that has more tabs, keyed off the `Tabs` primitive's scroll-state classes; the
-   built-in fade can land in whitespace and show nothing on a phone. */
-.codex-modetabs {
-  position: relative;
-  flex: 0 1 auto;
-  min-width: 0;
-}
-.codex-modetabs::before,
-.codex-modetabs::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  width: 7px;
-  height: 7px;
-  pointer-events: none;
-  border-right: 2px solid var(--text-dim);
-  border-bottom: 2px solid var(--text-dim);
-  opacity: 0;
-  transition: opacity var(--dur-base) var(--ease-settle);
-}
-.codex-modetabs::after {
-  right: 2px;
-  transform: translateY(-50%) rotate(-45deg);
-}
-.codex-modetabs::before {
-  left: 2px;
-  transform: translateY(-50%) rotate(135deg);
-}
-.codex-modetabs:has(.is-scrollable:not(.is-scrolled-end))::after {
-  opacity: 1;
-}
-.codex-modetabs:has(.is-scrolled-start)::before {
-  opacity: 1;
 }
 
 /* Command palette */
@@ -2138,13 +2011,6 @@
   gap: var(--space-1);
   margin-bottom: var(--space-3);
 }
-.codex-inspector-go {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--line);
-}
 .codex-inspector-hint {
   font-size: var(--fs-sm);
   color: var(--text-muted);
@@ -2341,9 +2207,6 @@
   align-items: center;
   justify-content: space-between;
 }
-.codex-composer-gm {
-  position: relative;
-}
 .codex-composer-gm-label {
   display: flex;
   align-items: center;
@@ -2534,13 +2397,7 @@
   color: var(--text-dim);
   font-size: var(--fs-sm);
 }
-
 /* ----- Player Codex ----- */
-.player-codex-row {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: var(--space-2);
-}
 /* The player reader is bare prose on the sky scene, so it reserves the horizon band at the bottom. The GM's
    panes end in opaque cards and don't need it. */
 .codex-player:not(.is-embedded) .codex-main {
@@ -3584,7 +3441,6 @@
    Never put it on a scroller: the layer would scroll with the content. */
 .codex-sidebar,
 .codex-rail,
-.codex-modebar,
 .codex-main-empty,
 .codex-editor-center,
 .codex-editor-context,
@@ -3611,7 +3467,6 @@
 }
 .codex-sidebar::before,
 .codex-rail::before,
-.codex-modebar::before,
 .codex-main-empty::before,
 .codex-editor-center::before,
 .codex-editor-context::before,
@@ -3651,7 +3506,6 @@
 /* Outermost: the texture. */
 .codex-sidebar,
 .codex-rail,
-.codex-modebar,
 .codex-main-empty,
 .codex-editor-center,
 .codex-editor-context,

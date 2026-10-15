@@ -731,16 +731,12 @@ a:focus-visible .nav-arrow {
 /* The shared backing layer: behind the content, above the element's background, pointer-transparent. */
 .chamfer,
 .rim,
-.bezel,
-.rim-lit,
 .cue {
   position: relative;
   isolation: isolate;
 }
 .chamfer::before,
 .rim::before,
-.bezel::before,
-.rim-lit::before,
 .cue::before {
   content: "";
   position: absolute;
@@ -781,18 +777,6 @@ a:focus-visible .nav-arrow {
   border-color: var(--rim-color-hi);
 }
 
-/* An outline costs no layout and doesn't contest the rim's properties. */
-.bezel::before {
-  outline: 1px solid var(--bezel-color);
-  outline-offset: calc(-1 * var(--bezel-inset));
-}
-
-/* Opt-in rest glow. On the backing layer because a filter follows the cut, and a filter on the element
-   would make it the containing block for fixed overlays inside it. */
-.rim-lit::before {
-  filter: var(--rim-glow);
-}
-
 /* The cue: a background layer on the backing layer. Not on the element itself, whose background paints
    below the backing layer and would be hidden by an opaque --material-fill. Prepending one layer to
    var(--material-fill) composes with any fill. It appears without blinking, on press as well as hover. */
@@ -809,13 +793,9 @@ a:focus-visible .nav-arrow {
    consumer's own --material-fill would win on source order. */
 .chamfer:disabled,
 .rim:disabled,
-.bezel:disabled,
-.rim-lit:disabled,
 .cue:disabled,
 .chamfer[aria-disabled="true"],
 .rim[aria-disabled="true"],
-.bezel[aria-disabled="true"],
-.rim-lit[aria-disabled="true"],
 .cue[aria-disabled="true"] {
   --material-fill: var(--surface-2);
   --rim-color: transparent;
@@ -911,12 +891,6 @@ a:focus-visible .nav-arrow {
   background-clip: content-box;
 }
 
-/* ---- Signature color bloom ---- */
-.bloom {
-  background: var(--grad-bloom);
-  border-radius: var(--radius-pill);
-}
-
 /* ---- App wordmark ----
    Chrome-gradient fill with a bevel; wordmark only. The bevel uses drop-shadow because text-shadow can't
    show through background-clipped text. */
@@ -985,21 +959,6 @@ a:focus-visible .nav-arrow {
   opacity: 0.5;
 }
 
-/* Analog static / grain overlay, kept very low opacity (--noise-opacity, per theme) */
-.static-noise {
-  position: relative;
-}
-.static-noise::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: var(--noise);
-  background-size: 140px 140px;
-  opacity: var(--noise-opacity);
-  mix-blend-mode: screen;
-}
-
 /* Subtle magenta/cyan fringing, app wordmark only; optional garnish on top of the chrome fill. */
 .chromatic {
   text-shadow:
@@ -1009,8 +968,7 @@ a:focus-visible .nav-arrow {
 
 /* Light theme: texture off, wordmark fringing off */
 [data-theme="light"] .grid-floor,
-[data-theme="light"] .scanlines::after,
-[data-theme="light"] .static-noise::after {
+[data-theme="light"] .scanlines::after {
   display: none;
 }
 [data-theme="light"] .chromatic {
@@ -1092,20 +1050,8 @@ a:focus-visible .nav-arrow {
     transform: none;
   }
 }
-@keyframes panel-fade {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
 .anim-view {
   animation: view-in var(--dur-enter) var(--ease-settle) both;
-}
-.anim-panel {
-  animation: panel-fade var(--dur-base) ease both;
 }
 .anim-popover {
   animation: popover-in var(--dur-base) var(--ease-settle) both;
@@ -1134,19 +1080,6 @@ a:focus-visible .nav-arrow {
   animation: attention-flash 1.2s var(--ease-settle);
 }
 
-/* One-time data reveal, e.g. an HP/progress bar filling on first paint */
-@keyframes bar-reveal {
-  from {
-    clip-path: inset(0 100% 0 0);
-  }
-  to {
-    clip-path: inset(0 0 0 0);
-  }
-}
-.anim-bar-reveal {
-  animation: bar-reveal var(--dur-reveal) var(--ease-settle) both;
-}
-
 /* View-swap cascade: a frame's direct children settle in with a brief, capped stagger. Containers only,
    never long lists. */
 .anim-cascade > * {
@@ -1160,48 +1093,6 @@ a:focus-visible .nav-arrow {
 }
 .anim-cascade > :nth-child(n + 4) {
   animation-delay: 180ms;
-}
-
-/* Landing → app entry: .anim-entry-dip on the departing landing, .anim-entry-settle on the arriving frame. */
-@keyframes entry-dip {
-  from {
-    opacity: 1;
-    transform: none;
-  }
-  to {
-    opacity: 0;
-    transform: scale(1.015);
-  }
-}
-@keyframes entry-settle {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-.anim-entry-dip {
-  animation: entry-dip var(--dur-base) var(--ease-settle) both;
-}
-.anim-entry-settle {
-  animation: entry-settle var(--dur-enter) var(--ease-settle) both;
-}
-
-/* Theme switch: put .theme-switching on the root for about --dur-theme so surfaces cross-fade. Not
-   !important, so the reduced-motion rule below still wins. */
-.theme-switching,
-.theme-switching *,
-.theme-switching *::before,
-.theme-switching *::after {
-  transition:
-    background-color var(--dur-theme) ease,
-    color var(--dur-theme) ease,
-    border-color var(--dur-theme) ease,
-    fill var(--dur-theme) ease,
-    box-shadow var(--dur-theme) ease;
 }
 
 /* ---- Accessibility fallbacks ---- */
@@ -1218,8 +1109,7 @@ a:focus-visible .nav-arrow {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
-  .scanlines::after,
-  .static-noise::after {
+  .scanlines::after {
     display: none;
   }
 }

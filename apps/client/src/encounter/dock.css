@@ -114,9 +114,6 @@
 .dock-tabs-body > .dice-proof .roll-list-head {
   margin-top: var(--space-2);
 }
-.dock-tabs-body > .dice-proof .dice-feedback {
-  margin-top: 0.4rem;
-}
 /* Count of questions waiting on the GM, on the header that stays on screen while the body that
    would show them is unmounted. Caution tone: someone is waiting on a call.
    Chamfered, not a pill. The cut rides a backing layer because the count sits inside a tab header
