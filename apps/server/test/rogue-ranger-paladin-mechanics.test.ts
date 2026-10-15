@@ -732,6 +732,7 @@ describe("Paladin - Channel Divinity is ONE counter that three features spend", 
     expect(actionOf(built, "abjure-foes")?.save).toEqual({
       ability: "wis",
       dc: 14,
+      spellcasting: true,
       successDamage: "none",
       failureConditions: ["frightened"]
     });

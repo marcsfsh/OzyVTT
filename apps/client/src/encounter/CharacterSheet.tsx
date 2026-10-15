@@ -241,6 +241,7 @@ export function CharacterSheet({
             edit={edit}
             rolls={rolls}
             onFeedback={setFeedback}
+            spellSaveDcBonus={derived?.spellSaveDcBonus ?? 0}
             routeSpell={(spell) => {
               const structured = structuredAttacks
                 ? structuredActionFor({ actionId: spell.actionId ?? undefined, name: spell.name })

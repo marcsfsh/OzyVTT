@@ -121,7 +121,8 @@ export function SheetSpells({
   edit,
   rolls,
   onFeedback,
-  routeSpell
+  routeSpell,
+  spellSaveDcBonus = 0
 }: Readonly<{
   actor: GmActor | PlayerActor;
   definition: ActorDefinition;
@@ -131,6 +132,8 @@ export function SheetSpells({
   onFeedback: (text: string) => void;
   /** Hands a spell to the structured flow; false when it has no server-resolvable action now. */
   routeSpell: (spell: SheetSpell) => boolean;
+  /** The server's sum of standing spell-save-DC riders (an item, a feat), which the cast DC includes. */
+  spellSaveDcBonus?: number;
 }>) {
   const { rollFlat } = rolls;
   const spellcasting = definition.spellcasting;
@@ -152,7 +155,8 @@ export function SheetSpells({
       const resolved = resolveSpellcasting(spellcasting, classId);
       if (!resolved) return [];
       const dc =
-        resolved.saveDc ?? spellSaveDc(definition.abilityScores[resolved.ability], definition.proficiencyBonus);
+        (resolved.saveDc ?? spellSaveDc(definition.abilityScores[resolved.ability], definition.proficiencyBonus)) +
+        spellSaveDcBonus;
       const attack =
         resolved.attackBonus ??
         spellAttackBonus(definition.abilityScores[resolved.ability], definition.proficiencyBonus);

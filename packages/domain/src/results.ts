@@ -227,6 +227,8 @@ export type ActorDerivedSheet = Readonly<{
     immunities: readonly DerivedDefence[];
     vulnerabilities: readonly DerivedDefence[];
   }>;
+  /** What standing `spell-save-dc` riders add to the bearer's spell save DC, and so to every action that uses it. */
+  spellSaveDcBonus: number;
 }>;
 export type ActorActionsAvailabilityResult = {
   ok: boolean;

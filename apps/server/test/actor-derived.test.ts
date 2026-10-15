@@ -231,6 +231,24 @@ describe("check-bonus rides into ability checks and skills", () => {
   });
 });
 
+describe("the sheet's spell save DC carries the riders the engine folds into spells", () => {
+  const FOCUS = {
+    id: "focus-of-power",
+    name: "Focus of Power",
+    category: "wondrous",
+    slot: "neck",
+    isMagic: true,
+    modifiers: [{ type: "spell-save-dc", amount: 2 }]
+  };
+  const worn = item({ id: "focus-of-power", name: "Focus of Power", category: "wondrous", equipped: true });
+
+  it("reports the worn focus's +2, and nothing once it comes off", () => {
+    const definition = definitionOf();
+    expect(sheetFor(stateWith([worn]), definition, catalogOf([FOCUS])).spellSaveDcBonus).toBe(2);
+    expect(sheetFor(stateWith([]), definition, catalogOf([FOCUS])).spellSaveDcBonus).toBe(0);
+  });
+});
+
 describe("viewer safety: the derived block never rides the broadcast projections", () => {
   // The block rides `actor:available-actions`, a request that authorizes its caller for one named actor,
   // never `PlayerView` or `GmView`. A per-actor field on the broadcast projection is how another

@@ -707,6 +707,37 @@ describe("row 6: an item that casts a spell, with its cast details", () => {
     expect(cast.save).toEqual({ ability: "dex", dc: 15, successDamage: "half", failureConditions: [] });
   });
 
+  it("uses a caster's spell save DC, which a spell-save-dc rider raises, and leaves a printed DC alone", () => {
+    const caster = definitionOf({
+      spellcasting: { ability: "wis", saveDc: 14, attackBonus: 6, slots: [], spells: [] }
+    });
+    const focus = {
+      id: "focus-of-power",
+      name: "Focus of Power",
+      category: "wondrous",
+      slot: "neck",
+      isMagic: true,
+      modifiers: [{ type: "spell-save-dc", amount: 2 }]
+    };
+    const necklace = item({ id: "focus-of-power", name: "Focus of Power", equipped: true, category: "wondrous" });
+    const dcOf = (cast: Record<string, unknown>, inventory: InventoryItem[]) =>
+      effectiveActions(
+        caster,
+        fight(stateWith(inventory)).actors[0],
+        catalogOf([wandOf(cast), focus], [FIREBALL])
+      ).find((entry) => entry.id === "item-wand-of-fireballs-cast-fireball")!.save;
+
+    expect(dcOf({}, [row])).toMatchObject({ dc: 14, spellcasting: true });
+    expect(dcOf({}, [row, necklace])!.dc).toBe(16);
+    // A printed DC is the wand's, not the wielder's.
+    expect(dcOf({ saveDc: 15 }, [row, necklace])).toEqual({
+      ability: "dex",
+      dc: 15,
+      successDamage: "half",
+      failureConditions: []
+    });
+  });
+
   it("spends the wearer's own spell slot when the item says it does, and refuses when the pool is empty", () => {
     const catalog = catalogOf([wandOf({ atLevel: 3, consumesSpellSlot: true })], [FIREBALL]);
     const state = fight(stateWith([row], { spellSlots: [{ level: 3, remaining: 1 }] }));

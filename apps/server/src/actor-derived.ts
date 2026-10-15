@@ -6,7 +6,7 @@ import type {
   DerivedAbilityRow,
   DerivedSkillRow
 } from "@vtt/domain";
-import { abilityModifier } from "@vtt/rules-5e";
+import { abilityModifier, collectRiders, sumRiders } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import {
   checkRiderBonus,
@@ -96,6 +96,11 @@ export function deriveActorSheet(
       definition,
       choiceOverrideDefenses(definition, actor.choiceOverrides, catalog?.featureRecord),
       derivation
+    ),
+    // The same standing sum `effectiveActions` folds into every spell-save-DC action.
+    spellSaveDcBonus: sumRiders(
+      collectRiders(derivation.carriers, { ...derivation.context, moment: null }),
+      "spell-save-dc"
     )
   };
 }

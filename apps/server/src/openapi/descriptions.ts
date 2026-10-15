@@ -404,6 +404,8 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "attack.rangeNormalFeet":
       'Normal range for a two-range weapon ("80/320" -> 80); attacks beyond it up to rangeFeet roll at disadvantage',
     save: "A printed save DC, and what the save does",
+    "save.spellcasting":
+      "The DC is the bearer's spell save DC (a spell, or a feature that uses it), so a `spell-save-dc` rider raises it. Absent: a printed DC no rider touches, such as a breath weapon's",
     "save.successDamage": 'The damage a successful save takes: "half" (Fireball) or "none" (Sacred Flame)',
     "save.failureConditions":
       "Every condition a failed save imposes (Turn Undead: Frightened and Incapacitated); empty for none. Exhaustion is not offered: it stacks by level"

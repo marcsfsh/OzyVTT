@@ -546,6 +546,7 @@ describe("Fiend Patron: Hurl Through Hell rolls its 8d10 and holds the target to
     expect(action.save).toEqual({
       ability: "cha",
       dc: 18,
+      spellcasting: true,
       successDamage: "none",
       failureConditions: ["incapacitated"]
     });

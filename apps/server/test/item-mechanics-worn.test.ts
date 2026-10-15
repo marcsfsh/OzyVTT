@@ -694,10 +694,9 @@ describe("the casts that survived the spell-record check", () => {
 });
 
 describe("the spell save DC a legendary robe does NOT raise", () => {
-  // The Robe of the Archmagi's "spell save DC ... increases by 2" cannot be authored as `spell-save-dc`:
-  // that rider raises `action.save.dc` on every action carrying a save (`effective-actions.ts` sums and
-  // folds it without asking whether the action is a spell), including DCs printed on other items. The
-  // robe stays prose; these assertions keep it that way.
+  // The Robe of the Archmagi stays prose. A `spell-save-dc` rider now raises only actions whose DC is the
+  // bearer's spell save DC, but the robe's matching spell attack bonus has no consumer yet, so carrying half
+  // of it would misstate the robe. These assertions keep printed DCs untouched either way.
   it("leaves a Wand of Paralysis' printed DC 15 alone, and a Breath Weapon's 13, with the robe on", () => {
     const robe = worn("robe-of-the-archmagi", "Robe of the Archmagi");
     // A definition action that is not a spell at all.

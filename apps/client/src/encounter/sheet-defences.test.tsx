@@ -12,7 +12,15 @@ const definition = {
 const rolls = { rolling: false, rollD20: () => Promise.resolve() } as unknown as SheetRolls;
 
 const derivedWith = (defences: ActorDerivedSheet["defences"]) =>
-  ({ proficiencyBonus: 2, armorClass: 14, initiative: 1, abilities: [], skills: [], defences }) as ActorDerivedSheet;
+  ({
+    proficiencyBonus: 2,
+    armorClass: 14,
+    initiative: 1,
+    abilities: [],
+    skills: [],
+    defences,
+    spellSaveDcBonus: 0
+  }) as ActorDerivedSheet;
 
 const rowText = (label: string) => screen.getByText(label).nextElementSibling?.textContent;
 
