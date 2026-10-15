@@ -64,7 +64,6 @@ function deps(
     newRollId: () => `40000000-0000-4000-8000-${String(rollIndex++).padStart(12, "0")}`,
     gmSessionId: IDS.gmSession,
     now: () => "2026-07-18T00:00:00.000Z",
-    hasCondition: () => true,
     definition,
     distanceFeet
   };

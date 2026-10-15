@@ -153,6 +153,10 @@ the action economy, release); builtin actions such as Hide and the unarmed Grapp
 cases through the handler table in `resolution/builtins.ts`. Every condition write goes through
 `applyCondition` in `effects.ts`, which honours innate and item-granted immunities.
 
+What a save does is data on the action's save block, not read from its description: `successDamage`
+(half or none) and the `failureCondition` a failed save imposes. They are written where the content
+is made (the SRD build, the builder, homebrew) and copied onto the pending save prompt.
+
 How strictly rules are enforced is table policy (`GameState.rulesPolicy`): enforce, advise or
 off, with per-family exceptions (`rules-families.ts`). A player blocked by a rule can ask the GM
 (`rules.ask`); the GM allows or denies and the parked command replays.

@@ -629,6 +629,34 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
     );
     expect(state.combat.pendingSaves[0]).toMatchObject({ ability: "wis", dc: 17, conditionId: null });
   });
+
+  it("gives the Decanter's Geyser a DC 13 Str save: no damage on a success, Prone on a failure", () => {
+    const definition = definitionOf();
+    const state = fight(
+      stateWith([carried("decanter-of-endless-water", "Decanter of Endless Water", { attuned: false })])
+    );
+    const action = effectiveActions(definition, state.actors[0], catalog).find(
+      (entry) => entry.id === "item-decanter-of-endless-water-geyser"
+    )!;
+    // The SRD's "must succeed ... or take 1d4" means nothing on a success, which prose reading got wrong.
+    expect(action.save).toEqual({ ability: "str", dc: 13, successDamage: "none", failureCondition: "prone" });
+    expect(action.damage).toEqual([{ formula: "1d4", type: "bludgeoning" }]);
+    expect(action.uses).toBeUndefined();
+
+    resolveDefinitionAction(
+      state,
+      action,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(18) },
+      deps([3], definition)
+    );
+    expect(state.combat.pendingSaves[0]).toMatchObject({
+      ability: "str",
+      dc: 13,
+      proposedDamage: 3,
+      halfOnSuccess: false,
+      conditionId: "prone"
+    });
+  });
 });
 
 // The absences, pinned so none is authored by accident.
@@ -681,12 +709,10 @@ describe("the absences that were measured and must stay absent", () => {
     }
   });
 
-  it("the two rows whose save-or-damage sentence the engine misreads carry no damage action", () => {
-    // `halfOnSuccessFrom` reads both as "half on a success"; the SRD gives neither any damage there.
-    for (const id of ["decanter-of-endless-water", "bead-of-force"]) {
-      expect(view.equipmentRecord(id)!.actions).toEqual([]);
-    }
-    // The Horn of Blasting is read correctly, but is absent for its 20% explosion chance.
+  it("the Bead of Force and the Horn of Blasting carry no action", () => {
+    // The bead is destroyed on use, which no `per` value can say.
+    expect(view.equipmentRecord("bead-of-force")!.actions).toEqual([]);
+    // The horn is absent for its 20% explosion chance.
     const horn = view.equipmentRecord("horn-of-blasting")!;
     expect(horn.description).toContain("20 percent chance of causing the horn to explode");
     expect(carries(horn)).toBe(false);

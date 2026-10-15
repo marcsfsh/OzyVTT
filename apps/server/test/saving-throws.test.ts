@@ -3,10 +3,8 @@ import { GameStateSchema } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import {
   answerSave,
-  conditionFrom,
   createPendingSaves,
   dismissSave,
-  halfOnSuccessFrom,
   saveModifierFor,
   type SaveAnswerDependencies
 } from "../src/saving-throws.js";
@@ -158,18 +156,37 @@ describe("saving-throw prompts", () => {
     expect(saveModifierFor(undefined, "dex")).toBe(0);
   });
 
-  it("defaults to half-on-success unless the text says no damage", () => {
-    expect(halfOnSuccessFrom("Success: Half damage.")).toBe(true);
-    expect(halfOnSuccessFrom("Failure: 10 damage. Success: No damage.")).toBe(false);
-    expect(halfOnSuccessFrom("some prose")).toBe(true);
-  });
-
-  it("detects a condition a failed save imposes from the action prose", () => {
-    expect(conditionFrom("Failure: The target has the Poisoned condition until the end of its next turn.")).toBe(
-      "poisoned"
+  it("takes the success damage and failure condition from the save block, never from the prose", () => {
+    const game = state();
+    // The prose says the opposite of the data on both counts; the data wins.
+    const sting = {
+      ...BREATH,
+      id: "sting",
+      name: "Sting",
+      description: "Failure: 10 (3d6) Poison damage. Success: Half damage. A Prone target is unaffected.",
+      save: { ability: "con" as const, dc: 13, successDamage: "none" as const, failureCondition: "poisoned" as const }
+    };
+    const resolveDeps = {
+      random: () => 4,
+      newRollId: () => "40000000-0000-4000-8000-000000000000",
+      gmSessionId: IDS.gm,
+      now: () => "2026-07-17T00:00:00.000Z"
+    };
+    resolveDefinitionAction(game, sting, { actorId: IDS.source, targetIds: [IDS.pc], commandId: cmd(1) }, resolveDeps);
+    expect(game.combat.pendingSaves[0]).toMatchObject({
+      ability: "con",
+      halfOnSuccess: false,
+      conditionId: "poisoned"
+    });
+    // The GM's explicit condition replaces the declared one on the prompt.
+    const ruled = state();
+    resolveDefinitionAction(
+      ruled,
+      sting,
+      { actorId: IDS.source, targetIds: [IDS.pc], commandId: cmd(2), conditionId: "frightened" },
+      resolveDeps
     );
-    expect(conditionFrom("On a failed save the target is knocked Prone.")).toBe("prone");
-    expect(conditionFrom("Failure: 15 Fire damage.")).toBeNull();
+    expect(ruled.combat.pendingSaves[0]).toMatchObject({ conditionId: "frightened" });
   });
 
   it("auto-applies full damage and the condition on a failed save", () => {

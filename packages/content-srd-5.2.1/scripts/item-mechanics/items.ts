@@ -1005,7 +1005,6 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //   - An item's `effects` ignore `duration`, so "Resistance for 1 hour" would be permanent.
   //   - Spell records describe the spell's text, not one cast (see the wands section), and there
   //     is no healing or temporary-HP rider.
-  //   - `halfOnSuccessFrom` reads "succeed ... or take X" as half on a success, where the SRD means none.
   //   - One use spends one charge, and pools are capped at 20.
   //   - `ability-score` is refused on items.
   //   - Item actions only resolve inside an encounter. Outside one, `iron-bands` (the only one with an
@@ -1040,7 +1039,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `bead-of-force` - destroyed on use, and its save sentence would be read as half on a success.
+  // `bead-of-force` - destroyed on use.
   // `bead-of-nourishment` - no hunger model.
 
   /**
@@ -1131,7 +1130,21 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `decanter-of-endless-water` - the geyser save would be read as half on a success.
+  /** The Geyser command, unlimited as printed; Splash and Fountain only pour water. */
+  "decanter-of-endless-water": {
+    actions: [
+      {
+        id: "geyser",
+        name: "Geyser",
+        activation: "action",
+        description:
+          "Remove the stopper and speak the command word: 30 gallons of water gush forth in a Line 30 feet long and 1 foot wide. One creature of your choice in the Line must succeed on a DC 13 Strength saving throw or take 1d4 Bludgeoning damage and have the Prone condition. Instead of a creature, you can target one object in the Line that isn't being worn or carried and that weighs no more than 200 pounds; the object is knocked over.",
+        save: { ability: "str", dc: 13, successDamage: "none", failureCondition: "prone" },
+        damage: [{ formula: "1d4", type: "bludgeoning" }]
+      }
+    ]
+  },
+
   // `deck-of-illusions` - illusions and card state are not modeled.
   // `dimensional-shackles` - prevents extradimensional movement, which is not modeled.
   // `dragon-orb` - multi-charge spells, a healing cast, a self-charm on attunement and a curse.
