@@ -45,7 +45,7 @@ describe("the census: every API-authorable key the editor cannot reach, held to 
       covered: results.filter((result) => result.covered).length,
       forced: results.filter((result) => !result.covered && isSystemForced(result.address)).length,
       open: open.length
-    }).toEqual({ asked: 5494, covered: 3243, forced: 106, open: 2145 });
+    }).toEqual({ asked: 5494, covered: 3244, forced: 106, open: 2144 });
   });
 
   it("holds the open set to the exemption table exactly, in both directions", () => {

@@ -1,7 +1,7 @@
 /** The per-type field schemas: data, not forms; `FieldRenderer` draws them. A field that is stored
     but not yet read by anything carries a `note` so the GM isn't misled. */
 
-import { RARITY_IDS, WEAPON_PROPERTY_IDS } from "@vtt/content-srd-5.2.1/schemas";
+import { RARITY_IDS, WEAPON_MASTERY_IDS, WEAPON_PROPERTY_IDS } from "@vtt/content-srd-5.2.1/schemas";
 import { newId } from "../lib/ids";
 import { SUB_OBJECT_DEFAULTS, blankFeature } from "./defaults";
 import { featureFields } from "./feature-fields";
@@ -1038,6 +1038,16 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           suggestions: WEAPON_PROPERTY_IDS,
           placeholder: "finesse",
           help: "Finesse lets it swing off Dexterity; reach threatens at 10 feet."
+        },
+        // Closed: each mastery is engine behaviour, so the select offers exactly the eight the engine runs.
+        {
+          key: "weapon.mastery",
+          label: "Mastery",
+          kind: "select",
+          options: WEAPON_MASTERY_IDS.map((id) => opt(id, humanise(id))),
+          placeholder: "None",
+          emptyValue: "omit",
+          help: "What a wielder with Weapon Mastery gets from it: Graze, Cleave, Topple and the rest."
         }
       ])
     },
