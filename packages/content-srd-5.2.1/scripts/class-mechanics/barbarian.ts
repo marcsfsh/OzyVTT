@@ -109,8 +109,8 @@ export const barbarian: ClassMechanicsModule = {
   subclasses: {
     "path-of-the-berserker": {
       /**
-       * DC 8 + Strength + Proficiency Bonus; the resolver reads Frightened from the prose on a failed
-       * save. The Emanation targeting, repeat save and restoring the use by spending a Rage stay prose.
+       * DC 8 + Strength + Proficiency Bonus; a failed save is Frightened. The Emanation targeting, repeat
+       * save and restoring the use by spending a Rage stay prose.
        */
       "intimidating-presence": {
         uses: { limit: 1, per: "long-rest" },
@@ -122,7 +122,12 @@ export const barbarian: ClassMechanicsModule = {
             description:
               "Each creature of your choice in a 30-foot Emanation makes a Wisdom saving throw. On a failed save, the creature has the Frightened condition for 1 minute; at the end of each of its turns it repeats the save, ending the effect on itself on a success.",
             damage: [],
-            save: { ability: "wis", dc: { base: 8, ability: "str", proficiencyBonus: true } }
+            save: {
+              ability: "wis",
+              dc: { base: 8, ability: "str", proficiencyBonus: true },
+              successDamage: "none",
+              failureCondition: "frightened"
+            }
           }
         ]
       },

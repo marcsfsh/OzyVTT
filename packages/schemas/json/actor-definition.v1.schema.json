@@ -736,7 +736,27 @@
           "required": ["ability", "dc"],
           "properties": {
             "ability": { "enum": ["str", "dex", "con", "int", "wis", "cha"] },
-            "dc": { "type": "integer", "minimum": 1, "maximum": 40 }
+            "dc": { "type": "integer", "minimum": 1, "maximum": 40 },
+            "successDamage": { "enum": ["half", "none"], "default": "half" },
+            "failureCondition": {
+              "enum": [
+                "blinded",
+                "charmed",
+                "deafened",
+                "frightened",
+                "grappled",
+                "incapacitated",
+                "paralyzed",
+                "petrified",
+                "poisoned",
+                "prone",
+                "restrained",
+                "stunned",
+                "unconscious",
+                null
+              ],
+              "default": null
+            }
           },
           "additionalProperties": false
         },

@@ -63,7 +63,6 @@ export type ResolveDependencies = Readonly<{
   initiatorRole?: "gm" | "player";
   initiatorSessionId?: string;
   now: () => string;
-  hasCondition?: (id: string) => boolean;
   /** The attacker's full definition; multiattack composition and limited-use lookups need sibling actions. */
   definition?: ActorDefinition;
   /** Map distance in feet between two combatants' tokens; null when unmeasurable. */

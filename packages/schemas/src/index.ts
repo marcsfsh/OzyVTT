@@ -786,6 +786,35 @@ export const ActionUsesSchema = z
       });
   });
 
+/** The conditions a failed save can impose. Closed because the engine applies the id itself. Exhaustion is
+ * left out: it stacks by level, and a plain condition write would reset it rather than add one. */
+export const SaveConditionSchema = z.enum([
+  "blinded",
+  "charmed",
+  "deafened",
+  "frightened",
+  "grappled",
+  "incapacitated",
+  "paralyzed",
+  "petrified",
+  "poisoned",
+  "prone",
+  "restrained",
+  "stunned",
+  "unconscious"
+]);
+export type SaveCondition = z.infer<typeof SaveConditionSchema>;
+
+/**
+ * What a saving throw does, as data: the damage a success takes ("half" for Fireball, "none" for Sacred
+ * Flame) and the condition a failure imposes. Every save block (stat-block action, feature action, spell)
+ * spreads these fields. Unset, they take the common printing: half damage on a success, no condition.
+ */
+export const SaveOutcomeFields = {
+  successDamage: z.enum(["half", "none"]).default("half"),
+  failureCondition: SaveConditionSchema.nullable().default(null)
+};
+
 /** Mechanics fields are optional (ADR-0020): absent means prose only. Descriptions stay the display source of truth. */
 export const ActionSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
@@ -805,7 +834,7 @@ export const ActionSchema = z.object({
       criticalBonusDice: z.number().int().min(1).max(4).optional()
     })
     .optional(),
-  save: z.object({ ability: AbilitySchema, dc: z.number().int().min(1).max(40) }).optional(),
+  save: z.object({ ability: AbilitySchema, dc: z.number().int().min(1).max(40), ...SaveOutcomeFields }).optional(),
   damage: z
     .array(z.object({ formula: DiceFormulaSchema, type: z.string().min(1).max(40) }))
     .max(8)

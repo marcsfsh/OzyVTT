@@ -1278,6 +1278,37 @@ const homebrewDiceFormula = {
 } as const;
 const homebrewDamageType = { type: "string", minLength: 1, maxLength: 40 } as const;
 const homebrewConditionId = { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 60 } as const;
+/** `SaveOutcomeFields`: what a save does, as data. Every save block (stat block, feature, spell) carries both. */
+const homebrewSaveOutcome = {
+  successDamage: {
+    type: "string",
+    enum: ["half", "none"],
+    default: "half",
+    description: 'The damage a successful save takes: "half" (Fireball) or "none" (Sacred Flame)'
+  },
+  failureCondition: {
+    type: ["string", "null"],
+    enum: [
+      "blinded",
+      "charmed",
+      "deafened",
+      "frightened",
+      "grappled",
+      "incapacitated",
+      "paralyzed",
+      "petrified",
+      "poisoned",
+      "prone",
+      "restrained",
+      "stunned",
+      "unconscious",
+      null
+    ],
+    default: null,
+    description:
+      "The condition a failed save imposes, offered on the save prompt; null for none. Exhaustion is not offered: it stacks by level"
+  }
+} as const;
 const homebrewEffectTag = { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 40 } as const;
 const homebrewActionId = { type: "string", pattern: "^[a-z0-9-]+$" } as const;
 const homebrewRef = (schemaRef: string) => ({ $ref: `#/components/schemas/${schemaRef}` });
@@ -10072,8 +10103,8 @@ export const openApiDocument = {
             }
           },
           save: {
-            description: "Which save the target rolls; null when the spell forces none",
-            oneOf: [homebrewAbility, { type: "null" }]
+            description: "The save the spell forces; null when it forces none",
+            oneOf: [{ $ref: "#/components/schemas/HomebrewSpellSave" }, { type: "null" }]
           },
           target: {
             type: "object",
@@ -10570,6 +10601,14 @@ export const openApiDocument = {
           }
         }
       },
+      HomebrewSpellSave: {
+        type: "object",
+        additionalProperties: false,
+        required: ["ability"],
+        description:
+          "The save a spell forces: the ability the target rolls and what the save does. The caster supplies the DC.",
+        properties: { ability: homebrewAbility, ...homebrewSaveOutcome }
+      },
       HomebrewSpellShape: {
         type: "object",
         additionalProperties: false,
@@ -10828,8 +10867,12 @@ export const openApiDocument = {
             type: "object",
             additionalProperties: false,
             required: ["ability", "dc"],
-            description: "A printed save DC",
-            properties: { ability: homebrewAbility, dc: { type: "integer", minimum: 1, maximum: 40 } }
+            description: "A printed save DC, and what the save does",
+            properties: {
+              ability: homebrewAbility,
+              dc: { type: "integer", minimum: 1, maximum: 40 },
+              ...homebrewSaveOutcome
+            }
           }
         }
       },
@@ -10853,7 +10896,8 @@ export const openApiDocument = {
         type: "object",
         additionalProperties: false,
         required: ["ability", "dc"],
-        description: "A save a feature forces. `ability` is what the TARGET rolls; `dc` is how the number is derived.",
+        description:
+          "A save a feature forces. `ability` is what the TARGET rolls; `dc` is how the number is derived; the outcome fields are a stat block's.",
         properties: {
           ability: homebrewAbility,
           dc: {
@@ -10864,7 +10908,8 @@ export const openApiDocument = {
               { type: "integer", minimum: 1, maximum: 40 },
               { $ref: "#/components/schemas/HomebrewFeatureSaveDc" }
             ]
-          }
+          },
+          ...homebrewSaveOutcome
         }
       },
       HomebrewFeatureSaveDc: {

@@ -201,7 +201,7 @@ function interpretAction(
           : save.dc.base +
             abilityModifier(context.finalScores[save.dc.ability]) +
             (save.dc.proficiencyBonus ? context.proficiencyBonus : 0);
-    assembled.save = { ability: save.ability, dc };
+    assembled.save = { ...save, dc };
   }
   if (damageByLevel && damageByLevel.length > 0) {
     const rows = [...damageByLevel]
@@ -258,7 +258,7 @@ function cantripActionFor(
     description: spell.description.slice(0, 12000),
     damage: typedDamage ? [{ formula: spell.damage.roll!, type: spell.damage.types[0] }] : [],
     ...(spell.save !== null
-      ? { save: { ability: spell.save, dc: numbers.saveDc } }
+      ? { save: { ...spell.save, dc: numbers.saveDc } }
       : spell.attackRoll
         ? { attack: { bonus: numbers.attackBonus } }
         : {}),

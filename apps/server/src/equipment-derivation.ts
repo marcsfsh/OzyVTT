@@ -1,5 +1,5 @@
 import type { Actor } from "@vtt/domain";
-import type { ActorAction, ActorDefinition, InventoryItem } from "@vtt/schemas";
+import type { ActorAction, ActorDefinition, InventoryItem, SaveCondition } from "@vtt/schemas";
 import {
   abilityModifier,
   armorWeightOf,
@@ -81,10 +81,12 @@ export type RiderActionLike = Readonly<{
     count?: number;
     criticalBonusDice?: number;
   }>;
-  save?: Readonly<{ ability: RiderAbility; dc: FeatureSaveDcLike }>;
+  save?: Readonly<{ ability: RiderAbility; dc: FeatureSaveDcLike } & SaveOutcomeLike>;
   damage?: readonly Readonly<{ formula: string; type: string }>[];
   uses?: RiderUsesLike;
 }>;
+/** `SaveOutcomeFields`: what a success does to the damage and the condition a failure imposes. */
+export type SaveOutcomeLike = Readonly<{ successDamage: "half" | "none"; failureCondition: SaveCondition | null }>;
 /** `FeatureSaveDcSchema`'s three printed forms: the character's own spell DC, a flat number, or `base + ability (+ PB)`. */
 export type FeatureSaveDcLike =
   "spellcasting" | number | Readonly<{ base?: number; ability: RiderAbility; proficiencyBonus?: boolean }>;
@@ -148,7 +150,7 @@ export type SpellRecordLike = Readonly<{
   level: number;
   attackRoll?: boolean;
   damage?: Readonly<{ roll: string | null; types: readonly string[] }>;
-  save?: RiderAbility | null;
+  save?: (Readonly<{ ability: RiderAbility }> & SaveOutcomeLike) | null;
   description?: string;
   castingOptions?: readonly Readonly<{ type: string; damageRoll: string | null; targetCount: number | null }>[];
 }>;
@@ -788,9 +790,7 @@ function itemAction(
         : scoreModifierOf(definition, resolved) + (proficient === false ? 0 : caster.proficiencyBonus);
     attack = { bonus, ...rest };
   }
-  const save = declared.save
-    ? { ability: declared.save.ability, dc: resolveSaveDc(declared.save.dc, definition) }
-    : undefined;
+  const save = declared.save ? { ...declared.save, dc: resolveSaveDc(declared.save.dc, definition) } : undefined;
   return {
     id: itemActionId(itemId, declared.id),
     name: declared.name,
@@ -864,7 +864,7 @@ function castAction(
   return {
     ...base,
     ...(spell.attackRoll === true ? { attack: { bonus: attackBonus } } : {}),
-    ...(spell.save ? { save: { ability: spell.save, dc: clampDc(saveDc) } } : {}),
+    ...(spell.save ? { save: { ...spell.save, dc: clampDc(saveDc) } } : {}),
     ...(formula ? { damage: [{ formula, type: damageType }] } : {})
   };
 }

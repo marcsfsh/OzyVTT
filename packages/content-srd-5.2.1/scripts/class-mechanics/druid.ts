@@ -150,7 +150,7 @@ export const druid: ClassMechanicsModule = {
             activation: "action",
             description:
               "As a Magic action, expend a use of your Wild Shape and choose a point within 60 feet. Each creature of your choice in a 10-foot-radius Sphere centered there makes a Constitution saving throw, taking the damage below on a failure and half as much on a success. One creature of your choice in that area regains the same amount in Hit Points. The damage and healing increase at Druid levels 10 and 14.",
-            save: { ability: "con", dc: "spellcasting" },
+            save: { ability: "con", dc: "spellcasting", successDamage: "half", failureCondition: null },
             damage: [{ formula: "2d6", type: "necrotic" }],
             damageByLevel: [
               { level: 3, formula: "2d6", type: "necrotic" },

@@ -731,7 +731,12 @@ describe("Paladin - Channel Divinity is ONE counter that three features spend", 
     // `dc: "spellcasting"` is 8 + proficiency + Charisma modifier from the built sheet: at level 9,
     // 8 + 4 + 2 = 14.
     const built = table(paladinInput(9));
-    expect(actionOf(built, "abjure-foes")?.save).toEqual({ ability: "wis", dc: 14 });
+    expect(actionOf(built, "abjure-foes")?.save).toEqual({
+      ability: "wis",
+      dc: 14,
+      successDamage: "none",
+      failureCondition: "frightened"
+    });
     const resolution = resolve(built, "abjure-foes", [], [IDS.foe]);
     expect(resolution.save).toMatchObject({ ability: "wis", dc: 14 });
   });

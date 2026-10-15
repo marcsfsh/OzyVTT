@@ -7,7 +7,7 @@
  */
 
 import { z } from "zod";
-import { AbilitySchema, ActorDefinitionSchema, ItemSlotSchema } from "@vtt/schemas";
+import { AbilitySchema, ActorDefinitionSchema, ItemSlotSchema, SaveOutcomeFields } from "@vtt/schemas";
 import {
   BackgroundReferenceSchema,
   ClassReferenceSchema,
@@ -65,7 +65,11 @@ export const SpellReferenceSchema = z.object({
   ritual: z.boolean(),
   attackRoll: z.boolean(),
   damage: z.object({ roll: z.string().nullable(), types: z.array(z.string()) }),
-  save: AbilityShortSchema.nullable(),
+  /** The save the spell forces: the ability the target rolls and what the save does. The caster supplies the DC. */
+  save: z
+    .object({ ability: AbilityShortSchema, ...SaveOutcomeFields })
+    .strict()
+    .nullable(),
   target: z.object({ type: z.string().nullable(), count: z.number().int().nullable() }),
   shape: z.object({ type: z.string(), size: z.number().nullable(), unit: z.string().nullable() }).nullable(),
   classes: z.array(z.string()),

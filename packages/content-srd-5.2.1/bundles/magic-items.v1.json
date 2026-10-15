@@ -2044,7 +2044,26 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "geyser",
+    "name": "Geyser",
+    "activation": "action",
+    "description": "Remove the stopper and speak the command word: 30 gallons of water gush forth in a Line 30 feet long and 1 foot wide. One creature of your choice in the Line must succeed on a DC 13 Strength saving throw or take 1d4 Bludgeoning damage and have the Prone condition. Instead of a creature, you can target one object in the Line that isn't being worn or carried and that weighs no more than 200 pounds; the object is knocked over.",
+    "damage": [
+     {
+      "formula": "1d4",
+      "type": "bludgeoning"
+     }
+    ],
+    "save": {
+     "ability": "str",
+     "dc": 13,
+     "successDamage": "none",
+     "failureCondition": "prone"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -3975,7 +3994,9 @@
     "damage": [],
     "save": {
      "ability": "wis",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "none",
+     "failureCondition": null
     }
    }
   ],
@@ -4935,7 +4956,9 @@
     },
     "save": {
      "ability": "wis",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "frightened"
     }
    }
   ],
@@ -6021,7 +6044,9 @@
     },
     "save": {
      "ability": "dex",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "half",
+     "failureCondition": null
     }
    }
   ],
@@ -6334,7 +6359,9 @@
     },
     "save": {
      "ability": "wis",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "stunned"
     }
    }
   ],
@@ -6620,7 +6647,9 @@
     },
     "save": {
      "ability": "wis",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "charmed"
     }
    }
   ],
@@ -6710,7 +6739,9 @@
     "damage": [],
     "save": {
      "ability": "dex",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "restrained"
     }
    }
   ],
@@ -7697,7 +7728,9 @@
     },
     "save": {
      "ability": "dex",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "half",
+     "failureCondition": null
     }
    },
    {
@@ -7717,7 +7750,9 @@
     },
     "save": {
      "ability": "con",
-     "dc": 17
+     "dc": 17,
+     "successDamage": "half",
+     "failureCondition": "deafened"
     }
    }
   ],
@@ -8616,7 +8651,9 @@
     },
     "save": {
      "ability": "con",
-     "dc": 15
+     "dc": 15,
+     "successDamage": "none",
+     "failureCondition": "paralyzed"
     }
    }
   ],

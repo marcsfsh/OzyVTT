@@ -582,13 +582,23 @@ describe("Barbarian: Intimidating Presence holds the target to the Barbarian's o
     // A level-14 Berserker: Str 20 (+5), proficiency 5 -> DC 18. The DC is derived (`FeatureSaveDcSchema`),
     // so the level-17 sheet is asserted too, where proficiency alone moves it to 19.
     const built = onTheTable(build(barbarianInput(14)));
-    expect(actionOf(built, "intimidating-presence").save).toEqual({ ability: "wis", dc: 18 });
+    expect(actionOf(built, "intimidating-presence").save).toEqual({
+      ability: "wis",
+      dc: 18,
+      successDamage: "none",
+      failureCondition: "frightened"
+    });
     const resolution = use(built, "intimidating-presence", [IDS.foe]);
     expect(resolution.save).toMatchObject({ ability: "wis", dc: 18 });
     expect(built.hero.actionUses["intimidating-presence"]).toBe(1);
 
     const later = onTheTable(build(barbarianInput(17)), { fight: false });
-    expect(actionOf(later, "intimidating-presence").save).toEqual({ ability: "wis", dc: 19 });
+    expect(actionOf(later, "intimidating-presence").save).toEqual({
+      ability: "wis",
+      dc: 19,
+      successDamage: "none",
+      failureCondition: "frightened"
+    });
   });
 
   it("counts PRIMAL CHAMPION's +4 - the capstone the DC used to be computed before", () => {
@@ -597,7 +607,12 @@ describe("Barbarian: Intimidating Presence holds the target to the Barbarian's o
     // Str 20 at level 16, +4 from the capstone = 24 (+7); proficiency 6. 8 + 7 + 6 = 21.
     const capstone = onTheTable(build(barbarianInput(20)));
     expect(capstone.definition.abilityScores.str).toBe(24);
-    expect(actionOf(capstone, "intimidating-presence").save).toEqual({ ability: "wis", dc: 21 });
+    expect(actionOf(capstone, "intimidating-presence").save).toEqual({
+      ability: "wis",
+      dc: 21,
+      successDamage: "none",
+      failureCondition: "frightened"
+    });
     // The number the target is held to, not just the one printed on the sheet.
     expect(use(capstone, "intimidating-presence", [IDS.foe]).save).toMatchObject({ ability: "wis", dc: 21 });
   });
@@ -941,7 +956,12 @@ describe("Monk: Stunning Strike holds the target to the Monk's own DC", () => {
   it("derives 8 + Wisdom + proficiency and draws on the SAME Focus Points pool", () => {
     // Wis 16 (+3) at level 11, proficiency 4: DC 15.
     const built = onTheTable(build(monkInput(11)));
-    expect(actionOf(built, "stunning-strike").save).toEqual({ ability: "con", dc: 15 });
+    expect(actionOf(built, "stunning-strike").save).toEqual({
+      ability: "con",
+      dc: 15,
+      successDamage: "none",
+      failureCondition: "stunned"
+    });
     const resolution = use(built, "stunning-strike", [IDS.foe]);
     expect(resolution.save).toMatchObject({ ability: "con", dc: 15 });
     expect(built.hero.actionUses["focus-points"]).toBe(1);
@@ -953,7 +973,12 @@ describe("Monk: Stunning Strike holds the target to the Monk's own DC", () => {
     // the capstone = 24 (+7); proficiency 6. 8 + 7 + 6 = 21.
     const capstone = onTheTable(build(monkInput(20)));
     expect(capstone.definition.abilityScores.wis).toBe(24);
-    expect(actionOf(capstone, "stunning-strike").save).toEqual({ ability: "con", dc: 21 });
+    expect(actionOf(capstone, "stunning-strike").save).toEqual({
+      ability: "con",
+      dc: 21,
+      successDamage: "none",
+      failureCondition: "stunned"
+    });
     expect(use(capstone, "stunning-strike", [IDS.foe]).save).toMatchObject({ ability: "con", dc: 21 });
   });
 });

@@ -154,7 +154,9 @@
       "description": "As a Magic action, expend a use of your Wild Shape and choose a point within 60 feet. Each creature of your choice in a 10-foot-radius Sphere centered there makes a Constitution saving throw, taking the damage below on a failure and half as much on a success. One creature of your choice in that area regains the same amount in Hit Points. The damage and healing increase at Druid levels 10 and 14.",
       "save": {
        "ability": "con",
-       "dc": "spellcasting"
+       "dc": "spellcasting",
+       "successDamage": "half",
+       "failureCondition": null
       },
       "damage": [
        {
@@ -876,7 +878,9 @@
       "description": "Once per turn when you hit a creature with an attack roll, the target must succeed on a Charisma saving throw or hurtle through the Lower Planes, taking 8d10 Psychic damage if it isn't a Fiend and gaining the Incapacitated condition until the end of your next turn.",
       "save": {
        "ability": "cha",
-       "dc": "spellcasting"
+       "dc": "spellcasting",
+       "successDamage": "none",
+       "failureCondition": "incapacitated"
       },
       "damage": [
        {
@@ -1269,7 +1273,9 @@
         "base": 8,
         "ability": "str",
         "proficiencyBonus": true
-       }
+       },
+       "successDamage": "none",
+       "failureCondition": "frightened"
       }
      }
     ]
@@ -1393,7 +1399,9 @@
         "base": 8,
         "ability": "wis",
         "proficiencyBonus": true
-       }
+       },
+       "successDamage": "half",
+       "failureCondition": null
       }
      }
     ]

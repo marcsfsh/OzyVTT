@@ -98,32 +98,6 @@ export function saveRiderBonus(derivation: EquipmentDerivation, ability: Ability
 
 const ABILITIES: readonly AbilityId[] = ["str", "dex", "con", "int", "wis", "cha"];
 
-/** SRD 2024 stat blocks print "Success: Half damage."; without an explicit "no damage" success line, default to half. */
-export function halfOnSuccessFrom(description: string): boolean {
-  return !/success:?\s*(the target )?(takes? )?no\b/i.test(description);
-}
-
-const CONDITION_WORDS: ReadonlyArray<readonly [RegExp, string]> = [
-  [/\bprone\b/i, "prone"],
-  [/\bpoisoned\b/i, "poisoned"],
-  [/\bparalyzed\b/i, "paralyzed"],
-  [/\bstunned\b/i, "stunned"],
-  [/\brestrained\b/i, "restrained"],
-  [/\bgrappled\b/i, "grappled"],
-  [/\bfrightened\b/i, "frightened"],
-  [/\bblinded\b/i, "blinded"],
-  [/\bcharmed\b/i, "charmed"],
-  [/\bdeafened\b/i, "deafened"],
-  [/\bincapacitated\b/i, "incapacitated"],
-  [/\bpetrified\b/i, "petrified"],
-  [/\bunconscious\b/i, "unconscious"]
-];
-/** Best-guess condition a failed save imposes, from the prose ("...or be Poisoned"); the answerer confirms it. */
-export function conditionFrom(description: string): string | null {
-  for (const [pattern, id] of CONDITION_WORDS) if (pattern.test(description)) return id;
-  return null;
-}
-
 /** Save modifier without situational terms. Precedence: GM-typed `saveOverrides`, the sheet's
  *  `proficiencies.saves`, the open5e extension's monster totals, then the bare ability modifier. */
 export function saveModifierFor(definition: ActorDefinition | undefined, ability: AbilityId): number {

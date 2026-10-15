@@ -21,6 +21,7 @@ import {
   WeaponReferenceSchema
 } from "../src/index.js";
 import { outDir, sourcePath } from "./paths.js";
+import { SPELL_SAVE_OVERRIDE_IDS, spellSaveOutcomeFor, statBlockSaveOutcome } from "./save-outcomes.js";
 
 const sourceDir = sourcePath("open5e-srd-2024");
 
@@ -428,7 +429,7 @@ const parseProseAttack = (desc: string): ProseAttack | null => {
 
 /**
  * Damage a save action deals on a failed save, from the "Failure:" clause ("Failure: 45 (10d8) Fire
- * damage."). Half-on-success and condition riders are read from the description at resolve time; a
+ * damage."). What a success does and the condition a failure imposes come from `statBlockSaveOutcome`; a
  * flat-only failure with no dice stays prose (ADR-0008).
  */
 const parseSaveDamage = (desc: string): { formula: string; type: string }[] => {
@@ -512,6 +513,12 @@ for (const pk of [...Object.keys(CORRECTIONS), ...EXCLUSIONS]) {
 for (const pk of Object.keys(SPELL_CORRECTIONS)) {
   if (!spells.some((spell) => spell.pk === pk))
     throw new Error(`Spell correction targets unknown spell ${pk} - check for a typo or an upstream rename.`);
+}
+for (const id of SPELL_SAVE_OVERRIDE_IDS) {
+  if (!spells.some((spell) => spell.pk === `srd-2024_${id}` && spell.fields.saving_throw_ability))
+    throw new Error(
+      `Save override targets ${id}, which is not a spell with a save - check for a typo or an upstream rename.`
+    );
 }
 
 const report = {
@@ -649,7 +656,8 @@ const monsters: ActorDefinition[] = creatures
           ? {
               save: {
                 ability: ABILITY_BY_NAME[save[1] as keyof typeof ABILITY_BY_NAME],
-                dc: Number.parseInt(save[2], 10)
+                dc: Number.parseInt(save[2], 10),
+                ...statBlockSaveOutcome(action.fields.desc)
               }
             }
           : {}),
@@ -844,7 +852,9 @@ const spellRecords = onlySrd(spells).map((spell) => {
     ritual: fields.ritual,
     attackRoll: fields.attack_roll,
     damage: { roll: fields.damage_roll || null, types: [...fields.damage_types] },
-    save: fields.saving_throw_ability ? abilityShort[fields.saving_throw_ability] : null,
+    save: fields.saving_throw_ability
+      ? { ability: abilityShort[fields.saving_throw_ability], ...spellSaveOutcomeFor(slugOf(spell.pk), fields.desc) }
+      : null,
     target: { type: fields.target_type, count: fields.target_count },
     shape: fields.shape_type
       ? { type: fields.shape_type, size: fields.shape_size, unit: fields.shape_size_unit }

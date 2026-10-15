@@ -137,7 +137,6 @@ export const actionCommands = [
             initiatorRole: initiator.role,
             initiatorSessionId: sessionIdOf(principal),
             now: () => new Date().toISOString(),
-            hasCondition: (id) => kit.catalogFor(principal).hasCondition(id),
             definition,
             distanceFeet,
             resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),

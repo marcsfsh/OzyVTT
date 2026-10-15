@@ -19,6 +19,7 @@ import {
   diceValidate,
   grouped,
   opt,
+  saveOutcomeFields,
   suggestionLabel,
   type Draft,
   type FieldDef,
@@ -1104,7 +1105,8 @@ const actionsField = (scope: RiderScope): FieldDef => ({
           min: 1,
           max: 40,
           help: "Leave empty to use the character's own spell save DC."
-        }
+        },
+        ...saveOutcomeFields("save")
       ]
     },
     actionUsesField()
@@ -1389,9 +1391,11 @@ function GrantsEditor({
   ctx,
   scope
 }: Readonly<{ value: Draft; onChange: (next: Draft) => void; ctx: SchemaContext; scope: RiderScope }>) {
-  const grants = (value.grants ?? {}) as Record<string, unknown>;
+  const stored = value.grants as Record<string, unknown> | undefined;
+  const grants = stored ?? {};
 
-  const rows = useMemo<readonly GrantRow[]>(() => grantRowsOf(grants), [grants]);
+  // Keyed on the stored bag's identity, so an absent bag does not rebuild the rows on every render.
+  const rows = useMemo<readonly GrantRow[]>(() => grantRowsOf(stored ?? {}), [stored]);
 
   // Pass the current bag so keys without rows (e.g. `grants.when`) are preserved.
   const write = (next: readonly GrantRow[]) => onChange({ ...value, grants: grantsFromRows(next, grants) });

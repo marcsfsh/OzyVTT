@@ -148,7 +148,7 @@ const MIRENA: ActorDefinition = {
       id: "sacred-flame",
       name: "Sacred Flame (Cantrip)",
       activation: "action",
-      save: { ability: "dex", dc: 15 },
+      save: { ability: "dex", dc: 15, successDamage: "none", failureCondition: null },
       damage: [{ formula: "2d8", type: "radiant" }],
       description:
         "*Dexterity Saving Throw:* DC 15, one creature (ignores cover). *Failure:* 2d8 radiant damage. *Success:* No damage."
@@ -182,7 +182,7 @@ const MIRENA: ActorDefinition = {
       id: "hold-person",
       name: "Hold Person (2nd)",
       activation: "action",
-      save: { ability: "wis", dc: 15 },
+      save: { ability: "wis", dc: 15, successDamage: "none", failureCondition: "paralyzed" },
       damage: [],
       description:
         "*Wisdom Saving Throw:* DC 15, one Humanoid. *Failure:* the target is **Paralyzed** for the duration (Concentration, up to 1 minute), repeating the save at the end of each of its turns."
@@ -191,7 +191,7 @@ const MIRENA: ActorDefinition = {
       id: "spirit-guardians",
       name: "Spirit Guardians (3rd)",
       activation: "action",
-      save: { ability: "wis", dc: 15 },
+      save: { ability: "wis", dc: 15, successDamage: "half", failureCondition: null },
       damage: [{ formula: "3d8", type: "radiant" }],
       description:
         "*Wisdom Saving Throw:* DC 15 for each creature that starts its turn within 15 ft. *Failure:* 3d8 radiant damage and speed halved. *Success:* Half damage. (Concentration.)"
@@ -360,7 +360,7 @@ const LYRA: ActorDefinition = {
       id: "fireball",
       name: "Fireball (3rd)",
       activation: "action",
-      save: { ability: "dex", dc: 15 },
+      save: { ability: "dex", dc: 15, successDamage: "half", failureCondition: null },
       damage: [{ formula: "8d6", type: "fire" }],
       description:
         "*Dexterity Saving Throw:* DC 15, each creature in a **20-foot-radius Sphere** within 150 ft. *Failure:* 8d6 fire damage. *Success:* Half damage. *Sculpt Spells:* choose up to 4 creatures to automatically succeed and take no damage."
