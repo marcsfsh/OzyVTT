@@ -1192,7 +1192,7 @@ export function resolveDefinitionAction(
     }
     // Flat damage bonuses from active effects (Rage +2 melee) land as their own explainable line.
     if (action.attack) {
-      const melee = action.attack.reachFeet !== undefined || action.attack.rangeFeet === undefined;
+      const melee = !attackUsedAsRanged(action.attack, deps.distanceFeet?.(attacker.id, targets[0].id) ?? null);
       for (const effect of attacker.effects) {
         for (const modifier of effect.modifiers) {
           if (modifier.type === "damage-bonus" && (modifier.appliesTo === "all" || melee)) {

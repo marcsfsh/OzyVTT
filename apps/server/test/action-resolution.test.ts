@@ -142,6 +142,53 @@ describe("definition action resolution", () => {
     expect(playerGame.rolls.every((roll) => roll.visibility === "public")).toBe(true);
   });
 
+  it("keeps a melee-only damage bonus off a thrown weapon used at range", () => {
+    const HANDAXE = {
+      id: "handaxe",
+      name: "Handaxe",
+      activation: "action" as const,
+      description: "Melee or Ranged Attack Roll: +5, reach 5 ft. or range 20/60 ft.",
+      attack: { bonus: 5, reachFeet: 5, rangeFeet: 60, rangeNormalFeet: 20 },
+      damage: [{ formula: "1d6 + 3", type: "slashing" }]
+    };
+    const throwAt = (distance: number) => {
+      const game = combatState();
+      game.actors[0].effects = [
+        {
+          id: "fury",
+          name: "Fury",
+          tags: [],
+          sourceActorId: IDS.attacker,
+          sourceName: "Aboleth",
+          sourceActionId: null,
+          startedRound: 1,
+          duration: { type: "manual" },
+          endsWhenSourceDefeated: false,
+          voidWhileIncapacitated: false,
+          concentration: false,
+          modifiers: [{ type: "damage-bonus", amount: 2, appliesTo: "melee" }],
+          linkedConditionIds: [],
+          escapeDc: null,
+          onEnd: [],
+          endsWithTag: null
+        }
+      ];
+      return resolveDefinitionAction(
+        game,
+        HANDAXE,
+        { actorId: IDS.attacker, targetIds: [IDS.pc], commandId: "50000000-0000-4000-8000-000000000098" },
+        { ...deps([15, 4]), distanceFeet: () => distance }
+      );
+    };
+    // Swung in reach it is a melee attack and the bonus lands as its own line...
+    expect(throwAt(5).bonusDamage).toEqual([{ amount: 2, type: "slashing", source: "Fury" }]);
+    // ...thrown from 15 feet it is a ranged attack, so the melee-only bonus stays off.
+    const thrown = throwAt(15);
+    expect(thrown.attack?.outcome).toBe("hit");
+    expect(thrown.bonusDamage).toBeUndefined();
+    expect(thrown.damageTotal).toBe(7);
+  });
+
   it("doubles only the dice on a natural 20 and skips damage on a natural 1", () => {
     const crit = combatState();
     const critResolution = resolveDefinitionAction(
