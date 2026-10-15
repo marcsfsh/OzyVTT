@@ -86,7 +86,7 @@ describe("A player at a GM-only address", () => {
   });
 });
 
-describe("Resume never volunteers a GM-only address (D2 + §3.2)", () => {
+describe("Resume never volunteers a GM-only address", () => {
   it("sends a player to their own default rather than back to a GM-only address they once reached", () => {
     rememberLocation("player", "/codex/audit");
     // The app must never offer a GM-only address as a resume target.

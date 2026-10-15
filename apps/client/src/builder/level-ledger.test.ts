@@ -81,7 +81,7 @@ describe("Reading a character back into the wizard", () => {
   });
 });
 
-describe("Rolled hit points (D14)", () => {
+describe("Rolled hit points", () => {
   const roll = (level: number, value: number): CharacterChoice => ({
     level,
     kind: "hp-roll",

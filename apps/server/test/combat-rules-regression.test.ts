@@ -1977,7 +1977,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     onEnd: []
   };
 
-  it("a runtime `speed` effect moves the feet in the refusal, and ending it gives them back (U18)", () => {
+  it("a runtime `speed` effect moves the feet in the refusal, and ending it gives them back", () => {
     const game = buildGame(); // Torva's turn, 40 ft on the sheet
     expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 45, y: 0 })).toThrow(
       "Torva Grimtusk has 40 ft of movement left (this move needs 45 ft)."
@@ -2001,7 +2001,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     expect(game.combat.turn.movementUsedFeet).toBe(35);
   });
 
-  it("two attackers' speed effects both bite, and each expires with its own source's turn (U18/M2 shape)", () => {
+  it("two attackers' speed effects both bite, and each expires with its own source's turn", () => {
     const game = buildGame();
     addEffect(
       game,
@@ -2027,7 +2027,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     );
   });
 
-  it("Dash doubles the SLOWED Speed, not the sheet's - the order of operations (U18)", () => {
+  it("Dash doubles the SLOWED Speed, not the sheet's - the order of operations", () => {
     const dash = buildGame();
     dash.actors.find((actor) => actor.id === IDS.torva)!.effects = [dashingEffect];
     expect(moveRules(dash, IDS.torva, { x: 0, y: 0 }, { x: 70, y: 0 }).warning).toBeNull(); // 70 <= 80
@@ -2187,7 +2187,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     );
   });
 
-  it("the sum floors at 0 before Dash, and a Speed-0 condition refuses a bonus outright (U18)", () => {
+  it("the sum floors at 0 before Dash, and a Speed-0 condition refuses a bonus outright", () => {
     // 40 - 5x2 exhaustion - 30 = 0 exactly; a second -30 must not become a doubled debt under Dash.
     const buried = buildGame();
     buried.actors.find((actor) => actor.id === IDS.torva)!.effects = [dashingEffect];
@@ -2207,7 +2207,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     );
   });
 
-  it("a `voidWhileIncapacitated` speed effect lapses while the bearer is incapacitated (U18)", () => {
+  it("a `voidWhileIncapacitated` speed effect lapses while the bearer is incapacitated", () => {
     const game = buildGame();
     addEffect(game, IDS.torva, speedEffect("boon-1", 20, "boon", { voidWhileIncapacitated: true }));
     expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 65, y: 0 })).toThrow(
@@ -2220,7 +2220,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     );
   });
 
-  it("standing up costs half the CURRENT Speed, so a slowed creature pays less (U18 sweep)", () => {
+  it("standing up costs half the CURRENT Speed, so a slowed creature pays less", () => {
     const game = buildGame();
     const torva = game.actors.find((actor) => actor.id === IDS.torva)!;
     torva.conditions = [{ id: "prone" }];
@@ -2241,7 +2241,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     expect(game.combat.turn.movementUsedFeet).toBe(25);
   });
 
-  it("a grappled creature still cannot stand, though half its Speed is now 0 ft (U18's trap)", () => {
+  it("a grappled creature still cannot stand, though half its Speed is now 0 ft", () => {
     const game = buildGame();
     const torva = game.actors.find((actor) => actor.id === IDS.torva)!;
     // Half of a zeroed Speed is 0, so `cost > budgetLeft` alone would have waved the stand-up through.

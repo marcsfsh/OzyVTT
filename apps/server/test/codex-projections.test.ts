@@ -70,7 +70,7 @@ const playerContext = (publishedInstant: number | null = null) => ({
   publishedInstant
 });
 
-describe("M11 calendar projection - the GM's prep clock never reaches a player (O-1 / D11-G)", () => {
+describe("calendar projection - the GM's prep clock never reaches a player", () => {
   /** The two clocks differ, so a projection that returned the GM's clock cannot pass. */
   it("emits the PUBLISHED date as a player's currentDate, and the GM clock is not reachable from the payload", () => {
     const published: CodexInWorldDate = { year: 1492, month: 0, day: 10 };
@@ -127,7 +127,7 @@ describe("M11 calendar projection - the GM's prep clock never reaches a player (
   });
 });
 
-describe("M11 chronicle projection - deadlines and downtime are gated by reveal and nothing else (O-2 / D11-E)", () => {
+describe("chronicle projection - deadlines and downtime are gated by reveal and nothing else", () => {
   // Unrevealed records are absent and revealed ones are present. The positive half guards against a
   // kind-based filter that would hide deadlines from players forever.
   it("hides an unrevealed deadline and an unrevealed downtime from a player, and shows them once revealed", () => {
@@ -241,7 +241,7 @@ function markerRow(overrides: Partial<CodexMarker> = {}): CodexMarker {
 }
 const markerContext = { revealedPageIds: new Set<string>(), subMapRevealed: false };
 
-describe("M12 standing projection - CT-6, two gates and a signed value", () => {
+describe("standing projection - two gates and a signed value", () => {
   it("hides an unrevealed standing from a player and carries the VALUE once revealed", () => {
     const hidden = standingRow({ value: -40 });
     expect(projectPlayerStanding(hidden, { factionRevealed: true })).toBeNull();
@@ -270,7 +270,7 @@ describe("M12 standing projection - CT-6, two gates and a signed value", () => {
 
 // The party marker is an ordinary marker with a flag: its projected key set is the ordinary one plus
 // `isParty`, and `isParty` grants no visibility of its own.
-describe("M12 party marker projection - CT-7, a flag and nothing else", () => {
+describe("party marker projection - a flag and nothing else", () => {
   it("gives a party pin exactly an ordinary pin's key set plus isParty, and no GM-only field", () => {
     const ordinary = projectPlayerMarker(markerRow({ revealedToPlayers: true }), markerContext);
     const party = projectPlayerMarker(markerRow({ revealedToPlayers: true, isParty: true }), markerContext);
@@ -316,7 +316,7 @@ describe("M12 party marker projection - CT-7, a flag and nothing else", () => {
 
 // Milestone and standing payloads, allow-listed per kind and audience. A player gets a revealed standing
 // record's delta and reason, since its `playerText` is empty.
-describe("M12 chronicle payloads - milestone and standing (CT-8 / CT-6)", () => {
+describe("chronicle payloads - milestone and standing", () => {
   const milestone = entryRow({ kind: "milestone", payload: { level: 5, reason: "Cleared the crypt" } });
   const standing = entryRow({
     kind: "standing",
@@ -372,7 +372,7 @@ describe("M12 chronicle payloads - milestone and standing (CT-8 / CT-6)", () => 
 
 // The reveal audit's membership test is the player projection, so a record whose reveal flag is set
 // but which no player can see is absent from it.
-describe("M12 reveal audit projection - CT-9, an aggregation and not a second opinion", () => {
+describe("reveal audit projection - an aggregation and not a second opinion", () => {
   it("counts a revealed pin on a HIDDEN map as not visible, and reports every section even when empty", () => {
     const onShownMap = markerRow({ id: "99999999-9999-4999-8999-999999999999", revealedToPlayers: true });
     const onSecretMap = markerRow({

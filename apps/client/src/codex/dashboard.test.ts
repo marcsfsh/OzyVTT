@@ -22,7 +22,7 @@ const SESSION = (
   ...over
 });
 
-describe("Which session the dashboard names, and what it calls it (D18)", () => {
+describe("Which session the dashboard names, and what it calls it", () => {
   it("says 'Next session' about one that has not been played", () => {
     const card = nextSessionCard([SESSION({ id: "s4", sessionNumber: 4 })], null);
     expect(card?.heading).toBe("Next session");

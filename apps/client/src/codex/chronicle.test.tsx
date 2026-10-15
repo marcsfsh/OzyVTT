@@ -118,7 +118,7 @@ const rowOf = (id: string) => document.getElementById(`codex-entry-${id}`)!;
 /** The group headings, in order. */
 const headings = () => [...document.querySelectorAll(".codex-timeline-year")].map((node) => node.textContent);
 
-describe("The chronicle is ONE timeline (CT-11)", () => {
+describe("The chronicle is ONE timeline", () => {
   it("renders a dated event page beside a journal entry, each naming its own kind", async () => {
     await renderJournal([ENTRY, EVENT]);
 
@@ -129,7 +129,7 @@ describe("The chronicle is ONE timeline (CT-11)", () => {
     expect(within(rowOf("j1")).getByText("Entry")).toBeInTheDocument();
   });
 
-  it("R2: a record's kind reads without any colour at all", async () => {
+  it("a record's kind reads without any colour at all", async () => {
     await renderJournal([ENTRY, EVENT]);
     // Colour is CSS-only, so each row's text must distinguish its kind.
     expect(rowOf("p9").textContent).toContain("Event");
@@ -173,7 +173,7 @@ describe("The chronicle is ONE timeline (CT-11)", () => {
   });
 });
 
-describe("Two lenses over the same records (CT-12)", () => {
+describe("Two lenses over the same records", () => {
   it("regroups without refetching and without writing anything", async () => {
     await renderJournal([ENTRY, EVENT]);
     const user = userEvent.setup();
@@ -239,7 +239,7 @@ describe("Two lenses over the same records (CT-12)", () => {
  * The editor autosaves the whole draft, so a page with no date control must omit `inWorldDate` (sending
  * `null` would erase an event's date once it was demoted and edited).
  */
-describe("An event page is dated in the editor (CT-11)", () => {
+describe("An event page is dated in the editor", () => {
   const PAGE: CodexPage = {
     id: "p9",
     title: "The Sundering",

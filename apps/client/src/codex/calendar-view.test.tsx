@@ -153,7 +153,7 @@ describe("The Calendar grid", () => {
   });
 });
 
-describe("The month is an address (D3/D17)", () => {
+describe("The month is an address", () => {
   it("renders the month named by ?y= and ?m= rather than the clock's", () => {
     renderCalendar({ year: "1492", month: "1" });
     expect(screen.getByRole("grid", { name: "Alturiak 1492 DR" })).toBeInTheDocument();
@@ -177,7 +177,7 @@ describe("The month is an address (D3/D17)", () => {
   });
 });
 
-describe("The two clocks (D17)", () => {
+describe("The two clocks", () => {
   it("names them in the glossary's words and marks the GM's as GM-only", () => {
     renderCalendar();
     expect(screen.getByText("Your date")).toBeInTheDocument();
@@ -316,7 +316,7 @@ describe("Loading, failure and the empty world", () => {
   });
 });
 
-describe("The player's Calendar (D14)", () => {
+describe("The player's Calendar", () => {
   const PLAYER_CALENDAR = {
     yearName: "DR",
     months: CALENDAR.months,

@@ -155,7 +155,7 @@ const renderGm = (at: string) =>
 const renderPlayer = (at: string) => (goTo(at), render)(<PlayerCodex token="player" />);
 const rail = async (name: string) => within(await screen.findByRole("navigation", { name }));
 
-describe("D3 — the GM's Sessions and Quests filters live in the address", () => {
+describe("the GM's Sessions and Quests filters live in the address", () => {
   it("Sessions: opening a filtered address filters the list, and using the control writes the address", async () => {
     const user = userEvent.setup();
     renderGm("/codex/sessions?status=planned");
@@ -197,7 +197,7 @@ describe("D3 — the GM's Sessions and Quests filters live in the address", () =
   });
 });
 
-describe("D10 — the player's lists filter in place too", () => {
+describe("the player's lists filter in place too", () => {
   it("Sessions: a filter box that narrows the recaps and writes the address", async () => {
     const user = userEvent.setup();
     playerSessions.mockResolvedValue([

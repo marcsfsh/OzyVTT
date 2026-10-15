@@ -52,7 +52,7 @@ describe("session scene attachments", () => {
     expect(store.createSession({ sceneIds: many }).sceneIds).toHaveLength(20);
   });
 
-  it("is GM-only in projections ALWAYS - even for a revealed session (R2)", () => {
+  it("is GM-only in projections ALWAYS - even for a revealed session", () => {
     const session = store.createSession({
       sessionNumber: 5,
       recapBody: "They crossed the bridge.",

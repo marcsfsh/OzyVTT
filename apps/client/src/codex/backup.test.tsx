@@ -51,7 +51,7 @@ async function choose(user: ReturnType<typeof userEvent.setup>, file: File) {
   await user.upload(input, file);
 }
 
-describe("The restore confirmation states what the file holds (D16)", () => {
+describe("The restore confirmation states what the file holds", () => {
   it("counts every section, including the ones the file does not contain", async () => {
     const user = userEvent.setup();
     renderBackup();

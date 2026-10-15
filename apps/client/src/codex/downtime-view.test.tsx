@@ -107,7 +107,7 @@ beforeEach(() => {
   update.mockResolvedValue(undefined);
 });
 
-describe("Totals — a person, not a spelling (D12)", () => {
+describe("Totals — a person, not a spelling", () => {
   it("groups a linked row with its page however its `who` string is spelled", () => {
     renderDowntime({
       records: [
@@ -190,7 +190,7 @@ describe("Logging downtime", () => {
     expect(screen.getByText(/Nothing moves until you confirm it below/)).toBeInTheDocument();
   });
 
-  it("D13: the note is the shared editor, so a downtime note can link to the world", async () => {
+  it("the note is the shared editor, so a downtime note can link to the world", async () => {
     const user = userEvent.setup();
     renderDowntime();
 
@@ -389,7 +389,7 @@ describe("A party bigger than the Combobox's default page", () => {
   });
 });
 
-describe("The player's Downtime (D12/D14)", () => {
+describe("The player's Downtime", () => {
   const PLAYER_ROWS = [
     {
       id: "d1",

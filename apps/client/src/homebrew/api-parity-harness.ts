@@ -354,7 +354,7 @@ export function assertCanonicaliserSound(): void {
  * One reasoned row per uncovered address group (a subtree plus the types it is open on). The test
  * holds the raw open set to these rows in both directions: every open address matches a row (first
  * match wins, so specific rows come first), every row still matches something, and totals are
- * pinned. `owner` names who closes the group; `permanent:` or `unowned:` give the reason otherwise.
+ * pinned. `status` is `gap` when an editor control could close the group, or `permanent:` and why not.
  */
 export type ExemptionRow = Readonly<{
   /**
@@ -367,7 +367,7 @@ export type ExemptionRow = Readonly<{
   /** The record types the row exempts, or `"*"` for every type the walk finds the path on. */
   types: "*" | readonly HomebrewBodyType[];
   reason: string;
-  owner: string;
+  status: string;
 }>;
 
 /** The path half of an addressId — what `ExemptionRow.at` is matched against. */
@@ -410,7 +410,7 @@ export function censusVerdict(
   }
   const stale = rows
     .filter((row) => (matched.get(row) ?? 0) === 0)
-    .map((row) => `${row.types === "*" ? "*" : row.types.join("|")}.${row.at} (${row.owner})`);
+    .map((row) => `${row.types === "*" ? "*" : row.types.join("|")}.${row.at} (${row.status})`);
   return { unmatched: unmatched.sort(), stale, matched };
 }
 
@@ -441,90 +441,90 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "actions[].onHit[].**",
     types: ACTION_CARRIERS,
     reason: "a hit that lands a condition — no rows control on the action row",
-    owner: "C1"
+    status: "gap"
   },
   {
     at: "actions[].legendary.cost",
     types: ACTION_CARRIERS,
     reason: "the per-round pool cost — the record has actionsPerRound, the action has no cost",
-    owner: "C2"
+    status: "gap"
   },
   {
     at: "actions[].damageByLevel[].**",
     types: FEATURE_CARRIERS,
     reason:
       "damage that grows with level — feature-carrier actions only (a statblock ActionSchema has no such key, which is why monster is absent)",
-    owner: "C3"
+    status: "gap"
   },
   {
     at: "actions[].attack.count",
     types: ACTION_CARRIERS,
     reason:
       "attack keys the action rows do not enumerate — surfaced when the bare-group false credit was removed (this batch's adversarial review)",
-    owner: "unowned: recorded by this census, owned by no plan"
+    status: "gap"
   },
   {
     at: "actions[].attack.criticalBonusDice",
     types: ACTION_CARRIERS,
     reason:
       "attack keys the action rows do not enumerate — surfaced when the bare-group false credit was removed (this batch's adversarial review)",
-    owner: "unowned: recorded by this census, owned by no plan"
+    status: "gap"
   },
   {
     at: "actions[].attack.proficient",
     types: FEATURE_CARRIERS,
     reason:
       "the feature attack shape's proficiency flag — no row enumerates it (the statblock shape does not carry it)",
-    owner: "unowned: recorded by this census, owned by no plan"
+    status: "gap"
   },
   {
     at: "actions[].save.dc.**",
     types: FEATURE_CARRIERS,
     reason:
       "the feature save's DERIVED dc object (ability/base/proficiencyBonus) — the rows author the statblock's flat number only",
-    owner: "unowned: recorded by this census, owned by no plan"
+    status: "gap"
   },
   {
     at: "actions[].grants.**",
     types: ACTION_CARRIERS,
     reason: "an action that grants itself an effect, the whole EffectGrant subtree included",
-    owner: "C4"
+    status: "gap"
   },
   {
     at: "actions[].multiattack[].**",
     types: ACTION_CARRIERS,
     reason: "126 SRD authors; owned outside this program (census row at vocabulary-parity.mirror.test.ts:3416)",
-    owner: "U21a (engine program)"
+    status: "gap"
   },
   {
     at: "actions[].reaction.**",
     types: ACTION_CARRIERS,
-    reason: "one SRD author (rogue uncanny-dodge) — test 2's 'not a lone record' is unsatisfiable (§4)",
-    owner: "permanent: lone SRD record"
+    reason: "one SRD author (rogue uncanny-dodge), so no second record shows the shape",
+    status: "permanent: lone SRD record"
   },
   {
     at: "actions[].spellId",
     types: ACTION_CARRIERS,
-    reason: "synthesised at character-build.ts:443, zero hand authors (§4)",
-    owner: "permanent: system-synthesised"
+    reason: "synthesised by the character build, zero hand authors",
+    status: "permanent: system-synthesised"
   },
   {
     at: "actions[].spellSlot.level",
     types: ACTION_CARRIERS,
-    reason: "synthesised from an item's consumesSpellSlot (equipment-derivation.ts:918), zero hand authors (§4)",
-    owner: "permanent: system-synthesised"
+    reason: "synthesised from an item's consumesSpellSlot during equipment derivation, zero hand authors",
+    status: "permanent: system-synthesised"
   },
   {
     at: "actions[].requiresEffectTag",
     types: ACTION_CARRIERS,
-    reason: "zero SRD authors; read at action-resolution.ts:230 — C4 authors the effect side it reads (§4)",
-    owner: "permanent: zero SRD authors"
+    reason: "zero SRD authors; action resolution reads it, and the effect editor authors the tag it checks",
+    status: "permanent: zero SRD authors"
   },
   {
     at: "actions[].targetRules",
     types: ACTION_CARRIERS,
-    reason: "one SRD author (§4, lone record)",
-    owner: "permanent: lone SRD record"
+    reason: "one SRD author (a lone record)",
+    status: "permanent: lone SRD record"
   },
 
   // ---- effect rider surface ----
@@ -532,32 +532,32 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "effects[].onEnd[].**",
     types: FEATURE_CARRIERS,
     reason: "what happens when an effect ends — no program unit authors it",
-    owner: "unowned: recorded by this census, owned by no plan"
+    status: "gap"
   },
   {
     at: "effects[].endsWithTag",
     types: FEATURE_CARRIERS,
     reason: "effect linkage vocabulary with no control — no program unit authors it",
-    owner: "unowned: recorded by this census, owned by no plan"
+    status: "gap"
   },
   {
     at: "effects[].target",
     types: FEATURE_CARRIERS,
     reason: "effect linkage vocabulary with no control — no program unit authors it",
-    owner: "unowned: recorded by this census, owned by no plan"
+    status: "gap"
   },
   {
     at: "effects[].voidWhileIncapacitated",
     types: FEATURE_CARRIERS,
     reason: "effect linkage vocabulary with no control — no program unit authors it",
-    owner: "unowned: recorded by this census, owned by no plan"
+    status: "gap"
   },
   {
     at: "modifiers[].**",
     types: FEATURE_CARRIERS,
     reason:
       "the modifier rows beyond the editor's offered subset — a type the form does not offer has no field for its keys",
-    owner: "unowned: recorded by this census, owned by no plan"
+    status: "gap"
   },
 
   // ---- feature-scope machinery shared by the feature carriers ----
@@ -566,19 +566,19 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: "*",
     reason:
       "an option's own payload (nested choice, grants, uses, extraPicks) — the choice panel authors one level and no deeper",
-    owner: "unowned: the panel's depth-1 boundary, recorded by this census"
+    status: "gap"
   },
   {
     at: "choices[].**",
     types: "*",
     reason: "the plural choices list — the panel writes the singular choice; the list shape has no control at all",
-    owner: "unowned: recorded by this census, owned by no plan"
+    status: "gap"
   },
   {
     at: "choice.**",
     types: "*",
     reason: "the parts of a feature's choice beyond the panel's fields",
-    owner: "unowned: the panel's field set, recorded by this census"
+    status: "gap"
   },
   // GrantsEditor territory, spelled per mount: a bare `grants.**` would also match under
   // `actions[].grants.` and absorb that group.
@@ -587,65 +587,66 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: "*",
     reason:
       "GrantsEditor writes the spells array whole (grantsFromRows, U9); the per-row keys have no FieldDef the probe can see",
-    owner: "content-program C7, then the GrantsEditor→declarative follow-on (§4.1)"
+    status: "gap"
   },
   {
     at: "features[].grants.**",
     types: "*",
     reason:
       "bespoke GrantsEditor JSX with no FieldDef — authored today through grantsFromRows and driven in pick-fields.test.tsx, invisible to the probe",
-    owner: "content-program C7, then the GrantsEditor→declarative follow-on (§4.1)"
+    status: "gap"
   },
   {
     at: "traits[].grants.**",
     types: "*",
     reason:
       "bespoke GrantsEditor JSX with no FieldDef — authored today through grantsFromRows and driven in pick-fields.test.tsx, invisible to the probe",
-    owner: "content-program C7, then the GrantsEditor→declarative follow-on (§4.1)"
+    status: "gap"
   },
   {
     at: "^feature.grants.**",
     types: ["feat"],
     reason:
       "bespoke GrantsEditor JSX at the feat's singular-feature scope — open now that the bare-group credit is gone",
-    owner: "content-program C7, then the GrantsEditor\u2192declarative follow-on (\u00a74.1)"
+    status: "gap"
   },
   {
     at: "^grants.**",
     types: "*",
     reason: "bespoke GrantsEditor JSX at record scope — same probe-blind mount",
-    owner: "content-program C7, then the GrantsEditor→declarative follow-on (§4.1)"
+    status: "gap"
   },
   {
     at: "uses.scaling.table[].**",
     types: "*",
     reason:
       "the by-level table at the three mounts the canonicaliser cannot reach — lineage depth, the feat's dotted singular feature, a cast's row scope (instrumented: exactly those six). The plain feature mounts author the table and probe covered",
-    owner: "unowned: recorded by this census, owned by no plan"
+    status: "gap"
   },
   {
     at: "casts[].uses.scaling.**",
     types: ["equipment"],
     reason: "an item cast's scaling — zero SRD authors until the magic-item bundle lands",
-    owner: "content-program C7, then the GrantsEditor→declarative follow-on (§4.1)"
+    status: "gap"
   },
   {
     at: "extraPicks[].**",
     types: "*",
-    reason: "extra-pick rows beyond the resolver U15 wired — no rows control at feature scope",
-    owner: "unowned: recorded by this census, owned by no plan"
+    reason: "extra-pick rows beyond what the resolver reads — no rows control at feature scope",
+    status: "gap"
   },
   {
     at: "replaces[].**",
     types: "*",
-    reason: "the replacement clause's rows — written whole by the U14 control, per-key fields invisible to the probe",
-    owner: "unowned: recorded by this census, owned by no plan"
+    reason:
+      "the replacement clause's rows — written whole by the replacement control, per-key fields invisible to the probe",
+    status: "gap"
   },
   {
     at: "replacesFeatureId",
     types: ["species"],
-    reason: "supersession at species-trait scope — the control exists on class features (U14), not here",
-    owner: "unowned: recorded by this census, owned by no plan"
+    reason: "supersession at species-trait scope — the control exists on class features, not here",
+    status: "gap"
   },
 
   // ---- record-scope gaps, per type ----
@@ -653,159 +654,158 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "^lineages[].**",
     types: ["species"],
     reason: "a lineage's own traits — today a lineage row is name + description only",
-    owner: "D2"
+    status: "gap"
   },
   {
     at: "languageChoices.**",
     types: ["species"],
     reason: "9 of 9 SRD species author languageChoices — the builder's language offer has no authoring end",
-    owner: "D1"
+    status: "gap"
   },
   {
     at: "languageChoices.**",
     types: ["background"],
-    reason: "zero SRD backgrounds author it (§4)",
-    owner: "permanent: zero SRD authors"
+    reason: "zero SRD backgrounds author it",
+    status: "permanent: zero SRD authors"
   },
   {
     at: "^languages",
     types: ["background"],
-    reason: "zero SRD backgrounds author it (§4)",
-    owner: "permanent: zero SRD authors"
+    reason: "zero SRD backgrounds author it",
+    status: "permanent: zero SRD authors"
   },
   {
     at: "skillChoices.**",
     types: ["background"],
-    reason: "zero SRD backgrounds author it (§4)",
-    owner: "permanent: zero SRD authors"
+    reason: "zero SRD backgrounds author it",
+    status: "permanent: zero SRD authors"
   },
   {
     at: "toolChoices.**",
     types: ["background"],
-    reason: "one SRD background authors it (§4, lone record)",
-    owner: "permanent: lone SRD record"
+    reason: "one SRD background authors it (a lone record)",
+    status: "permanent: lone SRD record"
   },
   {
     at: "abilityBonusChoice.**",
     types: ["species"],
-    reason: "zero SRD species author it (§4)",
-    owner: "permanent: zero SRD authors"
+    reason: "zero SRD species author it",
+    status: "permanent: zero SRD authors"
   },
   {
     at: "skillChoices.fromCatalog",
     types: ["class"],
     reason:
       "zero of 12 SRD classes author it — every class uses the from list, which has a control (\u00a74); the group's rows never offered it",
-    owner: "permanent: zero SRD authors"
+    status: "permanent: zero SRD authors"
   },
   {
     at: "toolChoices.fromCatalog",
     types: ["class"],
     reason: "zero of 12 SRD classes author it (\u00a74); the group's rows never offered it",
-    owner: "permanent: zero SRD authors"
+    status: "permanent: zero SRD authors"
   },
   {
     at: "multiclassProficiencies.**",
     types: ["class"],
     reason: "the builder does not multiclass — no reader on the build path and no control",
-    owner: "unowned: recorded by this census, owned by no plan"
+    status: "gap"
   },
   {
     at: "multiclassPrerequisites.**",
     types: ["class"],
     reason: "the builder does not multiclass — the schema key has no reader on the build path and no control",
-    owner: "unowned: recorded by this census, owned by no plan"
+    status: "gap"
   },
   {
     at: "levelTable[].classResources[].**",
     types: ["class", "subclass"],
     reason:
-      "the resource rows LevelTableEditor writes without FieldDefs — E1's refactor gives them real fields plus the missing id/display pair",
-    owner: "E1"
+      "the resource rows LevelTableEditor writes without FieldDefs; real fields would also add the missing id/display pair",
+    status: "gap"
   },
   {
     at: "levelTable[].**",
     types: ["class", "subclass"],
     reason:
-      "bespoke LevelTableEditor JSX with no FieldDef — authored today, invisible to the probe (the E1 refactor is the visibility fix)",
-    owner: "E1"
+      "bespoke LevelTableEditor JSX with no FieldDef — authored today, invisible to the probe until it uses FieldDefs",
+    status: "gap"
   },
   {
     at: "^uses.scaling.id",
     types: ["equipment"],
     reason:
       "the class-resource id at ITEM scope — the dedicated field exists on feature mounts only; the item's uses rows omit it",
-    owner: "unowned: recorded by this census, owned by no plan"
+    status: "gap"
   },
   {
     at: "weapon.mastery",
     types: ["equipment"],
     reason: "owned outside this program (census row at vocabulary-parity.mirror.test.ts:3415)",
-    owner: "U38 (mastery program)"
+    status: "gap"
   },
   {
     at: "prerequisite.**",
     types: ["feat"],
     reason:
       "feat prerequisites have no controls — the ability-score rows, the requires slug and the printed text alike",
-    owner: "unowned: recorded by this census, owned by no plan"
+    status: "gap"
   },
   {
     at: "castingOptions[].**",
     types: ["spell"],
     reason: "a spell's casting options — the spell form has no rows control for them",
-    owner: "unowned: recorded by this census, owned by no plan"
+    status: "gap"
   },
   {
     at: "^add",
     types: ["spell-list"],
     reason: "written whole by the bespoke SpellListContents editor — no FieldDef the probe can see",
-    owner: "permanent: bespoke editor, probe-blind"
+    status: "permanent: bespoke editor, probe-blind"
   },
   {
     at: "^remove",
     types: ["spell-list"],
     reason: "written whole by the bespoke SpellListContents editor — no FieldDef the probe can see",
-    owner: "permanent: bespoke editor, probe-blind"
+    status: "permanent: bespoke editor, probe-blind"
   },
 
   // ---- the monster stat block's shared-schema tail ----
   {
     at: "^extensions",
     types: ["monster"],
-    reason:
-      "the opaque bag itself — the census's structural blind spot; B0 declares the key contract the walk cannot see",
-    owner: "B0"
+    reason: "the opaque bag itself — the census's structural blind spot, since the walk cannot see its keys",
+    status: "gap"
   },
   {
     at: "proficiencies.**",
     types: ["monster"],
-    reason: "0 of 330 SRD monsters author it, and a control would change which rung saves resolve on (§4, B1's trap)",
-    owner: "permanent: zero SRD authors"
+    reason: "0 of 330 SRD monsters author it, and a control would change which rung saves resolve on",
+    status: "permanent: zero SRD authors"
   },
   {
     at: "spellcasting.**",
     types: ["monster"],
-    reason: "a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it (§4)",
-    owner: "permanent: built-character field"
+    reason: "a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it",
+    status: "permanent: built-character field"
   },
   {
     at: "character.**",
     types: ["monster"],
-    reason: "a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it (§4)",
-    owner: "permanent: built-character field"
+    reason: "a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it",
+    status: "permanent: built-character field"
   },
   {
     at: "startingInventory[].**",
     types: ["monster"],
-    reason: "a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it (§4)",
-    owner: "permanent: built-character field"
+    reason: "a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it",
+    status: "permanent: built-character field"
   },
   {
     at: "startingCurrency.**",
     types: ["monster"],
-    reason: "a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it (§4)",
-    owner: "permanent: built-character field"
+    reason: "a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it",
+    status: "permanent: built-character field"
   }
 ];
 

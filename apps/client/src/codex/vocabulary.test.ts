@@ -63,7 +63,7 @@ function codexSources(): readonly string[] {
     .sort();
 }
 
-describe("The canonical glossary (D5)", () => {
+describe("The canonical glossary", () => {
   const strings = scanCopy(codexSources().map((file) => ({ file, read: readSource(`${CODEX_DIR}${file}`) })));
 
   it("reads enough of the Codex to be worth trusting", () => {
@@ -127,7 +127,7 @@ describe("The canonical glossary (D5)", () => {
   });
 });
 
-describe("The words the navigation itself uses (D1/D5)", () => {
+describe("The words the navigation itself uses", () => {
   it("names every sidebar destination in the glossary's words, in both roles", () => {
     const labels = (groups: typeof GM_SIDEBAR) => groups.flatMap((group) => group.items.map((item) => item.label));
     expect(labels(GM_SIDEBAR)).toEqual([
@@ -158,7 +158,7 @@ describe("The words the navigation itself uses (D1/D5)", () => {
   });
 });
 
-describe("The words a chronicle row uses (D5/R2)", () => {
+describe("The words a chronicle row uses", () => {
   it("gives every kind a label in TEXT, quests included", () => {
     // Each kind must say what it is without colour.
     for (const [kind, meta] of Object.entries(CHRONICLE_KIND_META)) {

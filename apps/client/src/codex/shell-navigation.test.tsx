@@ -121,7 +121,7 @@ const DESTINATIONS = GM_SIDEBAR.flatMap((group) => group.items)
   .filter((item): item is typeof item & { path: string } => Boolean(item.path))
   .map((item) => [item.label, item.path] as const);
 
-describe("Every sidebar destination is reachable, and says so (D1/D3)", () => {
+describe("Every sidebar destination is reachable, and says so", () => {
   it.each(DESTINATIONS)("%s opens at %s with exactly one item lit", async (label, path) => {
     const user = userEvent.setup();
     renderShell("/codex");
@@ -168,7 +168,7 @@ describe("Every sidebar destination is reachable, and says so (D1/D3)", () => {
   });
 });
 
-describe("Deep links (D3)", () => {
+describe("Deep links", () => {
   it.each(DESTINATIONS)("renders %s directly from the address %s, with no navigation first", async (label, path) => {
     renderShell(path);
     await waitFor(() => expect(listPages).toHaveBeenCalled());
@@ -190,7 +190,7 @@ describe("Deep links (D3)", () => {
   });
 });
 
-describe("The browser's own buttons (D3)", () => {
+describe("The browser's own buttons", () => {
   it("goes back to the previous section, and forward again", async () => {
     const user = userEvent.setup();
     renderShell("/codex");
@@ -224,7 +224,7 @@ describe("The browser's own buttons (D3)", () => {
   });
 });
 
-describe("The phone nav drawer (D1, mobile parity)", () => {
+describe("The phone nav drawer (mobile parity)", () => {
   /** jsdom loads no CSS, so aside and drawer are both in the tree; the closed drawer is `inert`/`aria-hidden`. */
   const drawerNav = () => screen.getAllByRole("navigation", { name: "Codex sections" });
 
@@ -245,7 +245,7 @@ describe("The phone nav drawer (D1, mobile parity)", () => {
 
   /**
    * The browser-only race (closing the drawer via `history.back()` undoing the navigation) doesn't
-   * reproduce in jsdom; `scripts/browser-verify.mjs` catches it. These pin the resulting behaviour.
+   * reproduce in jsdom, so these pin the resulting behaviour instead.
    */
   it("navigating from the drawer lands on the destination", async () => {
     const user = userEvent.setup();

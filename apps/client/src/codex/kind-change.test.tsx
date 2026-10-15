@@ -91,7 +91,7 @@ beforeEach(() => {
   forPage.mockResolvedValue([]);
 });
 
-describe("Changing a page's kind (R7)", () => {
+describe("Changing a page's kind", () => {
   it("asks even when NOTHING would be lost — the prompt is unconditional", async () => {
     const user = userEvent.setup();
     // A note has no typed fields, so switching to a character drops nothing.

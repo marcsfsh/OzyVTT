@@ -333,7 +333,7 @@ const presenceFor = () => null;
 const rosterOf = (state: GameState) =>
   rosterActors(projectGmView(state, presenceFor).actors).map((actor) => actor.name);
 
-describe("replay.launch - the clones are scoped, hidden, and cleaned up (D3)", () => {
+describe("replay.launch - the clones are scoped, hidden, and cleaned up", () => {
   it("keeps the clones in the fight but out of both roster projections, with no name ending (replay)", () => {
     const state = liveState();
     const outcome = launch(state, documentWith([{ revision: 10, state: archivedState() }]));

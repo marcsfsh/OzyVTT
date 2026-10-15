@@ -90,7 +90,7 @@ function deps(faces: number[]): ResolveDependencies {
   };
 }
 
-describe("the C9 bind: one shipped row, two picked bases, two different numbers", () => {
+describe("the bind: one shipped row, two picked bases, two different numbers", () => {
   it("binds Sword of Sharpness to a greatsword: the server copies the base's stats and the swing derives", () => {
     const state = stateWith();
     setInventoryItem(
@@ -315,7 +315,7 @@ describe("the C9 bind: one shipped row, two picked bases, two different numbers"
   });
 });
 
-describe("the C9 headline far end: the +N ladder lands whole through the real bind", () => {
+describe("the headline far end: the +N ladder lands whole through the real bind", () => {
   it("one shipped 'Weapon, +1' row, bound to a greatsword: +1 to hit AND +1 damage, derived and ROLLED", () => {
     const state = stateWith();
     setInventoryItem(
@@ -357,7 +357,7 @@ describe("the C9 headline far end: the +N ladder lands whole through the real bi
   });
 });
 
-describe("the C9 bind: armor", () => {
+describe("the bind: armor", () => {
   it("binds Armor of Vulnerability to chain mail: worn alone, the real base AC derives", () => {
     const state = stateWith();
     setInventoryItem(
@@ -440,7 +440,7 @@ describe("the C9 bind: armor", () => {
   });
 });
 
-describe("the C9 bind: the 2026-08-14 review's four write-path rules", () => {
+describe("the bind: the four write-path rules", () => {
   it("a stale pick fails OPEN on an existing bind, and the row stays removable by anyone", () => {
     const state = stateWith();
     setInventoryItem(

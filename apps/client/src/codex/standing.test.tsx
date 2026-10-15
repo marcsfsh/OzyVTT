@@ -69,7 +69,7 @@ const renderCard = (standing: readonly CampaignStanding[], onAdjustStanding?: (i
 
 const meterWidth = () => (document.querySelector(".nh-meter-fill") as HTMLElement).style.width;
 
-describe("The seven tiers are a reading rule with hard edges (CT-6 / M12-B)", () => {
+describe("The seven tiers are a reading rule with hard edges", () => {
   it("every tier is reachable, and each named boundary lands on the side it should", () => {
     // Worst to best; every tier must be reachable.
     expect(STANDING_TIERS.map((tier) => tier.label)).toEqual([
@@ -127,7 +127,7 @@ describe("The seven tiers are a reading rule with hard edges (CT-6 / M12-B)", ()
   });
 });
 
-describe("A signed scale on an unsigned bar (F-6)", () => {
+describe("A signed scale on an unsigned bar", () => {
   it("maps −100…+100 onto Meter's 0…max without ever asking it for a negative", () => {
     // `Meter` can't render negatives, so the value is shifted; passing it raw would make Hunted and
     // Uninvested both empty bars.
@@ -153,7 +153,7 @@ describe("A signed scale on an unsigned bar (F-6)", () => {
   });
 });
 
-describe("The card says where you stand, in words (CT-6 / R2)", () => {
+describe("The card says where you stand, in words", () => {
   it("names the faction, the tier and the signed value, with no colour at all", () => {
     renderCard([CARD(-80, "The Zhentarim"), CARD(50, "Harpers")]);
 
@@ -186,7 +186,7 @@ describe("The card says where you stand, in words (CT-6 / R2)", () => {
   });
 });
 
-describe("Adjusting standing writes the reason with it (CT-6)", () => {
+describe("Adjusting standing writes the reason with it", () => {
   const renderAdjuster = (standing: CodexStanding | null, onSaved = vi.fn()) => {
     render(
       <StandingAdjuster
@@ -318,7 +318,7 @@ describe("Adjusting standing writes the reason with it (CT-6)", () => {
   });
 });
 
-describe("M12's two new chronicle kinds read by icon AND word (R2)", () => {
+describe("Standing and milestone chronicle kinds read by icon AND word", () => {
   it("both name an icon the registry actually has, and neither is the silent `pin` fallback", () => {
     // `iconChildren` silently falls back to `pin` for an unknown id.
     for (const kind of ["milestone", "standing"] as const) {

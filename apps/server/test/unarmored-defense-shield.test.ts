@@ -190,7 +190,7 @@ function equip(table: Table, itemId: string): Actor["armorClass"] {
   return table.hero.armorClass;
 }
 
-describe("Unarmored Defense and a shield (U28)", () => {
+describe("Unarmored Defense and a shield", () => {
   // Both characters read 15 bare-handed; the shield moves them in opposite directions because the two
   // class records disagree about it.
   it("adds a shield on top of the Barbarian's Constitution, and takes the Monk's Wisdom away", () => {

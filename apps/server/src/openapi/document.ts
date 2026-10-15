@@ -1578,7 +1578,7 @@ export const openApiDocument = {
         params: [uuidParam("id")],
         notFound: true,
         description:
-          'CT-7: marks this pin as where the party is, or clears the flag from it. **Exactly one marker in the whole atlas** carries it, so setting a new one clears the old in a single step - the party is in exactly one place, and one-pin-per-map would leave "which pin is real?" unanswerable. `isParty: false` clears the flag from THIS marker only and never disturbs a different party pin. The flag is the pin\'s ONLY party-specific surface: it is moved, relabelled, linked, revealed and deleted through the ordinary marker routes, because the party marker is an ordinary marker with a flag rather than a marker type of its own. It is player-facing - the party pin is for the players - but it grants no visibility: a hidden party pin, or one on a hidden map, stays hidden exactly like any other pin.'
+          'Marks this pin as where the party is, or clears the flag from it. **Exactly one marker in the whole atlas** carries it, so setting a new one clears the old in a single step - the party is in exactly one place, and one-pin-per-map would leave "which pin is real?" unanswerable. `isParty: false` clears the flag from THIS marker only and never disturbs a different party pin. The flag is the pin\'s ONLY party-specific surface: it is moved, relabelled, linked, revealed and deleted through the ordinary marker routes, because the party marker is an ordinary marker with a flag rather than a marker type of its own. It is player-facing - the party pin is for the players - but it grants no visibility: a hidden party pin, or one on a hidden map, stays hidden exactly like any other pin.'
       })
     },
     [CODEX_PATHS.timeline]: {
@@ -1615,7 +1615,7 @@ export const openApiDocument = {
         body: "CodexDeadlineCreateRequest",
         notFound: true,
         description:
-          'CT-5: adds a DEADLINE - a thing that will happen at an in-world date, which the campaign clock can reach. Its own text is the "what" and its own `inWorldDate` is the "when", so a deadline stores no extra payload at all; `fired` is DERIVED from that date against the clock on every read and never stored, which is why rewinding the clock correctly un-fires one. `inWorldDate` is REQUIRED and may not be null - an undated deadline can never fire, so it is a note, not a deadline. Created HIDDEN like any other entry and published by the ordinary `POST /codex/journal/{id}/reveal`: there is no kind-specific reveal and no kind-based visibility rule anywhere.'
+          'Adds a DEADLINE - a thing that will happen at an in-world date, which the campaign clock can reach. Its own text is the "what" and its own `inWorldDate` is the "when", so a deadline stores no extra payload at all; `fired` is DERIVED from that date against the clock on every read and never stored, which is why rewinding the clock correctly un-fires one. `inWorldDate` is REQUIRED and may not be null - an undated deadline can never fire, so it is a note, not a deadline. Created HIDDEN like any other entry and published by the ordinary `POST /codex/journal/{id}/reveal`: there is no kind-specific reveal and no kind-based visibility rule anywhere.'
       })
     },
     [CODEX_PATHS.journalDowntime]: {
@@ -1624,7 +1624,7 @@ export const openApiDocument = {
         body: "CodexDowntimeCreateRequest",
         notFound: true,
         description:
-          "CT-10: records DOWNTIME - who spent how many days doing what between adventures. Creating it NEVER moves the campaign clock; it answers with `proposedDate`, the date the clock WOULD move to, so the GM's confirm affordance can state what it will do before it does it. `POST /codex/journal/{id}/apply-downtime` is the only thing that moves the clock. Dated at the GM's current campaign date when no `inWorldDate` is given, the same rule an auto-logged battle follows, so the record lands where it happened."
+          "Records DOWNTIME - who spent how many days doing what between adventures. Creating it NEVER moves the campaign clock; it answers with `proposedDate`, the date the clock WOULD move to, so the GM's confirm affordance can state what it will do before it does it. `POST /codex/journal/{id}/apply-downtime` is the only thing that moves the clock. Dated at the GM's current campaign date when no `inWorldDate` is given, the same rule an auto-logged battle follows, so the record lands where it happened."
       })
     },
     [CODEX_PATHS.journalMilestone]: {
@@ -1633,7 +1633,7 @@ export const openApiDocument = {
         body: "CodexMilestoneCreateRequest",
         notFound: true,
         description:
-          "CT-8: records a MILESTONE - the party reached a level, and why. `level` is the level REACHED, not a step, so a deleted record cannot silently change what level the party is on (a delta would make the current level a sum over the whole timeline). There is no XP: progression here is milestone-based by design and the record carries no arithmetic. Created HIDDEN like any other entry and published by the ordinary `POST /codex/journal/{id}/reveal` - there is no kind-specific reveal. Dated at the GM's current campaign date when no `inWorldDate` is given, the rule an auto-logged battle and a downtime record already follow."
+          "Records a MILESTONE - the party reached a level, and why. `level` is the level REACHED, not a step, so a deleted record cannot silently change what level the party is on (a delta would make the current level a sum over the whole timeline). There is no XP: progression here is milestone-based by design and the record carries no arithmetic. Created HIDDEN like any other entry and published by the ordinary `POST /codex/journal/{id}/reveal` - there is no kind-specific reveal. Dated at the GM's current campaign date when no `inWorldDate` is given, the rule an auto-logged battle and a downtime record already follow."
       })
     },
     [CODEX_PATHS.journalById]: {
@@ -1776,7 +1776,7 @@ export const openApiDocument = {
         notModified: true,
         bad: false,
         description:
-          "CT-6: where the party stands with each faction, ROLE-SCOPED. A GM receives every standing; a player receives only those that are BOTH revealed themselves AND whose faction page is itself revealed, reduced to `factionPageId` and `value`. The second gate is not belt-and-braces: a standing row carries no title of its own (the faction's live page is the one name, so a rename cannot go stale), so a reader NAMES it by resolving `factionPageId` - and a standing published for a secret faction would hand the party a page id they cannot open beside a bar they cannot label. `value` is SIGNED, -100 (hostile) to +100 (allied), because a faction can be actively against the party and an unsigned favour scale cannot say so; a reader shows the word beside the bar, never the bar alone."
+          "Where the party stands with each faction, ROLE-SCOPED. A GM receives every standing; a player receives only those that are BOTH revealed themselves AND whose faction page is itself revealed, reduced to `factionPageId` and `value`. The second gate is not belt-and-braces: a standing row carries no title of its own (the faction's live page is the one name, so a rename cannot go stale), so a reader NAMES it by resolving `factionPageId` - and a standing published for a secret faction would hand the party a page id they cannot open beside a bar they cannot label. `value` is SIGNED, -100 (hostile) to +100 (allied), because a faction can be actively against the party and an unsigned favour scale cannot say so; a reader shows the word beside the bar, never the bar alone."
       })
     },
     [CODEX_PATHS.standingByFaction]: {
@@ -1802,7 +1802,7 @@ export const openApiDocument = {
         notModified: true,
         bad: false,
         description:
-          'CT-9: one GM view of everything the party can currently see, across every reveal surface in the Codex - pages, maps, markers, journal (all six kinds), sessions, quests and standing. GM-only, and READ-ONLY: it is an AGGREGATION of the existing player projections, not a second opinion about visibility, so it lists exactly what the corresponding player-facing endpoints would return - a marker flagged revealed on a HIDDEN map is absent here, because the party cannot see it either. Every section is always present, empty ones included with `revealed: 0`, so "nothing is revealed here" cannot be mistaken for "this did not load". Each row carries the id its own kind\'s EXISTING reveal route takes, which is how un-revealing works from this surface: there is deliberately no unreveal route and no bulk operation. Table-side exposure (tokens, fog, the shared viewer) is deliberately out of scope - that system has its own visibility rules, and folding it in would make this the second place that decides what a player can see.'
+          'One GM view of everything the party can currently see, across every reveal surface in the Codex - pages, maps, markers, journal (all six kinds), sessions, quests and standing. GM-only, and READ-ONLY: it is an AGGREGATION of the existing player projections, not a second opinion about visibility, so it lists exactly what the corresponding player-facing endpoints would return - a marker flagged revealed on a HIDDEN map is absent here, because the party cannot see it either. Every section is always present, empty ones included with `revealed: 0`, so "nothing is revealed here" cannot be mistaken for "this did not load". Each row carries the id its own kind\'s EXISTING reveal route takes, which is how un-revealing works from this surface: there is deliberately no unreveal route and no bulk operation. Table-side exposure (tokens, fog, the shared viewer) is deliberately out of scope - that system has its own visibility rules, and folding it in would make this the second place that decides what a player can see.'
       })
     },
     [CODEX_PATHS.calendar]: {
@@ -3842,7 +3842,7 @@ export const openApiDocument = {
           isParty: {
             type: "boolean",
             description:
-              "CT-7: is this the party's pin? At most one marker in the whole atlas carries it. PLAYER-FACING - the party pin is for the players, and it is the ONE key M12 adds to the player marker projection - but it grants no visibility of its own: a hidden party pin, or one on a hidden map, is exactly as hidden as any other pin, because `isParty` is not part of any reveal predicate anywhere."
+              "Is this the party's pin? At most one marker in the whole atlas carries it. PLAYER-FACING - the party pin is for the players, and it is the ONE such key on the player marker projection - but it grants no visibility of its own: a hidden party pin, or one on a hidden map, is exactly as hidden as any other pin, because `isParty` is not part of any reveal predicate anywhere."
           },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" }
@@ -3852,7 +3852,7 @@ export const openApiDocument = {
         type: "object",
         additionalProperties: false,
         description:
-          "CT-10: what a downtime record stores beyond its prose - who spent how many days doing what, and whether the GM has confirmed the clock move it proposes. The GM's shape. Deliberately NOT here: an `outcome`, which is prose, and this record already has two prose layers with the reveal split between them (`playerText`/`gmText`) - a third prose channel inside a JSON blob would sit outside that split.",
+          "What a downtime record stores beyond its prose - who spent how many days doing what, and whether the GM has confirmed the clock move it proposes. The GM's shape. Deliberately NOT here: an `outcome`, which is prose, and this record already has two prose layers with the reveal split between them (`playerText`/`gmText`) - a third prose channel inside a JSON blob would sit outside that split.",
         required: ["who", "activity", "days", "applied", "characterPageId"],
         properties: {
           who: { type: "string", description: "Who spent the time. Free text - a character, the whole party, an NPC." },
@@ -3925,7 +3925,7 @@ export const openApiDocument = {
         type: "object",
         additionalProperties: false,
         description:
-          "CT-8: what a MILESTONE record carries beyond its prose - the level the party reached, and why. Identical for both audiences: a party knows its own level, and a revealed milestone with its two facts removed would be a dated row that says nothing. There is no GM-only half here at all; a milestone needing one writes it in the record's `gmText`, like every other journal row. No XP: progression is milestone-based by design and this record carries no arithmetic.",
+          "What a MILESTONE record carries beyond its prose - the level the party reached, and why. Identical for both audiences: a party knows its own level, and a revealed milestone with its two facts removed would be a dated row that says nothing. There is no GM-only half here at all; a milestone needing one writes it in the record's `gmText`, like every other journal row. No XP: progression is milestone-based by design and this record carries no arithmetic.",
         required: ["level", "reason"],
         properties: {
           level: {
@@ -3947,7 +3947,7 @@ export const openApiDocument = {
         type: "object",
         additionalProperties: false,
         description:
-          "CT-6: what a STANDING record carries - which faction, how much it MOVED, and why. The GM's shape. `delta` and not the resulting value, deliberately: the `codex_standing` table says where things stand and this says what happened, so a deleted record cannot leave a history that no longer adds up to the table.",
+          "What a STANDING record carries - which faction, how much it MOVED, and why. The GM's shape. `delta` and not the resulting value, deliberately: the `codex_standing` table says where things stand and this says what happened, so a deleted record cannot leave a history that no longer adds up to the table.",
         required: ["factionPageId", "delta", "reason"],
         properties: {
           factionPageId: {
@@ -3978,7 +3978,7 @@ export const openApiDocument = {
         type: "object",
         additionalProperties: false,
         description:
-          "CT-6: where the party stands with ONE faction, GM view. Four facts, and what is absent is the point: no HISTORY (every change writes a `kind='standing'` chronicle record instead, so the timeline is the one history in this codex rather than a second one), no `rev` (a standing is a number set in one action - there is no draft to go stale), and no cached faction TITLE (the live page is the one name, so a rename cannot leave a stale copy behind). A player projection of a revealed standing is exactly `factionPageId` and `value`, and only when the faction page is revealed too.",
+          "Where the party stands with ONE faction, GM view. Four facts, and what is absent is the point: no HISTORY (every change writes a `kind='standing'` chronicle record instead, so the timeline is the one history in this codex rather than a second one), no `rev` (a standing is a number set in one action - there is no draft to go stale), and no cached faction TITLE (the live page is the one name, so a rename cannot leave a stale copy behind). A player projection of a revealed standing is exactly `factionPageId` and `value`, and only when the faction page is revealed too.",
         required: ["id", "factionPageId", "value", "revealedToPlayers", "createdAt", "updatedAt"],
         properties: {
           id: codexUuid,
@@ -4044,7 +4044,7 @@ export const openApiDocument = {
             type: "string",
             enum: ["note", "combat", "deadline", "downtime", "milestone", "standing", "quest"],
             description:
-              "What the row IS. `deadline` (CT-5) and `downtime` (CT-10) are M11; `milestone` (CT-8) and `standing` (CT-6) are M12, and the database has permitted all six since M11's migration so neither needed a table rebuild. Visibility NEVER depends on this: every kind is gated by `revealedToPlayers` alone."
+              "What the row IS. `deadline`, `downtime`, `milestone` and `standing` are the structured kinds. Visibility NEVER depends on this: every kind is gated by `revealedToPlayers` alone."
           },
           sourceEncounterId: { type: ["integer", "null"] },
           sessionId: {
@@ -4084,7 +4084,7 @@ export const openApiDocument = {
         type: "object",
         additionalProperties: false,
         description:
-          "One row on the ONE chronicle (CT-11/CT-12) as the **GM** receives it, in the single row shape every timeline record uses. `kind` says what it is and therefore what opening it means: `entry`/`combat`/`deadline`/`downtime` carry a journal-entry id, `event` carries a PAGE id. Every key is present on every kind (null where it does not apply), so no reader branches on key presence. The player's row is the separate `CodexChronicleRecordPlayer`; the two are joined by `CodexChronicleRecordProjected`.",
+          "One row on the ONE chronicle as the **GM** receives it, in the single row shape every timeline record uses. `kind` says what it is and therefore what opening it means: `entry`/`combat`/`deadline`/`downtime` carry a journal-entry id, `event` carries a PAGE id. Every key is present on every kind (null where it does not apply), so no reader branches on key presence. The player's row is the separate `CodexChronicleRecordPlayer`; the two are joined by `CodexChronicleRecordProjected`.",
         // Every key required, GM-only ones included (nullable where unused), so the role `oneOf` stays unambiguous.
         required: [
           "kind",
@@ -4174,7 +4174,7 @@ export const openApiDocument = {
           fired: {
             type: "boolean",
             description:
-              "CT-5: has the campaign clock reached this deadline's own date? DERIVED on every read from `inWorldDate` against the clock, never stored - so rewinding the clock correctly un-fires a deadline. `false` for every kind that is not a dated deadline. Measured against WHOSE clock is a viewer-safety decision: the GM's row uses the GM's clock, a player's row uses the PUBLISHED date, so this boolean can never tell the party that a date they have not been shown has already gone by."
+              "Has the campaign clock reached this deadline's own date? DERIVED on every read from `inWorldDate` against the clock, never stored - so rewinding the clock correctly un-fires a deadline. `false` for every kind that is not a dated deadline. Measured against WHOSE clock is a viewer-safety decision: the GM's row uses the GM's clock, a player's row uses the PUBLISHED date, so this boolean can never tell the party that a date they have not been shown has already gone by."
           },
           // The GM branch's payloads only; player payloads are listed separately so `oneOf` has one match.
           payload: {
@@ -4186,7 +4186,7 @@ export const openApiDocument = {
               { type: "null" }
             ],
             description:
-              "The kind's structured facts, discriminated by `kind`; null for the kinds that carry none. Allow-listed per kind, never a spread of the stored blob: the GM receives the full downtime payload including `applied` (CT-10), a milestone's `{ level, reason }` (CT-8), and a standing change's `delta`/`reason` (CT-6)."
+              "The kind's structured facts, discriminated by `kind`; null for the kinds that carry none. Allow-listed per kind, never a spread of the stored blob: the GM receives the full downtime payload including `applied`, a milestone's `{ level, reason }`, and a standing change's `delta`/`reason`."
           },
           proposedDate: {
             ...codexInWorldDateOrNull,
@@ -4377,7 +4377,7 @@ export const openApiDocument = {
         type: "object",
         additionalProperties: false,
         description:
-          "The world's calendar as the **GM** receives it. The campaign has two clocks (M11/O-1): the GM's, which they run ahead while prepping, and the PUBLISHED one the party sees. The player's calendar is the separate `CodexCalendarPlayer`, where `currentDate` is sourced from the published date and `publishedDate` is not declared at all; the two are joined by `CodexCalendarProjected`.",
+          "The world's calendar as the **GM** receives it. The campaign has two clocks: the GM's, which they run ahead while prepping, and the PUBLISHED one the party sees. The player's calendar is the separate `CodexCalendarPlayer`, where `currentDate` is sourced from the published date and `publishedDate` is not declared at all; the two are joined by `CodexCalendarProjected`.",
         required: ["yearName", "eras", "months", "weekdays", "currentDate", "publishedDate"],
         properties: {
           yearName: { type: "string" },
@@ -4576,7 +4576,7 @@ export const openApiDocument = {
               { type: "null" }
             ],
             description:
-              "The player half of the kind's structured facts: downtime without `applied` (CT-10), a milestone's `{ level, reason }` unchanged (CT-8), a standing change with `factionPageId` nulled unless that faction page is revealed (CT-6)."
+              "The player half of the kind's structured facts: downtime without `applied`, a milestone's `{ level, reason }` unchanged, a standing change with `factionPageId` nulled unless that faction page is revealed."
           },
           createdAt: { type: "string", format: "date-time" }
         }
@@ -5046,7 +5046,7 @@ export const openApiDocument = {
         type: "object",
         additionalProperties: false,
         description:
-          "CT-9: everything the party can currently see across every reveal surface in the Codex. A READ-ONLY AGGREGATION of the existing player projections - it restates no visibility rule and writes nothing, which is why it agrees with the player-facing endpoints exactly rather than approximately.",
+          "Everything the party can currently see across every reveal surface in the Codex. A READ-ONLY AGGREGATION of the existing player projections - it restates no visibility rule and writes nothing, which is why it agrees with the player-facing endpoints exactly rather than approximately.",
         required: ["sections", "revealed", "total"],
         properties: {
           sections: {

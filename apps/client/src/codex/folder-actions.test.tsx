@@ -50,7 +50,7 @@ const renderTree = (h: ReturnType<typeof handlers>) =>
 /** The row's action control. `Menu`'s trigger is a `<summary>` with no `button` role in jsdom, so find it by name. */
 const folderMenu = () => screen.getByLabelText("Actions for NPCs");
 
-describe("Notebook folder row — one action control, not four (§4)", () => {
+describe("Notebook folder row — one action control, not four", () => {
   it("puts every folder action behind a single menu trigger", async () => {
     const user = userEvent.setup();
     renderTree(handlers());

@@ -85,7 +85,7 @@ function carried(view: ReturnType<ContentLibrary["forAudience"]>, id: string) {
   });
 }
 
-describe("C3 — a homebrew weapon's properties reach the engine", () => {
+describe("a homebrew weapon's properties reach the engine", () => {
   it("authors Finesse through the real control, publishes it, and swings it off Dexterity", async () => {
     const draft = weaponDraft(["finesse"]);
 

@@ -5,7 +5,7 @@ import { SETTINGS_GROUPS, groupsFor } from "./SettingsPage";
  * Pins the Settings declaration rather than the DOM: a player sees Mine only. A DOM test would also
  * pass for a page that mounted the GM controls and hid them with CSS.
  */
-describe("Settings groups (D24)", () => {
+describe("Settings groups", () => {
   it("is three groups, in the order the page renders them", () => {
     expect(SETTINGS_GROUPS.map((group) => group.id)).toEqual(["mine", "table", "players"]);
     expect(SETTINGS_GROUPS.map((group) => group.label)).toEqual(["Mine", "The table", "Players"]);

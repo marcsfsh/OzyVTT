@@ -186,7 +186,7 @@ describe("Pins — the one kind that is not client-enumerable", () => {
   });
 });
 
-describe("Role-blindness (invariant §3.3)", () => {
+describe("Role-blindness", () => {
   it("badges reveal state for the GM, on every kind that has one", () => {
     renderTags();
     // The badge is per row.

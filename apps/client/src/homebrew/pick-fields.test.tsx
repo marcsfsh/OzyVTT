@@ -7,8 +7,7 @@
  * - typing "unique" writes `"unique"` (the slug stays open);
  * - clearing removes the key rather than writing `null` (`rarity` is `.optional()`).
  *
- * jsdom loads no stylesheet, so the 44px touch floor is left to `Combobox.css` and
- * `scripts/tap-audit.mjs`.
+ * jsdom loads no stylesheet, so the 44px touch floor is left to `Combobox.css`.
  */
 
 import { useState } from "react";
@@ -341,7 +340,7 @@ describe("3d — every damage-type control is a visible chooser; the open ones s
   });
 });
 
-describe("U9 — the eleventh grant kind is a spell PICKER, because a spell id cannot be typed", () => {
+describe("the eleventh grant kind is a spell PICKER, because a spell id cannot be typed", () => {
   /** A spell id can't be typed reliably, so the spells grant kind uses `CatalogPicker` plus removable
       chips. Driven through the rendered form because `GrantsEditor` has no `FieldDef`. The body half
       (ids become `{id, alwaysPrepared}` and reach a sheet) is in `vocabulary-parity.mirror.test.ts`. */
@@ -512,7 +511,7 @@ describe("a gate the editor cannot show is a gate the editor must not drop", () 
  * like `topple` means nothing in this column and would be silently inert. The engine half is
  * `weapon-properties.mirror.test.ts`.
  */
-describe("C3 — a homebrew weapon's Properties row is a visible chooser over the properties alone", () => {
+describe("a homebrew weapon's Properties row is a visible chooser over the properties alone", () => {
   const PROPERTY_NAMES = WEAPON_PROPERTY_IDS.map(suggestionLabel);
 
   it("offers all nine properties unprompted, and none of the eight masteries", async () => {

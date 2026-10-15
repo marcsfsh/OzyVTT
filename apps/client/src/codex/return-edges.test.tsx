@@ -145,7 +145,7 @@ const openJournal = async (user: ReturnType<typeof userEvent.setup>) => {
   await waitFor(() => expect(chronicle).toHaveBeenCalled());
 };
 
-describe("Journal entry → its marker (CI-6 / R1)", () => {
+describe("Journal entry → its marker", () => {
   beforeEach(() => {
     listPages.mockResolvedValue([]);
     listRelationships.mockResolvedValue([]);
@@ -187,7 +187,7 @@ describe("Journal entry → its marker (CI-6 / R1)", () => {
     expect(surface).toHaveAttribute("data-selected", "k1");
   });
 
-  it("says the pin is gone rather than silently landing on some other map (R4)", async () => {
+  it("says the pin is gone rather than silently landing on some other map", async () => {
     // The entry names a pin that has since been deleted.
     chronicle.mockResolvedValue([RECORD({ attachMarkerId: "vanished" })]);
     markerById.mockRejectedValue(new Error("The codex request failed (404)."));
@@ -212,7 +212,7 @@ describe("Journal entry → its marker (CI-6 / R1)", () => {
   });
 });
 
-describe("Journal entry → its combat replay (CI-6)", () => {
+describe("Journal entry → its combat replay", () => {
   beforeEach(() => {
     listPages.mockResolvedValue([]);
     listRelationships.mockResolvedValue([]);

@@ -91,7 +91,7 @@ function tableWith(level = 5) {
   return { state, definition };
 }
 
-describe("the app remembers hit-point rolls (D14)", () => {
+describe("the app remembers hit-point rolls", () => {
   it("writes one ledger row per rolled level, and reads them back for a rebuild", () => {
     const { definition } = tableWith();
     const rows = (definition.character?.choices ?? []).filter((row) => row.kind === "hp-roll");

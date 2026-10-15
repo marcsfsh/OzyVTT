@@ -286,7 +286,7 @@ describe("gap 5: Fiendish Resilience is a real resistance, not a visible one", (
   });
 });
 
-describe("gap 4 (D7): the untyped manual path can name a type", () => {
+describe("gap 4: the untyped manual path can name a type", () => {
   const resistant = () => definitionOf({ damageResistances: ["fire"] });
   const manual = (state: GameState, input: Record<string, unknown>) => {
     const before = state.actors[0].hp.current;

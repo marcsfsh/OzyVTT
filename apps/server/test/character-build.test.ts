@@ -705,7 +705,7 @@ const clericInput = (): MutableCreateInput => ({
   ]
 });
 
-describe("M4 - always-prepared grants are not charged to the prepared count", () => {
+describe("always-prepared grants are not charged to the prepared count", () => {
   const definition = buildCharacterDefinition(clericInput(), library, defaultPolicy);
   const spells = new Map((definition.spellcasting?.spells ?? []).map((spell) => [spell.id, spell]));
 
@@ -1152,7 +1152,7 @@ describe("extra picks raise the budget the server validates against", () => {
   });
 });
 
-describe("M3 - the same feat cannot be taken twice across different offers", () => {
+describe("the same feat cannot be taken twice across different offers", () => {
   it("rejects a Versatile pick that repeats the background's origin feat", () => {
     // A Human Acolyte already holds Magic Initiate (Cleric) from the background; taking it again with
     // Versatile would interpret the feature twice (7 cantrips instead of 5).
@@ -1215,7 +1215,7 @@ describe("M3 - the same feat cannot be taken twice across different offers", () 
   });
 });
 
-describe("M7 - a feature whose only rider is limited USES still lands as a trackable action", () => {
+describe("a feature whose only rider is limited USES still lands as a trackable action", () => {
   const definition = buildCharacterDefinition(fighterInput(), library, defaultPolicy);
 
   it("synthesizes an activation carrying the resolved use count", () => {
@@ -1277,7 +1277,7 @@ describe("M7 - a feature whose only rider is limited USES still lands as a track
   });
 });
 
-describe("M5 - an action that shares a pool is gated on the POOL's size", () => {
+describe("an action that shares a pool is gated on the POOL's size", () => {
   const definition = buildCharacterDefinition(clericInput(), library, defaultPolicy);
   const CLERIC = ACTOR_ID;
   const FOE = "7a4b1a58-0f6c-4a52-9a51-2f60cf6f9d12";
@@ -1355,7 +1355,7 @@ describe("M5 - an action that shares a pool is gated on the POOL's size", () => 
   });
 });
 
-describe("D3 - a malformed content record rejects instead of throwing a raw TypeError", () => {
+describe("a malformed content record rejects instead of throwing a raw TypeError", () => {
   const malformedLibrary = libraryWith({
     speciesRecord: (id: string) => {
       const real = library.speciesRecord(id);
@@ -1397,7 +1397,7 @@ describe("D3 - a malformed content record rejects instead of throwing a raw Type
   });
 });
 
-describe("D5 - multiclass prerequisites are correct but deliberately uncalled in phase 2", () => {
+describe("multiclass prerequisites are correct but deliberately uncalled in phase 2", () => {
   it("cannot gate anything yet: `character.create` carries exactly one class", () => {
     // The request has one `classId` and one `level`. SRD ability minimums apply to taking a second class,
     // never a starting class, so creation does not enforce them. This fails if the request grows a second

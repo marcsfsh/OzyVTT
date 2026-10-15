@@ -191,7 +191,7 @@ describe("Opening and closing", () => {
   });
 });
 
-describe("The scope decision (D20) — Codex-only, deliberately", () => {
+describe("The scope decision — Codex-only, deliberately", () => {
   /** Fails if the key listener moves to `main.tsx` or module scope. */
   it("⌘K does nothing when the Codex is not on screen", async () => {
     /** A bare tree is the discriminating case: a global listener would fire regardless of what's rendered. */
@@ -356,7 +356,7 @@ describe("What it can do", () => {
   });
 });
 
-describe("The player's palette (invariant §1)", () => {
+describe("The player's palette", () => {
   const renderPlayer = () => (goTo("/codex"), render)(<PlayerCodex token="player" />);
 
   it("searches through the PLAYER endpoint and never the GM's", async () => {

@@ -97,7 +97,7 @@ const del = (base: string, path: string, headers: Record<string, string>, payloa
 
 // The router hands `notifyChanged` no arguments: a scope word on the `codex:changed` ping would tell every
 // socket which part of the codex the GM is editing. The socket emit is covered in `realtime-presence.test.ts`.
-describe("codex:changed carries no content (D22, router half)", () => {
+describe("codex:changed carries no content (router half)", () => {
   it("calls its notifier with no arguments at all, whichever surface was written", async () => {
     const pings: unknown[][] = [];
     const { base, store } = await fixture(pings);
@@ -928,7 +928,7 @@ describe("codex HTTP viewer-safety boundary", () => {
     expect(JSON.stringify(links)).not.toContain(page.data.page.id as string);
   });
 
-  it("returns ONE list carrying every matching kind, with no superseded second list (R8)", async () => {
+  it("returns ONE list carrying every matching kind, with no superseded second list", async () => {
     const { base } = await fixture();
     // One word ("Ravenloft") on a page and a map: one result list carries both.
     const page = await body(
@@ -977,7 +977,7 @@ describe("codex HTTP viewer-safety boundary", () => {
 
 // Search starts from raw matched text rather than a GM-curated list, so the player index must be gated by
 // exactly the predicate its record's player list endpoint uses.
-describe("codex suite-wide search viewer safety (CI-1)", () => {
+describe("codex suite-wide search viewer safety", () => {
   /** One world holding every leak shape at once, so a single query can prove what search must not return. */
   async function world() {
     const { base } = await fixture();
@@ -1092,7 +1092,7 @@ describe("codex suite-wide search viewer safety (CI-1)", () => {
 
 // Every chronicle record kind is player-reachable through `PlayerCodex`'s timeline. Pipeline tests; the
 // projection is tested directly in `codex-store.test.ts`.
-describe("codex chronicle HTTP boundary (CT-11, A-8)", () => {
+describe("codex chronicle HTTP boundary", () => {
   const chronicle = async (base: string, headers: Record<string, string>) =>
     (await body(await get(base, "/api/v1/codex/timeline", headers))).data.records as Json[];
 
@@ -1239,7 +1239,7 @@ describe("codex chronicle HTTP boundary (CT-11, A-8)", () => {
 
 // Sessions: `prepBody` is the GM's plan, `recapBody` is what the table reads. Pipeline tests; the
 // projection is tested directly in `codex-store.test.ts`.
-describe("codex sessions HTTP boundary (M9, A-8)", () => {
+describe("codex sessions HTTP boundary", () => {
   const PREP = "The ambush is at the bridge; Ireena is the real target.";
   const RECAP = "The party crossed the bridge.";
 
@@ -1496,7 +1496,7 @@ describe("codex sessions HTTP boundary (M9, A-8)", () => {
 
 // Quests: two layers like a session, plus the search index and `entityIds` that may point at secret pages.
 // Pipeline tests; the deciding layers are tested directly in `codex-store.test.ts`.
-describe("codex quests HTTP boundary (M10, A-8)", () => {
+describe("codex quests HTTP boundary", () => {
   const GM_BODY = "The ledger is a forgery; Strahd burned the real one.";
   const PLAYER_BODY = "Recover the ledger from the counting house.";
   const OBJECTIVES = [
@@ -1739,7 +1739,7 @@ describe("codex quests HTTP boundary (M10, A-8)", () => {
 
 // Deadlines, downtime and the prep clock, asserted on the serialized body. Projection and store halves are
 // in `codex-projections.test.ts` and `codex-store.test.ts`.
-describe("codex deadlines, downtime and the prep clock, HTTP boundary (M11, A-8)", () => {
+describe("codex deadlines, downtime and the prep clock, HTTP boundary", () => {
   const calendar = async (base: string, headers: Record<string, string>) =>
     (await body(await get(base, "/api/v1/codex/calendar", headers))).data.calendar as Json;
   const chronicleRaw = async (base: string, headers: Record<string, string>) =>
@@ -2040,7 +2040,7 @@ describe("Codex routes vs the published contract", () => {
 
 // Standing, party marker, milestones and reveal audit, asserted on the serialized body. Projection and
 // store halves are in `codex-projections.test.ts` and `codex-store.test.ts`.
-describe("codex standing, party marker and reveal audit, HTTP boundary (M12, A-8)", () => {
+describe("codex standing, party marker and reveal audit, HTTP boundary", () => {
   const faction = async (base: string, title: string, revealed: boolean) => {
     const page = await body(await post(base, "/api/v1/codex/pages", GM, { title, entityType: "faction" }));
     const id = page.data.page.id as string;
@@ -2392,7 +2392,7 @@ describe("codex standing, party marker and reveal audit, HTTP boundary (M12, A-8
   });
 
   /** The audit and standing routes are documented with the security they enforce. */
-  it("documents the M12 routes with the roles they enforce", async () => {
+  it("documents the routes with the roles they enforce", async () => {
     const paths = openApiDocument.paths as unknown as Record<
       string,
       Record<string, { security?: ReadonlyArray<Record<string, readonly string[]>> }>
@@ -2424,7 +2424,7 @@ describe("codex standing, party marker and reveal audit, HTTP boundary (M12, A-8
 
   // The write schemas are applied, proved by `.strict()` (an unknown key is a rejection only this layer
   // performs). The missing-payload row is defence in depth: `createMilestone` refuses it too.
-  it("parses the M12 bodies through their own schemas", async () => {
+  it("parses the bodies through their own schemas", async () => {
     const { base } = await fixture();
     const factionId = await faction(base, "The Harpers", true);
     const mapId = await makeMap(base, "Barovia", true);
@@ -2641,7 +2641,7 @@ describe("codex settings and the revision delete, HTTP boundary (owner decision,
 
 // Two reads, one compound gate (pin and map revealed). The by-id read 404s so an id is not a probe; the party
 // read answers `null`, so a hidden party pin looks like no party pin.
-describe("codex pin-by-id and party location, HTTP boundary (D15)", () => {
+describe("codex pin-by-id and party location, HTTP boundary", () => {
   const seed = async (base: string, store: CodexStore) => {
     const page = store.createPage({ title: "Vallaki", playerBody: "a walled town" });
     const secretPage = store.createPage({ title: "The Ambush", gmBody: "here" });
@@ -2777,7 +2777,7 @@ describe("codex pin-by-id and party location, HTTP boundary (D15)", () => {
 });
 
 /** Linking existing downtime rows to character pages, so the tracker can total downtime recorded before the link existed. */
-describe("codex journal PATCH — the narrow downtime group (D12)", () => {
+describe("codex journal PATCH — the narrow downtime group", () => {
   it("edits who/activity/characterPageId, refuses `days`, and refuses the group on any other kind", async () => {
     const { base, store } = await fixture();
     const character = store.createPage({ title: "Ireena", entityType: "character" });
@@ -2840,7 +2840,7 @@ describe("codex journal PATCH — the narrow downtime group (D12)", () => {
 });
 
 /** The export/import round trip a GM performs, and the version check. */
-describe("codex export/import, HTTP boundary (D16, R1)", () => {
+describe("codex export/import, HTTP boundary", () => {
   it("round-trips a saved export file POSTed back UNEDITED, and reports the database's own counts", async () => {
     const { base, store } = await fixture();
     const page = store.createPage({ title: "Barovia", playerBody: "A misty valley." });
@@ -2874,7 +2874,7 @@ describe("codex export/import, HTTP boundary (D16, R1)", () => {
     expect((await body(await get(base, "/api/v1/codex/pages", GM))).data.pages).toHaveLength(1);
   });
 
-  it("restores a bundle with NO bundleVersion — every backup taken before this feature existed (R1)", async () => {
+  it("restores a bundle with NO bundleVersion — every backup taken before this feature existed", async () => {
     const { base, store } = await fixture();
     store.createPage({ title: "Barovia" });
     const exported = (await body(await get(base, "/api/v1/codex/export", GM))).data as Json;
@@ -2985,7 +2985,7 @@ describe("codex export/import, HTTP boundary (D16, R1)", () => {
 
 // `commandId` idempotency: a retry across a dropped connection cannot double-create, and a caller can
 // tell a replay from a fresh execution.
-describe("codex commandId idempotency (D19)", () => {
+describe("codex commandId idempotency", () => {
   it("executes once, replays the identical status and bytes, and says that it replayed", async () => {
     const { base, store } = await fixture();
     const commandId = randomUUID();

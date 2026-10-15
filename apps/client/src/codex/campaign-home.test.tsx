@@ -260,7 +260,7 @@ const playerDefaults = () => {
   getCalendar.mockResolvedValue(CALENDAR);
 };
 
-describe("Home is the section name, and 'World' is not a destination (CI-7 / D1)", () => {
+describe("Home is the section name, and 'World' is not a destination", () => {
   it("on the GM mode bar, and 'World' is gone from it", async () => {
     gmDefaults();
     renderWorkspace();
@@ -303,7 +303,7 @@ describe("Home is the section name, and 'World' is not a destination (CI-7 / D1)
   });
 });
 
-describe("The Campaign dashboard shows what exists today (CI-7)", () => {
+describe("The Campaign dashboard shows what exists today", () => {
   beforeEach(() => {
     gmDefaults();
     /** Server order is ascending, so any recency the dashboard shows is its own work. */
@@ -345,7 +345,7 @@ describe("The Campaign dashboard shows what exists today (CI-7)", () => {
     expect(screen.getByText(/(Your date|Today): Hammer 3, 1492 DR/)).toBeInTheDocument();
   });
 
-  it("a journal row jumps to the Journal with THAT entry marked (R1)", async () => {
+  it("a journal row jumps to the Journal with THAT entry marked", async () => {
     const user = userEvent.setup();
     renderWorkspace();
     await openCampaign(user);
@@ -359,7 +359,7 @@ describe("The Campaign dashboard shows what exists today (CI-7)", () => {
     expect(document.getElementById("codex-entry-j2")).not.toHaveAttribute("aria-current");
   });
 
-  it("an atlas row opens the Atlas ON that map (R1)", async () => {
+  it("an atlas row opens the Atlas ON that map", async () => {
     const user = userEvent.setup();
     renderWorkspace();
     await openCampaign(user);
@@ -372,7 +372,7 @@ describe("The Campaign dashboard shows what exists today (CI-7)", () => {
     await waitFor(() => expect(screen.getByTestId("map-surface")).toHaveAttribute("data-asset", "a1"));
   });
 
-  it("says a feed failed rather than rendering one section fewer, silently (R4)", async () => {
+  it("says a feed failed rather than rendering one section fewer, silently", async () => {
     chronicle.mockRejectedValue(new Error("The codex request failed (500)."));
     const user = userEvent.setup();
     renderWorkspace();
@@ -485,7 +485,7 @@ describe("A record with a card of its own does not also sit in the feed (owner d
   });
 });
 
-describe("The player's Campaign dashboard is the server's projection (CI-7, viewer safety)", () => {
+describe("The player's Campaign dashboard is the server's projection (viewer safety)", () => {
   beforeEach(playerDefaults);
 
   it("renders the entries and maps the SERVER sent, with no reveal state a player was never given", async () => {
@@ -504,7 +504,7 @@ describe("The player's Campaign dashboard is the server's projection (CI-7, view
     expect(screen.queryByText("revealed to players")).not.toBeInTheDocument();
   });
 
-  it("a player's journal row jumps to the revealed timeline with that entry marked (R1)", async () => {
+  it("a player's journal row jumps to the revealed timeline with that entry marked", async () => {
     const user = userEvent.setup();
     (goTo("/codex"), render)(<PlayerCodex token="player" />);
     await waitFor(() => expect(playerListPages).toHaveBeenCalled());
