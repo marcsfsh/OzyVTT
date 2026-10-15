@@ -5,8 +5,7 @@ import { Avatar, Button, Modal, useToast } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { RandomCharacterModal } from "../builder/RandomCharacter";
 import { CLAIM_WORD, classLine, hpLabel, presenceDot, presenceLabel } from "./actor-display";
-import { newId } from "../lib/ids";
-import { socket } from "../socket";
+import { command } from "../lib/command";
 
 /**
  * The player's "My character" tab: who they play, how they are doing, and the door to the sheet.
@@ -147,11 +146,10 @@ export function MyCharacter({
     )
       return;
     setReleasing(true);
-    socket.emit("character:release", { commandId: newId(), expectedRevision: state.revision }, (result) => {
-      setReleasing(false);
-      if (result.ok) toast(`You released ${name}. Pick another when you're ready.`, { tone: "success" });
-      else toast(result.message ?? "Couldn't release the character.", { tone: "error" });
-    });
+    const result = await command("character:release", { expectedRevision: state.revision });
+    setReleasing(false);
+    if (result.ok) toast(`You released ${name}. Pick another when you're ready.`, { tone: "success" });
+    else toast(result.message ?? "Couldn't release the character.", { tone: "error" });
   };
 
   return (

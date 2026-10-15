@@ -1,106 +1,87 @@
-import { useEffect, useMemo, useState } from "react";
-import type {
-  CatalogChoiceCatalogs,
-  ContentBackgroundSummary,
-  ContentClassSummary,
-  ContentFeatSummary,
-  ContentLanguageSummary,
-  ContentNameBundle,
-  ContentSkillSummary,
-  ContentSpeciesSummary,
-  ContentSubclassSummary
-} from "@vtt/domain";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
+import type { CatalogChoiceCatalogs, ContentBackgroundSummary, ContentNameBundle } from "@vtt/domain";
 import { useEquipmentReference } from "../encounter/equipment";
 import { useSpellReference } from "../encounter/spells";
-import { socket } from "../socket";
+import { read } from "../lib/command";
 import { registerContentCache } from "./invalidate";
 
 /**
  * The character-builder content catalogs, read once per session and shared by every consumer.
- * Each catalog has a module-level cache, a shared in-flight promise and a listener set; a failed
- * or empty ack is never cached, so a transient miss retries on the next mount. Each response's
- * CC BY 4.0 `attribution` line (ADR-0015) is kept for the wizard's footer.
+ * Each catalog is a small external store: a snapshot, a shared in-flight read and a listener set. A
+ * failed or empty reply is never cached, so a transient miss retries on the next mount. Each
+ * response's CC BY 4.0 `attribution` line (ADR-0015) is kept for the wizard's footer.
  */
 
 type CatalogRead<T> = Readonly<{ items: readonly T[]; attribution: string | null; loaded: boolean }>;
+type CatalogReply<T> = Readonly<{ items?: readonly T[]; attribution?: string }>;
 
-/** One frozen empty list for every unloaded catalog, so `items` identity changes exactly once,
-    when the cache fills (consumers memoize on it). */
-const EMPTY: readonly never[] = Object.freeze([]);
-
-/** Builds one cached catalog and its hook. `fetcher` owns the typed socket emit. */
-function makeCatalog<T>(
-  fetcher: (done: (items: readonly T[] | undefined, attribution: string | undefined) => void) => void
-) {
-  let cache: readonly T[] | null = null;
-  let attribution: string | null = null;
+/** Builds one cached catalog and its hook. `fetch` reads the catalog from the server. */
+function makeCatalog<T>(fetch: () => Promise<CatalogReply<T>>) {
+  // Replaced, never mutated, so a consumer can memoize on its identity.
+  let snapshot: CatalogRead<T> = { items: [], attribution: null, loaded: false };
   let inFlight: Promise<void> | null = null;
   const listeners = new Set<() => void>();
 
   /** `force` bypasses the one-fetch guard after a homebrew publish. The previous list stays
       served until the new one lands, so nothing flashes empty. */
   const request = (force = false) => {
-    if (cache && !force) return;
-    inFlight ??= new Promise<void>((resolve) => {
-      fetcher((items, line) => {
-        inFlight = null;
-        // Never cache a miss: `ok:false`, a dropped field, or an empty list all retry next mount.
-        if (items && items.length > 0) {
-          cache = items;
-          attribution = line ?? null;
-          for (const listener of listeners) listener();
-        }
-        resolve();
-      });
+    if (snapshot.loaded && !force) return;
+    inFlight ??= fetch().then(({ items, attribution }) => {
+      inFlight = null;
+      // Never cache a miss: a refusal, a dropped field, or an empty list all retry next mount.
+      if (!items || items.length === 0) return;
+      snapshot = { items, attribution: attribution ?? null, loaded: true };
+      for (const listener of listeners) listener();
     });
   };
 
   // A GM can publish content mid-session; a cold cache does nothing (see `content/invalidate.ts`).
   registerContentCache(() => {
-    if (cache) request(true);
+    if (snapshot.loaded) request(true);
   });
 
+  const subscribe = (listener: () => void) => {
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  };
+  const getSnapshot = () => snapshot;
+
   function useCatalog(): CatalogRead<T> {
-    const [, bump] = useState(0);
+    const current = useSyncExternalStore(subscribe, getSnapshot);
     useEffect(() => {
-      // Always subscribe, even when the cache is warm: `items` is read from the module cache at render,
-      // so a later invalidation is only visible through this re-render.
-      const listener = () => bump((count) => count + 1);
-      listeners.add(listener);
       request();
-      return () => {
-        listeners.delete(listener);
-      };
     }, []);
-    return { items: cache ?? EMPTY, attribution, loaded: cache !== null };
+    return current;
   }
 
   return { useCatalog, request };
 }
 
-const classes = makeCatalog<ContentClassSummary>((done) =>
-  socket.emit("content:classes", {}, (result) => done(result.classes, result.attribution))
+const classes = makeCatalog(() =>
+  read("content:classes", {}).then((reply) => ({ items: reply.classes, attribution: reply.attribution }))
 );
-const subclasses = makeCatalog<ContentSubclassSummary>((done) =>
-  socket.emit("content:subclasses", {}, (result) => done(result.subclasses, result.attribution))
+const subclasses = makeCatalog(() =>
+  read("content:subclasses", {}).then((reply) => ({ items: reply.subclasses, attribution: reply.attribution }))
 );
-const species = makeCatalog<ContentSpeciesSummary>((done) =>
-  socket.emit("content:species", {}, (result) => done(result.species, result.attribution))
+const species = makeCatalog(() =>
+  read("content:species", {}).then((reply) => ({ items: reply.species, attribution: reply.attribution }))
 );
-const backgrounds = makeCatalog<ContentBackgroundSummary>((done) =>
-  socket.emit("content:backgrounds", {}, (result) => done(result.backgrounds, result.attribution))
+const backgrounds = makeCatalog(() =>
+  read("content:backgrounds", {}).then((reply) => ({ items: reply.backgrounds, attribution: reply.attribution }))
 );
-const feats = makeCatalog<ContentFeatSummary>((done) =>
-  socket.emit("content:feats", {}, (result) => done(result.feats, result.attribution))
+const feats = makeCatalog(() =>
+  read("content:feats", {}).then((reply) => ({ items: reply.feats, attribution: reply.attribution }))
 );
-const names = makeCatalog<ContentNameBundle>((done) =>
-  socket.emit("content:names", {}, (result) => done(result.names, result.attribution))
+const names = makeCatalog(() =>
+  read("content:names", {}).then((reply) => ({ items: reply.names, attribution: reply.attribution }))
 );
-const skills = makeCatalog<ContentSkillSummary>((done) =>
-  socket.emit("content:skills", {}, (result) => done(result.skills, result.attribution))
+const skills = makeCatalog(() =>
+  read("content:skills", {}).then((reply) => ({ items: reply.skills, attribution: reply.attribution }))
 );
-const languages = makeCatalog<ContentLanguageSummary>((done) =>
-  socket.emit("content:languages", {}, (result) => done(result.languages, result.attribution))
+const languages = makeCatalog(() =>
+  read("content:languages", {}).then((reply) => ({ items: reply.languages, attribution: reply.attribution }))
 );
 
 export const useClassCatalog = classes.useCatalog;
@@ -149,7 +130,8 @@ export function useBuilderCatalogs(): BuilderCatalogs {
 
   /**
    * One object identity per content load: `catalogs` is a dependency of the wizard's step-reason memo,
-   * so a new object per render would recheck every step on each keystroke.
+   * so a new object per render would recheck every step on each keystroke. Each catalog read is a
+   * store snapshot, replaced only when that catalog changes.
    */
   return useMemo(() => {
     const reads = [classRead, subclassRead, speciesRead, backgroundRead, featRead, skillRead, languageRead, nameRead];
@@ -176,26 +158,17 @@ export function useBuilderCatalogs(): BuilderCatalogs {
       loaded: reads.every((read) => read.loaded) && spells.length > 0 && equipment.catalog.length > 0,
       attributions
     };
-    // `loaded` flips exactly when a list identity does (a miss is never cached), so it needs no key.
   }, [
-    classRead.items,
-    subclassRead.items,
-    speciesRead.items,
-    backgroundRead.items,
-    featRead.items,
-    skillRead.items,
-    languageRead.items,
-    nameRead.items,
+    classRead,
+    subclassRead,
+    speciesRead,
+    backgroundRead,
+    featRead,
+    skillRead,
+    languageRead,
+    nameRead,
     spells,
     equipment.catalog,
-    classRead.attribution,
-    subclassRead.attribution,
-    speciesRead.attribution,
-    backgroundRead.attribution,
-    featRead.attribution,
-    skillRead.attribution,
-    languageRead.attribution,
-    nameRead.attribution,
     equipment.attribution
   ]);
 }

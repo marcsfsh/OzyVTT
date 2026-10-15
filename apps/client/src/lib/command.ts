@@ -11,6 +11,8 @@ export type CommandEvent = {
   [E in EventName]: Payload<E> extends { commandId: string } ? E : never;
 }[EventName];
 export type ReadEvent = Exclude<EventName, CommandEvent>;
+/** What a caller passes to `command`: the payload without the `commandId` it adds. */
+export type CommandPayload<E extends CommandEvent> = Omit<Payload<E>, "commandId">;
 
 /** Long enough for a slow LAN, short enough that a dropped reply doesn't leave a button busy forever. */
 export const COMMAND_TIMEOUT_MS = 10_000;
@@ -30,9 +32,16 @@ function emit<E extends EventName>(event: E, payload: Payload<E>): Promise<Reply
   });
 }
 
-/** Sends a command with a fresh `commandId` and resolves with the server's reply, or a refusal on timeout. */
-export function command<E extends CommandEvent>(event: E, payload: Omit<Payload<E>, "commandId">): Promise<Reply<E>> {
-  return emit(event, { ...payload, commandId: newId() } as Payload<E>);
+/**
+ * Sends a command and resolves with the server's reply, or a refusal on timeout. A caller resending the
+ * same intent passes its earlier `commandId`, so the server answers the retry without acting twice.
+ */
+export function command<E extends CommandEvent>(
+  event: E,
+  payload: CommandPayload<E>,
+  commandId: string = newId()
+): Promise<Reply<E>> {
+  return emit(event, { ...payload, commandId } as Payload<E>);
 }
 
 /** Asks the server for something without changing state. */

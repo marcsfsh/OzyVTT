@@ -4,8 +4,7 @@ import { Avatar, Badge, Button, useToast } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { PdfImportModal } from "./PdfImportModal";
 import { CLAIM_WORD, claimStateOf } from "./actor-display";
-import { newId } from "../lib/ids";
-import { socket } from "../socket";
+import { command } from "../lib/command";
 
 /**
  * The table view for a player who has not claimed a character yet.
@@ -31,11 +30,10 @@ export function ClaimCharacter({ state }: Readonly<{ state: PlayerView }>) {
     )
       return;
     setClaiming(actorId);
-    socket.emit("character:claim", { commandId: newId(), actorId, expectedRevision: state.revision }, (result) => {
-      setClaiming(null);
-      if (result.ok) toast(`You're playing ${name}.`, { tone: "success" });
-      else toast(result.message ?? `Couldn't claim ${name} — someone may have claimed them first.`, { tone: "error" });
-    });
+    const result = await command("character:claim", { actorId, expectedRevision: state.revision });
+    setClaiming(null);
+    if (result.ok) toast(`You're playing ${name}.`, { tone: "success" });
+    else toast(result.message ?? `Couldn't claim ${name} — someone may have claimed them first.`, { tone: "error" });
   };
 
   /* A scroll region at every width, so the picker never pushes the map down its column. */

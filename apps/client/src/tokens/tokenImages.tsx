@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { apiBlob } from "../lib/api";
 import { TokenGlyph, type TokenGlyphProps } from "../scene/mapImage";
 
 /**
@@ -12,11 +13,8 @@ const resolved = new Map<string, string>();
 function loadTokenBlob(assetId: string, token: string): Promise<string> {
   const existing = pendingCache.get(assetId);
   if (existing) return existing;
-  const pending = fetch(`/api/v1/token-assets/${encodeURIComponent(assetId)}/content`, {
-    headers: { authorization: `Bearer ${token}` }
-  }).then(async (response) => {
-    if (!response.ok) throw new Error("The token image could not be loaded.");
-    const url = URL.createObjectURL(await response.blob());
+  const pending = apiBlob(`/api/v1/token-assets/${encodeURIComponent(assetId)}/content`, { token }).then((blob) => {
+    const url = URL.createObjectURL(blob);
     resolved.set(assetId, url);
     return url;
   });
