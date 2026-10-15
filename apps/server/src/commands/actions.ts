@@ -12,10 +12,10 @@ import { CommandRejectedError } from "../game-store.js";
 import { damageAdjustmentDetail } from "../hit-points.js";
 import { tokenCreatureDistance } from "../movement-narration.js";
 import { settlePlayerHit, type AppliedDamage } from "../player-damage.js";
-import { recordRoll } from "../roll-history.js";
+import { recordRoll, rolledTerms } from "../roll-history.js";
 import { overrideReason, rememberOverride } from "../rules-families.js";
 import { looseRollPlan, NOT_YOUR_TURN, offTurnVerdict, routeForTap } from "../tap-routing.js";
-import { gmGradeLabelOf, initiatorOf, isGmGrade, principalTag, rolledTerms, sessionIdOf } from "./kit.js";
+import { gmGradeLabelOf, initiatorOf, isGmGrade, principalTag, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
 // Stat-block actions, the server-routed "use this action" tap, and free dice rolls.
