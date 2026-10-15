@@ -3,7 +3,7 @@ import { Chip, Field, FieldGrid, RowEditor, Select, TagInput } from "@vtt/ui";
 import { newId } from "../../lib/ids";
 import { CatalogPicker } from "../CatalogPicker";
 import { type Draft, type SchemaContext, suggestionLabel } from "../schema";
-import { ABILITIES, type RiderScope } from "./vocabulary";
+import { ABILITIES, type RiderScope } from "../vocabulary";
 
 /** `FeatureGrantsSchema`'s parallel arrays (skills, expertise, tools, …, spells) presented as one
     `[What][Which…]` list; the storage shape stays the server's. */

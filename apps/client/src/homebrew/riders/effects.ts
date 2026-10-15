@@ -1,7 +1,7 @@
 import { type Modifier } from "@vtt/content-srd-5.2.1/schemas";
 import { newId } from "../../lib/ids";
 import { type Draft, type FieldDef, type SelectOption, grouped, opt } from "../schema";
-import { DAMAGE_TYPES, type RiderScope } from "./vocabulary";
+import { DAMAGE_TYPES, type RiderScope } from "../vocabulary";
 import { ROLL_MODE_ROLLS, ROLL_MODE_WAYS, signed } from "./modifiers";
 import { hasType, whenField } from "./triggers";
 

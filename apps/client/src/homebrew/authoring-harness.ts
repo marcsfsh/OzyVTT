@@ -11,7 +11,7 @@ import { HOMEBREW_BODY_SCHEMAS } from "@vtt/content-srd-5.2.1/schemas";
 import { blankDraft, forStorage } from "./defaults";
 import { setAt } from "./paths";
 import { riderFieldsForTest } from "./RiderEditor";
-import { type RiderScope } from "./riders/vocabulary";
+import { type RiderScope } from "./vocabulary";
 import { EMPTY_CONTEXT, type Draft, type FieldDef, type SchemaContext } from "./schema";
 import { SCHEMAS } from "./schemas";
 import type { HomebrewType } from "./types";

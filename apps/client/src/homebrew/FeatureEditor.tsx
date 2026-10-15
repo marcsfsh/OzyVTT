@@ -21,7 +21,7 @@ import { useId, useMemo, useState } from "react";
 import { Button, Chip, Field, FieldGrid, RowEditor, SegmentedControl, Select } from "@vtt/ui";
 import { FieldRenderer } from "./FieldRenderer";
 import { RiderEditor, riderSummary } from "./RiderEditor";
-import { type RiderKind } from "./riders/vocabulary";
+import { type RiderKind } from "./vocabulary";
 import { blankFeature, LEVELS } from "./defaults";
 import { setAt } from "./paths";
 import { type Draft, namesOwnRecord, type SchemaContext } from "./schema";

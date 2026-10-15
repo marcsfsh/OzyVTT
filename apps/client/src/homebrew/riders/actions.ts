@@ -1,6 +1,6 @@
 import { newId } from "../../lib/ids";
 import { type Draft, type FieldDef, type SelectOption, damagePartsField, opt, saveOutcomeFields } from "../schema";
-import { ABILITIES, type RiderScope } from "./vocabulary";
+import { ABILITIES, type RiderScope } from "../vocabulary";
 import { slugValidate } from "./triggers";
 
 export const usesField = (label: string, scope: RiderScope): FieldDef => ({

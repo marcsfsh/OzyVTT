@@ -14,7 +14,7 @@ import { FieldGrid } from "@vtt/ui";
 import { FieldRenderer } from "./FieldRenderer";
 import { type Draft, type FieldDef, type SchemaContext } from "./schema";
 import { GrantsEditor } from "./riders/GrantsEditor";
-import { type RiderKind, type RiderScope } from "./riders/vocabulary";
+import { type RiderKind, type RiderScope } from "./vocabulary";
 import { actionsField, tagsField, usesField } from "./riders/actions";
 import { effectsField } from "./riders/effects";
 import { modifiersField } from "./riders/modifiers";

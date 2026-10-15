@@ -1,7 +1,7 @@
 import { RIDER_TRIGGER_KINDS, type RiderTrigger, type RiderTriggerKind } from "@vtt/content-srd-5.2.1/schemas";
 import { newId } from "../../lib/ids";
 import { type Draft, type FieldDef, type SelectOption, grouped, opt } from "../schema";
-import { ABILITIES, CONDITIONS, DAMAGE_TYPES, SIZES } from "./vocabulary";
+import { ABILITIES, CONDITIONS, DAMAGE_TYPES, SIZES } from "../vocabulary";
 
 /** The gating conditions, grouped by the phrase each completes. The kind is the server's (`RIDER_TRIGGER_KINDS`):
     it backs the two structural rules (at most one moment; a filter needs a moment), which `publishBlockedReason`

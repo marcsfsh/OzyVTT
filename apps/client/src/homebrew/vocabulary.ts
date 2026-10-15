@@ -1,5 +1,7 @@
+/** Option lists and rider types shared by the record forms and the rider forms. */
+
 import { CONDITION_IDS, DAMAGE_TYPE_IDS } from "@vtt/content-srd-5.2.1/schemas";
-import { type SelectOption, opt, suggestionLabel } from "../schema";
+import { type SelectOption, opt, suggestionLabel } from "./schema";
 
 export type RiderKind = "modifiers" | "grants" | "uses" | "tags" | "actions" | "effects";
 

@@ -20,24 +20,7 @@ import {
   type SectionDef
 } from "./schema";
 import type { HomebrewType } from "./types";
-
-const ABILITIES = [
-  opt("str", "Strength"),
-  opt("dex", "Dexterity"),
-  opt("con", "Constitution"),
-  opt("int", "Intelligence"),
-  opt("wis", "Wisdom"),
-  opt("cha", "Charisma")
-];
-
-const SIZES = [
-  opt("tiny", "Tiny"),
-  opt("small", "Small"),
-  opt("medium", "Medium"),
-  opt("large", "Large"),
-  opt("huge", "Huge"),
-  opt("gargantuan", "Gargantuan")
-];
+import { ABILITIES, SIZES } from "./vocabulary";
 
 const LEVEL_CHIPS = Array.from({ length: 20 }, (_, index) => opt(String(index + 1), String(index + 1)));
 

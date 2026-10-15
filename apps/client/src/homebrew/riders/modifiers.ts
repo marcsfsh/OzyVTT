@@ -1,7 +1,7 @@
 import { ITEM_REFUSED_MODIFIER_TYPES, type Modifier } from "@vtt/content-srd-5.2.1/schemas";
 import { newId } from "../../lib/ids";
 import { type Draft, type FieldDef, type SelectOption, diceValidate, grouped, opt } from "../schema";
-import { ABILITIES, DAMAGE_TYPES, type RiderScope } from "./vocabulary";
+import { ABILITIES, DAMAGE_TYPES, type RiderScope } from "../vocabulary";
 import { EFFECT_MODIFIER_LABELS } from "./effects";
 import { hasType, slugValidate, whenField } from "./triggers";
 
