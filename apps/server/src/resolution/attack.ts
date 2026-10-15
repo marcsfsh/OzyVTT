@@ -1,7 +1,7 @@
 import {
   aggregateRollMode,
   collectRiders,
-  d20Die,
+  d20TestFormula,
   parseDiceFormula,
   resolveDice,
   sumRiders,
@@ -231,15 +231,12 @@ function rollD20(
     if (isPreview)
       recordRoll(
         ctx,
-        resolveDice(parseDiceFormula(`1d20 ${bonus < 0 ? "-" : "+"} ${Math.abs(bonus)}`), () => naturalRoll),
+        resolveDice(parseDiceFormula(d20TestFormula("normal", bonus)), () => naturalRoll),
         "attack"
       );
     return { naturalRoll, total: naturalRoll + bonus, declaredCrit: false };
   }
-  const resolution = resolveDice(
-    parseDiceFormula(`${d20Die(mode)} ${bonus < 0 ? "-" : "+"} ${Math.abs(bonus)}`),
-    deps.random
-  );
+  const resolution = resolveDice(parseDiceFormula(d20TestFormula(mode, bonus)), deps.random);
   recordRoll(ctx, resolution, "attack");
   return { naturalRoll: naturalFace(resolution), total: resolution.total, declaredCrit: false };
 }

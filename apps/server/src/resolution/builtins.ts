@@ -1,4 +1,4 @@
-import { d20Die, parseDiceFormula, resolveDice, type RiderAbility } from "@vtt/rules-5e";
+import { d20TestFormula, parseDiceFormula, resolveDice, type RiderAbility } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { checkRollMode } from "../ability-checks.js";
 import { exhaustionPenalty } from "../condition-rules.js";
@@ -51,10 +51,7 @@ function rollCheck(
   const total = modifier + exhaustionPenalty(ctx.attacker);
   const aggregated = checkRollMode(ctx.derivation, narrow);
   if (aggregated.mode !== "normal") ctx.rollMode = aggregated;
-  const resolution = resolveDice(
-    parseDiceFormula(`${d20Die(aggregated.mode)} ${total < 0 ? "-" : "+"} ${Math.abs(total)}`),
-    ctx.deps.random
-  );
+  const resolution = resolveDice(parseDiceFormula(d20TestFormula(aggregated.mode, total)), ctx.deps.random);
   recordRoll(ctx, resolution, "check");
   const success = dc === null ? null : resolution.total >= dc;
   ctx.check = { skill: label, total: resolution.total, naturalRoll: naturalFace(resolution), dc, success };

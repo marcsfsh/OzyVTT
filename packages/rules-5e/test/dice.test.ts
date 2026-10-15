@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { d20Die, DiceFormulaError, parseDiceFormula, rollDice } from "../src/index.js";
+import { d20Die, d20TestFormula, DiceFormulaError, parseDiceFormula, rollDice } from "../src/index.js";
 
 function sequence(...faces: number[]) {
   let index = 0;
@@ -35,5 +35,10 @@ describe("server-safe dice grammar", () => {
     expect(d20Die("advantage")).toBe("2d20kh1");
     expect(d20Die("disadvantage")).toBe("2d20kl1");
     expect([d20Die("normal"), d20Die(null), d20Die(undefined)]).toEqual(["1d20", "1d20", "1d20"]);
+  });
+  it("writes a D20 Test's modifier with its sign, even at zero", () => {
+    expect(d20TestFormula("advantage", 5)).toBe("2d20kh1 + 5");
+    expect(d20TestFormula("normal", -2)).toBe("1d20 - 2");
+    expect(d20TestFormula(undefined, 0)).toBe("1d20 + 0");
   });
 });
