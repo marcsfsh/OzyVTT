@@ -675,7 +675,7 @@ summary {
   transform: translateY(0);
 }
 
-/* Forward-nav nudge: put <span class="nav-arrow">→</span> at the end of the label. `color: inherit` is
+/* Forward-nav nudge: end the label with `<IconArrow className="nav-arrow" />`. `color: inherit` is
    needed because the client's `button span { color: var(--text-dim) }` would otherwise paint the arrow
    unreadably on a primary button's fill. */
 .nav-arrow {
@@ -882,7 +882,10 @@ a:focus-visible .nav-arrow {
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
+/* A region scrolls on y only; wide content gets its own horizontal scroller. Hiding x keeps a hit-area
+   `::after` or a hidden tooltip at the region's edge from making the whole region scroll sideways. */
 .scroll-y {
+  overflow-x: hidden;
   overflow-y: auto;
   scrollbar-gutter: stable;
   scrollbar-width: thin; /* restated so a region never falls back to the 15px bar */

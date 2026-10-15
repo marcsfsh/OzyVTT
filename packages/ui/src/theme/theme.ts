@@ -1,13 +1,13 @@
-/* Theme model shared by the app and the standalone viewer. Framework-free so it runs in the no-flash <head>
-   script and inside React alike. */
+/* Theme model shared by the app and the standalone viewer. The no-flash script in each HTML entry repeats
+   the storage key and the dark default, because HTML can't import TS. */
 
 export const THEMES = ["dark", "dusk", "light"] as const;
 export type Theme = (typeof THEMES)[number];
 
 /** localStorage key holding the active theme. */
-export const THEME_STORAGE_KEY = "vtt.theme";
+const THEME_STORAGE_KEY = "vtt.theme";
 
-export function isTheme(value: unknown): value is Theme {
+function isTheme(value: unknown): value is Theme {
   return value === "dark" || value === "dusk" || value === "light";
 }
 
@@ -31,10 +31,3 @@ export function applyTheme(theme: Theme): void {
     /* persistence is best-effort */
   }
 }
-
-/** Inline <head> script that sets data-theme before first paint. The source of truth; index.html and
-    viewer.html embed an equivalent literal because HTML can't import TS. */
-export const NO_FLASH_THEME_SCRIPT =
-  `try{var t=localStorage.getItem("${THEME_STORAGE_KEY}");` +
-  `document.documentElement.setAttribute("data-theme",t==="dusk"||t==="light"?t:"dark")}` +
-  `catch(e){document.documentElement.setAttribute("data-theme","dark")}`;

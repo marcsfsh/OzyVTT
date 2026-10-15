@@ -215,17 +215,6 @@
   opacity: 0.7;
   grid-column: 1 / -1;
 }
-.replay-hidden-tag {
-  font-style: normal;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  opacity: 0.75;
-  border: 1px solid currentColor;
-  border-radius: 0;
-  padding: 0 0.3rem;
-  margin-left: 0.4rem;
-}
 .replay-log li {
   padding: 0.3rem 0.55rem;
   border-left: 2px solid var(--line-strong);

@@ -12,7 +12,7 @@ export interface StepItem {
   state?: "done" | "incomplete";
 }
 
-export interface StepsProps {
+interface StepsProps {
   steps: StepItem[];
   /** Zero-based index of the active step; earlier steps read as done. */
   current: number;

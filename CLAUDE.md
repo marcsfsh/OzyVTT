@@ -9,16 +9,17 @@ HTTP paths.
 
 Node 24+. Run from the repo root.
 
-| Command           | What it does                                               |
-| ----------------- | ---------------------------------------------------------- |
-| `npm run dev`     | Client on `:5173`, server on `:3001`.                      |
-| `npm run check`   | Typecheck every workspace.                                 |
-| `npm test`        | All tests.                                                 |
-| `npm run build`   | Build the client.                                          |
-| `npm run map`     | Regenerate `docs/app-map.md`; a test fails if it is stale. |
-| `npm run content` | Rebuild the SRD content bundles from their sources.        |
-| `npm run lint`    | ESLint.                                                    |
-| `npm run format`  | Prettier; CI runs `npm run format:check`.                  |
+| Command           | What it does                                                |
+| ----------------- | ----------------------------------------------------------- |
+| `npm run dev`     | Client on `:5173`, server on `:3001`.                       |
+| `npm run check`   | Typecheck every workspace and the smoke suite.              |
+| `npm test`        | All tests.                                                  |
+| `npm run build`   | Build the client.                                           |
+| `npm run smoke`   | Browser smoke tests against the built client (build first). |
+| `npm run map`     | Regenerate `docs/app-map.md`; a test fails if it is stale.  |
+| `npm run content` | Rebuild the SRD content bundles from their sources.         |
+| `npm run lint`    | ESLint.                                                     |
+| `npm run format`  | Prettier; CI runs `npm run format:check`.                   |
 
 ## Invariants
 
@@ -34,8 +35,9 @@ Node 24+. Run from the repo root.
 
 ## Working here
 
-- Verify for real: run `npm run lint`, `npm run check` and `npm test`, and for UI changes look at it running at
-  phone and laptop widths. Say what you ran and what you saw.
+- Verify for real: run `npm run lint`, `npm run check` and `npm test`. For UI changes also run
+  `npm run build` and `npm run smoke`, and look at it running at phone and laptop widths. Say what you
+  ran and what you saw.
 - Comments explain why the code is the way it is, in a line or two. History belongs in git;
   plans, bugs and the roadmap belong in GitHub issues. Don't put ticket IDs in code.
 - Keep commit messages short: a subject line and, if needed, a few lines of body.

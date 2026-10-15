@@ -1,0 +1,33 @@
+/* `flex-wrap` lets the damage-type chooser take its own line (`flex-basis: 100%`); the five buttons
+   are `flex: 1` (basis 0) and always share one line. Child combinators (`> input`, `> button`) keep
+   these rules out of the shared Combobox's own `<input>` and option `<button>`s. */
+.hp-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.hp-editor > input {
+  width: 4.2rem;
+  margin: 0;
+  padding: 0.45rem;
+  text-align: center;
+}
+.hp-editor .damage-type-field {
+  flex: 1 0 100%;
+}
+.hp-editor > button {
+  flex: 1;
+  min-height: var(--tap-min);
+  padding: 0.45rem 0.3rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+}
+.hp-editor > button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
+}

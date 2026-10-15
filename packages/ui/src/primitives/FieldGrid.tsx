@@ -2,7 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { cx } from "./util";
 import "./FieldGrid.css";
 
-export interface FieldGridProps {
+interface FieldGridProps {
   children: ReactNode;
   /** Minimum column width before the grid folds to fewer columns. Default 220px. */
   min?: string;

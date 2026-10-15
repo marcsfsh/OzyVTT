@@ -1,9 +1,10 @@
 import type { ButtonHTMLAttributes, MouseEvent, ReactNode } from "react";
 import { useEffect, useRef } from "react";
 import { cx } from "./util";
+import { IconChevron } from "./icons";
 import "./Menu.css";
 
-export interface MenuProps {
+interface MenuProps {
   /** Trigger content (label and/or icon). */
   trigger: ReactNode;
   children: ReactNode;
@@ -114,7 +115,7 @@ export function Menu({
         <span className="nh-menu-trigger-label">{trigger}</span>
         {!hideCaret && !icon && (
           <span className="nh-menu-caret" aria-hidden="true">
-            ▾
+            <IconChevron />
           </span>
         )}
       </summary>
@@ -125,7 +126,7 @@ export function Menu({
   );
 }
 
-export interface MenuItemProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface MenuItemProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon?: ReactNode;
   tone?: "default" | "danger";
 }

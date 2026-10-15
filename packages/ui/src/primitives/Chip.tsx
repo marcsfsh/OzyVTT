@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import { cx } from "./util";
+import { IconX } from "./icons";
 import "./Chip.css";
 
 export type ChipTone = "neutral" | "harmful" | "beneficial" | "magical" | "info";
 
-export interface ChipProps {
+interface ChipProps {
   tone?: ChipTone;
   /** Short glyph/icon so the category reads without relying on color. */
   icon?: ReactNode;
@@ -84,7 +85,7 @@ export function Chip({
           aria-label={removeLabel ?? "Remove"}
           onClick={onRemove}
         >
-          ✕
+          <IconX />
         </button>
       )}
     </span>

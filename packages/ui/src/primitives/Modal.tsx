@@ -5,7 +5,7 @@ import { IconX } from "./icons";
 import type { PanelAccent } from "./Panel";
 import "./Modal.css";
 
-export interface ModalProps {
+interface ModalProps {
   open: boolean;
   onClose: () => void;
   title?: ReactNode;

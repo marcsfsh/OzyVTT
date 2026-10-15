@@ -5,6 +5,7 @@ import { useConfirm } from "../components/feedback";
 import { PdfImportModal } from "./PdfImportModal";
 import { CLAIM_WORD, claimStateOf } from "./actor-display";
 import { command } from "../lib/command";
+import "./claim-character.css";
 
 /**
  * The table view for a player who has not claimed a character yet.

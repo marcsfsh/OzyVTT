@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import type { Actor, ContentConditionSummary } from "@vtt/domain";
 import { Chip, Stepper, type ChipTone } from "@vtt/ui";
-import { newId } from "../lib/ids";
-import { socket } from "../socket";
-import { CONDITION_GLYPHS } from "../scene/mapImage";
+import { command, read } from "../lib/command";
+import { CONDITION_GLYPHS } from "../scene/tokenGlyph";
+import "./conditions.css";
 
 type ConditionInstance = Actor["conditions"][number];
 
@@ -29,15 +29,12 @@ let referenceInFlight: Promise<void> | null = null;
 const referenceListeners = new Set<(reference: readonly ContentConditionSummary[]) => void>();
 export function requestConditionReference() {
   if (referenceCache) return;
-  referenceInFlight ??= new Promise((resolve) => {
-    socket.emit("content:conditions", {}, (result) => {
-      referenceInFlight = null;
-      if (result.ok && result.conditions && result.conditions.length > 0) {
-        referenceCache = result.conditions;
-        for (const listener of referenceListeners) listener(referenceCache);
-      }
-      resolve();
-    });
+  referenceInFlight ??= read("content:conditions", {}).then((result) => {
+    referenceInFlight = null;
+    if (result.ok && result.conditions && result.conditions.length > 0) {
+      referenceCache = result.conditions;
+      for (const listener of referenceListeners) listener(referenceCache);
+    }
   });
 }
 
@@ -83,45 +80,10 @@ const labelFor = (instance: ConditionInstance, reference: readonly ContentCondit
 const descriptionFor = (id: string, reference: readonly ContentConditionSummary[]) =>
   reference.find((entry) => entry.id === id)?.description ?? "";
 
-/** Ultra-compact condition presence for dense list rows: dots with tooltips (full names one tap away in the row's tools). */
-export function ConditionDots({ conditions }: Readonly<{ conditions: readonly ConditionInstance[] }>) {
+/** The conditions' display names ("Prone", "Exhaustion 3"), in the order the actor carries them. */
+export function useConditionLabels(conditions: readonly ConditionInstance[]): string[] {
   const reference = useConditionReference();
-  if (conditions.length === 0) return null;
-  const shown = conditions.slice(0, 4);
-  return (
-    <span
-      className="condition-dots"
-      role="img"
-      aria-label={conditions.map((instance) => labelFor(instance, reference)).join(", ")}
-    >
-      {shown.map((instance) => (
-        <span key={instance.id} className="condition-dot" title={labelFor(instance, reference)} />
-      ))}
-      {conditions.length > shown.length && (
-        <span className="condition-dot-more">+{conditions.length - shown.length}</span>
-      )}
-    </span>
-  );
-}
-
-/** Read-only condition chips with rules-text tooltips. */
-export function ConditionChips({ conditions }: Readonly<{ conditions: readonly ConditionInstance[] }>) {
-  const reference = useConditionReference();
-  if (conditions.length === 0) return null;
-  return (
-    <span className="condition-chips">
-      {conditions.map((instance) => (
-        <Chip
-          key={instance.id}
-          tone={conditionTone(instance.id)}
-          icon={conditionIcon(instance.id)}
-          title={descriptionFor(instance.id, reference)}
-        >
-          {labelFor(instance, reference)}
-        </Chip>
-      ))}
-    </span>
-  );
+  return conditions.map((instance) => labelFor(instance, reference));
 }
 
 /**
@@ -140,14 +102,15 @@ export function ConditionEditor({
 
   const send = (conditionId: string, active: boolean, level?: number) => {
     setBusy(true);
-    socket.emit(
-      "actor:set-condition",
-      { commandId: newId(), actorId, conditionId, active, ...(level !== undefined ? { level } : {}) },
-      (result) => {
-        setBusy(false);
-        if (!result.ok) onFeedback(result.message ?? "The condition could not be updated.");
-      }
-    );
+    void command("actor:set-condition", {
+      actorId,
+      conditionId,
+      active,
+      ...(level !== undefined ? { level } : {})
+    }).then((result) => {
+      setBusy(false);
+      if (!result.ok) onFeedback(result.message ?? "The condition could not be updated.");
+    });
   };
 
   return (

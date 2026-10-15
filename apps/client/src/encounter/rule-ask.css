@@ -1,0 +1,40 @@
+/* Asking the GM: the player's refusal-and-ask, the player's waiting question, and the GM's queue.
+   Caution, not danger: nothing is lost, a move is just not allowed yet. */
+.rule-ask {
+  padding: 0.6rem var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--caution);
+  background: var(--surface-2);
+}
+.rule-ask + .rule-ask {
+  margin-top: 0.4rem;
+}
+.rule-ask-list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+}
+.rule-ask-reason {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+.rule-ask-who {
+  margin: 0 0 0.2rem;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+.rule-ask-meta {
+  margin: 0.3rem 0 0;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.rule-ask-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: var(--space-2);
+}
+.rule-ask-question {
+  border-left-color: var(--magenta);
+}

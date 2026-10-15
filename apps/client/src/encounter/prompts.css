@@ -1,0 +1,191 @@
+.save-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.3rem;
+  padding: 0.35rem var(--space-2);
+  border: 1px solid transparent;
+}
+.save-prompt-label {
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
+.save-prompt-label strong {
+  color: var(--text);
+}
+/* The save's damage amend field, on its own row so it is not read as a pair with the d20 field. The
+   label is the hit area (44px floor), and the field shares `.action-damage-edit`'s danger tint. */
+.save-damage-amend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: var(--tap-min);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.save-damage-amend > span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.save-damage-amend .action-damage-edit {
+  flex: 0 0 4rem;
+  min-height: var(--tap-min);
+  box-sizing: border-box;
+}
+.save-prompt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+.save-prompt-roll {
+  flex: 0 0 auto;
+}
+.save-prompt-manual {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0.3rem;
+  flex: 1 1 12rem;
+}
+.save-prompt-actions input {
+  flex: 1 1 auto;
+  min-width: 7rem;
+  width: auto;
+  margin: 0;
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+}
+/* Paint grows to 44px: in a wrapping .4rem-gap row, overhangs from two neighbours would collide. */
+.save-prompt-actions button,
+.save-prompt-confirm button {
+  min-height: var(--tap-min);
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+}
+.save-prompt-actions button:hover:not(:disabled),
+.save-prompt-confirm button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
+}
+/* The dismiss is transparent, so growing its paint to 44px costs nothing visually; an overhang would
+   collide with the neighbouring prompt buttons. */
+.save-prompt-dismiss {
+  flex: none;
+  margin-left: auto;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  display: grid !important;
+  place-items: center;
+  padding: 0 !important;
+  line-height: 1;
+  background: transparent !important;
+  color: var(--text-muted) !important;
+}
+.save-prompt-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.reaction-prompt {
+  border-color: var(--indigo);
+  background: color-mix(in srgb, var(--surface-2) 85%, var(--indigo));
+}
+.pending-damage {
+  border-color: color-mix(in srgb, var(--line-strong) 55%, var(--magenta));
+  background: color-mix(in srgb, var(--surface-2) 88%, var(--magenta));
+}
+.initiative-prompt {
+  margin: 0 0 0.6rem;
+  padding: 0.55rem 0.7rem;
+  border-color: color-mix(in srgb, var(--line-strong) 45%, var(--cyan));
+  background: color-mix(in srgb, var(--surface-2) 86%, var(--cyan));
+}
+.initiative-gathering {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: var(--space-2);
+  padding: var(--space-2) 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 55%, var(--magenta));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-2) 88%, var(--magenta));
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
+.initiative-gathering span {
+  flex: 1 1 12rem;
+}
+.reaction-prompt .save-prompt-label {
+  color: var(--cyan-hi);
+}
+.reaction-prompt .save-prompt-label strong {
+  color: var(--text);
+}
+.save-die-mode {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+.save-die-mode:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
+  color: var(--text);
+}
+.save-die-mode.active {
+  background: color-mix(in srgb, var(--surface-3) 70%, var(--cyan));
+  border-color: var(--cyan);
+  color: var(--text);
+}
+.save-prompt-confirm .save-pass {
+  color: var(--cyan-hi);
+}
+.save-prompt-confirm .save-fail {
+  color: var(--danger-hi);
+}
+.save-prompt-effect {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.save-prompt-confirm .encounter-primary {
+  background: color-mix(in srgb, var(--surface-3) 70%, var(--magenta));
+  border-color: var(--magenta);
+  color: var(--text);
+  margin-left: auto;
+}
+.save-prompt-outcome,
+.action-save-note {
+  margin: 0.3rem 0 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.action-save-note.resolved {
+  color: var(--cyan-hi);
+}
+.save-legendary {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--violet) 45%, var(--line));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-3) 78%, var(--violet));
+  color: var(--violet-hi);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+.save-legendary:hover:not(:disabled) {
+  border-color: var(--violet);
+}

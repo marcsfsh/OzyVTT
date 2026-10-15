@@ -54,12 +54,10 @@ function tableWith(resistances: readonly string[]) {
  * an SRD slug when picked, raw words when typed.
  */
 function applyFromTheDoor(table: ReturnType<typeof tableWith>, amount: number, chosen: string | null) {
-  const payload = manualDamagePayload({
+  const payload = {
     commandId: IDS.command,
-    actorId: IDS.hero,
-    amount,
-    damageType: manualDamageType(chosen)
-  });
+    ...manualDamagePayload({ actorId: IDS.hero, amount, damageType: manualDamageType(chosen) })
+  };
   const request = ApplyDamageSchema.parse(payload);
   const before = table.hp();
   const outcome = applyDamageDetailed(

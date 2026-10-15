@@ -3,7 +3,7 @@ import { useId } from "react";
 import { cx } from "./util";
 import "./Tooltip.css";
 
-export interface TooltipProps {
+interface TooltipProps {
   content: ReactNode;
   /** The trigger — should be focusable so the tip is keyboard-reachable. */
   children: ReactNode;

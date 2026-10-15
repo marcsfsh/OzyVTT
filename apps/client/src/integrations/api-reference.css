@@ -53,11 +53,14 @@
   border-bottom: 1px solid var(--line);
   border-radius: 0;
 }
+/* A stacked row cannot overhang its neighbours, so its paint reaches the 44px floor. */
 .api-endpoint > summary {
   list-style: none;
   cursor: pointer;
+  min-height: var(--tap-min);
   padding: 0.55rem 0.7rem;
   display: grid;
+  align-content: center;
   gap: var(--space-1);
 }
 .api-endpoint > summary::-webkit-details-marker {

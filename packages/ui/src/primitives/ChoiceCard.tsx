@@ -3,7 +3,7 @@ import { cx } from "./util";
 import { IconCheck, IconWarning } from "./icons";
 import "./ChoiceCard.css";
 
-export interface ChoiceCardProps {
+interface ChoiceCardProps {
   selected: boolean;
   onSelect: () => void;
   title: ReactNode;

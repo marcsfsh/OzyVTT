@@ -1,7 +1,7 @@
+import { IconPencil, Eyebrow } from "@vtt/ui";
 import { useState } from "react";
 import type { GmActor, Scene, StagingDefaults } from "@vtt/domain";
-import { newId } from "../lib/ids";
-import { socket } from "../socket";
+import { command } from "../lib/command";
 import { useMapCatalog } from "../maps/map-catalog";
 import { ScenePrepPanel } from "./ScenePrepPanel";
 import "./scene-panel.css";
@@ -44,10 +44,8 @@ export function SceneBuilder({
   const setCombatants = (ids: readonly string[]) => {
     setBusy(true);
     setMessage("");
-    socket.emit(
-      "scene:set-combatants",
-      { commandId: newId(), sceneId: scene.id, combatantIds: ids, expectedRevision: revision },
-      (result: { ok: boolean; message?: string }) => {
+    void command("scene:set-combatants", { sceneId: scene.id, combatantIds: ids, expectedRevision: revision }).then(
+      (result) => {
         setBusy(false);
         if (!result.ok) setMessage(result.message ?? "The scene's list could not be updated.");
       }
@@ -59,34 +57,26 @@ export function SceneBuilder({
     if (staged.includes(actorId)) return;
     setBusy(true);
     setMessage("");
-    socket.emit(
-      "scene:set-combatants",
-      { commandId: newId(), sceneId: scene.id, combatantIds: [...staged, actorId] },
-      (result: { ok: boolean; message?: string }) => {
-        setBusy(false);
-        if (!result.ok) setMessage(result.message ?? "The scene's list could not be updated.");
-      }
-    );
+    void command("scene:set-combatants", { sceneId: scene.id, combatantIds: [...staged, actorId] }).then((result) => {
+      setBusy(false);
+      if (!result.ok) setMessage(result.message ?? "The scene's list could not be updated.");
+    });
   };
   const rename = async () => {
     const next = await prompt({ title: "Rename scene", defaultValue: scene.name, confirmLabel: "Rename" });
     if (!next || next === scene.name) return;
     setBusy(true);
     setMessage("");
-    socket.emit(
-      "scene:rename",
-      { commandId: newId(), sceneId: scene.id, name: next },
-      (result: { ok: boolean; message?: string }) => {
-        setBusy(false);
-        if (!result.ok) setMessage(result.message ?? "The scene could not be renamed.");
-      }
-    );
+    void command("scene:rename", { sceneId: scene.id, name: next }).then((result) => {
+      setBusy(false);
+      if (!result.ok) setMessage(result.message ?? "The scene could not be renamed.");
+    });
   };
 
   return (
     <section className="scene-builder frame-col frame-fill" aria-labelledby="scene-builder-heading">
       <div className="scene-builder-head">
-        <span className="eyebrow">ARRANGING · GM ONLY</span>
+        <Eyebrow>ARRANGING · GM ONLY</Eyebrow>
         <h2 id="scene-builder-heading">
           {scene.name}
           <button
@@ -97,7 +87,7 @@ export function SceneBuilder({
             aria-label={`Rename ${scene.name}`}
             onClick={() => void rename()}
           >
-            ✎
+            <IconPencil />
           </button>
         </h2>
         <p>Players see none of this until you make the scene live.</p>

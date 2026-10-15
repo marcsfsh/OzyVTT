@@ -1,7 +1,8 @@
 import type { ClientToServerEvents } from "@vtt/domain";
 import { DAMAGE_TYPE_IDS } from "@vtt/content-srd-5.2.1/schemas";
 
-export type ApplyDamagePayload = Parameters<ClientToServerEvents["actor:apply-damage"]>[0];
+/** Without `commandId`, which `command()` adds. */
+export type ApplyDamagePayload = Omit<Parameters<ClientToServerEvents["actor:apply-damage"]>[0], "commandId">;
 
 /**
  * The `actor:apply-damage` manual-entry payload for all three hand-entry doors. A plain `.ts` so
@@ -9,7 +10,6 @@ export type ApplyDamagePayload = Parameters<ClientToServerEvents["actor:apply-da
  */
 export function manualDamagePayload(
   input: Readonly<{
-    commandId: string;
     actorId: string;
     amount: number;
     /** The canonical slug from `manualDamageType`, or `undefined` for the untyped fast path. */
@@ -20,7 +20,6 @@ export function manualDamagePayload(
   }>
 ): ApplyDamagePayload {
   return {
-    commandId: input.commandId,
     actorId: input.actorId,
     amount: input.amount,
     ...(input.damageType !== undefined ? { damageType: input.damageType } : {}),
