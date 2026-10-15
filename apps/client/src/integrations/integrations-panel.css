@@ -15,11 +15,6 @@
   font-size: 0.9rem;
   text-align: right;
 }
-.roster-feedback {
-  min-height: 1.4rem;
-  margin: 0.8rem 0 0;
-  font-size: 0.85rem;
-}
 
 .integrations {
   margin-top: var(--space-10);

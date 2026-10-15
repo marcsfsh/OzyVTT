@@ -10,6 +10,7 @@ import {
   IconSearch,
   IconSelect
 } from "@vtt/ui";
+import { useMediaQuery } from "../lib/useMediaQuery";
 import { NEEDS_GRID, type MapTool, type MapToolbarProps } from "./mapTools";
 import { DrawGroup, FogGroup, ViewGroup } from "./MapToolGroups";
 import "./map-toolbar.css";
@@ -38,24 +39,9 @@ const CONSTANT_TOOLS: ReadonlyArray<{ id: MapTool; label: string; icon: React.Re
 /** The phone collapse breakpoint. */
 const COMPACT_QUERY = "(max-width: 560px)";
 
-function useCompact(): boolean {
-  const [compact, setCompact] = useState(
-    () => typeof window !== "undefined" && (window.matchMedia?.(COMPACT_QUERY).matches ?? false)
-  );
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const query = window.matchMedia(COMPACT_QUERY);
-    const onChange = () => setCompact(query.matches);
-    onChange();
-    query.addEventListener("change", onChange);
-    return () => query.removeEventListener("change", onChange);
-  }, []);
-  return compact;
-}
-
 export function MapToolbar(props: MapToolbarProps) {
   const { role, tool, onToolChange, calibrated, viewerPreview } = props;
-  const compact = useCompact();
+  const compact = useMediaQuery(COMPACT_QUERY);
   const [openGroup, setOpenGroup] = useState<GroupId | null>(null);
   const [railOpen, setRailOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);

@@ -5,7 +5,7 @@ import {
   type IntegrationCredentialMetadata,
   type IntegrationScope
 } from "@vtt/api-contract";
-import { Button, Eyebrow, IconPlug, Input } from "@vtt/ui";
+import { Button, Eyebrow, IconPlug, Input, useToast } from "@vtt/ui";
 import { ApiReference } from "./ApiReference";
 import { useConfirm } from "../components/feedback";
 import { apiRequest } from "../lib/api";
@@ -21,7 +21,6 @@ function formatTimestamp(value: string | null) {
 
 export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
   const [credentials, setCredentials] = useState<IntegrationCredentialMetadata[]>([]);
-  const [feedback, setFeedback] = useState("");
   const [name, setName] = useState("");
   const [scopes, setScopes] = useState<Set<IntegrationScope>>(new Set());
   const [expiresAt, setExpiresAt] = useState("");
@@ -30,6 +29,8 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
   const [auditFor, setAuditFor] = useState<string | null>(null);
   const [auditEvents, setAuditEvents] = useState<CredentialAuditEvent[]>([]);
   const { confirm, dialog } = useConfirm();
+  const { toast } = useToast();
+  const fail = useCallback((error: unknown) => toast((error as Error).message, { tone: "error" }), [toast]);
   /* The empty state's door focuses the name field on this screen (via a ref: `scrollIntoView` alone
      leaves no caret). */
   const nameField = useRef<HTMLInputElement>(null);
@@ -41,8 +42,8 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
   const loadCredentials = useCallback(() => {
     apiRequest<{ credentials: IntegrationCredentialMetadata[] }>(CREDENTIALS, { token: gmToken })
       .then((data) => setCredentials(data.credentials))
-      .catch((error: Error) => setFeedback(error.message));
-  }, [gmToken]);
+      .catch(fail);
+  }, [gmToken, fail]);
   useEffect(loadCredentials, [loadCredentials]);
 
   const toggleScope = (scope: IntegrationScope) => {
@@ -56,7 +57,7 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
 
   const createCredential = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (scopes.size === 0) return setFeedback("Select at least one scope.");
+    if (scopes.size === 0) return toast("Select at least one scope.", { tone: "error" });
     try {
       const data = await apiRequest<Issued>(CREDENTIALS, {
         token: gmToken,
@@ -73,10 +74,9 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
       setName("");
       setScopes(new Set());
       setExpiresAt("");
-      setFeedback("");
       loadCredentials();
     } catch (error) {
-      setFeedback((error as Error).message);
+      fail(error);
     }
   };
 
@@ -96,7 +96,7 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
       setCopyConfirmed(false);
       loadCredentials();
     } catch (error) {
-      setFeedback((error as Error).message);
+      fail(error);
     }
   };
 
@@ -112,10 +112,10 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
       return;
     try {
       await apiRequest(`${CREDENTIALS}/${credential.id}/revoke`, { token: gmToken, method: "POST" });
-      setFeedback(`"${credential.name}" revoked.`);
+      toast(`"${credential.name}" revoked.`, { tone: "success" });
       loadCredentials();
     } catch (error) {
-      setFeedback((error as Error).message);
+      fail(error);
     }
   };
 
@@ -131,7 +131,7 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
       setAuditEvents(data.events);
       setAuditFor(credential.id);
     } catch (error) {
-      setFeedback((error as Error).message);
+      fail(error);
     }
   };
 
@@ -141,7 +141,7 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
       await navigator.clipboard.writeText(issued.token);
       setCopyConfirmed(true);
     } catch {
-      setFeedback("Could not copy automatically; select and copy the secret manually.");
+      toast("Could not copy automatically; select and copy the secret manually.", { tone: "error" });
     }
   };
 
@@ -213,9 +213,6 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
           Create credential
         </Button>
       </form>
-      <p className="roster-feedback" aria-live="polite">
-        {feedback}
-      </p>
       {/* The empty state names the next thing to do and offers the door to it. */}
       {credentials.length === 0 ? (
         <div className="nh-empty">

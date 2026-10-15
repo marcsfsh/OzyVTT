@@ -98,7 +98,6 @@ export function TokenLibrary({
   const [search, setSearch] = useState("");
   const [folder, setFolder] = useState<string>("all");
   const [uploadFolder, setUploadFolder] = useState("");
-  const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
@@ -112,8 +111,8 @@ export function TokenLibrary({
     setRemembered(data.rememberedAssetId ?? null);
   }, [bearer, definitionId, role]);
   useEffect(() => {
-    void refresh().catch((error: Error) => setMessage(error.message));
-  }, [refresh]);
+    void refresh().catch((error: Error) => toast(error.message, { tone: "error" }));
+  }, [refresh, toast]);
 
   const folders = useMemo(
     () =>
@@ -134,7 +133,6 @@ export function TokenLibrary({
 
   const assign = async (tokenAssetId: string | null) => {
     setBusy(true);
-    setMessage("");
     const result = await command("actor:set-token-image", { actorId, tokenAssetId });
     setBusy(false);
     if (result.ok) {
@@ -142,13 +140,12 @@ export function TokenLibrary({
         tone: "success"
       });
       onClose();
-    } else setMessage(result.message ?? "That token image could not be assigned.");
+    } else toast(result.message ?? "That token image could not be assigned.", { tone: "error" });
   };
 
   /** Upload, assign and close in one gesture. */
   const upload = async (file: File) => {
     setBusy(true);
-    setMessage("");
     try {
       const params = new URLSearchParams({ filename: file.name, name: file.name.replace(/\.[^.]+$/, "") });
       // A player never chooses a folder: the server files their upload on one shelf the GM can curate.
@@ -163,7 +160,7 @@ export function TokenLibrary({
       await assign(data.token.id);
     } catch (error) {
       setBusy(false);
-      setMessage((error as Error).message);
+      toast((error as Error).message, { tone: "error" });
     }
   };
 
@@ -178,7 +175,7 @@ export function TokenLibrary({
         failure
       });
     } catch (error) {
-      setMessage((error as Error).message);
+      toast((error as Error).message, { tone: "error" });
       await refresh().catch(() => {});
     }
   };
@@ -239,12 +236,6 @@ export function TokenLibrary({
           ))}
         </datalist>
       </div>
-
-      {message && (
-        <p className="token-library-feedback" role="status">
-          {message}
-        </p>
-      )}
 
       {rememberedAsset && role === "gm" && (
         <section className="token-library-section" aria-label="Previously used for this character or monster">

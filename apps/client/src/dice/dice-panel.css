@@ -88,7 +88,11 @@
   color: var(--text-muted);
   font-size: var(--fs-sm);
 }
+/* The disclosure row is a control: its paint reaches 44px, since the panel's rows sit too close for an
+   overhang. */
 .dice-custom summary {
+  min-height: var(--tap-min);
+  padding-block: var(--space-3);
   cursor: pointer;
 }
 .dice-custom .dice-form {
@@ -118,11 +122,6 @@
 .dice-form button:hover:not(:disabled) {
   background: var(--magenta-hi);
   box-shadow: var(--glow-magenta);
-}
-.dice-feedback {
-  min-height: 1.2rem;
-  margin: 0.8rem 0 0;
-  font-size: var(--fs-body);
 }
 .roll-list-head {
   display: flex;

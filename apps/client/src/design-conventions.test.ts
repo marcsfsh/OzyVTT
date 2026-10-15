@@ -236,18 +236,14 @@ const FEEDBACK = /\bset(?:Message|Feedback)\s*\(/g;
 
 /** Surfaces still to move to `useToast`, one row per call. */
 const FEEDBACK_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
-  ["apps/client/src/dice/DicePanel.tsx", 7],
   ["apps/client/src/encounter/GmEncounterPanel.tsx", 7],
   ["apps/client/src/encounter/InitiativePrompt.tsx", 2],
   ["apps/client/src/encounter/MonsterBrowser.tsx", 1],
   ["apps/client/src/encounter/PlayerEncounterPanel.tsx", 1],
-  ["apps/client/src/integrations/IntegrationsPanel.tsx", 9],
   ["apps/client/src/scene/TokenContextMenu.tsx", 4],
   ["apps/client/src/scenes/SceneBuilder.tsx", 6],
   ["apps/client/src/scenes/ScenePanel.tsx", 3],
-  ["apps/client/src/tokens/TokenLibrary.tsx", 6],
-  ["apps/client/src/viewer/ViewerApp.tsx", 4],
-  ["apps/client/src/viewer/ViewerControls.tsx", 6]
+  ["apps/client/src/viewer/ViewerApp.tsx", 4]
 ];
 
 describe("(e) feedback is a toast", () => {

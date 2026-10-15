@@ -132,10 +132,6 @@
   grid-column: 2;
   grid-row: 1 / 4;
 }
-.viewer-control-feedback {
-  margin: 0;
-  color: var(--danger-hi);
-}
 
 .viewer-tool-tabs {
   margin: 0;
