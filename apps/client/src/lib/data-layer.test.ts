@@ -12,7 +12,7 @@ vi.mock("../socket", () => ({
 }));
 
 const { command, read, TIMEOUT_MESSAGE } = await import("./command");
-const { ApiError, apiBlob, apiRequest, hostRequest } = await import("./api");
+const { ApiError, apiBlob, apiRequest, jsonRequest } = await import("./api");
 
 afterEach(() => {
   sent.length = 0;
@@ -102,18 +102,18 @@ describe("apiBlob", () => {
   });
 });
 
-describe("hostRequest", () => {
+describe("jsonRequest", () => {
   it("returns the bare body, and the server's message on failure", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response(JSON.stringify({ bootstrapped: true }), { status: 200 }))
     );
-    await expect(hostRequest("/api/bootstrap/status")).resolves.toEqual({ bootstrapped: true });
+    await expect(jsonRequest("/api/bootstrap/status")).resolves.toEqual({ bootstrapped: true });
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response(JSON.stringify({ message: "Invalid GM password." }), { status: 401 }))
     );
-    await expect(hostRequest("/api/gm/login", { body: { password: "x" } })).rejects.toMatchObject({
+    await expect(jsonRequest("/api/gm/login", { body: { password: "x" } })).rejects.toMatchObject({
       status: 401,
       message: "Invalid GM password."
     });

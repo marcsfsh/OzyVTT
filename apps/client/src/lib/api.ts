@@ -78,10 +78,11 @@ export async function apiBlob(path: string, request: Omit<ApiRequest, "body" | "
 }
 
 /**
- * Calls one of the host's own routes outside `/api/v1` (GM password setup, sign-in and sessions, the
- * viewer addresses). They answer bare JSON and put a failure's text in `message`.
+ * Calls a route that answers bare JSON instead of the `/api/v1` envelope: the host's own routes outside
+ * `/api/v1` (GM password setup, sign-in and sessions, the viewer addresses) and the OpenAPI document.
+ * A failure's text is in `message`.
  */
-export async function hostRequest<T>(path: string, request: ApiRequest = {}): Promise<T> {
+export async function jsonRequest<T>(path: string, request: ApiRequest = {}): Promise<T> {
   const response = await send(path, request);
   const body = await response.json().catch(() => null);
   if (!response.ok) {

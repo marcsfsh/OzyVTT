@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Eyebrow, SegmentedControl, Select } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
-import { apiRequest, hostRequest } from "../lib/api";
+import { apiRequest, jsonRequest } from "../lib/api";
 import { newId } from "../lib/ids";
 import { clampPoint, imagePointFromClient } from "../scene/mapImage";
 import "./viewer-controls.css";
@@ -71,7 +71,7 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
     const [state, access, addresses] = await Promise.all([
       apiRequest<{ presentation: PresentationSummary }>("/api/v1/viewer/presentation", { token: gmToken }),
       apiRequest<AccessList>("/api/v1/viewer/access", { token: gmToken }),
-      hostRequest<{ viewerUrls: readonly string[] }>("/api/gm/viewer-urls", { token: gmToken })
+      jsonRequest<{ viewerUrls: readonly string[] }>("/api/gm/viewer-urls", { token: gmToken })
     ]);
     setPresentation(state.presentation);
     setViewers(access.viewers);

@@ -22,8 +22,8 @@ export const CONVENTION_SHAPE = {
   /** Floor on the `.tsx` files the glyph scan reads (play `.tsx` plus `packages/ui` primitives). */
   glyphSourceFloor: 80,
   /** Current glyph offenders as (file, glyph) pairs; both reach 0 once call sites use icons.tsx. */
-  glyphAllowFiles: 15,
-  glyphAllowPairs: 38,
+  glyphAllowFiles: 14,
+  glyphAllowPairs: 36,
 
   // (b) raw form elements
   /** Floor on the play `.tsx` files the raw-input scan reads (`packages/ui` is excluded). */
