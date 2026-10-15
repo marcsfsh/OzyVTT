@@ -8,10 +8,9 @@ import type {
 } from "@vtt/domain";
 import { assertNotArchived } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
-import { aggregateRollMode, collectRiders, type RollModeSource } from "@vtt/rules-5e";
-import { deriveEquipment } from "./equipment-derivation.js";
+import { aggregateRollMode } from "@vtt/rules-5e";
+import { deriveEquipment, rollModeClaims, type EquipmentCatalog } from "./equipment-derivation.js";
 import { effectiveActions } from "./effective-actions.js";
-import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { expireEffectsAtTurnStart, type EffectNarration } from "./effects.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 
@@ -58,8 +57,9 @@ function clearPerEncounterUses(
 
 const validScore = (value: number) => Number.isInteger(value) && value >= -1000 && value <= 1000;
 
-/** Item `roll-mode {roll: "initiative"}` riders ("advantage on Initiative while attuned"). 5e
- *  cancellation applies via `aggregateRollMode`: any advantage plus any disadvantage is a normal roll. */
+/** `roll-mode {roll: "initiative"}` riders ("advantage on Initiative while attuned", Feral Instinct), standing or
+ *  `on-initiative-roll`. 5e cancellation applies via `aggregateRollMode`: any advantage plus any disadvantage is a
+ *  normal roll. */
 export function initiativeRollMode(
   state: GameState,
   actorId: string,
@@ -67,27 +67,10 @@ export function initiativeRollMode(
   catalog: EquipmentCatalog | undefined
 ): "advantage" | "disadvantage" | "normal" {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
-  if (!actor || !catalog) return "normal";
+  if (!actor) return "normal";
   const definition = actor.definitionId ? resolveDefinition?.(actor.definitionId) : undefined;
-  const derivation = deriveEquipment(actor, definition, catalog);
-  const advantage: RollModeSource[] = [];
-  const disadvantage: RollModeSource[] = [];
-  for (const rider of collectRiders(derivation.carriers, { ...derivation.context, moment: "on-initiative-roll" })) {
-    if (rider.modifier.type !== "roll-mode" || rider.modifier.roll !== "initiative") continue;
-    (rider.modifier.mode === "advantage" ? advantage : disadvantage).push({
-      source: `item:${rider.sourceItemId ?? rider.label}`,
-      label: rider.label
-    });
-  }
-  // A rider with no `when` is standing, the natural way to author "advantage on Initiative".
-  for (const rider of collectRiders(derivation.carriers, { ...derivation.context, moment: null })) {
-    if (rider.modifier.type !== "roll-mode" || rider.modifier.roll !== "initiative") continue;
-    (rider.modifier.mode === "advantage" ? advantage : disadvantage).push({
-      source: `item:${rider.sourceItemId ?? rider.label}`,
-      label: rider.label
-    });
-  }
-  return aggregateRollMode(advantage, disadvantage).mode;
+  const claims = rollModeClaims(deriveEquipment(actor, definition, catalog), ["initiative"], "on-initiative-roll");
+  return aggregateRollMode(claims.advantage, claims.disadvantage).mode;
 }
 
 /** Told about every initiative die the server rolls, so the caller can put it in the table feed.

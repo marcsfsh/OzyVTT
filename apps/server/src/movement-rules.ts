@@ -1,9 +1,10 @@
 import type { EncounterTokenPosition, GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { RulesBlockedError } from "./game-store.js";
-import { effectiveSpeedFeet, isIncapacitated } from "./condition-rules.js";
+import { isIncapacitated } from "./condition-rules.js";
 import { effectiveActions } from "./effective-actions.js";
-import type { EquipmentCatalog } from "./equipment-derivation.js";
+import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
+import { effectiveSpeedFeet } from "./speed.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
 import { effectiveModeFor, familyModeFor, overrideCovers, overrideReason, rememberOverride } from "./rules-families.js";
 
@@ -70,7 +71,8 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   }
 
   const moved = input.distance(from, to);
-  const effective = effectiveSpeedFeet(mover);
+  const moverDefinition = mover.definitionId ? input.resolveDefinition(mover.definitionId) : undefined;
+  const effective = effectiveSpeedFeet(mover, deriveEquipment(mover, moverDefinition, input.catalog));
   if (moved !== null && effective !== null && moved > 0.05) {
     const used = state.combat.turn.movementUsedFeet;
     const overrun = used + moved > effective + 1e-6;

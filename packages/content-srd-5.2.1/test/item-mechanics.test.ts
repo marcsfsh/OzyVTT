@@ -65,7 +65,7 @@ describe("the item mechanics overlay", () => {
     });
 
     const landed = merged.find((row) => row.id === "cloak-of-protection")!;
-    expect(landed.modifiers).toEqual([{ type: "armor-class", amount: -3, whileArmored: false, when: [] }]);
+    expect(landed.modifiers).toEqual([{ type: "armor-class", amount: -3, whileArmored: false }]);
     // The merge re-parses the touched row, so it comes back in the bundle's output form.
     expect(landed.modifiers).not.toEqual(rows.find((row) => row.id === "cloak-of-protection")!.modifiers);
 
@@ -219,10 +219,8 @@ describe("the item mechanics overlay", () => {
         'modifiers.0.when.1.spellIds.0 names "magic-missle", which is no spell this content ships (bundles/spells.v1.json); did you mean "magic-missile"?'
       ],
       [
-        {
-          modifiers: [{ type: "save-bonus", amount: 1, when: [{ type: "while-condition", conditionIds: ["cursed"] }] }]
-        },
-        'modifiers.0.when.0.conditionIds.0 names "cursed", which is no condition this content ships (src/enums.ts CONDITION_IDS)'
+        { grants: { conditionImmunities: ["cursed"] } },
+        'grants.conditionImmunities.0 names "cursed", which is no condition this content ships (src/enums.ts CONDITION_IDS)'
       ],
       [
         { modifiers: [{ type: "spell-save-dc", amount: 1, classId: "wizzard" }] },

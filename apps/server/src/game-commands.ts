@@ -17,6 +17,7 @@ import {
   CharacterChoiceSchema,
   CharacterIdentitySchema,
   CurrencySchema,
+  EffectModifiersSchema,
   InventoryItemSchema,
   ProficienciesSchema
 } from "@vtt/schemas";
@@ -424,49 +425,8 @@ export const EffectAddSchema = z
         z.object({ type: z.literal("manual") }).strict()
       ])
       .optional(),
-    modifiers: z
-      .array(
-        z.discriminatedUnion("type", [
-          z
-            .object({
-              type: z.literal("damage-bonus"),
-              amount: z.number().int().min(-20).max(20),
-              appliesTo: z.enum(["melee", "all"]).default("all")
-            })
-            .strict(),
-          z
-            .object({
-              type: z.literal("damage-resistance"),
-              damageTypes: z.array(z.string().min(1).max(40)).min(1).max(20)
-            })
-            .strict(),
-          /** The only channel by which anything can make a target vulnerable. */
-          z
-            .object({
-              type: z.literal("damage-vulnerability"),
-              damageTypes: z.array(z.string().min(1).max(40)).min(1).max(20)
-            })
-            .strict(),
-          z.object({ type: z.literal("attack-advantage") }).strict(),
-          z.object({ type: z.literal("incoming-attack-advantage") }).strict(),
-          z.object({ type: z.literal("attack-disadvantage") }).strict(),
-          z.object({ type: z.literal("incoming-attack-disadvantage") }).strict(),
-          z
-            .object({
-              type: z.literal("save-advantage"),
-              ability: z.enum(["str", "dex", "con", "int", "wis", "cha"]).optional()
-            })
-            .strict(),
-          z
-            .object({
-              type: z.literal("save-disadvantage"),
-              ability: z.enum(["str", "dex", "con", "int", "wis", "cha"]).optional()
-            })
-            .strict()
-        ])
-      )
-      .max(8)
-      .optional(),
+    /** The shared modifier vocabulary, minus what an effect cannot give back when it ends. */
+    modifiers: EffectModifiersSchema.optional(),
     /** The granter concentrates to sustain this effect (SRD Concentration): one at a time; damage prompts a CON save; incapacitation breaks it. */
     concentration: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()

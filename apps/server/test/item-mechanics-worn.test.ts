@@ -154,8 +154,8 @@ describe("a Cloak of Protection moves AC and a rolled save, and both come off wi
     expect(record.slot).toBe("shoulders");
     expect(record.attunement).toMatchObject({ required: true });
     expect(record.modifiers).toEqual([
-      { type: "armor-class", amount: 1, whileArmored: false, when: [] },
-      { type: "save-bonus", amount: 1, when: [] }
+      { type: "armor-class", amount: 1, whileArmored: false },
+      { type: "save-bonus", amount: 1 }
     ]);
     // The shipped row has no weapon or armor for a fixture to have supplied.
     expect(record.weapon ?? null).toBeNull();

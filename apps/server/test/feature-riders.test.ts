@@ -14,6 +14,7 @@ import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../s
 import { ContentLibrary, EMPTY_HOMEBREW_SLICE, type HomebrewContentSource } from "../src/content-library.js";
 import { criticalThreshold, effectiveActions } from "../src/effective-actions.js";
 import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation.js";
+import { currentSpeedFeet } from "../src/speed.js";
 import { startEncounter } from "../src/encounter.js";
 import { saveRiderBonus, saveRollSources } from "../src/saving-throws.js";
 
@@ -722,7 +723,7 @@ describe("nothing the builder baked is counted a second time as a carrier", () =
       ]
     });
     const derivation = deriveEquipment(built.hero, built.definition, built.catalog);
-    expect(derivation.speed).toBe(0);
+    expect(currentSpeedFeet(built.hero, derivation)).toBe(40);
     expect(derivation.initiative).toBe(0);
     expect(derivation.armorClass).toBe(0);
 

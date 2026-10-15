@@ -516,8 +516,7 @@
    {
     "type": "armor-class",
     "amount": 1,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -565,8 +564,7 @@
    {
     "type": "armor-class",
     "amount": 2,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -614,8 +612,7 @@
    {
     "type": "armor-class",
     "amount": 3,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -906,13 +903,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    },
    {
     "type": "damage-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    }
   ]
  },
@@ -1661,13 +1656,11 @@
    {
     "type": "armor-class",
     "amount": 1,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    },
    {
     "type": "save-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    }
   ]
  },
@@ -1977,13 +1970,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    },
    {
     "type": "damage-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    }
   ]
  },
@@ -2133,13 +2124,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 3,
-    "when": []
+    "amount": 3
    },
    {
     "type": "damage-bonus",
-    "amount": 3,
-    "when": []
+    "amount": 3
    }
   ]
  },
@@ -2187,8 +2176,7 @@
    {
     "type": "armor-class",
     "amount": 1,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -2292,8 +2280,7 @@
    {
     "type": "armor-class",
     "amount": 1,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -2366,13 +2353,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    },
    {
     "type": "damage-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    }
   ]
  },
@@ -2488,8 +2473,7 @@
    {
     "type": "armor-class",
     "amount": 2,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -2528,13 +2512,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 3,
-    "when": []
+    "amount": 3
    },
    {
     "type": "damage-bonus",
-    "amount": 3,
-    "when": []
+    "amount": 3
    }
   ]
  },
@@ -2676,8 +2658,7 @@
    {
     "type": "armor-class",
     "amount": 1,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -2935,8 +2916,7 @@
     "type": "extra-damage",
     "formula": "2d6",
     "damageType": "fire",
-    "doubleOnCritical": true,
-    "when": []
+    "doubleOnCritical": true
    }
   ]
  },
@@ -3020,8 +3000,7 @@
     "type": "extra-damage",
     "formula": "1d6",
     "damageType": "cold",
-    "doubleOnCritical": true,
-    "when": []
+    "doubleOnCritical": true
    }
   ]
  },
@@ -3185,13 +3164,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    },
    {
     "type": "damage-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    }
   ]
  },
@@ -3228,8 +3205,7 @@
    {
     "type": "armor-class",
     "amount": 1,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -3386,13 +3362,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    },
    {
     "type": "damage-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    }
   ]
  },
@@ -3708,13 +3682,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 3,
-    "when": []
+    "amount": 3
    },
    {
     "type": "damage-bonus",
-    "amount": 3,
-    "when": []
+    "amount": 3
    }
   ]
  },
@@ -4077,18 +4049,15 @@
   "modifiers": [
    {
     "type": "save-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    },
    {
     "type": "attack-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    },
    {
     "type": "damage-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    }
   ]
  },
@@ -4155,13 +4124,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    },
    {
     "type": "damage-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    }
   ]
  },
@@ -4630,13 +4597,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 2,
-    "when": []
+    "amount": 2
    },
    {
     "type": "damage-bonus",
-    "amount": 2,
-    "when": []
+    "amount": 2
    }
   ]
  },
@@ -5574,13 +5539,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 2,
-    "when": []
+    "amount": 2
    },
    {
     "type": "damage-bonus",
-    "amount": 2,
-    "when": []
+    "amount": 2
    }
   ]
  },
@@ -5894,13 +5857,11 @@
    {
     "type": "armor-class",
     "amount": 1,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    },
    {
     "type": "save-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    }
   ]
  },
@@ -6368,8 +6329,7 @@
   "modifiers": [
    {
     "type": "save-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    }
   ]
  },
@@ -6512,8 +6472,7 @@
    {
     "type": "roll-mode",
     "roll": "initiative",
-    "mode": "advantage",
-    "when": []
+    "mode": "advantage"
    },
    {
     "type": "roll-mode",
@@ -6745,8 +6704,7 @@
    {
     "type": "armor-class",
     "amount": 1,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -6782,13 +6740,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 2,
-    "when": []
+    "amount": 2
    },
    {
     "type": "damage-bonus",
-    "amount": 2,
-    "when": []
+    "amount": 2
    }
   ]
  },
@@ -6862,8 +6818,7 @@
    {
     "type": "roll-mode",
     "roll": "initiative",
-    "mode": "advantage",
-    "when": []
+    "mode": "advantage"
    },
    {
     "type": "roll-mode",
@@ -6949,8 +6904,7 @@
    {
     "type": "armor-class",
     "amount": 2,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -6988,8 +6942,7 @@
    {
     "type": "armor-class",
     "amount": 1,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -7027,8 +6980,7 @@
    {
     "type": "armor-class",
     "amount": 2,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -7066,8 +7018,7 @@
    {
     "type": "armor-class",
     "amount": 3,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    }
   ]
  },
@@ -7442,13 +7393,11 @@
    {
     "type": "armor-class",
     "amount": 2,
-    "whileArmored": false,
-    "when": []
+    "whileArmored": false
    },
    {
     "type": "save-bonus",
-    "amount": 2,
-    "when": []
+    "amount": 2
    }
   ]
  },
@@ -7816,13 +7765,11 @@
   "modifiers": [
    {
     "type": "check-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    },
    {
     "type": "save-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    }
   ]
  },
@@ -7961,8 +7908,7 @@
     "type": "extra-damage",
     "formula": "2d6",
     "damageType": "necrotic",
-    "doubleOnCritical": true,
-    "when": []
+    "doubleOnCritical": true
    }
   ]
  },
@@ -8326,13 +8272,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 3,
-    "when": []
+    "amount": 3
    },
    {
     "type": "damage-bonus",
-    "amount": 3,
-    "when": []
+    "amount": 3
    }
   ]
  },
@@ -8922,8 +8866,7 @@
    {
     "type": "roll-mode",
     "roll": "initiative",
-    "mode": "advantage",
-    "when": []
+    "mode": "advantage"
    }
   ]
  },
@@ -8996,13 +8939,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    },
    {
     "type": "damage-bonus",
-    "amount": 1,
-    "when": []
+    "amount": 1
    }
   ]
  },
@@ -9075,13 +9016,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 2,
-    "when": []
+    "amount": 2
    },
    {
     "type": "damage-bonus",
-    "amount": 2,
-    "when": []
+    "amount": 2
    }
   ]
  },
@@ -9154,13 +9093,11 @@
   "modifiers": [
    {
     "type": "attack-bonus",
-    "amount": 3,
-    "when": []
+    "amount": 3
    },
    {
     "type": "damage-bonus",
-    "amount": 3,
-    "when": []
+    "amount": 3
    }
   ]
  },

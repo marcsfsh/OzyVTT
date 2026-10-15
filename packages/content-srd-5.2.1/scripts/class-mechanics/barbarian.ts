@@ -62,15 +62,18 @@ export const barbarian: ClassMechanicsModule = {
         }
       ]
     },
-    // Authored as `effects` so an activation is synthesised. "Using Strength" stays prose: attack
-    // advantage cannot be gated on the attack's ability.
+    // Authored as `effects` so an activation is synthesised; it lasts until the start of your next turn. "Using
+    // Strength" stays prose: attack advantage cannot be gated on the attack's ability.
     "reckless-attack": {
       effects: [
         {
           name: "Reckless Attack",
           tags: ["reckless-attack"],
           duration: { type: "until-source-next-turn" },
-          modifiers: [{ type: "attack-advantage" }, { type: "incoming-attack-advantage" }]
+          modifiers: [
+            { type: "roll-mode", roll: "attack", mode: "advantage" },
+            { type: "roll-mode", roll: "incoming-attack", mode: "advantage" }
+          ]
         }
       ]
     },

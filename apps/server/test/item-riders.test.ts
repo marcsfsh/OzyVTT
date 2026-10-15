@@ -3,13 +3,8 @@ import { GameStateSchema, type GameState } from "@vtt/domain";
 import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { effectiveActions } from "../src/effective-actions.js";
-import {
-  deriveEquipment,
-  effectiveSkillTier,
-  type EquipmentCatalog,
-  type EquipmentRecordLike,
-  type FeatRecordLike
-} from "../src/equipment-derivation.js";
+import { deriveEquipment, effectiveSkillTier, type EquipmentCatalog } from "../src/equipment-derivation.js";
+import { testCatalog } from "./catalog-records.js";
 import { reconcileEquipment, setInventoryItem } from "../src/inventory.js";
 import { startEncounter, initiativeRollMode } from "../src/encounter.js";
 import { answerReaction } from "../src/reactions.js";
@@ -48,12 +43,8 @@ const item = (over: Record<string, unknown>): InventoryItem =>
   InventoryItemSchema.parse({ id: "x", name: "X", ...over });
 
 /** An in-test catalog. `equipmentRecord`/`featRecord` are the two hooks the derivation reads. */
-function catalogOf(records: readonly EquipmentRecordLike[], feats: readonly FeatRecordLike[] = []): EquipmentCatalog {
-  return {
-    equipmentRecord: (id) => records.find((record) => record.id === id),
-    featRecord: (id) => feats.find((feat) => feat.id === id)
-  };
-}
+const catalogOf = (equipment: readonly object[], feats: readonly object[] = []): EquipmentCatalog =>
+  testCatalog({ equipment, feats });
 
 function stateWith(inventory: InventoryItem[], extra: Record<string, unknown> = {}): GameState {
   return GameStateSchema.parse({
@@ -125,7 +116,7 @@ const SWORD_ROW = {
 };
 
 describe("criterion 1: a magic weapon's +1 to hit and extra damage die", () => {
-  const SWORD: EquipmentRecordLike = {
+  const SWORD = {
     id: "shortsword-of-lightning",
     name: "Shortsword of Lightning",
     category: "weapon",
@@ -216,7 +207,7 @@ describe("criterion 2: `slot` makes an open category mechanically real", () => {
       category: "relic",
       slot: "armor",
       armor: { acBase: 14, addDexModifier: true, dexModifierCap: 2, stealthDisadvantage: false, strengthRequired: null }
-    } as EquipmentRecordLike;
+    };
     const catalog = catalogOf([relic]);
     const state = stateWith([]);
     // `category: "relic"` is inert to the engine; `slot: "armor"` is not.
@@ -241,7 +232,7 @@ describe("criterion 2: `slot` makes an open category mechanically real", () => {
     );
     expect(state.actors[0].armorClass).toBe(16); // 14 + min(dex +2, cap 2)
 
-    const rings: EquipmentRecordLike[] = [1, 2, 3].map((n) => ({
+    const rings = [1, 2, 3].map((n) => ({
       id: `ring-${n}`,
       name: `Ring ${n}`,
       category: "ring",
@@ -300,7 +291,7 @@ describe("criterion 2: `slot` makes an open category mechanically real", () => {
 });
 
 describe("criterion 3: a ring changes AC and the change disappears on unequip", () => {
-  const RING: EquipmentRecordLike = {
+  const RING = {
     id: "ring-of-protection",
     name: "Ring of Protection",
     category: "ring",
@@ -369,7 +360,7 @@ describe("criterion 3: a ring changes AC and the change disappears on unequip", 
 });
 
 describe("criterion 4: an item that casts a spell on a limited pool", () => {
-  const AMULET: EquipmentRecordLike = {
+  const AMULET = {
     id: "amulet-of-whispers",
     name: "Amulet of Whispers",
     category: "wondrous",
@@ -424,7 +415,7 @@ describe("criterion 4: an item that casts a spell on a limited pool", () => {
   });
 
   it("re-arms a SHORT-rest item pool - the sweep site that silently strands charges", () => {
-    const wand: EquipmentRecordLike = {
+    const wand = {
       id: "wand-of-sparks",
       name: "Wand of Sparks",
       category: "held",
@@ -433,6 +424,8 @@ describe("criterion 4: an item that casts a spell on a limited pool", () => {
         {
           id: "spark",
           name: "Spark",
+          activation: "action",
+          description: "A spark.",
           damage: [{ formula: "1d6", type: "fire" }],
           uses: { limit: 3, per: "short-rest" }
         }
@@ -449,7 +442,7 @@ describe("criterion 4: an item that casts a spell on a limited pool", () => {
 });
 
 describe("criterion 5: a cloak granting advantage on Initiative while attuned", () => {
-  const CLOAK: EquipmentRecordLike = {
+  const CLOAK = {
     id: "cloak-of-quickness",
     name: "Cloak of Quickness",
     category: "wondrous",
@@ -507,7 +500,7 @@ describe("criterion 5: a cloak granting advantage on Initiative while attuned", 
 });
 
 describe("criterion 6: a shield granting a Paladin one more use of Lay on Hands", () => {
-  const SHIELD: EquipmentRecordLike = {
+  const SHIELD = {
     id: "devotion-shield",
     name: "Shield of Devotion",
     category: "shield",
@@ -573,7 +566,7 @@ describe("criterion 6: a shield granting a Paladin one more use of Lay on Hands"
 // Advantage on opportunity attacks is a distinct moment from ordinary attack advantage.
 
 describe("criterion 7: a dagger granting advantage on opportunity attacks", () => {
-  const DAGGER: EquipmentRecordLike = {
+  const DAGGER = {
     id: "dagger-of-reprisal",
     name: "Dagger of Reprisal",
     category: "weapon",
@@ -674,7 +667,7 @@ describe("criterion 7: a dagger granting advantage on opportunity attacks", () =
 });
 
 describe("criterion 8: an amulet granting one extra 1st-level spell slot", () => {
-  const AMULET: EquipmentRecordLike = {
+  const AMULET = {
     id: "amulet-of-reserves",
     name: "Amulet of Reserves",
     category: "wondrous",
@@ -743,7 +736,7 @@ describe("criterion 8: an amulet granting one extra 1st-level spell slot", () =>
 });
 
 describe("criterion 9: a mace dealing an extra 1d6 fire on a critical hit", () => {
-  const MACE: EquipmentRecordLike = {
+  const MACE = {
     id: "mace-of-embers",
     name: "Mace of Embers",
     category: "weapon",
@@ -801,7 +794,7 @@ describe("criterion 9: a mace dealing an extra 1d6 fire on a critical hit", () =
   });
 
   it("widens the critical range when a rider says so", () => {
-    const keen: EquipmentRecordLike = {
+    const keen = {
       id: "keen-blade",
       name: "Keen Blade",
       category: "weapon",
@@ -844,7 +837,7 @@ describe("criterion 9: a mace dealing an extra 1d6 fire on a critical hit", () =
 
 describe("criterion 10: half-plate that raises the spell save DC", () => {
   it("raises the DC the server ENFORCES, not just the one displayed", () => {
-    const armor: EquipmentRecordLike = {
+    const armor = {
       id: "half-plate-of-power",
       name: "Half-Plate of Power",
       category: "armor",
@@ -897,7 +890,7 @@ describe("criterion 10: half-plate that raises the spell save DC", () => {
 });
 
 describe("criterion 11: a circlet granting a skill proficiency or expertise", () => {
-  const CIRCLET: EquipmentRecordLike = {
+  const CIRCLET = {
     id: "circlet-of-shadows",
     name: "Circlet of Shadows",
     category: "wondrous",
@@ -934,7 +927,7 @@ describe("criterion 11: a circlet granting a skill proficiency or expertise", ()
 });
 
 describe("criterion 12: a bow granting a bonus and advantage on saving throws", () => {
-  const BOW: EquipmentRecordLike = {
+  const BOW = {
     id: "bow-of-poise",
     name: "Bow of Poise",
     category: "weapon",
@@ -969,7 +962,7 @@ describe("criterion 12: a bow granting a bonus and advantage on saving throws", 
 });
 
 describe("criterion 13: curses are the negative of every rider", () => {
-  const CURSED: EquipmentRecordLike = {
+  const CURSED = {
     id: "blade-of-weakness",
     name: "Blade of Weakness",
     category: "weapon",
@@ -1037,7 +1030,7 @@ describe("criterion 13: curses are the negative of every rider", () => {
 });
 
 describe("criteria 14 & 15: feats carry the same riders, and an item can grant one", () => {
-  const FEAT: FeatRecordLike = {
+  const FEAT = {
     id: "resilient-guard",
     name: "Resilient Guard",
     feature: {
@@ -1048,7 +1041,7 @@ describe("criteria 14 & 15: feats carry the same riders, and an item can grant o
       grants: { skills: ["athletics"] }
     }
   };
-  const BELT: EquipmentRecordLike = {
+  const BELT = {
     id: "belt-of-the-guard",
     name: "Belt of the Guard",
     category: "wondrous",
@@ -1066,9 +1059,7 @@ describe("criteria 14 & 15: feats carry the same riders, and an item can grant o
     ]);
     const derivation = deriveEquipment(state.actors[0], definition, catalog);
 
-    expect(derivation.featIds).toEqual([
-      { id: "resilient-guard", name: "Resilient Guard", sourceItemId: "belt-of-the-guard" }
-    ]);
+    expect(derivation.carriers.map((carrier) => carrier.label)).toContain("Resilient Guard (Belt of the Guard)");
     // The feat's riders were read by the same collector that reads an item's.
     expect(derivation.armorClass).toBe(1);
     expect(derivation.saveBonus).toBe(2);
@@ -1087,7 +1078,7 @@ describe("criteria 14 & 15: feats carry the same riders, and an item can grant o
     setInventoryItem(state, IDS.hero, item({ ...row, equipped: false, attuned: true }), () => definition, { catalog });
     expect(state.actors[0].armorClass).toBe(12);
     const after = deriveEquipment(state.actors[0], definition, catalog);
-    expect(after.featIds).toEqual([]);
+    expect(after.carriers).toEqual([]);
     expect(after.saveBonus).toBe(0);
     expect(effectiveSkillTier(definition, after, "athletics")).toBe("none");
   });
@@ -1099,7 +1090,7 @@ describe("criteria 14 & 15: feats carry the same riders, and an item can grant o
       item({ id: "belt-of-the-guard", name: "Belt of the Guard", category: "wondrous", equipped: true, attuned: true })
     ]);
     const derivation = deriveEquipment(state.actors[0], definition, catalogOf([BELT], []));
-    expect(derivation.featIds).toEqual([]);
+    expect(derivation.carriers.map((carrier) => carrier.label)).toEqual(["Belt of the Guard"]);
     expect(derivation.armorClass).toBe(0);
   });
 });
@@ -1167,7 +1158,7 @@ describe("the catalog adapter's cast is a CHECKED claim, not an assumption", () 
     // compile time here, so renaming or retyping a rider field in `@vtt/content-srd-5.2.1` breaks the
     // build instead of making riders inert.
     const content = await import("@vtt/content-srd-5.2.1");
-    const equipment: EquipmentRecordLike = content.EquipmentReferenceSchema.parse({
+    const equipment = content.EquipmentReferenceSchema.parse({
       id: "ring-of-proof",
       name: "Ring of Proof",
       source: "homebrew",
@@ -1199,7 +1190,7 @@ describe("the catalog adapter's cast is a CHECKED claim, not an assumption", () 
 });
 
 describe("criterion 16: a +1 weapon's flat damage bonus", () => {
-  const PLUS_ONE: EquipmentRecordLike = {
+  const PLUS_ONE = {
     id: "shortsword-plus-one",
     name: "Shortsword, +1",
     category: "weapon",
@@ -1244,7 +1235,7 @@ describe("criterion 16: a +1 weapon's flat damage bonus", () => {
 
   it("without the rider the formula stays 1d6 + 3 - the number moves with the value, not the field", () => {
     const definition = definitionOf();
-    const plain: EquipmentRecordLike = { ...PLUS_ONE, modifiers: [{ type: "attack-bonus", amount: 1 }] };
+    const plain = { ...PLUS_ONE, modifiers: [{ type: "attack-bonus", amount: 1 }] };
     const state = fight(stateWith([item(ROW)]));
     const action = effectiveActions(definition, state.actors[0], catalogOf([plain])).find(
       (entry) => entry.id === "item-shortsword-plus-one"
@@ -1254,7 +1245,7 @@ describe("criterion 16: a +1 weapon's flat damage bonus", () => {
 
   it("a moment-gated bonus lands only at its moment, as its own labelled line", () => {
     const definition = definitionOf();
-    const SMITER: EquipmentRecordLike = {
+    const SMITER = {
       id: "smiting-shortsword",
       name: "Smiting Shortsword",
       category: "weapon",

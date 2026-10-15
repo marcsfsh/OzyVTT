@@ -323,9 +323,7 @@ describe("Rogue - the flat grants and the pick", () => {
     expect(actionOf(built, "steady-aim")?.activation).toBe("bonus-action");
     resolve(built, "steady-aim", [], []);
     const granted = built.hero.effects.find((effect) => effect.tags.includes("steady-aim"));
-    expect(granted?.modifiers).toEqual([
-      { type: "roll-mode", roll: "attack", mode: "advantage", when: [], scope: undefined }
-    ]);
+    expect(granted?.modifiers).toEqual([{ type: "roll-mode", roll: "attack", mode: "advantage" }]);
   });
 
   it("makes the Thief's Fast Hands a Bonus Action", () => {
@@ -540,7 +538,7 @@ describe("Ranger - the rest of the kit", () => {
     const carrier = deriveEquipment(built.hero, built.definition, built.catalog).carriers.find(
       (entry) => entry.label === "Feral Senses"
     );
-    expect(carrier?.modifiers).toEqual([{ type: "sense", sense: "blindsight", feet: 30, when: [], scope: undefined }]);
+    expect(carrier?.modifiers).toEqual([{ type: "sense", sense: "blindsight", feet: 30 }]);
   });
 
   it("takes Extra Attack all the way to a SECOND WEAPON SWING - the engine gap, closed", () => {

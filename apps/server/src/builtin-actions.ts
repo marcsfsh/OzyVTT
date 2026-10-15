@@ -59,7 +59,15 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
       name: "Dodging",
       tags: ["dodging"],
       duration: { type: "until-source-next-turn" },
-      modifiers: [{ type: "incoming-attack-disadvantage" }, { type: "save-advantage", ability: "dex" }],
+      modifiers: [
+        { type: "roll-mode", roll: "incoming-attack", mode: "disadvantage" },
+        {
+          type: "roll-mode",
+          roll: "save",
+          mode: "advantage",
+          when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["dex"] }]
+        }
+      ],
       onEnd: [],
       target: "self",
       voidWhileIncapacitated: true,
@@ -77,7 +85,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
       name: "Helped",
       tags: ["helped"],
       duration: { type: "until-source-next-turn" },
-      modifiers: [{ type: "attack-advantage" }],
+      modifiers: [{ type: "roll-mode", roll: "attack", mode: "advantage" }],
       onEnd: [],
       target: "target",
       voidWhileIncapacitated: false,

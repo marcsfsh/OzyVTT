@@ -10,13 +10,9 @@ import {
   type ConditionImmunitySource,
   type EffectNarration
 } from "./effects.js";
-import {
-  conditionLabel,
-  currentSpeedFeet,
-  effectiveSpeedFeet,
-  exhaustionLevel,
-  INCAPACITATING_CONDITIONS
-} from "./condition-rules.js";
+import { conditionLabel, exhaustionLevel, INCAPACITATING_CONDITIONS } from "./condition-rules.js";
+import { deriveEquipment } from "./equipment-derivation.js";
+import { currentSpeedFeet, effectiveSpeedFeet } from "./speed.js";
 import { effectiveModeFor, familyModeFor, overrideCovers, rememberOverride } from "./rules-families.js";
 
 /** Tracks a condition on an actor. The engine owns the mechanical hooks (ADR-0020): condition immunities
@@ -49,8 +45,10 @@ export function setCondition(
     ) {
       // Half your current Speed (slowed or exhausted creatures pay less). Not `effectiveSpeedFeet`: Dash adds
       // movement without raising Speed.
-      const cost = Math.floor((currentSpeedFeet(actor) ?? 0) / 2);
-      const effective = effectiveSpeedFeet(actor) ?? 0;
+      const definition = actor.definitionId ? options?.resolveDefinition?.(actor.definitionId) : undefined;
+      const derivation = deriveEquipment(actor, definition, options?.catalog);
+      const cost = Math.floor((currentSpeedFeet(actor, derivation) ?? 0) / 2);
+      const effective = effectiveSpeedFeet(actor, derivation) ?? 0;
       const budgetLeft = effective - state.combat.turn.movementUsedFeet;
       // Speed 0 is its own refusal: with a zeroed Speed the cost is also 0, so `cost > budgetLeft` alone would pass.
       const blocked = effective === 0 || cost > budgetLeft;

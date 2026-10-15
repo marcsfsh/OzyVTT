@@ -5,21 +5,20 @@ import {
   parseDiceFormula,
   resolveDice,
   sumRiders,
-  type AttackKind,
-  type RollModeSource
+  type AttackKind
 } from "@vtt/rules-5e";
-import { toRollModes } from "@vtt/schemas";
 import { conditionLabel, exhaustionLevel, exhaustionPenalty, isIncapacitated } from "../condition-rules.js";
 import { criticalThreshold } from "../effective-actions.js";
 import {
   deriveEquipment,
+  rollModeClaims,
   weaponPropertiesOf,
-  UNARMED_STRIKE_ACTION_ID,
-  type EquipmentDerivation
+  type EquipmentDerivation,
+  type RollModeClaims
 } from "../equipment-derivation.js";
+import { UNARMED_STRIKE_ACTION_ID } from "../item-actions.js";
+import { statblockFacts } from "../statblock-facts.js";
 import { naturalFace, recordRoll, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
-
-type RollModeSources = { advantage: RollModeSource[]; disadvantage: RollModeSource[] };
 
 /** Whether this swing is at range. A thrown weapon needs the measured distance; unmeasurable resolves to
  *  ranged, so a mapless table never hands a thrown weapon melee-gated riders or bonuses. */
@@ -32,7 +31,8 @@ export function attackUsedAsRanged(
   return distance === null || distance > attack.reachFeet + 1e-6;
 }
 
-/** melee/ranged/thrown derive from reach and range; reaction/opportunity come from `input.attackKinds`. */
+/** melee/ranged/thrown derive from reach and range, spell from the spell the action casts; reaction/opportunity
+ *  come from `input.attackKinds`. */
 function attackKindsOf(ctx: ResolveContext, distance: number | null): AttackKind[] {
   const { action, input } = ctx;
   const kinds = new Set<AttackKind>(input.attackKinds ?? []);
@@ -43,6 +43,7 @@ function attackKindsOf(ctx: ResolveContext, distance: number | null): AttackKind
     if (attackUsedAsRanged(attack, distance)) kinds.add("ranged");
     else if (melee) kinds.add("melee");
     if (melee && ranged) kinds.add("thrown");
+    if (action.spellId !== undefined) kinds.add("spell");
   }
   // Matched by id so a Monk's own strike (which shadows the builtin) still counts as unarmed.
   if (action.id === UNARMED_STRIKE_ACTION_ID) kinds.add("unarmed");
@@ -74,60 +75,16 @@ const CONDITION_ROLL_MODES: ReadonlyArray<
 
 const has = (actor: LiveActor, id: string) => actor.conditions.some((condition) => condition.id === id);
 
-/** Effect modifiers normalised through `toRollModes`. `onOwnTurn` belongs only to the legacy
- *  `attack-advantage` variant (Reckless Attack semantics); `roll-mode` carries its own `when`. */
-function effectClaims(ctx: ResolveContext, target: LiveActor, sources: RollModeSources): void {
-  const { state, attacker } = ctx;
-  const onOwnTurn = state.combat.turnActorId === attacker.id;
-  const activeEffects = (actor: LiveActor) =>
-    actor.effects.filter((effect) => !(effect.voidWhileIncapacitated && isIncapacitated(actor)));
-  for (const effect of activeEffects(attacker)) {
-    for (const modifier of effect.modifiers) {
-      if (modifier.type === "attack-advantage" && !onOwnTurn) continue;
-      for (const claim of toRollModes(modifier)) {
-        if (claim.roll !== "attack") continue;
-        sources[claim.mode].push({ source: effect.id, label: effect.name });
-      }
-    }
-  }
-  for (const effect of activeEffects(target)) {
-    for (const modifier of effect.modifiers) {
-      for (const claim of toRollModes(modifier)) {
-        if (claim.roll !== "incoming-attack") continue;
-        sources[claim.mode].push({ source: effect.id, label: `Target: ${effect.name}` });
-      }
-    }
-  }
-}
-
-/** Item and item-granted feat riders at `on-attack-roll`, read whoever's turn it is (opportunity attacks
- *  are off-turn). Standing and momentary passes are disjoint. */
-function riderClaims(ctx: ResolveContext, targetDerivation: EquipmentDerivation, sources: RollModeSources): void {
-  const { derivation, riderFilters } = ctx;
-  for (const pass of [null, "on-attack-roll"] as const) {
-    for (const rider of collectRiders(derivation.carriers, { ...derivation.context, ...riderFilters, moment: pass })) {
-      if (rider.modifier.type !== "roll-mode" || rider.modifier.roll !== "attack" || rider.modifier.mode === undefined)
-        continue;
-      sources[rider.modifier.mode].push({ source: `item:${rider.sourceItemId ?? rider.label}`, label: rider.label });
-    }
-    // The target's own gear (Cloak of Displacement) claims `incoming-attack` against this attack.
-    for (const rider of collectRiders(targetDerivation.carriers, { ...targetDerivation.context, moment: pass })) {
-      if (
-        rider.modifier.type !== "roll-mode" ||
-        rider.modifier.roll !== "incoming-attack" ||
-        rider.modifier.mode === undefined
-      )
-        continue;
-      sources[rider.modifier.mode].push({
-        source: `item:${rider.sourceItemId ?? rider.label}`,
-        label: `Target: ${rider.label}`
-      });
-    }
-  }
+/** Riders on both sides at `on-attack-roll`, read whoever's turn it is (opportunity attacks are off-turn): the
+ *  attacker's claims on its attack (Reckless Attack, a cursed blade) and the target's on attacks against it
+ *  (Dodge, a Cloak of Displacement). */
+function riderClaims(ctx: ResolveContext, targetDerivation: EquipmentDerivation, sources: RollModeClaims): void {
+  rollModeClaims(ctx.derivation, ["attack"], "on-attack-roll", ctx.riderFilters, sources);
+  rollModeClaims(targetDerivation, ["incoming-attack"], "on-attack-roll", {}, sources, "Target: ");
 }
 
 /** Conditions on either side, including the two that depend on who or where: Grappled and a Prone target. */
-function conditionClaims(ctx: ResolveContext, target: LiveActor, distance: number | null, sources: RollModeSources) {
+function conditionClaims(ctx: ResolveContext, target: LiveActor, distance: number | null, sources: RollModeClaims) {
   const { attacker } = ctx;
   for (const entry of CONDITION_ROLL_MODES) {
     if (!has(entry.side === "attacker" ? attacker : target, entry.condition)) continue;
@@ -157,7 +114,7 @@ function conditionClaims(ctx: ResolveContext, target: LiveActor, distance: numbe
 }
 
 /** Where the attack is made from: underwater melee, long range, and a ranged shot in close combat. */
-function positionClaims(ctx: ResolveContext, distance: number | null, sources: RollModeSources): void {
+function positionClaims(ctx: ResolveContext, distance: number | null, sources: RollModeClaims): void {
   const { state, attacker, action, deps } = ctx;
   const attack = action.attack!;
   // SRD Underwater Combat: melee attacks have Disadvantage unless the weapon deals piercing damage
@@ -195,9 +152,8 @@ function attackRollSources(
   target: LiveActor,
   targetDerivation: EquipmentDerivation,
   distance: number | null
-): RollModeSources {
-  const sources: RollModeSources = { advantage: [], disadvantage: [] };
-  effectClaims(ctx, target, sources);
+): RollModeClaims {
+  const sources: RollModeClaims = { advantage: [], disadvantage: [] };
   riderClaims(ctx, targetDerivation, sources);
   conditionClaims(ctx, target, distance, sources);
   positionClaims(ctx, distance, sources);
@@ -246,8 +202,12 @@ function rollD20(
 export function rollAttack(ctx: ResolveContext): void {
   const { attacker, targets, input, deps, derivation, warnings } = ctx;
   const action: DefinitionAction = ctx.action;
-  // The spell this action is, on both branches: `spell-id-is` must gate a save spell's riders too.
-  const spellFilter = action.spellId === undefined ? {} : { spellId: action.spellId };
+  // The spell this action is, on both branches: the spell filters must gate a save spell's riders too.
+  const spell = action.spellId === undefined ? undefined : deps.catalog?.spellRecord?.(action.spellId);
+  const spellFilter = {
+    ...(action.spellId !== undefined ? { spellId: action.spellId } : {}),
+    ...(spell ? { spellSchool: spell.school, spellLevel: spell.level } : {})
+  };
   // `damage-type-is` depends only on the action, so a save spell (Burning Hands) must match like an
   // attack spell (Fire Bolt) does.
   const damageTypes = action.damage.map((part) => part.type);
@@ -256,17 +216,16 @@ export function rollAttack(ctx: ResolveContext): void {
 
   const target = targets[0];
   const distance = deps.distanceFeet?.(attacker.id, target.id) ?? null;
-  const targetDerivation = deriveEquipment(
-    target,
-    target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined,
-    deps.catalog
-  );
+  const targetDefinition = target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined;
+  const targetDerivation = deriveEquipment(target, targetDefinition, deps.catalog);
+  const creatureType = targetDefinition ? statblockFacts(targetDefinition).creatureType : null;
   ctx.riderFilters = {
     attackKinds: attackKindsOf(ctx, distance),
     weaponProperties: weaponPropertiesOf(ctx.riderItemId, attacker.inventory),
     damageTypes,
     targetSize: target.size ?? "medium",
     targetConditionIds: target.conditions.map((condition) => condition.id),
+    ...(creatureType !== null ? { targetCreatureType: creatureType } : {}),
     sourceItemId: ctx.riderItemId,
     ...spellFilter
   };

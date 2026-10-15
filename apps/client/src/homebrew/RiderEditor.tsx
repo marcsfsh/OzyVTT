@@ -10,6 +10,7 @@
  */
 
 import { useMemo } from "react";
+import { CONDITION_IDS, DAMAGE_TYPE_IDS } from "@vtt/content-srd-5.2.1/schemas";
 import { Chip, Field, FieldGrid, RowEditor, Select, TagInput } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { CatalogPicker } from "./CatalogPicker";
@@ -41,6 +42,10 @@ const ABILITIES = [
   opt("wis", "Wisdom"),
   opt("cha", "Charisma")
 ];
+
+/* Riders name damage types and conditions from the SRD's closed sets, so these are choices, never free text. */
+const DAMAGE_TYPES: readonly SelectOption[] = DAMAGE_TYPE_IDS.map((id) => opt(id, suggestionLabel(id)));
+const CONDITIONS: readonly SelectOption[] = CONDITION_IDS.map((id) => opt(id, suggestionLabel(id)));
 
 const SIZES = [
   opt("tiny", "Tiny"),
@@ -77,14 +82,11 @@ const TRIGGER_TYPES: readonly SelectOption[] = [
   WHEN("on-attack-roll", "Making an attack roll"),
   WHEN("on-hit", "An attack hits"),
   WHEN("on-critical-hit", "Scoring a critical hit"),
-  WHEN("on-critical-miss", "Rolling a natural 1"),
   WHEN("on-damage-roll", "Rolling damage"),
   WHEN("on-saving-throw", "Making a saving throw"),
   WHEN("on-ability-check", "Making an ability check"),
   WHEN("on-initiative-roll", "Rolling initiative"),
-  WHEN("on-death-save", "Making a death save"),
   WHEN("on-taking-damage", "Taking damage"),
-  WHEN("on-spell-cast", "Casting a spell"),
   // Filters: narrow the accompanying moment.
   FOR("attack-kind-is", "A kind of attack"),
   FOR("weapon-property-is", "A weapon property"),
@@ -304,9 +306,9 @@ const whenField = (): FieldDef => ({
     {
       key: "conditionIds",
       label: "Conditions",
-      kind: "tags",
-      visibleWhen: hasType("while-condition", "versus-condition"),
-      suggestions: (ctx) => ctx.conditions
+      kind: "multiselect",
+      options: CONDITIONS,
+      visibleWhen: hasType("while-condition", "versus-condition")
     },
     {
       key: "present",
@@ -337,14 +339,12 @@ const whenField = (): FieldDef => ({
       visibleWhen: hasType("weapon-property-is"),
       suggestions: (ctx) => ctx.weaponProperties
     },
-    // A mistyped slug here never fires rather than failing, so use the canonical list.
     {
       key: "damageTypes",
       label: "Damage types",
-      kind: "tags",
-      pick: true,
-      visibleWhen: hasType("damage-type-is"),
-      suggestions: (ctx) => ctx.damageTypes
+      kind: "multiselect",
+      options: DAMAGE_TYPES,
+      visibleWhen: hasType("damage-type-is")
     },
     {
       key: "abilities",
@@ -391,7 +391,7 @@ const whenField = (): FieldDef => ({
       kind: "tags",
       visibleWhen: hasType("versus-creature-type"),
       suggestions: (ctx) => ctx.creatureTypes,
-      note: "Not checked yet — a creature doesn't record its kind."
+      help: "Read from the target's stat block. A character has no kind recorded, so it never matches one."
     }
   ]
 });
@@ -502,7 +502,6 @@ const ROLL_MODE_ROLLS: readonly SelectOption[] = [
   opt("save", "Saving throws"),
   opt("check", "Ability checks"),
   opt("initiative", "Initiative"),
-  opt("death-save", "Death saves"),
   opt("concentration", "Concentration")
 ];
 const ROLL_MODE_WAYS: readonly SelectOption[] = [opt("advantage", "Advantage"), opt("disadvantage", "Disadvantage")];
@@ -567,8 +566,8 @@ const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
         "spell-attack-bonus"
       )
     },
-    /* On a feature the builder bakes this into `speedFeet`; on an item nothing reads the summed
-       value yet, so the item gets a note. */
+    /* On a feature the builder bakes this into `speedFeet`; on an item it joins the movement budget
+       while the item is worn. */
     {
       key: "amount",
       label: "Amount",
@@ -578,12 +577,7 @@ const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       max: 60,
       unit: "ft",
       help: "Negative for a curse.",
-      visibleWhen: hasType("speed"),
-      ...(scope === "item"
-        ? {
-            note: "Not read on an item — a worn item's speed bonus reaches no rule yet. Say it on a feature or a feat instead."
-          }
-        : {})
+      visibleWhen: hasType("speed")
     },
     {
       key: "amount",
@@ -690,14 +684,12 @@ const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       visibleWhen: hasType("extra-damage"),
       help: "Adds the character's own modifier, resolved at the roll — “add your Charisma modifier to the damage”."
     },
-    /* Left empty, the type inherits the weapon's own (`damageType ?? damage[0].type`), so `"untyped"`
-       is not offered: picking it would override that inheritance. The box stays open. */
     {
       key: "damageType",
       label: "Damage type",
-      pick: true,
-      placeholder: "fire",
-      suggestions: (ctx) => ctx.damageTypes,
+      kind: "select",
+      options: DAMAGE_TYPES,
+      placeholder: "Choose a type",
       visibleWhen: hasType("extra-damage")
     },
     {
@@ -1122,26 +1114,18 @@ const tagsField = (label: string): FieldDef => ({
 /* ------------------------------------------------------- effect modifiers ------ */
 
 /**
- * What an effect does: `EffectModifierSchema`, a different union from `FeatureModifierSchema`
- * (they share only `attack-bonus`, `extra-damage` and `roll-mode`; `speed` exists in both but is
- * baked at build time for features and summed live for effects).
- *
- * Offered subset:
- * - `roll-mode` covers the single-direction advantage/disadvantage variants, which normalise to it.
- * - `attack-advantage` applies only on the bearer's own turn (Reckless Attack), so it is distinct
- *   from `roll-mode`; `incoming-attack-advantage` is its paired cost.
- * - `damage-bonus` is not offered: with no type it has no rider equivalent and is inert on an item.
- * - `speed` is read live by `effectiveSpeedFeet`; on an item it becomes a standing rider whose speed
- *   nothing reads, so the item gets a note.
- *
- * No `when` list: a live effect's modifiers are never gated, while an item's would be, so a gate
- * would behave differently per carrier.
+ * What an effect does: the same `ModifierSchema` as a feature's or an item's modifiers, gated the same way, read
+ * by the same evaluator. An effect refuses what the sheet stores (`EFFECT_REFUSED_MODIFIER_TYPES`), and this
+ * form offers the subset an effect is usually written with:
+ * - `roll-mode` for advantage or disadvantage on a named roll (Reckless Attack, Dodge, Rage's Strength checks
+ *   with an "Only for…" ability line).
+ * - `damage-resistance` and `damage-vulnerability`.
+ * - `speed`, summed live and given back when the effect ends.
  */
 const EFFECT_MODIFIER_TYPES: readonly SelectOption[] = [
   ROLLS("roll-mode", "Advantage or disadvantage"),
-  ROLLS("attack-advantage", "Advantage on your attacks, on your turn"),
-  ROLLS("incoming-attack-advantage", "Attacks against you have advantage"),
   HARM("damage-resistance", "Resistance to damage"),
+  HARM("damage-vulnerability", "Vulnerability to damage"),
   SELF("speed", "Speed")
 ];
 
@@ -1151,6 +1135,7 @@ function blankEffectModifier(type: string): Draft {
     case "roll-mode":
       return { type, roll: "attack", mode: "advantage" };
     case "damage-resistance":
+    case "damage-vulnerability":
       return { type, damageTypes: [] };
     case "speed":
       return { type, amount: 10 };
@@ -1159,7 +1144,7 @@ function blankEffectModifier(type: string): Draft {
   }
 }
 
-const effectModifiersField = (scope: RiderScope): FieldDef => ({
+const effectModifiersField = (): FieldDef => ({
   key: "modifiers",
   label: "What it does",
   kind: "rows",
@@ -1208,8 +1193,7 @@ const effectModifiersField = (scope: RiderScope): FieldDef => ({
       visibleWhen: hasType("roll-mode"),
       help: "Disadvantage is how a curse bites."
     },
-    /* Same bounds as the build-time `speed` row, signed (Longstrider and the `slow` mastery are one
-       row). On an item nothing reads the result, hence the note. */
+    // Same bounds as the build-time `speed` row, signed (Longstrider and the `slow` mastery are one row).
     {
       key: "amount",
       label: "Amount",
@@ -1219,22 +1203,16 @@ const effectModifiersField = (scope: RiderScope): FieldDef => ({
       max: 60,
       unit: "ft",
       visibleWhen: hasType("speed"),
-      help: "Negative for a curse. The bearer's Speed while this effect lasts, given back when it ends.",
-      ...(scope === "item"
-        ? {
-            note: "Not read on an item — an item's effect becomes a standing rider, and no rule reads a rider's speed. Say it on a feature or a feat instead."
-          }
-        : {})
+      help: "Negative for a curse. The bearer's Speed while this effect lasts, given back when it ends."
     },
-    // Half damage of every type named here.
     {
       key: "damageTypes",
       label: "Damage types",
-      kind: "tags",
-      pick: true,
-      suggestions: (ctx) => ctx.damageTypes,
-      visibleWhen: hasType("damage-resistance")
-    }
+      kind: "multiselect",
+      options: DAMAGE_TYPES,
+      visibleWhen: hasType("damage-resistance", "damage-vulnerability")
+    },
+    whenField()
   ]
 });
 
@@ -1294,7 +1272,7 @@ const effectsField = (scope: RiderScope): FieldDef => ({
     },
     { key: "concentration", label: "Needs concentration", kind: "switch" },
     // Nested `rows`, the same depth `whenField` renders at inside `modifiersField`.
-    effectModifiersField(scope)
+    effectModifiersField()
   ]
 });
 
@@ -1389,8 +1367,9 @@ function GrantsEditor({
   ctx,
   scope
 }: Readonly<{ value: Draft; onChange: (next: Draft) => void; ctx: SchemaContext; scope: RiderScope }>) {
-  const grants = (value.grants ?? {}) as Record<string, unknown>;
-
+  const stored = value.grants;
+  // Memoised on the stored bag, so the rows are rebuilt only when the grants themselves change.
+  const grants = useMemo(() => (stored ?? {}) as Record<string, unknown>, [stored]);
   const rows = useMemo<readonly GrantRow[]>(() => grantRowsOf(grants), [grants]);
 
   // Pass the current bag so keys without rows (e.g. `grants.when`) are preserved.

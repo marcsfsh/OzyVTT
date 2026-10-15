@@ -7,8 +7,8 @@ import {
   type ActorDefinition,
   type EffectInstance,
   type CharacterChoice,
-  type EffectModifier,
-  type HitDie
+  type HitDie,
+  type Modifier
 } from "@vtt/schemas";
 
 export * from "./catalog-choice.js";
@@ -26,16 +26,16 @@ export {
   ActorSchema,
   DeathSavesSchema,
   EffectInstanceSchema,
-  EffectModifierSchema,
   HealthDisplaySchema,
+  ModifierSchema,
   type Actor,
   type ActorDefinition,
   type DeathSaves,
   type EffectInstance,
-  type EffectModifier,
   type HealthDisplay,
   type HealthDisplayAudience,
-  type HealthDisplayStyle
+  type HealthDisplayStyle,
+  type Modifier
 } from "@vtt/schemas";
 /** Re-exported because the client cannot import `@vtt/schemas`; a hand-copied list would drift. */
 export {
@@ -45,9 +45,7 @@ export {
   RiderTriggerSchema,
   RiderWhenSchema,
   riderLayer,
-  toRollModes,
   type ItemSlot,
-  type NormalisedRollMode,
   type RiderTrigger,
   type RiderTriggerKind
 } from "@vtt/schemas";
@@ -1867,7 +1865,7 @@ export interface ClientToServerEvents {
         | { type: "until-source-next-turn" }
         | { type: "encounter" }
         | { type: "manual" };
-      modifiers?: readonly EffectModifier[];
+      modifiers?: readonly Modifier[];
       expectedRevision?: number;
     },
     acknowledgement: (result: MutationResult & { effectId?: string }) => void
