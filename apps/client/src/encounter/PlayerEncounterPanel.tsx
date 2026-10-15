@@ -1,0 +1,388 @@
+import { useEffect, useRef, useState } from "react";
+import {
+  type DeathSaves,
+  type MutationResult,
+  type PlayerEffect,
+  type PlayerPendingReaction,
+  type PlayerPendingSave,
+  type PlayerView
+} from "@vtt/domain";
+import { Button } from "@vtt/ui";
+import { command } from "../lib/command";
+import { MyPendingAsks } from "./RuleAsk";
+import { useTargetingResult } from "./targeting";
+import { useRollPreference } from "../dice/roll-preference";
+import { CharacterSheet } from "./CharacterSheet";
+import { InitiativeRow } from "./InitiativeList";
+import { DockPicker, type DockControl } from "./DockPicker";
+import { SavePrompt } from "./SavePrompt";
+import { ReactionPrompt } from "./ReactionPrompt";
+import { EffectChips } from "./EffectChips";
+import { DyingTracker } from "./DyingTracker";
+import { PlayerActionRunner } from "./PlayerActionRunner";
+import { InitiativePrompt } from "./InitiativePrompt";
+
+/** A player's own pending reaction prompts, with a local feedback line. */
+function OwnReactionPrompts({
+  reactions,
+  actorName,
+  rollMode
+}: Readonly<{ reactions: readonly PlayerPendingReaction[]; actorName: string; rollMode: "auto" | "manual" }>) {
+  const [feedback, setFeedback] = useState("");
+  if (reactions.length === 0 && !feedback) return null;
+  return (
+    <div className="own-save-prompts">
+      {reactions.map((reaction) => (
+        <ReactionPrompt
+          key={reaction.id}
+          reaction={reaction}
+          actorName={actorName}
+          canDismiss={false}
+          onFeedback={setFeedback}
+          rollMode={rollMode}
+        />
+      ))}
+      {feedback && (
+        <p className="save-prompt-outcome" role="status">
+          {feedback}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** A player's own pending saves, with a local feedback line. */
+function OwnSavePrompts({
+  saves,
+  targetName,
+  rollMode
+}: Readonly<{ saves: readonly PlayerPendingSave[]; targetName: string; rollMode: "auto" | "manual" }>) {
+  const [feedback, setFeedback] = useState("");
+  if (saves.length === 0 && !feedback) return null;
+  return (
+    <div className="own-save-prompts">
+      {saves.map((save) => (
+        <SavePrompt
+          key={save.id}
+          save={save}
+          targetName={targetName}
+          canDismiss={false}
+          onFeedback={setFeedback}
+          rollMode={rollMode}
+        />
+      ))}
+      {feedback && (
+        <p className="save-prompt-outcome" role="status">
+          {feedback}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Player-side wrappers with their own feedback lines. */
+function PlayerEffectRow({
+  actorId,
+  effects,
+  isMe
+}: Readonly<{ actorId: string; effects: readonly PlayerEffect[]; isMe: boolean }>) {
+  const [feedback, setFeedback] = useState("");
+  if (effects.length === 0 && !feedback) return null;
+  return (
+    <div className="own-effect-row">
+      <EffectChips actorId={actorId} effects={effects} canEnd={isMe} onFeedback={setFeedback} />
+      {feedback && (
+        <p className="save-prompt-outcome" role="status">
+          {feedback}
+        </p>
+      )}
+    </div>
+  );
+}
+function OwnDyingTracker({
+  actorId,
+  name,
+  deathSaves,
+  rollMode,
+  isActingTurn
+}: Readonly<{
+  actorId: string;
+  name: string;
+  deathSaves: DeathSaves;
+  rollMode: "auto" | "manual";
+  isActingTurn: boolean;
+}>) {
+  const [feedback, setFeedback] = useState("");
+  return (
+    <div className="own-dying">
+      <DyingTracker
+        actorId={actorId}
+        name={name}
+        deathSaves={deathSaves}
+        canRoll
+        onFeedback={setFeedback}
+        rollMode={rollMode}
+        isActingTurn={isActingTurn}
+      />
+      {feedback && (
+        <p className="save-prompt-outcome" role="status">
+          {feedback}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** A player's own economy: Action/Bonus only on their turn; the reaction is markable any time. Pressed = spent. */
+function PlayerTurnEconomy({
+  combat,
+  myId,
+  myTurn,
+  mySpeedFeet
+}: Readonly<{ combat: PlayerView["combat"]; myId: string; myTurn: boolean; mySpeedFeet?: number }>) {
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const emit = (run: () => Promise<MutationResult>, failure: string) => {
+    setBusy(true);
+    void run().then((result) => {
+      setBusy(false);
+      setFeedback(result.ok ? "" : (result.message ?? failure));
+    });
+  };
+  const reactionUsed = combat.reactionsUsed.includes(myId);
+  return (
+    <div className="turn-economy" role="group" aria-label="Your turn resources">
+      {myTurn && (
+        <>
+          <button
+            type="button"
+            className="economy-slot"
+            aria-pressed={combat.turn.actionUsed}
+            disabled={busy}
+            onClick={() =>
+              emit(
+                () => command("turn:use", { slot: "action", used: !combat.turn.actionUsed }),
+                "The action could not be updated."
+              )
+            }
+          >
+            Action
+          </button>
+          <button
+            type="button"
+            className="economy-slot"
+            aria-pressed={combat.turn.bonusActionUsed}
+            disabled={busy}
+            onClick={() =>
+              emit(
+                () =>
+                  command("turn:use", {
+                    slot: "bonus-action",
+                    used: !combat.turn.bonusActionUsed
+                  }),
+                "The bonus action could not be updated."
+              )
+            }
+          >
+            Bonus
+          </button>
+        </>
+      )}
+      <button
+        type="button"
+        className="economy-slot"
+        aria-pressed={reactionUsed}
+        disabled={busy}
+        title="Reactions refresh when your turn starts"
+        onClick={() =>
+          emit(
+            () => command("turn:use-reaction", { actorId: myId, used: !reactionUsed }),
+            "The reaction could not be updated."
+          )
+        }
+      >
+        Reaction
+      </button>
+      {myTurn && mySpeedFeet !== undefined && (
+        <span className="economy-movement" title="Movement spent this turn / base walking speed">
+          Move {Math.round(combat.turn.movementUsedFeet)}/{mySpeedFeet} ft
+        </span>
+      )}
+      {myTurn && (
+        <button
+          type="button"
+          className="encounter-primary turn-end"
+          disabled={busy}
+          onClick={() => emit(() => command("turn:end", {}), "The turn could not end.")}
+        >
+          End turn
+        </button>
+      )}
+      {feedback && (
+        <span className="economy-feedback" role="status">
+          {feedback}
+        </span>
+      )}
+    </div>
+  );
+}
+
+export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerView; dock?: DockControl }>) {
+  const { combat } = state;
+  const myId = state.actors.find((actor) => "claimStatus" in actor && actor.claimStatus === "mine")?.id ?? null;
+  // Bring the active combatant's row into view when the turn advances.
+  const activeRowRef = useRef<HTMLLIElement | null>(null);
+  useEffect(() => {
+    activeRowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [combat.turnActorId]);
+  // Toggle this panel between the turn order and the player's own sheet, which carries live state
+  // and combat context so its actions resolve as real attacks.
+  const [view, setView] = useState<"initiative" | "sheet">("initiative");
+  // The shared per-browser dice-input preference.
+  const { rollMode, bonusMode } = useRollPreference();
+  // "Jump" sheet-attack mode: an attack tapped on the sheet comes here to pick and confirm, then
+  // returns to the sheet once it commits.
+  const [returnToSheetAfterAttack, setReturnToSheetAfterAttack] = useState(false);
+  const jumpAttackResult = useTargetingResult();
+  useEffect(() => {
+    if (returnToSheetAfterAttack && jumpAttackResult && !jumpAttackResult.preview) {
+      setView("sheet");
+      setReturnToSheetAfterAttack(false);
+    }
+  }, [returnToSheetAfterAttack, jumpAttackResult]);
+  const myActor = state.actors.find((actor) => actor.id === myId) ?? null;
+  if (!combat.active)
+    return (
+      <section className="encounter-panel compact" aria-labelledby="player-initiative-title">
+        <span className="eyebrow">FIGHT</span>
+        <h2 id="player-initiative-title">Waiting for combat</h2>
+        <p>The GM hasn't started a fight yet.</p>
+      </section>
+    );
+  const myTurn = myId !== null && combat.turnActorId === myId;
+  // Rotate the turn order so the acting combatant leads. The player's economy rides their own row.
+  const activeIndex = combat.initiative.findIndex((entry) => entry.active);
+  const orderedInitiative =
+    activeIndex > 0
+      ? [...combat.initiative.slice(activeIndex), ...combat.initiative.slice(0, activeIndex)]
+      : combat.initiative;
+  return (
+    <section className="encounter-panel combat-active" aria-label={`Turn order - round ${combat.round}`}>
+      <div className="encounter-topbar player">
+        <strong className="encounter-round">Round {combat.round}</strong>
+        {/* The only route into the sheet view besides the post-attack jump; the embedded sheet's
+          `onClose` returns to initiative, so this is shown only in the initiative view. */}
+        {myActor && view === "initiative" && (
+          <Button size="sm" variant="secondary" className="player-sheet-door" onClick={() => setView("sheet")}>
+            My sheet
+          </Button>
+        )}
+        {myTurn && (
+          <span className="your-turn-flag" role="status">
+            Your turn - act, then end it below
+          </span>
+        )}
+        {combat.hiddenTurn && !myTurn && (
+          <span className="encounter-quiet-note" role="status">
+            The GM is taking a hidden turn.
+          </span>
+        )}
+        {combat.rewound && (
+          <span className="encounter-quiet-note" role="status">
+            The GM is reviewing an earlier turn.
+          </span>
+        )}
+      </div>
+      {/* Player-rolled initiative: a view-independent prompt, so it cannot be scrolled off or hidden
+        behind the sheet view. Clears once the player rolls. */}
+      {myId !== null && (combat.pendingInitiative ?? []).includes(myId) && <InitiativePrompt actorId={myId} />}
+      {/* Questions this player has waiting, pinned above the region like the roll prompt. */}
+      <MyPendingAsks state={state} />
+      {/* The tracker's scroll region: the turn order scrolls here instead of growing the surface.
+        The topbar and roll prompt stay pinned above it. */}
+      <div className={`encounter-region scroll-y${view === "sheet" ? " is-sheet" : ""}`}>
+        {view === "sheet" && myActor ? (
+          <CharacterSheet
+            actor={myActor}
+            role="player"
+            state={state}
+            embedded
+            combat={{
+              revision: state.revision,
+              active: combat.active,
+              myTurn,
+              playerDamageMode: combat.playerDamageMode,
+              targets: combat.initiative.map((initiativeEntry) => ({
+                actorId: initiativeEntry.actorId,
+                name: initiativeEntry.name
+              }))
+            }}
+            onJumpToInitiative={() => {
+              setView("initiative");
+              setReturnToSheetAfterAttack(true);
+            }}
+            onClose={() => setView("initiative")}
+          />
+        ) : (
+          <ol className="initiative-list player">
+            {orderedInitiative.map((entry) => {
+              const isMe = entry.actorId === myId;
+              const rowActor = state.actors.find((actor) => actor.id === entry.actorId);
+              const mySaves = isMe ? combat.pendingSaves.filter((save) => save.targetActorId === entry.actorId) : [];
+              return (
+                <li
+                  key={entry.actorId}
+                  ref={entry.active ? activeRowRef : undefined}
+                  className={`${entry.active ? "active" : ""}${isMe ? " you" : ""}`.trim()}
+                  aria-current={entry.active ? "step" : undefined}
+                >
+                  {/* The row shared with the shared-screen viewer, so the two lists never drift. */}
+                  <InitiativeRow entry={entry} self={isMe} />
+                  {isMe && myId !== null && (
+                    <PlayerTurnEconomy combat={combat} myId={myId} myTurn={myTurn} mySpeedFeet={rowActor?.speedFeet} />
+                  )}
+                  {/* On your turn, the interactive action console. */}
+                  {isMe && myTurn && myId !== null && rowActor?.definition && (
+                    <PlayerActionRunner
+                      actorId={myId}
+                      definition={rowActor.definition}
+                      revision={state.revision}
+                      rollMode={rollMode}
+                      bonusMode={bonusMode}
+                      playerDamageMode={combat.playerDamageMode}
+                      targets={combat.initiative.map((initiativeEntry) => ({
+                        actorId: initiativeEntry.actorId,
+                        name: initiativeEntry.name
+                      }))}
+                    />
+                  )}
+                  {isMe && rowActor && (
+                    <PlayerEffectRow actorId={entry.actorId} effects={rowActor.effects} isMe={isMe} />
+                  )}
+                  {isMe && rowActor && "deathSaves" in rowActor && rowActor.deathSaves && (
+                    <OwnDyingTracker
+                      actorId={entry.actorId}
+                      name={entry.name}
+                      deathSaves={rowActor.deathSaves}
+                      rollMode={rollMode}
+                      isActingTurn={myTurn}
+                    />
+                  )}
+                  {isMe && <OwnSavePrompts saves={mySaves} targetName={entry.name} rollMode={rollMode} />}
+                  {isMe && (
+                    <OwnReactionPrompts
+                      reactions={combat.pendingReactions.filter((reaction) => reaction.actorId === entry.actorId)}
+                      actorName={entry.name}
+                      rollMode={rollMode}
+                    />
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </div>
+      <DockPicker dock={dock} />
+    </section>
+  );
+}

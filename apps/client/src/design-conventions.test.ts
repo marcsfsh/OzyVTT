@@ -60,8 +60,12 @@ const GLYPH = /[←-⇿⌀-⏿■-◿☀-➿⬀-⯿]|\p{Extended_Pictographic}/g
 const GLYPH_ALLOW: ReadonlyArray<readonly [file: string, glyphs: string]> = [
   ["apps/client/src/encounter/ActionRunner.tsx", "→↻▴▾⚠✕✦"],
   ["apps/client/src/encounter/CharacterSheet.tsx", "↑→✕"],
-  ["apps/client/src/encounter/EncounterPanel.tsx", "→▦▶◧◨✕⭐"],
+  ["apps/client/src/encounter/DockPicker.tsx", "▦◧◨"],
+  ["apps/client/src/encounter/GmEncounterPanel.tsx", "→▶⭐"],
   ["apps/client/src/encounter/InitiativeList.tsx", "▶"],
+  ["apps/client/src/encounter/PendingDamagePrompt.tsx", "✕"],
+  ["apps/client/src/encounter/PlayerActionRunner.tsx", "✕"],
+  ["apps/client/src/encounter/ReactionPrompt.tsx", "✕"],
   ["apps/client/src/encounter/RollControls.tsx", "✕"],
   ["apps/client/src/integrations/ApiReference.tsx", "✓⬇"],
   ["apps/client/src/integrations/IntegrationsPanel.tsx", "🔌"],
@@ -167,7 +171,7 @@ const RAW_SEARCH_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = 
  */
 const RAW_NUMBER_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
   ["apps/client/src/encounter/CharacterSheet.tsx", 3],
-  ["apps/client/src/encounter/EncounterPanel.tsx", 2],
+  ["apps/client/src/encounter/GmEncounterPanel.tsx", 2],
   ["apps/client/src/scene/TokenContextMenu.tsx", 1],
   // Two on one line (the X and Y of a calibration point) plus the focus-zoom field.
   ["apps/client/src/viewer/ViewerControls.tsx", 3]
@@ -417,8 +421,10 @@ const FEEDBACK = /\bset(?:Message|Feedback)\s*\(/g;
 const FEEDBACK_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
   ["apps/client/src/dice/DicePanel.tsx", 7],
   ["apps/client/src/encounter/CharacterSheet.tsx", 8],
-  ["apps/client/src/encounter/EncounterPanel.tsx", 17],
+  ["apps/client/src/encounter/GmEncounterPanel.tsx", 14],
+  ["apps/client/src/encounter/InitiativePrompt.tsx", 2],
   ["apps/client/src/encounter/MonsterBrowser.tsx", 1],
+  ["apps/client/src/encounter/PlayerEncounterPanel.tsx", 1],
   ["apps/client/src/integrations/IntegrationsPanel.tsx", 9],
   ["apps/client/src/scene/EncounterMap.tsx", 14],
   ["apps/client/src/scene/TokenContextMenu.tsx", 6],

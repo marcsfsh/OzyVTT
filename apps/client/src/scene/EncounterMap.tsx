@@ -44,7 +44,7 @@ import {
   useTargetingBusy
 } from "../encounter/targeting";
 import { TokenContextMenu } from "./TokenContextMenu";
-import type { DockPosition } from "../encounter/EncounterPanel";
+import type { DockPosition } from "../encounter/DockPicker";
 import { command } from "../lib/command";
 import "./encounter-map.css";
 

@@ -19,7 +19,7 @@ import {
   IconSearch,
   IconSelect
 } from "@vtt/ui";
-import type { DockPosition } from "../encounter/EncounterPanel";
+import type { DockPosition } from "../encounter/DockPicker";
 
 /**
  * The map toolbar. Always visible: the constant tools (Select · Ping · Measure) and three labelled

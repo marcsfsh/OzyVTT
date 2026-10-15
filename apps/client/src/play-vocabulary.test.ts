@@ -95,11 +95,11 @@ const LEGITIMATE: ReadonlyArray<readonly [file: string, text: string, why: strin
   ["apps/client/src/scene/MapToolbar.tsx", "Reveal the whole map", "fog: Reveal/Hide are in-fight verbs D28 keeps"],
   ["apps/client/src/scene/MapToolbar.tsx", "Hide the whole map again", "fog: the Hide half"],
   [
-    "apps/client/src/encounter/EncounterPanel.tsx",
+    "apps/client/src/encounter/InitiativePrompt.tsx",
     "Initiative d20",
     "Initiative the SCORE keeps its D&D name; only the LIST is “Turn order”"
   ],
-  ["apps/client/src/encounter/EncounterPanel.tsx", "Saving throw for $", "Save the THROW, not the persist verb"],
+  ["apps/client/src/encounter/SavePrompt.tsx", "Saving throw for $", "Save the THROW, not the persist verb"],
   ["apps/client/src/actors/ClaimCharacter.tsx", "Claim", "the table's claim verb"],
   ["apps/client/src/actors/MyCharacter.tsx", "Release", "the table's release verb — never “Leave”"]
 ];
@@ -149,7 +149,7 @@ describe("The play glossary (D28)", () => {
     );
     expect(
       at(
-        "apps/client/src/encounter/EncounterPanel.tsx",
+        "apps/client/src/encounter/GmEncounterPanel.tsx",
         "Turn order stays saved for reference, but the shared screen will hide it."
       ),
       "object-literal confirm body"

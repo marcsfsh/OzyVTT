@@ -11,7 +11,7 @@ vi.mock("../socket", () => {
   return { socket: { on: vi.fn(), off: vi.fn(), emit, connected: true, timeout: () => timed } };
 });
 
-import { placeFightMenu } from "./EncounterPanel";
+import { placeFightMenu } from "./FightMenu";
 
 /**
  * Where the ⋯ fight menu lands. The rects are real ones read off the running app at each viewport.

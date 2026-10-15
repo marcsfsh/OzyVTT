@@ -30,7 +30,7 @@ import { SpellCard, useSpellReference } from "./spells";
 import { RichText } from "./RichText";
 import { DicePanel } from "../dice/DicePanel";
 import { useRollPreference } from "../dice/roll-preference";
-import { PlayerActionRunner, summaryOfOwnAction } from "./EncounterPanel";
+import { PlayerActionRunner, summaryOfOwnAction } from "./PlayerActionRunner";
 import { beginTargeting, setTargetingResult, useTargeting } from "./targeting";
 import { usePrompt } from "../components/feedback";
 import { newId } from "../lib/ids";

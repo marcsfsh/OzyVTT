@@ -16,7 +16,7 @@ vi.mock("../socket", () => {
 });
 
 import { socket } from "../socket";
-import { SavePrompt } from "./EncounterPanel";
+import { SavePrompt } from "./SavePrompt";
 
 /**
  * The save prompt's damage field reaches the wire through the shared payload builder. The hit-point
