@@ -123,7 +123,7 @@ mis-encoded into a rider that means something else:
 
 - **Weapon Mastery** (Fighter level 1). The pick is real and lands in the choice ledger, but
   the eight mastery properties (Cleave, Graze, Nick, Push, Sap, Slow, Topple, Vex) are combat
-  behaviors with no counterpart in `EffectModifier`/`onHit`, and the SRD's per-weapon mastery
+  behaviors with no counterpart in `Modifier`/`onHit`, and the SRD's per-weapon mastery
   column is not in the vendored fixtures. The chosen weapons are provenance and display only.
 - **Potent Spellcasting** (Cleric Blessed Strikes) — "add your Wisdom modifier to Cleric cantrip
   damage": `damage-bonus` carries a flat integer for weapon attacks, not an ability-derived
