@@ -7,6 +7,7 @@ import { DamageTypeField } from "../encounter/DamageTypeField";
 import { manualDamagePayload, manualDamageType } from "../encounter/manual-damage";
 import { command } from "../lib/command";
 import { TokenLibrary } from "../tokens/TokenLibrary";
+import { titleCase } from "../encounter/format";
 
 type Actor = GmActor | PlayerActor;
 
@@ -153,7 +154,6 @@ export function TokenContextMenu({
     });
   };
   const SIZES = ["tiny", "small", "medium", "large", "huge", "gargantuan"] as const;
-  const cap = (value: string) => `${value[0].toUpperCase()}${value.slice(1)}`;
   const currentSize =
     actor.size ??
     (actor.sizeCells === 4
@@ -233,7 +233,7 @@ export function TokenContextMenu({
           <select value={currentSize} disabled={busy} onChange={(event) => setSize(event.target.value)}>
             {SIZES.map((size) => (
               <option key={size} value={size}>
-                {cap(size)}
+                {titleCase(size)}
               </option>
             ))}
           </select>

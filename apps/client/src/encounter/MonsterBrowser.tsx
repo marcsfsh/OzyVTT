@@ -2,15 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ContentMonsterSummary } from "@vtt/domain";
 import { Modal, Input } from "@vtt/ui";
 import { command, read } from "../lib/command";
-
-/** CR display matches the books: fractional ratings render as 1/8, 1/4, 1/2. */
-const formatChallenge = (rating: number) => {
-  if (rating === 0.125) return "1/8";
-  if (rating === 0.25) return "1/4";
-  if (rating === 0.5) return "1/2";
-  return String(rating);
-};
-const titleCase = (value: string) => (value.length ? `${value[0].toUpperCase()}${value.slice(1)}` : value);
+import { formatChallenge, titleCase } from "./format";
 
 /**
  * The bestiary browser. It adds monsters; visibility comes from the staging tray (`visibility`),

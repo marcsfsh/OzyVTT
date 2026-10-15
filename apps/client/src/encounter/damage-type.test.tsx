@@ -17,7 +17,7 @@ vi.mock("../socket", () => {
 import { socket } from "../socket";
 import { TokenContextMenu } from "../scene/TokenContextMenu";
 import { EncounterPanel } from "./EncounterPanel";
-import { SheetHpControls } from "./CharacterSheet";
+import { SheetHpControls } from "./SheetVitals";
 import { ApplyDamageSchema } from "../../../server/src/game-commands";
 
 /**

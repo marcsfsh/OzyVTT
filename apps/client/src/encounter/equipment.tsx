@@ -3,6 +3,7 @@ import type { ContentEquipmentSummary } from "@vtt/domain";
 import { Input, Modal } from "@vtt/ui";
 import { read } from "../lib/command";
 import { registerContentCache } from "../content/invalidate";
+import { titleCase } from "./format";
 
 /**
  * One shared, session-cached fetch of the equipment catalog, so every sheet browses the same list.
@@ -65,7 +66,6 @@ export function inventoryWeaponFrom(weapon: NonNullable<ContentEquipmentSummary[
   };
 }
 
-const titleCase = (value: string) => (value.length ? `${value[0].toUpperCase()}${value.slice(1)}` : value);
 const categoryLabel = (category: string) => category.split("-").map(titleCase).join(" ");
 
 /** The picker's filter groups, each folding one or more catalog categories. */

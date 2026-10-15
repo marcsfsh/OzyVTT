@@ -3,6 +3,7 @@ import { usePrompt } from "../components/feedback";
 import type { ContentActionSummary, GmActor, GmView } from "@vtt/domain";
 import { Button } from "@vtt/ui";
 import { RichText } from "./RichText";
+import { signed } from "./format";
 import { SpellcastingText } from "./spells";
 import {
   beginTargeting,
@@ -44,7 +45,6 @@ const isTargetless = (action: ContentActionSummary) =>
   action.damage.length === 0 &&
   action.targeting !== "single" &&
   (action.grants || action.multiattack !== null || action.usesLimit !== null || action.builtin === true);
-const signed = (value: number) => (value >= 0 ? `+${value}` : String(value));
 const tagLabel = (tag: string) =>
   tag
     .split("-")

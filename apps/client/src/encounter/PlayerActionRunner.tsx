@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { type ActorDefinition, type ContentActionSummary } from "@vtt/domain";
 import { Button } from "@vtt/ui";
 import { AskTheGmPrompt } from "./RuleAsk";
+import { signed } from "./format";
 import {
   beginTargeting,
   clearTargeting,
@@ -43,12 +44,11 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
     reaction: action.reaction ?? null
   };
 }
-const signedBonus = (value: number) => (value >= 0 ? `+${value}` : String(value));
 function ownActionSummaryParts(action: ContentActionSummary): string[] {
   const parts: string[] = [];
   if (action.attackBonus !== null)
     parts.push(
-      `${signedBonus(action.attackBonus)} to hit${action.reachFeet ? `, reach ${action.reachFeet} ft` : action.rangeFeet ? `, range ${action.rangeFeet} ft` : ""}`
+      `${signed(action.attackBonus)} to hit${action.reachFeet ? `, reach ${action.reachFeet} ft` : action.rangeFeet ? `, range ${action.rangeFeet} ft` : ""}`
     );
   if (action.attackCount !== null && action.attackCount > 1) parts.push(`${action.attackCount} attacks`);
   if (action.saveAbility !== null) parts.push(`DC ${action.saveDc} ${action.saveAbility.toUpperCase()} save`);
