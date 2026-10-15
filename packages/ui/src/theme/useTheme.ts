@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { applyTheme, getStoredTheme, THEMES, type Theme } from "./theme";
 
-export interface UseThemeResult {
+interface UseThemeResult {
   theme: Theme;
   setTheme: (theme: Theme) => void;
   /** Advance dark → dusk → light → dark. */

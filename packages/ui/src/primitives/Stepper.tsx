@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { cx } from "./util";
 import "./Stepper.css";
 
-export interface StepperProps {
+interface StepperProps {
   value: number;
   onChange: (value: number) => void;
   min?: number;

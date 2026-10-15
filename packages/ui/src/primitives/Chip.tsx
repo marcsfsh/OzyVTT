@@ -5,7 +5,7 @@ import "./Chip.css";
 
 export type ChipTone = "neutral" | "harmful" | "beneficial" | "magical" | "info";
 
-export interface ChipProps {
+interface ChipProps {
   tone?: ChipTone;
   /** Short glyph/icon so the category reads without relying on color. */
   icon?: ReactNode;

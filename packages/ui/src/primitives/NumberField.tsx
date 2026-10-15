@@ -3,7 +3,7 @@ import { cx } from "./util";
 import { Input } from "./forms";
 import "./NumberField.css";
 
-export interface NumberFieldProps {
+interface NumberFieldProps {
   value: number | null;
   onChange: (next: number | null) => void;
   min?: number;

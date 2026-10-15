@@ -4,7 +4,7 @@ import { cx } from "./util";
 import { IconChevron } from "./icons";
 import "./Menu.css";
 
-export interface MenuProps {
+interface MenuProps {
   /** Trigger content (label and/or icon). */
   trigger: ReactNode;
   children: ReactNode;
@@ -126,7 +126,7 @@ export function Menu({
   );
 }
 
-export interface MenuItemProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface MenuItemProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon?: ReactNode;
   tone?: "default" | "danger";
 }

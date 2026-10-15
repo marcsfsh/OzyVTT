@@ -16,7 +16,7 @@ export interface FeatureItem {
   defaultOpen?: boolean;
 }
 
-export interface FeatureListProps {
+interface FeatureListProps {
   items: readonly FeatureItem[];
   /** Controlled mode: the ids currently open. Omit to let the list manage itself. */
   openIds?: readonly string[];

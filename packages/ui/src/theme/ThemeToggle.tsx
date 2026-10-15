@@ -11,7 +11,7 @@ const THEME_META: Record<Theme, { label: string; icon: ReactNode }> = {
   light: { label: "Light", icon: <IconThemeLight /> }
 };
 
-export interface ThemeToggleProps {
+interface ThemeToggleProps {
   /** Icons only, for tight headers. */
   compact?: boolean;
   className?: string;

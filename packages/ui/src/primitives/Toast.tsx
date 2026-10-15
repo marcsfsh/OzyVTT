@@ -5,7 +5,7 @@ import { IconCheck, IconInfo, IconWarning, IconX } from "./icons";
 import "./Toast.css";
 
 export type ToastTone = "success" | "error" | "info";
-export interface ToastOptions {
+interface ToastOptions {
   tone?: ToastTone;
   /** Milliseconds before auto-dismiss; 0 keeps it until dismissed. */
   duration?: number;
@@ -15,7 +15,7 @@ interface ToastRecord {
   message: ReactNode;
   tone: ToastTone;
 }
-export interface ToastApi {
+interface ToastApi {
   toast: (message: ReactNode, options?: ToastOptions) => void;
   /** Client-local notification mute (per browser, persisted). While true, toast() is a no-op. */
   muted: boolean;

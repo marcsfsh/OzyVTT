@@ -6,7 +6,7 @@ import { Menu, MenuItem } from "./Menu";
 import { IconChevron, IconDrag, IconPlus, IconTrash } from "./icons";
 import "./RowEditor.css";
 
-export interface RowEditorProps<T> {
+interface RowEditorProps<T> {
   rows: readonly T[];
   onChange: (next: readonly T[]) => void;
   /** Stable id, never the array index (see the component note). */

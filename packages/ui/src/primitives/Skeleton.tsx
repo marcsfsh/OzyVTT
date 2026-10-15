@@ -1,7 +1,7 @@
 import { cx } from "./util";
 import "./Skeleton.css";
 
-export interface SkeletonProps {
+interface SkeletonProps {
   /** text = a line, block = a rectangle, circle = an avatar/thumbnail placeholder. */
   variant?: "text" | "block" | "circle";
   width?: string;

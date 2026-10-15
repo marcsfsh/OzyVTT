@@ -11,12 +11,12 @@ import "./MarkdownEditor.css";
  * viewer-safe renderer out of the design system.
  */
 
-export interface MarkdownSuggestion {
+interface MarkdownSuggestion {
   id: string;
   label: string;
 }
 
-export interface MarkdownEditorProps {
+interface MarkdownEditorProps {
   value: string;
   onChange: (next: string) => void;
   ariaLabel: string;

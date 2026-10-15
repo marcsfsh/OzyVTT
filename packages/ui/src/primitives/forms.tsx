@@ -3,7 +3,7 @@ import { cx } from "./util";
 import { IconWarning } from "./icons";
 import "./forms.css";
 
-export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   invalid?: boolean;
   /** `title` is the borderless display-face field a record's own name is typed into; the well appears only on
       hover/focus so it reads as a heading. */
@@ -25,7 +25,7 @@ export function Input({ invalid, variant = "default", className, ...rest }: Inpu
   );
 }
 
-export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
+interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   invalid?: boolean;
   ref?: Ref<HTMLSelectElement>;
 }
@@ -41,7 +41,7 @@ export function Select({ invalid, className, children, ...rest }: SelectProps) {
   );
 }
 
-export interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
+interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   invalid?: boolean;
   ref?: Ref<HTMLTextAreaElement>;
 }
@@ -55,7 +55,7 @@ export function Textarea({ invalid, className, ...rest }: TextareaProps) {
   );
 }
 
-export interface FieldProps {
+interface FieldProps {
   label?: ReactNode;
   htmlFor?: string;
   /** Helper text shown below the control when there's no error. */

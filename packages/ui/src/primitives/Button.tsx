@@ -3,10 +3,10 @@ import { cx } from "./util";
 import { IconArrow } from "./icons";
 import "./Button.css";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive";
-export type ButtonSize = "sm" | "md";
+type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive";
+type ButtonSize = "sm" | "md";
 
-export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;
   /** Stretch to the container width. */
@@ -52,7 +52,7 @@ export function Button({
   );
 }
 
-export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /** Accessible name; required because icon-only buttons have no text. */
   label: string;
   size?: ButtonSize;

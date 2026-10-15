@@ -22,7 +22,7 @@ export interface ChoiceOption {
   keywords?: string;
 }
 
-export interface ChoiceGridProps {
+interface ChoiceGridProps {
   options: readonly ChoiceOption[];
   /** Single-select answer. Ignored (pass null) when `selection` is "multiple". */
   value: string | null;

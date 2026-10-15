@@ -4,7 +4,7 @@ import "./Panel.css";
 
 export type PanelAccent = "none" | "magenta" | "cyan" | "violet";
 
-export interface PanelProps extends HTMLAttributes<HTMLElement> {
+interface PanelProps extends HTMLAttributes<HTMLElement> {
   /** Optional 2px top hairline labelling the panel kind (magenta = combat,
       cyan = notes/info, violet = special). Used sparingly and consistently. */
   accent?: PanelAccent;
@@ -48,7 +48,7 @@ export function Panel({
   );
 }
 
-export interface PanelHeaderProps {
+interface PanelHeaderProps {
   title: ReactNode;
   eyebrow?: ReactNode;
   /** Right-aligned controls (buttons, menus). */

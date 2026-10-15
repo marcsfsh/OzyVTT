@@ -3,7 +3,7 @@ import { cx } from "./util";
 import { IconX } from "./icons";
 import "./Combobox.css";
 
-export interface ComboboxOption {
+interface ComboboxOption {
   id: string;
   label: string;
   /** Optional leading glyph — an entity icon, a kind mark. Purely decorative; the label names it. */
@@ -12,7 +12,7 @@ export interface ComboboxOption {
   meta?: string;
 }
 
-export interface ComboboxProps {
+interface ComboboxProps {
   options: readonly ComboboxOption[];
   /** The chosen option's id, or null. A chosen value renders as a removable chip, not as typed text. */
   value: string | null;
