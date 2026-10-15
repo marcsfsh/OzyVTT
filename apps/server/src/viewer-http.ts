@@ -1,7 +1,7 @@
-import { randomUUID } from "node:crypto";
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
-import { API_VERSION } from "@vtt/api-contract";
+import { bearerToken, cookie, pathParam, sendFailure, sendInternalError, sendViewerData } from "./http-kit.js";
+import { InvalidRequestError } from "./invalid-request.js";
 import { ViewerAccessDeniedError, ViewerPairingRateLimitError, type ViewerAccessStore } from "./viewer-access.js";
 import type { ViewerCoordinator } from "./viewer-coordinator.js";
 import { ViewerRevisionConflictError, type ViewerCommand } from "./viewer-presentation.js";
@@ -93,80 +93,25 @@ type ViewerRouterOptions = Readonly<{
   now?: () => number;
 }>;
 
-function bearer(request: Request) {
-  const value = request.header("authorization");
-  return value?.startsWith("Bearer ") ? value.slice(7) : undefined;
-}
-
-function cookies(request: Request) {
-  return Object.fromEntries(
-    (request.header("cookie") ?? "").split(";").flatMap((part) => {
-      const separator = part.indexOf("=");
-      if (separator < 1) return [];
-      return [[part.slice(0, separator).trim(), decodeURIComponent(part.slice(separator + 1).trim())]];
-    })
-  );
-}
-
 function viewerToken(request: Request) {
-  return bearer(request) ?? cookies(request).vtt_viewer_session;
+  return bearerToken(request) ?? cookie(request, "vtt_viewer_session");
 }
 
-// ADR-0016: a caller-supplied X-Request-Id is echoed only when it is a UUID v4, so arbitrary caller
-// text never lands in response bodies or logs.
-const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-function requestId(request: Request, response: Response) {
-  const supplied = request.header("x-request-id");
-  const id = supplied && UUID_V4.test(supplied) ? supplied : randomUUID();
-  response.setHeader("x-request-id", id);
-  response.setHeader("cache-control", "no-store");
-  return id;
-}
-
-/** Adds the shared ok/apiVersion/data envelope alongside the existing top-level keys (e.g. `body.pairing`). */
-function success(response: Response, status: number, body: Record<string, unknown>) {
-  return response.status(status).json({ ok: true, apiVersion: API_VERSION, ...body });
-}
-
-function errorResponse(error: unknown, request: Request, response: Response) {
-  const id = requestId(request, response);
-  const status =
-    error instanceof ViewerPairingRateLimitError
-      ? 429
-      : error instanceof ViewerRevisionConflictError
-        ? 409
-        : error instanceof ViewerAccessDeniedError
-          ? 401
-          : error instanceof z.ZodError
-            ? 400
-            : error instanceof Error
-              ? 400
-              : 500;
-  const message =
-    status === 500
-      ? "Viewer request failed."
-      : error instanceof z.ZodError
-        ? "Viewer request body is invalid."
-        : (error as Error).message;
-  // Codes follow the shared ApiErrorCodeSchema vocabulary.
-  const code =
-    status === 401
-      ? "unauthenticated"
-      : status === 409
-        ? "conflict"
-        : status === 429
-          ? "rate_limited"
-          : status === 400
-            ? "validation_failed"
-            : "internal_error";
-  return response.status(status).json({ ok: false, apiVersion: API_VERSION, error: { code, message, requestId: id } });
+function errorResponse(error: unknown, response: Response) {
+  if (error instanceof ViewerPairingRateLimitError) return sendFailure(response, 429, "rate_limited", error.message);
+  if (error instanceof ViewerRevisionConflictError) return sendFailure(response, 409, "conflict", error.message);
+  if (error instanceof ViewerAccessDeniedError) return sendFailure(response, 401, "unauthenticated", error.message);
+  if (error instanceof z.ZodError)
+    return sendFailure(response, 400, "validation_failed", "Viewer request body is invalid.");
+  if (error instanceof InvalidRequestError) return sendFailure(response, 400, "validation_failed", error.message);
+  return sendInternalError(response, error, "Viewer request failed.");
 }
 
 export function createViewerRouter(options: ViewerRouterOptions) {
   const router = Router();
   const now = options.now ?? Date.now;
   const requireGm = (request: Request) => {
-    const token = bearer(request);
+    const token = bearerToken(request);
     if (!options.authorizeGm(token)) throw new ViewerAccessDeniedError("A valid GM session is required.");
     return token;
   };
@@ -182,10 +127,9 @@ export function createViewerRouter(options: ViewerRouterOptions) {
       requireGm(request);
       const input = PairingSchema.parse(request.body);
       const pairing = options.access.createPairingCode(input.ttlMs);
-      requestId(request, response);
-      return success(response, 201, { pairing });
+      return sendViewerData(response, 201, { pairing });
     } catch (error) {
-      return errorResponse(error, request, response);
+      return errorResponse(error, response);
     }
   });
 
@@ -202,35 +146,32 @@ export function createViewerRouter(options: ViewerRouterOptions) {
         "set-cookie",
         `vtt_viewer_session=${encodeURIComponent(result.token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}`
       );
-      requestId(request, response);
-      return success(response, 201, { viewer: result.viewer });
+      return sendViewerData(response, 201, { viewer: result.viewer });
     } catch (error) {
-      return errorResponse(error, request, response);
+      return errorResponse(error, response);
     }
   });
 
   router.get("/api/v1/viewer/access", (request, response) => {
     try {
       requireGm(request);
-      requestId(request, response);
-      return success(response, 200, {
+      return sendViewerData(response, 200, {
         viewers: options.access.list(),
         connections: options.coordinator.activeViewers()
       });
     } catch (error) {
-      return errorResponse(error, request, response);
+      return errorResponse(error, response);
     }
   });
 
   router.delete("/api/v1/viewer/access/:id", (request, response) => {
     try {
       requireGm(request);
-      const viewer = options.access.revoke(request.params.id);
+      const viewer = options.access.revoke(pathParam(request, "id"));
       options.coordinator.disconnectViewerAccess(viewer.id);
-      requestId(request, response);
-      return success(response, 200, { viewer });
+      return sendViewerData(response, 200, { viewer });
     } catch (error) {
-      return errorResponse(error, request, response);
+      return errorResponse(error, response);
     }
   });
 
@@ -244,20 +185,18 @@ export function createViewerRouter(options: ViewerRouterOptions) {
         "set-cookie",
         `vtt_viewer_session=${encodeURIComponent(result.token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}`
       );
-      requestId(request, response);
-      return success(response, 201, { viewer: result.viewer });
+      return sendViewerData(response, 201, { viewer: result.viewer });
     } catch (error) {
-      return errorResponse(error, request, response);
+      return errorResponse(error, response);
     }
   });
 
   router.get("/api/v1/viewer/presentation", (request, response) => {
     try {
-      if (!options.authorizeGm(bearer(request))) requireViewer(request);
-      requestId(request, response);
-      return success(response, 200, { presentation: options.presentation.project(now()) });
+      if (!options.authorizeGm(bearerToken(request))) requireViewer(request);
+      return sendViewerData(response, 200, { presentation: options.presentation.project(now()) });
     } catch (error) {
-      return errorResponse(error, request, response);
+      return errorResponse(error, response);
     }
   });
 
@@ -266,20 +205,18 @@ export function createViewerRouter(options: ViewerRouterOptions) {
       const token = requireGm(request);
       const command = CommandSchema.parse(request.body) as Omit<ViewerCommand, "role">;
       const result = await options.coordinator.executeGm(token, command);
-      requestId(request, response);
-      return success(response, 200, { revision: result.state.revision, duplicate: result.duplicate });
+      return sendViewerData(response, 200, { revision: result.state.revision, duplicate: result.duplicate });
     } catch (error) {
-      return errorResponse(error, request, response);
+      return errorResponse(error, response);
     }
   });
 
   router.get("/api/v1/viewer/events", (request, response) => {
     let disconnect = () => {};
     try {
-      const gmToken = bearer(request);
+      const gmToken = bearerToken(request);
       const isGm = options.authorizeGm(gmToken);
       const token = isGm ? gmToken! : requireViewer(request);
-      requestId(request, response);
       response.setHeader("content-type", "text/event-stream");
       response.setHeader("connection", "keep-alive");
       response.flushHeaders();
@@ -295,7 +232,7 @@ export function createViewerRouter(options: ViewerRouterOptions) {
         disconnect();
       });
     } catch (error) {
-      return errorResponse(error, request, response);
+      return errorResponse(error, response);
     }
   });
 

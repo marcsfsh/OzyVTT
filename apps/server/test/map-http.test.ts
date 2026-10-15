@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import express from "express";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { MapAssetStore } from "../src/map-assets.js";
 import { MapCatalogStore } from "../src/map-catalog.js";
 import { createMapRouter } from "../src/map-http.js";
@@ -50,7 +50,7 @@ async function fixture() {
     catalog.close();
     await rm(directory, { recursive: true, force: true });
   });
-  return { base: `http://127.0.0.1:${address.port}`, input: png(500, 400) };
+  return { base: `http://127.0.0.1:${address.port}`, input: png(500, 400), directory };
 }
 
 function gm(contentType = "application/json") {
@@ -303,5 +303,22 @@ describe("map asset HTTP workflow", () => {
         })
       ).status
     ).not.toBe(200);
+  });
+
+  it("answers a storage fault with a fixed message, never the server's file paths", async () => {
+    const test = await fixture();
+    await rm(join(test.directory, "map-assets"), { recursive: true, force: true });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    const failed = await fetch(`${test.base}/api/v1/map-assets?filename=arena.png`, {
+      method: "POST",
+      headers: gm("image/png"),
+      body: test.input
+    });
+    expect(failed.status).toBe(500);
+    const text = await failed.text();
+    expect(JSON.parse(text).error).toMatchObject({ code: "internal_error", message: "Map request failed." });
+    expect(text).not.toContain(test.directory);
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
   });
 });

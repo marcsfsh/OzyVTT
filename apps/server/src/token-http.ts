@@ -1,7 +1,6 @@
-import { randomUUID } from "node:crypto";
 import express, { Router, type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
-import { API_VERSION } from "@vtt/api-contract";
+import { apiErrorHandler, bearerToken, cookie, pathParam, sendData, sendFailure, sendRefusal } from "./http-kit.js";
 import type { MapAssetMetadata, MapAssetStore } from "./map-assets.js";
 import type { TokenCatalogEntry, TokenCatalogStore } from "./token-catalog.js";
 
@@ -19,6 +18,7 @@ const PLAYER_UPLOAD_FOLDER = "Player uploads";
  *  each file; this bounds the count so a phone can't fill the disk. In-memory, so a restart resets it. */
 const PLAYER_UPLOADS_PER_DAY = 20;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const FAULT = "Token request failed.";
 
 type TokenRouterOptions = Readonly<{
   assets: MapAssetStore;
@@ -31,36 +31,9 @@ type TokenRouterOptions = Readonly<{
   now?: () => number;
 }>;
 
-function bearer(request: Request) {
-  return request.header("authorization")?.match(/^Bearer\s+([^\s]+)$/i)?.[1];
-}
-function viewerCookie(request: Request) {
-  for (const part of (request.header("cookie") ?? "").split(";")) {
-    const separator = part.indexOf("=");
-    if (separator > 0 && part.slice(0, separator).trim() === "vtt_viewer_session")
-      return decodeURIComponent(part.slice(separator + 1).trim());
-  }
-  return undefined;
-}
-/** ADR-0016: echo a caller's X-Request-Id only when it is a UUID v4, replace anything else. */
-const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-function requestId(request: Request, response: Response) {
-  const supplied = request.header("x-request-id");
-  const id = supplied && UUID_V4.test(supplied) ? supplied : randomUUID();
-  response.setHeader("x-request-id", id);
-  response.setHeader("cache-control", "no-store");
-  return id;
-}
-function success(response: Response, status: number, data: unknown) {
-  return response.status(status).json({ ok: true, apiVersion: API_VERSION, data });
-}
-function failure(request: Request, response: Response, status: number, code: string, message: string) {
-  const id = response.getHeader("x-request-id")?.toString() ?? requestId(request, response);
-  return response.status(status).json({ ok: false, apiVersion: API_VERSION, error: { code, message, requestId: id } });
-}
 function tokenId(request: Request) {
-  const id = request.params.id;
-  return typeof id === "string" && TOKEN_ID.test(id) ? id : null;
+  const id = pathParam(request, "id");
+  return TOKEN_ID.test(id) ? id : null;
 }
 function publicToken(metadata: MapAssetMetadata, entry: TokenCatalogEntry) {
   return {
@@ -82,28 +55,24 @@ function publicToken(metadata: MapAssetMetadata, entry: TokenCatalogEntry) {
  *  presented token for a viewer). Mounted before the /api/v1 catch-all. */
 export function createTokenRouter(options: TokenRouterOptions) {
   const router = Router();
-  router.use((request, response, next) => {
-    requestId(request, response);
-    next();
-  });
   const requireGm = (request: Request, response: Response, next: NextFunction) => {
-    if (!options.authorizeGm(bearer(request)))
-      return failure(request, response, 401, "unauthenticated", "A valid GM session is required.");
+    if (!options.authorizeGm(bearerToken(request)))
+      return sendFailure(response, 401, "unauthenticated", "A valid GM session is required.");
     next();
   };
   const canReadContent = (request: Request, assetId: string) => {
-    const token = bearer(request);
+    const token = bearerToken(request);
     return (
       options.authorizeGm(token) ||
       options.authorizePlayer(token, assetId) ||
-      options.authorizeViewer(viewerCookie(request), assetId)
+      options.authorizeViewer(cookie(request, "vtt_viewer_session"), assetId)
     );
   };
 
   /** A player may upload their own character's token. The GM keeps every management route; a player gets
    *  only this upload and the browse list, with uploads landing in one folder the GM can curate. */
   const requireGmOrPlayer = (request: Request, response: Response, next: NextFunction) => {
-    const token = bearer(request);
+    const token = bearerToken(request);
     if (options.authorizeGm(token)) {
       response.locals.tokenPrincipal = { role: "gm" };
       return next();
@@ -113,7 +82,7 @@ export function createTokenRouter(options: TokenRouterOptions) {
       response.locals.tokenPrincipal = { role: "player", sessionId: player.sessionId };
       return next();
     }
-    return failure(request, response, 401, "unauthenticated", "A valid GM or player session is required.");
+    return sendFailure(response, 401, "unauthenticated", "A valid GM or player session is required.");
   };
   const principalOf = (response: Response) =>
     response.locals.tokenPrincipal as { role: "gm" } | { role: "player"; sessionId: string };
@@ -138,8 +107,7 @@ export function createTokenRouter(options: TokenRouterOptions) {
       try {
         const principal = principalOf(response);
         if (principal.role === "player" && !withinUploadCap(principal.sessionId)) {
-          return failure(
-            request,
+          return sendFailure(
             response,
             429,
             "rate_limited",
@@ -147,7 +115,7 @@ export function createTokenRouter(options: TokenRouterOptions) {
           );
         }
         if (!Buffer.isBuffer(request.body))
-          return failure(request, response, 400, "validation_failed", "Upload the image as the request body.");
+          return sendFailure(response, 400, "validation_failed", "Upload the image as the request body.");
         const filename = typeof request.query.filename === "string" ? request.query.filename : "token";
         const name = typeof request.query.name === "string" ? request.query.name : filename.replace(/\.[^.]+$/, "");
         // A player does not choose the folder: their uploads land on one shelf the GM can curate.
@@ -160,18 +128,12 @@ export function createTokenRouter(options: TokenRouterOptions) {
         // The same validation as map assets: real image, real dimensions, content-hash dedupe.
         const imported = await options.assets.import(request.body, filename);
         const entry = options.catalog.register(imported.metadata.id, name, folder);
-        return success(response, imported.duplicate ? 200 : 201, {
+        return sendData(response, imported.duplicate ? 200 : 201, {
           token: publicToken(imported.metadata, entry),
           duplicate: imported.duplicate
         });
       } catch (error) {
-        return failure(
-          request,
-          response,
-          400,
-          "validation_failed",
-          error instanceof Error ? error.message : "Token upload failed."
-        );
+        return sendRefusal(response, error, "Token upload failed.", FAULT);
       }
     }
   );
@@ -195,22 +157,16 @@ export function createTokenRouter(options: TokenRouterOptions) {
     // The per-definition memory is GM prep, not a player's business.
     const rememberedAssetId =
       principal.role === "gm" && definitionId ? options.catalog.recallForDefinition(definitionId) : null;
-    return success(response, 200, { tokens, rememberedAssetId });
+    return sendData(response, 200, { tokens, rememberedAssetId });
   });
 
   router.post(`${TOKEN_COLLECTION}/folders/rename`, requireGm, (request, response) => {
     try {
       const input = FolderRenameSchema.parse(request.body);
       options.catalog.renameFolder(input.from, input.to);
-      return success(response, 200, { renamed: true });
+      return sendData(response, 200, { renamed: true });
     } catch (error) {
-      return failure(
-        request,
-        response,
-        400,
-        "validation_failed",
-        error instanceof z.ZodError ? "Folder rename is malformed." : (error as Error).message
-      );
+      return sendRefusal(response, error, "Folder rename is malformed.", FAULT);
     }
   });
 
@@ -219,51 +175,39 @@ export function createTokenRouter(options: TokenRouterOptions) {
     try {
       const input = FolderVisibilitySchema.parse(request.body);
       options.catalog.setFolderHidden(input.folder, input.hidden);
-      return success(response, 200, { folder: input.folder, hidden: input.hidden });
+      return sendData(response, 200, { folder: input.folder, hidden: input.hidden });
     } catch (error) {
-      return failure(
-        request,
-        response,
-        400,
-        "validation_failed",
-        error instanceof z.ZodError ? "Folder visibility is malformed." : (error as Error).message
-      );
+      return sendRefusal(response, error, "Folder visibility is malformed.", FAULT);
     }
   });
 
   router.patch(`${TOKEN_COLLECTION}/:id`, requireGm, (request, response) => {
     try {
       const id = tokenId(request);
-      if (!id) return failure(request, response, 400, "validation_failed", "Token asset ID is malformed.");
-      if (!options.catalog.get(id)) return failure(request, response, 404, "not_found", "Token asset was not found.");
-      return success(response, 200, { token: options.catalog.updateDetails(id, DetailsSchema.parse(request.body)) });
+      if (!id) return sendFailure(response, 400, "validation_failed", "Token asset ID is malformed.");
+      if (!options.catalog.get(id)) return sendFailure(response, 404, "not_found", "Token asset was not found.");
+      return sendData(response, 200, { token: options.catalog.updateDetails(id, DetailsSchema.parse(request.body)) });
     } catch (error) {
-      return failure(
-        request,
-        response,
-        400,
-        "validation_failed",
-        error instanceof z.ZodError ? "Token details are malformed." : (error as Error).message
-      );
+      return sendRefusal(response, error, "Token details are malformed.", FAULT);
     }
   });
 
   router.delete(`${TOKEN_COLLECTION}/:id`, requireGm, async (request, response) => {
     const id = tokenId(request);
-    if (!id) return failure(request, response, 400, "validation_failed", "Token asset ID is malformed.");
+    if (!id) return sendFailure(response, 400, "validation_failed", "Token asset ID is malformed.");
     options.catalog.remove(id);
     await options.assets.remove(id);
-    return success(response, 200, { removed: true });
+    return sendData(response, 200, { removed: true });
   });
 
   router.get(`${TOKEN_COLLECTION}/:id/content`, async (request, response) => {
     const id = tokenId(request);
-    if (!id) return failure(request, response, 400, "validation_failed", "Token asset ID is malformed.");
+    if (!id) return sendFailure(response, 400, "validation_failed", "Token asset ID is malformed.");
     if (!canReadContent(request, id))
-      return failure(request, response, 403, "forbidden", "That token image is not available to this table session.");
+      return sendFailure(response, 403, "forbidden", "That token image is not available to this table session.");
     const metadata = await options.assets.get(id);
     const content = metadata ? await options.assets.readOriginal(id) : null;
-    if (!metadata || !content) return failure(request, response, 404, "not_found", "Token asset was not found.");
+    if (!metadata || !content) return sendFailure(response, 404, "not_found", "Token asset was not found.");
     const etag = `"${id}"`;
     response.setHeader("etag", etag);
     response.setHeader("content-type", metadata.mediaType);
@@ -274,10 +218,6 @@ export function createTokenRouter(options: TokenRouterOptions) {
     return response.send(content);
   });
 
-  router.use((error: unknown, request: Request, response: Response, _next: NextFunction) => {
-    if ((error as { type?: string }).type === "entity.too.large")
-      return failure(request, response, 413, "bad_request", "Token upload exceeds the 6 MiB limit.");
-    return failure(request, response, 500, "internal_error", "Token request failed.");
-  });
+  router.use(apiErrorHandler(FAULT, "Token upload exceeds the 6 MiB limit."));
   return router;
 }

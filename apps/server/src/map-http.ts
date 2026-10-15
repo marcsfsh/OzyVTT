@@ -1,7 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import express, { Router, type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
-import { API_VERSION } from "@vtt/api-contract";
 import {
   adjustWizardGrid,
   completeGridCalibrationWizard,
@@ -14,13 +13,24 @@ import {
   type GridCalibrationWizardState
 } from "./grid-calibration-wizard.js";
 import { gridOverlayLines } from "./grid-overlay.js";
+import {
+  apiErrorHandler,
+  bearerToken,
+  cookie,
+  isUuidV4,
+  pathParam,
+  sendData,
+  sendFailure,
+  sendRefusal
+} from "./http-kit.js";
+import { InvalidRequestError } from "./invalid-request.js";
 import type { MapAssetMetadata, MapAssetStore } from "./map-assets.js";
 import { deriveMapDistanceScale } from "./map-measurement.js";
 import type { MapCatalogEntry, MapCatalogStore, MapKind } from "./map-catalog.js";
 
 const MAP_COLLECTION = "/api/v1/map-assets";
 const MAP_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-const WIZARD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const FAULT = "Map request failed.";
 const WIZARD_TTL_MS = 30 * 60 * 1_000;
 
 const PointSchema = z.object({ x: z.number().finite(), y: z.number().finite() }).strict();
@@ -87,43 +97,9 @@ type MapRouterOptions = Readonly<{
   now?: () => number;
 }>;
 
-function bearer(request: Request) {
-  const match = request.header("authorization")?.match(/^Bearer\s+([^\s]+)$/i);
-  return match?.[1];
-}
-
-function cookie(request: Request, name: string) {
-  for (const part of (request.header("cookie") ?? "").split(";")) {
-    const separator = part.indexOf("=");
-    if (separator > 0 && part.slice(0, separator).trim() === name)
-      return decodeURIComponent(part.slice(separator + 1).trim());
-  }
-  return undefined;
-}
-
-function requestId(request: Request, response: Response) {
-  const supplied = request.header("x-request-id");
-  const id =
-    supplied && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(supplied)
-      ? supplied
-      : randomUUID();
-  response.setHeader("x-request-id", id);
-  response.setHeader("cache-control", "no-store");
-  return id;
-}
-
-function success(response: Response, status: number, data: unknown) {
-  return response.status(status).json({ ok: true, apiVersion: API_VERSION, data });
-}
-
-function failure(request: Request, response: Response, status: number, code: string, message: string) {
-  const id = response.getHeader("x-request-id")?.toString() ?? requestId(request, response);
-  return response.status(status).json({ ok: false, apiVersion: API_VERSION, error: { code, message, requestId: id } });
-}
-
 function mapId(request: Request) {
-  const id = request.params.id;
-  return typeof id === "string" && MAP_ID.test(id) ? id : null;
+  const id = pathParam(request, "id");
+  return MAP_ID.test(id) ? id : null;
 }
 
 function publicAsset(metadata: MapAssetMetadata, entry: MapCatalogEntry) {
@@ -149,18 +125,14 @@ export function createMapRouter(options: MapRouterOptions) {
   const router = Router();
   const now = options.now ?? Date.now;
   const wizards = new Map<string, WizardSession>();
-  router.use((request, response, next) => {
-    requestId(request, response);
-    next();
-  });
 
   const requireGm = (request: Request, response: Response, next: NextFunction) => {
-    if (!options.authorizeGm(bearer(request)))
-      return failure(request, response, 401, "unauthenticated", "A valid GM session is required.");
+    if (!options.authorizeGm(bearerToken(request)))
+      return sendFailure(response, 401, "unauthenticated", "A valid GM session is required.");
     next();
   };
   const canReadContent = (request: Request, assetId: string) => {
-    const token = bearer(request);
+    const token = bearerToken(request);
     const viewer = cookie(request, "vtt_viewer_session");
     return (
       options.authorizeGm(token) || options.authorizePlayer(token, assetId) || options.authorizeViewer(viewer, assetId)
@@ -171,9 +143,9 @@ export function createMapRouter(options: MapRouterOptions) {
   };
   const wizardFor = (request: Request, assetId: string) => {
     pruneWizards();
-    const id = request.params.wizardId;
-    const session = typeof id === "string" && WIZARD_ID.test(id) ? wizards.get(id) : undefined;
-    const token = bearer(request);
+    const id = pathParam(request, "wizardId");
+    const session = isUuidV4(id) ? wizards.get(id) : undefined;
+    const token = bearerToken(request);
     if (
       !session ||
       session.assetId !== assetId ||
@@ -182,7 +154,7 @@ export function createMapRouter(options: MapRouterOptions) {
     )
       return null;
     session.touchedAt = now();
-    return { id: id as string, session };
+    return { id, session };
   };
   const wizardPayload = (wizardId: string, state: GridCalibrationWizardState) => {
     let overlay: ReturnType<typeof gridOverlayLines> = [];
@@ -195,7 +167,8 @@ export function createMapRouter(options: MapRouterOptions) {
           { overscanCells: 0, maxLines: 4_000 }
         );
       } catch (error) {
-        overlayWarning = error instanceof Error ? error.message : "Zoom in to preview this grid.";
+        if (!(error instanceof InvalidRequestError)) throw error;
+        overlayWarning = error.message;
       }
     }
     return { wizardId, state, overlay, overlayWarning };
@@ -208,24 +181,18 @@ export function createMapRouter(options: MapRouterOptions) {
     async (request, response) => {
       try {
         if (!Buffer.isBuffer(request.body))
-          return failure(request, response, 400, "validation_failed", "Upload the image as the request body.");
+          return sendFailure(response, 400, "validation_failed", "Upload the image as the request body.");
         const filename = typeof request.query.filename === "string" ? request.query.filename : "map";
         const name = typeof request.query.name === "string" ? request.query.name : filename.replace(/\.[^.]+$/, "");
         const kind = (typeof request.query.kind === "string" ? request.query.kind : "battlemap") as MapKind;
         const imported = await options.assets.import(request.body, filename);
         const entry = options.catalog.register(imported.metadata.id, name, kind);
-        return success(response, imported.duplicate ? 200 : 201, {
+        return sendData(response, imported.duplicate ? 200 : 201, {
           asset: publicAsset(imported.metadata, entry),
           duplicate: imported.duplicate
         });
       } catch (error) {
-        return failure(
-          request,
-          response,
-          400,
-          "validation_failed",
-          error instanceof Error ? error.message : "Map upload failed."
-        );
+        return sendRefusal(response, error, "Map upload failed.", FAULT);
       }
     }
   );
@@ -240,31 +207,25 @@ export function createMapRouter(options: MapRouterOptions) {
         })
       )
     ).filter((asset) => asset !== null);
-    return success(response, 200, { assets });
+    return sendData(response, 200, { assets });
   });
 
   router.get(`${MAP_COLLECTION}/:id`, requireGm, async (request, response) => {
     const id = mapId(request);
-    if (!id) return failure(request, response, 400, "validation_failed", "Map asset ID is malformed.");
+    if (!id) return sendFailure(response, 400, "validation_failed", "Map asset ID is malformed.");
     const [metadata, entry] = await Promise.all([options.assets.get(id), Promise.resolve(options.catalog.get(id))]);
-    if (!metadata || !entry) return failure(request, response, 404, "not_found", "Map asset was not found.");
-    return success(response, 200, { asset: publicAsset(metadata, entry) });
+    if (!metadata || !entry) return sendFailure(response, 404, "not_found", "Map asset was not found.");
+    return sendData(response, 200, { asset: publicAsset(metadata, entry) });
   });
 
   router.patch(`${MAP_COLLECTION}/:id`, requireGm, (request, response) => {
     try {
       const id = mapId(request);
-      if (!id) return failure(request, response, 400, "validation_failed", "Map asset ID is malformed.");
+      if (!id) return sendFailure(response, 400, "validation_failed", "Map asset ID is malformed.");
       const input = DetailsSchema.parse(request.body);
-      return success(response, 200, { map: options.catalog.updateDetails(id, input) });
+      return sendData(response, 200, { map: options.catalog.updateDetails(id, input) });
     } catch (error) {
-      return failure(
-        request,
-        response,
-        400,
-        "validation_failed",
-        error instanceof z.ZodError ? "Map details are malformed." : (error as Error).message
-      );
+      return sendRefusal(response, error, "Map details are malformed.", FAULT);
     }
   });
 
@@ -272,26 +233,20 @@ export function createMapRouter(options: MapRouterOptions) {
     try {
       const input = FolderRenameSchema.parse(request.body);
       options.catalog.renameFolder(input.from, input.to);
-      return success(response, 200, { renamed: true });
+      return sendData(response, 200, { renamed: true });
     } catch (error) {
-      return failure(
-        request,
-        response,
-        400,
-        "validation_failed",
-        error instanceof z.ZodError ? "Folder rename is malformed." : (error as Error).message
-      );
+      return sendRefusal(response, error, "Folder rename is malformed.", FAULT);
     }
   });
 
   router.get(`${MAP_COLLECTION}/:id/content`, async (request, response) => {
     const id = mapId(request);
-    if (!id) return failure(request, response, 400, "validation_failed", "Map asset ID is malformed.");
+    if (!id) return sendFailure(response, 400, "validation_failed", "Map asset ID is malformed.");
     if (!canReadContent(request, id))
-      return failure(request, response, 403, "forbidden", "That map is not available to this table session.");
+      return sendFailure(response, 403, "forbidden", "That map is not available to this table session.");
     const metadata = await options.assets.get(id);
     const content = metadata ? await options.assets.readOriginal(id) : null;
-    if (!metadata || !content) return failure(request, response, 404, "not_found", "Map asset was not found.");
+    if (!metadata || !content) return sendFailure(response, 404, "not_found", "Map asset was not found.");
     const etag = `"${id}"`;
     response.setHeader("etag", etag);
     response.setHeader("accept-ranges", "bytes");
@@ -343,22 +298,22 @@ export function createMapRouter(options: MapRouterOptions) {
   // every annotation command.
   router.get(`${MAP_COLLECTION}/:id/grid`, (request, response) => {
     const id = mapId(request);
-    if (!id) return failure(request, response, 400, "validation_failed", "Map asset ID is malformed.");
+    if (!id) return sendFailure(response, 400, "validation_failed", "Map asset ID is malformed.");
     if (!canReadContent(request, id))
-      return failure(request, response, 403, "forbidden", "That map is not available to this table session.");
+      return sendFailure(response, 403, "forbidden", "That map is not available to this table session.");
     const entry = options.catalog.get(id);
-    if (!entry) return failure(request, response, 404, "not_found", "Map asset was not found.");
-    return success(response, 200, { calibration: entry.calibration?.calibration ?? null });
+    if (!entry) return sendFailure(response, 404, "not_found", "Map asset was not found.");
+    return sendData(response, 200, { calibration: entry.calibration?.calibration ?? null });
   });
 
   router.post(`${MAP_COLLECTION}/:id/calibration/wizards`, requireGm, async (request, response) => {
     try {
       const id = mapId(request);
-      const token = bearer(request);
-      if (!id || !token) return failure(request, response, 400, "validation_failed", "Map asset ID is malformed.");
+      const token = bearerToken(request);
+      if (!id || !token) return sendFailure(response, 400, "validation_failed", "Map asset ID is malformed.");
       const metadata = await options.assets.get(id);
       if (!metadata || !options.catalog.get(id))
-        return failure(request, response, 404, "not_found", "Map asset was not found.");
+        return sendFailure(response, 404, "not_found", "Map asset was not found.");
       const input = StartWizardSchema.parse(request.body);
       const initial = createGridCalibrationWizard({
         assetId: id,
@@ -374,47 +329,35 @@ export function createMapRouter(options: MapRouterOptions) {
         state,
         touchedAt: now()
       });
-      return success(response, 201, wizardPayload(wizardId, state));
+      return sendData(response, 201, wizardPayload(wizardId, state));
     } catch (error) {
-      return failure(
-        request,
-        response,
-        400,
-        "validation_failed",
-        error instanceof z.ZodError ? "Calibration measurement is malformed." : (error as Error).message
-      );
+      return sendRefusal(response, error, "Calibration measurement is malformed.", FAULT);
     }
   });
 
   router.post(`${MAP_COLLECTION}/:id/calibration/wizards/:wizardId/actions`, requireGm, (request, response) => {
     try {
       const id = mapId(request);
-      if (!id) return failure(request, response, 400, "validation_failed", "Map asset ID is malformed.");
+      if (!id) return sendFailure(response, 400, "validation_failed", "Map asset ID is malformed.");
       const found = wizardFor(request, id);
-      if (!found) return failure(request, response, 404, "not_found", "Calibration wizard was not found or expired.");
+      if (!found) return sendFailure(response, 404, "not_found", "Calibration wizard was not found or expired.");
       const action = WizardActionSchema.parse(request.body);
       if (action.action === "adjust") found.session.state = adjustWizardGrid(found.session.state, action.adjustment);
       else if (action.action === "undo") found.session.state = undoWizardGrid(found.session.state);
       else if (action.action === "redo") found.session.state = redoWizardGrid(found.session.state);
       else found.session.state = verifyWizardIntersection(found.session.state, action.imagePoint, action.tolerancePx);
-      return success(response, 200, wizardPayload(found.id, found.session.state));
+      return sendData(response, 200, wizardPayload(found.id, found.session.state));
     } catch (error) {
-      return failure(
-        request,
-        response,
-        400,
-        "validation_failed",
-        error instanceof z.ZodError ? "Calibration action is malformed." : (error as Error).message
-      );
+      return sendRefusal(response, error, "Calibration action is malformed.", FAULT);
     }
   });
 
   router.post(`${MAP_COLLECTION}/:id/calibration/wizards/:wizardId/complete`, requireGm, (request, response) => {
     try {
       const id = mapId(request);
-      if (!id) return failure(request, response, 400, "validation_failed", "Map asset ID is malformed.");
+      if (!id) return sendFailure(response, 400, "validation_failed", "Map asset ID is malformed.");
       const found = wizardFor(request, id);
-      if (!found) return failure(request, response, 404, "not_found", "Calibration wizard was not found or expired.");
+      if (!found) return sendFailure(response, 404, "not_found", "Calibration wizard was not found or expired.");
       const state = completeGridCalibrationWizard(found.session.state);
       const verification = state.verification?.accepted ? state.verification : null;
       const entry = options.catalog.saveCalibration(id, {
@@ -424,33 +367,23 @@ export function createMapRouter(options: MapRouterOptions) {
         verificationErrorPx: verification?.errorPx ?? null
       });
       wizards.delete(found.id);
-      return success(response, 200, { map: entry });
+      return sendData(response, 200, { map: entry });
     } catch (error) {
-      return failure(request, response, 400, "validation_failed", (error as Error).message);
+      return sendRefusal(response, error, "Calibration is malformed.", FAULT);
     }
   });
 
   router.put(`${MAP_COLLECTION}/:id/scale`, requireGm, (request, response) => {
     try {
       const id = mapId(request);
-      if (!id) return failure(request, response, 400, "validation_failed", "Map asset ID is malformed.");
+      if (!id) return sendFailure(response, 400, "validation_failed", "Map asset ID is malformed.");
       const input = ScaleSchema.parse(request.body);
-      return success(response, 200, { map: options.catalog.saveScale(id, deriveMapDistanceScale(input)) });
+      return sendData(response, 200, { map: options.catalog.saveScale(id, deriveMapDistanceScale(input)) });
     } catch (error) {
-      return failure(
-        request,
-        response,
-        400,
-        "validation_failed",
-        error instanceof z.ZodError ? "Map scale request is malformed." : (error as Error).message
-      );
+      return sendRefusal(response, error, "Map scale request is malformed.", FAULT);
     }
   });
 
-  router.use((error: unknown, request: Request, response: Response, _next: NextFunction) => {
-    if ((error as { type?: string }).type === "entity.too.large")
-      return failure(request, response, 413, "bad_request", "Map upload exceeds the 50 MiB limit.");
-    return failure(request, response, 500, "internal_error", "Map request failed.");
-  });
+  router.use(apiErrorHandler(FAULT, "Map upload exceeds the 50 MiB limit."));
   return router;
 }

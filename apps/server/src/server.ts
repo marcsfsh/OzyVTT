@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import express, { type Express } from "express";
 import { Server } from "socket.io";
 import { z } from "zod";
-import { API_VERSION, CODEX_PATHS } from "@vtt/api-contract";
+import { CODEX_PATHS } from "@vtt/api-contract";
 import type {
   ClientToServerEvents,
   ClientRole,
@@ -32,6 +32,7 @@ import { createHomebrewRouter, homebrewPackBodyParser, HOMEBREW_PACK_IMPORT_PATH
 import { createHomebrewValidator } from "./homebrew-validate.js";
 import { buildHomebrewUsageIndex } from "./homebrew-usages.js";
 import { findCatalogRecord } from "./homebrew-srd-copy.js";
+import { bearerToken, requestConventions, sendFailure } from "./http-kit.js";
 import { createInitialGameState } from "./initial-game-state.js";
 import { createStateReader } from "./state-reader.js";
 import { IntegrationCredentialStore } from "./integration-credentials.js";
@@ -72,6 +73,7 @@ export type CreateServerOptions = {
 };
 
 const isLoopback = (ip: string | undefined) => ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
+const isApiV1 = (path: string) => path === "/api/v1" || path.startsWith("/api/v1/");
 
 export function createServer(options: CreateServerOptions) {
   const app: Express = express();
@@ -377,15 +379,16 @@ export function createServer(options: CreateServerOptions) {
   // Open CORS for /api/v1 only: credentials there are bearer headers (or SameSite=Strict cookies), so a
   // wildcard origin grants nothing a token doesn't, and browser integrations can call it. The legacy
   // /api/gm/* endpoints (password login) stay same-origin so web pages can't relay password guesses.
-  // Mounted above the body parsers so preflights skip body buffering and parser errors carry CORS headers.
+  // Mounted above the body parsers so preflights skip body buffering and parser errors carry CORS headers
+  // and the request id. Every /api/v1 router relies on this one request-id stamp.
   app.use((req, res, next) => {
-    if (req.path !== "/api/v1" && !req.path.startsWith("/api/v1/")) return next();
+    if (!isApiV1(req.path)) return next();
     res.setHeader("access-control-allow-origin", "*");
     res.setHeader("access-control-allow-headers", "authorization, content-type, x-request-id, if-none-match");
     res.setHeader("access-control-allow-methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
     res.setHeader("access-control-expose-headers", "x-request-id, etag, retry-after, x-idempotent-replay");
     if (req.method === "OPTIONS") return res.status(204).end();
-    next();
+    requestConventions(req, res, next);
   });
   // Homebrew packs exceed the global body limit. body-parser skips already-parsed requests, so a
   // route-scoped limit must be mounted before the global parser.
@@ -398,18 +401,10 @@ export function createServer(options: CreateServerOptions) {
   app.use(express.json({ limit: "512kb" }));
   // Give /api/v1 callers the stable error envelope for malformed/oversized JSON instead of Express's HTML.
   app.use((error: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    if (!error || res.headersSent || !(req.path === "/api/v1" || req.path.startsWith("/api/v1/")))
-      return next(error as Error);
-    const tooLarge = (error as { type?: string }).type === "entity.too.large";
-    return res.status(tooLarge ? 413 : 400).json({
-      ok: false,
-      apiVersion: API_VERSION,
-      error: {
-        code: tooLarge ? "bad_request" : "validation_failed",
-        message: tooLarge ? "The request body is too large." : "The request body is not valid JSON.",
-        requestId: randomUUID()
-      }
-    });
+    if (!error || res.headersSent || !isApiV1(req.path)) return next(error as Error);
+    return (error as { type?: string }).type === "entity.too.large"
+      ? sendFailure(res, 413, "bad_request", "The request body is too large.")
+      : sendFailure(res, 400, "validation_failed", "The request body is not valid JSON.");
   });
   app.get("/api/bootstrap/status", (_req, res) => res.json({ bootstrapped: auth.isBootstrapped }));
   app.post("/api/bootstrap", async (req, res) => {
@@ -445,22 +440,19 @@ export function createServer(options: CreateServerOptions) {
     return res.json({ token });
   });
   app.post("/api/gm/logout", async (req, res) => {
-    const token = req.header("authorization")?.replace("Bearer ", "");
-    const revoked = await auth.logout(token);
+    const revoked = await auth.logout(bearerToken(req));
     if (!revoked) return res.status(401).json({ message: "A valid GM session is required to sign out." });
     broadcast();
     return res.json({ ok: true });
   });
   app.post("/api/gm/sessions/revoke-all", async (req, res) => {
-    const token = req.header("authorization")?.replace("Bearer ", "");
-    if (!auth.verify(token)) return res.status(401).json({ message: "A valid GM session is required." });
+    if (!auth.verify(bearerToken(req))) return res.status(401).json({ message: "A valid GM session is required." });
     await auth.revokeAllGmSessions();
     broadcast();
     return res.json({ ok: true });
   });
   app.get("/api/gm/viewer-urls", (req, res) => {
-    const token = req.header("authorization")?.replace("Bearer ", "");
-    if (!auth.verify(token)) return res.status(401).json({ message: "A valid GM session is required." });
+    if (!auth.verify(bearerToken(req))) return res.status(401).json({ message: "A valid GM session is required." });
     const viewerUrls = [
       ...new Set((options.viewerBaseUrls ?? []).map((url) => `${url.replace(/\/$/, "")}/viewer.html`))
     ];
@@ -611,9 +603,7 @@ export function createServer(options: CreateServerOptions) {
     gameRouter: gameApiRouter
   });
   // Keep the API-only 404 envelope scoped to /api/v1 so it cannot swallow the SPA or the viewer.
-  app.use((req, res, next) =>
-    req.path === "/api/v1" || req.path.startsWith("/api/v1/") ? apiV1Router(req, res, next) : next()
-  );
+  app.use((req, res, next) => (isApiV1(req.path) ? apiV1Router(req, res, next) : next()));
   app.use("/api", (_req, res) => res.status(404).json({ message: "API route not found." }));
   if (!options.useDevelopmentClient) {
     app.get("/viewer", (_req, res) => res.redirect(307, "/viewer.html"));
