@@ -141,7 +141,7 @@ const withinSpellWindow = (
 export const withinOfferSpellWindow = withinSpellWindow;
 
 /** Every budget an `extraPicks` grant may name by fixed key (a feature's own pick is `feature:<id>`):
- *  six offer keys plus the `class-cantrips` / `class-spells` columns. Shared with the wizard. */
+ *  six offer keys plus the `class-cantrips` / `class-spells` columns. */
 export const NAMED_PICK_BUDGETS = NAMED_PICK_BUDGET_KEYS;
 export type NamedPickBudget = (typeof NAMED_PICK_BUDGETS)[number];
 
@@ -525,7 +525,7 @@ function placeChoices(
   ) => {
     if (!list || list.choose <= 0) return;
     // A choose-N list may draw on an open catalog too (the species' Standard Languages), resolved through
-    // the same `resolveCatalogChoice` the wizard uses; a catalog gap defers the pick.
+    // `resolveCatalogChoice`; a catalog gap defers the pick.
     const options = new Set(list.from);
     const names = new Map<string, string>();
     let unresolvable: string | null = null;
@@ -633,7 +633,7 @@ function placeChoices(
         optionLevels = new Map(resolved.map((option) => [option.id, option.level ?? 0]));
     };
     // Inline `options` carry their own mechanics. When both a catalog and bespoke options are authored
-    // the offer is their union, matching the wizard.
+    // the offer is their union.
     const named = choice.from ?? [];
     for (const option of choice.options ?? []) names.set(option.id, option.name);
     // Options drawn from the character's own earlier answers ("one of your known Warlock cantrips"),
@@ -730,8 +730,7 @@ function placeChoices(
   const extraPickBudgets = new Map<string, number>();
   const grantExtraPicks = (record: FeatureRecord, count: number): void => {
     for (const grant of record.extraPicks) {
-      // `extraPickAmount` is shared with the wizard so a scaled budget cannot be computed two ways. With no
-      // class chosen yet the printed table is empty.
+      // With no class chosen yet (a wizard draft) the printed table is empty.
       const amount = extraPickAmount(grant, classRecord?.levelTable ?? [], level) * count;
       extraPickBudgets.set(grant.offer, (extraPickBudgets.get(grant.offer) ?? 0) + amount);
       // `class-cantrips` / `class-spells` are level-row columns read at step 9, so no matching offer is not yet an error.

@@ -815,7 +815,7 @@ describe("extra picks raise the budget the server validates against", () => {
 
   it("accepts exactly `printed + granted` class cantrips, and refuses one more", () => {
     // The server accepts `printed + granted` from the shared content record, keyed on the same string
-    // ("class-cantrips") `computeOffers` uses; `extra-picks.test.ts` asserts the wizard offers the same number.
+    // ("class-cantrips") the builder's offers use; `builder-offers.test.ts` asserts they offer the same number.
     const composed = printedCantrips + grantedCantrips;
     expect(composed).toBe(4);
     expect(() => buildCharacterDefinition(withCantrips(composed), library, defaultPolicy)).not.toThrow();

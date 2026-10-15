@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type {
+  BuilderOffer,
+  BuilderOffersRequest,
   ContentBackgroundSummary,
   ContentClassLevelRow,
   ContentClassSummary,
@@ -16,7 +18,9 @@ import type {
 /**
  * Rendered-text tests of the character wizard with fixture catalogs: answered offers keep their
  * options, the subclass note on the features step, and reading a spell's rules while choosing.
- * The socket is mocked to answer each `content:*` emit synchronously from the fixtures.
+ * The socket is mocked to answer each `content:*` emit synchronously from the fixtures, and
+ * `builder:offers` from a small stand-in for the server's survey over the same fixtures (the real
+ * survey is tested server-side).
  */
 
 // Fixtures
@@ -305,17 +309,110 @@ const CATALOG_ANSWERS: Readonly<Record<string, unknown>> = {
   }
 };
 
+/** One fixture offer with the fields these tests do not vary filled in. */
+const fixtureOffer = (
+  over: Pick<BuilderOffer, "key" | "step" | "kind" | "label" | "capacity" | "options"> & Partial<BuilderOffer>
+): BuilderOffer => ({
+  featureId: null,
+  help: null,
+  maxSpellLevel: null,
+  level: 1,
+  classId: null,
+  unresolvable: null,
+  unavailable: null,
+  ...over
+});
+
+/** What the server's survey offers these fixtures: a species trait's pick, the Cleric's subclass from
+ *  level 3, and its cantrip and prepared-spell budgets. Answers are kept where an offer takes them. */
+function offersFor(request: BuilderOffersRequest) {
+  const offers: BuilderOffer[] = [];
+  const species = [elf, halfling].find((entry) => entry.id === request.speciesId);
+  for (const trait of species?.features ?? []) {
+    if (!trait.choice) continue;
+    offers.push(
+      fixtureOffer({
+        key: `feature:${trait.id}`,
+        step: "species",
+        featureId: trait.id,
+        kind: trait.choice.kind,
+        label: trait.name,
+        help: trait.description,
+        capacity: trait.choice.choose,
+        options: trait.choice.from.map((id) => ({ id, name: skills.find((skill) => skill.id === id)!.name })),
+        unavailable: {}
+      })
+    );
+  }
+  if (request.classId === cleric.id) {
+    if (request.level >= cleric.subclassLevel)
+      offers.push(
+        fixtureOffer({
+          key: "feature:cleric-subclass",
+          step: "features",
+          featureId: "cleric-subclass",
+          kind: "subclass",
+          label: "Cleric Subclass",
+          capacity: 1,
+          options: [{ id: lifeDomain.id, name: lifeDomain.name }],
+          level: cleric.subclassLevel,
+          classId: cleric.id
+        })
+      );
+    const row = cleric.levelTable[request.level - 1];
+    offers.push(
+      fixtureOffer({
+        key: "class-cantrips",
+        step: "features",
+        kind: "cantrip",
+        label: "Cleric cantrips",
+        capacity: row.cantripsKnown ?? 0,
+        options: spells.filter((entry) => entry.level === 0).map(({ id, name, level }) => ({ id, name, level })),
+        maxSpellLevel: 0,
+        classId: cleric.id
+      }),
+      fixtureOffer({
+        key: "class-spells",
+        step: "features",
+        kind: "spell",
+        label: "Cleric prepared spells",
+        capacity: row.preparedCount ?? 0,
+        options: spells.filter((entry) => entry.level >= 1).map(({ id, name, level }) => ({ id, name, level })),
+        maxSpellLevel: 1,
+        classId: cleric.id
+      })
+    );
+  }
+  const picks = Object.fromEntries(
+    offers.flatMap((offer) => {
+      const kept = (request.picks?.[offer.key] ?? []).filter((id) => offer.options.some((option) => option.id === id));
+      return kept.length > 0 ? [[offer.key, kept.slice(0, offer.capacity)]] : [];
+    })
+  );
+  return {
+    ok: true,
+    offers,
+    picks,
+    asiIncreases: {},
+    subclassId: picks["feature:cleric-subclass"]?.[0] ?? null,
+    choices: []
+  };
+}
+
 vi.mock("../socket", () => ({
   socket: {
     on: vi.fn(),
     off: vi.fn(),
-    emit: vi.fn((event: string, _payload: unknown, ack?: (result: unknown) => void) => {
-      if (ack) ack((CATALOG_ANSWERS as Record<string, unknown>)[event] ?? { ok: false });
+    emit: vi.fn((event: string, payload: unknown, ack?: (result: unknown) => void) => {
+      if (!ack) return;
+      if (event === "builder:offers") ack(offersFor(payload as BuilderOffersRequest));
+      else ack((CATALOG_ANSWERS as Record<string, unknown>)[event] ?? { ok: false });
     })
   }
 }));
 
 import { ToastProvider } from "@vtt/ui";
+import { socket } from "../socket";
 import { CharacterBuilder } from "./CharacterBuilder";
 
 const gmView = {
@@ -604,5 +701,60 @@ describe("Issue 2c — a spell's rules can be read while choosing spells", () =>
     await user.click(await screen.findByRole("radio", { name: /Elf/ }));
     // A skill has no rules card, so its cards get no second control.
     expect(within(offerNamed("Keen Senses")).queryAllByRole("button", { name: /^Read the/ })).toHaveLength(0);
+  });
+});
+
+describe("the offers come from the table", () => {
+  /** Holds every `builder:offers` answer until the test releases it; catalogs still answer at once. */
+  function holdOffers() {
+    const held: Array<{ payload: BuilderOffersRequest; ack: (result: unknown) => void }> = [];
+    vi.mocked(socket.emit).mockImplementation(((event: string, payload: unknown, ack?: (result: unknown) => void) => {
+      if (!ack) return socket;
+      if (event === "builder:offers") held.push({ payload: payload as BuilderOffersRequest, ack });
+      else ack((CATALOG_ANSWERS as Record<string, unknown>)[event] ?? { ok: false });
+      return socket;
+    }) as never);
+    return {
+      requests: () => held.map((entry) => entry.payload),
+      answerAll: (answer: (request: BuilderOffersRequest) => unknown = offersFor) =>
+        act(() => {
+          for (const { payload, ack } of held.splice(0)) ack(answer(payload));
+        })
+    };
+  }
+
+  it("shows a pick at once, asks again, and keeps the last offers on screen meanwhile", async () => {
+    const offers = holdOffers();
+    const user = userEvent.setup();
+    mount();
+    await user.click(await screen.findByRole("radio", { name: /Elf/ }));
+    // Nothing to pick until the table answers for an Elf.
+    expect(screen.queryByRole("heading", { name: "Keen Senses" })).toBeNull();
+    await offers.answerAll();
+    const keen = () => offerNamed("Keen Senses");
+
+    await user.click(within(keen()).getByRole("radio", { name: /Perception/ }));
+    // The answer shows before the table has seen it, on the offer it already had.
+    expect(within(keen()).getByRole("radio", { name: /Perception/ })).toHaveAttribute("aria-checked", "true");
+    expect(offers.requests().at(-1)?.picks).toEqual({ "feature:elf-keen-senses": ["perception"] });
+    await offers.answerAll();
+    expect(within(keen()).getByRole("radio", { name: /Perception/ })).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("shows the table's refusal in its own words, beside the last offers", async () => {
+    const offers = holdOffers();
+    const user = userEvent.setup();
+    mount();
+    await user.click(await screen.findByRole("radio", { name: /Elf/ }));
+    await offers.answerAll();
+    await user.click(within(offerNamed("Keen Senses")).getByRole("radio", { name: /Survival/ }));
+    await offers.answerAll(() => ({
+      ok: false,
+      code: "refused",
+      message: 'No species "elf" is in the content catalog.'
+    }));
+    const alert = screen.getByText("The table could not check these choices").closest(".nh-alert");
+    expect(alert).toHaveTextContent('No species "elf" is in the content catalog.');
+    expect(offerNamed("Keen Senses")).toBeInTheDocument();
   });
 });

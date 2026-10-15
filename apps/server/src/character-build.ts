@@ -41,11 +41,11 @@ import { CommandRejectedError } from "./game-store.js";
 
 /**
  * Server-side character assembly for `character.create`. The client sends choices, never a finished
- * sheet, so only the server interprets feature riders. Validates every id and pick through the same
- * `resolveCatalogChoice` the wizard uses, interprets riders (unmodeled mechanics stay prose, ADR-0008),
- * assembles the `ActorDefinition` with `@vtt/rules-5e` math and re-validates it.
+ * sheet, so only the server interprets feature riders. Validates every id and pick through the offer
+ * survey the builder is served (`character-offers.ts`), interprets riders (unmodeled mechanics stay
+ * prose, ADR-0008), assembles the `ActorDefinition` with `@vtt/rules-5e` math and re-validates it.
  *
- * Ledger-row conventions (the wizard writes the same rows):
+ * Ledger-row conventions (`builder-offers.ts` writes the wizard's rows; the generator writes the same):
  *   - kind = a feature's `choice.kind` (`payload.featureId` disambiguates same-kind offers);
  *   - "skill"/"tool"/"language" also match the class/background/species choose-N lists;
  *   - "subclass" mirrors `subclassId`; "lineage" picks the species lineage;

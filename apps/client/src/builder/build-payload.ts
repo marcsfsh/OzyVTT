@@ -1,19 +1,15 @@
-import {
-  CatalogChoiceError,
-  extraPickAmount,
-  resolveCatalogChoice,
-  resolvePickChoice,
-  type BuilderAbilityMethod,
-  type BuilderPolicy,
-  type CatalogChoiceOption,
-  type ContentBackgroundSummary,
-  type ContentChoiceList,
-  type ContentClassSummary,
-  type ContentExtraPickSummary,
-  type ContentFeatSummary,
-  type ContentFeatureSummary,
-  type ContentSpeciesSummary,
-  type ContentSubclassSummary
+import type {
+  BuilderAbilityMethod,
+  BuilderOffer,
+  BuilderOffersReply,
+  BuilderOffersRequest,
+  BuilderOfferStep,
+  BuilderPolicy,
+  ContentBackgroundSummary,
+  ContentClassSummary,
+  ContentFeatSummary,
+  ContentSpeciesSummary,
+  ContentSubclassSummary
 } from "@vtt/domain";
 import type { CharacterChoice } from "@vtt/schemas";
 import {
@@ -36,13 +32,11 @@ import type { BuilderCatalogs } from "../content/catalogs";
 /**
  * The character builder's draft model and payload assembly (pure, no React, no socket).
  *
- * The wizard collects choices, never a finished sheet; feature riders stay server-side. This module:
- *   1. works out what the content asks the player to pick (`computeOffers`), resolving `fromCatalog`
- *      slugs with `resolveCatalogChoice`, the same function `character-build.ts` re-validates with;
- *   2. turns the answers into the `character.create` payload (`buildCreatePayload`).
- *
- * Game outcomes (HP, AC, slots, prerequisites) are decided by the server. The few numbers computed
- * here (ability totals, point-buy budget) are previews of the player's inputs; the server's win.
+ * The wizard collects choices, never a finished sheet. What the content asks a build to pick, and the
+ * ledger rows the answers make, come from the server (`builder:offers`), worked out by the same survey
+ * `character.create` validates against. This module keeps the draft, asks for and adopts those offers,
+ * and gates each step. The few numbers computed here (ability totals, point-buy budget) are previews of
+ * the player's inputs; the server's win.
  */
 
 export const BUILDER_DRAFT_VERSION = 1;
@@ -97,105 +91,49 @@ export function emptyDraft(): BuilderDraft {
   };
 }
 
-// Offers: everything the content asks this build to pick.
+// Offers: what the content asks this build to pick, as the server works it out.
 
-/** Which wizard step owns an offer. Rule: the step that chose the SOURCE owns its picks. */
-export type OfferStep = "species" | "background" | "class" | "features" | "equipment";
-
-export type BuilderOffer = Readonly<{
-  /** Stable key into `draft.picks`. */
-  key: string;
-  step: OfferStep;
-  /** Written to the ledger row's `payload.featureId` when the offer came from a feature. A
-      list-derived offer (class skills, background languages) must send no featureId, or the
-      server scopes the row to a feature that never offered it. */
-  featureId: string | null;
-  kind: string;
-  label: string;
-  help: string | null;
-  capacity: number;
-  options: readonly CatalogChoiceOption[];
-  maxSpellLevel: number | null;
-  /** Character level stamped on this offer's ledger rows. */
-  level: number;
-  classId: string | null;
-  /** Set when a `fromCatalog` slug resolved to nothing (a content gap, not a player error). The
-      pick is then deferred rather than required, as on the server. */
-  unresolvable: string | null;
-  /**
-   * Option id -> why this build already has it, for proficiency kinds a character holds only once.
-   * Present (possibly empty) on those kinds, null otherwise. The options are disabled, not filtered,
-   * so a pick in a parked draft does not vanish when an earlier step changes.
-   */
-  unavailable: Readonly<Record<string, string>> | null;
-}>;
-
-/**
- * Every pick a feature owes; the client's mirror of the content package's `featurePicks`.
- * `choice` is the first and `choices` the whole list, so read both.
- */
-const featurePicksOf = (feature: ContentFeatureSummary): readonly NonNullable<ContentFeatureSummary["choice"]>[] =>
-  feature.choices.length > 0 ? feature.choices : feature.choice ? [feature.choice] : [];
-
-const optionsOfIds = (ids: readonly string[], nameOf: (id: string) => string): CatalogChoiceOption[] =>
-  ids.map((id) => ({ id, name: nameOf(id) }));
-
-const titleize = (id: string) =>
-  id
-    .split("-")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-
-/** Resolves a feature's choice to concrete options, never throwing: a gap becomes `unresolvable`. */
-function resolveChoice(
-  choice: NonNullable<ContentFeatureSummary["choice"]>,
-  catalogs: BuilderCatalogs,
-  nameOf: (id: string) => string,
-  answersFor: (offer: string) => readonly string[]
-): { options: CatalogChoiceOption[]; unresolvable: string | null } {
-  // Options drawn from the character's own earlier answers ("one of your known Warlock cantrips"),
-  // resolved with the server's function. Too early (nothing chosen yet), it defers with the
-  // resolver's message instead of showing an empty list.
-  if (choice.fromPicks) {
-    try {
-      return {
-        options: resolvePickChoice(choice.fromPicks, answersFor(choice.fromPicks.offer), catalogs.choice),
-        unresolvable: null
-      };
-    } catch (error) {
-      if (!(error instanceof CatalogChoiceError)) throw error;
-      return { options: [], unresolvable: error.message };
-    }
-  }
-  const named = choice.from.length > 0 ? optionsOfIds(choice.from, nameOf) : [];
-  // A catalog plus bespoke inline options (e.g. "a Fighting Style feat or Blessed Warrior"): the two
-  // are unioned, inline entries first, and an id in both keeps its inline record.
-  if (!choice.fromCatalog) {
-    return named.length > 0
-      ? { options: named, unresolvable: null }
-      : { options: [], unresolvable: "this pick names no option list." };
-  }
-  try {
-    const catalog = resolveCatalogChoice(choice.fromCatalog, catalogs.choice);
-    const inline = new Set(named.map((option) => option.id));
-    return { options: [...named, ...catalog.filter((option) => !inline.has(option.id))], unresolvable: null };
-  } catch (error) {
-    if (!(error instanceof CatalogChoiceError)) throw error;
-    // A content gap in the catalog half must not take the bespoke half down with it.
-    return named.length > 0 ? { options: named, unresolvable: null } : { options: [], unresolvable: error.message };
-  }
+/** The offers read for a draft: the identity so far and every answer by offer key. */
+export function offersRequestOf(draft: BuilderDraft): BuilderOffersRequest {
+  return {
+    ...(draft.speciesId ? { speciesId: draft.speciesId } : {}),
+    ...(draft.backgroundId ? { backgroundId: draft.backgroundId } : {}),
+    ...(draft.classId ? { classId: draft.classId } : {}),
+    level: draft.level,
+    picks: draft.picks,
+    asiIncreases: draft.asiIncreases
+  };
 }
 
+/** The draft with the answers the server kept: a pick the build no longer offers is gone, and the subclass
+ *  is the subclass offer's answer. The same object when nothing changed, so it is safe from an effect. */
+export function withAnswersFrom(draft: BuilderDraft, reply: BuilderOffersReply): BuilderDraft {
+  const same =
+    sameAnswers(draft.picks, reply.picks) &&
+    sameAnswers(draft.asiIncreases, reply.asiIncreases) &&
+    draft.subclassId === reply.subclassId;
+  return same
+    ? draft
+    : { ...draft, picks: reply.picks, asiIncreases: reply.asiIncreases, subclassId: reply.subclassId };
+}
+
+const sameAnswers = (left: Readonly<Record<string, unknown>>, right: Readonly<Record<string, unknown>>) => {
+  const keyed = (answers: Readonly<Record<string, unknown>>) =>
+    JSON.stringify(
+      Object.keys(answers)
+        .sort()
+        .map((key) => [key, answers[key]])
+    );
+  return keyed(left) === keyed(right);
+};
+
+/** The catalog records the draft names, for the step bodies and the detail pane. */
 export type OfferContext = Readonly<{
   species: ContentSpeciesSummary | null;
   background: ContentBackgroundSummary | null;
   classRecord: ContentClassSummary | null;
   subclass: ContentSubclassSummary | null;
   originFeat: ContentFeatSummary | null;
-  /** The class's level row for the draft's level (display data: slots, cantrips, prepared cap). */
-  levelRow: ContentClassSummary["levelTable"][number] | null;
-  /** The class/subclass spell list id, when this build casts. */
-  spellListId: string | null;
   hitDie: HitDie | null;
 }>;
 
@@ -207,61 +145,24 @@ export function offerContext(draft: BuilderDraft, catalogs: BuilderCatalogs): Of
   const originFeat = background?.originFeatId
     ? (catalogs.choice.feats.find((entry) => entry.id === background.originFeatId) ?? null)
     : null;
-  const levelRow = classRecord?.levelTable.find((row) => row.level === draft.level) ?? null;
-  // Mirrors the server's `subclass?.spellcasting ?? class.spellcasting` so the spell step offers the
-  // list the server will accept.
-  const casting = subclass?.spellcasting ?? classRecord?.spellcasting ?? null;
   return {
     species,
     background,
     classRecord,
     subclass,
     originFeat,
-    levelRow,
-    spellListId: casting ? (casting.spellListId ?? classRecord?.id ?? null) : null,
     hitDie: (classRecord?.hitDie as HitDie | undefined) ?? null
   };
 }
 
-/** The class features a level-`level` character has been granted, with how many times. */
-function grantedClassFeatures(
-  classRecord: ContentClassSummary,
-  level: number
-): Array<{ feature: ContentFeatureSummary; level: number }> {
-  const granted: Array<{ feature: ContentFeatureSummary; level: number }> = [];
-  for (const feature of classRecord.features) {
-    // `grantedAtLevels` is the level table's server-resolved repeat count, the only thing that agrees
-    // with the server's `choose x grants` capacity (Expertise at 1 and 6, Metamagic at 2, 10, 17...).
-    if (feature.grantedAtLevels.length > 0) {
-      for (const grantLevel of feature.grantedAtLevels)
-        if (grantLevel <= level) granted.push({ feature, level: grantLevel });
-      continue;
-    }
-    // No level-table grant: a species trait, a feat, a subclass feature. `level` stands alone.
-    if (feature.level != null) {
-      if (feature.level <= level) granted.push({ feature, level: feature.level });
-      continue;
-    }
-    granted.push({ feature, level: 1 });
-  }
-  return granted;
-}
-
-/** The offer kinds whose answer is a feat (the server's `FEAT_KINDS` in `character-build.ts`). */
+/** The offer kinds answered by a feat, whose grids show each feat's summary. */
 export const FEAT_KINDS: ReadonlySet<string> = new Set(["feat", "fighting-style", "asi-or-feat"]);
 
-/**
- * The offer kinds whose answer is a proficiency, which a character can never usefully hold twice.
- * The server merges duplicates and only guards per offer, so taking one twice silently wastes a pick.
- */
-const HELD_KINDS: ReadonlySet<string> = new Set(["skill", "skill-or-tool", "expertise", "tool", "language"]);
-
-/**
- * The kinds whose options are disabled once already held. `expertise` is excluded: SRD expertise
- * requires proficiency (the server rejects it otherwise), so it takes the inverse rule in
- * `withExpertiseReach` instead.
- */
-const PROVENANCE_KINDS: ReadonlySet<string> = new Set(["skill", "skill-or-tool", "tool", "language"]);
+const titleize = (id: string) =>
+  id
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 
 /** What to call one of these picks in an instruction. */
 const kindNoun = (kind: string) =>
@@ -274,599 +175,8 @@ const kindNoun = (kind: string) =>
         ? "language"
         : "option";
 
-/**
- * Every pick this build owes, in step order. Mirrors `character-build.ts`'s offer machinery (same
- * sources, same `resolveCatalogChoice`, same capacities), so a build satisfying every offer here
- * is one the server accepts.
- */
-export function computeOffers(draft: BuilderDraft, catalogs: BuilderCatalogs): BuilderOffer[] {
-  const context = offerContext(draft, catalogs);
-  const offers: BuilderOffer[] = [];
-  // An offer key indexes `draft.picks`, so keys must be unique or two offers share one answer and
-  // `buildChoiceRows` submits it twice. The first holder keeps the plain key (parked drafts still
-  // resolve); later collisions take a "#n" suffix. Keys never cross the wire.
-  const keyUses = new Map<string, number>();
-  const uniqueKey = (key: string) => {
-    const uses = (keyUses.get(key) ?? 0) + 1;
-    keyUses.set(key, uses);
-    return uses === 1 ? key : `${key}#${uses}`;
-  };
-  // A feat already held (the background's origin feat, or one from an earlier offer) is dropped from
-  // later offers unless it may genuinely be repeated.
-  const heldFeatIds = new Set<string>(context.background?.originFeatId ? [context.background.originFeatId] : []);
-  // Proficiencies differ from feats: a duplicate is merged server-side, not rejected, so the pick is
-  // silently lost. Sources accumulate in step order, and each offer records what it can no longer give.
-  const heldProficiencies = new Map<string, string>();
-  for (const skill of context.background?.skillProficiencies ?? []) {
-    heldProficiencies.set(skill, `already granted by ${context.background!.name}`);
-  }
-  /** The already-held subset of these options, or null for a kind without this rule. */
-  const unavailableOf = (
-    kind: string,
-    options: readonly CatalogChoiceOption[]
-  ): Readonly<Record<string, string>> | null => {
-    if (!PROVENANCE_KINDS.has(kind)) return null;
-    const held: Record<string, string> = {};
-    for (const option of options) {
-      const reason = heldProficiencies.get(option.id);
-      if (reason) held[option.id] = reason;
-    }
-    return held;
-  };
-  /** Records an offer's answers after it is built, so its own picks stay tappable to un-pick. */
-  const recordHeld = (offerKey: string, kind: string, label: string) => {
-    if (!HELD_KINDS.has(kind)) return;
-    for (const id of draft.picks[offerKey] ?? []) {
-      if (!heldProficiencies.has(id)) heldProficiencies.set(id, `already chosen for "${label}"`);
-    }
-  };
-  /**
-   * What an earlier grant of the same feature already spent: budget key -> option id -> reason.
-   *
-   * A feature granted at several levels (Expertise at 3 and 9, Metamagic at 2, 10, 17) is one offer
-   * per grant level here, because `buildChoiceRows` stamps each row's level and `level-ledger.ts`
-   * matches rows by `(level, kind, classId, featureId)`. The server keeps one offer of capacity
-   * `choose x count` and refuses a repeated id, so siblings must not take the same option.
-   *
-   * Keyed on `budgetKeyOf` (strips "#n"). ASI keys (`feature:<id>@<level>`) never collide, which is
-   * right: the server mints one offer per chosen feat, so repeating an ability there is legal.
-   */
-  const spentByRepeat = new Map<string, Map<string, string>>();
-  const featRepeats = (id: string) => {
-    const feat = catalogs.choice.feats.find((entry) => entry.id === id);
-    if (!feat?.repeatable) return false;
-    // The server's `repeatsOnlyWithADifferentSpellList`: a feat whose choice draws from a
-    // `<list>-spells` catalog (Magic Initiate) may not repeat the same id, whatever `repeatable` says.
-    return !featurePicksOf(feat.feature).some((pick) => pick.fromCatalog?.endsWith("-spells") ?? false);
-  };
-  /**
-   * Offer key -> how many picks granted features have added to it. Mirrors `character-build.ts`'s
-   * `extraPickBudgets` exactly; any divergence either refuses the build at Create or makes a
-   * feature's promise unselectable. Applied as a post-pass (`withGrantedPicks`) because a grant can
-   * raise a budget built in an earlier step.
-   */
-  const extraPicks = new Map<string, number>();
-  const addExtraPicks = (grants: readonly ContentExtraPickSummary[] | undefined, times: number) => {
-    // `extraPickAmount` is the shared resolver, so scaling budgets (Eldritch Invocations 1 -> 10) agree
-    // with the server. With no class yet the table is empty and nothing is added.
-    const table = context.classRecord?.levelTable ?? [];
-    for (const grant of grants ?? []) {
-      extraPicks.set(
-        grant.offer,
-        (extraPicks.get(grant.offer) ?? 0) + extraPickAmount(grant, table, draft.level) * times
-      );
-    }
-  };
-  /**
-   * Whether a gate's earlier answer is already in the draft; mirrors the server's `ledgerAnswered`.
-   * The `#n` suffix is stripped so a repeated offer still answers its gate.
-   */
-  const answeredInDraft = (gate: Readonly<{ offer: string; id: string }>): boolean =>
-    answersInDraft(gate.offer).includes(gate.id);
-  /** Every answer this budget already holds; the draft-side mirror of the server's `answersFor`. */
-  const answersInDraft = (offer: string): readonly string[] =>
-    Object.entries(draft.picks).flatMap(([key, ids]) => (budgetKeyOf(key).split("@")[0] === offer ? ids : []));
-  const skillName = (id: string) => catalogs.choice.skills.find((skill) => skill.id === id)?.name ?? titleize(id);
-  const spellName = (id: string) => catalogs.choice.spells.find((spell) => spell.id === id)?.name ?? titleize(id);
-  // Options use full names ("Strength"), matching the review; three-letter forms are for dense strips.
-  const nameOfKind = (kind: string) => (id: string) =>
-    kind === "skill" || kind === "expertise" || kind === "skill-or-tool"
-      ? skillName(id)
-      : kind === "spell" || kind === "cantrip"
-        ? spellName(id)
-        : kind === "ability-score"
-          ? ABILITIES.includes(id as Ability)
-            ? ABILITY_LABELS[id as Ability]
-            : titleize(id)
-          : titleize(id);
-
-  const listOffer = (
-    key: string,
-    step: OfferStep,
-    kind: string,
-    label: string,
-    list:
-      ContentChoiceList | { choose: number; from: readonly string[]; fromCatalog?: string | null } | null | undefined,
-    classId: string | null
-  ) => {
-    if (!list || list.choose <= 0) return;
-    const offerKey = uniqueKey(key);
-    // A "choose N" list may also name an open catalog (e.g. the species language budget), resolved
-    // with the same function the server validates the row with.
-    const named = optionsOfIds(list.from, nameOfKind(kind));
-    let options = named;
-    let unresolvable: string | null = null;
-    if (list.fromCatalog) {
-      try {
-        const catalog = resolveCatalogChoice(list.fromCatalog, catalogs.choice);
-        const inline = new Set(named.map((option) => option.id));
-        options = [...named, ...catalog.filter((option) => !inline.has(option.id))];
-      } catch (error) {
-        if (!(error instanceof CatalogChoiceError)) throw error;
-        if (named.length === 0) unresolvable = error.message;
-      }
-    }
-    offers.push({
-      key: offerKey,
-      step,
-      featureId: null,
-      kind,
-      label,
-      help: null,
-      capacity: list.choose,
-      options,
-      maxSpellLevel: null,
-      level: 1,
-      classId,
-      unresolvable,
-      unavailable: unavailableOf(kind, options)
-    });
-    recordHeld(offerKey, kind, label);
-  };
-
-  const featureOffer = (
-    key: string,
-    step: OfferStep,
-    feature: ContentFeatureSummary,
-    level: number,
-    classId: string | null,
-    times = 1
-  ) => {
-    // Before the early return: a feature may raise a budget without asking for a pick of its own.
-    addExtraPicks(feature.extraPicks, times);
-    // Every pick the record owes, mirroring the server's `featurePicks` loop (Magic Initiate owes two
-    // cantrips and a level-1 spell). Later picks take "/2", "/3", which `budgetKeyOf` does not collapse:
-    // "#n" is the same pick again and shares a budget, "/n" is a different pick on the same record.
-    const picks = featurePicksOf(feature);
-    picks.forEach((choice, index) =>
-      featurePickOffer(index === 0 ? key : `${key}/${index + 1}`, step, feature, choice, level, classId, times)
-    );
-  };
-
-  const featurePickOffer = (
-    key: string,
-    step: OfferStep,
-    feature: ContentFeatureSummary,
-    choice: NonNullable<ContentFeatureSummary["choice"]>,
-    level: number,
-    classId: string | null,
-    times = 1
-  ) => {
-    if (choice.choose <= 0) return;
-    const { options, unresolvable } = resolveChoice(choice, catalogs, nameOfKind(choice.kind), answersInDraft);
-    // The spell-level window the server's `withinSpellWindow` enforces: `maxSpellLevel` is a ceiling,
-    // `minSpellLevel` a floor (Mystic Arcanum is exactly level 6), and "cantrip" is level 0, "spell" 1+.
-    const ceiling = choice.maxSpellLevel;
-    const floor = choice.minSpellLevel;
-    const filtered = options.filter((option) => {
-      const spellLevel = option.level;
-      if (ceiling != null && (spellLevel ?? 0) > ceiling) return false;
-      if (floor != null && (spellLevel ?? 0) < floor) return false;
-      if (spellLevel == null) return true;
-      if (choice.kind === "cantrip") return spellLevel === 0;
-      if (choice.kind === "spell") return spellLevel >= 1;
-      return true;
-    });
-    // Drop feats this build already has (see `heldFeatIds`); the "asi" shorthand is never a feat.
-    let offerable = FEAT_KINDS.has(choice.kind)
-      ? filtered.filter(
-          (option) => option.id === ASI_SHORTHAND || !heldFeatIds.has(option.id) || featRepeats(option.id)
-        )
-      : filtered;
-    /**
-     * Options gated on an earlier answer (`requires`), mirroring the server. Unmet gates drop the
-     * option; when the survivors exactly fill the capacity the answer is a consequence, so no card is
-     * rendered and the server adopts the same survivors.
-     */
-    const gatedOptions = choice.options ?? [];
-    if (gatedOptions.some((option) => option.requires)) {
-      const legal = gatedOptions.filter((option) => !option.requires || answeredInDraft(option.requires));
-      if (legal.length === choice.choose * times) {
-        for (const option of legal) addExtraPicks(option.extraPicks, times);
-        return;
-      }
-      offerable = offerable.filter((option) => legal.some((candidate) => candidate.id === option.id));
-    }
-    const offerKey = uniqueKey(key);
-    // A feature granted more than once is one offer on the server and several here (see
-    // `spentByRepeat`): siblings share a budget key and must not share an answer.
-    const budgetKey = feature.grantedAtLevels.length > 1 ? budgetKeyOf(offerKey) : null;
-    const spent = budgetKey ? spentByRepeat.get(budgetKey) : undefined;
-    const held = unavailableOf(choice.kind, offerable);
-    let unavailable = held;
-    if (spent && spent.size > 0) {
-      const merged: Record<string, string> = { ...held };
-      for (const option of offerable) {
-        const reason = spent.get(option.id);
-        if (reason && !merged[option.id]) merged[option.id] = reason;
-      }
-      unavailable = merged;
-    }
-    offers.push({
-      key: offerKey,
-      step,
-      featureId: feature.id,
-      kind: choice.kind,
-      label: feature.name,
-      help: feature.description || null,
-      capacity: choice.choose * times,
-      options: offerable,
-      maxSpellLevel: ceiling ?? null,
-      level,
-      classId,
-      unresolvable,
-      unavailable
-    });
-    if (FEAT_KINDS.has(choice.kind)) {
-      for (const id of draft.picks[offerKey] ?? []) if (id !== ASI_SHORTHAND) heldFeatIds.add(id);
-    }
-    // After the push, like `recordHeld`: an offer never greys out its own answers.
-    if (budgetKey) {
-      const running = spentByRepeat.get(budgetKey) ?? new Map<string, string>();
-      for (const id of draft.picks[offerKey] ?? []) {
-        if (!running.has(id)) running.set(id, `already chosen for ${feature.name} at level ${level}`);
-      }
-      spentByRepeat.set(budgetKey, running);
-    }
-    recordHeld(offerKey, choice.kind, feature.name);
-    /**
-     * A chosen inline option is itself a feature: its own picks and budget grants mirror the server's
-     * second pass (Blessed Warrior's cantrips, Pact of the Blade's weapon). Keyed on the option id,
-     * as on the server.
-     */
-    const picked = new Set(draft.picks[offerKey] ?? []);
-    for (const option of choice.options ?? []) {
-      if (!picked.has(option.id)) continue;
-      addExtraPicks(option.extraPicks, times);
-      const nested = option.choices.length > 0 ? option.choices : option.choice ? [option.choice] : [];
-      const asFeature = { ...feature, id: option.id, name: option.name, description: option.description };
-      nested.forEach((pick, index) =>
-        featurePickOffer(
-          index === 0 ? `feature:${option.id}` : `feature:${option.id}/${index + 1}`,
-          step,
-          asFeature,
-          pick,
-          level,
-          classId,
-          times
-        )
-      );
-    }
-  };
-
-  // Step 1: species traits' picks, language choices, and size when more than one is printed. The
-  // wire folds lineage traits into `features` without a lineage tag; no SRD lineage trait asks for
-  // a pick, so nothing is mis-offered.
-  if (context.species) {
-    for (const trait of context.species.features) featureOffer(`feature:${trait.id}`, "species", trait, 1, null);
-    listOffer(
-      "species-languages",
-      "species",
-      "language",
-      `${context.species.name} languages`,
-      context.species.languageChoices,
-      null
-    );
-    if (context.species.sizes.length > 1) {
-      offers.push({
-        key: uniqueKey("species-size"),
-        step: "species",
-        featureId: null,
-        kind: "size",
-        label: "Size",
-        help: null,
-        capacity: 1,
-        options: optionsOfIds(context.species.sizes, titleize),
-        maxSpellLevel: null,
-        level: 1,
-        classId: null,
-        unresolvable: null,
-        unavailable: null
-      });
-    }
-  }
-
-  // Step 2: background lists, its features' picks, and the origin feat it grants.
-  if (context.background) {
-    listOffer(
-      "background-skills",
-      "background",
-      "skill",
-      `${context.background.name} skills`,
-      context.background.skillChoices,
-      null
-    );
-    listOffer(
-      "background-tools",
-      "background",
-      "tool",
-      `${context.background.name} tools`,
-      context.background.toolChoices,
-      null
-    );
-    listOffer(
-      "background-languages",
-      "background",
-      "language",
-      `${context.background.name} languages`,
-      context.background.languageChoices,
-      null
-    );
-    for (const feature of context.background.features)
-      featureOffer(`feature:${feature.id}`, "background", feature, 1, null);
-    if (context.originFeat)
-      featureOffer(`feature:${context.originFeat.feature.id}`, "background", context.originFeat.feature, 1, null);
-  }
-
-  // Step 3: class and level; the proficiency lists the class opens.
-  if (context.classRecord) {
-    listOffer(
-      "class-skills",
-      "class",
-      "skill",
-      `${context.classRecord.name} skills`,
-      context.classRecord.skillChoiceCount > 0
-        ? { choose: context.classRecord.skillChoiceCount, from: context.classRecord.skillChoices }
-        : null,
-      context.classRecord.id
-    );
-    listOffer(
-      "class-tools",
-      "class",
-      "tool",
-      `${context.classRecord.name} tools`,
-      context.classRecord.toolChoices,
-      context.classRecord.id
-    );
-  }
-
-  // Step 4: class features (subclass, fighting style, weapon mastery, expertise), one decision per
-  // ASI level, the subclass's own features, then cantrip and prepared-spell budgets.
-  if (context.classRecord) {
-    for (const { feature, level } of grantedClassFeatures(context.classRecord, draft.level)) {
-      // One offer per ASI level; the server sees N rows against its single capacity-N offer.
-      const key = feature.choice?.kind === "asi-or-feat" ? `feature:${feature.id}@${level}` : `feature:${feature.id}`;
-      featureOffer(key, "features", feature, level, context.classRecord.id);
-    }
-    if (context.subclass) {
-      const subclassLevel = context.subclass.subclassLevel ?? context.classRecord.subclassLevel;
-      for (const feature of context.subclass.features) {
-        const at = feature.level ?? subclassLevel;
-        if (at <= draft.level) featureOffer(`feature:${feature.id}`, "features", feature, at, context.classRecord.id);
-      }
-    }
-    /**
-     * A chosen feat's own feature can ask for picks (Magic Initiate's cantrips, the ASI feat's ability
-     * points); those offers exist only once the parent feat is chosen, as in the server's two passes.
-     *
-     * One offer per chosen feat, as the server mints them; never one merged offer of N times the
-     * capacity, which a checkbox grid cannot fill (`repeatable` does not cross the wire). `uniqueKey`
-     * suffixes the repeats and `budgetKeyOf` strips the suffix, so `extraPicks` still sum per budget.
-     *
-     * Every taken feat is passed on, since the server applies `grantExtraPicks` to all of them.
-     */
-    const takenFeatIds = offers
-      .filter((offer) => FEAT_KINDS.has(offer.kind))
-      .flatMap((offer) =>
-        (draft.picks[offer.key] ?? []).map((id) => ({
-          id,
-          step: offer.step,
-          level: offer.level,
-          classId: offer.classId
-        }))
-      );
-    for (const taken of takenFeatIds) {
-      if (taken.id === ASI_SHORTHAND) continue;
-      const feat = catalogs.choice.feats.find((entry) => entry.id === taken.id);
-      if (!feat) continue;
-      featureOffer(`feature:${feat.feature.id}`, taken.step, feat.feature, taken.level, taken.classId);
-    }
-
-    // The class's spell budgets from its level row: the untagged rows the server matches against
-    // `cantripsKnown` / `preparedCount`. Feature-tagged spell picks are separate offers outside them.
-    const row = context.levelRow;
-    if (row && context.spellListId) {
-      const slug = `${context.spellListId}-spells`;
-      let list: CatalogChoiceOption[] = [];
-      let unresolvable: string | null = null;
-      try {
-        list = resolveCatalogChoice(slug, catalogs.choice);
-      } catch (error) {
-        if (error instanceof CatalogChoiceError) unresolvable = error.message;
-        else throw error;
-      }
-      const maxSlotLevel = (row.spellSlots ?? []).reduce(
-        (highest, count, index) => (count > 0 ? index + 1 : highest),
-        0
-      );
-      if ((row.cantripsKnown ?? 0) > 0) {
-        offers.push({
-          key: uniqueKey("class-cantrips"),
-          step: "features",
-          featureId: null,
-          kind: "cantrip",
-          label: `${context.classRecord.name} cantrips`,
-          help: null,
-          capacity: row.cantripsKnown!,
-          options: list.filter((option) => option.level === 0),
-          maxSpellLevel: 0,
-          level: 1,
-          classId: context.classRecord.id,
-          unresolvable,
-          unavailable: null
-        });
-      }
-      const preparedCap = row.preparedCount ?? row.spellsKnown ?? 0;
-      if (preparedCap > 0 && maxSlotLevel > 0) {
-        offers.push({
-          key: uniqueKey("class-spells"),
-          step: "features",
-          featureId: null,
-          kind: "spell",
-          label:
-            context.classRecord.spellcasting?.prepares === "known"
-              ? `${context.classRecord.name} spells known`
-              : `${context.classRecord.name} prepared spells`,
-          help: null,
-          capacity: preparedCap,
-          options: list.filter((option) => (option.level ?? 0) >= 1 && (option.level ?? 0) <= maxSlotLevel),
-          maxSpellLevel: maxSlotLevel,
-          level: 1,
-          classId: context.classRecord.id,
-          unresolvable,
-          unavailable: null
-        });
-      }
-    }
-  }
-
-  // Step 6: equipment. One class option and one background option.
-  if (context.classRecord && context.classRecord.startingEquipmentOptions.length > 0) {
-    offers.push({
-      key: uniqueKey("class-equipment"),
-      step: "equipment",
-      featureId: null,
-      kind: "equipment",
-      label: `${context.classRecord.name} starting equipment`,
-      help: null,
-      capacity: 1,
-      options: context.classRecord.startingEquipmentOptions.map((option) => ({ id: option.id, name: option.label })),
-      maxSpellLevel: null,
-      level: 1,
-      classId: context.classRecord.id,
-      unresolvable: null,
-      unavailable: null
-    });
-  }
-  if (context.background && context.background.startingEquipmentOptions.length > 0) {
-    offers.push({
-      key: uniqueKey("background-equipment"),
-      step: "equipment",
-      featureId: null,
-      kind: "equipment",
-      label: `${context.background.name} starting equipment`,
-      help: null,
-      capacity: 1,
-      options: context.background.startingEquipmentOptions.map((option) => ({ id: option.id, name: option.label })),
-      maxSpellLevel: null,
-      level: 1,
-      classId: null,
-      unresolvable: null,
-      unavailable: null
-    });
-  }
-
-  return withGrantedPicks(withExpertiseReach(offers, context, catalogs, draft), extraPicks);
-}
-
-/** An offer's key without its "#n" suffix; what an `extraPicks` grant names. */
-const budgetKeyOf = (key: string) => key.replace(/#\d+$/, "");
-
-/**
- * Capacity is the printed budget plus what was granted (e.g. Thaumaturge's extra Cleric cantrip),
- * applied once every offer exists. A grant naming no offer is ignored here; the server rejects it
- * as an authoring error.
- */
-function withGrantedPicks(offers: readonly BuilderOffer[], extraPicks: ReadonlyMap<string, number>): BuilderOffer[] {
-  if (extraPicks.size === 0) return [...offers];
-  return offers.map((offer) => {
-    const granted = extraPicks.get(budgetKeyOf(offer.key)) ?? 0;
-    return granted === 0 ? offer : { ...offer, capacity: offer.capacity + granted };
-  });
-}
-
-/**
- * Greys the expertise options this build is not proficient in (SRD: expertise needs proficiency).
- * A second pass rather than part of `unavailableOf` because the server's rule is a union over all
- * sources, not a step-order accumulation, and `heldProficiencies` also holds tools and languages.
- */
-function withExpertiseReach(
-  offers: BuilderOffer[],
-  context: OfferContext,
-  catalogs: BuilderCatalogs,
-  draft: BuilderDraft
-): BuilderOffer[] {
-  if (!offers.some((offer) => offer.kind === "expertise")) return offers;
-  // The server's split: a "skill-or-tool" pick counts as a skill only if the id is one.
-  const skillIds = new Set(catalogs.choice.skills.map((skill) => skill.id));
-  const proficient = new Set<string>(context.background?.skillProficiencies ?? []);
-  for (const offer of offers) {
-    if (offer.kind !== "skill" && offer.kind !== "skill-or-tool") continue;
-    for (const id of draft.picks[offer.key] ?? []) {
-      if (offer.kind === "skill" || skillIds.has(id)) proficient.add(id);
-    }
-  }
-  return offers.map((offer) => {
-    if (offer.kind !== "expertise") return offer;
-    const notProficient: Record<string, string> = {};
-    for (const option of offer.options) {
-      if (!proficient.has(option.id)) notProficient[option.id] = "not one of your proficiencies";
-    }
-    // Never grey an offer into a dead end: with no proficient options (possibly granted by a rider the
-    // client cannot see), leave the list enabled and let the server explain.
-    if (Object.keys(notProficient).length === offer.options.length) return offer;
-    // Merged, not assigned: `offer.unavailable` may already hold the sibling grant's reason (see
-    // `spentByRepeat`), and the more specific reason wins.
-    return { ...offer, unavailable: { ...notProficient, ...offer.unavailable } };
-  });
-}
-
 /** The built-in "raise two points instead of taking a feat" row id the server understands. */
 export const ASI_SHORTHAND = "asi";
-
-/**
- * Drops picks the current offers no longer support (e.g. after a class change) and re-mirrors
- * `subclassId`, so stale picks never reach the server as a rejection. Returns the same object
- * when nothing changed, so it is safe to run from an effect.
- */
-export function prunePicks(draft: BuilderDraft, offers: readonly BuilderOffer[]): BuilderDraft {
-  const byKey = new Map(offers.map((offer) => [offer.key, offer]));
-  const picks: Record<string, readonly string[]> = {};
-  let changed = false;
-  for (const [key, chosen] of Object.entries(draft.picks)) {
-    const offer = byKey.get(key);
-    if (!offer) {
-      changed = true;
-      continue;
-    }
-    const legal = chosen.filter(
-      (id) => (offer.kind === "asi-or-feat" && id === ASI_SHORTHAND) || offer.options.some((option) => option.id === id)
-    );
-    const capped = legal.slice(0, offer.capacity);
-    if (capped.length !== chosen.length) changed = true;
-    if (capped.length > 0) picks[key] = capped;
-  }
-  const asiIncreases: Record<string, ReadonlyArray<{ ability: Ability; amount: number }>> = {};
-  for (const [key, increases] of Object.entries(draft.asiIncreases)) {
-    if (byKey.has(key)) asiIncreases[key] = increases;
-    else changed = true;
-  }
-  // The subclass offer is the subclass answer; the top-level id only mirrors it.
-  const subclassOffer = offers.find((offer) => offer.kind === "subclass");
-  const mirrored = subclassOffer ? ((picks[subclassOffer.key] ?? [])[0] ?? null) : null;
-  if (mirrored !== draft.subclassId) changed = true;
-  return changed ? { ...draft, picks, asiIncreases, subclassId: mirrored } : draft;
-}
 
 /** An offer is satisfied when exactly filled, or deferred because its catalog is empty. */
 export function offerFilled(offer: BuilderOffer, draft: BuilderDraft): boolean {
@@ -1025,25 +335,6 @@ export function pointBuySpent(draft: BuilderDraft): number {
 
 // The submitted payload
 
-export function buildChoiceRows(draft: BuilderDraft, offers: readonly BuilderOffer[]): CharacterChoice[] {
-  const rows: CharacterChoice[] = [];
-  for (const offer of offers) {
-    for (const id of draft.picks[offer.key] ?? []) {
-      const payload: Record<string, unknown> = {};
-      if (offer.featureId) payload.featureId = offer.featureId;
-      if (offer.kind === "asi-or-feat" && id === ASI_SHORTHAND) payload.increases = draft.asiIncreases[offer.key] ?? [];
-      rows.push({
-        level: offer.level,
-        ...(offer.classId ? { classId: offer.classId } : {}),
-        kind: offer.kind,
-        id,
-        ...(Object.keys(payload).length > 0 ? { payload } : {})
-      });
-    }
-  }
-  return rows;
-}
-
 export type CharacterCreatePayload = Readonly<{
   name: string;
   speciesId: string;
@@ -1058,9 +349,9 @@ export type CharacterCreatePayload = Readonly<{
   choices: readonly CharacterChoice[];
 }>;
 
-/** The `character.create` body, minus the caller's `commandId`. Throws only on a draft the step
-    gating should already have blocked. */
-export function buildCreatePayload(draft: BuilderDraft, offers: readonly BuilderOffer[]): CharacterCreatePayload {
+/** The `character.create` body, minus the caller's `commandId`; `choices` are the ledger rows the server
+    made from the draft's answers. Throws only on a draft the step gating should already have blocked. */
+export function buildCreatePayload(draft: BuilderDraft, choices: readonly CharacterChoice[]): CharacterCreatePayload {
   const base = baseScoresOf(draft);
   const scores = {} as Record<Ability, number>;
   for (const ability of ABILITIES) {
@@ -1081,7 +372,7 @@ export function buildCreatePayload(draft: BuilderDraft, offers: readonly Builder
     baseScores: scores,
     backgroundBonusAllocation: draft.backgroundBonus,
     hp: draft.hpMode === "average" ? { mode: "average" } : { mode: "entries", entries: draft.hpEntries },
-    choices: buildChoiceRows(draft, offers)
+    choices
   };
 }
 
@@ -1147,7 +438,7 @@ export const STEP_SHORT: Readonly<Record<StepId, string>> = {
   review: "Review"
 };
 
-const offersForStep = (offers: readonly BuilderOffer[], step: OfferStep) =>
+const offersForStep = (offers: readonly BuilderOffer[], step: BuilderOfferStep) =>
   offers.filter((offer) => offer.step === step);
 
 /** The first unmet requirement of a step, phrased as an instruction, or null when the step is done. */
@@ -1159,7 +450,8 @@ export function stepBlockedReason(
   policy: BuilderPolicy
 ): string | null {
   const context = offerContext(draft, catalogs);
-  const unfilled = (owner: OfferStep) => offersForStep(offers, owner).find((offer) => !offerFilled(offer, draft));
+  const unfilled = (owner: BuilderOfferStep) =>
+    offersForStep(offers, owner).find((offer) => !offerFilled(offer, draft));
   /**
    * One template for "this pick is not answered yet". The label is printed as the content prints it,
    * unquoted, matching the heading it points at.
@@ -1180,7 +472,7 @@ export function stepBlockedReason(
    * A pick already held from another source. Options are not filtered, so a pick made before the
    * collision (e.g. the background changed later) survives and must be reported.
    */
-  const heldConflict = (owner: OfferStep) => {
+  const heldConflict = (owner: BuilderOfferStep) => {
     for (const offer of offersForStep(offers, owner)) {
       if (!offer.unavailable) continue;
       for (const id of draft.picks[offer.key] ?? []) {
