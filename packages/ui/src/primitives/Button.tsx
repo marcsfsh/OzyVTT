@@ -1,4 +1,4 @@
-import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode, Ref } from "react";
+import type { ButtonHTMLAttributes, ReactNode, Ref } from "react";
 import { cx } from "./util";
 import "./Button.css";
 
@@ -52,49 +52,6 @@ export function Button({
         </span>
       )}
     </button>
-  );
-}
-
-export interface LinkButtonProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
-  variant?: ButtonVariant;
-  size?: ButtonSize;
-  block?: boolean;
-  lift?: boolean;
-  arrow?: boolean;
-  ref?: Ref<HTMLAnchorElement>;
-}
-
-/** Anchor styled as a button, for real navigations (download links, viewer URL). */
-export function LinkButton({
-  variant = "secondary",
-  size = "md",
-  block = false,
-  lift = false,
-  arrow = false,
-  className,
-  children,
-  ...rest
-}: LinkButtonProps) {
-  return (
-    <a
-      className={cx(
-        "nh-btn",
-        `nh-btn--${variant}`,
-        size === "sm" && "nh-btn--sm tap-target",
-        block && "nh-btn--block",
-        "interactive",
-        lift && "lift",
-        className
-      )}
-      {...rest}
-    >
-      {children}
-      {arrow && (
-        <span className="nav-arrow" aria-hidden="true">
-          →
-        </span>
-      )}
-    </a>
   );
 }
 

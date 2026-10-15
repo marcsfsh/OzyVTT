@@ -138,7 +138,6 @@ describe("The play glossary (D28)", () => {
       expect(dirs.has(dir), `apps/client/src/${dir}/ is not in the scan`).toBe(true);
     }
     expect(dirs.has("codex"), "codex/ has its own lock and must stay out of this one").toBe(false);
-    expect(dirs.has("styleguide"), "styleguide/ must be able to demo a retired word").toBe(false);
   });
 
   it("sees the copy shapes a naive scanner is blind to", () => {

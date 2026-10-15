@@ -1,7 +1,7 @@
 /* The label band: a Field's input well starts one label line plus one row-gap below its cell top. Controls with
    their own label (Stepper) or none (Switch) reserve this so they align. Derived from `.nh-field-label`'s line
    box (`--fs-sm` × 1.3) and `.nh-field`'s `gap`; change all three together. `forms-band.test.tsx` checks the
-   pairing and `scripts/primitive-align-check.mjs` measures it in a browser. */
+   pairing. */
 :root {
   --nh-label-band: calc(var(--fs-sm) * 1.3 + var(--space-2));
 }

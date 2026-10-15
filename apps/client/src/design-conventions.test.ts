@@ -13,7 +13,7 @@
  * a dead row to delete. Allowlist sizes are pinned in `design-conventions-shape.ts`.
  *
  * Source text only: an imported-but-unused icon passes (a), and `color-mix()` over vars, inline
- * styles or runtime colours are invisible to (d). Those are left to review and `/styleguide`.
+ * styles or runtime colours are invisible to (d). Those are left to review.
  */
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
@@ -117,7 +117,7 @@ describe("(a) a glyph is never text — design-language.md:41-45", () => {
       [...new Set(offenders)],
       `A glyph rendered as text is a different typeface at the wrong size, and on iOS/Android it is an EMOJI — a hue this palette does not own.\n` +
         `Fix: import an icon from @vtt/ui (the set is packages/ui/src/primitives/icons.tsx) and render <IconX /> instead of the character.\n` +
-        `If the glyph you need has no icon yet, add one there and demo it in the styleguide icons grid — that is the same commit, not a follow-up.\n` +
+        `If the glyph you need has no icon yet, add one there in the same commit.\n` +
         `(design-language.md:41-45. Do NOT add a row to GLYPH_ALLOW: that list only shrinks.)`
     ).toEqual([]);
   });
@@ -162,8 +162,7 @@ const RAW_SEARCH_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = 
 ];
 
 /**
- * Raw number inputs; `NumberField` is the replacement (see the styleguide's `#numberfield`
- * section). Capitalized `<Input type="number">` is the primitive and out of scope here.
+ * Raw number inputs; `NumberField` is the replacement. Capitalized `<Input type="number">` is the primitive and out of scope here.
  */
 const RAW_NUMBER_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
   ["apps/client/src/encounter/CharacterSheet.tsx", 3],
@@ -767,7 +766,7 @@ describe("the design-convention checks themselves", () => {
     }
   });
 
-  it("excludes only the two directories it says it excludes", () => {
+  it("excludes only the directory it says it excludes", () => {
     // An empty or over-broad prefix would silently empty every scan above.
     for (const [prefix, why] of PLAY_EXCLUDED) {
       expect(prefix.trim(), "an empty PLAY_EXCLUDED prefix excludes the whole tree").not.toBe("");
@@ -780,6 +779,6 @@ describe("the design-convention checks themselves", () => {
       PLAY_EXCLUDED.map(([prefix]) => prefix),
       `PLAY_EXCLUDED has changed. It is an EXCLUSION list on purpose — a new play directory must be born scanned — so every entry is a hole in every check above.\n` +
         `Fix: a new exclusion needs a reason a reviewer would accept. "It fails otherwise" is not one.`
-    ).toEqual(["codex/", "styleguide/"]);
+    ).toEqual(["codex/"]);
   });
 });

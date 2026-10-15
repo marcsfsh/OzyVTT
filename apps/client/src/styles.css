@@ -4,7 +4,7 @@
   box-sizing: border-box;
 }
 /* The shell lock: the body is the viewport and never scrolls; `<main>` is the frame. Also loaded by
-   sheet.html (one 100dvh column, so a no-op there), but not by viewer.html or styleguide.html. */
+   sheet.html (one 100dvh column, so a no-op there), but not by viewer.html. */
 body {
   margin: 0;
   min-width: 320px;

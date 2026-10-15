@@ -14,8 +14,7 @@ export const UI_SRC = `${process.cwd()}/../../packages/ui/src`;
  * scanned from birth. Paths are relative to `apps/client/src/`; a directory prefix ends in `/`.
  */
 export const PLAY_EXCLUDED: ReadonlyArray<readonly [prefix: string, why: string]> = [
-  ["codex/", "has its own lock with its own glossary — codex/vocabulary.test.ts"],
-  ["styleguide/", "the developer reference has to be able to demo the thing it documents"]
+  ["codex/", "has its own lock with its own glossary — codex/vocabulary.test.ts"]
 ];
 
 export const CONVENTION_SHAPE = {
@@ -92,21 +91,9 @@ export const CONVENTION_SHAPE = {
   /** (file, string) exemptions in `play-vocabulary.test.ts`. Shrink-only. */
   playExemptions: 2,
 
-  // Styleguide completeness
-  /** Floor on the renderable components parsed out of `packages/ui/src/index.ts`. */
-  styleguideComponentFloor: 70,
-  /** Components exported but not demoed in the styleguide. */
-  nonVisualCount: 0,
-  /** The styleguide's own non-test files, pinned so the set cannot drift silently. */
-  styleguideFiles: ["StyleGuide.tsx", "styleguide.css"] as readonly string[],
-
   // The checks themselves
   /** The enforcement files, relative to `apps/client`; must match the client tests importing this module. */
-  checkFiles: [
-    "src/design-conventions.test.ts",
-    "src/play-vocabulary.test.ts",
-    "src/styleguide/styleguide-completeness.test.ts"
-  ] as readonly string[]
+  checkFiles: ["src/design-conventions.test.ts", "src/play-vocabulary.test.ts"] as readonly string[]
 } as const;
 
 // The tree, as data
@@ -175,9 +162,9 @@ export function playCopySources(): { file: string; read: () => string }[] {
 /** The scanned set plus `codex/`: (c)'s scope, because the composite class lives there. */
 export function eyebrowScanned(): Source[] {
   return [
-    ...walk(CLIENT_SRC, (n) => /\.tsx?$/.test(n) && !n.includes(".test.") && !n.endsWith(".d.ts"))
-      .filter((rel) => !rel.startsWith("styleguide/"))
-      .map((rel) => source(CLIENT_SRC, rel, clientPath)),
+    ...walk(CLIENT_SRC, (n) => /\.tsx?$/.test(n) && !n.includes(".test.") && !n.endsWith(".d.ts")).map((rel) =>
+      source(CLIENT_SRC, rel, clientPath)
+    ),
     ...uiPrimitiveTsx()
   ];
 }

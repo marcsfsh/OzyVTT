@@ -20,10 +20,8 @@ export { ThemeToggle, type ThemeToggleProps } from "./theme/ThemeToggle";
 export { cx } from "./primitives/util";
 export {
   Button,
-  LinkButton,
   IconButton,
   type ButtonProps,
-  type LinkButtonProps,
   type IconButtonProps,
   type ButtonVariant,
   type ButtonSize
@@ -41,9 +39,8 @@ export {
 export { Panel, PanelHeader, type PanelProps, type PanelHeaderProps, type PanelAccent } from "./primitives/Panel";
 export { Wordmark, Eyebrow, type WordmarkProps, type EyebrowProps } from "./primitives/Wordmark";
 export { Chip, type ChipProps, type ChipTone } from "./primitives/Chip";
-export { Tabs, type TabsProps, type TabItem } from "./primitives/Tabs";
+export { Tabs, type TabsProps } from "./primitives/Tabs";
 export { Menu, MenuItem, type MenuProps, type MenuItemProps } from "./primitives/Menu";
-export { Tooltip, type TooltipProps } from "./primitives/Tooltip";
 export { Modal, type ModalProps } from "./primitives/Modal";
 export { Drawer, type DrawerProps } from "./primitives/Drawer";
 export {
@@ -77,20 +74,13 @@ export { SaveState, type SaveStateProps, type SaveStatus } from "./primitives/Sa
 
 /* Icons: the design system's own SVG glyphs. The app's richer set lives in apps/client/src/codex/icons.tsx. */
 export {
-  IconCheck,
   IconChevron,
   IconChevronLeft,
   IconChevronRight,
   IconSearch,
-  IconShuffle,
-  IconDie,
   IconPencil,
-  IconWarning,
-  IconInfo,
   IconPlus,
-  IconTrash,
   IconDrag,
-  IconCopy,
   IconEye,
   IconEyeOff,
   IconX,
@@ -105,8 +95,7 @@ export {
   IconFog,
   IconColor,
   IconCleanup,
-  IconScene,
-  IconStar
+  IconScene
 } from "./primitives/icons";
 export { Combobox, type ComboboxProps, type ComboboxOption } from "./primitives/Combobox";
 // The editor's two pure rules, exported for direct testing.
@@ -126,8 +115,7 @@ export {
   AbilityScoreAllocator,
   type AbilityScoreAllocatorProps,
   type AbilityAllocationMode,
-  type AbilityRowData,
-  type AbilityPoolValue
+  type AbilityRowData
 } from "./primitives/AbilityScoreAllocator";
 export { DiceInputRow, type DiceInputRowProps, type DiceEntryMode } from "./primitives/DiceInputRow";
 export { NameField, type NameFieldProps } from "./primitives/NameField";

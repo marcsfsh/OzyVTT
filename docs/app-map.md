@@ -341,5 +341,5 @@ Curated pointers (verify line numbers before relying on them - code moves):
 - **Rules engine:** `apps/server/src/{action-resolution,saving-throws,hit-points,rests,condition-rules}.ts`.
 - **Shared 5e math:** `packages/rules-5e/src/{dice,combat,character}.ts`.
 - **SRD content bundles:** `packages/content-srd-5.2.1`.
-- **Client entry points:** `apps/client/src/{main,viewer-main,styleguide-main}.tsx`.
-- **Design system:** `packages/ui/src/index.ts` (+ the `/styleguide` route).
+- **Client entry points:** `apps/client/src/{main,viewer-main,sheet-main}.tsx`.
+- **Design system:** `packages/ui/src/index.ts`.
