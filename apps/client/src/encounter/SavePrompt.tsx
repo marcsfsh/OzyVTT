@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { type PendingSave, type PlayerPendingSave } from "@vtt/domain";
 import { command } from "../lib/command";
 import { RollControls, type DieMode } from "./RollControls";
+import { damageAdjustments } from "./format";
 import { saveAnswerPayload, saveDamageAmend } from "./save-answer";
 import "./prompts.css";
 
@@ -24,12 +25,8 @@ const RECHECK_AMEND_MS = 350;
  *
  * An amend typed after the roll invalidates the server's projection, so the prompt re-sends
  * Confirm's own payload with `commit: false` after a short pause and shows the server's answer.
- * Halving is per typed part and floored, and differs by save outcome, so it is not reimplemented
- * here.
- *
- * Known limitation: the preview projection has been halved but not run through resistances,
- * vulnerability, immunity or damage reduction, so against a resistant target the commit lands less
- * than shown. `save-damage.mirror.test.ts` pins the current behaviour.
+ * Halving is per typed part and floored, differs by save outcome, and then runs through the
+ * target's defences, so it is not reimplemented here: the line prints what Confirm will land.
  */
 export function SavePrompt({
   save,
@@ -49,11 +46,12 @@ export function SavePrompt({
   const [busy, setBusy] = useState(false);
   // A rolled-but-not-applied result: the server records the die and returns the projected outcome,
   // shown until the answerer confirms. `basis` is the pre-halving damage that preview used, so a later
-  // amend is detectable.
+  // amend is detectable; `defences` says what resistances and the like did to it.
   const [rolled, setRolled] = useState<{
     total: number;
     success: boolean;
     damage: number;
+    defences: string;
     condition: boolean;
     mode?: DieMode;
     basis: number;
@@ -113,6 +111,7 @@ export function SavePrompt({
           total: outcome.total,
           success: outcome.success,
           damage: outcome.appliedDamage,
+          defences: damageAdjustments(outcome.parts, outcome.flatReduction),
           condition: outcome.conditionApplied,
           mode: outcome.rollMode?.mode,
           basis: proposal
@@ -171,6 +170,7 @@ export function SavePrompt({
                 ...current,
                 success: outcome.success,
                 damage: outcome.appliedDamage,
+                defences: damageAdjustments(outcome.parts, outcome.flatReduction),
                 condition: outcome.conditionApplied,
                 basis
               }
@@ -230,13 +230,13 @@ export function SavePrompt({
                 - {rolled.success ? "Success" : "Failure"}
               </strong>
               {/* `rolled.damage` is always the server's projection for the field's number, never local
-            arithmetic. While a recheck is out, show only what was typed. The projection is
-            pre-defence (see the docblock). */}
+            arithmetic. While a recheck is out, show only what was typed. */}
               <span className="save-prompt-effect">
                 {stale
                   ? `Amended to ${proposal}${recheck === "failed" ? "" : " - checking"}`
                   : `${rolled.damage > 0 ? `${rolled.damage} dmg` : "no damage"}${rolled.condition ? " + condition" : ""}${rolled.basis !== save.proposedDamage ? ` (amended - rolled ${save.proposedDamage})` : ""}`}
               </span>
+              {!stale && rolled.defences && <span className="save-prompt-defences">{rolled.defences}</span>}
             </>
           ) : undefined
         }

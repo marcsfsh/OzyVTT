@@ -613,6 +613,7 @@ describe("criterion 7: a dagger granting advantage on opportunity attacks", () =
           proposedDamage: 0,
           proposedDamageParts: [],
           critical: false,
+          weighed: null,
           createdAt: 0
         }
       ]
@@ -852,7 +853,15 @@ describe("criterion 10: half-plate that raises the spell save DC", () => {
           name: "Scorching Ray",
           activation: "action",
           description: "Dexterity Saving Throw: DC 14.",
-          save: { ability: "dex", dc: 14 },
+          save: { ability: "dex", dc: 14, spellcasting: true, successDamage: "half", failureConditions: [] },
+          damage: [{ formula: "2d6", type: "fire" }]
+        },
+        {
+          id: "breath",
+          name: "Fire Breath",
+          activation: "action",
+          description: "Dexterity Saving Throw: DC 13.",
+          save: { ability: "dex", dc: 13, successDamage: "half", failureConditions: [] },
           damage: [{ formula: "2d6", type: "fire" }]
         }
       ]
@@ -876,8 +885,11 @@ describe("criterion 10: half-plate that raises the spell save DC", () => {
       ])
     );
 
-    const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === "scorch")!;
+    const actions = effectiveActions(definition, state.actors[0], catalog);
+    const action = actions.find((entry) => entry.id === "scorch")!;
     expect(action.save!.dc).toBe(15);
+    // A printed DC is not the bearer's spell save DC, so the armour leaves it alone.
+    expect(actions.find((entry) => entry.id === "breath")!.save!.dc).toBe(13);
     const resolution = resolveDefinitionAction(
       state,
       action,

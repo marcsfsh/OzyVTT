@@ -248,11 +248,10 @@ export function saveOutcomeFields(prefix: string): readonly FieldDef[] {
       options: [opt("half", "Half damage"), opt("none", "No damage")]
     },
     {
-      key: `${prefix}.failureCondition`,
+      key: `${prefix}.failureConditions`,
       label: "On a failure, also",
-      kind: "select",
-      placeholder: "No condition",
-      emptyValue: "null",
+      kind: "multiselect",
+      wide: true,
       options: SaveConditionSchema.options.map((id) => opt(id, `${id[0].toUpperCase()}${id.slice(1)}`))
     }
   ];

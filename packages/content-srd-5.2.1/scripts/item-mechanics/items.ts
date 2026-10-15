@@ -411,7 +411,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Expend 1 charge to launch a glowing mote of light at a point within 60 feet. Each creature in a 15-foot Cube originating from that point makes a DC 15 Dexterity saving throw, taking 5d4 Radiant damage on a failed save or half as much damage on a successful one.",
-        save: { ability: "dex", dc: 15, successDamage: "half", failureCondition: null },
+        save: { ability: "dex", dc: 15, successDamage: "half", failureConditions: [] },
         damage: [{ formula: "5d4", type: "radiant" }],
         uses: { limit: 6, per: "long-rest", pool: "ring-of-shooting-stars-charges" }
       }
@@ -485,7 +485,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Present the rod and command obedience from each creature of your choice that you can see within 120 feet. Each target must succeed on a DC 15 Wisdom saving throw or have the Charmed condition for 8 hours. If harmed by you or your allies, or commanded to do something contrary to its nature, a target ceases to be Charmed in this way.",
-        save: { ability: "wis", dc: 15, successDamage: "none", failureCondition: "charmed" },
+        save: { ability: "wis", dc: 15, successDamage: "none", failureConditions: ["charmed"] },
         uses: { limit: 1, per: "long-rest" }
       }
     ]
@@ -595,7 +595,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "A bolt of lightning leaps from the staff's tip in a Line 5 feet wide and 120 feet long. Each creature in that Line makes a DC 17 Dexterity saving throw, taking 9d6 Lightning damage on a failed save or half as much damage on a successful one.",
-        save: { ability: "dex", dc: 17, successDamage: "half", failureCondition: null },
+        save: { ability: "dex", dc: 17, successDamage: "half", failureConditions: [] },
         damage: [{ formula: "9d6", type: "lightning" }],
         uses: { limit: 1, per: "long-rest" }
       },
@@ -605,7 +605,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "The staff produces a thunderclap audible out to 600 feet. Every creature within a 60-foot Emanation originating from you makes a DC 17 Constitution saving throw. On a failed save, a creature takes 2d6 Thunder damage and has the Deafened condition for 1 minute. On a successful save, a creature takes half as much damage only.",
-        save: { ability: "con", dc: 17, successDamage: "half", failureCondition: "deafened" },
+        save: { ability: "con", dc: 17, successDamage: "half", failureConditions: ["deafened"] },
         damage: [{ formula: "2d6", type: "thunder" }],
         uses: { limit: 1, per: "long-rest" }
       }
@@ -678,7 +678,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Expend 1 charge to send a thin blue ray toward a creature you can see within 60 feet. The target must succeed on a DC 15 Constitution saving throw or have the Paralyzed condition for 1 minute. At the end of each of its turns, it repeats the save, ending the effect on itself on a success.",
-        save: { ability: "con", dc: 15, successDamage: "none", failureCondition: "paralyzed" },
+        save: { ability: "con", dc: 15, successDamage: "none", failureConditions: ["paralyzed"] },
         uses: { limit: 7, per: "long-rest", pool: "wand-of-paralysis-charges" }
       }
     ]
@@ -980,7 +980,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Expend 1 charge to make the garment display a shifting pattern of dazzling hues until the end of your next turn. During this time, the robe sheds Bright Light in a 30-foot radius and Dim Light for an additional 30 feet, and creatures that can see you have Disadvantage on attack rolls against you. Any creature in the Bright Light that can see you when the robe's power is activated must succeed on a DC 15 Wisdom saving throw or have the Stunned condition until the effect ends.",
-        save: { ability: "wis", dc: 15, successDamage: "none", failureCondition: "stunned" },
+        save: { ability: "wis", dc: 15, successDamage: "none", failureConditions: ["stunned"] },
         uses: { limit: 3, per: "long-rest", pool: "robe-of-scintillating-colors-charges" }
       }
     ]
@@ -1139,7 +1139,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Remove the stopper and speak the command word: 30 gallons of water gush forth in a Line 30 feet long and 1 foot wide. One creature of your choice in the Line must succeed on a DC 13 Strength saving throw or take 1d4 Bludgeoning damage and have the Prone condition. Instead of a creature, you can target one object in the Line that isn't being worn or carried and that weighs no more than 200 pounds; the object is knocked over.",
-        save: { ability: "str", dc: 13, successDamage: "none", failureCondition: "prone" },
+        save: { ability: "str", dc: 13, successDamage: "none", failureConditions: ["prone"] },
         damage: [{ formula: "1d4", type: "bludgeoning" }]
       }
     ]
@@ -1214,7 +1214,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Target a creature you can see within 60 feet of yourself. If the flask is empty and the target is native to a plane of existence other than the one you are on, the target must succeed on a DC 17 Wisdom saving throw or be trapped in the flask. Once trapped, a creature remains in the flask until released.",
-        save: { ability: "wis", dc: 17, successDamage: "none", failureCondition: null }
+        save: { ability: "wis", dc: 17, successDamage: "none", failureConditions: [] }
       }
     ]
   },
@@ -1244,7 +1244,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Expend 1 charge to play an eerie, spellbinding tune. Each creature of your choice within 30 feet of you must succeed on a DC 15 Wisdom saving throw or have the Frightened condition for 1 minute. A creature that fails the save repeats it at the end of each of its turns, ending the effect on itself on a success. A creature that succeeds on its save is immune to the effect of these pipes for 24 hours.",
-        save: { ability: "wis", dc: 15, successDamage: "none", failureCondition: "frightened" },
+        save: { ability: "wis", dc: 15, successDamage: "none", failureConditions: ["frightened"] },
         uses: { limit: 3, per: "long-rest", pool: "pipes-of-haunting-charges" }
       }
     ]
@@ -1280,7 +1280,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Command the other end of the rope to dart forward and entangle one creature you can see within 20 feet of yourself. The target must succeed on a DC 15 Dexterity saving throw or have the Restrained condition. You can release the target by letting go of your end of the rope or by using a Bonus Action to repeat the command.",
-        save: { ability: "dex", dc: 15, successDamage: "none", failureCondition: "restrained" }
+        save: { ability: "dex", dc: 15, successDamage: "none", failureConditions: ["restrained"] }
       }
     ]
   },

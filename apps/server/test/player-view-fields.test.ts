@@ -179,7 +179,7 @@ describe("player view pending prompts", () => {
         "actionName",
         "proposedDamage",
         "halfOnSuccess",
-        "conditionId",
+        "conditionIds",
         "saveBonus",
         "createdAt",
         "sourceName",
@@ -198,6 +198,7 @@ describe("player view pending prompts", () => {
         "proposedDamage",
         "proposedDamageParts",
         "critical",
+        "weighed",
         "createdAt",
         "sourceName"
       ].sort()

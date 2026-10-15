@@ -49,7 +49,10 @@ describe("save outcomes in the shipped content", () => {
     const incomplete = blocks.filter(
       ({ save }) =>
         (save.successDamage !== "half" && save.successDamage !== "none") ||
-        !(save.failureCondition === null || SaveConditionSchema.safeParse(save.failureCondition).success)
+        !(
+          Array.isArray(save.failureConditions) &&
+          save.failureConditions.every((id: unknown) => SaveConditionSchema.safeParse(id).success)
+        )
     );
     expect(incomplete.map(({ path }) => path)).toEqual([]);
   });
@@ -59,36 +62,43 @@ describe("save outcomes in the shipped content", () => {
       ability: "dex",
       dc: 21,
       successDamage: "half",
-      failureCondition: null
+      failureConditions: []
     });
   });
 
   it("gives no damage on a success when the stat block prints no Success line", () => {
     // "Failure: 5 (1d6 + 2) Psychic damage." and nothing more: a success is unharmed.
-    expect(monsterAction("satyr", "mockery").save).toMatchObject({ successDamage: "none", failureCondition: null });
+    expect(monsterAction("satyr", "mockery").save).toMatchObject({ successDamage: "none", failureConditions: [] });
     // A "Failure or Success:" line applies either way; it is not the success line.
     expect(monsterAction("adult-black-dragon", "cloud-of-insects").save).toMatchObject({ successDamage: "none" });
   });
 
   it("names the condition a failure imposes, and not one the targeting line mentions", () => {
-    expect(monsterAction("ghoul", "claw").save).toMatchObject({ successDamage: "none", failureCondition: "paralyzed" });
-    expect(monsterAction("giant-spider", "web").save).toMatchObject({ failureCondition: "restrained" });
+    expect(monsterAction("ghoul", "claw").save).toMatchObject({
+      successDamage: "none",
+      failureConditions: ["paralyzed"]
+    });
+    expect(monsterAction("giant-spider", "web").save).toMatchObject({ failureConditions: ["restrained"] });
     // "one creature ... that is Charmed or Grappled by the aboleth" is who it targets, not what a failure does.
     expect(monsterAction("aboleth", "consume-memories").save).toMatchObject({
       successDamage: "half",
-      failureCondition: null
+      failureConditions: []
     });
     // "First Failure" is the failure the prompt applies; the second is the GM's.
     expect(monsterAction("basilisk", "petrifying-gaze-recharge-4-6").save).toMatchObject({
-      failureCondition: "restrained"
+      failureConditions: ["restrained"]
     });
   });
 
   it("reads spells' running prose the same way", () => {
-    expect(spellSave("fireball")).toEqual({ ability: "dex", successDamage: "half", failureCondition: null });
-    expect(spellSave("sacred-flame")).toEqual({ ability: "dex", successDamage: "none", failureCondition: null });
-    expect(spellSave("hold-person")).toEqual({ ability: "wis", successDamage: "none", failureCondition: "paralyzed" });
+    expect(spellSave("fireball")).toEqual({ ability: "dex", successDamage: "half", failureConditions: [] });
+    expect(spellSave("sacred-flame")).toEqual({ ability: "dex", successDamage: "none", failureConditions: [] });
+    expect(spellSave("hold-person")).toEqual({
+      ability: "wis",
+      successDamage: "none",
+      failureConditions: ["paralyzed"]
+    });
     // A reviewed override: the condition is named in the sentence after the save.
-    expect(spellSave("banishment")).toMatchObject({ failureCondition: "incapacitated" });
+    expect(spellSave("banishment")).toMatchObject({ failureConditions: ["incapacitated"] });
   });
 });

@@ -146,7 +146,7 @@ function unarmedSave(failure: "grappled" | "prone" | "pushed") {
       targetIds: [target.id],
       proposedDamage: 0,
       halfOnSuccess: false,
-      conditionId: failure === "prone" ? "prone" : null,
+      conditionIds: failure === "prone" ? ["prone"] : [],
       ...(failure === "grappled"
         ? {
             onFailEffect: {

@@ -27,7 +27,7 @@ const BREATH = {
   name: "Fire Breath",
   activation: "action" as const,
   description: "Dexterity Saving Throw: DC 15. Failure: 10 (3d6) Fire damage. Success: Half damage.",
-  save: { ability: "dex" as const, dc: 15, successDamage: "half" as const, failureCondition: null },
+  save: { ability: "dex" as const, dc: 15, successDamage: "half" as const, failureConditions: [] },
   damage: [{ formula: "3d6", type: "fire" }]
 };
 
@@ -115,7 +115,7 @@ const pendingInput = (
   targetIds,
   proposedDamage: 12,
   halfOnSuccess: true,
-  conditionId: null as string | null,
+  conditionIds: [] as string[],
   newSaveId: () => `60000000-0000-4000-8000-00000000000${saveSeq++}`,
   createdAt: 0,
   ...overrides
@@ -164,7 +164,12 @@ describe("saving-throw prompts", () => {
       id: "sting",
       name: "Sting",
       description: "Failure: 10 (3d6) Poison damage. Success: Half damage. A Prone target is unaffected.",
-      save: { ability: "con" as const, dc: 13, successDamage: "none" as const, failureCondition: "poisoned" as const }
+      save: {
+        ability: "con" as const,
+        dc: 13,
+        successDamage: "none" as const,
+        failureConditions: ["poisoned" as const]
+      }
     };
     const resolveDeps = {
       random: () => 4,
@@ -176,7 +181,7 @@ describe("saving-throw prompts", () => {
     expect(game.combat.pendingSaves[0]).toMatchObject({
       ability: "con",
       halfOnSuccess: false,
-      conditionId: "poisoned"
+      conditionIds: ["poisoned"]
     });
     // The GM's explicit condition replaces the declared one on the prompt.
     const ruled = state();
@@ -186,12 +191,12 @@ describe("saving-throw prompts", () => {
       { actorId: IDS.source, targetIds: [IDS.pc], commandId: cmd(2), conditionId: "frightened" },
       resolveDeps
     );
-    expect(ruled.combat.pendingSaves[0]).toMatchObject({ conditionId: "frightened" });
+    expect(ruled.combat.pendingSaves[0]).toMatchObject({ conditionIds: ["frightened"] });
   });
 
   it("auto-applies full damage and the condition on a failed save", () => {
     const game = state();
-    createPendingSaves(game, pendingInput([IDS.monster], { conditionId: "prone" }));
+    createPendingSaves(game, pendingInput([IDS.monster], { conditionIds: ["prone"] }));
     const saveId = game.combat.pendingSaves[0].id;
     const outcome = outcomeOf(answerSave(game, cmd(2), saveId, "roll", undefined, true, { role: "gm" }, deps([5]))); // 5 + 7 = 12 < 15
     expect(outcome).toMatchObject({ success: false, total: 12, appliedDamage: 12, conditionApplied: true });
@@ -206,9 +211,22 @@ describe("saving-throw prompts", () => {
     });
   });
 
+  it("applies every condition a failed save names (Turn Undead: Frightened and Incapacitated)", () => {
+    const game = state();
+    createPendingSaves(
+      game,
+      pendingInput([IDS.monster], { proposedDamage: 0, conditionIds: ["frightened", "incapacitated"] })
+    );
+    const saveId = game.combat.pendingSaves[0].id;
+    const outcome = outcomeOf(answerSave(game, cmd(3), saveId, "roll", undefined, true, { role: "gm" }, deps([5])));
+    expect(outcome).toMatchObject({ success: false, conditionApplied: true });
+    const goblin = game.actors.find((actor) => actor.id === IDS.monster)!;
+    expect(goblin.conditions.map((condition) => condition.id).sort()).toEqual(["frightened", "incapacitated"]);
+  });
+
   it("previews a roll without applying it (commit=false): records the die, keeps the save, applies nothing", () => {
     const game = state();
-    createPendingSaves(game, pendingInput([IDS.monster], { conditionId: "prone" }));
+    createPendingSaves(game, pendingInput([IDS.monster], { conditionIds: ["prone"] }));
     const saveId = game.combat.pendingSaves[0].id;
     const preview = outcomeOf(answerSave(game, cmd(20), saveId, "roll", undefined, false, { role: "gm" }, deps([5]))); // 12 < 15 → would fail
     expect(preview).toMatchObject({
@@ -315,7 +333,7 @@ describe("saving-throw prompts", () => {
 describe("save roll modes and auto-fail (SRD conditions appendix)", () => {
   it("a Paralyzed target automatically fails a Dex save - no die is rolled", () => {
     const game = state();
-    createPendingSaves(game, pendingInput([IDS.monster], { conditionId: "prone" }));
+    createPendingSaves(game, pendingInput([IDS.monster], { conditionIds: ["prone"] }));
     game.actors.find((actor) => actor.id === IDS.monster)!.conditions = [{ id: "paralyzed" }];
     // Empty dice queue proves no d20 was consumed.
     const { outcome, events } = answerSave(

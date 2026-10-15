@@ -614,7 +614,7 @@ const SPELL_SCHEMA: HomebrewSchema = {
             ...scope,
             save:
               typeof next === "string"
-                ? { successDamage: "half", failureCondition: null, ...(scope.save as Draft | null), ability: next }
+                ? { successDamage: "half", failureConditions: [], ...(scope.save as Draft | null), ability: next }
                 : null
           })
         },

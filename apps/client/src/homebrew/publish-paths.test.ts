@@ -209,9 +209,9 @@ describe("the same repair, on the other type that had it", () => {
     expect((spell as Record<string, unknown>).save).toEqual({
       ability: "dex",
       successDamage: "half",
-      failureCondition: null
+      failureConditions: []
     });
-    spell = applyField("spell", spell, "save.failureCondition", "prone");
+    spell = applyField("spell", spell, "save.failureConditions", ["prone", "incapacitated"]);
     expectPublishable("spell", spell);
     spell = clearField("spell", spell, "save.ability");
     expect((spell as Record<string, unknown>).save).toBeNull();

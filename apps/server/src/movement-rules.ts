@@ -161,6 +161,7 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
             proposedDamage: 0,
             proposedDamageParts: [],
             critical: false,
+            weighed: null,
             createdAt: input.now()
           }
         ]

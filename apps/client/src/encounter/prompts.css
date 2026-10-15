@@ -189,3 +189,9 @@
 .save-legendary:hover:not(:disabled) {
   border-color: var(--violet);
 }
+/* What the target's defences did, on its own line under the rolled result. */
+.save-prompt-defences {
+  flex-basis: 100%;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}

@@ -86,7 +86,13 @@ export function itemAction(
         : scoreModifierOf(definition, resolved) + (proficient === false ? 0 : caster.proficiencyBonus);
     attack = { bonus, ...rest };
   }
-  const save = declared.save ? { ...declared.save, dc: resolveSaveDc(declared.save.dc, definition) } : undefined;
+  const save = declared.save
+    ? {
+        ...declared.save,
+        dc: resolveSaveDc(declared.save.dc, definition),
+        ...(declared.save.dc === "spellcasting" ? { spellcasting: true } : {})
+      }
+    : undefined;
   const uses = usesOf(declared.uses, definition);
   return {
     id: itemActionId(itemId, declared.id),
@@ -151,6 +157,8 @@ export function castAction(
     cast.ability !== undefined || caster.attackBonus === null
       ? scoreModifierOf(definition, ability) + caster.proficiencyBonus
       : caster.attackBonus;
+  // Only the wielder's own spell save DC is theirs to raise; a printed DC or the item's own ability is not.
+  const bearersDc = cast.saveDc === undefined && cast.ability === undefined && caster.saveDc !== null;
   const saveDc =
     cast.saveDc ??
     (cast.ability !== undefined || caster.saveDc === null
@@ -159,7 +167,9 @@ export function castAction(
   return {
     ...base,
     ...(spell.attackRoll ? { attack: { bonus: attackBonus } } : {}),
-    ...(spell.save ? { save: { ...spell.save, dc: clampDc(saveDc) } } : {}),
+    ...(spell.save
+      ? { save: { ...spell.save, dc: clampDc(saveDc), ...(bearersDc ? { spellcasting: true } : {}) } }
+      : {}),
     ...(formula ? { damage: [{ formula, type: damageType }] } : {})
   };
 }

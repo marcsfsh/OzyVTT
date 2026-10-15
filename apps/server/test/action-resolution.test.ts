@@ -25,7 +25,7 @@ const BREATH = {
   name: "Fire Breath",
   activation: "action" as const,
   description: "Dexterity Saving Throw: DC 15.",
-  save: { ability: "dex" as const, dc: 15, successDamage: "half" as const, failureCondition: null },
+  save: { ability: "dex" as const, dc: 15, successDamage: "half" as const, failureConditions: [] },
   damage: [{ formula: "3d6", type: "fire" }]
 };
 const PARRY = {
@@ -381,5 +381,62 @@ describe("definition action resolution", () => {
         deps([])
       )
     ).toThrow(/Start an encounter/);
+  });
+});
+
+describe("a save that rides an attack", () => {
+  // A ghoul's Claw: the hit deals the damage, and a failed save adds the paralysis.
+  const CLAW = {
+    id: "claw",
+    name: "Claw",
+    activation: "action" as const,
+    description: "Melee Attack Roll: +4. Constitution Saving Throw: DC 10. Failure: Paralyzed.",
+    attack: { bonus: 4, reachFeet: 5 },
+    damage: [{ formula: "1d4 + 2", type: "slashing" }],
+    save: { ability: "con" as const, dc: 10, successDamage: "none" as const, failureConditions: ["paralyzed" as const] }
+  };
+
+  it("is not owed on a miss", () => {
+    const game = combatState();
+    const resolution = resolveDefinitionAction(
+      game,
+      CLAW,
+      { actorId: IDS.attacker, targetIds: [IDS.pc], commandId: "50000000-0000-4000-8000-0000000000c1" },
+      deps([2])
+    );
+    expect(resolution.attack?.outcome).toBe("miss");
+    expect(game.combat.pendingSaves).toEqual([]);
+  });
+
+  it("is owed on a hit, with the condition and none of the hit's damage again", () => {
+    const game = combatState();
+    const resolution = resolveDefinitionAction(
+      game,
+      CLAW,
+      { actorId: IDS.attacker, targetIds: [IDS.pc], commandId: "50000000-0000-4000-8000-0000000000c2" },
+      deps([15, 3])
+    );
+    expect(resolution.attack?.outcome).toBe("hit");
+    expect(resolution.damageTotal).toBe(5);
+    expect(game.combat.pendingSaves).toHaveLength(1);
+    expect(game.combat.pendingSaves[0]).toMatchObject({
+      targetActorId: IDS.pc,
+      ability: "con",
+      dc: 10,
+      proposedDamage: 0,
+      conditionIds: ["paralyzed"]
+    });
+    expect(game.combat.pendingSaves[0].proposedDamageParts).toBeUndefined();
+  });
+
+  it("still carries a save-only action's damage, which is the whole effect", () => {
+    const game = combatState();
+    resolveDefinitionAction(
+      game,
+      BREATH,
+      { actorId: IDS.attacker, targetIds: [IDS.pc], commandId: "50000000-0000-4000-8000-0000000000c3" },
+      deps([4, 5, 6])
+    );
+    expect(game.combat.pendingSaves[0]).toMatchObject({ proposedDamage: 15, halfOnSuccess: true });
   });
 });

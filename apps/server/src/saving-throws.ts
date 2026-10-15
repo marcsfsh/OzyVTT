@@ -15,7 +15,7 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { recordRoll as recordRollInHistory, rolledTerms } from "./roll-history.js";
 import { requireGm, type Initiator } from "./authorization.js";
-import { applyDamageDetailed, adjustableActor } from "./hit-points.js";
+import { applyDamageDetailed, previewDamage, adjustableActor } from "./hit-points.js";
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty } from "./condition-rules.js";
 import { addEffect, endEffectIfPresent, makeEffect, type EffectNarration } from "./effects.js";
@@ -154,7 +154,7 @@ export function createPendingSaves(
     proposedDamage: number;
     proposedDamageParts?: ReadonlyArray<{ amount: number; type: string }>;
     halfOnSuccess: boolean;
-    conditionId: string | null;
+    conditionIds: readonly string[];
     saveBonus?: number;
     onFailEffect?: PendingSave["onFailEffect"];
     /** Replace an older prompt with the same (target, actionName, source) key. Default true; per-hit riders
@@ -177,7 +177,7 @@ export function createPendingSaves(
       ? { proposedDamageParts: [...input.proposedDamageParts] }
       : {}),
     halfOnSuccess: input.halfOnSuccess,
-    conditionId: input.conditionId,
+    conditionIds: [...input.conditionIds],
     saveBonus: input.saveBonus ?? 0,
     ...(input.onFailEffect ? { onFailEffect: input.onFailEffect } : {}),
     createdAt: input.createdAt
@@ -350,24 +350,40 @@ export function answerSave(
         : pending.halfOnSuccess
           ? Math.floor(proposedTotal / 2)
           : 0;
-  const outcomeCondition = !success && pending.conditionId !== null;
+  const outcomeCondition = !success && pending.conditionIds.length > 0;
 
   // Preview (commit=false): the roll is recorded so everyone sees it, but nothing is applied and the
-  // save stays open until the answerer confirms.
-  if (!commit)
+  // save stays open until the answerer confirms. The damage is weighed through the target's defences, so the
+  // prompt shows what Confirm will land.
+  if (!commit) {
+    const weighed =
+      outcomeDamage > 0
+        ? previewDamage(
+            state,
+            target.id,
+            outcomeParts !== null ? { amount: outcomeDamage, parts: outcomeParts } : { amount: outcomeDamage },
+            {
+              resolveDefinition: (definitionId) => deps.resolveDefinition(definitionId),
+              ...(deps.catalog ? { catalog: deps.catalog } : {})
+            }
+          )
+        : null;
     return {
       outcome: {
         success,
         total,
         dc: pending.dc,
-        appliedDamage: outcomeDamage,
+        appliedDamage: weighed?.totalApplied ?? 0,
         conditionApplied: outcomeCondition,
         committed: false,
         autoFailed,
-        ...(rollMode ? { rollMode } : {})
+        ...(rollMode ? { rollMode } : {}),
+        ...(weighed && weighed.parts.length > 0 ? { parts: weighed.parts } : {}),
+        ...(weighed?.flatReduction ? { flatReduction: weighed.flatReduction } : {})
       },
       events: []
     };
+  }
 
   const events: EffectNarration[] = [];
   if (legendaryNote !== null) events.push({ kind: "effect", text: legendaryNote, actorId: target.id });
@@ -398,23 +414,24 @@ export function answerSave(
     application = outcome.application;
     events.push(...outcome.events);
   }
-  if (outcomeCondition && pending.conditionId) {
-    // setCondition narrates immunity skips; whether the condition landed is read back.
-    events.push(
-      ...setCondition(
-        state,
-        target.id,
-        pending.conditionId,
-        true,
-        undefined,
-        { role: "gm" },
-        {
-          resolveDefinition: (definitionId) => deps.resolveDefinition(definitionId),
-          ...(deps.catalog ? { catalog: deps.catalog } : {})
-        }
-      )
-    );
-    conditionApplied = target.conditions.some((condition) => condition.id === pending.conditionId);
+  if (outcomeCondition) {
+    // setCondition narrates immunity skips; whether any condition landed is read back.
+    for (const conditionId of pending.conditionIds)
+      events.push(
+        ...setCondition(
+          state,
+          target.id,
+          conditionId,
+          true,
+          undefined,
+          { role: "gm" },
+          {
+            resolveDefinition: (definitionId) => deps.resolveDefinition(definitionId),
+            ...(deps.catalog ? { catalog: deps.catalog } : {})
+          }
+        )
+      );
+    conditionApplied = target.conditions.some((condition) => pending.conditionIds.includes(condition.id));
   }
   // A committed failed concentration check ends the sustained effects (SRD Concentration); tolerant of
   // effects already gone.

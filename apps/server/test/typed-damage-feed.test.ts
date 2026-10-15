@@ -280,6 +280,8 @@ describe("both reaction paths narrate the adjustment they used to swallow", () =
     // Uncanny Dodge halves the parked total, then fire resistance halves what is left.
     const halved = Math.floor(parked / 2);
     expect(before - hpOf(server, BORIN)).toBe(Math.floor(halved / 2));
+    // The prompt's Use button named that number before anyone answered.
+    expect(prompt.weighed).toEqual({ use: Math.floor(halved / 2), decline: Math.floor(parked / 2) });
 
     const row = (await feed(base, gmToken)).find(
       (entry) => entry.kind === "reaction" && entry.text.includes("used Uncanny Dodge")
@@ -310,6 +312,7 @@ describe("both reaction paths narrate the adjustment they used to swallow", () =
       ).status
     ).toBe(200);
     expect(before - hpOf(server, BORIN)).toBe(Math.floor(parked / 2));
+    expect(prompt.weighed?.decline).toBe(before - hpOf(server, BORIN));
 
     const row = (await feed(base, gmToken)).find(
       (entry) => entry.kind === "damage" && entry.text.includes("declined")
@@ -354,6 +357,7 @@ describe("the opportunity-attack path narrates it too", () => {
               proposedDamage: 0,
               proposedDamageParts: [],
               critical: false,
+              weighed: null,
               createdAt: 0
             }
           ]

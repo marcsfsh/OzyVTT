@@ -748,7 +748,7 @@
               "ability": "con",
               "dc": "spellcasting",
               "successDamage": "half",
-              "failureCondition": null
+              "failureConditions": []
             },
             "damage": [
               {
@@ -788,7 +788,7 @@
               "ability": "wis",
               "dc": "spellcasting",
               "successDamage": "none",
-              "failureCondition": "frightened"
+              "failureConditions": ["frightened", "incapacitated"]
             },
             "damage": []
           }

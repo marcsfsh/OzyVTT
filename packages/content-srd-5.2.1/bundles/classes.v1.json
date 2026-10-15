@@ -2470,7 +2470,7 @@
        "ability": "con",
        "dc": "spellcasting",
        "successDamage": "half",
-       "failureCondition": null
+       "failureConditions": []
       },
       "damage": [
        {
@@ -2510,7 +2510,10 @@
        "ability": "wis",
        "dc": "spellcasting",
        "successDamage": "none",
-       "failureCondition": "frightened"
+       "failureConditions": [
+        "frightened",
+        "incapacitated"
+       ]
       },
       "damage": []
      }
@@ -5266,7 +5269,9 @@
         "proficiencyBonus": true
        },
        "successDamage": "none",
-       "failureCondition": "stunned"
+       "failureConditions": [
+        "stunned"
+       ]
       }
      }
     ]
@@ -6200,7 +6205,9 @@
        "ability": "wis",
        "dc": "spellcasting",
        "successDamage": "none",
-       "failureCondition": "frightened"
+       "failureConditions": [
+        "frightened"
+       ]
       }
      }
     ]

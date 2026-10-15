@@ -233,13 +233,13 @@ describe("the Pipes of Haunting spend a charge, refuse the fourth press, and for
       { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(5) },
       deps([], definition)
     );
-    // `conditionId` is the save block's declared condition.
+    // `conditionIds` are the save block's declared conditions.
     expect(state.combat.pendingSaves).toHaveLength(1);
     expect(state.combat.pendingSaves[0]).toMatchObject({
       targetActorId: IDS.foe,
       ability: "wis",
       dc: 15,
-      conditionId: "frightened"
+      conditionIds: ["frightened"]
     });
 
     // And the server enforces the DC: a monster with Wis +0 rolling 14 fails DC 15 and passes DC 13.
@@ -331,7 +331,7 @@ describe("the Stone of Good Luck - both halves reach the roll", () => {
         targetIds: [IDS.hero],
         proposedDamage: 10,
         halfOnSuccess: true,
-        conditionId: null,
+        conditionIds: [],
         newSaveId: () => `60000000-0000-4000-8000-00000000000${attuned ? 1 : 2}`,
         createdAt: 0
       });
@@ -526,7 +526,7 @@ describe("the casts that survived the spell-record check", () => {
         (entry) => entry.id === `item-${id}-cast-scrying`
       )!;
       // The save Scrying's own target makes, at the item's printed DC, not the wearer's derived one.
-      expect(cast.save).toEqual({ ability: "wis", dc: 17, successDamage: "none", failureCondition: null });
+      expect(cast.save).toEqual({ ability: "wis", dc: 17, successDamage: "none", failureConditions: [] });
       expect(cast.damage).toEqual([]);
       expect(cast.attack).toBeUndefined();
       expect(cast.uses).toBeUndefined(); // no charge limit is printed on any of the four
@@ -597,7 +597,7 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
     const action = effectiveActions(definition, state.actors[0], catalog).find(
       (entry) => entry.id === "item-rope-of-entanglement-entangle"
     )!;
-    expect(action.save).toEqual({ ability: "dex", dc: 15, successDamage: "none", failureCondition: "restrained" });
+    expect(action.save).toEqual({ ability: "dex", dc: 15, successDamage: "none", failureConditions: ["restrained"] });
     expect(action.uses).toBeUndefined(); // unlimited is the printed item
     expect(action.damage).toEqual([]);
 
@@ -607,7 +607,7 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
       { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(14) },
       deps([], definition)
     );
-    expect(state.combat.pendingSaves[0]).toMatchObject({ ability: "dex", dc: 15, conditionId: "restrained" });
+    expect(state.combat.pendingSaves[0]).toMatchObject({ ability: "dex", dc: 15, conditionIds: ["restrained"] });
   });
 
   it("gives the Iron Flask a DC 17 Wis save and applies NO condition - nothing spurious off the prose", () => {
@@ -616,7 +616,7 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
     const action = effectiveActions(definition, state.actors[0], catalog).find(
       (entry) => entry.id === "item-iron-flask-trap"
     )!;
-    expect(action.save).toEqual({ ability: "wis", dc: 17, successDamage: "none", failureCondition: null });
+    expect(action.save).toEqual({ ability: "wis", dc: 17, successDamage: "none", failureConditions: [] });
     expect(action.damage).toEqual([]);
 
     resolveDefinitionAction(
@@ -625,7 +625,7 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
       { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(15) },
       deps([], definition)
     );
-    expect(state.combat.pendingSaves[0]).toMatchObject({ ability: "wis", dc: 17, conditionId: null });
+    expect(state.combat.pendingSaves[0]).toMatchObject({ ability: "wis", dc: 17, conditionIds: [] });
   });
 
   it("gives the Decanter's Geyser a DC 13 Str save: no damage on a success, Prone on a failure", () => {
@@ -637,7 +637,7 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
       (entry) => entry.id === "item-decanter-of-endless-water-geyser"
     )!;
     // The SRD's "must succeed ... or take 1d4" means nothing on a success, which prose reading got wrong.
-    expect(action.save).toEqual({ ability: "str", dc: 13, successDamage: "none", failureCondition: "prone" });
+    expect(action.save).toEqual({ ability: "str", dc: 13, successDamage: "none", failureConditions: ["prone"] });
     expect(action.damage).toEqual([{ formula: "1d4", type: "bludgeoning" }]);
     expect(action.uses).toBeUndefined();
 
@@ -652,7 +652,7 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
       dc: 13,
       proposedDamage: 3,
       halfOnSuccess: false,
-      conditionId: "prone"
+      conditionIds: ["prone"]
     });
   });
 });

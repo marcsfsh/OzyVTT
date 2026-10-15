@@ -156,7 +156,7 @@
        "ability": "con",
        "dc": "spellcasting",
        "successDamage": "half",
-       "failureCondition": null
+       "failureConditions": []
       },
       "damage": [
        {
@@ -880,7 +880,9 @@
        "ability": "cha",
        "dc": "spellcasting",
        "successDamage": "none",
-       "failureCondition": "incapacitated"
+       "failureConditions": [
+        "incapacitated"
+       ]
       },
       "damage": [
        {
@@ -1275,7 +1277,9 @@
         "proficiencyBonus": true
        },
        "successDamage": "none",
-       "failureCondition": "frightened"
+       "failureConditions": [
+        "frightened"
+       ]
       }
      }
     ]
@@ -1401,7 +1405,7 @@
         "proficiencyBonus": true
        },
        "successDamage": "half",
-       "failureCondition": null
+       "failureConditions": []
       }
      }
     ]

@@ -922,7 +922,8 @@ export type SaveCondition = z.infer<typeof SaveConditionSchema>;
  */
 export const SaveOutcomeFields = {
   successDamage: z.enum(["half", "none"]).default("half"),
-  failureCondition: SaveConditionSchema.nullable().default(null)
+  /** Every condition a failed save imposes (Turn Undead: Frightened and Incapacitated). */
+  failureConditions: z.array(SaveConditionSchema).max(4).default([])
 };
 
 /** Mechanics fields are optional (ADR-0020): absent means prose only. Descriptions stay the display source of truth. */
@@ -944,7 +945,16 @@ export const ActionSchema = z.object({
       criticalBonusDice: z.number().int().min(1).max(4).optional()
     })
     .optional(),
-  save: z.object({ ability: AbilitySchema, dc: z.number().int().min(1).max(40), ...SaveOutcomeFields }).optional(),
+  save: z
+    .object({
+      ability: AbilitySchema,
+      dc: z.number().int().min(1).max(40),
+      /** The DC is the bearer's spell save DC (a spell, or a feature that uses it), so a `spell-save-dc` rider
+       *  raises it. Absent: a printed DC that no rider touches (a breath weapon, a wand's DC 15). */
+      spellcasting: z.boolean().optional(),
+      ...SaveOutcomeFields
+    })
+    .optional(),
   damage: z
     .array(z.object({ formula: DiceFormulaSchema, type: z.string().min(1).max(40) }))
     .max(8)

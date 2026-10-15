@@ -5,6 +5,7 @@ import { ActionResultCard } from "./ActionResultCard";
 import { ActionTargetPicker } from "./ActionTargetPicker";
 import { componentLabel } from "./action-summary";
 import { ConfirmRow } from "./ConfirmRow";
+import { damageAdjustments } from "./format";
 import { GmActionList } from "./GmActionList";
 import {
   beginTargeting,
@@ -131,14 +132,9 @@ export function ActionRunner({
       setApplied((current) => new Set([...current, key]));
       const application = response.applied;
       if (application && application.totalApplied !== application.totalRequested) {
-        const adjusted = application.parts
-          .filter((part) => part.adjustment !== null)
-          .map(
-            (part) =>
-              `${part.amount} ${part.type} became ${part.adjusted} (${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""})`
-          )
-          .join("; ");
-        onFeedback(`${targetName} took ${application.totalApplied} damage - ${adjusted}.`);
+        onFeedback(
+          `${targetName} took ${application.totalApplied} damage - ${damageAdjustments(application.parts, application.flatReduction)}.`
+        );
       } else {
         onFeedback(`${targetName} took ${application?.totalApplied ?? result.damageTotal} damage.`);
       }

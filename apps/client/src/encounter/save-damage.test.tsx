@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { PendingSave } from "@vtt/domain";
+import type { DamageApplication, PendingSave } from "@vtt/domain";
 
 // `command()` and `read()` send through `socket.timeout(ms).emit` with an error-first ack; it is routed to
 // `socket.emit` here so the assertions read one call list.
@@ -34,7 +34,7 @@ const SAVE: PendingSave = {
   proposedDamage: 17,
   proposedDamageParts: [{ amount: 17, type: "fire" }],
   halfOnSuccess: true,
-  conditionId: null,
+  conditionIds: [],
   saveBonus: 0,
   createdAt: 0
 };
@@ -88,7 +88,13 @@ const RECHECK_WAIT_MS = 600;
 const answers = () => emitted().filter(([event]) => event === "save:answer");
 /** Answers the newest `save:answer` as the server would: an uncommitted projection. */
 const ack = (
-  outcome: Readonly<{ total: number; success: boolean; appliedDamage: number; conditionApplied?: boolean }>
+  outcome: Readonly<{
+    total: number;
+    success: boolean;
+    appliedDamage: number;
+    conditionApplied?: boolean;
+    parts?: DamageApplication["parts"];
+  }>
 ) => {
   const [, , acknowledge] = answers().at(-1)!;
   acknowledge({ ok: true, outcome: { dc: 15, conditionApplied: false, committed: false, ...outcome } });
@@ -199,6 +205,20 @@ describe("the save prompt's damage field", () => {
     expect(await nextAnswer(1)).toMatchObject({ commit: false, damageOverride: 12 });
     ack({ total: 18, success: true, appliedDamage: 0 });
     expect(await screen.findByText("no damage (amended - rolled 17)")).toBeTruthy();
+  });
+
+  it("says what the target's defences did to the number it prints", async () => {
+    mount(SAVE, "auto");
+    ack({
+      total: 9,
+      success: false,
+      appliedDamage: 8,
+      parts: [
+        { amount: 17, type: "fire", adjusted: 8, adjustment: "resistance", adjustmentSource: "Ring of Fire Resistance" }
+      ]
+    });
+    expect(await screen.findByText("8 dmg")).toBeTruthy();
+    expect(screen.getByText("17 fire became 8 (resistance: Ring of Fire Resistance)")).toBeTruthy();
   });
 
   it("stops checking and stops claiming when the server refuses the recheck", async () => {

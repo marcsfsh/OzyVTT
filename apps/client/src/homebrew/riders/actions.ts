@@ -188,6 +188,20 @@ const toHitFields = (scope: RiderScope): readonly FieldDef[] =>
         }
       ];
 
+/* A stat block prints its DC, so it says whether that number is the creature's spell save DC; a feature
+   or item names "spellcasting" through the empty DC above instead. */
+const spellDcFields = (scope: RiderScope): readonly FieldDef[] =>
+  scope === "statblock"
+    ? [
+        {
+          key: "save.spellcasting",
+          label: "It is the spell save DC",
+          kind: "switch",
+          help: "On for a spell: a spell save DC bonus it carries raises this. Off for a printed DC like a breath weapon's."
+        }
+      ]
+    : [];
+
 /**
  * An action's own limited uses (`ActionUsesSchema`), a different schema from the record-level
  * `FeatureUsesSchema` that `usesField` writes: `limit` is required, there is no `scaling`, and there
@@ -337,6 +351,7 @@ export const actionsField = (scope: RiderScope): FieldDef => ({
           max: 40,
           help: "Leave empty to use the character's own spell save DC."
         },
+        ...spellDcFields(scope),
         ...saveOutcomeFields("save")
       ]
     },

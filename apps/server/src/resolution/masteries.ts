@@ -46,7 +46,7 @@ function parkMasterySaves(ctx: ResolveContext): void {
       targetIds: [forced.targetId],
       proposedDamage: 0,
       halfOnSuccess: false,
-      conditionId: forced.conditionId,
+      conditionIds: forced.conditionId === null ? [] : [forced.conditionId],
       // Extra Attack can land two hits in one action, so each prompt is parked beside its predecessor.
       replaceExisting: false,
       newSaveId: deps.newRollId,

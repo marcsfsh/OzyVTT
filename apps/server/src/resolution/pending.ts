@@ -1,5 +1,6 @@
 import { isIncapacitated } from "../condition-rules.js";
 import { effectiveActions } from "../effective-actions.js";
+import { halvedDamageParts, previewDamage } from "../hit-points.js";
 import { familyModeFor } from "../rules-families.js";
 import { createPendingSaves } from "../saving-throws.js";
 import type { ResolveContext } from "./context.js";
@@ -37,6 +38,12 @@ export function parkReaction(ctx: ResolveContext): void {
     state.combat.pendingReactions.length >= 20
   )
     return;
+  // Both answers weighed through the reactor's defences now, so its buttons name what each would take off.
+  const damageDeps = { resolveDefinition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) };
+  const weigh = (parts: typeof proposedParts) =>
+    previewDamage(state, target.id, { amount: 0, parts }, damageDeps).totalApplied;
+  const halved = halvedDamageParts(proposedParts);
+  const weighed = { use: halved.length > 0 ? weigh(halved) : 0, decline: weigh(proposedParts) };
   state.combat = {
     ...state.combat,
     pendingReactions: [
@@ -54,6 +61,7 @@ export function parkReaction(ctx: ResolveContext): void {
         proposedDamage: proposedTotal,
         proposedDamageParts: proposedParts,
         critical: ctx.crit,
+        weighed,
         createdAt: Date.parse(deps.now())
       }
     ]
@@ -61,10 +69,16 @@ export function parkReaction(ctx: ResolveContext): void {
   ctx.reactionPrompts.push({ actorId: target.id, actorName: target.name, actionName: declared.name });
 }
 
-/** A save action parks one pending save per target; the outcome auto-applies (see saving-throws.ts). */
+/**
+ * A save action parks one pending save per target; the outcome auto-applies (see saving-throws.ts). When the
+ * action also attacks, the save is the hit's rider (a ghoul's paralysing claw): it is owed only on a hit, and
+ * the damage already rode the hit, so the save proposes none of its own.
+ */
 export function parkActionSave(ctx: ResolveContext): void {
-  const { state, action, attacker, targets, input, deps, damage } = ctx;
+  const { state, action, attacker, targets, input, deps, damage, attack } = ctx;
   if (!action.save) return;
+  const rider = attack !== null;
+  if (rider && attack.outcome !== "hit" && attack.outcome !== "crit") return;
   createPendingSaves(state, {
     sourceActorId: attacker.id,
     sourceName: attacker.name,
@@ -72,13 +86,13 @@ export function parkActionSave(ctx: ResolveContext): void {
     ability: action.save.ability,
     dc: action.save.dc,
     targetIds: targets.map((target) => target.id),
-    proposedDamage: damage.reduce((sum, part) => sum + part.total, 0),
-    proposedDamageParts: damage.map((part) => ({ amount: part.total, type: part.type })),
+    proposedDamage: rider ? 0 : damage.reduce((sum, part) => sum + part.total, 0),
+    proposedDamageParts: rider ? [] : damage.map((part) => ({ amount: part.total, type: part.type })),
     // Cover adds to Dexterity saving throws (SRD Cover) - carried on the prompt.
     saveBonus: action.save.ability === "dex" ? ctx.coverBonus : 0,
     halfOnSuccess: action.save.successDamage === "half",
     // The GM's explicit choice wins over the condition the action declares.
-    conditionId: input.conditionId ?? action.save.failureCondition,
+    conditionIds: input.conditionId ? [input.conditionId] : action.save.failureConditions,
     newSaveId: deps.newRollId,
     createdAt: Date.parse(deps.now())
   });

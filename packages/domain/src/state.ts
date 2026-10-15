@@ -180,12 +180,16 @@ export const PendingSaveSchema = z
       .max(9)
       .optional(),
     halfOnSuccess: z.boolean().default(true),
-    conditionId: z
-      .string()
-      .regex(/^[a-z0-9-]+$/)
-      .max(60)
-      .nullable()
-      .default(null),
+    /** Conditions a failed save imposes. */
+    conditionIds: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(60)
+      )
+      .max(4)
+      .default([]),
     /** Flat bonus to the save roll (GM-adjudicated cover: +2/+5 on Dex saves, SRD Cover). */
     saveBonus: z.number().int().min(0).max(10).default(0),
     /** Concentration check (SRD): effects ended when this save fails. Stripped from player projections. */
@@ -252,6 +256,16 @@ export const PendingReactionSchema = z
       .default([]),
     /** The triggering attack was a critical hit (drives death-save failure ticks when the damage lands). */
     critical: z.boolean().default(false),
+    /** hit-by-attack: what each answer takes off hit points after the reactor's defences, weighed when the hit
+     *  landed. Null when nothing was weighed (an opportunity attack). */
+    weighed: z
+      .object({
+        use: z.number().int().nonnegative().max(10000),
+        decline: z.number().int().nonnegative().max(10000)
+      })
+      .strict()
+      .nullable()
+      .default(null),
     createdAt: z.number().int().nonnegative()
   })
   .strict();

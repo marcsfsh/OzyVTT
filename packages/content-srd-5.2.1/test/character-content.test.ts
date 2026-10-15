@@ -246,7 +246,7 @@ describe("character-builder content records", () => {
       ability: "wis",
       dc: "spellcasting",
       successDamage: "none",
-      failureCondition: "frightened"
+      failureConditions: ["frightened", "incapacitated"]
     });
     // Divine Order is a level-1 choice between the two printed sacred roles.
     const order = cleric.features.find((feature) => feature.id === "divine-order")!;
@@ -933,7 +933,7 @@ describe("character-builder content records", () => {
         ability: "dex",
         dc: { base: 8, ability: "con", proficiencyBonus: true },
         successDamage: "half",
-        failureCondition: null
+        failureConditions: []
       });
       // 1d10, rising by 1d10 at character levels 5, 11, and 17 - in the ancestry's own damage type.
       const type = expectedTypes[lineage.id];
@@ -952,7 +952,7 @@ describe("character-builder content records", () => {
       .find((entry) => entry.id === "cleric")!
       .features.find((feature) => feature.id === "channel-divinity")!
       .actions.find((action) => action.id === "divine-spark")!;
-    expect(spark.save).toEqual({ ability: "con", dc: "spellcasting", successDamage: "half", failureCondition: null });
+    expect(spark.save).toEqual({ ability: "con", dc: "spellcasting", successDamage: "half", failureConditions: [] });
     expect(spark.damage).toEqual([{ formula: "1d8", type: "radiant" }]);
     expect(spark.damageByLevel).toEqual([
       { level: 2, formula: "1d8", type: "radiant" },

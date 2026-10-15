@@ -119,7 +119,7 @@ const CARRIER_RIDER_DISPOSITION: Readonly<
 > = {
   "attack-bonus": "standing", // effective-actions folds it into attack.bonus; action-resolution adds the on-attack-roll half
   "save-bonus": "standing", // saving-throws.ts saveRiderBonus (standing + on-saving-throw)
-  "spell-save-dc": "standing", // effective-actions folds it into save.dc
+  "spell-save-dc": "standing", // effective-actions folds it into save.dc where the DC is the spell save DC
   "spell-slot": "standing", // spellSlotMaxima, via derivation.spellSlots
   "resource-bonus": "standing", // effective-actions usesBonus raises uses.limit
   "critical-range": "standing", // effective-actions criticalThreshold
@@ -190,7 +190,7 @@ function interpretAction(
           : save.dc.base +
             abilityModifier(context.finalScores[save.dc.ability]) +
             (save.dc.proficiencyBonus ? context.proficiencyBonus : 0);
-    assembled.save = { ...save, dc };
+    assembled.save = { ...save, dc, ...(save.dc === "spellcasting" ? { spellcasting: true } : {}) };
   }
   if (damageByLevel && damageByLevel.length > 0) {
     const rows = [...damageByLevel]
@@ -247,7 +247,7 @@ function cantripActionFor(
     description: spell.description.slice(0, 12000),
     damage: typedDamage ? [{ formula: spell.damage.roll!, type: spell.damage.types[0] }] : [],
     ...(spell.save !== null
-      ? { save: { ...spell.save, dc: numbers.saveDc } }
+      ? { save: { ...spell.save, dc: numbers.saveDc, spellcasting: true } }
       : spell.attackRoll
         ? { attack: { bonus: numbers.attackBonus } }
         : {}),

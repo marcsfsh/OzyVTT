@@ -105,7 +105,7 @@
                     "proficiencyBonus": true
                   },
                   "successDamage": "half",
-                  "failureCondition": null
+                  "failureConditions": []
                 },
                 "damage": [
                   {
@@ -180,7 +180,7 @@
                     "proficiencyBonus": true
                   },
                   "successDamage": "half",
-                  "failureCondition": null
+                  "failureConditions": []
                 },
                 "damage": [
                   {
@@ -255,7 +255,7 @@
                     "proficiencyBonus": true
                   },
                   "successDamage": "half",
-                  "failureCondition": null
+                  "failureConditions": []
                 },
                 "damage": [
                   {
@@ -330,7 +330,7 @@
                     "proficiencyBonus": true
                   },
                   "successDamage": "half",
-                  "failureCondition": null
+                  "failureConditions": []
                 },
                 "damage": [
                   {
@@ -405,7 +405,7 @@
                     "proficiencyBonus": true
                   },
                   "successDamage": "half",
-                  "failureCondition": null
+                  "failureConditions": []
                 },
                 "damage": [
                   {
@@ -480,7 +480,7 @@
                     "proficiencyBonus": true
                   },
                   "successDamage": "half",
-                  "failureCondition": null
+                  "failureConditions": []
                 },
                 "damage": [
                   {
@@ -555,7 +555,7 @@
                     "proficiencyBonus": true
                   },
                   "successDamage": "half",
-                  "failureCondition": null
+                  "failureConditions": []
                 },
                 "damage": [
                   {
@@ -630,7 +630,7 @@
                     "proficiencyBonus": true
                   },
                   "successDamage": "half",
-                  "failureCondition": null
+                  "failureConditions": []
                 },
                 "damage": [
                   {
@@ -705,7 +705,7 @@
                     "proficiencyBonus": true
                   },
                   "successDamage": "half",
-                  "failureCondition": null
+                  "failureConditions": []
                 },
                 "damage": [
                   {
@@ -780,7 +780,7 @@
                     "proficiencyBonus": true
                   },
                   "successDamage": "half",
-                  "failureCondition": null
+                  "failureConditions": []
                 },
                 "damage": [
                   {

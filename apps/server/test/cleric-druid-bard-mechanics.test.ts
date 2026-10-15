@@ -353,8 +353,9 @@ describe("Land's Aid - a Circle of the Land action spending the CLASS's Wild Sha
     expect(actionOf(definition, "lands-aid")?.save).toEqual({
       ability: "con",
       dc: 13,
+      spellcasting: true,
       successDamage: "half",
-      failureCondition: null
+      failureConditions: []
     });
     expect(actionOf(definition, "lands-aid")?.damage).toEqual([{ formula: "2d6", type: "necrotic" }]);
     expect(
@@ -630,6 +631,14 @@ describe("Divine Intervention - a pool that now costs the action the SRD prints"
         { level: 1, kind: "equipment", id: "sage-a" }
       ]
     }) as Mutable;
+
+  it("marks the DCs that are the cleric's spell save DC, so a spell-save-dc rider raises them", () => {
+    const definition = build(clericInput());
+    const spellDc = definition.spellcasting!.saveDc;
+    // A cantrip and a Channel Divinity option both use the spell save DC.
+    expect(actionOf(definition, "spell-sacred-flame")?.save).toMatchObject({ dc: spellDc, spellcasting: true });
+    expect(actionOf(definition, "divine-spark")?.save).toMatchObject({ dc: spellDc, spellcasting: true });
+  });
 
   it("is a Magic action with one use per long rest, and the use really goes", () => {
     // A feature with `uses` and no `actions` gets a synthesized action; the SRD says "As a Magic action".

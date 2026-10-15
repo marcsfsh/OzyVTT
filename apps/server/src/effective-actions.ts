@@ -61,7 +61,8 @@ export function withStandingRiders(action: ActorAction, derivation: EquipmentDer
           }
         }
       : {}),
-    ...(action.save && saveDc !== 0
+    // Only a DC that is the bearer's spell save DC rises; a printed one (a wand's DC 15) stays as printed.
+    ...(action.save?.spellcasting && saveDc !== 0
       ? { save: { ...action.save, dc: Math.max(1, Math.min(40, action.save.dc + saveDc)) } }
       : {}),
     ...(action.uses && poolBonus !== 0

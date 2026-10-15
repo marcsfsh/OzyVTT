@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BuilderPolicySchema, GameStateSchema, type Actor, type GameState } from "@vtt/domain";
 import { EquipmentReferenceSchema, FeatReferenceSchema } from "@vtt/content-srd-5.2.1";
-import { InventoryItemSchema, type ActorDefinition } from "@vtt/schemas";
+import { InventoryItemSchema, type ActorAction, type ActorDefinition } from "@vtt/schemas";
 import { collectRiders } from "@vtt/rules-5e";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { importActorDefinition } from "../src/actor-roster.js";
@@ -310,7 +310,7 @@ describe("a feat's save-bonus reaches the saving throw", () => {
   });
 });
 
-describe("a feat's spell-save-dc raises the DC the target is held to", () => {
+describe("a feat's spell-save-dc raises the bearer's spell save DC and nothing else", () => {
   const WAR_CRY = {
     id: "war-cry",
     name: "War Cry",
@@ -319,14 +319,29 @@ describe("a feat's spell-save-dc raises the DC the target is held to", () => {
     save: { ability: "wis", dc: 13 },
     damage: [{ formula: "2d6", type: "thunder" }]
   };
+  /** A spell on the sheet: its DC is the bearer's spell save DC, which is what the rider raises. */
+  const SHATTER = {
+    id: "shatter",
+    name: "Shatter",
+    activation: "action",
+    description: "Constitution Saving Throw: DC 13. Failure: 2d6 Thunder damage.",
+    save: { ability: "con", dc: 13, spellcasting: true, successDamage: "half", failureConditions: [] },
+    damage: [{ formula: "2d6", type: "thunder" }]
+  } as ActorAction;
+  const withSpell = (built: Built): Built => ({
+    ...built,
+    definition: { ...built.definition, actions: [...built.definition.actions, SHATTER] }
+  });
 
-  it("folds into the action's DC and into the pending save the foe must beat", () => {
-    const bare = build({ actions: [WAR_CRY] });
-    expect(actionOf(bare, "war-cry").save!.dc).toBe(13);
+  it("folds into a spell's DC and into the pending save the foe must beat", () => {
+    const bare = withSpell(build({ actions: [WAR_CRY] }));
+    expect(actionOf(bare, "shatter").save!.dc).toBe(13);
 
-    const built = fight(build({ modifiers: [{ type: "spell-save-dc", amount: 2 }], actions: [WAR_CRY] }));
-    const action = actionOf(built, "war-cry");
+    const built = fight(withSpell(build({ modifiers: [{ type: "spell-save-dc", amount: 2 }], actions: [WAR_CRY] })));
+    const action = actionOf(built, "shatter");
     expect(action.save!.dc).toBe(15);
+    // The feat's own War Cry prints its DC, so the rider leaves it alone.
+    expect(actionOf(built, "war-cry").save!.dc).toBe(13);
 
     const resolution = resolveDefinitionAction(
       built.state,

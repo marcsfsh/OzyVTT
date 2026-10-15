@@ -97,8 +97,8 @@ export function settlePlayerHit(
 
 /**
  * The GM applies or dismisses a parked proposal. Apply reduces HP through the typed-defense pipeline
- * (an `amount` override applies as a bare total, no defense math) and removes the proposal; dismiss
- * just removes it. Returns the applied outcome, or null (dismissed, overridden to nothing, or already
+ * and removes the proposal; an `amount` override re-weights the proposal's typed parts to that total
+ * (`rescaleDamageParts`), so resistances still apply to the edited number. Dismiss just removes it. Returns the applied outcome, or null (dismissed, overridden to nothing, or already
  * resolved; idempotent).
  */
 export function resolvePendingDamage(
@@ -113,15 +113,13 @@ export function resolvePendingDamage(
   let applied: AppliedDamage | null = null;
   if (apply) {
     const label = `${proposal.sourceName}'s ${proposal.actionName}`;
-    const input =
-      amount !== undefined
-        ? { amount, critical: proposal.critical, sourceName: label }
-        : {
-            amount: proposal.proposedTotal,
-            parts: proposal.proposedDamageParts,
-            critical: proposal.critical,
-            sourceName: label
-          };
+    const input = {
+      amount: proposal.proposedTotal,
+      parts: proposal.proposedDamageParts,
+      ...(amount !== undefined ? { damageOverride: amount } : {}),
+      critical: proposal.critical,
+      sourceName: label
+    };
     const outcome = applyDamageDetailed(
       state,
       proposal.targetActorId,

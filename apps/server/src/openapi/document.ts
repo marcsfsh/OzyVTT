@@ -2309,7 +2309,15 @@ export const openApiDocument = {
           derived: {
             type: "object",
             additionalProperties: false,
-            required: ["proficiencyBonus", "armorClass", "initiative", "abilities", "skills", "defences"],
+            required: [
+              "proficiencyBonus",
+              "armorClass",
+              "initiative",
+              "abilities",
+              "skills",
+              "defences",
+              "spellSaveDcBonus"
+            ],
             description:
               "DISPLAY ONLY, and the sheet's single source for every number beside a roll button. Derived from the actor's LIVE loadout with the same functions the resolver uses, so a chip cannot disagree with the roll it starts - a circlet's granted expertise and an amulet's save bonus are already inside these numbers. Present on every response; a client should still tolerate its absence so it can talk to an older server. It rides this REQUEST rather than the broadcast game-state projection on purpose: this endpoint already authorizes its caller for one named actor, so the block is never even computed for an actor the caller may not see.",
             properties: {
@@ -2397,6 +2405,11 @@ export const openApiDocument = {
                     }
                   ])
                 )
+              },
+              spellSaveDcBonus: {
+                type: "integer",
+                description:
+                  "What standing spell-save-dc riders (an item, a feat) add to the bearer's spell save DC, and so to every action that uses it. A printed DC is not raised."
               }
             }
           },

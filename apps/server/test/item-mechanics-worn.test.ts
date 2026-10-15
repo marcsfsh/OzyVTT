@@ -198,7 +198,7 @@ describe("a Cloak of Protection moves AC and a rolled save, and both come off wi
       targetIds: [IDS.hero],
       proposedDamage: 10,
       halfOnSuccess: true,
-      conditionId: null,
+      conditionIds: [],
       newSaveId: () => "60000000-0000-4000-8000-000000000001",
       createdAt: 0
     });
@@ -238,7 +238,7 @@ describe("a Cloak of Protection moves AC and a rolled save, and both come off wi
       targetIds: [IDS.hero],
       proposedDamage: 10,
       halfOnSuccess: true,
-      conditionId: null,
+      conditionIds: [],
       newSaveId: () => "60000000-0000-4000-8000-000000000002",
       createdAt: 0
     });
@@ -561,7 +561,7 @@ describe("the charges a worn item rations", () => {
     const action = effectiveActions(definition, actor, catalog).find(
       (entry) => entry.id === "item-robe-of-scintillating-colors-dazzle"
     )!;
-    expect(action.save).toEqual({ ability: "wis", dc: 15, successDamage: "none", failureCondition: "stunned" });
+    expect(action.save).toEqual({ ability: "wis", dc: 15, successDamage: "none", failureConditions: ["stunned"] });
     expect(action.uses).toEqual({ limit: 3, per: "long-rest", pool: "robe-of-scintillating-colors-charges" });
 
     resolveDefinitionAction(
@@ -571,7 +571,7 @@ describe("the charges a worn item rations", () => {
       deps([], definition)
     );
     // The prompt carries the condition the action's save block declares.
-    expect(state.combat.pendingSaves[0]).toMatchObject({ ability: "wis", dc: 15, conditionId: "stunned" });
+    expect(state.combat.pendingSaves[0]).toMatchObject({ ability: "wis", dc: 15, conditionIds: ["stunned"] });
     expect(actor.actionUses["robe-of-scintillating-colors-charges"]).toBe(1);
 
     actor.actionUses = { "robe-of-scintillating-colors-charges": 3 };
@@ -623,8 +623,8 @@ describe("the casts that survived the spell-record check", () => {
     const suggest = actions.find((entry) => entry.id === "item-helm-of-telepathy-cast-suggestion")!;
 
     // The DC is the item's: this Wizard has no spellcasting block, so 13 can only be authored.
-    expect(detect.save).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureCondition: null });
-    expect(suggest.save).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureCondition: "charmed" });
+    expect(detect.save).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureConditions: [] });
+    expect(suggest.save).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureConditions: ["charmed"] });
     // Neither cast synthesizes damage or an attack from the spell's text.
     expect(detect.damage).toEqual([]);
     expect(suggest.damage).toEqual([]);
@@ -655,7 +655,7 @@ describe("the casts that survived the spell-record check", () => {
     const cast = effectiveActions(definition, state.actors[0], catalog).find(
       (entry) => entry.id === "item-eyes-of-charming-cast-charm-person"
     )!;
-    expect(cast.save).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureCondition: "charmed" });
+    expect(cast.save).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureConditions: ["charmed"] });
     expect(cast.uses).toEqual({ limit: 3, per: "long-rest", pool: "eyes-of-charming-charges" });
     resolveDefinitionAction(
       state,
@@ -669,7 +669,7 @@ describe("the casts that survived the spell-record check", () => {
     const detect = effectiveActions(definition, medallion.actors[0], catalog).find(
       (entry) => entry.id === "item-medallion-of-thoughts-cast-detect-thoughts"
     )!;
-    expect(detect.save).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureCondition: null });
+    expect(detect.save).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureConditions: [] });
     expect(detect.uses).toEqual({ limit: 5, per: "long-rest", pool: "medallion-of-thoughts-charges" });
   });
 
@@ -694,10 +694,9 @@ describe("the casts that survived the spell-record check", () => {
 });
 
 describe("the spell save DC a legendary robe does NOT raise", () => {
-  // The Robe of the Archmagi's "spell save DC ... increases by 2" cannot be authored as `spell-save-dc`:
-  // that rider raises `action.save.dc` on every action carrying a save (`effective-actions.ts` sums and
-  // folds it without asking whether the action is a spell), including DCs printed on other items. The
-  // robe stays prose; these assertions keep it that way.
+  // The Robe of the Archmagi stays prose. A `spell-save-dc` rider now raises only actions whose DC is the
+  // bearer's spell save DC, but the robe's matching spell attack bonus has no consumer yet, so carrying half
+  // of it would misstate the robe. These assertions keep printed DCs untouched either way.
   it("leaves a Wand of Paralysis' printed DC 15 alone, and a Breath Weapon's 13, with the robe on", () => {
     const robe = worn("robe-of-the-archmagi", "Robe of the Archmagi");
     // A definition action that is not a spell at all.

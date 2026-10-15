@@ -5,17 +5,23 @@
  */
 import { SaveConditionSchema, type SaveCondition } from "@vtt/schemas";
 
-export type SaveOutcome = { successDamage: "half" | "none"; failureCondition: SaveCondition | null };
+export type SaveOutcome = { successDamage: "half" | "none"; failureConditions: SaveCondition[] };
 
 const CONDITIONS: ReadonlySet<string> = new Set(SaveConditionSchema.options);
 
-/** The first condition named as "has the X condition" (or "X and Y conditions"); the engine applies one. */
-function namedCondition(clause: string): SaveCondition | null {
-  for (const match of clause.matchAll(/\b(?:has|have|gains?|having) the ([A-Z][a-z]+)\b[^.]*?\bconditions?\b/g)) {
-    const id = match[1].toLowerCase();
-    if (CONDITIONS.has(id)) return id as SaveCondition;
-  }
-  return null;
+/**
+ * The conditions the first "has the X condition" or "has the X and Y conditions" names. Only the first
+ * phrase: later ones are usually conditional ("Failure by 5 or More", "while Charmed") or describe what the
+ * first condition already does, and the engine applies everything it is given on any failure.
+ */
+function namedConditions(clause: string): SaveCondition[] {
+  const match = clause.match(
+    /\b(?:has|have|gains?|having) the ([A-Z][a-z]+(?:,? (?:and |or )?[A-Z][a-z]+)*) conditions?\b/
+  );
+  if (!match) return [];
+  // "X or Y" is a choice, not both: keep the first, as the engine cannot pick.
+  const names = /\bor\b/.test(match[1]) ? [match[1].split(/,? or /)[0]!] : match[1].split(/,? (?:and )?/);
+  return [...new Set(names.map((name) => name.toLowerCase()).filter((id) => CONDITIONS.has(id)))] as SaveCondition[];
 }
 
 /**
@@ -29,7 +35,7 @@ export function statBlockSaveOutcome(description: string): SaveOutcome {
   const end = tail.search(/\b(?:Failure or Success:|Success:|Second Failure|Subsequent Failures:)/);
   const failure = end === -1 ? tail : tail.slice(0, end);
   const success = /(?<!or )\bSuccess:\s*Half damage\b/.test(description);
-  return { successDamage: success ? "half" : "none", failureCondition: namedCondition(failure) };
+  return { successDamage: success ? "half" : "none", failureConditions: namedConditions(failure) };
 }
 
 /**
@@ -46,15 +52,15 @@ function spellSaveOutcome(description: string): SaveOutcome {
     .split(/(?<=[.!?])\s+/)
     .filter((sentence) => /saving throw,? or\b|failed save|fails (?:the|its|a|this) save|on a failure/i.test(sentence))
     .join(" ");
-  return { successDamage: half ? "half" : "none", failureCondition: namedCondition(failureSentences) };
+  return { successDamage: half ? "half" : "none", failureConditions: namedConditions(failureSentences) };
 }
 
 /** Reviewed corrections, keyed by spell id; each says why the reader is wrong there. */
 const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   // "or be transported to a harmless demiplane": the Incapacitated condition is named in the next sentence.
-  banishment: { failureCondition: "incapacitated" },
+  banishment: { failureConditions: ["incapacitated"] },
   // The ray is rolled per target (Restrained is only the indigo ray), so no single condition applies.
-  "prismatic-spray": { failureCondition: null },
+  "prismatic-spray": { failureConditions: [] },
   // The first save's Thunder damage is all or nothing; the halving is the turn-3 lightning's.
   "storm-of-vengeance": { successDamage: "none" }
 };
