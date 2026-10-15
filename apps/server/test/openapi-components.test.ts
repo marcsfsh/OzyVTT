@@ -73,6 +73,7 @@ const document = {
   createdAt: timestamp,
   updatedAt: timestamp,
   validity: { valid: false, issues: [issue], warnings: [] },
+  pendingChanges: false,
   record
 };
 const summary = {

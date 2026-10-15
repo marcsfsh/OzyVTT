@@ -628,14 +628,21 @@ function startingEquipmentIssues(
 /** Always validates against the GM catalog, resolved per call so a just-published record is visible. */
 export function createHomebrewValidator(source: {
   forAudience: (audience: "gm" | "player") => ContentView;
+  /** The GM catalog without one record; see `ContentLibrary.forAudienceWithout`. */
+  forAudienceWithout?: (audience: "gm" | "player", id: string) => ContentView;
   publishedSpellLists: () => readonly SpellListReference[];
   /** Drafts included: the gate asks about authorship, not publication. */
   authoredIndex: () => HomebrewAuthoredIndex;
 }) {
-  return (type: HomebrewContentType, body: unknown): HomebrewValidity =>
+  /** `replacing` names a published record whose pending edits these are, so its live body is left out of the
+   *  catalog they are checked against. */
+  return (type: HomebrewContentType, body: unknown, replacing?: string): HomebrewValidity =>
     validateForPublish(type, body, {
-      catalog: source.forAudience("gm"),
-      spellLists: source.publishedSpellLists(),
+      catalog:
+        replacing !== undefined && source.forAudienceWithout
+          ? source.forAudienceWithout("gm", replacing)
+          : source.forAudience("gm"),
+      spellLists: source.publishedSpellLists().filter((list) => list.id !== replacing),
       authored: source.authoredIndex()
     });
 }

@@ -52,6 +52,8 @@ export type HomebrewRecordDocument = Readonly<{
   createdAt: string;
   updatedAt: string;
   validity: HomebrewValidity;
+  /** A published record's edits are held until Update puts them live; `record` and `validity` describe them. */
+  pendingChanges: boolean;
   record: Readonly<Record<string, unknown>>;
 }>;
 
@@ -166,6 +168,13 @@ export const homebrewApi = {
   /** POST /content/{id}/publish — requires validity. Publishing does not show it to players. */
   publish: (token: string, id: string, expectedRev?: number) =>
     request<{ record: HomebrewRecordDocument }>(token, `/content/${encodeURIComponent(id)}/publish`, {
+      method: "POST",
+      body: withRev(expectedRev)
+    }).then((data) => data.record),
+
+  /** POST /content/{id}/discard — drops a published record's pending edits; the live body stays. */
+  discard: (token: string, id: string, expectedRev?: number) =>
+    request<{ record: HomebrewRecordDocument }>(token, `/content/${encodeURIComponent(id)}/discard`, {
       method: "POST",
       body: withRev(expectedRev)
     }).then((data) => data.record),

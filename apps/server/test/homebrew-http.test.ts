@@ -66,6 +66,7 @@ async function fixture(options: { validate?: HomebrewValidator; realValidation?:
         (options.realValidation
           ? createHomebrewValidator({
               forAudience: (audience) => contentLibrary.forAudience(audience),
+              forAudienceWithout: (audience, id) => contentLibrary.forAudienceWithout(audience, id),
               publishedSpellLists: () => store.publishedFor("gm").spellLists,
               authoredIndex: () => store.authoredIndex()
             })
@@ -175,10 +176,10 @@ describe("homebrew HTTP authorization gate", () => {
     expect((await get(base, CONTENT, GM)).status).toBe(200);
   });
 
-  it("declares the same ten paths the router mounts", async () => {
+  it("declares the same eleven paths the router mounts", async () => {
     // A path added to the contract without a route (or the reverse) is a documented endpoint that 404s.
     const declared = Object.values(HOMEBREW_PATHS);
-    expect(declared).toHaveLength(10);
+    expect(declared).toHaveLength(11);
     expect(
       Object.keys(openApiDocument.paths)
         .filter((path) => path.startsWith("/api/v1/homebrew"))
@@ -344,7 +345,7 @@ describe("homebrew HTTP CRUD", () => {
   // A PATCH to a published record goes through validation: an autosave that makes the record invalid
   // demotes it to a hidden draft, so the library never claims "Published - shown to players" for a record
   // `publishedFor` would drop.
-  describe("editing a published record cannot leave it claiming to be live", () => {
+  describe("editing a published record never pulls it from the players", () => {
     /** A published, player-visible spell list drawing one real spell. */
     const publishAndShare = async (base: string) => {
       const created = await createRecord(base, { type: "spell-list", name: "Blood Magic", add: ["fireball"] });
@@ -357,7 +358,7 @@ describe("homebrew HTTP CRUD", () => {
       return created.id as string;
     };
 
-    it("demotes to an invisible draft when an autosave makes the body unpublishable, and says so in the response", async () => {
+    it("holds an autosave that makes the record unpublishable as pending, and keeps the live list shared", async () => {
       const { base, store } = await fixture({ realValidation: true });
       const id = await publishAndShare(base);
       expect(store.publishedFor("player").spellLists).toHaveLength(1);
@@ -366,40 +367,55 @@ describe("homebrew HTTP CRUD", () => {
       const patched = await body(
         await patch(base, byId(id), GM, { record: { id, name: "Blood Magic", source: "homebrew", add: [] } })
       );
+      // The editor sees its edit and what blocks it...
       expect(patched.data.record.record.add).toEqual([]);
-      // ...but the record no longer claims to be live.
-      expect(patched.data.record).toMatchObject({ state: "draft", visibleToPlayers: false });
+      expect(patched.data.record).toMatchObject({ state: "published", visibleToPlayers: true, pendingChanges: true });
       expect(patched.data.record.validity.valid).toBe(false);
-      expect(store.publishedFor("player").spellLists).toHaveLength(0);
-      expect(store.publishedFor("gm").spellLists).toHaveLength(0);
-      // And the library agrees on the next read, not only in the PATCH response.
-      expect((await body(await get(base, byId(id), GM))).data.record.state).toBe("draft");
+      // ...while the players keep the published list.
+      expect(store.publishedFor("player").spellLists).toHaveLength(1);
+      expect(store.publishedFor("player").spellLists[0].add).toEqual(["fireball"]);
+
+      // Putting it live is refused, and the live version is untouched.
+      const refused = await post(base, sub(HOMEBREW_PATHS.contentPublish, id), GM, {});
+      expect(refused.status).toBe(409);
+      expect((await body(refused)).error.message).toContain("the published version is unchanged");
+      expect(store.publishedFor("player").spellLists).toHaveLength(1);
     });
 
-    it("demotes when the patch breaks the record's SCHEMA - the case that used to hide behind a console.warn", async () => {
+    it("keeps a schema-breaking patch out of the catalogs, which still serve the published body", async () => {
       const { base, store } = await fixture({ realValidation: true });
       const id = await publishAndShare(base);
-      // `add` must be an array of ids. This body saves and parses as JSON but fails its own Zod schema, the
-      // shape `publishedFor` would drop.
+      // `add` must be an array of ids. This body saves and parses as JSON but fails its own Zod schema.
       const patched = await body(
         await patch(base, byId(id), GM, { record: { id, name: "Blood Magic", source: "homebrew", add: "fireball" } })
       );
-      expect(patched.data.record).toMatchObject({ state: "draft", visibleToPlayers: false });
-      // The invariant, stated directly: nothing published is ever missing from the merged catalog.
-      const publishedRows = store.list({ state: "published" }).rows;
-      expect(publishedRows).toHaveLength(0);
-      expect(store.publishedFor("gm").spellLists).toHaveLength(0);
+      expect(patched.data.record).toMatchObject({ state: "published", pendingChanges: true });
+      // The invariant: nothing published is ever missing from the merged catalog.
+      expect(store.list({ state: "published" }).rows).toHaveLength(1);
+      expect(store.publishedFor("gm").spellLists).toHaveLength(1);
     });
 
-    it("leaves a still-valid edit published, and never demotes a draft it had no business touching", async () => {
-      const { base } = await fixture({ realValidation: true });
+    it("puts a valid edit live only on Publish, and drops one on Discard", async () => {
+      const { base, store } = await fixture({ realValidation: true });
       const id = await publishAndShare(base);
       const fine = await body(
         await patch(base, byId(id), GM, {
           record: { id, name: "Blood Magic II", source: "homebrew", add: ["fireball", "fire-bolt"] }
         })
       );
-      expect(fine.data.record).toMatchObject({ state: "published", visibleToPlayers: true });
+      expect(fine.data.record).toMatchObject({ state: "published", visibleToPlayers: true, pendingChanges: true });
+      expect(store.publishedFor("player").spellLists[0].name).toBe("Blood Magic");
+
+      const live = await body(await post(base, sub(HOMEBREW_PATHS.contentPublish, id), GM, {}));
+      expect(live.data.record).toMatchObject({ state: "published", visibleToPlayers: true, pendingChanges: false });
+      expect(store.publishedFor("player").spellLists[0].name).toBe("Blood Magic II");
+
+      await patch(base, byId(id), GM, {
+        record: { id, name: "Blood Magic III", source: "homebrew", add: ["fireball"] }
+      });
+      const discarded = await body(await post(base, sub(HOMEBREW_PATHS.contentDiscard, id), GM, {}));
+      expect(discarded.data.record).toMatchObject({ pendingChanges: false });
+      expect(discarded.data.record.record.name).toBe("Blood Magic II");
 
       // A draft may be invalid, so editing one into nonsense is fine.
       const draft = await createRecord(base, { type: "spell-list", name: "Scratch", add: ["fireball"] });

@@ -144,6 +144,7 @@ export const HOMEBREW_PATHS = {
   contentDuplicate: `${API_NAMESPACE}/homebrew/content/{id}/duplicate`,
   contentPublish: `${API_NAMESPACE}/homebrew/content/{id}/publish`,
   contentUnpublish: `${API_NAMESPACE}/homebrew/content/{id}/unpublish`,
+  contentDiscard: `${API_NAMESPACE}/homebrew/content/{id}/discard`,
   contentVisibility: `${API_NAMESPACE}/homebrew/content/{id}/visibility`,
   contentUsages: `${API_NAMESPACE}/homebrew/content/{id}/usages`,
   packsExport: `${API_NAMESPACE}/homebrew/packs/export`,
@@ -726,6 +727,8 @@ export const HomebrewRecordDocumentSchema = z
     createdAt: TimestampSchema,
     updatedAt: TimestampSchema,
     validity: HomebrewValiditySchema,
+    /** A published record has edits that are not live yet; `record` and `validity` describe them. */
+    pendingChanges: z.boolean(),
     record: HomebrewRecordSchema
   })
   .strict();

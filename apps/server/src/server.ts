@@ -528,6 +528,7 @@ export function createServer(options: CreateServerOptions) {
       // The GM catalog: a dependency that is published but not player-visible is valid here.
       validate: createHomebrewValidator({
         forAudience: (audience) => contentLibrary.forAudience(audience),
+        forAudienceWithout: (audience, id) => contentLibrary.forAudienceWithout(audience, id),
         publishedSpellLists: () => homebrewStore.publishedFor("gm").spellLists,
         // Drafts included, only here: the gate asks whether a record exists, so a class and its subclass can
         // publish in either order.

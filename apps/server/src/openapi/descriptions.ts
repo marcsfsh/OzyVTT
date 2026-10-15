@@ -698,7 +698,9 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   HomebrewRecordDocument: {
     "": "One stored row: the authored body plus the three orthogonal row-state fields. `state` is set only by /publish and /unpublish, `visibleToPlayers` only by /visibility, `deletedAt` only by DELETE and /restore. A player sees a record only when it is published AND visible AND not deleted - and even then only through the merged CONTENT_PATHS catalogs, never through this component.",
     visibleToPlayers: "Publishing does not reveal: this is the separate, deliberate second step",
-    deletedAt: "Soft delete; a deleted row leaves every merged catalog at once and is restorable"
+    deletedAt: "Soft delete; a deleted row leaves every merged catalog at once and is restorable",
+    pendingChanges:
+      "A published record has edits that are not live yet. `record` and `validity` describe the pending body; the catalogs still serve the live one until /publish"
   },
   HomebrewRecordSummary: {
     "": "The flat, deliberately NON-polymorphic list row: a name and a badge. Carries `valid` alone - the issue list costs a GET - so listing a 300-record library never ships a 20-row level table.",

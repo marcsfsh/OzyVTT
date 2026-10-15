@@ -239,16 +239,40 @@ export function RecordDetail({
   };
 
   const publish = () => runStateChange(() => homebrewApi.publish(gmToken, docRef.current.id, docRef.current.rev));
+  const discard = async () => {
+    const confirmed = await confirm({
+      title: "Discard these changes?",
+      body: "The published version stays as it is, and the editor goes back to it.",
+      confirmLabel: "Discard",
+      danger: true
+    });
+    if (!confirmed) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      // Flushed first, so a save still in flight cannot land after the discard and re-create the changes.
+      await autosave.flush();
+      const next = await homebrewApi.discard(gmToken, docRef.current.id, docRef.current.rev);
+      adopt(next);
+      // The editor goes back to the live body, which is now the saved baseline.
+      const filled = withDefaults(next.type, next.record);
+      setDraft(filled);
+      autosave.markSaved(next.rev, filled);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Couldn't discard those changes.");
+    } finally {
+      setBusy(false);
+    }
+  };
   const unpublish = () => runStateChange(() => homebrewApi.unpublish(gmToken, docRef.current.id, docRef.current.rev));
   const setVisible = (visible: boolean) =>
     void runStateChange(() => homebrewApi.setVisibility(gmToken, docRef.current.id, visible, docRef.current.rev));
   const restore = () => runStateChange(() => homebrewApi.restore(gmToken, docRef.current.id));
 
   /**
-   * Removing a record can invalidate another (e.g. a published class losing its only subclass),
-   * which the server then demotes to Draft on its next write. To report this when it happens,
-   * re-list after the delete and diff the server-computed `valid` against what was
-   * published-and-valid before.
+   * Removing a record can invalidate another (e.g. a published class losing its only subclass).
+   * To report this when it happens, re-list after the delete and diff the server-computed `valid`
+   * against what was published-and-valid before.
    */
   const remove = async () => {
     const name = nameOf(draft).trim() || `this ${typeLabel(doc.type)}`;
@@ -294,6 +318,8 @@ export function RecordDetail({
 
   const removed = !!doc.deletedAt;
   const published = doc.state === "published";
+  // A published record's edits wait for Update, so players never lose it mid-edit.
+  const pending = published && doc.pendingChanges;
 
   return (
     <article className="hb-detail scroll-y">
@@ -306,7 +332,10 @@ export function RecordDetail({
           {removed ? (
             <Badge tone="neutral">Archived</Badge>
           ) : published ? (
-            <Badge tone="neutral">Published</Badge>
+            <>
+              <Badge tone="neutral">Published</Badge>
+              {pending && <Badge tone="caution">Changes not live</Badge>}
+            </>
           ) : (
             <Badge tone="caution">Draft</Badge>
           )}
@@ -314,14 +343,14 @@ export function RecordDetail({
           <SaveState status={autosave.status} onReload={() => void reload()} onRetry={autosave.retry} />
 
           <div className="hb-state-actions">
-            {!removed && !published && (
+            {!removed && (!published || pending) && (
               <Button
                 variant="primary"
                 onClick={() => void publish()}
                 disabled={checklist.length > 0 || busy}
                 aria-describedby={blockedReason || actionError ? reasonId : undefined}
               >
-                Publish
+                {pending ? "Update" : "Publish"}
               </Button>
             )}
             {!removed && published && (
@@ -333,6 +362,11 @@ export function RecordDetail({
             )}
             {!removed && (
               <Menu trigger="⋯" label={`More actions for this ${typeLabel(doc.type)}`} icon align="end">
+                {pending && (
+                  <MenuItem onClick={() => void discard()} disabled={busy}>
+                    Discard changes
+                  </MenuItem>
+                )}
                 {published && (
                   <MenuItem onClick={() => void unpublish()} disabled={busy}>
                     Unpublish
@@ -362,11 +396,11 @@ export function RecordDetail({
               </p>
             ) : (
               <>
-                {/* A published record with outstanding issues is still live, and the store demotes
-                    it to Draft on the next re-validating write. */}
+                {/* A published record's edits are held until Update, so outstanding issues never take it
+                    away from the players. */}
                 <p className="hb-blocked-count">
                   {published
-                    ? `${checklist.length} things need fixing, or the next edit puts this back to Draft.`
+                    ? `${checklist.length} things need fixing before these changes can go live. Players keep the published version.`
                     : `${checklist.length} things left before this can be published.`}
                 </p>
                 <ul className="hb-blocked-list">

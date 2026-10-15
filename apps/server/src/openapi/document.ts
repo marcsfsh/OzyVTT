@@ -1950,7 +1950,7 @@ export const openApiDocument = {
         notFound: true,
         conflict: "A stale `expectedRev`; `error.currentRevision` carries the row's revision",
         description:
-          "Replaces the authored `record` and leaves `state`, `visibleToPlayers`, and `deletedAt` alone - genuinely correct PATCH semantics on the ROW, even though the `record` value it carries is complete. A partial merge into a polymorphic body under `additionalProperties: false` is unspecifiable, so the body is always the whole record."
+          'Replaces the authored `record` and leaves `state`, `visibleToPlayers`, and `deletedAt` alone - correct PATCH semantics on the ROW, even though the `record` value it carries is complete. A partial merge into a polymorphic body under `additionalProperties: false` is unspecifiable, so the body is always the whole record. On a published record the edit is held as pending (`pendingChanges: true`): the live body stays in the catalogs, so an edit mid-session never pulls content from the players, until `/publish` validates the pending body and puts it live or `/discard` drops it.'
       }),
       delete: homebrewOp("deleteHomebrewContent", "HomebrewDeletedResponse", {
         bad: false,
@@ -1988,7 +1988,17 @@ export const openApiDocument = {
         conflict:
           "The draft is not valid: `error.details.invalid.issues` lists every blocking issue with its machine-addressable `path`",
         description:
-          'Moves a record to `state: "published"`, which requires it to be valid. Publishing does NOT show it to players - that is `/visibility`, deliberately a separate endpoint. A publish REQUEST that is itself malformed is a 400; a well-formed request against a draft the stored state refuses is a 409.'
+          'Moves a record to `state: "published"`, which requires it to be valid. On a published record with `pendingChanges`, validates the pending body and puts it live; refused, the live body is unchanged. Publishing does NOT show it to players - that is `/visibility`, deliberately a separate endpoint. A publish REQUEST that is itself malformed is a 400; a well-formed request against a body the stored state refuses is a 409.'
+      })
+    },
+    [HOMEBREW_PATHS.contentDiscard]: {
+      post: homebrewOp("discardHomebrewChanges", "HomebrewContentResponse", {
+        body: "HomebrewStateChangeRequest",
+        bodyRequired: false,
+        params: [homebrewIdParam],
+        notFound: true,
+        description:
+          "Drops a published record's pending edits, leaving the live body as it is. A no-op when nothing is pending."
       })
     },
     [HOMEBREW_PATHS.contentUnpublish]: {
@@ -1998,7 +2008,7 @@ export const openApiDocument = {
         params: [homebrewIdParam],
         notFound: true,
         description:
-          'Returns a record to `state: "draft"`. It leaves the merged catalogs at once and may be invalid again while the GM reworks it.'
+          'Returns a record to `state: "draft"`. It leaves the merged catalogs at once and may be invalid again while the GM reworks it. Pending edits become the draft\'s body, since a draft is edited in place.'
       })
     },
     [HOMEBREW_PATHS.contentVisibility]: {

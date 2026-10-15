@@ -33,7 +33,6 @@ import {
   recordName,
   type HomebrewBody,
   type HomebrewRecordRow,
-  type HomebrewRevalidator,
   type HomebrewStore,
   type HomebrewSummaryRow
 } from "./homebrew-store.js";
@@ -74,7 +73,8 @@ export const HOMEBREW_PACK_BODY_LIMIT = "4mb";
 const MAX_PACK_RECORDS = 500;
 
 /** Publish validation. The always-valid fallback is only for store-only test fixtures. */
-export type HomebrewValidator = (type: HomebrewContentType, body: HomebrewBody) => HomebrewValidity;
+/** `replacing` is set when `body` is a published record's pending edits; see `createHomebrewValidator`. */
+export type HomebrewValidator = (type: HomebrewContentType, body: HomebrewBody, replacing?: string) => HomebrewValidity;
 const UNVALIDATED: HomebrewValidator = () => ({ valid: true, issues: [], warnings: [] });
 
 /** Reference scan over GameState (`homebrew-usages.ts`). */
@@ -152,8 +152,10 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
     rev: row.rev,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-    validity: validate(row.type, row.body),
-    record: { ...row.body, type: row.type }
+    // A published record's editor works on its pending edits, so the report describes what Publish would put live.
+    validity: row.pendingBody ? validate(row.type, row.pendingBody, row.id) : validate(row.type, row.body),
+    pendingChanges: row.pendingBody !== null,
+    record: { ...(row.pendingBody ?? row.body), type: row.type }
   });
   const summaryOf = (row: HomebrewSummaryRow, record: HomebrewRecordRow | undefined) => ({
     id: row.id,
@@ -212,12 +214,11 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
     return sendData(response, 200, { record: documentOf(row) });
   });
 
-  // Always lands (autosave); the store demotes a published record whose new body would not publish.
+  // Always lands (autosave); a published record's edit is held as pending until Publish puts it live.
   router.patch(expressPath(HOMEBREW_PATHS.contentById), requireGm, (request, response) => {
     try {
       const { record, expectedRev } = HomebrewUpdateRequestSchema.parse(request.body);
-      const revalidate: HomebrewRevalidator = (type, body) => validate(type, body).valid;
-      return sent(response, store.update(pathParam(request, "id"), record, expectedRev, "gm", revalidate));
+      return sent(response, store.update(pathParam(request, "id"), record, expectedRev, "gm"));
     } catch (error) {
       return storeError(response, error);
     }
@@ -272,12 +273,20 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
       const id = pathParam(request, "id");
       const existing = store.get(id);
       if (!existing) return sendFailure(response, 404, "not_found", "That record was not found.");
-      const validity = validate(existing.type, existing.body);
+      const validity = existing.pendingBody
+        ? validate(existing.type, existing.pendingBody, existing.id)
+        : validate(existing.type, existing.body);
       if (!validity.valid)
-        return sendFailure(response, 409, "conflict", "This draft cannot be published until it is valid.", {
-          invalid: { issues: validity.issues }
-        });
-      return sent(response, store.setState(id, "published", expectedRev));
+        return sendFailure(
+          response,
+          409,
+          "conflict",
+          existing.pendingBody
+            ? "These changes cannot go live until they are valid; the published version is unchanged."
+            : "This draft cannot be published until it is valid.",
+          { invalid: { issues: validity.issues } }
+        );
+      return sent(response, store.publish(id, expectedRev));
     } catch (error) {
       return storeError(response, error);
     }
@@ -286,7 +295,16 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
   router.post(expressPath(HOMEBREW_PATHS.contentUnpublish), requireGm, (request, response) => {
     try {
       const { expectedRev } = HomebrewStateChangeRequestSchema.parse(request.body ?? {});
-      return sent(response, store.setState(pathParam(request, "id"), "draft", expectedRev));
+      return sent(response, store.unpublish(pathParam(request, "id"), expectedRev));
+    } catch (error) {
+      return storeError(response, error);
+    }
+  });
+
+  router.post(expressPath(HOMEBREW_PATHS.contentDiscard), requireGm, (request, response) => {
+    try {
+      const { expectedRev } = HomebrewStateChangeRequestSchema.parse(request.body ?? {});
+      return sent(response, store.discardPending(pathParam(request, "id"), expectedRev));
     } catch (error) {
       return storeError(response, error);
     }

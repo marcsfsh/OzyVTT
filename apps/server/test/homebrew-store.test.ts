@@ -30,8 +30,7 @@ import {
   HomebrewNotFoundError,
   HomebrewRevisionConflictError,
   HomebrewStateError,
-  HomebrewStore,
-  type HomebrewRevalidator
+  HomebrewStore
 } from "../src/homebrew-store.js";
 
 // Store and id-minting tests. Critical: the id length budget (an over-long id passes creation, then
@@ -339,7 +338,8 @@ describe("HomebrewStore revision counter", () => {
 
     const database = new DatabaseSync(path);
     expect(database.prepare("SELECT store, version FROM migrations").all()).toEqual([
-      { store: "homebrew", version: 1 }
+      { store: "homebrew", version: 1 },
+      { store: "homebrew", version: 2 }
     ]);
     const tables = (
       database.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]
@@ -434,23 +434,44 @@ describe("HomebrewStore as a ContentLibrary source", () => {
     expect(store.importRecord(draft.id, "feat", bodyFor("Updated"), true).name).toBe("Updated");
   });
 
-  it("demotes a published record whose patched body would no longer publish, and leaves a valid one alone", () => {
+  it("holds a published record's edits as pending, so the live body and visibility never move mid-edit", () => {
     const record = store.create({ type: "feat", body: bodyFor("Alert") });
     store.setState(record.id, "published", undefined);
     store.setVisibility(record.id, true, undefined);
-    // The revalidator is injected, so the store stays free of the validator; when supplied, a patch
-    // cannot leave a record marked published that the merged catalog would drop.
-    const refusesBroken: HomebrewRevalidator = (_type, body) => body.name !== "Broken";
-    const kept = store.update(record.id, bodyFor("Alert II"), undefined, "gm", refusesBroken);
-    expect(kept).toMatchObject({ state: "published", visibleToPlayers: true });
+    const before = store.revision;
 
-    const demoted = store.update(record.id, bodyFor("Broken"), undefined, "gm", refusesBroken);
-    expect(demoted).toMatchObject({ state: "draft", visibleToPlayers: false, name: "Broken" });
-    // The demotion is in the audit trail, not only in the row.
-    expect(store.listRevisions(record.id)[0]).toMatchObject({ state: "draft", authorTag: "gm:demoted" });
-    // With no validator supplied nothing is re-checked; the store never validates on its own.
+    const edited = store.update(record.id, bodyFor("Alert II"), undefined, "gm");
+    expect(edited).toMatchObject({ state: "published", visibleToPlayers: true, name: "Alert" });
+    expect(edited.body.name).toBe("Alert");
+    expect(edited.pendingBody?.name).toBe("Alert II");
+    expect(store.revision).toBeGreaterThan(before);
+    expect(store.listRevisions(record.id)[0]).toMatchObject({ state: "published", authorTag: "gm:pending" });
+
+    // Editing back to the live body leaves nothing pending.
+    expect(store.update(record.id, bodyFor("Alert"), undefined, "gm").pendingBody).toBeNull();
+  });
+
+  it("puts pending edits live on publish, adopts them on unpublish, and drops them on discard", () => {
+    const record = store.create({ type: "feat", body: bodyFor("Alert") });
     store.setState(record.id, "published", undefined);
-    expect(store.update(record.id, bodyFor("Broken Again"), undefined, "gm").state).toBe("published");
+
+    store.update(record.id, bodyFor("Alert II"), undefined, "gm");
+    const live = store.publish(record.id, undefined);
+    expect(live).toMatchObject({ state: "published", name: "Alert II", pendingBody: null });
+    expect(live.body.name).toBe("Alert II");
+
+    store.update(record.id, bodyFor("Alert III"), undefined, "gm");
+    const dropped = store.discardPending(record.id, undefined);
+    expect(dropped).toMatchObject({ name: "Alert II", pendingBody: null });
+
+    store.update(record.id, bodyFor("Alert IV"), undefined, "gm");
+    const draft = store.unpublish(record.id, undefined);
+    expect(draft).toMatchObject({ state: "draft", name: "Alert IV", pendingBody: null });
+    // A draft is edited in place.
+    expect(store.update(record.id, bodyFor("Alert V"), undefined, "gm")).toMatchObject({
+      name: "Alert V",
+      pendingBody: null
+    });
   });
 
   it("returns the empty slice before initialize, so a synchronous ContentLibrary is safe to construct", async () => {
