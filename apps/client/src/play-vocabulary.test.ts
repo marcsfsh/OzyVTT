@@ -242,12 +242,16 @@ describe("The structured copy, pinned at its one definition (D28)", () => {
   });
 
   it("calls the place the Table and never the Encounter", () => {
-    // "Encounter" is a fight, not a place. `main.tsx` calls `createRoot` at import, so its tab table is
-    // checked through the scan (its rows are `label: "…"`); the order is not pinned here.
+    // "Encounter" is a fight, not a place. The GM tab table is checked through the scan (its rows are
+    // `label: "…"`); the order is not pinned here.
     for (const label of ["Table", "Scenes", "Roster", "Codex", "Homebrew", "Settings"]) {
-      expect(at("apps/client/src/main.tsx", label), `the GM tab bar no longer has a "${label}" tab`).toBe(true);
+      expect(at("apps/client/src/shell/GmShell.tsx", label), `the GM tab bar no longer has a "${label}" tab`).toBe(
+        true
+      );
     }
-    expect(at("apps/client/src/main.tsx", "Encounter"), 'the table tab is labelled "Encounter" again').toBe(false);
+    expect(at("apps/client/src/shell/GmShell.tsx", "Encounter"), 'the table tab is labelled "Encounter" again').toBe(
+      false
+    );
   });
 });
 

@@ -488,13 +488,13 @@ p {
   );
 }
 
-/* The entry drive, landing → app. `--entry-drive` (1500ms) and the two timers in `main.tsx` are one
+/* The entry drive, landing → app. `--entry-drive` (1500ms) and the two timers in `shell/Landing.tsx` are one
    number in two places; change them together. Two beats: road and doors (0-1000ms), then sun and
    flare (560-1500ms) overlapping the curtain's fade.
    The drive never replaces a resting animation (that snaps): the road streams on
    `background-position` while the drive scales the plane on `transform`; stars twinkle on `opacity`
    while the drive uses `filter: opacity()`; the sun rests on `translate`. It is a fixed curtain
-   (z-70, above the token menu's 60) and unmounts afterwards. Reduced motion skips it (main.tsx). */
+   (z-70, above the token menu's 60) and unmounts afterwards. Reduced motion skips it (shell/Landing.tsx). */
 :root {
   --entry-drive: 1500ms;
 }
@@ -1924,7 +1924,7 @@ button.party-strip-entry:hover {
 /* The phone table (below 980px): two rows. `section.table` (top line, map band, status line) is
    `flex: 0 0 auto` because each of its rows has a stated size. `.table-sheet` is `flex: 1 1 0` (a zero
    basis grows into the leftover without taking shrink by content size) with an 8.25rem floor (tab
-   bar + two initiative rows). Below the floors the frame scrolls (`.scroll-y` in main.tsx) rather
+   bar + two initiative rows). Below the floors the frame scrolls (`.scroll-y` in shell/TableView.tsx) rather
    than clipping content out of reach. */
 @media (max-width: 979px) {
   /* `scrollbar-gutter: auto` matters most here: `stable` reserves ~10px of a phone's content box, enough
@@ -1986,7 +1986,7 @@ button.party-strip-entry:hover {
     min-height: 9rem;
     margin-top: 0;
   }
-  /* Below 980px the claim picker is the sheet (main.tsx renders it in this row). `flex: 1 1 0` so its
+  /* Below 980px the claim picker is the sheet (shell/TableView.tsx renders it in this row). `flex: 1 1 0` so its
      539px content basis does not take the whole shrink, and the sheet's floor so it never resolves to
      0px when the replays shelf and "Leave table" share the row; the overflow goes to the frame's scroll.
      The picker scrolls its own cards (`.scroll-y` in ClaimCharacter.tsx). */

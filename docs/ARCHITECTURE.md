@@ -200,7 +200,16 @@ change as a new numbered migration in the owning store.
 
 ## Client
 
-A routed single-page app (`apps/client/src/router.ts`); every surface has an address. The game
-arrives over the socket; the Codex and homebrew are fetched over HTTP. The table viewer is a
-separate bundle that never loads the game client. Rules checks on the client are hints only;
-the server decides.
+A routed single-page app (`apps/client/src/router.ts`); every surface has an address. `main.tsx` only
+mounts `shell/App.tsx`, where `useSession` holds the sign-in, the socket and the projected state, and
+the GM and player shells render the surface the address names. The game arrives over the socket; the
+Codex and homebrew are fetched over HTTP. Socket request/replies go through `lib/command.ts`
+(`command` adds the `commandId`, `read` does not, and a lost reply becomes a refusal) and `/api/v1`
+calls through `lib/api.ts`. The table viewer is a separate bundle that never loads the game client.
+Rules checks on the client are hints only; the server decides.
+
+Surfaces not needed for first paint load on first use (`components/lazySurface.tsx`): the Codex,
+homebrew, settings and the API reference, the character builder and level flow, replays, the map
+library and the shared-screen controls. pdf.js loads with the first imported PDF. The build targets
+current phone and laptop browsers (Chrome and Edge 111, Firefox 121, Safari 16.4; `build.target` in
+`apps/client/vite.config.ts`), the floor the stylesheets' `:has()` and `dvh` already set.

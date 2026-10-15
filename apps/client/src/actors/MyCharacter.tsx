@@ -158,7 +158,7 @@ export function MyCharacter({
       <div className="my-character-head neon-beam">
         <h2>My character</h2>
         <div className="my-character-head-actions">
-          {/* Always offered: the route answers with the builder or its policy gate (main.tsx). */}
+          {/* Always offered: the route answers with the builder or its policy gate (shell/LayerView.tsx). */}
           <Button variant="secondary" onClick={onCreateCharacter}>
             Create a character
           </Button>
