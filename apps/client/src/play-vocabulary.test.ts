@@ -92,8 +92,8 @@ const ALLOWED: ReadonlyArray<readonly [file: string, text: string, why: string]>
 
 /** Domain terms the lock must never eat, asserted present at their home. */
 const LEGITIMATE: ReadonlyArray<readonly [file: string, text: string, why: string]> = [
-  ["apps/client/src/scene/MapToolbar.tsx", "Reveal the whole map", "fog: Reveal/Hide are in-fight verbs D28 keeps"],
-  ["apps/client/src/scene/MapToolbar.tsx", "Hide the whole map again", "fog: the Hide half"],
+  ["apps/client/src/scene/MapToolGroups.tsx", "Reveal the whole map", "fog: Reveal/Hide are in-fight verbs D28 keeps"],
+  ["apps/client/src/scene/MapToolGroups.tsx", "Hide the whole map again", "fog: the Hide half"],
   [
     "apps/client/src/encounter/InitiativePrompt.tsx",
     "Initiative d20",

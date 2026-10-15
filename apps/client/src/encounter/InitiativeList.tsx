@@ -1,4 +1,4 @@
-import { initialsOf } from "../scene/mapImage";
+import { initialsOf } from "../scene/tokenGlyph";
 import "./InitiativeList.css";
 
 /**

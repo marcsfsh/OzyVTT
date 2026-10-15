@@ -433,7 +433,6 @@ const FEEDBACK_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
   ["apps/client/src/encounter/MonsterBrowser.tsx", 1],
   ["apps/client/src/encounter/PlayerEncounterPanel.tsx", 1],
   ["apps/client/src/integrations/IntegrationsPanel.tsx", 9],
-  ["apps/client/src/scene/EncounterMap.tsx", 14],
   ["apps/client/src/scene/TokenContextMenu.tsx", 6],
   ["apps/client/src/scenes/SceneBuilder.tsx", 6],
   ["apps/client/src/scenes/ScenePanel.tsx", 3],

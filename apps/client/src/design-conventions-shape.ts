@@ -54,8 +54,8 @@ export const CONVENTION_SHAPE = {
 
   // (e) one feedback channel
   /** Inline `setMessage(…)` / `setFeedback(…)` call sites; reaches 0 once every surface uses `useToast`. */
-  feedbackAllowFiles: 13,
-  feedbackAllowSites: 72,
+  feedbackAllowFiles: 12,
+  feedbackAllowSites: 58,
 
   // (f) the breakpoint ladder
   /**

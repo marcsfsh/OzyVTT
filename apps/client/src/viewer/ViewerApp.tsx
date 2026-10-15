@@ -1,13 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Input } from "@vtt/ui";
-import {
-  bandFraction,
-  FogOverlay,
-  probeImageDimensions,
-  TokenGlyph,
-  TokenHealthAura,
-  TokenStatusBadges
-} from "../scene/mapImage";
+import { probeImageDimensions } from "../scene/mapImage";
+import { FogOverlay } from "../scene/FogOverlay";
+import { bandFraction, TokenGlyph, TokenHealthAura, TokenStatusBadges } from "../scene/tokenGlyph";
 import { AnnotationGlyph, PingGlyph } from "../scene/annotationGlyph";
 import { InitiativeRow } from "../encounter/InitiativeList";
 import "./viewer.css";

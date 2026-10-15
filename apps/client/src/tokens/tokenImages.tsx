@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { TokenGlyph, type TokenGlyphProps } from "../scene/mapImage";
+import { TokenGlyph, type TokenGlyphProps } from "../scene/tokenGlyph";
 
 /**
  * Token-asset blob URLs by asset id, fetched once and shared by every token using the asset. Never

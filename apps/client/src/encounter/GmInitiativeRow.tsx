@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode, type Ref } from "react";
 import type { GmActor, GmView, InitiativeEntry, MutationResult } from "@vtt/domain";
 import { ConditionDots } from "./conditions";
-import { initialsOf } from "../scene/mapImage";
+import { initialsOf } from "../scene/tokenGlyph";
 import { DyingTracker } from "./DyingTracker";
 import { PendingDamagePrompt } from "./PendingDamagePrompt";
 import { ReactionPrompt } from "./ReactionPrompt";

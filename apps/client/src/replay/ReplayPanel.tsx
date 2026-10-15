@@ -16,7 +16,8 @@ import {
 } from "@vtt/ui";
 import { navigate } from "../router";
 import { conditionBadgeLabel, healthBandFor } from "../encounter/conditions";
-import { TokenStatusBadges, useAuthorizedMapImage } from "../scene/mapImage";
+import { useAuthorizedMapImage } from "../scene/mapImage";
+import { TokenStatusBadges } from "../scene/tokenGlyph";
 import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
 import { useConfirm } from "../components/feedback";
 import { newId } from "../lib/ids";
