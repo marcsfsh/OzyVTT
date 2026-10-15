@@ -14,18 +14,16 @@ import {
   TagInput,
   Textarea
 } from "@vtt/ui";
-import {
-  calendarApi,
-  codexApi,
-  uploadCodexAsset,
-  type CodexAutosaveSettings,
-  type CodexCalendar,
-  type CodexPage,
-  type CodexPageConnection,
-  type CodexPageRevision,
-  type CodexPageSummary,
-  type CodexSettings
-} from "./api";
+import type {
+  CodexAutosaveSettings,
+  CodexCalendar,
+  CodexPage,
+  CodexPageConnection,
+  CodexPageRevision,
+  CodexPageSummary,
+  CodexSettings
+} from "@vtt/domain";
+import { calendarApi, codexApi, uploadCodexAsset } from "./api";
 import { CodexImage } from "./CodexImage";
 import { CodexEditor } from "./CodexEditor";
 import { BODY_LAYER, TwoLayerBodyTabs, type BodyLayer } from "./TwoLayerBodyTabs";

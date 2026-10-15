@@ -12,13 +12,8 @@ import {
   Skeleton,
   VisibilityBadge
 } from "@vtt/ui";
-import {
-  codexApi,
-  type CodexAutosaveSettings,
-  type CodexPage,
-  type CodexPageConnection,
-  type CodexPageSummary
-} from "./api";
+import type { CodexAutosaveSettings, CodexPage, CodexPageConnection, CodexPageSummary } from "@vtt/domain";
+import { codexApi } from "./api";
 import { PageEditor } from "./PageEditor";
 import { NotebookTree, buildFolderTree, type NotebookSort } from "./NotebookTree";
 import { SearchResultList, useCodexSearch } from "./SearchResults";

@@ -2,14 +2,14 @@ import { useMemo, useState } from "react";
 import { Alert, Badge, Button, Combobox, Field, Input, NumberField, Skeleton } from "@vtt/ui";
 import {
   formatWorldDate,
-  journalApi,
   type CodexChronicleRecord,
   type CodexDowntimePayload,
   type CodexInWorldDate,
   type CodexPageSummary,
   type GmCodexCalendar,
   type PlayerCodexChronicleRecord
-} from "./api";
+} from "@vtt/domain";
+import { journalApi } from "./api";
 import { ARCHIVED_META, charactersFor, type ArchivableActor } from "./characters";
 import { deadlinesPassedBy, downtimeOf, downtimeProposedDate, downtimeSummaryLabel } from "./chronicle";
 import { CodexEditor } from "./CodexEditor";
@@ -66,7 +66,7 @@ export function DowntimeView({
   const rows = useMemo<readonly DowntimeRow[]>(
     () =>
       records
-        .map((record) => ({ record, payload: downtimeOf<CodexDowntimePayload>(record) }))
+        .map((record) => ({ record, payload: downtimeOf(record) }))
         .filter((row): row is DowntimeRow => row.payload !== null),
     [records]
   );

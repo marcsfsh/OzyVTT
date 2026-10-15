@@ -1,12 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { Badge, Skeleton, VisibilityBadge } from "@vtt/ui";
-import {
-  codexApi,
-  playerCodexApi,
-  type CodexJournalPayload,
-  type CodexPlayerChroniclePayload,
-  type CodexQuestStatus
-} from "./api";
+import type { CodexJournalPayload, CodexQuestStatus, PlayerCodexJournalPayload } from "@vtt/domain";
+import { codexApi, playerCodexApi } from "./api";
 import { chronicleRowSummary, type ChroniclePayloadRef } from "./chronicle";
 import { sessionTitle, type SessionRef } from "./sessions";
 import { QUEST_STATUS_LABEL, questStatusTone } from "./quests";
@@ -30,7 +25,7 @@ export type TagPageRef = Readonly<{
   revealedToPlayers?: boolean;
 }>;
 export type TagMapRef = Readonly<{ id: string; name: string; tags: readonly string[]; revealedToPlayers?: boolean }>;
-export type TagRecordRef = ChroniclePayloadRef<CodexJournalPayload | CodexPlayerChroniclePayload> &
+export type TagRecordRef = ChroniclePayloadRef<CodexJournalPayload | PlayerCodexJournalPayload> &
   Readonly<{ id: string; text: string; gmText?: string | null; tags: readonly string[]; revealedToPlayers?: boolean }>;
 export type TagSessionRef = SessionRef & Readonly<{ tags: readonly string[]; revealedToPlayers?: boolean }>;
 export type TagQuestRef = Readonly<{

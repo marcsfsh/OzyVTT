@@ -11,11 +11,15 @@ import {
   projectPlayerStanding,
   projectRevealAudit
 } from "../src/codex-projections.js";
-import type { CodexCalendar, CodexInWorldDate } from "@vtt/domain";
-import type { CodexMarkerRow } from "../src/codex/atlas.js";
-import type { CodexDowntimePayload, CodexJournalKind } from "../src/codex/journal-kinds.js";
-import type { CodexJournalRow } from "../src/codex/journal.js";
-import type { CodexStandingRow } from "../src/codex/standing.js";
+import type {
+  CodexCalendar,
+  CodexDowntimePayload,
+  CodexInWorldDate,
+  CodexJournalEntry,
+  CodexJournalKind,
+  CodexMarker,
+  CodexStanding
+} from "@vtt/domain";
 
 // Codex projection gates on literal rows, so a bug cannot hide behind a store that never returned a
 // dangerous row. SQL and HTTP layers are covered in `codex-store.test.ts` and `codex-http.test.ts`.
@@ -31,7 +35,7 @@ const CALENDAR: CodexCalendar = {
 };
 
 /** A journal row as the store returns one. Every field explicit so the test inherits no defaults. */
-function entryRow(overrides: Partial<CodexJournalRow> & { kind: CodexJournalKind }): CodexJournalRow {
+function entryRow(overrides: Partial<CodexJournalEntry> & { kind: CodexJournalKind }): CodexJournalEntry {
   return {
     id: "11111111-1111-4111-8111-111111111111",
     playerText: "The tax is due.",
@@ -202,7 +206,7 @@ const FACTION_ID = "22222222-2222-4222-8222-222222222222";
 const SECRET_FACTION_ID = "33333333-3333-4333-8333-333333333333";
 
 /** A standing row as the store returns one. Every field explicit so the test inherits no defaults. */
-function standingRow(overrides: Partial<CodexStandingRow> = {}): CodexStandingRow {
+function standingRow(overrides: Partial<CodexStanding> = {}): CodexStanding {
   return {
     id: "44444444-4444-4444-8444-444444444444",
     factionPageId: FACTION_ID,
@@ -214,7 +218,7 @@ function standingRow(overrides: Partial<CodexStandingRow> = {}): CodexStandingRo
   };
 }
 /** A marker row as the store returns one, GM-only links included so a leak has something to leak. */
-function markerRow(overrides: Partial<CodexMarkerRow> = {}): CodexMarkerRow {
+function markerRow(overrides: Partial<CodexMarker> = {}): CodexMarker {
   return {
     id: "55555555-5555-4555-8555-555555555555",
     mapId: "66666666-6666-4666-8666-666666666666",

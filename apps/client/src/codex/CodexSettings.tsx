@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Badge, Button, Field, Input, Select, Skeleton, Switch } from "@vtt/ui";
+import type { CodexAutosaveSettings, CodexRevisionHistorySettings, CodexSettings } from "@vtt/domain";
 import {
-  codexApi,
   AUTOSAVE_INTERVAL_CHOICES,
   AUTOSAVE_INTERVAL_MAX,
   AUTOSAVE_INTERVAL_MIN,
+  codexApi,
   REVISION_WINDOW_MAX,
-  REVISION_WINDOW_MIN,
-  type CodexAutosaveSettings,
-  type CodexRevisionHistorySettings,
-  type CodexSettings as CodexSettingsRecord
+  REVISION_WINDOW_MIN
 } from "./api";
 import { useConfirm } from "../components/feedback";
 
@@ -20,9 +18,9 @@ import { useConfirm } from "../components/feedback";
 export function CodexSettingsView({
   gmToken,
   onSettingsChanged
-}: Readonly<{ gmToken: string; onSettingsChanged?: (settings: CodexSettingsRecord) => void }>) {
+}: Readonly<{ gmToken: string; onSettingsChanged?: (settings: CodexSettings) => void }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [settings, setSettings] = useState<CodexSettingsRecord | null>(null);
+  const [settings, setSettings] = useState<CodexSettings | null>(null);
   // Until the first read settles, don't show a guessed state.
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

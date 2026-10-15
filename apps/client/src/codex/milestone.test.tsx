@@ -30,7 +30,7 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { JournalView } from "./JournalView";
-import type { CodexChronicleRecord, CodexPageSummary, GmCodexCalendar } from "./api";
+import type { CodexChronicleRecord, CodexPageSummary, GmCodexCalendar } from "@vtt/domain";
 
 /**
  * Milestones in the composer. The kind switch chooses the route (via `create` a milestone would land as a
@@ -38,6 +38,7 @@ import type { CodexChronicleRecord, CodexPageSummary, GmCodexCalendar } from "./
  */
 const CALENDAR: GmCodexCalendar = {
   yearName: "DR",
+  eras: [],
   months: [
     { name: "Hammer", days: 30 },
     { name: "Alturiak", days: 30 }

@@ -24,7 +24,8 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { PageEditor } from "./PageEditor";
-import { CodexRequestError, type CodexPage } from "./api";
+import type { CodexPage } from "@vtt/domain";
+import { CodexRequestError } from "./api";
 
 /**
  * `PageEditor`'s save path: debounced autosave, serialized saves, and revision resync on 409. The Codex is

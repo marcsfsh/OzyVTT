@@ -16,16 +16,8 @@ import {
   Switch,
   TagInput
 } from "@vtt/ui";
-import {
-  atlasApi,
-  journalApi,
-  type CodexAutosaveSettings,
-  type CodexJournalEntry,
-  type CodexMap,
-  type CodexMarker,
-  type CodexMarkerInput,
-  type CodexPageSummary
-} from "./api";
+import type { CodexAutosaveSettings, CodexJournalEntry, CodexMap, CodexMarker, CodexPageSummary } from "@vtt/domain";
+import { atlasApi, journalApi, type CodexMarkerInput } from "./api";
 import { useCodexAutosave } from "./autosave";
 import { CodexIcon, IconPicker, EntityIcon, pinSwatchVar } from "./icons";
 

@@ -26,7 +26,7 @@ vi.mock("./api", async (importOriginal) => {
 import { ToastProvider } from "@vtt/ui";
 import { goTo } from "../../test/route";
 import { PageEditor } from "./PageEditor";
-import type { CodexPage } from "./api";
+import type { CodexPage } from "@vtt/domain";
 
 /**
  * Changing a page's kind always confirms; the body names the fields at risk or says nothing is lost. With

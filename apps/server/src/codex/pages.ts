@@ -1,4 +1,10 @@
-import { pruneCodexFields, type CodexEntityType, type CodexInWorldDate } from "@vtt/domain";
+import {
+  pruneCodexFields,
+  type CodexEntityType,
+  type CodexInWorldDate,
+  type CodexPage,
+  type CodexPageSummary
+} from "@vtt/domain";
 import { transaction } from "../database.js";
 import { resolveDate } from "./calendar.js";
 import { bumpRevision, freshId, stamp, write, type CodexDb } from "./db.js";
@@ -25,29 +31,6 @@ import {
 
 /** Wiki pages (`codex_pages`) and the folder records that keep an empty folder alive (`codex_folders`). */
 
-export type CodexPageRow = Readonly<{
-  id: string;
-  title: string;
-  entityType: CodexEntityType;
-  /** Type-specific attributes; player-facing once the page is revealed. */
-  fields: Readonly<Record<string, string>>;
-  /** GM-only attributes; never projected to players, like `gmBody`. */
-  gmFields: Readonly<Record<string, string>>;
-  folder: string | null;
-  tags: readonly string[];
-  playerBody: string;
-  gmBody: string;
-  revealedToPlayers: boolean;
-  bannerAssetId: string | null;
-  /** `inWorldDate` is the source of truth; the instant and label derive from it. Any type keeps them, so a type switch is lossless. */
-  inWorldLabel: string | null;
-  calendarInstant: number | null;
-  inWorldDate: CodexInWorldDate | null;
-  rev: number;
-  createdAt: string;
-  updatedAt: string;
-}>;
-export type CodexPageSummaryRow = Omit<CodexPageRow, "playerBody" | "gmBody" | "gmFields">;
 export type CodexPageCreateInput = Readonly<{
   title: string;
   entityType?: CodexEntityType;
@@ -89,7 +72,7 @@ type SummaryRowRaw = {
 };
 type PageRowRaw = SummaryRowRaw & { gm_fields_json: string; player_body: string; gm_body: string };
 
-function toSummary(row: SummaryRowRaw): CodexPageSummaryRow {
+function toSummary(row: SummaryRowRaw): CodexPageSummary {
   return {
     id: row.id,
     title: row.title,
@@ -111,7 +94,7 @@ function toSummary(row: SummaryRowRaw): CodexPageSummaryRow {
     updatedAt: row.updated_at
   };
 }
-function toPage(row: PageRowRaw): CodexPageRow {
+function toPage(row: PageRowRaw): CodexPage {
   return {
     ...toSummary(row),
     gmFields: parseFields(row.gm_fields_json),
@@ -130,7 +113,7 @@ function sealedFields(
 }
 
 /** Leaf write of a whole page row (create and restore); its links, index row and folder records follow. */
-export function insertPage(db: CodexDb, page: CodexPageRow): void {
+export function insertPage(db: CodexDb, page: CodexPage): void {
   db.database
     .prepare(
       `INSERT INTO codex_pages (${PAGE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -162,7 +145,7 @@ export function insertPage(db: CodexDb, page: CodexPageRow): void {
 }
 
 /** A restored page: fields re-pruned and re-sealed, and its date re-resolved against the restored calendar. */
-export function restorePage(db: CodexDb, page: CodexPageRow): void {
+export function restorePage(db: CodexDb, page: CodexPage): void {
   const sealed = sealedFields(page.entityType, page.fields, page.gmFields);
   const dated = resolveDate(db, page.inWorldDate, null);
   insertPage(db, {
@@ -174,13 +157,13 @@ export function restorePage(db: CodexDb, page: CodexPageRow): void {
   });
 }
 
-export function createPage(db: CodexDb, input: CodexPageCreateInput): CodexPageRow {
+export function createPage(db: CodexDb, input: CodexPageCreateInput): CodexPage {
   const type = entityType(input.entityType);
   const sealed = sealedFields(type, entityFields(input.fields), entityFields(input.gmFields));
   // The same `resolveDate` as journal entries, so a calendar change reflows both by one rule.
   const dated = resolveDate(db, input.inWorldDate, null);
   const now = stamp(db);
-  const page: CodexPageRow = {
+  const page: CodexPage = {
     id: freshId(),
     title: title(input.title),
     entityType: type,
@@ -215,7 +198,7 @@ export function updatePage(
   expectedRev: number | undefined,
   authorTag: string,
   forceRevision = false
-): CodexPageRow {
+): CodexPage {
   const existing = getPage(db, pageId);
   if (!existing) throw new CodexNotFoundError("That page no longer exists.");
   // Single-writer, last-writer-wins: the message states what happened; the next save resyncs the revision.
@@ -235,7 +218,7 @@ export function updatePage(
       : { fields: existing.fields, gmFields: existing.gmFields };
   // Omitted `inWorldDate` keeps the stored date and `null` clears it: the editor PATCHes whole drafts.
   const dated = input.inWorldDate !== undefined ? resolveDate(db, input.inWorldDate, null) : null;
-  const next: CodexPageRow = {
+  const next: CodexPage = {
     ...existing,
     title: input.title === undefined ? existing.title : title(input.title),
     entityType: nextType,
@@ -292,14 +275,14 @@ export function updatePage(
 }
 
 /** Writes a past revision forward as a new save, checkpointing the state it discards so the restore can be undone. */
-export function restoreRevision(db: CodexDb, pageId: string, revisionId: number, authorTag: string): CodexPageRow {
+export function restoreRevision(db: CodexDb, pageId: string, revisionId: number, authorTag: string): CodexPage {
   const content = revisionContent(db, pageId, revisionId);
   if (!content) throw new CodexNotFoundError("That revision no longer exists.");
   return updatePage(db, pageId, content, undefined, authorTag, true);
 }
 
 /** Revealing is not editing: `updatedAt` stays, though the Codex revision still bumps. */
-export function setPageRevealed(db: CodexDb, pageId: string, revealed: boolean): CodexPageRow {
+export function setPageRevealed(db: CodexDb, pageId: string, revealed: boolean): CodexPage {
   if (!getPage(db, pageId)) throw new CodexNotFoundError("That page no longer exists.");
   write(db, () => {
     db.database.prepare("UPDATE codex_pages SET revealed = ? WHERE id = ?").run(revealed ? 1 : 0, pageId);
@@ -320,7 +303,7 @@ export function touchPages(db: CodexDb, pageIds: readonly string[], at: string):
   for (const pageId of pageIds) update.run(at, pageId);
 }
 
-export function getPage(db: CodexDb, pageId: string): CodexPageRow | null {
+export function getPage(db: CodexDb, pageId: string): CodexPage | null {
   if (!isId(pageId)) return null;
   const row = db.database.prepare(`SELECT ${PAGE_COLUMNS} FROM codex_pages WHERE id = ?`).get(pageId) as
     PageRowRaw | undefined;
@@ -330,7 +313,7 @@ export function getPage(db: CodexDb, pageId: string): CodexPageRow | null {
 export function listPages(
   db: CodexDb,
   filter?: Readonly<{ folder?: string | null; tag?: string }>
-): CodexPageSummaryRow[] {
+): CodexPageSummary[] {
   return (
     db.database
       .prepare(`SELECT ${SUMMARY_COLUMNS} FROM codex_pages ORDER BY title COLLATE NOCASE`)
@@ -345,14 +328,14 @@ export function listPages(
 }
 
 /** Every page with both bodies, for the backup. */
-export function listFullPages(db: CodexDb): CodexPageRow[] {
+export function listFullPages(db: CodexDb): CodexPage[] {
   return (
     db.database.prepare(`SELECT ${PAGE_COLUMNS} FROM codex_pages ORDER BY title COLLATE NOCASE`).all() as PageRowRaw[]
   ).map(toPage);
 }
 
 /** Dated `event` pages. Filtering on type rather than clearing dates keeps a type switch lossless. */
-export function listDatedEventPages(db: CodexDb): CodexPageRow[] {
+export function listDatedEventPages(db: CodexDb): CodexPage[] {
   return (
     db.database
       .prepare(

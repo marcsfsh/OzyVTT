@@ -16,13 +16,8 @@ import {
   TagInput,
   VisibilityBadge
 } from "@vtt/ui";
-import {
-  sessionApi,
-  type CodexAutosaveSettings,
-  type CodexPageSummary,
-  type CodexSession,
-  type CodexSessionStatus
-} from "./api";
+import type { CodexAutosaveSettings, CodexPageSummary, CodexSession, CodexSessionStatus } from "@vtt/domain";
+import { sessionApi } from "./api";
 import { sessionTitle } from "./sessions";
 import { createSession } from "./creates";
 import { CodexEditor } from "./CodexEditor";

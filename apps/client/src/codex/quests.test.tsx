@@ -93,7 +93,7 @@ import { goTo } from "../../test/route";
 import { CodexShell } from "./CodexShell";
 import { PlayerCodex } from "./PlayerCodex";
 import { QUEST_STATUS_LABEL, QUEST_STATUS_ORDER, openQuests, questProgress, questStatusTone } from "./quests";
-import type { CodexCalendar, CodexQuest, CodexSearchHit, PlayerCodexQuest } from "./api";
+import type { CodexCalendar, CodexQuest, CodexSearchHit, PlayerCodexQuest } from "@vtt/domain";
 
 const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] };
 

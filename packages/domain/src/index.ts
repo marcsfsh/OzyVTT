@@ -20,6 +20,8 @@ import type { PickBudgetScaling } from "./pick-budget.js";
 export * from "./codex-entities.js";
 /** In-world calendar arithmetic, shared so stored labels and the client's display agree. */
 export * from "./codex-calendar.js";
+/** The Codex's HTTP shapes, shared so the server's projections and the client's reads are one type. */
+export * from "./codex-wire.js";
 
 export {
   ACTOR_SCHEMA_VERSION,

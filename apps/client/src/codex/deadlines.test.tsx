@@ -67,10 +67,11 @@ import {
   downtimeSummaryLabel
 } from "./chronicle";
 import { CODEX_ICONS } from "./icons";
-import type { CodexChronicleRecord, GmCodexCalendar, PlayerCodexChronicleRecord } from "./api";
+import type { CodexChronicleRecord, GmCodexCalendar, PlayerCodexChronicleRecord } from "@vtt/domain";
 
 const CALENDAR: GmCodexCalendar = {
   yearName: "DR",
+  eras: [],
   months: [
     { name: "Hammer", days: 30 },
     { name: "Alturiak", days: 30 }

@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { Alert, Badge, Button, GmOnlyTag, IconChevron, Input, Skeleton } from "@vtt/ui";
 import {
-  calendarApi,
   calendarDaysPerYear,
   dateToInstant,
   formatWorldDate,
@@ -10,7 +9,8 @@ import {
   type CodexChronicleRecord,
   type CodexInWorldDate,
   type GmCodexCalendar
-} from "./api";
+} from "@vtt/domain";
+import { calendarApi } from "./api";
 import { CHRONICLE_KIND_META, chronicleRowSummary, sameInWorldDate } from "./chronicle";
 import { CalendarEditor, CampaignDateEditor } from "./CalendarEditor";
 import { CodexIcon } from "./icons";

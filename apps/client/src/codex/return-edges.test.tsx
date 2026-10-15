@@ -63,7 +63,7 @@ vi.mock("./api", async (importOriginal) => {
 import { ToastProvider } from "@vtt/ui";
 import { goTo } from "../../test/route";
 import { CodexShell } from "./CodexShell";
-import type { CodexCalendar, CodexChronicleRecord, CodexMap, CodexMarker } from "./api";
+import type { CodexCalendar, CodexChronicleRecord, CodexMap, CodexMarker } from "@vtt/domain";
 
 /**
  * A journal entry's jumps back to its pin and its combat replay. An entry stores only the pin, so the atlas

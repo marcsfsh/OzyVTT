@@ -17,15 +17,8 @@ import {
   useToast
 } from "@vtt/ui";
 import { socket } from "../socket";
-import {
-  atlasApi,
-  type CodexMap,
-  type CodexMapKind,
-  type CodexMarker,
-  type CodexPageSummary,
-  type MapAsset
-} from "./api";
-import { codexApi } from "./api";
+import type { CodexAutosaveSettings, CodexMap, CodexMapKind, CodexMarker, CodexPageSummary } from "@vtt/domain";
+import { atlasApi, codexApi, type MapAsset } from "./api";
 import { MapSurface } from "./MapSurface";
 import { MarkerInspector } from "./MarkerInspector";
 import { useConfirm } from "../components/feedback";
@@ -33,7 +26,6 @@ import { DEFAULT_COLOR, DEFAULT_ICON } from "./icons";
 import { CODEX_ROOT, atlasPath } from "./routes";
 import { withQuery } from "../router";
 import type { QuickCreateRequest } from "./QuickCreate";
-import type { CodexAutosaveSettings } from "./api";
 
 /**
  * The atlas: a navigable forest of maps (world, region, local) with markers that link to pages and

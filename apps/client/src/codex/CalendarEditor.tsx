@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Alert, Button, Field, IconButton, IconPlus, IconX, Input, Modal, Select } from "@vtt/ui";
-import { calendarApi, formatWorldDate, type CodexCalendar, type CodexCalendarEra } from "./api";
+import { formatWorldDate, type CodexCalendar, type CodexCalendarEra } from "@vtt/domain";
+import { calendarApi } from "./api";
 
 type EraDraft = Readonly<{ name: string; startYear: string }>;
 

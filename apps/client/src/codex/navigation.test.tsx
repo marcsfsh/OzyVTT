@@ -43,7 +43,7 @@ vi.mock("./api", async (importOriginal) => {
 import { ToastProvider } from "@vtt/ui";
 import { goTo } from "../../test/route";
 import { CodexShell } from "./CodexShell";
-import type { CodexPage, CodexPageSummary } from "./api";
+import type { CodexPage, CodexPageSummary } from "@vtt/domain";
 
 /** Cross-section navigation: which section is active, a type card sets the filter and lands on Pages, and filters clear. */
 const summary = (

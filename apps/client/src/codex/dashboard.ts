@@ -14,7 +14,7 @@ import {
   type CodexInWorldDate,
   type GmCodexCalendar,
   type PlayerCodexChronicleRecord
-} from "./api";
+} from "@vtt/domain";
 import { pickNextSession, type SessionRef } from "./sessions";
 import type { CampaignDeadline, CampaignDowntime, CampaignEntry, CampaignSession } from "./CampaignHome";
 
@@ -23,7 +23,7 @@ type AnyChronicleRecord = CodexChronicleRecord | PlayerCodexChronicleRecord;
 /** Downtime awaiting confirmation. GM-only by construction: `applied` isn't on the player payload. */
 export function pendingDowntime(records: readonly CodexChronicleRecord[]): readonly CampaignDowntime[] {
   return records
-    .map((record) => ({ record, payload: downtimeOf<CodexDowntimePayload>(record) }))
+    .map((record) => ({ record, payload: downtimeOf(record) }))
     .filter(
       (row): row is { record: CodexChronicleRecord; payload: CodexDowntimePayload } =>
         row.payload !== null && !row.payload.applied

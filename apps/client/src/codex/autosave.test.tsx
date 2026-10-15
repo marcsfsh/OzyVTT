@@ -3,7 +3,8 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { useCodexAutosave } from "./autosave";
-import { CodexRequestError, type CodexAutosaveSettings } from "./api";
+import type { CodexAutosaveSettings } from "@vtt/domain";
+import { CodexRequestError } from "./api";
 import { navigate } from "../router";
 import { goTo } from "../../test/route";
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Alert, Button, Field, Input, Modal, Select } from "@vtt/ui";
-import { codexApi, type CodexPage } from "./api";
+import type { CodexPage } from "@vtt/domain";
+import { codexApi } from "./api";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, type EntityType } from "./entities";
 import { newId } from "../lib/ids";
 

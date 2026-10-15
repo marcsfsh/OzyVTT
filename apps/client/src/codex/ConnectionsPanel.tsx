@@ -1,12 +1,7 @@
 import { useMemo, useState } from "react";
 import { Alert, Badge, Button, Combobox, GmOnlyTag, Input, Switch } from "@vtt/ui";
-import {
-  codexApi,
-  CONNECTION_LABEL_MAX,
-  type CodexPageConnection,
-  type CodexPageSummary,
-  type PlayerCodexPageConnection
-} from "./api";
+import type { CodexPageConnection, CodexPageSummary, PlayerCodexPageConnection } from "@vtt/domain";
+import { codexApi, CONNECTION_LABEL_MAX } from "./api";
 import { CodexIcon, EntityIcon } from "./icons";
 import { CONNECTION_LABEL_SUGGESTIONS } from "./entities";
 import { newId } from "../lib/ids";

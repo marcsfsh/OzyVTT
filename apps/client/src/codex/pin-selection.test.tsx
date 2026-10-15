@@ -51,7 +51,7 @@ vi.mock("./api", async (importOriginal) => {
 
 import { ToastProvider } from "@vtt/ui";
 import { AtlasView } from "./AtlasView";
-import type { CodexMap, CodexMarker } from "./api";
+import type { CodexMap, CodexMarker } from "@vtt/domain";
 import { navigate, replaceQuery, currentHref } from "../router";
 import { goTo } from "../../test/route";
 

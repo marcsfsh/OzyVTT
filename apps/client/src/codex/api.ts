@@ -1,143 +1,63 @@
 /** Bearer-authorized fetch helpers for `/api/v1/codex/*`. The server projects every response by role (`codex-projections.ts`). */
 
-import type { CodexCalendar, CodexInWorldDate } from "@vtt/domain";
-import { type EntityType } from "./entities";
+import type {
+  CodexAutosaveSettings,
+  CodexCalendar,
+  CodexChronicleRecord,
+  CodexConnection,
+  CodexConnectionLayer,
+  CodexEntityType,
+  CodexImportCounts,
+  CodexInWorldDate,
+  CodexJournalEntry,
+  CodexMap,
+  CodexMapKind,
+  CodexMarker,
+  CodexPage,
+  CodexPageConnection,
+  CodexPageRevision,
+  CodexPageSummary,
+  CodexQuest,
+  CodexQuestObjective,
+  CodexQuestStatus,
+  CodexRevealAudit,
+  CodexSearchResult,
+  CodexSession,
+  CodexSessionStatus,
+  CodexSettings,
+  CodexSettingsInput,
+  CodexStanding,
+  GmCodexCalendar,
+  PlayerCodexCalendar,
+  PlayerCodexChronicleRecord,
+  PlayerCodexConnection,
+  PlayerCodexMap,
+  PlayerCodexMarker,
+  PlayerCodexPage,
+  PlayerCodexPageConnection,
+  PlayerCodexPageSummary,
+  PlayerCodexQuest,
+  PlayerCodexSession,
+  PlayerCodexStanding
+} from "@vtt/domain";
 
-export type CodexPageSummary = Readonly<{
-  id: string;
-  title: string;
-  entityType: EntityType;
-  fields: Readonly<Record<string, string>>;
-  folder: string | null;
-  tags: readonly string[];
-  revealedToPlayers: boolean;
-  bannerAssetId: string | null;
-  /** `inWorldDate` is what the GM typed and is the source of truth; the label and instant are derived server-side. */
-  inWorldLabel: string | null;
-  calendarInstant: number | null;
-  inWorldDate: CodexInWorldDate | null;
-  rev: number;
-  createdAt: string;
-  updatedAt: string;
-}>;
-
-export type CodexPage = CodexPageSummary &
-  Readonly<{ playerBody: string; gmBody: string; gmFields: Readonly<Record<string, string>> }>;
-
-// ----- Connections (typed relationships and [[wiki-links]] are one system) -----
-
-/** Every connection points into a page, so there is no `toKind`. */
-export type CodexConnectionSourceKind = "page" | "session" | "quest" | "journal";
-export type CodexConnectionOrigin = "declared" | "mention";
-/** A GM-layer edge never travels to a player. */
-export type CodexConnectionLayer = "player" | "gm";
-
-/** GM view. `id` is null exactly when `origin === "mention"`: a derived edge is edited through its source text. */
-export type CodexPageConnection = Readonly<{
-  id: string | null;
-  direction: "out" | "in";
-  otherKind: CodexConnectionSourceKind;
-  otherId: string;
-  otherTitle: string;
-  otherEntityType: EntityType | null;
-  otherRevealed: boolean;
-  label: string | null;
-  origin: CodexConnectionOrigin;
-  layer: CodexConnectionLayer;
-  section: string | null;
-}>;
-/** Player view: players only receive connections to records they can see. */
-export type PlayerCodexPageConnection = Readonly<{
-  direction: "out" | "in";
-  otherKind: CodexConnectionSourceKind;
-  otherId: string;
-  otherTitle: string;
-  otherEntityType: EntityType | null;
-  label: string | null;
-  origin: CodexConnectionOrigin;
-  section: string | null;
-}>;
-export type CodexConnection = Readonly<{
-  id: string | null;
-  fromKind: CodexConnectionSourceKind;
-  fromId: string;
-  toPageId: string;
-  label: string | null;
-  origin: CodexConnectionOrigin;
-  layer: CodexConnectionLayer;
-  createdAt: string | null;
-}>;
-export type PlayerCodexConnection = Readonly<{
-  fromKind: CodexConnectionSourceKind;
-  fromId: string;
-  toPageId: string;
-  label: string | null;
-  origin: CodexConnectionOrigin;
-}>;
 /** Restated from the server so an input can refuse rather than earn a 400. */
 export const CONNECTION_LABEL_MAX = 40;
-export type CodexPageRevision = Readonly<{
-  id: number;
-  pageId: string;
-  rev: number;
-  title: string;
-  playerBody: string;
-  gmBody: string;
-  bannerAssetId: string | null;
-  tags: readonly string[];
-  authoredAt: string;
-  authorTag: string;
-}>;
-
-/** `enabled: false` stops new revisions but keeps old ones; `windowMinutes: 0` keeps every save. */
-export type CodexRevisionHistorySettings = Readonly<{ enabled: boolean; windowMinutes: number }>;
-/** A preference only; the editor's `autosave.ts` does the work. Stored server-side so it follows the GM across devices. */
-export type CodexAutosaveSettings = Readonly<{ enabled: boolean; intervalSeconds: number }>;
 export const AUTOSAVE_INTERVAL_MIN = 1;
 export const AUTOSAVE_INTERVAL_MAX = 600;
 /** Any other stored value renders as a "custom" option. */
 export const AUTOSAVE_INTERVAL_CHOICES: readonly number[] = [1, 10, 60, 300];
 export const AUTOSAVE_DEFAULT: CodexAutosaveSettings = { enabled: true, intervalSeconds: 1 };
-/** `versionCount`/`versionBytes` are server-computed and read-only; `versionBytes` is approximate, not disk usage. */
-export type CodexSettings = Readonly<{
-  revisionHistory: CodexRevisionHistorySettings & Readonly<{ versionCount: number; versionBytes: number }>;
-  autosave: CodexAutosaveSettings;
-}>;
-/** The PUT is wholesale: both groups are required. */
-export type CodexSettingsInput = Readonly<{
-  revisionHistory: CodexRevisionHistorySettings;
-  autosave: CodexAutosaveSettings;
-}>;
 /** Server-enforced bounds. The server also truncates fractions, so display what it answers. */
 export const REVISION_WINDOW_MIN = 0;
 export const REVISION_WINDOW_MAX = 10_080;
 
-// ----- Suite-wide search -----
-
-/** Mirrors the server's `CodexRecordKind`. A session hit's `title` is built server-side. */
-export type CodexRecordKind = "page" | "journal" | "map" | "marker" | "quest" | "session";
-/**
- * Mirrors `CodexSearchHit` in `codex-projections.ts`; every key is present on every kind. A player's hits
- * are projected server-side, so the client never filters visibility itself.
- */
-export type CodexSearchHit = Readonly<{
-  kind: CodexRecordKind;
-  id: string;
-  title: string;
-  tags: readonly string[];
-  /** Pages only. */
-  entityType: EntityType | null;
-  /** Markers only: lets a marker hit open its map before selecting the pin. */
-  mapId: string | null;
-}>;
-
-/** The codex is unpaginated; `truncated` means "narrow the search". */
-export type CodexSearchResult = Readonly<{ hits: readonly CodexSearchHit[]; truncated: boolean }>;
+/** The server's cap on one search's hits. */
 export const SEARCH_HIT_CAP = 50;
 
 export type CodexPageInput = Readonly<{
   title?: string;
-  entityType?: EntityType;
+  entityType?: CodexEntityType;
   fields?: Readonly<Record<string, string>>;
   gmFields?: Readonly<Record<string, string>>;
   folder?: string | null;
@@ -286,22 +206,6 @@ export type CodexImportBundle = Readonly<{
   bundleVersion?: number;
   commandId?: string;
 }>;
-export type CodexImportCounts = Readonly<{
-  pages: number;
-  folders: number;
-  maps: number;
-  markers: number;
-  journal: number;
-  /** Declared connections only; mentions are rebuilt from body text. */
-  connections: number;
-  sessions: number;
-  quests: number;
-  standing: number;
-  revisions: number;
-}>;
-
-/** Shared with the server, so a link the editor marks as known resolves to the same page there. */
-export { pageLinkKey } from "@vtt/domain";
 
 /** Sends raw bytes with the file's content-type (not JSON, so express.raw handles it). */
 export async function uploadCodexAsset(
@@ -323,59 +227,7 @@ export async function uploadCodexAsset(
   return body.data.asset as { id: string; width: number; height: number };
 }
 
-// ----- Player-facing projections (same endpoints, stripped by the server for a player token) -----
-
-export type PlayerCodexPageSummary = Readonly<{
-  id: string;
-  title: string;
-  entityType: EntityType;
-  folder: string | null;
-  tags: readonly string[];
-  bannerAssetId: string | null;
-  updatedAt: string;
-}>;
-export type PlayerCodexPage = PlayerCodexPageSummary &
-  Readonly<{ fields: Readonly<Record<string, string>>; body: string }>;
-export type PlayerCodexMap = Readonly<{
-  id: string;
-  assetId: string;
-  name: string;
-  kind: "battlemap" | "regional" | "world";
-  parentMapId: string | null;
-  tags: readonly string[];
-}>;
-export type PlayerCodexMarker = Readonly<{
-  id: string;
-  mapId: string;
-  x: number;
-  y: number;
-  iconId: string;
-  iconColor: string;
-  label: string | null;
-  pageIds: string[];
-  subMapId: string | null;
-  isParty: boolean;
-  tags: readonly string[];
-}>;
-export type PlayerCodexJournalEntry = Readonly<{
-  id: string;
-  text: string;
-  kind: CodexJournalKind;
-  sessionId: string | null;
-  sessionNumber: number | null;
-  realDate: string | null;
-  inWorldLabel: string | null;
-  tags: readonly string[];
-  createdAt: string;
-}>;
-/** No `prepBody`, `rev`, `status` or `attendees`; `recapBody` arrives as `recap`. */
-export type PlayerCodexSession = Readonly<{
-  id: string;
-  sessionNumber: number | null;
-  realDate: string | null;
-  recap: string;
-  tags: readonly string[];
-}>;
+// ----- Player reads: the same routes, projected by the server for a player token -----
 
 export const playerCodexApi = {
   listPages: (token: string) =>
@@ -404,44 +256,12 @@ export const playerCodexApi = {
   standing: (token: string) =>
     request<{ standing: PlayerCodexStanding[] }>(token, "/standing").then((data) => data.standing),
   /** `currentDate` here is the published date. Player surfaces must never use `calendarApi.get`, which carries the GM's clock. */
-  calendar: (token: string) => request<{ calendar: CodexCalendar }>(token, "/calendar").then((data) => data.calendar)
+  calendar: (token: string) =>
+    request<{ calendar: PlayerCodexCalendar }>(token, "/calendar").then((data) => data.calendar)
 };
 
 // ----- Atlas: maps + markers -----
 
-export type CodexMapKind = "battlemap" | "regional" | "world";
-/** Tags follow the page-tag slug rules; the server rejects a non-slug, so editors keep `TagInput`'s slugify normalizer. */
-export type CodexMap = Readonly<{
-  id: string;
-  assetId: string;
-  name: string;
-  kind: CodexMapKind;
-  parentMapId: string | null;
-  revealedToPlayers: boolean;
-  sortKey: number;
-  tags: readonly string[];
-  createdAt: string;
-  updatedAt: string;
-}>;
-export type CodexMarker = Readonly<{
-  id: string;
-  mapId: string;
-  x: number;
-  y: number;
-  iconId: string;
-  iconColor: string;
-  label: string | null;
-  revealedToPlayers: boolean;
-  pageIds: string[];
-  subMapId: string | null;
-  sceneIds: string[];
-  actorId: string | null;
-  /** At most one party pin per atlas; the server clears the previous one. Does not change the pin's reveal gate. */
-  isParty: boolean;
-  tags: readonly string[];
-  createdAt: string;
-  updatedAt: string;
-}>;
 /** On every write, omitting `tags` leaves them alone; `[]` clears them. */
 export type CodexMapInput = Readonly<{
   assetId?: string;
@@ -535,58 +355,8 @@ export const atlasApi = {
     request<{ deleted: boolean }>(token, `/markers/${id}`, { method: "DELETE" })
 };
 
-// ----- Journal / timeline -----
+// ----- Journal -----
 
-/** All kinds are ordinary journal rows discriminated for display. Mirrors the server's `CodexJournalKind`. */
-export type CodexJournalKind = "note" | "combat" | "deadline" | "downtime" | "milestone" | "standing" | "quest";
-/** `applied` (has the GM confirmed the clock move?) is GM workflow state, dropped from the player projection. */
-export type CodexDowntimeSummary = Readonly<{
-  who: string;
-  activity: string;
-  days: number;
-  /** Always present. `who` is the display fallback when the page is gone or unrevealed. */
-  characterPageId: string | null;
-}>;
-export type CodexDowntimePayload = CodexDowntimeSummary & Readonly<{ applied: boolean }>;
-/** The level reached and why. No XP arithmetic by design. */
-export type CodexMilestonePayload = Readonly<{ level: number; reason: string }>;
-/** `delta` is the change, not the new value; `codex_standing` holds current values. */
-export type CodexStandingPayload = Readonly<{ factionPageId: string; delta: number; reason: string }>;
-/** The server nulls `factionPageId` when the faction's page is unrevealed, so the id never advertises a secret. */
-export type PlayerCodexStandingPayload = Readonly<{ factionPageId: string | null; delta: number; reason: string }>;
-/** What `standingOf` returns; callers must handle a null faction id. */
-export type CodexStandingChange = PlayerCodexStandingPayload;
-/** Written by the server on quest create and status change. `questId` is nulled for players until the quest is revealed. */
-export type CodexQuestEventPayload = Readonly<{ questId: string; status: CodexQuestStatus }>;
-export type PlayerCodexQuestEventPayload = Readonly<{ questId: string | null; status: CodexQuestStatus }>;
-/** Read it through `chronicle.ts`'s kind-gated helpers (`downtimeOf`, `milestoneOf`, `standingOf`). */
-export type CodexJournalPayload =
-  CodexDowntimePayload | CodexMilestonePayload | CodexStandingPayload | CodexQuestEventPayload;
-export type CodexJournalEntry = Readonly<{
-  id: string;
-  playerText: string;
-  gmText: string | null;
-  revealedToPlayers: boolean;
-  attachMarkerId: string | null;
-  attachPageId: string | null;
-  kind: CodexJournalKind;
-  sourceEncounterId: number | null;
-  /**
-   * `sessionNumber` is resolved live by the server and never written. `sessionId: null` with a number is
-   * expected (a deleted, previously revealed session); render the number without a link.
-   */
-  sessionId: string | null;
-  sessionNumber: number | null;
-  realDate: string | null;
-  inWorldLabel: string | null;
-  calendarInstant: number | null;
-  inWorldDate: CodexInWorldDate | null;
-  payload: CodexJournalPayload | null;
-  sortKey: number;
-  tags: readonly string[];
-  createdAt: string;
-  updatedAt: string;
-}>;
 export type CodexJournalInput = Readonly<{
   playerText?: string;
   gmText?: string | null;
@@ -612,97 +382,20 @@ export type CodexDowntimeInput = Readonly<{
 }>;
 export type CodexMilestoneInput = Readonly<{ level: number; reason: string }>;
 
-// ----- Calendar (the world's own months / weekdays / eras) -----
-// The types and arithmetic are shared with the server, which writes the stored instants and labels.
-export {
-  calendarDaysPerYear,
-  calendarYearOf,
-  clampToCalendar,
-  dateToInstant,
-  eraForYear,
-  formatWorldDate,
-  formatWorldYear,
-  instantToDate
-} from "@vtt/domain";
-export type { CodexCalendar, CodexCalendarEra, CodexCalendarMonth, CodexInWorldDate } from "@vtt/domain";
-/**
- * The calendar as the GM reads it. `currentDate` is the GM's clock; `publishedDate` is what players see as
- * their `currentDate`. Separate from `CodexCalendar` because that is the strict PUT body.
- */
-export type GmCodexCalendar = CodexCalendar & Readonly<{ publishedDate: CodexInWorldDate | null }>;
+// ----- Calendar -----
+
 export const calendarApi = {
   /** The GM's clock plus `publishedDate`. Players read the same route via `playerCodexApi.calendar`. */
   get: (token: string) => request<{ calendar: GmCodexCalendar }>(token, "/calendar").then((data) => data.calendar),
-  /** Never the published date; see `GmCodexCalendar`. */
+  /** Replaces the structure and the GM's clock; it never publishes. */
   set: (token: string, calendar: CodexCalendar) =>
-    request<{ calendar: CodexCalendar }>(token, "/calendar", { method: "PUT", body: JSON.stringify(calendar) }).then(
+    request<{ calendar: GmCodexCalendar }>(token, "/calendar", { method: "PUT", body: JSON.stringify(calendar) }).then(
       (data) => data.calendar
     ),
   /** Copy the GM's clock onto the players' clock. Nothing else publishes it. */
   publish: (token: string) =>
     request<{ calendar: GmCodexCalendar }>(token, "/calendar/publish", { method: "POST" }).then((data) => data.calendar)
 };
-
-// ----- The chronicle (journal entries plus dated `event` pages) -----
-
-/** `combat` is a journal entry discriminated for display. */
-export type CodexChronicleKind =
-  "entry" | "combat" | "event" | "deadline" | "downtime" | "milestone" | "standing" | "quest";
-
-/**
- * GM view; mirrors `GmCodexChronicleRecord` in `codex-projections.ts`. `id` is a journal-entry id, or a
- * page id for `event` rows. For an event, `text`/`gmText` are bounded excerpts of the page's bodies.
- */
-export type CodexChronicleRecord = Readonly<{
-  kind: CodexChronicleKind;
-  id: string;
-  title: string | null;
-  text: string;
-  gmText: string | null;
-  revealedToPlayers: boolean;
-  sessionId: string | null;
-  sessionNumber: number | null;
-  realDate: string | null;
-  inWorldLabel: string | null;
-  calendarInstant: number | null;
-  inWorldDate: CodexInWorldDate | null;
-  tags: readonly string[];
-  attachPageId: string | null;
-  attachMarkerId: string | null;
-  sourceEncounterId: number | null;
-  /** Read through `chronicle.ts`'s kind-gated helpers. */
-  payload: CodexJournalPayload | null;
-  /** Derived server-side, so rewinding the clock un-fires a deadline. Read it through `deadlineFired`. */
-  fired: boolean;
-  /** Where applying this downtime would put the clock, per the server. Null once applied. */
-  proposedDate: CodexInWorldDate | null;
-  createdAt: string;
-  updatedAt: string;
-}>;
-
-/** Downtime arrives without `applied`, and a standing change has a nullable `factionPageId`. */
-export type CodexPlayerChroniclePayload =
-  CodexDowntimeSummary | CodexMilestonePayload | PlayerCodexStandingPayload | PlayerCodexQuestEventPayload;
-
-/** Player view (`projectPlayerChronicleRecord`); already filtered server-side. */
-export type PlayerCodexChronicleRecord = Readonly<{
-  kind: CodexChronicleKind;
-  id: string;
-  title: string | null;
-  text: string;
-  /** Nulled together with `sessionNumber` when the session is unrevealed. */
-  sessionId: string | null;
-  sessionNumber: number | null;
-  realDate: string | null;
-  inWorldLabel: string | null;
-  /** Use `calendarInstant` for placement and sorting; never re-derive it client-side. */
-  inWorldDate: CodexInWorldDate | null;
-  calendarInstant: number | null;
-  tags: readonly string[];
-  payload: CodexPlayerChroniclePayload | null;
-  fired: boolean;
-  createdAt: string;
-}>;
 
 export const journalApi = {
   /** Both lenses read this; "by session" regroups the same records. */
@@ -738,7 +431,7 @@ export const journalApi = {
     }).then((data) => data.entry),
   /** Marks the downtime applied and advances the clock in one transaction; applying twice is rejected. */
   applyDowntime: (token: string, id: string) =>
-    request<{ entry: CodexJournalEntry; calendar: CodexCalendar }>(token, `/journal/${id}/apply-downtime`, {
+    request<{ entry: CodexJournalEntry; calendar: GmCodexCalendar }>(token, `/journal/${id}/apply-downtime`, {
       method: "POST"
     }),
   update: (token: string, id: string, input: CodexJournalInput & { downtime?: CodexDowntimeEditInput }) =>
@@ -756,23 +449,6 @@ export const journalApi = {
 
 // ----- Sessions (prep is the GM half, recap is the player half) -----
 
-export type CodexSessionStatus = "planned" | "played";
-/** Mirrors `CodexSessionRow`. `prepBody` never leaves the GM projection; `rev` is the optimistic-concurrency token. */
-export type CodexSession = Readonly<{
-  id: string;
-  sessionNumber: number | null;
-  /** Real-world date, free text. */
-  realDate: string | null;
-  attendees: readonly string[];
-  prepBody: string;
-  recapBody: string;
-  revealedToPlayers: boolean;
-  status: CodexSessionStatus;
-  tags: readonly string[];
-  rev: number;
-  createdAt: string;
-  updatedAt: string;
-}>;
 /** Create and update schemas are strict and differ, so each call site adds its one extra key. Reveal is its own route. */
 export type CodexSessionInput = Readonly<{
   sessionNumber?: number | null;
@@ -814,28 +490,6 @@ export const sessionApi = {
 
 // ----- Quests -----
 
-/** Lifecycle order. `not-started` and `active` are open; the rest are done. */
-export type CodexQuestStatus = "not-started" | "active" | "completed" | "failed" | "canceled";
-/** A blank `text` is a legitimate transient state (add a row, then type), so never strip blank rows before sending. */
-export type CodexQuestObjective = Readonly<{ text: string; done: boolean }>;
-/**
- * Mirrors `CodexQuestRow`. `gmBody` never leaves the GM projection. `objectives` order is content and is
- * sent back exactly as rendered. `entityIds` are filtered to revealed pages for players.
- */
-export type CodexQuest = Readonly<{
-  id: string;
-  title: string;
-  status: CodexQuestStatus;
-  playerBody: string;
-  gmBody: string;
-  objectives: readonly CodexQuestObjective[];
-  entityIds: readonly string[];
-  revealedToPlayers: boolean;
-  tags: readonly string[];
-  rev: number;
-  createdAt: string;
-  updatedAt: string;
-}>;
 /** Same split as `CodexSessionInput`. */
 export type CodexQuestInput = Readonly<{
   title?: string;
@@ -848,17 +502,6 @@ export type CodexQuestInput = Readonly<{
   tags?: readonly string[];
   commandId?: string;
 }>;
-/** `gmBody` and `rev` stripped, `playerBody` arrives as `body`. Unlike a session, `status` is player-visible. */
-export type PlayerCodexQuest = Readonly<{
-  id: string;
-  title: string;
-  status: CodexQuestStatus;
-  body: string;
-  objectives: readonly CodexQuestObjective[];
-  entityIds: readonly string[];
-  tags: readonly string[];
-}>;
-
 export const questApi = {
   list: (token: string) => request<{ quests: CodexQuest[] }>(token, "/quests").then((data) => data.quests),
   get: (token: string, id: string) => request<{ quest: CodexQuest }>(token, `/quests/${id}`).then((data) => data.quest),
@@ -880,17 +523,6 @@ export const questApi = {
 
 // ----- Faction standing -----
 
-/** Keyed by `factionPageId` (unique). `value` is -100..+100. History lives in `kind='standing'` chronicle records. */
-export type CodexStanding = Readonly<{
-  id: string;
-  factionPageId: string;
-  value: number;
-  revealedToPlayers: boolean;
-  createdAt: string;
-  updatedAt: string;
-}>;
-export type PlayerCodexStanding = Readonly<{ factionPageId: string; value: number }>;
-
 export const standingApi = {
   list: (token: string) => request<{ standing: CodexStanding[] }>(token, "/standing").then((data) => data.standing),
   /** `value` is absolute; the server computes the delta and writes the chronicle record in the same transaction. */
@@ -907,36 +539,6 @@ export const standingApi = {
 };
 
 // ----- The reveal audit -----
-
-export type CodexRevealAuditKind = "page" | "map" | "marker" | "journal" | "session" | "quest" | "standing";
-
-/** `id` is what the record's reveal route takes, which for `standing` is the faction page id. */
-export type CodexRevealAuditRow = Readonly<{
-  kind: CodexRevealAuditKind;
-  id: string;
-  title: string;
-  /** Set on `journal` rows only. Render as a badge; `title` is the record's prose and can't identify the kind. */
-  journalKind: CodexJournalKind | null;
-}>;
-
-/** `revealed` counts what the player projections emit, not reveal flags (a revealed pin on a hidden map is not visible). */
-export type CodexRevealAuditSection = Readonly<{
-  kind: CodexRevealAuditKind;
-  revealed: number;
-  total: number;
-  rows: readonly CodexRevealAuditRow[];
-}>;
-
-/**
- * GM-only and read-only, built from the existing player projections. All sections are always present, so a
- * missing one is malformed, not empty. Codex records only; table visibility is separate.
- */
-export type CodexRevealAudit = Readonly<{
-  sections: readonly CodexRevealAuditSection[];
-  /** The server's totals; summing sections under-counts if one is missing. */
-  revealed: number;
-  total: number;
-}>;
 
 export const revealAuditApi = {
   get: (token: string) => request<{ audit: CodexRevealAudit }>(token, "/reveal-audit").then((data) => data.audit)

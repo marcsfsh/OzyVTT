@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SaveStatus } from "@vtt/ui";
-import { CodexRequestError, type CodexAutosaveSettings } from "./api";
+import type { CodexAutosaveSettings } from "@vtt/domain";
+import { CodexRequestError } from "./api";
 import { registerNavigationGuard } from "../router";
 
 /**

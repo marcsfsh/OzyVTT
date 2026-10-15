@@ -18,19 +18,17 @@ import {
 } from "@vtt/ui";
 import { socket } from "../socket";
 import {
-  calendarApi,
   calendarYearOf,
-  codexApi,
   dateToInstant,
   formatWorldDate,
-  journalApi,
   type CodexAutosaveSettings,
   type CodexChronicleKind,
   type CodexChronicleRecord,
   type CodexPageSummary,
   type CodexSession,
   type GmCodexCalendar
-} from "./api";
+} from "@vtt/domain";
+import { calendarApi, codexApi, journalApi } from "./api";
 import {
   CHRONICLE_FILTER_KINDS,
   CHRONICLE_KIND_META,

@@ -1,41 +1,23 @@
-import {
-  CodexValidationError,
-  coerceQuestStatus,
-  isId,
-  optionalId,
-  shortLabel,
-  type CodexQuestStatus
-} from "./validate.js";
+import type {
+  CodexDowntimePayload,
+  CodexJournalKind,
+  CodexJournalPayload,
+  CodexMilestonePayload,
+  CodexQuestEventPayload,
+  CodexStandingPayload
+} from "@vtt/domain";
+import { CodexValidationError, coerceQuestStatus, isId, optionalId, shortLabel } from "./validate.js";
 
 /**
  * The journal's record kinds and the structured payload each carries. A payload is read only for the kind
  * that owns it, through that kind's parser, so a stray blob can never surface on another kind's record.
  */
 
-export type CodexJournalKind = "note" | "combat" | "deadline" | "downtime" | "milestone" | "standing" | "quest";
 const JOURNAL_KINDS = new Set<string>(["note", "combat", "deadline", "downtime", "milestone", "standing", "quest"]);
 /** Fails closed to `note` rather than throwing, so one bad row cannot make the Codex unopenable. */
 export function journalKind(value: string): CodexJournalKind {
   return JOURNAL_KINDS.has(value) ? (value as CodexJournalKind) : "note";
 }
-
-/** `applied` makes `applyDowntime` idempotent and is GM workflow state, never projected. Prose goes in the text layers. */
-export type CodexDowntimePayload = Readonly<{
-  who: string;
-  activity: string;
-  days: number;
-  applied: boolean;
-  /** Links the tracker to a character page; `who` is the fallback. No FK: deleting the page nulls it. */
-  characterPageId: string | null;
-}>;
-/** The level reached, not a delta. `reason` has no reveal split, so GM-only detail belongs in `gmText`. */
-export type CodexMilestonePayload = Readonly<{ level: number; reason: string }>;
-/** `delta` is the change, not the value. No FK on `factionPageId`, so history survives a deleted faction. */
-export type CodexStandingPayload = Readonly<{ factionPageId: string; delta: number; reason: string }>;
-/** A quest reached `status`. No FK, so history survives the quest. */
-export type CodexQuestEventPayload = Readonly<{ questId: string; status: CodexQuestStatus }>;
-export type CodexEntryPayload =
-  CodexDowntimePayload | CodexMilestonePayload | CodexStandingPayload | CodexQuestEventPayload;
 
 /** 3650 days = ten default years: long enough for a decade in the tower, short enough to catch a typo. */
 const MAX_DOWNTIME_DAYS = 3650;
@@ -90,7 +72,7 @@ const finite = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : null;
 
 /** Exhaustive, no `default`: a new journal kind is a compile error here. */
-export function payloadOf(kind: CodexJournalKind, raw: string | null): CodexEntryPayload | null {
+export function payloadOf(kind: CodexJournalKind, raw: string | null): CodexJournalPayload | null {
   const value = storedObject(raw);
   if (value === null) return null;
   switch (kind) {
@@ -119,7 +101,7 @@ export function payloadOf(kind: CodexJournalKind, raw: string | null): CodexEntr
 }
 
 /** Narrow an entry's payload by kind, never by shape, so compatible fields cannot be misread. */
-type PayloadBearing = Readonly<{ kind: CodexJournalKind; payload: CodexEntryPayload | null }>;
+type PayloadBearing = Readonly<{ kind: CodexJournalKind; payload: CodexJournalPayload | null }>;
 export function downtimePayloadOf(entry: PayloadBearing): CodexDowntimePayload | null {
   return entry.kind === "downtime" ? (entry.payload as CodexDowntimePayload | null) : null;
 }

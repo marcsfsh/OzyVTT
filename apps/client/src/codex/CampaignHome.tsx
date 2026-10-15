@@ -16,7 +16,7 @@ import {
   standingValueLabel
 } from "./chronicle";
 import { DashCard } from "./DashCard";
-import type { CodexChronicleKind, CodexQuestStatus } from "./api";
+import type { CodexChronicleKind, CodexQuestStatus } from "@vtt/domain";
 
 /**
  * Home: every card is a `DashCard` (heading, bounded body, empty state, link to the full section).

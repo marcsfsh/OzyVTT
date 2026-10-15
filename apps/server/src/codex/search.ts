@@ -1,5 +1,5 @@
+import type { CodexQuestObjective, CodexRecordKind } from "@vtt/domain";
 import type { CodexDb } from "./db.js";
-import type { CodexQuestObjective } from "./validate.js";
 import { PLAYER_SEARCH_VISIBLE_SQL } from "./visibility.js";
 
 /**
@@ -11,12 +11,11 @@ import { PLAYER_SEARCH_VISIBLE_SQL } from "./visibility.js";
  * `codex_search_player` (nothing downstream catches GM text there), `PLAYER_SEARCH_VISIBLE_SQL`, and
  * `projectPlayerSearchHit`.
  */
-export type CodexRecordKind = "page" | "journal" | "map" | "marker" | "quest" | "session";
 export const CODEX_RECORD_KINDS: readonly CodexRecordKind[] = ["page", "journal", "map", "marker", "quest", "session"];
 /** One search hit as the store returns it: what kind of record matched, and which one. */
 export type CodexSearchRef = Readonly<{ kind: CodexRecordKind; id: string }>;
 /** `truncated` says more matches exist than `hits` holds. */
-export type CodexSearchResult = Readonly<{ hits: readonly CodexSearchRef[]; truncated: boolean }>;
+export type CodexSearchRefs = Readonly<{ hits: readonly CodexSearchRef[]; truncated: boolean }>;
 /** The one cap for every kind. */
 const SEARCH_LIMIT = 50;
 
@@ -154,7 +153,7 @@ export function searchAll(
   audience: "player" | "gm",
   query: string,
   kinds: readonly CodexRecordKind[] = CODEX_RECORD_KINDS
-): CodexSearchResult {
+): CodexSearchRefs {
   const match = ftsQuery(query);
   if (!match) return { hits: [], truncated: false };
   // Never "" here (`ftsQuery` requires a letter or digit), so empty-titled rows cannot match the first tier.

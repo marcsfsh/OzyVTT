@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, HiddenFromPlayers, Skeleton } from "@vtt/ui";
 import { socket } from "../socket";
-import { codexApi, type CodexMarker } from "./api";
+import type { CodexMarker } from "@vtt/domain";
+import { codexApi } from "./api";
 import { CodexIcon } from "./icons";
 
 /**

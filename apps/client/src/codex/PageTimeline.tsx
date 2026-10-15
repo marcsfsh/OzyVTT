@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Badge, Button, HiddenFromPlayers, Input, Skeleton } from "@vtt/ui";
 import { socket } from "../socket";
-import { journalApi, type CodexJournalEntry } from "./api";
+import type { CodexJournalEntry } from "@vtt/domain";
+import { journalApi } from "./api";
 
 /**
  * A page's campaign history in the editor: journal entries attached to it (including auto-logged battles),

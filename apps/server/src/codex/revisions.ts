@@ -1,7 +1,11 @@
-import type { CodexEntityType } from "@vtt/domain";
+import type {
+  CodexEntityType,
+  CodexPage,
+  CodexPageRevision,
+  CodexRevisionHistorySettings,
+  CodexRevisionHistoryUsage
+} from "@vtt/domain";
 import type { CodexDb } from "./db.js";
-import type { CodexPageRow } from "./pages.js";
-import type { CodexRevisionSettings } from "./settings.js";
 import { CodexValidationError, MAX_PRUNE_DAYS, parseFields, parseStringArray } from "./validate.js";
 
 /**
@@ -9,27 +13,13 @@ import { CodexValidationError, MAX_PRUNE_DAYS, parseFields, parseStringArray } f
  * the newest revision is a real undo. Restoring writes a past revision forward as a new save.
  */
 
-export type CodexPageRevisionRow = Readonly<{
-  id: number;
-  pageId: string;
-  rev: number;
-  title: string;
-  playerBody: string;
-  gmBody: string;
-  bannerAssetId: string | null;
-  tags: readonly string[];
-  authoredAt: string;
-  authorTag: string;
-}>;
 /** A revision as the backup carries it: the wire row plus what a restore needs. */
-export type CodexPageRevisionExportRow = CodexPageRevisionRow &
+export type CodexPageRevisionExportRow = CodexPageRevision &
   Readonly<{
     entityType: CodexEntityType;
     fields: Readonly<Record<string, string>>;
     gmFields: Readonly<Record<string, string>>;
   }>;
-/** What kept history costs; `versionBytes` is an approximate character count, not disk usage. */
-export type CodexRevisionHistoryUsage = Readonly<{ versionCount: number; versionBytes: number }>;
 /** The content a restore writes back. The in-world date is not part of it, so chronicle placement stays. */
 export type CodexRevisionContent = Pick<
   CodexPageRevisionExportRow,
@@ -54,7 +44,7 @@ type RevisionRowRaw = {
   author_tag: string;
 };
 
-function toRevision(row: RevisionRowRaw): CodexPageRevisionRow {
+function toRevision(row: RevisionRowRaw): CodexPageRevision {
   return {
     id: row.id,
     pageId: row.page_id,
@@ -104,7 +94,7 @@ export function insertRevision(
 }
 
 /** Leaf write: checkpoint a page's stored state. `authoredAt` is when that content was written. */
-export function snapshotRevision(db: CodexDb, page: CodexPageRow, authorTag: string): void {
+export function snapshotRevision(db: CodexDb, page: CodexPage, authorTag: string): void {
   insertRevision(db, {
     pageId: page.id,
     rev: page.rev,
@@ -125,7 +115,12 @@ export function snapshotRevision(db: CodexDb, page: CodexPageRow, authorTag: str
  * Whether a save should checkpoint. It skips while the newest checkpoint's content is younger than the window,
  * so at most `windowMinutes` of work can be lost. `force` bypasses the window but never the switch.
  */
-export function revisionDue(db: CodexDb, pageId: string, settings: CodexRevisionSettings, force: boolean): boolean {
+export function revisionDue(
+  db: CodexDb,
+  pageId: string,
+  settings: CodexRevisionHistorySettings,
+  force: boolean
+): boolean {
   // Disabled history writes nothing new but deletes nothing; existing revisions stay restorable.
   if (!settings.enabled) return false;
   if (force) return true;
@@ -153,7 +148,7 @@ export function revisionExistsAt(db: CodexDb, pageId: string, rev: number): bool
 }
 
 /** One page's history, newest first, as the wire row. */
-export function listRevisions(db: CodexDb, pageId: string): CodexPageRevisionRow[] {
+export function listRevisions(db: CodexDb, pageId: string): CodexPageRevision[] {
   return (
     db.database
       .prepare(`SELECT ${REVISION_COLUMNS} FROM codex_page_revisions WHERE page_id = ? ORDER BY rev DESC`)

@@ -89,7 +89,7 @@ import type {
   PlayerCodexChronicleRecord,
   PlayerCodexMap,
   PlayerCodexPageSummary
-} from "./api";
+} from "@vtt/domain";
 
 const CALENDAR: CodexCalendar = {
   yearName: "DR",

@@ -1,18 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Badge, Button, Modal, RevealSwitch, Skeleton } from "@vtt/ui";
 import { socket } from "../socket";
-import {
-  atlasApi,
-  codexApi,
-  journalApi,
-  questApi,
-  revealAuditApi,
-  sessionApi,
-  standingApi,
-  type CodexRevealAudit,
-  type CodexRevealAuditKind,
-  type CodexRevealAuditSection
-} from "./api";
+import type { CodexRevealAudit, CodexRevealAuditKind, CodexRevealAuditSection } from "@vtt/domain";
+import { atlasApi, codexApi, journalApi, questApi, revealAuditApi, sessionApi, standingApi } from "./api";
 import { CHRONICLE_KIND_META, chronicleKindOfJournal } from "./chronicle";
 import { CodexIcon } from "./icons";
 

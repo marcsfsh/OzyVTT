@@ -18,7 +18,6 @@ import { socket } from "../socket";
 import {
   formatWorldDate,
   formatWorldYear,
-  playerCodexApi,
   type CodexCalendar,
   type CodexSearchHit,
   type PlayerCodexChronicleRecord,
@@ -31,7 +30,8 @@ import {
   type PlayerCodexQuest,
   type PlayerCodexSession,
   type PlayerCodexStanding
-} from "./api";
+} from "@vtt/domain";
+import { playerCodexApi } from "./api";
 import {
   CHRONICLE_FILTER_KINDS,
   CHRONICLE_KIND_META,
