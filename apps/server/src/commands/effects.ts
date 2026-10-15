@@ -1,6 +1,6 @@
 import { requireActorAccess } from "../authorization.js";
 import { addEffect, endEffect, makeEffect, type EffectNarration } from "../effects.js";
-import { EffectAddSchema, EffectEndSchema } from "../game-commands.js";
+import { EffectAddSchema, EffectEndSchema } from "@vtt/domain/commands";
 import { initiatorOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 

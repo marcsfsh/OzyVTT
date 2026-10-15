@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
-import { SaveAnswerSchema } from "../../../server/src/game-commands";
+import { SaveAnswerSchema } from "@vtt/domain/commands";
 import { answerSave, createPendingSaves, type SaveAnswerDependencies } from "../../../server/src/saving-throws";
 import { startEncounter } from "../../../server/src/encounter";
 import { saveAnswerPayload, saveDamageAmend } from "./save-answer";

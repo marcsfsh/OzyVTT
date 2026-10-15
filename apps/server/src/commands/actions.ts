@@ -7,7 +7,7 @@ import { canPlayerTarget, GameAccessDeniedError, requireActorAccess } from "../a
 import { builtinAction } from "../builtin-actions.js";
 import { effectiveActions } from "../effective-actions.js";
 import { pushTokenAway } from "../forced-movement.js";
-import { ActionResolveSchema, ActionUseSchema, DiceRollSchema } from "../game-commands.js";
+import { ActionResolveSchema, ActionUseSchema, DiceRollSchema } from "@vtt/domain/commands";
 import { CommandRejectedError } from "../game-store.js";
 import { damageAdjustmentDetail } from "../hit-points.js";
 import { tokenCreatureDistance } from "../movement-narration.js";

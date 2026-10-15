@@ -1,6 +1,6 @@
 import type { PendingRuleAsk } from "@vtt/domain";
 import { requireActorAccess } from "../authorization.js";
-import { RulesAnswerSchema, RulesAskSchema } from "../game-commands.js";
+import { RulesAnswerSchema, RulesAskSchema } from "@vtt/domain/commands";
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
 import {
   allowCovers,

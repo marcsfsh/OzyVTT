@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ActorDefinitionSchema } from "@vtt/schemas";
 import { BUILTIN_ACTIONS } from "../src/builtin-actions.js";
-import { EffectAddSchema } from "../src/game-commands.js";
+import { EffectAddSchema } from "@vtt/domain/commands";
 
 // The builtin catalog is engine behavior expressed in the content vocabulary: every entry must parse
 // through ActionSchema (via a wrapper definition) so the catalog can never drift from the schema,

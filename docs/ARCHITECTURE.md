@@ -51,7 +51,8 @@ socket event is its type with the first `.` as `:`. The socket handlers and the 
 registered by looping over the table, and both run the same pipeline (`commands/pipeline.ts`):
 
 1. Refuse a GM-only command from a player, then validate the payload with its strict Zod schema
-   (`game-commands.ts`). Role comes from the signed token, per command; it is never cached at connect.
+   (`packages/domain/src/commands.ts`, from which the client's socket payload types are inferred). Role comes
+   from the signed token, per command; it is never cached at connect.
 2. Run the command. Whether a player may act on a given actor is decided in one place,
    `canInitiateForActor` in `authorization.ts`, against live state.
 3. `store.execute` commits the idempotency receipt and the new state in one SQLite

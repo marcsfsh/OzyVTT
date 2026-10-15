@@ -8,7 +8,7 @@ import {
   SetRulesModeSchema,
   TableSetPartyVisibilitySchema,
   TableSetStagingDefaultsSchema
-} from "../game-commands.js";
+} from "@vtt/domain/commands";
 import type { Kit } from "./kit.js";
 import { defineCommand, type Committed } from "./pipeline.js";
 
