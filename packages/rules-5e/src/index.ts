@@ -5,6 +5,3 @@ export * from "./ability-scores.js";
 export * from "./class-data.js";
 export * from "./progression.js";
 export * from "./riders.js";
-
-/** Declarative operation vocabulary only. Imported content can describe it but never execute code. */
-export type DiceIntent = { formula: string; purpose: "attack" | "save" | "check" | "damage" | "manual" };

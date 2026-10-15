@@ -153,7 +153,7 @@ export function saveModifierFor(definition: ActorDefinition | undefined, ability
 }
 
 /** Proficiency bonus when an item grants this save's proficiency and the sheet lacks it. */
-export function saveProficiencyFromItems(
+function saveProficiencyFromItems(
   definition: ActorDefinition | undefined,
   derivation: EquipmentDerivation,
   ability: AbilityId

@@ -1,9 +1,9 @@
-// Ability-score generation for the builder: standard array, point buy and rolled scores. Rolling reuses the
-// dice grammar in `dice.ts` (`kh`/`kl`) rather than reimplementing "roll four, drop the lowest".
-import { DiceFormulaError, parseDiceFormula, resolveDice, type DiceExpression, type RandomSource } from "./dice.js";
+// Ability-score generation for the builder: standard array, point buy and the rolled-scores formula. A rolled
+// formula is checked with the dice grammar in `dice.ts` (`kh`/`kl`), the parser every roll goes through.
+import { DiceFormulaError, parseDiceFormula, type DiceExpression } from "./dice.js";
 import type { Ability } from "./character.js";
 
-/** The six abilities in SRD sheet order. Used as the fallback assignment order. */
+/** The six abilities in SRD sheet order; the stat priority of a class the table doesn't know. */
 export const ABILITIES: readonly Ability[] = ["str", "dex", "con", "int", "wis", "cha"];
 
 /** SRD standard array, highest first. */
@@ -51,7 +51,6 @@ export function isPointBuyLegal(scores: readonly number[], budget: number = POIN
 
 /** The SRD rolled-scores method: roll 4d6 and drop the lowest, six times. */
 export const ABILITY_ROLL_FORMULA = "4d6kh3";
-export const ABILITY_SCORE_COUNT = 6;
 /** Generated scores must land inside the sheet's legal 1-30 range. */
 export const ABILITY_SCORE_MINIMUM = 1;
 export const ABILITY_SCORE_MAXIMUM = 30;
@@ -109,31 +108,4 @@ export function validateAbilityFormula(formula: string): AbilityFormulaCheck {
       message: `That formula can roll as high as ${maximum}; ability scores stop at ${ABILITY_SCORE_MAXIMUM}.`
     };
   return { ok: true, formula, minimum, maximum };
-}
-
-/** Roll six ability scores, highest first, with the caller's `random` (the server's RNG, or a fixed sequence in
- * tests). The formula must pass `validateAbilityFormula`. */
-export function rollAbilityScores(
-  random: RandomSource,
-  formula: string = ABILITY_ROLL_FORMULA,
-  count: number = ABILITY_SCORE_COUNT
-): number[] {
-  const check = validateAbilityFormula(formula);
-  if (!check.ok) throw new DiceFormulaError(check.message);
-  const expression = parseDiceFormula(formula);
-  const scores = Array.from({ length: count }, () => resolveDice(expression, random).total);
-  return scores.sort((left, right) => right - left);
-}
-
-/** Assign scores by class stat priority, best score first; abilities the priority omits get the rest in sheet order. */
-export function assignByPriority(scores: readonly number[], priority: readonly Ability[]): Record<Ability, number> {
-  if (scores.length !== ABILITY_SCORE_COUNT)
-    throw new RangeError(`Assigning scores needs exactly ${ABILITY_SCORE_COUNT} values; got ${scores.length}.`);
-  const order: Ability[] = [...new Set([...priority, ...ABILITIES])];
-  const descending = [...scores].sort((left, right) => right - left);
-  const assigned = {} as Record<Ability, number>;
-  order.forEach((ability, index) => {
-    assigned[ability] = descending[index];
-  });
-  return assigned;
 }

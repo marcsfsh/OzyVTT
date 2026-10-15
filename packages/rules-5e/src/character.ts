@@ -28,12 +28,6 @@ export function weaponAbilityModifierFrom(
   return properties.includes("finesse") ? Math.max(str, dex) : ranged ? dex : str;
 }
 
-/** Total character level for multiclass sheets = the sum of class levels; never below 1. */
-export function characterLevel(classLevels: readonly number[]): number {
-  const total = classLevels.reduce((sum, level) => sum + level, 0);
-  return total < 1 ? 1 : total;
-}
-
 /** SRD proficiency bonus by total level: +2 at 1-4, +1 every 4 levels to +6 at 17-20. Clamps level to 1-20. */
 export function proficiencyBonusForLevel(level: number): number {
   const clamped = Math.max(1, Math.min(20, level));

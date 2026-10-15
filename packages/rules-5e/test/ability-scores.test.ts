@@ -1,28 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { DiceFormulaError } from "../src/dice.js";
 import {
-  ABILITIES,
   ABILITY_ROLL_FORMULA,
   POINT_BUY_BUDGET,
   POINT_BUY_COSTS,
   STANDARD_ARRAY,
-  assignByPriority,
   diceExpressionBounds,
   isPointBuyLegal,
   isPointBuyScore,
   pointBuyCost,
   pointBuyRemaining,
-  rollAbilityScores,
   validateAbilityFormula
 } from "../src/ability-scores.js";
 import { parseDiceFormula } from "../src/dice.js";
-import { statPriorityFor } from "../src/class-data.js";
-
-/** A deterministic random source: hands out the given faces in order, ignoring the die size. */
-function sequence(...faces: number[]) {
-  let index = 0;
-  return () => faces[index++];
-}
 
 describe("STANDARD_ARRAY", () => {
   it("is the SRD array, highest first", () => {
@@ -75,49 +64,9 @@ describe("point buy", () => {
   });
 });
 
-describe("rollAbilityScores", () => {
-  it("rolls 4d6 keep-highest-3 six times and returns the scores highest first", () => {
+describe("ABILITY_ROLL_FORMULA", () => {
+  it("is the SRD method: roll 4d6 and keep the highest three", () => {
     expect(ABILITY_ROLL_FORMULA).toBe("4d6kh3");
-    // Six groups of four faces; each line's total drops the lowest.
-    const faces = [
-      6,
-      5,
-      4,
-      1, // 15
-      4,
-      4,
-      4,
-      4, // 12
-      3,
-      3,
-      3,
-      3, //  9
-      6,
-      6,
-      6,
-      6, // 18
-      1,
-      1,
-      1,
-      1, //  3
-      2,
-      5,
-      5,
-      1 // 12
-    ];
-    expect(rollAbilityScores(sequence(...faces))).toEqual([18, 15, 12, 12, 9, 3]);
-  });
-
-  it("accepts a GM-configured custom formula and still sorts descending", () => {
-    // 3d6 straight, six times.
-    const faces = [1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6];
-    expect(rollAbilityScores(sequence(...faces), "3d6")).toEqual([18, 15, 12, 9, 6, 3]);
-  });
-
-  it("refuses a formula that could produce an illegal ability score", () => {
-    expect(() => rollAbilityScores(sequence(1), "4d20")).toThrow(DiceFormulaError);
-    expect(() => rollAbilityScores(sequence(1), "1d6 - 3")).toThrow(DiceFormulaError);
-    expect(() => rollAbilityScores(sequence(1), "1d20; rm -rf /")).toThrow(DiceFormulaError);
   });
 });
 
@@ -145,58 +94,5 @@ describe("diceExpressionBounds", () => {
       minimum: 2 - 4 + 3,
       maximum: 16 - 1 + 3
     });
-  });
-});
-
-describe("assignByPriority", () => {
-  it("gives the best score to the class's top ability", () => {
-    // A wizard wants INT first, then CON.
-    expect(assignByPriority(STANDARD_ARRAY, statPriorityFor("wizard"))).toEqual({
-      int: 15,
-      con: 14,
-      dex: 13,
-      wis: 12,
-      cha: 10,
-      str: 8
-    });
-    // A barbarian wants STR first.
-    expect(assignByPriority(STANDARD_ARRAY, statPriorityFor("barbarian"))).toEqual({
-      str: 15,
-      con: 14,
-      dex: 13,
-      wis: 12,
-      cha: 10,
-      int: 8
-    });
-  });
-
-  it("sorts the incoming scores itself, so roll order does not matter", () => {
-    expect(assignByPriority([8, 15, 10, 14, 12, 13], statPriorityFor("wizard"))).toEqual(
-      assignByPriority(STANDARD_ARRAY, statPriorityFor("wizard"))
-    );
-  });
-
-  it("completes a short (homebrew) priority list in SRD sheet order", () => {
-    // Only CHA is stated; the rest fall through str, dex, con, int, wis.
-    expect(assignByPriority(STANDARD_ARRAY, ["cha"])).toEqual({ cha: 15, str: 14, dex: 13, con: 12, int: 10, wis: 8 });
-    // An unknown class falls back to sheet order entirely.
-    expect(assignByPriority(STANDARD_ARRAY, statPriorityFor("moon-warden"))).toEqual({
-      str: 15,
-      dex: 14,
-      con: 13,
-      int: 12,
-      wis: 10,
-      cha: 8
-    });
-  });
-
-  it("always fills all six abilities and never drops a score", () => {
-    const assigned = assignByPriority(STANDARD_ARRAY, statPriorityFor("paladin"));
-    expect(Object.keys(assigned).sort()).toEqual([...ABILITIES].sort());
-    expect(Object.values(assigned).sort((a, b) => b - a)).toEqual([...STANDARD_ARRAY]);
-  });
-
-  it("requires exactly six scores", () => {
-    expect(() => assignByPriority([15, 14, 13], statPriorityFor("wizard"))).toThrow(RangeError);
   });
 });

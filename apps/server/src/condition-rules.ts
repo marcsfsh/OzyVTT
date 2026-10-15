@@ -18,7 +18,7 @@ export function isIncapacitated(actor: Actor): boolean {
 }
 
 /** While Paralyzed/Petrified/Stunned/Unconscious a creature automatically fails Strength and Dexterity saves (SRD conditions appendix). */
-export const AUTO_FAIL_PHYSICAL_SAVES = ["paralyzed", "petrified", "stunned", "unconscious"] as const;
+const AUTO_FAIL_PHYSICAL_SAVES = ["paralyzed", "petrified", "stunned", "unconscious"] as const;
 
 export function autoFailsPhysicalSaves(actor: Actor): string | null {
   return (
@@ -44,14 +44,7 @@ export function conditionLabel(conditionId: string): string {
 }
 
 /** Conditions that set Speed to 0 (SRD conditions appendix). */
-export const SPEED_ZERO_CONDITIONS = [
-  "grappled",
-  "restrained",
-  "unconscious",
-  "paralyzed",
-  "petrified",
-  "stunned"
-] as const;
+const SPEED_ZERO_CONDITIONS = ["grappled", "restrained", "unconscious", "paralyzed", "petrified", "stunned"] as const;
 
 /** True while a condition that sets Speed to 0 is active (SRD: "your Speed is 0 and can't increase"). */
 function speedZeroed(actor: Actor): boolean {

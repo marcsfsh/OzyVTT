@@ -31,12 +31,10 @@ export function withStandingRiders(action: ActorAction, derivation: EquipmentDer
 
   const attackBonus = sumRiders(riders, "attack-bonus");
   const damageBonus = sumRiders(riders, "damage-bonus");
-  const critDice =
-    sumRiders(riders, "critical-bonus-dice") ||
-    riders.reduce(
-      (total, rider) => (rider.modifier.type === "critical-bonus-dice" ? total + (rider.modifier.count ?? 0) : total),
-      0
-    );
+  const critDice = riders.reduce(
+    (total, rider) => (rider.modifier.type === "critical-bonus-dice" ? total + (rider.modifier.count ?? 0) : total),
+    0
+  );
   const saveDc = sumRiders(riders, "spell-save-dc");
   const poolBonus = usesBonus(action, riders);
   const extraAttacks = extraAttacksFor(action, derivation, riders);

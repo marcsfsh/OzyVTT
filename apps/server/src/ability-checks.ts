@@ -19,7 +19,7 @@ import type { EquipmentDerivation } from "./equipment-derivation.js";
 /** Advantage/disadvantage an ability check collects from the bearer's carriers (items, feats, features).
  *  `narrow` supplies `ability`/`skill` so filtered riders can match; without it filtered riders fail
  *  closed and only unnarrowed ones apply. */
-export function checkRollSources(
+function checkRollSources(
   derivation: EquipmentDerivation,
   narrow: Readonly<{ ability?: RiderAbility; skill?: string }> = {}
 ): { advantage: RollModeSource[]; disadvantage: RollModeSource[] } {

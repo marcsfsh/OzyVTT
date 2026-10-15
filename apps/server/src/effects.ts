@@ -46,7 +46,7 @@ export type ConditionImmunitySource = Readonly<{
 }>;
 
 /** SRD condition immunity: innate, or granted by what the actor carries when a catalog is supplied. */
-export function immuneToCondition(actor: Actor, conditionId: string, source?: ConditionImmunitySource): boolean {
+function immuneToCondition(actor: Actor, conditionId: string, source?: ConditionImmunitySource): boolean {
   if (actor.conditionImmunities.includes(conditionId)) return true;
   if (!source?.catalog) return false;
   const definition = actor.definitionId ? source.resolveDefinition?.(actor.definitionId) : undefined;
