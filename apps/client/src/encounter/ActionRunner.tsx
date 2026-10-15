@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { usePrompt } from "../components/feedback";
-import type { ContentActionSummary, DamageApplyResult, GmActor, GmView } from "@vtt/domain";
-import { Button } from "@vtt/ui";
-import { RichText } from "./RichText";
-import { SpellcastingText } from "./spells";
+import type { ContentActionSummary, GmActor, GmView } from "@vtt/domain";
+import { ActionResultCard } from "./ActionResultCard";
+import { ActionTargetPicker } from "./ActionTargetPicker";
+import { componentLabel } from "./action-summary";
+import { ConfirmRow } from "./ConfirmRow";
+import { GmActionList } from "./GmActionList";
 import {
   beginTargeting,
   clearBlockedPrompt,
@@ -11,123 +13,26 @@ import {
   resolveActionDirect,
   resolveTargeting,
   setTargetingResult,
-  toggleTarget,
   useTargeting,
   useTargetingBlocked,
   useTargetingBusy,
-  useTargetingResult,
-  type ResolveOptions
+  useTargetingResult
 } from "./targeting";
 import { useRollPreference } from "../dice/roll-preference";
-import { newId } from "../lib/ids";
-import { socket } from "../socket";
+import { command, read } from "../lib/command";
 import { registerContentCache } from "../content/invalidate";
+import "./action-runner.css";
 
 /** Per-definition action cache. Cleared on `homebrew:changed` (`content/invalidate.ts`), since a GM
     can republish a creature mid-session and a stale entry would show the wrong attack. */
 const actionCache = new Map<string, readonly ContentActionSummary[]>();
 registerContentCache(() => actionCache.clear());
 
-/* A limited use is itself the mechanic (`resolveDefinitionAction`): Action Surge, Indomitable and
-   similar have a counter and nothing to roll. Both predicates must mirror the server's. */
-const isResolvable = (action: ContentActionSummary) =>
-  action.attackBonus !== null ||
-  action.saveAbility !== null ||
-  action.damage.length > 0 ||
-  action.grants ||
-  action.multiattack !== null ||
-  action.usesLimit !== null ||
-  action.builtin === true;
-/** Rage/Reckless (grants), a Multiattack plan, a spent charge, and no-target builtins (Dodge, Hide) resolve with a single Use tap; single-target builtins (Help, Unarmed Strike) go through targeting. */
-const isTargetless = (action: ContentActionSummary) =>
-  action.attackBonus === null &&
-  action.saveAbility === null &&
-  action.damage.length === 0 &&
-  action.targeting !== "single" &&
-  (action.grants || action.multiattack !== null || action.usesLimit !== null || action.builtin === true);
-const signed = (value: number) => (value >= 0 ? `+${value}` : String(value));
-const tagLabel = (tag: string) =>
-  tag
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-/** The action's mechanics as discrete lines - each renders as its own bullet beneath the name. */
-const summaryParts = (action: ContentActionSummary, all: readonly ContentActionSummary[]): string[] => {
-  const parts: string[] = [];
-  const componentName = (id: string) => all.find((candidate) => candidate.id === id)?.name ?? tagLabel(id);
-  if (action.attackBonus !== null)
-    parts.push(
-      `${signed(action.attackBonus)} to hit${action.reachFeet ? `, reach ${action.reachFeet} ft` : action.rangeFeet ? `, range ${action.rangeFeet} ft` : ""}`
-    );
-  if (action.attackCount !== null && action.attackCount > 1) parts.push(`${action.attackCount} attacks`);
-  if (action.multiattack)
-    parts.push(
-      action.multiattack.map((component) => `${component.count}× ${componentName(component.actionId)}`).join(" + ")
-    );
-  if (action.saveAbility !== null) parts.push(`DC ${action.saveDc} ${action.saveAbility.toUpperCase()} save`);
-  for (const part of action.damage) parts.push(`${part.formula} ${part.type} damage`);
-  if (action.usesLimit !== null)
-    parts.push(
-      action.usesPer === "recharge"
-        ? `Recharge ${action.usesRecharge}${(action.usesRecharge ?? 6) < 6 ? "-6" : ""}`
-        : `${action.usesLimit}/${action.usesPer === "long-rest" ? "long rest" : action.usesPer}`
-    );
-  if (action.legendaryCost !== undefined)
-    parts.push(`Legendary${action.legendaryCost > 1 ? ` ×${action.legendaryCost}` : ""}`);
-  return parts;
-};
-
-/**
- * Client-side availability hint (ADR-0020). The server decides: rows stay tappable and a
- * strict-mode rejection opens the audited override.
- */
-function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSummary): string | null {
-  if (action.requiresEffectTag && !actor.effects.some((effect) => effect.tags.includes(action.requiresEffectTag!)))
-    return `Needs ${tagLabel(action.requiresEffectTag)}`;
-  if (action.legendaryCost !== undefined) {
-    if (state.combat.turnActorId === actor.id) return "On another creature's turn";
-    const perRound = actor.legendary?.actionsPerRound ?? 3;
-    if ((state.combat.legendaryUsed[actor.id] ?? 0) + action.legendaryCost > perRound)
-      return "No legendary actions left this round";
-  }
-  if (action.usesLimit !== null && action.usesPer !== null) {
-    const key = action.usesPool ?? action.id;
-    const spent =
-      action.usesPer === "turn"
-        ? (state.combat.turn.turnUses[`${actor.id}:${key}`] ?? 0)
-        : (actor.actionUses[key] ?? 0);
-    if (spent >= action.usesLimit)
-      return action.usesPer === "recharge"
-        ? `Spent - recharges on ${action.usesRecharge}+ at its turn start`
-        : "No uses left";
-  }
-  const myTurn = state.combat.turnActorId === actor.id;
-  if (!myTurn) return null;
-  const turn = state.combat.turn;
-  if (action.activation === "bonus-action" && turn.bonusActionUsed) return "Bonus action used";
-  if (action.activation === "action" && turn.actionUsed) {
-    const instance = turn.actionInstance?.actorId === actor.id ? turn.actionInstance.components : null;
-    // The Multiattack plan row stays a live "continue" while any component remains.
-    if (action.multiattack && instance && Object.values(instance).some((count) => count > 0))
-      return "In progress - pick the next attack";
-    const remaining = instance
-      ? (instance[action.id] ?? 0) + (action.attackBonus !== null ? (instance["attack"] ?? 0) : 0)
-      : 0;
-    if (remaining > 0) return `${remaining} attack${remaining === 1 ? "" : "s"} left`;
-    return "Action used";
-  }
-  if (action.activation === "reaction" && state.combat.reactionsUsed.includes(actor.id)) return "Reaction used";
-  return null;
-}
-
 /**
  * The GM's action runner for the current stat-block combatant: pick an action, pick targets (here
  * or on the map, via the shared targeting store), resolve on the server, then apply the proposed
  * typed damage with explicit taps. Strict-mode rejections offer a one-tap override (ADR-0020).
  */
-/** The generic actions a table reaches for mid-fight; the rest sit behind "More". */
-const PRIMARY_BUILTINS = ["dodge", "dash", "disengage", "help", "hide"] as const;
-
 export function ActionRunner({
   state,
   actor,
@@ -139,12 +44,6 @@ export function ActionRunner({
   const [applied, setApplied] = useState<ReadonlySet<string>>(new Set());
   // A typed damage override (manual roll mode, or a GM adjustment).
   const [damageEdit, setDamageEdit] = useState<string | null>(null);
-  // A typed d20 for the attack preview (manual entry or a physical die).
-  const [attackDieEdit, setAttackDieEdit] = useState("");
-  // Whether that typed d20 has been submitted: drives "Use roll" → Confirm/Re-roll.
-  const [manualSubmitted, setManualSubmitted] = useState(false);
-  const [openReference, setOpenReference] = useState<string | null>(null);
-  const [moreBuiltins, setMoreBuiltins] = useState(false);
   const [busy, setBusy] = useState(false);
   const { prompt, dialog } = usePrompt();
   // Manual vs auto follows the shared per-browser dice-input preference.
@@ -162,7 +61,6 @@ export function ActionRunner({
   useEffect(() => {
     clearTargeting();
     setTargetingResult(null);
-    setOpenReference(null);
     if (!definitionId) return;
     const cached = actionCache.get(definitionId);
     if (cached) {
@@ -170,7 +68,7 @@ export function ActionRunner({
       return;
     }
     setActions(null);
-    socket.emit("content:monster-actions", { definitionId }, (response) => {
+    void read("content:monster-actions", { definitionId }).then((response) => {
       if (response.ok && response.actions) {
         actionCache.set(definitionId, response.actions);
         setActions(response.actions);
@@ -190,17 +88,6 @@ export function ActionRunner({
     setApplied(new Set());
     setDamageEdit(null);
   }, [result]);
-  // Reset the manual d20 field only when a new attack preview first appears. Adv/Disadv/Use roll
-  // each produce a fresh result, and the submitted roll must persist through them.
-  const previewShownRef = useRef(false);
-  useEffect(() => {
-    const showing = Boolean(result?.preview);
-    if (showing && !previewShownRef.current) {
-      setAttackDieEdit("");
-      setManualSubmitted(false);
-    }
-    previewShownRef.current = showing;
-  }, [result]);
 
   if (!definitionId) return null;
   const combatants = state.combat.initiative.flatMap((entry) => {
@@ -213,9 +100,6 @@ export function ActionRunner({
   const onOutcome = (ok: boolean, message?: string) => {
     if (!ok && message) onFeedback(message);
   };
-  const resolve = () => resolveTargeting(state.revision, onOutcome);
-  const runDirect = (action: ContentActionSummary) =>
-    resolveActionDirect(actor.id, action.id, state.revision, onOutcome);
 
   const applyDamage = (targetId: string, targetName: string, key: string, overrideAmount?: number) => {
     if (!result || (overrideAmount ?? result.damageTotal) <= 0) {
@@ -230,601 +114,115 @@ export function ActionRunner({
       ...(result.bonusDamage ?? []).map((part) => ({ amount: part.amount, type: part.type }))
     ].filter((part) => part.amount > 0);
     const useOverride = overrideAmount !== undefined && overrideAmount !== result.damageTotal;
-    socket.emit(
-      "actor:apply-damage",
-      {
-        commandId: newId(),
-        actorId: targetId,
-        amount: overrideAmount ?? result.damageTotal,
-        parts,
-        ...(useOverride ? { damageOverride: overrideAmount } : {}),
-        sourceActorId: actor.id,
-        sourceName: `${actor.name}'s ${result.actionName}`,
-        critical: result.crit
-      },
-      (response: DamageApplyResult) => {
-        setBusy(false);
-        if (!response.ok) {
-          onFeedback(response.message ?? "The damage could not be applied.");
-          return;
-        }
-        setApplied((current) => new Set([...current, key]));
-        const application = response.applied;
-        if (application && application.totalApplied !== application.totalRequested) {
-          const adjusted = application.parts
-            .filter((part) => part.adjustment !== null)
-            .map(
-              (part) =>
-                `${part.amount} ${part.type} → ${part.adjusted} (${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""})`
-            )
-            .join("; ");
-          onFeedback(`${targetName} took ${application.totalApplied} damage - ${adjusted}.`);
-        } else {
-          onFeedback(`${targetName} took ${application?.totalApplied ?? result.damageTotal} damage.`);
-        }
+    void command("actor:apply-damage", {
+      actorId: targetId,
+      amount: overrideAmount ?? result.damageTotal,
+      parts,
+      ...(useOverride ? { damageOverride: overrideAmount } : {}),
+      sourceActorId: actor.id,
+      sourceName: `${actor.name}'s ${result.actionName}`,
+      critical: result.crit
+    }).then((response) => {
+      setBusy(false);
+      if (!response.ok) {
+        onFeedback(response.message ?? "The damage could not be applied.");
+        return;
       }
-    );
+      setApplied((current) => new Set([...current, key]));
+      const application = response.applied;
+      if (application && application.totalApplied !== application.totalRequested) {
+        const adjusted = application.parts
+          .filter((part) => part.adjustment !== null)
+          .map(
+            (part) =>
+              `${part.amount} ${part.type} → ${part.adjusted} (${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""})`
+          )
+          .join("; ");
+        onFeedback(`${targetName} took ${application.totalApplied} damage - ${adjusted}.`);
+      } else {
+        onFeedback(`${targetName} took ${application?.totalApplied ?? result.damageTotal} damage.`);
+      }
+    });
   };
 
   const instance =
     state.combat.turn.actionInstance?.actorId === actor.id ? state.combat.turn.actionInstance.components : null;
   const attacksLeft = instance ? Object.values(instance).reduce((sum, remaining) => sum + remaining, 0) : 0;
-  // Name what is left ("1× Tail") so the GM picks the next attack instead of re-tapping the last.
-  const componentLabel = (components: Record<string, number>) =>
-    Object.entries(components)
-      .filter(([, remaining]) => remaining > 0)
-      .map(
-        ([id, remaining]) =>
-          `${remaining}× ${id === "attack" ? "any attack" : (actions?.find((candidate) => candidate.id === id)?.name ?? id)}`
-      )
-      .join(", ");
 
   return (
     <div className="action-runner">
       {actions === null && <p className="action-runner-status">Loading stat block…</p>}
       {blockedPrompt && (
-        <div className="action-blocked" role="alertdialog" aria-label="Rules check">
-          <span>
-            <strong>Blocked:</strong> {blockedPrompt.blocked.message}
-          </span>
-          <div className="action-blocked-actions">
-            <Button type="button" variant="secondary" onClick={() => clearBlockedPrompt()}>
-              Cancel
-            </Button>
-            <button
-              type="button"
-              className="encounter-primary"
-              onClick={async () => {
-                const pending = blockedPrompt;
-                clearBlockedPrompt();
-                const reason = await prompt({
-                  title: "Override reason",
-                  body: "Logged for the table.",
-                  defaultValue: "GM override",
-                  confirmLabel: "Override"
-                });
-                pending.retry({ reason: reason || "GM override" });
-              }}
-            >
-              Override
-            </button>
-          </div>
-        </div>
+        <ConfirmRow
+          ariaLabel="Rules check"
+          confirmLabel="Override"
+          onCancel={() => clearBlockedPrompt()}
+          onConfirm={async () => {
+            const pending = blockedPrompt;
+            clearBlockedPrompt();
+            const reason = await prompt({
+              title: "Override reason",
+              body: "Logged for the table.",
+              defaultValue: "GM override",
+              confirmLabel: "Override"
+            });
+            pending.retry({ reason: reason || "GM override" });
+          }}
+        >
+          <strong>Blocked:</strong> {blockedPrompt.blocked.message}
+        </ConfirmRow>
       )}
+      {/* Name what is left ("1× Tail") so the GM picks the next attack instead of re-tapping the last. */}
       {attacksLeft > 0 && !picking && instance && (
         <p className="action-instance-note" role="status">
-          Remaining in this action: {componentLabel(instance)}.
+          Remaining in this action: {componentLabel(instance, actions)}.
         </p>
       )}
-      {actions &&
-        !picking &&
-        (() => {
-          // Three tiers: the stat block's own rollable actions get full rows; shared builtins (Dodge, Dash,
-          // Unarmed Strike...) are one cluster of small chips; prose traits collapse behind one line.
-          const own = actions.filter((action) => isResolvable(action) && action.builtin !== true);
-          const builtins = actions.filter((action) => isResolvable(action) && action.builtin === true);
-          const reference = actions.filter((action) => !isResolvable(action));
-          // Spellcasting is the reference entry read mid-fight, so it is hoisted out and shown open.
-          const spellcasting = reference.find(
-            (action) => action.id === "spellcasting" || /spellcasting/i.test(action.name)
-          );
-          const otherReference = reference.filter((action) => action !== spellcasting);
-          return (
-            <>
-              <ul className="action-list">
-                {own.map((action) => {
-                  const hint = availabilityHint(state, actor, action);
-                  const parts = summaryParts(action, actions);
-                  return (
-                    <li key={action.id}>
-                      <button
-                        type="button"
-                        className={`action-row${hint ? " action-row-hinted" : ""}`}
-                        disabled={busy}
-                        title={action.description}
-                        onClick={() => (isTargetless(action) ? runDirect(action) : beginTargeting(action, actor.id))}
-                      >
-                        <strong className="action-row-name">{action.name}</strong>
-                        {parts.length > 0 ? (
-                          <ul className="action-row-summary">
-                            {parts.map((part) => (
-                              <li key={part}>{part}</li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <span className="action-row-summary-note">
-                            {action.grants ? "Grants an effect" : "Tap to use"}
-                          </span>
-                        )}
-                        {hint ? <span className="action-hint">{hint}</span> : null}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-              {builtins.length > 0 &&
-                (() => {
-                  const primary = PRIMARY_BUILTINS.flatMap((id) => builtins.filter((action) => action.id === id));
-                  const rest = builtins.filter(
-                    (action) => !(PRIMARY_BUILTINS as readonly string[]).includes(action.id)
-                  );
-                  const shown = moreBuiltins ? [...primary, ...rest] : primary.length > 0 ? primary : builtins;
-                  return (
-                    <div className="builtin-actions" role="group" aria-label="Common actions">
-                      <span className="builtin-actions-label">Common</span>
-                      {shown.map((action) => {
-                        const hint = availabilityHint(state, actor, action);
-                        return (
-                          <button
-                            key={action.id}
-                            type="button"
-                            className={`builtin-chip${hint ? " hinted" : ""}`}
-                            disabled={busy}
-                            title={`${action.description}${hint ? `\n\n${hint}` : ""}`}
-                            onClick={() =>
-                              isTargetless(action) ? runDirect(action) : beginTargeting(action, actor.id)
-                            }
-                          >
-                            {action.name}
-                          </button>
-                        );
-                      })}
-                      {rest.length > 0 && primary.length > 0 && (
-                        <button
-                          type="button"
-                          className="builtin-chip builtin-more"
-                          aria-expanded={moreBuiltins}
-                          onClick={() => setMoreBuiltins((current) => !current)}
-                        >
-                          {moreBuiltins ? "Less ▴" : `More ▾`}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })()}
-              {spellcasting && (
-                <div className="action-spellcasting" role="group" aria-label="Spellcasting">
-                  <div className="action-spellcasting-head">
-                    <span aria-hidden="true">✦</span> <strong>{spellcasting.name}</strong>
-                  </div>
-                  <SpellcastingText text={spellcasting.description} />
-                </div>
-              )}
-              {otherReference.length > 0 && (
-                <details className="action-reference-group">
-                  <summary>Traits &amp; reference ({otherReference.length})</summary>
-                  <ul className="action-list">
-                    {otherReference.map((action) => (
-                      <li key={action.id}>
-                        <button
-                          type="button"
-                          className="action-row action-row-static"
-                          aria-expanded={openReference === action.id}
-                          onClick={() => setOpenReference((current) => (current === action.id ? null : action.id))}
-                        >
-                          <strong>{action.name}</strong>
-                          <small>
-                            {action.activation === "other" ? "click to read" : `${action.activation} · click to read`}
-                          </small>
-                        </button>
-                        {openReference === action.id && (
-                          <div className="action-reference-text">
-                            <RichText text={action.description} />
-                          </div>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
-            </>
-          );
-        })()}
+      {actions && !picking && (
+        <GmActionList
+          key={actor.id}
+          state={state}
+          actor={actor}
+          actions={actions}
+          busy={busy}
+          onUse={(action, targetless) =>
+            targetless
+              ? resolveActionDirect(actor.id, action.id, state.revision, onOutcome)
+              : beginTargeting(action, actor.id)
+          }
+        />
+      )}
       {picking && !result?.preview && (
-        <div className="action-targeting" role="group" aria-label={`Targets for ${picking.action.name}`}>
-          {picking.mode === "template" ? (
-            <p className="action-targeting-head">
-              <strong>{picking.action.name}</strong> - drag the {picking.action.area?.sizeFeet}-ft{" "}
-              {picking.action.area?.shape} on the map
-              {picking.template?.placed ? " (placed - Roll to resolve)" : ", then Roll"}. Everyone under it is caught
-              automatically.
-            </p>
-          ) : (
-            <>
-              <p className="action-targeting-head">
-                <strong>{picking.action.name}</strong> -{" "}
-                {picking.mode === "single"
-                  ? "choose one target (or click a token)"
-                  : "choose targets (or click tokens)"}
-              </p>
-              <ul className="action-target-list scroll-y">
-                {combatants
-                  .filter((target) => target.id !== actor.id)
-                  .map((target) => {
-                    const checked = picking.selected.includes(target.id);
-                    return (
-                      <li key={target.id}>
-                        <label className="action-target">
-                          <input
-                            type={picking.mode === "single" ? "radio" : "checkbox"}
-                            name="action-target"
-                            checked={checked}
-                            onChange={() => toggleTarget(target.id)}
-                          />
-                          <span>
-                            {target.name}
-                            {target.armorClass !== undefined ? ` (AC ${target.armorClass})` : ""}
-                          </span>
-                        </label>
-                      </li>
-                    );
-                  })}
-              </ul>
-            </>
-          )}
-          <div className="action-targeting-buttons">
-            <Button type="button" variant="secondary" disabled={resolveBusy} onClick={() => clearTargeting()}>
-              Back
-            </Button>
-            <button
-              type="button"
-              className="encounter-primary"
-              disabled={
-                resolveBusy || (picking.mode === "template" ? !picking.template?.placed : picking.selected.length === 0)
-              }
-              onClick={resolve}
-            >
-              Roll {picking.action.name}
-            </button>
-          </div>
-        </div>
+        <ActionTargetPicker
+          picking={picking}
+          targets={combatants
+            .filter((target) => target.id !== actor.id)
+            .map((target) => ({
+              id: target.id,
+              label: `${target.name}${target.armorClass !== undefined ? ` (AC ${target.armorClass})` : ""}`
+            }))}
+          onMap
+          busy={resolveBusy}
+          onRoll={() => resolveTargeting(state.revision, onOutcome)}
+        />
       )}
       {result && (
-        <div className="action-result" role="status">
-          <div className="action-result-head">
-            <strong>{result.actionName}</strong>
-            <div className="action-result-actions">
-              {/* An open compound action (Extra Attack / Multiattack) continues from here; anything else
-              re-resolves through the rules check, where strict mode offers the audited override. */}
-              {!result.preview &&
-                (() => {
-                  const again = actions?.find((candidate) => candidate.name === result.actionName);
-                  return again ? (
-                    <button
-                      type="button"
-                      className="action-again"
-                      disabled={busy || resolveBusy}
-                      title="Resolve this action again"
-                      onClick={() => beginTargeting(again, actor.id)}
-                    >
-                      ↻ Again
-                    </button>
-                  ) : null;
-                })()}
-              <button
-                type="button"
-                className="secondary action-result-close"
-                aria-label={result.preview ? "Cancel roll" : "Dismiss result"}
-                onClick={() => {
-                  setTargetingResult(null);
-                  if (result.preview) clearTargeting();
-                }}
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-          {result.overridden && (
-            <p className="action-overridden">
-              Override ({result.overridden.rule}): {result.overridden.reason}
-            </p>
-          )}
-          {result.rollMode && (
-            <p className="action-rollmode">
-              {result.rollMode.mode === "normal"
-                ? "Advantage and disadvantage cancel"
-                : result.rollMode.mode === "advantage"
-                  ? "Advantage"
-                  : "Disadvantage"}
-              : {[...result.rollMode.advantage, ...result.rollMode.disadvantage].join(", ")}
-            </p>
-          )}
-          {result.attack && (
-            <p className={`action-outcome outcome-${result.attack.outcome}`}>
-              {result.attack.total}
-              {result.attack.targetAc !== null ? ` vs AC ${result.attack.targetAc}` : ""} -{" "}
-              {result.attack.outcome === "crit"
-                ? "CRITICAL HIT"
-                : result.attack.outcome === "fumble"
-                  ? "NATURAL 1"
-                  : result.attack.outcome === "unknown"
-                    ? "no AC on record"
-                    : result.attack.outcome.toUpperCase()}{" "}
-              (nat {result.attack.naturalRoll}) vs {result.attack.targetName}
-            </p>
-          )}
-          {/* Attack preview: Adv/Disadv re-roll the d20, a typed d20 is the manual path, and Confirm
-          resolves the hit for real (damage, riders, economy). */}
-          {result.preview &&
-            result.attack &&
-            (() => {
-              const previewResolve = (opts: ResolveOptions) => resolveTargeting(state.revision, onOutcome, opts);
-              // Any auto control (Adv/Disadv/Re-roll) abandons a pending manual entry.
-              const autoPreview = (opts: ResolveOptions) => {
-                setManualSubmitted(false);
-                previewResolve(opts);
-              };
-              const mode = result.rollMode?.mode;
-              // Manual mode adds a "type the d20" zone under an "or" divider below the roll controls.
-              const manualEntry = rollMode === "manual";
-              const submitDie = () => {
-                const value = Number(attackDieEdit.trim());
-                if (!Number.isInteger(value) || value < 1 || value > 20) {
-                  onFeedback("Enter the attack d20 (1-20).");
-                  return;
-                }
-                setManualSubmitted(true);
-                previewResolve({ commit: false, attackNatural: value });
-              };
-              return (
-                <div className="action-preview">
-                  <div className="roll-zone">
-                    <span className="save-prompt-confirm">
-                      <button
-                        type="button"
-                        className={`save-die-mode${mode === "advantage" ? " active" : ""}`}
-                        disabled={resolveBusy}
-                        title="Roll two d20s and keep the higher"
-                        onClick={() => autoPreview({ commit: false, rollMode: "advantage" })}
-                      >
-                        Adv
-                      </button>
-                      <button
-                        type="button"
-                        className={`save-die-mode${mode === "disadvantage" ? " active" : ""}`}
-                        disabled={resolveBusy}
-                        title="Roll two d20s and keep the lower"
-                        onClick={() => autoPreview({ commit: false, rollMode: "disadvantage" })}
-                      >
-                        Disadv
-                      </button>
-                      <button
-                        type="button"
-                        className="encounter-primary"
-                        disabled={resolveBusy}
-                        onClick={() => previewResolve({ commit: true, attackNatural: result.attack!.naturalRoll })}
-                      >
-                        Confirm{" "}
-                        {result.attack!.outcome === "crit"
-                          ? "crit"
-                          : result.attack!.outcome === "hit" || result.attack!.outcome === "unknown"
-                            ? "hit"
-                            : result.attack!.outcome === "fumble"
-                              ? "miss"
-                              : result.attack!.outcome}
-                      </button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        disabled={resolveBusy}
-                        title="Roll the attack again"
-                        onClick={() => autoPreview({ commit: false })}
-                      >
-                        Re-roll
-                      </Button>
-                    </span>
-                    {manualEntry && <span className="roll-zone-caption">auto-roll</span>}
-                  </div>
-                  {manualEntry && (
-                    <>
-                      <div className="roll-or">
-                        <span>or</span>
-                      </div>
-                      <div className="roll-zone">
-                        <span className="roll-zone-caption">manual entry</span>
-                        <span className="save-prompt-manual">
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            placeholder="type the d20"
-                            aria-label="Attack d20"
-                            value={attackDieEdit}
-                            disabled={manualSubmitted}
-                            onChange={(event) => setAttackDieEdit(event.target.value.replace(/[^0-9]/g, ""))}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter" && !manualSubmitted && attackDieEdit.trim() !== "") submitDie();
-                            }}
-                          />
-                          {/* "Use roll" sits on its own row under the field; once used it becomes Confirm/Re-roll. */}
-                          <span className="manual-actions">
-                            {manualSubmitted ? (
-                              <>
-                                <button
-                                  type="button"
-                                  className="encounter-primary"
-                                  disabled={resolveBusy}
-                                  onClick={() =>
-                                    previewResolve({ commit: true, attackNatural: Number(attackDieEdit.trim()) })
-                                  }
-                                >
-                                  Confirm roll
-                                </button>
-                                <Button
-                                  type="button"
-                                  variant="secondary"
-                                  disabled={resolveBusy}
-                                  title="Enter a different d20"
-                                  onClick={() => {
-                                    setAttackDieEdit("");
-                                    setManualSubmitted(false);
-                                  }}
-                                >
-                                  Re-roll
-                                </Button>
-                              </>
-                            ) : (
-                              <button
-                                type="button"
-                                disabled={resolveBusy || attackDieEdit.trim() === ""}
-                                onClick={submitDie}
-                              >
-                                Use roll
-                              </button>
-                            )}
-                          </span>
-                        </span>
-                      </div>
-                    </>
-                  )}
-                </div>
-              );
-            })()}
-          {result.save && (
-            <p className="action-outcome">
-              Each target: DC {result.save.dc} {result.save.ability.toUpperCase()} save
-            </p>
-          )}
-          {result.effectGranted && (
-            <p className="action-effect-granted">
-              {actor.name} gains <strong>{result.effectGranted.name}</strong>.
-            </p>
-          )}
-          {result.effectsApplied?.map((appliedEffect) => (
-            <p key={`${appliedEffect.targetId}-${appliedEffect.name}`} className="action-effect-applied">
-              {appliedEffect.targetName} is <strong>{appliedEffect.name}</strong>.
-            </p>
-          ))}
-          {result.damage.length > 0 &&
-            (() => {
-              // With a typed amount in the apply field, the headline shows that number; the rolled one stays
-              // for reference.
-              const typed = damageEdit !== null && damageEdit.trim() !== "" ? Number(damageEdit) : null;
-              const overriding = typed !== null && Number.isFinite(typed) && typed >= 0 && typed !== result.damageTotal;
-              const breakdown = [
-                ...result.damage.map((part) => `${part.formula} ${part.type} = ${part.total}`),
-                ...(result.bonusDamage ?? []).map((part) => `+${part.amount} ${part.source}`)
-              ].join(" + ");
-              return (
-                <p className="action-damage">
-                  Damage: <strong>{overriding ? typed : result.damageTotal}</strong>
-                  {overriding ? ` (manual - rolled ${result.damageTotal})` : ` (${breakdown})`}
-                  {!overriding && result.crit ? " - crit dice doubled" : ""}
-                </p>
-              );
-            })()}
-          {result.attack &&
-            (result.attack.outcome === "crit" ||
-              result.attack.outcome === "hit" ||
-              result.attack.outcome === "unknown") &&
-            result.damageTotal > 0 &&
-            (() => {
-              // A reaction window (Uncanny Dodge) parked this damage on a prompt whose answer applies it
-              // server-side, so no apply button here (it would double-apply).
-              const prompt = result.reactionPrompts?.find((candidate) => candidate.actorId === result.attack!.targetId);
-              if (prompt) {
-                const waiting = state.combat.pendingReactions.some(
-                  (reaction) => reaction.actorId === result.attack!.targetId && reaction.sourceActorId === actor.id
-                );
-                return waiting ? (
-                  <p className="action-save-note">
-                    Waiting on {result.attack.targetName}'s <strong>{prompt.actionName}</strong> - answer it in the turn
-                    order; the damage applies there.
-                  </p>
-                ) : (
-                  <p className="action-applied">{prompt.actionName} answered - damage handled in the turn order.</p>
-                );
-              }
-              return applied.has(result.attack.targetId) ? (
-                <p className="action-applied">Applied to {result.attack.targetName}.</p>
-              ) : (
-                <span className="action-apply-group">
-                  {/* The rolled total is pre-filled; type over it to apply a hand-rolled number instead. */}
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    className="action-damage-edit"
-                    aria-label="Damage to apply"
-                    value={damageEdit ?? String(result.damageTotal)}
-                    onChange={(event) => setDamageEdit(event.target.value.replace(/[^0-9]/g, ""))}
-                  />
-                  <button
-                    type="button"
-                    className="action-apply"
-                    disabled={busy}
-                    onClick={() =>
-                      applyDamage(
-                        result.attack!.targetId,
-                        result.attack!.targetName,
-                        result.attack!.targetId,
-                        damageEdit === null || damageEdit === "" ? result.damageTotal : Number(damageEdit)
-                      )
-                    }
-                  >
-                    Apply to {result.attack!.targetName}
-                  </button>
-                </span>
-              );
-            })()}
-          {result.warnings?.map((warning) => (
-            <p key={warning} className="action-warning">
-              ⚠ {warning}
-            </p>
-          ))}
-          {/* Narration of what happened (a push, a forced save), matching the feed. Includes `gmOnly`
-          rows because this component takes a `GmView` and is mounted only in the GM console. Reusing
-          it for a player would need a client-side filter here; the server also strips gmOnly rows
-          from non-GM acks (`withoutGmOnlyNarration`, game-operations.ts). */}
-          {result.tableNarration?.map((line) => (
-            <p key={line.text} className="action-narration">
-              {line.text}
-            </p>
-          ))}
-          {result.save &&
-            (() => {
-              // The live count of unanswered saves for this action, so the note clears as each is answered.
-              const waiting = state.combat.pendingSaves.filter(
-                (save) => save.sourceActorId === actor.id && save.actionName === result.actionName
-              ).length;
-              return waiting > 0 ? (
-                <p className="action-save-note">
-                  Saving-throw {waiting === 1 ? "prompt is" : "prompts are"} waiting on {waiting}{" "}
-                  {waiting === 1 ? "target" : "targets"} in the turn order - roll or enter each result there, then
-                  confirm to apply.
-                </p>
-              ) : (
-                <p className="action-save-note resolved">All saving throws for {result.actionName} resolved.</p>
-              );
-            })()}
-          {result.componentsRemaining &&
-            Object.values(result.componentsRemaining).some((remaining) => remaining > 0) && (
-              <p className="action-result-hint">
-                Remaining: {componentLabel(result.componentsRemaining)} - tap <strong>↻ Again</strong> or pick the next
-                attack from the list below.
-              </p>
-            )}
-        </div>
+        <ActionResultCard
+          state={state}
+          actor={actor}
+          result={result}
+          actions={actions}
+          busy={busy}
+          resolveBusy={resolveBusy}
+          rollMode={rollMode}
+          onFeedback={onFeedback}
+          resolve={(options) => resolveTargeting(state.revision, onOutcome, options)}
+          onAgain={(action) => beginTargeting(action, actor.id)}
+          applied={applied}
+          damageEdit={damageEdit}
+          onDamageEditChange={setDamageEdit}
+          applyDamage={applyDamage}
+        />
       )}
       {dialog}
     </div>

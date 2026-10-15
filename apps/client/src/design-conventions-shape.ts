@@ -22,8 +22,8 @@ export const CONVENTION_SHAPE = {
   /** Floor on the `.tsx` files the glyph scan reads (play `.tsx` plus `packages/ui` primitives). */
   glyphSourceFloor: 80,
   /** Current glyph offenders as (file, glyph) pairs; both reach 0 once call sites use icons.tsx. */
-  glyphAllowFiles: 14,
-  glyphAllowPairs: 36,
+  glyphAllowFiles: 13,
+  glyphAllowPairs: 20,
 
   // (b) raw form elements
   /** Floor on the play `.tsx` files the raw-input scan reads (`packages/ui` is excluded). */
@@ -33,14 +33,14 @@ export const CONVENTION_SHAPE = {
   rawSearchSites: 1,
   /** Raw `<input type="number">` sites (a naive grep misses a `className` before `type`). */
   rawNumberFiles: 4,
-  rawNumberSites: 9,
+  rawNumberSites: 6,
 
   // (c) the second eyebrow
   /** Floor on the `.ts`/`.tsx` files the eyebrow scan reads (the scanned set plus `codex/`). */
   eyebrowSourceFloor: 100,
   /** Uses of the `eyebrow` class token (not `\beyebrow\b`, which would match `viewer-eyebrow`). */
-  eyebrowUses: 8,
-  eyebrowFiles: 7,
+  eyebrowUses: 4,
+  eyebrowFiles: 4,
   /** `.eyebrow` selectors left in `apps/client/src/styles.css`: the declaration alone. */
   eyebrowCssSelectors: 1,
 
@@ -54,7 +54,7 @@ export const CONVENTION_SHAPE = {
   // (e) one feedback channel
   /** Inline `setMessage(…)` / `setFeedback(…)` call sites; reaches 0 once every surface uses `useToast`. */
   feedbackAllowFiles: 12,
-  feedbackAllowSites: 87,
+  feedbackAllowSites: 56,
 
   // (f) the breakpoint ladder
   /**
@@ -72,7 +72,7 @@ export const CONVENTION_SHAPE = {
   /** Floor on the client stylesheets (g) and (h) read; `packages/ui`'s `dvh` uses are the lock itself. */
   appCssSourceFloor: 22,
   /** (g) Conforming viewport-unit uses (landing clamps, overlay caps, the viewer's portrait band). */
-  viewportConformingFiles: 3,
+  viewportConformingFiles: 5,
   viewportConformingTotal: 8,
   /** (g) Legacy viewport-fraction caps on in-flow content, which frames replace. Shrink-only. */
   viewportLegacyFiles: 0,

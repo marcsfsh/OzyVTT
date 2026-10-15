@@ -1,0 +1,41 @@
+.rt-line {
+  margin: 0;
+}
+.rt-line + .rt-line,
+.rt-line + .rt-table-wrap,
+.rt-table-wrap + .rt-line,
+.rt-table-wrap + .rt-table-wrap {
+  margin-top: var(--space-2);
+}
+.rt-bullet {
+  padding-left: 0.4rem;
+}
+.rt-line em {
+  font-style: italic;
+}
+.rt-table-wrap {
+  margin-top: var(--space-2);
+  overflow-x: auto;
+}
+.rt-table {
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+.rt-table caption {
+  text-align: left;
+  font-weight: 800;
+  color: var(--text-dim);
+  padding: 0.1rem 0.1rem 0.3rem;
+}
+.rt-table th,
+.rt-table td {
+  border: 1px solid var(--line);
+  padding: 0.22rem 0.55rem;
+  text-align: left;
+  vertical-align: top;
+}
+.rt-table th {
+  background: var(--surface-3);
+  color: var(--text-dim);
+  white-space: nowrap;
+}

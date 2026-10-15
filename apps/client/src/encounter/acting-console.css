@@ -1,0 +1,118 @@
+/* The acting creature's console, a continuation of the active row: a hairline above, spacing, and no
+   fill or accent of its own (the row's tick and rules already say whose turn it is). */
+.acting-console {
+  margin-top: 0.45rem;
+  padding: 0.5rem 0 0.2rem;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+.acting-console.down {
+  opacity: 0.5;
+  border-top-color: color-mix(in srgb, var(--danger) 55%, var(--line));
+}
+.acting-down-note {
+  margin: var(--space-2) 0 0;
+  padding: 0.45rem 0.7rem;
+  border-left: 3px solid var(--danger);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.acting-console-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: var(--space-2);
+}
+.acting-console-head strong {
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+.acting-console-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+.acting-console-name {
+  min-width: 0;
+  line-height: 1.25;
+}
+.acting-console-economy-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.acting-console-title .economy-movement {
+  flex: none;
+  margin: 0;
+  padding: 0;
+  align-self: baseline;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.acting-console-title .legendary-pill {
+  flex: none;
+}
+.acting-console .turn-economy {
+  margin-top: 0;
+}
+.acting-console .action-runner {
+  margin-top: 0.45rem;
+}
+/* Solid border: dashed edges mean a state (at will vs prepared) elsewhere in this file, not a
+   secondary control. */
+.builtin-more {
+  color: var(--text-muted);
+}
+
+.legendary-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.55rem;
+}
+/* Paint grows to 44px: the strip's gap is smaller than an overhang would need. Solid, not dashed. */
+.legendary-offer {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap-min);
+  padding: 0.28rem 0.6rem;
+  /* Fill, rim and corners come from the controls' material in encounter-panel.css. Only the border
+     box is set here, so the paint does not depend on which stylesheet loads first. */
+  border: 1px solid transparent;
+  color: var(--violet-hi);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+.legendary-offer:hover:not(:disabled) {
+  border-color: var(--violet-hi);
+}
+.legendary-offer:disabled {
+  color: var(--text-muted);
+  border-color: var(--line);
+  cursor: default;
+}
+.acting-console.legendary-acting {
+  border-top-color: color-mix(in srgb, var(--violet) 60%, var(--line));
+}
+.acting-console.legendary-acting .acting-console-head strong {
+  color: var(--violet-hi);
+}
+.legendary-pill {
+  cursor: default;
+  color: var(--violet-hi);
+  border-color: color-mix(in srgb, var(--violet) 45%, var(--line));
+}
+.legendary-done {
+  margin-left: auto;
+  padding: 0.24rem 0.55rem;
+  font-size: var(--fs-sm);
+}

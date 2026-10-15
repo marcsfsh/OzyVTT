@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, IconChevronLeft, IconChevronRight, IconPlay, SegmentedControl } from "@vtt/ui";
-import { TokenStatusBadges, useAuthorizedMapImage } from "../scene/mapImage";
+import { useAuthorizedMapImage } from "../scene/mapImage";
+import { TokenStatusBadges } from "../scene/tokenGlyph";
 import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
 import { readArchive } from "./replays";
 import "./replay.css";

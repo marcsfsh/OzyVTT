@@ -1,0 +1,208 @@
+/* padding: 0 so the base button padding cannot stretch the square. */
+.encounter-menu-toggle {
+  flex: none;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Fill, rim and corners come from the controls' material in encounter-panel.css. Only the border
+     box is set here, so the paint does not depend on which stylesheet loads first. */
+  border: 1px solid transparent;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+.encounter-menu-toggle:hover,
+.encounter-menu-toggle[aria-expanded="true"] {
+  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
+  color: var(--text);
+}
+/* The options menu is a fixed viewport overlay rather than a dropdown inside the panel, so the
+   tracker's scroller can never clip it. This transparent layer catches outside clicks (no dim, so it
+   reads as a popover); it sits above the enlarged map (z-40) and below the menu. */
+.encounter-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 41;
+}
+/* Positioned from the ⋯ button's rect via inline top/left/width/max-height. This box is the frame
+   and does not scroll; `.encounter-menu-body` does. `.encounter-menu::before` (plate, rim, chamfer)
+   is `position: absolute; inset: -1px`, which in a scroll container would be sized to the
+   scrollport and scroll away from the content. The 85vh cap is allowed on a fixed overlay. A menu
+   takes a brighter rim than the panel it opened from. */
+.encounter-menu {
+  position: fixed;
+  z-index: 42;
+  width: min(24rem, 92vw);
+  max-height: min(85vh, 44rem);
+  display: flex;
+  flex-direction: column;
+  padding: 0.7rem;
+  border: 1px solid transparent;
+  box-shadow: var(--shadow-2);
+}
+/* `min-height: 0` lets the body shrink inside the capped column instead of pushing the frame past it. */
+.encounter-menu-body {
+  display: grid;
+  gap: 0.6rem;
+  min-height: 0;
+}
+.encounter-menu .rules-mode-control {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.3rem;
+  margin: 0;
+}
+.encounter-menu .rules-mode-control select {
+  width: 100%;
+}
+.encounter-menu .environment-control {
+  margin: 0;
+}
+.menu-section {
+  display: grid;
+  gap: 0.4rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--line);
+}
+.menu-section-title {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+/* No nested scroll: the list flows inside the menu body's single scroll region, bounded by
+   `RECENT_COUNT` and the disclosure. */
+.menu-add-list {
+  display: grid;
+  gap: 0.3rem;
+}
+.menu-empty-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+/* `Recent`, collapsed, ten monsters deep, matching `.scene-prep-recent`: a bordered 44px row with the
+   caret at the far edge (`display: flex` on a <summary> suppresses the native marker). */
+.menu-add-recent > summary {
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 0.3rem var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  list-style: none;
+}
+.menu-add-recent > summary::-webkit-details-marker {
+  display: none;
+}
+.menu-add-recent > summary::after {
+  content: "▾";
+  color: var(--text-muted);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.menu-add-recent[open] > summary::after {
+  content: "▴";
+}
+.menu-add-recent > summary:hover {
+  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
+  color: var(--text);
+}
+.menu-add-recent > summary:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 2px;
+}
+.menu-add-recent[open] > summary {
+  margin-bottom: 0.35rem;
+}
+.menu-add-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
+.menu-add-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.menu-add-row button {
+  flex: none;
+  padding: 0.3rem 0.8rem;
+  /* Painted by the controls' material, as `.encounter-menu-toggle` above. */
+  border: 1px solid transparent;
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+}
+.menu-add-row button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
+  color: var(--text);
+}
+.encounter-menu .encounter-add-monsters {
+  margin: 0;
+}
+.encounter-menu .encounter-end {
+  margin-top: 0;
+}
+.encounter-add-monsters {
+  width: 100%;
+  min-height: var(--tap-min);
+  margin: 0.9rem 0 0.6rem;
+  padding: 0.6rem;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+}
+.encounter-add-monsters:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
+  background: var(--surface-2);
+  color: var(--text);
+}
+.rules-mode-control {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0.4rem 0 0;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.rules-mode-control select {
+  width: auto;
+  flex: 1 1 auto;
+  margin: 0;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
+.environment-control {
+  align-self: start;
+  margin: 0.35rem 0 0;
+}

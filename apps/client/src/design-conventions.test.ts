@@ -58,15 +58,14 @@ const GLYPH = /[←-⇿⌀-⏿■-◿☀-➿⬀-⯿]|\p{Extended_Pictographic}/g
  * waiting on its icon from `packages/ui/src/primitives/icons.tsx`.
  */
 const GLYPH_ALLOW: ReadonlyArray<readonly [file: string, glyphs: string]> = [
-  ["apps/client/src/encounter/ActionRunner.tsx", "→↻▴▾⚠✕✦"],
-  ["apps/client/src/encounter/CharacterSheet.tsx", "↑→✕"],
-  ["apps/client/src/encounter/EncounterPanel.tsx", "→▦▶◧◨✕⭐"],
-  ["apps/client/src/encounter/InitiativeList.tsx", "▶"],
-  ["apps/client/src/encounter/RollControls.tsx", "✕"],
+  ["apps/client/src/encounter/ActionResultCard.tsx", "↻"],
+  ["apps/client/src/encounter/ActionRunner.tsx", "→"],
+  ["apps/client/src/encounter/DockPicker.tsx", "▦◧◨"],
+  ["apps/client/src/encounter/GmActionList.tsx", "▴▾✦"],
+  ["apps/client/src/encounter/SheetSpells.tsx", "↑"],
   ["apps/client/src/integrations/IntegrationsPanel.tsx", "🔌"],
   ["apps/client/src/maps/CalibrationSteps.tsx", "←↑→↓"],
-  ["apps/client/src/scenes/SceneBuilder.tsx", "✎"],
-  ["apps/client/src/scenes/SceneGallery.tsx", "←→●✎🗑🗺"],
+  ["apps/client/src/scenes/SceneGallery.tsx", "●"],
   ["apps/client/src/viewer/ViewerPreviewPanel.tsx", "✕"],
   // packages/ui: primitives that break their own rule.
   ["packages/ui/src/primitives/Button.tsx", "→"],
@@ -164,9 +163,9 @@ const RAW_SEARCH_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = 
  * Raw number inputs; `NumberField` is the replacement. Capitalized `<Input type="number">` is the primitive and out of scope here.
  */
 const RAW_NUMBER_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
-  ["apps/client/src/encounter/CharacterSheet.tsx", 3],
-  ["apps/client/src/encounter/EncounterPanel.tsx", 2],
-  ["apps/client/src/scene/TokenContextMenu.tsx", 1],
+  ["apps/client/src/encounter/GmInitiativeRow.tsx", 1],
+  ["apps/client/src/encounter/SheetIdentityEditor.tsx", 1],
+  ["apps/client/src/encounter/SheetInventory.tsx", 1],
   // Two on one line (the X and Y of a calibration point) plus the focus-zoom field.
   ["apps/client/src/viewer/ViewerControls.tsx", 3]
 ];
@@ -414,12 +413,12 @@ const FEEDBACK = /\bset(?:Message|Feedback)\s*\(/g;
 /** Surfaces still awaiting their move to `useToast`. */
 const FEEDBACK_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
   ["apps/client/src/dice/DicePanel.tsx", 7],
-  ["apps/client/src/encounter/CharacterSheet.tsx", 8],
-  ["apps/client/src/encounter/EncounterPanel.tsx", 17],
+  ["apps/client/src/encounter/GmEncounterPanel.tsx", 7],
+  ["apps/client/src/encounter/InitiativePrompt.tsx", 2],
   ["apps/client/src/encounter/MonsterBrowser.tsx", 1],
+  ["apps/client/src/encounter/PlayerEncounterPanel.tsx", 1],
   ["apps/client/src/integrations/IntegrationsPanel.tsx", 9],
-  ["apps/client/src/scene/EncounterMap.tsx", 14],
-  ["apps/client/src/scene/TokenContextMenu.tsx", 6],
+  ["apps/client/src/scene/TokenContextMenu.tsx", 4],
   ["apps/client/src/scenes/SceneBuilder.tsx", 6],
   ["apps/client/src/scenes/ScenePanel.tsx", 3],
   ["apps/client/src/tokens/TokenLibrary.tsx", 6],
@@ -545,9 +544,19 @@ const VIEWPORT_UNIT = /\b\d+(?:\.\d+)?(?:d|s)?vh\b/g;
 /** Reasoned survivors: rows carry a why, and growth must be argued. */
 const VIEWPORT_CONFORMING: ReadonlyArray<readonly [file: string, values: readonly string[], why: string]> = [
   [
-    "apps/client/src/encounter/encounter-panel.css",
-    ["85vh", "52vh", "94vh", "92vh"],
-    "overlay caps bounding fixed/modal layers (⋯-menu, sheet modal + its capped picker, monster browser) — §8 reference implementations"
+    "apps/client/src/encounter/character-sheet.css",
+    ["52vh", "94vh"],
+    "overlay caps bounding modal layers (sheet modal + its capped picker) — §8 reference implementations"
+  ],
+  [
+    "apps/client/src/encounter/fight-menu.css",
+    ["85vh"],
+    "overlay cap bounding the fixed ⋯-menu — §8 reference implementation"
+  ],
+  [
+    "apps/client/src/encounter/monster-browser.css",
+    ["92vh"],
+    "overlay cap bounding the monster browser modal — §8 reference implementation"
   ],
   [
     "apps/client/src/styles.css",

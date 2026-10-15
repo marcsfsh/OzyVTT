@@ -1,0 +1,119 @@
+/* The token menu, portaled to clear the dock/enlarged stacking contexts. It scrolls itself when the
+   viewport cannot hold it (`.scroll-y` plus a measured inline max-height); overscroll-behavior stops
+   a flick chaining to the locked page. */
+.token-context-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 12.5rem;
+  max-width: 16rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-2);
+  overscroll-behavior: contain;
+}
+.token-context-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.token-context-head strong {
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The close is the shared IconButton; this only quiets it into the header (keeps its 44px target). */
+.token-context-head .nh-iconbtn {
+  flex: none;
+  background: transparent;
+  border-color: transparent;
+}
+.token-context-head .nh-iconbtn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
+}
+.token-context-item {
+  min-height: var(--tap-min);
+  padding: 0.55rem 0.6rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.token-context-item:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
+}
+.token-context-size {
+  display: grid;
+  grid-template-columns: 4rem 1fr;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.token-context-size select {
+  width: 100%;
+  margin: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.token-context-item[aria-pressed="true"] {
+  background: var(--surface-2);
+  border-color: var(--line);
+  color: var(--text-muted);
+}
+.token-context-conditions {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 0.1rem;
+}
+.token-context-conditions-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--tap-min);
+  cursor: pointer;
+  padding: var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  list-style: none;
+}
+.token-context-conditions-summary::-webkit-details-marker {
+  display: none;
+}
+.token-context-conditions-summary::after {
+  content: "▾";
+  color: var(--text-muted);
+}
+.token-context-conditions[open] .token-context-conditions-summary::after {
+  content: "▴";
+}
+.token-context-feedback {
+  margin: 0.1rem 0 0;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+}

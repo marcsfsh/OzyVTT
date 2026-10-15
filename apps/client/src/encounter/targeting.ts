@@ -7,8 +7,8 @@ import type {
   ContentActionSummary,
   RulesBlocked
 } from "@vtt/domain";
+import { command } from "../lib/command";
 import { newId } from "../lib/ids";
-import { socket } from "../socket";
 
 /**
  * Shared targeting state, so both action runners and the map agree on the action, targets and
@@ -159,7 +159,6 @@ export function resolveTargeting(
     mode === "template"
       ? template?.placed
         ? {
-            commandId: newId(),
             actorId: attackerId,
             actionId: action.id,
             template: { shape: template.shape, origin: template.placed.origin, target: template.placed.target },
@@ -167,35 +166,31 @@ export function resolveTargeting(
           }
         : null
       : selected.length > 0
-        ? { commandId: newId(), actorId: attackerId, actionId: action.id, targetIds: [...selected], ...extra }
+        ? { actorId: attackerId, actionId: action.id, targetIds: [...selected], ...extra }
         : null;
   if (!payload) return;
   busy = true;
   blockedPrompt = null;
   emit();
-  socket.emit(
-    "action:resolve",
-    payload,
-    (response: { ok: boolean; message?: string; blocked?: RulesBlocked; resolution?: ActionResolution }) => {
-      busy = false;
-      // A preview keeps the session for re-rolls or confirm; a committed resolve ends it.
-      if (response.ok && response.resolution) {
-        result = response.resolution;
-        if (!response.resolution.preview) session = null;
-      }
-      // Overridable rejection: keep the session (same targets) and offer the audited override; the retry
-      // skips expectedRevision because it is an explicit human confirmation. The GM's retry keeps `commit`
-      // as sent; the player's ask is replayed on the GM's socket, so it is parked committing.
-      else if (response.blocked?.overridable)
-        blockedPrompt = {
-          blocked: response.blocked,
-          retry: (confirmed) => resolveTargeting(undefined, onResult, { ...opts, override: confirmed }),
-          asked: { type: "action.resolve", payload: { ...payload, commit: true } }
-        };
-      emit();
-      onResult(response.ok, response.blocked ? undefined : response.message);
+  void command("action:resolve", payload).then((response) => {
+    busy = false;
+    // A preview keeps the session for re-rolls or confirm; a committed resolve ends it.
+    if (response.ok && response.resolution) {
+      result = response.resolution;
+      if (!response.resolution.preview) session = null;
     }
-  );
+    // Overridable rejection: keep the session (same targets) and offer the audited override; the retry
+    // skips expectedRevision because it is an explicit human confirmation. The GM's retry keeps `commit`
+    // as sent; the player's ask is replayed on the GM's socket, so it is parked committing.
+    else if (response.blocked?.overridable)
+      blockedPrompt = {
+        blocked: response.blocked,
+        retry: (confirmed) => resolveTargeting(undefined, onResult, { ...opts, override: confirmed }),
+        asked: { type: "action.resolve", payload: { commandId: newId(), ...payload, commit: true } }
+      };
+    emit();
+    onResult(response.ok, response.blocked ? undefined : response.message);
+  });
 }
 
 /** Resolve a targetless action (Rage, Reckless Attack, a Multiattack plan) without a targeting session. */
@@ -206,29 +201,24 @@ export function resolveActionDirect(
   onResult: (ok: boolean, message?: string) => void,
   override?: { reason: string }
 ) {
-  socket.emit(
-    "action:resolve",
-    {
-      commandId: newId(),
-      actorId: attackerId,
-      actionId,
-      ...(override ? { override } : {}),
-      ...(revision !== undefined ? { expectedRevision: revision } : {})
-    },
-    (response: { ok: boolean; message?: string; blocked?: RulesBlocked; resolution?: ActionResolution }) => {
-      if (response.ok && response.resolution) {
-        result = response.resolution;
-        session = null;
-      } else if (response.blocked?.overridable)
-        blockedPrompt = {
-          blocked: response.blocked,
-          retry: (confirmed) => resolveActionDirect(attackerId, actionId, undefined, onResult, confirmed),
-          asked: { type: "action.resolve", payload: { commandId: newId(), actorId: attackerId, actionId } }
-        };
-      emit();
-      onResult(response.ok, response.blocked ? undefined : response.message);
-    }
-  );
+  void command("action:resolve", {
+    actorId: attackerId,
+    actionId,
+    ...(override ? { override } : {}),
+    ...(revision !== undefined ? { expectedRevision: revision } : {})
+  }).then((response) => {
+    if (response.ok && response.resolution) {
+      result = response.resolution;
+      session = null;
+    } else if (response.blocked?.overridable)
+      blockedPrompt = {
+        blocked: response.blocked,
+        retry: (confirmed) => resolveActionDirect(attackerId, actionId, undefined, onResult, confirmed),
+        asked: { type: "action.resolve", payload: { commandId: newId(), actorId: attackerId, actionId } }
+      };
+    emit();
+    onResult(response.ok, response.blocked ? undefined : response.message);
+  });
 }
 
 export function useTargeting() {

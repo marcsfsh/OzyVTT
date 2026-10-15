@@ -1,0 +1,72 @@
+.spell-link {
+  display: inline;
+  width: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--violet-hi);
+  font: inherit;
+  text-decoration: underline dotted var(--violet);
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.spell-link:hover {
+  color: var(--text);
+  text-decoration-style: solid;
+  border-color: transparent;
+}
+.spell-card-type {
+  margin: -0.2rem 0 0;
+  color: var(--violet-hi);
+  font-size: var(--fs-sm);
+  font-style: italic;
+}
+.spell-card-meta {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.4rem;
+  margin: 0.9rem 0 0;
+}
+.spell-card-meta div {
+  padding: var(--space-2) 0.6rem;
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+}
+.spell-card-meta dt {
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.spell-card-meta dd {
+  margin: 0.15rem 0 0;
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
+.spell-card-desc {
+  margin: var(--space-4) 0 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+.spell-card-higher {
+  margin: 0.8rem 0 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+.spell-card-higher strong {
+  color: var(--violet-hi);
+}
+.spell-card-attribution {
+  margin: var(--space-4) 0 0;
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+}
+@media (max-width: 560px) {
+  .spell-card-meta {
+    grid-template-columns: 1fr;
+  }
+}

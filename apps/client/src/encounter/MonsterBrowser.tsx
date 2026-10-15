@@ -1,17 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ContentMonsterSummary } from "@vtt/domain";
 import { Modal, Input } from "@vtt/ui";
-import { newId } from "../lib/ids";
-import { socket } from "../socket";
-
-/** CR display matches the books: fractional ratings render as 1/8, 1/4, 1/2. */
-const formatChallenge = (rating: number) => {
-  if (rating === 0.125) return "1/8";
-  if (rating === 0.25) return "1/4";
-  if (rating === 0.5) return "1/2";
-  return String(rating);
-};
-const titleCase = (value: string) => (value.length ? `${value[0].toUpperCase()}${value.slice(1)}` : value);
+import { command, read } from "../lib/command";
+import { formatChallenge, titleCase } from "./format";
+import "./monster-browser.css";
 
 /**
  * The bestiary browser. It adds monsters; visibility comes from the staging tray (`visibility`),
@@ -49,7 +41,7 @@ export function MonsterBrowser({
   const [addedIds, setAddedIds] = useState<ReadonlySet<string>>(() => new Set());
 
   useEffect(() => {
-    socket.emit("content:monsters", {}, (result) => {
+    void read("content:monsters", {}).then((result) => {
       if (!result.ok || !result.monsters) {
         setError(result.message ?? "The bundled bestiary could not be loaded.");
         return;
@@ -70,26 +62,26 @@ export function MonsterBrowser({
 
   const add = (monster: ContentMonsterSummary) => {
     setBusyIds((current) => new Set(current).add(monster.id));
-    socket.emit(
-      "actor:add-from-definition",
-      { commandId: newId(), definitionId: monster.id, visibility, ...(joinEncounter ? { joinEncounter: true } : {}) },
-      (result) => {
-        setBusyIds((current) => {
-          const next = new Set(current);
-          next.delete(monster.id);
-          return next;
-        });
-        if (result.ok && result.actorId) {
-          setAddedIds((current) => new Set(current).add(monster.id));
-          onAdded?.(result.actorId);
-        }
-        setFeedback(
-          result.ok
-            ? `${monster.name} is in the staging tray${visibility === "gm-only" ? ", GM only" : ""}.`
-            : (result.message ?? "The monster could not be added.")
-        );
+    void command("actor:add-from-definition", {
+      definitionId: monster.id,
+      visibility,
+      ...(joinEncounter ? { joinEncounter: true } : {})
+    }).then((result) => {
+      setBusyIds((current) => {
+        const next = new Set(current);
+        next.delete(monster.id);
+        return next;
+      });
+      if (result.ok && result.actorId) {
+        setAddedIds((current) => new Set(current).add(monster.id));
+        onAdded?.(result.actorId);
       }
-    );
+      setFeedback(
+        result.ok
+          ? `${monster.name} is in the staging tray${visibility === "gm-only" ? ", GM only" : ""}.`
+          : (result.message ?? "The monster could not be added.")
+      );
+    });
   };
 
   return (

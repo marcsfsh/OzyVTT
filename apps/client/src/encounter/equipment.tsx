@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ContentEquipmentSummary } from "@vtt/domain";
 import { Input, Modal } from "@vtt/ui";
-import { socket } from "../socket";
+import { read } from "../lib/command";
 import { registerContentCache } from "../content/invalidate";
+import { titleCase } from "./format";
 
 /**
  * One shared, session-cached fetch of the equipment catalog, so every sheet browses the same list.
@@ -15,16 +16,13 @@ let inFlight: Promise<void> | null = null;
 const listeners = new Set<(catalog: readonly ContentEquipmentSummary[]) => void>();
 function requestEquipmentReference(force = false) {
   if (catalogCache && !force) return;
-  inFlight ??= new Promise((resolve) => {
-    socket.emit("content:equipment", {}, (result) => {
-      inFlight = null;
-      if (result.ok && result.equipment && result.equipment.length > 0) {
-        catalogCache = result.equipment;
-        attributionCache = result.attribution ?? null;
-        for (const listener of listeners) listener(catalogCache);
-      }
-      resolve();
-    });
+  inFlight ??= read("content:equipment", {}).then((result) => {
+    inFlight = null;
+    if (result.ok && result.equipment && result.equipment.length > 0) {
+      catalogCache = result.equipment;
+      attributionCache = result.attribution ?? null;
+      for (const listener of listeners) listener(catalogCache);
+    }
   });
 }
 
@@ -68,7 +66,6 @@ export function inventoryWeaponFrom(weapon: NonNullable<ContentEquipmentSummary[
   };
 }
 
-const titleCase = (value: string) => (value.length ? `${value[0].toUpperCase()}${value.slice(1)}` : value);
 const categoryLabel = (category: string) => category.split("-").map(titleCase).join(" ");
 
 /** The picker's filter groups, each folding one or more catalog categories. */

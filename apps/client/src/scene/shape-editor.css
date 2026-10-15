@@ -1,0 +1,80 @@
+.encounter-shape-editor-color {
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: space-between;
+}
+.encounter-shape-editor-color input {
+  width: 2.4rem;
+  height: 1.7rem;
+  padding: 0;
+}
+
+.encounter-shape-editor {
+  position: absolute;
+  right: 0.7rem;
+  top: 0.7rem;
+  z-index: 4;
+  width: 15rem;
+  max-width: calc(100% - 1.4rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-1) 96%, transparent);
+  box-shadow: var(--shadow-2);
+}
+.encounter-map-stage.has-dock-right .encounter-shape-editor {
+  right: calc(var(--dock-side-width) + 0.7rem);
+}
+.encounter-shape-editor-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.encounter-shape-editor-head strong {
+  text-transform: capitalize;
+}
+.encounter-shape-editor-head span {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+.encounter-shape-editor label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: var(--text-dim);
+  font-size: 0.75rem;
+}
+.encounter-shape-editor select {
+  padding: 0.45rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text);
+}
+.encounter-shape-editor-check {
+  align-self: start;
+}
+.encounter-shape-editor .danger {
+  padding: 0.55rem;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--danger-hi);
+  text-align: center;
+  cursor: pointer;
+}
+.encounter-shape-editor .danger:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--text-on-neon);
+  box-shadow: var(--glow-danger);
+}
+.encounter-shape-editor-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}

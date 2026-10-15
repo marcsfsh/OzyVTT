@@ -1,9 +1,9 @@
 import { useState } from "react";
 import type { AskableCommand, GmView, PlayerView } from "@vtt/domain";
 import { Button } from "@vtt/ui";
-import { newId } from "../lib/ids";
-import { socket } from "../socket";
+import { command } from "../lib/command";
 import { clearBlockedPrompt, useTargetingBlocked } from "./targeting";
+import "./rule-ask.css";
 
 /**
  * Asking the GM. With the rules assistant on Enforce the server refuses an illegal move, and
@@ -37,10 +37,8 @@ export function AskTheGmPrompt({ onFeedback }: Readonly<{ onFeedback: (message: 
   if (!blocked) return null;
   const ask = () => {
     setBusy(true);
-    socket.emit(
-      "rules:ask",
-      { commandId: newId(), type: blocked.asked.type as AskableCommand, payload: blocked.asked.payload },
-      (result: { ok: boolean; message?: string; ran?: boolean }) => {
+    void command("rules:ask", { type: blocked.asked.type as AskableCommand, payload: blocked.asked.payload }).then(
+      (result) => {
         setBusy(false);
         if (!result.ok) {
           onFeedback(result.message ?? "That question could not be sent.");
@@ -99,7 +97,7 @@ export function PendingAsksForGm({
   if (asks.length === 0) return null;
   const answer = (askId: string, allow: boolean, name: string) => {
     setBusyId(askId);
-    socket.emit("rules:answer", { commandId: newId(), askId, allow }, (result: { ok: boolean; message?: string }) => {
+    void command("rules:answer", { askId, allow }).then((result) => {
       setBusyId(null);
       if (!result.ok) {
         onFeedback(result.message ?? "That answer did not go through.");

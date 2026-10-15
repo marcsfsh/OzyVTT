@@ -1,0 +1,113 @@
+import type { ActorDefinition, ActorDerivedSheet } from "@vtt/domain";
+import { ABILITIES, abilityModifier as modifierOf } from "@vtt/rules-5e";
+import { signed } from "./format";
+import type { SrdExtension } from "./sheet-extension";
+import type { SheetRolls } from "./useSheetRolls";
+
+/** The six scores with their check rolls, and the stat block's senses, languages and defences. */
+export function SheetAbilities({
+  definition,
+  extension,
+  derived,
+  rolls
+}: Readonly<{
+  definition: ActorDefinition;
+  extension: SrdExtension;
+  derived: ActorDerivedSheet | null;
+  rolls: SheetRolls;
+}>) {
+  const { rolling, rollD20 } = rolls;
+  const derivedAbility = (ability: (typeof ABILITIES)[number]) =>
+    derived?.abilities.find((row) => row.ability === ability) ?? null;
+  return (
+    <>
+      <div className="sheet-abilities">
+        {ABILITIES.map((ability) => {
+          const score = definition.abilityScores[ability];
+          // The server's numbers when it has answered; its own arithmetic only until then. The
+          // difference is item `check-bonus` riders, which the client cannot see (rule 2).
+          const row = derivedAbility(ability);
+          const mod = row?.check ?? modifierOf(score);
+          const withProf = row?.checkWithProficiency ?? modifierOf(score) + definition.proficiencyBonus;
+          return (
+            <div key={ability} className="sheet-ability">
+              <span>{ability.toUpperCase()}</span>
+              <strong>{score}</strong>
+              <div className="sheet-ability-rolls">
+                <button
+                  type="button"
+                  disabled={rolling}
+                  title={`Roll a ${ability.toUpperCase()} check`}
+                  onClick={() => void rollD20(mod, "check", `${ability.toUpperCase()} check`)}
+                >
+                  {signed(mod)}
+                </button>
+                <button
+                  type="button"
+                  className="prof"
+                  disabled={rolling}
+                  title={`Roll a ${ability.toUpperCase()} check WITH proficiency (for a GM-called custom/unnamed check)`}
+                  onClick={() => void rollD20(withProf, "check", `${ability.toUpperCase()} check w/ proficiency`)}
+                >
+                  {signed(withProf)}
+                  <em>P</em>
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <dl className="sheet-meta">
+        {extension.senses && extension.senses.length > 0 && (
+          <div>
+            <dt>Senses</dt>
+            <dd>
+              {extension.senses.join(", ")}
+              {extension.passivePerception ? `; passive Perception ${extension.passivePerception}` : ""}
+            </dd>
+          </div>
+        )}
+        {!extension.senses?.length && extension.passivePerception ? (
+          <div>
+            <dt>Senses</dt>
+            <dd>passive Perception {extension.passivePerception}</dd>
+          </div>
+        ) : null}
+        {extension.languages && (
+          <div>
+            <dt>Languages</dt>
+            <dd>{extension.languages}</dd>
+          </div>
+        )}
+        {extension.damageVulnerabilities && (
+          <div>
+            <dt>Vulnerabilities</dt>
+            <dd>{extension.damageVulnerabilities}</dd>
+          </div>
+        )}
+        {extension.damageResistances && (
+          <div>
+            <dt>Resistances</dt>
+            <dd>{extension.damageResistances}</dd>
+          </div>
+        )}
+        {extension.damageImmunities && (
+          <div>
+            <dt>Immunities</dt>
+            <dd>{extension.damageImmunities}</dd>
+          </div>
+        )}
+        {extension.conditionImmunities && (
+          <div>
+            <dt>Condition immunities</dt>
+            <dd>{extension.conditionImmunities}</dd>
+          </div>
+        )}
+        <div>
+          <dt>Proficiency</dt>
+          <dd>{signed(definition.proficiencyBonus)}</dd>
+        </div>
+      </dl>
+    </>
+  );
+}

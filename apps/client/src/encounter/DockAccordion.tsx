@@ -2,6 +2,7 @@ import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react
 import type { GmView, PlayerView } from "@vtt/domain";
 import { Tabs } from "@vtt/ui";
 import { socket } from "../socket";
+import "./dock.css";
 
 /**
  * The dock: an accordion on a laptop, a tabbed sheet on a phone. It holds the turn order and the

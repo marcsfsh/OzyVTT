@@ -1,4 +1,5 @@
-import { initialsOf } from "../scene/mapImage";
+import { IconPlay } from "@vtt/ui";
+import { initialsOf } from "../scene/tokenGlyph";
 import "./InitiativeList.css";
 
 /**
@@ -16,8 +17,12 @@ export type InitiativeRowEntry = Readonly<{
   conditions?: readonly string[];
 }>;
 
-/** Condition presence as plain dots (up to 4, then +N), from the entry's ids + labels. */
-function InitiativeConditionDots({
+/**
+ * Condition presence for a dense list row: plain dots (up to 4, then +N) with the names in the
+ * tooltip and the accessible name. Takes ids and labels, not a rules lookup, so the shared screen can
+ * use it without a socket.
+ */
+export function ConditionDots({
   conditionIds,
   conditions
 }: Readonly<{ conditionIds?: readonly string[]; conditions?: readonly string[] }>) {
@@ -52,12 +57,12 @@ export function InitiativeRow({ entry, self = false }: Readonly<{ entry: Initiat
         <span className="init-row-name-line">
           {entry.active && (
             <span className="init-row-caret" aria-hidden="true">
-              ▶
+              <IconPlay />
             </span>
           )}
           <strong className="init-row-name">{entry.name}</strong>
           {self && <span className="init-row-you">YOU</span>}
-          <InitiativeConditionDots conditionIds={entry.conditionIds} conditions={entry.conditions} />
+          <ConditionDots conditionIds={entry.conditionIds} conditions={entry.conditions} />
           {entry.health !== "healthy" && (
             <span className={`init-row-health hp-${entry.health}`}>
               {entry.health === "down" ? "Down" : "Bloodied"}

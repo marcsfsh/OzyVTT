@@ -1,6 +1,7 @@
 import type { ClientToServerEvents } from "@vtt/domain";
 
-export type SaveAnswerPayload = Parameters<ClientToServerEvents["save:answer"]>[0];
+/** Without `commandId`, which `command()` adds. */
+export type SaveAnswerPayload = Omit<Parameters<ClientToServerEvents["save:answer"]>[0], "commandId">;
 
 /**
  * The `save:answer` payload, in a plain module so `save-damage.mirror.test.ts` can run the server's
@@ -8,7 +9,6 @@ export type SaveAnswerPayload = Parameters<ClientToServerEvents["save:answer"]>[
  */
 export function saveAnswerPayload(
   input: Readonly<{
-    commandId: string;
     saveId: string;
     method: "roll" | "manual";
     commit: boolean;
@@ -21,7 +21,6 @@ export function saveAnswerPayload(
   }>
 ): SaveAnswerPayload {
   return {
-    commandId: input.commandId,
     saveId: input.saveId,
     method: input.method,
     commit: input.commit,
