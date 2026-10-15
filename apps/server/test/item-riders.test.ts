@@ -210,7 +210,13 @@ describe("criterion 1: a magic weapon's +1 to hit and extra damage die", () => {
 describe("criterion 2: `slot` makes an open category mechanically real", () => {
   it("derives AC from a homebrew category that declares an armor slot, and caps rings at two", () => {
     const definition = definitionOf();
-    const relic: EquipmentRecordLike = { id: "scale-relic", name: "Scale Relic", category: "relic", slot: "armor" };
+    const relic = {
+      id: "scale-relic",
+      name: "Scale Relic",
+      category: "relic",
+      slot: "armor",
+      armor: { acBase: 14, addDexModifier: true, dexModifierCap: 2, stealthDisadvantage: false, strengthRequired: null }
+    } as EquipmentRecordLike;
     const catalog = catalogOf([relic]);
     const state = stateWith([]);
     // `category: "relic"` is inert to the engine; `slot: "armor"` is not.

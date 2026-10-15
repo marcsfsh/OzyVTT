@@ -606,3 +606,49 @@ describe("the C9 bind: the 2026-08-14 review's four write-path rules", () => {
     expect(crit.damageTotal).toBe(18);
   });
 });
+
+describe("a non-template item's stats come from the catalog", () => {
+  const resolve = () => definitionOf();
+
+  it("replaces forged armor stats a player sends for a catalog shield", () => {
+    const state = stateWith();
+    const forged = row({
+      id: "shield",
+      name: "Shield",
+      quantity: 1,
+      equipped: true,
+      armor: {
+        acBase: 20,
+        addDexModifier: false,
+        dexModifierCap: null,
+        stealthDisadvantage: false,
+        strengthRequired: null
+      }
+    });
+    setInventoryItem(state, IDS.hero, forged, resolve, { catalog: CATALOG, role: "player" });
+    const stored = state.actors[0].inventory.find((item) => item.id === "shield");
+    expect(stored?.armor?.acBase).toBe(RECORDS.find((record) => record.id === "shield")?.armor?.acBase);
+  });
+
+  it("keeps stats only a GM gives to an item the catalog does not know", () => {
+    const custom = {
+      id: "heirloom-buckler",
+      name: "Heirloom buckler",
+      quantity: 1,
+      equipped: true,
+      armor: {
+        acBase: 3,
+        addDexModifier: false,
+        dexModifierCap: null,
+        stealthDisadvantage: false,
+        strengthRequired: null
+      }
+    };
+    const asPlayer = stateWith();
+    setInventoryItem(asPlayer, IDS.hero, row(custom), resolve, { catalog: CATALOG, role: "player" });
+    expect(asPlayer.actors[0].inventory[0].armor).toBeUndefined();
+    const asGm = stateWith();
+    setInventoryItem(asGm, IDS.hero, row(custom), resolve, { catalog: CATALOG, role: "gm" });
+    expect(asGm.actors[0].inventory[0].armor?.acBase).toBe(3);
+  });
+});

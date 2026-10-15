@@ -9,15 +9,16 @@ HTTP paths.
 
 Node 24+. Run from the repo root.
 
-| Command          | What it does                                               |
-| ---------------- | ---------------------------------------------------------- |
-| `npm run dev`    | Client on `:5173`, server on `:3001`.                      |
-| `npm run check`  | Typecheck every workspace.                                 |
-| `npm test`       | All tests.                                                 |
-| `npm run build`  | Build the client.                                          |
-| `npm run map`    | Regenerate `docs/app-map.md`; a test fails if it is stale. |
-| `npm run lint`   | ESLint.                                                    |
-| `npm run format` | Prettier; CI runs `npm run format:check`.                  |
+| Command           | What it does                                               |
+| ----------------- | ---------------------------------------------------------- |
+| `npm run dev`     | Client on `:5173`, server on `:3001`.                      |
+| `npm run check`   | Typecheck every workspace.                                 |
+| `npm test`        | All tests.                                                 |
+| `npm run build`   | Build the client.                                          |
+| `npm run map`     | Regenerate `docs/app-map.md`; a test fails if it is stale. |
+| `npm run content` | Rebuild the SRD content bundles from their sources.        |
+| `npm run lint`    | ESLint.                                                    |
+| `npm run format`  | Prettier; CI runs `npm run format:check`.                  |
 
 ## Invariants
 
