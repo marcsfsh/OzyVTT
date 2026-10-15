@@ -120,7 +120,7 @@ export const useSkillCatalog = skills.useCatalog;
 export const useLanguageCatalog = languages.useCatalog;
 
 export type BuilderCatalogs = Readonly<{
-  /** Exactly the shape `resolveCatalogChoice` reads, the same resolver the server validates with. */
+  /** Exactly the shape `resolveCatalogChoice` reads (the homebrew editor resolves slugs with it). */
   choice: CatalogChoiceCatalogs;
   backgrounds: readonly ContentBackgroundSummary[];
   names: readonly ContentNameBundle[];
@@ -131,8 +131,9 @@ export type BuilderCatalogs = Readonly<{
 }>;
 
 /**
- * Every catalog the wizard needs, in one read. `choice` goes straight to `resolveCatalogChoice`,
- * so `fromCatalog` slugs resolve with the exact function the server re-validates with.
+ * Every catalog the wizard and the homebrew editor need, in one read: the wizard names and describes
+ * what the server offers from them, and the editor resolves `fromCatalog` slugs with
+ * `resolveCatalogChoice`, the function the server validates with.
  */
 export function useBuilderCatalogs(): BuilderCatalogs {
   const classRead = useClassCatalog();
@@ -147,8 +148,8 @@ export function useBuilderCatalogs(): BuilderCatalogs {
   const equipment = useEquipmentReference();
 
   /**
-   * One object identity per content load: `catalogs` is a dependency of the wizard's offer memos and
-   * pruning effect, so a new object per render would recompute every offer on each keystroke.
+   * One object identity per content load: `catalogs` is a dependency of the wizard's step-reason memo,
+   * so a new object per render would recheck every step on each keystroke.
    */
   return useMemo(() => {
     const reads = [classRead, subclassRead, speciesRead, backgroundRead, featRead, skillRead, languageRead, nameRead];

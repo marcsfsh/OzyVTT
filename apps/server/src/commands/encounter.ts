@@ -320,7 +320,10 @@ export const encounterCommands = [
       const effectEvents: EffectNarration[] = [];
       const { state, duplicate } = await executeTimeline((draft, timeline) => {
         if (draft.combat.historyCursor !== null)
-          throw new CommandRejectedError("The GM is reviewing an earlier turn. Try again once play resumes.");
+          throw new CommandRejectedError(
+            "The GM is reviewing an earlier turn. Try again once play resumes.",
+            "history_review"
+          );
         planNextTurn(draft, timeline, false, (advancing) =>
           endTurn(advancing, initiatorOf(principal), effectEvents, {
             resolveDefinition: (definitionId) => kit.resolveDefinitionIn(advancing, definitionId),

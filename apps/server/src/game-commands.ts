@@ -786,6 +786,34 @@ export const CharacterCreateSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** A builder draft for the offers read: the identity so far, and the answers by offer key or a stored ledger. */
+const BuilderContentIdSchema = z
+  .string()
+  .regex(/^[a-z0-9-]+$/)
+  .max(80);
+const OfferKeySchema = z.string().min(1).max(200);
+export const BuilderOffersSchema = z
+  .object({
+    speciesId: BuilderContentIdSchema.optional(),
+    backgroundId: BuilderContentIdSchema.optional(),
+    classId: BuilderContentIdSchema.optional(),
+    level: z.number().int().min(1).max(20),
+    picks: z
+      .record(OfferKeySchema, z.array(BuilderContentIdSchema).max(40))
+      .refine((picks) => Object.keys(picks).length <= 200)
+      .optional(),
+    asiIncreases: z
+      .record(
+        OfferKeySchema,
+        z.array(z.object({ ability: AbilitySchema, amount: z.number().int().min(1).max(2) }).strict()).max(2)
+      )
+      .refine((increases) => Object.keys(increases).length <= 40)
+      .optional(),
+    choices: z.array(CharacterChoiceSchema).max(200).optional()
+  })
+  .strict()
+  .refine((draft) => !(draft.picks && draft.choices), "Send the answers as picks or as a ledger, not both.");
+
 /** Level up/down or respec: `CharacterCreateSchema` minus the name, plus the actor. Fully re-validated. */
 export const CharacterRebuildSchema = CharacterCreateSchema.omit({ name: true })
   .extend({ actorId: z.string().uuid() })

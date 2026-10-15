@@ -7,11 +7,8 @@ import {
   type GameState
 } from "@vtt/domain";
 import { abilityModifier, meetsMulticlassPrerequisites } from "@vtt/rules-5e";
-import {
-  buildCharacterDefinition,
-  NAMED_PICK_BUDGETS,
-  type CharacterCreateRequestInput
-} from "../src/character-build.js";
+import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
+import { NAMED_PICK_BUDGETS } from "../src/character-offers.js";
 import { importActorDefinition } from "../src/actor-roster.js";
 import { ContentLibrary, type ContentView } from "../src/content-library.js";
 import { CommandRejectedError } from "../src/game-store.js";
@@ -818,7 +815,7 @@ describe("extra picks raise the budget the server validates against", () => {
 
   it("accepts exactly `printed + granted` class cantrips, and refuses one more", () => {
     // The server accepts `printed + granted` from the shared content record, keyed on the same string
-    // ("class-cantrips") `computeOffers` uses; `extra-picks.test.ts` asserts the wizard offers the same number.
+    // ("class-cantrips") the builder's offers use; `builder-offers.test.ts` asserts they offer the same number.
     const composed = printedCantrips + grantedCantrips;
     expect(composed).toBe(4);
     expect(() => buildCharacterDefinition(withCantrips(composed), library, defaultPolicy)).not.toThrow();

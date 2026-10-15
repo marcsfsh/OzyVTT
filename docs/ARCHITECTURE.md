@@ -62,8 +62,11 @@ registered by looping over the table, and both run the same pipeline (`commands/
 
 A failure answers through one mapping (`commands/failures.ts`) on both transports: a validation
 failure is 400, a denial 403, a missing read subject 404, a rules or state refusal 409, and anything
-unexpected is logged and answered with a generic 500. The reads both transports serve (content
-catalogs, action availability, the combat log) are a second table in `commands/reads.ts`.
+unexpected is logged and answered with a generic 500. Every refusal also carries a stable code (the
+socket reply's `code`, `error.details.reason` over HTTP; a rules block's code is its rule id), so a
+client branches on the code and only shows the message. The reads both transports serve (content
+catalogs, the character builder's offers, action availability, the combat log) are a second table in
+`commands/reads.ts`.
 
 Commands run one at a time through a promise queue. Add new capability to the command table,
 never to one transport.
@@ -162,7 +165,10 @@ off, with per-family exceptions (`rules-families.ts`). A player blocked by a rul
 - The GM authors homebrew in the app. It is stored in its own store (`homebrew-store.ts`),
   validated against the same schemas, and served through `homebrew-http.ts`.
 - Characters are built server-side (`character-build.ts`) from content and the choices made in
-  the guided builder. A D&D Beyond PDF can be imported as an actor definition.
+  the guided builder. What a build may pick is one survey (`character-offers.ts`): a create
+  validates against it, the random generator answers it, and the builder is served it for each
+  draft (`builder-offers.ts`), so the client holds no copy of the build rules. A D&D Beyond PDF can
+  be imported as an actor definition.
 
 ## Codex
 

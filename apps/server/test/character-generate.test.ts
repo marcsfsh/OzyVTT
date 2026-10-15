@@ -7,12 +7,8 @@ import { BuilderPolicySchema, GameStateSchema } from "@vtt/domain";
 import { GAME_PATHS } from "@vtt/api-contract";
 import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
 import { STANDARD_ARRAY, statPriorityFor } from "@vtt/rules-5e";
-import {
-  buildCharacterDefinition,
-  computeServerOffers,
-  levelOfPick,
-  storedHitPointRolls
-} from "../src/character-build.js";
+import { buildCharacterDefinition, storedHitPointRolls } from "../src/character-build.js";
+import { computeServerOffers, levelOfPick } from "../src/character-offers.js";
 import { generateCharacterRequest } from "../src/character-generate.js";
 import { ContentLibrary } from "../src/content-library.js";
 import { importActorDefinition } from "../src/actor-roster.js";

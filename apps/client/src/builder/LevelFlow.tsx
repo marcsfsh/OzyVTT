@@ -5,6 +5,7 @@ import { Alert, Button, useToast } from "@vtt/ui";
 import { useBuilderCatalogs } from "../content/catalogs";
 import { CharacterBuilder } from "./CharacterBuilder";
 import { choicesAbove, draftFromLedger, hpRollGap, identityOf, ledgerOf } from "./level-ledger";
+import { useBuilderOffers } from "./useBuilderOffers";
 import "./character-builder.css";
 
 /**
@@ -13,7 +14,8 @@ import "./character-builder.css";
  * levelling back up restores earlier choices and HP rolls exactly.
  *
  * Gates: no ledger (a PDF import or pre-wizard sheet) cannot be rebuilt; up stops at the table's max
- * level, down always reaches 1; missing HP rolls use the average and say so.
+ * level, down always reaches 1; missing HP rolls use the average and say so. The table reads the ledger
+ * back onto the offers at the chosen level before the wizard opens.
  * The server authorizes `character.rebuild` (`canInitiateForActor`) and re-checks cap and policy;
  * this surface mirrors those rules so a player is not walked into a rejection.
  */
@@ -59,6 +61,17 @@ export function LevelFlow({
   const identity = identityOf(definition);
   const ledger = ledgerOf(definition);
   const current = identity?.level ?? 1;
+  const reading = useBuilderOffers(
+    target !== null && identity && ledger
+      ? {
+          speciesId: identity.speciesId,
+          backgroundId: identity.backgroundId,
+          classId: identity.classId,
+          level: target,
+          choices: ledger
+        }
+      : null
+  );
 
   if (!actor)
     return (
@@ -82,8 +95,27 @@ export function LevelFlow({
       </Gate>
     );
 
-  if (target !== null) {
-    const seed = draftFromLedger(identity, ledger, definition, catalogs, target, state.builderPolicy);
+  if (target !== null && reading.refusal)
+    return (
+      <Gate title={`${actor.name}'s choices could not be read`} onClose={() => setTarget(null)}>
+        {reading.refusal}
+      </Gate>
+    );
+
+  if (target !== null && (!reading.current || !reading.reply || !catalogs.loaded))
+    return (
+      <div className="cb-page cb-level">
+        <p className="cb-note" role="status">
+          Reading {actor.name}&rsquo;s choices at level {target}…
+        </p>
+        <Button variant="ghost" onClick={() => setTarget(null)}>
+          Back
+        </Button>
+      </div>
+    );
+
+  if (target !== null && reading.reply) {
+    const seed = draftFromLedger(identity, ledger, definition, catalogs, target, state.builderPolicy, reading.reply);
     const gap = hpRollGap(ledger, target);
     return (
       <CharacterBuilder

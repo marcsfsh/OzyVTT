@@ -1,20 +1,15 @@
 import type { ActorDefinition, CharacterChoice } from "@vtt/schemas";
-import { ABILITIES, type Ability } from "@vtt/rules-5e";
-import type { BuilderAbilityMethod, BuilderPolicy } from "@vtt/domain";
-import {
-  ASI_SHORTHAND,
-  abilityBonusesOf,
-  computeOffers,
-  emptyDraft,
-  type BuilderDraft,
-  type BuilderOffer
-} from "./build-payload";
+import { ABILITIES } from "@vtt/rules-5e";
+import type { BuilderAbilityMethod, BuilderOffersReply, BuilderPolicy } from "@vtt/domain";
+import { abilityBonusesOf, emptyDraft, type BuilderDraft } from "./build-payload";
 import type { BuilderCatalogs } from "../content/catalogs";
 
 /**
  * Reads a character back into the wizard for a rebuild (level up or down, respec) from the
- * choice-provenance ledger. The ability method is not stored, so base scores are the sheet minus the
- * bonuses the ledger explains. Older characters may lack some hp-roll rows; see `hpRollGap`.
+ * choice-provenance ledger. The table reads the ledger back onto the offers (`builder:offers` with
+ * `choices`); this turns that answer into a draft. The ability method is not stored, so base scores are
+ * the sheet minus the bonuses the ledger explains. Older characters may lack some hp-roll rows; see
+ * `hpRollGap`.
  */
 
 /** The ledger, or null when this sheet carries no provenance (absent differs from empty). */
@@ -45,20 +40,9 @@ export function identityOf(definition: ActorDefinition | null | undefined): Ledg
   };
 }
 
-/** Ledger rows at or below `level`: everything a character of that level still owns. */
-const rowsUpTo = (choices: readonly CharacterChoice[], level: number) => choices.filter((row) => row.level <= level);
-
-/** Whether a ledger row answers an offer, matched on its fields rather than `offer.key`. */
-const rowAnswers = (row: CharacterChoice, offer: BuilderOffer) =>
-  row.level === offer.level &&
-  row.kind === offer.kind &&
-  (row.classId ?? null) === offer.classId &&
-  ((row.payload?.featureId as string | undefined) ?? null) === offer.featureId;
-
 /**
- * Rebuilds a wizard draft from a character's ledger at a target level. A pick can create the next
- * offer (a subclass asks for its own choices), so offers are recomputed until the set stops
- * growing; four passes bounds a content bug.
+ * The wizard draft for a rebuild at `targetLevel`, from the table's reading of the character's ledger at
+ * that level: its answers by offer, and the base scores the sheet's totals imply.
  */
 export function draftFromLedger(
   identity: LedgerIdentity,
@@ -66,47 +50,28 @@ export function draftFromLedger(
   definition: ActorDefinition,
   catalogs: BuilderCatalogs,
   targetLevel: number,
-  policy: BuilderPolicy
+  policy: BuilderPolicy,
+  read: BuilderOffersReply
 ): BuilderDraft {
-  const rows = rowsUpTo(choices, targetLevel);
-  let draft: BuilderDraft = {
+  // Recorded rolls are re-sent verbatim so a level-down/level-up round trip restores the same max HP.
+  const rolls = hpRolls(choices, targetLevel);
+  const draft: BuilderDraft = {
     ...emptyDraft(),
     speciesId: identity.speciesId,
     backgroundId: identity.backgroundId,
     classId: identity.classId,
-    subclassId: identity.subclassId,
+    subclassId: read.subclassId,
     level: targetLevel,
     name: definition.name,
     abilityMethod: methodFor(policy),
-    // Recorded rolls are re-sent verbatim so a level-down/level-up round trip restores the same max HP.
-    ...(hpRolls(choices, targetLevel)
-      ? { hpMode: "entries" as const, hpEntries: hpRolls(choices, targetLevel)! }
-      : { hpMode: "average" as const, hpEntries: [] })
+    ...(rolls ? { hpMode: "entries" as const, hpEntries: rolls } : { hpMode: "average" as const, hpEntries: [] }),
+    picks: read.picks,
+    asiIncreases: read.asiIncreases
   };
-
-  for (let pass = 0; pass < 4; pass += 1) {
-    const offers = computeOffers(draft, catalogs);
-    const picks: Record<string, readonly string[]> = {};
-    const asiIncreases: Record<string, ReadonlyArray<{ ability: Ability; amount: number }>> = {};
-    for (const offer of offers) {
-      const matched = rows.filter((row) => rowAnswers(row, offer)).slice(0, offer.capacity);
-      if (matched.length === 0) continue;
-      picks[offer.key] = matched.map((row) => row.id);
-      const asi = matched.find((row) => row.id === ASI_SHORTHAND);
-      const increases = asi?.payload?.increases as ReadonlyArray<{ ability: Ability; amount: number }> | undefined;
-      if (increases) asiIncreases[offer.key] = increases;
-    }
-    const next: BuilderDraft = { ...draft, picks, asiIncreases };
-    if (JSON.stringify(next.picks) === JSON.stringify(draft.picks) && pass > 0) {
-      draft = next;
-      break;
-    }
-    draft = next;
-  }
 
   // Ability scores last: bonuses depend on the picks above (an ASI is a pick). Base = sheet score
   // minus explained bonus.
-  const bonuses = abilityBonusesOf(draft, catalogs, computeOffers(draft, catalogs));
+  const bonuses = abilityBonusesOf(draft, catalogs, read.offers);
   const pool: Array<{ id: string; value: number }> = [];
   const poolAssignment: Record<string, string | null> = {};
   const spendScores: Record<string, number> = {};

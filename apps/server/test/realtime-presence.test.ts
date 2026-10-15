@@ -447,7 +447,7 @@ describe("codex:changed on the wire (D22, socket half)", () => {
       const refused = await new Promise<{ ok: boolean; message?: string }>((resolve) =>
         odd.emit("content:skills", {}, resolve)
       );
-      expect(refused).toEqual({ ok: false, message: "Join a session first." });
+      expect(refused).toEqual({ ok: false, code: "not_joined", message: "Join a session first." });
       odd.emit("session:join");
       odd.emit("content:skills", {});
       const { join } = await connectAndJoin(server.url, await loginGm(server.url));

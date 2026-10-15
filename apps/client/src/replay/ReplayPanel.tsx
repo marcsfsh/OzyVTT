@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { CombatLogEntry, GameState, PlayerCombatView, PlayerHp } from "@vtt/domain";
+import type { CombatLogEntry, GameState, MutationResult, PlayerCombatView, PlayerHp } from "@vtt/domain";
 import {
   Alert,
   Button,
@@ -15,7 +15,6 @@ import {
   useToast
 } from "@vtt/ui";
 import { navigate } from "../router";
-import { launchRefusalOf, type LaunchRefusal } from "./launch-refusal";
 import { conditionBadgeLabel, healthBandFor } from "../encounter/conditions";
 import { TokenStatusBadges, useAuthorizedMapImage } from "../scene/mapImage";
 import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
@@ -23,6 +22,10 @@ import { useConfirm } from "../components/feedback";
 import { newId } from "../lib/ids";
 import { socket } from "../socket";
 import "./replay.css";
+
+/** The launch refusals the panel can route somewhere; any other refusal is a toast. */
+const ROUTED_REFUSALS = ["scene_room_full", "history_review"] as const;
+type RoutedRefusal = (typeof ROUTED_REFUSALS)[number];
 
 /**
  * Replays: every finished fight is kept. The GM gets the list (with a per-replay reveal control,
@@ -368,8 +371,8 @@ function GmViewer({
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [launching, setLaunching] = useState(false);
-  /** A refusal stays on screen (an Alert, not a toast): it is a state with a next step. */
-  const [refused, setRefused] = useState<{ kind: LaunchRefusal; message: string } | null>(null);
+  /** A refusal with somewhere to go stays on screen (an Alert, not a toast): it is a state with a next step. */
+  const [refused, setRefused] = useState<{ code: RoutedRefusal; message: string } | null>(null);
   const { confirm, dialog } = useConfirm();
   const { toast } = useToast();
 
@@ -432,26 +435,19 @@ function GmViewer({
     if (!ok) return;
     setLaunching(true);
     setRefused(null);
-    socket.emit(
-      "replay:launch",
-      { commandId: newId(), archiveId, turnIndex: index },
-      (result: { ok: boolean; message?: string }) => {
-        setLaunching(false);
-        if (!result.ok) {
-          const message = result.message ?? "That moment could not be launched.";
-          const kind = launchRefusalOf(result.message);
-          // A refusal with somewhere to go stays on screen with its door; anything else is a toast.
-          if (kind === "other") {
-            toast(message, { tone: "error" });
-            return;
-          }
-          setRefused({ kind, message });
-          return;
-        }
-        toast("The table is live on that moment. Your previous scene is parked in Scenes.", { tone: "success" });
-        onLaunched();
+    socket.emit("replay:launch", { commandId: newId(), archiveId, turnIndex: index }, (result: MutationResult) => {
+      setLaunching(false);
+      if (!result.ok) {
+        const message = result.message ?? "That moment could not be launched.";
+        // A refusal with somewhere to go stays on screen with its door; anything else is a toast.
+        const routed = ROUTED_REFUSALS.find((code) => code === result.code);
+        if (routed) setRefused({ code: routed, message });
+        else toast(message, { tone: "error" });
+        return;
       }
-    );
+      toast("The table is live on that moment. Your previous scene is parked in Scenes.", { tone: "success" });
+      onLaunched();
+    });
   };
 
   return (
@@ -479,19 +475,19 @@ function GmViewer({
           </Button>
         </div>
       </div>
-      {/* The refusal and its way out. `scene-room` links to the scene gallery, the only place a
-        prepared scene can be removed; `history-review` says where to go (the rewind banner on the
+      {/* The refusal and its way out. A full scene list links to the scene gallery, the only place a
+        prepared scene can be removed; a history review says where to go (the rewind banner on the
         table) rather than offering a route. */}
       {refused && (
         <Alert tone="warning" className="replay-refusal" title="That moment could not be launched">
           <p>{refused.message}</p>
           <div className="replay-refusal-actions">
-            {refused.kind === "scene-room" && (
+            {refused.code === "scene_room_full" && (
               <Button variant="primary" size="sm" onClick={() => void navigate("/scenes")}>
                 Manage scenes
               </Button>
             )}
-            {refused.kind === "history-review" && (
+            {refused.code === "history_review" && (
               <span>
                 Step back to the live turn on the table first - the fight&rsquo;s history banner has the way out.
               </span>

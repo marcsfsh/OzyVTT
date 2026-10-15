@@ -1381,7 +1381,7 @@ describe("the command and read tables", () => {
       const ack = await new Promise<{ ok: boolean; message?: string }>((resolve) =>
         (socket.emit as (...args: unknown[]) => void)(event, {}, resolve)
       );
-      expect(ack, event).toEqual({ ok: false, message: "Join a session first." });
+      expect(ack, event).toEqual({ ok: false, code: "not_joined", message: "Join a session first." });
     }
   });
 
