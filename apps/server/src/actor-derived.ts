@@ -85,7 +85,8 @@ export function deriveActorSheet(
 
   return {
     proficiencyBonus,
-    // `actor.armorClass` is reconciled on every inventory write; a bare token falls back to the stat block.
+    // `actor.armorClass` is reconciled on every inventory write and content change; a bare token falls back to
+    // the stat block.
     armorClass: actor.armorClass ?? definition?.armorClass ?? 0,
     // Initiative is not reconciled onto the actor, so the live value is computed here; `actor.initiative`
     // still holds the instantiation-time number.

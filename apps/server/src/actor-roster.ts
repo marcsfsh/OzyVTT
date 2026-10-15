@@ -159,6 +159,41 @@ export function unarmoredDefenseOf(definition: ActorDefinition, catalog?: Equipm
   return null;
 }
 
+/** The AC an actor stores, which attacks read: equipped armor and shields when there are any, else the sheet's
+ *  own (natural armor, monsters); plus the flat rider, so a built definition and its actor agree, and standing
+ *  item riders. */
+export function storedArmorClass(actor: Actor, definition: ActorDefinition, catalog?: EquipmentCatalog): number {
+  const equipmentAc = armorClassFromEquipment(
+    abilityModifier(definition.abilityScores.dex),
+    withResolvedSlots(actor.inventory, catalog),
+    unarmoredDefenseOf(definition, catalog)
+  );
+  return (
+    (equipmentAc === null ? definition.armorClass : equipmentAc + armorClassRiderOf(definition)) +
+    deriveEquipment(actor, definition, catalog).armorClass
+  );
+}
+
+/** Re-derives every stored AC from current content. Inventory writes reconcile AC, but a homebrew publish or a
+ *  content upgrade changes it with no write, and attacks would keep resolving against the old number. True when
+ *  any moved. */
+export function reconcileArmorClasses(
+  state: GameState,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
+  catalog?: EquipmentCatalog
+): boolean {
+  let changed = false;
+  for (const actor of state.actors) {
+    const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
+    if (!definition) continue;
+    const next = storedArmorClass(actor, definition, catalog);
+    if (actor.armorClass === next) continue;
+    actor.armorClass = next;
+    changed = true;
+  }
+  return changed;
+}
+
 /** Unarmored Defense from the sheet's features then feats (last wins, like `interpretFeature`); fails open to null. */
 function unarmoredDefenseFromContent(definition: ActorDefinition, catalog?: EquipmentCatalog): UnarmoredDefense | null {
   if (!catalog) return null;
@@ -191,11 +226,6 @@ function instantiate(
   if (state.actors.length >= MAX_ACTORS)
     throw new CommandRejectedError("The roster is full - remove unused combatants first.");
   const inventory = (definition.startingInventory ?? []).map((item) => ({ ...item }));
-  const equipmentAc = armorClassFromEquipment(
-    abilityModifier(definition.abilityScores.dex),
-    withResolvedSlots(inventory, catalog),
-    unarmoredDefenseOf(definition, catalog)
-  );
   // Seeding through the same derivation as inventory writes gives monsters and PDF imports their
   // equipment riders from the start.
   const seed = {
@@ -211,11 +241,7 @@ function instantiate(
     kind,
     visibility,
     hp: { current: definition.hitPoints.maximum, maximum: definition.hitPoints.maximum, temporary: 0 },
-    // AC derives from equipped armor/shields when there are any; otherwise the stored AC stands
-    // (natural armor, monsters). The flat rider is added back so a built definition and its actor agree.
-    armorClass:
-      (equipmentAc === null ? definition.armorClass : equipmentAc + armorClassRiderOf(definition)) +
-      derivation.armorClass,
+    armorClass: storedArmorClass(seed, definition, catalog),
     initiative: definition.initiativeBonus + derivation.initiative,
     ownerSessionId: null,
     conditions: [],
@@ -337,11 +363,7 @@ export function rebuildActorDefinition(
   const rebuilt = rememberHitPointRolls(previous, definition);
 
   const inventory = actor.inventory.map((item) => ({ ...item }));
-  const equipmentAc = armorClassFromEquipment(
-    abilityModifier(definition.abilityScores.dex),
-    withResolvedSlots(inventory, catalog),
-    unarmoredDefenseOf(definition, catalog)
-  );
+  const armorClass = storedArmorClass({ ...actor, inventory } as Actor, definition, catalog);
   const derivation = deriveEquipment({ ...actor, inventory } as Actor, definition, catalog);
   const previousMaximum = actor.hp.maximum;
   const maximum = definition.hitPoints.maximum;
@@ -351,9 +373,7 @@ export function rebuildActorDefinition(
     maximum,
     temporary: actor.hp.temporary
   };
-  actor.armorClass =
-    (equipmentAc === null ? definition.armorClass : equipmentAc + armorClassRiderOf(definition)) +
-    derivation.armorClass;
+  actor.armorClass = armorClass;
   actor.initiative = definition.initiativeBonus + derivation.initiative;
   actor.speedFeet = definition.speedFeet;
   actor.conditionImmunities = definition.conditionImmunities ? [...definition.conditionImmunities] : [];
