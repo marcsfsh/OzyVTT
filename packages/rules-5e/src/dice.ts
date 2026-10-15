@@ -112,3 +112,8 @@ export function resolveDice(expression: DiceExpression, random: RandomSource): D
 export function rollDice(formula: string, random: RandomSource) {
   return resolveDice(parseDiceFormula(formula), random);
 }
+
+/** The d20 a roll mode rolls (SRD Advantage and Disadvantage: roll two, keep the higher or the lower). */
+export function d20Die(mode: "advantage" | "disadvantage" | "normal" | null | undefined): string {
+  return mode === "advantage" ? "2d20kh1" : mode === "disadvantage" ? "2d20kl1" : "1d20";
+}

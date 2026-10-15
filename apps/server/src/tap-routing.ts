@@ -1,4 +1,5 @@
 import type { CombatState, GameState } from "@vtt/domain";
+import { d20Die } from "@vtt/rules-5e";
 import type { ActorAction } from "@vtt/schemas";
 import { effectiveModeFor, overrideCovers } from "./rules-families.js";
 import { RulesBlockedError } from "./game-store.js";
@@ -52,7 +53,7 @@ export function looseRollPlan(
 ): ReadonlyArray<Readonly<{ formula: string; purpose: "attack" | "damage"; label: string }>> {
   const plan: Array<{ formula: string; purpose: "attack" | "damage"; label: string }> = [];
   if (action.attack) {
-    const die = options.rollMode === "advantage" ? "2d20kh1" : options.rollMode === "disadvantage" ? "2d20kl1" : "1d20";
+    const die = d20Die(options.rollMode);
     const bonus = action.attack.bonus;
     plan.push({
       formula: `${die}${bonus === 0 ? "" : bonus < 0 ? ` - ${Math.abs(bonus)}` : ` + ${bonus}`}`,

@@ -7,7 +7,7 @@ import type {
   RollRecord,
   TableEvent
 } from "@vtt/domain";
-import type { rollDice } from "@vtt/rules-5e";
+import { d20Die, type rollDice } from "@vtt/rules-5e";
 import { storedDefinition } from "../actor-roster.js";
 import type { Initiator } from "../authorization.js";
 import type { CombatLogStore } from "../combat-log.js";
@@ -167,7 +167,7 @@ export function createKit(context: CommandContext) {
       (state: GameState, commandId: string, principal: GamePrincipal): InitiativeRollSink =>
       (roll) => {
         const actor = state.actors.find((candidate) => candidate.id === roll.actorId);
-        const formula = roll.mode === "advantage" ? "2d20kh1" : roll.mode === "disadvantage" ? "2d20kl1" : "1d20";
+        const formula = d20Die(roll.mode);
         const gmGrade = isGmGrade(principal);
         recordRoll(state, {
           id: context.newId(),

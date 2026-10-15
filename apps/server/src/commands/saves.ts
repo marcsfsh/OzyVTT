@@ -1,3 +1,4 @@
+import { d20Die } from "@vtt/rules-5e";
 import { requireActorAccess } from "../authorization.js";
 import { rollDeathSave } from "../death-saves.js";
 import type { EffectNarration } from "../effects.js";
@@ -48,7 +49,7 @@ export const saveCommands = [
         ability,
         deriveEquipment(actor, definition, kit.equipmentCatalog())
       );
-      const die = rollMode === "advantage" ? "2d20kh1" : rollMode === "disadvantage" ? "2d20kl1" : "1d20";
+      const die = d20Die(rollMode);
       const loose = await dispatch("dice.roll", {
         commandId,
         actorId,

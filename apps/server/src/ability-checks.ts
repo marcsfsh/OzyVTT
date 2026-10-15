@@ -51,8 +51,3 @@ export function checkRollMode(
   const sources = checkRollSources(derivation, narrow);
   return aggregateRollMode(sources.advantage, sources.disadvantage);
 }
-
-/** The d20 expression one aggregated mode rolls (SRD Advantage and Disadvantage: two dice, keep one). */
-export function checkDieFor(mode: AggregatedRollMode["mode"]): string {
-  return mode === "advantage" ? "2d20kh1" : mode === "disadvantage" ? "2d20kl1" : "1d20";
-}

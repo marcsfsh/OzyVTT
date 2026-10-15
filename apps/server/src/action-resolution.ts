@@ -3,6 +3,7 @@ import {
   abilityModifier as scoreModifier,
   aggregateRollMode,
   collectRiders,
+  d20Die,
   parseDiceFormula,
   resolveDice,
   sumRiders,
@@ -14,7 +15,7 @@ import {
   type RollModeSource
 } from "@vtt/rules-5e";
 import { toRollModes, type ActorDefinition } from "@vtt/schemas";
-import { checkDieFor, checkRollMode } from "./ability-checks.js";
+import { checkRollMode } from "./ability-checks.js";
 import { criticalThreshold, effectiveActions } from "./effective-actions.js";
 import {
   deriveEquipment,
@@ -949,7 +950,7 @@ export function resolveDefinitionAction(
     });
     if (aggregated.mode !== "normal") rollMode = aggregated;
     const resolution = resolveDice(
-      parseDiceFormula(`${checkDieFor(aggregated.mode)} ${modifier < 0 ? "-" : "+"} ${Math.abs(modifier)}`),
+      parseDiceFormula(`${d20Die(aggregated.mode)} ${modifier < 0 ? "-" : "+"} ${Math.abs(modifier)}`),
       deps.random
     );
     recordRoll(state, resolution, { ...rollBase, id: deps.newRollId(), purpose: "check" });
@@ -1008,7 +1009,7 @@ export function resolveDefinitionAction(
     const aggregated = checkRollMode(derivation, escapeNarrow);
     if (aggregated.mode !== "normal") rollMode = aggregated;
     const resolution = resolveDice(
-      parseDiceFormula(`${checkDieFor(aggregated.mode)} ${modifier < 0 ? "-" : "+"} ${Math.abs(modifier)}`),
+      parseDiceFormula(`${d20Die(aggregated.mode)} ${modifier < 0 ? "-" : "+"} ${Math.abs(modifier)}`),
       deps.random
     );
     recordRoll(state, resolution, { ...rollBase, id: deps.newRollId(), purpose: "check" });
@@ -1077,7 +1078,6 @@ export function resolveDefinitionAction(
     const bonus = action.attack.bonus + exhaustionPenalty(attacker) + momentaryAttackBonus;
     if (exhaustionLevel(attacker) > 0)
       warnings.push(`Exhaustion ${exhaustionLevel(attacker)}: −${2 * exhaustionLevel(attacker)} to the attack roll.`);
-    const die = mode === "advantage" ? "2d20kh1" : mode === "disadvantage" ? "2d20kl1" : "1d20";
     // A preview or hand-rolled/confirmed d20 supplies the natural roll; otherwise roll it. A confirm
     // reuses the shown roll and records no new die.
     const isPreview = input.commit === false;
@@ -1107,7 +1107,7 @@ export function resolveDefinitionAction(
       }
     } else {
       const attackResolution = resolveDice(
-        parseDiceFormula(`${die} ${bonus < 0 ? "-" : "+"} ${Math.abs(bonus)}`),
+        parseDiceFormula(`${d20Die(mode)} ${bonus < 0 ? "-" : "+"} ${Math.abs(bonus)}`),
         deps.random
       );
       recordRoll(state, attackResolution, { ...rollBase, id: deps.newRollId(), purpose: "attack" });

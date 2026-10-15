@@ -3,6 +3,7 @@ import {
   abilityModifier as scoreModifier,
   aggregateRollMode,
   collectRiders,
+  d20Die,
   parseDiceFormula,
   rescaleDamageParts,
   resolveDice,
@@ -330,9 +331,8 @@ export function answerSave(
     const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
     // An explicit choice (the answerer's button, or a forced "normal") wins over detected sources.
     const mode = explicitRollMode ?? aggregated.mode;
-    const die = mode === "advantage" ? "2d20kh1" : mode === "disadvantage" ? "2d20kl1" : "1d20";
     const resolution = resolveDice(
-      parseDiceFormula(`${die} ${modifier < 0 ? "-" : "+"} ${Math.abs(modifier)}`),
+      parseDiceFormula(`${d20Die(mode)} ${modifier < 0 ? "-" : "+"} ${Math.abs(modifier)}`),
       deps.random
     );
     if (mode !== "normal")

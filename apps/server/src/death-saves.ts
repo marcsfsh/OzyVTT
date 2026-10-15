@@ -1,5 +1,5 @@
 import type { Actor, GameState, RollRecord } from "@vtt/domain";
-import { parseDiceFormula, resolveDeathSave, resolveDice, type RandomSource } from "@vtt/rules-5e";
+import { d20Die, parseDiceFormula, resolveDeathSave, resolveDice, type RandomSource } from "@vtt/rules-5e";
 import { recordRoll as recordRollInHistory } from "./roll-history.js";
 
 export type DeathSaveMode = "advantage" | "disadvantage" | "normal";
@@ -43,7 +43,7 @@ export function rollDeathSave(
     face = options.naturalRoll;
   } else {
     const chosen = options.rollMode ?? "normal";
-    const formula = chosen === "advantage" ? "2d20kh1" : chosen === "disadvantage" ? "2d20kl1" : "1d20";
+    const formula = d20Die(chosen);
     const resolution = resolveDice(parseDiceFormula(formula), deps.random);
     face = resolution.total;
     if (chosen !== "normal") mode = chosen;
