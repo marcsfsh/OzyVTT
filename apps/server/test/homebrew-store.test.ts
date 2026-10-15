@@ -170,6 +170,13 @@ describe("HomebrewStore", () => {
     expect(updated.body.id).toBe(row.id);
   });
 
+  it("stamps every non-monster body as homebrew, so an API client that omits or forges `source` is not badged SRD", () => {
+    const row = store.create({ type: "feat", body: bodyFor("Blood Maledict") });
+    expect(row.body.source).toBe("homebrew");
+    const updated = store.update(row.id, { ...bodyFor("Blood Maledict"), source: "srd" }, row.rev, "gm");
+    expect(updated.body.source).toBe("homebrew");
+  });
+
   it("rejects a body that is not an object or has no usable name", () => {
     expect(() => store.create({ type: "class", body: {} })).toThrow(HomebrewStateError);
     expect(() => store.create({ type: "class", body: { name: "   " } })).toThrow(/Name this record/);

@@ -814,6 +814,7 @@ export function recordName(body: unknown): string {
 /**
  * Serialize with `id` forced to the row id (the client's is never trusted) and `type` stripped. A monster's
  * `source.externalId` is forced too: it becomes `Actor.definitionId`, and an arbitrary value would break the next boot.
+ * Every other type's `source` is forced to "homebrew", so an API body or a pack that omits it is never badged SRD.
  */
 function normalizeBody(body: HomebrewBody, id: string, type: HomebrewContentType): string {
   const { type: _type, ...rest } = body as Record<string, unknown>;
@@ -830,7 +831,7 @@ function normalizeBody(body: HomebrewBody, id: string, type: HomebrewContentType
             externalId: id
           }
         }
-      : { ...rest, id };
+      : { ...rest, id, source: "homebrew" };
   const json = JSON.stringify(withIdentity);
   if (json.length > MAX_BODY_BYTES) throw new HomebrewStateError("That record is too large to store.");
   return json;
