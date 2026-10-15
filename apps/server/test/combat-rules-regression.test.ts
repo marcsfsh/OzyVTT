@@ -879,7 +879,9 @@ describe("prose-only Multiattack degrades strict blocking to warnings", () => {
           name: "Multiattack",
           activation: "action",
           description: "The beast attacks twice, in any combination.",
-          damage: []
+          damage: [],
+          // As the content build or an import marks it; stored straight into the game here.
+          untrackedMultiattack: true
         },
         {
           id: "claw",

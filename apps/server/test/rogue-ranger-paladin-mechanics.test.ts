@@ -755,7 +755,7 @@ describe("Paladin - the auras that are really immunities", () => {
     const brave = table(paladinInput(10));
     const events = setCondition(brave.state, IDS.hero, "frightened", true, undefined, GM_SCOPE);
     expect(events).toEqual([
-      { kind: "condition", text: "Bree is immune to Frightened - not applied.", actorId: IDS.hero }
+      { kind: "condition", text: "Bree is immune to Frightened - not applied.", actorId: IDS.hero, immune: true }
     ]);
     expect(brave.hero.conditions).toEqual([]);
 

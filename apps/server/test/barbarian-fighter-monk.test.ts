@@ -491,7 +491,7 @@ describe("Berserker: Mindless Rage refuses Frightened only while the Rage is run
       { resolveDefinition: () => table.definition, catalog }
     );
     expect(during).toEqual([
-      { kind: "condition", text: "Ozar is immune to Frightened - not applied.", actorId: IDS.hero }
+      { kind: "condition", text: "Ozar is immune to Frightened - not applied.", actorId: IDS.hero, immune: true }
     ]);
     expect(table.hero.conditions, "the gate held but the condition landed anyway").toEqual([]);
 

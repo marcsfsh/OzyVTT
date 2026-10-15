@@ -6007,6 +6007,11 @@
      "per": "long-rest",
      "pool": "ring-of-shooting-stars-charges"
     },
+    "area": {
+     "shape": "cube",
+     "sizeFeet": 15,
+     "widthFeet": null
+    },
     "save": {
      "ability": "dex",
      "dc": 15,
@@ -7508,6 +7513,11 @@
      "limit": 10,
      "per": "long-rest",
      "pool": "staff-of-swarming-insects-charges"
+    },
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 30,
+     "widthFeet": null
     }
    }
   ],
@@ -7706,6 +7716,11 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 60,
+     "widthFeet": null
     },
     "save": {
      "ability": "con",

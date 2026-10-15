@@ -516,6 +516,24 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "permanent: system-synthesised"
   },
   {
+    at: "actions[].area.**",
+    types: ACTION_CARRIERS,
+    reason: "read from the action's description as the catalog is built; the editor writes the description",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].untrackedMultiattack",
+    types: ACTION_CARRIERS,
+    reason: "marked as the catalog is built, on a Multiattack whose attacks nothing structured names",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "area.**",
+    types: ["spell"],
+    reason: "read from the spell's description as the catalog is built; the editor writes the description",
+    status: "permanent: system-synthesised"
+  },
+  {
     at: "actions[].spellSlot.level",
     types: ACTION_CARRIERS,
     reason: "synthesised from an item's consumesSpellSlot during equipment derivation, zero hand authors",

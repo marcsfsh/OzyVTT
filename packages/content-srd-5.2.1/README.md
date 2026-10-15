@@ -50,7 +50,10 @@ scratch directory and requires every committed bundle back byte for byte, so edi
   so structure never misrepresents the text. What each monster and spell save does (half or no
   damage on a success, the condition a failure imposes) is read from the text once here by
   `scripts/save-outcomes.ts`, with reviewed overrides, so the engine never reads prose; authored
-  mechanics (classes, species, items) state it explicitly. Upstream data bugs are fixed via reviewed
+  mechanics (classes, species, items) state it explicitly. The same goes for an action's or spell's
+  area of effect and for a Multiattack whose attacks the build cannot structure, read here by
+  `src/action-prose.ts` (homebrew and imported stat blocks go through it as they enter the
+  campaign). Upstream data bugs are fixed via reviewed
   `CORRECTIONS` tables (never by editing sources); fixtures open5e mislabels as SRD are dropped via
   `EXCLUSIONS`.
 - `scripts/build-class-bundle.ts`: generates the other nine classes and their subclasses from

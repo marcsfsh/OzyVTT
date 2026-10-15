@@ -148,6 +148,7 @@ export const druid: ClassMechanicsModule = {
             id: "lands-aid",
             name: "Land's Aid",
             activation: "action",
+            area: { shape: "sphere", sizeFeet: 10, widthFeet: null },
             description:
               "As a Magic action, expend a use of your Wild Shape and choose a point within 60 feet. Each creature of your choice in a 10-foot-radius Sphere centered there makes a Constitution saving throw, taking the damage below on a failure and half as much on a success. One creature of your choice in that area regains the same amount in Hit Points. The damage and healing increase at Druid levels 10 and 14.",
             save: { ability: "con", dc: "spellcasting", successDamage: "half", failureConditions: [] },
@@ -248,6 +249,7 @@ export const druid: ClassMechanicsModule = {
             id: "natures-sanctuary",
             name: "Nature's Sanctuary",
             activation: "action",
+            area: { shape: "cube", sizeFeet: 15, widthFeet: null },
             description:
               "As a Magic action, expend a use of your Wild Shape to make spectral trees and vines appear in a 15-foot Cube on the ground within 120 feet of yourself. They last 1 minute or until you have the Incapacitated condition or die. You and your allies have Half Cover while in that area, and your allies gain the current Resistance of your Nature's Ward there. As a Bonus Action you can move the Cube up to 60 feet to ground within 120 feet of yourself.",
             damage: []

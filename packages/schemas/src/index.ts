@@ -927,6 +927,16 @@ export const SaveOutcomeFields = {
   failureConditions: z.array(SaveConditionSchema).max(4).default([])
 };
 
+/** An area of effect the GM places as a map template ("60-foot Cone"). `widthFeet` is a line's width, null otherwise. */
+export const ActionAreaSchema = z
+  .object({
+    shape: z.enum(["cone", "line", "sphere", "cube", "emanation"]),
+    sizeFeet: z.number().int().min(1).max(1000),
+    widthFeet: z.number().int().min(1).max(100).nullable()
+  })
+  .strict();
+export type ActionArea = z.infer<typeof ActionAreaSchema>;
+
 /** Mechanics fields are optional (ADR-0020): absent means prose only. Descriptions stay the display source of truth. */
 export const ActionSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
@@ -1015,7 +1025,13 @@ export const ActionSchema = z.object({
   legendary: z
     .object({ cost: z.number().int().min(1).max(5) })
     .strict()
-    .optional()
+    .optional(),
+  /** The area it covers, for the map template. Filled from the description where the action enters the system
+   *  (the content build, a homebrew save, an import), so play never reads the prose. */
+  area: ActionAreaSchema.optional(),
+  /** A Multiattack whose attacks the build could not read: the engine cannot track them against the action, so
+   *  the creature's action-slot checks soften to notes. */
+  untrackedMultiattack: z.literal(true).optional()
 });
 
 export type ActorAction = z.infer<typeof ActionSchema>;

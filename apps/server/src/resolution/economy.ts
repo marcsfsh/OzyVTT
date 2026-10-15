@@ -89,7 +89,7 @@ export function evaluateActionEconomy(
     targetIds,
     siblings,
     onOwnTurn: state.combat.turnActorId === attacker.id,
-    proseMultiattack: siblings.some((candidate) => /multiattack/i.test(candidate.name) && !candidate.multiattack),
+    proseMultiattack: siblings.some((candidate) => candidate.untrackedMultiattack === true),
     violations: [],
     softViolations: [],
     notes: []

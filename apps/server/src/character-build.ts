@@ -264,6 +264,7 @@ function cantripActionFor(
       : spell.attackRoll
         ? { attack: { bonus: numbers.attackBonus, ...(beams > 1 ? { count: Math.min(10, beams) } : {}) } }
         : {}),
+    ...(spell.area ? { area: spell.area } : {}),
     // `spell-id-is` riders (Agonizing Blast) match on this field alone.
     spellId: spell.id
   } as ActorAction;

@@ -76,8 +76,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // Metal Shell (timed immunity, once per dawn) is not authored: a standing immunity grant would be permanent.
   "armor-of-invulnerability": { grants: { damageResistances: ["bludgeoning", "piercing", "slashing"] } },
 
-  // The curse only. Resistance to ranged-weapon damage (resistance is by damage type) and the
-  // redirect of nearby ranged attacks are not expressible.
+  // Kept as the curse alone: the SRD item is a trap, and the attunement lock is what springs it. The GM
+  // applies the rest from the description, since neither half is expressible: resistance to ranged-weapon
+  // damage (resistance is by damage type, not source) and the redirect of nearby ranged attacks.
   "shield-of-missile-attraction": { cursed: true },
 
   /**
@@ -409,6 +410,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         id: "shooting-stars",
         name: "Shooting Stars",
         activation: "action",
+        area: { shape: "cube", sizeFeet: 15, widthFeet: null },
         description:
           "Expend 1 charge to launch a glowing mote of light at a point within 60 feet. Each creature in a 15-foot Cube originating from that point makes a DC 15 Dexterity saving throw, taking 5d4 Radiant damage on a failed save or half as much damage on a successful one.",
         save: { ability: "dex", dc: 15, successDamage: "half", failureConditions: [] },
@@ -546,6 +548,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         id: "insect-cloud",
         name: "Insect Cloud",
         activation: "action",
+        area: { shape: "emanation", sizeFeet: 30, widthFeet: null },
         description:
           "Expend 1 charge to fill a 30-foot Emanation originating from you with a swarm of harmless flying insects. They remain for 10 minutes, making the area Heavily Obscured for creatures other than you. A strong wind disperses the swarm and ends the effect.",
         uses: { limit: 10, per: "long-rest", pool: "staff-of-swarming-insects-charges" }
@@ -603,6 +606,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         id: "thunderclap",
         name: "Thunderclap",
         activation: "action",
+        area: { shape: "emanation", sizeFeet: 60, widthFeet: null },
         description:
           "The staff produces a thunderclap audible out to 600 feet. Every creature within a 60-foot Emanation originating from you makes a DC 17 Constitution saving throw. On a failed save, a creature takes 2d6 Thunder damage and has the Deafened condition for 1 minute. On a successful save, a creature takes half as much damage only.",
         save: { ability: "con", dc: 17, successDamage: "half", failureConditions: ["deafened"] },

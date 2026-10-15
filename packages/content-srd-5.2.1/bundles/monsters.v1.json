@@ -308,6 +308,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 60,
+     "widthFeet": 5
     }
    },
    {
@@ -492,6 +497,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 90,
+     "widthFeet": 5
     }
    },
    {
@@ -672,6 +682,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 60,
+     "widthFeet": 5
     }
    },
    {
@@ -708,7 +723,12 @@
       "incapacitated"
      ]
     },
-    "damage": []
+    "damage": [],
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 60,
+     "widthFeet": null
+    }
    },
    {
     "id": "spellcasting",
@@ -878,6 +898,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 90,
+     "widthFeet": 5
     }
    },
    {
@@ -901,6 +926,11 @@
     ],
     "legendary": {
      "cost": 1
+    },
+    "area": {
+     "shape": "sphere",
+     "sizeFeet": 20,
+     "widthFeet": null
     }
    },
    {
@@ -916,7 +946,12 @@
       "prone"
      ]
     },
-    "damage": []
+    "damage": [],
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 30,
+     "widthFeet": null
+    }
    },
    {
     "id": "spellcasting",
@@ -1101,6 +1136,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 60,
+     "widthFeet": 5
     }
    },
    {
@@ -1124,7 +1164,12 @@
      "successDamage": "none",
      "failureConditions": []
     },
-    "damage": []
+    "damage": [],
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 60,
+     "widthFeet": null
+    }
    },
    {
     "id": "spellcasting",
@@ -1307,6 +1352,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 60,
+     "widthFeet": null
     }
    },
    {
@@ -1330,7 +1380,12 @@
      "successDamage": "none",
      "failureConditions": []
     },
-    "damage": []
+    "damage": [],
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 60,
+     "widthFeet": null
+    }
    },
    {
     "id": "spellcasting",
@@ -1472,6 +1527,11 @@
     ],
     "legendary": {
      "cost": 1
+    },
+    "area": {
+     "shape": "sphere",
+     "sizeFeet": 20,
+     "widthFeet": null
     }
    },
    {
@@ -1515,6 +1575,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 60,
+     "widthFeet": null
     }
    },
    {
@@ -1702,6 +1767,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 60,
+     "widthFeet": null
     }
    },
    {
@@ -1850,6 +1920,11 @@
     ],
     "legendary": {
      "cost": 1
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 60,
+     "widthFeet": 10
     }
    },
    {
@@ -1893,6 +1968,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 60,
+     "widthFeet": null
     }
    },
    {
@@ -1918,7 +1998,12 @@
       "incapacitated"
      ]
     },
-    "damage": []
+    "damage": [],
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 60,
+     "widthFeet": null
+    }
    },
    {
     "id": "spellcasting",
@@ -2033,6 +2118,11 @@
     ],
     "legendary": {
      "cost": 1
+    },
+    "area": {
+     "shape": "sphere",
+     "sizeFeet": 30,
+     "widthFeet": null
     }
    },
    {
@@ -2099,6 +2189,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 60,
+     "widthFeet": null
     }
    },
    {
@@ -2541,6 +2636,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 90,
+     "widthFeet": 10
     }
    },
    {
@@ -2725,6 +2825,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 120,
+     "widthFeet": 10
     }
    },
    {
@@ -2905,6 +3010,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 90,
+     "widthFeet": 5
     }
    },
    {
@@ -2941,7 +3051,12 @@
       "incapacitated"
      ]
     },
-    "damage": []
+    "damage": [],
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 90,
+     "widthFeet": null
+    }
    },
    {
     "id": "spellcasting",
@@ -3111,6 +3226,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 120,
+     "widthFeet": 10
     }
    },
    {
@@ -3134,6 +3254,11 @@
     ],
     "legendary": {
      "cost": 1
+    },
+    "area": {
+     "shape": "sphere",
+     "sizeFeet": 20,
+     "widthFeet": null
     }
    },
    {
@@ -3149,7 +3274,12 @@
       "prone"
      ]
     },
-    "damage": []
+    "damage": [],
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 30,
+     "widthFeet": null
+    }
    },
    {
     "id": "spellcasting",
@@ -3334,6 +3464,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 90,
+     "widthFeet": 10
     }
    },
    {
@@ -3357,7 +3492,12 @@
      "successDamage": "none",
      "failureConditions": []
     },
-    "damage": []
+    "damage": [],
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 90,
+     "widthFeet": null
+    }
    },
    {
     "id": "spellcasting",
@@ -3540,6 +3680,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 90,
+     "widthFeet": null
     }
    },
    {
@@ -3563,7 +3708,12 @@
      "successDamage": "none",
      "failureConditions": []
     },
-    "damage": []
+    "damage": [],
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 90,
+     "widthFeet": null
+    }
    },
    {
     "id": "spellcasting",
@@ -3705,6 +3855,11 @@
     ],
     "legendary": {
      "cost": 1
+    },
+    "area": {
+     "shape": "sphere",
+     "sizeFeet": 30,
+     "widthFeet": null
     }
    },
    {
@@ -3748,6 +3903,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 90,
+     "widthFeet": null
     }
    },
    {
@@ -3935,6 +4095,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 90,
+     "widthFeet": null
     }
    },
    {
@@ -4083,6 +4248,11 @@
     ],
     "legendary": {
      "cost": 1
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 60,
+     "widthFeet": 10
     }
    },
    {
@@ -4126,6 +4296,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 90,
+     "widthFeet": null
     }
    },
    {
@@ -4151,7 +4326,12 @@
       "incapacitated"
      ]
     },
-    "damage": []
+    "damage": [],
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 90,
+     "widthFeet": null
+    }
    },
    {
     "id": "spellcasting",
@@ -4266,6 +4446,11 @@
     ],
     "legendary": {
      "cost": 1
+    },
+    "area": {
+     "shape": "sphere",
+     "sizeFeet": 30,
+     "widthFeet": null
     }
    },
    {
@@ -4332,6 +4517,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 90,
+     "widthFeet": null
     }
    },
    {
@@ -4809,6 +4999,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 6
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 30,
+     "widthFeet": 5
     }
    }
   ],
@@ -5385,7 +5580,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The assassin makes three attacks, using Shortsword or Light Crossbow in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "shortsword",
@@ -6317,7 +6513,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The bandit makes two attacks, using Scimitar and Pistol in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "parry",
@@ -6638,6 +6835,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 4
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 30,
+     "widthFeet": null
     }
    }
   ],
@@ -6949,7 +7151,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The behir makes one Bite attack and uses Constrict.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "swallow",
@@ -7029,6 +7232,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 90,
+     "widthFeet": 5
     }
    }
   ],
@@ -7358,6 +7566,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 15,
+     "widthFeet": 5
     }
    }
   ],
@@ -7816,6 +8029,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 30,
+     "widthFeet": 5
     }
    }
   ],
@@ -8164,6 +8382,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 20,
+     "widthFeet": 5
     }
    },
    {
@@ -8179,7 +8402,12 @@
       "incapacitated"
      ]
     },
-    "damage": []
+    "damage": [],
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 15,
+     "widthFeet": null
+    }
    }
   ],
   "token": {
@@ -8309,6 +8537,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 40,
+     "widthFeet": 5
     }
    },
    {
@@ -8324,7 +8557,12 @@
       "prone"
      ]
     },
-    "damage": []
+    "damage": [],
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 30,
+     "widthFeet": null
+    }
    }
   ],
   "token": {
@@ -8547,7 +8785,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The bugbear makes two Javelin or Morningstar attacks.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "quick-grapple",
@@ -9117,7 +9356,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The centaur makes two attacks, using Pike or Longbow in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "trampling-charge-recharge-5-6",
@@ -9414,7 +9654,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The chimera makes one Ram attack, one Bite attack, and one Claw attack. It can replace the Claw attack with a use of Fire Breath if available.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "bite",
@@ -9495,6 +9736,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 15,
+     "widthFeet": null
     }
    }
   ],
@@ -9873,14 +10119,20 @@
       "frightened"
      ]
     },
-    "damage": []
+    "damage": [],
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 60,
+     "widthFeet": null
+    }
    },
    {
     "id": "multiattack",
     "name": "Multiattack",
     "activation": "action",
     "description": "The cloaker makes one Attach attack and two Tail attacks.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "attach",
@@ -10016,7 +10268,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The giant makes two attacks, using Thunderous Mace or Thundercloud in any combination. It can replace one attack with a use of Spellcasting to cast Fog Cloud.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "thunderous-mace",
@@ -10467,6 +10720,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 20,
+     "widthFeet": 5
     }
    },
    {
@@ -10480,7 +10738,12 @@
      "successDamage": "none",
      "failureConditions": []
     },
-    "damage": []
+    "damage": [],
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 15,
+     "widthFeet": null
+    }
    }
   ],
   "token": {
@@ -11113,6 +11376,11 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 15,
+     "widthFeet": null
     }
    }
   ],
@@ -11638,7 +11906,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The djinni makes three attacks, using Storm Blade or Storm Bolt in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "storm-blade",
@@ -11858,6 +12127,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 6
+    },
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 15,
+     "widthFeet": null
     }
    },
    {
@@ -12105,6 +12379,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 60,
+     "widthFeet": null
     }
    }
   ],
@@ -12222,6 +12501,11 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 10,
+     "widthFeet": null
     }
    }
   ],
@@ -12326,7 +12610,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The drider makes three attacks, using Foreleg or Poison Burst in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "foreleg",
@@ -12452,7 +12737,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The druid makes two attacks, using Vine Staff or Verdant Wisp in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "vine-staff",
@@ -12570,7 +12856,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The dryad makes one Vine Lash or Thorn Burst attack, and it can use Spellcasting to cast Charm Monster.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "tree-stride",
@@ -12735,6 +13022,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 6
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 15,
+     "widthFeet": null
     }
    },
    {
@@ -12927,7 +13219,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The elemental makes two attacks, using Slam or Rock Launch in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "slam",
@@ -13070,7 +13363,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The efreeti makes three attacks, using Heated Blade or Hurl Flame in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "heated-blade",
@@ -13994,7 +14288,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The giant makes two attacks, using Flame Sword or Hammer Throw in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "flame-sword",
@@ -14429,7 +14724,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The giant makes two attacks, using Frost Axe or Great Bow in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "war-cry-recharge-5-6",
@@ -14978,7 +15274,12 @@
       "formula": "2d6 + 3",
       "type": "psychic"
      }
-    ]
+    ],
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 60,
+     "widthFeet": null
+    }
    },
    {
     "id": "possession",
@@ -15306,6 +15607,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 6
+    },
+    "area": {
+     "shape": "sphere",
+     "sizeFeet": 5,
+     "widthFeet": null
     }
    }
   ],
@@ -15751,7 +16057,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The snake makes one Bite attack and uses Constrict.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "bite",
@@ -16826,6 +17133,11 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "area": {
+     "shape": "cube",
+     "sizeFeet": 10,
+     "widthFeet": null
     }
    },
    {
@@ -18228,6 +18540,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "sphere",
+     "sizeFeet": 10,
+     "widthFeet": null
     }
    }
   ],
@@ -18810,7 +19127,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The goblin makes two attacks, using Scimitar or Shortbow in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "nimble-escape",
@@ -19196,6 +19514,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 15,
+     "widthFeet": null
     }
    },
    {
@@ -19209,7 +19532,12 @@
      "successDamage": "none",
      "failureConditions": []
     },
-    "damage": []
+    "damage": [],
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 15,
+     "widthFeet": null
+    }
    }
   ],
   "token": {
@@ -19346,6 +19674,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 30,
+     "widthFeet": null
     }
    }
   ],
@@ -19580,6 +19913,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 15,
+     "widthFeet": null
     }
    }
   ],
@@ -20220,7 +20558,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The guard makes two attacks, using Javelin or Longsword in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "javelin",
@@ -20524,6 +20863,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 30,
+     "widthFeet": null
     }
    }
   ],
@@ -20635,7 +20979,12 @@
       "charmed"
      ]
     },
-    "damage": []
+    "damage": [],
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 300,
+     "widthFeet": null
+    }
    }
   ],
   "token": {
@@ -20842,6 +21191,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 15,
+     "widthFeet": null
     }
    }
   ],
@@ -21065,7 +21419,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The giant makes two attacks, using Tree Club or Trash Lob in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "tree-club",
@@ -21399,7 +21754,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The hobgoblin makes two attacks, using Greatsword or Longbow in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "greatsword",
@@ -21735,7 +22091,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The devil makes three attacks, using Searing Fork or Hurl Flame in any combination. It can replace one attack with a use of Infernal Tail.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "searing-fork",
@@ -21977,7 +22334,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The hydra makes as many Bite attacks as it has heads.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "bite",
@@ -22364,6 +22722,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 6
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 15,
+     "widthFeet": null
     }
    },
    {
@@ -22883,7 +23246,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The golem makes two attacks, using Bladed Arm or Fiery Bolt in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "bladed-arm",
@@ -22938,6 +23302,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 6
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 60,
+     "widthFeet": null
     }
    }
   ],
@@ -23230,7 +23599,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The knight makes two attacks, using Greatsword or Heavy Crossbow in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "parry",
@@ -23511,6 +23881,11 @@
     "damage": [],
     "legendary": {
      "cost": 1
+    },
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 15,
+     "widthFeet": null
     }
    },
    {
@@ -23936,7 +24311,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The lich makes three attacks, using Eldritch Burst or Paralyzing Touch in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "protective-magic",
@@ -23964,6 +24340,11 @@
     ],
     "legendary": {
      "cost": 1
+    },
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 20,
+     "widthFeet": null
     }
    },
    {
@@ -24503,6 +24884,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 6
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 15,
+     "widthFeet": null
     }
    }
   ],
@@ -24821,7 +25207,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The manticore makes three attacks, using Rend or Tail Spike in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "rend",
@@ -24935,7 +25322,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The marilith makes six Pact Blade attacks and uses Constrict.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "parry",
@@ -25221,6 +25609,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 30,
+     "widthFeet": null
     }
    },
    {
@@ -25445,7 +25838,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The merrow makes two attacks, using Bite, Claw, or Harpoon in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "bite",
@@ -26176,7 +26570,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The mummy makes one Rotting Fist or Channel Negative Energy attack, and it uses Dreadful Glare.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "whirlwind-of-sand",
@@ -26389,6 +26784,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 15,
+     "widthFeet": null
     }
    },
    {
@@ -27002,6 +27402,11 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "area": {
+     "shape": "cube",
+     "sizeFeet": 5,
+     "widthFeet": null
     }
    },
    {
@@ -27320,7 +27725,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The oni makes two Claw or Nightmare Ray attacks. It can replace one attack with a use of Spellcasting.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "claw",
@@ -27455,7 +27861,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The otyugh makes one Bite attack and two Tentacle attacks.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "bite",
@@ -28329,7 +28736,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The pirate makes three attacks, using Rapier or Pistol in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "riposte",
@@ -28448,7 +28856,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The pit fiend makes one Bite attack, two Devilish Claw attacks, and one Fiery Mace attack.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "bite",
@@ -28678,7 +29087,12 @@
       "formula": "7d6",
       "type": "radiant"
      }
-    ]
+    ],
+    "area": {
+     "shape": "sphere",
+     "sizeFeet": 20,
+     "widthFeet": null
+    }
    },
    {
     "id": "spellcasting",
@@ -29080,7 +29494,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The priest makes two attacks, using Mace or Radiant Flame in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "mace",
@@ -29890,6 +30305,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 30,
+     "widthFeet": null
     }
    },
    {
@@ -30214,6 +30634,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 15,
+     "widthFeet": null
     }
    }
   ],
@@ -30986,7 +31411,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The rust monster makes one Bite attack and uses Antennae twice.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "reflexive-antennae",
@@ -31029,7 +31455,12 @@
     "name": "Destroy Metal",
     "activation": "action",
     "description": "The rust monster touches a nonmagical metal object within 5 feet of itself that isn't being worn or carried. The touch destroys a 1-foot Cube [Area of Effect]|XPHB|Cube of the object.",
-    "damage": []
+    "damage": [],
+    "area": {
+     "shape": "cube",
+     "sizeFeet": 1,
+     "widthFeet": null
+    }
    }
   ],
   "token": {
@@ -31690,7 +32121,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The scout makes two attacks, using Shortsword and Longbow in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "shortsword",
@@ -32543,6 +32975,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 15,
+     "widthFeet": null
     }
    },
    {
@@ -32558,7 +32995,12 @@
       "incapacitated"
      ]
     },
-    "damage": []
+    "damage": [],
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 15,
+     "widthFeet": null
+    }
    }
   ],
   "token": {
@@ -32830,6 +33272,11 @@
     ],
     "legendary": {
      "cost": 1
+    },
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 10,
+     "widthFeet": null
     }
    },
    {
@@ -33165,6 +33612,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 300,
+     "widthFeet": null
     }
    },
    {
@@ -33349,6 +33801,11 @@
     "uses": {
      "limit": 3,
      "per": "long-rest"
+    },
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 500,
+     "widthFeet": null
     }
    },
    {
@@ -33666,7 +34123,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The naga makes three attacks, using Bite or Necrotic Ray in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "bite",
@@ -34062,6 +34520,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 6
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 15,
+     "widthFeet": null
     }
    }
   ],
@@ -34262,7 +34725,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The giant makes two attacks, using Stone Club or Boulder in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "stone-club",
@@ -34386,7 +34850,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The golem makes two attacks, using Slam or Force Bolt in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "slow-recharge-5-6",
@@ -34532,7 +34997,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The giant makes two attacks, using Storm Sword or Thunderbolt in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "storm-sword",
@@ -34688,7 +35154,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The succubus makes one Fiendish Touch attack and uses Charm or Draining Kiss.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "shape-shift",
@@ -35546,7 +36013,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The tarrasque makes one Bite attack and three other attacks, using Claw or Tail in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "onslaught",
@@ -35613,6 +36081,11 @@
     "damage": [],
     "legendary": {
      "cost": 1
+    },
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 60,
+     "widthFeet": null
     }
    },
    {
@@ -35681,6 +36154,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 150,
+     "widthFeet": null
     }
    }
   ],
@@ -36011,7 +36489,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The tough makes two attacks, using Warhammer or Heavy Crossbow in any combination.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "warhammer",
@@ -37621,6 +38100,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 6
+    },
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 20,
+     "widthFeet": null
     }
    },
    {
@@ -37645,6 +38129,11 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 20,
+     "widthFeet": null
     }
    }
   ],
@@ -38119,7 +38608,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The warrior makes two Greatsword or Heavy Crossbow attacks.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "parry",
@@ -38491,7 +38981,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The werebear makes two attacks, using Handaxe or Rend in any combination. It can replace one attack with a Bite attack.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "shape-shift",
@@ -38635,7 +39126,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The wereboar makes two attacks, using Javelin or Tusk in any combination. It can replace one attack with a Gore attack.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "shape-shift",
@@ -38777,7 +39269,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The wererat makes two attacks, using Scratch or Hand Crossbow in any combination. It can replace one attack with a Bite attack.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "shape-shift",
@@ -38920,7 +39413,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The weretiger makes two attacks, using Scratch or Longbow in any combination. It can replace one attack with a Bite attack.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "prowl-tiger-or-hybrid-form-only",
@@ -39070,7 +39564,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The werewolf makes two attacks, using Scratch or Longbow in any combination. It can replace one attack with a Bite attack.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "shape-shift",
@@ -39267,6 +39762,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 15,
+     "widthFeet": null
     }
    }
   ],
@@ -39357,7 +39857,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The wight makes two attacks, using Necrotic Sword or Necrotic Bow in any combination. It can replace one attack with a use of Life Drain.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "necrotic-sword",
@@ -39689,6 +40190,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 15,
+     "widthFeet": null
     }
    }
   ],
@@ -40227,7 +40733,8 @@
     "name": "Multiattack",
     "activation": "action",
     "description": "The xorn makes one Bite attack and three Claw attacks.",
-    "damage": []
+    "damage": [],
+    "untrackedMultiattack": true
    },
    {
     "id": "bite",
@@ -40407,6 +40914,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 30,
+     "widthFeet": 5
     }
    }
   ],
@@ -40546,6 +41058,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 60,
+     "widthFeet": 5
     }
    }
   ],
@@ -40676,6 +41193,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 40,
+     "widthFeet": 5
     }
    },
    {
@@ -40691,7 +41213,12 @@
       "incapacitated"
      ]
     },
-    "damage": []
+    "damage": [],
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 30,
+     "widthFeet": null
+    }
    }
   ],
   "token": {
@@ -40821,6 +41348,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 60,
+     "widthFeet": 5
     }
    },
    {
@@ -40836,7 +41368,12 @@
       "prone"
      ]
     },
-    "damage": []
+    "damage": [],
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 30,
+     "widthFeet": null
+    }
    }
   ],
   "token": {
@@ -40971,6 +41508,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 40,
+     "widthFeet": 5
     }
    },
    {
@@ -40984,7 +41526,12 @@
      "successDamage": "none",
      "failureConditions": []
     },
-    "damage": []
+    "damage": [],
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 30,
+     "widthFeet": null
+    }
    }
   ],
   "token": {
@@ -41114,6 +41661,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 30,
+     "widthFeet": null
     }
    },
    {
@@ -41127,7 +41679,12 @@
      "successDamage": "none",
      "failureConditions": []
     },
-    "damage": []
+    "damage": [],
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 30,
+     "widthFeet": null
+    }
    }
   ],
   "token": {
@@ -41266,6 +41823,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 30,
+     "widthFeet": null
     }
    }
   ],
@@ -41408,6 +41970,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 30,
+     "widthFeet": null
     }
    }
   ],
@@ -41538,6 +42105,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 30,
+     "widthFeet": null
     }
    },
    {
@@ -41553,7 +42125,12 @@
       "incapacitated"
      ]
     },
-    "damage": []
+    "damage": [],
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 30,
+     "widthFeet": null
+    }
    }
   ],
   "token": {
@@ -41687,6 +42264,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 30,
+     "widthFeet": null
     }
    }
   ],

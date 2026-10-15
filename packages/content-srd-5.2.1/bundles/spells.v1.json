@@ -34,6 +34,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "wizard"
   ],
@@ -127,6 +128,11 @@
    "size": 5,
    "unit": "feet"
   },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 5,
+   "widthFeet": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -187,6 +193,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -278,6 +285,11 @@
    "size": 20,
    "unit": "feet"
   },
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 20,
+   "widthFeet": null
+  },
   "classes": [
    "ranger",
    "wizard"
@@ -319,6 +331,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "wizard"
@@ -366,6 +379,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "druid",
@@ -461,6 +475,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "druid",
@@ -546,6 +561,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid"
   ],
@@ -586,6 +602,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "wizard"
@@ -664,6 +681,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -731,6 +749,11 @@
    "count": 1
   },
   "shape": null,
+  "area": {
+   "shape": "emanation",
+   "sizeFeet": 10,
+   "widthFeet": null
+  },
   "classes": [
    "druid"
   ],
@@ -771,6 +794,11 @@
    "count": 1
   },
   "shape": null,
+  "area": {
+   "shape": "emanation",
+   "sizeFeet": 10,
+   "widthFeet": null
+  },
   "classes": [
    "cleric",
    "wizard"
@@ -816,6 +844,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "druid",
@@ -858,6 +887,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "wizard"
   ],
@@ -898,6 +928,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "wizard"
@@ -964,6 +995,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "wizard"
   ],
@@ -1006,6 +1038,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "wizard"
@@ -1047,6 +1080,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "wizard"
   ],
@@ -1087,6 +1121,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "warlock",
@@ -1129,6 +1164,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "druid",
@@ -1173,6 +1209,11 @@
    "count": 1
   },
   "shape": null,
+  "area": {
+   "shape": "emanation",
+   "sizeFeet": 30,
+   "widthFeet": null
+  },
   "classes": [
    "cleric",
    "paladin"
@@ -1214,6 +1255,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "druid"
@@ -1259,6 +1301,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -1356,6 +1399,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "paladin",
@@ -1431,6 +1475,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "ranger"
@@ -1476,6 +1521,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric"
   ],
@@ -1522,6 +1568,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "druid",
@@ -1571,6 +1618,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -1658,6 +1706,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "wizard"
   ],
@@ -1704,6 +1753,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric"
   ],
@@ -1744,6 +1794,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "paladin"
@@ -1840,6 +1891,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "sorcerer",
@@ -1920,6 +1972,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -2006,6 +2059,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "wizard"
@@ -2047,6 +2101,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "wizard"
@@ -2097,6 +2152,11 @@
    "type": "cone",
    "size": 15,
    "unit": "feet"
+  },
+  "area": {
+   "shape": "cone",
+   "sizeFeet": 15,
+   "widthFeet": null
   },
   "classes": [
    "sorcerer",
@@ -2194,6 +2254,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid"
   ],
@@ -2279,6 +2340,11 @@
    "size": 20,
    "unit": "feet"
   },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 20,
+   "widthFeet": null
+  },
   "classes": [
    "bard",
    "cleric"
@@ -2326,6 +2392,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "wizard"
@@ -2373,6 +2440,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "druid",
@@ -2454,6 +2522,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "druid",
@@ -2549,6 +2618,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "warlock",
@@ -2610,6 +2680,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "wizard"
@@ -2710,6 +2781,11 @@
    "size": 60,
    "unit": "feet"
   },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 60,
+   "widthFeet": null
+  },
   "classes": [
    "sorcerer",
    "warlock",
@@ -2771,6 +2847,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -2814,6 +2891,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "wizard"
   ],
@@ -2863,6 +2941,11 @@
    "type": "sphere",
    "size": 20,
    "unit": "feet"
+  },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 20,
+   "widthFeet": null
   },
   "classes": [
    "sorcerer",
@@ -2940,6 +3023,11 @@
    "size": 15,
    "unit": "feet"
   },
+  "area": {
+   "shape": "cone",
+   "sizeFeet": 15,
+   "widthFeet": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -2986,6 +3074,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -3077,6 +3166,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric"
   ],
@@ -3117,6 +3207,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "ranger"
@@ -3158,6 +3249,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -3207,6 +3299,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard"
   ],
@@ -3256,6 +3349,11 @@
    "type": "cone",
    "size": 60,
    "unit": "feet"
+  },
+  "area": {
+   "shape": "cone",
+   "sizeFeet": 60,
+   "widthFeet": null
   },
   "classes": [
    "druid",
@@ -3331,6 +3429,11 @@
    "type": "sphere",
    "size": 10,
    "unit": "feet"
+  },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 10,
+   "widthFeet": null
   },
   "classes": [
    "bard",
@@ -3412,6 +3515,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "ranger"
@@ -3490,6 +3594,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric"
   ],
@@ -3549,6 +3654,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "wizard"
@@ -3617,6 +3723,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid"
   ],
@@ -3676,6 +3783,11 @@
    "count": 1
   },
   "shape": null,
+  "area": {
+   "shape": "emanation",
+   "sizeFeet": 15,
+   "widthFeet": null
+  },
   "classes": [
    "druid",
    "wizard"
@@ -3754,6 +3866,11 @@
    "count": 1
   },
   "shape": null,
+  "area": {
+   "shape": "emanation",
+   "sizeFeet": 10,
+   "widthFeet": null
+  },
   "classes": [
    "druid",
    "ranger"
@@ -3834,6 +3951,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "warlock",
    "wizard"
@@ -3883,6 +4001,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "druid"
@@ -3924,6 +4043,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "wizard"
   ],
@@ -3964,6 +4084,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "druid",
@@ -4006,6 +4127,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "druid",
@@ -4048,6 +4170,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "druid",
@@ -4094,6 +4217,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "warlock",
@@ -4136,6 +4260,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "paladin"
@@ -4177,6 +4302,11 @@
    "count": 1
   },
   "shape": null,
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 30,
+   "widthFeet": null
+  },
   "classes": [
    "cleric",
    "druid"
@@ -4267,6 +4397,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "warlock",
@@ -4331,6 +4462,11 @@
    "type": "cube",
    "size": 5,
    "unit": "feet"
+  },
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 5,
+   "widthFeet": null
   },
   "classes": [
    "sorcerer",
@@ -4398,6 +4534,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -4491,6 +4628,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -4537,6 +4675,11 @@
    "size": 15,
    "unit": "feet"
   },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 15,
+   "widthFeet": null
+  },
   "classes": [
    "sorcerer",
    "warlock",
@@ -4579,6 +4722,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "ranger",
@@ -4626,6 +4770,11 @@
    "size": 60,
    "unit": "feet"
   },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 60,
+   "widthFeet": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -4670,6 +4819,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "paladin"
@@ -4720,6 +4870,11 @@
    "type": "sphere",
    "size": 20,
    "unit": "feet"
+  },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 20,
+   "widthFeet": null
   },
   "classes": [
    "sorcerer",
@@ -4775,6 +4930,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "warlock",
@@ -4817,6 +4973,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "paladin"
@@ -4858,6 +5015,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -4905,6 +5063,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "druid",
@@ -4952,6 +5111,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -4996,6 +5156,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -5039,6 +5200,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -5087,6 +5249,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "wizard"
@@ -5147,6 +5310,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "paladin"
@@ -5188,6 +5352,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -5284,6 +5449,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard"
   ],
@@ -5324,6 +5490,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "druid",
@@ -5368,6 +5535,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "paladin"
   ],
@@ -5410,6 +5578,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "paladin"
   ],
@@ -5503,6 +5672,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric"
   ],
@@ -5549,6 +5719,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "ranger",
@@ -5628,6 +5799,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -5684,6 +5856,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -5758,6 +5931,11 @@
    "type": "cone",
    "size": 15,
    "unit": "feet"
+  },
+  "area": {
+   "shape": "cone",
+   "sizeFeet": 15,
+   "widthFeet": null
   },
   "classes": [
    "sorcerer",
@@ -5849,6 +6027,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "warlock",
@@ -5891,6 +6070,11 @@
    "count": 1
   },
   "shape": null,
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 5,
+   "widthFeet": null
+  },
   "classes": [
    "druid"
   ],
@@ -5943,6 +6127,7 @@
    "size": 100,
    "unit": "feet"
   },
+  "area": null,
   "classes": [
    "cleric",
    "druid",
@@ -5987,6 +6172,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "warlock"
   ],
@@ -6046,6 +6232,11 @@
    "count": 1
   },
   "shape": null,
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 5,
+   "widthFeet": null
+  },
   "classes": [
    "druid",
    "sorcerer",
@@ -6088,6 +6279,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -6180,6 +6372,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "druid",
@@ -6231,6 +6424,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "ranger"
   ],
@@ -6326,6 +6520,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "ranger"
@@ -6371,6 +6566,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "warlock"
@@ -6414,6 +6610,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -6471,6 +6668,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "warlock",
@@ -6517,6 +6715,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -6563,6 +6762,11 @@
    "type": "cube",
    "size": 10,
    "unit": "feet"
+  },
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 10,
+   "widthFeet": null
   },
   "classes": [
    "wizard"
@@ -6612,6 +6816,11 @@
    "size": 20,
    "unit": "feet"
   },
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 20,
+   "widthFeet": null
+  },
   "classes": [
    "bard",
    "druid"
@@ -6659,6 +6868,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "wizard"
   ],
@@ -6699,6 +6909,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "wizard"
@@ -6799,6 +7010,11 @@
    "size": 30,
    "unit": "feet"
   },
+  "area": {
+   "shape": "cone",
+   "sizeFeet": 30,
+   "widthFeet": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -6842,6 +7058,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -6884,6 +7101,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "wizard"
   ],
@@ -6924,6 +7142,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "paladin"
   ],
@@ -7007,6 +7226,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -7049,6 +7269,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "druid",
@@ -7097,6 +7318,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "warlock",
@@ -7141,6 +7363,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "wizard"
@@ -7204,6 +7427,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "sorcerer",
@@ -7256,6 +7480,11 @@
    "size": 10,
    "unit": "feet"
   },
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 10,
+   "widthFeet": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -7307,6 +7536,11 @@
    "type": "sphere",
    "size": 20,
    "unit": "feet"
+  },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 20,
+   "widthFeet": null
   },
   "classes": [
    "sorcerer",
@@ -7388,6 +7622,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "sorcerer"
@@ -7479,6 +7714,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric"
   ],
@@ -7550,6 +7786,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "sorcerer",
@@ -7641,6 +7878,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "sorcerer",
@@ -7683,6 +7921,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "wizard"
   ],
@@ -7723,6 +7962,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "warlock",
@@ -7805,6 +8045,11 @@
    "type": "sphere",
    "size": 20,
    "unit": "feet"
+  },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 20,
+   "widthFeet": null
   },
   "classes": [
    "druid",
@@ -7900,6 +8145,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric"
   ],
@@ -7944,6 +8190,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "warlock",
@@ -7986,6 +8233,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "druid",
@@ -8039,6 +8287,7 @@
    "size": 60,
    "unit": "feet"
   },
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -8123,6 +8372,11 @@
    "size": 60,
    "unit": "feet"
   },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 60,
+   "widthFeet": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -8189,6 +8443,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "warlock",
@@ -8268,6 +8523,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "sorcerer",
@@ -8319,6 +8575,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -8376,6 +8633,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "paladin",
@@ -8418,6 +8676,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid"
   ],
@@ -8489,6 +8748,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "warlock"
@@ -8530,6 +8790,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "wizard"
@@ -8590,6 +8851,11 @@
    "count": 1
   },
   "shape": null,
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 20,
+   "widthFeet": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -8669,6 +8935,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "ranger"
@@ -8716,6 +8983,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "wizard"
@@ -8757,6 +9025,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -8799,6 +9068,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -8849,6 +9119,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric"
   ],
@@ -8889,6 +9160,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "wizard"
@@ -8930,6 +9202,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "druid"
@@ -8973,6 +9246,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric"
   ],
@@ -9066,6 +9340,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "ranger",
@@ -9109,6 +9384,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric"
   ],
@@ -9152,6 +9428,11 @@
    "type": "cube",
    "size": 150,
    "unit": "feet"
+  },
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 150,
+   "widthFeet": null
   },
   "classes": [
    "bard",
@@ -9202,6 +9483,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric"
   ],
@@ -9246,6 +9528,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "wizard"
@@ -9287,6 +9570,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "druid"
@@ -9347,6 +9631,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -9444,6 +9729,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "druid"
@@ -9534,6 +9820,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "warlock"
   ],
@@ -9629,6 +9916,11 @@
    "size": 10,
    "unit": "feet"
   },
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 10,
+   "widthFeet": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -9671,6 +9963,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "paladin"
@@ -9763,6 +10056,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "warlock"
   ],
@@ -9859,6 +10153,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "warlock",
@@ -9956,6 +10251,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -10030,6 +10326,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -10118,6 +10415,11 @@
    "count": 1
   },
   "shape": null,
+  "area": {
+   "shape": "emanation",
+   "sizeFeet": 30,
+   "widthFeet": null
+  },
   "classes": [
    "cleric"
   ],
@@ -10160,6 +10462,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "ranger"
   ],
@@ -10253,6 +10556,11 @@
    "size": 30,
    "unit": "feet"
   },
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 30,
+   "widthFeet": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -10303,6 +10611,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "sorcerer",
@@ -10401,6 +10710,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "sorcerer",
@@ -10474,6 +10784,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "wizard"
@@ -10515,6 +10826,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "warlock",
@@ -10561,6 +10873,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "warlock",
    "wizard"
@@ -10612,6 +10925,11 @@
    "size": 20,
    "unit": "feet"
   },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 20,
+   "widthFeet": null
+  },
   "classes": [
    "druid",
    "sorcerer",
@@ -10660,6 +10978,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric"
   ],
@@ -10759,6 +11078,11 @@
    "size": 20,
    "unit": "feet"
   },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 20,
+   "widthFeet": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -10826,6 +11150,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "wizard"
   ],
@@ -10866,6 +11191,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -10958,6 +11284,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "wizard"
@@ -10999,6 +11326,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "ranger",
@@ -11091,6 +11419,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -11133,6 +11462,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -11175,6 +11505,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -11223,6 +11554,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "wizard"
@@ -11264,6 +11596,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -11316,6 +11649,11 @@
    "type": "line",
    "size": 5,
    "unit": "feet"
+  },
+  "area": {
+   "shape": "line",
+   "sizeFeet": 100,
+   "widthFeet": 5
   },
   "classes": [
    "sorcerer",
@@ -11395,6 +11733,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "druid",
@@ -11437,6 +11776,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -11482,6 +11822,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -11527,6 +11868,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "druid",
@@ -11619,6 +11961,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "wizard"
@@ -11660,6 +12003,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -11707,6 +12051,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "paladin",
@@ -11791,6 +12136,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "wizard"
   ],
@@ -11833,6 +12179,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "wizard"
@@ -11923,6 +12270,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "wizard"
@@ -11964,6 +12312,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "paladin",
    "ranger",
@@ -12054,6 +12403,11 @@
    "size": 10,
    "unit": "feet"
   },
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 10,
+   "widthFeet": null
+  },
   "classes": [
    "bard",
    "wizard"
@@ -12098,6 +12452,11 @@
    "type": "cube",
    "size": 20,
    "unit": "feet"
+  },
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 20,
+   "widthFeet": null
   },
   "classes": [
    "bard",
@@ -12183,6 +12542,11 @@
    "size": 30,
    "unit": "feet"
   },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 30,
+   "widthFeet": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -12250,6 +12614,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric"
   ],
@@ -12290,6 +12655,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric"
@@ -12374,6 +12740,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -12435,6 +12802,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "wizard"
   ],
@@ -12477,6 +12845,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "druid",
@@ -12519,6 +12888,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -12563,6 +12933,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "druid",
@@ -12617,6 +12988,11 @@
    "size": 40,
    "unit": "feet"
   },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 40,
+   "widthFeet": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -12660,6 +13036,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "wizard"
@@ -12707,6 +13084,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "warlock",
@@ -12792,6 +13170,11 @@
    "count": 1
   },
   "shape": null,
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 5,
+   "widthFeet": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -12835,6 +13218,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "druid",
@@ -12877,6 +13261,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -12920,6 +13305,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "warlock",
@@ -12962,6 +13348,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "warlock",
@@ -13010,6 +13397,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "wizard"
@@ -13082,6 +13470,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid"
   ],
@@ -13165,6 +13554,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "sorcerer",
@@ -13207,6 +13597,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "ranger",
@@ -13249,6 +13640,11 @@
    "count": 1
   },
   "shape": null,
+  "area": {
+   "shape": "emanation",
+   "sizeFeet": 30,
+   "widthFeet": null
+  },
   "classes": [
    "druid",
    "ranger"
@@ -13290,6 +13686,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "wizard"
   ],
@@ -13340,6 +13737,11 @@
    "size": 10,
    "unit": "feet"
   },
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 10,
+   "widthFeet": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -13388,6 +13790,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "wizard"
@@ -13460,6 +13863,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "wizard"
   ],
@@ -13500,6 +13904,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric"
   ],
@@ -13544,6 +13949,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -13613,6 +14019,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "druid",
@@ -13657,6 +14064,11 @@
    "count": 1
   },
   "shape": null,
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 100,
+   "widthFeet": null
+  },
   "classes": [
    "bard",
    "druid",
@@ -13701,6 +14113,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "sorcerer",
@@ -13767,6 +14180,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "druid",
@@ -13810,6 +14224,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric"
@@ -13853,6 +14268,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -13900,6 +14316,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -13943,6 +14360,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "paladin"
@@ -14027,6 +14445,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -14084,6 +14503,11 @@
    "size": 60,
    "unit": "feet"
   },
+  "area": {
+   "shape": "cone",
+   "sizeFeet": 60,
+   "widthFeet": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -14139,6 +14563,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "wizard"
@@ -14180,6 +14605,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "wizard"
   ],
@@ -14253,6 +14679,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid"
   ],
@@ -14316,6 +14743,11 @@
    "size": 30,
    "unit": "feet"
   },
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 30,
+   "widthFeet": null
+  },
   "classes": [
    "bard",
    "wizard"
@@ -14357,6 +14789,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "wizard"
@@ -14398,6 +14831,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "druid",
@@ -14442,6 +14876,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "druid",
@@ -14488,6 +14923,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "druid",
@@ -14535,6 +14971,11 @@
    "size": 5,
    "unit": "feet"
   },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 5,
+   "widthFeet": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -14577,6 +15018,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -14623,6 +15065,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "warlock",
    "wizard"
@@ -14666,6 +15109,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "wizard"
@@ -14728,6 +15172,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "wizard"
@@ -14818,6 +15263,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -14860,6 +15306,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid"
   ],
@@ -14900,6 +15347,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "paladin",
@@ -14947,6 +15395,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "wizard"
   ],
@@ -14987,6 +15436,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "druid"
@@ -15028,6 +15478,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric"
@@ -15073,6 +15524,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "sorcerer",
@@ -15115,6 +15567,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "druid",
@@ -15158,6 +15611,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "wizard"
   ],
@@ -15204,6 +15658,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric"
   ],
@@ -15267,6 +15722,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric"
   ],
@@ -15309,6 +15765,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "wizard"
@@ -15397,6 +15854,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -15447,6 +15905,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "paladin"
   ],
@@ -15536,6 +15995,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "wizard"
   ],
@@ -15576,6 +16036,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -15622,6 +16083,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -15664,6 +16126,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -15706,6 +16169,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "wizard"
   ],
@@ -15746,6 +16210,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "wizard"
@@ -15796,6 +16261,11 @@
    "type": "sphere",
    "size": 10,
    "unit": "feet"
+  },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 10,
+   "widthFeet": null
   },
   "classes": [
    "bard",
@@ -15882,6 +16352,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "wizard"
@@ -15923,6 +16394,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "paladin"
@@ -15966,6 +16438,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid"
   ],
@@ -16027,6 +16500,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "paladin"
   ],
@@ -16112,6 +16586,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "wizard"
@@ -16178,6 +16653,11 @@
    "size": 20,
    "unit": "feet"
   },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 20,
+   "widthFeet": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -16224,6 +16704,11 @@
    "size": 15,
    "unit": "feet"
   },
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 15,
+   "widthFeet": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -16266,6 +16751,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "wizard"
   ],
@@ -16316,6 +16802,11 @@
    "size": 5,
    "unit": "feet"
   },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 5,
+   "widthFeet": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -16364,6 +16855,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "sorcerer",
@@ -16414,6 +16906,11 @@
    "size": 40,
    "unit": "feet"
   },
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 40,
+   "widthFeet": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -16456,6 +16953,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer"
   ],
@@ -16515,6 +17013,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "druid"
@@ -16575,6 +17074,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "druid",
@@ -16618,6 +17118,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -16660,6 +17161,11 @@
    "count": 1
   },
   "shape": null,
+  "area": {
+   "shape": "emanation",
+   "sizeFeet": 30,
+   "widthFeet": null
+  },
   "classes": [
    "bard",
    "druid",
@@ -16702,6 +17208,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "warlock",
@@ -16793,6 +17300,11 @@
    "size": 20,
    "unit": "feet"
   },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 20,
+   "widthFeet": null
+  },
   "classes": [
    "druid",
    "ranger"
@@ -16841,6 +17353,11 @@
    "count": 1
   },
   "shape": null,
+  "area": {
+   "shape": "emanation",
+   "sizeFeet": 15,
+   "widthFeet": null
+  },
   "classes": [
    "cleric"
   ],
@@ -16920,6 +17437,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric"
   ],
@@ -17005,6 +17523,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "druid"
@@ -17075,6 +17594,11 @@
    "size": 20,
    "unit": "feet"
   },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 20,
+   "widthFeet": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -17117,6 +17641,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "druid",
@@ -17161,6 +17686,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "ranger",
@@ -17212,6 +17738,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid"
   ],
@@ -17258,6 +17785,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -17301,6 +17829,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "wizard"
   ],
@@ -17374,6 +17903,11 @@
    "count": 1
   },
   "shape": null,
+  "area": {
+   "shape": "line",
+   "sizeFeet": 60,
+   "widthFeet": 5
+  },
   "classes": [
    "cleric",
    "druid",
@@ -17429,6 +17963,11 @@
    "size": 60,
    "unit": "feet"
   },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 60,
+   "widthFeet": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -17475,6 +18014,11 @@
    "type": "sphere",
    "size": 60,
    "unit": "feet"
+  },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 60,
+   "widthFeet": null
   },
   "classes": [
    "bard",
@@ -17523,6 +18067,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "wizard"
@@ -17564,6 +18109,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "wizard"
@@ -17605,6 +18151,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -17651,6 +18198,7 @@
    "size": 5,
    "unit": "feet"
   },
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -17694,6 +18242,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric"
   ],
@@ -17743,6 +18292,11 @@
    "type": "cube",
    "size": 15,
    "unit": "feet"
+  },
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 15,
+   "widthFeet": null
   },
   "classes": [
    "bard",
@@ -17836,6 +18390,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "wizard"
@@ -17877,6 +18432,11 @@
    "count": 1
   },
   "shape": null,
+  "area": {
+   "shape": "emanation",
+   "sizeFeet": 10,
+   "widthFeet": null
+  },
   "classes": [
    "bard",
    "wizard"
@@ -17918,6 +18478,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -17962,6 +18523,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid"
   ],
@@ -18002,6 +18564,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "ranger"
@@ -18047,6 +18610,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "warlock",
@@ -18089,6 +18653,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "druid"
@@ -18130,6 +18695,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "cleric",
@@ -18176,6 +18742,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "sorcerer",
@@ -18244,6 +18811,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid"
   ],
@@ -18284,6 +18852,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard",
    "warlock",
@@ -18328,6 +18897,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "warlock",
@@ -18413,6 +18983,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "bard"
   ],
@@ -18481,6 +19052,11 @@
    "type": "sphere",
    "size": 20,
    "unit": "feet"
+  },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 20,
+   "widthFeet": null
   },
   "classes": [
    "sorcerer",
@@ -18560,6 +19136,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "sorcerer",
@@ -18633,6 +19210,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "wizard"
   ],
@@ -18681,6 +19259,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "wizard"
   ],
@@ -18746,6 +19325,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "sorcerer",
@@ -18795,6 +19375,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid"
   ],
@@ -18854,6 +19435,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "paladin"
@@ -18895,6 +19477,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "ranger",
@@ -18938,6 +19521,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric",
    "druid",
@@ -18993,6 +19577,11 @@
    "size": 20,
    "unit": "feet"
   },
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 20,
+   "widthFeet": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -19046,6 +19635,11 @@
    "size": 30,
    "unit": "feet"
   },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 30,
+   "widthFeet": null
+  },
   "classes": [
    "warlock",
    "wizard"
@@ -19089,6 +19683,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid"
   ],
@@ -19135,6 +19730,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "druid",
    "ranger"
@@ -19178,6 +19774,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "sorcerer",
    "wizard"
@@ -19219,6 +19816,7 @@
    "count": 1
   },
   "shape": null,
+  "area": null,
   "classes": [
    "cleric"
   ],
@@ -19266,6 +19864,11 @@
    "type": "sphere",
    "size": 15,
    "unit": "feet"
+  },
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 15,
+   "widthFeet": null
   },
   "classes": [
    "bard",

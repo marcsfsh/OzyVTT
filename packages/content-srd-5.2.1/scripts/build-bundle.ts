@@ -22,6 +22,7 @@ import {
 } from "../src/index.js";
 import { outDir, sourcePath } from "./paths.js";
 import { SPELL_SAVE_OVERRIDE_IDS, spellSaveOutcomeFor, statBlockSaveOutcome } from "./save-outcomes.js";
+import { areaOfProse, withProseFacts } from "../src/action-prose.js";
 
 const sourceDir = sourcePath("open5e-srd-2024");
 
@@ -639,7 +640,7 @@ const monsters: ActorDefinition[] = creatures
       if (uses?.per === "recharge") report.rechargeUses += 1;
       else if (uses) report.restUses += 1;
       for (const part of damage) if (part.type === "untyped") report.untypedDamage.push(action.pk);
-      return {
+      return withProseFacts({
         id: actionId,
         name: `${action.fields.name}${usesSuffix(action.fields)}`.slice(0, 120),
         activation:
@@ -667,7 +668,7 @@ const monsters: ActorDefinition[] = creatures
         ...(uses ? { uses } : {}),
         ...(legendary ? { legendary: { cost: action.fields.legendary_action_cost ?? 1 } } : {}),
         ...(enrichment ?? {})
-      };
+      });
     });
     const senses = [
       fields.darkvision_range ? `darkvision ${fields.darkvision_range} ft.` : null,
@@ -859,6 +860,7 @@ const spellRecords = onlySrd(spells).map((spell) => {
     shape: fields.shape_type
       ? { type: fields.shape_type, size: fields.shape_size, unit: fields.shape_size_unit }
       : null,
+    area: areaOfProse(fields.desc),
     classes: fields.classes.map(slugOf).sort(),
     description: fields.desc,
     higherLevel: fields.higher_level || null,

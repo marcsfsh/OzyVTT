@@ -96,6 +96,7 @@
                 "id": "breath-weapon",
                 "name": "Breath Weapon (Acid)",
                 "activation": "action",
+                "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
                 "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Acid energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
@@ -171,6 +172,7 @@
                 "id": "breath-weapon",
                 "name": "Breath Weapon (Lightning)",
                 "activation": "action",
+                "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
                 "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Lightning energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
@@ -246,6 +248,7 @@
                 "id": "breath-weapon",
                 "name": "Breath Weapon (Fire)",
                 "activation": "action",
+                "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
                 "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Fire energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
@@ -321,6 +324,7 @@
                 "id": "breath-weapon",
                 "name": "Breath Weapon (Lightning)",
                 "activation": "action",
+                "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
                 "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Lightning energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
@@ -396,6 +400,7 @@
                 "id": "breath-weapon",
                 "name": "Breath Weapon (Acid)",
                 "activation": "action",
+                "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
                 "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Acid energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
@@ -471,6 +476,7 @@
                 "id": "breath-weapon",
                 "name": "Breath Weapon (Fire)",
                 "activation": "action",
+                "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
                 "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Fire energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
@@ -546,6 +552,7 @@
                 "id": "breath-weapon",
                 "name": "Breath Weapon (Poison)",
                 "activation": "action",
+                "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
                 "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Poison energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
@@ -621,6 +628,7 @@
                 "id": "breath-weapon",
                 "name": "Breath Weapon (Fire)",
                 "activation": "action",
+                "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
                 "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Fire energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
@@ -696,6 +704,7 @@
                 "id": "breath-weapon",
                 "name": "Breath Weapon (Cold)",
                 "activation": "action",
+                "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
                 "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Cold energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
@@ -771,6 +780,7 @@
                 "id": "breath-weapon",
                 "name": "Breath Weapon (Cold)",
                 "activation": "action",
+                "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
                 "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Cold energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",

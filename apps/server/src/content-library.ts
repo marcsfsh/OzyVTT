@@ -53,7 +53,6 @@ import {
 } from "@vtt/content-srd-5.2.1";
 import type { CharacterFeatureRef } from "./equipment-derivation.js";
 import { statblockFacts } from "./statblock-facts.js";
-import { parseAreaProse } from "./area-targeting.js";
 
 /** Who reads a catalog. GM-grade principals also see published homebrew that isn't player-visible.
  *  The public viewer never reads content, so there is no viewer audience. */
@@ -198,7 +197,7 @@ export function actionSummaryOf(action: ActorDefinition["actions"][number]): Con
     saveAbility: action.save?.ability ?? null,
     saveDc: action.save?.dc ?? null,
     damage: action.damage.map((part) => ({ formula: part.formula, type: part.type })),
-    area: parseAreaProse(action.description),
+    area: action.area ?? null,
     attackCount: action.attack?.count ?? null,
     usesLimit: action.uses?.limit ?? null,
     usesPer: action.uses?.per ?? null,

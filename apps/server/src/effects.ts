@@ -8,7 +8,14 @@ import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.j
  *  end, clearing linked conditions and firing onEnd grants. Returns narration events rather than writing
  *  the log. Sweeps touch only actors in the current initiative, so parked scenes keep their effects. */
 
-export type EffectNarration = Readonly<{ kind: "effect" | "condition"; text: string; actorId: string }>;
+/** `immune` marks a condition skipped for immunity, so a caller can drop its generic "is X" line without reading
+ *  the text. */
+export type EffectNarration = Readonly<{
+  kind: "effect" | "condition";
+  text: string;
+  actorId: string;
+  immune?: true;
+}>;
 
 const MAX_EFFECTS = 20;
 

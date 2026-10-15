@@ -1,8 +1,8 @@
 import type { Actor, GameState } from "@vtt/domain";
 import type { ActorDefinition, Currency, InventoryItem } from "@vtt/schemas";
-import { abilityModifier, armorClassFromEquipment, effectiveSlot } from "@vtt/rules-5e";
-import { armorClassRiderOf, spellSlotMaxima, unarmoredDefenseOf } from "./actor-roster.js";
-import { deriveEquipment, itemIsActive, withResolvedSlots, type EquipmentCatalog } from "./equipment-derivation.js";
+import { effectiveSlot } from "@vtt/rules-5e";
+import { spellSlotMaxima, storedArmorClass } from "./actor-roster.js";
+import { deriveEquipment, itemIsActive, type EquipmentCatalog } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
 
 const MAX_ITEMS = 200;
@@ -39,16 +39,7 @@ export function reconcileEquipment(
 ): void {
   if (!definition) return;
   const derivation = deriveEquipment(actor, definition, deps.catalog);
-  // Unarmored Defense comes from the definition because this is the write a shield arrives on; the
-  // catalog lets older sheets resolve the feature from content.
-  const derived = armorClassFromEquipment(
-    abilityModifier(definition.abilityScores.dex),
-    withResolvedSlots(actor.inventory, deps.catalog),
-    unarmoredDefenseOf(definition, deps.catalog)
-  );
-  // The builder's flat rider (Defense) and item riders are both re-applied from scratch.
-  actor.armorClass =
-    (derived === null ? definition.armorClass : derived + armorClassRiderOf(definition)) + derivation.armorClass;
+  actor.armorClass = storedArmorClass(actor, definition, deps.catalog);
 
   if (actor.spellSlots && definition.spellcasting) {
     const maxByLevel = new Map(
