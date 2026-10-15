@@ -72,8 +72,8 @@ function useAddressMemory(role: "gm" | "player" | null, route: Route) {
 export function App() {
   const route = useRoute();
   const entry = useEntryAnimation();
-  const table = useSession(entry.begin);
-  const { session, state, connection } = table;
+  const session = useSession(entry.begin);
+  const { signedIn, state, connection } = session;
   /**
    * The combat log drawer's state lives here because its door is in two places (the dock, and the
    * docked-into-the-map arm with no dock), and the drawer itself sits outside the pane.
@@ -81,18 +81,18 @@ export function App() {
   const [logOpen, setLogOpen] = useState(false);
   /** Keyboard safety is shell plumbing: installed once, for every region on every surface. */
   useEffect(() => installKeyboardFocusHelper(), []);
-  useAddressMemory(session?.role ?? null, route);
+  useAddressMemory(signedIn?.role ?? null, route);
   /** The signed-in shell. It mounts during the entry drive, behind the opaque curtain. */
-  const shell = session && state ? { ...session, state } : null;
+  const shell = signedIn && state ? { ...signedIn, state } : null;
   const openLog = () => setLogOpen(true);
 
   return (
     <main className={entry.phase === "settle" ? "anim-cascade" : undefined}>
       <div className="app-texture" aria-hidden="true" />
-      {session && <TableEventToasts />}
+      {signedIn && <TableEventToasts />}
       {/* Row 1: the connection strip. A real frame row, so it never paints over a surface and nothing
         covers it, full-page layers included. */}
-      {session && connection !== "online" && (
+      {signedIn && connection !== "online" && (
         <p className="connection-banner" role="status">
           {connection === "reconnecting" ? "Reconnecting to the table…" : "Connection lost. Trying to reconnect…"}
         </p>
@@ -103,16 +103,16 @@ export function App() {
       {/* Row 3: the pane. Each surface is its one child, a `.frame-col` with chrome rows above a
         `.scroll-y` region; the pane gives out the height and the surface divides it. */}
       <div className="app-pane">
-        {(!session || entry.phase === "drive") && (
+        {(!signedIn || entry.phase === "drive") && (
           <Landing
             driving={entry.phase === "drive"}
-            bootstrapped={table.bootstrapped}
-            busy={table.busy}
-            notice={table.notice}
-            onJoin={table.joinPlayer}
-            onSignIn={(password) => void table.signInGm(password)}
-            onSetPassword={(password) => void table.setGmPassword(password)}
-            onClearNotice={table.clearNotice}
+            bootstrapped={session.bootstrapped}
+            busy={session.busy}
+            notice={session.notice}
+            onJoin={session.joinPlayer}
+            onSignIn={(password) => void session.signInGm(password)}
+            onSetPassword={(password) => void session.setGmPassword(password)}
+            onClearNotice={session.clearNotice}
           />
         )}
         {shell?.role === "gm" && (
@@ -120,10 +120,10 @@ export function App() {
             state={shell.state as GmView}
             token={shell.token}
             connection={connection}
-            busy={table.busy}
+            busy={session.busy}
             onOpenLog={openLog}
-            onSignOut={() => void table.signOutGm()}
-            onRevokeAll={() => void table.revokeAllGmSessions()}
+            onSignOut={() => void session.signOutGm()}
+            onRevokeAll={() => void session.revokeAllGmSessions()}
           />
         )}
         {shell?.role === "player" && (
@@ -132,7 +132,7 @@ export function App() {
             token={shell.token}
             connection={connection}
             onOpenLog={openLog}
-            onLeave={table.leavePlayer}
+            onLeave={session.leavePlayer}
           />
         )}
       </div>

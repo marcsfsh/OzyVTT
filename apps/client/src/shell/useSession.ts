@@ -19,7 +19,7 @@ export type Session = Readonly<{ role: "gm" | "player"; token: string }>;
  * `enter` runs the landing's entry animation around `commit`, the change that mounts the app.
  */
 export function useSession(enter: (commit: () => void) => void) {
-  const [session, setSession] = useState<Session | null>(null);
+  const [signedIn, setSignedIn] = useState<Session | null>(null);
   const [state, setState] = useState<PlayerView | GmView | null>(null);
   const [connection, setConnection] = useState<Connection>("online");
   const [bootstrapped, setBootstrapped] = useState<boolean | null>(null);
@@ -65,7 +65,7 @@ export function useSession(enter: (commit: () => void) => void) {
       return;
     }
     enter(() => {
-      setSession({ role, token: accepted });
+      setSignedIn({ role, token: accepted });
       setConnection("online");
       setNotice(null);
     });
@@ -103,17 +103,17 @@ export function useSession(enter: (commit: () => void) => void) {
 
   const leave = () => {
     socket.disconnect();
-    setSession(null);
+    setSignedIn(null);
     setState(null);
     navigate("/");
   };
 
   /** Ends this GM session (sign out) or every GM session (revoke all), then returns to the landing. */
   const endGmSession = async (path: "/api/gm/logout" | "/api/gm/sessions/revoke-all", done: string) => {
-    if (session?.role !== "gm") return;
+    if (signedIn?.role !== "gm") return;
     setBusy(true);
     try {
-      await jsonRequest(path, { token: session.token, method: "POST" });
+      await jsonRequest(path, { token: signedIn.token, method: "POST" });
     } catch (error) {
       setBusy(false);
       toast((error as Error).message, { tone: "error" });
@@ -125,7 +125,7 @@ export function useSession(enter: (commit: () => void) => void) {
   };
 
   return {
-    session,
+    signedIn,
     state,
     connection,
     bootstrapped,
