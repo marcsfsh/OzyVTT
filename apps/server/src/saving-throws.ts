@@ -479,24 +479,30 @@ export function answerSave(
   }
   // A committed failure applies the declared source-linked effect (Unarmed Strike Grapple, ADR-0020).
   if (!success && pending.onFailEffect) {
-    const applied = addEffect(state, target.id, {
-      id: `${commandId}:${saveId}:fail`,
-      name: pending.onFailEffect.name,
-      tags: [...pending.onFailEffect.tags],
-      sourceActorId: pending.onFailEffect.sourceActorId,
-      sourceName: pending.onFailEffect.sourceName,
-      sourceActionId: null,
-      startedRound: state.combat.round,
-      duration: { type: "manual" },
-      endsWhenSourceDefeated: true,
-      voidWhileIncapacitated: false,
-      concentration: false,
-      modifiers: [],
-      linkedConditionIds: [...pending.onFailEffect.linkedConditionIds],
-      escapeDc: pending.onFailEffect.escapeDc,
-      onEnd: [],
-      endsWithTag: null
-    });
+    const applied = addEffect(
+      state,
+      target.id,
+      {
+        id: `${commandId}:${saveId}:fail`,
+        name: pending.onFailEffect.name,
+        tags: [...pending.onFailEffect.tags],
+        sourceActorId: pending.onFailEffect.sourceActorId,
+        sourceName: pending.onFailEffect.sourceName,
+        sourceActionId: null,
+        startedRound: state.combat.round,
+        duration: { type: "manual" },
+        endsWhenSourceDefeated: true,
+        voidWhileIncapacitated: false,
+        concentration: false,
+        modifiers: [],
+        linkedConditionIds: [...pending.onFailEffect.linkedConditionIds],
+        escapeDc: pending.onFailEffect.escapeDc,
+        onEnd: [],
+        endsWithTag: null
+      },
+      undefined,
+      deps
+    );
     events.push({ kind: "effect", text: `${target.name} is ${applied.name}.`, actorId: target.id });
   }
   state.combat = { ...state.combat, pendingSaves: state.combat.pendingSaves.filter((entry) => entry.id !== saveId) };

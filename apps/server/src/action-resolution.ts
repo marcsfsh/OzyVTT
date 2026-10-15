@@ -967,24 +967,30 @@ export function resolveDefinitionAction(
     };
     if (action.id === "hide" && success === true) {
       // Hiding grants Invisible while hidden (SRD Hide); attacking ends it (see the reveal below).
-      const effect = addEffect(state, attacker.id, {
-        id: `${input.commandId}:hide`,
-        name: "Hiding",
-        tags: ["hidden"],
-        sourceActorId: attacker.id,
-        sourceName: attacker.name,
-        sourceActionId: "hide",
-        startedRound: state.combat.round,
-        duration: { type: "manual" },
-        endsWhenSourceDefeated: false,
-        voidWhileIncapacitated: false,
-        concentration: false,
-        modifiers: [],
-        linkedConditionIds: ["invisible"],
-        escapeDc: null,
-        onEnd: [],
-        endsWithTag: null
-      });
+      const effect = addEffect(
+        state,
+        attacker.id,
+        {
+          id: `${input.commandId}:hide`,
+          name: "Hiding",
+          tags: ["hidden"],
+          sourceActorId: attacker.id,
+          sourceName: attacker.name,
+          sourceActionId: "hide",
+          startedRound: state.combat.round,
+          duration: { type: "manual" },
+          endsWhenSourceDefeated: false,
+          voidWhileIncapacitated: false,
+          concentration: false,
+          modifiers: [],
+          linkedConditionIds: ["invisible"],
+          escapeDc: null,
+          onEnd: [],
+          endsWithTag: null
+        },
+        undefined,
+        deps
+      );
       hiddenGranted = { name: effect.name, tags: effect.tags };
     }
   }
@@ -1300,31 +1306,37 @@ export function resolveDefinitionAction(
         return;
       }
       const conditionIds = rider.conditions.map((condition) => condition.id);
-      const effect = addEffect(state, target.id, {
-        id: `${input.commandId}:hit:${target.id}:${index}`,
-        name: `${conditionLabel(conditionIds[0])} by ${attacker.name} (${action.name})`,
-        tags: conditionIds.includes("grappled") ? ["grapple"] : [],
-        sourceActorId: attacker.id,
-        sourceName: attacker.name,
-        sourceActionId: `${action.id}:${index}`,
-        startedRound: state.combat.round,
-        duration: { type: "manual" },
-        endsWhenSourceDefeated: true,
-        voidWhileIncapacitated: false,
-        concentration: false,
-        modifiers: [],
-        linkedConditionIds: conditionIds,
-        escapeDc: rider.escapeDc ?? null,
-        onEnd: [],
-        endsWithTag: null
-      });
+      const effect = addEffect(
+        state,
+        target.id,
+        {
+          id: `${input.commandId}:hit:${target.id}:${index}`,
+          name: `${conditionLabel(conditionIds[0])} by ${attacker.name} (${action.name})`,
+          tags: conditionIds.includes("grappled") ? ["grapple"] : [],
+          sourceActorId: attacker.id,
+          sourceName: attacker.name,
+          sourceActionId: `${action.id}:${index}`,
+          startedRound: state.combat.round,
+          duration: { type: "manual" },
+          endsWhenSourceDefeated: true,
+          voidWhileIncapacitated: false,
+          concentration: false,
+          modifiers: [],
+          linkedConditionIds: conditionIds,
+          escapeDc: rider.escapeDc ?? null,
+          onEnd: [],
+          endsWithTag: null
+        },
+        undefined,
+        deps
+      );
       effectsApplied.push({ targetId: target.id, targetName: target.name, name: effect.name, conditionIds });
     });
   }
 
   // Mastery on-hit effects (Sap); `addEffect` is idempotent by id, so its return is what gets narrated.
   for (const applied of masteryHitEffects(masterySwing)) {
-    const effect = addEffect(state, applied.targetId, applied.effect);
+    const effect = addEffect(state, applied.targetId, applied.effect, undefined, deps);
     effectsApplied.push({
       targetId: applied.targetId,
       targetName: applied.targetName,
@@ -1447,7 +1459,8 @@ export function resolveDefinitionAction(
         concentration: grant.concentration,
         ...grantedMovement
       },
-      replaced
+      replaced,
+      deps
     );
     warnings.push(...replaced.map((event) => event.text));
     if (grant.target === "target")

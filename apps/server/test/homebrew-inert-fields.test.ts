@@ -415,6 +415,58 @@ describe("row 3: the four dropped grant kinds", () => {
     );
     expect(bare.actors[0].conditions.map((condition) => condition.id)).toEqual(["frightened"]);
   });
+
+  it("conditionImmunities: a condition an on-hit rider applies is refused the same way", () => {
+    const PERIAPT: EquipmentRecordLike = {
+      id: "periapt-of-clarity",
+      name: "Periapt of Clarity",
+      category: "wondrous",
+      slot: "neck",
+      isMagic: true,
+      attunement: { required: true },
+      grants: { conditionImmunities: ["frightened"] }
+    };
+    const GAZE = {
+      id: "gaze",
+      name: "Dread Gaze",
+      activation: "action" as const,
+      description: "Melee Attack Roll: +10. Hit: the target is Frightened.",
+      attack: { bonus: 10, reachFeet: 5 },
+      damage: [{ formula: "1d4", type: "psychic" }],
+      onHit: [{ conditions: [{ id: "frightened" }] }]
+    };
+    const definition = definitionOf();
+    const catalog = catalogOf([PERIAPT]);
+    const hitWith = (equipped: boolean) => {
+      const state = fight(
+        stateWith([
+          item({
+            id: "periapt-of-clarity",
+            name: "Periapt of Clarity",
+            equipped,
+            attuned: equipped,
+            category: "wondrous"
+          })
+        ]),
+        IDS.foe
+      );
+      const resolution = resolveDefinitionAction(
+        state,
+        GAZE,
+        { actorId: IDS.foe, targetIds: [IDS.hero], commandId: cmd(96) },
+        { ...deps([15, 2], catalog), resolveDefinition: () => definition }
+      );
+      expect(resolution.attack?.outcome).toBe("hit");
+      return state.actors[0];
+    };
+
+    // The rider's effect still lands (it names its source), but the immune bearer never gains the condition.
+    const warded = hitWith(true);
+    expect(warded.effects.map((effect) => effect.linkedConditionIds)).toEqual([["frightened"]]);
+    expect(warded.conditions).toEqual([]);
+    // Negative control: without the periapt the same hit frightens.
+    expect(hitWith(false).conditions.map((condition) => condition.id)).toEqual(["frightened"]);
+  });
 });
 
 describe("row 4: an item action's attack and save halves", () => {
