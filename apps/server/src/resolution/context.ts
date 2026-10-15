@@ -16,6 +16,7 @@ import {
 import type { ActorDefinition } from "@vtt/schemas";
 import type { EquipmentCatalog, EquipmentDerivation } from "../equipment-derivation.js";
 import { recordRoll as recordRollInHistory, rolledTerms } from "../roll-history.js";
+import type { RuleId } from "../rules-families.js";
 import type { MasterySwing } from "../weapon-mastery.js";
 import type { BuiltinHandler } from "./builtins.js";
 import type { EconomyPlan } from "./economy.js";
@@ -108,7 +109,7 @@ export type ResolveContext = {
   readonly siblings: ReadonlyArray<DefinitionAction>;
   readonly riderItemId: string | null;
   readonly plan: EconomyPlan;
-  overridden: { rule: string; reason: string } | null;
+  overridden: { rule: RuleId; reason: string } | null;
   /** GM-adjudicated cover's bonus to AC and Dexterity saves (SRD Cover). */
   readonly coverBonus: number;
   /** Shared fields of every roll this resolve records; set once the action is final. */

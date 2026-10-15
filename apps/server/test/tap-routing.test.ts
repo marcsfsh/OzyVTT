@@ -118,7 +118,7 @@ describe("tap routing (the seam)", () => {
     const fight = fightState();
     fight.combat = {
       ...fight.combat,
-      turn: { ...fight.combat.turn, rulesOverridden: true, rulesOverriddenFamilies: ["economy"] }
+      turn: { ...fight.combat.turn, rulesOverriddenFamilies: ["economy"] }
     };
     expect(offTurnVerdict(fight, SWING, "Hero").warning).toBeNull();
   });

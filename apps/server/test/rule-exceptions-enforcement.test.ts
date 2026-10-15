@@ -102,7 +102,7 @@ describe("per-family rule exceptions at the enforcement sites", () => {
     // The next step needs no second Allow...
     expect(() => step(game)).not.toThrow();
     // ...but the memory is scoped to movement: another family is untouched by it.
-    expect(game.combat.turn.rulesOverridden).toBe(true);
+    expect(game.combat.turn.rulesOverriddenFamilies).not.toContain("economy");
   });
 
   it("remembers a stand-up override the same way (movement overrides used to be forgotten entirely)", () => {

@@ -1,65 +1,49 @@
-import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { GameStateSchema, type GameState, type RuleFamily } from "@vtt/domain";
+import { GameStateSchema, RuleFamilySchema, type GameState, type RuleFamily } from "@vtt/domain";
 import {
   effectiveModeFor,
   familyModeFor,
   familyOf,
   overrideCovers,
   overrideReason,
-  rememberOverride
+  rememberOverride,
+  RULE_IDS,
+  type RuleId
 } from "../src/rules-families.js";
 
 // Two properties of the rule-family map:
-// 1. Totality: every rule id the engine can throw maps to a family. An unclassified id falls back to
-//    the dial (safe, but a gap), so the ids are read from source and a new unclassified one fails here.
+// 1. Totality: every rule id is a typed entry with a family, so raising an unlisted id fails to compile.
 // 2. Precedence: a family exception beats the dial, and an absent family follows it.
-
-const SOURCE_DIR = new URL("../src/", import.meta.url).pathname;
-
-/** Every `rule: "..."` violation id and every `RulesBlockedError("...")` id the server can raise. */
-function thrownRuleIds(): readonly string[] {
-  const ids = new Set<string>();
-  for (const file of readdirSync(SOURCE_DIR, { recursive: true, encoding: "utf8" }).filter((name) =>
-    name.endsWith(".ts")
-  )) {
-    const text = readFileSync(join(SOURCE_DIR, file), "utf8");
-    for (const match of text.matchAll(/rule: "([a-z]+\.[a-z-]+)"/g)) ids.add(match[1]);
-    for (const match of text.matchAll(/RulesBlockedError\("([a-z]+\.[a-z-]+)"/g)) ids.add(match[1]);
-  }
-  return [...ids].sort();
-}
 
 function stateWith(combat: Partial<GameState["combat"]>): GameState {
   return GameStateSchema.parse({ schemaVersion: 1, combat });
 }
 
 describe("rule families", () => {
-  it("classifies every rule id the server can throw (no id falls through to the dial by accident)", () => {
-    const ids = thrownRuleIds();
-    // A guard on the guard: if the extraction stops finding rule ids, the totality claim is vacuous.
-    expect(ids.length).toBeGreaterThanOrEqual(15);
-    const unclassified = ids.filter((rule) => familyOf(rule) === null);
-    expect(unclassified, `these rule ids belong to no family - add them to apps/server/src/rules-families.ts`).toEqual(
-      []
-    );
+  it("gives every rule id a family from the wire vocabulary", () => {
+    expect(RULE_IDS.length).toBeGreaterThanOrEqual(15);
+    for (const rule of RULE_IDS) {
+      expect(rule).toMatch(/^[a-z]+\.[a-z-]+$/);
+      expect(RuleFamilySchema.safeParse(familyOf(rule)).success, rule).toBe(true);
+    }
   });
 
   it("puts each rule id in the family a GM would expect to switch off", () => {
-    const expected: ReadonlyArray<readonly [string, RuleFamily]> = [
+    const expected: ReadonlyArray<readonly [RuleId, RuleFamily]> = [
       ["movement.exceeds-speed", "movement"],
       ["movement.no-movement-remaining", "movement"],
       ["movement.stand-up-cost", "movement"],
       ["economy.action-used", "economy"],
       ["economy.bonus-action-used", "economy"],
       ["economy.reaction-used", "economy"],
+      ["economy.not-your-turn", "economy"],
       // Being incapacitated or down is "you have no actions" - economy, not a targeting rule.
       ["condition.incapacitated", "economy"],
       ["condition.down", "economy"],
       ["legendary.own-turn", "economy"],
       ["feature.no-uses-remaining", "resources"],
       ["feature.requires-effect", "resources"],
+      ["feature.no-spell-slot", "resources"],
       ["legendary.no-actions-remaining", "resources"],
       ["range.out-of-range", "targeting"],
       ["range.out-of-reach", "targeting"],
@@ -72,10 +56,7 @@ describe("rule families", () => {
       ["slots.none-remaining", "slots"]
     ];
     for (const [rule, family] of expected) expect(familyOf(rule), rule).toBe(family);
-  });
-
-  it("returns null for an unknown rule id rather than guessing a family", () => {
-    expect(familyOf("teapot.short-and-stout")).toBeNull();
+    expect(expected.map(([rule]) => rule).sort()).toEqual([...RULE_IDS].sort());
   });
 });
 
@@ -101,20 +82,6 @@ describe("effective mode", () => {
     expect(fresh.rulesPolicy).toEqual({ dial: "strict", exceptions: { slots: "assisted" } });
     expect(effectiveModeFor(fresh.combat, "slots.none-remaining")).toBe("assisted");
   });
-
-  it("falls back to the dial for an unclassified rule id (fails safe, never into a switched-off family)", () => {
-    const state = stateWith({
-      rulesMode: "strict",
-      ruleExceptions: {
-        movement: "freeform",
-        economy: "freeform",
-        resources: "freeform",
-        targeting: "freeform",
-        slots: "freeform"
-      }
-    });
-    expect(effectiveModeFor(state.combat, "teapot.short-and-stout")).toBe("strict");
-  });
 });
 
 describe("per-turn override memory", () => {
@@ -128,7 +95,7 @@ describe("per-turn override memory", () => {
     expect(overrideCovers(state.combat.turn, "range.out-of-range")).toBe(false);
   });
 
-  it("remembers movement overrides, which the old boolean never covered", () => {
+  it("remembers movement overrides", () => {
     const state = stateWith({ rulesMode: "strict" });
     rememberOverride(state, "movement.exceeds-speed");
     expect(overrideCovers(state.combat.turn, "movement.exceeds-speed")).toBe(true);
@@ -136,33 +103,10 @@ describe("per-turn override memory", () => {
     expect(state.combat.turn.rulesOverriddenFamilies).toEqual(["movement"]);
   });
 
-  it("writes the legacy boolean too, and reads it when an older save carries only that", () => {
-    const state = stateWith({ rulesMode: "strict" });
-    rememberOverride(state, "range.out-of-range");
-    expect(state.combat.turn.rulesOverridden).toBe(true);
-    // A turn persisted with only the boolean override keeps its two-prefix meaning.
-    const legacy = stateWith({
-      rulesMode: "strict",
-      turn: {
-        actionUsed: false,
-        bonusActionUsed: false,
-        actionInstance: null,
-        turnUses: {},
-        movementUsedFeet: 0,
-        rulesOverridden: true
-      }
-    });
-    expect(legacy.combat.turn.rulesOverriddenFamilies).toBeUndefined();
-    expect(overrideCovers(legacy.combat.turn, "economy.action-used")).toBe(true);
-    expect(overrideCovers(legacy.combat.turn, "range.out-of-range")).toBe(true);
-    expect(overrideCovers(legacy.combat.turn, "movement.exceeds-speed")).toBe(false);
-  });
-
-  it("does not accumulate duplicates or remember an unclassified rule", () => {
+  it("does not accumulate duplicates", () => {
     const state = stateWith({ rulesMode: "strict" });
     rememberOverride(state, "economy.action-used");
     rememberOverride(state, "economy.reaction-used");
-    rememberOverride(state, "teapot.short-and-stout");
     expect(state.combat.turn.rulesOverriddenFamilies).toEqual(["economy"]);
   });
 });

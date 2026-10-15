@@ -4,11 +4,11 @@ import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
 import { hasEffectTag } from "../effects.js";
 import { RulesBlockedError } from "../game-store.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
-import { effectiveModeFor, overrideCovers, overrideReason, rememberOverride } from "../rules-families.js";
+import { effectiveModeFor, overrideCovers, overrideReason, rememberOverride, type RuleId } from "../rules-families.js";
 import { builtinHandlerFor } from "./builtins.js";
 import { sizeRank, type DefinitionAction, type LiveActor, type ResolveContext, type ResolveInput } from "./context.js";
 
-type RuleViolation = Readonly<{ rule: string; message: string }>;
+type RuleViolation = Readonly<{ rule: RuleId; message: string }>;
 
 /** How this resolve settles the action economy once it succeeds. */
 export type EconomyPlan = Readonly<{
@@ -420,7 +420,7 @@ export function planEconomy(
   warnings: string[],
   distanceFeet: ((actorIdA: string, actorIdB: string) => number | null) | undefined,
   siblings: ReadonlyArray<DefinitionAction>
-): { plan: EconomyPlan; overridden: { rule: string; reason: string } | null } {
+): { plan: EconomyPlan; overridden: { rule: RuleId; reason: string } | null } {
   const { violations, softViolations, plan, proseMultiattack, notes } = evaluateActionEconomy(
     state,
     attacker,
@@ -440,7 +440,7 @@ export function planEconomy(
   if (input.override) return { plan, overridden: { rule: policed[0].rule, reason: overrideReason(input.override) } };
   // A GM override earlier this turn covers that family for the rest of the creature's turn; other
   // families still re-prompt.
-  const covered = (rule: string) => overrideCovers(state.combat.turn, rule);
+  const covered = (rule: RuleId) => overrideCovers(state.combat.turn, rule);
   const blocking = violations.filter(
     (violation) => !covered(violation.rule) && effectiveModeFor(state.combat, violation.rule) === "strict"
   );
