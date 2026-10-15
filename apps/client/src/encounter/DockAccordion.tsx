@@ -21,7 +21,7 @@ import "./dock.css";
 export type DockKey = "turn" | "dice";
 
 const MEMORY_KEY = "vtt.dock-open";
-/** Where the sidebar stops being a column. Paired with the `max-width: 979px` block in styles.css. */
+/** Where the sidebar stops being a column. Paired with the `max-width: 979px` block in shell/table-view.css. */
 const SHEET_QUERY = "(max-width: 979px)";
 
 /** In combat the fight leads. Out of combat the GM is staging one and the player is rolling. */

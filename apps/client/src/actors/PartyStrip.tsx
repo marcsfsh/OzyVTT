@@ -4,6 +4,7 @@ import { Avatar, Button } from "@vtt/ui";
 import { CharacterSheet } from "../encounter/CharacterSheet";
 import { CLAIM_WORD, claimStateOf, classLine, hpLabel, presenceDot, presenceLabel } from "./actor-display";
 import { partyVisibilityOf } from "./MyCharacter";
+import "./party-strip.css";
 
 /**
  * The party as one scrolling row of portraits, shown out of combat (in combat the turn order

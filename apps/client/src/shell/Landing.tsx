@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, IconArrow, Input, ThemeToggle, Wordmark } from "@vtt/ui";
 import { Notice, type NoticeMessage } from "../components/feedback";
+import "./landing.css";
 
 /**
  * The landing→app entry animation, one-shot. The choreography is CSS (`.landing--drive` in
- * styles.css); this is only the clock. `drive` keeps the landing mounted as a fixed curtain over the
+ * landing.css); this is only the clock. `drive` keeps the landing mounted as a fixed curtain over the
  * frame; `settle` hands over to the app's cascade (`.anim-cascade`, opacity-led so no transform traps
  * a fixed overlay). Both classes are dropped when the entry finishes, so nothing persists and tab
  * navigation never replays it. Reduced motion skips it entirely.
@@ -38,7 +39,7 @@ export function useEntryAnimation() {
     };
     requestAnimationFrame(() => requestAnimationFrame(once));
     timers.current.push(window.setTimeout(once, 120));
-    // 1500ms drive + 400ms settle. Must match `--entry-drive` in styles.css, or the drive is cut short.
+    // 1500ms drive + 400ms settle. Must match `--entry-drive` in landing.css, or the drive is cut short.
     timers.current.push(window.setTimeout(() => setPhase("settle"), 1500));
     timers.current.push(window.setTimeout(() => setPhase(null), 1900));
   };

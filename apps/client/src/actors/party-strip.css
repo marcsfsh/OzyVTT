@@ -1,0 +1,101 @@
+/* The party strip: one ~56px row out of combat. `min-width: 0` here and on the map column is required:
+   a grid item's automatic minimum is its content's, so a row of pills widened the table past a phone.
+   The row scrolls; the page must not. */
+.party-strip {
+  min-width: 0;
+  max-width: 100%;
+  margin: 0 0 0.9rem;
+}
+.party-strip-row {
+  display: flex;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 0 0 var(--space-1);
+  list-style: none;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+.party-strip-item {
+  flex: 0 0 auto;
+}
+.party-strip-entry {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 3.5rem;
+  max-width: 13rem;
+  padding: var(--space-2) 0.8rem var(--space-2) var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: left;
+}
+button.party-strip-entry {
+  cursor: pointer;
+}
+button.party-strip-entry:hover {
+  border-color: var(--line-strong);
+}
+.party-strip-item.is-mine .party-strip-entry {
+  border-color: var(--cyan);
+  box-shadow: var(--glow-cyan);
+}
+.party-strip-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+}
+.party-strip-hp {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+/* The `name-and-class` tier's class line, in the body face; it ellipsizes so the 13rem cap holds. */
+.party-strip-line {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+.party-strip-claim {
+  flex: 0 0 auto;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+.party-strip-claim--claimed {
+  background: var(--violet-hi);
+}
+.party-strip-claim--mine {
+  background: var(--cyan-hi);
+}
+.party-strip-empty {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.party-strip-empty p {
+  margin: 0;
+  font-size: 0.85rem;
+}
+@media (max-width: 979px) {
+  /* The strip's floor is paint (a scrolling list of pills); padding shrinks with it or the row grows
+     back to 55px. */
+  .party-strip-entry {
+    min-height: var(--tap-min);
+    padding: var(--space-1) 0.7rem var(--space-1) var(--space-1);
+  }
+}

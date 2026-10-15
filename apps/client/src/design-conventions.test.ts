@@ -559,7 +559,7 @@ const VIEWPORT_CONFORMING: ReadonlyArray<readonly [file: string, values: readonl
     "overlay cap bounding the monster browser modal — §8 reference implementation"
   ],
   [
-    "apps/client/src/styles.css",
+    "apps/client/src/shell/landing.css",
     ["4vh", "3.5vh", "4.5vh"],
     "landing clamp() mid-terms — fluid spacing inside the locked hero, rem-bounded, cannot grow the page"
   ],

@@ -9,6 +9,7 @@ import { Button, Input } from "@vtt/ui";
 import { ApiReference } from "./ApiReference";
 import { useConfirm } from "../components/feedback";
 import { apiRequest } from "../lib/api";
+import "./integrations-panel.css";
 
 const SCOPES = IntegrationScopeSchema.options;
 const CREDENTIALS = "/api/v1/gm/integration-credentials";

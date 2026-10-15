@@ -1,0 +1,198 @@
+/* The integration credentials panel in Settings. */
+
+.roster-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+.roster-heading h2 {
+  font-size: var(--fs-h1);
+}
+.roster-heading p {
+  max-width: 23rem;
+  margin: 0;
+  font-size: 0.9rem;
+  text-align: right;
+}
+.roster-feedback {
+  min-height: 1.4rem;
+  margin: 0.8rem 0 0;
+  font-size: 0.85rem;
+}
+
+.integrations {
+  margin-top: var(--space-10);
+  padding: var(--space-6);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+}
+.integration-secret {
+  border-left-color: var(--cyan);
+}
+.integration-secret strong {
+  display: block;
+  margin-bottom: 0.3rem;
+}
+.integration-token {
+  display: block;
+  margin: 0.8rem 0;
+  padding: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+  color: var(--cyan-hi);
+  word-break: break-all;
+  font-size: 0.9rem;
+  font-family: var(--font-mono);
+}
+.integration-secret-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.integration-secret-actions button {
+  padding: 0.7rem var(--space-4);
+}
+.integration-secret-warning {
+  margin-top: 0.8rem;
+  color: var(--danger-hi);
+  font-size: 0.85rem;
+}
+.integration-form {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+  align-items: start;
+}
+.integration-form label {
+  display: block;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+.integration-form fieldset {
+  grid-column: 1 / -1;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 0.8rem var(--space-4);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 0.9rem;
+}
+.integration-form legend {
+  padding: 0 0.4rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+/* The checkbox cannot take `::after`, so the wrapping label carries the 44px floor. */
+.integration-scope {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: auto;
+  min-height: var(--tap-min);
+  font-size: 0.85rem;
+  color: var(--text);
+}
+.integration-scope input {
+  width: auto;
+  margin: 0;
+}
+.integration-form button[type="submit"] {
+  grid-column: 1 / -1;
+  background: var(--primary);
+  color: var(--text-on-neon);
+  border: 0;
+  padding: 0.85rem 1.2rem;
+}
+.integration-form button[type="submit"]:hover:not(:disabled) {
+  background: var(--magenta-hi);
+  box-shadow: var(--glow-magenta);
+}
+.integration-list {
+  list-style: none;
+  margin: var(--space-6) 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.8rem;
+}
+.integration-row {
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+.integration-row-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.integration-scopes {
+  margin: 0.3rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+.integration-meta {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-2);
+  margin: 0.9rem 0;
+}
+.integration-meta div {
+  padding: var(--space-2) 0.4rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  text-align: center;
+}
+.integration-meta dt {
+  color: var(--text-muted);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.integration-meta dd {
+  margin: 0.15rem 0 0;
+  font-size: 0.75rem;
+}
+.integration-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.integration-row-actions button {
+  padding: 0.6rem 0.9rem;
+}
+.integration-audit {
+  list-style: none;
+  margin: 0.8rem 0 0;
+  padding: 0.6rem 0.8rem;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: grid;
+  gap: 0.3rem;
+}
+
+@media (max-width: 760px) {
+  .integration-form {
+    grid-template-columns: 1fr;
+  }
+  .integration-meta {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 560px) {
+  .roster-heading {
+    display: block;
+  }
+  .roster-heading p {
+    text-align: left;
+    margin-top: 0.8rem;
+  }
+}

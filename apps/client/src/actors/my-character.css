@@ -1,0 +1,179 @@
+/* The player's My character tab. */
+
+.my-character-head,
+.my-character-body {
+  width: 100%;
+  max-width: 72rem;
+  margin-inline: auto;
+}
+.my-character-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.my-character-head h2 {
+  margin: 0;
+}
+.my-character-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-left: auto;
+}
+/* The identity card. `min-width: 0` on the facts column so a long name ellipsizes instead of pushing
+   the doors off. */
+.my-character-card {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: var(--space-4) 0 0;
+  padding: var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+.my-character-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+.my-character-name {
+  font: 400 1.35rem/1.2 var(--font-display);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.my-character-line {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+.my-character-hp {
+  color: var(--cyan-hi);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.my-character-doors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+.my-character-party {
+  margin-top: var(--space-6);
+}
+.my-character-party-head {
+  margin: 0 0 var(--space-2);
+  font: 400 1.1rem/1.2 var(--font-display);
+  color: var(--text-dim);
+}
+.my-character-party-list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* Party rows are hairline-ruled, and the row is the control where a sheet can be opened. Their paint
+   reaches 44px because stacked rows cannot use an overhang. */
+.my-character-party-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+button.my-character-party-row {
+  cursor: pointer;
+}
+button.my-character-party-row:hover {
+  border-bottom-color: var(--line-hover);
+}
+.my-character-party-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+.my-character-party-line {
+  flex: 1 1 4rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-align: right;
+}
+.party-sheet {
+  display: grid;
+  gap: var(--space-3);
+}
+.party-sheet-line {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+.party-sheet-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: 0;
+}
+.party-sheet-stats dt {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.party-sheet-stats dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.party-sheet-abilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.party-sheet-abilities li {
+  display: grid;
+  place-items: center;
+  gap: 0.1rem;
+  min-width: 3.5rem;
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+}
+.party-sheet-ability {
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.08em;
+}
+.party-sheet-mod {
+  color: var(--cyan-hi);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+}

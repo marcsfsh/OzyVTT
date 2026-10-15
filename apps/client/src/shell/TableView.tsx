@@ -12,6 +12,7 @@ import { ReplayShelf } from "../replay/ReplayShelf";
 import { EncounterMap } from "../scene/EncounterMap";
 import { SceneBuilder } from "../scenes/SceneBuilder";
 import { navigate, pathForGmTab } from "../router";
+import "./table-view.css";
 
 type StagedScene = GmView["combat"]["scenes"][number];
 

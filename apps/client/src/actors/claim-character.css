@@ -1,0 +1,46 @@
+/* The player's pre-claim picker is a region (`.scroll-y` in the markup) at every width: above 980px
+   it keeps the picker from pushing the map down; below, it is the sheet's body while the map band
+   stays live. */
+.claim-view {
+  min-height: 0;
+  margin-bottom: 1.2rem;
+}
+.claim-heading h2 {
+  font-size: var(--fs-h2);
+}
+.claim-heading p {
+  margin: 0 0 var(--space-4);
+  font-size: 0.9rem;
+}
+.claim-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.8rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.claim-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  text-align: center;
+}
+.claim-card-name {
+  margin: 0;
+  font: 400 1.05rem/1.2 var(--font-display);
+}
+.claim-card-action {
+  margin-top: auto;
+}
+.claim-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: var(--space-4);
+}

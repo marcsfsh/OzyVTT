@@ -768,7 +768,7 @@
    holds the status line), and the sheet below takes the rest. 14rem fits the shortest supported phone
    (375x667). In landscape it cannot fit, and `section.table` is content-sized so nothing shrinks it,
    hence the ceiling `100dvh - 204px` (tab bar 44 + sheet floor 132 + padding 20 + gap 8, from
-   styles.css; update together). */
+   shell/table-view.css; update together). */
 @media (max-width: 979px) {
   .encounter-map-interaction:not(.enlarged) {
     flex: 0 1 auto;

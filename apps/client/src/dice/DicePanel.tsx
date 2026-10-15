@@ -3,6 +3,7 @@ import type { GmView, PlayerView, RollPurpose, RollVisibility } from "@vtt/domai
 import { Button, Input, SegmentedControl, Select, Stepper } from "@vtt/ui";
 import { command } from "../lib/command";
 import { useRollPreference } from "./roll-preference";
+import "./dice-panel.css";
 
 const PURPOSE_LABELS: Record<RollPurpose, string> = {
   manual: "Roll",

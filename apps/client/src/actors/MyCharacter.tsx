@@ -6,6 +6,7 @@ import { useConfirm } from "../components/feedback";
 import { RandomCharacterModal } from "../builder/RandomCharacter";
 import { CLAIM_WORD, classLine, hpLabel, presenceDot, presenceLabel } from "./actor-display";
 import { command } from "../lib/command";
+import "./my-character.css";
 
 /**
  * The player's "My character" tab: who they play, how they are doing, and the door to the sheet.
