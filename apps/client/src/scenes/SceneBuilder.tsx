@@ -1,3 +1,4 @@
+import { IconPencil, Eyebrow } from "@vtt/ui";
 import { useState } from "react";
 import type { GmActor, Scene, StagingDefaults } from "@vtt/domain";
 import { command } from "../lib/command";
@@ -75,7 +76,7 @@ export function SceneBuilder({
   return (
     <section className="scene-builder frame-col frame-fill" aria-labelledby="scene-builder-heading">
       <div className="scene-builder-head">
-        <span className="eyebrow">ARRANGING · GM ONLY</span>
+        <Eyebrow>ARRANGING · GM ONLY</Eyebrow>
         <h2 id="scene-builder-heading">
           {scene.name}
           <button
@@ -86,7 +87,7 @@ export function SceneBuilder({
             aria-label={`Rename ${scene.name}`}
             onClick={() => void rename()}
           >
-            ✎
+            <IconPencil />
           </button>
         </h2>
         <p>Players see none of this until you make the scene live.</p>

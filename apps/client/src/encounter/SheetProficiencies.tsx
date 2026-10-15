@@ -108,8 +108,8 @@ export function SheetProficiencies({
       {editing ? (
         <div className="sheet-editor">
           <p className="sheet-editor-hint">
-            Changes save as you go. Tap a save to toggle it; tap a skill to cycle proficient → expertise → none. Press{" "}
-            <strong>Done</strong> when finished.
+            Changes save as you go. Tap a save to toggle it; tap a skill to cycle it through proficient, expertise and
+            none. Press <strong>Done</strong> when finished.
           </p>
           <div className="sheet-roll-row">
             <span className="sheet-roll-label">Saves</span>

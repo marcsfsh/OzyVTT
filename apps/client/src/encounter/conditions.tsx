@@ -79,45 +79,10 @@ const labelFor = (instance: ConditionInstance, reference: readonly ContentCondit
 const descriptionFor = (id: string, reference: readonly ContentConditionSummary[]) =>
   reference.find((entry) => entry.id === id)?.description ?? "";
 
-/** Ultra-compact condition presence for dense list rows: dots with tooltips (full names one tap away in the row's tools). */
-export function ConditionDots({ conditions }: Readonly<{ conditions: readonly ConditionInstance[] }>) {
+/** The conditions' display names ("Prone", "Exhaustion 3"), in the order the actor carries them. */
+export function useConditionLabels(conditions: readonly ConditionInstance[]): string[] {
   const reference = useConditionReference();
-  if (conditions.length === 0) return null;
-  const shown = conditions.slice(0, 4);
-  return (
-    <span
-      className="condition-dots"
-      role="img"
-      aria-label={conditions.map((instance) => labelFor(instance, reference)).join(", ")}
-    >
-      {shown.map((instance) => (
-        <span key={instance.id} className="condition-dot" title={labelFor(instance, reference)} />
-      ))}
-      {conditions.length > shown.length && (
-        <span className="condition-dot-more">+{conditions.length - shown.length}</span>
-      )}
-    </span>
-  );
-}
-
-/** Read-only condition chips with rules-text tooltips. */
-export function ConditionChips({ conditions }: Readonly<{ conditions: readonly ConditionInstance[] }>) {
-  const reference = useConditionReference();
-  if (conditions.length === 0) return null;
-  return (
-    <span className="condition-chips">
-      {conditions.map((instance) => (
-        <Chip
-          key={instance.id}
-          tone={conditionTone(instance.id)}
-          icon={conditionIcon(instance.id)}
-          title={descriptionFor(instance.id, reference)}
-        >
-          {labelFor(instance, reference)}
-        </Chip>
-      ))}
-    </span>
-  );
+  return conditions.map((instance) => labelFor(instance, reference));
 }
 
 /**

@@ -3480,7 +3480,7 @@
   background: color-mix(in srgb, var(--surface-3) 70%, var(--cyan));
   border-color: var(--cyan);
 }
-.turn-confirm {
+.confirm-row {
   margin: var(--space-2) 0 0;
   padding: 0.6rem 0.7rem;
   border: 0;
@@ -3490,17 +3490,17 @@
   display: grid;
   gap: var(--space-2);
 }
-.turn-confirm span {
+.confirm-row span {
   color: var(--text);
   font-size: var(--fs-sm);
   line-height: 1.4;
 }
-.turn-confirm-actions {
+.confirm-row-actions {
   display: flex;
   gap: var(--space-2);
   justify-content: flex-end;
 }
-.turn-confirm-actions button {
+.confirm-row-actions button {
   flex: 0 0 auto;
   padding: 0.4rem 0.9rem;
 }
@@ -3616,30 +3616,6 @@
   color: var(--text);
   font-size: var(--fs-sm);
   font-weight: 700;
-}
-.action-blocked {
-  margin: 0.4rem 0;
-  padding: 0.55rem 0.7rem;
-  border: 0;
-  border-left: 2px solid var(--danger);
-  border-radius: 0;
-  background: var(--surface-2);
-  display: grid;
-  gap: var(--space-2);
-}
-.action-blocked span {
-  color: var(--text);
-  font-size: var(--fs-sm);
-  line-height: 1.4;
-}
-.action-blocked-actions {
-  display: flex;
-  gap: var(--space-2);
-  justify-content: flex-end;
-}
-.action-blocked-actions button {
-  flex: 0 0 auto;
-  padding: 0.35rem 0.8rem;
 }
 .action-rollmode {
   margin: 0.2rem 0;

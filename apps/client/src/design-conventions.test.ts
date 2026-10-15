@@ -58,25 +58,15 @@ const GLYPH = /[←-⇿⌀-⏿■-◿☀-➿⬀-⯿]|\p{Extended_Pictographic}/g
  * waiting on its icon from `packages/ui/src/primitives/icons.tsx`.
  */
 const GLYPH_ALLOW: ReadonlyArray<readonly [file: string, glyphs: string]> = [
-  ["apps/client/src/encounter/ActionRunner.tsx", "→↻▴▾⚠✕✦"],
-  ["apps/client/src/encounter/ActingConsole.tsx", "⭐"],
-  ["apps/client/src/encounter/CharacterSheet.tsx", "✕"],
+  ["apps/client/src/encounter/ActionResultCard.tsx", "↻"],
+  ["apps/client/src/encounter/ActionRunner.tsx", "→"],
   ["apps/client/src/encounter/DockPicker.tsx", "▦◧◨"],
-  ["apps/client/src/encounter/GmEncounterPanel.tsx", "→"],
-  ["apps/client/src/encounter/GmInitiativeRow.tsx", "▶"],
-  ["apps/client/src/encounter/InitiativeList.tsx", "▶"],
-  ["apps/client/src/encounter/PendingDamagePrompt.tsx", "✕"],
-  ["apps/client/src/encounter/PlayerActionRunner.tsx", "✕"],
-  ["apps/client/src/encounter/ReactionPrompt.tsx", "✕"],
-  ["apps/client/src/encounter/SheetInventory.tsx", "✕"],
-  ["apps/client/src/encounter/SheetProficiencies.tsx", "→"],
+  ["apps/client/src/encounter/GmActionList.tsx", "▴▾✦"],
   ["apps/client/src/encounter/SheetSpells.tsx", "↑"],
-  ["apps/client/src/encounter/RollControls.tsx", "✕"],
   ["apps/client/src/integrations/ApiReference.tsx", "✓⬇"],
   ["apps/client/src/integrations/IntegrationsPanel.tsx", "🔌"],
   ["apps/client/src/maps/MapManager.tsx", "←↑→↓"],
-  ["apps/client/src/scenes/SceneBuilder.tsx", "✎"],
-  ["apps/client/src/scenes/SceneGallery.tsx", "←→●✎🗑🗺"],
+  ["apps/client/src/scenes/SceneGallery.tsx", "●"],
   ["apps/client/src/viewer/ViewerPreviewPanel.tsx", "✕"],
   // packages/ui: primitives that break their own rule.
   ["packages/ui/src/primitives/Button.tsx", "→"],
@@ -176,11 +166,8 @@ const RAW_SEARCH_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = 
  */
 const RAW_NUMBER_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
   ["apps/client/src/encounter/GmInitiativeRow.tsx", 1],
-  ["apps/client/src/encounter/RowTools.tsx", 1],
   ["apps/client/src/encounter/SheetIdentityEditor.tsx", 1],
   ["apps/client/src/encounter/SheetInventory.tsx", 1],
-  ["apps/client/src/encounter/SheetVitals.tsx", 1],
-  ["apps/client/src/scene/TokenContextMenu.tsx", 1],
   // Two on one line (the X and Y of a calibration point) plus the focus-zoom field.
   ["apps/client/src/viewer/ViewerControls.tsx", 3]
 ];
@@ -433,7 +420,7 @@ const FEEDBACK_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
   ["apps/client/src/encounter/MonsterBrowser.tsx", 1],
   ["apps/client/src/encounter/PlayerEncounterPanel.tsx", 1],
   ["apps/client/src/integrations/IntegrationsPanel.tsx", 9],
-  ["apps/client/src/scene/TokenContextMenu.tsx", 6],
+  ["apps/client/src/scene/TokenContextMenu.tsx", 4],
   ["apps/client/src/scenes/SceneBuilder.tsx", 6],
   ["apps/client/src/scenes/ScenePanel.tsx", 3],
   ["apps/client/src/tokens/TokenLibrary.tsx", 6],

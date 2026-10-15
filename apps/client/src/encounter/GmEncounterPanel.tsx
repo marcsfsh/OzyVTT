@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { rosterActors, type GmView, type MutationResult } from "@vtt/domain";
 import type { MapSelection } from "../maps/MapManager";
-import { Button, Switch } from "@vtt/ui";
+import { Button, Switch, IconArrow, Eyebrow } from "@vtt/ui";
 import { command } from "../lib/command";
 import { PendingAsksForGm } from "./RuleAsk";
 import { useRollPreference } from "../dice/roll-preference";
@@ -11,6 +11,7 @@ import { ScenePrepPanel } from "../scenes/ScenePrepPanel";
 import type { PickerMap } from "../maps/MapPicker";
 import { useConfirm } from "../components/feedback";
 import { DockPicker, type DockControl } from "./DockPicker";
+import { ConfirmRow } from "./ConfirmRow";
 import { FightMenu } from "./FightMenu";
 import { ActingConsole } from "./ActingConsole";
 import { GmInitiativeRow } from "./GmInitiativeRow";
@@ -271,7 +272,7 @@ export function GmEncounterPanel({
       {!state.combat.active && (
         <div className="encounter-heading">
           <div>
-            <span className="eyebrow">FIGHT</span>
+            <Eyebrow>FIGHT</Eyebrow>
             <h2 id="gm-encounter-title">Start a fight</h2>
           </div>
         </div>
@@ -364,7 +365,7 @@ export function GmEncounterPanel({
               >
                 {nextLabel}
                 <span className="nav-arrow" aria-hidden="true">
-                  →
+                  <IconArrow />
                 </span>
               </button>
             </div>
@@ -389,26 +390,19 @@ export function GmEncounterPanel({
             />
           </div>
           {confirm && (
-            <div className="turn-confirm" role="alertdialog" aria-label="Confirm history change">
-              <span>{confirm.message}</span>
-              <div className="turn-confirm-actions">
-                <Button type="button" variant="secondary" disabled={busy} onClick={() => setConfirm(null)}>
-                  Cancel
-                </Button>
-                <button
-                  type="button"
-                  className="encounter-primary"
-                  disabled={busy}
-                  onClick={() => {
-                    const pending = confirm;
-                    setConfirm(null);
-                    void runTurn(pending.run, pending.success);
-                  }}
-                >
-                  Confirm
-                </button>
-              </div>
-            </div>
+            <ConfirmRow
+              ariaLabel="Confirm history change"
+              confirmLabel="Confirm"
+              busy={busy}
+              onCancel={() => setConfirm(null)}
+              onConfirm={() => {
+                const pending = confirm;
+                setConfirm(null);
+                void runTurn(pending.run, pending.success);
+              }}
+            >
+              {confirm.message}
+            </ConfirmRow>
           )}
           {/* Players' questions, pinned above the turn order. Allow replays the parked command with GM
           authority; it can fail against current state, in which case the question stays and says so. */}

@@ -1,3 +1,4 @@
+import { IconStar } from "@vtt/ui";
 import { useEffect, useState } from "react";
 import type { GmActor, GmView, MutationResult } from "@vtt/domain";
 import { command } from "../lib/command";
@@ -75,7 +76,7 @@ export function ActingConsole({
               }
               onClick={() => setLegendaryActingId(candidate.id)}
             >
-              ⭐ {candidate.name} {remaining}/{candidate.legendary!.actionsPerRound}
+              <IconStar /> {candidate.name} {remaining}/{candidate.legendary!.actionsPerRound}
             </button>
           ))}
         </div>
@@ -112,7 +113,7 @@ export function ActingConsole({
                   className="economy-slot legendary-pill"
                   title="Legendary actions remaining this round; the pool refills on its own turn."
                 >
-                  ⭐ {Math.max(0, (legendaryPool ?? 0) - legendarySpent)}/{legendaryPool}
+                  <IconStar /> {Math.max(0, (legendaryPool ?? 0) - legendarySpent)}/{legendaryPool}
                 </span>
               ) : (
                 actor.speedFeet !== undefined && (

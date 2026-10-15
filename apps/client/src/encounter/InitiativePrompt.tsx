@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button, Input } from "@vtt/ui";
 import { command } from "../lib/command";
 import { useRollPreference } from "../dice/roll-preference";
-import { type DieMode } from "./RollControls";
+import { DieModeButtons, type DieMode } from "./RollControls";
 
 /**
  * A player's "roll for initiative" prompt while their id is in `combat.pendingInitiative`. Digital
@@ -61,24 +61,7 @@ export function InitiativePrompt({ actorId }: Readonly<{ actorId: string }>) {
         </span>
       ) : (
         <span className="save-prompt-confirm">
-          <button
-            type="button"
-            className="save-die-mode"
-            disabled={busy}
-            title="Roll two d20s and keep the higher"
-            onClick={() => roll({ rollMode: "advantage" })}
-          >
-            Adv
-          </button>
-          <button
-            type="button"
-            className="save-die-mode"
-            disabled={busy}
-            title="Roll two d20s and keep the lower"
-            onClick={() => roll({ rollMode: "disadvantage" })}
-          >
-            Disadv
-          </button>
+          <DieModeButtons disabled={busy} onPick={(mode) => roll({ rollMode: mode })} />
           <button type="button" className="encounter-primary" disabled={busy} onClick={() => roll({})}>
             Roll initiative
           </button>

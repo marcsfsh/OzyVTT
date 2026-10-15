@@ -1,10 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { GmActor, PlayerActor } from "@vtt/domain";
-import { IconButton, IconX } from "@vtt/ui";
+import { IconButton, IconX, Select } from "@vtt/ui";
 import { ConditionEditor } from "../encounter/conditions";
-import { DamageTypeField } from "../encounter/DamageTypeField";
-import { manualDamagePayload, manualDamageType } from "../encounter/manual-damage";
+import { HpAdjust } from "../encounter/HpAdjust";
+import { HealthAudienceOptions, HealthStyleOptions, type HealthStyle } from "../encounter/health-display";
 import { command } from "../lib/command";
 import { TokenLibrary } from "../tokens/TokenLibrary";
 import { titleCase } from "../encounter/format";
@@ -43,9 +43,6 @@ export function TokenContextMenu({
   onClose: () => void;
 }>) {
   const ref = useRef<HTMLDivElement | null>(null);
-  const [amount, setAmount] = useState("");
-  /** The optional damage type for the number beside it; untouched = the untyped fast path. */
-  const [damageType, setDamageType] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("");
   const [busy, setBusy] = useState(false);
   const [library, setLibrary] = useState(false);
@@ -90,27 +87,6 @@ export function TokenContextMenu({
     };
   }, [onClose]);
 
-  const adjustHp = (event: "actor:apply-damage" | "actor:heal", verb: string) => {
-    const value = Number(amount.trim());
-    if (!Number.isInteger(value) || value < 1 || value > 1000) {
-      setFeedback("Enter a whole number (1-1000).");
-      return;
-    }
-    setBusy(true);
-    // Only the damage action carries a type; Heal shares this row and has none.
-    const typed = event === "actor:apply-damage" ? manualDamageType(damageType) : undefined;
-    const sent =
-      event === "actor:apply-damage"
-        ? command(event, manualDamagePayload({ actorId: actor.id, amount: value, damageType: typed }))
-        : command(event, { actorId: actor.id, amount: value });
-    void sent.then((result) => {
-      setBusy(false);
-      setFeedback(
-        result.ok ? `${verb} ${typed ? `${value} ${typed}` : value}.` : (result.message ?? "That change was rejected.")
-      );
-      if (result.ok) setAmount("");
-    });
-  };
   const toggleReaction = () => {
     setBusy(true);
     void command("turn:use-reaction", { actorId: actor.id, used: !reactionUsed }).then((result) => {
@@ -128,7 +104,7 @@ export function TokenContextMenu({
       if (!result.ok) setFeedback(result.message ?? "The token could not be resized.");
     });
   };
-  const setHealthDisplay = (display: { style: "band" | "bar" | "ring" | "aura"; audience: "gm" | "all" } | null) => {
+  const setHealthDisplay = (display: { style: HealthStyle; audience: "gm" | "all" } | null) => {
     setBusy(true);
     void command("actor:set-health-display", { actorId: actor.id, display }).then((result) => {
       setBusy(false);
@@ -205,44 +181,23 @@ export function TokenContextMenu({
           <IconX />
         </IconButton>
       </div>
-      {role === "gm" && (
-        <div className="token-context-hp" role="group" aria-label="Adjust hit points">
-          <input
-            type="number"
-            min="1"
-            max="1000"
-            placeholder="HP"
-            aria-label="Amount"
-            value={amount}
-            onChange={(event) => setAmount(event.target.value)}
-          />
-          <button type="button" disabled={busy} onClick={() => adjustHp("actor:apply-damage", "Damaged")}>
-            Dmg
-          </button>
-          <button type="button" disabled={busy} onClick={() => adjustHp("actor:heal", "Healed")}>
-            Heal
-          </button>
-          {/* On its own line under the buttons. The menu is a `.scroll-y` with a measured max-height, so the
-            listbox opens inside the menu's scroll region rather than off the viewport. */}
-          <DamageTypeField value={damageType} disabled={busy} onChange={setDamageType} />
-        </div>
-      )}
+      {role === "gm" && <HpAdjust actor={actor} controls={["damage", "heal"]} onFeedback={setFeedback} />}
       {role === "gm" && (
         <label className="token-context-size">
           Size
-          <select value={currentSize} disabled={busy} onChange={(event) => setSize(event.target.value)}>
+          <Select value={currentSize} disabled={busy} onChange={(event) => setSize(event.target.value)}>
             {SIZES.map((size) => (
               <option key={size} value={size}>
                 {titleCase(size)}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
       )}
       {role === "gm" && (
         <label className="token-context-size">
           Health
-          <select
+          <Select
             value={healthOverride?.style ?? "default"}
             disabled={busy}
             onChange={(event) => {
@@ -250,32 +205,28 @@ export function TokenContextMenu({
               if (value === "default") setHealthDisplay(null);
               else
                 setHealthDisplay({
-                  style: value as "band" | "bar" | "ring" | "aura",
+                  style: value as HealthStyle,
                   audience: healthOverride?.audience ?? "gm"
                 });
             }}
           >
             <option value="default">Default (table)</option>
-            <option value="band">Status badge</option>
-            <option value="bar">HP bar</option>
-            <option value="ring">Health ring</option>
-            <option value="aura">Health aura</option>
-          </select>
+            <HealthStyleOptions />
+          </Select>
         </label>
       )}
       {role === "gm" && healthOverride && healthOverride.style !== "band" && (
         <label className="token-context-size">
           Health is
-          <select
+          <Select
             value={healthOverride.audience}
             disabled={busy}
             onChange={(event) =>
               setHealthDisplay({ style: healthOverride.style, audience: event.target.value as "gm" | "all" })
             }
           >
-            <option value="gm">GM only</option>
-            <option value="all">Shown to players</option>
-          </select>
+            <HealthAudienceOptions />
+          </Select>
         </label>
       )}
       <details className="token-context-conditions">

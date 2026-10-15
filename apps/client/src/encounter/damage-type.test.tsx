@@ -17,7 +17,7 @@ vi.mock("../socket", () => {
 import { socket } from "../socket";
 import { TokenContextMenu } from "../scene/TokenContextMenu";
 import { EncounterPanel } from "./EncounterPanel";
-import { SheetHpControls } from "./SheetVitals";
+import { HpAdjust } from "./HpAdjust";
 import { ApplyDamageSchema } from "../../../server/src/game-commands";
 
 /**
@@ -142,7 +142,9 @@ describe("the sheet's HP box carries the type too", () => {
   const said: string[] = [];
   const mountSheetHp = () => {
     said.length = 0;
-    return render(<SheetHpControls actorId={ACTOR.id} allowSet onFeedback={(text) => said.push(text)} />);
+    return render(
+      <HpAdjust actor={ACTOR} controls={["damage", "heal", "temp", "set"]} onFeedback={(text) => said.push(text)} />
+    );
   };
 
   it("sends the picked type with the number typed on the sheet", async () => {
@@ -185,7 +187,7 @@ describe("the sheet's HP box carries the type too", () => {
     await user.click(screen.getByRole("button", { name: "Dmg" }));
     // Drive the ack: the feedback line is written from inside it, once the reply settles.
     lastHpCall()[2]({ ok: true });
-    await waitFor(() => expect(said.at(-1)).toBe("Damaged 10 cold."));
+    await waitFor(() => expect(said.at(-1)).toBe("Aria took 10 cold damage."));
   });
 });
 

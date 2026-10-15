@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ContentEquipmentSummary, GmActor, PlayerActor } from "@vtt/domain";
-import { Badge, Button, IconButton, Stepper } from "@vtt/ui";
+import { Badge, Button, IconButton, Stepper, IconX } from "@vtt/ui";
 import { BindItemModal, EquipmentPicker, inventoryWeaponFrom, useEquipmentReference } from "./equipment";
 import { slugify, titleCase } from "./format";
 import type { SheetEdit } from "./useSheetEdit";
@@ -180,7 +180,7 @@ export function SheetInventory({
                   });
                 }}
               >
-                ✕
+                <IconX />
               </IconButton>
             </div>
           ))}

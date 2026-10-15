@@ -1,6 +1,6 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { CombatLogEntry } from "@vtt/domain";
-import { Drawer } from "@vtt/ui";
+import { Drawer, Eyebrow } from "@vtt/ui";
 import { read } from "../lib/command";
 import { socket } from "../socket";
 import "./combat-log.css";
@@ -80,7 +80,7 @@ export function CombatLogPanel() {
   return (
     <section className="combat-log" aria-labelledby="combat-log-heading">
       <div className="combat-log-heading">
-        <span className="eyebrow">LOG</span>
+        <Eyebrow>LOG</Eyebrow>
         <h2 id="combat-log-heading">Combat log</h2>
       </div>
       <CombatLogList />

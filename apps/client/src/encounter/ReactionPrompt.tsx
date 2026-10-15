@@ -1,13 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { type ActionResolution, type PendingReaction, type PlayerPendingReaction } from "@vtt/domain";
-import { Button } from "@vtt/ui";
+import { Button, IconX } from "@vtt/ui";
 import { command } from "../lib/command";
-import { type DieMode } from "./RollControls";
+import { DieModeButtons, type DieMode } from "./RollControls";
 
 /**
  * A reaction window awaiting an answer (Uncanny Dodge). The triggering hit's damage is parked here,
  * so both buttons apply it: Use spends the reaction and halves each part, Decline applies it in
- * full. Numbers shown are before resistances; the server reports the final total. The GM's ✕
+ * full. Numbers shown are before resistances; the server reports the final total. The GM's dismiss
  * dismisses without applying, for damage already entered by hand.
  */
 export function ReactionPrompt({
@@ -67,12 +67,12 @@ export function ReactionPrompt({
     });
   };
   // Auto mode rolls the opportunity swing as soon as the prompt appears (still a preview).
+  const rollOnAppear = useEffectEvent(() => answer(true, { commit: false }));
   useEffect(() => {
     if (opportunity && rollMode === "auto" && !rolled && !autoRolled.current) {
       autoRolled.current = true;
-      answer(true, { commit: false });
+      rollOnAppear();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opportunity, rollMode, rolled]);
   const submitDie = () => {
     const value = Number(dieEdit.trim());
@@ -118,24 +118,11 @@ export function ReactionPrompt({
             {rolled.attack.outcome === "crit" ? "CRIT" : rolled.attack.outcome.toUpperCase()} (nat{" "}
             {rolled.attack.naturalRoll})
           </strong>
-          <button
-            type="button"
-            className={`save-die-mode${rolled.mode === "advantage" ? " active" : ""}`}
+          <DieModeButtons
+            current={rolled.mode}
             disabled={busy}
-            title="Roll two d20s and keep the higher"
-            onClick={() => answer(true, { commit: false, rollMode: "advantage" })}
-          >
-            Adv
-          </button>
-          <button
-            type="button"
-            className={`save-die-mode${rolled.mode === "disadvantage" ? " active" : ""}`}
-            disabled={busy}
-            title="Roll two d20s and keep the lower"
-            onClick={() => answer(true, { commit: false, rollMode: "disadvantage" })}
-          >
-            Disadv
-          </button>
+            onPick={(mode) => answer(true, { commit: false, rollMode: mode })}
+          />
           <button
             type="button"
             className="encounter-primary"
@@ -231,9 +218,10 @@ export function ReactionPrompt({
               className="save-prompt-dismiss"
               disabled={busy}
               title="Dismiss without applying anything"
+              aria-label="Dismiss without applying anything"
               onClick={dismiss}
             >
-              ✕
+              <IconX />
             </button>
           )}
         </span>

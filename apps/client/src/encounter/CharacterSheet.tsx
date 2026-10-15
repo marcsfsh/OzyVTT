@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { ActorDefinition, GmActor, GmView, PlayerActor, PlayerView } from "@vtt/domain";
-import { Button, IconButton, Modal, SegmentedControl } from "@vtt/ui";
+import { Button, IconButton, Modal, SegmentedControl, IconX } from "@vtt/ui";
 import { ConditionEditor } from "./conditions";
 import { RichText } from "./RichText";
 import { DicePanel } from "../dice/DicePanel";
@@ -365,7 +365,7 @@ export function CharacterSheet({
           className="sheet-close"
           onClick={onClose}
         >
-          ✕
+          <IconX />
         </IconButton>
       </div>
     </div>

@@ -1,6 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import type { MutationResult, Scene } from "@vtt/domain";
-import { Badge, Button, Menu, MenuItem } from "@vtt/ui";
+import {
+  Badge,
+  Button,
+  Menu,
+  MenuItem,
+  IconScene,
+  IconDrag,
+  IconChevronLeft,
+  IconChevronRight,
+  IconPencil,
+  IconCopy,
+  IconTrash
+} from "@vtt/ui";
 import type { MapSelection } from "../maps/MapManager";
 import { command } from "../lib/command";
 import { useCachedMapThumbnail } from "../scene/mapImage";
@@ -18,7 +30,7 @@ function SceneThumb({ mapAssetId, token }: Readonly<{ mapAssetId: string; token:
     <img src={url} alt="" onError={() => setFailed(true)} />
   ) : (
     <span className="nh-card-thumb-empty" aria-hidden="true">
-      🗺️
+      <IconScene />
     </span>
   );
 }
@@ -265,21 +277,25 @@ export function SceneGallery({
                         aria-label={`Drag to reorder ${scene.name}`}
                         onPointerDown={(event) => beginDrag(scene.id, event)}
                       >
-                        ⠿
+                        <IconDrag />
                       </button>
                     )}
                     <Menu trigger="⋯" label={`${scene.name} actions`} align="end" hideCaret>
-                      <MenuItem icon="←" disabled={index === 0} onClick={() => move(scene.id, -1)}>
+                      <MenuItem icon={<IconChevronLeft />} disabled={index === 0} onClick={() => move(scene.id, -1)}>
                         Move earlier
                       </MenuItem>
-                      <MenuItem icon="→" disabled={index === ordered.length - 1} onClick={() => move(scene.id, 1)}>
+                      <MenuItem
+                        icon={<IconChevronRight />}
+                        disabled={index === ordered.length - 1}
+                        onClick={() => move(scene.id, 1)}
+                      >
                         Move later
                       </MenuItem>
-                      <MenuItem icon="✎" onClick={() => void rename(scene)}>
+                      <MenuItem icon={<IconPencil />} onClick={() => void rename(scene)}>
                         Rename
                       </MenuItem>
                       <MenuItem
-                        icon="⧉"
+                        icon={<IconCopy />}
                         onClick={() =>
                           void command("scene:duplicate", { sceneId: scene.id }).then(
                             report("The scene could not be duplicated.")
@@ -289,7 +305,7 @@ export function SceneGallery({
                         Duplicate
                       </MenuItem>
                       {!live && (
-                        <MenuItem icon="🗑" tone="danger" onClick={() => void remove(scene)}>
+                        <MenuItem icon={<IconTrash />} tone="danger" onClick={() => void remove(scene)}>
                           Delete scene
                         </MenuItem>
                       )}

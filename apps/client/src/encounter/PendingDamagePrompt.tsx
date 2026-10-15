@@ -1,10 +1,11 @@
+import { IconX } from "@vtt/ui";
 import { useState } from "react";
 import { type PendingDamage } from "@vtt/domain";
 import { command } from "../lib/command";
 
 /**
  * A player's hit awaiting the GM's Apply (proposal mode, the default). The rolled total is editable;
- * Apply goes through the typed-defence pipeline (resistances, dying), ✕ dismisses. Rendered under
+ * Apply goes through the typed-defence pipeline (resistances, dying); dismissing applies nothing. Rendered under
  * the target's row beside its save/reaction prompts.
  */
 export function PendingDamagePrompt({
@@ -57,9 +58,10 @@ export function PendingDamagePrompt({
           className="save-prompt-dismiss"
           disabled={busy}
           title="Dismiss without applying"
+          aria-label="Dismiss without applying"
           onClick={() => emit(false)}
         >
-          ✕
+          <IconX />
         </button>
       </span>
     </div>

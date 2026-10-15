@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { rosterActors, type GmActor, type GmView, type MutationResult } from "@vtt/domain";
 import { Select, Switch } from "@vtt/ui";
 import { command } from "../lib/command";
+import { HealthAudienceOptions, HealthStyleOptions, healthStylePhrase, type HealthStyle } from "./health-display";
 
 /* The ⋯ fight menu's geometry: margin from viewport edges, gap from the trigger, and box width. */
 const MENU_MARGIN = 8;
@@ -242,23 +243,20 @@ export function FightMenu({
                     value={state.combat.healthDisplay.style}
                     disabled={busy}
                     onChange={(event) => {
-                      const style = event.target.value as "band" | "bar" | "ring" | "aura";
+                      const style = event.target.value as HealthStyle;
                       void command("encounter:set-health-display", {
                         style,
                         audience: state.combat.healthDisplay.audience
                       }).then((result) =>
                         onFeedback(
                           result.ok
-                            ? `Health shows as ${style === "band" ? "a status badge" : style === "bar" ? "an HP bar" : style === "ring" ? "a health ring" : "a health aura"}.`
+                            ? `Health shows as ${healthStylePhrase(style)}.`
                             : (result.message ?? "The health display could not be changed.")
                         )
                       );
                     }}
                   >
-                    <option value="band">Status badge</option>
-                    <option value="bar">HP bar</option>
-                    <option value="ring">Health ring</option>
-                    <option value="aura">Health aura</option>
+                    <HealthStyleOptions />
                   </Select>
                 </label>
                 <label className="rules-mode-control">
@@ -280,8 +278,7 @@ export function FightMenu({
                       );
                     }}
                   >
-                    <option value="gm">GM only</option>
-                    <option value="all">Shown to players</option>
+                    <HealthAudienceOptions />
                   </Select>
                 </label>
                 <Switch

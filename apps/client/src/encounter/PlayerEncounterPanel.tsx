@@ -1,13 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import {
-  type DeathSaves,
-  type MutationResult,
-  type PlayerEffect,
-  type PlayerPendingReaction,
-  type PlayerPendingSave,
-  type PlayerView
-} from "@vtt/domain";
-import { Button } from "@vtt/ui";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { type MutationResult, type PlayerView } from "@vtt/domain";
+import { Button, Eyebrow } from "@vtt/ui";
 import { command } from "../lib/command";
 import { MyPendingAsks } from "./RuleAsk";
 import { useTargetingResult } from "./targeting";
@@ -22,108 +15,20 @@ import { DyingTracker } from "./DyingTracker";
 import { PlayerActionRunner } from "./PlayerActionRunner";
 import { InitiativePrompt } from "./InitiativePrompt";
 
-/** A player's own pending reaction prompts, with a local feedback line. */
-function OwnReactionPrompts({
-  reactions,
-  actorName,
-  rollMode
-}: Readonly<{ reactions: readonly PlayerPendingReaction[]; actorName: string; rollMode: "auto" | "manual" }>) {
+/**
+ * A player's own prompts keep their outcome line beside them: answering one unmounts it, and the
+ * player panel has no feedback line of its own. Hidden while there is nothing to answer or report.
+ */
+function OwnFeedback({
+  className,
+  empty = false,
+  children
+}: Readonly<{ className: string; empty?: boolean; children: (onFeedback: (text: string) => void) => ReactNode }>) {
   const [feedback, setFeedback] = useState("");
-  if (reactions.length === 0 && !feedback) return null;
+  if (empty && !feedback) return null;
   return (
-    <div className="own-save-prompts">
-      {reactions.map((reaction) => (
-        <ReactionPrompt
-          key={reaction.id}
-          reaction={reaction}
-          actorName={actorName}
-          canDismiss={false}
-          onFeedback={setFeedback}
-          rollMode={rollMode}
-        />
-      ))}
-      {feedback && (
-        <p className="save-prompt-outcome" role="status">
-          {feedback}
-        </p>
-      )}
-    </div>
-  );
-}
-
-/** A player's own pending saves, with a local feedback line. */
-function OwnSavePrompts({
-  saves,
-  targetName,
-  rollMode
-}: Readonly<{ saves: readonly PlayerPendingSave[]; targetName: string; rollMode: "auto" | "manual" }>) {
-  const [feedback, setFeedback] = useState("");
-  if (saves.length === 0 && !feedback) return null;
-  return (
-    <div className="own-save-prompts">
-      {saves.map((save) => (
-        <SavePrompt
-          key={save.id}
-          save={save}
-          targetName={targetName}
-          canDismiss={false}
-          onFeedback={setFeedback}
-          rollMode={rollMode}
-        />
-      ))}
-      {feedback && (
-        <p className="save-prompt-outcome" role="status">
-          {feedback}
-        </p>
-      )}
-    </div>
-  );
-}
-
-/** Player-side wrappers with their own feedback lines. */
-function PlayerEffectRow({
-  actorId,
-  effects,
-  isMe
-}: Readonly<{ actorId: string; effects: readonly PlayerEffect[]; isMe: boolean }>) {
-  const [feedback, setFeedback] = useState("");
-  if (effects.length === 0 && !feedback) return null;
-  return (
-    <div className="own-effect-row">
-      <EffectChips actorId={actorId} effects={effects} canEnd={isMe} onFeedback={setFeedback} />
-      {feedback && (
-        <p className="save-prompt-outcome" role="status">
-          {feedback}
-        </p>
-      )}
-    </div>
-  );
-}
-function OwnDyingTracker({
-  actorId,
-  name,
-  deathSaves,
-  rollMode,
-  isActingTurn
-}: Readonly<{
-  actorId: string;
-  name: string;
-  deathSaves: DeathSaves;
-  rollMode: "auto" | "manual";
-  isActingTurn: boolean;
-}>) {
-  const [feedback, setFeedback] = useState("");
-  return (
-    <div className="own-dying">
-      <DyingTracker
-        actorId={actorId}
-        name={name}
-        deathSaves={deathSaves}
-        canRoll
-        onFeedback={setFeedback}
-        rollMode={rollMode}
-        isActingTurn={isActingTurn}
-      />
+    <div className={className}>
+      {children(setFeedback)}
       {feedback && (
         <p className="save-prompt-outcome" role="status">
           {feedback}
@@ -254,7 +159,7 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
   if (!combat.active)
     return (
       <section className="encounter-panel compact" aria-labelledby="player-initiative-title">
-        <span className="eyebrow">FIGHT</span>
+        <Eyebrow>FIGHT</Eyebrow>
         <h2 id="player-initiative-title">Waiting for combat</h2>
         <p>The GM hasn't started a fight yet.</p>
       </section>
@@ -329,6 +234,9 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
               const isMe = entry.actorId === myId;
               const rowActor = state.actors.find((actor) => actor.id === entry.actorId);
               const mySaves = isMe ? combat.pendingSaves.filter((save) => save.targetActorId === entry.actorId) : [];
+              const myReactions = isMe
+                ? combat.pendingReactions.filter((reaction) => reaction.actorId === entry.actorId)
+                : [];
               return (
                 <li
                   key={entry.actorId}
@@ -357,24 +265,63 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                     />
                   )}
                   {isMe && rowActor && (
-                    <PlayerEffectRow actorId={entry.actorId} effects={rowActor.effects} isMe={isMe} />
+                    <OwnFeedback className="own-effect-row" empty={rowActor.effects.length === 0}>
+                      {(onFeedback) => (
+                        <EffectChips
+                          actorId={entry.actorId}
+                          effects={rowActor.effects}
+                          canEnd
+                          onFeedback={onFeedback}
+                        />
+                      )}
+                    </OwnFeedback>
                   )}
                   {isMe && rowActor && "deathSaves" in rowActor && rowActor.deathSaves && (
-                    <OwnDyingTracker
-                      actorId={entry.actorId}
-                      name={entry.name}
-                      deathSaves={rowActor.deathSaves}
-                      rollMode={rollMode}
-                      isActingTurn={myTurn}
-                    />
+                    <OwnFeedback className="own-dying">
+                      {(onFeedback) => (
+                        <DyingTracker
+                          actorId={entry.actorId}
+                          name={entry.name}
+                          deathSaves={rowActor.deathSaves!}
+                          canRoll
+                          onFeedback={onFeedback}
+                          rollMode={rollMode}
+                          isActingTurn={myTurn}
+                        />
+                      )}
+                    </OwnFeedback>
                   )}
-                  {isMe && <OwnSavePrompts saves={mySaves} targetName={entry.name} rollMode={rollMode} />}
                   {isMe && (
-                    <OwnReactionPrompts
-                      reactions={combat.pendingReactions.filter((reaction) => reaction.actorId === entry.actorId)}
-                      actorName={entry.name}
-                      rollMode={rollMode}
-                    />
+                    <OwnFeedback className="own-save-prompts" empty={mySaves.length === 0}>
+                      {(onFeedback) =>
+                        mySaves.map((save) => (
+                          <SavePrompt
+                            key={save.id}
+                            save={save}
+                            targetName={entry.name}
+                            canDismiss={false}
+                            onFeedback={onFeedback}
+                            rollMode={rollMode}
+                          />
+                        ))
+                      }
+                    </OwnFeedback>
+                  )}
+                  {isMe && (
+                    <OwnFeedback className="own-save-prompts" empty={myReactions.length === 0}>
+                      {(onFeedback) =>
+                        myReactions.map((reaction) => (
+                          <ReactionPrompt
+                            key={reaction.id}
+                            reaction={reaction}
+                            actorName={entry.name}
+                            canDismiss={false}
+                            onFeedback={onFeedback}
+                            rollMode={rollMode}
+                          />
+                        ))
+                      }
+                    </OwnFeedback>
                   )}
                 </li>
               );

@@ -1,6 +1,8 @@
+import { IconPlay } from "@vtt/ui";
 import { useRef, useState, type ReactNode, type Ref } from "react";
 import type { GmActor, GmView, InitiativeEntry, MutationResult } from "@vtt/domain";
-import { ConditionDots } from "./conditions";
+import { healthBandFor, useConditionLabels } from "./conditions";
+import { ConditionDots } from "./InitiativeList";
 import { initialsOf } from "../scene/tokenGlyph";
 import { DyingTracker } from "./DyingTracker";
 import { PendingDamagePrompt } from "./PendingDamagePrompt";
@@ -117,6 +119,9 @@ export function GmInitiativeRow({
   onFeedback: (text: string) => void;
 }>) {
   const down = actor !== undefined && actor.hp.current <= 0;
+  const conditionLabels = useConditionLabels(actor?.conditions ?? []);
+  const conditionIds = actor?.conditions.map((condition) => condition.id);
+  const band = actor ? healthBandFor(actor.hp) : null;
   return (
     <li
       ref={rowRef}
@@ -145,20 +150,18 @@ export function GmInitiativeRow({
             <span className="initiative-name-line">
               {active && (
                 <span className="initiative-caret" aria-hidden="true">
-                  ▶
+                  <IconPlay />
                 </span>
               )}
               <strong className="initiative-name-text">{actor?.name ?? "(removed)"}</strong>
-              {actor && <ConditionDots conditions={actor.conditions} />}
+              {actor && <ConditionDots conditionIds={conditionIds} conditions={conditionLabels} />}
               {actor && state.combat.reactionsUsed.includes(actor.id) && (
                 <span className="reaction-spent-dot" title="Reaction spent (restore in the row tools)">
                   R
                 </span>
               )}
               {actor && (
-                <span
-                  className={`initiative-hp-text hp-${actor.hp.current <= 0 ? "down" : actor.hp.current * 2 <= actor.hp.maximum ? "bloodied" : "healthy"}`}
-                >
+                <span className={`initiative-hp-text hp-${band}`}>
                   {actor.hp.current}/{actor.hp.maximum}
                   {actor.hp.temporary > 0 ? <small>+{actor.hp.temporary}</small> : null}
                 </span>
@@ -167,7 +170,7 @@ export function GmInitiativeRow({
             {actor && (
               <span className="initiative-hpbar" aria-hidden="true">
                 <span
-                  className={`initiative-hpbar-fill hp-${actor.hp.current <= 0 ? "down" : actor.hp.current * 2 <= actor.hp.maximum ? "bloodied" : "healthy"}`}
+                  className={`initiative-hpbar-fill hp-${band}`}
                   style={{
                     width: `${Math.max(0, Math.min(100, (actor.hp.current / Math.max(1, actor.hp.maximum)) * 100))}%`
                   }}
