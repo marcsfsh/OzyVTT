@@ -13,7 +13,6 @@ import {
   instantToDate,
   type CodexCalendar,
   type CodexChronicleKind,
-  type CodexChronicleRecord,
   type CodexDowntimePayload,
   type CodexInWorldDate,
   type CodexJournalKind,
@@ -357,18 +356,19 @@ export const CHRONICLE_LENSES: ReadonlyArray<Readonly<{ id: ChronicleLens; label
   { id: "session", label: "By session" }
 ];
 
-export type ChronicleGroup = Readonly<{ key: string; label: string; records: readonly CodexChronicleRecord[] }>;
+export type ChronicleGroup<R> = Readonly<{ key: string; label: string; records: readonly R[] }>;
+type Groupable = Readonly<{ sessionNumber: number | null; calendarInstant: number | null }>;
 
 /**
  * Both lenses read earliest first, with keyless records last. Within a group the server's order is kept.
- * By session, an `event` page always lands in "No session yet".
+ * By session, an `event` page always lands in "No session yet". Both journals group this way.
  */
-export function groupChronicle(
-  records: readonly CodexChronicleRecord[],
+export function groupChronicle<R extends Groupable>(
+  records: readonly R[],
   lens: ChronicleLens,
   calendar: CodexCalendar | null
-): ChronicleGroup[] {
-  const buckets = new Map<number | null, CodexChronicleRecord[]>();
+): ChronicleGroup<R>[] {
+  const buckets = new Map<number | null, R[]>();
   for (const record of records) {
     const key =
       lens === "session"
