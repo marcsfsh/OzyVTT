@@ -10,7 +10,15 @@
  */
 
 import { useMemo } from "react";
-import { CONDITION_IDS, DAMAGE_TYPE_IDS } from "@vtt/content-srd-5.2.1/schemas";
+import {
+  CONDITION_IDS,
+  DAMAGE_TYPE_IDS,
+  ITEM_REFUSED_MODIFIER_TYPES,
+  RIDER_TRIGGER_KINDS,
+  type Modifier,
+  type RiderTrigger,
+  type RiderTriggerKind
+} from "@vtt/content-srd-5.2.1/schemas";
 import { Chip, Field, FieldGrid, RowEditor, Select, TagInput } from "@vtt/ui";
 import { newId } from "../lib/ids";
 import { CatalogPicker } from "./CatalogPicker";
@@ -59,59 +67,61 @@ const SIZES = [
 
 /* ------------------------------------------------------- gating conditions ------ */
 
-/** The gating conditions, grouped as the GM reads them. `kind` is internal: it backs the two
-    structural rules (at most one moment; a filter needs a moment), which `publishBlockedReason`
+/** The gating conditions, grouped by the phrase each completes. The kind is the server's (`RIDER_TRIGGER_KINDS`):
+    it backs the two structural rules (at most one moment; a filter needs a moment), which `publishBlockedReason`
     enforces, and decides whether a rider is a standing sheet number or a note at roll time. */
 type TriggerKind = "gate" | "moment" | "filter";
 
-const WHILE = grouped("Only while…");
-const WHEN = grouped("Only when…");
-const FOR = grouped("Only for…");
+const TRIGGER_GROUPS: Readonly<Record<RiderTriggerKind, string>> = {
+  "static-gate": "Only while…",
+  "dynamic-gate": "Only while…",
+  moment: "Only when…",
+  filter: "Only for…"
+};
+const GROUP_ORDER = ["Only while…", "Only when…", "Only for…"];
 
-const TRIGGER_TYPES: readonly SelectOption[] = [
-  // Gates: resolvable from the sheet, so the rider stays a real sheet number.
-  WHILE("attuned", "It's attuned"),
-  WHILE("while-armored", "Wearing armour"),
-  WHILE("while-unarmored", "Not wearing armour"),
-  WHILE("while-shield", "Holding a shield"),
-  WHILE("while-character-is", "A certain class or species"),
-  WHILE("while-proficient-with", "Proficient with something"),
-  WHILE("while-effect-tag", "Under an effect"),
-  WHILE("while-hp-at-or-below", "Low on hit points"),
-  WHILE("while-condition", "Under a condition"),
-  // Moments: the named roll or event. At most one per rider.
-  WHEN("on-attack-roll", "Making an attack roll"),
-  WHEN("on-hit", "An attack hits"),
-  WHEN("on-critical-hit", "Scoring a critical hit"),
-  WHEN("on-damage-roll", "Rolling damage"),
-  WHEN("on-saving-throw", "Making a saving throw"),
-  WHEN("on-ability-check", "Making an ability check"),
-  WHEN("on-initiative-roll", "Rolling initiative"),
-  WHEN("on-taking-damage", "Taking damage"),
-  // Filters: narrow the accompanying moment.
-  FOR("attack-kind-is", "A kind of attack"),
-  FOR("weapon-property-is", "A weapon property"),
-  FOR("damage-type-is", "A damage type"),
-  FOR("ability-is", "One ability"),
-  FOR("skill-is", "One skill"),
-  FOR("spell-school-is", "A school of magic"),
-  FOR("spell-level-is", "A spell level"),
-  FOR("spell-id-is", "One specific spell"),
-  FOR("versus-size", "A target's size"),
-  FOR("versus-condition", "A target's condition"),
-  FOR("versus-creature-type", "A target's kind")
-];
+/** Every gating condition the server knows, keyed by its type, so a new one doesn't compile until it has a label. */
+const TRIGGER_LABELS: Readonly<Record<RiderTrigger["type"], string>> = {
+  attuned: "It's attuned",
+  "while-armored": "Wearing armour",
+  "while-unarmored": "Not wearing armour",
+  "while-shield": "Holding a shield",
+  "while-character-is": "A certain class or species",
+  "while-proficient-with": "Proficient with something",
+  "while-effect-tag": "Under an effect",
+  "while-hp-at-or-below": "Low on hit points",
+  "while-condition": "Under a condition",
+  "on-attack-roll": "Making an attack roll",
+  "on-hit": "An attack hits",
+  "on-critical-hit": "Scoring a critical hit",
+  "on-damage-roll": "Rolling damage",
+  "on-saving-throw": "Making a saving throw",
+  "on-ability-check": "Making an ability check",
+  "on-initiative-roll": "Rolling initiative",
+  "on-taking-damage": "Taking damage",
+  "attack-kind-is": "A kind of attack",
+  "weapon-property-is": "A weapon property",
+  "damage-type-is": "A damage type",
+  "ability-is": "One ability",
+  "skill-is": "One skill",
+  "spell-school-is": "A school of magic",
+  "spell-level-is": "A spell level",
+  "spell-id-is": "One specific spell",
+  "versus-size": "A target's size",
+  "versus-condition": "A target's condition",
+  "versus-creature-type": "A target's kind"
+};
 
-const TRIGGER_KINDS: Readonly<Record<string, TriggerKind>> = Object.fromEntries(
-  TRIGGER_TYPES.map(
-    (entry) =>
-      [entry.value, entry.group === "Only when…" ? "moment" : entry.group === "Only for…" ? "filter" : "gate"] as const
-  )
-);
+const TRIGGER_TYPES: readonly SelectOption[] = (Object.keys(TRIGGER_LABELS) as RiderTrigger["type"][])
+  .map((type) => grouped(TRIGGER_GROUPS[RIDER_TRIGGER_KINDS[type]])(type, TRIGGER_LABELS[type]))
+  .sort((a, b) => GROUP_ORDER.indexOf(a.group ?? "") - GROUP_ORDER.indexOf(b.group ?? ""));
 
-export const triggerKindOf = (type: unknown): TriggerKind | null => TRIGGER_KINDS[String(type ?? "")] ?? null;
+export const triggerKindOf = (type: unknown): TriggerKind | null => {
+  const kind = RIDER_TRIGGER_KINDS[String(type ?? "") as RiderTrigger["type"]];
+  return kind === undefined ? null : kind === "moment" || kind === "filter" ? kind : "gate";
+};
 export const triggerLabelOf = (type: unknown): string =>
-  TRIGGER_TYPES.find((entry) => entry.value === String(type ?? ""))?.label ?? "A condition";
+  TRIGGER_LABELS[String(type ?? "") as RiderTrigger["type"]] ?? "A condition";
 
 /** Switching condition replaces the row: the union is `.strict()`, so leftover keys fail the parse. */
 function blankTrigger(type: string): Draft {
@@ -399,41 +409,48 @@ const whenField = (): FieldDef => ({
 
 /* ------------------------------------------------------------- modifiers -------- */
 
-/** The typed modifiers, in four groups: a bounded union (ADR-0008); anything else stays prose.
-    `note` marks variants that parse but that nothing reads yet. */
-const ROLLS = grouped("Rolls");
-const HARM = grouped("Damage and defence");
-const MAGIC = grouped("Spellcasting");
-const SELF = grouped("The character");
+/** The typed modifiers, in four groups: a bounded union (ADR-0008); anything else stays prose. Keyed by type, so a
+    modifier the server adds doesn't compile until it has a group and a label. A feature or item grants resistance
+    and vulnerability through `grants`; only an effect carries them as modifiers. */
+const MODIFIER_LABELS: Readonly<
+  Record<
+    Exclude<Modifier["type"], "damage-resistance" | "damage-vulnerability">,
+    readonly [group: string, label: string]
+  >
+> = {
+  "attack-bonus": ["Rolls", "Attack rolls"],
+  "save-bonus": ["Rolls", "Saving throws"],
+  "check-bonus": ["Rolls", "Ability checks"],
+  initiative: ["Rolls", "Initiative"],
+  "roll-mode": ["Rolls", "Advantage or disadvantage"],
+  "damage-bonus": ["Damage and defence", "Damage rolls"],
+  "extra-damage": ["Damage and defence", "Extra damage"],
+  "critical-range": ["Damage and defence", "Critical hit range"],
+  "critical-bonus-dice": ["Damage and defence", "Extra dice on a critical hit"],
+  "damage-reduction": ["Damage and defence", "Damage taken"],
+  "armor-class": ["Damage and defence", "Armour class"],
+  "unarmored-defense": ["Damage and defence", "Unarmoured defence"],
+  "hit-points-per-level": ["Damage and defence", "Hit points per level"],
+  "spell-save-dc": ["Spellcasting", "Spell save DC"],
+  "spell-attack-bonus": ["Spellcasting", "Spell attack rolls"],
+  "spell-slot": ["Spellcasting", "Spell slots"],
+  "ability-score": ["The character", "Ability score"],
+  speed: ["The character", "Speed"],
+  "extra-attack": ["The character", "Extra attack"],
+  darkvision: ["The character", "Darkvision"],
+  sense: ["The character", "Another sense"],
+  "resource-bonus": ["The character", "A limited-use pool"]
+};
 
-const MODIFIER_TYPES: readonly SelectOption[] = [
-  ROLLS("attack-bonus", "Attack rolls"),
-  ROLLS("save-bonus", "Saving throws"),
-  ROLLS("check-bonus", "Ability checks"),
-  ROLLS("initiative", "Initiative"),
-  ROLLS("roll-mode", "Advantage or disadvantage"),
-  HARM("damage-bonus", "Damage rolls"),
-  HARM("extra-damage", "Extra damage"),
-  HARM("critical-range", "Critical hit range"),
-  HARM("critical-bonus-dice", "Extra dice on a critical hit"),
-  HARM("damage-reduction", "Damage taken"),
-  HARM("armor-class", "Armour class"),
-  HARM("unarmored-defense", "Unarmoured defence"),
-  HARM("hit-points-per-level", "Hit points per level"),
-  MAGIC("spell-save-dc", "Spell save DC"),
-  MAGIC("spell-attack-bonus", "Spell attack rolls"),
-  MAGIC("spell-slot", "Spell slots"),
-  SELF("ability-score", "Ability score"),
-  SELF("speed", "Speed"),
-  SELF("extra-attack", "Extra attack"),
-  SELF("darkvision", "Darkvision"),
-  SELF("sense", "Another sense"),
-  SELF("resource-bonus", "A limited-use pool")
-];
+const MODIFIER_TYPES: readonly SelectOption[] = Object.entries(MODIFIER_LABELS).map(([type, [group, label]]) =>
+  grouped(group)(type, label)
+);
 
 /** The GM-facing word for a modifier type, used by publish blockers. */
-export const modifierLabel = (type: unknown): string =>
-  MODIFIER_TYPES.find((entry) => entry.value === String(type ?? ""))?.label ?? "a modifier";
+export const modifierLabel = (type: unknown): string => {
+  const labels: Partial<Record<string, readonly [string, string]>> = { ...EFFECT_MODIFIER_LABELS, ...MODIFIER_LABELS };
+  return labels[String(type ?? "")]?.[1] ?? "a modifier";
+};
 
 /** Switching variant replaces the row: the union is `.strict()`, so leftover keys fail the parse. */
 function blankModifier(type: string): Draft {
@@ -491,11 +508,6 @@ function blankModifier(type: string): Draft {
     switch to broaden them. */
 const WEAPON_SCOPED = ["attack-bonus", "damage-bonus", "extra-damage", "critical-range", "critical-bonus-dice"];
 
-/** Riders `EquipmentReferenceSchema` refuses on an item, so they are not offered there. Neither can
-    be layered over a sheet: hit points would strand `hp.current` above maximum on unequip, and an
-    ability score cascades into values read from the baked scores. */
-const ITEM_REFUSED = ["ability-score", "hit-points-per-level"];
-
 /** The rolls a roll-mode variant can target; `RollModeVariantSchema` is shared by modifiers and effects. */
 const ROLL_MODE_ROLLS: readonly SelectOption[] = [
   opt("attack", "Attack rolls"),
@@ -538,7 +550,9 @@ const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       kind: "select",
       // The refusal belongs to the item carrier; a stat block is not an item.
       options:
-        scope === "item" ? MODIFIER_TYPES.filter((entry) => !ITEM_REFUSED.includes(entry.value)) : MODIFIER_TYPES,
+        scope === "item"
+          ? MODIFIER_TYPES.filter((entry) => !(ITEM_REFUSED_MODIFIER_TYPES as readonly string[]).includes(entry.value))
+          : MODIFIER_TYPES,
       // Replace the whole row so no key from the previous variant survives.
       write: (next, row) => ({ rowId: (row as { rowId?: string }).rowId ?? newId(), ...blankModifier(String(next)) })
     },
@@ -1124,12 +1138,15 @@ const tagsField = (label: string): FieldDef => ({
  * - `damage-resistance` and `damage-vulnerability`.
  * - `speed`, summed live and given back when the effect ends.
  */
-const EFFECT_MODIFIER_TYPES: readonly SelectOption[] = [
-  ROLLS("roll-mode", "Advantage or disadvantage"),
-  HARM("damage-resistance", "Resistance to damage"),
-  HARM("damage-vulnerability", "Vulnerability to damage"),
-  SELF("speed", "Speed")
-];
+const EFFECT_MODIFIER_LABELS = {
+  "roll-mode": ["Rolls", "Advantage or disadvantage"],
+  "damage-resistance": ["Damage and defence", "Resistance to damage"],
+  "damage-vulnerability": ["Damage and defence", "Vulnerability to damage"],
+  speed: ["The character", "Speed"]
+} as const satisfies Partial<Record<Modifier["type"], readonly [group: string, label: string]>>;
+const EFFECT_MODIFIER_TYPES: readonly SelectOption[] = Object.entries(EFFECT_MODIFIER_LABELS).map(
+  ([type, [group, label]]) => grouped(group)(type, label)
+);
 
 /** The union is `.strict()`, so switching variant replaces the row. */
 function blankEffectModifier(type: string): Draft {
