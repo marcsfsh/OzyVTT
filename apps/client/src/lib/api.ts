@@ -77,11 +77,7 @@ export async function apiBlob(path: string, request: Omit<ApiRequest, "body" | "
   return response.blob();
 }
 
-/**
- * Calls a route that answers bare JSON instead of the `/api/v1` envelope: the host's own routes outside
- * `/api/v1` (GM password setup, sign-in and sessions, the viewer addresses) and the OpenAPI document.
- * A failure's text is in `message`.
- */
+/** Fetches JSON that is not wrapped in the `/api/v1` envelope: the OpenAPI document. A failure's text is in `message`. */
 export async function jsonRequest<T>(path: string, request: ApiRequest = {}): Promise<T> {
   const response = await send(path, request);
   const body = await response.json().catch(() => null);

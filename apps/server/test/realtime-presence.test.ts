@@ -38,7 +38,7 @@ async function startTestServer(overrides: Partial<CreateServerOptions> = {}) {
 }
 
 async function bootstrapGm(url: string) {
-  const response = await fetch(`${url}/api/bootstrap`, {
+  const response = await fetch(`${url}/api/v1/host/setup`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ password: PASSWORD })
@@ -47,13 +47,13 @@ async function bootstrapGm(url: string) {
 }
 
 async function loginGm(url: string) {
-  const response = await fetch(`${url}/api/gm/login`, {
+  const response = await fetch(`${url}/api/v1/host/gm/sign-in`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ password: PASSWORD })
   });
-  const body = (await response.json()) as { token: string };
-  return body.token;
+  const body = (await response.json()) as { data: { token: string } };
+  return body.data.token;
 }
 
 /** Collects every `state:updated` payload a socket receives, so tests can wait for convergence. */
@@ -372,7 +372,7 @@ describe("realtime presence, reconnect, and convergence", () => {
       const other = await connectAndJoin(server.url, otherToken);
       expect(server.presence.statusFor(revoked.join.sessionId!)).toBe("online");
 
-      const logout = await fetch(`${server.url}/api/gm/logout`, {
+      const logout = await fetch(`${server.url}/api/v1/host/gm/sign-out`, {
         method: "POST",
         headers: { authorization: `Bearer ${revokedToken}` }
       });

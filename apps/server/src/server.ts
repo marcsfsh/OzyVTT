@@ -3,8 +3,7 @@ import { randomInt, randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import express, { type Express } from "express";
 import { Server } from "socket.io";
-import { z } from "zod";
-import { CODEX_PATHS } from "@vtt/api-contract";
+import { CODEX_PATHS, HOST_NAMESPACE } from "@vtt/api-contract";
 import type {
   ClientToServerEvents,
   ClientRole,
@@ -38,11 +37,12 @@ import { createHomebrewRouter, homebrewPackBodyParser, HOMEBREW_PACK_IMPORT_PATH
 import { createHomebrewValidator } from "./homebrew-validate.js";
 import { buildHomebrewUsageIndex } from "./homebrew-usages.js";
 import { findCatalogRecord } from "./homebrew-srd-copy.js";
-import { bearerToken, requestConventions, sendFailure } from "./http-kit.js";
+import { requestConventions, sendFailure } from "./http-kit.js";
 import { createInitialGameState } from "./initial-game-state.js";
 import { createStateReader } from "./state-reader.js";
 import { IntegrationCredentialStore } from "./integration-credentials.js";
 import { LoginRateLimiter } from "./login-rate-limit.js";
+import { createHostRouter } from "./host-http.js";
 import { MapAssetStore } from "./map-assets.js";
 import { MapCatalogStore } from "./map-catalog.js";
 import { createMapRouter } from "./map-http.js";
@@ -80,6 +80,7 @@ export type CreateServerOptions = {
 
 const isLoopback = (ip: string | undefined) => ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
 const isApiV1 = (path: string) => path === "/api/v1" || path.startsWith("/api/v1/");
+const isHostRoute = (path: string) => path === HOST_NAMESPACE || path.startsWith(`${HOST_NAMESPACE}/`);
 
 export function createServer(options: CreateServerOptions) {
   const app: Express = express();
@@ -382,18 +383,20 @@ export function createServer(options: CreateServerOptions) {
     }
   });
 
-  // Open CORS for /api/v1 only: credentials there are bearer headers (or SameSite=Strict cookies), so a
-  // wildcard origin grants nothing a token doesn't, and browser integrations can call it. The legacy
-  // /api/gm/* endpoints (password login) stay same-origin so web pages can't relay password guesses.
+  // Open CORS for /api/v1: credentials there are bearer headers (or SameSite=Strict cookies), so a
+  // wildcard origin grants nothing a token doesn't, and browser integrations can call it. The host's GM
+  // account routes (password setup and sign-in) stay same-origin so web pages can't relay password guesses.
   // Mounted above the body parsers so preflights skip body buffering and parser errors carry CORS headers
   // and the request id. Every /api/v1 router relies on this one request-id stamp.
   app.use((req, res, next) => {
     if (!isApiV1(req.path)) return next();
-    res.setHeader("access-control-allow-origin", "*");
-    res.setHeader("access-control-allow-headers", "authorization, content-type, x-request-id, if-none-match");
-    res.setHeader("access-control-allow-methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-    res.setHeader("access-control-expose-headers", "x-request-id, etag, retry-after, x-idempotent-replay");
-    if (req.method === "OPTIONS") return res.status(204).end();
+    if (!isHostRoute(req.path)) {
+      res.setHeader("access-control-allow-origin", "*");
+      res.setHeader("access-control-allow-headers", "authorization, content-type, x-request-id, if-none-match");
+      res.setHeader("access-control-allow-methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+      res.setHeader("access-control-expose-headers", "x-request-id, etag, retry-after, x-idempotent-replay");
+      if (req.method === "OPTIONS") return res.status(204).end();
+    }
     requestConventions(req, res, next);
   });
   // Homebrew packs exceed the global body limit. body-parser skips already-parsed requests, so a
@@ -412,58 +415,15 @@ export function createServer(options: CreateServerOptions) {
       ? sendFailure(res, 413, "bad_request", "The request body is too large.")
       : sendFailure(res, 400, "validation_failed", "The request body is not valid JSON.");
   });
-  app.get("/api/bootstrap/status", (_req, res) => res.json({ bootstrapped: auth.isBootstrapped }));
-  app.post("/api/bootstrap", async (req, res) => {
-    if (!isLoopback(req.ip))
-      return res.status(403).json({ message: "Initial GM setup must be performed on the host machine." });
-    const result = z.object({ password: z.string().min(12).max(256) }).safeParse(req.body);
-    if (!result.success) return res.status(400).json({ message: "Use a GM password of at least 12 characters." });
-    try {
-      await auth.bootstrap(result.data.password);
-      return res.status(201).json({ ok: true });
-    } catch (error) {
-      return res.status(409).json({ message: (error as Error).message });
-    }
-  });
-  app.post("/api/gm/login", async (req, res) => {
-    const rateLimitKey = req.ip ?? "unknown";
-    const decision = gmLoginRateLimiter.check(rateLimitKey);
-    if (!decision.allowed) {
-      res.set("Retry-After", String(decision.retryAfterSeconds));
-      return res.status(429).json({ message: "Too many attempts. Try again later." });
-    }
-    const result = z.object({ password: z.string() }).safeParse(req.body);
-    if (!result.success) {
-      gmLoginRateLimiter.recordFailure(rateLimitKey);
-      return res.status(400).json({ message: "Password is required." });
-    }
-    const token = await auth.login(result.data.password);
-    if (!token) {
-      gmLoginRateLimiter.recordFailure(rateLimitKey);
-      return res.status(401).json({ message: "Invalid GM password." });
-    }
-    gmLoginRateLimiter.recordSuccess(rateLimitKey);
-    return res.json({ token });
-  });
-  app.post("/api/gm/logout", async (req, res) => {
-    const revoked = await auth.logout(bearerToken(req));
-    if (!revoked) return res.status(401).json({ message: "A valid GM session is required to sign out." });
-    broadcast();
-    return res.json({ ok: true });
-  });
-  app.post("/api/gm/sessions/revoke-all", async (req, res) => {
-    if (!auth.verify(bearerToken(req))) return res.status(401).json({ message: "A valid GM session is required." });
-    await auth.revokeAllGmSessions();
-    broadcast();
-    return res.json({ ok: true });
-  });
-  app.get("/api/gm/viewer-urls", (req, res) => {
-    if (!auth.verify(bearerToken(req))) return res.status(401).json({ message: "A valid GM session is required." });
-    const viewerUrls = [
-      ...new Set((options.viewerBaseUrls ?? []).map((url) => `${url.replace(/\/$/, "")}/viewer.html`))
-    ];
-    return res.json({ viewerUrls });
-  });
+  app.use(
+    createHostRouter({
+      auth,
+      loginLimiter: gmLoginRateLimiter,
+      isLoopback,
+      broadcast,
+      viewerBaseUrls: options.viewerBaseUrls
+    })
+  );
   app.use(
     createViewerRouter({
       access: viewerAccess,

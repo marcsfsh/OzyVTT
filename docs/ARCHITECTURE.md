@@ -88,9 +88,11 @@ holds a dropped session as "reconnecting" for about 8 seconds before "offline".
 
 ## Identity and roles
 
-- **GM.** The first GM password can only be set from loopback (`POST /api/bootstrap`). It is
+- **GM.** The first GM password can only be set from loopback (`POST /api/v1/host/setup`). It is
   stored as a bcrypt hash in `data/auth.json` with a random token secret. GM tokens are
-  HMAC-signed, expire after 12 hours, and can be revoked singly or all at once.
+  HMAC-signed, expire after 12 hours, and can be revoked singly or all at once. The host routes
+  (`host-http.ts`) are the one part of `/api/v1` without open CORS, so a web page can't relay password
+  guesses.
 - **Player.** No password. Joining issues a signed 30-day token. A player claims one
   player-character at a time; the claim sets that character's `ownerSessionId`. A player may
   act only on the character they own: move it, roll for it, level it, set its token image.

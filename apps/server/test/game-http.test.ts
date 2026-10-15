@@ -1148,18 +1148,18 @@ describe("public game API over /api/v1", () => {
 
     // The password endpoint must stay same-origin: wildcard CORS there would let any web page
     // relay password guesses through a browser on the LAN and read the outcome.
-    const loginPreflight = await fetch(`${base}/api/gm/login`, {
+    const loginPreflight = await fetch(`${base}/api/v1/host/gm/sign-in`, {
       method: "OPTIONS",
       headers: { origin: "https://evil.example", "access-control-request-method": "POST" }
     });
     expect(loginPreflight.headers.get("access-control-allow-origin")).toBeNull();
-    const loginPost = await fetch(`${base}/api/gm/login`, {
+    const loginPost = await fetch(`${base}/api/v1/host/gm/sign-in`, {
       method: "POST",
       headers: { origin: "https://evil.example", "content-type": "application/json" },
       body: JSON.stringify({ password: "wrong" })
     });
     expect(loginPost.headers.get("access-control-allow-origin")).toBeNull();
-    const bootstrapStatus = await fetch(`${base}/api/bootstrap/status`, {
+    const bootstrapStatus = await fetch(`${base}/api/v1/host/setup`, {
       headers: { origin: "https://evil.example" }
     });
     expect(bootstrapStatus.headers.get("access-control-allow-origin")).toBeNull();
@@ -1195,8 +1195,10 @@ describe("public game API over /api/v1", () => {
     });
 
     // A bare token is not a bearer token, on the GM session routes too.
-    expect((await fetch(`${base}/api/gm/viewer-urls`, { headers: { authorization: gmToken } })).status).toBe(401);
-    expect((await fetch(`${base}/api/gm/viewer-urls`, { headers: bearer(gmToken) })).status).toBe(200);
+    expect((await fetch(`${base}/api/v1/host/gm/viewer-urls`, { headers: { authorization: gmToken } })).status).toBe(
+      401
+    );
+    expect((await fetch(`${base}/api/v1/host/gm/viewer-urls`, { headers: bearer(gmToken) })).status).toBe(200);
   });
 
   it("serves server-computed action availability with role gating", async () => {

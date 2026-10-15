@@ -29,7 +29,7 @@ export default defineConfig({
     command: "node --import tsx e2e/start-server.mts",
     cwd: "..",
     env: { PORT: String(basePort + index) },
-    url: `http://localhost:${basePort + index}/api/bootstrap/status`,
+    url: `http://localhost:${basePort + index}/api/v1/host/setup`,
     // Never run against a server that already holds data.
     reuseExistingServer: false,
     // SIGTERM rather than the default kill, so the server removes its data directory.

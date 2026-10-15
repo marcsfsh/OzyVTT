@@ -8,6 +8,7 @@ import {
   ENCOUNTER_ARCHIVE_PATHS,
   GAME_PATHS,
   HOMEBREW_PATHS,
+  HOST_PATHS,
   HomebrewContentStateSchema,
   HomebrewContentTypeSchema,
   INTEGRATION_CREDENTIAL_PATHS,
@@ -877,6 +878,97 @@ export const openApiDocument = {
           },
           "401": { $ref: "#/components/responses/ApiError" },
           "403": { $ref: "#/components/responses/ApiError" }
+        }
+      }
+    },
+    // ===== The host's GM account (host-http.ts). Same-origin only: these routes send no CORS headers, so a
+    // web page can't relay password guesses. Not reachable with an integration credential. =====
+    [HOST_PATHS.setup]: {
+      get: {
+        operationId: "getHostSetup",
+        security: [],
+        description: "Whether the GM password has been set on this host.",
+        responses: {
+          "200": {
+            description: "The setup state",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/HostSetupResponse" } } }
+          }
+        }
+      },
+      post: {
+        operationId: "setGmPassword",
+        security: [],
+        description:
+          "Sets the first GM password (at least 12 characters). Accepted only from the host machine itself (loopback); refused once a password is set.",
+        requestBody: jsonBody("HostPasswordRequest"),
+        responses: {
+          "201": {
+            description: "The password is set",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/HostSetupResponse" } } }
+          },
+          "400": apiError,
+          "403": apiError,
+          "409": apiError
+        }
+      }
+    },
+    [HOST_PATHS.gmSignIn]: {
+      post: {
+        operationId: "signInGm",
+        security: [],
+        description:
+          "Exchanges the GM password for a GM session token (12 hours). Repeated failures from one address are rate-limited with 429 and Retry-After.",
+        requestBody: jsonBody("HostPasswordRequest"),
+        responses: {
+          "200": {
+            description: "A GM session token",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/GmSignInResponse" } } }
+          },
+          "400": apiError,
+          "401": apiError,
+          "429": apiError
+        }
+      }
+    },
+    [HOST_PATHS.gmSignOut]: {
+      post: {
+        operationId: "signOutGm",
+        security: [{ gmAuth: [] }],
+        description: "Revokes the GM session that sends it.",
+        responses: {
+          "200": {
+            description: "Signed out",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/GmSignOutResponse" } } }
+          },
+          "401": apiError
+        }
+      }
+    },
+    [HOST_PATHS.gmRevokeAll]: {
+      post: {
+        operationId: "revokeAllGmSessions",
+        security: [{ gmAuth: [] }],
+        description: "Revokes every GM session, this one included.",
+        responses: {
+          "200": {
+            description: "Every GM session revoked",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/GmRevokeAllResponse" } } }
+          },
+          "401": apiError
+        }
+      }
+    },
+    [HOST_PATHS.viewerUrls]: {
+      get: {
+        operationId: "listViewerUrls",
+        security: [{ gmAuth: [] }],
+        description: "The addresses a table viewer on the LAN can open, one per configured host address.",
+        responses: {
+          "200": {
+            description: "Viewer addresses",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerUrlsResponse" } } }
+          },
+          "401": apiError
         }
       }
     },
@@ -2488,6 +2580,48 @@ export const openApiDocument = {
       SystemHealthResponse: envelopeSchema("#/components/schemas/SystemHealth"),
       SystemVersionResponse: envelopeSchema("#/components/schemas/SystemVersion"),
       SystemCapabilitiesResponse: envelopeSchema("#/components/schemas/SystemCapabilities"),
+      HostSetup: {
+        type: "object",
+        additionalProperties: false,
+        required: ["bootstrapped"],
+        properties: { bootstrapped: { type: "boolean" } }
+      },
+      HostSetupResponse: envelopeSchema("#/components/schemas/HostSetup"),
+      HostPasswordRequest: {
+        type: "object",
+        additionalProperties: false,
+        required: ["password"],
+        properties: { password: { type: "string", maxLength: 256 } }
+      },
+      GmSignIn: {
+        type: "object",
+        additionalProperties: false,
+        required: ["token"],
+        properties: { token: { type: "string" } }
+      },
+      GmSignInResponse: envelopeSchema("#/components/schemas/GmSignIn"),
+      GmSignOut: {
+        type: "object",
+        additionalProperties: false,
+        required: ["signedOut"],
+        properties: { signedOut: { const: true } }
+      },
+      GmSignOutResponse: envelopeSchema("#/components/schemas/GmSignOut"),
+      GmRevokeAll: {
+        type: "object",
+        additionalProperties: false,
+        required: ["revoked"],
+        properties: { revoked: { const: true } }
+      },
+      GmRevokeAllResponse: envelopeSchema("#/components/schemas/GmRevokeAll"),
+      ViewerUrls: {
+        type: "object",
+        additionalProperties: false,
+        required: ["viewerUrls"],
+        properties: { viewerUrls: { type: "array", items: { type: "string", format: "uri" } } }
+      },
+      ViewerUrlsResponse: envelopeSchema("#/components/schemas/ViewerUrls"),
+
       IntegrationCredentialMetadata: {
         type: "object",
         additionalProperties: false,

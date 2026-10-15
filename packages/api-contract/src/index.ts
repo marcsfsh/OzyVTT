@@ -14,6 +14,17 @@ export const SYSTEM_PATHS = {
 export const OPENAPI_DOCUMENT_PATH = `${API_NAMESPACE}/openapi.json` as const;
 
 /** GM-authorized credential management, not integration-token authorized. `{id}` is OpenAPI-style; the Express router substitutes `:id`. */
+/** The host's own GM account: first-run password setup (from the host machine only), sign-in and sign-out.
+ *  Same-origin only: open CORS here would let any web page relay password guesses. */
+export const HOST_NAMESPACE = `${API_NAMESPACE}/host` as const;
+export const HOST_PATHS = {
+  setup: `${HOST_NAMESPACE}/setup`,
+  gmSignIn: `${HOST_NAMESPACE}/gm/sign-in`,
+  gmSignOut: `${HOST_NAMESPACE}/gm/sign-out`,
+  gmRevokeAll: `${HOST_NAMESPACE}/gm/revoke-all`,
+  viewerUrls: `${HOST_NAMESPACE}/gm/viewer-urls`
+} as const;
+
 export const INTEGRATION_CREDENTIAL_PATHS = {
   collection: `${API_NAMESPACE}/gm/integration-credentials`,
   rotate: `${API_NAMESPACE}/gm/integration-credentials/{id}/rotate`,

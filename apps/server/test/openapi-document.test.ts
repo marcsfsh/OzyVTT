@@ -12,6 +12,7 @@ import {
   GameSnapshotSchema,
   GAME_COMMANDS,
   HOMEBREW_PATHS,
+  HOST_PATHS,
   HomebrewContentTypeSchema,
   INTEGRATION_CREDENTIAL_PATHS,
   IntegrationScopeSchema,
@@ -43,7 +44,8 @@ describe("the OpenAPI document", () => {
       ...Object.values(SESSION_PATHS),
       ...Object.values(CODEX_PATHS),
       ...Object.values(CODEX_ASSET_PATHS),
-      ...Object.values(HOMEBREW_PATHS)
+      ...Object.values(HOMEBREW_PATHS),
+      ...Object.values(HOST_PATHS)
     ];
     expect(Object.keys(openApiDocument.paths).sort()).toEqual([...new Set(declaredPaths)].sort());
     expect(openApiDocument.components.schemas.SystemCapabilities.properties.supportedScopes.items.enum).toEqual(
@@ -421,7 +423,10 @@ describe("the OpenAPI document", () => {
     const issuance = new Set([
       "IntegrationCredentialIssued.token",
       "PlayerSessionIssuedData.token",
-      "CodexPreviewSessionData.token"
+      "CodexPreviewSessionData.token",
+      // The host's own sign-in: the GM password goes in and a GM session token comes out.
+      "HostPasswordRequest.password",
+      "GmSignIn.token"
     ]);
     for (const [name, schema] of Object.entries(openApiDocument.components.schemas)) {
       const properties =
@@ -434,6 +439,14 @@ describe("the OpenAPI document", () => {
         expect(property, `${name}.${property} looks secret-shaped`).not.toMatch(forbiddenNames);
       }
     }
+  });
+
+  it("never lets an integration credential reach the host's GM account routes", () => {
+    for (const path of Object.values(HOST_PATHS))
+      for (const operation of Object.values(
+        openApiDocument.paths[path] as unknown as Record<string, { security: readonly unknown[] }>
+      ))
+        expect(JSON.stringify(operation.security)).not.toContain("bearerAuth");
   });
 
   it("serves the OpenAPI document from a dedicated, unauthenticated, stable path distinct from any one system operation", () => {

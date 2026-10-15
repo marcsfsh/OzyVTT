@@ -106,16 +106,16 @@ describe("jsonRequest", () => {
   it("returns the bare body, and the server's message on failure", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => new Response(JSON.stringify({ bootstrapped: true }), { status: 200 }))
+      vi.fn(async () => new Response(JSON.stringify({ openapi: "3.1.0" }), { status: 200 }))
     );
-    await expect(jsonRequest("/api/bootstrap/status")).resolves.toEqual({ bootstrapped: true });
+    await expect(jsonRequest("/api/v1/openapi.json")).resolves.toEqual({ openapi: "3.1.0" });
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => new Response(JSON.stringify({ message: "Invalid GM password." }), { status: 401 }))
+      vi.fn(async () => new Response(JSON.stringify({ message: "Not found." }), { status: 404 }))
     );
-    await expect(jsonRequest("/api/gm/login", { body: { password: "x" } })).rejects.toMatchObject({
-      status: 401,
-      message: "Invalid GM password."
+    await expect(jsonRequest("/api/v1/openapi.json")).rejects.toMatchObject({
+      status: 404,
+      message: "Not found."
     });
   });
 });
