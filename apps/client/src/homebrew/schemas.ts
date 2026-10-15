@@ -4,7 +4,7 @@
 import { RARITY_IDS, WEAPON_PROPERTY_IDS } from "@vtt/content-srd-5.2.1/schemas";
 import { newId } from "../lib/ids";
 import { SUB_OBJECT_DEFAULTS, blankFeature } from "./defaults";
-import { featureFields } from "./FeatureEditor";
+import { featureFields } from "./feature-fields";
 import { getAt } from "./paths";
 import {
   basicsSection,
