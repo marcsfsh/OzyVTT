@@ -46,16 +46,17 @@ separately.
 
 ## Commands
 
-| Command          | What it does                                                               |
-| ---------------- | -------------------------------------------------------------------------- |
-| `npm run dev`    | Client on `:5173` and the server on `:3001`, both reloading on change.     |
-| `npm run check`  | Typecheck every workspace.                                                 |
-| `npm test`       | Run every workspace's tests.                                               |
-| `npm run build`  | Build the client.                                                          |
-| `npm run start`  | Build, then serve on `:3001`.                                              |
-| `npm run map`    | Regenerate `docs/app-map.md` after changing state, commands or HTTP paths. |
-| `npm run lint`   | Run ESLint.                                                                |
-| `npm run format` | Format with Prettier.                                                      |
+| Command           | What it does                                                               |
+| ----------------- | -------------------------------------------------------------------------- |
+| `npm run dev`     | Client on `:5173` and the server on `:3001`, both reloading on change.     |
+| `npm run check`   | Typecheck every workspace.                                                 |
+| `npm test`        | Run every workspace's tests.                                               |
+| `npm run build`   | Build the client.                                                          |
+| `npm run start`   | Build, then serve on `:3001`.                                              |
+| `npm run map`     | Regenerate `docs/app-map.md` after changing state, commands or HTTP paths. |
+| `npm run content` | Rebuild the SRD content bundles from their sources, in dependency order.   |
+| `npm run lint`    | Run ESLint.                                                                |
+| `npm run format`  | Format with Prettier.                                                      |
 
 ## Running a fight
 
