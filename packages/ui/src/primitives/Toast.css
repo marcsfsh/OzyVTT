@@ -59,7 +59,7 @@
   color: var(--success);
 }
 .nh-toast--error .nh-toast-icon {
-  color: var(--danger-hi);
+  color: var(--danger-text);
 }
 .nh-toast--info .nh-toast-icon {
   color: var(--info);

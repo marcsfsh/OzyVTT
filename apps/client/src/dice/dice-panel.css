@@ -51,7 +51,7 @@
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   background: var(--surface-3);
-  color: var(--magenta-hi);
+  color: var(--magenta-text);
   font-size: var(--fs-sm);
   font-weight: 700;
 }
@@ -255,13 +255,13 @@
    the colour as a static accent on the newest total. */
 @keyframes roll-flare {
   from {
-    color: var(--magenta-hi);
+    color: var(--magenta-text);
     text-shadow:
       0 0 10px var(--magenta),
       0 0 26px color-mix(in srgb, var(--magenta) 55%, transparent);
   }
   70% {
-    color: var(--magenta-hi);
+    color: var(--magenta-text);
   }
   to {
     color: var(--text);
@@ -273,7 +273,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .roll-list > .roll-card:first-child .roll-total {
-    color: var(--magenta-hi);
+    color: var(--magenta-text);
   }
 }
 

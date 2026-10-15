@@ -13,8 +13,11 @@ import {
   effectiveSkillTier,
   EMPTY_DERIVATION,
   skillTierSources,
+  type EquipmentCatalog,
   type EquipmentDerivation
 } from "./equipment-derivation.js";
+import { choiceOverrideDefenses } from "./choice-overrides.js";
+import { standingDefences } from "./hit-points.js";
 import { saveTotalFor } from "./saving-throws.js";
 
 /**
@@ -38,7 +41,8 @@ export function deriveActorSheet(
   actor: Actor,
   definition: ActorDefinition | undefined,
   derivation: EquipmentDerivation,
-  skills: readonly ContentSkillSummary[]
+  skills: readonly ContentSkillSummary[],
+  catalog?: Pick<EquipmentCatalog, "featureRecord">
 ): ActorDerivedSheet {
   const scores = definition?.abilityScores;
   const proficiencyBonus = definition?.proficiencyBonus ?? 0;
@@ -87,6 +91,11 @@ export function deriveActorSheet(
     // still holds the instantiation-time number.
     initiative: (scores ? abilityModifier(scores.dex) : 0) + (definition?.initiativeBonus ?? 0) + derivation.initiative,
     abilities,
-    skills: derivedSkills
+    skills: derivedSkills,
+    defences: standingDefences(
+      definition,
+      choiceOverrideDefenses(definition, actor.choiceOverrides, catalog?.featureRecord),
+      derivation
+    )
   };
 }

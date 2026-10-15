@@ -1,3 +1,4 @@
+import { Ajv2020 } from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 import { GameStateSchema, type ContentSkillSummary, type GameState } from "@vtt/domain";
 import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
@@ -5,6 +6,7 @@ import { deriveActorSheet } from "../src/actor-derived.js";
 import { deriveEquipment, type EquipmentCatalog } from "../src/equipment-derivation.js";
 import { testCatalog } from "./catalog-records.js";
 import { projectGmView, projectPlayerView } from "../src/projections.js";
+import { openApiDocument } from "../src/openapi/document.js";
 import { saveModifierFor, saveTotalFor } from "../src/saving-throws.js";
 
 // The derived sheet block: item-granted skill proficiency/expertise, save bonuses, and `check-bonus`.
@@ -257,5 +259,43 @@ describe("viewer safety: the derived block never rides the broadcast projections
     // Deriving must not mutate: the owner's projection hands them `definition` verbatim.
     sheetFor(stateWith([item(CIRCLET_ROW)]), definition, catalogOf([CIRCLET]));
     expect(definition.proficiencies!.skills).toEqual([{ id: "stealth", proficiency: "proficient" }]);
+  });
+});
+
+describe("the sheet's defences are the ones the damage pipeline applies", () => {
+  const RING = {
+    id: "ring-of-warmth",
+    name: "Ring of Warmth",
+    category: "ring",
+    slot: "ring",
+    isMagic: true,
+    grants: { damageResistances: ["cold"] }
+  };
+  const RING_ROW = { id: "ring-of-warmth", name: "Ring of Warmth", category: "ring", equipped: true };
+  // A Dwarf's Dwarven Resilience, as the builder writes it: a typed list on the definition.
+  const definition = definitionOf({ damageResistances: ["poison"], damageImmunities: [] });
+
+  it("lists the stat block's typed resistance and a worn item's, naming the item", () => {
+    const sheet = sheetFor(stateWith([item(RING_ROW)]), definition, catalogOf([RING]));
+    expect(sheet.defences.resistances).toEqual([
+      { type: "poison", source: null },
+      { type: "cold", source: "Ring of Warmth" }
+    ]);
+    expect(sheet.defences.immunities).toEqual([]);
+  });
+
+  it("drops the item's resistance when it is not worn", () => {
+    const sheet = sheetFor(stateWith([item({ ...RING_ROW, equipped: false })]), definition, catalogOf([RING]));
+    expect(sheet.defences.resistances).toEqual([{ type: "poison", source: null }]);
+  });
+
+  it("matches the documented derived block", () => {
+    const ajv = new Ajv2020({ strict: false });
+    ajv.addSchema(openApiDocument as unknown as Record<string, unknown>, "openapi");
+    const validate = ajv.compile({
+      $ref: "openapi#/components/schemas/ActorAvailableActionsData/properties/derived"
+    });
+    const sheet = sheetFor(stateWith([item(RING_ROW)]), definition, catalogOf([RING]));
+    expect(validate(sheet), JSON.stringify(validate.errors)).toBe(true);
   });
 });

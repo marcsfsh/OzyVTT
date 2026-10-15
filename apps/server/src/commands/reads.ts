@@ -146,7 +146,8 @@ export const gameReads = [
           actor,
           definition,
           deriveEquipment(actor, definition, catalog),
-          kit.catalogFor(principal).skillSummaries()
+          kit.catalogFor(principal).skillSummaries(),
+          catalog
         )
       };
     }

@@ -486,7 +486,7 @@
 }
 .verification.rejected {
   border-color: var(--danger);
-  color: var(--danger-hi);
+  color: var(--danger-text);
 }
 .map-review {
   display: grid;
@@ -542,7 +542,7 @@
   font-size: var(--fs-xs);
 }
 .crosshair-label {
-  color: var(--magenta-hi);
+  color: var(--magenta-text);
   font-weight: 700;
 }
 .crosshair-swatches {

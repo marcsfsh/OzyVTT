@@ -33,7 +33,7 @@
   font-size: 0.8rem;
 }
 .api-reference-error {
-  color: var(--danger-hi);
+  color: var(--danger-text);
 }
 .api-reference-group {
   margin-top: var(--space-5);
@@ -213,6 +213,8 @@
 }
 .api-copy {
   margin-left: auto;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
   padding: var(--space-1) 0.6rem;
   font-size: 0.72rem;
   border: 1px solid var(--line);

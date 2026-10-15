@@ -43,7 +43,7 @@
 /* Soft outline tones: a coloured edge and readable tinted text on a quiet surface. */
 .nh-badge--primary {
   --nh-rim: var(--magenta);
-  color: var(--magenta-hi);
+  color: var(--magenta-text);
 }
 .nh-badge--success {
   --nh-rim: var(--success);
@@ -55,16 +55,11 @@
 }
 .nh-badge--danger {
   --nh-rim: var(--danger);
-  color: var(--danger-hi);
+  color: var(--danger-text);
 }
 .nh-badge--info {
   --nh-rim: var(--info);
-  color: var(--indigo);
-}
-/* Daybreak's outline info badge needs deeper ink. `:not(.nh-badge--solid)` is required: without it this beats
-   the solid variant's `--text-on-neon` and paints info ink on an info fill. */
-:root[data-theme="light"] .nh-badge--info:not(.nh-badge--solid) {
-  color: var(--info);
+  color: var(--indigo-text);
 }
 
 /* Solid: filled tone for counts and high emphasis, dark ink on neon. */

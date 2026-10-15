@@ -188,7 +188,7 @@
   background: transparent;
 }
 .nh-menu-item--danger {
-  color: var(--danger-hi);
+  color: var(--danger-text);
 }
 .nh-menu-item--danger:hover,
 .nh-menu-item--danger:active {

@@ -106,7 +106,10 @@
   text-wrap: balance;
   text-align: center;
 }
+/* The code is read aloud to whoever is at the TV, so it stays on one line across the full width,
+   sized to the panel: fourteen mono characters with their tracking are about 9.5em wide. */
 .viewer-pairing-code {
+  container-type: inline-size;
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 0.3rem var(--space-4);
@@ -117,21 +120,21 @@
   background: var(--surface-2);
 }
 .viewer-pairing-code .nh-eyebrow,
-.viewer-pairing-code strong,
-.viewer-pairing-code small {
-  grid-column: 1;
+.viewer-pairing-code strong {
+  grid-column: 1 / -1;
 }
 .viewer-pairing-code strong {
-  font: 700 clamp(1.5rem, 4vw, 2.25rem) var(--font-mono);
+  font: 700 clamp(1rem, 9cqi, 2.25rem) var(--font-mono);
   letter-spacing: 0.08em;
+  white-space: nowrap;
   color: var(--text);
 }
 .viewer-pairing-code small {
+  grid-column: 1;
   color: var(--text-muted);
 }
 .viewer-pairing-code .nh-btn {
   grid-column: 2;
-  grid-row: 1 / 4;
 }
 
 .viewer-tool-tabs {

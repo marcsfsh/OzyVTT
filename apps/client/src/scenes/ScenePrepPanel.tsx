@@ -33,6 +33,7 @@ export function ScenePrepPanel({
   onSelectMap,
   mapToken,
   mapFallback,
+  onMapUploaded,
   stagingRevealed,
   combatActive,
   busy = false,
@@ -58,6 +59,8 @@ export function ScenePrepPanel({
   onSelectMap?: (map: PickerMap) => void;
   mapToken?: string | null;
   mapFallback?: readonly MapSelection[];
+  /** A map was uploaded from the picker, so the caller's copy of the library is stale. */
+  onMapUploaded?: (map: PickerMap) => void;
   /** `GameState.stagingDefaults.visibility === "public"`: the tray toggle's starting state. */
   stagingRevealed: boolean;
   combatActive: boolean;
@@ -161,6 +164,7 @@ export function ScenePrepPanel({
             onSelectMap(map);
             if (!meta?.fromUpload) setPickingMap(false);
           }}
+          onUploaded={onMapUploaded}
         />
       )}
 

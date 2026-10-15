@@ -52,7 +52,7 @@
 }
 .integration-secret-warning {
   margin-top: 0.8rem;
-  color: var(--danger-hi);
+  color: var(--danger-text);
   font-size: 0.85rem;
 }
 .integration-form {

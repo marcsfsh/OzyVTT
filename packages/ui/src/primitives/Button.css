@@ -125,7 +125,7 @@
 /* Destructive — danger edge at rest, fills on hover, always with a clear label */
 .nh-btn--destructive {
   --nh-rim: var(--danger);
-  color: var(--danger-hi);
+  color: var(--danger-text);
 }
 
 /* ---- Interaction: the rim brightens and the cue appears, on :active as well as :hover. ---- */

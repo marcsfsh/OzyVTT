@@ -1,8 +1,15 @@
-import type { ActorDefinition, ActorDerivedSheet } from "@vtt/domain";
+import type { ActorDefinition, ActorDerivedSheet, DerivedDefence } from "@vtt/domain";
 import { ABILITIES, abilityModifier as modifierOf } from "@vtt/rules-5e";
 import { signed } from "./format";
 import type { SrdExtension } from "./sheet-extension";
 import type { SheetRolls } from "./useSheetRolls";
+
+const titleCase = (type: string) => `${type[0]?.toUpperCase() ?? ""}${type.slice(1)}`;
+
+/** A defence row as the engine applies it: each type, and what grants it when that isn't the stat block. */
+function defenceText(rows: readonly DerivedDefence[]): string {
+  return rows.map((row) => (row.source ? `${titleCase(row.type)} (${row.source})` : titleCase(row.type))).join(", ");
+}
 
 /** The six scores with their check rolls, and the stat block's senses, languages and defences. */
 export function SheetAbilities({
@@ -17,6 +24,13 @@ export function SheetAbilities({
   rolls: SheetRolls;
 }>) {
   const { rolling, rollD20 } = rolls;
+  // The typed lists the damage pipeline applies, items and species traits included. The stat block's
+  // prose is shown only where there is nothing typed, as for an imported monster with prose alone.
+  const defence = (typed: readonly DerivedDefence[] | undefined, prose: string | null | undefined) =>
+    typed && typed.length > 0 ? defenceText(typed) : prose;
+  const vulnerabilities = defence(derived?.defences.vulnerabilities, extension.damageVulnerabilities);
+  const resistances = defence(derived?.defences.resistances, extension.damageResistances);
+  const immunities = defence(derived?.defences.immunities, extension.damageImmunities);
   const derivedAbility = (ability: (typeof ABILITIES)[number]) =>
     derived?.abilities.find((row) => row.ability === ability) ?? null;
   return (
@@ -79,22 +93,22 @@ export function SheetAbilities({
             <dd>{extension.languages}</dd>
           </div>
         )}
-        {extension.damageVulnerabilities && (
+        {vulnerabilities && (
           <div>
             <dt>Vulnerabilities</dt>
-            <dd>{extension.damageVulnerabilities}</dd>
+            <dd>{vulnerabilities}</dd>
           </div>
         )}
-        {extension.damageResistances && (
+        {resistances && (
           <div>
             <dt>Resistances</dt>
-            <dd>{extension.damageResistances}</dd>
+            <dd>{resistances}</dd>
           </div>
         )}
-        {extension.damageImmunities && (
+        {immunities && (
           <div>
             <dt>Immunities</dt>
-            <dd>{extension.damageImmunities}</dd>
+            <dd>{immunities}</dd>
           </div>
         )}
         {extension.conditionImmunities && (

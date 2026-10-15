@@ -212,12 +212,21 @@ export type DerivedSkillRow = Readonly<{
   bonus: number | null;
   sources: readonly string[];
 }>;
+/** One damage type a defence covers, and what grants it (null for the stat block itself). */
+export type DerivedDefence = Readonly<{ type: string; source: string | null }>;
 export type ActorDerivedSheet = Readonly<{
   proficiencyBonus: number;
   armorClass: number;
   initiative: number;
   abilities: readonly DerivedAbilityRow[];
   skills: readonly DerivedSkillRow[];
+  /** The damage defences in force outside any one hit: the stat block's, chosen features', items' and
+   *  effects', as the damage pipeline reads them. */
+  defences: Readonly<{
+    resistances: readonly DerivedDefence[];
+    immunities: readonly DerivedDefence[];
+    vulnerabilities: readonly DerivedDefence[];
+  }>;
 }>;
 export type ActorActionsAvailabilityResult = {
   ok: boolean;

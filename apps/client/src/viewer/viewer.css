@@ -133,7 +133,7 @@
 }
 .viewer-feedback {
   min-height: 1.5rem;
-  color: var(--danger-hi) !important;
+  color: var(--danger-text) !important;
 }
 .viewer-shell {
   position: relative;
@@ -324,7 +324,7 @@
   top: 2rem;
   left: 50%;
   transform: translateX(-50%);
-  color: var(--magenta-hi);
+  color: var(--magenta-text);
 }
 /* The panel is a frame with a pinned resize handle; the content scrolls in the `.frame-fill`
    wrapper, sized by flex so it scrolls at both aspects. The inner edge is the 2px rim. */

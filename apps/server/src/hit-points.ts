@@ -1,4 +1,4 @@
-import type { Actor, DamageApplication, GameState, HealthBand } from "@vtt/domain";
+import type { Actor, ActorDerivedSheet, DamageApplication, DerivedDefence, GameState, HealthBand } from "@vtt/domain";
 import {
   adjustDamageParts,
   collectRiders,
@@ -21,7 +21,7 @@ import {
   removeConditionDirect,
   type EffectNarration
 } from "./effects.js";
-import { choiceOverrideDefenses } from "./choice-overrides.js";
+import { choiceOverrideDefenses, type OverrideDamageDefenses } from "./choice-overrides.js";
 import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 
 export function healthBandOf(hp: Actor["hp"]): HealthBand {
@@ -119,6 +119,41 @@ function definitionDefenses(definition: ActorDefinition | undefined, superseded:
   };
 }
 
+export type StandingDefences = ActorDerivedSheet["defences"];
+
+/**
+ * The defences an actor carries outside any one hit: the stat block's (less any a rest-time re-choice
+ * replaced), the re-chosen features', and its items' and effects'. Situational ones (Petrified,
+ * underwater) are added per hit by `applyDamageDetailed`.
+ */
+export function standingDefences(
+  definition: ActorDefinition | undefined,
+  fromChoices: OverrideDamageDefenses,
+  derivation: EquipmentDerivation
+): StandingDefences {
+  const innate = definitionDefenses(definition, fromChoices.suppressed);
+  const rows = (
+    stated: readonly string[],
+    chosen: readonly string[],
+    derived: EquipmentDerivation["damageResistances"]
+  ) => {
+    const seen = new Map<string, DerivedDefence>();
+    const add = (type: string, source: string | null) => {
+      const key = normalizeDamageType(type);
+      if (!seen.has(key)) seen.set(key, { type: key, source });
+    };
+    for (const type of stated) add(type, null);
+    for (const type of chosen) add(type, fromChoices.sources.get(normalizeDamageType(type)) ?? null);
+    for (const entry of derived) add(entry.id, entry.source);
+    return [...seen.values()];
+  };
+  return {
+    resistances: rows(innate.resistances, fromChoices.resistances, derivation.damageResistances),
+    immunities: rows(innate.immunities, fromChoices.immunities, derivation.damageImmunities),
+    vulnerabilities: rows(innate.vulnerabilities, [], derivation.damageVulnerabilities)
+  };
+}
+
 /** The single damage entry point (ADR-0020): typed parts go through definition, effect and item
  *  defences; the untyped amount stays exact. Temp HP absorbs first. At 0 HP player characters start
  *  dying (or die on massive overflow) and any combatant releases the effects it sustains. */
@@ -145,7 +180,6 @@ export function applyDamageDetailed(
     // Effects, items, feats and features are derived whole each time, so removing the ring or ending the Rage
     // removes the resistance on the next hit.
     const derivation = deriveEquipment(actor, definition, deps?.catalog);
-    const ids = (list: EquipmentDerivation["damageResistances"]) => list.map((entry) => entry.id);
     const derivedSourceOf = (adjustment: "resistance" | "immunity" | "vulnerability", type: string) => {
       const list =
         adjustment === "immunity"
@@ -159,20 +193,13 @@ export function applyDamageDetailed(
     const petrified = actor.conditions.some((condition) => condition.id === "petrified");
     // SRD Underwater Combat: everything fully underwater has resistance to fire damage.
     const underwater = state.combat.active && state.combat.underwater;
+    const standing = standingDefences(definition, fromChoices, derivation);
+    const types = (rows: readonly DerivedDefence[]) => rows.map((row) => row.type);
     const adjusted = adjustDamageParts(typed, {
-      resistances: [
-        ...innate.resistances,
-        ...fromChoices.resistances,
-        ...ids(derivation.damageResistances),
-        ...(underwater ? ["fire"] : [])
-      ],
-      immunities: [
-        ...(petrified ? [...innate.immunities, "poison"] : innate.immunities),
-        ...fromChoices.immunities,
-        ...ids(derivation.damageImmunities)
-      ],
+      resistances: [...types(standing.resistances), ...(underwater ? ["fire"] : [])],
+      immunities: [...types(standing.immunities), ...(petrified ? ["poison"] : [])],
       // Effects and items can make a target vulnerable as a stat block can; a same-type resistance cancels it.
-      vulnerabilities: [...innate.vulnerabilities, ...ids(derivation.damageVulnerabilities)],
+      vulnerabilities: types(standing.vulnerabilities),
       resistAll: petrified
     });
     parts = adjusted.map((part) => {
