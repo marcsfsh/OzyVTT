@@ -14,6 +14,7 @@
     "test": "npm run test --workspaces --if-present",
     "start": "npm run build && npm run start --workspace=@vtt/server",
     "map": "npm run map --workspace=@vtt/server",
+    "content": "npm run content --workspace=@vtt/content-srd-5.2.1",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint ."

@@ -151,8 +151,8 @@ off, with per-family exceptions (`rules-families.ts`). A player blocked by a rul
 
 ## Content and homebrew
 
-- SRD 5.2.1 content ships as JSON bundles in `packages/content-srd-5.2.1/bundles`, generated
-  from vendored sources by the package's `build-*` scripts. Magic-item mechanics are authored
+- SRD 5.2.1 content ships as JSON bundles in `packages/content-srd-5.2.1/bundles`, rebuilt from
+  the package's `sources/` by `npm run content`. Class and magic-item mechanics are authored
   separately and merged at build time.
 - The GM authors homebrew in the app. It is stored in its own store (`homebrew-store.ts`),
   validated against the same schemas, and served through `homebrew-http.ts`.

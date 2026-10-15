@@ -1,0 +1,290 @@
+[
+  {
+    "id": "acolyte",
+    "name": "Acolyte",
+    "source": "srd",
+    "summary": "You served in a temple, learning sacred rites and prayers.",
+    "description": "You spent your formative years in a temple, monastery, or shrine, performing sacred rites, copying prayers, and serving the faithful and the divine.",
+    "abilityOptions": {
+      "from": [
+        "int",
+        "wis",
+        "cha"
+      ],
+      "spreads": [
+        [
+          2,
+          1
+        ],
+        [
+          1,
+          1,
+          1
+        ]
+      ]
+    },
+    "originFeatId": "magic-initiate-cleric",
+    "skillProficiencies": [
+      "insight",
+      "religion"
+    ],
+    "toolProficiencies": [
+      "calligraphers-supplies"
+    ],
+    "startingEquipment": [
+      {
+        "id": "acolyte-a",
+        "label": "Calligrapher's Supplies, Book (prayers), Holy Symbol, 10 sheets of Parchment, Robe, and 8 GP",
+        "items": [
+          {
+            "id": "calligraphers-supplies",
+            "name": "Calligrapher's Supplies"
+          },
+          {
+            "id": "book",
+            "name": "Book (prayers)"
+          },
+          {
+            "id": "holy-symbol-amulet",
+            "name": "Holy Symbol"
+          },
+          {
+            "id": "parchment",
+            "name": "Parchment (one sheet)",
+            "quantity": 10
+          },
+          {
+            "id": "robe",
+            "name": "Robe"
+          }
+        ],
+        "goldPieces": 8
+      },
+      {
+        "id": "acolyte-b",
+        "label": "50 GP",
+        "items": [],
+        "goldPieces": 50
+      }
+    ]
+  },
+  {
+    "id": "criminal",
+    "name": "Criminal",
+    "source": "srd",
+    "summary": "You earned your living in the shadows, outside the law.",
+    "description": "You made your way on the wrong side of the law - picking locks, lifting purses, or pulling off jobs respectable folk pretend not to know about - and you learned to stay alert while doing it.",
+    "abilityOptions": {
+      "from": [
+        "dex",
+        "con",
+        "int"
+      ],
+      "spreads": [
+        [
+          2,
+          1
+        ],
+        [
+          1,
+          1,
+          1
+        ]
+      ]
+    },
+    "originFeatId": "alert",
+    "skillProficiencies": [
+      "sleight-of-hand",
+      "stealth"
+    ],
+    "toolProficiencies": [
+      "thieves-tools"
+    ],
+    "startingEquipment": [
+      {
+        "id": "criminal-a",
+        "label": "2 Daggers, Thieves' Tools, Crowbar, 2 Pouches, Traveler's Clothes, and 16 GP",
+        "items": [
+          {
+            "id": "dagger",
+            "name": "Dagger",
+            "quantity": 2
+          },
+          {
+            "id": "thieves-tools",
+            "name": "Thieves' Tools"
+          },
+          {
+            "id": "crowbar",
+            "name": "Crowbar"
+          },
+          {
+            "id": "pouch",
+            "name": "Pouch",
+            "quantity": 2
+          },
+          {
+            "id": "travelers-clothes",
+            "name": "Traveler's Clothes"
+          }
+        ],
+        "goldPieces": 16
+      },
+      {
+        "id": "criminal-b",
+        "label": "50 GP",
+        "items": [],
+        "goldPieces": 50
+      }
+    ]
+  },
+  {
+    "id": "sage",
+    "name": "Sage",
+    "source": "srd",
+    "summary": "You spent years learning the lore of the multiverse.",
+    "description": "You spent years learning the lore of the multiverse, studying at a library, an academy, or under a mentor, and you know where to look for answers.",
+    "abilityOptions": {
+      "from": [
+        "con",
+        "int",
+        "wis"
+      ],
+      "spreads": [
+        [
+          2,
+          1
+        ],
+        [
+          1,
+          1,
+          1
+        ]
+      ]
+    },
+    "originFeatId": "magic-initiate-wizard",
+    "skillProficiencies": [
+      "arcana",
+      "history"
+    ],
+    "toolProficiencies": [
+      "calligraphers-supplies"
+    ],
+    "startingEquipment": [
+      {
+        "id": "sage-a",
+        "label": "Quarterstaff, Calligrapher's Supplies, Book (history), 8 sheets of Parchment, Robe, and 8 GP",
+        "items": [
+          {
+            "id": "quarterstaff",
+            "name": "Quarterstaff"
+          },
+          {
+            "id": "calligraphers-supplies",
+            "name": "Calligrapher's Supplies"
+          },
+          {
+            "id": "book",
+            "name": "Book (history)"
+          },
+          {
+            "id": "parchment",
+            "name": "Parchment (one sheet)",
+            "quantity": 8
+          },
+          {
+            "id": "robe",
+            "name": "Robe"
+          }
+        ],
+        "goldPieces": 8
+      },
+      {
+        "id": "sage-b",
+        "label": "50 GP",
+        "items": [],
+        "goldPieces": 50
+      }
+    ]
+  },
+  {
+    "id": "soldier",
+    "name": "Soldier",
+    "source": "srd",
+    "summary": "You trained on a battlefield and learned discipline under arms.",
+    "description": "You trained as a soldier, whether in a militia, a mercenary company, or a standing army. You learned discipline, unit tactics, and the value of a hot meal.",
+    "abilityOptions": {
+      "from": [
+        "str",
+        "dex",
+        "con"
+      ],
+      "spreads": [
+        [
+          2,
+          1
+        ],
+        [
+          1,
+          1,
+          1
+        ]
+      ]
+    },
+    "originFeatId": "savage-attacker",
+    "skillProficiencies": [
+      "athletics",
+      "intimidation"
+    ],
+    "toolChoices": {
+      "choose": 1,
+      "from": [
+        "gaming-set-dice",
+        "gaming-set-playing-cards"
+      ]
+    },
+    "startingEquipment": [
+      {
+        "id": "soldier-a",
+        "label": "Spear, Shortbow, 20 Arrows, Gaming Set, Healer's Kit, Quiver, Traveler's Clothes, and 14 GP",
+        "items": [
+          {
+            "id": "spear",
+            "name": "Spear"
+          },
+          {
+            "id": "shortbow",
+            "name": "Shortbow"
+          },
+          {
+            "id": "arrows-20",
+            "name": "Arrows (20)"
+          },
+          {
+            "id": "gaming-set-dice",
+            "name": "Gaming Set (Dice)"
+          },
+          {
+            "id": "healers-kit",
+            "name": "Healer's Kit"
+          },
+          {
+            "id": "quiver",
+            "name": "Quiver"
+          },
+          {
+            "id": "travelers-clothes",
+            "name": "Traveler's Clothes"
+          }
+        ],
+        "goldPieces": 14
+      },
+      {
+        "id": "soldier-b",
+        "label": "50 GP",
+        "items": [],
+        "goldPieces": 50
+      }
+    ]
+  }
+]

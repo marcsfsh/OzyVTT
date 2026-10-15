@@ -1041,7 +1041,7 @@ describe("2a - no class or subclass feature falls back to a pointer at an extern
     expect(proseOf("barbarian", "rage")).toContain("a primal power called Rage");
     expect(proseOf("monk", "martial-arts")).toContain("Unarmed Strike");
     expect(proseOf("rogue", "sneak-attack")).toContain("Sneak Attack");
-    // Negative control: the three HAND_AUTHORED classes are skipped by the ETL and must be untouched.
+    // Negative control: the three hand-authored classes are copied from sources/authored, not generated.
     expect(proseOf("cleric", "channel-divinity")).toContain("Channel Divinity");
     expect(proseOf("wizard", "arcane-recovery")).toContain(
       "regain some of your magical energy by studying your spellbook"

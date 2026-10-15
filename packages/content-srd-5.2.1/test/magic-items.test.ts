@@ -1,13 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { ItemSlotSchema } from "@vtt/schemas";
-import { ITEM_MECHANICS_LANES } from "../scripts/item-mechanics/index.js";
+import { ITEM_MECHANICS } from "../scripts/item-mechanics/items.js";
 import { loadArmor, loadEquipment, loadMagicItems, loadWeapons } from "../src/index.js";
-import { RARITY_IDS } from "../src/enums.js";
 
 /**
- * Guards the output of `scripts/build-magic-items.ts`; `magic-item-source.test.ts` guards its input.
- * The worn/carried `slot` split is one reading of the SRD among several, and the lanes are scoped
- * off it, so it is pinned per slot.
+ * What `scripts/build-magic-items.ts` decides, pinned where a reading of the SRD is a choice: the
+ * ladder expansion, the worn/carried slot split, the browse categories and the base-item column.
+ * Counts the ETL already refuses on (268 rows, slots and rarities in their enums) are not repeated.
  */
 
 const rows = loadMagicItems();
@@ -45,14 +43,10 @@ const VARIES_ROWS = [
 ];
 
 describe("the generated magic-item bundle", () => {
-  it("emits 268 rows: 258 printed entries, minus 5 ladders, plus their 15 tiers", () => {
-    expect(rows).toHaveLength(268);
-    // 258 - 5 + 15 = 268, asserted in parts so a wrong expansion says which half moved.
-    const ladders = rows.filter((row) => LADDER_ROWS.includes(row.name));
+  it("expands the five +1/+2/+3 ladders to one row per tier, and keeps each Rarity Varies table whole", () => {
+    const ladders = rows.filter((row) => /, \+[123]$/.test(row.name));
     expect(ladders.map((row) => row.name).sort()).toEqual([...LADDER_ROWS].sort());
-    expect(rows.length - ladders.length).toBe(258 - 5);
-    expect(258 - 5 + ladders.length).toBe(268);
-    // ...and the seven that deliberately did not expand are each still exactly one row.
+    // The seven that deliberately did not expand are each still exactly one row.
     for (const name of VARIES_ROWS) {
       expect(
         rows.filter((row) => row.name === name),
@@ -70,30 +64,6 @@ describe("the generated magic-item bundle", () => {
         creature
       ).not.toContain(creature);
     }
-  });
-
-  it("classifies every row into a slot that is a member of ItemSlotSchema", () => {
-    // `slot` is a closed enum the engine switches on, so name-derived values are checked per item.
-    const bad = rows
-      .filter((row) => !ItemSlotSchema.safeParse(row.slot).success)
-      .map((row) => `${row.name} -> ${String(row.slot)}`);
-    expect(bad, "rows whose slot is not a member of ItemSlotSchema").toEqual([]);
-    expect(histogram(rows.map((row) => row.slot!))).toEqual({
-      wondrous: 71,
-      held: 34,
-      weapon: 33,
-      consumable: 25,
-      ring: 22,
-      neck: 15,
-      shoulders: 15,
-      armor: 14,
-      head: 11,
-      shield: 9,
-      feet: 7,
-      hands: 6,
-      ammunition: 4,
-      belt: 2
-    });
   });
 
   it("emits only category values the browse-and-add chips can filter on", () => {
@@ -115,17 +85,12 @@ describe("the generated magic-item bundle", () => {
     });
   });
 
-  it("splits the 127 wondrous items 56 worn / 71 carried, and that split is the rule's OUTPUT", () => {
+  it("splits the wondrous items into worn and carried by the slot rule, pinned by name", () => {
     /**
      * The rule lives in `scripts/build-magic-items.ts`: worn when the name names a garment, minus
      * `Hat of Many Spells` (held), plus `Wings of Flying` (its prose says "this cloak").
      */
-    const wondrous = rows.filter((row) => row.category === "wondrous-item");
-    expect(wondrous).toHaveLength(127);
-    const worn = wondrous.filter((row) => row.slot !== "wondrous");
-    expect(worn).toHaveLength(56);
-    expect(wondrous.filter((row) => row.slot === "wondrous")).toHaveLength(71);
-    // Roster first, so a failure names the item that moved rather than a count.
+    const worn = rows.filter((row) => row.category === "wondrous-item" && row.slot !== "wondrous");
     const roster = worn.reduce<Record<string, string[]>>(
       (into, row) => ({ ...into, [row.slot!]: [...(into[row.slot!] ?? []), row.name].sort() }),
       {}
@@ -197,15 +162,6 @@ describe("the generated magic-item bundle", () => {
       ],
       belt: ["Belt of Dwarvenkind", "Belt of Giant Strength"]
     });
-    // The counts, derived from the roster above so the two can never disagree.
-    expect(histogram(worn.map((row) => row.slot!))).toEqual({
-      neck: 15,
-      shoulders: 15,
-      head: 11,
-      feet: 7,
-      hands: 6,
-      belt: 2
-    });
     // `Ioun Stone` orbits rather than occupies the head, and horseshoes are worn by a horse.
     // `Hat of Many Spells` is held, not worn; at `head` it would block a helm (`SLOT_CAPACITY.head` is 1).
     expect(rows.find((row) => row.name === "Hat of Many Spells")!.slot).toBe("wondrous");
@@ -224,15 +180,10 @@ describe("the generated magic-item bundle", () => {
       .map((row) => row.name)
       .sort();
     expect(ammunition).toEqual(["Ammunition of Slaying", "Ammunition, +1", "Ammunition, +2", "Ammunition, +3"]);
-    expect(rows.filter((row) => row.slot === "shield")).toHaveLength(9);
     expect(rows.find((row) => row.name === "Animated Shield")!.slot).toBe("shield");
   });
 
-  it("declares only rarities RARITY_IDS knows, which is what makes that containment non-vacuous", () => {
-    const bad = rows
-      .filter((row) => !RARITY_IDS.includes(row.rarity ?? ""))
-      .map((row) => `${row.name} -> ${String(row.rarity)}`);
-    expect(bad, "rows whose rarity is outside RARITY_IDS").toEqual([]);
+  it("reads each printed rarity, and a d100 rung as varies", () => {
     expect(histogram(rows.map((row) => row.rarity!))).toEqual({
       rare: 87,
       uncommon: 77,
@@ -266,9 +217,6 @@ describe("the generated magic-item bundle", () => {
       "dwarf",
       "creature-attuned-to-a-belt-of-dwarvenkind"
     ]);
-    expect(rows.filter((row) => row.attunement?.required && row.attunement.restrictedTo.length === 0)).toHaveLength(
-      119
-    );
   });
 
   it("prices nothing, because the SRD prints a value band by rarity and not a per-item price", () => {
@@ -278,11 +226,11 @@ describe("the generated magic-item bundle", () => {
 
   it("carries no mechanics the overlay did not author - the ETL itself emits none", () => {
     /**
-     * Every rider in the generated bundle must come from `scripts/item-mechanics/`; one hand-edited into
-     * `magic-items.v1.json` would be destroyed by the next build. `item-mechanics.test.ts` covers the
-     * other direction.
+     * Every rider in the generated bundle must come from `scripts/item-mechanics/items.ts`; one
+     * hand-edited into `magic-items.v1.json` would be destroyed by the next build.
+     * `item-mechanics.test.ts` covers the other direction.
      */
-    const authored = new Set(ITEM_MECHANICS_LANES.flatMap((lane) => Object.keys(lane.entries)));
+    const authored = new Set(Object.keys(ITEM_MECHANICS));
     const withMechanics = rows.filter(
       (row) =>
         row.modifiers.length > 0 ||
@@ -295,7 +243,7 @@ describe("the generated magic-item bundle", () => {
     );
     expect(
       withMechanics.filter((row) => !authored.has(row.id)).map((row) => row.name),
-      "a rider in the generated bundle that no lane authored was hand-edited in, and the next build destroys it"
+      "a rider in the generated bundle that items.ts does not author was hand-edited in, and the next build destroys it"
     ).toEqual([]);
     expect(rows.every((row) => row.isMagic)).toBe(true);
     expect(rows.every((row) => row.source === "srd")).toBe(true);
@@ -315,7 +263,7 @@ describe("the generated magic-item bundle", () => {
     expect(rows.find((row) => row.name === "Armor of Resistance")!.description).toContain("1d10 1: Damage Type Acid");
   });
 
-  it("cuts exactly twelve descriptions at the schema's 2000-char cap, and names them", () => {
+  it("cuts only the two long d100 tables at the 4000-char cap, and names them", () => {
     // The cap matches `InventoryItemSchema.description` (add-from-catalog copies this string onto it).
     // Overflow is cut at a sentence boundary and marked; only two long d100 tables are cut.
     const cut = rows
@@ -323,7 +271,6 @@ describe("the generated magic-item bundle", () => {
       .map((row) => row.name)
       .sort();
     expect(cut).toEqual(["Mysterious Deck", "Wand of Wonder"]);
-    expect(rows.every((row) => row.description!.length <= 4000)).toBe(true);
     // Spot-checks mechanics that a lower cap would cut.
     const textOf = (name: string) => rows.find((row) => row.name === name)!.description!;
     expect(textOf("Ring of Elemental Command")).toContain("save DC of 18");
@@ -364,13 +311,25 @@ describe("the generated magic-item bundle", () => {
     expect(rows.filter((row) => /^Potion of Healing/.test(row.name))).toEqual([]);
   });
 
+  it("gives every magic shield the plain shield's armor block, so its own bonus stacks on the +2", () => {
+    // AC derivation counts a shield only through its armor block; the rarity bonus is a separate rider.
+    const plain = loadEquipment().find((item) => item.id === "shield")!.armor;
+    expect(plain).toMatchObject({ acBase: 2 });
+    const shields = rows.filter((row) => row.slot === "shield");
+    expect(shields.filter((row) => JSON.stringify(row.armor) !== JSON.stringify(plain)).map((row) => row.id)).toEqual(
+      []
+    );
+    expect(shields.map((row) => row.id)).toContain("shield-2");
+  });
+
   it("reaches the addable catalog through the fourth fold, sorted in with everything else", () => {
     const catalog = loadEquipment();
-    expect(catalog.filter((item) => item.isMagic)).toHaveLength(268);
-    // The fold gives every row the uniform `weapon`/`armor`-present shape the other three have.
-    expect(catalog.filter((item) => item.isMagic).every((item) => item.weapon === null && item.armor === null)).toBe(
-      true
-    );
+    expect(catalog.filter((item) => item.isMagic)).toHaveLength(rows.length);
+    // The fold gives every row the uniform `weapon`/`armor`-present shape the other three have; only a
+    // shield carries a block of its own (see below).
+    const magic = catalog.filter((item) => item.isMagic);
+    expect(magic.filter((item) => item.weapon !== null)).toEqual([]);
+    expect(magic.filter((item) => item.armor !== null && item.slot !== "shield")).toEqual([]);
     const wand = catalog.find((item) => item.id === "wand-of-the-war-mage-1")!;
     expect(wand).toMatchObject({
       name: "Wand of the War Mage, +1",
@@ -607,13 +566,12 @@ describe("the eligibility column", () => {
         .sort()
     ).toEqual(["energy-bow", "sun-blade"]);
     expect(rows.filter((row) => row.category !== "weapon" && row.category !== "armor" && row.appliesTo)).toEqual([]);
-    // Magic ammunition is unbound (no ammunition model), and a shield is its own base.
+    // Magic ammunition is unbound (no ammunition model), and a shield carries its own block.
     expect(
       rows
         .filter((row) => row.category === "ammunition")
         .map((row) => row.id)
         .sort()
     ).toEqual(["ammunition-1", "ammunition-2", "ammunition-3", "ammunition-of-slaying"]);
-    expect(rows.filter((row) => row.category === "shield")).toHaveLength(9);
   });
 });

@@ -1,7 +1,7 @@
 /**
- * Cleric and Life Domain mechanics. Cleric is HAND_AUTHORED, so this overlay may only add to the
- * record in `classes.v1.json`; riders already there (Divine Order, Blessed Strikes, Channel
- * Divinity, the domain spell tiers) are not restated.
+ * Cleric and Life Domain mechanics. Cleric is hand-transcribed in `sources/authored/classes.json`;
+ * riders already there (Divine Order, Blessed Strikes, Channel Divinity, the domain spell tiers) are
+ * not restated here.
  */
 import type { ClassMechanicsModule } from "./overlay.js";
 
