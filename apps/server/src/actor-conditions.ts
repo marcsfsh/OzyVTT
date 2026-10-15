@@ -13,7 +13,14 @@ import {
 import { conditionLabel, exhaustionLevel, INCAPACITATING_CONDITIONS } from "./condition-rules.js";
 import { deriveEquipment } from "./equipment-derivation.js";
 import { currentSpeedFeet, effectiveSpeedFeet } from "./speed.js";
-import { effectiveModeFor, familyModeFor, overrideCovers, rememberOverride } from "./rules-families.js";
+import {
+  effectiveModeFor,
+  familyModeFor,
+  overrideCovers,
+  overrideWaives,
+  rememberOverride,
+  type RulesOverride
+} from "./rules-families.js";
 
 /** Tracks a condition on an actor. The engine owns the mechanical hooks (ADR-0020): condition immunities
  *  skip with narration, and Exhaustion reaching level 6 is death. Returns narration events. `level` is
@@ -25,7 +32,7 @@ export function setCondition(
   active: boolean,
   level: number | undefined,
   scope: Initiator,
-  options?: ConditionImmunitySource & Readonly<{ override?: { reason?: string } | null }>
+  options?: ConditionImmunitySource & Readonly<{ override?: RulesOverride | null }>
 ): EffectNarration[] {
   const actor = adjustableActor(state, actorId, scope);
   if (level !== undefined && conditionId !== "exhaustion")
@@ -57,16 +64,17 @@ export function setCondition(
         effective === 0
           ? `${actor.name} can't stand up - its Speed is 0.`
           : `Standing up costs ${cost} ft of movement - ${actor.name} has ${Math.max(0, Math.round(budgetLeft * 10) / 10)} ft left.`;
+      const waived = overrideWaives(options?.override, "movement.stand-up-cost");
       if (
         blocked &&
-        !options?.override &&
+        !waived &&
         effectiveModeFor(state.combat, "movement.stand-up-cost") === "strict" &&
         !overrideCovers(state.combat.turn, "movement.stand-up-cost")
       ) {
         throw new RulesBlockedError("movement.stand-up-cost", violation);
       }
       // A GM Allow here covers the movement family for the rest of the turn, exactly as it does on the map.
-      if (blocked && options?.override) rememberOverride(state, "movement.stand-up-cost");
+      if (blocked && waived) rememberOverride(state, "movement.stand-up-cost", options?.override);
       state.combat = {
         ...state.combat,
         turn: { ...state.combat.turn, movementUsedFeet: state.combat.turn.movementUsedFeet + cost }
@@ -75,8 +83,7 @@ export function setCondition(
       // Assisted mode (and a strict turn already covered by a GM Allow) narrates the violation as a
       // "Rules note", the movement family's convention, rather than passing silently. An explicit
       // `override` on this command is audited by the caller instead.
-      if (blocked && !options?.override)
-        events.push({ kind: "condition", text: `Rules note: ${violation}`, actorId: actor.id });
+      if (blocked && !waived) events.push({ kind: "condition", text: `Rules note: ${violation}`, actorId: actor.id });
     }
     actor.conditions = actor.conditions.filter((condition) => condition.id !== conditionId);
     return events;

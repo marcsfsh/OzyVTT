@@ -16,7 +16,7 @@ import {
 import type { ActorDefinition } from "@vtt/schemas";
 import type { EquipmentCatalog, EquipmentDerivation } from "../equipment-derivation.js";
 import { recordRoll as recordRollInHistory, rolledTerms } from "../roll-history.js";
-import type { RuleId } from "../rules-families.js";
+import type { RuleId, RulesOverride } from "../rules-families.js";
 import type { MasterySwing } from "../weapon-mastery.js";
 import type { BuiltinHandler } from "./builtins.js";
 import type { EconomyPlan } from "./economy.js";
@@ -32,7 +32,7 @@ export type ResolveInput = Readonly<{
   /** Explicit GM roll-mode choice; wins over the aggregated advantage/disadvantage sources. */
   rollMode?: "advantage" | "disadvantage" | "normal" | null;
   /** GM override of a rules-mode rejection; audited in the log and journal (ADR-0020). */
-  override?: Readonly<{ reason?: string }> | null;
+  override?: RulesOverride | null;
   /** The action came from the builtin catalog (not the stat block); enables the builtin special cases. */
   builtin?: boolean;
   /** Free-text annotation (the Ready action's trigger); folded into the granted effect's name. */

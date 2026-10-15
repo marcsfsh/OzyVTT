@@ -1267,6 +1267,15 @@ const homebrewDataObject = (key: string, valueSchema: unknown) => ({
 //   1. Absent, never null: Zod `.optional()` rejects null. `required` is exactly the Zod schema's non-optional
 //      keys; a field with a Zod `.default()` is optional on the wire.
 //   2. Riders are hoisted into named components, because `reference.ts` flattens only one level of nesting.
+/** The rule families an override waives; absent, it waives every block on the command (the GM's own ruling). */
+const rulesOverrideFamilies = {
+  type: "array",
+  minItems: 1,
+  maxItems: 5,
+  items: { type: "string", enum: ["movement", "economy", "resources", "targeting", "slots"] },
+  description:
+    "Limit the override to these kinds of block, so allowing one kind never waves another through. Absent, it waives every block on the command."
+} as const;
 const homebrewAbility = { type: "string", enum: ["str", "dex", "con", "int", "wis", "cha"] } as const;
 const homebrewLevel = { type: "integer", minimum: 1, maximum: 20 } as const;
 const homebrewSize = { type: "string", enum: ["tiny", "small", "medium", "large", "huge", "gargantuan"] } as const;
@@ -2905,7 +2914,7 @@ export const openApiDocument = {
     ...gameCommandOperation(
       "rules.answer",
       "answerRulesAsk",
-      "Answers a parked question in one tap (GM-grade only, D9). `allow: true` re-runs the parked command under GM authority with an injected override - the `reason` is optional and the audit line falls back to \"GM override\" - and the rules engine remembers the rule's FAMILY for the rest of that character's turn, so the same kind of block stops re-prompting. The replay runs against CURRENT state and passes full validation, so a stale question (the target moved, the target died) fails loudly and stays parked for another look. `allow: false` clears it and tells the player. A question that no longer exists is a 409.",
+      "Answers a parked question in one tap (GM-grade only, D9). `allow: true` re-runs the parked command under GM authority with an injected override of the asked rule's FAMILY only - the `reason` is optional and the audit line falls back to \"GM override\" - and the rules engine remembers that family for the rest of that character's turn, so the same kind of block stops re-prompting. The replay runs against CURRENT state and passes full validation, so a stale question (the target moved, the target died) fails loudly and stays parked for another look. A replay stopped by a block of ANOTHER family does not ride the same Allow: the question is re-asked about that block under a fresh `askId` (the reply carries `blocked`), and the next Allow covers both families. `allow: false` clears it and tells the player. A question that no longer exists is a 409.",
       "RulesAnswerRequest"
     ),
     [CONTENT_PATHS.monsters]: {
@@ -4457,7 +4466,7 @@ export const openApiDocument = {
             type: "object",
             additionalProperties: false,
             required: ["reason"],
-            properties: { reason: { type: "string", minLength: 1, maxLength: 300 } },
+            properties: { reason: { type: "string", minLength: 1, maxLength: 300 }, families: rulesOverrideFamilies },
             description: "GM-grade bypass of a movement-budget rejection; audited in the combat log"
           }
         }
@@ -4626,7 +4635,7 @@ export const openApiDocument = {
           override: {
             type: "object",
             additionalProperties: false,
-            properties: { reason: { type: "string", minLength: 1, maxLength: 300 } },
+            properties: { reason: { type: "string", minLength: 1, maxLength: 300 }, families: rulesOverrideFamilies },
             description:
               "GM-grade only: waves the off-turn refusal (and the resolver's own economy blocks) through, remembers the family for the rest of the turn, and audits the line. The reason is optional."
           }
@@ -5424,7 +5433,7 @@ export const openApiDocument = {
             type: "object",
             additionalProperties: false,
             required: ["reason"],
-            properties: { reason: { type: "string", minLength: 1, maxLength: 300 } },
+            properties: { reason: { type: "string", minLength: 1, maxLength: 300 }, families: rulesOverrideFamilies },
             description: "GM-grade bypass of the stand-up movement cost rejection; audited"
           }
         }
@@ -5545,7 +5554,7 @@ export const openApiDocument = {
             type: "object",
             additionalProperties: false,
             required: ["reason"],
-            properties: { reason: { type: "string", minLength: 1, maxLength: 300 } },
+            properties: { reason: { type: "string", minLength: 1, maxLength: 300 }, families: rulesOverrideFamilies },
             description: "Bypasses a rules-mode rejection; audited in the combat log and journal"
           },
           effectId: {

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema, RuleFamilySchema, type GameState, type RuleFamily } from "@vtt/domain";
+import { ActorDefinitionSchema, type ActorAction } from "@vtt/schemas";
+import { loadActorFixture } from "@vtt/test-fixtures";
+import { resolveDefinitionAction } from "../src/action-resolution.js";
+import { RulesBlockedError } from "../src/game-store.js";
 import {
   effectiveModeFor,
   familyModeFor,
@@ -8,7 +12,8 @@ import {
   overrideReason,
   rememberOverride,
   RULE_IDS,
-  type RuleId
+  type RuleId,
+  type RulesOverride
 } from "../src/rules-families.js";
 
 // Two properties of the rule-family map:
@@ -118,5 +123,87 @@ describe("override reason", () => {
     expect(overrideReason({})).toBe("GM override");
     expect(overrideReason({ reason: "   " })).toBe("GM override");
     expect(overrideReason({ reason: "House rule" })).toBe("House rule");
+  });
+});
+
+describe("an override waives only its own family", () => {
+  // The Hero has spent this turn's action and the War Cry's one use: an economy block and a resources block.
+  const HERO = "10000000-0000-4000-8000-0000000000c1";
+  const WAR_CRY: ActorAction = {
+    id: "war-cry",
+    name: "War Cry",
+    activation: "action",
+    description: "A shout that rallies allies.",
+    damage: [],
+    uses: { limit: 1, per: "long-rest" }
+  };
+  const definition = ActorDefinitionSchema.parse({
+    ...(loadActorFixture("monster") as object),
+    actions: [WAR_CRY]
+  });
+  const spentTurn = () =>
+    GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [
+        {
+          id: HERO,
+          name: "Hero",
+          kind: "monster",
+          visibility: "public",
+          hp: { current: 7, maximum: 7 },
+          actionUses: { "war-cry": 1 }
+        }
+      ],
+      combat: {
+        active: true,
+        round: 1,
+        turnActorId: HERO,
+        rulesMode: "strict",
+        initiative: [{ actorId: HERO, score: 10 }],
+        turn: { actionUsed: true, bonusActionUsed: false, actionInstance: null, turnUses: {}, movementUsedFeet: 0 }
+      }
+    });
+  let command = 0;
+  const shout = (state: GameState, override: RulesOverride) =>
+    resolveDefinitionAction(
+      state,
+      WAR_CRY,
+      {
+        actorId: HERO,
+        targetIds: [],
+        commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`,
+        override
+      },
+      {
+        random: () => 1,
+        newRollId: () => "40000000-0000-4000-8000-000000000001",
+        gmSessionId: "30000000-0000-4000-8000-00000000000a",
+        now: () => "2026-10-15T00:00:00.000Z",
+        definition
+      }
+    );
+  const blockedRule = (run: () => unknown): string | null => {
+    try {
+      run();
+      return null;
+    } catch (error) {
+      return error instanceof RulesBlockedError ? error.rule : String(error);
+    }
+  };
+
+  it("leaves a resources block standing under an economy override, and the other way round", () => {
+    expect(blockedRule(() => shout(spentTurn(), { families: ["economy"] }))).toBe("feature.no-uses-remaining");
+    expect(blockedRule(() => shout(spentTurn(), { families: ["resources"] }))).toBe("economy.action-used");
+  });
+
+  it("resolves once every blocking family is named, and remembers each for the turn", () => {
+    const state = spentTurn();
+    const resolution = shout(state, { families: ["economy", "resources"] });
+    expect(resolution.overridden?.rule).toBe("feature.no-uses-remaining");
+    expect([...(state.combat.turn.rulesOverriddenFamilies ?? [])].sort()).toEqual(["economy", "resources"]);
+  });
+
+  it("treats an override naming no family as the GM's own ruling on the whole command", () => {
+    expect(blockedRule(() => shout(spentTurn(), { reason: "The GM said so" }))).toBeNull();
   });
 });

@@ -10,6 +10,7 @@ import {
   RollPurposeSchema,
   RollVisibilitySchema,
   RuleExceptionsSchema,
+  RuleFamilySchema,
   RuleModeSchema
 } from "@vtt/domain";
 import {
@@ -26,7 +27,14 @@ import {
 // the idempotency key; `expectedRevision` the optimistic-concurrency guard.
 
 /** A GM override of a rules block. The reason is optional so an override is one tap; audit lines fall back to "GM override". */
-export const RulesOverrideSchema = z.object({ reason: z.string().trim().min(1).max(300).optional() }).strict();
+/** A GM override. `families` limits it to those kinds of block (an Allow names the one the GM was asked about);
+ *  absent, it waives every block on the command. */
+export const RulesOverrideSchema = z
+  .object({
+    reason: z.string().trim().min(1).max(300).optional(),
+    families: z.array(RuleFamilySchema).min(1).max(5).optional()
+  })
+  .strict();
 /** Per-family exceptions on the wire are strict: a misspelled family is a rejection, never a silent no-op. */
 export const WireRuleExceptionsSchema = RuleExceptionsSchema.strict();
 export const CommandIdentitySchema = z
