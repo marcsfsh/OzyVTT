@@ -12,13 +12,8 @@ import { socket } from "../socket";
 import { CreateRecordModal, type CreateRequest } from "./CreateRecordModal";
 import { HomebrewRail, EMPTY_FILTERS, type RailFilters } from "./HomebrewRail";
 import { RecordDetail } from "./RecordDetail";
-import {
-  HomebrewRequestError,
-  homebrewApi,
-  listAllHomebrew,
-  type HomebrewRecordDocument,
-  type HomebrewRecordSummary
-} from "./api";
+import { homebrewApi, listAllHomebrew, type HomebrewRecordDocument, type HomebrewRecordSummary } from "./api";
+import { ApiError } from "../lib/api";
 import { blankDraft } from "./defaults";
 import { typeLabel } from "./types";
 import "./homebrew.css";
@@ -45,7 +40,7 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
       setLoadMessage(null);
     } catch (error) {
       // 404 (router not mounted) or 501 (store not mounted) means "not available", not "broken".
-      const status = error instanceof HomebrewRequestError ? error.status : 0;
+      const status = error instanceof ApiError ? error.status : 0;
       setLoad(status === 404 || status === 501 ? "unavailable" : "error");
       setLoadMessage(error instanceof Error ? error.message : "Couldn't load your homebrew.");
     }
