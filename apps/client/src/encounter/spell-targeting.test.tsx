@@ -11,8 +11,8 @@ import { socket } from "../socket";
 import { ActionTargetPicker } from "./ActionTargetPicker";
 import { beginTargeting, resolveTargeting, toggleTarget, useTargeting } from "./targeting";
 
-// Magic Missile's darts strike one creature or several: the picker assigns them, and the resolve names each target
-// once per dart it takes.
+// Spells that ask the caster something when they target: Magic Missile's darts strike one creature or several (the
+// picker assigns them, and the resolve names each target once per dart), and Chromatic Orb's damage type.
 
 const MISSILE = {
   id: "spell-magic-missile",
@@ -28,6 +28,19 @@ const MISSILE = {
 const CASTER = "11111111-1111-4111-8111-111111111111";
 const GOBLIN = "22222222-2222-4222-8222-222222222222";
 const ORC = "33333333-3333-4333-8333-333333333333";
+
+/** The last resolve sent, acknowledged so the next test's resolve isn't held up as busy. */
+async function lastResolve(): Promise<Record<string, unknown>> {
+  const [event, payload, ack] = vi.mocked(socket.emit).mock.calls.at(-1)! as unknown as [
+    string,
+    Record<string, unknown>,
+    (error: null, reply: unknown) => void
+  ];
+  expect(event).toBe("action:resolve");
+  ack(null, { ok: false, message: "Refused in the test." });
+  await Promise.resolve();
+  return payload;
+}
 
 function Picker() {
   const session = useTargeting();
@@ -45,7 +58,7 @@ function Picker() {
 }
 
 describe("assigning Magic Missile's darts", () => {
-  it("gives each chosen target a dart count, and sends a target once per dart", () => {
+  it("gives each chosen target a dart count, and sends a target once per dart", async () => {
     beginTargeting(MISSILE, CASTER, 2, 4);
     render(<Picker />);
     act(() => {
@@ -57,8 +70,22 @@ describe("assigning Magic Missile's darts", () => {
     fireEvent.click(goblin.querySelector('button[aria-label="Increase"]')!);
     expect(screen.getByText(/4 darts: all assigned/)).toBeTruthy();
     resolveTargeting(undefined, () => {});
-    const [event, payload] = vi.mocked(socket.emit).mock.calls.at(-1)!;
-    expect(event).toBe("action:resolve");
-    expect(payload).toMatchObject({ targetIds: [GOBLIN, GOBLIN, GOBLIN, ORC], slotLevel: 2 });
+    expect(await lastResolve()).toMatchObject({ targetIds: [GOBLIN, GOBLIN, GOBLIN, ORC], slotLevel: 2 });
+  });
+
+  it("sends the damage type picked for Chromatic Orb", async () => {
+    const orb = {
+      ...MISSILE,
+      id: "spell-chromatic-orb",
+      name: "Chromatic Orb",
+      darts: undefined,
+      damageTypes: ["acid", "fire"]
+    };
+    beginTargeting(orb as unknown as ContentActionSummary, CASTER, 1);
+    render(<Picker />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "fire" } });
+    act(() => toggleTarget(GOBLIN));
+    resolveTargeting(undefined, () => {});
+    expect(await lastResolve()).toMatchObject({ targetIds: [GOBLIN], damageType: "fire" });
   });
 });

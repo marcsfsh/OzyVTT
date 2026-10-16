@@ -92,7 +92,13 @@ describe("save outcomes in the shipped content", () => {
 
   it("reads spells' running prose the same way", () => {
     expect(spellSave("fireball")).toEqual({ ability: "dex", successDamage: "half", failureConditions: [] });
-    expect(spellSave("sacred-flame")).toEqual({ ability: "dex", successDamage: "none", failureConditions: [] });
+    // A reviewed override: "no benefit from Half Cover or Three-Quarters Cover for this save".
+    expect(spellSave("sacred-flame")).toEqual({
+      ability: "dex",
+      successDamage: "none",
+      failureConditions: [],
+      ignoresCover: true
+    });
     expect(spellSave("hold-person")).toEqual({
       ability: "wis",
       successDamage: "none",
@@ -100,5 +106,7 @@ describe("save outcomes in the shipped content", () => {
     });
     // A reviewed override: the condition is named in the sentence after the save.
     expect(spellSave("banishment")).toMatchObject({ failureConditions: ["incapacitated"] });
+    // "While Charmed, the creature has the Incapacitated condition", a second phrase the reader skips.
+    expect(spellSave("hypnotic-pattern")).toMatchObject({ failureConditions: ["charmed", "incapacitated"] });
   });
 });

@@ -1,6 +1,6 @@
 import { useId } from "react";
-import { Button, Stepper } from "@vtt/ui";
-import { clearTargeting, setTargetDarts, toggleTarget, type TargetingSession } from "./targeting";
+import { Button, Select, Stepper } from "@vtt/ui";
+import { clearTargeting, setDamageType, setTargetDarts, toggleTarget, type TargetingSession } from "./targeting";
 
 /**
  * Choosing who an action targets: one (radio) or several (checkboxes), or, for an area, where to drag
@@ -68,6 +68,21 @@ export function ActionTargetPicker({
             ))}
           </ul>
         </>
+      )}
+      {picking.action.damageTypes && (
+        <label className="action-damage-type">
+          <span>Damage type</span>
+          <Select
+            value={picking.damageType ?? picking.action.damageTypes[0]}
+            onChange={(event) => setDamageType(event.target.value)}
+          >
+            {picking.action.damageTypes.map((type) => (
+              <option key={type} value={type}>
+                {type.charAt(0).toUpperCase() + type.slice(1)}
+              </option>
+            ))}
+          </Select>
+        </label>
       )}
       <div className="action-targeting-buttons">
         <Button type="button" variant="secondary" disabled={busy} onClick={() => clearTargeting()}>

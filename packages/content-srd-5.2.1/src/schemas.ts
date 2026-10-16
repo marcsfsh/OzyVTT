@@ -52,19 +52,55 @@ export type ConditionReference = z.infer<typeof ConditionReferenceSchema>;
 
 const AbilityShortSchema = z.enum(["str", "dex", "con", "int", "wis", "cha"]);
 
+/** How a spell attack is made: a melee spell attack within `feet` of the caster (Touch is 5; a summoned blade
+ *  strikes 5 feet past the spell's range), or a ranged one out to `feet`. */
+const SpellAttackRangeSchema = z
+  .object({ kind: z.enum(["melee", "ranged"]), feet: z.number().int().min(5).max(5280) })
+  .strict();
+
+/** Typed damage; `addsModifier` adds the caster's spellcasting ability modifier (Spiritual Weapon's 1d8 + it). */
+const SpellDamageSchema = z
+  .array(
+    z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema, addsModifier: z.boolean().optional() }).strict()
+  )
+  .max(4);
+
+/** Something a spell lets its caster do after the cast, as an action of its own: Produce Flame's hurl, Spiritual
+ *  Weapon's later attacks, or the save a creature makes when it enters Spirit Guardians (`activation` "other": no
+ *  action, the trigger is the GM's to spot). It rolls at the spell's own level. */
+export const SpellLaterActionSchema = z
+  .object({
+    /** Its name on the sheet, after the spell's ("Spirit Guardians: save"). */
+    name: z.string().min(1).max(60),
+    activation: z.enum(["action", "bonus-action", "other"]),
+    /** When it happens, for the reminder on casting ("a creature enters the Emanation or ends its turn there"). */
+    when: z.string().min(1).max(300),
+    attackRange: SpellAttackRangeSchema.optional(),
+    save: z
+      .object({ ability: AbilityShortSchema, ...SaveOutcomeFields })
+      .strict()
+      .optional(),
+    damage: SpellDamageSchema,
+    area: ActionAreaSchema.optional()
+  })
+  .strict();
+export type SpellLaterAction = z.infer<typeof SpellLaterActionSchema>;
+
 /** One cast's mechanical effect; see `SpellReference.effect`. */
 export const SpellEffectSchema = z
   .object({
     /** Spell attack rolls one cast makes (Scorching Ray's three rays); 0 for none. */
     attacks: z.number().int().min(0).max(10),
-    /** How those attacks are made: a melee spell attack within `feet` of the caster (Touch is 5; a summoned blade
-     *  strikes 5 feet past the spell's range), or a ranged one out to `feet`. Absent, the spell's range decides. */
-    attackRange: z
-      .object({ kind: z.enum(["melee", "ranged"]), feet: z.number().int().min(5).max(5280) })
-      .strict()
-      .optional(),
+    /** How those attacks are made. Absent, the spell's range decides. */
+    attackRange: SpellAttackRangeSchema.optional(),
     /** Damage to each target, every part rolled; with `darts`, what each dart deals. */
-    damage: z.array(z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema }).strict()).max(4),
+    damage: SpellDamageSchema,
+    /** The damage types the caster picks from on each cast (Chromatic Orb); the damage carries the first. */
+    damageTypes: z.array(DamageTypeSchema).min(2).max(10).optional(),
+    /** The spell's save is not made when it is cast but later (Spirit Guardians, Web) or never by its target
+     *  (Haste, Sanctuary): the cast prompts none. `laterActions` carries one the engine can roll. */
+    noCastSave: z.literal(true).optional(),
+    laterActions: z.array(SpellLaterActionSchema).min(1).max(2).optional(),
     /** Missiles one cast makes, each at a creature of the caster's choice (Magic Missile's three darts). */
     darts: z.number().int().min(2).max(20).optional(),
     /** Hit points each target regains; `addsModifier` adds the caster's spellcasting ability modifier. */

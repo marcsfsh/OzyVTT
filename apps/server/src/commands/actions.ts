@@ -24,6 +24,7 @@ import {
 } from "../tap-routing.js";
 import { upcastAction } from "../item-actions.js";
 import { castSlotLevel } from "../resolution/economy.js";
+import { withChosenDamageType } from "../resolution/validate.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, principalTag, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -143,7 +144,8 @@ export const actionCommands = [
             attackTotal,
             critical,
             ...(request.pushFeet !== undefined ? { pushFeet: request.pushFeet } : {}),
-            ...(request.slotLevel !== undefined ? { slotLevel: request.slotLevel } : {})
+            ...(request.slotLevel !== undefined ? { slotLevel: request.slotLevel } : {}),
+            ...(request.damageType !== undefined ? { damageType: request.damageType } : {})
           },
           {
             random: (sides) => kit.context.random(sides),
@@ -256,6 +258,7 @@ export const actionCommands = [
         includeDamage,
         override,
         slotLevel,
+        damageType,
         expectedRevision
       } = request;
       if (override && !isGmGrade(principal)) throw new GameAccessDeniedError("Your GM adjudicates rules overrides.");
@@ -273,6 +276,7 @@ export const actionCommands = [
           ...(rollMode ? { rollMode } : {}),
           ...(withOverride && override ? { override } : {}),
           ...(slotLevel === undefined ? {} : { slotLevel }),
+          ...(damageType === undefined ? {} : { damageType }),
           ...(expectedRevision === undefined ? {} : { expectedRevision })
         });
 
@@ -286,10 +290,12 @@ export const actionCommands = [
       // A spell cast with a higher slot rolls that slot's dice, on the loose route as in the fight.
       const castLevel = listed.spellSlot ? castSlotLevel(actor, listed.spellSlot.level, slotLevel) : undefined;
       const spell = listed.spellId ? kit.equipmentCatalog().spellRecord?.(listed.spellId) : undefined;
-      const action =
+      const action = withChosenDamageType(
         castLevel !== undefined && spell && castLevel > listed.spellSlot!.level
           ? upcastAction(listed, spell, castLevel)
-          : listed;
+          : listed,
+        damageType ?? null
+      );
 
       // Off turn in combat: a real rules block, so the GM can override and the player can ask. Advise
       // resolves with a warning; Off just resolves.

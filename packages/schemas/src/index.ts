@@ -951,7 +951,10 @@ export type SaveCondition = z.infer<typeof SaveConditionSchema>;
 export const SaveOutcomeFields = {
   successDamage: z.enum(["half", "none"]).default("half"),
   /** Every condition a failed save imposes (Turn Undead: Frightened and Incapacitated). */
-  failureConditions: z.array(SaveConditionSchema).max(4).default([])
+  failureConditions: z.array(SaveConditionSchema).max(4).default([]),
+  /** Cover gives no bonus to this save (Sacred Flame: "The target gains no benefit from Half Cover or
+   *  Three-Quarters Cover for this save"). */
+  ignoresCover: z.boolean().optional()
 };
 
 /** An area of effect the GM places as a map template ("60-foot Cone"). `widthFeet` is a line's width, null otherwise. */
@@ -1042,6 +1045,9 @@ export const ActionSchema = z.object({
   /** Missiles that each deal `damage` to a creature of the caster's choice (Magic Missile's darts), rolled one by one.
    *  The resolve's targets assign them in order, a target named twice taking two. */
   darts: z.number().int().min(2).max(20).optional(),
+  /** The damage types the caster picks from on each use (Chromatic Orb); the resolve names one, and every damage
+   *  part takes it. Absent: the damage's own types. */
+  damageTypes: z.array(DamageTypeSchema).min(2).max(10).optional(),
   /** Compound action: one shared action slot, components tracked (crocodile Multiattack = one Bite + one Tail). */
   multiattack: z
     .array(z.object({ actionId: z.string().regex(/^[a-z0-9-]+$/), count: z.number().int().min(1).max(4) }).strict())

@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { AbilitySchema, HitDieSchema, PickBudgetScalingSchema, type ActionReaction } from "@vtt/schemas";
+import {
+  AbilitySchema,
+  HitDieSchema,
+  PickBudgetScalingSchema,
+  type ActionReaction,
+  type DamageType
+} from "@vtt/schemas";
 import type { Wire } from "./wire.js";
 
 /** An open identity slug; ids are never closed enums, so homebrew stays additive. */
@@ -461,6 +467,7 @@ export type ContentActionSummary = Readonly<{
   /** Builtin targeting: "single" picks one combatant, "none" is a direct tap. */ targeting?: "single" | "none";
   /** SRD Legendary Action cost against the creature's per-round pool (taken on other creatures' turns). */ legendaryCost?: number;
   /** Darts the action makes, each assigned to a target (Magic Missile); see `ActorAction.darts`. */ darts?: number;
+  /** Damage types the caster picks from (Chromatic Orb); see `ActorAction.damageTypes`. */ damageTypes?: readonly DamageType[];
 }>;
 export type ContentActionsResult = {
   ok: boolean;

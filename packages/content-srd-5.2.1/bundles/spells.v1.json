@@ -922,6 +922,7 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
    "healing": null
   },
   "classes": [
@@ -1134,8 +1135,36 @@
   "shape": null,
   "area": null,
   "effect": {
-   "attacks": 0,
-   "damage": [],
+   "attacks": 1,
+   "attackRange": {
+    "kind": "melee",
+    "feet": 95
+   },
+   "damage": [
+    {
+     "formula": "4d12",
+     "type": "force",
+     "addsModifier": true
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "attack",
+     "activation": "bonus-action",
+     "when": "On your later turns, a Bonus Action moves the sword up to 30 feet and repeats the attack.",
+     "attackRange": {
+      "kind": "melee",
+      "feet": 95
+     },
+     "damage": [
+      {
+       "formula": "4d12",
+       "type": "force",
+       "addsModifier": true
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -1664,6 +1693,7 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
    "healing": null
   },
   "classes": [
@@ -1868,7 +1898,32 @@
   "area": null,
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "3d6",
+     "type": "bludgeoning"
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "A creature that enters the area or ends its turn there makes the save. A creature makes this save only once per turn.",
+     "save": {
+      "ability": "str",
+      "successDamage": "none",
+      "failureConditions": [
+       "restrained"
+      ]
+     },
+     "damage": [
+      {
+       "formula": "3d6",
+       "type": "bludgeoning"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -1920,7 +1975,30 @@
   "area": null,
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "6d10",
+     "type": "force"
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "A creature that enters the wall's space or ends its turn there makes the save. A creature makes this save only once per turn.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "6d10",
+       "type": "force"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -2945,7 +3023,20 @@
     "kind": "ranged",
     "feet": 90
    },
-   "damage": [],
+   "damage": [
+    {
+     "formula": "3d8",
+     "type": "acid"
+    }
+   ],
+   "damageTypes": [
+    "acid",
+    "cold",
+    "fire",
+    "lightning",
+    "poison",
+    "thunder"
+   ],
    "healing": null
   },
   "classes": [
@@ -3236,7 +3327,30 @@
   },
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "5d8",
+     "type": "poison"
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. A creature makes this save only once per turn.",
+     "save": {
+      "ability": "con",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "5d8",
+       "type": "poison"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -3856,6 +3970,25 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "When the pack moves within 10 feet of a creature, or a creature enters a space within 10 feet of it or ends its turn there, you can force the save. A creature makes this save only once per turn.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "none",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "3d10",
+       "type": "slashing"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -4005,6 +4138,33 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "damageTypes": [
+    "lightning",
+    "thunder",
+    "fire",
+    "cold"
+   ],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "A creature that enters the spirit's space or starts its turn within 5 feet of it makes the save, if the spirit has no creature Restrained; the Restrained target repeats it at the start of each of its turns, taking 4d8 on a failure.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "none",
+      "failureConditions": [
+       "restrained"
+      ]
+     },
+     "damage": [
+      {
+       "formula": "8d8",
+       "type": "lightning"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -4077,8 +4237,36 @@
   "shape": null,
   "area": null,
   "effect": {
-   "attacks": 0,
-   "damage": [],
+   "attacks": 1,
+   "attackRange": {
+    "kind": "melee",
+    "feet": 65
+   },
+   "damage": [
+    {
+     "formula": "3d12",
+     "type": "psychic",
+     "addsModifier": true
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "attack",
+     "activation": "bonus-action",
+     "when": "On your later turns, a Bonus Action teleports the spirit up to 30 feet and makes the attack (a hit also Frightens the target until the start of your next turn).",
+     "attackRange": {
+      "kind": "melee",
+      "feet": 65
+     },
+     "damage": [
+      {
+       "formula": "3d12",
+       "type": "psychic",
+       "addsModifier": true
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -4236,6 +4424,25 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "When the Emanation enters a creature's space, or a creature enters it or ends its turn there, you can force the save. A creature makes this save only once per turn.",
+     "save": {
+      "ability": "wis",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "5d8",
+       "type": "force"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -5339,6 +5546,30 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "explosion",
+     "activation": "other",
+     "when": "The bead explodes when the spell ends: 12d6, plus 1d6 for each of your turns that ended while it lasted.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "12d6",
+       "type": "fire"
+      }
+     ],
+     "area": {
+      "shape": "sphere",
+      "sizeFeet": 20,
+      "widthFeet": null
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -6559,6 +6790,37 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "damageTypes": [
+    "acid",
+    "cold",
+    "fire",
+    "lightning",
+    "poison"
+   ],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "exhale",
+     "activation": "action",
+     "when": "Until the spell ends, the creature you touched can take a Magic action to exhale.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "3d6",
+       "type": "acid"
+      }
+     ],
+     "area": {
+      "shape": "cone",
+      "sizeFeet": 15,
+      "widthFeet": null
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -6655,6 +6917,7 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
    "healing": null
   },
   "classes": [
@@ -7580,6 +7843,25 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "bite",
+     "activation": "other",
+     "when": "At the start of each of your turns, the hound bites one enemy within 5 feet of it.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "none",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "4d8",
+       "type": "force"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -8423,6 +8705,24 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "attack",
+     "activation": "action",
+     "when": "As a Magic action, you can make a melee spell attack with the fiery blade.",
+     "attackRange": {
+      "kind": "melee",
+      "feet": 5
+     },
+     "damage": [
+      {
+       "formula": "3d6",
+       "type": "fire",
+       "addsModifier": true
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -8606,6 +8906,25 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "A creature that ends its turn within 5 feet of the sphere, or whose space you ram it into as a Bonus Action, makes the save.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "2d6",
+       "type": "fire"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -9040,6 +9359,7 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
    "healing": null
   },
   "classes": [
@@ -9147,6 +9467,7 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
    "healing": null
   },
   "classes": [
@@ -9318,6 +9639,7 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
    "healing": null
   },
   "classes": [
@@ -10054,6 +10376,7 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
    "healing": null
   },
   "classes": [
@@ -10517,6 +10840,7 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
    "healing": null
   },
   "classes": [
@@ -10738,7 +11062,26 @@
   "area": null,
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "2d8",
+     "type": "fire"
+    }
+   ],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "heat again",
+     "activation": "bonus-action",
+     "when": "On your later turns, a Bonus Action deals the damage again if the object is within range; a creature holding or wearing it makes a Constitution save or drops it.",
+     "damage": [
+      {
+       "formula": "2d8",
+       "type": "fire"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -11610,7 +11953,8 @@
    "ability": "wis",
    "successDamage": "none",
    "failureConditions": [
-    "charmed"
+    "charmed",
+    "incapacitated"
    ]
   },
   "target": {
@@ -12046,7 +12390,30 @@
   },
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "10d8",
+     "type": "fire"
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. A creature makes this save only once per turn.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "10d8",
+       "type": "fire"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -12214,7 +12581,30 @@
   },
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "4d10",
+     "type": "piercing"
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "A creature that enters the area for the first time on a turn or ends its turn there makes the save. A creature makes this save only once per turn.",
+     "save": {
+      "ability": "con",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "4d10",
+       "type": "piercing"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -13274,6 +13664,7 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
    "healing": null
   },
   "classes": [
@@ -14844,6 +15235,24 @@
      "type": "radiant"
     }
    ],
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "A creature the Cylinder moves into, or that enters it or ends its turn there, makes the save. A creature makes this save only once per turn.",
+     "save": {
+      "ability": "con",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "2d10",
+       "type": "radiant"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -15784,6 +16193,7 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
    "healing": null
   },
   "classes": [
@@ -16054,6 +16464,7 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
    "healing": null
   },
   "classes": [
@@ -16178,15 +16589,23 @@
   "shape": null,
   "area": null,
   "effect": {
-   "attacks": 1,
-   "attackRange": {
-    "kind": "ranged",
-    "feet": 60
-   },
-   "damage": [
+   "attacks": 0,
+   "damage": [],
+   "laterActions": [
     {
-     "formula": "1d8",
-     "type": "fire"
+     "name": "hurl",
+     "activation": "action",
+     "when": "Until the spell ends, a Magic action hurls fire at a creature or object within 60 feet.",
+     "attackRange": {
+      "kind": "ranged",
+      "feet": 60
+     },
+     "damage": [
+      {
+       "formula": "1d8",
+       "type": "fire"
+      }
+     ]
     }
    ],
    "healing": null
@@ -17278,7 +17697,8 @@
   "save": {
    "ability": "dex",
    "successDamage": "none",
-   "failureConditions": []
+   "failureConditions": [],
+   "ignoresCover": true
   },
   "target": {
    "type": "creature",
@@ -17363,6 +17783,7 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
    "healing": null
   },
   "classes": [
@@ -18635,6 +19056,22 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "A creature that enters the Cylinder for the first time on a turn or starts its turn there makes the save; a failure also breaks its Concentration.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "none",
+      "failureConditions": [
+       "prone"
+      ]
+     },
+     "damage": []
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -18746,7 +19183,21 @@
     "kind": "ranged",
     "feet": 120
    },
-   "damage": [],
+   "damage": [
+    {
+     "formula": "1d8",
+     "type": "acid"
+    }
+   ],
+   "damageTypes": [
+    "acid",
+    "cold",
+    "fire",
+    "lightning",
+    "poison",
+    "psychic",
+    "thunder"
+   ],
    "healing": null
   },
   "classes": [
@@ -19186,6 +19637,29 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "damageTypes": [
+    "radiant",
+    "necrotic"
+   ],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "When the Emanation enters a creature's space, or a creature enters it or ends its turn there, it makes the save. A creature makes this save only once per turn.",
+     "save": {
+      "ability": "wis",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "3d8",
+       "type": "radiant"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -19269,8 +19743,36 @@
   "shape": null,
   "area": null,
   "effect": {
-   "attacks": 0,
-   "damage": [],
+   "attacks": 1,
+   "attackRange": {
+    "kind": "melee",
+    "feet": 65
+   },
+   "damage": [
+    {
+     "formula": "1d8",
+     "type": "force",
+     "addsModifier": true
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "attack",
+     "activation": "bonus-action",
+     "when": "On your later turns, a Bonus Action moves the force up to 20 feet and repeats the attack.",
+     "attackRange": {
+      "kind": "melee",
+      "feet": 65
+     },
+     "damage": [
+      {
+       "formula": "1d8",
+       "type": "force",
+       "addsModifier": true
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -19451,6 +19953,22 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "A creature that starts its turn in the Sphere makes the save; it is Poisoned until the end of that turn and can't take an action or a Bonus Action.",
+     "save": {
+      "ability": "con",
+      "successDamage": "none",
+      "failureConditions": [
+       "poisoned"
+      ]
+     },
+     "damage": []
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -19605,7 +20123,12 @@
   "area": null,
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "2d6",
+     "type": "thunder"
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -20798,7 +21321,12 @@
   "area": null,
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "6d10",
+     "type": "bludgeoning"
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -21167,7 +21695,25 @@
   "area": null,
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "5d8",
+     "type": "fire"
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "burn",
+     "activation": "other",
+     "when": "A creature that ends its turn within 10 feet of the burning side or inside the wall, or enters the wall for the first time on a turn, takes the damage.",
+     "damage": [
+      {
+       "formula": "5d8",
+       "type": "fire"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -21300,7 +21846,12 @@
   "area": null,
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "10d6",
+     "type": "cold"
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -21311,19 +21862,19 @@
   "castingOptions": [
    {
     "type": "slot_level_7",
-    "damageRoll": "11d6",
-    "targetCount": null,
-    "description": null
-   },
-   {
-    "type": "slot_level_8",
     "damageRoll": "12d6",
     "targetCount": null,
     "description": null
    },
    {
+    "type": "slot_level_8",
+    "damageRoll": "14d6",
+    "targetCount": null,
+    "description": null
+   },
+   {
     "type": "slot_level_9",
-    "damageRoll": "13d6",
+    "damageRoll": "16d6",
     "targetCount": null,
     "description": null
    }
@@ -21426,7 +21977,30 @@
   "area": null,
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "7d8",
+     "type": "piercing"
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "A creature that enters a space in the wall for the first time on a turn or ends its turn there makes the save. A creature makes this save only once per turn.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "7d8",
+       "type": "slashing"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -21653,6 +22227,22 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "The first time a creature enters the webs on a turn or starts its turn there, it makes the save; Restrained, it can try a Strength (Athletics) check against your spell save DC as an action.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "none",
+      "failureConditions": [
+       "restrained"
+      ]
+     },
+     "damage": []
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -21821,7 +22411,12 @@
   "area": null,
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "4d8",
+     "type": "bludgeoning"
+    }
+   ],
    "healing": null
   },
   "classes": [

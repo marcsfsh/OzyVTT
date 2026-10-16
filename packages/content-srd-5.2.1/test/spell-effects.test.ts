@@ -40,9 +40,12 @@ describe("what one cast of an SRD spell does", () => {
     expect(effectOf("fire-bolt")!.attackRange).toEqual({ kind: "ranged", feet: 120 });
     expect(effectOf("scorching-ray")!.attackRange).toEqual({ kind: "ranged", feet: 120 });
     expect(effectOf("shocking-grasp")!.attackRange).toEqual({ kind: "melee", feet: 5 });
-    // A Self spell's touch, and a Self spell's hurled flame.
+    // A Self spell's touch; a summoned weapon strikes 5 feet past where it appears.
     expect(effectOf("vampiric-touch")!.attackRange).toEqual({ kind: "melee", feet: 5 });
-    expect(effectOf("produce-flame")!.attackRange).toEqual({ kind: "ranged", feet: 60 });
+    expect(effectOf("spiritual-weapon")!.attackRange).toEqual({ kind: "melee", feet: 65 });
+    // Produce Flame's cast makes no attack; its hurl on a later turn reaches 60 feet.
+    expect(effectOf("produce-flame")!.attacks).toBe(0);
+    expect(effectOf("produce-flame")!.laterActions?.[0]?.attackRange).toEqual({ kind: "ranged", feet: 60 });
   });
 
   it("declares the reactions the table can offer, and none it can't see the trigger of", () => {
@@ -58,6 +61,53 @@ describe("what one cast of an SRD spell does", () => {
       rangeFeet: 60
     });
     for (const id of ["counterspell", "feather-fall"]) expect(effectOf(id)!.reaction, id).toBeUndefined();
+  });
+
+  it("deals the damage of a spell that harms as it appears (2024 wording)", () => {
+    const appearing: Record<string, string> = {
+      "black-tentacles": "3d6 bludgeoning",
+      "blade-barrier": "6d10 force",
+      cloudkill: "5d8 poison",
+      "incendiary-cloud": "10d8 fire",
+      "insect-plague": "4d10 piercing",
+      "storm-of-vengeance": "2d6 thunder",
+      tsunami: "6d10 bludgeoning",
+      "wall-of-fire": "5d8 fire",
+      "wall-of-ice": "10d6 cold",
+      "wall-of-thorns": "7d8 piercing",
+      "wind-wall": "4d8 bludgeoning",
+      "heat-metal": "2d8 fire"
+    };
+    for (const [id, damage] of Object.entries(appearing))
+      expect(
+        effectOf(id)!
+          .damage.map((part) => `${part.formula} ${part.type}`)
+          .join(", "),
+        id
+      ).toBe(damage);
+    // The summoned thing's attack on appearing adds the caster's modifier.
+    for (const id of ["spiritual-weapon", "arcane-sword", "conjure-fey"]) {
+      expect(effectOf(id)!.attacks, id).toBe(1);
+      expect(effectOf(id)!.damage[0]!.addsModifier, id).toBe(true);
+    }
+  });
+
+  it("makes no save on the cast where the SRD's save comes later, and models the later one", () => {
+    for (const id of ["spirit-guardians", "haste", "web", "stinking-cloud", "sanctuary", "power-word-stun"])
+      expect(effectOf(id)!.noCastSave, id).toBe(true);
+    expect(effectOf("spirit-guardians")!.laterActions).toEqual([
+      expect.objectContaining({
+        activation: "other",
+        save: { ability: "wis", successDamage: "half", failureConditions: [] },
+        damage: [{ formula: "3d8", type: "radiant" }]
+      })
+    ]);
+    expect(effectOf("fireball")!.noCastSave).toBeUndefined();
+  });
+
+  it("lets the caster pick the damage type where the spell does", () => {
+    expect(effectOf("chromatic-orb")!.damageTypes).toEqual(["acid", "cold", "fire", "lightning", "poison", "thunder"]);
+    expect(effectOf("sorcerous-burst")!.damage).toEqual([{ formula: "1d8", type: "acid" }]);
   });
 
   it("reviews only spells that exist", () => {

@@ -258,6 +258,46 @@ export const fighterInput = () =>
     ]
   }) as CharacterCreateRequestInput;
 
+/** A level-5 Human Sage Druid (Circle of the Land): Produce Flame and the spells given. */
+export const druidInput = (spells: readonly string[]) =>
+  ({
+    name: "Maelin",
+    speciesId: "human",
+    backgroundId: "sage",
+    classId: "druid",
+    level: 5,
+    subclassId: "circle-of-the-land",
+    abilityMethod: "standard-array",
+    baseScores: { str: 10, dex: 14, con: 13, int: 8, wis: 15, cha: 12 },
+    backgroundBonusAllocation: [
+      { ability: "wis", amount: 2 },
+      { ability: "con", amount: 1 }
+    ],
+    hp: { mode: "average" },
+    choices: [
+      ...shared,
+      { level: 1, classId: "druid", kind: "skill", id: "nature" },
+      { level: 1, classId: "druid", kind: "skill", id: "perception" },
+      { level: 1, classId: "druid", kind: "primal-order", id: "warden", payload: { featureId: "primal-order" } },
+      { level: 1, kind: "cantrip", id: "druidcraft" },
+      { level: 1, kind: "cantrip", id: "produce-flame" },
+      { level: 4, kind: "cantrip", id: "guidance" },
+      ...spells.map((id) => ({ level: 1, kind: "spell", id })),
+      { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
+      { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
+      { level: 1, kind: "cantrip", id: "minor-illusion", payload: { featureId: "magic-initiate-wizard" } },
+      { level: 1, kind: "cantrip", id: "dancing-lights", payload: { featureId: "magic-initiate-wizard" } },
+      { level: 1, kind: "spell", id: "magic-missile", payload: { featureId: "magic-initiate-wizard" } },
+      { level: 3, classId: "druid", kind: "subclass", id: "circle-of-the-land" },
+      { level: 3, kind: "land", id: "polar", payload: { featureId: "circle-of-the-land-spells" } },
+      { level: 4, classId: "druid", kind: "asi-or-feat", id: "ability-score-improvement" },
+      { level: 4, kind: "ability-score", id: "wis", payload: { featureId: "ability-score-improvement" } },
+      { level: 4, kind: "ability-score", id: "wis", payload: { featureId: "ability-score-improvement" } },
+      { level: 1, kind: "equipment", id: "druid-a" },
+      { level: 1, kind: "equipment", id: "sage-a" }
+    ]
+  }) as CharacterCreateRequestInput;
+
 export const build = (input: CharacterCreateRequestInput): ActorDefinition =>
   buildCharacterDefinition(input, view, POLICY);
 

@@ -185,14 +185,18 @@ export function spellCastMechanics(
   spell: SpellReference,
   numbers: Readonly<{ attackBonus: number; saveDc: number; bearersDc: boolean; modifier: number }>,
   scaled: Readonly<{ roll?: string | null; attacks?: number }> = {}
-): Pick<ActorAction, "damage"> & Partial<Pick<ActorAction, "attack" | "save" | "healing" | "darts">> {
+): Pick<ActorAction, "damage"> & Partial<Pick<ActorAction, "attack" | "save" | "healing" | "darts" | "damageTypes">> {
   // No cast model: the save still applies, and the rest is the GM's.
   const effect = spell.effect ?? { attacks: 0, damage: [], healing: null };
   const scale = (formula: string) => (scaled.roll && formula === spell.damage.roll ? scaled.roll : formula);
   const attacks = scaled.attacks ?? effect.attacks;
+  // A save made later or by someone else (Spirit Guardians, Haste) is not the cast's.
+  const castSave = effect.noCastSave ? null : spell.save;
+  const damage = spellDamage(effect.damage, scale, numbers.modifier);
   return {
-    damage: effect.damage.map((part) => ({ formula: scale(part.formula), type: part.type })),
+    damage,
     ...(effect.darts ? { darts: effect.darts } : {}),
+    ...(effect.damageTypes && damage.length > 0 ? { damageTypes: [...effect.damageTypes] } : {}),
     ...(attacks > 0
       ? {
           attack: {
@@ -201,8 +205,8 @@ export function spellCastMechanics(
             ...spellAttackReach(spell)
           }
         }
-      : spell.save
-        ? { save: { ...spell.save, dc: numbers.saveDc, ...(numbers.bearersDc ? { spellcasting: true } : {}) } }
+      : castSave
+        ? { save: { ...castSave, dc: numbers.saveDc, ...(numbers.bearersDc ? { spellcasting: true } : {}) } }
         : {}),
     ...(effect.healing
       ? {
@@ -211,6 +215,57 @@ export function spellCastMechanics(
           }
         }
       : {})
+  };
+}
+
+/** A cast model's damage parts as an action's: scaled (an upcast row, a cantrip tier), and with the caster's
+ *  spellcasting modifier where the spell adds it (Spiritual Weapon's 1d8 + it). */
+function spellDamage(
+  parts: NonNullable<SpellReference["effect"]>["damage"],
+  scale: (formula: string) => string,
+  modifier: number
+): ActorAction["damage"] {
+  return parts.map((part) => ({
+    formula: part.addsModifier ? formulaPlus(scale(part.formula), modifier) : scale(part.formula),
+    type: part.type
+  }));
+}
+
+/** The id of the action a spell's later action is minted as ("spell-spirit-guardians-then-save"). */
+export const laterSpellActionId = (spellId: string, name: string): string =>
+  `spell-${spellId}-then-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+
+/** One of the things a spell lets its caster do after the cast (`SpellReference.effect.laterActions`), as an action
+ *  with the caster's numbers: no slot, the spell's own level (a cantrip's tier through `scaled.roll`). */
+export function laterSpellAction(
+  spell: SpellReference,
+  later: NonNullable<NonNullable<SpellReference["effect"]>["laterActions"]>[number],
+  numbers: Readonly<{ attackBonus: number; saveDc: number; bearersDc: boolean; modifier: number }>,
+  scaled: Readonly<{ roll?: string | null }> = {}
+): ActorAction {
+  const scale = (formula: string) => (scaled.roll && formula === spell.damage.roll ? scaled.roll : formula);
+  const damage = spellDamage(later.damage, scale, numbers.modifier);
+  return {
+    id: laterSpellActionId(spell.id, later.name),
+    name: `${spell.name}: ${later.name}`,
+    activation: later.activation,
+    description: `${later.when}\n\n${spell.description}`.slice(0, 12000),
+    damage,
+    ...(later.attackRange
+      ? {
+          attack: {
+            bonus: numbers.attackBonus,
+            ...(later.attackRange.kind === "melee"
+              ? { reachFeet: later.attackRange.feet }
+              : { rangeFeet: later.attackRange.feet })
+          }
+        }
+      : later.save
+        ? { save: { ...later.save, dc: numbers.saveDc, ...(numbers.bearersDc ? { spellcasting: true } : {}) } }
+        : {}),
+    ...(spell.effect?.damageTypes && damage.length > 0 ? { damageTypes: [...spell.effect.damageTypes] } : {}),
+    ...(later.area ? { area: later.area } : {}),
+    spellId: spell.id
   };
 }
 

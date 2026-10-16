@@ -57,6 +57,8 @@ export type ResolveInput = Readonly<{
   pushFeet?: number;
   /** The slot a spell is cast with; absent, its own level, else the lowest above it with a slot left. */
   slotLevel?: number;
+  /** The damage type picked for an action whose caster chooses one (`ActorAction.damageTypes`); absent, its first. */
+  damageType?: string | null;
   /** A parked attack finishing (see `parkForAcReaction`): its economy was checked and spent when it rolled, so it is
    *  neither checked nor spent again, and its target is not offered the AC reaction a second time. */
   economyPaid?: boolean;

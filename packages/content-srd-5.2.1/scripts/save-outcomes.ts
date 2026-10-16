@@ -5,7 +5,7 @@
  */
 import { SaveConditionSchema, type SaveCondition } from "@vtt/schemas";
 
-export type SaveOutcome = { successDamage: "half" | "none"; failureConditions: SaveCondition[] };
+export type SaveOutcome = { successDamage: "half" | "none"; failureConditions: SaveCondition[]; ignoresCover?: true };
 
 const CONDITIONS: ReadonlySet<string> = new Set(SaveConditionSchema.options);
 
@@ -62,7 +62,11 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   // The ray is rolled per target (Restrained is only the indigo ray), so no single condition applies.
   "prismatic-spray": { failureConditions: [] },
   // The first save's Thunder damage is all or nothing; the halving is the turn-3 lightning's.
-  "storm-of-vengeance": { successDamage: "none" }
+  "storm-of-vengeance": { successDamage: "none" },
+  // "While Charmed, the creature has the Incapacitated condition": the reader keeps only the first phrase.
+  "hypnotic-pattern": { failureConditions: ["charmed", "incapacitated"] },
+  // "The target gains no benefit from Half Cover or Three-Quarters Cover for this save."
+  "sacred-flame": { ignoresCover: true }
 };
 
 /** `spellSaveOutcome` with the reviewed corrections applied. */

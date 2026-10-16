@@ -523,6 +523,24 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "permanent: system-synthesised"
   },
   {
+    at: "actions[].damageTypes",
+    types: ACTION_CARRIERS,
+    reason: "synthesised from a spell's cast model by the character build (Chromatic Orb), zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].save.ignoresCover",
+    types: ACTION_CARRIERS,
+    reason: "one SRD author (Sacred Flame), copied from the spell by the character build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "save.ignoresCover",
+    types: ["spell"],
+    reason: "one SRD author (Sacred Flame), a reviewed override in the content build; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "actions[].darts",
     types: ACTION_CARRIERS,
     reason: "synthesised from a spell's cast model by the character build (Magic Missile), zero hand authors",

@@ -34,7 +34,7 @@ import {
 } from "./character-offers.js";
 import type { ContentView } from "./content-library.js";
 import { BUILDER_BAKED_MODIFIER_TYPES, type CharacterFeatureRef } from "./equipment-derivation.js";
-import { spellCastMechanics, UNARMED_STRIKE_ACTION_ID } from "./item-actions.js";
+import { laterSpellAction, spellCastMechanics, UNARMED_STRIKE_ACTION_ID } from "./item-actions.js";
 import { bindTemplateItem } from "./inventory.js";
 import { CommandRejectedError } from "./game-store.js";
 
@@ -338,13 +338,25 @@ function linkSpellActions(
       into.push(action);
       entry[key] = action.id;
     };
-    if (record.level === 0) {
-      mint(cantripActionFor(record, numbers), "actionId");
-      continue;
+    if (record.level === 0) mint(cantripActionFor(record, numbers), "actionId");
+    else {
+      if (hasSlots && entry.withSlot !== false) mint(leveledSpellActionFor(record, numbers), "actionId");
+      const grant = granted.find((candidate) => candidate.id === record.id && candidate.free !== undefined);
+      if (grant) mint(leveledSpellActionFor(record, numbers, grant.free), "freeActionId");
     }
-    if (hasSlots && entry.withSlot !== false) mint(leveledSpellActionFor(record, numbers), "actionId");
-    const grant = granted.find((candidate) => candidate.id === record.id && candidate.free !== undefined);
-    if (grant) mint(leveledSpellActionFor(record, numbers, grant.free), "freeActionId");
+    // What the spell lets its caster do once it is up (Produce Flame's hurl, Spirit Guardians' save), with no slot.
+    const tier =
+      record.level === 0 ? cantripTierAt(cantripScalingOf(record.castingOptions), numbers.characterLevel) : null;
+    for (const later of record.effect?.laterActions ?? []) {
+      const action = laterSpellAction(
+        record,
+        later,
+        { attackBonus: numbers.attackBonus, saveDc: numbers.saveDc, bearersDc: true, modifier: numbers.modifier },
+        { roll: tier?.damageRoll ?? null }
+      );
+      if (into.length < MAX_DEFINITION_ACTIONS && !into.some((existing) => existing.id === action.id))
+        into.push(action);
+    }
   }
 }
 

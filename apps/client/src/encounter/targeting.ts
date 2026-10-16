@@ -30,6 +30,8 @@ export type TargetingSession = Readonly<{
   slotLevel?: number;
   /** A darts action's darts (Magic Missile at this slot) and how many each selected target takes. */
   darts?: Readonly<{ total: number; counts: Readonly<Record<string, number>> }>;
+  /** The damage type picked for an action whose caster chooses one (Chromatic Orb). */
+  damageType?: NonNullable<ContentActionSummary["damageTypes"]>[number];
 }>;
 
 let session: TargetingSession | null = null;
@@ -111,6 +113,13 @@ export function toggleTarget(actorId: string) {
   }
   emit();
 }
+/** Picks the damage type an action deals, for one whose caster chooses (Chromatic Orb). */
+export function setDamageType(damageType: string) {
+  const picked = session?.action.damageTypes?.find((type) => type === damageType);
+  if (!session || picked === undefined) return;
+  session = { ...session, damageType: picked };
+  emit();
+}
 /** Sets how many darts a selected target takes, within the darts the action has left to assign. */
 export function setTargetDarts(actorId: string, count: number) {
   if (!session?.darts || !session.selected.includes(actorId)) return;
@@ -174,7 +183,7 @@ export function resolveTargeting(
   opts: ResolveOptions = {}
 ) {
   if (!session || busy) return;
-  const { attackerId, action, mode, selected, template, slotLevel, darts } = session;
+  const { attackerId, action, mode, selected, template, slotLevel, darts, damageType } = session;
   // A single-target attack previews first (commit: false) so the result card can offer Adv/Disadv, a
   // typed d20 and Confirm. Templates, multi-target and save/utility actions resolve straight through.
   // An explicit `commit` in opts wins (the Confirm tap).
@@ -188,6 +197,7 @@ export function resolveTargeting(
     ...(opts.critical !== undefined ? { critical: opts.critical } : {}),
     ...(opts.pushFeet !== undefined ? { pushFeet: opts.pushFeet } : {}),
     ...(slotLevel !== undefined ? { slotLevel } : {}),
+    ...(damageType !== undefined ? { damageType } : {}),
     commit,
     ...(revision !== undefined ? { expectedRevision: revision } : {})
   };

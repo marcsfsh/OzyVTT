@@ -45,7 +45,8 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
       : null,
     grants: action.grants !== undefined,
     reaction: action.reaction ?? null,
-    ...(action.darts !== undefined ? { darts: action.darts } : {})
+    ...(action.darts !== undefined ? { darts: action.darts } : {}),
+    ...(action.damageTypes !== undefined ? { damageTypes: [...action.damageTypes] } : {})
   };
 }
 

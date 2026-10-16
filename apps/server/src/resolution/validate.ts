@@ -1,9 +1,10 @@
+import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { GameState } from "@vtt/domain";
 import { effectiveActions } from "../effective-actions.js";
 import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
 import { effectiveModeFor, overrideCovers, overrideReason, overrideWaives } from "../rules-families.js";
-import { upcastAction, withSpellAttackReach } from "../item-actions.js";
+import { laterSpellActionId, upcastAction, withSpellAttackReach } from "../item-actions.js";
 import { builtinHandlerFor } from "./builtins.js";
 import type { DefinitionAction, LiveActor, ResolveContext, ResolveDependencies, ResolveInput } from "./context.js";
 import { castLevelOf, planEconomy, type EconomyPlan } from "./economy.js";
@@ -68,10 +69,11 @@ export function openResolve(
   // A spell cast with a higher slot rolls that slot's dice and makes its rays (before the economy opens the action's
   // instance); a paid replay names the slot it was cast with.
   const castLevel = input.economyPaid ? input.slotLevel : castLevelOf(state, attacker, reaching, input.slotLevel);
-  const action =
+  const upcast =
     castLevel !== null && castLevel !== undefined && spell && reaching.spellSlot && castLevel > reaching.spellSlot.level
       ? upcastAction(reaching, spell, castLevel)
       : reaching;
+  const action = withChosenDamageType(upcast, input.damageType ?? null);
   const warnings: string[] = [];
   const derivation = deriveEquipment(attacker, deps.definition, deps.catalog);
   const siblings = effectiveActions(deps.definition, attacker, deps.catalog);
@@ -143,7 +145,24 @@ export function openResolve(
     opens: null
   };
   if (builtin?.prepare) ctx.action = builtin.prepare(ctx);
+  if (!input.economyPaid) warnings.push(...laterActionReminders(spell, action));
   return ctx;
+}
+
+/** An action whose caster picks the damage type (Chromatic Orb) deals the one picked, every part of it. */
+export function withChosenDamageType(action: DefinitionAction, chosen: string | null): DefinitionAction {
+  if (chosen === null) return action;
+  if (!action.damageTypes?.includes(chosen as never))
+    throw new CommandRejectedError(`${action.name} can't deal ${chosen} damage.`);
+  return { ...action, damage: action.damage.map((part) => ({ ...part, type: chosen })) };
+}
+
+/** The GM's reminder on casting a spell that does more later (SRD text): the engine can't see a creature enter an
+ *  area or a turn come round, so the GM resolves the later action when it happens. */
+function laterActionReminders(spell: SpellReference | undefined, action: DefinitionAction): string[] {
+  const later = spell?.effect?.laterActions ?? [];
+  if (later.some((row) => laterSpellActionId(spell!.id, row.name) === action.id)) return [];
+  return later.map((row) => `${spell!.name}: ${row.when} Use "${spell!.name}: ${row.name}" for it.`);
 }
 
 /** The plan of a resolve whose economy was already spent: it changes nothing. */

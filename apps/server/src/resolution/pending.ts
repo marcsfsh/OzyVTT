@@ -122,6 +122,7 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
           ),
           pushFeet: input.pushFeet ?? null,
           slotLevel: ctx.plan.castLevel,
+          damageType: input.damageType ?? null,
           distanceFeet: deps.distanceFeet?.(attacker.id, target.id) ?? null,
           initiatorRole: deps.initiatorRole ?? "gm",
           initiatorSessionId: deps.initiatorSessionId ?? deps.gmSessionId,
@@ -154,8 +155,8 @@ export function parkActionSave(ctx: ResolveContext): void {
     targetIds: targets.map((target) => target.id),
     proposedDamage: rider ? 0 : damage.reduce((sum, part) => sum + part.total, 0),
     proposedDamageParts: rider ? [] : damage.map((part) => ({ amount: part.total, type: part.type })),
-    // Cover adds to Dexterity saving throws (SRD Cover) - carried on the prompt.
-    saveBonus: action.save.ability === "dex" ? ctx.coverBonus : 0,
+    // Cover adds to Dexterity saving throws (SRD Cover) - carried on the prompt - unless the save ignores it.
+    saveBonus: action.save.ability === "dex" && !action.save.ignoresCover ? ctx.coverBonus : 0,
     halfOnSuccess: action.save.successDamage === "half",
     // The GM's explicit choice wins over the condition the action declares.
     conditionIds: input.conditionId ? [input.conditionId] : action.save.failureConditions,

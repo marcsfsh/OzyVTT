@@ -5,25 +5,22 @@
  * the caster makes ("Make a ranged spell attack"), never one the text only mentions. `test/spell-effects.test.ts`
  * pins the cases.
  */
-import { DamageTypeSchema } from "@vtt/schemas";
-import type { SpellEffect, SpellReference } from "../src/schemas.js";
+import { DamageTypeSchema, type DamageType } from "@vtt/schemas";
+import type { SpellEffect, SpellLaterAction, SpellReference } from "../src/schemas.js";
 import { healingOfText, spellAttackRangeOf, type SpellRange } from "../src/spell-effect.js";
 
 /** Spells whose printed damage is not dealt by the cast to its targets, and why. They cast with no damage and the
- *  GM applies the rest from the text. */
+ *  GM applies the rest from the text, or a later action does (`LATER_ACTIONS`). */
 const NO_CAST_DAMAGE: Readonly<Record<string, string>> = {
-  "arcane-sword": "the sword attacks on later turns",
   "bestow-curse": "one curse option, on later hits",
-  "black-tentacles": "the area harms on later turns",
-  "blade-barrier": "a wall",
-  cloudkill: "the area harms on later turns",
-  "conjure-animals": "a summons",
-  "conjure-fey": "a summons",
-  "conjure-woodland-beings": "a summons",
+  "conjure-animals": "the pack harms on later turns",
+  "conjure-elemental": "the spirit harms on later turns",
+  "conjure-woodland-beings": "the spirits harm on later turns",
   "contact-other-plane": "harms the caster on a failed save",
   "delayed-blast-fireball": "detonates later",
   "dimension-door": "harms the caster when the destination is occupied",
   "divine-favor": "a rider on later weapon hits",
+  "dragons-breath": "the touched creature exhales later",
   dream: "harms on a later nightmare",
   earthquake: "harms through collapse and fissures",
   "ensnaring-strike": "harms the Restrained target on later turns",
@@ -34,27 +31,18 @@ const NO_CAST_DAMAGE: Readonly<Record<string, string>> = {
   forbiddance: "harms creatures entering the area",
   "freedom-of-movement": "no damage; the column is noise",
   geas: "harms a target that defies it",
-  "heat-metal": "its save is to keep hold, not to avoid the damage",
   "heroes-feast": "no damage; the column is noise",
   hex: "a rider on later hits",
   "hunters-mark": "a rider on later hits",
-  "incendiary-cloud": "the cloud harms on later turns",
-  "insect-plague": "the swarm harms on later turns",
   "meld-into-stone": "harms the caster if the stone is destroyed",
   "phantasmal-force": "harms on later turns",
   "power-word-kill": "kills outright, or harms only above 100 Hit Points",
   "prismatic-spray": "a random ray per creature",
   "prismatic-wall": "a wall",
+  "produce-flame": "the flame is hurled on later turns",
   "spike-growth": "harms creatures moving through the area",
   "spirit-guardians": "the emanation harms on later turns",
-  "spiritual-weapon": "its damage adds the caster's modifier and recurs on later turns",
-  "storm-of-vengeance": "harms on later rounds",
-  tsunami: "a moving wall",
-  "wall-of-fire": "a wall",
-  "wall-of-ice": "a wall",
-  "wall-of-thorns": "a wall",
   web: "harms only if the webs burn",
-  "wind-wall": "a wall",
   wish: "harms the caster after a stressful wish"
 };
 
@@ -77,24 +65,316 @@ const CAST_DAMAGE: Readonly<Record<string, Damage>> = {
     { formula: "20d6", type: "bludgeoning" }
   ],
   // The hit; the 2d6 Cold burst is a save for everyone within 5 feet, left to the GM.
-  "ice-knife": [{ formula: "1d10", type: "piercing" }]
+  "ice-knife": [{ formula: "1d10", type: "piercing" }],
+  // The wall appearing; the sheet of frigid air left by a breach is the GM's.
+  "wall-of-ice": [{ formula: "10d6", type: "cold" }],
+  // The wall appearing; moving through it later is Slashing (`LATER_ACTIONS`).
+  "wall-of-thorns": [{ formula: "7d8", type: "piercing" }],
+  // The attack when the summoned thing appears adds the caster's modifier.
+  "spiritual-weapon": [{ formula: "1d8", type: "force", addsModifier: true }],
+  "arcane-sword": [{ formula: "4d12", type: "force", addsModifier: true }],
+  "conjure-fey": [{ formula: "3d12", type: "psychic", addsModifier: true }],
+  // A type the caster chooses (`DAMAGE_CHOICES`); the first is the default.
+  "chromatic-orb": [{ formula: "3d8", type: "acid" }],
+  "sorcerous-burst": [{ formula: "1d8", type: "acid" }]
+};
+
+/** The damage types a caster picks from on each cast, for spells that let them choose. */
+const DAMAGE_CHOICES: Readonly<Record<string, readonly DamageType[]>> = {
+  "chromatic-orb": ["acid", "cold", "fire", "lightning", "poison", "thunder"],
+  "sorcerous-burst": ["acid", "cold", "fire", "lightning", "poison", "psychic", "thunder"],
+  "dragons-breath": ["acid", "cold", "fire", "lightning", "poison"],
+  "conjure-elemental": ["lightning", "thunder", "fire", "cold"],
+  // Radiant for a good or neutral caster, Necrotic for an evil one.
+  "spirit-guardians": ["radiant", "necrotic"]
 };
 
 /** Spell attack rolls one cast makes, where the text's wording misleads the reader. */
 const CAST_ATTACKS: Readonly<Record<string, number>> = {
   "scorching-ray": 3,
-  // These name a spell attack the summoned thing makes later, not the cast.
+  // The summoned thing attacks when it appears ("you can immediately make one melee spell attack").
+  "spiritual-weapon": 1,
+  "arcane-sword": 1,
+  "conjure-fey": 1,
+  // These attack only on later turns (`LATER_ACTIONS`), not as the cast.
   "arcane-hand": 0,
-  "arcane-sword": 0,
-  "flame-blade": 0
+  "flame-blade": 0,
+  "produce-flame": 0
 };
 
 /** Missiles one cast makes, each striking a creature of the caster's choice. */
 const CAST_DARTS: Readonly<Record<string, number>> = { "magic-missile": 3 };
 
-/** Where a cast's spell attack reaches, where the spell's own range doesn't say it: the hurled flame of a Self spell. */
-const ATTACK_RANGES: Readonly<Record<string, NonNullable<SpellEffect["attackRange"]>>> = {
-  "produce-flame": { kind: "ranged", feet: 60 }
+/** Spells whose target makes no save when the spell is cast: the save comes later, on a trigger the GM spots (a
+ *  `LATER_ACTIONS` row resolves it), or belongs to someone else entirely (Sanctuary's attacker, Haste has none). */
+const NO_CAST_SAVE: ReadonlySet<string> = new Set([
+  "antipathysympathy",
+  "beacon-of-hope",
+  "conjure-animals",
+  "conjure-elemental",
+  "conjure-woodland-beings",
+  "delayed-blast-fireball",
+  "dragons-breath",
+  "dream",
+  "faithful-hound",
+  "flaming-sphere",
+  "forcecage",
+  "freedom-of-movement",
+  "gaseous-form",
+  "guardian-of-faith",
+  "haste",
+  "heat-metal",
+  "magic-circle",
+  "power-word-stun",
+  "prismatic-wall",
+  "sanctuary",
+  "sleet-storm",
+  "spirit-guardians",
+  "stinking-cloud",
+  "web"
+]);
+
+type Later = SpellLaterAction;
+const melee = (feet: number) => ({ kind: "melee" as const, feet });
+/** A save that halves the damage on a success and imposes no condition. */
+const save = (ability: "str" | "dex" | "con" | "int" | "wis" | "cha") => ({
+  ability,
+  successDamage: "half" as const,
+  failureConditions: []
+});
+const ONCE_PER_TURN = "A creature makes this save only once per turn.";
+
+/**
+ * What a spell lets its caster do after the cast (SRD 5.2.1 text): the attacks a summoned thing or a held flame
+ * makes on later turns, and the saves an area forces when a creature enters it or ends its turn there. The engine
+ * can't see those triggers, so the GM resolves the save against the creature; the cast reminds them.
+ */
+const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
+  "arcane-sword": [
+    {
+      name: "attack",
+      activation: "bonus-action",
+      when: "On your later turns, a Bonus Action moves the sword up to 30 feet and repeats the attack.",
+      attackRange: melee(95),
+      damage: [{ formula: "4d12", type: "force", addsModifier: true }]
+    }
+  ],
+  "black-tentacles": [
+    {
+      name: "save",
+      activation: "other",
+      when: `A creature that enters the area or ends its turn there makes the save. ${ONCE_PER_TURN}`,
+      save: { ability: "str", successDamage: "none", failureConditions: ["restrained"] },
+      damage: [{ formula: "3d6", type: "bludgeoning" }]
+    }
+  ],
+  "blade-barrier": [
+    {
+      name: "save",
+      activation: "other",
+      when: `A creature that enters the wall's space or ends its turn there makes the save. ${ONCE_PER_TURN}`,
+      save: save("dex"),
+      damage: [{ formula: "6d10", type: "force" }]
+    }
+  ],
+  cloudkill: [
+    {
+      name: "save",
+      activation: "other",
+      when: `A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. ${ONCE_PER_TURN}`,
+      save: save("con"),
+      damage: [{ formula: "5d8", type: "poison" }]
+    }
+  ],
+  "conjure-animals": [
+    {
+      name: "save",
+      activation: "other",
+      when: `When the pack moves within 10 feet of a creature, or a creature enters a space within 10 feet of it or ends its turn there, you can force the save. ${ONCE_PER_TURN}`,
+      save: { ability: "dex", successDamage: "none", failureConditions: [] },
+      damage: [{ formula: "3d10", type: "slashing" }]
+    }
+  ],
+  "conjure-elemental": [
+    {
+      name: "save",
+      activation: "other",
+      when: "A creature that enters the spirit's space or starts its turn within 5 feet of it makes the save, if the spirit has no creature Restrained; the Restrained target repeats it at the start of each of its turns, taking 4d8 on a failure.",
+      save: { ability: "dex", successDamage: "none", failureConditions: ["restrained"] },
+      damage: [{ formula: "8d8", type: "lightning" }]
+    }
+  ],
+  "conjure-fey": [
+    {
+      name: "attack",
+      activation: "bonus-action",
+      when: "On your later turns, a Bonus Action teleports the spirit up to 30 feet and makes the attack (a hit also Frightens the target until the start of your next turn).",
+      attackRange: melee(65),
+      damage: [{ formula: "3d12", type: "psychic", addsModifier: true }]
+    }
+  ],
+  "conjure-woodland-beings": [
+    {
+      name: "save",
+      activation: "other",
+      when: `When the Emanation enters a creature's space, or a creature enters it or ends its turn there, you can force the save. ${ONCE_PER_TURN}`,
+      save: save("wis"),
+      damage: [{ formula: "5d8", type: "force" }]
+    }
+  ],
+  "delayed-blast-fireball": [
+    {
+      name: "explosion",
+      activation: "other",
+      when: "The bead explodes when the spell ends: 12d6, plus 1d6 for each of your turns that ended while it lasted.",
+      save: save("dex"),
+      damage: [{ formula: "12d6", type: "fire" }],
+      area: { shape: "sphere", sizeFeet: 20, widthFeet: null }
+    }
+  ],
+  "dragons-breath": [
+    {
+      name: "exhale",
+      activation: "action",
+      when: "Until the spell ends, the creature you touched can take a Magic action to exhale.",
+      save: save("dex"),
+      damage: [{ formula: "3d6", type: "acid" }],
+      area: { shape: "cone", sizeFeet: 15, widthFeet: null }
+    }
+  ],
+  "faithful-hound": [
+    {
+      name: "bite",
+      activation: "other",
+      when: "At the start of each of your turns, the hound bites one enemy within 5 feet of it.",
+      save: { ability: "dex", successDamage: "none", failureConditions: [] },
+      damage: [{ formula: "4d8", type: "force" }]
+    }
+  ],
+  "flame-blade": [
+    {
+      name: "attack",
+      activation: "action",
+      when: "As a Magic action, you can make a melee spell attack with the fiery blade.",
+      attackRange: melee(5),
+      damage: [{ formula: "3d6", type: "fire", addsModifier: true }]
+    }
+  ],
+  "flaming-sphere": [
+    {
+      name: "save",
+      activation: "other",
+      when: "A creature that ends its turn within 5 feet of the sphere, or whose space you ram it into as a Bonus Action, makes the save.",
+      save: save("dex"),
+      damage: [{ formula: "2d6", type: "fire" }]
+    }
+  ],
+  "heat-metal": [
+    {
+      name: "heat again",
+      activation: "bonus-action",
+      when: "On your later turns, a Bonus Action deals the damage again if the object is within range; a creature holding or wearing it makes a Constitution save or drops it.",
+      damage: [{ formula: "2d8", type: "fire" }]
+    }
+  ],
+  "incendiary-cloud": [
+    {
+      name: "save",
+      activation: "other",
+      when: `A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. ${ONCE_PER_TURN}`,
+      save: save("dex"),
+      damage: [{ formula: "10d8", type: "fire" }]
+    }
+  ],
+  "insect-plague": [
+    {
+      name: "save",
+      activation: "other",
+      when: `A creature that enters the area for the first time on a turn or ends its turn there makes the save. ${ONCE_PER_TURN}`,
+      save: save("con"),
+      damage: [{ formula: "4d10", type: "piercing" }]
+    }
+  ],
+  moonbeam: [
+    {
+      name: "save",
+      activation: "other",
+      when: `A creature the Cylinder moves into, or that enters it or ends its turn there, makes the save. ${ONCE_PER_TURN}`,
+      save: save("con"),
+      damage: [{ formula: "2d10", type: "radiant" }]
+    }
+  ],
+  "produce-flame": [
+    {
+      name: "hurl",
+      activation: "action",
+      when: "Until the spell ends, a Magic action hurls fire at a creature or object within 60 feet.",
+      attackRange: { kind: "ranged", feet: 60 },
+      damage: [{ formula: "1d8", type: "fire" }]
+    }
+  ],
+  "sleet-storm": [
+    {
+      name: "save",
+      activation: "other",
+      when: "A creature that enters the Cylinder for the first time on a turn or starts its turn there makes the save; a failure also breaks its Concentration.",
+      save: { ability: "dex", successDamage: "none", failureConditions: ["prone"] },
+      damage: []
+    }
+  ],
+  "spirit-guardians": [
+    {
+      name: "save",
+      activation: "other",
+      when: `When the Emanation enters a creature's space, or a creature enters it or ends its turn there, it makes the save. ${ONCE_PER_TURN}`,
+      save: save("wis"),
+      damage: [{ formula: "3d8", type: "radiant" }]
+    }
+  ],
+  "spiritual-weapon": [
+    {
+      name: "attack",
+      activation: "bonus-action",
+      when: "On your later turns, a Bonus Action moves the force up to 20 feet and repeats the attack.",
+      attackRange: melee(65),
+      damage: [{ formula: "1d8", type: "force", addsModifier: true }]
+    }
+  ],
+  "stinking-cloud": [
+    {
+      name: "save",
+      activation: "other",
+      when: "A creature that starts its turn in the Sphere makes the save; it is Poisoned until the end of that turn and can't take an action or a Bonus Action.",
+      save: { ability: "con", successDamage: "none", failureConditions: ["poisoned"] },
+      damage: []
+    }
+  ],
+  "wall-of-fire": [
+    {
+      name: "burn",
+      activation: "other",
+      when: "A creature that ends its turn within 10 feet of the burning side or inside the wall, or enters the wall for the first time on a turn, takes the damage.",
+      damage: [{ formula: "5d8", type: "fire" }]
+    }
+  ],
+  "wall-of-thorns": [
+    {
+      name: "save",
+      activation: "other",
+      when: `A creature that enters a space in the wall for the first time on a turn or ends its turn there makes the save. ${ONCE_PER_TURN}`,
+      save: save("dex"),
+      damage: [{ formula: "7d8", type: "slashing" }]
+    }
+  ],
+  web: [
+    {
+      name: "save",
+      activation: "other",
+      when: "The first time a creature enters the webs on a turn or starts its turn there, it makes the save; Restrained, it can try a Strength (Athletics) check against your spell save DC as an action.",
+      save: { ability: "dex", successDamage: "none", failureConditions: ["restrained"] },
+      damage: []
+    }
+  ]
 };
 
 /** Reaction spells the table offers as prompts: what triggers each and what casting it does. Counterspell and Feather
@@ -115,13 +395,18 @@ export function spellEffectFor(
 ): SpellEffect {
   const healing = healingOfText(description);
   const attacks = CAST_ATTACKS[id] ?? (/\bmakes? an? (?:ranged|melee) spell attack\b/i.test(description) ? 1 : 0);
-  const attackRange = attacks > 0 ? (ATTACK_RANGES[id] ?? spellAttackRangeOf(description, range)) : null;
+  const attackRange = attacks > 0 ? spellAttackRangeOf(description, range) : null;
   const reaction = CAST_REACTIONS[id];
   const darts = CAST_DARTS[id];
+  const choices = DAMAGE_CHOICES[id];
+  const later = LATER_ACTIONS[id];
   return {
     attacks,
     ...(attackRange ? { attackRange } : {}),
     damage: castDamage(id, roll, types, healing !== null),
+    ...(choices ? { damageTypes: [...choices] } : {}),
+    ...(NO_CAST_SAVE.has(id) ? { noCastSave: true as const } : {}),
+    ...(later ? { laterActions: later.map((row) => ({ ...row, damage: [...row.damage] })) } : {}),
     ...(darts ? { darts } : {}),
     healing,
     ...(reaction ? { reaction } : {})
@@ -149,6 +434,8 @@ const UPCAST_CORRECTIONS: Readonly<Record<string, Readonly<Record<number, Upcast
   ),
   // The source scales the 1d10 Piercing hit; the SRD scales the 2d6 Cold burst, which stays with the GM.
   "ice-knife": Object.fromEntries([2, 3, 4, 5, 6, 7, 8, 9].map((level) => [level, { roll: null }] as const)),
+  // +2d6 for each slot level above 6; the source prints +1d6.
+  "wall-of-ice": { 7: { roll: "12d6" }, 8: { roll: "14d6" }, 9: { roll: "16d6" } },
   // +10 Hit Points for each slot level above 6; the source prints no amounts.
   heal: { 7: { roll: "80" }, 8: { roll: "90" }, 9: { roll: "100" } }
 };
@@ -174,7 +461,9 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...Object.keys(NO_CAST_DAMAGE),
   ...Object.keys(CAST_DAMAGE),
   ...Object.keys(CAST_ATTACKS),
-  ...Object.keys(ATTACK_RANGES),
+  ...Object.keys(DAMAGE_CHOICES),
+  ...NO_CAST_SAVE,
+  ...Object.keys(LATER_ACTIONS),
   ...Object.keys(CAST_DARTS),
   ...Object.keys(UPCAST_CORRECTIONS),
   ...Object.keys(CAST_REACTIONS)

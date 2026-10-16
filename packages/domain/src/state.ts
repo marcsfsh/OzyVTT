@@ -250,6 +250,8 @@ export const ParkedAttackSchema = z
     pushFeet: z.number().int().min(0).max(100).nullable(),
     /** The slot the spell was cast with, so the replay rolls the same dice. */
     slotLevel: z.number().int().min(1).max(9).nullable(),
+    /** The damage type the caster picked (Chromatic Orb), so the replay deals it. */
+    damageType: z.string().max(40).nullable().default(null),
     /** Attacker to target when it rolled, so the replay classifies the swing (melee or thrown) the same way. */
     distanceFeet: z.number().min(0).max(100000).nullable(),
     initiatorRole: z.enum(["gm", "player"]),
