@@ -29,6 +29,7 @@ import type { ReadSpec } from "./pipeline.js";
  *  (ADR-0015): reference text, and the character builder's choices. */
 const PUBLIC_CATALOGS = [
   ["content:conditions", CONTENT_PATHS.conditions, "conditions", (catalog) => catalog.conditionSummaries()],
+  ["content:glossary", CONTENT_PATHS.glossary, "glossary", (catalog) => catalog.glossaryEntries()],
   ["content:skills", CONTENT_PATHS.skills, "skills", (catalog) => catalog.skillSummaries()],
   ["content:languages", CONTENT_PATHS.languages, "languages", (catalog) => catalog.languageSummaries()],
   ["content:spells", CONTENT_PATHS.spells, "spells", (catalog) => catalog.spellSummaries()],

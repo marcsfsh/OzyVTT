@@ -503,6 +503,13 @@ describe("public game API over /api/v1", () => {
     expect(conditionsBody.data.conditions.length).toBeGreaterThan(5);
     expect(conditionsBody.data.attribution).toContain("System Reference Document 5.2.1");
 
+    // The Rules Glossary is reference text any joined player may read.
+    const glossary = await fetch(base + CONTENT_PATHS.glossary, { headers: bearer(playerToken) });
+    expect(glossary.status).toBe(200);
+    const glossaryBody = await glossary.json();
+    expect(glossaryBody.data.glossary.find((entry: { id: string }) => entry.id === "prone")?.tag).toBe("Condition");
+    expect(glossaryBody.data.attribution).toContain("System Reference Document 5.2.1");
+
     const equipment = await fetch(base + CONTENT_PATHS.equipment, { headers: bearer(playerToken) });
     expect(equipment.status).toBe(200);
     const equipmentBody = await equipment.json();

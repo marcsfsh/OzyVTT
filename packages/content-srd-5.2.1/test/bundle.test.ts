@@ -12,6 +12,7 @@ import {
   loadConditions,
   loadDamageTypes,
   loadEquipment,
+  loadGlossary,
   loadMagicItems,
   loadMonsterDefinitions,
   loadRules,
@@ -756,5 +757,25 @@ describe("attribution", () => {
     expect(attribution.license).toBe("CC-BY-4.0");
     expect(attribution.attribution).toContain("This work includes material from the System Reference Document 5.2.1");
     expect(attribution.attribution).toContain("https://creativecommons.org/licenses/by/4.0/legalcode");
+  });
+});
+
+describe("SRD 5.2.1 Rules Glossary bundle", () => {
+  const glossary = loadGlossary();
+
+  it("holds every term once, with its bracketed tag", () => {
+    expect(glossary.length).toBe(155);
+    expect(new Set(glossary.map((entry) => entry.id)).size).toBe(glossary.length);
+    const prone = glossary.find((entry) => entry.id === "prone");
+    expect(prone).toMatchObject({ name: "Prone", tag: "Condition" });
+    expect(prone!.description).toContain("Restricted Movement.");
+    expect(glossary.find((entry) => entry.id === "attack")?.tag).toBe("Action");
+    // No markdown left for a reader to see.
+    expect(glossary.some((entry) => /\*\*|<\/?t[dr]>/.test(entry.description))).toBe(false);
+  });
+
+  it("gives every rules section a distinct id", () => {
+    const rules = loadRules();
+    expect(new Set(rules.map((rule) => rule.id)).size).toBe(rules.length);
   });
 });

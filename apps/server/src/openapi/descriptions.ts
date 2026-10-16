@@ -1268,6 +1268,11 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   ContentConditionsData: {
     attribution: ATTRIBUTION
   },
+  ContentGlossaryData: {
+    "glossary[].tag":
+      'The family the SRD names in brackets after the term ("Condition", "Action", "Hazard"); null when none',
+    attribution: ATTRIBUTION
+  },
   ContentSkillsData: {
     "skills[].ability": "The ability this skill's check uses; null only for a record that has not declared one yet",
     attribution: ATTRIBUTION

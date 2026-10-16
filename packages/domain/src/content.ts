@@ -29,6 +29,21 @@ export type ContentMonstersResult = {
   monsters?: readonly ContentMonsterSummary[];
   attribution?: string;
 };
+/** One Rules Glossary term for the in-app rules reference; public information for any joined session. */
+export const ContentGlossaryEntrySchema = z.strictObject({
+  id: z.string(),
+  name: z.string(),
+  /** The bracketed family the SRD gives the term ("Condition", "Action", "Hazard"), or null. */
+  tag: z.string().nullable(),
+  description: z.string()
+});
+export type ContentGlossaryEntry = Wire<z.infer<typeof ContentGlossaryEntrySchema>>;
+export type ContentGlossaryResult = {
+  ok: boolean;
+  message?: string;
+  glossary?: readonly ContentGlossaryEntry[];
+  attribution?: string;
+};
 /** SRD condition reference (name + rules text) for pickers and tooltips; public information for any joined session. */
 export const ContentConditionSummarySchema = z.strictObject({
   id: z.string(),

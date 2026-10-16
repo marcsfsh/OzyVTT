@@ -5,6 +5,7 @@
  *   2. `build-bundle.ts`: monsters, spells, weapons, armor and the other open5e reference bundles.
  *   3. `build-class-bundle.ts`: classes and subclasses. Starting equipment resolves against steps 1-2.
  *   4. `build-magic-items.ts`: magic items. Bases resolve against the weapons and armor from step 2.
+ *   5. `build-glossary.ts`: the Rules Glossary.
  *
  * No step reads its own output. `--out=<dir>` sends every step's bundles there instead of `bundles/`,
  * and each step reads earlier steps' bundles from the same directory.
@@ -33,7 +34,7 @@ const AUTHORED: ReadonlyArray<readonly [name: string, schema: z.ZodType]> = [
   ["names", NamePoolReferenceSchema]
 ];
 
-const STEPS = ["build-bundle.ts", "build-class-bundle.ts", "build-magic-items.ts"] as const;
+const STEPS = ["build-bundle.ts", "build-class-bundle.ts", "build-magic-items.ts", "build-glossary.ts"] as const;
 
 mkdirSync(outDir, { recursive: true });
 

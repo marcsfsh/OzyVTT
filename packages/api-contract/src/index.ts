@@ -270,6 +270,7 @@ export const CONTENT_PATHS = {
   monsterById: `${API_NAMESPACE}/content/monsters/{definitionId}`,
   monsterActions: `${API_NAMESPACE}/content/monsters/{definitionId}/actions`,
   conditions: `${API_NAMESPACE}/content/conditions`,
+  glossary: `${API_NAMESPACE}/content/glossary`,
   skills: `${API_NAMESPACE}/content/skills`,
   languages: `${API_NAMESPACE}/content/languages`,
   spells: `${API_NAMESPACE}/content/spells`,

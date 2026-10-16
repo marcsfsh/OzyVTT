@@ -1179,12 +1179,15 @@ const skillRecords = describesRecords(skills).map(({ id, name, description }) =>
 const damageTypeRecords = describesRecords(damageTypes);
 
 const ruleSetNames = new Map(onlySrd(ruleSets).map((set) => [set.pk, set.fields.name]));
+// Ids count within each ruleset: upstream repeats an index ("exploration-3" was both Hiding and
+// Interacting with Objects).
+const ruleCounts = new Map<string, number>();
 const ruleRecords = onlySrd(rules)
   .sort(
     (left, right) => left.fields.ruleset.localeCompare(right.fields.ruleset) || left.fields.index - right.fields.index
   )
   .map((rule) => ({
-    id: `${slugOf(rule.fields.ruleset)}-${rule.fields.index}`,
+    id: `${slugOf(rule.fields.ruleset)}-${ruleCounts.set(rule.fields.ruleset, (ruleCounts.get(rule.fields.ruleset) ?? 0) + 1).get(rule.fields.ruleset)}`,
     name: rule.fields.name,
     ruleset: ruleSetNames.get(rule.fields.ruleset) ?? slugOf(rule.fields.ruleset),
     order: rule.fields.index,
