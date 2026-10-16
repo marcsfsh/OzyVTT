@@ -193,9 +193,21 @@ export function CharacterSheet({
     beginTargeting(summaryOfOwnAction(action), actor.id, slotLevel, darts);
     if (effectiveAttackMode === "jump") onJumpToInitiative?.();
   };
+  // A smite is added to a hit in a fight, so its Cast tap says where to find it rather than starting a refused cast.
+  const hitExtraNote = (actionId: string | null | undefined): string | null => {
+    const row = inFight && actionId ? serverActions.find((candidate) => candidate.id === actionId) : undefined;
+    return row?.ridesAHit
+      ? `${row.name} is added to a hit: choose it on the attack's result, before you confirm.`
+      : null;
+  };
   // A leveled spell's cast: on your turn it goes through targeting with its slot; otherwise the server routes it,
   // spending the slot and rolling its dice outside a fight, or refusing off turn.
   const castSpellAction = (actionId: string, slotLevel?: number) => {
+    const note = hitExtraNote(actionId);
+    if (note) {
+      toast(note);
+      return;
+    }
     const structured = structuredAttacks ? definition?.actions.find((action) => action.id === actionId) : undefined;
     if (structured) {
       routeAttack(structured, slotLevel);
@@ -322,6 +334,11 @@ export function CharacterSheet({
             canPrepare={role === "gm" || Boolean(actor.preparation)}
             castSpellAction={castSpellAction}
             routeSpell={(spell) => {
+              const note = hitExtraNote(spell.actionId);
+              if (note) {
+                toast(note);
+                return true;
+              }
               const structured = structuredAttacks
                 ? structuredActionFor({ actionId: spell.actionId ?? undefined, name: spell.name })
                 : null;

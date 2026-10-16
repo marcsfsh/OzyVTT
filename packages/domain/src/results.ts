@@ -250,6 +250,10 @@ export const ActionAvailabilitySchema = z.strictObject({
   componentsRemaining: z.number().int().min(0).nullable(),
   /** True for the SRD generic actions every combatant can take (Dodge, Dash, Help, ...) - not on the stat block. */
   builtin: z.boolean().optional(),
+  /** A builtin that resolves against one chosen creature (Help, an Unarmed Strike); absent, a direct tap. */
+  targeting: z.enum(["single", "none"]).optional(),
+  /** Added to a hit rather than taken alone (Sneak Attack, a smite): chosen on an attack's result. */
+  ridesAHit: z.literal(true).optional(),
   // Display values only (ADR-0007); resolution recomputes from the id.
   description: z.string(),
   attackBonus: z.number().int().nullable(),

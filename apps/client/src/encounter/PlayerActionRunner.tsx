@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { type ActorDefinition, type ContentActionSummary } from "@vtt/domain";
+import { read } from "../lib/command";
 import { ActionResultHead, HealingOutcome } from "./ActionResultHead";
 import { ActionRow } from "./ActionRow";
 import { ActionTargetPicker } from "./ActionTargetPicker";
 import { actionSummaryParts } from "./action-summary";
 import { AttackOutcome, AttackPreview } from "./AttackPreview";
+import { CommonActionChips } from "./CommonActionChips";
 import { damageBreakdown } from "./format";
 import { AskTheGmPrompt } from "./RuleAsk";
+import { summaryOfAvailability, type AvailabilityRow } from "./useSheetDefinition";
 import {
   beginTargeting,
   clearTargeting,
@@ -55,6 +58,31 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
   };
 }
 
+/** What the server lists for this character beyond its own rows: the generic actions it can take (with the Bonus
+ *  Action forms its features give) and which of its rows are added to a hit rather than taken alone. Read once per
+ *  sheet; the server still decides each use. */
+function useServerActionFacts(actorId: string, definition: ActorDefinition) {
+  const [facts, setFacts] = useState<{ common: readonly ContentActionSummary[]; ridesAHit: ReadonlySet<string> }>({
+    common: [],
+    ridesAHit: new Set()
+  });
+  useEffect(() => {
+    let live = true;
+    void read("actor:available-actions", { actorId }).then((result) => {
+      if (!live || !result.ok) return;
+      const rows: readonly AvailabilityRow[] = result.actions ?? [];
+      setFacts({
+        common: rows.filter((row) => row.builtin).map(summaryOfAvailability),
+        ridesAHit: new Set(rows.filter((row) => row.ridesAHit).map((row) => row.id))
+      });
+    });
+    return () => {
+      live = false;
+    };
+  }, [actorId, definition]);
+  return facts;
+}
+
 /**
  * A player's action console on their own turn, mirroring the GM's ActionRunner for their claimed
  * character: pick an action and targets, preview the d20 (Adv/Disadv or a typed die), and confirm.
@@ -82,19 +110,22 @@ export function PlayerActionRunner({
 }>) {
   const [feedback, setFeedback] = useState("");
   const onFeedback = setFeedback;
+  const facts = useServerActionFacts(actorId, definition);
   // A limited use is a structured effect the server resolves, so Action Surge and the like get a
-  // targetless Use tap here too.
+  // targetless Use tap here too. Sneak Attack, a smite and the like are added to a hit instead, so they aren't
+  // offered as a tap that would be refused.
   const actions = useMemo(
     () => [
       ...definition.actions
         .filter(
           (action) =>
-            action.attack ||
-            action.save ||
-            action.damage.length > 0 ||
-            action.uses !== undefined ||
-            // A feature's heal (Second Wind); a spell's heal is cast from the spell list.
-            (action.healing !== undefined && action.spellId === undefined)
+            !facts.ridesAHit.has(action.id) &&
+            (action.attack ||
+              action.save ||
+              action.damage.length > 0 ||
+              action.uses !== undefined ||
+              // A feature's heal (Second Wind); a spell's heal is cast from the spell list.
+              (action.healing !== undefined && action.spellId === undefined))
         )
         .map(summaryOfOwnAction),
       // Item-derived actions are appended: their `item-<inventory id>` keys cannot collide with
@@ -107,7 +138,10 @@ export function PlayerActionRunner({
           action.usesLimit !== null
       )
     ],
-    [definition, extraActions]
+    [definition, extraActions, facts]
+  );
+  const hitExtras = definition.actions.filter(
+    (action) => facts.ridesAHit.has(action.id) && action.spellId === undefined
   );
   const healingOf = (action: ContentActionSummary) => definition.actions.find((own) => own.id === action.id)?.healing;
   // A self heal (Second Wind) is a direct tap; a heal for others picks its targets first.
@@ -135,7 +169,7 @@ export function PlayerActionRunner({
     []
   );
 
-  if (actions.length === 0) return null;
+  if (actions.length === 0 && facts.common.length === 0) return null;
   const onOutcome = (ok: boolean, message?: string) => {
     if (!ok && message) onFeedback(message);
   };
@@ -166,6 +200,21 @@ export function PlayerActionRunner({
               </li>
             ))}
           </ul>
+          {hitExtras.length > 0 && (
+            <p className="action-result-hint">
+              {hitExtras.map((action) => action.name).join(", ")}: add {hitExtras.length === 1 ? "it" : "them"} to a hit
+              on the attack's result, before you confirm it.
+            </p>
+          )}
+          <CommonActionChips
+            actions={facts.common}
+            busy={busy}
+            onUse={(action, targetless) => {
+              setTargetingResult(null);
+              if (targetless) resolveActionDirect(actorId, action.id, revision, onOutcome);
+              else beginTargeting(action, actorId);
+            }}
+          />
         </>
       )}
       {picking && !result?.preview && (

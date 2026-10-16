@@ -6,7 +6,9 @@ import {
   type GameState
 } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
+import { BUILTIN_TARGETING } from "./builtin-actions.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
+import { hitRiderOf } from "./resolution/hit-riders.js";
 import { masteryMissDamage } from "./weapon-mastery.js";
 import { spendAmmunition } from "./resolution/ammunition.js";
 import { useUpConsumable } from "./resolution/consumables.js";
@@ -222,7 +224,7 @@ export function actionAvailability(
       !action.multiattack
     ) {
       if (instance.components[action.id] !== undefined) componentsRemaining = instance.components[action.id];
-      else if (action.attack && instance.components["attack"] !== undefined)
+      else if ((action.attack || action.replacesAttack) && instance.components["attack"] !== undefined)
         componentsRemaining = instance.components["attack"];
     }
     return {
@@ -233,7 +235,8 @@ export function actionAvailability(
       violations: evaluation.violations,
       usesRemaining,
       componentsRemaining,
-      ...(builtin ? { builtin: true } : {}),
+      ...(builtin ? { builtin: true, targeting: BUILTIN_TARGETING[action.id] ?? ("none" as const) } : {}),
+      ...(hitRiderOf(action) ? { ridesAHit: true as const } : {}),
       // Display values only (ADR-0007), from the effective list; resolution recomputes from the id.
       description: action.description,
       attackBonus: action.attack?.bonus ?? null,

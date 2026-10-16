@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { ContentActionSummary, GmActor, GmView } from "@vtt/domain";
-import { IconChevron, IconSparkle } from "@vtt/ui";
+import { IconSparkle } from "@vtt/ui";
 import { ActionRow } from "./ActionRow";
+import { CommonActionChips } from "./CommonActionChips";
 import { actionSummaryParts, tagLabel } from "./action-summary";
 import { RichText } from "./RichText";
 import { SpellcastingText } from "./spells";
@@ -75,9 +76,6 @@ function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSu
   return null;
 }
 
-/** The generic actions a table reaches for mid-fight; the rest sit behind "More". */
-const PRIMARY_BUILTINS = ["dodge", "dash", "disengage", "help", "hide"] as const;
-
 /**
  * A stat block's actions in three tiers: its own rollable actions as full rows, the shared builtins
  * (Dodge, Dash, Unarmed Strike...) as one cluster of chips, and prose traits behind one line, with
@@ -98,7 +96,6 @@ export function GmActionList({
   onUse: (action: ContentActionSummary, targetless: boolean) => void;
 }>) {
   const [openReference, setOpenReference] = useState<string | null>(null);
-  const [moreBuiltins, setMoreBuiltins] = useState(false);
   const own = actions.filter((action) => isResolvable(action) && action.builtin !== true);
   const builtins = actions.filter((action) => isResolvable(action) && action.builtin === true);
   const reference = actions.filter((action) => !isResolvable(action));
@@ -115,7 +112,7 @@ export function GmActionList({
               <ActionRow
                 action={action}
                 parts={actionSummaryParts(action, actions)}
-                note={action.grants ? "Grants an effect" : "Tap to use"}
+                note={action.ridesAHit ? "Add it on a hit's result" : action.grants ? "Grants an effect" : "Tap to use"}
                 hint={hint}
                 disabled={busy}
                 onUse={() => onUse(action, isTargetless(action))}
@@ -124,42 +121,12 @@ export function GmActionList({
           );
         })}
       </ul>
-      {builtins.length > 0 &&
-        (() => {
-          const primary = PRIMARY_BUILTINS.flatMap((id) => builtins.filter((action) => action.id === id));
-          const rest = builtins.filter((action) => !(PRIMARY_BUILTINS as readonly string[]).includes(action.id));
-          const shown = moreBuiltins ? [...primary, ...rest] : primary.length > 0 ? primary : builtins;
-          return (
-            <div className="builtin-actions" role="group" aria-label="Common actions">
-              <span className="builtin-actions-label">Common</span>
-              {shown.map((action) => {
-                const hint = availabilityHint(state, actor, action);
-                return (
-                  <button
-                    key={action.id}
-                    type="button"
-                    className={`builtin-chip${hint ? " hinted" : ""}`}
-                    disabled={busy}
-                    title={`${action.description}${hint ? `\n\n${hint}` : ""}`}
-                    onClick={() => onUse(action, isTargetless(action))}
-                  >
-                    {action.name}
-                  </button>
-                );
-              })}
-              {rest.length > 0 && primary.length > 0 && (
-                <button
-                  type="button"
-                  className="builtin-chip builtin-more"
-                  aria-expanded={moreBuiltins}
-                  onClick={() => setMoreBuiltins((current) => !current)}
-                >
-                  {moreBuiltins ? "Less" : "More"} <IconChevron className="builtin-more-caret" />
-                </button>
-              )}
-            </div>
-          );
-        })()}
+      <CommonActionChips
+        actions={builtins}
+        busy={busy}
+        hintFor={(action) => availabilityHint(state, actor, action)}
+        onUse={onUse}
+      />
       {spellcasting && (
         <div className="action-spellcasting" role="group" aria-label="Spellcasting">
           <div className="action-spellcasting-head">
