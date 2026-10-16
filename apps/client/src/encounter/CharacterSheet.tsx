@@ -111,6 +111,10 @@ export function CharacterSheet({
     actor.kind === "player-character" &&
     definition !== null;
   // Outside the fight an item's action goes to the server's loose route, which rolls it and spends its charges.
+  // A cast past an empty slot is stopped here only when the fight enforces spell slots; otherwise the server warns
+  // or lets it through, and outside a fight it decides from the table's policy.
+  const slotsPoliced =
+    state?.combat.active === true && (state.combat.ruleExceptions.slots ?? state.combat.rulesMode) === "strict";
   const inFight = state
     ? state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actor.id)
     : liveCombat?.active === true;
@@ -181,7 +185,12 @@ export function CharacterSheet({
   // "inline" drives the runner in the Actions section.
   const routeAttack = (action: ActorDefinition["actions"][number], slotLevel?: number) => {
     setTargetingResult(null);
-    beginTargeting(summaryOfOwnAction(action), actor.id, slotLevel);
+    // Magic Missile makes one more dart for each slot level above its own; the server counts them again.
+    const darts =
+      action.darts !== undefined && slotLevel !== undefined && action.spellSlot
+        ? action.darts + Math.max(0, slotLevel - action.spellSlot.level)
+        : undefined;
+    beginTargeting(summaryOfOwnAction(action), actor.id, slotLevel, darts);
     if (effectiveAttackMode === "jump") onJumpToInitiative?.();
   };
   // A leveled spell's cast: on your turn it goes through targeting with its slot; otherwise the server routes it,
@@ -309,6 +318,8 @@ export function CharacterSheet({
             rolls={rolls}
             onFeedback={setFeedback}
             spellSaveDcBonus={derived?.spellSaveDcBonus ?? 0}
+            policeSlots={slotsPoliced}
+            canPrepare={role === "gm" || Boolean(actor.preparation)}
             castSpellAction={castSpellAction}
             routeSpell={(spell) => {
               const structured = structuredAttacks

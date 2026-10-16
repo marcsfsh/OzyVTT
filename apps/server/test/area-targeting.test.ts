@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema } from "@vtt/domain";
-import { cellCenterImage, tokensInTemplate } from "../src/area-targeting.js";
+import { areaOriginatesFromCaster, cellCenterImage, tokensInTemplate } from "../src/area-targeting.js";
 import { startEncounter } from "../src/encounter.js";
 import type { SquareGridCalibration } from "../src/grid-calibration.js";
 
@@ -97,5 +97,21 @@ describe("area-of-effect templates", () => {
     const game = placed([{ actor: id(1), column: 3, row: 0, sizeCells: 2 }]);
     const caught = tokensInTemplate(game, CAL, { origin: at(0, 0), target: at(3, 0) }, "circle", null); // radius 3 cells
     expect(caught).toContain(id(1));
+  });
+});
+
+describe("whether an area catches its own caster (SRD areas of effect)", () => {
+  it("leaves out an Emanation's creature, a Cone's or Line's origin, and a Self spell's caster", () => {
+    expect(areaOriginatesFromCaster("emanation", "Self")).toBe(true);
+    expect(areaOriginatesFromCaster("cone", "Self")).toBe(true);
+    expect(areaOriginatesFromCaster("line", null)).toBe(true);
+    // Thunderwave: a 15-foot Cube originating from you.
+    expect(areaOriginatesFromCaster("cube", "Self")).toBe(true);
+  });
+
+  it("catches a caster a Sphere or a placed Cube covers (a Fireball too close)", () => {
+    expect(areaOriginatesFromCaster("sphere", "150 feet")).toBe(false);
+    expect(areaOriginatesFromCaster("circle", null)).toBe(false);
+    expect(areaOriginatesFromCaster("cube", "60 feet")).toBe(false);
   });
 });

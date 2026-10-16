@@ -487,7 +487,7 @@ describe("actor definition v1", () => {
     expect(RiderWhenSchema.safeParse([{ type: "while-condition", conditionIds: ["poisonned"] }]).success).toBe(false);
   });
 
-  it("declares twenty-eight named triggers, every one classified and accepted by the JSON twin", () => {
+  it("declares twenty-nine named triggers, every one classified and accepted by the JSON twin", () => {
     // One sample per trigger: the JSON twin folds parameterless moments into one enum branch, so a branch count would
     // not prove agreement.
     const samples: Record<string, Record<string, unknown>> = {
@@ -518,10 +518,11 @@ describe("actor definition v1", () => {
       "spell-id-is": { spellIds: ["eldritch-blast"] },
       "versus-creature-type": { creatureTypes: ["undead"] },
       "versus-size": { sizes: ["large"] },
-      "versus-condition": { conditionIds: ["prone"] }
+      "versus-condition": { conditionIds: ["prone"] },
+      "by-effect-source": {}
     };
     const declared = RiderTriggerSchema.options.map((option) => option.shape.type.value as string);
-    expect(declared).toHaveLength(28);
+    expect(declared).toHaveLength(29);
     expect(Object.keys(samples).sort()).toEqual([...declared].sort());
     // Every trigger must be classified, or it would evaluate in the wrong layer.
     const kinds = declared.map((type) => RIDER_TRIGGER_KINDS[type as keyof typeof RIDER_TRIGGER_KINDS]);
@@ -529,7 +530,7 @@ describe("actor definition v1", () => {
     expect(kinds.filter((kind) => kind === "static-gate")).toHaveLength(6);
     expect(kinds.filter((kind) => kind === "dynamic-gate")).toHaveLength(3);
     expect(kinds.filter((kind) => kind === "moment")).toHaveLength(8);
-    expect(kinds.filter((kind) => kind === "filter")).toHaveLength(11);
+    expect(kinds.filter((kind) => kind === "filter")).toHaveLength(12);
 
     for (const type of declared) {
       const trigger = { type, ...samples[type] };

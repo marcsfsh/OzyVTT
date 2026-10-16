@@ -4,6 +4,7 @@ import {
   aggregateRollMode,
   collectRiders,
   d20TestFormula,
+  diceRiders,
   parseDiceFormula,
   resolveDice,
   sumRiders,
@@ -12,6 +13,7 @@ import {
 } from "@vtt/rules-5e";
 import { conditionLabel, exhaustionLevel, exhaustionPenalty, isIncapacitated } from "../condition-rules.js";
 import { criticalThreshold } from "../effective-actions.js";
+import { endEffect } from "../effects.js";
 import {
   deriveEquipment,
   rollModeClaims,
@@ -36,18 +38,20 @@ export function attackUsedAsRanged(
   return distance === null || distance > attack.reachFeet + 1e-6;
 }
 
-/** melee/ranged/thrown derive from reach and range, spell from the spell the action casts; reaction/opportunity
- *  come from `input.attackKinds`. */
+/** melee/ranged/thrown derive from reach and range, spell from the spell the action casts, weapon from a carried
+ *  weapon or a character's own non-spell attack, and melee-weapon/ranged-weapon from a weapon attack made in melee or
+ *  at range; reaction/opportunity come from `input.attackKinds`. */
 function attackKindsOf(ctx: ResolveContext, distance: number | null): AttackKind[] {
   const { action, input, attacker } = ctx;
   const kinds = new Set<AttackKind>(input.attackKinds ?? []);
   const attack = action.attack;
+  // Matched by id so a Monk's own strike (which shadows the builtin) still counts as unarmed.
   const unarmed = action.id === UNARMED_STRIKE_ACTION_ID;
   if (attack) {
     const melee = attack.reachFeet !== undefined;
     const ranged = attack.rangeFeet !== undefined;
-    if (attackUsedAsRanged(attack, distance)) kinds.add("ranged");
-    else if (melee) kinds.add("melee");
+    const used = attackUsedAsRanged(attack, distance) ? "ranged" : melee ? "melee" : null;
+    if (used) kinds.add(used);
     // A Dart is a ranged weapon with Thrown: it has no reach, and is still thrown.
     const thrownWeapon = weaponPropertiesOf(ctx.riderItemId, ctx.attacker.inventory).includes("thrown");
     if ((melee && ranged) || (ranged && thrownWeapon)) kinds.add("thrown");
@@ -60,10 +64,12 @@ function attackKindsOf(ctx: ResolveContext, distance: number | null): AttackKind
       !unarmed &&
       action.spellId === undefined &&
       (action.extraAttack !== undefined || carried || attacker.kind === "player-character")
-    )
+    ) {
       kinds.add("weapon");
+      // A melee spell attack is melee but no weapon's (Radiant Strikes).
+      if (used) kinds.add(used === "melee" ? "melee-weapon" : "ranged-weapon");
+    }
   }
-  // Matched by id so a Monk's own strike (which shadows the builtin) still counts as unarmed.
   if (unarmed) kinds.add("unarmed");
   if (action.activation === "reaction") kinds.add("reaction");
   return [...kinds];
@@ -107,6 +113,12 @@ const CONDITION_ROLL_MODES: ReadonlyArray<
 
 const has = (actor: LiveActor, id: string) => actor.conditions.some((condition) => condition.id === id);
 
+/** Faerie Fire's outline: a creature carrying it can't benefit from the Invisible condition. */
+export const OUTLINED_TAG = "outlined";
+/** An effect that lasts until the next attack roll against its bearer, whoever makes it (Guiding Bolt's light). */
+export const UNTIL_ATTACKED_TAG = "until-attacked";
+const outlined = (actor: LiveActor) => actor.effects.some((effect) => effect.tags.includes(OUTLINED_TAG));
+
 /** Riders on both sides at `on-attack-roll`, read whoever's turn it is (opportunity attacks are off-turn): the
  *  attacker's claims on its attack (Reckless Attack, a cursed blade) and the target's on attacks against it
  *  (Dodge, a Cloak of Displacement). */
@@ -119,7 +131,9 @@ function riderClaims(ctx: ResolveContext, targetDerivation: EquipmentDerivation,
 function conditionClaims(ctx: ResolveContext, target: LiveActor, distance: number | null, sources: RollModeClaims) {
   const { attacker } = ctx;
   for (const entry of CONDITION_ROLL_MODES) {
-    if (!has(entry.side === "attacker" ? attacker : target, entry.condition)) continue;
+    const side = entry.side === "attacker" ? attacker : target;
+    if (!has(side, entry.condition)) continue;
+    if (entry.condition === "invisible" && outlined(side)) continue;
     sources[entry.mode].push({
       source: `${entry.side}-${entry.condition}`,
       label: `${entry.side === "attacker" ? "Attacker" : "Target"} is ${conditionLabel(entry.condition)}`
@@ -241,6 +255,31 @@ function rollD20(
   return { naturalRoll: naturalFace(resolution), total: resolution.total, declaredCrit: false };
 }
 
+type BonusDie = { label: string; dice: string; total: number | null };
+
+/** Dice effects add to the roll (Bless +1d4, Bane -1d4): rolled once the attack is made for real, pending in a
+ *  preview, and reused by a parked attack's replay. A typed total already counts them. */
+function rollBonusDice(
+  ctx: ResolveContext,
+  dice: ReadonlyArray<Readonly<{ label: string; dice: string }>>
+): BonusDie[] {
+  const { input, deps, action, warnings } = ctx;
+  if (input.attackBonusDice !== undefined) return input.attackBonusDice.map((entry) => ({ ...entry }));
+  if (dice.length === 0) return [];
+  if (input.attackTotal !== undefined) {
+    const named = dice.map((entry) => `${entry.label} (${entry.dice})`).join(", ");
+    warnings.push(`${named}: count ${dice.length === 1 ? "it" : "them"} in the typed total.`);
+    return [];
+  }
+  if (input.commit === false) return dice.map((entry) => ({ ...entry, total: null }));
+  return dice.map((entry) => {
+    const negative = entry.dice.startsWith("-");
+    const rolled = resolveDice(parseDiceFormula(negative ? entry.dice.slice(1) : entry.dice), deps.random);
+    recordRoll(ctx, rolled, "attack", `${action.name}: ${entry.label}`);
+    return { ...entry, total: negative ? -rolled.total : rolled.total };
+  });
+}
+
 /** The attack roll against the one target: rider filters, roll mode, bonus, the d20 and the outcome
  *  (2024: a hit on an Unconscious or Paralyzed creature from within 5 feet is a critical hit). */
 export function rollAttack(ctx: ResolveContext): void {
@@ -287,15 +326,21 @@ export function rollAttack(ctx: ResolveContext): void {
     : aggregated;
   // A standing `attack-bonus` is already folded into `action.attack.bonus` by `effectiveActions`; only
   // momentary riders are added here. The two sets are disjoint.
-  const momentaryAttackBonus = sumRiders(
-    collectRiders(derivation.carriers, { ...derivation.context, ...ctx.riderFilters, moment: "on-attack-roll" }),
-    "attack-bonus"
-  );
+  const atRoll = collectRiders(derivation.carriers, {
+    ...derivation.context,
+    ...ctx.riderFilters,
+    moment: "on-attack-roll"
+  });
+  const momentaryAttackBonus = sumRiders(atRoll, "attack-bonus");
   // Exhaustion applies -2 x level to every D20 Test (SRD 5.2.1); explained as a warning line.
   const bonus = action.attack.bonus + exhaustionPenalty(attacker) + momentaryAttackBonus;
   if (exhaustionLevel(attacker) > 0)
     warnings.push(`Exhaustion ${exhaustionLevel(attacker)}: −${2 * exhaustionLevel(attacker)} to the attack roll.`);
-  const { naturalRoll, total, declaredCrit } = rollD20(ctx, mode, bonus);
+  const { naturalRoll, total: rolled, declaredCrit } = rollD20(ctx, mode, bonus);
+  // Dice riders are never folded into the bonus, standing or not.
+  const standing = collectRiders(derivation.carriers, { ...derivation.context, moment: null });
+  const bonusDice = rollBonusDice(ctx, diceRiders([...standing, ...atRoll], "attack-bonus"));
+  const total = rolled + bonusDice.reduce((sum, entry) => sum + (entry.total ?? 0), 0);
   const manualTotal = input.attackTotal !== undefined;
 
   // Cover raises the effective AC (SRD Cover: +2 half, +5 three-quarters), and so does a reaction against this
@@ -330,6 +375,19 @@ export function rollAttack(ctx: ResolveContext): void {
     targetAc,
     outcome,
     ...(ctx.coverBonus > 0 ? { coverBonus: ctx.coverBonus } : {}),
-    ...(input.reactionAcBonus ? { reactionAcBonus: { ...input.reactionAcBonus } } : {})
+    ...(input.reactionAcBonus ? { reactionAcBonus: { ...input.reactionAcBonus } } : {}),
+    ...(bonusDice.length > 0 ? { bonusDice } : {})
   };
+}
+
+/** The attack roll spends what lasts only until the next attack roll against its bearer (Guiding Bolt's light), hit
+ *  or miss. A hit that lays a fresh one does so afterwards. */
+export function spendUntilAttacked(ctx: ResolveContext): void {
+  const { state, attack, targets, effectsEnded } = ctx;
+  if (attack === null) return;
+  const target = targets[0];
+  for (const effect of target.effects.filter((candidate) => candidate.tags.includes(UNTIL_ATTACKED_TAG))) {
+    endEffect(state, target.id, effect.id);
+    effectsEnded.push({ actorId: target.id, actorName: target.name, name: effect.name });
+  }
 }

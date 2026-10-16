@@ -7,7 +7,7 @@ import { armorClassInPlay, GameStateSchema, type GameState } from "@vtt/domain";
 import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
 import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import { resolveDefinitionAction } from "../src/action-resolution.js";
-import { expireEffectsAtTurnStart } from "../src/effects.js";
+import { expireEffectsAtTurnStart, makeEffect } from "../src/effects.js";
 import { startEncounter } from "../src/encounter.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
 import { answerReaction } from "../src/reactions.js";
@@ -294,6 +294,28 @@ describe("Parry: an AC reaction against a melee attack that would hit", () => {
     const ranged = buildGame(["fighter", "knight"]);
     expect(attack(ranged, "fighter", "shortbow", "knight", [14, 3]).waitingOnReaction).toBeUndefined();
     expect(ranged.combat.pendingReactions).toEqual([]);
+  });
+
+  it("keeps a blessed attacker's d4 through the prompt, so the finished attack totals the same", () => {
+    const game = buildGame(["fighter", "knight"]);
+    actor(game, "fighter").effects = [
+      makeEffect({
+        id: "bless",
+        name: "Bless",
+        duration: { type: "rounds", remaining: 10 },
+        modifiers: [{ type: "attack-bonus", amount: 0, dice: "1d4", when: [{ type: "on-attack-roll" }] }]
+      })
+    ];
+    // 12 + 5 + 2 = 19 meets AC 18, and Parry's +2 would make it 20.
+    const rolled = attack(game, "fighter", "longsword", "knight", [12, 2]);
+    expect(rolled.attack).toMatchObject({ total: 19, bonusDice: [{ label: "Bless", dice: "1d4", total: 2 }] });
+    expect(game.combat.pendingReactions[0]!.parkedAttack?.bonusDice).toEqual([
+      { label: "Bless", dice: "1d4", total: 2 }
+    ]);
+    // Declined: the same total hits, and only the damage die rolls.
+    const outcome = answer(game, false, [5]);
+    expect(outcome.resolution?.attack).toMatchObject({ total: 19, outcome: "hit" });
+    expect(outcome.appliedDamage).toBe(8);
   });
 
   it("reads the SRD stat block's Parry", () => {

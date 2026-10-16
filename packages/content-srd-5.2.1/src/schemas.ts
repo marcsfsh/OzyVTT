@@ -10,6 +10,7 @@ import { z } from "zod";
 import {
   AbilitySchema,
   ActionAreaSchema,
+  ActionGrantSchema,
   AmmunitionKindSchema,
   ActionReactionSchema,
   ActorDefinitionSchema,
@@ -17,6 +18,7 @@ import {
   DiceFormulaSchema,
   HealingFormulaSchema,
   ItemSlotSchema,
+  SaveFailureEffectSchema,
   SaveOutcomeFields
 } from "@vtt/schemas";
 import {
@@ -53,15 +55,70 @@ export type ConditionReference = z.infer<typeof ConditionReferenceSchema>;
 
 const AbilityShortSchema = z.enum(["str", "dex", "con", "int", "wis", "cha"]);
 
+/** How a spell attack is made: a melee spell attack within `feet` of the caster (Touch is 5; a summoned blade
+ *  strikes 5 feet past the spell's range), or a ranged one out to `feet`. */
+const SpellAttackRangeSchema = z
+  .object({ kind: z.enum(["melee", "ranged"]), feet: z.number().int().min(5).max(5280) })
+  .strict();
+
+/** Typed damage; `addsModifier` adds the caster's spellcasting ability modifier (Spiritual Weapon's 1d8 + it). */
+const SpellDamageSchema = z
+  .array(
+    z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema, addsModifier: z.boolean().optional() }).strict()
+  )
+  .max(4);
+
+/** Something a spell lets its caster do after the cast, as an action of its own: Produce Flame's hurl, Spiritual
+ *  Weapon's later attacks, or the save a creature makes when it enters Spirit Guardians (`activation` "other": no
+ *  action, the trigger is the GM's to spot). It rolls at the spell's own level. */
+export const SpellLaterActionSchema = z
+  .object({
+    /** Its name on the sheet, after the spell's ("Spirit Guardians: save"). */
+    name: z.string().min(1).max(60),
+    activation: z.enum(["action", "bonus-action", "other"]),
+    /** When it happens, for the reminder on casting ("a creature enters the Emanation or ends its turn there"). */
+    when: z.string().min(1).max(300),
+    attackRange: SpellAttackRangeSchema.optional(),
+    save: z
+      .object({ ability: AbilityShortSchema, ...SaveOutcomeFields })
+      .strict()
+      .optional(),
+    damage: SpellDamageSchema,
+    area: ActionAreaSchema.optional()
+  })
+  .strict();
+export type SpellLaterAction = z.infer<typeof SpellLaterActionSchema>;
+
 /** One cast's mechanical effect; see `SpellReference.effect`. */
 export const SpellEffectSchema = z
   .object({
     /** Spell attack rolls one cast makes (Scorching Ray's three rays); 0 for none. */
     attacks: z.number().int().min(0).max(10),
-    /** Damage to each target, every part rolled (all three of Magic Missile's darts). */
-    damage: z.array(z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema }).strict()).max(4),
+    /** How those attacks are made. Absent, the spell's range decides. */
+    attackRange: SpellAttackRangeSchema.optional(),
+    /** Damage to each target, every part rolled; with `darts`, what each dart deals. */
+    damage: SpellDamageSchema,
+    /** The damage types the caster picks from on each cast (Chromatic Orb); the damage carries the first. */
+    damageTypes: z.array(DamageTypeSchema).min(2).max(10).optional(),
+    /** The spell's save is not made when it is cast but later (Spirit Guardians, Web) or never by its target
+     *  (Haste, Sanctuary): the cast prompts none. `laterActions` carries one the engine can roll. */
+    noCastSave: z.literal(true).optional(),
+    laterActions: z.array(SpellLaterActionSchema).min(1).max(2).optional(),
+    /** Missiles one cast makes, each at a creature of the caster's choice (Magic Missile's three darts). */
+    darts: z.number().int().min(2).max(20).optional(),
+    /** How many creatures one cast targets (Bless: up to three), plus `perSlot` more for each slot level above the
+     *  spell's own. Absent: the text sets no number the engine checks (an area, or the GM's call). */
+    targets: z
+      .object({ count: z.number().int().min(1).max(20), perSlot: z.number().int().min(1).max(2).optional() })
+      .strict()
+      .optional(),
     /** Hit points each target regains; `addsModifier` adds the caster's spellcasting ability modifier. */
     healing: z.object({ formula: HealingFormulaSchema, addsModifier: z.boolean() }).strict().nullable(),
+    /** What the cast leaves on the creatures it targets, or the one its attack hits, while it lasts (Bless's d4,
+     *  Hunter's Mark's extra damage). */
+    grant: ActionGrantSchema.optional(),
+    /** What a failed save against the cast leaves on the creature (Bane's -1d4, Faerie Fire's outline). */
+    failureEffect: SaveFailureEffectSchema.optional(),
     /** A reaction spell's trigger and response (Shield, Hellish Rebuke), so the table offers it as a prompt. */
     reaction: ActionReactionSchema.optional()
   })
@@ -89,6 +146,8 @@ export const SpellReferenceSchema = z.object({
   duration: z.string().min(1).max(120),
   concentration: z.boolean(),
   ritual: z.boolean(),
+  /** The caster makes a spell attack roll, when it casts or on a later turn: read from the cast model for the SRD,
+   *  since the source marks every spell whose text mentions an attack roll (Bless, Shining Smite). */
   attackRoll: z.boolean(),
   damage: z.object({ roll: z.string().nullable(), types: z.array(z.string()) }),
   /** The save the spell forces: the ability the target rolls and what the save does. The caster supplies the DC. */
@@ -102,7 +161,7 @@ export const SpellReferenceSchema = z.object({
    *  own field, which records a line's width as its size and has no emanations. */
   area: ActionAreaSchema.nullable().default(null),
   /** What one cast does to its targets: the spell attacks it makes, the damage it deals, the hit points it restores.
-   *  Read from the text at build time with a reviewed table, because the source's `damage` and `attackRoll` columns
+   *  Read from the text at build time with a reviewed table, because the source's `damage` and `attack_roll` columns
    *  describe the prose (Hex's later 1d6, Faerie Fire's "attack rolls against"), not a cast. A zone, a summons or a
    *  rider on later hits casts with none of these, and stays for the GM. Actions built from a spell read this. */
   effect: SpellEffectSchema.nullable().default(null),

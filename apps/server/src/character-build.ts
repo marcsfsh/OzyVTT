@@ -39,7 +39,13 @@ import {
 } from "./character-offers.js";
 import type { ContentView } from "./content-library.js";
 import { BUILDER_BAKED_MODIFIER_TYPES, type CharacterFeatureRef } from "./equipment-derivation.js";
-import { spellCastMechanics, UNARMED_STRIKE_ACTION_ID } from "./item-actions.js";
+import {
+  isLongCastingTime,
+  laterSpellAction,
+  ritualSpellActionId,
+  spellCastMechanics,
+  UNARMED_STRIKE_ACTION_ID
+} from "./item-actions.js";
 import { bindTemplateItem } from "./inventory.js";
 import { BUILDER_SOURCE_NAME } from "./actor-roster.js";
 import { featHoldings, featPrerequisiteFailure } from "./feat-prerequisites.js";
@@ -308,18 +314,22 @@ function cantripActionFor(
     activation: activationOf(spell.castingTime),
     description: spell.description.slice(0, 12000),
     ...mechanics,
-    ...(spell.area ? { area: spell.area } : {}),
+    // A healing area heals up to a number of creatures the caster picks (Mass Cure Wounds' six), so it is picked.
+    ...(spell.area && !mechanics.healing ? { area: spell.area } : {}),
     ...(spell.effect?.reaction ? { reaction: spell.effect.reaction } : {}),
     // `spell-id-is` riders (Agonizing Blast) match on this field alone.
     spellId: spell.id
   } as ActorAction;
 }
 
-/** The action economy a casting time names ("1 action", "1 bonus action", "1 reaction, which you take when..."). */
+/** The action economy a casting time names ("Action", "Bonus Action", "Reaction, which you take when..."). A casting
+ *  time of a minute or more takes the Magic action on each turn of it (SRD "Longer Casting Times"), so it is an action
+ *  too, refused while Incapacitated. */
 function activationOf(castingTime: string): ActorAction["activation"] {
   if (/bonus/i.test(castingTime)) return "bonus-action";
   if (/reaction/i.test(castingTime)) return "reaction";
-  return /^(?:1 )?action$/i.test(castingTime.trim()) ? "action" : "other";
+  if (/^(?:1 )?action\b/i.test(castingTime.trim()) || isLongCastingTime(castingTime)) return "action";
+  return "other";
 }
 
 type CasterNumbers = Readonly<{ attackBonus: number; saveDc: number; characterLevel: number; modifier: number }>;
@@ -345,6 +355,7 @@ function leveledSpellActionFor(
     mechanics.save !== undefined ||
     mechanics.healing !== undefined ||
     mechanics.attack ||
+    mechanics.grants !== undefined ||
     spell.effect?.reaction !== undefined;
   if (free === null && !resolvable) return null;
   const freeCast = free !== undefined;
@@ -354,12 +365,24 @@ function leveledSpellActionFor(
     activation: activationOf(spell.castingTime),
     description: spell.description.slice(0, 12000),
     ...mechanics,
-    ...(spell.area ? { area: spell.area } : {}),
+    // A healing area heals up to a number of creatures the caster picks (Mass Cure Wounds' six), so it is picked.
+    ...(spell.area && !mechanics.healing ? { area: spell.area } : {}),
     // A reaction spell's trigger rides its action, so the table offers it (Shield when an attack would hit).
     ...(spell.effect?.reaction ? { reaction: spell.effect.reaction } : {}),
     ...(freeCast ? (free ? { uses: free } : {}) : { spellSlot: { level: spell.level } }),
     spellId: spell.id
   } as ActorAction;
+}
+
+/** A slot cast as a Ritual: the same spell with no slot, 10 minutes longer, so the Magic action on each turn of it. */
+function ritualActionOf(cast: ActorAction, spell: SpellReference): ActorAction {
+  const { spellSlot: _slot, ...rest } = cast;
+  return {
+    ...rest,
+    id: ritualSpellActionId(spell.id),
+    name: `${spell.name} (ritual)`,
+    activation: "action"
+  };
 }
 
 /** The tag of a feature whose spell picks go to the spellbook to be prepared, not straight onto the prepared list
@@ -381,14 +404,16 @@ type SpellEntry = {
   classId?: string;
   actionId?: string;
   freeActionId?: string;
+  ritualActionId?: string;
   source: SpellSource;
   free?: ActorAction["uses"] | null;
 };
 
 /**
  * Mints and links each spell's actions: a cantrip's (`actionId`), a leveled spell's slot cast (`actionId`, when the
- * sheet has slots and the spell may use one) and a free cast (`freeActionId`), each with the numbers of the ability
- * its source casts with. Mutates the list in place.
+ * sheet has slots and the spell may use one), its Ritual cast (`ritualActionId`), a free cast (`freeActionId`) and
+ * what it lets its caster do later, each with the numbers of the ability its source casts with. Mutates the list in
+ * place.
  */
 function linkSpellActions(
   spells: SpellEntry[],
@@ -401,18 +426,35 @@ function linkSpellActions(
     const record = library.spellRecord(entry.id);
     if (!record) continue;
     const numbers = numbersOf(entry.source);
-    const mint = (action: ActorAction | null, key: "actionId" | "freeActionId") => {
+    const mint = (action: ActorAction | null, key: "actionId" | "freeActionId" | "ritualActionId") => {
       if (!action || into.length >= MAX_DEFINITION_ACTIONS || into.some((existing) => existing.id === action.id))
         return;
       into.push(action);
       entry[key] = action.id;
     };
-    if (record.level === 0) {
-      mint(cantripActionFor(record, numbers), "actionId");
-      continue;
+    if (record.level === 0) mint(cantripActionFor(record, numbers), "actionId");
+    else {
+      if (hasSlots && entry.withSlot !== false) {
+        const cast = leveledSpellActionFor(record, numbers);
+        mint(cast, "actionId");
+        // SRD Rituals: a prepared ritual spell can be cast without a slot, taking 10 minutes longer.
+        if (cast && record.ritual) mint(ritualActionOf(cast, record), "ritualActionId");
+      }
+      if (entry.free !== undefined) mint(leveledSpellActionFor(record, numbers, entry.free), "freeActionId");
     }
-    if (hasSlots && entry.withSlot !== false) mint(leveledSpellActionFor(record, numbers), "actionId");
-    if (entry.free !== undefined) mint(leveledSpellActionFor(record, numbers, entry.free), "freeActionId");
+    // What the spell lets its caster do once it is up (Produce Flame's hurl, Spirit Guardians' save), with no slot.
+    const tier =
+      record.level === 0 ? cantripTierAt(cantripScalingOf(record.castingOptions), numbers.characterLevel) : null;
+    for (const later of record.effect?.laterActions ?? []) {
+      const action = laterSpellAction(
+        record,
+        later,
+        { attackBonus: numbers.attackBonus, saveDc: numbers.saveDc, bearersDc: true, modifier: numbers.modifier },
+        { roll: tier?.damageRoll ?? null }
+      );
+      if (into.length < MAX_DEFINITION_ACTIONS && !into.some((existing) => existing.id === action.id))
+        into.push(action);
+    }
   }
 }
 
@@ -992,16 +1034,18 @@ export function buildCharacterDefinition(
         reject(`The ${classRecord.name} spell list could not be resolved: ${error.message}`);
       throw error;
     }
-    // Pact Magic is N slots all of one level, rising by replacing that level, so `pactSlots` replaces
-    // `spellSlots` rather than merging with it.
+    // Pact Magic is N slots all of one level, a pool of its own (`pact`, refilled by a Short Rest), never
+    // spell slots: writing it into `slots` too would seed it twice.
+    const pact =
+      levelRow.pactSlots && levelRow.pactSlots.slots > 0
+        ? { level: levelRow.pactSlots.level, max: levelRow.pactSlots.slots }
+        : null;
     const slots = levelRow.pactSlots
-      ? levelRow.pactSlots.slots > 0
-        ? [{ level: levelRow.pactSlots.level, max: levelRow.pactSlots.slots }]
-        : []
+      ? []
       : (levelRow.spellSlots ?? [])
           .map((count, index) => ({ level: index + 1, max: count }))
           .filter((slot) => slot.max > 0);
-    const maxSlotLevel = slots.reduce((highest, slot) => Math.max(highest, slot.level), 0);
+    const maxSlotLevel = slots.reduce((highest, slot) => Math.max(highest, slot.level), pact?.level ?? 0);
     // SRD: an always-prepared granted spell doesn't count against the prepared limit, so the grant wins
     // and a matching pick is not charged to the cap. A feature's always-prepared spell (Magic Initiate) counts too.
     const alwaysPreparedGrants = new Set([
@@ -1064,13 +1108,14 @@ export function buildCharacterDefinition(
     for (const grantedSpell of interpreted.grantedSpells) addSpell(spells, grantedSpellEntry(grantedSpell));
     const { saveDc, attackBonus } = numbersOf("class");
     // Spells become actions with the numbers of the ability their source casts with; the sheet sends only an id.
-    linkSpellActions(spells, interpreted.actions, numbersOf, library, slots.length > 0);
+    linkSpellActions(spells, interpreted.actions, numbersOf, library, slots.length > 0 || pact !== null);
     // Top-level fields stay populated (the schema demands the combined pool when per-class slots exist).
     spellcasting = {
       ability: casting.ability,
       saveDc,
       attackBonus,
       slots,
+      ...(pact ? { pact } : {}),
       // `prepared` is the composed cap the sheet shows.
       classes: [
         {

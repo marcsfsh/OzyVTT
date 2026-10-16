@@ -6451,7 +6451,7 @@
        {
         "type": "attack-kind-is",
         "kinds": [
-         "melee",
+         "melee-weapon",
          "unarmed"
         ]
        }

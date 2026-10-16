@@ -4,6 +4,7 @@ import {
   ABILITIES,
   abilityModifier,
   armorClassFromEquipment,
+  casterProgressionFor,
   hitDicePool,
   multiclassCasterLevel,
   multiclassPactSlots,
@@ -85,8 +86,15 @@ export function spellSlotMaxima(
 function baseSpellSlotMaxima(definition: ActorDefinition | undefined): ReadonlyArray<{ level: number; max: number }> {
   const spellcasting = definition?.spellcasting;
   if (!spellcasting) return [];
-  if (spellcasting.slots.length > 0) return spellcasting.slots;
   const casterIds = new Set((spellcasting.classes ?? []).map((entry) => entry.classId));
+  // A Warlock built before Pact Magic had a pool of its own carried the pact row as its `slots`; those are its pact
+  // slots, which `pactSlotMaximum` derives, so counting them here would seed them twice.
+  const pactOnly =
+    !spellcasting.pact &&
+    casterIds.size > 0 &&
+    [...casterIds].every((classId) => casterProgressionFor(classId) === "pact");
+  if (pactOnly) return [];
+  if (spellcasting.slots.length > 0) return spellcasting.slots;
   if (casterIds.size === 0) return [];
   const casterLevels = classLevelsOf(definition!).filter((entry) => casterIds.has(entry.classId));
   return multiclassSpellSlots(multiclassCasterLevel(casterLevels))
@@ -323,6 +331,7 @@ function instantiate(
     spellSlots: seedSpellSlots(definition, derivation.spellSlots),
     pactSlots: seedPactSlots(definition),
     preparedSpellIds: seedPreparedSpellIds(definition),
+    preparation: null,
     inventory,
     currency: definition.startingCurrency ? { ...definition.startingCurrency } : { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
     archived: false,

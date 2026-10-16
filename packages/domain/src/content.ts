@@ -4,7 +4,8 @@ import {
   AmmunitionKindSchema,
   HitDieSchema,
   PickBudgetScalingSchema,
-  type ActionReaction
+  type ActionReaction,
+  type DamageType
 } from "@vtt/schemas";
 import type { Wire } from "./wire.js";
 
@@ -492,6 +493,8 @@ export type ContentActionSummary = Readonly<{
   /** Targeting: "single" picks one combatant, "multi" several (Preserve Life), "none" is a direct tap. */ targeting?:
     "single" | "multi" | "none";
   /** SRD Legendary Action cost against the creature's per-round pool (taken on other creatures' turns). */ legendaryCost?: number;
+  /** Darts the action makes, each assigned to a target (Magic Missile); see `ActorAction.darts`. */ darts?: number;
+  /** Damage types the caster picks from (Chromatic Orb); see `ActorAction.damageTypes`. */ damageTypes?: readonly DamageType[];
 }>;
 export type ContentActionsResult = {
   ok: boolean;

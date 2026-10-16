@@ -19,6 +19,7 @@ import {
   CharacterChoiceSchema,
   CharacterIdentitySchema,
   CurrencySchema,
+  DamageTypeSchema,
   EffectModifiersSchema,
   InventoryItemSchema,
   ProficienciesSchema
@@ -358,6 +359,8 @@ export const ActionResolveSchema = z
     /** The spell slot to cast with (upcasting rolls that slot's dice); absent, the spell's own level, else the lowest
      *  above it with a slot left. */
     slotLevel: z.number().int().min(1).max(9).optional(),
+    /** The damage type picked for an action that lets its caster choose (Chromatic Orb); absent, its first. */
+    damageType: DamageTypeSchema.optional(),
     /** Extras to add to this hit, from the preview's `hitOffers` (Sneak Attack, a smite and its slot, Divine Strike's
      *  type, a charge). Each is checked and spent with the hit; on a miss nothing is spent. */
     hitOptions: z.array(HitOptionChoiceSchema).max(6).optional(),
@@ -539,6 +542,8 @@ export const ActionUseSchema = z
     override: RulesOverrideSchema.optional(),
     /** The spell slot to cast with; see `action.resolve`. */
     slotLevel: z.number().int().min(1).max(9).optional(),
+    /** The damage type picked; see `action.resolve`. */
+    damageType: DamageTypeSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -736,6 +741,8 @@ export const CharacterSetSlotSchema = z
     actorId: z.uuid(),
     level: z.number().int().min(1).max(9),
     remaining: z.number().int().min(0).max(9),
+    /** The Warlock's Pact Magic pool at `level`, not the spell slots. */
+    pact: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -745,6 +752,14 @@ export const CharacterSetPreparedSchema = z
     actorId: z.uuid(),
     spellId: z.string().min(1).max(80),
     prepared: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Closes the prepare step a Long Rest opened: the prepared list stands until the next one. */
+export const CharacterFinishPreparingSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

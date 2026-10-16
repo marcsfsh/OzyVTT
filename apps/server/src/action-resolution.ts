@@ -10,10 +10,10 @@ import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { masteryMissDamage } from "./weapon-mastery.js";
 import { spendAmmunition } from "./resolution/ammunition.js";
 import { useUpConsumable } from "./resolution/consumables.js";
-import { rollAttack } from "./resolution/attack.js";
+import { rollAttack, spendUntilAttacked } from "./resolution/attack.js";
 import { rollLastCharge } from "./resolution/charges.js";
 import type { DefinitionAction, ResolveContext, ResolveDependencies, ResolveInput } from "./resolution/context.js";
-import { rollRiderDamage, rollWeaponDamage } from "./resolution/damage.js";
+import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
 import { applyHealing } from "./resolution/heal.js";
@@ -48,10 +48,12 @@ export function resolveDefinitionAction(
   // Preview: the d20 is rolled and shown, nothing else applies. The economy was validated already, so an
   // illegal attack is blocked before the preview roll.
   if (ctx.attack !== null && input.commit === false) return previewOf(ctx);
-  // The roll is made, so a Vex marker or a Sap it read is spent; a finishing replay already spent them.
+  // The roll is made, so a Vex marker, a Sap or Guiding Bolt's light it read is spent; a finishing replay already
+  // spent them.
   if (input.economyPaid !== true) {
     spendVex(ctx);
     spendSap(ctx);
+    spendUntilAttacked(ctx);
   }
   // A hit the target's Parry or Shield may still turn into a miss: the attack is spent, and the answer finishes it.
   if (parkForAcReaction(ctx)) {
@@ -77,8 +79,8 @@ export function resolveDefinitionAction(
 
   applyOnHitEffects(ctx);
   applyMasteryForces(ctx);
-  applyGrant(ctx);
   startConcentration(ctx);
+  applyGrant(ctx);
   applyHealing(ctx);
 
   parkReaction(ctx);
@@ -124,10 +126,13 @@ function previewOf(ctx: ResolveContext): ActionResolution {
 
 const withOffers = (offers: ReturnType<typeof hitOffersOf>) => (offers.length > 0 ? { hitOffers: offers } : {});
 
-/** With no attack roll and no save, every target takes the damage (SRD Magic Missile: "A dart deals 1d4 + 1 Force
- *  damage to its target"), owed like a hit's: the GM's Apply, or a player's proposal or direct damage. */
+/** With no attack roll and no save, every target takes the damage, owed like a hit's: the GM's Apply, or a player's
+ *  proposal or direct damage. A darts action owes each creature what its own darts dealt (SRD Magic Missile: "A dart
+ *  deals 1d4 + 1 Force damage to its target"). */
 function damageTargetsOf(ctx: ResolveContext): ActionResolution["damageTargets"] {
   if (ctx.attack !== null || ctx.action.save || ctx.builtinSave) return undefined;
+  const darts = dartDamageTargetsOf(ctx);
+  if (darts) return darts;
   const parts = owedDamageParts(ctx);
   const total = parts.reduce((sum, part) => sum + part.amount, 0);
   if (total <= 0 || ctx.targets.length === 0) return undefined;

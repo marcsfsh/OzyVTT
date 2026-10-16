@@ -212,6 +212,8 @@ export function actionSummaryOf(action: ActorDefinition["actions"][number]): Con
     grants: action.grants !== undefined,
     reaction: action.reaction ?? null,
     ...(action.legendary ? { legendaryCost: action.legendary.cost } : {}),
+    ...(action.darts !== undefined ? { darts: action.darts } : {}),
+    ...(action.damageTypes !== undefined ? { damageTypes: [...action.damageTypes] } : {}),
     // A heal for others picks its targets: one (Divine Spark's healing), or several for a divided pool (Preserve Life).
     ...(action.healing && !action.healing.self
       ? { targeting: action.healing.divided ? ("multi" as const) : ("single" as const) }

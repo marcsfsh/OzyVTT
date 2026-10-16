@@ -1620,8 +1620,10 @@ describe("buildCharacterDefinition - Warlock 5 (Pact Magic)", () => {
 
   it("gives a Warlock its Pact Magic slots - all at one level, not a sparse row", () => {
     const definition = buildCharacterDefinition(warlockInput(), library, defaultPolicy);
-    // SRD: a Warlock 5 has two level-3 slots and no level-1 or level-2 slots.
-    expect(definition.spellcasting?.slots).toEqual([{ level: 3, max: 2 }]);
+    // SRD: a Warlock 5 has two level-3 Pact Magic slots and no level-1 or level-2 slots. They are their own pool
+    // (back on a Short Rest), so none of them is a spell slot.
+    expect(definition.spellcasting?.pact).toEqual({ level: 3, max: 2 });
+    expect(definition.spellcasting?.slots).toEqual([]);
     expect(definition.spellcasting?.ability).toBe("cha");
     expect(definition.hitPoints.maximum).toBe(38); // d8: 8 + 4x5, then +2 Con x5
   });

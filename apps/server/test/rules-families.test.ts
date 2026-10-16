@@ -68,7 +68,6 @@ describe("rule families", () => {
       ["attack.rides-a-hit", "economy"],
       ["feature.no-uses-remaining", "resources"],
       ["feature.requires-effect", "resources"],
-      ["feature.no-spell-slot", "resources"],
       ["legendary.no-actions-remaining", "resources"],
       ["range.out-of-range", "targeting"],
       ["range.out-of-reach", "targeting"],
@@ -77,12 +76,16 @@ describe("rule families", () => {
       ["target.too-large-to-grapple", "targeting"],
       ["cover.total", "targeting"],
       ["condition.charmed-charmer", "targeting"],
+      ["target.too-many", "targeting"],
       ["attack.cleave-same-target", "targeting"],
       ["attack.cleave-too-far", "targeting"],
       // The hit can't carry the extra: no Advantage or ally for Sneak Attack, no melee weapon for a smite.
       ["attack.hit-option-unqualified", "targeting"],
-      // Not thrown yet, but the family is already part of the wire vocabulary.
-      ["slots.none-remaining", "slots"]
+      // "Don't police spell slots or prepared spells" relaxes exactly these.
+      ["slots.none-remaining", "slots"],
+      ["slots.below-spell-level", "slots"],
+      ["slots.one-per-turn", "slots"],
+      ["slots.not-prepared", "slots"]
     ];
     for (const [rule, family] of expected) expect(familyOf(rule), rule).toBe(family);
     expect(expected.map(([rule]) => rule).sort()).toEqual([...RULE_IDS].sort());
