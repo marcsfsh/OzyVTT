@@ -774,6 +774,25 @@ describe("the generator's multiclass characters", () => {
     }
   });
 
+  it("never picks a tool a later class already trains", () => {
+    // Each of these draws a Human whose Skilled feat may take any tool, beside a later Rogue whose multiclass training
+    // already holds Thieves' Tools; the build refuses a repeated tool.
+    for (const [classId, seed] of [
+      ["wizard", 158],
+      ["barbarian", 148]
+    ] as const) {
+      const request = generated(
+        [
+          { classId, level: 1 },
+          { classId: "rogue", level: 1 }
+        ],
+        seed
+      );
+      expect(request.choices.some((row) => row.kind === "skill-or-tool")).toBe(true);
+      expect(build(request as Input).proficiencies?.tools).toContain("thieves-tools");
+    }
+  });
+
   it("refuses a plan the standard array can't qualify for", () => {
     // Paladin, Monk and Wizard need 13s in five abilities; the array and a background's increases make four at most.
     expect(() =>

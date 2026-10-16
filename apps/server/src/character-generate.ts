@@ -240,8 +240,13 @@ const PROFICIENCY_KINDS: ReadonlySet<string> = new Set(["skill", "tool", "langua
 function heldOfKind(survey: ServerOfferSurvey, kind: string, choices: readonly CharacterChoice[]): Set<string> {
   const held = new Set<string>();
   if (kind === "skill") for (const skill of survey.background.skillProficiencies) held.add(skill);
+  // A later class trains only its multiclass tools (a Rogue's Thieves' Tools).
   if (kind === "tool")
-    for (const tool of [...survey.classRecord.toolProficiencies, ...survey.background.toolProficiencies])
+    for (const tool of [
+      ...survey.classRecord.toolProficiencies,
+      ...survey.classes.slice(1).flatMap(({ record }) => record.multiclassProficiencies?.tools ?? []),
+      ...survey.background.toolProficiencies
+    ])
       held.add(tool);
   if (kind === "language")
     for (const language of [...survey.species.languages, ...survey.background.languages]) held.add(language);
