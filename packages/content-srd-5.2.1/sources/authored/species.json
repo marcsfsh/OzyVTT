@@ -94,10 +94,57 @@
             "actions": [
               {
                 "id": "breath-weapon",
-                "name": "Breath Weapon (Acid)",
+                "name": "Breath Weapon (Acid Line)",
                 "activation": "action",
+                "replacesAttack": true,
                 "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
-                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Acid energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "description": "In place of one attack of your Attack action, exhale Acid energy in a 30-foot Line that is 5 feet wide. Each creature in the line makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  },
+                  "successDamage": "half",
+                  "failureConditions": []
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "acid"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "acid"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "acid"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "acid"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "acid"
+                  }
+                ]
+              },
+              {
+                "id": "breath-weapon-cone",
+                "name": "Breath Weapon (Acid Cone)",
+                "activation": "action",
+                "replacesAttack": true,
+                "area": { "shape": "cone", "sizeFeet": 15, "widthFeet": null },
+                "description": "In place of one attack of your Attack action, exhale Acid energy in a 15-foot Cone. Each creature in the cone makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
                   "dc": {
@@ -170,10 +217,57 @@
             "actions": [
               {
                 "id": "breath-weapon",
-                "name": "Breath Weapon (Lightning)",
+                "name": "Breath Weapon (Lightning Line)",
                 "activation": "action",
+                "replacesAttack": true,
                 "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
-                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Lightning energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "description": "In place of one attack of your Attack action, exhale Lightning energy in a 30-foot Line that is 5 feet wide. Each creature in the line makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  },
+                  "successDamage": "half",
+                  "failureConditions": []
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "lightning"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "lightning"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "lightning"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "lightning"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "lightning"
+                  }
+                ]
+              },
+              {
+                "id": "breath-weapon-cone",
+                "name": "Breath Weapon (Lightning Cone)",
+                "activation": "action",
+                "replacesAttack": true,
+                "area": { "shape": "cone", "sizeFeet": 15, "widthFeet": null },
+                "description": "In place of one attack of your Attack action, exhale Lightning energy in a 15-foot Cone. Each creature in the cone makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
                   "dc": {
@@ -246,10 +340,57 @@
             "actions": [
               {
                 "id": "breath-weapon",
-                "name": "Breath Weapon (Fire)",
+                "name": "Breath Weapon (Fire Line)",
                 "activation": "action",
+                "replacesAttack": true,
                 "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
-                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Fire energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "description": "In place of one attack of your Attack action, exhale Fire energy in a 30-foot Line that is 5 feet wide. Each creature in the line makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  },
+                  "successDamage": "half",
+                  "failureConditions": []
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "fire"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "fire"
+                  }
+                ]
+              },
+              {
+                "id": "breath-weapon-cone",
+                "name": "Breath Weapon (Fire Cone)",
+                "activation": "action",
+                "replacesAttack": true,
+                "area": { "shape": "cone", "sizeFeet": 15, "widthFeet": null },
+                "description": "In place of one attack of your Attack action, exhale Fire energy in a 15-foot Cone. Each creature in the cone makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
                   "dc": {
@@ -322,10 +463,57 @@
             "actions": [
               {
                 "id": "breath-weapon",
-                "name": "Breath Weapon (Lightning)",
+                "name": "Breath Weapon (Lightning Line)",
                 "activation": "action",
+                "replacesAttack": true,
                 "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
-                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Lightning energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "description": "In place of one attack of your Attack action, exhale Lightning energy in a 30-foot Line that is 5 feet wide. Each creature in the line makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  },
+                  "successDamage": "half",
+                  "failureConditions": []
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "lightning"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "lightning"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "lightning"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "lightning"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "lightning"
+                  }
+                ]
+              },
+              {
+                "id": "breath-weapon-cone",
+                "name": "Breath Weapon (Lightning Cone)",
+                "activation": "action",
+                "replacesAttack": true,
+                "area": { "shape": "cone", "sizeFeet": 15, "widthFeet": null },
+                "description": "In place of one attack of your Attack action, exhale Lightning energy in a 15-foot Cone. Each creature in the cone makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
                   "dc": {
@@ -398,10 +586,57 @@
             "actions": [
               {
                 "id": "breath-weapon",
-                "name": "Breath Weapon (Acid)",
+                "name": "Breath Weapon (Acid Line)",
                 "activation": "action",
+                "replacesAttack": true,
                 "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
-                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Acid energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "description": "In place of one attack of your Attack action, exhale Acid energy in a 30-foot Line that is 5 feet wide. Each creature in the line makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  },
+                  "successDamage": "half",
+                  "failureConditions": []
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "acid"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "acid"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "acid"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "acid"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "acid"
+                  }
+                ]
+              },
+              {
+                "id": "breath-weapon-cone",
+                "name": "Breath Weapon (Acid Cone)",
+                "activation": "action",
+                "replacesAttack": true,
+                "area": { "shape": "cone", "sizeFeet": 15, "widthFeet": null },
+                "description": "In place of one attack of your Attack action, exhale Acid energy in a 15-foot Cone. Each creature in the cone makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
                   "dc": {
@@ -474,10 +709,57 @@
             "actions": [
               {
                 "id": "breath-weapon",
-                "name": "Breath Weapon (Fire)",
+                "name": "Breath Weapon (Fire Line)",
                 "activation": "action",
+                "replacesAttack": true,
                 "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
-                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Fire energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "description": "In place of one attack of your Attack action, exhale Fire energy in a 30-foot Line that is 5 feet wide. Each creature in the line makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  },
+                  "successDamage": "half",
+                  "failureConditions": []
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "fire"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "fire"
+                  }
+                ]
+              },
+              {
+                "id": "breath-weapon-cone",
+                "name": "Breath Weapon (Fire Cone)",
+                "activation": "action",
+                "replacesAttack": true,
+                "area": { "shape": "cone", "sizeFeet": 15, "widthFeet": null },
+                "description": "In place of one attack of your Attack action, exhale Fire energy in a 15-foot Cone. Each creature in the cone makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
                   "dc": {
@@ -550,10 +832,57 @@
             "actions": [
               {
                 "id": "breath-weapon",
-                "name": "Breath Weapon (Poison)",
+                "name": "Breath Weapon (Poison Line)",
                 "activation": "action",
+                "replacesAttack": true,
                 "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
-                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Poison energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "description": "In place of one attack of your Attack action, exhale Poison energy in a 30-foot Line that is 5 feet wide. Each creature in the line makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  },
+                  "successDamage": "half",
+                  "failureConditions": []
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "poison"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "poison"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "poison"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "poison"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "poison"
+                  }
+                ]
+              },
+              {
+                "id": "breath-weapon-cone",
+                "name": "Breath Weapon (Poison Cone)",
+                "activation": "action",
+                "replacesAttack": true,
+                "area": { "shape": "cone", "sizeFeet": 15, "widthFeet": null },
+                "description": "In place of one attack of your Attack action, exhale Poison energy in a 15-foot Cone. Each creature in the cone makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
                   "dc": {
@@ -626,10 +955,57 @@
             "actions": [
               {
                 "id": "breath-weapon",
-                "name": "Breath Weapon (Fire)",
+                "name": "Breath Weapon (Fire Line)",
                 "activation": "action",
+                "replacesAttack": true,
                 "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
-                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Fire energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "description": "In place of one attack of your Attack action, exhale Fire energy in a 30-foot Line that is 5 feet wide. Each creature in the line makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  },
+                  "successDamage": "half",
+                  "failureConditions": []
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "fire"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "fire"
+                  }
+                ]
+              },
+              {
+                "id": "breath-weapon-cone",
+                "name": "Breath Weapon (Fire Cone)",
+                "activation": "action",
+                "replacesAttack": true,
+                "area": { "shape": "cone", "sizeFeet": 15, "widthFeet": null },
+                "description": "In place of one attack of your Attack action, exhale Fire energy in a 15-foot Cone. Each creature in the cone makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
                   "dc": {
@@ -702,10 +1078,57 @@
             "actions": [
               {
                 "id": "breath-weapon",
-                "name": "Breath Weapon (Cold)",
+                "name": "Breath Weapon (Cold Line)",
                 "activation": "action",
+                "replacesAttack": true,
                 "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
-                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Cold energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "description": "In place of one attack of your Attack action, exhale Cold energy in a 30-foot Line that is 5 feet wide. Each creature in the line makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  },
+                  "successDamage": "half",
+                  "failureConditions": []
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "cold"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "cold"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "cold"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "cold"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "cold"
+                  }
+                ]
+              },
+              {
+                "id": "breath-weapon-cone",
+                "name": "Breath Weapon (Cold Cone)",
+                "activation": "action",
+                "replacesAttack": true,
+                "area": { "shape": "cone", "sizeFeet": 15, "widthFeet": null },
+                "description": "In place of one attack of your Attack action, exhale Cold energy in a 15-foot Cone. Each creature in the cone makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
                   "dc": {
@@ -778,10 +1201,57 @@
             "actions": [
               {
                 "id": "breath-weapon",
-                "name": "Breath Weapon (Cold)",
+                "name": "Breath Weapon (Cold Line)",
                 "activation": "action",
+                "replacesAttack": true,
                 "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
-                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Cold energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "description": "In place of one attack of your Attack action, exhale Cold energy in a 30-foot Line that is 5 feet wide. Each creature in the line makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  },
+                  "successDamage": "half",
+                  "failureConditions": []
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "cold"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "cold"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "cold"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "cold"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "cold"
+                  }
+                ]
+              },
+              {
+                "id": "breath-weapon-cone",
+                "name": "Breath Weapon (Cold Cone)",
+                "activation": "action",
+                "replacesAttack": true,
+                "area": { "shape": "cone", "sizeFeet": 15, "widthFeet": null },
+                "description": "In place of one attack of your Attack action, exhale Cold energy in a 15-foot Cone. Each creature in the cone makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
                   "dc": {

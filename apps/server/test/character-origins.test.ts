@@ -250,6 +250,87 @@ describe("Magic Initiate's level 1 spell", () => {
   });
 });
 
+describe("Breath Weapon replaces one attack of the Attack action", () => {
+  const dragonborn = (level: number) =>
+    build(fighter(level, { speciesId: "dragonborn", rows: [{ level: 1, kind: "lineage", id: "red-dragon" }] }));
+
+  function onTurn(definition: ActorDefinition) {
+    const state = GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [
+        {
+          id: IDS.foe,
+          name: "Foe",
+          kind: "monster",
+          visibility: "public",
+          hp: { current: 99, maximum: 99 },
+          armorClass: 5
+        }
+      ]
+    }) as GameState;
+    importActorDefinition(state, definition, IDS.hero, "public", catalog);
+    startEncounter(
+      state,
+      {
+        mapAssetId: IDS.map,
+        entries: [
+          { actorId: IDS.hero, score: 20 },
+          { actorId: IDS.foe, score: 10 }
+        ]
+      },
+      () => 1,
+      { width: 900, height: 600, calibration: null }
+    );
+    const hero = state.actors.find((actor) => actor.id === IDS.hero)!;
+    let command = 0;
+    return (actionId: string) =>
+      resolveDefinitionAction(
+        state,
+        effectiveActions(definition, hero, catalog).find((entry) => entry.id === actionId)!,
+        {
+          actorId: IDS.hero,
+          targetIds: actionId.startsWith("breath-weapon") ? [] : [IDS.foe],
+          commandId: `50000000-0000-4000-8000-0000000002${String(++command).padStart(2, "0")}`
+        },
+        {
+          random: () => 4,
+          newRollId: () => `40000000-0000-4000-8000-0000000002${String(command).padStart(2, "0")}`,
+          gmSessionId: IDS.gmSession,
+          now: () => "2026-07-28T00:00:00.000Z",
+          definition,
+          catalog
+        }
+      );
+  }
+
+  it("offers a 15-foot Cone beside the 30-foot Line, on one pool", () => {
+    const actions = dragonborn(5).actions.filter((action) => action.id.startsWith("breath-weapon"));
+    expect(actions.map((action) => [action.id, action.area])).toEqual([
+      ["breath-weapon", { shape: "line", sizeFeet: 30, widthFeet: 5 }],
+      ["breath-weapon-cone", { shape: "cone", sizeFeet: 15, widthFeet: null }]
+    ]);
+    for (const action of actions) expect(action.uses).toEqual({ limit: 3, per: "long-rest", pool: "breath-weapon" });
+  });
+
+  it("lets a Fighter 5 breathe and still swing once, or swing and then breathe", () => {
+    const breatheFirst = onTurn(dragonborn(5));
+    breatheFirst("breath-weapon-cone");
+    expect(() => breatheFirst("item-greatsword")).not.toThrow();
+    expect(() => breatheFirst("item-greatsword")).toThrowError(/no attacks remaining/);
+
+    const swingFirst = onTurn(dragonborn(5));
+    swingFirst("item-greatsword");
+    expect(() => swingFirst("breath-weapon")).not.toThrow();
+    expect(() => swingFirst("breath-weapon")).toThrowError(/no attacks remaining/);
+  });
+
+  it("is the whole Attack action for a Fighter 1, who has one attack", () => {
+    const one = onTurn(dragonborn(1));
+    one("breath-weapon");
+    expect(() => one("item-greatsword")).toThrowError(/already used an action/);
+  });
+});
+
 describe("Archery adds +2 to attack rolls with Ranged weapons", () => {
   const archer = (style: string) => {
     const input = fighter(1, { speciesId: "human", rows: humanRows });

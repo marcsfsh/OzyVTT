@@ -967,6 +967,18 @@ describe("character-builder content records", () => {
       ]);
       // The damage type agrees with the resistance the same ancestry grants.
       expect(lineage.traits[0].grants!.damageResistances, lineage.id).toEqual([type]);
+      // "Either a 15-foot Cone or a 30-foot Line": the cone is the same exhalation in the other shape, and both
+      // stand in for one attack of the Attack action.
+      const cone = trait.actions.find((candidate) => candidate.id === "breath-weapon-cone")!;
+      expect(cone.area, lineage.id).toEqual({ shape: "cone", sizeFeet: 15, widthFeet: null });
+      expect(action.area, lineage.id).toEqual({ shape: "line", sizeFeet: 30, widthFeet: 5 });
+      expect({ ...cone, id: action.id, name: "", area: null, description: "" }, lineage.id).toEqual({
+        ...action,
+        name: "",
+        area: null,
+        description: ""
+      });
+      expect([action.replacesAttack, cone.replacesAttack], lineage.id).toEqual([true, true]);
     }
     // Divine Spark: a Channel Divinity save (the class's own spell save DC) and the scaling damage.
     const spark = classes

@@ -306,6 +306,13 @@ export const actionsField = (scope: RiderScope): FieldDef => ({
         opt("other", "No action")
       ]
     },
+    {
+      key: "replacesAttack",
+      label: "Takes the place of one attack",
+      kind: "switch",
+      help: "Like a Breath Weapon: used as one of the attacks of the Attack action.",
+      visibleWhen: (scope_) => scope_.activation === "action"
+    },
     { key: "description", label: "Description", kind: "textarea", wide: true },
     damagePartsField("damage", { label: "Damage", max: 8, newId, help: "Every part is rolled on a hit." }),
     {
