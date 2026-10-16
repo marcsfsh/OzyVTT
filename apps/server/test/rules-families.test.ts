@@ -46,6 +46,9 @@ describe("rule families", () => {
       ["condition.incapacitated", "economy"],
       ["condition.down", "economy"],
       ["legendary.own-turn", "economy"],
+      // An extra attack waits on the swing that opens it: a matter of what this turn has done.
+      ["attack.light-needs-attack", "economy"],
+      ["attack.cleave-needs-hit", "economy"],
       ["feature.no-uses-remaining", "resources"],
       ["feature.requires-effect", "resources"],
       ["feature.no-spell-slot", "resources"],
@@ -57,6 +60,8 @@ describe("rule families", () => {
       ["target.too-large-to-grapple", "targeting"],
       ["cover.total", "targeting"],
       ["condition.charmed-charmer", "targeting"],
+      ["attack.cleave-same-target", "targeting"],
+      ["attack.cleave-too-far", "targeting"],
       // Not thrown yet, but the family is already part of the wire vocabulary.
       ["slots.none-remaining", "slots"]
     ];

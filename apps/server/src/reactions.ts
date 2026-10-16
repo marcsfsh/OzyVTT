@@ -162,12 +162,13 @@ function applyAnswerDamage(answer: Answer, targetId: string, input: DamageInput)
   );
 }
 
-/** Whether a committed resolve owes its target damage now: an attack's hit, or an action that rolls neither attack
- *  nor save (Storm's Thunder). A save's damage waits on the save prompt, and a reaction window the resolve opened
+/** Whether a committed resolve owes its target damage now: an attack's hit (or Graze's miss), or an action that
+ *  rolls neither attack nor save (Storm's Thunder). A save's damage waits on the save prompt, and a reaction window the resolve opened
  *  (the target's Uncanny Dodge or Parry) holds it instead. */
 function owesDamage(resolution: ActionResolution): boolean {
   if (resolution.preview || resolution.damageTotal <= 0 || (resolution.reactionPrompts?.length ?? 0) > 0) return false;
-  if (resolution.attack) return resolution.attack.outcome === "hit" || resolution.attack.outcome === "crit";
+  // A miss owes damage only through Graze, which is already in the total.
+  if (resolution.attack) return resolution.attack.outcome !== "unknown";
   return resolution.save === null;
 }
 

@@ -205,11 +205,9 @@ export function PlayerActionRunner({
           {result.healing && <HealingOutcome healing={result.healing} />}
           {/* Players never apply damage: a committed hit goes to the GM (proposal) or is auto-applied
           (direct), unless a target's reaction (Uncanny Dodge) parked it on a prompt instead. */}
+          {/* A miss owes damage only through Graze, which is already in the total. */}
           {!result.preview &&
             result.attack &&
-            (result.attack.outcome === "hit" ||
-              result.attack.outcome === "crit" ||
-              result.attack.outcome === "unknown") &&
             result.damageTotal > 0 &&
             (() => {
               const reactionPrompt = result.reactionPrompts?.find(
@@ -229,6 +227,27 @@ export function PlayerActionRunner({
                     : `Handed to the GM to apply to ${result.attack!.targetName}.`}
                 </p>
               );
+            })()}
+          {result.opens &&
+            (() => {
+              // Cleave: the hit opened a swing at a second creature, picked like any target.
+              const swing = actions.find((candidate) => candidate.id === result.opens!.actionId);
+              return swing ? (
+                <p className="action-result-hint">
+                  <button
+                    type="button"
+                    className="action-again"
+                    disabled={busy}
+                    onClick={() => {
+                      setTargetingResult(null);
+                      beginTargeting(swing, actorId);
+                    }}
+                  >
+                    {result.opens!.actionName}
+                  </button>{" "}
+                  swings at another target within 5 feet of {result.attack?.targetName ?? "the first"}.
+                </p>
+              ) : null;
             })()}
         </div>
       )}

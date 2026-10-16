@@ -1,6 +1,7 @@
 import { conditionLabel } from "../condition-rules.js";
+import { endEffect } from "../effects.js";
 import { createPendingSaves } from "../saving-throws.js";
-import { masteryHitPushes, masteryHitSaves, type MasterySwing } from "../weapon-mastery.js";
+import { masteryHitPushes, masteryHitSaves, VEXED_TAG, type MasterySwing } from "../weapon-mastery.js";
 import { sizeAtMost, type ResolveContext } from "./context.js";
 
 /** The weapon mastery in force on this swing (rules in `weapon-mastery.ts`); null unless a mastery
@@ -119,4 +120,18 @@ function pushMasteryTargets(ctx: ResolveContext): void {
       `${forced.targetName} is pushed straight away from ${attacker.name}, but the map has nowhere to put it - the token stays where it is.`
     );
   }
+}
+
+/** Vex's marker is spent by the attacker's next attack roll against the creature, hit or miss; a hit that vexes again
+ *  lays a fresh one afterwards. */
+export function spendVex(ctx: ResolveContext): void {
+  const { state, attack, attacker, targets, effectsEnded } = ctx;
+  if (attack === null) return;
+  const target = targets[0];
+  const marker = target.effects.find(
+    (effect) => effect.tags.includes(VEXED_TAG) && effect.sourceActorId === attacker.id
+  );
+  if (!marker) return;
+  endEffect(state, target.id, marker.id);
+  effectsEnded.push({ actorId: target.id, actorName: target.name, name: marker.name });
 }

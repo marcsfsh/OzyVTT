@@ -149,6 +149,8 @@ export type ResolveContext = {
   /** A save a builtin forced (grapple, shove); an action's own `save` is reported from the action. */
   builtinSave: ActionResolution["save"];
   healing: ActionResolution["healing"];
+  /** An extra attack this swing opened (Cleave), for the result card to offer. */
+  opens: ActionResolution["opens"] | null;
 };
 
 /** Records one rolled formula in the shared history, attributed like every roll of this resolve. */

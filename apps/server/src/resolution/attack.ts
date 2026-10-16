@@ -18,6 +18,7 @@ import {
   type RollModeClaims
 } from "../equipment-derivation.js";
 import { UNARMED_STRIKE_ACTION_ID } from "../item-actions.js";
+import { VEXED_TAG } from "../weapon-mastery.js";
 import { statblockFacts } from "../statblock-facts.js";
 import { naturalFace, recordRoll, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
 
@@ -107,6 +108,9 @@ function conditionClaims(ctx: ResolveContext, target: LiveActor, distance: numbe
         label: "Attacker is Grappled (target isn't the grappler)"
       });
   }
+  // Vex: the attacker's earlier hit marked this creature for their next attack roll (spent by it, `spendVex`).
+  if (target.effects.some((effect) => effect.tags.includes(VEXED_TAG) && effect.sourceActorId === attacker.id))
+    sources.advantage.push({ source: "vex", label: `Vex (${attacker.name}'s earlier hit)` });
   // 2024 rule: advantage within 5 feet, disadvantage beyond. Unknown distance contributes nothing.
   if (has(target, "prone") && distance !== null) {
     if (distance <= 5) sources.advantage.push({ source: "target-prone", label: "Target is Prone (within 5 ft)" });

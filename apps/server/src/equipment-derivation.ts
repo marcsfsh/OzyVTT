@@ -23,14 +23,15 @@ import {
 import { isIncapacitated } from "./condition-rules.js";
 import {
   castAction,
+  extraAttackAction,
   isItemActionId,
   itemAction,
   itemActionRest,
   UNARMED_STRIKE_ACTION_ID,
   weaponAbilityModifier,
-  weaponAction
+  weaponSwing
 } from "./item-actions.js";
-import { IMPLEMENTED_MASTERIES, type MasteryInForce } from "./weapon-mastery.js";
+import { freesLightExtraAttack, IMPLEMENTED_MASTERIES, type MasteryInForce } from "./weapon-mastery.js";
 
 /**
  * Every rider contribution is a pure function of (actor, definition, catalog), recomputed whole on every read
@@ -377,9 +378,15 @@ export function deriveEquipment(
     !equipped.some(
       (entry) => entry.item.armor !== undefined && ["armor", "shield"].includes(effectiveSlot(slotView(entry)))
     );
+  // The Light property's extra attack needs a second Light weapon in hand: another one, or a pair of the same.
+  const lightWeaponsInHand = equipped
+    .filter((entry) => entry.item.weapon?.properties?.includes("light"))
+    .reduce((count, entry) => count + Math.max(1, entry.item.quantity), 0);
+  const twoWeaponFighting = (definition?.character?.feats ?? []).some((feat) => feat.id === "two-weapon-fighting");
   for (const entry of equipped) {
-    const weaponAttack = weaponAction(entry.item, definition, weaponProficiencies, martialArtsInForce);
-    if (!weaponAttack) continue;
+    const swing = weaponSwing(entry.item, definition, weaponProficiencies, martialArtsInForce);
+    if (!swing) continue;
+    const weaponAttack = swing.action;
     actions.push(weaponAttack);
     weaponActionIds.push(weaponAttack.id);
     // A template row bound via `baseId` is that base weapon, so it carries the base's mastery and a pick
@@ -389,12 +396,23 @@ export function deriveEquipment(
     const unlockedHere =
       unlocked.has(entry.item.id) || (entry.item.baseId !== undefined && unlocked.has(entry.item.baseId));
     // The weapon has a mastery, the bearer unlocked this weapon, and the engine implements it.
-    if (mastery && unlockedHere && masteryReaches(mastery)) {
-      masteryByActionId[weaponAttack.id] = {
-        id: mastery,
-        abilityModifier: weaponAbilityModifier(entry.item, definition, martialArtsInForce)
-      };
+    const inForce: MasteryInForce | null =
+      mastery && unlockedHere && masteryReaches(mastery)
+        ? { id: mastery, abilityModifier: weaponAbilityModifier(entry.item, definition, martialArtsInForce) }
+        : null;
+    if (inForce) masteryByActionId[weaponAttack.id] = inForce;
+    // The extra attacks the weapon can make beside its own (not Extra Attack's to multiply, so not weapon swings
+    // for `weaponActionIds`). The Light one carries the weapon's mastery; Cleave's is the mastery itself.
+    if (entry.item.weapon?.properties?.includes("light") && lightWeaponsInHand >= 2) {
+      const extra = extraAttackAction(entry.item, swing, "light", {
+        insideAttackAction: freesLightExtraAttack(inForce?.id),
+        keepModifier: twoWeaponFighting
+      });
+      actions.push(extra);
+      if (inForce) masteryByActionId[extra.id] = inForce;
     }
+    if (inForce?.id === "cleave" && weaponAttack.attack?.reachFeet !== undefined)
+      actions.push(extraAttackAction(entry.item, swing, "cleave"));
   }
   // A builder-minted unarmed strike (Monk Martial Arts) is a weapon swing too, so Extra Attack reaches it.
   if (definition?.actions.some((action) => action.id === UNARMED_STRIKE_ACTION_ID && action.attack !== undefined)) {

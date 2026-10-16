@@ -29,14 +29,15 @@ import { createServer } from "../src/server.js";
 import { applyMovementRules } from "../src/movement-rules.js";
 import { addEffect } from "../src/effects.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
+import { playerHitOwesDamage } from "../src/player-damage.js";
 import { answerSave, type SaveAnswerDependencies } from "../src/saving-throws.js";
 import { pushTokenAway } from "../src/forced-movement.js";
 import { mapDistance, tokenCreatureDistance } from "../src/movement-narration.js";
 import { moveEncounterToken, setActorSize, type TokenMapGeometry } from "../src/token-placement.js";
 
 // Weapon Mastery, proved where a player sees it: damage on a miss, a foe's die rolled twice keeping the
-// worse, a condition from the foe's own save, a pushed token, a smaller Speed on the foe's turn. Five
-// masteries are implemented; the derivation does not advertise the other three (`masteryReaches`).
+// worse, a condition from the foe's own save, a pushed token, a smaller Speed on the foe's turn, the attacker's
+// own die rolled twice keeping the better, and the extra attacks Nick and Cleave open.
 
 const POLICY = BuilderPolicySchema.parse({});
 const view = new ContentLibrary().forAudience("gm");
@@ -287,15 +288,10 @@ describe("a mastery reaches a swing only when the character unlocked THAT weapon
     expect(derivation.masteryByActionId["item-greatsword"]).toBeUndefined();
   });
 
-  it("omits a mastery the engine does not implement, rather than advertising a no-op", () => {
-    // The shortbow is held, legally picked and recorded; only the unimplemented Vex leaves it unarmed. The
-    // greataxe and scimitar are unheld picks, showing picks are unrestricted.
+  it("arms only the weapons in hand: the greataxe and scimitar picks are unheld, so only the shortbow vexes", () => {
     const built = table(["shortbow", "greataxe", "scimitar"]);
-    expect(
-      effectiveActions(built.definition, built.hero, catalog).some((action) => action.id === "item-shortbow")
-    ).toBe(true);
     const derivation = deriveEquipment(built.hero, built.definition, catalog);
-    expect(derivation.masteryByActionId).toEqual({});
+    expect(derivation.masteryByActionId).toEqual({ "item-shortbow": { id: "vex", abilityModifier: 1 } });
   });
 });
 
@@ -329,6 +325,11 @@ describe("Graze deals the ability modifier on a miss", () => {
     expect(hit.attack?.outcome).toBe("hit");
     expect(hit.bonusDamage).toBeUndefined();
     expect(hit.damageTotal).toBe(11); // 2d6(4+4) + 3, with no Graze on top
+  });
+
+  it("owes the graze like a hit's damage, so it reaches the target's hit points", () => {
+    const built = table(["greatsword", "longbow", "rapier"]);
+    expect(playerHitOwesDamage(swing(built, "item-greatsword", [4]))).toBe(true);
   });
 
   it("still grazes on a natural 1 - the SRD writes no carve-out for a fumble", () => {
@@ -1483,16 +1484,199 @@ describe("the resolver stamps its own verdict on the table's line, and the ack r
   });
 });
 
+// Vex, the Light property's extra attack with Nick, and Cleave.
+
+const foeOf = (built: Built, actorId: string = IDS.foe) => built.state.actors.find((actor) => actor.id === actorId)!;
+
+/** Any of the hero's actions at any target, with the grid's distances when a geometry is given. */
+const act = (built: Built, actionId: string, targetId: string, faces: number[], geometry?: TokenMapGeometry) =>
+  resolveDefinitionAction(
+    built.state,
+    effectiveActions(built.definition, built.hero, catalog).find((action) => action.id === actionId)!,
+    {
+      actorId: IDS.hero,
+      targetIds: [targetId],
+      commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`
+    },
+    {
+      ...deps(built, built.definition, faces),
+      ...(geometry
+        ? {
+            distanceFeet: (a: string, b: string) => tokenCreatureDistance(built.state, geometry, a, b)?.value ?? null
+          }
+        : {})
+    }
+  );
+
+/** The rule a refused resolve names, or null when it went through. */
+function refusal(run: () => unknown): string | null {
+  try {
+    run();
+    return null;
+  } catch (error) {
+    if (error instanceof RulesBlockedError) return error.rule;
+    throw error;
+  }
+}
+
+describe("Vex gives Advantage on the attacker's next attack roll against the creature", () => {
+  // Level 5, so Extra Attack gives the second swing: the rapier (finesse) takes Str 19, so +7 against AC 13.
+  const duelist = () => table(["rapier", "greatsword", "longbow", "flail"], ["rapier"], GEOMETRY, 5);
+
+  it("marks the foe on a hit; the next swing rolls two dice, keeps the higher and spends the mark", () => {
+    const built = duelist();
+    expect(swing(built, "item-rapier", [15, 4]).attack?.outcome).toBe("hit");
+    expect(foeOf(built).effects.map((effect) => effect.name)).toEqual(["Vexed by Borin"]);
+    const second = swing(built, "item-rapier", [3, 17, 5]);
+    expect(second.rollMode?.advantage).toContain("Vex (Borin's earlier hit)");
+    expect(second.attack).toMatchObject({ naturalRoll: 17, outcome: "hit" });
+    // Spent by the roll, then laid afresh by this hit.
+    expect(second.effectsEnded).toEqual([{ actorId: IDS.foe, actorName: "Foe", name: "Vexed by Borin" }]);
+    expect(foeOf(built).effects.map((effect) => effect.name)).toEqual(["Vexed by Borin"]);
+  });
+
+  it("is spent by a miss too, which lays no new mark", () => {
+    const built = duelist();
+    swing(built, "item-rapier", [15, 4]);
+    // The better of 3 and 2 is 3: 10 misses AC 13.
+    expect(swing(built, "item-rapier", [3, 2]).attack?.outcome).toBe("miss");
+    expect(foeOf(built).effects).toEqual([]);
+  });
+
+  it("lasts until the start of the attacker's turn after next", () => {
+    const built = table(["rapier", "greatsword", "longbow"], ["rapier"]);
+    swing(built, "item-rapier", [15, 4]);
+    nextInitiativeTurn(built.state); // the foe's turn
+    nextInitiativeTurn(built.state); // Borin's next turn: still marked
+    expect(foeOf(built).effects).toHaveLength(1);
+    nextInitiativeTurn(built.state);
+    nextInitiativeTurn(built.state); // the turn after next
+    expect(foeOf(built).effects).toEqual([]);
+  });
+
+  it("marks nothing when the Fighter did not pick the rapier", () => {
+    const built = table(["greatsword", "longbow", "flail"], ["rapier"]);
+    swing(built, "item-rapier", [15, 4]);
+    expect(foeOf(built).effects).toEqual([]);
+  });
+});
+
+describe("the Light property's extra attack, and Nick", () => {
+  // A shortsword and a scimitar in hand, both Light; the scimitar's mastery is Nick.
+  const pair = (masteries: readonly string[] = ["scimitar", "greatsword", "longbow"]) =>
+    table(masteries, ["shortsword", "scimitar"]);
+  const extras = (built: Built, definition = built.definition) =>
+    effectiveActions(definition, built.hero, catalog).filter((action) => action.extraAttack !== undefined);
+
+  it("is minted for each Light weapon once two are in hand, without the ability modifier on its damage", () => {
+    expect(extras(table(["scimitar", "greatsword", "longbow"], ["shortsword"]))).toEqual([]);
+    expect(extras(pair()).map((action) => [action.id, action.activation, action.damage[0]!.formula])).toEqual([
+      ["item-shortsword-light", "bonus-action", "1d6"],
+      ["item-scimitar-light", "other", "1d6"]
+    ]);
+  });
+
+  it("keeps the ability modifier with the Two-Weapon Fighting style", () => {
+    const built = pair();
+    const character = built.definition.character!;
+    const definition = {
+      ...built.definition,
+      character: {
+        ...character,
+        feats: [...character.feats, { id: "two-weapon-fighting", name: "Two-Weapon Fighting" }]
+      }
+    };
+    expect(extras(built, definition)[0]!.damage[0]!.formula).toBe("1d6 + 3");
+  });
+
+  it("waits for an attack with a different Light weapon in the Attack action", () => {
+    const built = pair();
+    expect(refusal(() => act(built, "item-scimitar-light", IDS.foe, [15, 4]))).toBe("attack.light-needs-attack");
+    act(built, "item-scimitar", IDS.foe, [15, 4]);
+    // The scimitar's own swing opens the shortsword's extra attack, not its own.
+    expect(refusal(() => act(built, "item-scimitar-light", IDS.foe, [15, 4]))).toBe("attack.light-needs-attack");
+  });
+
+  it("with Nick, is part of the Attack action: no Bonus Action spent, and once per turn", () => {
+    // Extra Attack swings both weapons, which opens both extra attacks; only one is made.
+    const built = table(["scimitar", "greatsword", "longbow", "flail"], ["shortsword", "scimitar"], GEOMETRY, 5);
+    act(built, "item-shortsword", IDS.foe, [15, 4]);
+    act(built, "item-scimitar", IDS.foe, [15, 4]);
+    const extra = act(built, "item-scimitar-light", IDS.foe, [15, 4]);
+    expect(extra.attack?.outcome).toBe("hit");
+    expect(extra.damageTotal).toBe(4);
+    expect(built.state.combat.turn.bonusActionUsed).toBe(false);
+    expect(refusal(() => act(built, "item-shortsword-light", IDS.foe, [15, 4]))).toBe("feature.no-uses-remaining");
+  });
+
+  it("without Nick, costs the Bonus Action", () => {
+    const built = pair(["greatsword", "longbow", "flail"]);
+    act(built, "item-shortsword", IDS.foe, [15, 4]);
+    act(built, "item-scimitar-light", IDS.foe, [15, 4]);
+    expect(built.state.combat.turn.bonusActionUsed).toBe(true);
+  });
+});
+
+describe("Cleave swings at a second creature within 5 feet of the first", () => {
+  const SECOND = "10000000-0000-4000-8000-000000000005";
+  // Borin with a greataxe beside the foe; a second foe wherever the test puts it.
+  function arena(
+    second: { x: number; y: number },
+    masteries: readonly string[] = ["greataxe", "greatsword", "longbow"]
+  ) {
+    const built = battlefield(masteries, ["greataxe"], cell(2, 2), cell(3, 2));
+    importActorDefinition(built.state, FOE_DEFINITION, SECOND, "public", catalog);
+    addCombatant(built.state, SECOND, 5, () => 1, GRID);
+    moveEncounterToken(built.state, SECOND, second, GRID);
+    return built;
+  }
+
+  it("is opened by a melee hit, which the result card is told about", () => {
+    const built = arena(cell(3, 3));
+    expect(act(built, "item-greataxe", IDS.foe, [15, 6], GRID).opens).toEqual({
+      actionId: "item-greataxe-cleave",
+      actionName: "Greataxe (Cleave)"
+    });
+  });
+
+  it("strikes another creature with the weapon's dice alone, spending no action, once per turn", () => {
+    const built = arena(cell(3, 3));
+    act(built, "item-greataxe", IDS.foe, [15, 6], GRID);
+    expect(refusal(() => act(built, "item-greataxe-cleave", IDS.foe, [15, 7], GRID))).toBe("attack.cleave-same-target");
+    const cleave = act(built, "item-greataxe-cleave", SECOND, [15, 7], GRID);
+    expect(cleave.attack?.outcome).toBe("hit");
+    expect(cleave.damageTotal).toBe(7);
+    expect(cleave.opens).toBeUndefined();
+    expect(refusal(() => act(built, "item-greataxe-cleave", SECOND, [15, 7], GRID))).toBe("feature.no-uses-remaining");
+  });
+
+  it("refuses a second creature more than 5 feet from the first", () => {
+    // Beside Borin, but 10 feet from the foe he hit.
+    const built = arena(cell(1, 2));
+    act(built, "item-greataxe", IDS.foe, [15, 6], GRID);
+    expect(refusal(() => act(built, "item-greataxe-cleave", SECOND, [15, 7], GRID))).toBe("attack.cleave-too-far");
+  });
+
+  it("is opened by nothing but a hit, and not without the greataxe pick", () => {
+    const missed = arena(cell(3, 3));
+    expect(act(missed, "item-greataxe", IDS.foe, [2], GRID).opens).toBeUndefined();
+    expect(refusal(() => act(missed, "item-greataxe-cleave", SECOND, [15, 7], GRID))).toBe("attack.cleave-needs-hit");
+    const unpicked = arena(cell(3, 3), ["greatsword", "longbow", "flail"]);
+    expect(
+      effectiveActions(unpicked.definition, unpicked.hero, catalog).some(
+        (action) => action.id === "item-greataxe-cleave"
+      )
+    ).toBe(false);
+  });
+});
+
 // The engine claims exactly the masteries it implements.
 
 describe("the engine claims exactly the masteries it implements", () => {
-  it("names five as built and three as not, so neither half can drift silently", () => {
-    // `masteryReaches` is the single registry the derivation consults. Implementing another mastery means
-    // changing this list together with the behaviour and its test.
-    const built = ["graze", "push", "sap", "slow", "topple"];
-    const notYet = ["cleave", "nick", "vex"];
+  it("names all eight SRD masteries as built", () => {
+    // `masteryReaches` is the single registry the derivation consults, so a slug only counts with a behaviour.
+    const built = ["cleave", "graze", "nick", "push", "sap", "slow", "topple", "vex"];
     expect(built.filter(masteryReaches)).toEqual(built);
-    expect(notYet.filter(masteryReaches)).toEqual([]);
-    expect([...built, ...notYet].sort()).toEqual([...new Set(loadWeapons().map((weapon) => weapon.mastery))].sort());
+    expect(built).toEqual([...new Set(loadWeapons().map((weapon) => weapon.mastery))].sort());
   });
 });

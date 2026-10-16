@@ -59,7 +59,14 @@ type MasteryHandler = Readonly<{
   onHitSave?: (swing: MasterySwing) => readonly MasteryPendingSave[];
   /** The swing landed. Returns the forced movement this mastery applies to the target. */
   onHitPush?: (swing: MasterySwing) => readonly MasteryPush[];
+  /** A melee swing landed. True when it opens this weapon's swing at a second creature (Cleave). */
+  opensCleave?: (swing: MasterySwing) => boolean;
+  /** The Light extra attack made with this weapon is part of the Attack action, costing no Bonus Action (Nick). */
+  freesLightExtraAttack?: () => boolean;
 }>;
+
+/** The tag on Vex's marker, which the attack roll looks for. */
+export const VEXED_TAG = "vexed";
 
 // Moment gates shared by every mastery: a fumble is a miss, a crit is a hit, and `unknown` (target has
 // no AC) is neither, so no mastery fires on a swing the engine could not adjudicate.
@@ -67,6 +74,11 @@ const missed = (attack: ActionResolutionAttack): boolean => attack.outcome === "
 const landed = (attack: ActionResolutionAttack): boolean => attack.outcome === "hit" || attack.outcome === "crit";
 
 const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
+  /** Cleave (SRD): a melee hit opens one swing with the same weapon at a second creature within 5 feet of the first
+   *  and within reach, once per turn, its damage without a positive ability modifier. The engine mints that swing as
+   *  the weapon's `-cleave` action; the economy checks the rest. */
+  cleave: { opensCleave: () => true },
+
   /** Graze (SRD): on a miss (fumbles included), damage equal to the attack's ability modifier, of the
    *  weapon's type. A non-positive modifier deals nothing. */
   graze: {
@@ -75,6 +87,10 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
         ? [{ amount: swing.mastery.abilityModifier, type: swing.damageType, source: "Graze" }]
         : []
   },
+
+  /** Nick (SRD): the Light property's extra attack, made with this weapon, is part of the Attack action instead of a
+   *  Bonus Action, still once per turn. Read when the weapon's Light extra attack is minted. */
+  nick: { freesLightExtraAttack: () => true },
 
   /** Push (SRD): on a hit, push the creature up to 10 feet straight away if it is Large or smaller. The
    *  caller derives direction, does the geometry, and shortens or skips the push as the attacker chose. */
@@ -145,6 +161,31 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
   },
 
   /**
+   * Vex (SRD): a hit gives the attacker Advantage on their next attack roll against that creature before the end of
+   * their next turn. A marker on the target, linked to the attacker, which the attack roll reads and spends
+   * (`resolution/attack.ts`). It lasts until the start of the attacker's turn after next, a turn's opportunity
+   * attacks longer than the SRD's end of their next turn.
+   */
+  vex: {
+    onHit: (swing) => [
+      {
+        targetId: swing.attack.targetId,
+        targetName: swing.attack.targetName,
+        effect: {
+          id: `${swing.commandId}:mastery:vex:${swing.attack.targetId}`,
+          name: `Vexed by ${swing.attacker.name}`,
+          tags: [VEXED_TAG],
+          sourceActorId: swing.attacker.id,
+          sourceName: swing.attacker.name,
+          sourceActionId: `${swing.actionId}:vex`,
+          startedRound: swing.round,
+          duration: { type: "rounds", remaining: 2 }
+        }
+      }
+    ]
+  },
+
+  /**
    * Topple (SRD): on a hit, CON save (DC 8 + the attack's ability modifier + your PB) or fall Prone,
    * parked as a real pending save. `actionName` "Topple" names the rule in the tracker and keeps its
    * dedupe key apart from the action's own save. No per-turn limit, so Extra Attack's two hits owe two
@@ -165,9 +206,7 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
   }
 };
 
-/** The implemented masteries, derived from the registry so a slug can't be advertised without behaviour.
- *  Not yet implemented: cleave (second attack roll in one resolution), nick (Light extra attack off the
- *  bonus action), vex (needs effects scoped to one target creature). */
+/** The implemented masteries, derived from the registry so a slug can't be advertised without behaviour. */
 export const IMPLEMENTED_MASTERIES: ReadonlySet<string> = new Set(
   Object.entries(MASTERY_HANDLERS)
     // A key alone is not a behaviour (`cleave: {}` typechecks), so a slug joins only if it has a hook.
@@ -197,4 +236,15 @@ export function masteryHitSaves(swing: MasterySwing | null): readonly MasteryPen
 export function masteryHitPushes(swing: MasterySwing | null): readonly MasteryPush[] {
   if (swing === null || !landed(swing.attack)) return [];
   return MASTERY_HANDLERS[swing.mastery.id]?.onHitPush?.(swing) ?? [];
+}
+
+/** On-hit opening (Cleave): whether this landed melee swing opens a swing at a second creature. */
+export function masteryOpensCleave(swing: MasterySwing | null): boolean {
+  if (swing === null || !landed(swing.attack)) return false;
+  return MASTERY_HANDLERS[swing.mastery.id]?.opensCleave?.(swing) === true;
+}
+
+/** Whether a weapon with this mastery makes the Light extra attack inside the Attack action (Nick). */
+export function freesLightExtraAttack(masteryId: string | undefined): boolean {
+  return masteryId !== undefined && MASTERY_HANDLERS[masteryId]?.freesLightExtraAttack?.() === true;
 }

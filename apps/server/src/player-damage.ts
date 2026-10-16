@@ -29,14 +29,13 @@ export type AppliedDamage = Readonly<{
   label: string;
 }>;
 
-/** A committed hit that still owes damage: a real (non-preview) hit that rolled damage not already parked
- *  on a reaction window (Uncanny Dodge applies it there). */
+/** A committed attack that still owes damage: a real (non-preview) swing that rolled damage, a miss included when
+ *  Graze dealt some, not already parked on a reaction window (Uncanny Dodge applies it there). */
 export function playerHitOwesDamage(resolution: ActionResolution): boolean {
   const attack = resolution.attack;
   return (
     attack !== null &&
     !resolution.preview &&
-    (attack.outcome === "hit" || attack.outcome === "crit" || attack.outcome === "unknown") &&
     resolution.damageTotal > 0 &&
     !(resolution.reactionPrompts ?? []).some((prompt) => prompt.actorId === attack.targetId)
   );
