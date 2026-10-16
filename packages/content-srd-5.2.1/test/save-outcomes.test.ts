@@ -190,6 +190,8 @@ describe("save outcomes in the shipped content", () => {
     ]);
     // A rider that waits on a charge stays prose.
     expect(monsterAction("elk", "ram").onHit).toBeUndefined();
+    // No end printed in the hit's sentence: it lasts until ended (the otyugh's save after a Long Rest is the GM's).
+    expect(monsterAction("otyugh", "bite").onHit).toEqual([{ conditions: [{ id: "poisoned" }] }]);
   });
 
   it("reads damage a failure brings at the start of each turn, and leaves it out of the GM's reminder", () => {

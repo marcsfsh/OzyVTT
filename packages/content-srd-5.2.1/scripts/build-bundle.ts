@@ -370,17 +370,21 @@ const parseOnHitRiders = (desc: string): OnHitRider[] | null => {
   } else if (/it has the Prone condition/i.test(desc)) {
     riders.push({ conditions: [{ id: "prone" }], ...(maxTargetSize ? { maxTargetSize } : {}) });
   }
-  // An unconditional timed rider in the hit's own sentence (not one opening with "If").
+  // An unconditional rider in the hit's own sentence (not one opening with "If"): timed, or with no end printed there
+  // (an otyugh's Poisoned, which a later save ends), which lasts until ended.
   const hit = desc.slice(Math.max(0, desc.search(/\bHit:|Attack Roll:/)));
   for (const sentence of hit.split(/(?<=\.)\s+/)) {
     if (/^If\b/.test(sentence) || /Grappled/.test(sentence)) continue;
     const timed = sentence.match(
       /\bthe target has the ([A-Z][a-z]+(?: and [A-Z][a-z]+)?) conditions? (until the (?:start|end) of (?:its|the [A-Za-z' -]+?(?:'s|s')) next turn)/
     );
-    const ids = timed ? riderConditionIds(timed[1]) : [];
+    const untimed = timed
+      ? null
+      : sentence.match(/\bdamage, and the target has the ([A-Z][a-z]+(?: and [A-Z][a-z]+)?) conditions?\.$/);
+    const ids = riderConditionIds((timed ?? untimed)?.[1] ?? "");
     const duration = timed ? failureDurationOf(timed[2]) : undefined;
-    if (ids.length > 0 && duration && riders.length < 2)
-      riders.push({ conditions: ids.map((id) => ({ id })), duration });
+    if (ids.length > 0 && (duration || untimed) && riders.length < 2)
+      riders.push({ conditions: ids.map((id) => ({ id })), ...(duration ? { duration } : {}) });
   }
   return riders.length > 0 ? riders : null;
 };

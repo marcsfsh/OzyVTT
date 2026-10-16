@@ -29382,7 +29382,16 @@
       "type": "piercing"
      }
     ],
-    "reminder": "The hit gives the target the Poisoned condition. Whenever the Poisoned target finishes a Long Rest, it makes a DC 15 Constitution save: on a failure its Hit Point maximum decreases by 5 (1d10); on a success the Poisoned condition ends."
+    "reminder": "The hit gives the target the Poisoned condition. Whenever the Poisoned target finishes a Long Rest, it makes a DC 15 Constitution save: on a failure its Hit Point maximum decreases by 5 (1d10); on a success the Poisoned condition ends.",
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "poisoned"
+       }
+      ]
+     }
+    ]
    },
    {
     "id": "tentacle",

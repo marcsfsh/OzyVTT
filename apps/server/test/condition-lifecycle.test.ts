@@ -204,6 +204,25 @@ describe("save-imposed conditions end per their text", () => {
     expect(conditionIds(state, IDS.hero)).toEqual([]);
   });
 
+  it("an otyugh's bite poisons until ended: the save that ends it, after a Long Rest, is the GM's", () => {
+    const state = game("otyugh");
+    setTurn(state, IDS.foe);
+    resolveDefinitionAction(
+      state,
+      monsterAction("otyugh", "bite"),
+      { actorId: IDS.foe, targetIds: [IDS.hero], commandId: nextId() },
+      resolveDeps([15, 4, 4], "otyugh")
+    );
+    expect(actor(state, IDS.hero).effects[0]).toMatchObject({
+      name: "Poisoned by Foe (Bite)",
+      duration: { type: "manual" },
+      linkedConditionIds: ["poisoned"]
+    });
+    state.combat = { ...state.combat, active: false, initiative: [], turnActorId: null };
+    applyRest(state, IDS.hero, "long", resolveDefinition);
+    expect(conditionIds(state, IDS.hero)).toEqual(["poisoned"]);
+  });
+
   it("an otyugh's stun ends at the start of the otyugh's next turn", () => {
     const state = game("otyugh");
     setTurn(state, IDS.foe);
