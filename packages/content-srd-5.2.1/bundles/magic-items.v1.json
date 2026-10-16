@@ -523,10 +523,31 @@
   },
   "cursed": true,
   "casts": [],
+  "damageTypeChoice": [
+   "bludgeoning",
+   "piercing",
+   "slashing"
+  ],
+  "vulnerableToOtherChoices": true,
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
   "effects": [],
+  "grants": {
+   "skills": [],
+   "expertise": [],
+   "tools": [],
+   "languages": [],
+   "armor": [],
+   "weapons": [],
+   "saves": [],
+   "damageResistances": [
+    "bludgeoning"
+   ],
+   "damageImmunities": [],
+   "conditionImmunities": [],
+   "spells": []
+  },
   "modifiers": []
  },
  {

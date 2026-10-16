@@ -776,6 +776,7 @@ const MAGIC_KEYS = [
   "cursed",
   "charges",
   "damageTypeChoice",
+  "vulnerableToOtherChoices",
   "removesArmorDrawbacks",
   "casts",
   "grantsFeatIds",
@@ -950,6 +951,15 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
             const { damageTypeChoice: _old, ...rest } = draft;
             return Array.isArray(next) && next.length > 0 ? { ...rest, damageTypeChoice: next } : rest;
           }
+        },
+        // Like Armor of Vulnerability: the curse makes the bearer vulnerable to every choice it doesn't resist.
+        {
+          key: "vulnerableToOtherChoices",
+          label: "Curse: vulnerable to the other types",
+          kind: "switch",
+          help: "While attuned, worn or not, the bearer is vulnerable to every type in the GM's choice except the one it resists.",
+          visibleWhen: (draft) =>
+            draft.isMagic === true && draft.cursed === true && Array.isArray(draft.damageTypeChoice)
         },
         // Template pair, like the SRD's "Weapon, +1 (Any Simple or Martial)": with both set, the
         // player picks the base when the item lands on a sheet and the server copies its stats.

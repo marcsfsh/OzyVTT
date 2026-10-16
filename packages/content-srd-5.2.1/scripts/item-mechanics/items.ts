@@ -97,9 +97,14 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // Metal Shell (timed immunity, once per dawn) is not authored: a standing immunity grant would be permanent.
   "armor-of-invulnerability": { grants: { damageResistances: ["bludgeoning", "piercing", "slashing"] } },
 
-  // The curse alone: attuning locks the armor on (SRD: attunement to a cursed item can't be ended voluntarily).
-  // The resistance and the two vulnerabilities depend on a type the GM picks per copy, so they stay prose.
-  "armor-of-vulnerability": { cursed: true },
+  // Resistance to the type the GM picks per copy (bludgeoning until then), and the curse: attuning locks the armor
+  // on and leaves Vulnerability to the other two while the curse holds, worn or not.
+  "armor-of-vulnerability": {
+    cursed: true,
+    grants: { damageResistances: ["bludgeoning"] },
+    damageTypeChoice: ["bludgeoning", "piercing", "slashing"],
+    vulnerableToOtherChoices: true
+  },
 
   // Kept as the curse alone: the SRD item is a trap, and the attunement lock is what springs it. The GM
   // applies the rest from the description, since neither half is expressible: resistance to ranged-weapon

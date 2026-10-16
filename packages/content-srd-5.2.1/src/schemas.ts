@@ -359,6 +359,9 @@ export const EquipmentReferenceSchema = z
     /** "The GM chooses the type": the types the GM may pick for this item's one granted resistance, which then
      *  replaces the printed default in `grants.damageResistances` for that carried copy. */
     damageTypeChoice: z.array(DamageTypeSchema).min(2).max(13).optional(),
+    /** Armor of Vulnerability's curse: while attuned, worn or not, Vulnerability to every type in `damageTypeChoice`
+     *  but the one it resists. */
+    vulnerableToOtherChoices: z.boolean().optional(),
     /** Feats granted while active, depth 1. Nothing has `grants.items`, so a grant cycle cannot be expressed. */
     grantsFeatIds: z.array(ContentIdSchema).max(4).default([]),
 
@@ -385,6 +388,13 @@ export const EquipmentReferenceSchema = z
           message: "A chosen damage type replaces one granted resistance: grant exactly one, from the choices."
         });
     }
+    // The vulnerability is a curse's, and "the other choices" needs choices to be the other of.
+    if (item.vulnerableToOtherChoices && (!item.damageTypeChoice || !item.cursed))
+      context.addIssue({
+        code: "custom",
+        path: ["vulnerableToOtherChoices"],
+        message: "Vulnerability to the other choices needs a cursed item whose resistance the GM chooses."
+      });
     // Enforced on the item carrier only: the identical rider on a feat is valid.
     item.modifiers.forEach((modifier, index) => {
       if (ITEM_REFUSED_MODIFIER_TYPES.includes(modifier.type)) {

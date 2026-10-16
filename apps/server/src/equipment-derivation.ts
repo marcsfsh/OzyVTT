@@ -381,6 +381,8 @@ export function deriveEquipment(
   const active: ActiveItem[] = [];
   /** Potions and flasks in the pack: only their actions, which use one up. */
   const packed: ActiveItem[] = [];
+  /** A curse's vulnerabilities, which hold while attuned whether or not the item is worn. */
+  const cursedVulnerabilities: Defence[] = [];
   for (const item of catalog ? actor.inventory : []) {
     if (item.quantity <= 0) continue;
     const record = catalog!.equipmentRecord(catalogIdOf(item));
@@ -388,13 +390,20 @@ export function deriveEquipment(
     if (item.equipped) equipped.push(entry);
     if (item.equipped && itemIsActive(item, record)) active.push(entry);
     else if (record?.consumedOnUse) packed.push(entry);
+    if (item.attuned && record) cursedVulnerabilities.push(...curseVulnerabilitiesOf(record, item));
   }
   const carriers: RiderCarrier[] = [
     ...(catalog ? characterCarriers(definition, catalog) : []),
     ...effectCarriers(actor)
   ];
   const gatedGrants = catalog ? characterGatedGrants(definition, catalog) : [];
-  if (equipped.length === 0 && packed.length === 0 && carriers.length === 0 && gatedGrants.length === 0)
+  if (
+    equipped.length === 0 &&
+    packed.length === 0 &&
+    carriers.length === 0 &&
+    gatedGrants.length === 0 &&
+    cursedVulnerabilities.length === 0
+  )
     return EMPTY_DERIVATION;
   /** Feats the character already holds, so an item granting one adds nothing twice. */
   const heldFeatIds = new Set((definition?.character?.feats ?? []).map((feat) => feat.id));
@@ -566,7 +575,7 @@ export function deriveEquipment(
     skills,
     saves,
     damageResistances: [...damageResistances, ...defencesOf(standing, "damage-resistance")],
-    damageVulnerabilities: defencesOf(standing, "damage-vulnerability"),
+    damageVulnerabilities: [...defencesOf(standing, "damage-vulnerability"), ...cursedVulnerabilities],
     damageImmunities,
     conditionImmunities,
     armorClass: sumRiders(standing, "armor-class"),
@@ -652,6 +661,16 @@ function withChosenResistance(record: EquipmentReference, item: InventoryItem): 
   const chosen = item.chosenDamageType;
   if (!chosen || !record.grants || !record.damageTypeChoice?.includes(chosen)) return record;
   return { ...record, grants: { ...record.grants, damageResistances: [chosen] } };
+}
+
+/** Armor of Vulnerability: "Vulnerability to two of the three damage types associated with the armor (not the one to
+ *  which it grants Resistance)", on an attuned copy. */
+function curseVulnerabilitiesOf(record: EquipmentReference, item: InventoryItem): Defence[] {
+  if (!record.vulnerableToOtherChoices || !record.damageTypeChoice) return [];
+  const resisted = withChosenResistance(record, item).grants?.damageResistances ?? [];
+  return record.damageTypeChoice
+    .filter((type) => !resisted.includes(type))
+    .map((id) => ({ id, source: `${record.name} (curse)` }));
 }
 
 function summarise(record: RiderBlock | EquipmentReference): string {
