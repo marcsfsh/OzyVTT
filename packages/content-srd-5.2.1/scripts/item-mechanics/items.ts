@@ -377,7 +377,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `ring-of-feather-falling` - no falling model.
 
   // `ring-of-free-action` - a condition immunity cannot be limited to magical sources, and an absolute
-  // one would refuse ordinary Restrained/Paralyzed effects. Difficult terrain is not modeled.
+  // one would refuse ordinary Restrained/Paralyzed effects. Ignoring difficult terrain is not modeled.
 
   // `ring-of-invisibility` - no action applies a condition to its own user.
 
@@ -779,7 +779,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `boots-of-striding-and-springing` - a speed floor, encumbrance and jumping are not modeled.
   // `slippers-of-spider-climbing` - no climb speed or surface model.
 
-  // Ungated in the SRD. Cold tolerance and ice/snow difficult terrain are not modeled.
+  // Ungated in the SRD. Cold tolerance and ignoring ice or snow difficult terrain are not modeled.
   "boots-of-the-winterlands": { grants: { damageResistances: ["cold"] } },
 
   // Charge-alone: 4 charges exact; the Fly Speed is GM-adjudicated.

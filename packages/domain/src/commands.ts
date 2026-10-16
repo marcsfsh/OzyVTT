@@ -392,6 +392,8 @@ export const ReactionDismissSchema = z
   .strict();
 /** Read-only availability lookup (no commandId - nothing mutates). */
 export const ActorAvailableActionsSchema = z.object({ actorId: z.uuid() }).strict();
+/** The movement read: how much of this turn's movement a combatant has left. */
+export const ActorMovementSchema = z.object({ actorId: z.uuid() }).strict();
 export const ContentActionsSchema = z
   .object({
     definitionId: z
@@ -610,23 +612,42 @@ export const FogSetEnabledSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** A dragged rect in image pixels, before the server snaps and clamps it. */
+const PaintRectSchema = z
+  .object({
+    x: z.number().min(-100000).max(1_000_000),
+    y: z.number().min(-100000).max(1_000_000),
+    width: z.number().positive().max(1_000_000),
+    height: z.number().positive().max(1_000_000)
+  })
+  .strict();
 export const FogPaintSchema = z
   .object({
     commandId: z.uuid(),
     op: z.enum(["reveal", "hide"]),
-    rect: z
-      .object({
-        x: z.number().min(-100000).max(1_000_000),
-        y: z.number().min(-100000).max(1_000_000),
-        width: z.number().positive().max(1_000_000),
-        height: z.number().positive().max(1_000_000)
-      })
-      .strict(),
+    rect: PaintRectSchema,
     sceneId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
 export const FogResetSchema = z
+  .object({
+    commandId: z.uuid(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Difficult terrain (GM-only): mark a dragged area difficult, or clear it. `sceneId` targets a parked scene. */
+export const TerrainPaintSchema = z
+  .object({
+    commandId: z.uuid(),
+    op: z.enum(["difficult", "clear"]),
+    rect: PaintRectSchema,
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+export const TerrainResetSchema = z
   .object({
     commandId: z.uuid(),
     sceneId: z.uuid().optional(),

@@ -9,10 +9,13 @@ import {
   SceneIdSchema,
   SceneRenameSchema,
   SceneReorderSchema,
-  SceneSetCombatantsSchema
+  SceneSetCombatantsSchema,
+  TerrainPaintSchema,
+  TerrainResetSchema
 } from "@vtt/domain/commands";
 import { CommandRejectedError } from "../game-store.js";
 import { launchReplay } from "../replay-launch.js";
+import { paintTerrain, resetTerrain } from "../terrain.js";
 import {
   activateScene,
   createScene,
@@ -24,7 +27,7 @@ import {
 } from "../scenes.js";
 import { defineCommand } from "./pipeline.js";
 
-// Prepared scenes, launching a recorded moment, and the fog of war. All of it is the GM's.
+// Prepared scenes, launching a recorded moment, the fog of war and difficult terrain. All of it is the GM's.
 
 export const sceneCommands = [
   defineCommand({
@@ -277,6 +280,42 @@ export const sceneCommands = [
     gmOnly: "Only the GM controls the fog of war.",
     async run({ request, execute }) {
       await execute((state) => resetFog(state, request.sceneId));
+    }
+  }),
+
+  defineCommand({
+    type: "terrain.paint",
+    operationId: "paintTerrain",
+    description:
+      "Marks a dragged area as difficult terrain, or clears it (GM-grade only). The server snaps to whole grid cells on calibrated unrotated maps and clamps to the map bounds; a map needs a calibrated grid. Entering a cell whose centre lies in difficult terrain costs double. `sceneId` targets a prepared scene.",
+    summary: "Mark or clear difficult terrain over a grid-snapped area (GM).",
+    schema: TerrainPaintSchema,
+    malformed: "The terrain stroke is malformed.",
+    gmOnly: "Only the GM marks terrain.",
+    async run({ request, execute }, kit) {
+      const { op, rect, sceneId } = request;
+      const combat = kit.read().combat;
+      const mapAssetId =
+        sceneId === undefined
+          ? combat.mapAssetId
+          : (combat.scenes.find((scene) => scene.id === sceneId)?.mapAssetId ?? null);
+      if (!mapAssetId) throw new CommandRejectedError("Pick a map before marking terrain.");
+      const geometry = await kit.context.tokenGeometryFor(mapAssetId);
+      await execute((state) => paintTerrain(state, sceneId, geometry, { op, rect }));
+    }
+  }),
+
+  defineCommand({
+    type: "terrain.reset",
+    operationId: "resetTerrain",
+    description:
+      "Clears all difficult terrain from the live table or, with `sceneId`, a prepared scene (GM-grade only).",
+    summary: "Clear all difficult terrain (GM).",
+    schema: TerrainResetSchema,
+    malformed: "The terrain command is malformed.",
+    gmOnly: "Only the GM marks terrain.",
+    async run({ request, execute }) {
+      await execute((state) => resetTerrain(state, request.sceneId));
     }
   })
 ];

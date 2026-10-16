@@ -47,6 +47,11 @@ export type ViewerFog = Readonly<{
   }>[];
 }>;
 
+/** Difficult terrain the fog has revealed, as image-pixel rects. */
+export type ViewerTerrain = Readonly<{
+  difficult: readonly Readonly<{ x: number; y: number; width: number; height: number }>[];
+}>;
+
 export type ViewerInitiative = Readonly<{
   visible: boolean;
   round: number;
@@ -88,6 +93,8 @@ export type ViewerEncounterScene = Readonly<{
   annotations: readonly ViewerAnnotation[];
   /** Absent means no fog; the viewer renders the mask above everything. */
   fog?: ViewerFog;
+  /** Absent on a presentation stored before terrain existed. */
+  terrain?: ViewerTerrain;
 }>;
 
 export type ViewerPresentationState = Readonly<{
@@ -288,7 +295,22 @@ function encounter(value: ViewerEncounterScene): ViewerEncounterScene {
   if (mapAssetId === null && annotations.length)
     throw new InvalidRequestError("Viewer annotations require an active encounter map.");
   const fog = value.fog === undefined ? undefined : sanitizedFog(value.fog);
-  return { mapAssetId, tokens, annotations, ...(fog ? { fog } : {}) };
+  const terrain = value.terrain === undefined ? undefined : sanitizedTerrain(value.terrain);
+  return { mapAssetId, tokens, annotations, ...(fog ? { fog } : {}), ...(terrain ? { terrain } : {}) };
+}
+
+function sanitizedTerrain(value: ViewerTerrain): ViewerTerrain {
+  const rects = value.difficult ?? [];
+  if (!Array.isArray(rects) || rects.length > 1000)
+    throw new InvalidRequestError("Viewer terrain cannot exceed 1000 areas.");
+  return {
+    difficult: rects.map((rect) => {
+      for (const bound of [rect.x, rect.y, rect.width, rect.height])
+        if (!Number.isFinite(bound) || bound < 0 || bound > 1_000_000)
+          throw new InvalidRequestError("Viewer terrain geometry is invalid.");
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+    })
+  };
 }
 
 function sanitizedFog(value: ViewerFog): ViewerFog {

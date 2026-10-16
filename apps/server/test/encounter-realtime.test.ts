@@ -533,7 +533,8 @@ describe("live authoritative encounter workflow", () => {
           }
         ],
         annotations: [],
-        fog: { enabled: false, shapes: [] }
+        fog: { enabled: false, shapes: [] },
+        terrain: { difficult: [] }
       });
 
       const hiddenMoveId = "61000000-0000-4000-8000-000000000005";

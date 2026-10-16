@@ -1,4 +1,4 @@
-import type { EncounterTokenPosition, GameState } from "@vtt/domain";
+import type { ActorMovementReply, EncounterTokenPosition, GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { RulesBlockedError } from "./game-store.js";
 import { isIncapacitated } from "./condition-rules.js";
@@ -6,6 +6,7 @@ import { effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { effectiveSpeedFeet } from "./speed.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
+import type { MovementCost } from "./terrain.js";
 import {
   effectiveModeFor,
   familyModeFor,
@@ -24,8 +25,10 @@ export type MovementRulesInput = Readonly<{
   from: EncounterTokenPosition | null;
   /** Snapped position after the move; null when returning to the tray (free). */
   to: EncounterTokenPosition | null;
-  /** Map distance in feet between two image points; null when unmeasurable. Used for the mover's own budget. */
+  /** Map distance in feet between two image points; null when unmeasurable. */
   distance: (a: Point, b: Point) => number | null;
+  /** What the move costs the mover, difficult terrain included (`movementCost`); `distance` when absent. */
+  cost?: (from: Point, to: Point) => MovementCost | null;
   /** Footprint-aware feet between an enemy and the mover at `point` (SRD: nearest point of each space); center-to-center when absent. Used for reach. */
   creatureDistance?: (enemy: Readonly<{ actorId: string; position: Point }>, moverPoint: Point) => number | null;
   override: RulesOverride | null;
@@ -60,6 +63,32 @@ export type MovementRulesOutcome = Readonly<{
  * mover prompts no one (a player must not learn a hidden token's retreat). Sides use the
  * player-character vs monster heuristic; NPCs are GM-adjudicated.
  */
+/** A move spends movement only on the mover's own turn in combat, with movement rules on. */
+function movementCounts(state: GameState, actorId: string): boolean {
+  return (
+    state.combat.active &&
+    state.combat.turnActorId === actorId &&
+    familyModeFor(state.combat, "movement") !== "freeform"
+  );
+}
+
+/** What `actor:movement` reports: the same budget `applyMovementRules` charges against. */
+export function movementStatus(
+  state: GameState,
+  actorId: string,
+  input: Pick<MovementRulesInput, "resolveDefinition" | "catalog">
+): ActorMovementReply {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  const definition = actor?.definitionId ? input.resolveDefinition(actor.definitionId) : undefined;
+  const counted = actor !== undefined && movementCounts(state, actorId);
+  return {
+    counted,
+    speedFeet: actor ? effectiveSpeedFeet(actor, deriveEquipment(actor, definition, input.catalog)) : null,
+    usedFeet: counted ? state.combat.turn.movementUsedFeet : 0,
+    enforcement: effectiveModeFor(state.combat, "movement.exceeds-speed")
+  };
+}
+
 export function applyMovementRules(state: GameState, input: MovementRulesInput): MovementRulesOutcome {
   const { actorId, from, to } = input;
   const mover = state.actors.find((candidate) => candidate.id === actorId);
@@ -67,18 +96,15 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   let warning: string | null = null;
   let overridden: string | null = null;
   // The movement family owns both the speed budget and the opportunity-attack prompts.
-  if (
-    !mover ||
-    !state.combat.active ||
-    state.combat.turnActorId !== actorId ||
-    from === null ||
-    to === null ||
-    familyModeFor(state.combat, "movement") === "freeform"
-  ) {
+  if (!mover || !movementCounts(state, actorId) || from === null || to === null) {
     return { warning, overridden, prompts };
   }
 
-  const moved = input.distance(from, to);
+  const charge = input.cost
+    ? input.cost(from, to)
+    : ((distance) => (distance === null ? null : { feet: distance, difficultFeet: 0 }))(input.distance(from, to));
+  const moved = charge?.feet ?? null;
+  const difficultFeet = charge?.difficultFeet ?? 0;
   const moverDefinition = mover.definitionId ? input.resolveDefinition(mover.definitionId) : undefined;
   const effective = effectiveSpeedFeet(mover, deriveEquipment(mover, moverDefinition, input.catalog));
   if (moved !== null && effective !== null && moved > 0.05) {
@@ -90,7 +116,7 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
       const message =
         effective === 0
           ? `${mover.name} can't move - its Speed is 0.`
-          : `${mover.name} has ${Math.max(0, Math.round((effective - used) * 10) / 10)} ft of movement left (this move needs ${Math.round(moved * 10) / 10} ft).`;
+          : `${mover.name} has ${Math.max(0, Math.round((effective - used) * 10) / 10)} ft of movement left (this move needs ${Math.round(moved * 10) / 10} ft${difficultFeet > 0 ? `, ${Math.round(difficultFeet * 10) / 10} ft of it for difficult terrain` : ""}).`;
       // A GM Allow earlier this turn already covers the movement family.
       if (effectiveModeFor(state.combat, rule) === "strict" && !overrideCovers(state.combat.turn, rule))
         throw new RulesBlockedError(rule, message);

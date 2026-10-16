@@ -29,5 +29,5 @@ and should not be scheduled.
 ## What is still open
 
 Nothing about the grid itself. Fog is a separate decision (ADR-0022) and is presentation only.
-Difficult terrain and a server-authoritative movement preview are unimplemented and are tracked
-on `docs/ai-ledger/current-state.md`, not here.
+Difficult terrain and the movement preview now build on these cells: see the 2026-10-16 amendment to
+ADR-0020.

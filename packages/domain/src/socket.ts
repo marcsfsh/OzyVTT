@@ -21,6 +21,7 @@ import type {
   BuilderOffersResult,
   ActorActionsAvailabilityResult,
   ActorAddResult,
+  ActorMovementResult,
   AnnotationAddResult,
   DamageApplyResult,
   DeathSaveResult,
@@ -77,6 +78,8 @@ import type {
   FogPaintSchema,
   FogResetSchema,
   FogSetEnabledSchema,
+  TerrainPaintSchema,
+  TerrainResetSchema,
   HpAmountSchema,
   InitiativeNextSchema,
   InitiativePreviousSchema,
@@ -447,6 +450,7 @@ export interface ClientToServerEvents {
     payload: { actorId: string },
     acknowledgement: (result: ActorActionsAvailabilityResult) => void
   ) => void;
+  "actor:movement": (payload: { actorId: string }, acknowledgement: (result: ActorMovementResult) => void) => void;
   "turn:use": (
     payload: CommandPayload<typeof TurnUseSchema>,
     acknowledgement: (result: MutationResult) => void
@@ -550,6 +554,14 @@ export interface ClientToServerEvents {
   ) => void;
   "fog:reset": (
     payload: CommandPayload<typeof FogResetSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "terrain:paint": (
+    payload: CommandPayload<typeof TerrainPaintSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "terrain:reset": (
+    payload: CommandPayload<typeof TerrainResetSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "annotation:add": (

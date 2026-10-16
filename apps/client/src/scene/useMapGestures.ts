@@ -31,6 +31,7 @@ export type Gesture =
   | Readonly<{ kind: "pan"; startClient: Point; startCenter: Point; scaleX: number; scaleY: number }>
   | Readonly<{ kind: "measure" | AnnotationShapeKind; origin: Point; current: Point }>
   | Readonly<{ kind: "fog"; op: "reveal" | "hide"; origin: Point; current: Point }>
+  | Readonly<{ kind: "terrain"; op: "difficult" | "clear"; origin: Point; current: Point }>
   | Readonly<{ kind: "annotation-move"; id: string; grab: Point; geometry: Readonly<{ origin: Point; target: Point }> }>
   | Readonly<{ kind: "annotation-resize"; id: string; anchor: Point; current: Point }>
   /** Two fingers. Every field is read when the pinch begins and never updated, so zoom is absolute
@@ -315,7 +316,22 @@ export function useMapGestures({
       setGesture({ kind: "fog", op: tool === "fog-reveal" ? "reveal" : "hide", origin: point, current: point });
       return;
     }
-    if (tool !== "select" && calibration) {
+    // Terrain lives in grid cells, so it needs a calibrated map.
+    if ((tool === "terrain-difficult" || tool === "terrain-clear") && role === "gm" && calibration) {
+      const point = pointFromScreen(event.clientX, event.clientY);
+      if (!point) return;
+      event.preventDefault();
+      capturePointer(event);
+      setMessage("");
+      setGesture({
+        kind: "terrain",
+        op: tool === "terrain-difficult" ? "difficult" : "clear",
+        origin: point,
+        current: point
+      });
+      return;
+    }
+    if (tool !== "select" && tool !== "terrain-difficult" && tool !== "terrain-clear" && calibration) {
       const point = pointFromScreen(event.clientX, event.clientY);
       if (!point) return;
       event.preventDefault();
@@ -467,6 +483,12 @@ export function useMapGestures({
       const { op, origin, current } = gesture;
       setGesture(null);
       commands.paintFog(op, origin, current);
+      return;
+    }
+    if (gesture.kind === "terrain") {
+      const { op, origin, current } = gesture;
+      setGesture(null);
+      commands.paintTerrain(op, origin, current);
       return;
     }
     if (gesture.kind === "measure") {

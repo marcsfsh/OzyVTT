@@ -113,6 +113,7 @@ export type PlayerCombatView = Readonly<{
   underwater: boolean;
   reactionsUsed: readonly string[];
   /** The fog mask verbatim (geometry only - hidden things are stripped by their own filters). */ fog: CombatState["fog"];
+  /** Difficult terrain, clipped to what the fog reveals so unrevealed ground keeps its layout. */ terrain: CombatState["terrain"];
   pendingSaves: readonly PlayerPendingSave[];
   pendingReactions: readonly PlayerPendingReaction[];
   /** The player's own parked Ask-the-GM questions only. */ pendingRuleAsks: readonly PlayerPendingRuleAsk[];

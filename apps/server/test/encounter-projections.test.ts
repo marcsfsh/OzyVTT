@@ -93,6 +93,7 @@ describe("recipient-safe encounter projections", () => {
       underwater: false,
       reactionsUsed: [],
       fog: { enabled: false, shapes: [] },
+      terrain: { difficult: [] },
       rewound: false,
       pendingSaves: [],
       pendingReactions: [],
@@ -143,7 +144,8 @@ describe("recipient-safe encounter projections", () => {
         }
       ],
       annotations: [],
-      fog: { enabled: false, shapes: [] }
+      fog: { enabled: false, shapes: [] },
+      terrain: { difficult: [] }
     });
   });
 
@@ -164,7 +166,13 @@ describe("recipient-safe encounter projections", () => {
     // A live scene keeps its map and fog on the shared screen, but every combatant token (public or
     // hidden) stays off until the fight is running.
     const scene = projectViewerEncounterScene(state);
-    expect(scene).toEqual({ mapAssetId: MAP, tokens: [], annotations: [], fog: { enabled: false, shapes: [] } });
+    expect(scene).toEqual({
+      mapAssetId: MAP,
+      tokens: [],
+      annotations: [],
+      fog: { enabled: false, shapes: [] },
+      terrain: { difficult: [] }
+    });
     expect(JSON.stringify(scene)).not.toContain(PUBLIC);
     expect(JSON.stringify(scene)).not.toContain(HIDDEN);
   });

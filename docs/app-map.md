@@ -6,7 +6,7 @@ machine-derivable surfaces of the app (state shape, command catalog, HTTP paths)
 file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.
 
 - API version `1` · realtime protocol `1`
-- 11 GameState fields · 88 commands · 203 HTTP paths
+- 11 GameState fields · 90 commands · 206 HTTP paths
 
 ## GameState shape
 
@@ -33,7 +33,7 @@ schema in `packages/domain/src/commands.ts`, its route and scope in `GAME_COMMAN
 OpenAPI operation, and one table entry under `apps/server/src/commands/`, which both transports
 register from. Then the projection decision.
 
-Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `death-save`, `dice`, `effect`, `encounter`, `fog`, `initiative`, `reaction`, `replay`, `rules`, `save`, `scene`, `table`, `token`, `turn`.
+Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `death-save`, `dice`, `effect`, `encounter`, `fog`, `initiative`, `reaction`, `replay`, `rules`, `save`, `scene`, `table`, `terrain`, `token`, `turn`.
 
 | Command | Scope |
 | --- | --- |
@@ -120,6 +120,8 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `
 | `scene.set-combatants` | `scene:write` |
 | `table.set-party-visibility` | `combat:write` |
 | `table.set-staging-defaults` | `combat:write` |
+| `terrain.paint` | `scene:write` |
+| `terrain.reset` | `scene:write` |
 | `token.move` | `combat:write` |
 | `turn.end` | `combat:write` |
 | `turn.use` | `combat:write` |
@@ -220,6 +222,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/actors/{actorId}/hp`
 - `POST /api/v1/game/actors/{actorId}/identity`
 - `POST /api/v1/game/actors/{actorId}/inventory`
+- `GET /api/v1/game/actors/{actorId}/movement`
 - `POST /api/v1/game/actors/{actorId}/prepared-spell`
 - `POST /api/v1/game/actors/{actorId}/proficiencies`
 - `POST /api/v1/game/actors/{actorId}/rebuild`
@@ -289,6 +292,8 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/scenes/reorder`
 - `POST /api/v1/game/table/party-visibility`
 - `POST /api/v1/game/table/staging-defaults`
+- `POST /api/v1/game/terrain/paint`
+- `POST /api/v1/game/terrain/reset`
 - `POST /api/v1/game/tokens/{actorId}/move`
 - `POST /api/v1/game/turn/end`
 - `POST /api/v1/game/turn/legendary`

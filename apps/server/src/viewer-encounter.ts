@@ -1,6 +1,7 @@
 import type { GameState } from "@vtt/domain";
 import { healthBandOf } from "./hit-points.js";
 import { conditionLabels, projectPublicInitiative } from "./projections.js";
+import { visibleTerrain } from "./terrain.js";
 import type { ViewerEncounterScene, ViewerInitiative } from "./viewer-presentation.js";
 
 export function projectViewerInitiative(state: GameState): ViewerInitiative {
@@ -27,9 +28,11 @@ export function projectViewerInitiative(state: GameState): ViewerInitiative {
 export function projectViewerEncounterScene(state: GameState, now = Date.now()): ViewerEncounterScene {
   if (!state.combat.mapAssetId) return { mapAssetId: null, tokens: [], annotations: [] };
   const fog = { enabled: state.combat.fog.enabled, shapes: state.combat.fog.shapes.map((shape) => ({ ...shape })) };
-  // A live scene shows its map and fog immediately; tokens and drawings appear only once combat runs,
+  // As for players: only the terrain the fog reveals.
+  const terrain = visibleTerrain(state.combat);
+  // A live scene shows its map, fog and terrain immediately; tokens and drawings appear only once combat runs,
   // so no combatant data reaches the public screen before then.
-  if (!state.combat.active) return { mapAssetId: state.combat.mapAssetId, tokens: [], annotations: [], fog };
+  if (!state.combat.active) return { mapAssetId: state.combat.mapAssetId, tokens: [], annotations: [], fog, terrain };
   const publicActors = new Map(
     state.actors.filter((actor) => actor.visibility === "public").map((actor) => [actor.id, actor])
   );
@@ -76,7 +79,8 @@ export function projectViewerEncounterScene(state: GameState, now = Date.now()):
           ]
         : []
     ),
-    fog
+    fog,
+    terrain
   };
 }
 

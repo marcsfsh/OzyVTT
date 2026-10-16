@@ -479,6 +479,27 @@ const sceneCombatShape = {
     })
     .strict()
     .prefault({ enabled: false, shapes: [] }),
+  /** GM-painted difficult terrain: disjoint image-pixel rects, snapped to whole cells on an unrotated grid.
+   * Entering a cell whose centre lies in one costs double (SRD Difficult Terrain). Players and the table screen
+   * receive only the parts the fog has revealed. */
+  terrain: z
+    .object({
+      difficult: z
+        .array(
+          z
+            .object({
+              x: z.number().min(0).max(100000),
+              y: z.number().min(0).max(100000),
+              width: z.number().positive().max(100000),
+              height: z.number().positive().max(100000)
+            })
+            .strict()
+        )
+        .max(1000)
+        .default([])
+    })
+    .strict()
+    .prefault({ difficult: [] }),
   pendingSaves: z.array(PendingSaveSchema).max(100).default([]),
   pendingReactions: z.array(PendingReactionSchema).max(20).default([]),
   /** GM-only (see PendingDamageSchema). */
@@ -563,6 +584,7 @@ export const CombatStateSchema = z
         Object.keys(active.combat.legendaryUsed).length > 0 ||
         active.combat.fog.enabled ||
         active.combat.fog.shapes.length > 0 ||
+        active.combat.terrain.difficult.length > 0 ||
         active.combat.pendingSaves.length > 0 ||
         active.combat.pendingReactions.length > 0 ||
         active.combat.pendingDamage.length > 0 ||

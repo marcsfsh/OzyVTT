@@ -486,6 +486,7 @@ function actorFor(member: (typeof PARTY)[number]) {
     initiative: definition.initiativeBonus,
     ownerSessionId: null,
     conditions: [],
+    speedFeet: definition.speedFeet,
     hitDice: seedHitDice(definition),
     spellSlots: seedSpellSlots(definition),
     pactSlots: seedPactSlots(definition),

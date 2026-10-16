@@ -608,11 +608,20 @@
   pointer-events: none;
 }
 .encounter-move-line {
+  fill: none;
   stroke: var(--cyan);
   stroke-width: 3;
   stroke-dasharray: 6 5;
   vector-effect: non-scaling-stroke;
   stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* A drag longer than the mover's remaining movement: caution, and the label says "too far" in words. */
+.encounter-move-guide.over .encounter-move-line {
+  stroke: var(--caution);
+}
+.encounter-move-guide.over .encounter-live-distance {
+  fill: var(--caution-hi);
 }
 
 /* Phone form of the map. The toolbar collapses to its Tools button in JS at the same breakpoint
@@ -716,6 +725,33 @@
 .fog-stroke-hide {
   fill: var(--violet);
   stroke: var(--violet-hi);
+}
+/* Difficult terrain: caution-orange hatching with a thin edge, under drawings and tokens. Hatching keeps the
+   map art readable and doesn't rely on hue alone. */
+.terrain-hatch {
+  fill: var(--caution);
+  fill-opacity: 0.45;
+}
+.terrain-difficult {
+  stroke: var(--caution);
+  stroke-opacity: 0.7;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+.terrain-stroke-preview {
+  fill-opacity: 0.25;
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+.terrain-stroke-difficult {
+  fill: var(--caution);
+  stroke: var(--caution);
+}
+.terrain-stroke-clear {
+  fill: var(--surface-3);
+  stroke: var(--text-muted);
 }
 
 .token-condition circle {

@@ -869,6 +869,24 @@ export const openApiDocument = {
         }
       }
     },
+    [GAME_PATHS.actorMovement]: {
+      get: {
+        operationId: "getActorMovement",
+        security: gameSecurityWithPlayer("combat:read"),
+        description:
+          "How much of this turn's movement a combatant has left: whether a move is counted at all (combat running, its turn, movement rules on), its movement budget after exhaustion, Slow, Dash and the like, the feet already spent, and whether going over is refused or only warned. The same budget `token.move` charges against; a move's cost is the cheapest grid path, with difficult terrain and enemies' spaces costing double. GM-grade any combatant; a player session only their claimed character.",
+        parameters: [uuidParam("actorId")],
+        responses: {
+          "200": {
+            description: "The combatant's movement this turn",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ActorMovementResponse" } } }
+          },
+          "401": apiError,
+          "403": apiError,
+          "404": apiError
+        }
+      }
+    },
     [SESSION_PATHS.player]: {
       post: {
         operationId: "issuePlayerSession",
@@ -2030,6 +2048,7 @@ export const openApiDocument = {
         }
       },
       ActorAvailableActionsResponse: envelopeSchema("#/components/schemas/ActorAvailableActionsData"),
+      ActorMovementResponse: envelopeSchema("#/components/schemas/ActorMovementData"),
       BuilderOffersDraft: {
         type: "object",
         additionalProperties: false,
