@@ -32,6 +32,8 @@ type AvailabilityRow = Readonly<{
   requiresEffectTag?: string | null;
   multiattack?: ReadonlyArray<{ actionId: string; count: number }> | null;
   reaction?: ContentActionSummary["reaction"];
+  healing?: Readonly<{ formula: string }> | null;
+  targeting?: "none" | "single" | "multi" | null;
 }>;
 
 /** The wire row in the shape every action surface here already speaks. */
@@ -57,7 +59,9 @@ function summaryOfAvailability(row: AvailabilityRow): ContentActionSummary {
     requiresEffectTag: row.requiresEffectTag ?? null,
     multiattack: row.multiattack ?? null,
     grants: false,
-    reaction: row.reaction ?? null
+    reaction: row.reaction ?? null,
+    ...(row.healing ? { healing: row.healing } : {}),
+    ...(row.targeting ? { targeting: row.targeting } : {})
   };
 }
 

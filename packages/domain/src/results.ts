@@ -261,7 +261,11 @@ export const ActionAvailabilitySchema = z.strictObject({
   usesPool: z.string().nullable(),
   requiresEffectTag: z.string().nullable(),
   multiattack: z.array(z.strictObject({ actionId: z.string(), count: z.number().int() })).nullable(),
-  reaction: ActionReactionSchema.nullable()
+  reaction: ActionReactionSchema.nullable(),
+  /** The hit points it restores (a potion's 2d4 + 2), for display. */
+  healing: z.strictObject({ formula: z.string() }).nullable().optional(),
+  /** Who a tap picks: one creature, several, or none (it acts on its user); null when nothing structured resolves. */
+  targeting: z.enum(["none", "single", "multi"]).nullable().optional()
 });
 export type ActionAvailability = Wire<z.infer<typeof ActionAvailabilitySchema>>;
 /** The sheet's derived numbers. Sent only via `actor:available-actions` (authorized per actor), not `PlayerView`. */

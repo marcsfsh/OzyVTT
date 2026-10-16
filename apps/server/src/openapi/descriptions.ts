@@ -1546,7 +1546,10 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "actions[].rangeNormalFeet": "Normal range band; shots beyond it up to rangeFeet roll at disadvantage",
     "actions[].saveDc": "Save DC including item riders",
     "actions[].usesLimit": "Total limited uses including any item that raised the pool; null when unlimited",
-    "actions[].usesPool": "Shared pool key; actions naming one pool spend one counter"
+    "actions[].usesPool": "Shared pool key; actions naming one pool spend one counter",
+    "actions[].healing": "The hit points the action restores (a potion's 2d4 + 2); null when it heals nothing",
+    "actions[].targeting":
+      'Who a tap picks, as resolution takes it: "single" (an attack, a heal such as a potion, a grant aimed at a target), "multi" (a save or damage with no attack roll), "none" (it acts on its user: a self heal, Rage, a scroll of a spell with no target); null when nothing structured resolves'
   },
   BuilderOffersData: {
     "offers[].key": "Stable key the draft's answers are filed under",

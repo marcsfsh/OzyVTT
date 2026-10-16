@@ -6,10 +6,12 @@ import {
   type GameState
 } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
+import { BUILTIN_TARGETING } from "./builtin-actions.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { masteryMissDamage } from "./weapon-mastery.js";
 import { spendAmmunition } from "./resolution/ammunition.js";
 import { useUpConsumable } from "./resolution/consumables.js";
+import { consumableRowFor } from "./consumables.js";
 import { rollAttack } from "./resolution/attack.js";
 import { rollLastCharge } from "./resolution/charges.js";
 import type { DefinitionAction, ResolveContext, ResolveDependencies, ResolveInput } from "./resolution/context.js";
@@ -254,7 +256,29 @@ export function actionAvailability(
       multiattack: action.multiattack
         ? action.multiattack.map((component) => ({ actionId: component.actionId, count: component.count }))
         : null,
-      reaction: action.reaction ?? null
+      reaction: action.reaction ?? null,
+      healing: action.healing ? { formula: action.healing.formula } : null,
+      // A builtin says what the stat block's action list says of it (Help picks one creature, Dodge none).
+      targeting: builtin
+        ? (BUILTIN_TARGETING[action.id] ?? "none")
+        : tapTargeting(action, consumableRowFor(action, attacker.inventory, catalog) !== null)
     };
   });
+}
+
+/** Who a tap of this action picks, as the resolver will take it: one creature for an attack, a grant aimed at a
+ *  target or a heal (a potion: the drinker); several for a save or damage with no attack roll, or a divided heal;
+ *  none for what acts on its user (a self heal, Rage, a scroll of Detect Magic). Null for an action with nothing
+ *  structured to resolve. */
+function tapTargeting(action: DefinitionAction, usesUpItem: boolean): "none" | "single" | "multi" | null {
+  if (action.attack || action.grants?.target === "target") return "single";
+  if (action.save || action.damage.length > 0) return "multi";
+  if (action.healing) return action.healing.self ? "none" : action.healing.divided ? "multi" : "single";
+  const structured =
+    action.grants !== undefined ||
+    action.multiattack !== undefined ||
+    action.uses !== undefined ||
+    action.spellSlot !== undefined ||
+    usesUpItem;
+  return structured ? "none" : null;
 }

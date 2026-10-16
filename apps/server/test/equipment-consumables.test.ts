@@ -1,8 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
 import { GAME_PATHS } from "@vtt/api-contract";
+import { actionAvailability } from "../src/action-resolution.js";
+import { builtinAction } from "../src/builtin-actions.js";
 import {
   actionOf,
+  catalog,
   catalogRow,
   fight,
   fighterInput,
@@ -28,6 +31,42 @@ const newTurn = (table: Table) => {
     bonusActionInstance: null
   };
 };
+
+describe("what a player's turn is told about an item's action", () => {
+  it("says whom a tap picks: a potion's drinker, a flask's targets, nobody for what acts on its user", () => {
+    const table = tableOf({ [IDS.wizard]: wizardInput() });
+    for (const id of ["potion-of-healing", "acid", "antitoxin"])
+      write(table, IDS.wizard, catalogRow(id, { equipped: false }));
+    write(table, IDS.wizard, catalogRow("spell-scroll", { equipped: false, spellId: "detect-magic" }));
+    const ids = ["item-potion-of-healing-drink", "item-acid-throw", "item-antitoxin-drink", "item-spell-scroll-read"];
+    const rows = actionAvailability(
+      table.state,
+      table.actor(IDS.wizard),
+      ids.map((id) => actionOf(table, IDS.wizard, id)),
+      table.definition(IDS.wizard),
+      false,
+      undefined,
+      catalog
+    );
+    expect(rows.map((entry) => [entry.id, entry.targeting, entry.healing])).toEqual([
+      ["item-potion-of-healing-drink", "single", { formula: "2d4 + 2" }],
+      ["item-acid-throw", "multi", null],
+      ["item-antitoxin-drink", "none", null],
+      ["item-spell-scroll-read", "none", null]
+    ]);
+    // A builtin says what the stat block's list says: Help and a Grapple pick one creature, Dodge nobody.
+    const builtins = actionAvailability(
+      table.state,
+      table.actor(IDS.wizard),
+      ["help", "unarmed-grapple", "dodge"].map((id) => builtinAction(id)!),
+      table.definition(IDS.wizard),
+      true,
+      undefined,
+      catalog
+    );
+    expect(builtins.map((entry) => entry.targeting)).toEqual(["single", "single", "none"]);
+  });
+});
 
 describe("a Potion of Healing", () => {
   it("is drunk from the pack as a Bonus Action, heals 2d4 + 2, and the last one leaves the pack", () => {

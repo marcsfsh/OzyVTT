@@ -493,6 +493,9 @@ export type ContentActionSummary = Readonly<{
   /** SRD generic action rows (Dodge, Dash, Help, ...) appended after the stat block's own. */ builtin?: boolean;
   /** Targeting: "single" picks one combatant, "multi" several (Preserve Life), "none" is a direct tap. */ targeting?:
     "single" | "multi" | "none";
+  /** The hit points it restores, when it heals (a potion drunk from the pack). */ healing?: Readonly<{
+    formula: string;
+  }> | null;
   /** SRD Legendary Action cost against the creature's per-round pool (taken on other creatures' turns). */ legendaryCost?: number;
 }>;
 export type ContentActionsResult = {
