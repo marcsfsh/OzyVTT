@@ -466,21 +466,22 @@ describe("Ranger - Favored Enemy, audit row 32", () => {
   it("gives exactly as many free casts as the printed Favored Enemy column, at two levels", () => {
     // The column reads 2 at level 1 and 6 at level 17, via `scaling: {type: "class-resource"}`. The free casts
     // are Hunter's Mark cast without a slot, counted on the feature's pool.
-    // A bonus action each, so each cast is its own turn.
+    // A bonus action each, so each cast is its own turn, and each marks the foe.
+    const mark = (built: Table) => {
+      newTurn(built);
+      return resolve(built, "spell-hunters-mark-free", []);
+    };
     const first = table(rangerInput(1));
-    spend(first, "spell-hunters-mark-free");
-    spend(first, "spell-hunters-mark-free");
+    mark(first);
+    mark(first);
     expect(first.hero.actionUses["favored-enemy"]).toBe(2);
-    expect(() => spend(first, "spell-hunters-mark-free")).toThrowError(
-      /Hunter's Mark \(no slot\): no uses remaining \(2\/long rest\)/
-    );
+    expect(first.foe.effects.map((effect) => effect.name)).toEqual(["Hunter's Mark"]);
+    expect(() => mark(first)).toThrowError(/Hunter's Mark \(no slot\): no uses remaining \(2\/long rest\)/);
 
     const late = table(rangerInput(17));
-    for (let cast = 0; cast < 6; cast += 1) spend(late, "spell-hunters-mark-free");
+    for (let cast = 0; cast < 6; cast += 1) mark(late);
     expect(late.hero.actionUses["favored-enemy"]).toBe(6);
-    expect(() => spend(late, "spell-hunters-mark-free")).toThrowError(
-      /Hunter's Mark \(no slot\): no uses remaining \(6\/long rest\)/
-    );
+    expect(() => mark(late)).toThrowError(/Hunter's Mark \(no slot\): no uses remaining \(6\/long rest\)/);
   });
 });
 

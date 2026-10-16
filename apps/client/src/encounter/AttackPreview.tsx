@@ -7,25 +7,44 @@ import "./prompts.css";
 
 type Attack = NonNullable<ActionResolution["attack"]>;
 
+/** Effect dice still to roll: a preview shows "+ 1d4 Bless", and only Confirm rolls them. */
+export const pendingBonusDice = (attack: Attack) => (attack.bonusDice ?? []).filter((entry) => entry.total === null);
+
+/** Whether the shown outcome can still change: effect dice are pending and the d20 alone decides nothing. */
+const outcomeOpen = (attack: Attack) =>
+  pendingBonusDice(attack).length > 0 && attack.outcome !== "crit" && attack.outcome !== "fumble";
+
 /**
  * The attack's result line: total against AC, the outcome, the natural die and the target. A player
- * never sees an AC, so an attack the server could not judge reads as a hit for them.
+ * never sees an AC, so an attack the server could not judge reads as a hit for them. Effect dice (Bless) show in
+ * the total once rolled, or as still to roll in a preview, which then names no outcome.
  */
 export function AttackOutcome({ attack, audience }: Readonly<{ attack: Attack; audience: "gm" | "player" }>) {
+  const rolled = (attack.bonusDice ?? []).filter((entry) => entry.total !== null);
+  const pending = pendingBonusDice(attack)
+    .map((entry) => ` ${entry.dice.startsWith("-") ? "-" : "+"} ${entry.dice.replace(/^-/, "")} ${entry.label}`)
+    .join("");
+  const inTotal = rolled.map((entry) => `${entry.label} ${entry.total! < 0 ? "" : "+"}${entry.total}`).join(", ");
   return (
     <p className={`action-outcome outcome-${attack.outcome}`}>
       {attack.total}
+      {pending}
+      {inTotal !== "" ? ` (${inTotal})` : ""}
       {attack.targetAc !== null ? ` vs AC ${attack.targetAc}` : ""}
-      {attack.reactionAcBonus ? ` (+${attack.reactionAcBonus.amount} ${attack.reactionAcBonus.source})` : ""} -{" "}
-      {attack.outcome === "crit"
-        ? "CRITICAL HIT"
-        : attack.outcome === "fumble"
-          ? "NATURAL 1"
-          : attack.outcome === "unknown"
-            ? audience === "gm"
-              ? "no AC on record"
-              : "HIT"
-            : attack.outcome.toUpperCase()}
+      {attack.reactionAcBonus ? ` (+${attack.reactionAcBonus.amount} ${attack.reactionAcBonus.source})` : ""}
+      {outcomeOpen(attack)
+        ? ""
+        : ` - ${
+            attack.outcome === "crit"
+              ? "CRITICAL HIT"
+              : attack.outcome === "fumble"
+                ? "NATURAL 1"
+                : attack.outcome === "unknown"
+                  ? audience === "gm"
+                    ? "no AC on record"
+                    : "HIT"
+                  : attack.outcome.toUpperCase()
+          }`}
       {attack.naturalRoll >= 1 ? ` (nat ${attack.naturalRoll})` : ""} vs {attack.targetName}
     </p>
   );
@@ -150,12 +169,15 @@ export function AttackPreview({
             onPick={(picked) => autoPreview({ commit: false, rollMode: picked })}
           />
           <button type="button" className="encounter-primary" disabled={busy} onClick={confirmShown}>
-            Confirm{" "}
-            {attack.outcome === "crit"
-              ? "crit"
-              : attack.outcome === "hit" || attack.outcome === "unknown"
-                ? "hit"
-                : "miss"}
+            {outcomeOpen(attack)
+              ? "Confirm"
+              : `Confirm ${
+                  attack.outcome === "crit"
+                    ? "crit"
+                    : attack.outcome === "hit" || attack.outcome === "unknown"
+                      ? "hit"
+                      : "miss"
+                }`}
           </button>
           <Button
             type="button"

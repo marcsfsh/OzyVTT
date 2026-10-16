@@ -10,12 +10,14 @@ import { z } from "zod";
 import {
   AbilitySchema,
   ActionAreaSchema,
+  ActionGrantSchema,
   ActionReactionSchema,
   ActorDefinitionSchema,
   DamageTypeSchema,
   DiceFormulaSchema,
   HealingFormulaSchema,
   ItemSlotSchema,
+  SaveFailureEffectSchema,
   SaveOutcomeFields
 } from "@vtt/schemas";
 import {
@@ -111,6 +113,11 @@ export const SpellEffectSchema = z
       .optional(),
     /** Hit points each target regains; `addsModifier` adds the caster's spellcasting ability modifier. */
     healing: z.object({ formula: HealingFormulaSchema, addsModifier: z.boolean() }).strict().nullable(),
+    /** What the cast leaves on the creatures it targets, or the one its attack hits, while it lasts (Bless's d4,
+     *  Hunter's Mark's extra damage). */
+    grant: ActionGrantSchema.optional(),
+    /** What a failed save against the cast leaves on the creature (Bane's -1d4, Faerie Fire's outline). */
+    failureEffect: SaveFailureEffectSchema.optional(),
     /** A reaction spell's trigger and response (Shield, Hellish Rebuke), so the table offers it as a prompt. */
     reaction: ActionReactionSchema.optional()
   })

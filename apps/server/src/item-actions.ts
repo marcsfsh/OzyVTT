@@ -186,7 +186,8 @@ export function spellCastMechanics(
   spell: SpellReference,
   numbers: Readonly<{ attackBonus: number; saveDc: number; bearersDc: boolean; modifier: number }>,
   scaled: Readonly<{ roll?: string | null; attacks?: number }> = {}
-): Pick<ActorAction, "damage"> & Partial<Pick<ActorAction, "attack" | "save" | "healing" | "darts" | "damageTypes">> {
+): Pick<ActorAction, "damage"> &
+  Partial<Pick<ActorAction, "attack" | "save" | "healing" | "darts" | "damageTypes" | "grants">> {
   // No cast model: the save still applies, and the rest is the GM's.
   const effect = spell.effect ?? { attacks: 0, damage: [], healing: null };
   const scale = (formula: string) => (scaled.roll && formula === spell.damage.roll ? scaled.roll : formula);
@@ -207,8 +208,17 @@ export function spellCastMechanics(
           }
         }
       : castSave
-        ? { save: { ...castSave, dc: numbers.saveDc, ...(numbers.bearersDc ? { spellcasting: true } : {}) } }
+        ? {
+            save: {
+              ...castSave,
+              dc: numbers.saveDc,
+              ...(numbers.bearersDc ? { spellcasting: true } : {}),
+              ...(effect.failureEffect ? { failureEffect: structuredClone(effect.failureEffect) } : {})
+            }
+          }
         : {}),
+    // What the cast leaves on its targets (Bless, Hunter's Mark), sourced by the caster.
+    ...(effect.grant ? { grants: structuredClone(effect.grant) } : {}),
     ...(effect.healing
       ? {
           healing: {
@@ -301,6 +311,25 @@ export function withSpellAttackReach(action: ActorAction, spell: SpellReference 
   const attack = action.attack;
   if (!attack || !spell || attack.reachFeet !== undefined || attack.rangeFeet !== undefined) return action;
   return { ...action, attack: { ...attack, ...spellAttackReach(spell) } };
+}
+
+/** A spell action made before the cast model carried effects (an older sheet), given the spell's: Bless's d4 and
+ *  Bane's penalty land without a rebuild. A later action (Spiritual Weapon's attack) leaves none. */
+export function withSpellEffects(action: ActorAction, spell: SpellReference | undefined): ActorAction {
+  const effect = spell?.effect;
+  if (!spell || !effect || action.spellId !== spell.id) return action;
+  if ((effect.laterActions ?? []).some((row) => laterSpellActionId(spell.id, row.name) === action.id)) return action;
+  const grants = action.grants === undefined && effect.grant ? structuredClone(effect.grant) : undefined;
+  const failureEffect =
+    action.save && !action.save.failureEffect && effect.failureEffect
+      ? structuredClone(effect.failureEffect)
+      : undefined;
+  if (!grants && !failureEffect) return action;
+  return {
+    ...action,
+    ...(grants ? { grants } : {}),
+    ...(failureEffect && action.save ? { save: { ...action.save, failureEffect } } : {})
+  };
 }
 
 /** Martial Arts reaches this swing: the bearer has it, it is in force (no armour, no shield) and this is a Monk weapon. */

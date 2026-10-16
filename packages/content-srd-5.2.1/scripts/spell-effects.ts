@@ -430,6 +430,115 @@ const CAST_REACTIONS: Readonly<Record<string, NonNullable<SpellEffect["reaction"
   "hellish-rebuke": { trigger: "damaged-by-creature", response: "strike-back", rangeFeet: 60 }
 };
 
+type Grant = NonNullable<SpellEffect["grant"]>;
+type FailureEffect = NonNullable<SpellEffect["failureEffect"]>;
+type Modifier = Grant["modifiers"][number];
+
+const rounds = (count: number) => ({ type: "rounds" as const, rounds: count });
+/** A grant with the defaults every spell's shares: no end trigger, no Concentration flag (the cast's Concentration is
+ *  the caster's, not the effect's). */
+const spellGrant = (fields: Pick<Grant, "name" | "tags" | "target" | "duration"> & Partial<Grant>): Grant => ({
+  modifiers: [],
+  onEnd: [],
+  voidWhileIncapacitated: false,
+  concentration: false,
+  ...fields
+});
+/** Dice on every attack roll and saving throw the creature makes (Bless adds them, Bane takes them off). */
+const d20Dice = (dice: string): Modifier[] => [
+  { type: "attack-bonus", amount: 0, dice, when: [{ type: "on-attack-roll" }] },
+  { type: "save-bonus", amount: 0, dice, when: [{ type: "on-saving-throw" }] }
+];
+/** Advantage on attack rolls against the creature. */
+const attackedWithAdvantage: Modifier = {
+  type: "roll-mode",
+  roll: "incoming-attack",
+  mode: "advantage",
+  when: [{ type: "on-attack-roll" }]
+};
+/** The caster's extra damage whenever its attack roll hits the marked creature (Hunter's Mark, Hex). */
+const markDamage = (type: DamageType): Modifier => ({
+  type: "extra-damage",
+  formula: "1d6",
+  damageType: type,
+  doubleOnCritical: true,
+  when: [{ type: "on-hit" }, { type: "by-effect-source" }]
+});
+
+/**
+ * What a cast leaves on the creatures it targets (or the one its attack hits) while it lasts, in the effect vocabulary
+ * the engine reads (SRD 5.2.1 text). The durations are the spells' own; the GM ends one early when the caster's
+ * Concentration breaks. Mage Armor's AC and Haste's Speed are measured on the creature when it lands (`grant.ts`).
+ */
+const CAST_GRANTS: Readonly<Record<string, Grant>> = {
+  bless: spellGrant({
+    name: "Bless",
+    tags: ["blessed"],
+    target: "targets",
+    duration: rounds(10),
+    modifiers: d20Dice("1d4")
+  }),
+  "shield-of-faith": spellGrant({
+    name: "Shield of Faith",
+    tags: ["shield-of-faith"],
+    target: "target",
+    duration: rounds(100),
+    armorClassBonus: 2
+  }),
+  // The next attack roll against the creature before the end of the caster's next turn, whoever makes it, which
+  // spends the light; it lasts until the start of the caster's turn after, as Vex does.
+  "guiding-bolt": spellGrant({
+    name: "Guiding Bolt's light",
+    tags: ["until-attacked"],
+    target: "target",
+    onHit: true,
+    duration: rounds(2),
+    modifiers: [attackedWithAdvantage]
+  }),
+  "hunters-mark": spellGrant({
+    name: "Hunter's Mark",
+    tags: ["hunters-mark"],
+    target: "target",
+    duration: { type: "encounter" },
+    modifiers: [markDamage("force")]
+  }),
+  hex: spellGrant({
+    name: "Hex",
+    tags: ["hexed"],
+    target: "target",
+    duration: { type: "encounter" },
+    modifiers: [markDamage("necrotic")]
+  }),
+  "mage-armor": spellGrant({
+    name: "Mage Armor",
+    tags: ["mage-armor"],
+    target: "target",
+    duration: { type: "encounter" }
+  }),
+  haste: spellGrant({
+    name: "Haste",
+    tags: ["hasted"],
+    target: "target",
+    duration: rounds(10),
+    armorClassBonus: 2,
+    modifiers: [
+      {
+        type: "roll-mode",
+        roll: "save",
+        mode: "advantage",
+        when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["dex"] }]
+      }
+    ]
+  })
+};
+
+/** What a failed save against the cast leaves on the creature while the spell lasts (SRD 5.2.1 text). */
+const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
+  bane: { name: "Bane", tags: ["baned"], duration: rounds(10), modifiers: d20Dice("-1d4") },
+  // Outlined in light: attack rolls against it have Advantage, and it can't benefit from the Invisible condition.
+  "faerie-fire": { name: "Faerie Fire", tags: ["outlined"], duration: rounds(10), modifiers: [attackedWithAdvantage] }
+};
+
 /** The cast model for one SRD spell from its text, its range and the source's damage columns. */
 export function spellEffectFor(
   id: string,
@@ -446,6 +555,8 @@ export function spellEffectFor(
   const choices = DAMAGE_CHOICES[id];
   const later = LATER_ACTIONS[id];
   const targets = CAST_TARGETS[id];
+  const grant = CAST_GRANTS[id];
+  const failureEffect = SAVE_FAILURE_EFFECTS[id];
   return {
     attacks,
     ...(attackRange ? { attackRange } : {}),
@@ -456,6 +567,8 @@ export function spellEffectFor(
     ...(darts ? { darts } : {}),
     ...(targets ? { targets: { ...targets } } : {}),
     healing,
+    ...(grant ? { grant: structuredClone(grant) } : {}),
+    ...(failureEffect ? { failureEffect: structuredClone(failureEffect) } : {}),
     ...(reaction ? { reaction } : {})
   };
 }
@@ -514,5 +627,7 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...Object.keys(CAST_DARTS),
   ...Object.keys(CAST_TARGETS),
   ...Object.keys(UPCAST_CORRECTIONS),
-  ...Object.keys(CAST_REACTIONS)
+  ...Object.keys(CAST_REACTIONS),
+  ...Object.keys(CAST_GRANTS),
+  ...Object.keys(SAVE_FAILURE_EFFECTS)
 ];

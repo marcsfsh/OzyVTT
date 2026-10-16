@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ActorDefinitionSchema, ActorSchema, HealthDisplaySchema } from "@vtt/schemas";
+import { ActorDefinitionSchema, ActorSchema, EffectModifiersSchema, HealthDisplaySchema } from "@vtt/schemas";
 
 /** An imported stat block persisted with the campaign: the inert definition plus the id actors reference via `definitionId`. */
 export const StoredDefinitionSchema = z
@@ -221,7 +221,13 @@ export const PendingSaveSchema = z
           .default([]),
         escapeDc: z.number().int().min(1).max(40).nullable().default(null),
         sourceActorId: z.uuid().nullable().default(null),
-        sourceName: z.string().max(120).nullable().default(null)
+        sourceName: z.string().max(120).nullable().default(null),
+        /** What the effect does while it lasts (Bane's -1d4), and for how many rounds (absent: until ended). */
+        modifiers: EffectModifiersSchema.default([]),
+        duration: z
+          .object({ type: z.literal("rounds"), rounds: z.number().int().min(1).max(100) })
+          .strict()
+          .optional()
       })
       .strict()
       .optional(),
@@ -252,6 +258,19 @@ export const ParkedAttackSchema = z
     slotLevel: z.number().int().min(1).max(9).nullable(),
     /** The damage type the caster picked (Chromatic Orb), so the replay deals it. */
     damageType: z.string().max(40).nullable().default(null),
+    /** Dice an effect added to the roll (Bless's d4) as they rolled, so the replay totals the same. */
+    bonusDice: z
+      .array(
+        z
+          .object({
+            label: z.string().min(1).max(120),
+            dice: z.string().max(8),
+            total: z.number().int().min(-48).max(48)
+          })
+          .strict()
+      )
+      .max(8)
+      .default([]),
     /** Attacker to target when it rolled, so the replay classifies the swing (melee or thrown) the same way. */
     distanceFeet: z.number().min(0).max(100000).nullable(),
     initiatorRole: z.enum(["gm", "player"]),

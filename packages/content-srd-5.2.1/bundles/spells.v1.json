@@ -1469,7 +1469,39 @@
     "count": 3,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "failureEffect": {
+    "name": "Bane",
+    "tags": [
+     "baned"
+    ],
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    },
+    "modifiers": [
+     {
+      "type": "attack-bonus",
+      "amount": 0,
+      "dice": "-1d4",
+      "when": [
+       {
+        "type": "on-attack-roll"
+       }
+      ]
+     },
+     {
+      "type": "save-bonus",
+      "amount": 0,
+      "dice": "-1d4",
+      "when": [
+       {
+        "type": "on-saving-throw"
+       }
+      ]
+     }
+    ]
+   }
   },
   "classes": [
    "bard",
@@ -2068,7 +2100,43 @@
     "count": 3,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "attack-bonus",
+      "amount": 0,
+      "dice": "1d4",
+      "when": [
+       {
+        "type": "on-attack-roll"
+       }
+      ]
+     },
+     {
+      "type": "save-bonus",
+      "amount": 0,
+      "dice": "1d4",
+      "when": [
+       {
+        "type": "on-saving-throw"
+       }
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Bless",
+    "tags": [
+     "blessed"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    }
+   }
   },
   "classes": [
    "cleric",
@@ -7859,7 +7927,29 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "failureEffect": {
+    "name": "Faerie Fire",
+    "tags": [
+     "outlined"
+    ],
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    },
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "incoming-attack",
+      "mode": "advantage",
+      "when": [
+       {
+        "type": "on-attack-roll"
+       }
+      ]
+     }
+    ]
+   }
   },
   "classes": [
    "bard",
@@ -10621,7 +10711,34 @@
      "type": "radiant"
     }
    ],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "incoming-attack",
+      "mode": "advantage",
+      "when": [
+       {
+        "type": "on-attack-roll"
+       }
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Guiding Bolt's light",
+    "tags": [
+     "until-attacked"
+    ],
+    "target": "target",
+    "onHit": true,
+    "duration": {
+     "type": "rounds",
+     "rounds": 2
+    }
+   }
   },
   "classes": [
    "cleric"
@@ -10937,7 +11054,40 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "save",
+      "mode": "advantage",
+      "when": [
+       {
+        "type": "on-saving-throw"
+       },
+       {
+        "type": "ability-is",
+        "abilities": [
+         "dex"
+        ]
+       }
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Haste",
+    "tags": [
+     "hasted"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    },
+    "armorClassBonus": 2
+   }
   },
   "classes": [
    "sorcerer",
@@ -11542,7 +11692,36 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "extra-damage",
+      "formula": "1d6",
+      "damageType": "necrotic",
+      "doubleOnCritical": true,
+      "when": [
+       {
+        "type": "on-hit"
+       },
+       {
+        "type": "by-effect-source"
+       }
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Hex",
+    "tags": [
+     "hexed"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "encounter"
+    }
+   }
   },
   "classes": [
    "warlock"
@@ -11985,7 +12164,36 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "extra-damage",
+      "formula": "1d6",
+      "damageType": "force",
+      "doubleOnCritical": true,
+      "when": [
+       {
+        "type": "on-hit"
+       },
+       {
+        "type": "by-effect-source"
+       }
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Hunter's Mark",
+    "tags": [
+     "hunters-mark"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "encounter"
+    }
+   }
   },
   "classes": [
    "ranger"
@@ -13701,7 +13909,21 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Mage Armor",
+    "tags": [
+     "mage-armor"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "encounter"
+    }
+   }
   },
   "classes": [
    "sorcerer",
@@ -18714,7 +18936,23 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Shield of Faith",
+    "tags": [
+     "shield-of-faith"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "rounds",
+     "rounds": 100
+    },
+    "armorClassBonus": 2
+   }
   },
   "classes": [
    "cleric",

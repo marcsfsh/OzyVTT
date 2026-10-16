@@ -123,6 +123,9 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
           pushFeet: input.pushFeet ?? null,
           slotLevel: ctx.plan.castLevel,
           damageType: input.damageType ?? null,
+          bonusDice: (attack.bonusDice ?? []).flatMap((entry) =>
+            entry.total === null ? [] : [{ label: entry.label, dice: entry.dice, total: entry.total }]
+          ),
           distanceFeet: deps.distanceFeet?.(attacker.id, target.id) ?? null,
           initiatorRole: deps.initiatorRole ?? "gm",
           initiatorSessionId: deps.initiatorSessionId ?? deps.gmSessionId,
@@ -160,6 +163,21 @@ export function parkActionSave(ctx: ResolveContext): void {
     halfOnSuccess: action.save.successDamage === "half",
     // The GM's explicit choice wins over the condition the action declares.
     conditionIds: input.conditionId ? [input.conditionId] : action.save.failureConditions,
+    // What a failure leaves on the creature, from the caster (Bane's -1d4).
+    ...(action.save.failureEffect && !rider
+      ? {
+          onFailEffect: {
+            name: action.save.failureEffect.name,
+            tags: [...action.save.failureEffect.tags],
+            linkedConditionIds: [],
+            escapeDc: null,
+            sourceActorId: attacker.id,
+            sourceName: attacker.name,
+            modifiers: [...action.save.failureEffect.modifiers],
+            ...(action.save.failureEffect.duration ? { duration: { ...action.save.failureEffect.duration } } : {})
+          }
+        }
+      : {}),
     newSaveId: deps.newRollId,
     createdAt: Date.parse(deps.now())
   });

@@ -64,6 +64,8 @@ export type ResolveInput = Readonly<{
   economyPaid?: boolean;
   /** A reaction's AC bonus against this attack only (Parry), added to the target's AC. */
   reactionAcBonus?: Readonly<{ amount: number; source: string }>;
+  /** A parked attack's effect dice as they rolled (Bless's d4), reused by the replay instead of rolling again. */
+  attackBonusDice?: ReadonlyArray<Readonly<{ label: string; dice: string; total: number }>>;
 }>;
 
 export type ResolveDependencies = Readonly<{
@@ -157,10 +159,17 @@ export type ResolveContext = {
   opens: ActionResolution["opens"] | null;
 };
 
-/** Records one rolled formula in the shared history, attributed like every roll of this resolve. */
-export function recordRoll(ctx: ResolveContext, resolution: DiceResolution, purpose: RollRecord["purpose"]): void {
+/** Records one rolled formula in the shared history, attributed like every roll of this resolve; `label` names a die
+ *  that is not the action's own (Bless's d4). */
+export function recordRoll(
+  ctx: ResolveContext,
+  resolution: DiceResolution,
+  purpose: RollRecord["purpose"],
+  label?: string
+): void {
   const record: RollRecord = {
     ...ctx.rollBase,
+    ...(label !== undefined ? { label } : {}),
     id: ctx.deps.newRollId(),
     purpose,
     formula: resolution.expression.source,

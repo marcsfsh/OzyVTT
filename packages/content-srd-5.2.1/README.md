@@ -54,8 +54,9 @@ scratch directory and requires every committed bundle back byte for byte, so edi
   area of effect and for a Multiattack whose attacks the build cannot structure, read here by
   `src/action-prose.ts` (homebrew and imported stat blocks go through it as they enter the
   campaign). Each spell's cast model (the spell attacks one cast makes and how far they reach, its
-  damage and its healing, whether its save waits for a later trigger, and what it lets the caster do
-  on later turns) is read here too, by `scripts/spell-effects.ts` with a reviewed table, because the source's damage
+  damage and its healing, whether its save waits for a later trigger, what it lets the caster do
+  on later turns, and the effect it leaves on its targets or on a creature that fails its save) is read
+  here too, by `scripts/spell-effects.ts` with a reviewed table, because the source's damage
   and attack columns describe the prose rather than a cast. Upstream data bugs are fixed via reviewed
   `CORRECTIONS` tables (never by editing sources); fixtures open5e mislabels as SRD are dropped via
   `EXCLUSIONS`.

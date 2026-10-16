@@ -9,7 +9,8 @@ import {
   laterSpellActionId,
   ritualSpellActionId,
   upcastAction,
-  withSpellAttackReach
+  withSpellAttackReach,
+  withSpellEffects
 } from "../item-actions.js";
 import { builtinHandlerFor } from "./builtins.js";
 import type { DefinitionAction, LiveActor, ResolveContext, ResolveDependencies, ResolveInput } from "./context.js";
@@ -34,9 +35,11 @@ function combatantsOf(
   });
   if (action.attack && targets.length !== 1)
     throw new CommandRejectedError("An attack roll resolves against exactly one target.");
-  // A grant aimed at the action's target (Help) needs exactly one recipient.
+  // A grant aimed at the action's target (Help) needs exactly one recipient; one for each target (Bless), at least one.
   if (action.grants?.target === "target" && targets.length !== 1)
     throw new CommandRejectedError("Choose exactly one target for this action.");
+  if (action.grants?.target === "targets" && targets.length === 0)
+    throw new CommandRejectedError("Choose the creatures this action targets.");
   // A limited use or spell slot is itself the mechanic (Action Surge, Arcane Recovery, ...), so an
   // action that only spends one resolves without a roll or a target.
   const spendsALimitedUse = action.uses !== undefined || action.spellSlot !== undefined;
@@ -70,7 +73,7 @@ export function openResolve(
   deps: ResolveDependencies
 ): ResolveContext {
   const spell = declared.spellId ? deps.catalog?.spellRecord?.(declared.spellId) : undefined;
-  const reaching = withSpellAttackReach(declared, spell);
+  const reaching = withSpellEffects(withSpellAttackReach(declared, spell), spell);
   const { attacker, targets } = combatantsOf(state, reaching, input);
   // A spell cast with a higher slot rolls that slot's dice and makes its rays (before the economy opens the action's
   // instance); a paid replay names the slot it was cast with.

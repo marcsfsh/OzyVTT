@@ -1,7 +1,7 @@
 import type { ActionAvailability, ActionResolution, GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { masteryMissDamage } from "./weapon-mastery.js";
-import { rollAttack } from "./resolution/attack.js";
+import { rollAttack, spendUntilAttacked } from "./resolution/attack.js";
 import type { DefinitionAction, ResolveContext, ResolveDependencies, ResolveInput } from "./resolution/context.js";
 import { damageByTargetOf, rollRiderDamage, rollWeaponDamage } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
@@ -35,8 +35,11 @@ export function resolveDefinitionAction(
   // Preview: the d20 is rolled and shown, nothing else applies. The economy was validated already, so an
   // illegal attack is blocked before the preview roll.
   if (ctx.attack !== null && input.commit === false) return previewOf(ctx);
-  // The roll is made, so a Vex marker it read is spent; a finishing replay already spent it.
-  if (input.economyPaid !== true) spendVex(ctx);
+  // The roll is made, so a Vex marker or Guiding Bolt's light it read is spent; a finishing replay already spent it.
+  if (input.economyPaid !== true) {
+    spendVex(ctx);
+    spendUntilAttacked(ctx);
+  }
   // A hit the target's Parry or Shield may still turn into a miss: the attack is spent, and the answer finishes it.
   if (parkForAcReaction(ctx)) {
     commitEconomy(ctx);

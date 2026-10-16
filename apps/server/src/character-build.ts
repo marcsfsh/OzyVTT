@@ -307,6 +307,7 @@ function leveledSpellActionFor(
     mechanics.save !== undefined ||
     mechanics.healing !== undefined ||
     mechanics.attack ||
+    mechanics.grants !== undefined ||
     spell.effect?.reaction !== undefined;
   if (free === null && !resolvable) return null;
   const freeCast = free !== undefined;

@@ -168,6 +168,8 @@ const ON_FAIL_EFFECT_FIELDS = {
   tags: "player",
   linkedConditionIds: "player",
   escapeDc: "player",
+  modifiers: "player",
+  duration: "player",
   name: "derived",
   sourceName: "derived",
   sourceActorId: "derived"

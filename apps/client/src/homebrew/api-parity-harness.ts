@@ -541,6 +541,12 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].save.failureEffect.**",
+    types: ACTION_CARRIERS,
+    reason: "synthesised from a spell's cast model by the character build (Bane, Faerie Fire), zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
     at: "actions[].darts",
     types: ACTION_CARRIERS,
     reason: "synthesised from a spell's cast model by the character build (Magic Missile), zero hand authors",

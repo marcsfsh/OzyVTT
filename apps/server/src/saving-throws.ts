@@ -4,6 +4,8 @@ import {
   aggregateRollMode,
   collectRiders,
   d20TestFormula,
+  diceRiders,
+  diceRiderTerms,
   parseDiceFormula,
   rescaleDamageParts,
   resolveDice,
@@ -86,6 +88,13 @@ export function saveRiderBonus(derivation: EquipmentDerivation, ability: Ability
   return derivation.saveBonus + sumRiders(momentary, "save-bonus");
 }
 
+/** The dice riders add to one saving throw (Bless +1d4, Bane -1d4), standing or at the save, as formula terms. */
+export function saveRiderDiceTerms(derivation: EquipmentDerivation, ability: AbilityId): string {
+  const standing = collectRiders(derivation.carriers, { ...derivation.context, moment: null });
+  const atSave = collectRiders(derivation.carriers, { ...derivation.context, ability, moment: "on-saving-throw" });
+  return diceRiderTerms(diceRiders([...standing, ...atSave], "save-bonus"));
+}
+
 const ABILITIES: readonly AbilityId[] = ["str", "dex", "con", "int", "wis", "cha"];
 
 /** Save modifier without situational terms. Precedence: GM-typed `saveOverrides`, the sheet's
@@ -158,7 +167,8 @@ export function createPendingSaves(
     halfOnSuccess: boolean;
     conditionIds: readonly string[];
     saveBonus?: number;
-    onFailEffect?: PendingSave["onFailEffect"];
+    onFailEffect?: Omit<NonNullable<PendingSave["onFailEffect"]>, "modifiers"> &
+      Partial<Pick<NonNullable<PendingSave["onFailEffect"]>, "modifiers">>;
     /** Replace an older prompt with the same (target, actionName, source) key. Default true; per-hit riders
      *  pass false since Extra Attack can owe two saves. */
     replaceExisting?: boolean;
@@ -181,7 +191,9 @@ export function createPendingSaves(
     halfOnSuccess: input.halfOnSuccess,
     conditionIds: [...input.conditionIds],
     saveBonus: input.saveBonus ?? 0,
-    ...(input.onFailEffect ? { onFailEffect: input.onFailEffect } : {}),
+    ...(input.onFailEffect
+      ? { onFailEffect: { ...input.onFailEffect, modifiers: [...(input.onFailEffect.modifiers ?? [])] } }
+      : {}),
     createdAt: input.createdAt
   }));
   // A re-cast against the same target replaces its older prompt.
@@ -281,7 +293,9 @@ export function answerSave(
     const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
     // An explicit choice (the answerer's button, or a forced "normal") wins over detected sources.
     const mode = explicitRollMode ?? aggregated.mode;
-    const resolution = resolveDice(parseDiceFormula(d20TestFormula(mode, modifier)), deps.random);
+    // Bless's d4 rolls into the save itself, so a preview's total is the one Confirm sends.
+    const formula = d20TestFormula(mode, modifier) + saveRiderDiceTerms(derivation, pending.ability);
+    const resolution = resolveDice(parseDiceFormula(formula), deps.random);
     if (mode !== "normal")
       rollMode = {
         mode,
@@ -459,10 +473,13 @@ export function answerSave(
         sourceActorId: pending.onFailEffect.sourceActorId,
         sourceName: pending.onFailEffect.sourceName,
         startedRound: state.combat.round,
-        duration: { type: "manual" },
+        duration: pending.onFailEffect.duration
+          ? { type: "rounds", remaining: pending.onFailEffect.duration.rounds }
+          : { type: "manual" },
         endsWhenSourceDefeated: true,
         linkedConditionIds: [...pending.onFailEffect.linkedConditionIds],
-        escapeDc: pending.onFailEffect.escapeDc
+        escapeDc: pending.onFailEffect.escapeDc,
+        modifiers: [...pending.onFailEffect.modifiers]
       }),
       undefined,
       deps
