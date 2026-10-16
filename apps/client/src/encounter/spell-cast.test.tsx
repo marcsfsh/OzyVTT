@@ -106,3 +106,75 @@ describe("casting a leveled spell from the sheet", () => {
     expect(cast).toHaveBeenLastCalledWith("spell-jump-free");
   });
 });
+
+describe("a Warlock's Pact Magic on the sheet", () => {
+  /** Warlock 5: two 3rd-level pact slots, one spent; Hex from the builder, Hold Person from a PDF (no action). */
+  const warlock = {
+    ...definition,
+    actions: [
+      {
+        id: "spell-hex",
+        name: "Hex",
+        activation: "bonus-action",
+        description: "",
+        damage: [],
+        spellSlot: { level: 1 }
+      }
+    ],
+    spellcasting: {
+      ability: "cha",
+      slots: [],
+      pact: { level: 3, max: 2 },
+      spells: [
+        { id: "hex", name: "Hex", level: 1, prepared: true, alwaysPrepared: false, actionId: "spell-hex" },
+        { id: "hold-person", name: "Hold Person", level: 2, prepared: true, alwaysPrepared: false }
+      ]
+    }
+  } as unknown as ActorDefinition;
+  const vex = { ...actor, spellSlots: [], pactSlots: { level: 3, remaining: 1 } } as unknown as GmActor;
+
+  const mountWarlock = () => {
+    const castSpellAction = vi.fn();
+    const edit = vi.fn(() => Promise.resolve({ ok: false }));
+    render(
+      <SheetSpells
+        actor={vex}
+        definition={warlock}
+        busy={false}
+        edit={edit as unknown as SheetEdit}
+        rolls={{ rollFlat: vi.fn() } as unknown as SheetRolls}
+        onFeedback={() => {}}
+        routeSpell={() => false}
+        castSpellAction={castSpellAction}
+      />
+    );
+    return { castSpellAction, edit };
+  };
+
+  it("shows the pact slots as pips, spent and restored in their own pool", () => {
+    const { edit } = mountWarlock();
+    expect(screen.getByRole("group", { name: "Pact Magic slots (1 of 2 left)" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Spend a Pact Magic slot" }));
+    expect(edit).toHaveBeenLastCalledWith("character:set-slot", {
+      actorId: vex.id,
+      level: 3,
+      remaining: 0,
+      pact: true
+    });
+  });
+
+  it("casts a spell with a pact slot at the pact level, through its action or from the pool", () => {
+    const { castSpellAction, edit } = mountWarlock();
+    expect(screen.getAllByRole("option", { name: "3rd · 1/2 · pact · upcast" }).length).toBe(2);
+    const casts = screen.getAllByRole("button", { name: "Cast" });
+    fireEvent.click(casts[0]);
+    expect(castSpellAction).toHaveBeenLastCalledWith("spell-hex", 3);
+    fireEvent.click(casts[1]);
+    expect(edit).toHaveBeenLastCalledWith("character:set-slot", {
+      actorId: vex.id,
+      level: 3,
+      remaining: 0,
+      pact: true
+    });
+  });
+});

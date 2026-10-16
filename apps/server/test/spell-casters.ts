@@ -5,7 +5,7 @@ import { importActorDefinition } from "../src/actor-roster.js";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { ContentLibrary } from "../src/content-library.js";
 import { effectiveActions } from "../src/effective-actions.js";
-import { startEncounter } from "../src/encounter.js";
+import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
 import { equipmentCatalogOf } from "../src/equipment-derivation.js";
 
 /**
@@ -287,4 +287,13 @@ export function fight(
       }
     );
   return { state, definition, hero, action, resolve };
+}
+
+/** Advances the initiative until it is the hero's turn again (the next round). */
+export function heroTurnAgain(state: GameState): void {
+  for (let step = 0; step < 10; step += 1) {
+    nextInitiativeTurn(state);
+    if (state.combat.turnActorId === HERO) return;
+  }
+  throw new Error("The hero never came up again.");
 }

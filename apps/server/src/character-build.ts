@@ -764,16 +764,18 @@ export function buildCharacterDefinition(
         reject(`The ${classRecord.name} spell list could not be resolved: ${error.message}`);
       throw error;
     }
-    // Pact Magic is N slots all of one level, rising by replacing that level, so `pactSlots` replaces
-    // `spellSlots` rather than merging with it.
+    // Pact Magic is N slots all of one level, a pool of its own (`pact`, refilled by a Short Rest), never
+    // spell slots: writing it into `slots` too would seed it twice.
+    const pact =
+      levelRow.pactSlots && levelRow.pactSlots.slots > 0
+        ? { level: levelRow.pactSlots.level, max: levelRow.pactSlots.slots }
+        : null;
     const slots = levelRow.pactSlots
-      ? levelRow.pactSlots.slots > 0
-        ? [{ level: levelRow.pactSlots.level, max: levelRow.pactSlots.slots }]
-        : []
+      ? []
       : (levelRow.spellSlots ?? [])
           .map((count, index) => ({ level: index + 1, max: count }))
           .filter((slot) => slot.max > 0);
-    const maxSlotLevel = slots.reduce((highest, slot) => Math.max(highest, slot.level), 0);
+    const maxSlotLevel = slots.reduce((highest, slot) => Math.max(highest, slot.level), pact?.level ?? 0);
     // SRD: an always-prepared granted spell doesn't count against the prepared limit, so the grant wins
     // and a matching pick is not charged to the cap.
     const alwaysPreparedGrants = new Set(
@@ -853,7 +855,7 @@ export function buildCharacterDefinition(
       { attackBonus, saveDc, characterLevel: input.level, modifier: abilityModifier(finalScores[casting.ability]) },
       library,
       interpreted.grantedSpells,
-      slots.length > 0
+      slots.length > 0 || pact !== null
     );
     // Top-level fields stay populated (the schema demands the combined pool when per-class slots exist).
     spellcasting = {
@@ -861,6 +863,7 @@ export function buildCharacterDefinition(
       saveDc,
       attackBonus,
       slots,
+      ...(pact ? { pact } : {}),
       // `prepared` is the composed cap the sheet shows.
       classes: [
         {

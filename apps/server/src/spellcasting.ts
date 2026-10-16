@@ -1,23 +1,33 @@
 import type { GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
-import { spellSlotMaxima } from "./actor-roster.js";
+import { pactSlotMaximum, spellSlotMaxima } from "./actor-roster.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
 
 type ResolveDefinition = (definitionId: string) => ActorDefinition | undefined;
 
 /** Sets the remaining slots for one level, clamped to 0..max. Covers spending and restoring (Arcane
- *  Recovery); the caller computes the target. Rejects if the actor has no pool at that level. */
+ *  Recovery); the caller computes the target. Rejects if the actor has no pool at that level. `pact` names the
+ *  Pact Magic pool instead of the spell slots. */
 export function setSpellSlotRemaining(
   state: GameState,
   actorId: string,
   level: number,
   remaining: number,
   resolveDefinition: ResolveDefinition,
-  catalog?: EquipmentCatalog
+  catalog?: EquipmentCatalog,
+  pact = false
 ): void {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+  if (pact) {
+    if (actor.pactSlots?.level !== level)
+      throw new CommandRejectedError(`${actor.name} has no level-${level} Pact Magic slots.`);
+    const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
+    const max = pactSlotMaximum(definition)?.max ?? actor.pactSlots.remaining;
+    actor.pactSlots = { ...actor.pactSlots, remaining: Math.max(0, Math.min(max, remaining)) };
+    return;
+  }
   const slot = actor.spellSlots?.find((entry) => entry.level === level);
   if (!slot) throw new CommandRejectedError(`${actor.name} has no level-${level} spell slots.`);
   const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;

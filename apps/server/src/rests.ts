@@ -58,9 +58,15 @@ function clearOverrides(overrides: Actor["choiceOverrides"], kind: "long" | "sho
   return Object.fromEntries(Object.entries(overrides).filter(([, override]) => override.per !== "short-rest"));
 }
 
+/** SRD Pact Magic: every expended pact slot comes back on a Short or Long Rest. */
+function restorePactSlots(actor: Actor, definition: ActorDefinition | undefined): void {
+  const maximum = actor.pactSlots ? pactSlotMaximum(definition) : null;
+  if (actor.pactSlots && maximum) actor.pactSlots = { ...actor.pactSlots, remaining: maximum.max };
+}
+
 /**
  * Applies a rest to a rostered actor outside combat (SRD Resting, ADR-0020).
- * Short: per-short-rest and recharge pools re-arm; healing is only by spending Hit Point Dice.
+ * Short: per-short-rest and recharge pools and Pact Magic slots re-arm; healing is only by spending Hit Point Dice.
  * Long: remaining effects end first (onEnd grants land), then HP to max, temp HP cleared, dying
  * cleared, all pools refreshed, all Hit Point Dice restored, Exhaustion drops one level.
  */
@@ -90,6 +96,7 @@ export function applyRest(
     // A pick re-made "whenever you finish a Short or Long Rest" lapses here; the build's own answer stands
     // until the character chooses again.
     actor.choiceOverrides = clearOverrides(actor.choiceOverrides, "short");
+    restorePactSlots(actor, definition);
     return events;
   }
   for (const effect of [...actor.effects]) events.push(...endEffect(state, actorId, effect.id));
@@ -122,13 +129,12 @@ export function applyRest(
         (entry) => [entry.level, entry.max] as const
       )
     );
-    actor.spellSlots = actor.spellSlots.map((slot) => ({
-      ...slot,
-      remaining: maxByLevel.get(slot.level) ?? slot.remaining
-    }));
+    // A level the sheet no longer has (an older Warlock's pact row) goes; Pact Magic is its own pool.
+    actor.spellSlots = actor.spellSlots
+      .filter((slot) => maxByLevel.has(slot.level))
+      .map((slot) => ({ ...slot, remaining: maxByLevel.get(slot.level)! }));
   }
-  const pactMaximum = actor.pactSlots ? pactSlotMaximum(longRestDefinition) : null;
-  if (actor.pactSlots && pactMaximum) actor.pactSlots = { ...actor.pactSlots, remaining: pactMaximum.max };
+  restorePactSlots(actor, longRestDefinition);
   if (longRestDefinition?.spellcasting)
     actor.preparedSpellIds = longRestDefinition.spellcasting.spells
       .filter((spell) => spell.prepared || spell.alwaysPrepared)

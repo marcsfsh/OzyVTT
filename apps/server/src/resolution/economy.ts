@@ -30,8 +30,8 @@ export type EconomyPlan = Readonly<{
   spendUse: Readonly<{ key: string; per: "turn" | "encounter" | "long-rest" | "short-rest" | "recharge" }> | null;
   /** Legendary-action cost to add to the attacker's per-round pool (SRD Legendary Actions). */
   spendLegendary: Readonly<{ cost: number }> | null;
-  /** Spell slot the action spends from the bearer's own pool (an item cast with `consumesSpellSlot`). */
-  spendSpellSlot: Readonly<{ level: number }> | null;
+  /** Spell slot the action spends from the bearer's own pools: a spell slot, or a Pact Magic slot (`pact`). */
+  spendSpellSlot: Readonly<{ level: number; pact?: true }> | null;
 }>;
 
 type EconomyEvaluation = Readonly<{
@@ -365,38 +365,75 @@ function checkLegendary(
 }
 
 /** A spell cast with a slot (a prepared spell, or an item cast with `consumesSpellSlot`) spends one from the
- *  caster's own pool at `castSlotLevel`; refused here if none remains or the slot is below the spell. */
+ *  caster's own pools at `castSlot`; refused here if none remains or the slot is below the spell. */
 function checkSpellSlot({ attacker, action, slotLevel, violations }: Evaluation): EconomyPlan["spendSpellSlot"] {
   if (!action.spellSlot) return null;
-  const level = castSlotLevel(attacker, action.spellSlot.level, slotLevel);
-  const slot = attacker.spellSlots?.find((entry) => entry.level === level);
+  const { level, pact } = castSlot(attacker, action.spellSlot.level, slotLevel);
   if (level < action.spellSlot.level)
     violations.push({
       rule: "feature.no-spell-slot",
       message: `${action.name} needs a slot of level ${action.spellSlot.level} or higher.`
     });
-  else if (!slot || slot.remaining <= 0) {
+  else if (slotsLeft(attacker, level, pact) <= 0) {
     violations.push({
       rule: "feature.no-spell-slot",
-      message: `${action.name} spends a level-${level} spell slot - ${attacker.name} has none left.`
+      message: `${action.name} spends a level-${level} ${pact ? "Pact Magic" : "spell"} slot - ${attacker.name} has none left.`
     });
   }
-  return { level };
+  return pact ? { level, pact: true } : { level };
 }
 
-/** The slot level a cast spends: the one asked for; else the spell's own level when a slot is left there; else the
- *  lowest above it with one left (a Warlock's Pact Magic slots are all one level). */
-export function castSlotLevel(
-  attacker: Pick<LiveActor, "spellSlots">,
+type SlotPools = Pick<LiveActor, "spellSlots"> & Partial<Pick<LiveActor, "pactSlots">>;
+
+/** The slots left in one pool at one level. */
+export function slotsLeft(actor: SlotPools, level: number, pact: boolean): number {
+  if (pact) return actor.pactSlots?.level === level ? actor.pactSlots.remaining : 0;
+  return actor.spellSlots?.find((slot) => slot.level === level)?.remaining ?? 0;
+}
+
+/**
+ * The slot a cast spends (SRD: Pact Magic slots and spell slots each cast either class's spells): the level asked
+ * for; else the spell's own level when a slot is left there; else the lowest above it with one left. At a level both
+ * pools have, a Pact Magic slot goes first, since a Short Rest brings it back. With none left anywhere, a Pact Magic
+ * caster's refusal names its pact slot.
+ */
+export function castSlot(
+  actor: SlotPools,
   base: number,
   requested: number | undefined
-): number {
-  if (requested !== undefined) return requested;
-  const open = (attacker.spellSlots ?? [])
-    .filter((slot) => slot.level >= base && slot.remaining > 0)
-    .map((slot) => slot.level)
-    .sort((left, right) => left - right);
-  return open[0] ?? base;
+): { level: number; pact: boolean } {
+  const pact = actor.pactSlots && actor.pactSlots.level >= base ? actor.pactSlots : null;
+  if (requested !== undefined) {
+    const usePact = pact?.level === requested && (pact.remaining > 0 || slotsLeft(actor, requested, false) <= 0);
+    return { level: requested, pact: usePact };
+  }
+  const open = [
+    ...(actor.spellSlots ?? [])
+      .filter((slot) => slot.level >= base && slot.remaining > 0)
+      .map((slot) => ({ level: slot.level, pact: false })),
+    ...(pact && pact.remaining > 0 ? [{ level: pact.level, pact: true }] : [])
+  ].sort((left, right) => left.level - right.level || Number(right.pact) - Number(left.pact));
+  if (open[0]) return open[0];
+  const anySpellSlots = (actor.spellSlots ?? []).some((slot) => slot.level >= base);
+  return pact && !anySpellSlots ? { level: pact.level, pact: true } : { level: base, pact: false };
+}
+
+/** The slot level a cast spends; see `castSlot`. */
+export function castSlotLevel(actor: SlotPools, base: number, requested: number | undefined): number {
+  return castSlot(actor, base, requested).level;
+}
+
+/** Spends one slot from the pool `castSlot` picked, clamped at zero: an override spends what is there rather than
+ *  going into debt. */
+export function spendSlot(actor: SlotPools, slot: Readonly<{ level: number; pact?: boolean }>): void {
+  if (slot.pact) {
+    if (actor.pactSlots?.level === slot.level)
+      actor.pactSlots = { ...actor.pactSlots, remaining: Math.max(0, actor.pactSlots.remaining - 1) };
+    return;
+  }
+  actor.spellSlots = (actor.spellSlots ?? []).map((entry) =>
+    entry.level === slot.level ? { ...entry, remaining: Math.max(0, entry.remaining - 1) } : entry
+  );
 }
 
 /** Who and what this action may target: declared target rules, range and reach, size limits and Charmed. */
@@ -609,13 +646,7 @@ export function commitEconomy({
       }
     };
   }
-  if (plan.spendSpellSlot) {
-    const level = plan.spendSpellSlot.level;
-    // Clamped at zero: an override spends what is there rather than going into debt.
-    attacker.spellSlots = (attacker.spellSlots ?? []).map((entry) =>
-      entry.level === level ? { ...entry, remaining: Math.max(0, entry.remaining - 1) } : entry
-    );
-  }
+  if (plan.spendSpellSlot) spendSlot(attacker, plan.spendSpellSlot);
   if (plan.spendUse) {
     if (plan.spendUse.per === "turn") {
       const key = `${attacker.id}:${plan.spendUse.key}`;

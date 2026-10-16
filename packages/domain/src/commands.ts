@@ -694,6 +694,8 @@ export const CharacterSetSlotSchema = z
     actorId: z.uuid(),
     level: z.number().int().min(1).max(9),
     remaining: z.number().int().min(0).max(9),
+    /** The Warlock's Pact Magic pool at `level`, not the spell slots. */
+    pact: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
