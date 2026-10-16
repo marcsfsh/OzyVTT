@@ -47,18 +47,18 @@ move it aside to start fresh.
 
 ## Commands
 
-| Command           | What it does                                                                  |
-| ----------------- | ----------------------------------------------------------------------------- |
-| `npm run dev`     | Client on `:5173` and the server on `:3001`, both reloading on change.        |
-| `npm run check`   | Typecheck every workspace and the smoke suite.                                |
-| `npm test`        | Run every workspace's tests.                                                  |
-| `npm run build`   | Build the client.                                                             |
-| `npm run smoke`   | Run the browser smoke tests against the built client (`npm run build` first). |
-| `npm run start`   | Build, then serve on `:3001`.                                                 |
-| `npm run map`     | Regenerate `docs/app-map.md` after changing state, commands or HTTP paths.    |
-| `npm run content` | Rebuild the SRD content bundles from their sources, in dependency order.      |
-| `npm run lint`    | Run ESLint.                                                                   |
-| `npm run format`  | Format with Prettier.                                                         |
+| Command           | What it does                                                                                                           |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`     | Client on `:5173` and the server on `:3001`, both reloading on change.                                                 |
+| `npm run check`   | Typecheck every workspace and the smoke suite.                                                                         |
+| `npm test`        | Run every workspace's tests.                                                                                           |
+| `npm run build`   | Build the client.                                                                                                      |
+| `npm run smoke`   | Run the browser smoke tests against the built client (`npm run build` first).                                          |
+| `npm run start`   | Build, then serve on `:3001`.                                                                                          |
+| `npm run map`     | Regenerate `docs/app-map.md` and the actor JSON Schema after changing state, commands, HTTP paths or the actor schema. |
+| `npm run content` | Rebuild the SRD content bundles from their sources, in dependency order.                                               |
+| `npm run lint`    | Run ESLint.                                                                                                            |
+| `npm run format`  | Format with Prettier.                                                                                                  |
 
 The smoke suite (`e2e/`) starts its own servers on ports 3201 and 3202 (set `SMOKE_PORT` to move
 them), each against a fresh temporary data directory, and runs the first-evening journeys at a

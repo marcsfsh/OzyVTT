@@ -242,7 +242,7 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
     const adjusted = adjustDamageParts(reduction.parts, {
       resistances: [...types(standing.resistances), ...(underwater ? ["fire"] : [])],
       immunities: types(standing.immunities),
-      // Effects and items can make a target vulnerable as a stat block can; a same-type resistance cancels it.
+      // Effects and items can make a target vulnerable as a stat block can; with a same-type resistance both apply.
       vulnerabilities: types(standing.vulnerabilities),
       resistAll: petrified
     });

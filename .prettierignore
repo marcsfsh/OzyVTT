@@ -3,6 +3,7 @@ dist
 data
 package-lock.json
 docs/app-map.md
+packages/schemas/json
 packages/content-srd-5.2.1/bundles
 packages/content-srd-5.2.1/sources
 packages/test-fixtures/actors
