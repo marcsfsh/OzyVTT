@@ -389,7 +389,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "": "A rollable action a feature adds to the sheet (Second Wind, Channel Divinity, Breath Weapon). Identical to HomebrewStatblockAction except for `attack`/`save`: a class feature cannot know the character's ability scores, so it names the ability and the builder DERIVES the number, where a stat block prints it.",
     description: "Always the display source of truth; every rider below only adds mechanics on top",
     "damage[].formula":
-      'One die term plus at most one flat modifier ("1d8 + 3"). Anything richer stays prose (ADR-0008)',
+      'One die term plus at most one flat modifier ("1d8 + 3"), or a fixed amount that uses no roll ("1", a Blowgun), which a crit leaves as it is. Anything richer stays prose (ADR-0008)',
     multiattack: "Compound action: resolving a component consumes the shared action slot once and tracks the rest",
     onHit: "Conditions applied to the target as one source-linked effect",
     targetRules: "Targeting restrictions the engine enforces",
@@ -411,9 +411,13 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   },
   Action: {
     "": 'A stat block\'s action, in the exact `ActionSchema` vocabulary the live rules engine already resolves. Every mechanics field is optional: absent means "prose only", and the engine falls back to reference behavior.',
+    conditionalDamage:
+      "Damage a hit adds or swaps in under a printed condition: `advantage` (the attack roll had Advantage), `self-bloodied`, `target-bloodied`, `target-grappled-by-self`, applied by the engine; and `charge` (moved N feet straight toward the target first), which the engine cannot see, offered on the hit's preview for the attacker to confirm. `instead` replaces the first damage part; `plus` adds to the hit",
+    reminder:
+      "What the engine leaves to the GM, shown on the GM's result when the action resolves: damage on later turns, or a branch it cannot choose (a failure that turns on the target's Hit Points)",
     description: "Always the display source of truth; every rider below only adds mechanics on top",
     "damage[].formula":
-      'One die term plus at most one flat modifier ("1d8 + 3"). Anything richer stays prose (ADR-0008)',
+      'One die term plus at most one flat modifier ("1d8 + 3"), or a fixed amount that uses no roll ("1", a Blowgun), which a crit leaves as it is. Anything richer stays prose (ADR-0008)',
     multiattack: "Compound action: resolving a component consumes the shared action slot once and tracks the rest",
     onHit: "Conditions applied to the target as one source-linked effect",
     targetRules: "Targeting restrictions the engine enforces",

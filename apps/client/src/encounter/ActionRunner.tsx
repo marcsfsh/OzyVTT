@@ -102,19 +102,27 @@ export function ActionRunner({
     if (!ok && message) onFeedback(message);
   };
 
-  const applyDamage = (targetId: string, targetName: string, key: string, overrideAmount?: number) => {
-    if (!result || (overrideAmount ?? result.damageTotal) <= 0) {
+  const applyDamage = (
+    targetId: string,
+    targetName: string,
+    key: string,
+    overrideAmount?: number,
+    owedParts?: ReadonlyArray<{ amount: number; type: string }>
+  ) => {
+    // A target of an action with no attack roll is owed its own parts (Magic Missile's darts); a hit owes the roll's.
+    const parts = owedParts ? owedParts.map((part) => ({ ...part })) : result ? owedDamageParts(result) : [];
+    const owed = parts.reduce((sum, part) => sum + part.amount, 0);
+    if (!result || (overrideAmount ?? owed) <= 0) {
       setApplied((current) => new Set([...current, key]));
       return;
     }
     setBusy(true);
     // The typed parts always travel with the apply, amended or not: an override is sent as
     // `damageOverride` and the server re-weights the same types to it, so resistances still apply.
-    const parts = owedDamageParts(result);
-    const useOverride = overrideAmount !== undefined && overrideAmount !== result.damageTotal;
+    const useOverride = overrideAmount !== undefined && overrideAmount !== owed;
     void command("actor:apply-damage", {
       actorId: targetId,
-      amount: overrideAmount ?? result.damageTotal,
+      amount: overrideAmount ?? owed,
       parts,
       ...(useOverride ? { damageOverride: overrideAmount } : {}),
       sourceActorId: actor.id,
@@ -133,7 +141,7 @@ export function ActionRunner({
           `${targetName} took ${application.totalApplied} damage - ${damageAdjustments(application.parts, application.flatReduction)}.`
         );
       } else {
-        onFeedback(`${targetName} took ${application?.totalApplied ?? result.damageTotal} damage.`);
+        onFeedback(`${targetName} took ${application?.totalApplied ?? owed} damage.`);
       }
     });
   };

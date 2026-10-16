@@ -1044,7 +1044,40 @@
           "required": ["cost"],
           "properties": { "cost": { "type": "integer", "minimum": 1, "maximum": 5 } },
           "additionalProperties": false
-        }
+        },
+        "conditionalDamage": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "required": ["when", "mode", "damage"],
+            "properties": {
+              "when": {
+                "enum": ["advantage", "self-bloodied", "target-bloodied", "target-grappled-by-self", "charge"]
+              },
+              "mode": { "enum": ["instead", "plus"] },
+              "damage": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 2,
+                "items": {
+                  "type": "object",
+                  "required": ["formula", "type"],
+                  "properties": {
+                    "formula": { "$ref": "#/$defs/damageFormula" },
+                    "type": { "type": "string", "minLength": 1, "maxLength": 40 }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "feet": { "type": "integer", "minimum": 5, "maximum": 120 },
+              "maxTargetSize": { "$ref": "#/$defs/size" },
+              "conditions": { "type": "array", "maxItems": 2, "items": { "$ref": "#/$defs/conditionId" } }
+            },
+            "additionalProperties": false
+          }
+        },
+        "reminder": { "type": "string", "minLength": 1, "maxLength": 600 }
       },
       "additionalProperties": false
     }

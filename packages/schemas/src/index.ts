@@ -1100,6 +1100,34 @@ export const ActionSchema = z.object({
   /** The area it covers, for the map template. Filled from the description where the action enters the system
    *  (the content build, a homebrew save, an import), so play never reads the prose. */
   area: ActionAreaSchema.optional(),
+  /** Damage a hit adds or swaps in under a printed condition ("plus 2 (1d4) Slashing damage if the attack roll had
+   *  Advantage", "or 2 (1d4) Piercing damage if the swarm is Bloodied"). The engine applies what it can see; a
+   *  charge, which it can't, is offered on the hit for the attacker to confirm. */
+  conditionalDamage: z
+    .array(
+      z
+        .object({
+          when: z.enum(["advantage", "self-bloodied", "target-bloodied", "target-grappled-by-self", "charge"]),
+          /** `instead` replaces the first damage part; `plus` adds to the hit. */
+          mode: z.enum(["instead", "plus"]),
+          damage: z
+            .array(z.object({ formula: DamageFormulaSchema, type: z.string().min(1).max(40) }).strict())
+            .min(1)
+            .max(2),
+          /** A charge's run-up, in feet. */
+          feet: z.number().int().min(5).max(120).optional(),
+          /** Only against a target of at most this size. */
+          maxTargetSize: SizeSchema.optional(),
+          /** Conditions it imposes too (a charge's Prone). */
+          conditions: z.array(ConditionIdSchema).max(2).optional()
+        })
+        .strict()
+    )
+    .max(3)
+    .optional(),
+  /** What the engine leaves to the GM, shown when the action resolves: damage on later turns ("takes 10 (3d6) Acid
+   *  damage at the start of each of the cube's turns") or a branch it can't choose. */
+  reminder: z.string().min(1).max(600).optional(),
   /** A Multiattack whose attacks the build could not read: the engine cannot track them against the action, so
    *  the creature's action-slot checks soften to notes. */
   untrackedMultiattack: z.literal(true).optional()

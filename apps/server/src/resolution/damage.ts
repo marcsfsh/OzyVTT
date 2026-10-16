@@ -3,7 +3,7 @@ import { collectRiders, parseDiceFormula, resolveDice, type DiceExpression, type
 import { abilityModifier, recordRoll, type ResolveContext } from "./context.js";
 
 /** 2024 crit rule: double every dice term (modifiers once); `extraFirstTermDice` adds Savage Attacks dice. */
-function criticalExpression(expression: DiceExpression, extraFirstTermDice = 0): DiceExpression {
+export function criticalExpression(expression: DiceExpression, extraFirstTermDice = 0): DiceExpression {
   let firstDice = true;
   const terms = expression.terms.map((term) => {
     if (term.kind !== "dice") return term;
@@ -33,11 +33,49 @@ export function damagePartsOf(
   return owedDamageParts(resolution);
 }
 
+const bloodied = (hp: Readonly<{ current: number; maximum: number }>) => hp.current > 0 && hp.current * 2 <= hp.maximum;
+
+/** Whether a stat block's conditional damage holds for this hit; a charge is the attacker's to confirm, so it comes
+ *  through the hit's options instead (`hit-options.ts`). */
+function conditionHolds(
+  ctx: ResolveContext,
+  when: NonNullable<ResolveContext["action"]["conditionalDamage"]>[number]["when"]
+): boolean {
+  const target = ctx.targets[0];
+  switch (when) {
+    case "advantage":
+      return ctx.rollMode?.mode === "advantage";
+    case "self-bloodied":
+      return bloodied(ctx.attacker.hp);
+    case "target-bloodied":
+      return target !== undefined && bloodied(target.hp);
+    case "target-grappled-by-self":
+      return (
+        target !== undefined &&
+        target.effects.some(
+          (effect) => effect.sourceActorId === ctx.attacker.id && effect.linkedConditionIds.includes("grappled")
+        )
+      );
+    case "charge":
+      return false;
+  }
+}
+
+/** The action's damage parts for this hit: a stat block's "or 2 (1d4) Piercing damage if the swarm is Bloodied"
+ *  replaces the first part, and "plus 2 (1d4) Slashing damage if the attack roll had Advantage" adds one. */
+function damageInForce(ctx: ResolveContext): ResolveContext["action"]["damage"] {
+  const variants = (ctx.action.conditionalDamage ?? []).filter((variant) => conditionHolds(ctx, variant.when));
+  const instead = variants.find((variant) => variant.mode === "instead");
+  const base = instead ? [...instead.damage, ...ctx.action.damage.slice(1)] : ctx.action.damage;
+  return [...base, ...variants.filter((variant) => variant.mode === "plus").flatMap((variant) => variant.damage)];
+}
+
 /** The action's own damage dice: crit-doubled, Savage Attacks on the first part. */
 export function rollWeaponDamage(ctx: ResolveContext): void {
   const { action, deps, damage } = ctx;
-  if (action.damage.length === 0 || !rollsDamage(ctx.attack)) return;
-  action.damage.forEach((part, index) => {
+  const parts = damageInForce(ctx);
+  if (parts.length === 0 || !rollsDamage(ctx.attack)) return;
+  parts.forEach((part, index) => {
     const expression = parseDiceFormula(part.formula);
     const extraCritDice = index === 0 ? (action.attack?.criticalBonusDice ?? 0) : 0;
     const rolled = resolveDice(ctx.crit ? criticalExpression(expression, extraCritDice) : expression, deps.random);

@@ -74,12 +74,39 @@ export type ActionTableNarration = Readonly<{
   /** The resolver already knows this line names a hidden combatant; true forces the GM-only read. */
   gmOnly?: boolean;
 }>;
+/** An extra a hit can carry, offered on the attack's preview and chosen when it is confirmed (`hitOptions`): Sneak
+ *  Attack, a smite, Divine Strike, a charge. Its dice join the hit's, so a crit doubles them. */
+export type HitOffer = Readonly<{
+  /** What the confirm names: the rider's action id, or `charge` for the attack's own run-up damage. */
+  id: string;
+  name: string;
+  /** What it adds, for the label ("3d6 Piercing", "2d8 Radiant"). */
+  dice: string;
+  /** What choosing it spends ("1st-level slot and your Bonus Action", "once per turn"), or null. */
+  cost: string | null;
+  /** Pick one when choosing it (Divine Strike: Necrotic or Radiant). */
+  damageTypes?: readonly string[];
+  /** The spell slots it can be cast with, lowest first (a smite). */
+  slotLevels?: readonly number[];
+  /** What the engine could not check, so the attacker vouches for it ("No map to check for an ally within 5 feet"). */
+  unverified?: string;
+}>;
+/** One extra chosen at confirm, and how. */
+export type HitOptionChoice = Readonly<{ id: string; damageType?: string; slotLevel?: number }>;
+/** The damage an action with no attack roll and no save owes one target (Magic Missile, a smite resolved alone). */
+export type DamageTarget = Readonly<{
+  targetId: string;
+  targetName: string;
+  parts: ReadonlyArray<Readonly<{ amount: number; type: string }>>;
+  total: number;
+}>;
 export type ActionResolution = Readonly<{
   actionName: string;
   activation: "action" | "bonus-action" | "reaction" | "other";
   attack: ActionResolutionAttack | null;
   save: { ability: string; dc: number; targets: ReadonlyArray<{ targetId: string; targetName: string }> } | null;
-  damage: ReadonlyArray<{ formula: string; type: string; total: number }>;
+  /** Rolled damage. `source` names an extra that rode the hit (Sneak Attack, Divine Smite); absent for the action's own. */
+  damage: ReadonlyArray<{ formula: string; type: string; total: number; source?: string }>;
   damageTotal: number;
   crit: boolean;
   /** Advantage/disadvantage aggregation for the attack roll; absent when nothing contributed (plain 1d20). */
@@ -129,6 +156,10 @@ export type ActionResolution = Readonly<{
   effectsEnded?: ReadonlyArray<Readonly<{ actorId: string; actorName: string; name: string }>>;
   /** An attack-roll preview: the d20 is shown but nothing is applied until confirmed or re-rolled. */
   preview?: boolean;
+  /** On a previewed hit, the extras the attacker may add when confirming (`hitOptions`). */
+  hitOffers?: readonly HitOffer[];
+  /** No attack roll and no save, but damage (Magic Missile): what each target is owed, applied or proposed like a hit. */
+  damageTargets?: readonly DamageTarget[];
 }>;
 /** A strict-mode rules rejection: what rule blocked the command and whether an override may bypass it. */
 export type RulesBlocked = Readonly<{ rule: string; message: string; overridable: boolean }>;

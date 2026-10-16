@@ -124,7 +124,8 @@ export function openResolve(
     effectsEnded: [],
     reactionPrompts: [],
     builtinSave: null,
-    opens: null
+    opens: null,
+    hitRiders: []
   };
   if (builtin?.prepare) ctx.action = builtin.prepare(ctx);
   // A spell cast with a higher slot rolls that slot's dice; a paid replay names the slot it was cast with.

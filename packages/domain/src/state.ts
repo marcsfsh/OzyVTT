@@ -255,7 +255,27 @@ export const ParkedAttackSchema = z
     initiatorRole: z.enum(["gm", "player"]),
     initiatorSessionId: z.string().min(1).max(200),
     /** The bonus lasts until the reactor's next turn (Shield) rather than against this attack only (Parry). */
-    untilNextTurn: z.boolean()
+    untilNextTurn: z.boolean(),
+    /** Extras chosen for the hit (Sneak Attack, a smite), checked and spent only if it still hits. */
+    hitOptions: z
+      .array(
+        z
+          .object({
+            id: z
+              .string()
+              .regex(/^[a-z0-9-]+$/)
+              .max(120),
+            damageType: z
+              .string()
+              .regex(/^[a-z]+$/)
+              .max(40)
+              .optional(),
+            slotLevel: z.number().int().min(1).max(9).optional()
+          })
+          .strict()
+      )
+      .max(6)
+      .default([])
   })
   .strict();
 export type ParkedAttack = z.infer<typeof ParkedAttackSchema>;

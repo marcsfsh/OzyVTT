@@ -125,7 +125,9 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
           distanceFeet: deps.distanceFeet?.(attacker.id, target.id) ?? null,
           initiatorRole: deps.initiatorRole ?? "gm",
           initiatorSessionId: deps.initiatorSessionId ?? deps.gmSessionId,
-          untilNextTurn: offer.reaction.untilNextTurn === true
+          untilNextTurn: offer.reaction.untilNextTurn === true,
+          // The extras chosen for the hit ride the replay, spent only if it still hits.
+          hitOptions: (input.hitOptions ?? []).map((choice) => ({ ...choice }))
         },
         createdAt: Date.parse(deps.now())
       }

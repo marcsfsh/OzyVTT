@@ -5,6 +5,7 @@ import { ActionRow } from "./ActionRow";
 import { ActionTargetPicker } from "./ActionTargetPicker";
 import { actionSummaryParts } from "./action-summary";
 import { AttackOutcome, AttackPreview } from "./AttackPreview";
+import { damageBreakdown } from "./format";
 import { AskTheGmPrompt } from "./RuleAsk";
 import {
   beginTargeting,
@@ -169,6 +170,7 @@ export function PlayerActionRunner({
               bonusMode={bonusMode}
               onFeedback={onFeedback}
               push={result.push}
+              {...(result.hitOffers ? { hitOffers: result.hitOffers } : {})}
               resolve={(options) => resolveTargeting(revision, onOutcome, options)}
             />
           )}
@@ -190,10 +192,7 @@ export function PlayerActionRunner({
           {result.damage.length > 0 &&
             !result.preview &&
             (() => {
-              const breakdown = [
-                ...result.damage.map((part) => `${part.formula} ${part.type} = ${part.total}`),
-                ...(result.bonusDamage ?? []).map((part) => `+${part.amount} ${part.source}`)
-              ].join(" + ");
+              const breakdown = damageBreakdown(result);
               return (
                 <p className="action-damage">
                   Damage: <strong>{result.damageTotal}</strong>
@@ -228,6 +227,13 @@ export function PlayerActionRunner({
                 </p>
               );
             })()}
+          {/* No attack roll and no save (Magic Missile): each target's damage goes the same way as a hit's. */}
+          {!result.preview && !result.attack && (result.damageTargets?.length ?? 0) > 0 && (
+            <p className="action-save-note">
+              {playerDamageMode === "direct" ? "Applied to " : "Handed to the GM to apply to "}
+              {result.damageTargets!.map((owed) => `${owed.targetName} (${owed.total})`).join(", ")}.
+            </p>
+          )}
           {result.opens &&
             (() => {
               // Cleave: the hit opened a swing at a second creature, picked like any target.

@@ -5,7 +5,8 @@ import { resolveDefinitionAction, type ResolveDependencies } from "../src/action
 import { startEncounter } from "../src/encounter.js";
 import { applyDamageDetailed, halvedDamageParts } from "../src/hit-points.js";
 import { weaponAction } from "../src/item-actions.js";
-import { settlePlayerHit } from "../src/player-damage.js";
+import { settlePlayerDamage, settlePlayerHit } from "../src/player-damage.js";
+import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import { answerSave, createPendingSaves } from "../src/saving-throws.js";
 
 // How rolled damage becomes hit points lost: the card's total, halving, and damage at 0 HP (SRD "Damage and
@@ -211,5 +212,217 @@ describe("fixed damage that doesn't use a roll", () => {
     );
     expect(crit.attack?.outcome).toBe("crit");
     expect(crit.damageTotal).toBe(1);
+  });
+});
+
+describe("damage from an action with no attack roll and no save", () => {
+  const missile = {
+    id: "magic-missile",
+    name: "Magic Missile",
+    activation: "action" as const,
+    description: "Three darts.",
+    damage: [{ formula: "3d4 + 3", type: "force" }]
+  };
+
+  it("owes every target its damage, so the GM's card can apply it", () => {
+    const game = fight();
+    const cast = resolveDefinitionAction(
+      game,
+      missile,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd() },
+      queuedDeps([2, 3, 4])
+    );
+    expect(cast.damageTargets).toEqual([
+      { targetId: IDS.foe, targetName: "Foe", parts: [{ amount: 12, type: "force" }], total: 12 }
+    ]);
+  });
+
+  it("is proposed to the GM, or applied in direct mode, like a player's hit", () => {
+    const game = fight();
+    const cast = resolveDefinitionAction(
+      game,
+      missile,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd() },
+      queuedDeps([2, 3, 4], { initiatorRole: "player", initiatorSessionId: IDS.player })
+    );
+    const damageDeps = { resolveDefinition: () => undefined, newId: () => crypto.randomUUID(), now: () => 0 };
+    expect(settlePlayerDamage(game, cast, "Hero", IDS.hero, "proposal", damageDeps)).toEqual([]);
+    expect(game.combat.pendingDamage).toEqual([
+      expect.objectContaining({
+        targetActorId: IDS.foe,
+        proposedTotal: 12,
+        proposedDamageParts: [{ amount: 12, type: "force" }]
+      })
+    ]);
+    const direct = fight();
+    const again = resolveDefinitionAction(
+      direct,
+      missile,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd() },
+      queuedDeps([2, 3, 4])
+    );
+    settlePlayerDamage(direct, again, "Hero", IDS.hero, "direct", damageDeps);
+    expect(direct.actors[1].hp.current).toBe(28);
+  });
+});
+
+describe("a feature that rides any weapon hit (Divine Strike)", () => {
+  const cleric = ActorDefinitionSchema.parse({
+    schemaId: "vtt.actor-character",
+    schemaVersion: 1,
+    source: { name: "test", version: "1" },
+    name: "Cleric",
+    size: "medium",
+    armorClass: 16,
+    proficiencyBonus: 3,
+    speedFeet: 30,
+    abilityScores: { str: 14, dex: 10, con: 12, int: 10, wis: 16, cha: 10 },
+    hitPoints: { maximum: 40 },
+    token: { disposition: "friendly" },
+    actions: [
+      {
+        id: "mace",
+        name: "Mace",
+        activation: "action",
+        description: "A mace.",
+        attack: { bonus: 5, reachFeet: 5 },
+        damage: [{ formula: "1d6 + 2", type: "bludgeoning" }]
+      },
+      {
+        id: "divine-strike",
+        name: "Divine Strike",
+        activation: "other",
+        description: "Once on each of your turns.",
+        damage: [{ formula: "1d8", type: "radiant" }],
+        uses: { limit: 1, per: "turn", pool: "blessed-strikes" }
+      }
+    ]
+  });
+  const mace = cleric.actions[0];
+
+  it("offers a choice of Radiant or Necrotic, takes the chosen type, and doubles on a crit", () => {
+    const game = fight();
+    const preview = resolveDefinitionAction(
+      game,
+      mace,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(), commit: false },
+      queuedDeps([15], { definition: cleric })
+    );
+    expect(preview.hitOffers).toEqual([
+      expect.objectContaining({ id: "divine-strike", damageTypes: ["radiant", "necrotic"], cost: "once per turn" })
+    ]);
+    const crit = resolveDefinitionAction(
+      game,
+      mace,
+      {
+        actorId: IDS.hero,
+        targetIds: [IDS.foe],
+        commandId: cmd(),
+        hitOptions: [{ id: "divine-strike", damageType: "necrotic" }]
+      },
+      queuedDeps([20, 1, 1, 4, 5], { definition: cleric })
+    );
+    expect(crit.damage).toContainEqual({ formula: "2d8", type: "necrotic", total: 9, source: "Divine Strike" });
+    expect(game.combat.turn.turnUses[`${IDS.hero}:blessed-strikes`]).toBe(1);
+  });
+
+  it("spends nothing when the attack misses", () => {
+    const game = fight();
+    const miss = resolveDefinitionAction(
+      game,
+      mace,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(), hitOptions: [{ id: "divine-strike" }] },
+      queuedDeps([1], { definition: cleric })
+    );
+    expect(miss.attack?.outcome).toBe("fumble");
+    expect(game.combat.turn.turnUses[`${IDS.hero}:blessed-strikes`]).toBeUndefined();
+  });
+});
+
+describe("a stat block's conditional damage", () => {
+  const monster = (id: string) => loadMonsterDefinitions().find((entry) => entry.source.externalId === id)!;
+  const monsterFight = (id: string) => {
+    const definition = monster(id);
+    const game = GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [
+        {
+          id: IDS.foe,
+          name: definition.name,
+          kind: "monster",
+          visibility: "public",
+          hp: { current: definition.hitPoints.maximum, maximum: definition.hitPoints.maximum },
+          definitionId: id,
+          size: definition.size
+        },
+        {
+          id: IDS.hero,
+          name: "Hero",
+          kind: "player-character",
+          visibility: "public",
+          hp: { current: 30, maximum: 30 },
+          armorClass: 10,
+          size: "medium"
+        }
+      ],
+      definitions: [{ id, definition }]
+    });
+    startEncounter(
+      game,
+      {
+        mapAssetId: IDS.map,
+        entries: [
+          { actorId: IDS.foe, score: 20 },
+          { actorId: IDS.hero, score: 10 }
+        ]
+      },
+      () => 1,
+      { width: 900, height: 600, calibration: null }
+    );
+    const actionOf = (actionId: string) => definition.actions.find((action) => action.id === actionId)!;
+    const strike = (actionId: string, faces: number[], extra: Record<string, unknown> = {}) => {
+      // Each strike is a fresh action, so the economy never stands between two examples.
+      game.combat = { ...game.combat, turn: { ...game.combat.turn, actionUsed: false, actionInstance: null } };
+      return resolveDefinitionAction(
+        game,
+        actionOf(actionId),
+        { actorId: IDS.foe, targetIds: [IDS.hero], commandId: cmd(), ...extra },
+        queuedDeps(faces, { definition, resolveDefinition: (key) => (key === id ? definition : undefined) })
+      );
+    };
+    return { game, strike };
+  };
+
+  it("a Bloodied swarm bites for its smaller dice", () => {
+    const { game, strike } = monsterFight("swarm-of-rats");
+    expect(strike("bites", [15, 2, 2]).damage).toEqual([{ formula: "2d4", type: "piercing", total: 4 }]);
+    game.actors[0].hp.current = Math.floor(game.actors[0].hp.maximum / 2);
+    expect(strike("bites", [15, 3]).damage).toEqual([{ formula: "1d4", type: "piercing", total: 3 }]);
+  });
+
+  it("a goblin adds its 1d4 only when the attack roll had Advantage", () => {
+    const { strike } = monsterFight("goblin-warrior");
+    expect(strike("scimitar", [15, 4]).damage).toHaveLength(1);
+    expect(strike("scimitar", [15, 12, 4, 3], { rollMode: "advantage" }).damage).toEqual([
+      { formula: "1d6 + 2", type: "slashing", total: 6 },
+      { formula: "1d4", type: "slashing", total: 3 }
+    ]);
+  });
+
+  it("offers a charge for the GM to confirm, and a confirmed charge adds its dice and Prone", () => {
+    const { game, strike } = monsterFight("boar");
+    const preview = strike("gore", [15], { commit: false });
+    expect(preview.hitOffers).toEqual([
+      expect.objectContaining({ id: "charge", name: "Charge", dice: "1d6 Piercing" })
+    ]);
+    const charged = strike("gore", [15, 2, 4], { hitOptions: [{ id: "charge" }] });
+    expect(charged.damage).toContainEqual({ formula: "1d6", type: "piercing", total: 4, source: "Charge" });
+    expect(game.actors[1].conditions.map((condition) => condition.id)).toContain("prone");
+  });
+
+  it("reminds the GM of damage the stat block deals on later turns", () => {
+    const { strike } = monsterFight("gelatinous-cube");
+    const engulf = strike("engulf", [3, 3, 3]);
+    expect(engulf.warnings).toContainEqual(expect.stringMatching(/at the start of each of the cube's turns/));
   });
 });

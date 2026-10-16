@@ -10,6 +10,7 @@ import { answerReaction } from "../src/reactions.js";
 import { setCondition } from "../src/actor-conditions.js";
 import { startEncounter } from "../src/encounter.js";
 import type { ActorDefinition } from "@vtt/schemas";
+import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 
 // Rogue, Ranger and Paladin mechanics, asserted as rolled numbers, spent counters, refused builds or
 // text the table reads; never "the rider survived derivation". Runs against the real SRD bundles
@@ -204,28 +205,136 @@ const rogueInput = (level: number): MutableInput => {
   };
 };
 
-describe("Rogue - Sneak Attack rolls the printed column", () => {
-  it("rolls 6d6 at level 11 and 1d6 at level 1, off ONE record", () => {
-    // `damageByLevel` keeps the highest row at or below the character's level: six stubbed 4s is 24,
-    // and the same record on a level-1 Rogue rolls one die.
-    const eleven = table(rogueInput(11));
-    const rolled = resolve(eleven, "sneak-attack", [4, 4, 4, 4, 4, 4], []);
-    expect(rolled.damage).toEqual([{ formula: "6d6", type: "weapon", total: 24 }]);
+/** One swing with the extras the confirm carries, at a given roll mode and map distance. */
+function swing(
+  built: Table,
+  actionId: string,
+  faces: number[],
+  options: {
+    hitOptions?: Array<{ id: string; damageType?: string; slotLevel?: number }>;
+    rollMode?: "advantage" | "disadvantage";
+    commit?: boolean;
+    distanceFeet?: (a: string, b: string) => number | null;
+  } = {}
+) {
+  return resolveDefinitionAction(
+    built.state,
+    actionOf(built, actionId)!,
+    {
+      actorId: IDS.hero,
+      targetIds: [IDS.foe],
+      commandId: nextCommandId(),
+      ...(options.rollMode ? { rollMode: options.rollMode } : {}),
+      ...(options.commit === false ? { commit: false } : {}),
+      ...(options.hitOptions ? { hitOptions: options.hitOptions } : {})
+    },
+    { ...deps(built, faces), ...(options.distanceFeet ? { distanceFeet: options.distanceFeet } : {}) }
+  );
+}
 
-    const first = table(rogueInput(1));
-    expect(resolve(first, "sneak-attack", [5], []).damage).toEqual([{ formula: "1d6", type: "weapon", total: 5 }]);
+describe("Rogue - Sneak Attack rides a qualifying hit", () => {
+  it("is offered on an advantaged Finesse hit, rolls the printed column in the weapon's type, and spends the turn's use", () => {
+    // Level 11 prints 6d6. The shortsword is Finesse; Advantage qualifies it.
+    const built = table(rogueInput(11));
+    const preview = swing(built, "item-shortsword", [15, 2], { rollMode: "advantage", commit: false });
+    expect(preview.hitOffers).toEqual([
+      expect.objectContaining({ id: "sneak-attack", name: "Sneak Attack", dice: "6d6 Piercing", cost: "once per turn" })
+    ]);
+    const hit = swing(built, "item-shortsword", [15, 2, 4, 4, 4, 4, 4, 4, 4], {
+      rollMode: "advantage",
+      hitOptions: [{ id: "sneak-attack" }]
+    });
+    expect(hit.damage.find((part) => part.source === "Sneak Attack")).toEqual({
+      formula: "6d6",
+      type: "piercing",
+      total: 24,
+      source: "Sneak Attack"
+    });
+    expect(built.state.combat.turn.turnUses[`${IDS.hero}:sneak-attack`]).toBe(1);
+    // Once per turn: the next hit this turn offers it no more.
+    newTurn(built);
+    built.state.combat = {
+      ...built.state.combat,
+      turn: { ...built.state.combat.turn, turnUses: { [`${IDS.hero}:sneak-attack`]: 1 } }
+    };
+    expect(
+      swing(built, "item-shortsword", [15, 2], { rollMode: "advantage", commit: false }).hitOffers
+    ).toBeUndefined();
   });
 
-  it("refuses a SECOND Sneak Attack in the same turn, and the counter says so", () => {
-    // "Once per turn" is a `per: "turn"` pool counted in `combat.turn.turnUses`.
-    const built = table(rogueInput(11));
-    resolve(built, "sneak-attack", [1, 1, 1, 1, 1, 1], []);
-    expect(built.state.combat.turn.turnUses[`${IDS.hero}:sneak-attack`]).toBe(1);
-    expect(() => resolve(built, "sneak-attack", [1, 1, 1, 1, 1, 1], [])).toThrowError(
-      /Sneak Attack: no uses remaining \(1\/turn\)/
+  it("doubles its dice on a critical hit", () => {
+    const built = table(rogueInput(5));
+    const crit = swing(built, "item-dagger", [20, 2, 1, 2, 3, 4, 5, 6, 1, 2, 3], {
+      rollMode: "advantage",
+      hitOptions: [{ id: "sneak-attack" }]
+    });
+    expect(crit.attack?.outcome).toBe("crit");
+    expect(crit.damage.find((part) => part.source === "Sneak Attack")).toMatchObject({ formula: "6d6" });
+  });
+
+  it("is not offered without Advantage or an ally beside the target, and is refused if chosen anyway", () => {
+    const built = table(rogueInput(5));
+    expect(swing(built, "item-shortsword", [15], { commit: false }).hitOffers).toBeUndefined();
+    expect(() => swing(built, "item-shortsword", [15, 3], { hitOptions: [{ id: "sneak-attack" }] })).toThrowError(
+      /Sneak Attack needs a Finesse or Ranged weapon/
     );
-    // ...and nothing was spent by the refusal.
-    expect(built.state.combat.turn.turnUses[`${IDS.hero}:sneak-attack`]).toBe(1);
+    // ...nor with Disadvantage, even beside an ally.
+    expect(
+      swing(built, "item-shortsword", [15, 15], { rollMode: "disadvantage", commit: false }).hitOffers
+    ).toBeUndefined();
+  });
+
+  it("is refused when taken alone: it adds to a hit", () => {
+    const built = table(rogueInput(5));
+    expect(() => resolve(built, "sneak-attack", [3, 3, 3], [IDS.foe])).toThrowError(/adds to a hit/);
+  });
+});
+
+describe("Rogue - Sneak Attack from an ally beside the target", () => {
+  const ALLY = "10000000-0000-4000-8000-0000000000aa";
+  const withAlly = (level: number) => {
+    const built = table(rogueInput(level));
+    built.state.actors.push(
+      GameStateSchema.parse({
+        schemaVersion: 1,
+        actors: [
+          {
+            id: ALLY,
+            name: "Ally",
+            kind: "player-character",
+            visibility: "public",
+            hp: { current: 20, maximum: 20 }
+          }
+        ]
+      }).actors[0]
+    );
+    built.state.combat = {
+      ...built.state.combat,
+      initiative: [...built.state.combat.initiative, { actorId: ALLY, score: 5, tieBreaker: 0 }]
+    };
+    return built;
+  };
+
+  it("qualifies with an able ally within 5 feet of the target, and not with one farther off", () => {
+    const near = withAlly(5);
+    const beside = (a: string, b: string) =>
+      [a, b].includes(ALLY) && [a, b].includes(IDS.foe) ? 5 : a === IDS.hero || b === IDS.hero ? 5 : 30;
+    expect(swing(near, "item-shortsword", [15], { commit: false, distanceFeet: beside }).hitOffers?.[0]).toMatchObject({
+      id: "sneak-attack"
+    });
+    const far = (a: string, b: string) => ([a, b].includes(ALLY) ? 30 : 5);
+
+    expect(swing(near, "item-shortsword", [15], { commit: false, distanceFeet: far }).hitOffers).toBeUndefined();
+    // An Incapacitated ally doesn't count.
+    near.state.actors.find((actor) => actor.id === ALLY)!.conditions = [{ id: "stunned" }];
+    expect(swing(near, "item-shortsword", [15], { commit: false, distanceFeet: beside }).hitOffers).toBeUndefined();
+  });
+
+  it("is offered for the attacker to vouch for when the map can't measure", () => {
+    const built = withAlly(5);
+    const offer = swing(built, "item-shortsword", [15], { commit: false }).hitOffers?.[0];
+    expect(offer).toMatchObject({ id: "sneak-attack" });
+    expect(offer?.unverified).toMatch(/ally is within 5 feet/);
   });
 });
 
@@ -687,14 +796,14 @@ describe("Paladin - the two free casts, audit rows 30 and 31", () => {
     expect(built.definition.spellcasting?.classes?.[0]).toMatchObject({ prepared: 6 });
     expect(spells.filter((spell) => spell.level >= 1 && !spell.alwaysPrepared)).toHaveLength(6);
 
-    // The free cast is Divine Smite without a slot, counted on the feature's own pool.
+    // The free cast is Divine Smite without a slot, counted on the feature's own pool, added to a hit.
     newTurn(built);
-    resolve(built, "spell-divine-smite-free", [3, 4], []);
+    swing(built, "item-longsword", [19, 6, 3, 4], { hitOptions: [{ id: "spell-divine-smite-free" }] });
     expect(built.hero.actionUses["paladins-smite"]).toBe(1);
     newTurn(built);
-    expect(() => resolve(built, "spell-divine-smite-free", [3, 4], [])).toThrowError(
-      /Divine Smite \(no slot\): no uses remaining \(1\/long rest\)/
-    );
+    expect(() =>
+      swing(built, "item-longsword", [19, 6, 3, 4], { hitOptions: [{ id: "spell-divine-smite-free" }] })
+    ).toThrowError(/Divine Smite \(no slot\): no uses remaining \(1\/long rest\)/);
   });
 
   it("always has Find Steed prepared from level 5, on its OWN pool", () => {
@@ -776,6 +885,47 @@ describe("Paladin - the auras that are really immunities", () => {
     // Frightened is not immune yet: the class aura is level 10.
     setCondition(devoted.state, IDS.hero, "frightened", true, undefined, GM_SCOPE);
     expect(devoted.hero.conditions).toEqual([{ id: "frightened" }]);
+  });
+});
+
+describe("Paladin - Divine Smite rides a melee hit", () => {
+  it("adds 2d8 Radiant, doubled on a crit, with the extra 1d8 against an Undead, and spends the slot and Bonus Action", () => {
+    const built = table(paladinInput(5));
+    const zombie = loadMonsterDefinitions().find((monster) => monster.source.externalId === "zombie")!;
+    built.state.definitions.push({ id: "zombie", definition: zombie });
+    built.foe.definitionId = "zombie";
+    const slotsBefore = built.hero.spellSlots?.find((slot) => slot.level === 1)?.remaining ?? 0;
+    const preview = swing(built, "item-longsword", [20], { commit: false });
+    expect(preview.hitOffers?.map((offer) => offer.id)).toEqual(
+      expect.arrayContaining(["spell-divine-smite", "spell-divine-smite-free"])
+    );
+    expect(preview.hitOffers?.find((offer) => offer.id === "spell-divine-smite")).toMatchObject({
+      dice: "2d8 Radiant",
+      slotLevels: [1, 2]
+    });
+    // A crit: the longsword's 2d8, the smite's 4d8, and the Undead's 2d8.
+    const crit = swing(built, "item-longsword", [20, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3], {
+      hitOptions: [{ id: "spell-divine-smite", slotLevel: 1 }]
+    });
+    expect(crit.damage.filter((part) => part.source?.startsWith("Divine Smite"))).toEqual([
+      { formula: "4d8", type: "radiant", total: 8, source: "Divine Smite" },
+      { formula: "2d8", type: "radiant", total: 6, source: "Divine Smite (Undead)" }
+    ]);
+    expect(built.hero.spellSlots?.find((slot) => slot.level === 1)?.remaining).toBe(slotsBefore - 1);
+    expect(built.state.combat.turn.bonusActionUsed).toBe(true);
+  });
+
+  it("rides a Melee weapon even thrown (a Javelin), never a miss", () => {
+    // "A Melee weapon or an Unarmed Strike" names the weapon, not how it was used.
+    const built = table(paladinInput(5));
+    const thrown = resolveDefinitionAction(
+      built.state,
+      actionOf(built, "item-javelin")!,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: nextCommandId(), commit: false },
+      { ...deps(built, [19]), distanceFeet: () => 30 }
+    );
+    expect((thrown.hitOffers ?? []).some((offer) => offer.id === "spell-divine-smite")).toBe(true);
+    expect(swing(built, "item-longsword", [2], { commit: false }).hitOffers).toBeUndefined();
   });
 });
 

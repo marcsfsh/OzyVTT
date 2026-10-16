@@ -872,7 +872,7 @@
       "type": "slashing"
      },
      {
-      "formula": "1d8",
+      "formula": "1d10",
       "type": "lightning"
      }
     ]
@@ -1549,7 +1549,7 @@
       "type": "slashing"
      },
      {
-      "formula": "3d6",
+      "formula": "2d6",
       "type": "poison"
      }
     ]
@@ -2789,7 +2789,7 @@
       "type": "slashing"
      },
      {
-      "formula": "2d8",
+      "formula": "2d10",
       "type": "lightning"
      }
     ]
@@ -4491,7 +4491,7 @@
       "type": "slashing"
      },
      {
-      "formula": "2d8",
+      "formula": "2d6",
       "type": "cold"
      }
     ]
@@ -5602,6 +5602,10 @@
      {
       "formula": "1d6 + 4",
       "type": "piercing"
+     },
+     {
+      "formula": "5d6",
+      "type": "poison"
      }
     ]
    },
@@ -5619,6 +5623,10 @@
      {
       "formula": "1d8 + 4",
       "type": "piercing"
+     },
+     {
+      "formula": "6d6",
+      "type": "poison"
      }
     ]
    }
@@ -5711,7 +5719,12 @@
      "bonus": 1,
      "reachFeet": 5
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1",
+      "type": "slashing"
+     }
+    ]
    }
   ],
   "token": {
@@ -5974,6 +5987,10 @@
      {
       "formula": "1d10 + 3",
       "type": "bludgeoning"
+     },
+     {
+      "formula": "1d6",
+      "type": "fire"
      }
     ]
    }
@@ -6076,7 +6093,7 @@
     },
     "damage": [
      {
-      "formula": "1d4 + 1",
+      "formula": "1d4 - 1",
       "type": "piercing"
      }
     ]
@@ -6167,7 +6184,12 @@
      "bonus": 2,
      "reachFeet": 5
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1",
+      "type": "piercing"
+     }
+    ]
    }
   ],
   "token": {
@@ -6283,6 +6305,10 @@
      {
       "formula": "3d6 + 8",
       "type": "force"
+     },
+     {
+      "formula": "5d6",
+      "type": "fire"
      }
     ]
    },
@@ -6299,6 +6325,10 @@
      {
       "formula": "3d8 + 8",
       "type": "force"
+     },
+     {
+      "formula": "4d10",
+      "type": "lightning"
      }
     ]
    }
@@ -6826,6 +6856,10 @@
      {
       "formula": "2d6 + 3",
       "type": "piercing"
+     },
+     {
+      "formula": "2d6",
+      "type": "poison"
      }
     ]
    },
@@ -6937,7 +6971,12 @@
      "bonus": 4,
      "reachFeet": 5
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1",
+      "type": "piercing"
+     }
+    ]
    }
   ],
   "token": {
@@ -7180,12 +7219,8 @@
       "restrained"
      ]
     },
-    "damage": [
-     {
-      "formula": "6d6",
-      "type": "acid"
-     }
-    ]
+    "damage": [],
+    "reminder": "While swallowed, a creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the behir, and takes 21 (6d6) Acid damage at the start of each of the behir's turns."
    },
    {
     "id": "bite",
@@ -7200,6 +7235,10 @@
      {
       "formula": "2d12 + 6",
       "type": "piercing"
+     },
+     {
+      "formula": "2d10",
+      "type": "lightning"
      }
     ]
    },
@@ -7908,6 +7947,18 @@
       "formula": "1d4 + 2",
       "type": "piercing"
      }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "target-bloodied",
+      "mode": "instead",
+      "damage": [
+       {
+        "formula": "1d8 + 2",
+        "type": "piercing"
+       }
+      ]
+     }
     ]
    }
   ],
@@ -8140,6 +8191,23 @@
       "formula": "1d6 + 1",
       "type": "piercing"
      }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "charge",
+      "mode": "plus",
+      "feet": 20,
+      "maxTargetSize": "medium",
+      "damage": [
+       {
+        "formula": "1d6",
+        "type": "piercing"
+       }
+      ],
+      "conditions": [
+       "prone"
+      ]
+     }
     ]
    }
   ],
@@ -8261,6 +8329,10 @@
      {
       "formula": "2d10 + 4",
       "type": "piercing"
+     },
+     {
+      "formula": "4d8",
+      "type": "poison"
      }
     ]
    }
@@ -9282,7 +9354,12 @@
      "bonus": 4,
      "reachFeet": 5
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1",
+      "type": "slashing"
+     }
+    ]
    }
   ],
   "token": {
@@ -9683,6 +9760,18 @@
       "formula": "2d6 + 4",
       "type": "piercing"
      }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "advantage",
+      "mode": "instead",
+      "damage": [
+       {
+        "formula": "4d6 + 4",
+        "type": "piercing"
+       }
+      ]
+     }
     ]
    },
    {
@@ -10011,6 +10100,10 @@
      {
       "formula": "1d10 + 5",
       "type": "bludgeoning"
+     },
+     {
+      "formula": "1d12",
+      "type": "acid"
      }
     ]
    }
@@ -10296,6 +10389,10 @@
      {
       "formula": "3d8 + 8",
       "type": "bludgeoning"
+     },
+     {
+      "formula": "2d6",
+      "type": "thunder"
      }
     ]
    },
@@ -10981,7 +11078,12 @@
      "bonus": 2,
      "reachFeet": 5
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1",
+      "type": "bludgeoning"
+     }
+    ]
    }
   ],
   "token": {
@@ -11182,6 +11284,10 @@
      {
       "formula": "1d4 + 1",
       "type": "slashing"
+     },
+     {
+      "formula": "1",
+      "type": "necrotic"
      }
     ]
    }
@@ -11270,6 +11376,10 @@
      {
       "formula": "1d8 + 2",
       "type": "slashing"
+     },
+     {
+      "formula": "2d6",
+      "type": "necrotic"
      }
     ]
    },
@@ -11712,6 +11822,10 @@
      {
       "formula": "1d6 + 4",
       "type": "bludgeoning"
+     },
+     {
+      "formula": "4d8",
+      "type": "radiant"
      }
     ]
    },
@@ -11980,12 +12094,8 @@
       "restrained"
      ]
     },
-    "damage": [
-     {
-      "formula": "6d6",
-      "type": "thunder"
-     }
-    ]
+    "damage": [],
+    "reminder": "At the start of each of its turns, the Restrained target takes 21 (6d6) Thunder damage."
    },
    {
     "id": "spellcasting",
@@ -12341,6 +12451,10 @@
      {
       "formula": "3d10 + 7",
       "type": "piercing"
+     },
+     {
+      "formula": "2d6",
+      "type": "fire"
      }
     ]
    },
@@ -12765,6 +12879,10 @@
      {
       "formula": "1d8 + 3",
       "type": "bludgeoning"
+     },
+     {
+      "formula": "1d4",
+      "type": "poison"
      }
     ]
    },
@@ -13391,6 +13509,10 @@
      {
       "formula": "2d6 + 6",
       "type": "slashing"
+     },
+     {
+      "formula": "2d12",
+      "type": "fire"
      }
     ]
    },
@@ -13640,6 +13762,23 @@
       "formula": "1d6 + 3",
       "type": "bludgeoning"
      }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "charge",
+      "mode": "plus",
+      "feet": 20,
+      "maxTargetSize": "large",
+      "damage": [
+       {
+        "formula": "1d6",
+        "type": "bludgeoning"
+       }
+      ],
+      "conditions": [
+       "prone"
+      ]
+     }
     ]
    }
   ],
@@ -13755,6 +13894,10 @@
      {
       "formula": "2d8 + 4",
       "type": "slashing"
+     },
+     {
+      "formula": "2d10",
+      "type": "necrotic"
      }
     ]
    },
@@ -13912,6 +14055,10 @@
      {
       "formula": "1d6 + 2",
       "type": "piercing"
+     },
+     {
+      "formula": "1d4",
+      "type": "poison"
      }
     ]
    },
@@ -14322,6 +14469,10 @@
      {
       "formula": "4d6 + 7",
       "type": "slashing"
+     },
+     {
+      "formula": "3d6",
+      "type": "fire"
      }
     ]
    },
@@ -14339,6 +14490,10 @@
      {
       "formula": "3d10 + 7",
       "type": "bludgeoning"
+     },
+     {
+      "formula": "1d8",
+      "type": "fire"
      }
     ]
    }
@@ -14443,6 +14598,10 @@
      {
       "formula": "2d8 + 4",
       "type": "bludgeoning"
+     },
+     {
+      "formula": "1d8",
+      "type": "lightning"
      }
     ]
    }
@@ -14562,7 +14721,16 @@
      "bonus": 4,
      "reachFeet": 5
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1",
+      "type": "piercing"
+     },
+     {
+      "formula": "2d4",
+      "type": "poison"
+     }
+    ]
    }
   ],
   "token": {
@@ -14652,7 +14820,12 @@
      "bonus": 3,
      "reachFeet": 5
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1",
+      "type": "piercing"
+     }
+    ]
    }
   ],
   "token": {
@@ -14770,6 +14943,10 @@
      {
       "formula": "2d12 + 6",
       "type": "slashing"
+     },
+     {
+      "formula": "2d8",
+      "type": "cold"
      }
     ]
    },
@@ -14787,6 +14964,10 @@
      {
       "formula": "2d10 + 6",
       "type": "piercing"
+     },
+     {
+      "formula": "2d6",
+      "type": "cold"
      }
     ]
    }
@@ -15014,12 +15195,9 @@
      {
       "formula": "3d6",
       "type": "acid"
-     },
-     {
-      "formula": "3d6",
-      "type": "acid"
      }
-    ]
+    ],
+    "reminder": "An engulfed target is suffocating, can't cast spells with a Verbal component, has the Restrained condition, and takes 10 (3d6) Acid damage at the start of each of the cube's turns."
    }
   ],
   "token": {
@@ -15128,6 +15306,10 @@
      {
       "formula": "1d8 + 3",
       "type": "piercing"
+     },
+     {
+      "formula": "2d8",
+      "type": "necrotic"
      }
     ]
    },
@@ -15457,6 +15639,10 @@
      {
       "formula": "1d6 + 2",
       "type": "piercing"
+     },
+     {
+      "formula": "1d6",
+      "type": "necrotic"
      }
     ]
    },
@@ -15900,6 +16086,23 @@
      {
       "formula": "2d6 + 3",
       "type": "piercing"
+     }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "charge",
+      "mode": "plus",
+      "feet": 20,
+      "maxTargetSize": "large",
+      "damage": [
+       {
+        "formula": "2d6",
+        "type": "piercing"
+       }
+      ],
+      "conditions": [
+       "prone"
+      ]
      }
     ]
    }
@@ -16473,6 +16676,10 @@
      {
       "formula": "1d4 + 3",
       "type": "slashing"
+     },
+     {
+      "formula": "1d6",
+      "type": "radiant"
      }
     ]
    }
@@ -16565,6 +16772,27 @@
      {
       "formula": "2d6 + 4",
       "type": "bludgeoning"
+     },
+     {
+      "formula": "2d4",
+      "type": "radiant"
+     }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "charge",
+      "mode": "plus",
+      "feet": 20,
+      "maxTargetSize": "huge",
+      "damage": [
+       {
+        "formula": "2d4",
+        "type": "bludgeoning"
+       }
+      ],
+      "conditions": [
+       "prone"
+      ]
      }
     ]
    }
@@ -16655,7 +16883,12 @@
      "bonus": 1,
      "reachFeet": 5
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1",
+      "type": "fire"
+     }
+    ]
    }
   ],
   "token": {
@@ -16869,6 +17102,23 @@
      {
       "formula": "1d6 + 3",
       "type": "bludgeoning"
+     }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "charge",
+      "mode": "plus",
+      "feet": 20,
+      "maxTargetSize": "large",
+      "damage": [
+       {
+        "formula": "2d4",
+        "type": "bludgeoning"
+       }
+      ],
+      "conditions": [
+       "prone"
+      ]
      }
     ]
    }
@@ -17521,6 +17771,10 @@
      {
       "formula": "1d8 + 3",
       "type": "piercing"
+     },
+     {
+      "formula": "2d10",
+      "type": "poison"
      }
     ]
    }
@@ -17618,6 +17872,19 @@
      {
       "formula": "2d6 + 2",
       "type": "bludgeoning"
+     }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "charge",
+      "feet": 20,
+      "mode": "instead",
+      "damage": [
+       {
+        "formula": "2d8 + 2",
+        "type": "bludgeoning"
+       }
+      ]
      }
     ]
    }
@@ -17819,6 +18086,10 @@
      {
       "formula": "1d8 + 3",
       "type": "piercing"
+     },
+     {
+      "formula": "2d6",
+      "type": "poison"
      }
     ]
    },
@@ -17938,6 +18209,10 @@
      {
       "formula": "1d6 + 2",
       "type": "piercing"
+     },
+     {
+      "formula": "2d4",
+      "type": "poison"
      }
     ],
     "onHit": [
@@ -18055,6 +18330,10 @@
      {
       "formula": "1d4 + 4",
       "type": "piercing"
+     },
+     {
+      "formula": "1d8",
+      "type": "poison"
      }
     ]
    }
@@ -18243,6 +18522,10 @@
      {
       "formula": "1d6 + 2",
       "type": "piercing"
+     },
+     {
+      "formula": "2d4",
+      "type": "poison"
      }
     ]
    }
@@ -18426,6 +18709,10 @@
      {
       "formula": "1d4 + 3",
       "type": "piercing"
+     },
+     {
+      "formula": "2d4",
+      "type": "poison"
      }
     ]
    }
@@ -19070,7 +19357,25 @@
      "bonus": 2,
      "reachFeet": 5
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1",
+      "type": "bludgeoning"
+     }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "charge",
+      "feet": 20,
+      "mode": "instead",
+      "damage": [
+       {
+        "formula": "1d4",
+        "type": "bludgeoning"
+       }
+      ]
+     }
+    ]
    }
   ],
   "token": {
@@ -19182,6 +19487,18 @@
       "formula": "1d6 + 2",
       "type": "slashing"
      }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "advantage",
+      "mode": "plus",
+      "damage": [
+       {
+        "formula": "1d4",
+        "type": "slashing"
+       }
+      ]
+     }
     ]
    },
    {
@@ -19198,6 +19515,18 @@
      {
       "formula": "1d6 + 2",
       "type": "piercing"
+     }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "advantage",
+      "mode": "plus",
+      "damage": [
+       {
+        "formula": "1d4",
+        "type": "piercing"
+       }
+      ]
      }
     ]
    }
@@ -19395,6 +19724,18 @@
       "formula": "1d6 + 2",
       "type": "slashing"
      }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "advantage",
+      "mode": "plus",
+      "damage": [
+       {
+        "formula": "1d4",
+        "type": "slashing"
+       }
+      ]
+     }
     ]
    },
    {
@@ -19411,6 +19752,18 @@
      {
       "formula": "1d6 + 2",
       "type": "piercing"
+     }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "advantage",
+      "mode": "plus",
+      "damage": [
+       {
+        "formula": "1d4",
+        "type": "piercing"
+       }
+      ]
      }
     ]
    }
@@ -20056,6 +20409,10 @@
      {
       "formula": "1d8 + 4",
       "type": "slashing"
+     },
+     {
+      "formula": "1d6",
+      "type": "poison"
      }
     ]
    },
@@ -20410,6 +20767,10 @@
      {
       "formula": "1d6 + 3",
       "type": "bludgeoning"
+     },
+     {
+      "formula": "1d4",
+      "type": "psychic"
      }
     ]
    }
@@ -20717,6 +21078,10 @@
      {
       "formula": "2d12 + 4",
       "type": "piercing"
+     },
+     {
+      "formula": "4d10",
+      "type": "poison"
      }
     ]
    },
@@ -21091,7 +21456,12 @@
      "bonus": 5,
      "reachFeet": 5
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1",
+      "type": "slashing"
+     }
+    ]
    }
   ],
   "token": {
@@ -21191,6 +21561,10 @@
      {
       "formula": "1d8 + 3",
       "type": "piercing"
+     },
+     {
+      "formula": "1d6",
+      "type": "fire"
      }
     ]
    },
@@ -21337,6 +21711,10 @@
      {
       "formula": "1d4 + 4",
       "type": "slashing"
+     },
+     {
+      "formula": "2d8",
+      "type": "poison"
      }
     ]
    }
@@ -21794,6 +22172,10 @@
      {
       "formula": "2d6 + 2",
       "type": "slashing"
+     },
+     {
+      "formula": "1d6",
+      "type": "poison"
      }
     ]
    },
@@ -21811,6 +22193,10 @@
      {
       "formula": "1d8 + 2",
       "type": "piercing"
+     },
+     {
+      "formula": "2d4",
+      "type": "poison"
      }
     ]
    }
@@ -21923,6 +22309,10 @@
      {
       "formula": "1d8 + 1",
       "type": "piercing"
+     },
+     {
+      "formula": "3d4",
+      "type": "poison"
      }
     ]
    }
@@ -22022,7 +22412,12 @@
       "poisoned"
      ]
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1",
+      "type": "piercing"
+     }
+    ]
    }
   ],
   "token": {
@@ -22131,6 +22526,10 @@
      {
       "formula": "2d8 + 6",
       "type": "piercing"
+     },
+     {
+      "formula": "2d8",
+      "type": "fire"
      }
     ]
    },
@@ -22587,6 +22986,10 @@
      {
       "formula": "2d8 + 5",
       "type": "piercing"
+     },
+     {
+      "formula": "3d6",
+      "type": "cold"
      }
     ]
    },
@@ -22603,6 +23006,10 @@
      {
       "formula": "3d6 + 5",
       "type": "bludgeoning"
+     },
+     {
+      "formula": "4d8",
+      "type": "cold"
      }
     ]
    },
@@ -22722,6 +23129,10 @@
      {
       "formula": "1d4 + 1",
       "type": "slashing"
+     },
+     {
+      "formula": "1d4",
+      "type": "cold"
      }
     ]
    },
@@ -22864,6 +23275,10 @@
      {
       "formula": "1d6 + 3",
       "type": "piercing"
+     },
+     {
+      "formula": "2d6",
+      "type": "poison"
      }
     ]
    },
@@ -22992,16 +23407,10 @@
      "ability": "wis",
      "dc": 15,
      "successDamage": "none",
-     "failureConditions": [
-      "unconscious"
-     ]
+     "failureConditions": []
     },
-    "damage": [
-     {
-      "formula": "4d8",
-      "type": "psychic"
-     }
-    ],
+    "damage": [],
+    "reminder": "On a failed save: a target with 20 Hit Points or fewer has the Unconscious condition for 1 hour (until it takes damage or is woken); any other target takes 18 (4d8) Psychic damage.",
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -23162,12 +23571,9 @@
      {
       "formula": "1d8 + 3",
       "type": "thunder"
-     },
-     {
-      "formula": "2d6",
-      "type": "thunder"
      }
-    ]
+    ],
+    "reminder": "Until the grapple ends, the target can't cast spells with a Verbal component and takes 7 (2d6) Thunder damage at the start of each of the stalker's turns."
    }
   ],
   "token": {
@@ -23286,6 +23692,10 @@
      {
       "formula": "3d8 + 7",
       "type": "slashing"
+     },
+     {
+      "formula": "3d6",
+      "type": "fire"
      }
     ]
    },
@@ -23444,7 +23854,7 @@
     },
     "damage": [
      {
-      "formula": "1d4 + 1",
+      "formula": "1d4 - 1",
       "type": "piercing"
      }
     ]
@@ -23652,6 +24062,10 @@
      {
       "formula": "2d6 + 3",
       "type": "slashing"
+     },
+     {
+      "formula": "1d8",
+      "type": "radiant"
      }
     ]
    },
@@ -23669,6 +24083,10 @@
      {
       "formula": "2d10",
       "type": "piercing"
+     },
+     {
+      "formula": "1d8",
+      "type": "radiant"
      }
     ]
    }
@@ -23973,12 +24391,9 @@
      {
       "formula": "3d8 + 10",
       "type": "piercing"
-     },
-     {
-      "formula": "7d6",
-      "type": "acid"
      }
-    ]
+    ],
+    "reminder": "A swallowed creature has the Restrained condition, has Total Cover against attacks and other effects outside the kraken, and takes 24 (7d6) Acid damage at the start of each of its turns."
    }
   ],
   "token": {
@@ -24114,6 +24529,10 @@
      {
       "formula": "1d8 + 3",
       "type": "slashing"
+     },
+     {
+      "formula": "2d6",
+      "type": "psychic"
      }
     ]
    },
@@ -24671,7 +25090,12 @@
      "bonus": 2,
      "reachFeet": 5
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1",
+      "type": "piercing"
+     }
+    ]
    }
   ],
   "token": {
@@ -24902,6 +25326,10 @@
      {
       "formula": "1d4 + 1",
       "type": "slashing"
+     },
+     {
+      "formula": "1d6",
+      "type": "fire"
      }
     ]
    },
@@ -25405,6 +25833,10 @@
      {
       "formula": "1d10 + 5",
       "type": "slashing"
+     },
+     {
+      "formula": "2d6",
+      "type": "necrotic"
      }
     ]
    },
@@ -25693,6 +26125,10 @@
      {
       "formula": "1d4 + 3",
       "type": "piercing"
+     },
+     {
+      "formula": "4d6",
+      "type": "poison"
      }
     ]
    },
@@ -25801,6 +26237,10 @@
      {
       "formula": "1d6",
       "type": "piercing"
+     },
+     {
+      "formula": "1d4",
+      "type": "cold"
      }
     ]
    }
@@ -26036,6 +26476,18 @@
       "formula": "1d8",
       "type": "acid"
      }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "target-grappled-by-self",
+      "mode": "instead",
+      "damage": [
+       {
+        "formula": "2d8 + 3",
+        "type": "piercing"
+       }
+      ]
+     }
     ]
    },
    {
@@ -26058,6 +26510,10 @@
      {
       "formula": "1d8 + 3",
       "type": "bludgeoning"
+     },
+     {
+      "formula": "1d8",
+      "type": "acid"
      }
     ],
     "onHit": [
@@ -26170,6 +26626,10 @@
      {
       "formula": "1d12 + 4",
       "type": "slashing"
+     },
+     {
+      "formula": "3d6",
+      "type": "necrotic"
      }
     ]
    },
@@ -26186,6 +26646,23 @@
      {
       "formula": "4d6 + 4",
       "type": "piercing"
+     }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "charge",
+      "mode": "plus",
+      "feet": 10,
+      "maxTargetSize": "large",
+      "damage": [
+       {
+        "formula": "3d6",
+        "type": "piercing"
+       }
+      ],
+      "conditions": [
+       "prone"
+      ]
      }
     ],
     "uses": {
@@ -26281,6 +26758,23 @@
      {
       "formula": "2d6 + 4",
       "type": "piercing"
+     }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "charge",
+      "mode": "plus",
+      "feet": 20,
+      "maxTargetSize": "large",
+      "damage": [
+       {
+        "formula": "2d8",
+        "type": "piercing"
+       }
+      ],
+      "conditions": [
+       "prone"
+      ]
      }
     ]
    },
@@ -26500,6 +26994,10 @@
      {
       "formula": "1d10 + 3",
       "type": "bludgeoning"
+     },
+     {
+      "formula": "3d6",
+      "type": "necrotic"
      }
     ]
    },
@@ -26656,6 +27154,10 @@
      {
       "formula": "2d10 + 4",
       "type": "bludgeoning"
+     },
+     {
+      "formula": "3d6",
+      "type": "necrotic"
      }
     ]
    },
@@ -26877,6 +27379,10 @@
      {
       "formula": "2d10 + 5",
       "type": "slashing"
+     },
+     {
+      "formula": "2d10",
+      "type": "force"
      }
     ]
    },
@@ -27136,6 +27642,10 @@
      {
       "formula": "2d8 + 4",
       "type": "bludgeoning"
+     },
+     {
+      "formula": "3d6",
+      "type": "fire"
      }
     ]
    },
@@ -27477,7 +27987,12 @@
      "bonus": 4,
      "reachFeet": 5
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1",
+      "type": "bludgeoning"
+     }
+    ]
    }
   ],
   "token": {
@@ -27800,6 +28315,10 @@
      {
       "formula": "1d12 + 4",
       "type": "slashing"
+     },
+     {
+      "formula": "2d8",
+      "type": "necrotic"
      }
     ]
    },
@@ -27932,18 +28451,13 @@
      "bonus": 6,
      "reachFeet": 5
     },
-    "save": {
-     "ability": "con",
-     "dc": 15,
-     "successDamage": "none",
-     "failureConditions": []
-    },
     "damage": [
      {
       "formula": "2d8 + 3",
       "type": "piercing"
      }
-    ]
+    ],
+    "reminder": "The hit gives the target the Poisoned condition. Whenever the Poisoned target finishes a Long Rest, it makes a DC 15 Constitution save: on a failure its Hit Point maximum decreases by 5 (1d10); on a success the Poisoned condition ends."
    },
    {
     "id": "tentacle",
@@ -28075,7 +28589,12 @@
      "bonus": 3,
      "reachFeet": 5
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1",
+      "type": "slashing"
+     }
+    ]
    }
   ],
   "token": {
@@ -28369,6 +28888,10 @@
      {
       "formula": "1d6 + 4",
       "type": "bludgeoning"
+     },
+     {
+      "formula": "2d4",
+      "type": "radiant"
      }
     ]
    }
@@ -28477,6 +29000,10 @@
      {
       "formula": "1d10 + 3",
       "type": "piercing"
+     },
+     {
+      "formula": "2d8",
+      "type": "poison"
      }
     ]
    }
@@ -28576,7 +29103,12 @@
      "bonus": 5,
      "reachFeet": 5
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1",
+      "type": "piercing"
+     }
+    ]
    }
   ],
   "token": {
@@ -28946,7 +29478,8 @@
       "formula": "3d6 + 8",
       "type": "piercing"
      }
-    ]
+    ],
+    "reminder": "While Poisoned, the target can't regain Hit Points and takes 21 (6d6) Poison damage at the start of each of its turns, and it repeats the save at the end of each of its turns, ending the effect on itself on a success."
    },
    {
     "id": "devilish-claw",
@@ -28977,6 +29510,10 @@
      {
       "formula": "4d6 + 8",
       "type": "force"
+     },
+     {
+      "formula": "6d6",
+      "type": "fire"
      }
     ]
    },
@@ -29133,6 +29670,10 @@
      {
       "formula": "2d6 + 7",
       "type": "slashing"
+     },
+     {
+      "formula": "4d8",
+      "type": "radiant"
      }
     ]
    },
@@ -29575,6 +30116,10 @@
      {
       "formula": "1d6 + 3",
       "type": "bludgeoning"
+     },
+     {
+      "formula": "2d4",
+      "type": "radiant"
      }
     ]
    },
@@ -29697,6 +30242,10 @@
      {
       "formula": "1d6 + 2",
       "type": "bludgeoning"
+     },
+     {
+      "formula": "1d4",
+      "type": "radiant"
      }
     ]
    },
@@ -30048,12 +30597,8 @@
       "restrained"
      ]
     },
-    "damage": [
-     {
-      "formula": "5d6",
-      "type": "acid"
-     }
-    ]
+    "damage": [],
+    "reminder": "A swallowed creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the worm, and takes 17 (5d6) Acid damage at the start of each of the worm's turns."
    },
    {
     "id": "bite",
@@ -30095,6 +30640,10 @@
      {
       "formula": "2d6 + 9",
       "type": "piercing"
+     },
+     {
+      "formula": "10d6",
+      "type": "poison"
      }
     ]
    }
@@ -30343,6 +30892,10 @@
      {
       "formula": "2d6 + 5",
       "type": "slashing"
+     },
+     {
+      "formula": "3d12",
+      "type": "necrotic"
      }
     ]
    },
@@ -30476,7 +31029,12 @@
      "bonus": 2,
      "reachFeet": 5
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1",
+      "type": "piercing"
+     }
+    ]
    }
   ],
   "token": {
@@ -30566,7 +31124,12 @@
      "bonus": 4,
      "reachFeet": 5
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1",
+      "type": "piercing"
+     }
+    ]
    }
   ],
   "token": {
@@ -30896,6 +31459,10 @@
      {
       "formula": "2d10 + 7",
       "type": "piercing"
+     },
+     {
+      "formula": "4d6",
+      "type": "fire"
      }
     ],
     "onHit": [
@@ -30924,16 +31491,8 @@
       "restrained"
      ]
     },
-    "damage": [
-     {
-      "formula": "3d6",
-      "type": "acid"
-     },
-     {
-      "formula": "3d6",
-      "type": "fire"
-     }
-    ]
+    "damage": [],
+    "reminder": "A swallowed creature has the Blinded and Restrained conditions, it has Total Cover against attacks and other effects outside the remorhaz, and it takes 10 (3d6) Acid damage plus 10 (3d6) Fire damage at the start of each of the remorhaz's turns."
    }
   ],
   "token": {
@@ -31032,6 +31591,23 @@
      {
       "formula": "2d8 + 5",
       "type": "piercing"
+     }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "charge",
+      "mode": "plus",
+      "feet": 20,
+      "maxTargetSize": "large",
+      "damage": [
+       {
+        "formula": "2d8",
+        "type": "piercing"
+       }
+      ],
+      "conditions": [
+       "prone"
+      ]
      }
     ]
    }
@@ -31876,6 +32452,10 @@
      {
       "formula": "2d8 + 4",
       "type": "piercing"
+     },
+     {
+      "formula": "2d6",
+      "type": "fire"
      }
     ]
    },
@@ -32105,7 +32685,16 @@
      "bonus": 2,
      "reachFeet": 5
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1",
+      "type": "piercing"
+     },
+     {
+      "formula": "1d6",
+      "type": "poison"
+     }
+    ]
    }
   ],
   "token": {
@@ -32321,12 +32910,8 @@
      "successDamage": "none",
      "failureConditions": []
     },
-    "damage": [
-     {
-      "formula": "3d8",
-      "type": "psychic"
-     }
-    ],
+    "damage": [],
+    "reminder": "On a failed save: a target with 20 Hit Points or fewer drops to 0 Hit Points; any other target takes 13 (3d8) Psychic damage.",
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -32661,6 +33246,10 @@
      {
       "formula": "1d6 + 4",
       "type": "bludgeoning"
+     },
+     {
+      "formula": "2d4",
+      "type": "lightning"
      }
     ]
    },
@@ -32677,12 +33266,8 @@
       "grappled"
      ]
     },
-    "damage": [
-     {
-      "formula": "3d6",
-      "type": "lightning"
-     }
-    ]
+    "damage": [],
+    "reminder": "Until the grapple ends, the target has the Blinded and Restrained conditions, and it takes 10 (3d6) Lightning damage at the start of each of its turns."
    }
   ],
   "token": {
@@ -32807,6 +33392,10 @@
      {
       "formula": "2d6 + 4",
       "type": "bludgeoning"
+     },
+     {
+      "formula": "2d6",
+      "type": "force"
      }
     ]
    }
@@ -33315,6 +33904,10 @@
      {
       "formula": "4d6 + 8",
       "type": "slashing"
+     },
+     {
+      "formula": "8d8",
+      "type": "radiant"
      }
     ]
    },
@@ -33355,16 +33948,8 @@
      "successDamage": "none",
      "failureConditions": []
     },
-    "damage": [
-     {
-      "formula": "4d8 + 6",
-      "type": "piercing"
-     },
-     {
-      "formula": "8d8",
-      "type": "radiant"
-     }
-    ]
+    "damage": [],
+    "reminder": "On a failed save: a creature with 100 Hit Points or fewer dies; any other takes 24 (4d8 + 6) Piercing damage plus 36 (8d8) Radiant damage."
    },
    {
     "id": "spellcasting",
@@ -33857,12 +34442,8 @@
       "frightened"
      ]
     },
-    "damage": [
-     {
-      "formula": "8d10",
-      "type": "thunder"
-     }
-    ],
+    "damage": [],
+    "reminder": "Roar runs its First Roar (Frightened for 1 minute). The Second Roar (Paralyzed) and Third Roar (Con save, 44 (8d10) Thunder damage and Prone, half on a success) are applied by hand.",
     "uses": {
      "limit": 3,
      "per": "long-rest"
@@ -34002,6 +34583,10 @@
      {
       "formula": "1d4 + 3",
       "type": "slashing"
+     },
+     {
+      "formula": "2d6",
+      "type": "radiant"
      }
     ]
    }
@@ -34098,7 +34683,16 @@
      "bonus": 4,
      "reachFeet": 5
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1",
+      "type": "piercing"
+     },
+     {
+      "formula": "1d4",
+      "type": "poison"
+     }
+    ]
    }
   ],
   "token": {
@@ -34204,6 +34798,10 @@
      {
       "formula": "1d6 + 4",
       "type": "piercing"
+     },
+     {
+      "formula": "4d6",
+      "type": "poison"
      }
     ]
    },
@@ -34342,7 +34940,12 @@
      "rangeFeet": 160,
      "rangeNormalFeet": 40
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1",
+      "type": "piercing"
+     }
+    ]
    },
    {
     "id": "heart-sight",
@@ -34456,6 +35059,10 @@
      {
       "formula": "1d6 + 2",
       "type": "piercing"
+     },
+     {
+      "formula": "2d6",
+      "type": "poison"
      }
     ]
    },
@@ -34473,6 +35080,10 @@
      {
       "formula": "1d6 + 2",
       "type": "piercing"
+     },
+     {
+      "formula": "2d6",
+      "type": "poison"
      }
     ]
    }
@@ -34561,6 +35172,10 @@
      {
       "formula": "1d4",
       "type": "slashing"
+     },
+     {
+      "formula": "1d4",
+      "type": "fire"
      }
     ]
    },
@@ -34943,6 +35558,10 @@
      {
       "formula": "2d8 + 6",
       "type": "bludgeoning"
+     },
+     {
+      "formula": "2d8",
+      "type": "force"
      }
     ]
    },
@@ -35078,6 +35697,10 @@
      {
       "formula": "4d6 + 9",
       "type": "slashing"
+     },
+     {
+      "formula": "3d8",
+      "type": "lightning"
      }
     ]
    },
@@ -35369,6 +35992,18 @@
       "formula": "2d4",
       "type": "piercing"
      }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "self-bloodied",
+      "mode": "instead",
+      "damage": [
+       {
+        "formula": "1d4",
+        "type": "piercing"
+       }
+      ]
+     }
     ]
    }
   ],
@@ -35463,6 +36098,18 @@
      {
       "formula": "4d8 + 2",
       "type": "necrotic"
+     }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "self-bloodied",
+      "mode": "instead",
+      "damage": [
+       {
+        "formula": "2d8 + 2",
+        "type": "necrotic"
+       }
+      ]
      }
     ],
     "onHit": [
@@ -35586,6 +36233,18 @@
       "formula": "2d4 + 1",
       "type": "poison"
      }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "self-bloodied",
+      "mode": "instead",
+      "damage": [
+       {
+        "formula": "1d4 + 1",
+        "type": "poison"
+       }
+      ]
+     }
     ]
    }
   ],
@@ -35684,6 +36343,18 @@
      {
       "formula": "2d4 + 3",
       "type": "piercing"
+     }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "self-bloodied",
+      "mode": "instead",
+      "damage": [
+       {
+        "formula": "1d4 + 3",
+        "type": "piercing"
+       }
+      ]
      }
     ]
    }
@@ -35784,6 +36455,18 @@
       "formula": "2d4",
       "type": "piercing"
      }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "self-bloodied",
+      "mode": "instead",
+      "damage": [
+       {
+        "formula": "1d4",
+        "type": "piercing"
+       }
+      ]
+     }
     ]
    }
   ],
@@ -35878,6 +36561,18 @@
      {
       "formula": "1d6 + 2",
       "type": "piercing"
+     }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "self-bloodied",
+      "mode": "instead",
+      "damage": [
+       {
+        "formula": "1d4",
+        "type": "piercing"
+       }
+      ]
      }
     ]
    },
@@ -35991,6 +36686,22 @@
      {
       "formula": "1d8 + 4",
       "type": "piercing"
+     },
+     {
+      "formula": "3d6",
+      "type": "poison"
+     }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "self-bloodied",
+      "mode": "instead",
+      "damage": [
+       {
+        "formula": "1d4 + 4",
+        "type": "piercing"
+       }
+      ]
      }
     ]
    }
@@ -36105,12 +36816,8 @@
       "restrained"
      ]
     },
-    "damage": [
-     {
-      "formula": "16d6",
-      "type": "acid"
-     }
-    ]
+    "damage": [],
+    "reminder": "A swallowed creature has the Blinded and Restrained conditions and can't teleport, it has Total Cover against attacks and other effects outside the tarrasque, and it takes 56 (16d6) Acid damage at the start of each of the tarrasque's turns."
    },
    {
     "id": "bite",
@@ -36827,6 +37534,23 @@
       "formula": "2d12 + 6",
       "type": "piercing"
      }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "charge",
+      "mode": "plus",
+      "feet": 20,
+      "maxTargetSize": "huge",
+      "damage": [
+       {
+        "formula": "2d8",
+        "type": "piercing"
+       }
+      ],
+      "conditions": [
+       "prone"
+      ]
+     }
     ]
    }
   ],
@@ -37511,6 +38235,10 @@
      {
       "formula": "1d8 + 4",
       "type": "bludgeoning"
+     },
+     {
+      "formula": "2d6",
+      "type": "necrotic"
      }
     ],
     "onHit": [
@@ -37680,6 +38408,10 @@
      {
       "formula": "1d4 + 3",
       "type": "piercing"
+     },
+     {
+      "formula": "3d4",
+      "type": "necrotic"
      }
     ]
    }
@@ -37933,6 +38665,10 @@
      {
       "formula": "1d4 + 2",
       "type": "piercing"
+     },
+     {
+      "formula": "1d6",
+      "type": "poison"
      }
     ]
    }
@@ -38139,6 +38875,10 @@
      {
       "formula": "2d6 + 3",
       "type": "piercing"
+     },
+     {
+      "formula": "3d6",
+      "type": "poison"
      }
     ]
    },
@@ -38155,12 +38895,8 @@
       "poisoned"
      ]
     },
-    "damage": [
-     {
-      "formula": "1d10",
-      "type": "poison"
-     }
-    ],
+    "damage": [],
+    "reminder": "While Poisoned, the target takes 5 (1d10) Poison damage at the start of each of its turns.",
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -38401,6 +39137,23 @@
      {
       "formula": "2d4 + 4",
       "type": "bludgeoning"
+     }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "charge",
+      "mode": "plus",
+      "feet": 20,
+      "maxTargetSize": "large",
+      "damage": [
+       {
+        "formula": "2d4",
+        "type": "bludgeoning"
+       }
+      ],
+      "conditions": [
+       "prone"
+      ]
      }
     ]
    }
@@ -38850,12 +39603,9 @@
      {
       "formula": "4d8 + 4",
       "type": "bludgeoning"
-     },
-     {
-      "formula": "2d8",
-      "type": "bludgeoning"
      }
     ],
+    "reminder": "Until the grapple ends, the target has the Restrained condition, is suffocating unless it can breathe water, and takes 9 (2d8) Bludgeoning damage at the start of each of the elemental's turns.",
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -38971,7 +39721,12 @@
      "bonus": 5,
      "reachFeet": 5
     },
-    "damage": []
+    "damage": [
+     {
+      "formula": "1",
+      "type": "piercing"
+     }
+    ]
    }
   ],
   "token": {
@@ -39260,6 +40015,23 @@
      {
       "formula": "2d6 + 3",
       "type": "piercing"
+     }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "charge",
+      "mode": "plus",
+      "feet": 20,
+      "maxTargetSize": "medium",
+      "damage": [
+       {
+        "formula": "2d6",
+        "type": "piercing"
+       }
+      ],
+      "conditions": [
+       "prone"
+      ]
      }
     ]
    }
@@ -39944,6 +40716,10 @@
      {
       "formula": "1d8 + 2",
       "type": "slashing"
+     },
+     {
+      "formula": "1d8",
+      "type": "necrotic"
      }
     ]
    },
@@ -39961,6 +40737,10 @@
      {
       "formula": "1d8 + 2",
       "type": "piercing"
+     },
+     {
+      "formula": "1d8",
+      "type": "necrotic"
      }
     ]
    },
@@ -40715,6 +41495,10 @@
      {
       "formula": "2d6 + 4",
       "type": "piercing"
+     },
+     {
+      "formula": "7d6",
+      "type": "poison"
      }
     ]
    }
@@ -41103,7 +41887,7 @@
       "type": "slashing"
      },
      {
-      "formula": "1d6",
+      "formula": "1d10",
       "type": "lightning"
      }
     ]
