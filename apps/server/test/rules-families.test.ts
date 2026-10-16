@@ -49,6 +49,8 @@ describe("rule families", () => {
       // An extra attack waits on the swing that opens it: a matter of what this turn has done.
       ["attack.light-needs-attack", "economy"],
       ["attack.cleave-needs-hit", "economy"],
+      // A Loading weapon fires once per action: what this action has already done.
+      ["attack.loading", "economy"],
       ["feature.no-uses-remaining", "resources"],
       ["feature.requires-effect", "resources"],
       ["feature.no-spell-slot", "resources"],

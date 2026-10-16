@@ -22,6 +22,8 @@ const RULE_FAMILIES = {
   // An extra attack (Light, Cleave) is owed only once the swing that opens it has happened this turn.
   "attack.light-needs-attack": "economy",
   "attack.cleave-needs-hit": "economy",
+  // A Loading weapon fires once per action, however many attacks the action allows.
+  "attack.loading": "economy",
   // ...while "no legendary actions left this round" is a spent resource, like limited uses.
   "legendary.no-actions-remaining": "resources",
   "feature.no-uses-remaining": "resources",

@@ -3,6 +3,7 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
 import { hasEffectTag } from "../effects.js";
 import { RulesBlockedError } from "../game-store.js";
+import { isItemActionId, itemActionRest } from "../item-actions.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import {
   effectiveModeFor,
@@ -100,6 +101,7 @@ export function evaluateActionEconomy(
   };
   checkAbleToAct(evaluation);
   checkExtraAttackOpened(evaluation);
+  checkLoading(evaluation);
   const spendUse = checkLimitedUse(evaluation);
   const slots = checkActionSlots(evaluation);
   const spendLegendary = checkLegendary(evaluation, definition);
@@ -161,6 +163,28 @@ function checkExtraAttackOpened({ state, attacker, action, violations }: Evaluat
     violations.push({
       rule: "attack.cleave-needs-hit",
       message: `${action.name} follows a melee hit with this weapon this turn.`
+    });
+}
+
+/** The inventory row a weapon swing is made with (`item-<id>`), or null for any other action. */
+function swingItemOf(attacker: LiveActor, action: DefinitionAction) {
+  if (!isItemActionId(action.id)) return null;
+  const rest = itemActionRest(action.id);
+  return attacker.inventory.find((item) => item.id === rest && item.weapon !== undefined) ?? null;
+}
+
+/** SRD Loading: "You can fire only one piece of ammunition from a Loading weapon when you use an action ... to fire
+ *  it, regardless of the number of attacks you can normally make." Extra Attack's other swings stay open for
+ *  another weapon. */
+function checkLoading({ state, attacker, action, onOwnTurn, violations }: Evaluation): void {
+  if (!onOwnTurn || action.activation !== "action") return;
+  const item = swingItemOf(attacker, action);
+  if (!item?.weapon?.properties?.includes("loading")) return;
+  const fired = state.combat.turn.extraAttacks?.loading;
+  if (fired?.actorId === attacker.id && fired.itemIds.includes(item.id))
+    violations.push({
+      rule: "attack.loading",
+      message: `${action.name} has the Loading property: it fires once per action. Use another weapon for the remaining attacks.`
     });
 }
 

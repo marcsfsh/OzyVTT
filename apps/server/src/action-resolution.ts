@@ -7,7 +7,7 @@ import { rollRiderDamage, rollWeaponDamage } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
 import { applyHealing } from "./resolution/heal.js";
-import { recordCleaveOpening, recordLightAttack } from "./resolution/extra-attacks.js";
+import { recordCleaveOpening, recordLightAttack, recordLoadingShot } from "./resolution/extra-attacks.js";
 import { applyMasteryForces, masterySwingOf, offeredPush, spendVex } from "./resolution/masteries.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
 import { parkActionSave, parkForAcReaction, parkReaction } from "./resolution/pending.js";
@@ -41,6 +41,7 @@ export function resolveDefinitionAction(
   if (parkForAcReaction(ctx)) {
     commitEconomy(ctx);
     recordLightAttack(ctx);
+    recordLoadingShot(ctx);
     releaseHideAndReady(ctx);
     return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
   }
@@ -63,6 +64,7 @@ export function resolveDefinitionAction(
 
   commitEconomy(ctx);
   recordLightAttack(ctx);
+  recordLoadingShot(ctx);
   recordCleaveOpening(ctx);
   releaseHideAndReady(ctx);
   return resolutionOf(ctx);
