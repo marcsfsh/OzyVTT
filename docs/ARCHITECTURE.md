@@ -156,10 +156,13 @@ effects and conditions, saves, reactions and opportunity attacks, concentration,
 rests, death saves, weapon masteries and movement budgets. Entry points are
 `action-resolution.ts` and its neighbours in `apps/server/src`. Resolving an action runs a fixed
 sequence of steps over one shared context, one module per step in `apps/server/src/resolution/`
-(validation, attack roll, damage, masteries, on-hit effects, grants, pending saves and reactions,
-the action economy, release); builtin actions such as Hide and the unarmed Grapple add their special
-cases through the handler table in `resolution/builtins.ts`. Every condition write goes through
-`applyCondition` in `effects.ts`, which honours innate and item-granted immunities.
+(validation, attack roll, damage, masteries, on-hit effects, grants, concentration, pending saves
+and reactions, the action economy, release); builtin actions such as Hide and the unarmed Grapple
+add their special cases through the handler table in `resolution/builtins.ts`. Every condition
+write goes through `applyCondition` in `effects.ts`, which honours innate and item-granted
+immunities and runs what gaining a condition sets off (an Incapacitated creature drops its
+Concentration and its grapples). Effects end by their duration at turn start and turn end, and the
+end of a turn opens any repeat saves (`turn-boundaries.ts`).
 
 Bonuses, advantage, extra damage and defences are modifiers in one vocabulary (`ModifierSchema` in
 `packages/schemas`), shared by features, feats, chosen options, magic items and live effects, and
