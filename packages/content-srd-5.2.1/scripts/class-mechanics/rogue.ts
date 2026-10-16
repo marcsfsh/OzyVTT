@@ -84,7 +84,7 @@ export const rogue: ClassMechanicsModule = {
     },
 
     "epic-boon": {
-      choice: { kind: "feat", choose: 1, fromCatalog: "epic-boon-feats" }
+      choice: { kind: "feat", choose: 1, fromCatalog: "feats" }
     },
 
     // The counter only; turning a failed D20 Test into a 20 is not expressible.

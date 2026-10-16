@@ -94,6 +94,7 @@ const wizardInput = (): MutableCreateInput => ({
     { level: 1, classId: "wizard", kind: "skill", id: "insight" },
     { level: 1, kind: "skill", id: "perception", payload: { featureId: "elf-keen-senses" } },
     { level: 1, kind: "lineage", id: "high-elf" },
+    { level: 1, kind: "spellcasting-ability", id: "int", payload: { featureId: "elf-lineage" } },
     { level: 2, classId: "wizard", kind: "expertise", id: "arcana", payload: { featureId: "scholar" } },
     { level: 3, classId: "wizard", kind: "subclass", id: "evoker" },
     { level: 3, kind: "spell", id: "shatter", payload: { featureId: "evocation-savant" } },
@@ -105,6 +106,7 @@ const wizardInput = (): MutableCreateInput => ({
     { level: 1, kind: "cantrip", id: "dancing-lights", payload: { featureId: "magic-initiate-wizard" } },
     // Magic Initiate's level-1 spell pick.
     { level: 1, kind: "spell", id: "magic-missile", payload: { featureId: "magic-initiate-wizard" } },
+    { level: 1, kind: "spellcasting-ability", id: "int", payload: { featureId: "magic-initiate-wizard" } },
     { level: 1, kind: "spell", id: "magic-missile" },
     { level: 1, kind: "spell", id: "mage-armor" },
     { level: 1, kind: "spell", id: "detect-magic" },
@@ -187,6 +189,7 @@ const warlockInput = (): MutableCreateInput => ({
     { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "spellcasting-ability", id: "wis", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "equipment", id: "warlock-a" },
     { level: 1, kind: "equipment", id: "acolyte-a" }
   ]
@@ -434,12 +437,15 @@ describe("buildCharacterDefinition - Wizard 3 (high-elf sage, Evoker)", () => {
     ]);
     expect(spells.get("fire-bolt")?.alwaysPrepared).toBe(true); // class cantrip
     expect(spells.get("prestidigitation")?.alwaysPrepared).toBe(true); // High Elf lineage grant
+    // Magic Initiate keeps its level 1 spell always prepared with a free casting, so the class pick of the
+    // same spell is not charged to the prepared cap.
     expect(spells.get("magic-missile")).toMatchObject({
       level: 1,
       prepared: true,
-      alwaysPrepared: false,
-      classId: "wizard"
+      alwaysPrepared: true,
+      freeActionId: "spell-magic-missile-free"
     });
+    expect(spells.get("mage-armor")).toMatchObject({ alwaysPrepared: false, classId: "wizard" });
     expect(spells.get("shatter")).toMatchObject({ level: 2, prepared: true }); // savant pick, outside the prepared cap
   });
 
@@ -449,7 +455,8 @@ describe("buildCharacterDefinition - Wizard 3 (high-elf sage, Evoker)", () => {
     expect(skills.get("arcana")).toBe("expertise");
     expect(definition.proficiencies?.saves).toEqual(["int", "wis"]);
     expect(definition.proficiencies?.tools).toEqual(["calligraphers-supplies"]);
-    expect(definition.proficiencies?.languages).toEqual(["common", "elvish", "dwarvish", "giant"]);
+    // SRD 5.2.1: Common plus two standard languages; the 2024 Elf grants no language of its own.
+    expect(definition.proficiencies?.languages).toEqual(["common", "dwarvish", "giant"]);
     expect(definition.character?.race).toEqual({
       id: "elf",
       name: "Elf",
@@ -560,10 +567,14 @@ describe("buildCharacterDefinition - loud rejections", () => {
       /not on the Wizard spell list/
     );
     const overCap = wizardInput();
+    // Mage Armor and Misty Step are charged; Magic Missile is Magic Initiate's and Detect Magic the level-3 High
+    // Elf's, both always prepared and uncharged.
     overCap.choices.push(
       { level: 1, kind: "spell", id: "shield" },
       { level: 1, kind: "spell", id: "sleep" },
-      { level: 1, kind: "spell", id: "burning-hands" }
+      { level: 1, kind: "spell", id: "burning-hands" },
+      { level: 1, kind: "spell", id: "chromatic-orb" },
+      { level: 1, kind: "spell", id: "feather-fall" }
     );
     expect(() => buildCharacterDefinition(overCap, library, defaultPolicy)).toThrowError(
       /prepares 6 spells at level 3; got 7/
@@ -687,6 +698,7 @@ const clericInput = (): MutableCreateInput => ({
     { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "resistance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "spellcasting-ability", id: "wis", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "light" },
     { level: 1, kind: "cantrip", id: "sacred-flame" },
     { level: 1, kind: "cantrip", id: "spare-the-dying" },
@@ -1191,7 +1203,8 @@ describe("the same feat cannot be taken twice across different offers", () => {
     differentList.choices.push(
       { level: 1, kind: "cantrip", id: "fire-bolt", payload: { featureId: "magic-initiate-wizard" } },
       { level: 1, kind: "cantrip", id: "prestidigitation", payload: { featureId: "magic-initiate-wizard" } },
-      { level: 1, kind: "spell", id: "magic-missile", payload: { featureId: "magic-initiate-wizard" } }
+      { level: 1, kind: "spell", id: "magic-missile", payload: { featureId: "magic-initiate-wizard" } },
+      { level: 1, kind: "spellcasting-ability", id: "int", payload: { featureId: "magic-initiate-wizard" } }
     );
     const built = buildCharacterDefinition(differentList, library, defaultPolicy);
     // The Versatile pick replaced Alert here, so the sheet holds both Magic Initiate flavours: same feat

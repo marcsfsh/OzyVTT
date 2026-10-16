@@ -79,7 +79,7 @@ export const sorcerer: ClassMechanicsModule = {
     },
     // The once-per-Long-Rest permission only; the points it returns are refilled by hand.
     "sorcerous-restoration": { uses: { limit: 1, per: "long-rest" } },
-    "epic-boon": { choice: { kind: "feat", choose: 1, fromCatalog: "epic-boon-feats" } }
+    "epic-boon": { choice: { kind: "feat", choose: 1, fromCatalog: "feats" } }
     // Not modeled: Sorcery Incarnate (substitute cost, two Metamagic per spell), Arcane Apotheosis
     // (cost waiver) and the cantrip replacement clauses.
   },

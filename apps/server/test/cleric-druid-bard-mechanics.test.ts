@@ -59,13 +59,15 @@ const HUMAN: Row[] = [
 const SAGE_FEAT: Row[] = [
   { level: 1, kind: "cantrip", id: "minor-illusion", payload: { featureId: "magic-initiate-wizard" } },
   { level: 1, kind: "cantrip", id: "dancing-lights", payload: { featureId: "magic-initiate-wizard" } },
-  { level: 1, kind: "spell", id: "magic-missile", payload: { featureId: "magic-initiate-wizard" } }
+  { level: 1, kind: "spell", id: "magic-missile", payload: { featureId: "magic-initiate-wizard" } },
+  { level: 1, kind: "spellcasting-ability", id: "int", payload: { featureId: "magic-initiate-wizard" } }
 ];
 /** The same for the Acolyte's Magic Initiate (Cleric), on the Charisma class. */
 const ACOLYTE_FEAT: Row[] = [
   { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
   { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
-  { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } }
+  { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+  { level: 1, kind: "spellcasting-ability", id: "wis", payload: { featureId: "magic-initiate-cleric" } }
 ];
 
 // A Druid of any level. `sage` is the background because it can raise Wisdom; its origin feat's
@@ -292,7 +294,7 @@ describe("Druidic - a language and an always-prepared spell (audit row 35)", () 
         .filter((spell) => spell.level === 1 && !spell.alwaysPrepared)
         .map((spell) => spell.id)
         .sort()
-    ).toEqual(["cure-wounds", "entangle", "faerie-fire", "fog-cloud", "magic-missile"]); // 4 class + the Sage feat's own
+    ).toEqual(["cure-wounds", "entangle", "faerie-fire", "fog-cloud"]); // the Sage feat's own is always prepared
     expect(() =>
       build(druid(1, [primalOrder("magician"), ...four, { level: 1, kind: "spell", id: "thunderwave" } as Row]))
     ).toThrowError(/Druid prepares 4 spells at level 1; got 5/);
@@ -463,7 +465,7 @@ describe("Nature's Ward - the half of audit row 65 that is authorable", () => {
 });
 
 describe("Epic Boon - the level-19 feat nine classes lost outright (audit row 6)", () => {
-  it("makes a level-19 Druid pick one, and refuses a feat that is not an Epic Boon", () => {
+  it("makes a level-19 Druid pick one, or another feat it qualifies for", () => {
     const taken = build(
       druid(19, [
         primalOrder("warden"),
@@ -473,12 +475,17 @@ describe("Epic Boon - the level-19 feat nine classes lost outright (audit row 6)
     );
     expect((taken.character?.feats ?? []).map((feat) => feat.id)).toContain("boon-of-dimensional-travel");
     expect(() => build(druid(19, [primalOrder("warden"), elementalFury("primal-strike")]))).toThrowError(/Epic Boon/);
-    const wrongFeat = druid(19, [
+    // "or another feat of your choice for which you qualify": Grappler (DEX 14), but not Alert, already held.
+    const grappler = build(
+      druid(19, [primalOrder("warden"), elementalFury("primal-strike"), ...epicBoon("druid", "grappler", "dex")])
+    );
+    expect((grappler.character?.feats ?? []).map((feat) => feat.id)).toContain("grappler");
+    const held = druid(19, [
       primalOrder("warden"),
       elementalFury("primal-strike"),
-      { level: 19, classId: "druid", kind: "feat", id: "grappler", payload: { featureId: "epic-boon" } } as Row
+      { level: 19, classId: "druid", kind: "feat", id: "alert", payload: { featureId: "epic-boon" } } as Row
     ]);
-    expect(() => build(wrongFeat)).toThrowError(/not an offered option/);
+    expect(() => build(held)).toThrowError(/Alert is already on this character/);
   });
 
   it("does the same for the Bard", () => {

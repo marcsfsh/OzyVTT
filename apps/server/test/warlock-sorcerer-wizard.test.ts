@@ -11,6 +11,7 @@ import { effectiveActions } from "../src/effective-actions.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
 import { endEncounter, startEncounter } from "../src/encounter.js";
 import { applyRest } from "../src/rests.js";
+import { asiRows } from "./asi-rows.js";
 
 // Warlock, Sorcerer and Wizard mechanics, asserted as rolled numbers, spent counters, refusals or
 // rendered text; never "the rider survived derivation". Runs the real builder against the real SRD
@@ -56,6 +57,7 @@ const warlockInput = (level: number, extra: readonly Row[] = []): CharacterCreat
     { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "spellcasting-ability", id: "wis", payload: { featureId: "magic-initiate-cleric" } },
     { level: 3, classId: "warlock", kind: "subclass", id: "fiend-patron" },
     { level: 1, kind: "equipment", id: "warlock-a" },
     { level: 1, kind: "equipment", id: "acolyte-a" },
@@ -72,14 +74,6 @@ const invocation = (level: number, id: string): Row =>
     id,
     payload: { featureId: "eldritch-invocations" }
   }) as Row;
-
-/** One Ability Score Improvement, taken as +1/+1 into the named ability. */
-const asi = (level: number, ability: "cha" | "dex" = "cha"): Row[] =>
-  [
-    { level, classId: "warlock", kind: "asi-or-feat", id: "ability-score-improvement" },
-    { level, kind: "ability-score", id: ability, payload: { featureId: "ability-score-improvement" } },
-    { level, kind: "ability-score", id: ability, payload: { featureId: "ability-score-improvement" } }
-  ] as Row[];
 
 /** The invocations a Warlock of this level is owed by the printed column, as plain a set as possible. */
 const FILLER: ReadonlyArray<readonly [level: number, id: string]> = [
@@ -109,9 +103,15 @@ const invocationsAt = (level: number) =>
   ].find(([at]) => level >= at)![1];
 const fillerFor = (level: number): Row[] =>
   FILLER.slice(0, invocationsAt(level)).map(([grantedAt, id]) => invocation(grantedAt, id));
-/** Every ASI a Warlock of this level has been granted (levels 4, 8, 12, 16). */
+/** Every ASI a Warlock of this level has been granted (levels 4, 8, 12, 16), into CHA (17 before the first) or
+ *  DEX (14) until it reaches 20, then into CON. */
 const asisFor = (level: number, ability: "cha" | "dex" = "cha"): Row[] =>
-  [4, 8, 12, 16].filter((at) => at <= level).flatMap((at) => asi(at, ability));
+  asiRows(
+    "warlock",
+    [4, 8, 12, 16].filter((at) => at <= level),
+    [ability, "con"],
+    { cha: 17, dex: 14, con: 13 }
+  ) as Row[];
 
 type Built = Readonly<{
   definition: ActorDefinition;
@@ -215,10 +215,15 @@ describe("Warlock: Mystic Arcanum is a real pick and a real once-per-day casting
 
   it("spends its own once-per-Long-Rest use and refuses the second", () => {
     const built = table(level11());
-    expect(actionOf(built, "mystic-arcanum-level-6-spell").uses).toMatchObject({ limit: 1, per: "long-rest" });
+    // The daily use rides the arcanum spell's own free casting, spending the feature's pool.
+    expect(actionOf(built, "spell-true-seeing-free").uses).toMatchObject({
+      limit: 1,
+      per: "long-rest",
+      pool: "mystic-arcanum-level-6-spell"
+    });
     resolveDefinitionAction(
       built.state,
-      actionOf(built, "mystic-arcanum-level-6-spell"),
+      actionOf(built, "spell-true-seeing-free"),
       { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000001" },
       deps(built, [])
     );
@@ -226,7 +231,7 @@ describe("Warlock: Mystic Arcanum is a real pick and a real once-per-day casting
     expect(() =>
       resolveDefinitionAction(
         built.state,
-        actionOf(built, "mystic-arcanum-level-6-spell"),
+        actionOf(built, "spell-true-seeing-free"),
         { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000002" },
         deps(built, [])
       )
@@ -307,8 +312,13 @@ describe("Warlock: Mystic Arcanum is a real pick and a real once-per-day casting
       )
     ).toEqual([6, 7, 8, 9]);
     // Four separate pools, not one shared counter: the SRD regains "all uses" on a Long Rest.
+    const arcana = ["true-seeing", "forcecage", "demiplane", "foresight"];
     for (const level of [6, 7, 8, 9]) {
-      expect(actionOf(built, `mystic-arcanum-level-${level}-spell`).uses).toMatchObject({ limit: 1, per: "long-rest" });
+      expect(actionOf(built, `spell-${arcana[level - 6]}-free`).uses).toMatchObject({
+        limit: 1,
+        per: "long-rest",
+        pool: `mystic-arcanum-level-${level}-spell`
+      });
     }
   });
 });
@@ -625,12 +635,13 @@ describe("Warlock invocations: the eleven free castings are handed over (audit r
     ] as const) {
       expect(spellOf(built, id)).toMatchObject({ id, level, alwaysPrepared: true, prepared: true });
     }
-    // A level-5 Warlock prepares 6 spells. The granted castings are uncharged on top; the only charged
-    // extra is the background's Magic Initiate spell.
+    // A level-5 Warlock prepares 6 spells. The granted castings are uncharged on top, and so is the
+    // background's Magic Initiate spell, which the feat keeps always prepared.
     expect(built.spellcasting!.classes![0]).toMatchObject({ classId: "warlock", prepared: 6 });
     expect(
       (built.spellcasting!.spells ?? []).filter((spell) => spell.alwaysPrepared === false).map((spell) => spell.id)
-    ).toEqual(["bless"]);
+    ).toEqual([]);
+    expect(spellOf(built, "bless")).toMatchObject({ alwaysPrepared: true, freeActionId: "spell-bless-free" });
   });
 
   it("hands over NOTHING when the invocation was not taken", () => {
@@ -844,6 +855,7 @@ const sorcererInput = (level: number, extra: readonly Row[] = []): CharacterCrea
     { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "spellcasting-ability", id: "wis", payload: { featureId: "magic-initiate-cleric" } },
     ...(level >= 3 ? [{ level: 3, classId: "sorcerer", kind: "subclass", id: "draconic-sorcery" }] : []),
     { level: 1, kind: "equipment", id: "sorcerer-a" },
     { level: 1, kind: "equipment", id: "acolyte-a" },
@@ -854,18 +866,18 @@ const sorcererInput = (level: number, extra: readonly Row[] = []): CharacterCrea
 /** Metamagic: two at level 2, two more at 10, two more at 17 - the SRD's six. */
 const metamagic = (level: number, ids: readonly string[]): Row[] =>
   ids.map((id) => ({ level, classId: "sorcerer", kind: "metamagic", id, payload: { featureId: "metamagic" } }) as Row);
-const sorcererAsi = (level: number, ability: "cha" | "dex" = "dex"): Row[] =>
-  [
-    { level, classId: "sorcerer", kind: "asi-or-feat", id: "ability-score-improvement" },
-    { level, kind: "ability-score", id: ability, payload: { featureId: "ability-score-improvement" } },
-    { level, kind: "ability-score", id: ability, payload: { featureId: "ability-score-improvement" } }
-  ] as Row[];
 /** Everything a Sorcerer of this level owes beyond the base rows: metamagic, ASIs, the affinity. */
 const sorcererFor = (level: number, affinity = "fire"): Row[] => [
   ...(level >= 2 ? metamagic(2, ["careful-spell", "distant-spell"]) : []),
   ...(level >= 10 ? metamagic(10, ["quickened-spell", "subtle-spell"]) : []),
   ...(level >= 17 ? metamagic(17, ["twinned-spell", "empowered-spell"]) : []),
-  ...[4, 8, 12, 16].filter((at) => at <= level).flatMap((at) => sorcererAsi(at)),
+  // DEX 14 before the first, then CON 13.
+  ...(asiRows(
+    "sorcerer",
+    [4, 8, 12, 16].filter((at) => at <= level),
+    ["dex", "con"],
+    { dex: 14, con: 13 }
+  ) as Row[]),
   ...(level >= 6
     ? [
         {
@@ -1265,15 +1277,13 @@ const wizardInput = (): CharacterCreateRequestInput => ({
     { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "spellcasting-ability", id: "wis", payload: { featureId: "magic-initiate-cleric" } },
     { level: 2, classId: "wizard", kind: "expertise", id: "arcana", payload: { featureId: "scholar" } },
     { level: 3, classId: "wizard", kind: "subclass", id: "evoker" },
     { level: 3, kind: "spell", id: "burning-hands", payload: { featureId: "evocation-savant" } },
     { level: 3, kind: "spell", id: "shatter", payload: { featureId: "evocation-savant" } },
-    ...[4, 8, 12, 16].flatMap((level) => [
-      { level, classId: "wizard", kind: "asi-or-feat", id: "ability-score-improvement" },
-      { level, kind: "ability-score", id: "int", payload: { featureId: "ability-score-improvement" } },
-      { level, kind: "ability-score", id: "int", payload: { featureId: "ability-score-improvement" } }
-    ]),
+    // INT 17 before the first; past 20 the picks go to CON.
+    ...asiRows("wizard", [4, 8, 12, 16], ["int", "con"], { int: 17, con: 13 }),
     { level: 18, kind: "spell", id: "magic-missile", payload: { featureId: "spell-mastery" } },
     { level: 18, kind: "spell", id: "acid-arrow", payload: { featureId: "spell-mastery" } },
     {
@@ -1296,21 +1306,27 @@ describe("Wizard: Signature Spells becomes two free castings that a Short Rest g
     const built = table(buildCharacterDefinition(wizardInput(), library, POLICY));
     // "you can cast each of them once at level 3 without expending a spell slot ... until you finish a
     // Short or Long Rest": two uses, recovered on a Short Rest.
-    expect(actionOf(built, "signature-spells").uses).toMatchObject({ limit: 2, per: "short-rest" });
+    // One pool for both spells' free castings; the per-spell split stays in the text.
+    for (const id of ["spell-fireball-free", "spell-counterspell-free"])
+      expect(actionOf(built, id).uses).toMatchObject({ limit: 2, per: "short-rest", pool: "signature-spells" });
 
-    for (const commandId of ["50000000-0000-4000-8000-000000000130", "50000000-0000-4000-8000-000000000131"]) {
+    for (const [commandId, id] of [
+      ["50000000-0000-4000-8000-000000000130", "spell-fireball-free"],
+      ["50000000-0000-4000-8000-000000000131", "spell-counterspell-free"]
+    ] as const) {
       resolveDefinitionAction(
         built.state,
-        actionOf(built, "signature-spells"),
+        actionOf(built, id),
         { actorId: IDS.hero, targetIds: [], commandId },
-        deps(built, [])
+        // Fireball rolls its 8d6 even with no one in the area.
+        deps(built, Array<number>(8).fill(3))
       );
     }
     expect(built.hero.actionUses["signature-spells"]).toBe(2);
     expect(() =>
       resolveDefinitionAction(
         built.state,
-        actionOf(built, "signature-spells"),
+        actionOf(built, "spell-fireball-free"),
         { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000132" },
         deps(built, [])
       )
@@ -1335,7 +1351,7 @@ describe("Wizard: Signature Spells becomes two free castings that a Short Rest g
     for (const id of ["magic-missile", "acid-arrow", "fireball", "counterspell", "burning-hands", "shatter"]) {
       expect(spellOf(built.definition, id)).toMatchObject({ id });
     }
-    // INT 15 + the Acolyte's 2 = 17, then four ASIs at +2 each, clamped at 20, then the epic boon's +1.
+    // INT 15 + the Acolyte's 2 = 17, then three points of ASI to 20 (the rest go to CON), then the epic boon's +1.
     // Boon of Dimensional Travel prints "to a maximum of 30", carried as `maximum: 30` on the choice.
     expect(built.definition.abilityScores.int).toBe(21);
   });

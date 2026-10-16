@@ -77,6 +77,7 @@ const monkInput = (level = 1): MutableInput => ({
     { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "spellcasting-ability", id: "wis", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "equipment", id: "monk-a" },
     { level: 1, kind: "equipment", id: "acolyte-a" }
   ] as Row[]
@@ -106,6 +107,7 @@ const sorcererInput = (): MutableInput => ({
     { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "spellcasting-ability", id: "wis", payload: { featureId: "magic-initiate-cleric" } },
     // Metamagic is a level-2 feature that refuses to build without its two picks; neither touches AC.
     { level: 2, classId: "sorcerer", kind: "metamagic", id: "careful-spell" },
     { level: 2, classId: "sorcerer", kind: "metamagic", id: "distant-spell" },

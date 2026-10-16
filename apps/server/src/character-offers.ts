@@ -228,6 +228,12 @@ function validateBackgroundAllocation(input: CharacterCreateRequestInput, backgr
   }
 }
 
+/** Whether a record with an optional `level` has arrived by this character level. */
+const reachedBy =
+  (level: number) =>
+  (record: Pick<FeatureRecord, "level">): boolean =>
+    (record.level ?? 1) <= level;
+
 /** Features the class's level rows 1..level grant, with grant counts and grant levels, plus the row for `level`. */
 function grantedClassFeatures(
   entry: ClassReference,
@@ -287,6 +293,8 @@ type PlacedChoices = Readonly<{
   /** Every feature held so far with its provenance (the origin feat and chosen feats carry `origin: null`). */
   granted: ReadonlyArray<{ record: FeatureRecord; count: number; origin: CharacterFeatureOrigin | null }>;
   chosenFeats: readonly FeatReference[];
+  /** The character level each chosen feat was taken at, by index: what its prerequisites are checked at. */
+  chosenFeatLevels: readonly number[];
   /** Every feat id already held: the cross-offer duplicate guard. */
   heldFeatIds: ReadonlySet<string>;
   extraPickBudgets: ReadonlyMap<string, number>;
@@ -299,6 +307,8 @@ type PlacedChoices = Readonly<{
 }>;
 
 export const CLASS_CANTRIP_BUDGET: NamedPickBudget = "class-cantrips";
+/** The pick of the ability a species' or a feat's spells are cast with (Elven Lineage, Magic Initiate). */
+export const SPELLCASTING_ABILITY_KIND = "spellcasting-ability";
 export const CLASS_SPELL_BUDGET: NamedPickBudget = "class-spells";
 
 /** Steps 1-4 of `buildCharacterDefinition`: every id resolved and every ledger row placed. */
@@ -373,7 +383,7 @@ function surveyBuild(
   if (
     mode === "build" &&
     !input.choices.some((row) => row.kind === "lineage") &&
-    species.traits.some((trait) => trait.choice?.kind === "lineage")
+    species.traits.some((trait) => featurePicks(trait).some((pick) => pick.kind === "lineage"))
   )
     reject(`${species.name} asks for a lineage choice.`);
 
@@ -491,13 +501,15 @@ function placeChoices(
         parent: null
       } as const
     })),
-    ...(species?.traits ?? []).map((record) => ({
+    // A species trait's `level` is the character level it arrives at (Draconic Flight at 5, the
+    // Fiendish Legacy spells at 3 and 5).
+    ...(species?.traits ?? []).filter(reachedBy(level)).map((record) => ({
       record,
       count: 1,
       origin: { kind: "species", sourceId: species!.id } as const,
       site: speciesSite
     })),
-    ...(lineage?.traits ?? []).map((record) => ({
+    ...(lineage?.traits ?? []).filter(reachedBy(level)).map((record) => ({
       record,
       count: 1,
       origin: { kind: "lineage", sourceId: lineage!.id } as const,
@@ -709,7 +721,8 @@ function placeChoices(
         maxSpellLevel: choice.maxSpellLevel ?? null,
         minSpellLevel: choice.minSpellLevel ?? null,
         maximum: choice.maximum ?? null,
-        label: record.name,
+        // The ability pick shares its record with the lineage or the feat's spells, so it names itself.
+        label: choice.kind === SPELLCASTING_ABILITY_KIND ? `${record.name}: spellcasting ability` : record.name,
         help: record.description || null,
         ...site
       })
@@ -968,6 +981,7 @@ function placeChoices(
     originFeat,
     granted,
     chosenFeats,
+    chosenFeatLevels: chosenFeatSites.map((site) => site.levels[0] ?? 1),
     heldFeatIds,
     extraPickBudgets,
     preparedSpellRows,

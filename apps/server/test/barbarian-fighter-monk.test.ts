@@ -552,18 +552,29 @@ describe("Barbarian: the Epic Boon a level-19 Barbarian lost outright", () => {
     expect(featIds(build(barbarianInput(18)))).toEqual(["savage-attacker"]);
   });
 
-  it("refuses a feat that is not an Epic Boon, and refuses the boon before level 19", () => {
-    const wrongCategory = barbarianInput();
-    wrongCategory.choices = wrongCategory.choices
-      .filter(
-        (row) =>
-          row.id !== "boon-of-combat-prowess" &&
-          !(row.kind === "ability-score" && row.payload?.featureId === "boon-of-combat-prowess")
-      )
-      .concat([
-        { level: 19, classId: "barbarian", kind: "feat", id: "alert", payload: { featureId: "epic-boon" } }
-      ] as Row[]);
-    expect(() => build(wrongCategory)).toThrowError(/alert/i);
+  it("takes any feat the Barbarian qualifies for, refuses one it does not, and refuses the boon before level 19", () => {
+    // SRD: "You gain an Epic Boon feat or another feat of your choice for which you qualify."
+    const withFeat = (id: string) => {
+      const input = barbarianInput();
+      input.choices = input.choices
+        .filter(
+          (row) =>
+            row.id !== "boon-of-combat-prowess" &&
+            !(row.kind === "ability-score" && row.payload?.featureId === "boon-of-combat-prowess")
+        )
+        .concat([{ level: 19, classId: "barbarian", kind: "feat", id, payload: { featureId: "epic-boon" } }] as Row[]);
+      return input;
+    };
+    expect(featIds(build(withFeat("alert")))).toEqual(["savage-attacker", "alert"]);
+    // Boon of Spell Recall needs the Spellcasting feature, which a Barbarian lacks.
+    const recall = withFeat("boon-of-spell-recall");
+    recall.choices.push({
+      level: 19,
+      kind: "ability-score",
+      id: "cha",
+      payload: { featureId: "boon-of-spell-recall" }
+    } as Row);
+    expect(() => build(recall)).toThrowError(/Boon of Spell Recall needs the Spellcasting feature/);
 
     const tooEarly = barbarianInput(18);
     tooEarly.choices.push({

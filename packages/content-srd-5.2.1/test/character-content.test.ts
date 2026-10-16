@@ -523,7 +523,13 @@ describe("character-builder content records", () => {
     expect(soldier.startingEquipment.at(-1)).toMatchObject({ items: [], goldPieces: 50 });
     // The soldier's gaming set points at real catalog ids.
     expect(soldier.startingEquipment[0].items.map((item) => item.id)).toContain("gaming-set-dice");
-    expect(soldier.toolChoices?.from).toEqual(["gaming-set-dice", "gaming-set-playing-cards"]);
+    // "Choose one kind of Gaming Set": all four SRD variants.
+    expect(soldier.toolChoices?.from).toEqual([
+      "gaming-set-dice",
+      "gaming-set-dragonchess",
+      "gaming-set-playing-cards",
+      "gaming-set-three-dragon-ante"
+    ]);
     // Acolyte and Criminal complete the SRD 5.2.1 set of four.
     expect(backgrounds.map((background) => background.id).sort()).toEqual(["acolyte", "criminal", "sage", "soldier"]);
     const acolyte = backgrounds.find((background) => background.id === "acolyte")!;
@@ -897,8 +903,20 @@ describe("character-builder content records", () => {
     const defense = feats.find((feat) => feat.id === "defense")!;
     expect(defense.category).toBe("fighting-style");
     expect(defense.feature.modifiers).toEqual([{ type: "armor-class", amount: 1, whileArmored: true }]);
-    // Every other SRD fighting style stays prose - none of the three has a modeled rider.
-    for (const id of ["archery", "great-weapon-fighting", "two-weapon-fighting"]) {
+    // Archery's +2 is a roll-time rider on Ranged weapons (ammunition marks one; a thrown melee weapon and a
+    // spell attack do not qualify). The other two stay prose.
+    expect(feats.find((feat) => feat.id === "archery")!.feature.modifiers).toEqual([
+      {
+        type: "attack-bonus",
+        amount: 2,
+        when: [
+          { type: "on-attack-roll" },
+          { type: "attack-kind-is", kinds: ["ranged"] },
+          { type: "weapon-property-is", properties: ["ammunition"] }
+        ]
+      }
+    ]);
+    for (const id of ["great-weapon-fighting", "two-weapon-fighting"]) {
       expect(feats.find((feat) => feat.id === id)!.feature.modifiers, id).toEqual([]);
     }
     // An unconditional +1 AC is still expressible and still means "always" (back-compat).

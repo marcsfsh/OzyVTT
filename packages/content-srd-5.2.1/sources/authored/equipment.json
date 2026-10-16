@@ -57,6 +57,8 @@
   { "id": "thieves-tools", "name": "Thieves' Tools", "category": "tool", "costGp": 25, "weightLb": 1, "description": "Picks and tools for disarming traps and opening locks." },
   { "id": "gaming-set-dice", "name": "Gaming Set (Dice)", "category": "tool", "costGp": 0.1, "weightLb": 0, "description": "A set of dice for games of chance and skill." },
   { "id": "gaming-set-playing-cards", "name": "Gaming Set (Playing Cards)", "category": "tool", "costGp": 0.5, "weightLb": 0, "description": "A deck of cards for games of chance and skill." },
+  { "id": "gaming-set-dragonchess", "name": "Gaming Set (Dragonchess)", "category": "tool", "costGp": 1, "weightLb": 0, "description": "A board and pieces for dragonchess, a game of strategy." },
+  { "id": "gaming-set-three-dragon-ante", "name": "Gaming Set (Three-Dragon Ante)", "category": "tool", "costGp": 1, "weightLb": 0, "description": "A deck for three-dragon ante, a card game of chance and bluff." },
   { "id": "instrument-bagpipes", "name": "Musical Instrument (Bagpipes)", "category": "tool", "costGp": 30, "weightLb": 6, "description": "A musical instrument used as a Bard's spellcasting focus and for performances." },
   { "id": "instrument-drum", "name": "Musical Instrument (Drum)", "category": "tool", "costGp": 6, "weightLb": 3, "description": "A musical instrument used as a Bard's spellcasting focus and for performances." },
   { "id": "instrument-dulcimer", "name": "Musical Instrument (Dulcimer)", "category": "tool", "costGp": 25, "weightLb": 10, "description": "A musical instrument used as a Bard's spellcasting focus and for performances." },

@@ -168,6 +168,10 @@ export function AsiOffer({
       title: option.name,
       description: featSummary(catalogs, option.id),
       badge: sourceBadge(offerSource(catalogs, option.id)),
+      // A feat whose prerequisite this build does not meet stays listed, saying why.
+      ...(offer.unavailable?.[option.id]
+        ? { disabled: true, disabledReason: asReason(offer.unavailable[option.id]) }
+        : {}),
       keywords: option.id
     }));
 

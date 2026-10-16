@@ -7,11 +7,13 @@ import {
   classSpellList,
   computeServerOffers,
   levelOfPick,
+  SPELLCASTING_ABILITY_KIND,
   withinOfferSpellWindow,
   type ChoiceOffer,
   type ServerOfferSurvey
 } from "./character-offers.js";
 import type { ContentView } from "./content-library.js";
+import { featHoldings, featPrerequisiteFailure } from "./feat-prerequisites.js";
 import { CommandRejectedError } from "./game-store.js";
 
 /** Server-side random character generator: standard array by class priority, every other decision
@@ -183,10 +185,17 @@ function carriedWeaponIds(survey: ServerOfferSurvey, choices: readonly Character
   return carried;
 }
 
-/** Scores as step 5 sees them for the ASI cap: pre-increase scores plus existing "asi" rows. */
-function projectedScores(survey: ServerOfferSurvey, choices: readonly CharacterChoice[]): Record<Ability, number> {
+/** Scores as step 5 sees them: pre-increase scores plus the "asi" rows and ability-score picks so far, only
+ *  those below `level` when one is given (what a feat taken at that level is checked against). */
+function projectedScores(
+  survey: ServerOfferSurvey,
+  choices: readonly CharacterChoice[],
+  level = Number.POSITIVE_INFINITY
+): Record<Ability, number> {
   const scores = { ...survey.scoresBeforeIncreases };
   for (const row of choices) {
+    if (row.level >= level) continue;
+    if (row.kind === "ability-score" && ABILITY_IDS.has(row.id)) scores[row.id as Ability] += 1;
     if (row.kind !== "asi-or-feat" || row.id !== "asi") continue;
     for (const increase of (row.payload?.increases ?? []) as ReadonlyArray<{ ability: Ability; amount: number }>) {
       scores[increase.ability] += increase.amount;
@@ -211,7 +220,8 @@ function asiIncreases(
   return byOne.length === 2 ? byOne.map((ability) => ({ ability, amount: 1 })) : null;
 }
 
-/** Whether a feat is legally takeable now. Held feats are never redrawn, which only narrows the draw. */
+/** Whether a feat is legally takeable at this pick's level, by the prerequisites the build checks. Held feats are
+ *  never redrawn, which only narrows the draw. */
 function featIsTakeable(
   id: string,
   survey: ServerOfferSurvey,
@@ -222,8 +232,7 @@ function featIsTakeable(
   if (survey.heldFeatIds.has(id)) return false;
   const feat = library.featRecord(id);
   if (!feat) return true; // an inline option rather than a catalog feat; the offer already vouched for it
-  if (feat.prerequisite?.level !== undefined && level < feat.prerequisite.level) return false;
-  return (feat.prerequisite?.abilityScores ?? []).every((minimum) => scores[minimum.ability] >= minimum.minimum);
+  return featPrerequisiteFailure(feat, { ...featHoldings(survey), level, scores }) === null;
 }
 
 const FEAT_KINDS: ReadonlySet<string> = new Set(["feat", "fighting-style", "asi-or-feat"]);
@@ -255,7 +264,9 @@ function answerOffer(
   let candidates = legal;
   let preferred: readonly string[] = legal;
   if (FEAT_KINDS.has(offer.kind)) {
-    candidates = legal.filter((id) => featIsTakeable(id, survey, input.level, scores, library));
+    const level = levelOfPick(offer, offer.taken.length);
+    const before = projectedScores(survey, choices, level);
+    candidates = legal.filter((id) => featIsTakeable(id, survey, level, before, library));
     preferred = candidates;
   } else if (offer.kind === "expertise") {
     // SRD: expertise must be in skills you are proficient in; step 8 rejects otherwise.
@@ -266,18 +277,27 @@ function answerOffer(
       preferred = reachable;
     }
   } else if (offer.kind === "ability-score") {
+    // The build refuses a pick past the ceiling, so it is a hard filter.
     const ceiling = offer.maximum ?? 20;
-    preferred = legal.filter((id) => !ABILITY_IDS.has(id) || scores[id as Ability] < ceiling);
+    candidates = legal.filter((id) => !ABILITY_IDS.has(id) || scores[id as Ability] < ceiling);
+    preferred = candidates;
   } else if (
     offer.kind === "skill" ||
     offer.kind === "tool" ||
     offer.kind === "language" ||
     offer.kind === "skill-or-tool"
   ) {
-    // A repeat proficiency is refused by the build, so it is a hard filter.
-    const held = heldOfKind(survey, offer.kind === "skill-or-tool" ? "skill" : offer.kind, choices);
+    // A repeat proficiency is refused by the build, so it is a hard filter. Skilled's picks may be skills or tools.
+    const held =
+      offer.kind === "skill-or-tool"
+        ? new Set([...heldOfKind(survey, "skill", choices), ...heldOfKind(survey, "tool", choices)])
+        : heldOfKind(survey, offer.kind, choices);
     candidates = legal.filter((id) => !held.has(id));
     preferred = candidates;
+  } else if (offer.kind === SPELLCASTING_ABILITY_KIND) {
+    // Cast with the best of the abilities offered.
+    const best = Math.max(...legal.map((id) => scores[id as Ability] ?? 0));
+    preferred = legal.filter((id) => (scores[id as Ability] ?? 0) === best);
   } else if (offer.kind === "weapon-mastery") {
     // Mastery in an uncarried weapon is legal but useless, so carried weapons come first.
     const carried = carriedWeaponIds(survey, choices);
@@ -440,10 +460,11 @@ export function generateCharacterRequest(
     const pending = survey.offers.filter(
       (offer) => offer.unresolvable === null && offer.kind !== "subclass" && offer.taken.length < offer.capacity
     );
-    // The narrowest proficiency pick goes first (Keen Senses' three skills before a class's six), so a broad pick
+    // The narrowest proficiency or feat pick goes first (Keen Senses' three skills before a class's six, the
+    // Champion's Additional Fighting Style before an improvement that may take any feat), so a broad pick
     // cannot take the only options a narrow one has; repeats are refused.
     const narrowest = pending
-      .filter((offer) => PROFICIENCY_KINDS.has(offer.kind))
+      .filter((offer) => PROFICIENCY_KINDS.has(offer.kind) || FEAT_KINDS.has(offer.kind))
       .sort((left, right) => left.options.size - right.options.size)[0];
     const open = narrowest ?? pending[0];
     if (!open) {

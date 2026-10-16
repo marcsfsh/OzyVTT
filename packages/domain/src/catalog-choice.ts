@@ -14,9 +14,11 @@ import type {
  * homebrew editor (to preview a picker), so both agree on what is offerable.
  *
  * Slug families over open ids:
- *   - `skills`, `weapons`, `tools`, `languages` -> the whole catalog list.
+ *   - `skills`, `weapons`, `tools`, `languages`, `feats` -> the whole catalog list (`feats` is every category:
+ *                               "no category is specified" in the SRD's feat rules).
  *   - `<table>-languages`    -> languages printed in one SRD table ("standard-languages").
  *   - `<listId>-spells`      -> spells whose `classes` includes the class's `spellcasting.spellListId`.
+ *   - `<listId>-spells-of-<school>` -> those spells of one school ("wizard-spells-of-evocation").
  *   - `<classId>-subclasses` -> that class's subclasses.
  *   - `<category>-feats`     -> feats in that category ("origin-feats", "fighting-style-feats").
  *   - `<speciesId>-lineages` -> that species' lineages.
@@ -105,6 +107,24 @@ export function resolveCatalogChoice(slug: string, catalogs: CatalogChoiceCatalo
       "The equipment catalog has no tools."
     );
   }
+  if (slug === "feats") {
+    return nonEmpty(
+      slug,
+      catalogs.feats.map((entry) => ({ id: entry.id, name: entry.name })),
+      "The feats catalog is empty."
+    );
+  }
+  const school = /^(.+)-spells-of-([a-z0-9]+)$/.exec(slug);
+  if (school) {
+    const [, listId, schoolId] = school;
+    return nonEmpty(
+      slug,
+      catalogs.spells
+        .filter((spell) => spell.classes.includes(listId) && spell.school === schoolId)
+        .map((spell) => ({ id: spell.id, name: spell.name, level: spell.level })),
+      `No ${schoolId} spells are tagged for the "${listId}" spell list.`
+    );
+  }
   if (slug === "languages") {
     return nonEmpty(
       slug,
@@ -166,7 +186,7 @@ export function resolveCatalogChoice(slug: string, catalogs: CatalogChoiceCatalo
   }
   throw new CatalogChoiceError(
     slug,
-    `The catalog slug "${slug}" matches no known family (skills, weapons, tools, languages, *-languages, *-spells, *-subclasses, *-feats, *-lineages).`
+    `The catalog slug "${slug}" matches no known family (skills, weapons, tools, languages, feats, *-languages, *-spells, *-spells-of-<school>, *-subclasses, *-feats, *-lineages).`
   );
 }
 

@@ -113,7 +113,7 @@ export const monk: ClassMechanicsModule = {
       ]
     },
     "epic-boon": {
-      choice: { kind: "feat", choose: 1, fromCatalog: "epic-boon-feats" }
+      choice: { kind: "feat", choose: 1, fromCatalog: "feats" }
     },
     /** "Your Dexterity and Wisdom scores increase by 4, to a maximum of 25." */
     "body-and-mind": {

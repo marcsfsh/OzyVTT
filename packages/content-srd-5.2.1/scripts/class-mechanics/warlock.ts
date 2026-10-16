@@ -135,7 +135,7 @@ export const warlock: ClassMechanicsModule = {
       choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", minSpellLevel: 9, maxSpellLevel: 9 },
       uses: { limit: 1, per: "long-rest" }
     },
-    "epic-boon": { choice: { kind: "feat", choose: 1, fromCatalog: "epic-boon-feats" } }
+    "epic-boon": { choice: { kind: "feat", choose: 1, fromCatalog: "feats" } }
   },
   subclasses: {
     "fiend-patron": {

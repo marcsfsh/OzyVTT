@@ -20,6 +20,7 @@ import {
 import {
   cantripScalingOf,
   cantripTierAt,
+  featurePicks,
   type ClassLevelRow,
   type ClassReference,
   type FeatureRecord,
@@ -29,6 +30,8 @@ import {
 import {
   CLASS_CANTRIP_BUDGET,
   CLASS_SPELL_BUDGET,
+  levelOfPick,
+  SPELLCASTING_ABILITY_KIND,
   surveyForBuild,
   type CharacterFeatureOrigin
 } from "./character-offers.js";
@@ -36,6 +39,7 @@ import type { ContentView } from "./content-library.js";
 import { BUILDER_BAKED_MODIFIER_TYPES, type CharacterFeatureRef } from "./equipment-derivation.js";
 import { spellCastMechanics, UNARMED_STRIKE_ACTION_ID } from "./item-actions.js";
 import { bindTemplateItem } from "./inventory.js";
+import { featHoldings, featPrerequisiteFailure } from "./feat-prerequisites.js";
 import { CommandRejectedError } from "./game-store.js";
 
 /**
@@ -51,6 +55,7 @@ import { CommandRejectedError } from "./game-store.js";
  *   - "asi-or-feat" with id "asi" carries `payload.increases`; any other id is a feat (as are
  *     "feat" / "fighting-style" rows);
  *   - "cantrip" / "spell" without a featureId fill the class's cantripsKnown / preparedCount budgets;
+ *   - "spellcasting-ability" names the ability a species' or a feat's spells are cast with;
  *   - "equipment" names one class and one background starting-equipment option;
  *   - "size" (optional) picks among the species' sizes; defaults to medium.
  */
@@ -108,7 +113,11 @@ type InterpretedFeatures = {
     /** A free casting's uses (the granting feature's own); null for at will; absent when only a slot casts it. */
     free?: ActorAction["uses"] | null;
     withSlot: boolean;
+    /** Whose spellcasting ability casts it; see `SpellSource`. */
+    source: SpellSource;
   }>;
+  /** The free casting a feature with limited uses gives the spell picked for it (Magic Initiate's level 1 spell). */
+  pickedSpellUses: Map<string, NonNullable<ActorAction["uses"]>>;
   hitPointsPerLevel: number;
   speedBonus: number;
   armorClassBonus: number;
@@ -314,24 +323,45 @@ function leveledSpellActionFor(
   } as ActorAction;
 }
 
+/** The tag of a feature whose spell picks go to the spellbook to be prepared, not straight onto the prepared list
+ *  (Evocation Savant). */
+const SPELLBOOK_TAG = "spellbook";
+
 /** `ActorDefinitionSchema`'s cap on a sheet's actions; spells past it keep their sheet entry without an action. */
 const MAX_DEFINITION_ACTIONS = 100;
 
+/** One spell on the sheet while it is assembled: the definition's entry, plus whose ability casts it and its free
+ *  casting (the uses it spends; null at will; absent when only a slot casts it). Both are dropped from the sheet. */
+type SpellEntry = {
+  id: string;
+  name: string;
+  level: number;
+  prepared: boolean;
+  alwaysPrepared: boolean;
+  withSlot?: false;
+  classId?: string;
+  actionId?: string;
+  freeActionId?: string;
+  source: SpellSource;
+  free?: ActorAction["uses"] | null;
+};
+
 /**
  * Mints and links each spell's actions: a cantrip's (`actionId`), a leveled spell's slot cast (`actionId`, when the
- * sheet has slots and the spell may use one) and a grant's free cast (`freeActionId`). Mutates the list in place.
+ * sheet has slots and the spell may use one) and a free cast (`freeActionId`), each with the numbers of the ability
+ * its source casts with. Mutates the list in place.
  */
 function linkSpellActions(
-  spells: Array<Record<string, unknown>>,
+  spells: SpellEntry[],
   into: ActorAction[],
-  numbers: CasterNumbers,
+  numbersOf: (source: SpellSource) => CasterNumbers,
   library: ContentView,
-  granted: InterpretedFeatures["grantedSpells"],
   hasSlots: boolean
 ): void {
   for (const entry of spells) {
-    const record = library.spellRecord(String(entry.id));
+    const record = library.spellRecord(entry.id);
     if (!record) continue;
+    const numbers = numbersOf(entry.source);
     const mint = (action: ActorAction | null, key: "actionId" | "freeActionId") => {
       if (!action || into.length >= MAX_DEFINITION_ACTIONS || into.some((existing) => existing.id === action.id))
         return;
@@ -343,10 +373,12 @@ function linkSpellActions(
       continue;
     }
     if (hasSlots && entry.withSlot !== false) mint(leveledSpellActionFor(record, numbers), "actionId");
-    const grant = granted.find((candidate) => candidate.id === record.id && candidate.free !== undefined);
-    if (grant) mint(leveledSpellActionFor(record, numbers, grant.free), "freeActionId");
+    if (entry.free !== undefined) mint(leveledSpellActionFor(record, numbers, entry.free), "freeActionId");
   }
 }
+
+/** The sheet's spell entry without the build-only fields. */
+const sheetSpell = ({ source: _source, free: _free, ...entry }: SpellEntry) => entry;
 
 /** The Martial Arts unarmed strike from the printed `classResources` column, or null without one. Uses
  *  the better of DEX or STR (SRD Dexterous Attacks). A non-dice amount keeps the generic builtin. Monk weapons
@@ -376,8 +408,19 @@ function martialArtsStrike(context: BuildContext): ActorAction | null {
   } as ActorAction;
 }
 
+/**
+ * Whose spellcasting ability a spell is cast with: the class's, the species' (its traits and lineage share one
+ * pick, Elven Lineage), or one feat's (Magic Initiate).
+ */
+type SpellSource = "class" | "species" | `feat:${string}`;
+
 /** Interprets one feature's riders into the running build. Prose always lands as a trait; riders add mechanics on top. */
-function interpretFeature(feature: FeatureRecord, into: InterpretedFeatures, context: BuildContext): void {
+function interpretFeature(
+  feature: FeatureRecord,
+  into: InterpretedFeatures,
+  context: BuildContext,
+  source: SpellSource
+): void {
   into.traits.push({ name: feature.name, description: feature.description });
   for (const action of feature.actions) {
     const interpreted = interpretAction(feature, action, context);
@@ -392,9 +435,13 @@ function interpretFeature(feature: FeatureRecord, into: InterpretedFeatures, con
     ? { limit: synthesizedUses, per: feature.uses!.per, pool: feature.uses!.pool ?? feature.id }
     : undefined;
   const freeCastGrant = feature.grants?.spells.some((spell) => spell.withoutSlot === "free") === true;
+  // A spell picked for a feature with limited uses is cast with them (Magic Initiate once per Long Rest, Mystic
+  // Arcanum), so the counter rides that spell's free-cast action rather than an action of its own.
+  const freeCastPick = carriesUses && featurePicks(feature).some((pick) => pick.kind === "spell");
+  if (freeCastPick) into.pickedSpellUses.set(feature.id, freeUses!);
   if (
     feature.actions.length === 0 &&
-    (feature.effects.length > 0 || (carriesUses && !freeCastGrant)) &&
+    (feature.effects.length > 0 || (carriesUses && !freeCastGrant && !freeCastPick)) &&
     !into.actions.some((existing) => existing.id === feature.id)
   ) {
     into.actions.push({
@@ -435,6 +482,7 @@ function interpretFeature(feature: FeatureRecord, into: InterpretedFeatures, con
         alwaysPrepared: spell.alwaysPrepared,
         ability: spell.ability,
         withSlot: spell.withSlot,
+        source,
         ...(spell.withoutSlot === "at-will" ? { free: null } : {}),
         // A free casting with no counter to spend is refused at build rather than cast without limit.
         ...(spell.withoutSlot === "free"
@@ -558,7 +606,9 @@ export function buildCharacterDefinition(
     }
   }
 
-  // ---- 5. Ability increases: the "asi" shorthand's payload, then chosen ability-score picks. ----
+  // ---- 5. Ability increases and feat prerequisites, level by level: a feat taken at a level is checked
+  // against the scores just before that level's increases, its own included. ----
+  const increases: Array<{ level: number; ability: Ability; amount: number; maximum: number; source: string }> = [];
   for (const row of input.choices.filter((candidate) => candidate.kind === "asi-or-feat" && candidate.id === "asi")) {
     const payload = row.payload as { increases?: unknown } | undefined;
     if (!Array.isArray(payload?.increases) || payload.increases.length === 0)
@@ -576,30 +626,42 @@ export function buildCharacterDefinition(
           ? increase.amount
           : reject("An ASI increase must be +1 or +2.");
       total += amount;
-      finalScores[ability] += amount;
-      if (finalScores[ability] > 20)
-        reject(
-          `${ability.toUpperCase()} would be ${finalScores[ability]}; the Ability Score Improvement cannot raise a score above 20.`
-        );
+      increases.push({ level: row.level, ability, amount, maximum: 20, source: "the Ability Score Improvement" });
     }
     if (total !== 2) reject("An Ability Score Improvement grants exactly +2 (one ability +2, or two abilities +1).");
   }
   // Each consumed "ability-score" pick is +1 (the choice vocabulary carries no amount). The ceiling is
   // the offer's `maximum` (epic boons allow 30), not a fixed 20.
   for (const offer of offers.filter((candidate) => candidate.kind === "ability-score")) {
-    for (const taken of offer.taken) {
+    offer.taken.forEach((taken, index) => {
       const ability = ABILITIES.find((candidate) => candidate === taken) ?? reject(`"${taken}" is not an ability.`);
-      finalScores[ability] = Math.min(offer.maximum ?? 20, finalScores[ability] + 1);
-    }
+      increases.push({
+        level: levelOfPick(offer, index),
+        ability,
+        amount: 1,
+        maximum: offer.maximum ?? 20,
+        source: offer.label
+      });
+    });
   }
-  for (const feat of chosenFeats) {
-    if (feat.prerequisite?.level !== undefined && input.level < feat.prerequisite.level)
-      reject(`${feat.name} requires level ${feat.prerequisite.level}.`);
-    for (const minimum of feat.prerequisite?.abilityScores ?? []) {
-      if (finalScores[minimum.ability] < minimum.minimum)
-        reject(`${feat.name} requires ${minimum.ability.toUpperCase()} ${minimum.minimum}.`);
+  const holdings = featHoldings({ classRecord, subclass, granted });
+  const featChecks = [
+    ...(originFeat ? [{ feat: originFeat, level: 1 }] : []),
+    ...chosenFeats.map((feat, index) => ({ feat, level: survey.chosenFeatLevels[index] ?? input.level }))
+  ];
+  for (let level = 1; level <= input.level; level += 1) {
+    for (const check of featChecks.filter((candidate) => candidate.level === level)) {
+      const failure = featPrerequisiteFailure(check.feat, { ...holdings, level, scores: finalScores });
+      if (failure) reject(failure);
     }
-    // `requires` slugs beyond level/ability minimums are prose-adjudicated (ADR-0008 fail-open).
+    for (const increase of increases.filter((candidate) => candidate.level === level)) {
+      finalScores[increase.ability] += increase.amount;
+      // Refused rather than clamped, so a pick past the ceiling is never silently lost.
+      if (finalScores[increase.ability] > increase.maximum)
+        reject(
+          `${increase.ability.toUpperCase()} would be ${finalScores[increase.ability]}; ${increase.source} cannot raise a score above ${increase.maximum}. Choose another ability.`
+        );
+    }
   }
 
   // ---- 5c. Feature `ability-score` riders, before any feature is interpreted: `interpretAction`
@@ -634,6 +696,7 @@ export function buildCharacterDefinition(
     damageImmunities: [],
     conditionImmunities: [],
     grantedSpells: [],
+    pickedSpellUses: new Map(),
     hitPointsPerLevel: 0,
     speedBonus: 0,
     armorClassBonus: 0,
@@ -641,7 +704,25 @@ export function buildCharacterDefinition(
     initiativeBonus: 0,
     unarmoredDefense: null
   };
-  for (const { record } of granted) interpretFeature(record, interpreted, context);
+  // Whose spellcasting ability a feature's spells use: the species' traits share one, each feat has its own.
+  const speciesFeatureIds = new Set([...species.traits, ...(lineage?.traits ?? [])].map((trait) => trait.id));
+  const featFeatureIds = new Set([originFeat, ...chosenFeats].flatMap((feat) => (feat ? [feat.feature.id] : [])));
+  const sourceOfFeature = (featureId: string | null): SpellSource =>
+    featureId !== null && speciesFeatureIds.has(featureId)
+      ? "species"
+      : featureId !== null && featFeatureIds.has(featureId)
+        ? `feat:${featureId}`
+        : "class";
+  const spellSourceOf = (record: FeatureRecord, origin: CharacterFeatureOrigin | null): SpellSource =>
+    origin === null
+      ? `feat:${record.id}`
+      : origin.kind === "species" || origin.kind === "lineage"
+        ? "species"
+        : origin.kind === "option"
+          ? sourceOfFeature(origin.sourceId)
+          : "class";
+  for (const { record, origin } of granted)
+    interpretFeature(record, interpreted, context, spellSourceOf(record, origin));
   // Martial Arts runs after the features so an id a feature already declared keeps it.
   const strike = martialArtsStrike(context);
   const martialArtsDie = strike ? martialArtsDieOf(context) : null;
@@ -735,14 +816,35 @@ export function buildCharacterDefinition(
   };
 
   // ---- 9. Spellcasting: the class's level row (slots, cantrips, prepared cap) + chosen + granted spells. ----
-  // Feature-consumed spell/cantrip picks join the list outside the class budgets.
-  const featureSpellPicks = offers
-    .filter((offer) => offer.kind === "spell" && offer.featureId !== null)
-    .flatMap((offer) => offer.taken);
-  const featureCantripPicks = offers
-    .filter((offer) => offer.kind === "cantrip" && offer.featureId !== null)
-    .flatMap((offer) => offer.taken);
-  const grantedSpellEntry = (grantedSpell: InterpretedFeatures["grantedSpells"][number]) => {
+  // Feature-consumed spell/cantrip picks join the list outside the class budgets and are always prepared (Magic
+  // Initiate, Magical Discoveries); a feature with limited uses casts its pick free with them. A feature tagged
+  // "spellbook" (Evocation Savant) adds spells to prepare from instead.
+  const featurePicksOf = (kind: "spell" | "cantrip") =>
+    offers
+      .filter((offer) => offer.kind === kind && offer.featureId !== null)
+      .flatMap((offer) => offer.taken.map((id) => ({ id, featureId: offer.featureId! })));
+  const spellbookFeatures = new Set(
+    granted.filter(({ record }) => record.tags.includes(SPELLBOOK_TAG)).map(({ record }) => record.id)
+  );
+  const pickedEntry = (pick: Readonly<{ id: string; featureId: string }>, kind: "spell" | "cantrip"): SpellEntry => {
+    const record = library.spellRecord(pick.id);
+    const source = sourceOfFeature(pick.featureId);
+    const spellbook = spellbookFeatures.has(pick.featureId);
+    const uses = kind === "spell" ? interpreted.pickedSpellUses.get(pick.featureId) : undefined;
+    return {
+      id: pick.id,
+      name: record?.name ?? pick.id,
+      level: record?.level ?? (kind === "cantrip" ? 0 : 1),
+      prepared: !spellbook,
+      alwaysPrepared: !spellbook,
+      ...(casting && source === "class" ? { classId: classRecord.id } : {}),
+      source,
+      ...(uses ? { free: uses } : {})
+    };
+  };
+  const featureCantripEntries = featurePicksOf("cantrip").map((pick) => pickedEntry(pick, "cantrip"));
+  const featureSpellEntries = featurePicksOf("spell").map((pick) => pickedEntry(pick, "spell"));
+  const grantedSpellEntry = (grantedSpell: InterpretedFeatures["grantedSpells"][number]): SpellEntry => {
     const record = library.spellRecord(grantedSpell.id);
     return {
       id: grantedSpell.id,
@@ -750,7 +852,48 @@ export function buildCharacterDefinition(
       level: grantedSpell.level ?? record?.level ?? 0,
       prepared: true,
       alwaysPrepared: grantedSpell.alwaysPrepared,
-      ...(grantedSpell.withSlot ? {} : { withSlot: false })
+      ...(grantedSpell.withSlot ? {} : { withSlot: false as const }),
+      source: grantedSpell.source,
+      ...(grantedSpell.free !== undefined ? { free: grantedSpell.free } : {})
+    };
+  };
+  /** Adds a spell once; a second source of the same spell adds only its free casting. */
+  const addSpell = (spells: SpellEntry[], entry: SpellEntry) => {
+    const existing = spells.find((candidate) => candidate.id === entry.id);
+    if (!existing) spells.push(entry);
+    else if (existing.free === undefined && entry.free !== undefined) {
+      existing.free = entry.free;
+      existing.prepared = true;
+      existing.alwaysPrepared = true;
+    }
+  };
+  // The ability each source casts with: the species' or a feat's chosen one, else an ability the grant names, else
+  // the class's (a non-caster falls back to the first of those, then Intelligence).
+  const chosenAbility = new Map<SpellSource, Ability>();
+  for (const offer of offers) {
+    if (offer.kind !== SPELLCASTING_ABILITY_KIND) continue;
+    const ability = ABILITIES.find((candidate) => candidate === offer.taken[0]);
+    if (ability && !chosenAbility.has(sourceOfFeature(offer.featureId)))
+      chosenAbility.set(sourceOfFeature(offer.featureId), ability);
+  }
+  const grantAbility = new Map<SpellSource, Ability>();
+  for (const grantedSpell of interpreted.grantedSpells)
+    if (grantedSpell.ability && !grantAbility.has(grantedSpell.source))
+      grantAbility.set(grantedSpell.source, grantedSpell.ability);
+  const fallbackAbility: Ability =
+    casting?.ability ?? [...chosenAbility.values(), ...grantAbility.values()][0] ?? "int";
+  const abilityOf = (source: SpellSource): Ability =>
+    (source === "class" && casting ? casting.ability : undefined) ??
+    chosenAbility.get(source) ??
+    grantAbility.get(source) ??
+    fallbackAbility;
+  const numbersOf = (source: SpellSource): CasterNumbers => {
+    const score = finalScores[abilityOf(source)];
+    return {
+      attackBonus: spellAttackBonus(score, proficiencyBonus),
+      saveDc: spellSaveDc(score, proficiencyBonus),
+      characterLevel: input.level,
+      modifier: abilityModifier(score)
     };
   };
   let spellcasting: Record<string, unknown> | undefined;
@@ -775,10 +918,11 @@ export function buildCharacterDefinition(
           .filter((slot) => slot.max > 0);
     const maxSlotLevel = slots.reduce((highest, slot) => Math.max(highest, slot.level), 0);
     // SRD: an always-prepared granted spell doesn't count against the prepared limit, so the grant wins
-    // and a matching pick is not charged to the cap.
-    const alwaysPreparedGrants = new Set(
-      interpreted.grantedSpells.filter((granted) => granted.alwaysPrepared).map((granted) => granted.id)
-    );
+    // and a matching pick is not charged to the cap. A feature's always-prepared spell (Magic Initiate) counts too.
+    const alwaysPreparedGrants = new Set([
+      ...interpreted.grantedSpells.filter((granted) => granted.alwaysPrepared).map((granted) => granted.id),
+      ...featureSpellEntries.filter((entry) => entry.alwaysPrepared).map((entry) => entry.id)
+    ]);
     const chargedCantripRows = classCantripRows.filter((row) => !alwaysPreparedGrants.has(row.id));
     const chargedPreparedRows = preparedSpellRows.filter((row) => !alwaysPreparedGrants.has(row.id));
     // The printed row plus granted extras (Thaumaturge's extra cantrip); the wizard composes the same sum.
@@ -792,7 +936,7 @@ export function buildCharacterDefinition(
       reject(
         `${classRecord.name} ${casting.prepares === "prepared" ? "prepares" : "knows"} ${preparedCap} spells at level ${input.level}; got ${chargedPreparedRows.length}.`
       );
-    const spells: Array<Record<string, unknown>> = [];
+    const spells: SpellEntry[] = [];
     // Every id the ledger claimed, so "chosen twice" still rejects when both rows defer to one grant.
     const claimedSpellIds = new Set<string>();
     for (const row of classCantripRows) {
@@ -801,7 +945,14 @@ export function buildCharacterDefinition(
       if (claimedSpellIds.has(option.id)) reject(`"${row.id}" is chosen twice.`);
       claimedSpellIds.add(option.id);
       if (alwaysPreparedGrants.has(option.id)) continue; // the grant supplies it, uncharged
-      spells.push({ id: option.id, name: option.name, level: 0, prepared: true, alwaysPrepared: true });
+      spells.push({
+        id: option.id,
+        name: option.name,
+        level: 0,
+        prepared: true,
+        alwaysPrepared: true,
+        source: "class"
+      });
     }
     for (const row of preparedSpellRows) {
       const option = listOptions.get(row.id) ?? reject(`"${row.id}" is not on the ${classRecord.name} spell list.`);
@@ -820,41 +971,15 @@ export function buildCharacterDefinition(
         level: spellLevel,
         prepared: true,
         alwaysPrepared: false,
-        classId: classRecord.id
+        classId: classRecord.id,
+        source: "class"
       });
     }
-    // A feature pick that duplicates an always-prepared grant defers to the grant, like a class pick.
-    for (const id of featureCantripPicks) {
-      const record = library.spellRecord(id);
-      if (!alwaysPreparedGrants.has(id) && !spells.some((existing) => existing.id === id))
-        spells.push({ id, name: record?.name ?? id, level: record?.level ?? 0, prepared: true, alwaysPrepared: true });
-    }
-    for (const id of featureSpellPicks) {
-      const record = library.spellRecord(id);
-      if (!alwaysPreparedGrants.has(id) && !spells.some((existing) => existing.id === id))
-        spells.push({
-          id,
-          name: record?.name ?? id,
-          level: record?.level ?? 1,
-          prepared: true,
-          alwaysPrepared: false,
-          classId: classRecord.id
-        });
-    }
-    for (const grantedSpell of interpreted.grantedSpells) {
-      if (!spells.some((existing) => existing.id === grantedSpell.id)) spells.push(grantedSpellEntry(grantedSpell));
-    }
-    const saveDc = spellSaveDc(finalScores[casting.ability], proficiencyBonus);
-    const attackBonus = spellAttackBonus(finalScores[casting.ability], proficiencyBonus);
-    // Spells become actions with this caster's numbers; the sheet sends only an id.
-    linkSpellActions(
-      spells,
-      interpreted.actions,
-      { attackBonus, saveDc, characterLevel: input.level, modifier: abilityModifier(finalScores[casting.ability]) },
-      library,
-      interpreted.grantedSpells,
-      slots.length > 0
-    );
+    for (const entry of [...featureCantripEntries, ...featureSpellEntries]) addSpell(spells, entry);
+    for (const grantedSpell of interpreted.grantedSpells) addSpell(spells, grantedSpellEntry(grantedSpell));
+    const { saveDc, attackBonus } = numbersOf("class");
+    // Spells become actions with the numbers of the ability their source casts with; the sheet sends only an id.
+    linkSpellActions(spells, interpreted.actions, numbersOf, library, slots.length > 0);
     // Top-level fields stay populated (the schema demands the combined pool when per-class slots exist).
     spellcasting = {
       ability: casting.ability,
@@ -872,42 +997,29 @@ export function buildCharacterDefinition(
           ...(levelRow.preparedCount !== undefined ? { prepared: preparedCap } : {})
         }
       ],
-      spells
+      spells: spells.map(sheetSpell)
     };
   } else {
     if (preparedSpellRows.length > 0 || classCantripRows.length > 0)
       reject(`${classRecord.name} has no spell list to choose spells from.`);
-    const extraSpells = [
+    const extraSpells: SpellEntry[] = [];
+    for (const entry of [
       ...interpreted.grantedSpells.map(grantedSpellEntry),
-      ...featureCantripPicks.map((id) => {
-        const record = library.spellRecord(id);
-        return { id, name: record?.name ?? id, level: record?.level ?? 0, prepared: true, alwaysPrepared: true };
-      }),
-      ...featureSpellPicks.map((id) => {
-        const record = library.spellRecord(id);
-        return { id, name: record?.name ?? id, level: record?.level ?? 1, prepared: true, alwaysPrepared: true };
-      })
-    ].filter((spell, index, all) => all.findIndex((other) => other.id === spell.id) === index);
+      ...featureCantripEntries,
+      ...featureSpellEntries
+    ])
+      addSpell(extraSpells, entry);
     if (extraSpells.length > 0) {
-      // A non-caster with granted/feat spells: model them so the sheet can cast them.
-      const ability = interpreted.grantedSpells.find((spell) => spell.ability)?.ability ?? "int";
-      const saveDc = spellSaveDc(finalScores[ability], proficiencyBonus);
-      const attackBonus = spellAttackBonus(finalScores[ability], proficiencyBonus);
-      // A non-caster's spells get actions too, using the fallback ability above; with no slots, only free casts.
-      linkSpellActions(
-        extraSpells,
-        interpreted.actions,
-        { attackBonus, saveDc, characterLevel: input.level, modifier: abilityModifier(finalScores[ability]) },
-        library,
-        interpreted.grantedSpells,
-        false
-      );
+      // A non-caster with granted/feat spells: model them so the sheet can cast them. With no slots, only the
+      // free casts are actions.
+      const { saveDc, attackBonus } = numbersOf("class");
+      linkSpellActions(extraSpells, interpreted.actions, numbersOf, library, false);
       spellcasting = {
-        ability,
+        ability: fallbackAbility,
         saveDc,
         attackBonus,
         slots: [],
-        spells: extraSpells
+        spells: extraSpells.map(sheetSpell)
       };
     }
   }
@@ -916,7 +1028,11 @@ export function buildCharacterDefinition(
   const equipmentRows = input.choices.filter((row) => row.kind === "equipment");
   const inventory: InventoryItem[] = [];
   let goldPieces = 0;
-  const consumeEquipmentOption = (source: "class" | "background", options: ClassReference["startingEquipment"]) => {
+  const consumeEquipmentOption = (
+    source: "class" | "background",
+    options: ClassReference["startingEquipment"],
+    toolChoices: readonly string[]
+  ) => {
     if (options.length === 0) return;
     const optionIds = new Set(options.map((option) => option.id));
     const matches = equipmentRows.filter((row) => optionIds.has(row.id));
@@ -924,7 +1040,14 @@ export function buildCharacterDefinition(
       reject(`Choose exactly one ${source} equipment option (${options.map((option) => option.id).join(", ")}).`);
     const chosen = options.find((option) => option.id === matches[0].id)!;
     goldPieces += chosen.goldPieces;
-    for (const item of chosen.items) {
+    // A kit item that is one of this source's tool choices is the tool chosen there ("Gaming Set (same as above)").
+    const chosenTools = [...(offers.find((offer) => offer.key === `${source}-tools`)?.taken ?? [])];
+    const items = chosen.items.map((item) => {
+      if (!toolChoices.includes(item.id) || chosenTools.length === 0 || chosenTools.includes(item.id)) return item;
+      const tool = chosenTools.shift()!;
+      return { ...item, id: tool, name: library.equipmentRecord(tool)?.name ?? item.name };
+    });
+    for (const item of items) {
       const existing = inventory.find((candidate) => candidate.id === item.id);
       if (existing) {
         existing.quantity += item.quantity;
@@ -978,8 +1101,8 @@ export function buildCharacterDefinition(
       );
     }
   };
-  consumeEquipmentOption("class", classRecord.startingEquipment);
-  consumeEquipmentOption("background", background.startingEquipment);
+  consumeEquipmentOption("class", classRecord.startingEquipment, classRecord.toolChoices?.from ?? []);
+  consumeEquipmentOption("background", background.startingEquipment, background.toolChoices?.from ?? []);
   const strayEquipment = equipmentRows.find(
     (row) =>
       !classRecord.startingEquipment.some((option) => option.id === row.id) &&

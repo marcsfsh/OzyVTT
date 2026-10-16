@@ -158,7 +158,10 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     category:
       "Open slug: origin, general, fighting-style, epic-boon, or anything homebrew adds. Feeds the `<category>-feats` catalog slug a feature choice can point at",
     prerequisite: "The SERVER decides whether a prerequisite is met - never the client",
-    "prerequisite.requires": "Proficiency or feature slugs the character must already have",
+    "prerequisite.requires":
+      'Proficiency or feature slugs the character must already have ("fighting-style"); "spellcasting" means a class or subclass Spellcasting feature',
+    "prerequisite.abilityScoreMode":
+      'Whether every ability minimum must be met ("all") or any one of them ("any": Grappler\'s "Strength or Dexterity 13+")',
     "prerequisite.text": "Anything not modeled above, printed for the player to judge (ADR-0008 prose fallback)"
   },
   HomebrewSpellRecord: {
@@ -303,7 +306,8 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   },
   Feature: {
     "": "THE shared feature record: a class feature, a subclass feature, a species trait, a background feature, and a feat's mechanics are all this one shape. `description` is always the display source of truth, and every rider is optional - a prose-only feature is perfectly valid and is how most text starts life. This is the AUTHORING counterpart of `ContentFeature`, which publishes the same feature with its riders stripped.",
-    level: "Class/subclass level this feature is gained at. Omitted for always-on records (species traits, feats)",
+    level:
+      "Class/subclass level this feature is gained at; on a species or lineage trait, the character level it arrives at (Draconic Flight at 5). Omitted for records held from level 1 (most traits, feats)",
     choice:
       "A pick this feature asks the player to make; every one writes a row in the character's choice-provenance ledger, which is what makes level-up and respec possible",
     choices:

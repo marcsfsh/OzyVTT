@@ -10,6 +10,7 @@ import { answerReaction } from "../src/reactions.js";
 import { setCondition } from "../src/actor-conditions.js";
 import { startEncounter } from "../src/encounter.js";
 import type { ActorDefinition } from "@vtt/schemas";
+import { asiRows } from "./asi-rows.js";
 
 // Rogue, Ranger and Paladin mechanics, asserted as rolled numbers, spent counters, refused builds or
 // text the table reads; never "the rider survived derivation". Runs against the real SRD bundles
@@ -181,11 +182,7 @@ const rogueInput = (level: number): MutableInput => {
             ]
       ),
       ...(level >= 3 ? [{ level: 3, classId: "rogue", kind: "subclass", id: "thief" }] : []),
-      ...asiLevels.flatMap((asi) => [
-        { level: asi, classId: "rogue", kind: "asi-or-feat", id: "ability-score-improvement" },
-        { level: asi, kind: "ability-score", id: "dex", payload: { featureId: "ability-score-improvement" } },
-        { level: asi, kind: "ability-score", id: "dex", payload: { featureId: "ability-score-improvement" } }
-      ]),
+      ...asiRows("rogue", asiLevels, ["dex", "con", "wis"], { dex: 17, con: 15, wis: 12 }),
       ...(level >= 19
         ? [
             {
@@ -428,11 +425,7 @@ const rangerInput = (level: number, options: { wisFocus?: boolean } = {}): Mutab
             { level: 9, classId: "ranger", kind: "expertise", id: "nature", payload: { featureId: "expertise" } }
           ]
         : []),
-      ...asiLevels.flatMap((asi) => [
-        { level: asi, classId: "ranger", kind: "asi-or-feat", id: "ability-score-improvement" },
-        { level: asi, kind: "ability-score", id: bumped, payload: { featureId: "ability-score-improvement" } },
-        { level: asi, kind: "ability-score", id: bumped, payload: { featureId: "ability-score-improvement" } }
-      ]),
+      ...asiRows("ranger", asiLevels, [bumped, "con", "str"], { dex: 16, wis: 15, con: 14, str: 12 }),
       ...(level >= 19
         ? [
             {
@@ -654,11 +647,7 @@ const paladinInput = (level: number): MutableInput => {
           ]
         : []),
       ...(level >= 3 ? [{ level: 3, classId: "paladin", kind: "subclass", id: "oath-of-devotion" }] : []),
-      ...asiLevels.flatMap((asi) => [
-        { level: asi, classId: "paladin", kind: "asi-or-feat", id: "ability-score-improvement" },
-        { level: asi, kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } },
-        { level: asi, kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } }
-      ]),
+      ...asiRows("paladin", asiLevels, ["str", "con", "cha"], { str: 15, con: 14, cha: 14 }),
       ...(level >= 19
         ? [
             {

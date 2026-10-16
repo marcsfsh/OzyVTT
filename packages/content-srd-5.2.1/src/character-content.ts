@@ -474,7 +474,8 @@ export const FeatureRecordSchema = z
   .object({
     id: ContentIdSchema,
     name: z.string().min(1).max(120),
-    /** Class/subclass level this feature is gained at. Absent for always-on records (species traits, feats). */
+    /** Class/subclass level this feature is gained at; on a species or lineage trait, the character level it
+     *  arrives at (Draconic Flight at 5). Absent for records held from level 1 (most traits, feats). */
     level: ContentLevelSchema.optional(),
     description: z.string().min(1).max(20000),
     /** A pick this feature asks the player to make; writes a `choices[]` row. */
@@ -798,6 +799,8 @@ export const FeatReferenceSchema = z
           .array(z.object({ ability: AbilitySchema, minimum: z.number().int().min(1).max(20) }).strict())
           .max(6)
           .default([]),
+        /** Whether every minimum must be met, or any one of them (Grappler's "Strength or Dexterity 13+"). */
+        abilityScoreMode: z.enum(["all", "any"]).default("all"),
         /** Proficiency or feature slugs the character must already have ("martial", "spellcasting"). */
         requires: z.array(ContentIdSchema).max(10).default([]),
         /** Anything not modeled above, printed for the player to judge (ADR-0008 prose fallback). */

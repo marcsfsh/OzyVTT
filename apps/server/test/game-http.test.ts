@@ -601,7 +601,8 @@ describe("public game API over /api/v1", () => {
     const soldier = backgrounds.data.backgrounds.find((entry: { id: string }) => entry.id === "soldier");
     expect(soldier.toolChoices).toEqual({
       choose: 1,
-      from: ["gaming-set-dice", "gaming-set-playing-cards"],
+      // SRD: "Choose one kind of Gaming Set", all four variants.
+      from: ["gaming-set-dice", "gaming-set-dragonchess", "gaming-set-playing-cards", "gaming-set-three-dragon-ante"],
       fromCatalog: null
     });
     expect(soldier).toHaveProperty("skillChoices");

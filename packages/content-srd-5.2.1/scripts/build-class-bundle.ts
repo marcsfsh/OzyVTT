@@ -205,9 +205,10 @@ const ALL_SKILLS = [
   "survival"
 ];
 
-// `repeatable`: an ASI may be taken at several levels, and the server rejects a repeated option id
-// unless the choice allows it. Expertise and Metamagic pick a different entry each time.
-const asiChoice = { kind: "asi-or-feat", choose: 1, fromCatalog: "general-feats", repeatable: true };
+// "The Ability Score Improvement feat or another feat of your choice for which you qualify": every category,
+// with prerequisites checked by the build. `repeatable`: an ASI may be taken at several levels, and the server
+// rejects a repeated option id unless the choice allows it (a feat that is not repeatable is still refused).
+const asiChoice = { kind: "asi-or-feat", choose: 1, fromCatalog: "feats", repeatable: true };
 const weaponMastery = (n: number) => ({ kind: "weapon-mastery", choose: n, fromCatalog: "weapons" });
 
 /**
