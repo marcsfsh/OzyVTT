@@ -77,6 +77,9 @@ export type CharacterBuilderProps = Readonly<{
     seed: BuilderDraft;
     /** The method the character's scores were made with, kept even if the table no longer offers it. */
     recordedMethod?: BuilderAbilityMethod;
+    /** The classes the character keeps at the rebuilt level. The table refuses a rebuild that drops one (only a
+     *  level-down below where it was taken does), so the class step offers no way to remove them. */
+    heldClasses?: readonly string[];
     startStep?: StepId;
     notice?: ReactNode;
   }>;
@@ -549,7 +552,7 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
                         aria-label={`${record.name} levels`}
                         onChange={(next) => editDraft((current) => withClassLevels(current, record.id, next))}
                       />
-                      {index > 0 && (
+                      {index > 0 && !rebuild?.heldClasses?.includes(record.id) && (
                         <Button
                           variant="ghost"
                           size="sm"

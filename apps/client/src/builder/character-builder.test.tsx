@@ -449,6 +449,7 @@ vi.mock("../socket", () => {
 import { ToastProvider } from "@vtt/ui";
 import type { ActorDefinition, CharacterChoice } from "@vtt/schemas";
 import { socket } from "../socket";
+import { emptyDraft, type BuilderDraft } from "./build-payload";
 import { CharacterBuilder } from "./CharacterBuilder";
 import { LevelFlow } from "./LevelFlow";
 
@@ -775,6 +776,48 @@ describe("multiclassing on the class step", () => {
     expect(screen.getByRole("group", { name: "Character level" })).toBeInTheDocument();
     await waitFor(() => expect(offersRequests().at(-1)).not.toHaveProperty("classLevels"));
     expect(offersRequests().at(-1)?.level).toBe(2);
+  });
+
+  it("in a rebuild, offers no way to drop a class the character keeps, only one it adds", async () => {
+    const user = userEvent.setup();
+    const seed: BuilderDraft = {
+      ...emptyDraft(),
+      speciesId: "elf",
+      backgroundId: "acolyte",
+      classId: "cleric",
+      level: 3,
+      classLevels: ["cleric", "cleric", "fighter"],
+      picks: { "feature:elf-keen-senses": ["perception"] }
+    };
+    /** The rebuild's class step, keeping `heldClasses`. */
+    const classStepOf = async (heldClasses: readonly string[]) => {
+      const view = render(
+        <ToastProvider>
+          <CharacterBuilder
+            state={gmView}
+            onClose={() => {}}
+            onCreated={() => {}}
+            rebuild={{ actorId: "a1000000-0000-4000-8000-000000000001", name: "Mira", seed, heldClasses }}
+          />
+        </ToastProvider>
+      );
+      await screen.findByRole("radio", { name: /Elf/, checked: true });
+      await user.click(screen.getByRole("button", { name: "Next" }));
+      await screen.findByRole("radio", { name: /Acolyte/, checked: true });
+      await user.click(screen.getByRole("button", { name: "Next" }));
+      await screen.findByRole("group", { name: "Fighter levels" });
+      return view;
+    };
+    // A Cleric 2 levelling into the Fighter: the Fighter is new, so it can come off again.
+    const levellingIn = await classStepOf(["cleric"]);
+    expect(screen.getByRole("button", { name: "Remove Fighter" })).toBeInTheDocument();
+    levellingIn.unmount();
+    // ...whereas a Cleric 2 / Fighter 1 keeps its Fighter, which the table would refuse to drop.
+    await classStepOf(["cleric", "fighter"]);
+    expect(screen.queryByRole("button", { name: "Remove Fighter" })).toBeNull();
+    expect(
+      within(screen.getByRole("group", { name: "Fighter levels" })).getByRole("button", { name: "Increase" })
+    ).toBeInTheDocument();
   });
 });
 

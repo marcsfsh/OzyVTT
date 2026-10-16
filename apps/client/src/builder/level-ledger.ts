@@ -71,6 +71,11 @@ export function targetClassLevels(identity: LedgerIdentity, level: number, class
     : identity.classLevels.slice(0, level);
 }
 
+/** The classes the character keeps at a rebuilt level: all it has, less one a level-down takes off. */
+export function keptClasses(identity: LedgerIdentity, level: number): string[] {
+  return [...new Set(identity.classLevels.slice(0, Math.min(level, identity.level)))];
+}
+
 /**
  * The wizard draft for a rebuild at `targetLevel`, from the table's reading of the character's ledger at
  * that level: its answers by offer, and the base scores the sheet's totals imply.

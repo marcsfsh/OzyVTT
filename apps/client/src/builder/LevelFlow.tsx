@@ -12,6 +12,7 @@ import {
   draftFromLedger,
   hpRollGap,
   identityOf,
+  keptClasses,
   ledgerOf,
   recordedAbilities,
   targetClassLevels,
@@ -158,6 +159,7 @@ export function LevelFlow({
           actorId,
           name: actor.name,
           seed,
+          heldClasses: keptClasses(identity, target.level),
           ...(recordedMethod ? { recordedMethod } : {}),
           ...(gap
             ? {

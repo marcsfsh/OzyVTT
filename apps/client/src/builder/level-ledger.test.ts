@@ -10,6 +10,7 @@ import {
   hpRollGap,
   hpRolls,
   identityOf,
+  keptClasses,
   ledgerOf,
   methodFor,
   recordedAbilities,
@@ -114,6 +115,14 @@ describe("Reading a character back into the wizard", () => {
       "cleric"
     ]);
     expect(targetClassLevels(identity!, 4, "fighter")).toEqual(["fighter", "wizard", "fighter", "fighter"]);
+  });
+
+  it("keeps every class on a level-up, and lets a level-down take off a class it removes", () => {
+    const identity = identityOf(fighterWizard([order]))!;
+    expect(keptClasses(identity, 6)).toEqual(["fighter", "wizard"]);
+    expect(keptClasses(identity, 4)).toEqual(["fighter", "wizard"]);
+    // Down to level 1, below the Wizard's first level (2): only the Fighter is kept.
+    expect(keptClasses(identity, 1)).toEqual(["fighter"]);
   });
 
   it("refuses a built sheet whose classes were added by hand, with no record of their order", () => {
