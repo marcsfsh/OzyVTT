@@ -7,6 +7,7 @@ import { GameStateSchema } from "@vtt/domain";
 import { InventoryItemSchema, type ActorDefinition } from "@vtt/schemas";
 import { checkRollMode } from "../src/ability-checks.js";
 import { importActorDefinition, reconcileArmorClasses, storedArmorClass } from "../src/actor-roster.js";
+import { deriveActorSheet } from "../src/actor-derived.js";
 import { initiativeRollMode } from "../src/encounter.js";
 import { deriveEquipment } from "../src/equipment-derivation.js";
 import { RulesBlockedError } from "../src/game-store.js";
@@ -258,6 +259,7 @@ describe("attunement", () => {
       speedFeet: 30,
       actions: [],
       token: { disposition: "friendly", footprint: { width: 1, height: 1 } },
+      extensions: {},
       character: {
         classes: [{ id: "rogue", name: "Rogue", level, subclass: { id: "thief", name: "Thief" } }],
         feats: [],
@@ -281,9 +283,15 @@ describe("attunement", () => {
   const MAGIC = ["cloak-of-protection", "ring-of-protection", "brooch-of-shielding", "boots-of-the-winterlands"];
 
   it("lets Use Magic Device attune a fourth magic item, and no fifth", () => {
-    const { attune } = thief(13);
+    const { state, attune } = thief(13);
     for (const id of MAGIC) attune(id);
     expect(() => attune("ring-of-evasion")).toThrow(/Already attuned to 4 items/);
+    // The sheet's badge reads the same limit.
+    const rogue = state.actors[0];
+    const definition = state.definitions.find((entry) => entry.id === rogue.definitionId)!.definition;
+    expect(deriveActorSheet(rogue, definition, deriveEquipment(rogue, definition, catalog), []).attunementSlots).toBe(
+      4
+    );
   });
 
   it("holds anyone else to three", () => {

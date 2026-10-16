@@ -1476,6 +1476,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "derived.defences.vulnerabilities[].source": DEFENCE_SOURCE,
     "derived.spellSaveDcBonus":
       "What standing spell-save-dc riders (an item, a feat) add to the bearer's spell save DC, and so to every action that uses it. A printed DC is not raised.",
+    "derived.attunementSlots": "How many items the character can attune to at once: 3, or 4 with Use Magic Device",
     "actions[].available": "Whether strict mode would allow resolving this action right now",
     "actions[].violations[].rule":
       "Machine-readable rule id, e.g. economy.action-used, feature.requires-effect, condition.incapacitated",

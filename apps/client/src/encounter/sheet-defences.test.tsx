@@ -19,7 +19,8 @@ const derivedWith = (defences: ActorDerivedSheet["defences"]) =>
     abilities: [],
     skills: [],
     defences,
-    spellSaveDcBonus: 0
+    spellSaveDcBonus: 0,
+    attunementSlots: 3
   }) as ActorDerivedSheet;
 
 const rowText = (label: string) => screen.getByText(label).nextElementSibling?.textContent;

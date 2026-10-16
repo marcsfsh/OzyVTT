@@ -14,12 +14,15 @@ export function SheetInventory({
   busy,
   edit,
   role = "player",
-  others = []
+  others = [],
+  attunementSlots = 3
 }: Readonly<{
   actor: GmActor | PlayerActor;
   busy: boolean;
   edit: SheetEdit;
   role?: "gm" | "player";
+  /** 3, or 4 with Use Magic Device; the server enforces it. */
+  attunementSlots?: number;
   /** The characters the GM can hand an item to. */
   others?: readonly Readonly<{ id: string; name: string }>[];
 }>) {
@@ -286,7 +289,9 @@ export function SheetInventory({
       )}
       {attunedCount > 0 && (
         <p className="sheet-attunement">
-          <Badge tone={attunedCount > 3 ? "danger" : "neutral"}>Attunement {attunedCount}/3</Badge>
+          <Badge tone={attunedCount > attunementSlots ? "danger" : "neutral"}>
+            Attunement {attunedCount}/{attunementSlots}
+          </Badge>
         </p>
       )}
       {pickerOpen && (

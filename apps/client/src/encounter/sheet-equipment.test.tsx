@@ -38,10 +38,25 @@ const CATALOG: readonly ContentEquipmentSummary[] = loadEquipment().map((item) =
 }));
 
 const emit = socket.emit as unknown as ReturnType<typeof vi.fn>;
-/** Answers the catalog read, and every command with ok. */
-function serve() {
+/** Answers the catalog read, the sheet's derived numbers (`attunementSlots`), and every command with ok. */
+function serve(attunementSlots = 3) {
   emit.mockImplementation((event: string, _payload: unknown, ack?: (result: unknown) => void) => {
     if (event === "content:equipment") ack?.({ ok: true, equipment: CATALOG, attribution: "SRD 5.2.1, CC BY 4.0." });
+    else if (event === "actor:available-actions")
+      ack?.({
+        ok: true,
+        actions: [],
+        derived: {
+          proficiencyBonus: 3,
+          armorClass: 12,
+          initiative: 2,
+          abilities: [],
+          skills: [],
+          defences: { resistances: [], immunities: [], vulnerabilities: [] },
+          spellSaveDcBonus: 0,
+          attunementSlots
+        }
+      });
     else ack?.({ ok: true });
   });
 }
@@ -116,6 +131,16 @@ describe("the sheet's inventory", () => {
     expect(within(ring).getByRole("button", { name: "Attune" })).toBeTruthy();
     // A player never sees the GM's resistance pick control.
     expect(screen.queryByRole("combobox", { name: "Resistance type of Ring of Resistance" })).toBeNull();
+  });
+
+  it("counts attunement against the character's own limit", async () => {
+    serve(4);
+    const attuned = hero();
+    attuned.inventory = attuned.inventory.map((item) =>
+      item.id === "ring-of-resistance" ? { ...item, attuned: true } : item
+    );
+    render(<CharacterSheet actor={attuned} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    expect(await screen.findByText("Attunement 1/4")).toBeTruthy();
   });
 
   it("lets the GM pick a resistance type and hand an item to another character", async () => {

@@ -287,6 +287,7 @@ export function CharacterSheet({
               busy={busy}
               edit={edit}
               role={role}
+              attunementSlots={derived?.attunementSlots ?? 3}
               others={
                 role === "gm" && state
                   ? state.actors
