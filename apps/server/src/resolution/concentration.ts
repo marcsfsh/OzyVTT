@@ -27,14 +27,20 @@ export function spellOf(ctx: Pick<ResolveContext, "action" | "deps">): SpellRefe
 export function startConcentration(ctx: ResolveContext): void {
   const spell = spellOf(ctx);
   if (!spell?.concentration) return;
-  const { state, attacker, input, deps } = ctx;
-  ctx.castId = input.commandId;
+  ctx.castId = ctx.input.commandId;
+  beginConcentration(ctx, spell, ctx.castId);
+}
+
+/** The caster's "Concentrating on X" for one cast, whether the spell is the resolved action or rides its hit (a
+ *  smite); what the cast puts on others carries the same `castId`. */
+export function beginConcentration(ctx: ResolveContext, spell: SpellReference, castId: string): void {
+  const { state, attacker, deps } = ctx;
   const ended: EffectNarration[] = [];
   addEffect(
     state,
     attacker.id,
     makeEffect({
-      id: `${input.commandId}:concentration`,
+      id: `${castId}:concentration`,
       name: `Concentrating on ${spell.name}`,
       tags: [CONCENTRATING_TAG],
       sourceActorId: attacker.id,
@@ -43,7 +49,7 @@ export function startConcentration(ctx: ResolveContext): void {
       duration: spellEffectDuration(spell.duration),
       endsWhenSourceDefeated: true,
       concentration: true,
-      castId: ctx.castId
+      castId
     }),
     ended,
     deps

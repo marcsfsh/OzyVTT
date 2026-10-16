@@ -2,12 +2,13 @@ import type { HitOffer } from "@vtt/domain";
 import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import { isIncapacitated } from "../condition-rules.js";
 import { areAllies } from "../creature-sides.js";
-import { addEffect, applyCondition, makeEffect } from "../effects.js";
+import { addEffect, applyCondition, makeEffect, type EffectNarration } from "../effects.js";
 import { RulesBlockedError } from "../game-store.js";
 import { upcastAction } from "../item-actions.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { effectiveModeFor, overrideCovers, overrideWaives } from "../rules-families.js";
 import { recordRoll, sizeAtMost, type DefinitionAction, type ResolveContext } from "./context.js";
+import { beginConcentration } from "./concentration.js";
 import { criticalExpression } from "./damage.js";
 import { commitEconomy, evaluateActionEconomy, planEconomy } from "./economy.js";
 import { hitRiderOf, type HitRider } from "./hit-riders.js";
@@ -226,6 +227,11 @@ export function rollHitOptions(ctx: ResolveContext): void {
     if (rider.versus && creatureType !== undefined && rider.versus.creatureTypes.includes(creatureType))
       roll(rider.versus.formula, cast.damage[0]?.type ?? "radiant", `${action.name} (${capitalised(creatureType)})`);
     if (rider.marks) {
+      // A Concentration smite starts the caster's Concentration as any cast does, and its mark is held by it.
+      const spell = action.spellId ? ctx.deps.catalog?.spellRecord?.(action.spellId) : undefined;
+      const castId = spell?.concentration ? `${ctx.input.commandId}:${action.id}` : undefined;
+      if (spell && castId) beginConcentration(ctx, spell, castId);
+      const ended: EffectNarration[] = [];
       const effect = addEffect(
         ctx.state,
         target.id,
@@ -239,11 +245,14 @@ export function rollHitOptions(ctx: ResolveContext): void {
           startedRound: ctx.state.combat.round,
           duration: { type: "rounds", remaining: rider.marks.rounds },
           concentration: true,
+          ...(castId !== undefined ? { castId } : {}),
           modifiers: [{ type: "roll-mode", roll: "incoming-attack", mode: "advantage" }]
         }),
-        undefined,
+        ended,
         ctx.deps
       );
+      for (const event of ended)
+        ctx.tableNarration.push({ kind: "effect", text: event.text, actorIds: [event.actorId] });
       ctx.effectsApplied.push({ targetId: target.id, targetName: target.name, name: effect.name, conditionIds: [] });
     }
     if (rider.reminder) ctx.warnings.push(rider.reminder);

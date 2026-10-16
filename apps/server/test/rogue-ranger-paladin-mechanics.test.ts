@@ -9,6 +9,7 @@ import { resolveDefinitionAction, type ResolveDependencies } from "../src/action
 import { answerReaction } from "../src/reactions.js";
 import { answerSave, createPendingSaves } from "../src/saving-throws.js";
 import { setCondition } from "../src/actor-conditions.js";
+import { addEffect, endEffect, makeEffect } from "../src/effects.js";
 import { startEncounter } from "../src/encounter.js";
 import type { ActorDefinition } from "@vtt/schemas";
 import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
@@ -994,6 +995,44 @@ describe("Paladin - Divine Smite rides a melee hit", () => {
     );
     expect((thrown.hitOffers ?? []).some((offer) => offer.id === "spell-divine-smite")).toBe(true);
     expect(swing(built, "item-longsword", [2], { commit: false }).hitOffers).toBeUndefined();
+  });
+});
+
+/** A Paladin input with `spellId` prepared in place of its first pick. */
+const preparing = (input: MutableInput, spellId: string): MutableInput => {
+  const first = input.choices.findIndex((row) => row.kind === "spell");
+  input.choices[first] = { ...input.choices[first], id: spellId } as MutableInput["choices"][number];
+  return input;
+};
+
+describe("Paladin - a smite that needs Concentration starts it", () => {
+  it("Shining Smite gives the Paladin its Concentration, ends the one held before, and its mark ends with it", () => {
+    const built = table(preparing(paladinInput(5), "shining-smite"));
+    addEffect(
+      built.state,
+      IDS.hero,
+      makeEffect({
+        id: "bless",
+        name: "Concentrating on Bless",
+        tags: ["concentrating"],
+        sourceActorId: IDS.hero,
+        concentration: true,
+        castId: "bless",
+        duration: { type: "rounds", remaining: 10 }
+      })
+    );
+    const result = swing(built, "item-longsword", [19, 4, 3, 3, 3, 3], {
+      hitOptions: [{ id: "spell-shining-smite", slotLevel: 2 }]
+    });
+    expect(built.hero.effects.map((effect) => effect.name)).toEqual(["Concentrating on Shining Smite"]);
+    expect(result.effectsApplied?.map((applied) => applied.name)).toEqual(
+      expect.arrayContaining(["Concentrating on Shining Smite", "Shining Smite"])
+    );
+    const mark = built.foe.effects.find((effect) => effect.name === "Shining Smite")!;
+    expect(mark.castId).toBe(built.hero.effects[0].castId);
+    // Dropping the Concentration ends the mark.
+    endEffect(built.state, IDS.hero, built.hero.effects[0].id);
+    expect(built.foe.effects.map((effect) => effect.name)).toEqual(["Sapped by Bree"]);
   });
 });
 
