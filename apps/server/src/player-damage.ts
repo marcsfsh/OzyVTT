@@ -1,5 +1,5 @@
 import type { ActionResolution, GameState } from "@vtt/domain";
-import { applyDamageDetailed, type DamageOutcome } from "./hit-points.js";
+import { applyDamageDetailed, type DamageDeps, type DamageOutcome } from "./hit-points.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import type { ActorDefinition } from "@vtt/schemas";
 import { damagePartsOf } from "./resolution/damage.js";
@@ -16,6 +16,8 @@ export type PlayerDamageDeps = Readonly<{
   now: () => number;
   /** The item catalog, so a target's item-granted resistances and immunities reach the damage math. */
   catalog?: EquipmentCatalog;
+  /** Creature-to-creature distance, for the strike-back reaction the damage may open. */
+  distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
 }>;
 
 /** The applied result for table narration. `sourceActorId` rides along so narration includes it in `actorIds`,
@@ -44,6 +46,16 @@ function isoOf(now: () => number) {
   return () => new Date(now()).toISOString();
 }
 
+function damageDepsOf(deps: PlayerDamageDeps): DamageDeps {
+  return {
+    resolveDefinition: deps.resolveDefinition,
+    newId: deps.newId,
+    now: isoOf(deps.now),
+    ...(deps.catalog ? { catalog: deps.catalog } : {}),
+    ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
+  };
+}
+
 /** Settles a player's confirmed hit per the player-damage policy, mutating `state` (parks a proposal or
  *  applies the damage GM-scoped). Returns the applied outcome in direct mode, or null when parked or not
  *  a qualifying hit. */
@@ -63,14 +75,9 @@ export function settlePlayerHit(
     const outcome = applyDamageDetailed(
       state,
       attack.targetId,
-      { amount: resolution.damageTotal, parts, critical: resolution.crit, sourceName: label },
+      { amount: resolution.damageTotal, parts, critical: resolution.crit, sourceName: label, sourceActorId },
       { role: "gm" },
-      {
-        resolveDefinition: deps.resolveDefinition,
-        newId: deps.newId,
-        now: isoOf(deps.now),
-        ...(deps.catalog ? { catalog: deps.catalog } : {})
-      }
+      damageDepsOf(deps)
     );
     return { outcome, targetId: attack.targetId, sourceActorId, label };
   }
@@ -118,20 +125,10 @@ export function resolvePendingDamage(
       parts: proposal.proposedDamageParts,
       ...(amount !== undefined ? { damageOverride: amount } : {}),
       critical: proposal.critical,
-      sourceName: label
+      sourceName: label,
+      sourceActorId: proposal.sourceActorId
     };
-    const outcome = applyDamageDetailed(
-      state,
-      proposal.targetActorId,
-      input,
-      { role: "gm" },
-      {
-        resolveDefinition: deps.resolveDefinition,
-        newId: deps.newId,
-        now: isoOf(deps.now),
-        ...(deps.catalog ? { catalog: deps.catalog } : {})
-      }
-    );
+    const outcome = applyDamageDetailed(state, proposal.targetActorId, input, { role: "gm" }, damageDepsOf(deps));
     applied = { outcome, targetId: proposal.targetActorId, sourceActorId: proposal.sourceActorId, label };
   }
   state.combat = {

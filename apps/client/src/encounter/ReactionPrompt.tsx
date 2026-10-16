@@ -8,11 +8,13 @@ import { DieModeButtons, type DieMode } from "./RollControls";
 import "./prompts.css";
 
 /**
- * A reaction window awaiting an answer (Uncanny Dodge). The triggering hit's damage is parked here,
- * so both buttons apply it: Use spends the reaction and halves each part, Decline applies it in
- * full. Each button names what the server weighed through the reactor's defences when the hit
- * landed; a prompt parked before that was recorded falls back to the raw numbers. The GM's dismiss
- * dismisses without applying, for damage already entered by hand.
+ * A reaction window awaiting an answer. What the buttons do follows the trigger:
+ * - Uncanny Dodge: the hit's damage is parked here, so both buttons apply it, halved on Use. Each names what the
+ *   server weighed through the reactor's defences; a prompt parked before that was recorded shows the raw numbers.
+ * - Parry or Shield: the attack waits at its roll; both buttons finish it, Use against the raised AC.
+ * - An opportunity attack or Retaliation: Attack rolls a melee swing to confirm, re-roll or type; Let them go clears.
+ * - Hellish Rebuke or Storm's Thunder: Use strikes the creature that dealt the damage.
+ * The GM's dismiss clears the prompt without applying anything it holds, for a moment settled by hand.
  */
 export function ReactionPrompt({
   reaction,
@@ -28,7 +30,9 @@ export function ReactionPrompt({
   rollMode: "auto" | "manual";
 }>) {
   const [busy, setBusy] = useState(false);
-  const opportunity = reaction.kind === "leaves-reach";
+  // Answering rolls a melee swing first: an opportunity attack, or Retaliation.
+  const opportunity =
+    reaction.kind === "leaves-reach" || (reaction.kind === "damaged-by-creature" && reaction.rollsAttack);
   // An opportunity attack previewed but not applied: confirm, re-roll adv/disadv, or type a d20,
   // as with a saving throw.
   const [rolled, setRolled] = useState<{
@@ -72,10 +76,36 @@ export function ReactionPrompt({
         }
         setRolled(null);
         const attack = outcome.resolution?.attack;
+        const swing = reaction.kind === "leaves-reach" ? "opportunity attack" : reaction.actionName;
         onFeedback(
           use
-            ? `${actorName}'s opportunity attack: ${attack ? `${attack.outcome.toUpperCase()} (${attack.total})` : "resolved"}${outcome.appliedDamage > 0 ? ` - ${outcome.appliedDamage} damage` : ""}.`
-            : `${actorName} let ${reaction.sourceName} go.`
+            ? `${actorName}'s ${swing}: ${attack ? `${attack.outcome.toUpperCase()} (${attack.total})` : "resolved"}${outcome.appliedDamage > 0 ? ` - ${outcome.appliedDamage} damage` : ""}.`
+            : reaction.kind === "leaves-reach"
+              ? `${actorName} let ${reaction.sourceName} go.`
+              : `${actorName} kept the reaction.`
+        );
+      } else if (reaction.kind === "attack-would-hit") {
+        const attack = outcome.resolution?.attack;
+        const landed = attack && (attack.outcome === "hit" || attack.outcome === "crit");
+        onFeedback(
+          `${use ? `${actorName} used ${reaction.actionName}` : `${actorName} declined ${reaction.actionName}`} - ${
+            landed
+              ? `the attack hits${outcome.appliedDamage > 0 ? ` for ${outcome.appliedDamage} damage` : ""}`
+              : "the attack misses"
+          }.`
+        );
+      } else if (reaction.kind === "damaged-by-creature") {
+        const save = outcome.resolution?.save;
+        onFeedback(
+          use
+            ? `${actorName} used ${reaction.actionName} against ${reaction.sourceName}${
+                save
+                  ? ` - DC ${save.dc} ${save.ability.toUpperCase()} save`
+                  : outcome.appliedDamage > 0
+                    ? ` - ${outcome.appliedDamage} damage`
+                    : ""
+              }.`
+            : `${actorName} kept the reaction.`
         );
       } else {
         const defences = damageAdjustments(outcome.parts, outcome.flatReduction);
@@ -117,12 +147,22 @@ export function ReactionPrompt({
     });
   };
   const hit = rolled ? rolled.attack.outcome === "hit" || rolled.attack.outcome === "crit" : false;
+  const letGo = reaction.kind === "leaves-reach" ? "Let them go" : "Decline";
   return (
     <div className="save-prompt reaction-prompt" role="group" aria-label={`Reaction for ${actorName}`}>
       <span className="save-prompt-label">
-        {opportunity ? (
+        {reaction.kind === "leaves-reach" ? (
           <>
             <strong>Opportunity Attack</strong> - {reaction.sourceName} is leaving reach
+          </>
+        ) : reaction.kind === "damaged-by-creature" ? (
+          <>
+            <strong>{reaction.actionName}</strong> - {reaction.sourceName} damaged you
+          </>
+        ) : reaction.kind === "attack-would-hit" ? (
+          <>
+            <strong>{reaction.actionName}</strong> - {reaction.sourceName}'s attack would hit; +{reaction.acBonus} AC
+            turns it into a miss
           </>
         ) : (
           <>
@@ -196,7 +236,7 @@ export function ReactionPrompt({
               answer(false);
             }}
           >
-            Let them go
+            {letGo}
           </Button>
         </span>
       ) : (
@@ -207,7 +247,7 @@ export function ReactionPrompt({
                 type="button"
                 className="save-prompt-roll"
                 disabled={busy}
-                title="Roll one melee attack against the mover"
+                title={`Roll one melee attack against ${reaction.sourceName}`}
                 onClick={() => answer(true, { commit: false })}
               >
                 Attack
@@ -215,10 +255,38 @@ export function ReactionPrompt({
               <button
                 type="button"
                 disabled={busy}
-                title="Keep the reaction; the mover leaves freely"
+                title={
+                  reaction.kind === "leaves-reach" ? "Keep the reaction; the mover leaves freely" : "Keep the reaction"
+                }
                 onClick={() => answer(false)}
               >
-                Let them go
+                {letGo}
+              </button>
+            </>
+          ) : reaction.kind === "attack-would-hit" || reaction.kind === "damaged-by-creature" ? (
+            <>
+              <button
+                type="button"
+                className="save-prompt-roll"
+                disabled={busy}
+                title={
+                  reaction.kind === "attack-would-hit"
+                    ? `Spend the reaction: +${reaction.acBonus} AC against the attack`
+                    : `Spend the reaction against ${reaction.sourceName}`
+                }
+                onClick={() => answer(true)}
+              >
+                {reaction.kind === "attack-would-hit" ? `Use - +${reaction.acBonus} AC` : "Use"}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                title={
+                  reaction.kind === "attack-would-hit" ? "Keep the reaction; the attack hits" : "Keep the reaction"
+                }
+                onClick={() => answer(false)}
+              >
+                {reaction.kind === "attack-would-hit" ? "Decline - take the hit" : "Decline"}
               </button>
             </>
           ) : (

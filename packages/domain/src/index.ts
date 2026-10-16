@@ -1,5 +1,7 @@
 export * from "./catalog-choice.js";
 export * from "./pick-budget.js";
+/** The AC an attack meets, shared so the server's roll and the sheets agree. */
+export * from "./armor-class.js";
 
 /** Codex field vocabulary, shared so the GM UI and the server's prune-and-seal read one copy. */
 export * from "./codex-entities.js";

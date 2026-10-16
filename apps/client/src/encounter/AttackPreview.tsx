@@ -15,7 +15,8 @@ export function AttackOutcome({ attack, audience }: Readonly<{ attack: Attack; a
   return (
     <p className={`action-outcome outcome-${attack.outcome}`}>
       {attack.total}
-      {attack.targetAc !== null ? ` vs AC ${attack.targetAc}` : ""} -{" "}
+      {attack.targetAc !== null ? ` vs AC ${attack.targetAc}` : ""}
+      {attack.reactionAcBonus ? ` (+${attack.reactionAcBonus.amount} ${attack.reactionAcBonus.source})` : ""} -{" "}
       {attack.outcome === "crit"
         ? "CRITICAL HIT"
         : attack.outcome === "fumble"

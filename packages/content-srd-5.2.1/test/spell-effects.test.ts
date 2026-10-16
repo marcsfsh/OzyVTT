@@ -33,6 +33,21 @@ describe("what one cast of an SRD spell does", () => {
       expect(effectOf(id)!.attacks, id).toBe(0);
   });
 
+  it("declares the reactions the table can offer, and none it can't see the trigger of", () => {
+    expect(effectOf("shield")!.reaction).toEqual({
+      trigger: "hit-by-attack",
+      response: "ac-bonus",
+      amount: 5,
+      untilNextTurn: true
+    });
+    expect(effectOf("hellish-rebuke")!.reaction).toEqual({
+      trigger: "damaged-by-creature",
+      response: "strike-back",
+      rangeFeet: 60
+    });
+    for (const id of ["counterspell", "feather-fall"]) expect(effectOf(id)!.reaction, id).toBeUndefined();
+  });
+
   it("reviews only spells that exist", () => {
     const ids = new Set(loadSpells().map((spell) => spell.id));
     expect(SPELL_EFFECT_REVIEWED_IDS.filter((id) => !ids.has(id))).toEqual([]);

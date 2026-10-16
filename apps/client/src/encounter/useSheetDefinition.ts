@@ -31,7 +31,7 @@ type AvailabilityRow = Readonly<{
   usesPool?: string | null;
   requiresEffectTag?: string | null;
   multiattack?: ReadonlyArray<{ actionId: string; count: number }> | null;
-  reaction?: Readonly<{ trigger: "hit-by-attack"; response: "half-damage" }> | null;
+  reaction?: ContentActionSummary["reaction"];
 }>;
 
 /** The wire row in the shape every action surface here already speaks. */

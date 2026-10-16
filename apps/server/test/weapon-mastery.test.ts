@@ -979,6 +979,9 @@ function parkOpportunityAttack(built: Built): string {
         proposedDamageParts: [],
         critical: false,
         weighed: null,
+        acBonus: null,
+        rollsAttack: true,
+        parkedAttack: null,
         createdAt: 0
       }
     ]

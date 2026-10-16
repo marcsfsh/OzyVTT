@@ -993,10 +993,36 @@
         },
         "spellId": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 80 },
         "reaction": {
-          "type": "object",
-          "required": ["trigger", "response"],
-          "properties": { "trigger": { "const": "hit-by-attack" }, "response": { "const": "half-damage" } },
-          "additionalProperties": false
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["trigger", "response"],
+              "properties": { "trigger": { "const": "hit-by-attack" }, "response": { "const": "half-damage" } },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": ["trigger", "response", "amount"],
+              "properties": {
+                "trigger": { "const": "hit-by-attack" },
+                "response": { "const": "ac-bonus" },
+                "amount": { "type": "integer", "minimum": 1, "maximum": 10 },
+                "melee": { "type": "boolean" },
+                "untilNextTurn": { "type": "boolean" }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": ["trigger", "response"],
+              "properties": {
+                "trigger": { "const": "damaged-by-creature" },
+                "response": { "enum": ["strike-back", "melee-attack"] },
+                "rangeFeet": { "type": "integer", "minimum": 5, "maximum": 1000 }
+              },
+              "additionalProperties": false
+            }
+          ]
         },
         "legendary": {
           "type": "object",

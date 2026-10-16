@@ -10,6 +10,7 @@ import { z } from "zod";
 import {
   AbilitySchema,
   ActionAreaSchema,
+  ActionReactionSchema,
   ActorDefinitionSchema,
   DamageTypeSchema,
   DiceFormulaSchema,
@@ -59,7 +60,9 @@ export const SpellEffectSchema = z
     /** Damage to each target, every part rolled (all three of Magic Missile's darts). */
     damage: z.array(z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema }).strict()).max(4),
     /** Hit points each target regains; `addsModifier` adds the caster's spellcasting ability modifier. */
-    healing: z.object({ formula: HealingFormulaSchema, addsModifier: z.boolean() }).strict().nullable()
+    healing: z.object({ formula: HealingFormulaSchema, addsModifier: z.boolean() }).strict().nullable(),
+    /** A reaction spell's trigger and response (Shield, Hellish Rebuke), so the table offers it as a prompt. */
+    reaction: ActionReactionSchema.optional()
   })
   .strict();
 export type SpellEffect = z.infer<typeof SpellEffectSchema>;

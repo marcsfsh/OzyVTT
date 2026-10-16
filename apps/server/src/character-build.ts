@@ -261,6 +261,7 @@ function cantripActionFor(
     description: spell.description.slice(0, 12000),
     ...mechanics,
     ...(spell.area ? { area: spell.area } : {}),
+    ...(spell.effect?.reaction ? { reaction: spell.effect.reaction } : {}),
     // `spell-id-is` riders (Agonizing Blast) match on this field alone.
     spellId: spell.id
   } as ActorAction;
@@ -290,8 +291,13 @@ function leveledSpellActionFor(
     { attackBonus: numbers.attackBonus, saveDc: numbers.saveDc, bearersDc: true, modifier: numbers.modifier },
     {}
   );
+  // A reaction the table can offer (Shield) is something to resolve too.
   const resolvable =
-    mechanics.damage.length > 0 || mechanics.save !== undefined || mechanics.healing !== undefined || mechanics.attack;
+    mechanics.damage.length > 0 ||
+    mechanics.save !== undefined ||
+    mechanics.healing !== undefined ||
+    mechanics.attack ||
+    spell.effect?.reaction !== undefined;
   if (free === null && !resolvable) return null;
   const freeCast = free !== undefined;
   return {
@@ -301,6 +307,8 @@ function leveledSpellActionFor(
     description: spell.description.slice(0, 12000),
     ...mechanics,
     ...(spell.area ? { area: spell.area } : {}),
+    // A reaction spell's trigger rides its action, so the table offers it (Shield when an attack would hit).
+    ...(spell.effect?.reaction ? { reaction: spell.effect.reaction } : {}),
     ...(freeCast ? (free ? { uses: free } : {}) : { spellSlot: { level: spell.level } }),
     spellId: spell.id
   } as ActorAction;

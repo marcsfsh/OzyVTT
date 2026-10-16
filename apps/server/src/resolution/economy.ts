@@ -515,7 +515,15 @@ export function planEconomy(
 
 /** Commits the validated economy plan (ADR-0020): slots, compound instance, limited uses, legendary
  *  actions and spell slots. A GM override covers its rule family for the rest of this creature's turn. */
-export function commitEconomy({ state, attacker, input, plan, overridden }: ResolveContext): void {
+export function commitEconomy({
+  state,
+  attacker,
+  input,
+  plan,
+  overridden
+}: Pick<ResolveContext, "state" | "attacker" | "plan" | "overridden"> & {
+  input: Pick<ResolveInput, "override">;
+}): void {
   const instance = plan.instance
     ? { actorId: plan.instance.actorId, components: { ...plan.instance.components } }
     : null;

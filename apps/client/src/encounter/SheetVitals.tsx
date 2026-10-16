@@ -1,4 +1,4 @@
-import type { ActorDefinition, GmActor, PlayerActor } from "@vtt/domain";
+import { armorClassInPlay, type ActorDefinition, type GmActor, type PlayerActor } from "@vtt/domain";
 import { Meter } from "@vtt/ui";
 import { HpAdjust } from "./HpAdjust";
 import { signed } from "./format";
@@ -54,7 +54,8 @@ export function SheetVitals({
       </div>
       <div className="sheet-vital" title={extension.armorDetail ?? undefined}>
         <span>AC</span>
-        <strong>{actor.armorClass ?? "-"}</strong>
+        {/* A Shield up shows in the number, since that is what attacks meet. */}
+        <strong>{armorClassInPlay(actor) ?? "-"}</strong>
       </div>
       <div className="sheet-vital">
         <span>Init</span>

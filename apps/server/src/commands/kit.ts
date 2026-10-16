@@ -1,4 +1,5 @@
 import type {
+  ActionResolution,
   ActionTableNarration,
   CombatLogEntry,
   GameState,
@@ -17,6 +18,7 @@ import type { EffectNarration } from "../effects.js";
 import type { InitiativeRollSink } from "../encounter.js";
 import { equipmentCatalogOf } from "../equipment-derivation.js";
 import type { GameStore } from "../game-store.js";
+import { tokenCreatureDistance } from "../movement-narration.js";
 import { describeRoll, recordRoll, rollFeedIsGmOnly, rollsForCommand } from "../roll-history.js";
 import type { TokenMapGeometry } from "../token-placement.js";
 
@@ -129,6 +131,19 @@ export function createKit(context: CommandContext) {
   const resolveDefinitionIn = (state: GameState, definitionId: string) =>
     storedDefinition(state, definitionId) ?? contentLibrary.monsterForInstance(definitionId);
 
+  /** Drains a resolution's `tableNarration` into the feed (the one writer, for every resolve path).
+   *  `appendLog` re-derives visibility from live state; the resolver's `gmOnly` only adds to it. */
+  const appendTableNarration = (resolution: Readonly<{ tableNarration?: readonly ActionTableNarration[] }>) => {
+    for (const line of resolution.tableNarration ?? []) {
+      context.appendLog({
+        kind: line.kind,
+        text: line.text,
+        actorIds: line.actorIds,
+        ...(line.gmOnly === true ? { gmOnly: true } : {})
+      });
+    }
+  };
+
   // Player character-creation abuse guards, in-memory (a restart forgives).
   const CREATES_PER_DAY = 5;
   const DAY_MS = 24 * 60 * 60 * 1000;
@@ -202,6 +217,17 @@ export function createKit(context: CommandContext) {
       }
     },
 
+    /** Creature-to-creature distance on the active map, for rules a mutation checks (a strike-back reaction's
+     *  range). The grid lookup is async, so it is fetched before the mutation runs. */
+    async creatureDistance(): Promise<(state: GameState, actorIdA: string, actorIdB: string) => number | null> {
+      const mapAssetId = read().combat.mapAssetId;
+      const geometry = mapAssetId ? await context.tokenGeometryFor(mapAssetId) : null;
+      return (state, actorIdA, actorIdB) =>
+        geometry && state.combat.mapAssetId === mapAssetId
+          ? (tokenCreatureDistance(state, geometry, actorIdA, actorIdB)?.value ?? null)
+          : null;
+    },
+
     /** Shared narration fan-out for engine transitions (effect ends, dying, consciousness). */
     publishNarrations(events: readonly EffectNarration[]) {
       for (const event of events) {
@@ -214,17 +240,53 @@ export function createKit(context: CommandContext) {
       }
     },
 
-    /** Drains a resolution's `tableNarration` into the feed (the one writer, for both resolve paths).
-     *  `appendLog` re-derives visibility from live state; the resolver's `gmOnly` only adds to it. */
-    appendTableNarration(resolution: Readonly<{ tableNarration?: readonly ActionTableNarration[] }>) {
-      for (const line of resolution.tableNarration ?? []) {
+    appendTableNarration,
+
+    /** What a committed resolve did, for the feed: GM-only rules notes, the table's narration, effects applied, granted
+     *  and ended, and the reaction windows it opened. `actorId` acted; when hidden, its lines stay with the GM. */
+    narrateResolution(resolution: ActionResolution, actorId: string) {
+      const hidden = actorHidden(actorId);
+      for (const warning of resolution.warnings ?? [])
+        context.appendLog({ kind: "action", text: `Rules note: ${warning}`, actorIds: [actorId], gmOnly: true });
+      appendTableNarration(resolution);
+      for (const applied of resolution.effectsApplied ?? [])
+        context.broadcastTableEvent({
+          kind: "effect",
+          text: `${applied.targetName} is ${applied.name}.`,
+          actorIds: [applied.targetId],
+          gmOnly: hidden
+        });
+      if (resolution.effectGranted)
+        context.broadcastTableEvent({
+          kind: "effect",
+          text: `${actorName(actorId)} gains ${resolution.effectGranted.name}.`,
+          actorIds: [actorId],
+          gmOnly: hidden
+        });
+      // A reaction window opened: the table hears why nothing landed yet.
+      const waiting = resolution.waitingOnReaction ? "the attack waits" : "the damage waits";
+      for (const prompt of resolution.reactionPrompts ?? []) {
+        const promptHidden = hidden || actorHidden(prompt.actorId);
         context.appendLog({
-          kind: line.kind,
-          text: line.text,
-          actorIds: line.actorIds,
-          ...(line.gmOnly === true ? { gmOnly: true } : {})
+          kind: "reaction",
+          text: `${prompt.actorName} may use ${prompt.actionName} - ${waiting} on their answer.`,
+          actorIds: [prompt.actorId],
+          gmOnly: promptHidden
+        });
+        context.broadcastTableEvent({
+          kind: "reaction",
+          text: `${prompt.actorName} may use ${prompt.actionName}.`,
+          actorIds: [prompt.actorId],
+          gmOnly: promptHidden
         });
       }
+      for (const ended of resolution.effectsEnded ?? [])
+        context.broadcastTableEvent({
+          kind: "effect",
+          text: `${ended.name} ended on ${ended.actorName}.`,
+          actorIds: [ended.actorId],
+          gmOnly: hidden || actorHidden(ended.actorId)
+        });
     }
   };
 }

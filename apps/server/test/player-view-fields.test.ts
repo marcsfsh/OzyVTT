@@ -146,12 +146,30 @@ describe("player view pending prompts", () => {
       pendingReactions: [
         {
           id: "66666666-6666-4666-8666-666666666666",
+          kind: "attack-would-hit",
           actorId: mine,
-          actionId: "shield",
+          actionId: "spell-shield",
           actionName: "Shield",
           sourceActorId: hidden,
           sourceName: "Vashkar",
           triggerCommandId: "77777777-7777-4777-8777-777777777777",
+          acBonus: 5,
+          // Names the hidden attacker's action and how it rolled: never the player's.
+          parkedAttack: {
+            actionId: "claw",
+            builtin: false,
+            attackNatural: 14,
+            attackTotal: null,
+            cover: null,
+            conditionId: null,
+            attackKinds: [],
+            pushFeet: null,
+            slotLevel: null,
+            distanceFeet: 5,
+            initiatorRole: "gm",
+            initiatorSessionId: "gm-session",
+            untilNextTurn: true
+          },
           createdAt: 1
         }
       ],
@@ -199,6 +217,8 @@ describe("player view pending prompts", () => {
         "proposedDamageParts",
         "critical",
         "weighed",
+        "acBonus",
+        "rollsAttack",
         "createdAt",
         "sourceName"
       ].sort()

@@ -10,7 +10,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
+import { ActorDefinitionSchema, type ActorAction, type ActorDefinition } from "@vtt/schemas";
 import {
   ArmorReferenceSchema,
   ConditionReferenceSchema,
@@ -353,13 +353,22 @@ const splitTypedList = (display: string, known: ReadonlySet<string>): string[] =
     .map((token) => token.trim())
     .filter((token) => known.has(token));
 
+/** Protective Magic casts Shield (or Counterspell, which stays prose): +5 AC until the caster's next turn. */
+const PROTECTIVE_MAGIC: Pick<ActorAction, "reaction"> = {
+  reaction: { trigger: "hit-by-attack", response: "ac-bonus", amount: 5, untilNextTurn: true }
+};
+
 /**
  * Reviewed per-action enrichments the prose states but no generic pattern captures. Keyed
  * "<creature slug>/<action id>"; values merge into the adapted action.
  * - giant-crocodile tail: "…can't be targeted by the crocodile's Tail" (stated on Bite).
+ * - protective-magic: its Shield, offered when an attack would hit.
  */
-const ACTION_ENRICHMENTS: Record<string, { targetRules: ["not-grappled-by-source"] }> = {
-  "giant-crocodile/tail": { targetRules: ["not-grappled-by-source"] }
+const ACTION_ENRICHMENTS: Record<string, Pick<ActorAction, "targetRules" | "reaction">> = {
+  "giant-crocodile/tail": { targetRules: ["not-grappled-by-source"] },
+  "archmage/protective-magic": PROTECTIVE_MAGIC,
+  "lich/protective-magic": PROTECTIVE_MAGIC,
+  "mage/protective-magic": PROTECTIVE_MAGIC
 };
 
 const usesSuffix = (action: ActionFields): string => {

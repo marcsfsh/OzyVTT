@@ -1262,7 +1262,21 @@
     "id": "retaliation",
     "name": "Retaliation",
     "level": 10,
-    "description": "When you take damage from a creature that is within 5 feet of you, you can take a Reaction to make one melee attack against that creature, using a weapon or an Unarmed Strike."
+    "description": "When you take damage from a creature that is within 5 feet of you, you can take a Reaction to make one melee attack against that creature, using a weapon or an Unarmed Strike.",
+    "actions": [
+     {
+      "id": "retaliation",
+      "name": "Retaliation",
+      "activation": "reaction",
+      "description": "When you take damage from a creature within 5 feet of you, make one melee attack against that creature, using a weapon or an Unarmed Strike.",
+      "damage": [],
+      "reaction": {
+       "trigger": "damaged-by-creature",
+       "response": "melee-attack",
+       "rangeFeet": 5
+      }
+     }
+    ]
    },
    {
     "id": "intimidating-presence",

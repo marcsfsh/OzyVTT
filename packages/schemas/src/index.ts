@@ -533,6 +533,9 @@ export const EffectInstanceSchema = z
     /** Extra movement granted for the current turn, fixed when granted (Dash), so a later Slow does not rewrite it.
      * On a `dashing` effect without it, `effectiveSpeedFeet` falls back to doubling Speed. */
     movementGrantFeet: z.number().int().min(0).max(999).optional(),
+    /** A reaction's lasting AC bonus (Shield: +5 until the caster's next turn), added to the stored AC while the
+     * effect lasts. Kept apart from `modifiers`, whose `armor-class` is written onto the sheet and would outlast it. */
+    armorClassBonus: z.number().int().min(1).max(10).optional(),
     modifiers: EffectModifiersSchema.default([]),
     /** Conditions this effect applied to the same actor; removed automatically when the effect ends. */
     linkedConditionIds: z.array(ConditionIdSchema).max(4).default([]),
@@ -948,6 +951,46 @@ export const ActionAreaSchema = z
   .strict();
 export type ActionArea = z.infer<typeof ActionAreaSchema>;
 
+const ReactionRangeFeet = z.number().int().min(5).max(1000).optional();
+
+/**
+ * A reaction the engine offers as a prompt when its trigger happens (ADR-0020); only meaningful on activation
+ * "reaction". The response is what answering "use" does:
+ * - half-damage (Uncanny Dodge): halve the hit's damage.
+ * - ac-bonus (Parry, Shield): add `amount` to AC against the attack before it lands, possibly turning the hit into a
+ *   miss. `melee` limits it to melee attacks; `untilNextTurn` keeps the bonus until the reactor's next turn starts.
+ * - strike-back (Hellish Rebuke, Storm's Thunder): resolve this action against the creature that dealt the damage.
+ * - melee-attack (Retaliation): make one melee attack against that creature instead.
+ * `rangeFeet` skips the prompt when the map shows the damaging creature farther away.
+ */
+export const ActionReactionSchema = z.discriminatedUnion("response", [
+  z.object({ trigger: z.literal("hit-by-attack"), response: z.literal("half-damage") }).strict(),
+  z
+    .object({
+      trigger: z.literal("hit-by-attack"),
+      response: z.literal("ac-bonus"),
+      amount: z.number().int().min(1).max(10),
+      melee: z.boolean().optional(),
+      untilNextTurn: z.boolean().optional()
+    })
+    .strict(),
+  z
+    .object({
+      trigger: z.literal("damaged-by-creature"),
+      response: z.literal("strike-back"),
+      rangeFeet: ReactionRangeFeet
+    })
+    .strict(),
+  z
+    .object({
+      trigger: z.literal("damaged-by-creature"),
+      response: z.literal("melee-attack"),
+      rangeFeet: ReactionRangeFeet
+    })
+    .strict()
+]);
+export type ActionReaction = z.infer<typeof ActionReactionSchema>;
+
 /** Mechanics fields are optional (ADR-0020): absent means prose only. Descriptions stay the display source of truth. */
 export const ActionSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
@@ -1029,11 +1072,8 @@ export const ActionSchema = z.object({
     .regex(/^[a-z0-9-]+$/)
     .max(80)
     .optional(),
-  /** Declared reaction the engine can offer as a pending prompt (Uncanny Dodge: when hit by an attack, halve its damage). Only meaningful on activation "reaction". */
-  reaction: z
-    .object({ trigger: z.literal("hit-by-attack"), response: z.literal("half-damage") })
-    .strict()
-    .optional(),
+  /** Declared reaction the engine can offer as a pending prompt; see `ActionReactionSchema`. */
+  reaction: ActionReactionSchema.optional(),
   /** SRD Legendary Action: taken on other creatures' turns, spending `cost` from the per-round pool that refills on the creature's own turn. Pairs with activation "other". */
   legendary: z
     .object({ cost: z.number().int().min(1).max(5) })

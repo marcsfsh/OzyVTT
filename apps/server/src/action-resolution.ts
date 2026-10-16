@@ -9,7 +9,7 @@ import { applyGrant } from "./resolution/grant.js";
 import { applyHealing } from "./resolution/heal.js";
 import { applyMasteryForces, masterySwingOf, offeredPush } from "./resolution/masteries.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
-import { parkActionSave, parkReaction } from "./resolution/pending.js";
+import { parkActionSave, parkForAcReaction, parkReaction } from "./resolution/pending.js";
 import { releaseHideAndReady } from "./resolution/release.js";
 import { openResolve } from "./resolution/validate.js";
 
@@ -34,6 +34,12 @@ export function resolveDefinitionAction(
   // Preview: the d20 is rolled and shown, nothing else applies. The economy was validated already, so an
   // illegal attack is blocked before the preview roll.
   if (ctx.attack !== null && input.commit === false) return previewOf(ctx);
+  // A hit the target's Parry or Shield may still turn into a miss: the attack is spent, and the answer finishes it.
+  if (parkForAcReaction(ctx)) {
+    commitEconomy(ctx);
+    releaseHideAndReady(ctx);
+    return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
+  }
 
   rollWeaponDamage(ctx);
   ctx.masterySwing = masterySwingOf(ctx);

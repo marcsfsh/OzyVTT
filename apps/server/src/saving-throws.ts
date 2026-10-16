@@ -36,6 +36,8 @@ export type SaveAnswerDependencies = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
   /** The item catalog, so an item's save bonus and save advantage reach the roll. */
   catalog?: EquipmentCatalog;
+  /** Creature-to-creature distance, for the strike-back reaction the save's damage may open. */
+  distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
 }>;
 export type SaveOutcome = Readonly<{
   success: boolean;
@@ -400,13 +402,19 @@ export function answerSave(
     const outcome = applyDamageDetailed(
       state,
       target.id,
-      outcomeParts !== null ? { amount: outcomeDamage, parts: outcomeParts } : { amount: outcomeDamage },
+      {
+        amount: outcomeDamage,
+        ...(outcomeParts !== null ? { parts: outcomeParts } : {}),
+        sourceActorId: pending.sourceActorId
+      },
       { role: "gm" },
       {
         resolveDefinition: (definitionId) => deps.resolveDefinition(definitionId),
         newId: deps.newRollId,
         now: deps.now,
-        ...(deps.catalog ? { catalog: deps.catalog } : {})
+        commandId,
+        ...(deps.catalog ? { catalog: deps.catalog } : {}),
+        ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
       }
     );
     appliedDamage = outcome.application.totalApplied;

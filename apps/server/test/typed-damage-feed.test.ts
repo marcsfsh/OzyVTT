@@ -358,6 +358,9 @@ describe("the opportunity-attack path narrates it too", () => {
               proposedDamageParts: [],
               critical: false,
               weighed: null,
+              acBonus: null,
+              rollsAttack: true,
+              parkedAttack: null,
               createdAt: 0
             }
           ]
