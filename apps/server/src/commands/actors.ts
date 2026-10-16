@@ -1,4 +1,4 @@
-import { addActorFromDefinition, importActorDefinition, removeActor } from "../actor-roster.js";
+import { addActorFromDefinition, importActorDefinition, removeActor, withDerivedSlots } from "../actor-roster.js";
 import { requireActorAccess } from "../authorization.js";
 import { forceReleaseCharacter } from "../character-claims.js";
 import { addCombatant } from "../encounter.js";
@@ -67,7 +67,10 @@ export const actorCommands = [
     malformed: "The import command is malformed.",
     gmOnly: "Only the GM can import sheets.",
     async run({ request, execute }, kit) {
-      const definition = importedDefinition(request.definition, "actor definition");
+      const definition = withDerivedSlots(
+        importedDefinition(request.definition, "actor definition"),
+        kit.contentLibrary.forAudience("gm").classProgressionTable()
+      );
       const actorId = request.commandId;
       await execute(
         (state) => importActorDefinition(state, definition, actorId, request.visibility, kit.equipmentCatalog()),

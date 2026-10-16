@@ -201,8 +201,10 @@ function bearerContext(
 const notItemScoped = (modifier: Modifier): boolean => modifier.scope !== "this-item";
 
 /** Which of a character's own feat or feature riders the collector may see: not the builder-baked ones, which
- *  are already inside the definition's numbers. */
-const ridesOnTheBearer = (modifier: Modifier): boolean => !BUILDER_BAKED.has(modifier.type) && notItemScoped(modifier);
+ *  are already inside the definition's numbers, except a gated `speed` the build leaves for the live loadout. */
+const ridesOnTheBearer = (modifier: Modifier): boolean =>
+  (!BUILDER_BAKED.has(modifier.type) || (modifier.type === "speed" && (modifier.when?.length ?? 0) > 0)) &&
+  notItemScoped(modifier);
 
 /** The character's own feats and features (with chosen options) as rider carriers, recomputed from the sheet and
  *  the catalog so homebrew edits apply on the next read. Definitions without the arrays (PDF imports, monsters)

@@ -323,7 +323,10 @@ function fixedCards(survey: DraftSurvey): Card[] {
       classId: null
     });
   const levelRow = classRecord?.levelTable[survey.level - 1];
-  const list = classRecord && levelRow ? classSpellList(classRecord, subclass, levelRow, survey.catalogs) : null;
+  const list =
+    classRecord && levelRow
+      ? classSpellList(classRecord, subclass, levelRow, survey.catalogs, survey.extraSpellLists)
+      : null;
   if (classRecord && list) {
     // The printed level-row columns plus what features granted (Thaumaturge's extra cantrip).
     if (survey.printedCantrips > 0)

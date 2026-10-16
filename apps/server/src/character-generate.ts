@@ -320,7 +320,13 @@ type SpellOption = Readonly<{ id: string; name: string; level?: number }>;
 
 /** The class (or subclass) spell list this build casts from, or null when it casts nothing. */
 function spellListOf(survey: ServerOfferSurvey): { options: readonly SpellOption[]; maxSlotLevel: number } | null {
-  const list = classSpellList(survey.classRecord, survey.subclass, survey.levelRow, survey.catalogs);
+  const list = classSpellList(
+    survey.classRecord,
+    survey.subclass,
+    survey.levelRow,
+    survey.catalogs,
+    survey.extraSpellLists
+  );
   if (list?.unresolvable)
     reject(`The ${survey.classRecord.name} spell list could not be resolved: ${list.unresolvable}`);
   return list;

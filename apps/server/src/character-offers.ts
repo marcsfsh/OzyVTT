@@ -302,6 +302,8 @@ type PlacedChoices = Readonly<{
   extraPickBudgets: ReadonlyMap<string, number>;
   preparedSpellRows: readonly CharacterChoice[];
   classCantripRows: readonly CharacterChoice[];
+  /** Spell lists the class's own spell picks also draw on (Magical Secrets), beside the class's own. */
+  extraSpellLists: readonly string[];
   /** The printed level-row columns, before `extraPickBudgets` is added (step 9 does that sum). */
   printedCantrips: number;
   printedPrepared: number;
@@ -457,6 +459,7 @@ function placeChoices(
   const catalogs = library.catalogChoiceCatalogs();
   const classFeatures = classRecord ? grantedClassFeatures(classRecord, level).features : new Map();
   const levelRow = classRecord ? classRecord.levelTable[level - 1] : null;
+  const highestSlotLevel = levelRow ? maxSlotLevelOf(levelRow) : 0;
 
   // ---- 3. Collect every granted feature (class rows, subclass, species + lineage, background, origin feat). ----
   const chosenLineageId = choices.find((row) => row.kind === "lineage")?.id ?? null;
@@ -694,8 +697,15 @@ function placeChoices(
       }
     }
     /** Options gated on an earlier answer: unmet gates drop out, and if the survivors exactly fill the
-     *  capacity they are adopted without pushing an offer. */
+     *  capacity they are adopted without pushing an offer. An option above this build's level is not offered. */
     let optionRecords = choice.options ?? null;
+    if (optionRecords?.some((option) => (option.level ?? 1) > level)) {
+      optionRecords = optionRecords.filter((option) => (option.level ?? 1) <= level);
+      const reached = new Set(optionRecords.map((option) => option.id));
+      options = new Set(
+        [...options].filter((id) => reached.has(id) || !choice.options!.some((option) => option.id === id))
+      );
+    }
     if (optionRecords?.some((option) => option.requires)) {
       const legal = optionRecords.filter(
         (option) => !option.requires || ledgerAnswered(option.requires.offer, option.requires.id)
@@ -720,7 +730,11 @@ function placeChoices(
         optionRecords,
         unresolvable,
         repeatable: choice.repeatable,
-        maxSpellLevel: choice.maxSpellLevel ?? null,
+        // A class feature's spell pick with no printed ceiling is a spell this caster has slots for (Magical
+        // Discoveries); Mystic Arcanum prints its own level above the slots.
+        maxSpellLevel:
+          choice.maxSpellLevel ??
+          (choice.kind === "spell" && site.classId !== null && highestSlotLevel > 0 ? highestSlotLevel : null),
         minSpellLevel: choice.minSpellLevel ?? null,
         maximum: choice.maximum ?? null,
         // The ability pick shares its record with the lineage or the feat's spells, so it names itself.
@@ -984,6 +998,7 @@ function placeChoices(
     granted,
     chosenFeats,
     chosenFeatLevels: chosenFeatSites.map((site) => site.levels[0] ?? 1),
+    extraSpellLists: [...new Set(granted.flatMap(({ record }) => record.extraSpellLists ?? []))],
     heldFeatIds,
     extraPickBudgets,
     preparedSpellRows,
@@ -994,24 +1009,38 @@ function placeChoices(
   };
 }
 
-/** The spell list a class's own cantrip and prepared budgets draw from, and the highest slot level it can
- *  cast; null when the build casts nothing. Pact Magic is all one slot level. */
-export function classSpellList(
-  classRecord: ClassReference,
-  subclass: SubclassReference | null,
-  levelRow: ClassLevelRow,
-  catalogs: CatalogChoiceCatalogs
-): Readonly<{ options: readonly CatalogChoiceOption[]; maxSlotLevel: number; unresolvable: string | null }> | null {
-  const casting = subclass?.spellcasting ?? classRecord.spellcasting ?? null;
-  if (!casting) return null;
+/** The highest spell slot level a class table row gives; Pact Magic is all one level. */
+export function maxSlotLevelOf(levelRow: ClassLevelRow): number {
   const slots = levelRow.pactSlots
     ? levelRow.pactSlots.slots > 0
       ? [levelRow.pactSlots.level]
       : []
     : (levelRow.spellSlots ?? []).flatMap((count, index) => (count > 0 ? [index + 1] : []));
-  const maxSlotLevel = slots.reduce((highest, slotLevel) => Math.max(highest, slotLevel), 0);
+  return slots.reduce((highest, slotLevel) => Math.max(highest, slotLevel), 0);
+}
+
+/** The catalog slug of a class's own spell list, widened by the lists its features add (Magical Secrets). */
+export function classSpellListSlug(listId: string, extraSpellLists: readonly string[]): string {
+  return [listId, ...extraSpellLists.filter((extra) => extra !== listId)].map((id) => `${id}-spells`).join("-or-");
+}
+
+/** The spell list a class's own cantrip and prepared budgets draw from, and the highest slot level it can
+ *  cast; null when the build casts nothing. */
+export function classSpellList(
+  classRecord: ClassReference,
+  subclass: SubclassReference | null,
+  levelRow: ClassLevelRow,
+  catalogs: CatalogChoiceCatalogs,
+  extraSpellLists: readonly string[] = []
+): Readonly<{ options: readonly CatalogChoiceOption[]; maxSlotLevel: number; unresolvable: string | null }> | null {
+  const casting = subclass?.spellcasting ?? classRecord.spellcasting ?? null;
+  if (!casting) return null;
+  const maxSlotLevel = maxSlotLevelOf(levelRow);
   try {
-    const options = resolveCatalogChoice(`${casting.spellListId ?? classRecord.id}-spells`, catalogs);
+    const options = resolveCatalogChoice(
+      classSpellListSlug(casting.spellListId ?? classRecord.id, extraSpellLists),
+      catalogs
+    );
     return { options, maxSlotLevel, unresolvable: null };
   } catch (error) {
     if (!(error instanceof CatalogChoiceError)) throw error;

@@ -30,6 +30,7 @@ import {
 import {
   CLASS_CANTRIP_BUDGET,
   CLASS_SPELL_BUDGET,
+  classSpellListSlug,
   levelOfPick,
   SPELLCASTING_ABILITY_KIND,
   surveyForBuild,
@@ -505,8 +506,9 @@ function interpretFeature(
       case "hit-points-per-level":
         into.hitPointsPerLevel += modifier.amount;
         break;
+      // A gated one (Unarmored Movement) waits for the live loadout: `deriveEquipment` carries it to the movement rules.
       case "speed":
-        into.speedBonus += modifier.amount;
+        if ((modifier.when?.length ?? 0) === 0) into.speedBonus += modifier.amount;
         break;
       // Defense is "+1 AC while wearing armor": a `whileArmored` rider waits for step 11, which knows the
       // final loadout. An unconditional rider applies either way.
@@ -948,7 +950,7 @@ export function buildCharacterDefinition(
   };
   let spellcasting: Record<string, unknown> | undefined;
   if (casting) {
-    const listSlug = `${casting.spellListId ?? classRecord.id}-spells`;
+    const listSlug = classSpellListSlug(casting.spellListId ?? classRecord.id, survey.extraSpellLists);
     let listOptions: Map<string, { id: string; name: string; level?: number }>;
     try {
       listOptions = new Map(resolveCatalogChoice(listSlug, catalogs).map((option) => [option.id, option]));

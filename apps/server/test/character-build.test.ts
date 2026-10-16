@@ -467,7 +467,8 @@ describe("buildCharacterDefinition - Wizard 3 (high-elf sage, Evoker)", () => {
       freeActionId: "spell-magic-missile-free"
     });
     expect(spells.get("mage-armor")).toMatchObject({ alwaysPrepared: false, classId: "wizard" });
-    expect(spells.get("shatter")).toMatchObject({ level: 2, prepared: true }); // savant pick, outside the prepared cap
+    // Evocation Savant adds to the spellbook ("add them to your spellbook for free"): known, not prepared.
+    expect(spells.get("shatter")).toMatchObject({ level: 2, prepared: false, alwaysPrepared: false });
   });
 
   it("marks Scholar expertise on a proficient skill and folds species + background proficiencies", () => {
@@ -537,9 +538,7 @@ describe("buildCharacterDefinition - Wizard 3 (high-elf sage, Evoker)", () => {
       "magic-missile",
       "minor-illusion",
       "misty-step",
-      "prestidigitation",
-      "shatter",
-      "thunderwave"
+      "prestidigitation"
     ]);
   });
 });

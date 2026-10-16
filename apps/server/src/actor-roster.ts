@@ -10,6 +10,7 @@ import {
   multiclassSpellSlots,
   type Ability,
   type ClassLevelEntry,
+  type ClassProgressionTable,
   type UnarmoredDefense
 } from "@vtt/rules-5e";
 import { withProseFacts } from "@vtt/content-srd-5.2.1/action-prose";
@@ -90,6 +91,34 @@ function baseSpellSlotMaxima(definition: ActorDefinition | undefined): ReadonlyA
   return multiclassSpellSlots(multiclassCasterLevel(casterLevels))
     .map((count, index) => ({ level: index + 1, max: count }))
     .filter((slot) => slot.max > 0);
+}
+
+/**
+ * An imported sheet that lists its casting classes but states no slots, with the slots written in from the
+ * table's own class rows. The live reads above fall back to the SRD rows, which know no homebrew class, so a
+ * homebrew half caster's levels would otherwise add nothing to the shared table.
+ */
+export function withDerivedSlots(definition: ActorDefinition, table: ClassProgressionTable): ActorDefinition {
+  const spellcasting = definition.spellcasting;
+  if (!spellcasting || (spellcasting.slots.length > 0 && spellcasting.pact)) return definition;
+  const casterIds = new Set((spellcasting.classes ?? []).map((entry) => entry.classId));
+  if (casterIds.size === 0) return definition;
+  const casterLevels = classLevelsOf(definition).filter((entry) => casterIds.has(entry.classId));
+  const slots =
+    spellcasting.slots.length > 0
+      ? spellcasting.slots
+      : multiclassSpellSlots(multiclassCasterLevel(casterLevels, table))
+          .map((count, index) => ({ level: index + 1, max: count }))
+          .filter((slot) => slot.max > 0);
+  const pact = spellcasting.pact ?? multiclassPactSlots(casterLevels, table);
+  return {
+    ...definition,
+    spellcasting: {
+      ...spellcasting,
+      slots,
+      ...(pact ? { pact: "max" in pact ? pact : { level: pact.level, max: pact.slots } } : {})
+    }
+  };
 }
 
 /** Warlock Pact Magic maximum, derived from the Warlock levels when the sheet did not state one. */

@@ -174,18 +174,6 @@ const bard = (level: number, cha: 8 | 15, extra: Row[] = []): Mutable =>
             { level: 9, classId: "bard", kind: "expertise", id: "stealth", payload: { featureId: "expertise" } }
           ] as Row[])
         : []),
-      ...(level >= 10
-        ? ([
-            {
-              level: 10,
-              classId: "bard",
-              kind: "spell",
-              id: "hypnotic-pattern",
-              payload: { featureId: "magical-secrets" }
-            },
-            { level: 10, classId: "bard", kind: "spell", id: "fear", payload: { featureId: "magical-secrets" } }
-          ] as Row[])
-        : []),
       // Magical Discoveries: two spells from the Cleric, Druid or Wizard list (the union slug). Neither is
       // on the Bard list.
       ...(level >= 6
@@ -669,5 +657,71 @@ describe("Divine Intervention - a pool that now costs the action the SRD prints"
         deps(definition)
       )
     ).toThrowError(/no uses remaining \(1\/long rest\)/);
+  });
+});
+
+describe("Circle of the Land Spells - the chosen land's spells for the Druid's level and lower", () => {
+  const alwaysPrepared = (level: number) =>
+    (
+      build(druid(level, [primalOrder("warden"), ...(level >= 7 ? [elementalFury("primal-strike")] : [])])).spellcasting
+        ?.spells ?? []
+    )
+      .filter((spell) => spell.alwaysPrepared)
+      .map((spell) => spell.id);
+
+  it("gives a Polar Druid each row of the table as it reaches that level", () => {
+    expect(alwaysPrepared(3)).toEqual(expect.arrayContaining(["fog-cloud", "hold-person", "ray-of-frost"]));
+    expect(alwaysPrepared(3)).not.toContain("sleet-storm");
+    const five = alwaysPrepared(5);
+    expect(five).toContain("sleet-storm");
+    expect(five).not.toContain("ice-storm");
+    expect(alwaysPrepared(9)).toEqual(expect.arrayContaining(["sleet-storm", "ice-storm", "cone-of-cold"]));
+  });
+
+  it("describes each land with the spells the SRD table prints", () => {
+    const lands = new Map(
+      (
+        library
+          .subclassRecord("circle-of-the-land")!
+          .features.find((feature) => feature.id === "circle-of-the-land-spells")!.choice!.options ?? []
+      ).map((option) => [option.id, option.description])
+    );
+    expect(lands.get("arid")).toContain("Wall of Stone");
+    expect(lands.get("arid")).not.toContain("Wall of Fire");
+    expect(lands.get("polar")).toContain("Cone of Cold");
+    expect(lands.get("polar")).not.toContain("Slow");
+    expect(lands.get("temperate")).toContain("Tree Stride");
+    expect(lands.get("temperate")).not.toContain("Ice Storm");
+  });
+});
+
+describe("Magical Secrets - the Bard's own picks may come from three more lists", () => {
+  // Spirit Guardians is a Cleric spell, on no Bard list.
+  const guardians = { level: 10, kind: "spell", id: "spirit-guardians" } as Row;
+
+  it("lets a Bard 10 prepare a Cleric spell as a Bard spell, and a Bard 9 not", () => {
+    const skills = loreSkills("arcana", "history", "nature");
+    const built = build(bard(10, 15, [...skills, guardians]));
+    expect(spellOf(built, "spirit-guardians")).toMatchObject({ classId: "bard", alwaysPrepared: false });
+    expect(() => build(bard(9, 15, [...skills, { ...guardians, level: 9 }]))).toThrowError(/"spirit-guardians"/);
+  });
+
+  it("adds no picks of its own: the Bard 10 prepares the printed number", () => {
+    const built = build(bard(10, 15, loreSkills("arcana", "history", "nature")));
+    expect(built.spellcasting?.classes?.[0]).toMatchObject({ classId: "bard", prepared: 15 });
+  });
+});
+
+describe("Magical Discoveries - a spell the Bard has slots for", () => {
+  it("refuses Wish to a Bard 6, whose highest slot is level 3", () => {
+    const input = bard(6, 15);
+    input.choices = [
+      ...input.choices.filter((row) => row.payload?.featureId !== "magical-discoveries"),
+      { level: 6, kind: "spell", id: "spiritual-weapon", payload: { featureId: "magical-discoveries" } },
+      { level: 6, kind: "spell", id: "wish", payload: { featureId: "magical-discoveries" } }
+    ] as Row[];
+    expect(() => build(input)).toThrowError(
+      '"wish" is level 9, above the maximum spell level (3) for "Magical Discoveries".'
+    );
   });
 });

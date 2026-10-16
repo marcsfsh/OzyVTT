@@ -11,6 +11,7 @@ import { effectiveActions } from "../src/effective-actions.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
 import { endEncounter, startEncounter } from "../src/encounter.js";
 import { applyRest } from "../src/rests.js";
+import { builderOffers } from "../src/builder-offers.js";
 import { asiRows } from "./asi-rows.js";
 
 // Warlock, Sorcerer and Wizard mechanics, asserted as rolled numbers, spent counters, refusals or
@@ -424,15 +425,14 @@ describe("Warlock: Epic Boon is offered at last (audit row 6, the Warlock's)", (
 
 // Warlock: Fiend Patron
 
-describe("Fiend Patron: the level-3 Fiend Spells arrive prepared and free (audit row 27)", () => {
-  it("hands over all four without charging one prepared slot", () => {
+describe("Fiend Patron: the Fiend Spells arrive prepared and free, tier by tier (audit row 27)", () => {
+  it("hands over the level-3 four and the level-5 pair without charging one prepared slot", () => {
     const built = buildCharacterDefinition(warlockInput(5, fillerFor(5).concat(asisFor(5))), library, POLICY);
-    for (const id of ["burning-hands", "command", "scorching-ray", "suggestion"]) {
+    for (const id of ["burning-hands", "command", "scorching-ray", "suggestion", "fireball", "stinking-cloud"]) {
       expect(spellOf(built, id)).toMatchObject({ id, alwaysPrepared: true, prepared: true });
     }
-    // Fireball is the level-5 tier and is not granted: `grants.spells` has no character-level gate, and
-    // granting every tier would arm a level-3 Warlock with Geas. The table is in the description.
-    expect(spellOf(built, "fireball")).toBeUndefined();
+    // The level-7 row waits for Warlock 7, so a Warlock 5 has no Fire Shield.
+    expect(spellOf(built, "fire-shield")).toBeUndefined();
   });
 });
 
@@ -1090,8 +1090,9 @@ describe("Draconic Sorcery: the level-3 spells and the affinity (audit rows 26, 
     ] as const) {
       expect(spellOf(built, id)).toMatchObject({ id, level, alwaysPrepared: true, prepared: true });
     }
-    // Command is not on the Sorcerer list, so the grant is the only route to it. The level-9 tier is
-    // absent (see the overlay's comment).
+    // Command is not on the Sorcerer list, so the grant is the only route to it. The level-5 row (Fear, Fly)
+    // arrives with Sorcerer 5; the level-9 row waits.
+    for (const id of ["fear", "fly"]) expect(spellOf(built, id)).toMatchObject({ alwaysPrepared: true });
     expect(spellOf(built, "summon-dragon")).toBeUndefined();
     // A level-5 Sorcerer prepares 9; the four granted spells are on top of that.
     expect(built.spellcasting!.classes![0]).toMatchObject({ classId: "sorcerer", prepared: 9 });
@@ -1236,7 +1237,7 @@ describe("Draconic Sorcery: Dragon Wings and Dragon Companion carry their daily 
     ).toThrow();
   });
 
-  it("hands Dragon Companion its Summon Dragon, which no Sorcerer could otherwise prepare", () => {
+  it("hands Dragon Companion a free casting of Summon Dragon", () => {
     const built = level18();
     expect(spellOf(built.definition, "summon-dragon")).toMatchObject({
       id: "summon-dragon",
@@ -1244,8 +1245,10 @@ describe("Draconic Sorcery: Dragon Wings and Dragon Companion carry their daily 
       alwaysPrepared: true
     });
     expect(actionOf(built, "spell-summon-dragon-free").uses).toMatchObject({ limit: 1, per: "long-rest" });
-    // ...and a level-17 Sorcerer, one level short, has neither.
-    expect(spellOf(sorcerer(17), "summon-dragon")).toBeUndefined();
+    // A level-17 Sorcerer has the spell from the level-9 Draconic Spells row, but not the free casting.
+    const seventeen = sorcerer(17);
+    expect(spellOf(seventeen, "summon-dragon")).toMatchObject({ alwaysPrepared: true });
+    expect(seventeen.actions.some((action) => action.id === "spell-summon-dragon-free")).toBe(false);
   });
 });
 
@@ -1441,5 +1444,98 @@ describe("Wizard: Spell Mastery is a level-1 pick AND a level-2 pick, not two pi
       [2, 2]
     ]);
     expect(picks.map((pick) => pick.choose)).toEqual([1, 1]);
+  });
+});
+
+// Prerequisites and windows the SRD prints on these classes' picks
+
+describe("Warlock invocations: a prerequisite is met before the invocation is learned", () => {
+  it("offers a Warlock 1 only the invocations with no level prerequisite", () => {
+    const offer = builderOffers(
+      { speciesId: "human", backgroundId: "acolyte", classId: "warlock", level: 1 },
+      library
+    ).offers.find((candidate) => candidate.key === "feature:eldritch-invocations")!;
+    const ids = offer.options.map((option) => option.id);
+    expect(ids).toEqual(expect.arrayContaining(["armor-of-shadows", "pact-of-the-blade", "eldritch-mind"]));
+    // Level 2+, 9+ and 15+ invocations.
+    for (const later of ["agonizing-blast", "visions-of-distant-realms", "witch-sight"])
+      expect(ids).not.toContain(later);
+  });
+
+  it("refuses a level-15 invocation to a Warlock 5", () => {
+    expect(thrown(() => withInvocation("witch-sight"))).toMatch(/"witch-sight" is not an offered option/);
+  });
+
+  it("refuses Thirsting Blade without Pact of the Blade, and takes it with the pact", () => {
+    expect(thrown(() => withInvocation("thirsting-blade"))).toMatch(/"thirsting-blade" is not an offered option/);
+    const bladelock = buildCharacterDefinition(
+      warlockInput(5, [
+        invocation(1, "pact-of-the-blade"),
+        {
+          level: 1,
+          classId: "warlock",
+          kind: "weapon",
+          id: "longsword",
+          payload: { featureId: "pact-of-the-blade" }
+        } as Row,
+        invocation(2, "mask-of-many-faces"),
+        invocation(2, "misty-visions"),
+        invocation(5, "master-of-myriad-forms"),
+        invocation(5, "thirsting-blade"),
+        ...asisFor(5, "dex")
+      ]),
+      library,
+      POLICY
+    );
+    expect((bladelock.character?.choices ?? []).map((row) => row.id)).toContain("thirsting-blade");
+  });
+});
+
+describe("Draconic Sorcery: Draconic Resilience's Hit Points", () => {
+  it("adds 3 at Sorcerer 3 and 1 for every Sorcerer level after", () => {
+    // CON 13 (+1) on a d6: 7 at level 1, then 5 a level by the average. The ASI at 4 goes to Dexterity.
+    expect(sorcerer(2).hitPoints.maximum).toBe(12);
+    expect(sorcerer(3).hitPoints.maximum).toBe(17 + 3);
+    expect(sorcerer(4).hitPoints.maximum).toBe(22 + 4);
+  });
+});
+
+describe("Spell picks keep to the level and school the SRD prints", () => {
+  const withRows = (drop: string, rows: readonly Row[]): CharacterCreateRequestInput => {
+    const input = wizardInput();
+    return {
+      ...input,
+      choices: [...input.choices.filter((row) => row.payload?.featureId !== drop), ...rows]
+    };
+  };
+  const pick = (featureId: string, id: string, level: number): Row =>
+    ({ level, kind: "spell", id, payload: { featureId } }) as Row;
+
+  it("refuses a cantrip or a level-2 spell as a Signature Spell, which must be level 3", () => {
+    const cantrip = withRows("signature-spells", [
+      pick("signature-spells", "fire-bolt", 20),
+      pick("signature-spells", "fireball", 20)
+    ]);
+    expect(thrown(() => buildCharacterDefinition(cantrip, library, POLICY))).toBe(
+      '"fire-bolt" is level 0, below the minimum spell level (3) for "Signature Spells".'
+    );
+    const second = withRows("signature-spells", [
+      pick("signature-spells", "alter-self", 20),
+      pick("signature-spells", "fireball", 20)
+    ]);
+    expect(thrown(() => buildCharacterDefinition(second, library, POLICY))).toMatch(/"alter-self" is level 2, below/);
+  });
+
+  it("takes Evocation Savant's spells from the Evocation school only, into the spellbook", () => {
+    const transmuter = withRows("evocation-savant", [
+      pick("evocation-savant", "burning-hands", 3),
+      pick("evocation-savant", "alter-self", 3)
+    ]);
+    expect(thrown(() => buildCharacterDefinition(transmuter, library, POLICY))).toMatch(
+      /"alter-self" is not an offered option/
+    );
+    // The printed pick lands in the spellbook: known, prepared like any other Wizard spell.
+    const built = buildCharacterDefinition(wizardInput(), library, POLICY);
+    expect(spellOf(built, "burning-hands")).toMatchObject({ prepared: false, alwaysPrepared: false });
   });
 });

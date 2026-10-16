@@ -81,8 +81,7 @@ export const barbarian: ClassMechanicsModule = {
     "primal-knowledge": {
       extraPicks: [{ offer: "class-skills", amount: 1 }]
     },
-    // Currently reaches nothing: it raises `attack.count` only on feature actions, and martial swings
-    // come from inventory. Kept to match the Fighter's identical rider.
+    // A standing rider `effective-actions` folds onto every weapon swing (attack count 2).
     "extra-attack": {
       modifiers: [{ type: "extra-attack", count: 1 }]
     },

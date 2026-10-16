@@ -323,7 +323,9 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     uses: "Limited uses recovered on a rest",
     grants: "Flat proficiency/language/spell grants",
     modifiers: "Typed numeric riders",
-    replacesFeatureId: "This feature REPLACES an earlier one of the same id lineage (Indomitable at 9/13/17)"
+    replacesFeatureId: "This feature REPLACES an earlier one of the same id lineage (Indomitable at 9/13/17)",
+    extraSpellLists:
+      "Spell lists the class's OWN prepared and cantrip picks may also draw on, the spells counting as that class's (Magical Secrets: the Bard's picks may come from the Cleric, Druid and Wizard lists). Widens an existing budget; it adds no picks"
   },
   FeatureChoice: {
     "": "A pick a feature asks for, in three increasing richnesses: `fromCatalog` (an open catalog slug resolved at pick time), `from` (explicit ids whose mechanics live elsewhere or nowhere), or `options` (the ids WITH their mechanics inline, for options that exist only here - Divine Order's two sacred roles, Giant Ancestry's six boons). `options` and `from` are mutually exclusive: after parsing, `from` always holds the canonical id list, derived from `options` when they were authored.",
@@ -341,9 +343,11 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     options: "Options carrying their own mechanics. Mutually exclusive with `from`"
   },
   FeatureOption: {
-    "": 'ONE pickable option that carries its OWN mechanics - structurally a HomebrewFeature minus `level`/`replacesFeatureId`, with identical rider fields and identical meanings. That is the point: a chosen option is interpreted by the very same code path that interprets a class feature, so "Divine Order: Protector" carries its Martial-weapon and Heavy-armor training itself instead of being a bare id string nothing downstream can read.',
+    "": 'ONE pickable option that carries its OWN mechanics - structurally a HomebrewFeature minus `replacesFeatureId`, with identical rider fields and identical meanings. That is the point: a chosen option is interpreted by the very same code path that interprets a class feature, so "Divine Order: Protector" carries its Martial-weapon and Heavy-armor training itself instead of being a bare id string nothing downstream can read.',
     requires:
       'This option is legal only when an EARLIER answer says so - "the option you chose for Blessed Strikes grows more powerful". `offer` is the same offer-key namespace `extraPicks` uses. When gating leaves exactly as many legal options as the capacity, the survivors are ADOPTED and no pick is rendered: the answer is a consequence, not a choice.',
+    level:
+      'The class level this option may first be chosen at - an invocation\'s "Prerequisite: Level 5+ Warlock". A build below it is not offered the option',
     choice: "A SECOND-ORDER pick this option owes once chosen, from a list of its own",
     choices:
       "SEVERAL second-order picks (Pact of the Tome asks for three cantrips AND two rituals). Mutually exclusive with `choice`",

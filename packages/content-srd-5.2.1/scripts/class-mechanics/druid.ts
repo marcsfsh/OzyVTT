@@ -1,5 +1,81 @@
 // Druid and Circle of the Land mechanics, merged over the ETL-generated prose.
-import type { ClassMechanicsModule } from "./overlay.js";
+import type { ClassMechanicsModule, TableSpell } from "./overlay.js";
+
+/** The Circle of the Land table: each land's spells by Druid level (3, 5, 7, 9). */
+const LANDS: ReadonlyArray<{
+  id: string;
+  name: string;
+  tiers: ReadonlyArray<readonly [number, readonly TableSpell[]]>;
+}> = [
+  {
+    id: "arid",
+    name: "Arid",
+    tiers: [
+      [
+        3,
+        [
+          ["blur", "Blur", 2],
+          ["burning-hands", "Burning Hands", 1],
+          ["fire-bolt", "Fire Bolt", 0]
+        ]
+      ],
+      [5, [["fireball", "Fireball", 3]]],
+      [7, [["blight", "Blight", 4]]],
+      [9, [["wall-of-stone", "Wall of Stone", 5]]]
+    ]
+  },
+  {
+    id: "polar",
+    name: "Polar",
+    tiers: [
+      [
+        3,
+        [
+          ["fog-cloud", "Fog Cloud", 1],
+          ["hold-person", "Hold Person", 2],
+          ["ray-of-frost", "Ray of Frost", 0]
+        ]
+      ],
+      [5, [["sleet-storm", "Sleet Storm", 3]]],
+      [7, [["ice-storm", "Ice Storm", 4]]],
+      [9, [["cone-of-cold", "Cone of Cold", 5]]]
+    ]
+  },
+  {
+    id: "temperate",
+    name: "Temperate",
+    tiers: [
+      [
+        3,
+        [
+          ["misty-step", "Misty Step", 2],
+          ["shocking-grasp", "Shocking Grasp", 0],
+          ["sleep", "Sleep", 1]
+        ]
+      ],
+      [5, [["lightning-bolt", "Lightning Bolt", 3]]],
+      [7, [["freedom-of-movement", "Freedom of Movement", 4]]],
+      [9, [["tree-stride", "Tree Stride", 5]]]
+    ]
+  },
+  {
+    id: "tropical",
+    name: "Tropical",
+    tiers: [
+      [
+        3,
+        [
+          ["acid-splash", "Acid Splash", 0],
+          ["ray-of-sickness", "Ray of Sickness", 1],
+          ["web", "Web", 2]
+        ]
+      ],
+      [5, [["stinking-cloud", "Stinking Cloud", 3]]],
+      [7, [["polymorph", "Polymorph", 4]]],
+      [9, [["insect-plague", "Insect Plague", 5]]]
+    ]
+  }
+];
 
 export const druid: ClassMechanicsModule = {
   features: {
@@ -137,6 +213,36 @@ export const druid: ClassMechanicsModule = {
     // and Beast Spells (a permission, not a rider).
   },
 
+  // "You have the spells listed for your Druid level and lower prepared": each later row is a staged feature
+  // whose one legal option is the chosen land's, adopted without a pick.
+  subclassStages: {
+    "circle-of-the-land": [5, 7, 9].map((level, row) => ({
+      id: `circle-of-the-land-spells-${level}`,
+      name: `Circle of the Land Spells (Level ${level})`,
+      level,
+      description: `When you reach Druid level ${level}, you always have your land's level ${level} spell prepared: ${LANDS.map(
+        (land) => `${land.name}, ${land.tiers[row + 1][1].map(([, name]) => name).join(", ")}`
+      ).join("; ")}.`,
+      tags: ["spellcasting"],
+      choice: {
+        kind: `land-spells-${level}`,
+        choose: 1,
+        options: LANDS.map((land) => ({
+          id: `${land.id}-${level}`,
+          name: `${land.name} Land (Level ${level})`,
+          description: `${land.tiers[row + 1][1].map(([, name]) => name).join(", ")}, always prepared.`,
+          requires: { offer: "feature:circle-of-the-land-spells", id: land.id },
+          grants: {
+            spells: land.tiers[row + 1][1].map(([id, , spellLevel]) => ({
+              id,
+              level: spellLevel,
+              alwaysPrepared: true
+            }))
+          }
+        }))
+      }
+    }))
+  },
   subclasses: {
     "circle-of-the-land": {
       /**
@@ -165,9 +271,10 @@ export const druid: ClassMechanicsModule = {
       },
 
       /**
-       * "Choose one type of land": four inline options carrying only their names, read back by Nature's
-       * Ward. Each land's tiered spell set stays prose (`grants.spells` has no character-level gate, and
-       * the overlay cannot split the feature into staged records).
+       * "Choose one type of land": four inline options, each granting that land's level-3 spells always
+       * prepared; the table's later rows are staged features (`subclassStages`), which read this answer back,
+       * as Nature's Ward does. A re-choice on a Long Rest moves Nature's Ward's Resistance but not the spells,
+       * which are baked into the sheet: a different land's spells come with a rebuild.
        */
       "circle-of-the-land-spells": {
         // Re-chosen on every Long Rest: the override lives in `actor.choiceOverrides` and the next Long Rest clears it.
@@ -175,28 +282,12 @@ export const druid: ClassMechanicsModule = {
         choice: {
           kind: "land",
           choose: 1,
-          options: [
-            {
-              id: "arid",
-              name: "Arid Land",
-              description: "Blur, Burning Hands, Fire Bolt, Blight, Fireball, Wall of Fire."
-            },
-            {
-              id: "polar",
-              name: "Polar Land",
-              description: "Fog Cloud, Hold Person, Ray of Frost, Sleet Storm, Slow, Ice Storm."
-            },
-            {
-              id: "temperate",
-              name: "Temperate Land",
-              description: "Misty Step, Shocking Grasp, Lightning Bolt, Sleet Storm, Freedom of Movement, Ice Storm."
-            },
-            {
-              id: "tropical",
-              name: "Tropical Land",
-              description: "Acid Splash, Ray of Sickness, Web, Stinking Cloud, Polymorph, Insect Plague."
-            }
-          ]
+          options: LANDS.map((land) => ({
+            id: land.id,
+            name: `${land.name} Land`,
+            description: `${land.tiers.map(([level, spells]) => `Level ${level}: ${spells.map(([, name]) => name).join(", ")}`).join(". ")}.`,
+            grants: { spells: land.tiers[0][1].map(([id, , level]) => ({ id, level, alwaysPrepared: true })) }
+          }))
         }
       },
 

@@ -11,7 +11,14 @@
  * bundles the earlier steps wrote.
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import { CLASS_MECHANICS, LIVE_CLASS_RESOURCES, SUBCLASS_MECHANICS, applyMechanics } from "./class-mechanics/index.js";
+import {
+  CLASS_MECHANICS,
+  CLASS_STAGES,
+  LIVE_CLASS_RESOURCES,
+  SUBCLASS_MECHANICS,
+  SUBCLASS_STAGES,
+  applyMechanics
+} from "./class-mechanics/index.js";
 import { slug, strip, withTables } from "./markdown.js";
 import { join } from "node:path";
 import { z } from "zod";
@@ -103,14 +110,31 @@ function featuresTable(body: string, className: string): { columns: string[]; ro
  * The `#### Name` entries under one `### Heading`, as FeatureOptions carrying their own prose
  * (Metamagic, Eldritch Invocations).
  */
-function optionSection(body: string, heading: string) {
+function optionSection(body: string, heading: string, featureId: string) {
   const after = body.split(new RegExp(`^### ${heading}$`, "m"))[1];
   if (!after) throw new Error(`no "${heading}" section`);
   const tail = after.split(/^### /m)[0];
   const parts = tail.split(/^#### (.+)$/m);
-  const options: { id: string; name: string; description: string }[] = [];
+  const options: {
+    id: string;
+    name: string;
+    description: string;
+    level?: number;
+    requires?: { offer: string; id: string };
+  }[] = [];
   for (let i = 1; i < parts.length; i += 2) {
     const name = strip(parts[i]);
+    // "Prerequisite: Level 12+ Warlock, Thirsting Blade Invocation": a class level, and maybe another option of
+    // this same pick. A cantrip prerequisite ("a Warlock Cantrip That Deals Damage") is left to the option's text.
+    const prerequisite = /^_Prerequisite: Level (\d+)\+ \w+(?:, ([^_]+?) Invocation)?(?:, [^_]*)?_$/m.exec(
+      parts[i + 1]
+    );
+    const gates = prerequisite
+      ? {
+          level: Number(prerequisite[1]),
+          ...(prerequisite[2] ? { requires: { offer: `feature:${featureId}`, id: slug(prerequisite[2]) } } : {})
+        }
+      : {};
     const description = withTables(parts[i + 1])
       .split("\n")
       .map((line) => line.trim())
@@ -119,8 +143,12 @@ function optionSection(body: string, heading: string) {
       .replace(/[*_]/g, "")
       .replace(/\s+/g, " ")
       .trim();
-    if (name && description) options.push({ id: slug(name), name, description: description.slice(0, 4000) });
+    if (name && description) options.push({ id: slug(name), name, description: description.slice(0, 4000), ...gates });
   }
+  // A required option must be one of these, or the gate could never open.
+  const ids = new Set(options.map((option) => option.id));
+  const dangling = options.find((option) => option.requires && !ids.has(option.requires.id));
+  if (dangling) throw new Error(`${dangling.id} requires "${dangling.requires!.id}", which is not a ${heading} entry`);
   return options;
 }
 
@@ -143,10 +171,14 @@ function featureProse(body: string): Map<string, string> {
       .replace(/\s+/g, " ")
       .trim();
     if (!text) continue;
-    const bare = heading.match(LEVEL_HEADING)?.[2];
-    // First write wins: "Level 4: Ability Score Improvement" repeats at 4, 8, 12, 16 and 19.
+    const levelled = heading.match(LEVEL_HEADING);
+    const bare = levelled?.[2];
+    // "Level 4: Ability Score Improvement" repeats at 4, 8, 12, 16 and 19 with the same text, kept once; a repeat
+    // that says something new (Improved Brutal Strike at 17) is appended under its level.
     for (const key of [slug(heading), ...(bare ? [slug(bare)] : [])]) {
-      if (!out.has(key)) out.set(key, text);
+      const earlier = out.get(key);
+      if (earlier === undefined) out.set(key, text);
+      else if (levelled && !earlier.includes(text)) out.set(key, `${earlier} At level ${levelled[1]}: ${text}`);
     }
   }
   return out;
@@ -295,8 +327,7 @@ const CONFIG: Record<string, ClassConfig> = {
     choices: {
       expertise: { kind: "expertise", choose: 2, fromCatalog: "skills" },
       "ability-score-improvement": asiChoice,
-      "bard-subclass": { kind: "subclass", choose: 1, fromCatalog: "bard-subclasses" },
-      "magical-secrets": { kind: "spell", choose: 2, fromCatalog: "bard-spells" }
+      "bard-subclass": { kind: "subclass", choose: 1, fromCatalog: "bard-subclasses" }
     }
   },
   druid: {
@@ -673,7 +704,7 @@ for (const [id, entry] of parsed) {
   const toolText = traits["Tool Proficiencies"] ?? traits["Tool Proficiency"] ?? "";
   const equipment = equipmentOf(traits["Starting Equipment"] ?? "", id, catalog, unresolvedItems);
 
-  const features = [...featureIds].map(([featureId, level]) => {
+  const printedFeatures = [...featureIds].map(([featureId, level]) => {
     const description =
       entry.prose.get(featureId) ??
       entry.prose.get(featureId.replace(new RegExp(`^${id}-`), "")) ??
@@ -684,7 +715,7 @@ for (const [id, entry] of parsed) {
       ? (() => {
           const { optionsFrom, ...rest } = configured;
           // `from` is derived from the option ids by the schema - authoring both is rejected.
-          return { ...rest, options: optionSection(entry.body, optionsFrom) };
+          return { ...rest, options: optionSection(entry.body, optionsFrom, featureId) };
         })()
       : configured;
     return {
@@ -698,6 +729,14 @@ for (const [id, entry] of parsed) {
       ...(choice ? { choice } : {})
     };
   });
+
+  // Staged features join the printed ones, and their level's row of the table.
+  const stages = CLASS_STAGES[id] ?? [];
+  for (const stage of stages) (table[stage.level - 1].features as string[]).push(stage.id);
+  const features: Array<Record<string, unknown> & { id: string }> = [
+    ...printedFeatures,
+    ...stages.map((stage) => ({ ...stage }))
+  ];
 
   const record = {
     id,
@@ -814,10 +853,10 @@ for (const [id, entry] of parsed) {
     subclassLevel: CONFIG[id].subclassLevel,
     summary: intro.split(". ")[0].slice(0, 200) || `${title}, the SRD 5.2.1 ${entry.name} subclass.`,
     description: intro.slice(0, 4000) || `${title}.`,
-    features
+    features: [...features, ...(SUBCLASS_STAGES[subclassId] ?? []).map((stage) => ({ ...stage }))]
   };
   // The subclass half of the overlay, keyed on (subclassId, featureId).
-  overlayMisses.push(...applyMechanics(subclassId, features, SUBCLASS_MECHANICS));
+  overlayMisses.push(...applyMechanics(subclassId, record.features, SUBCLASS_MECHANICS));
   // Parsed for the same reason a class is.
   SubclassReferenceSchema.parse(record);
   builtSubclasses.push(record);

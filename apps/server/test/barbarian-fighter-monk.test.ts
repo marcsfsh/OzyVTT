@@ -12,6 +12,7 @@ import { criticalThreshold, effectiveActions } from "../src/effective-actions.js
 import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { initiativeRollMode, startEncounter } from "../src/encounter.js";
 import { saveRollSources } from "../src/saving-throws.js";
+import { currentSpeedFeet } from "../src/speed.js";
 
 // Barbarian, Fighter and Monk mechanics, asserted as numbers a player can act on: sheet AC, the DC a
 // target is held to, the die the engine keeps, the counter it spends, or the refusal it prints. Runs
@@ -308,6 +309,14 @@ describe("Barbarian: the sheet's own numbers", () => {
       limit: 2,
       per: "long-rest"
     });
+  });
+});
+
+describe("Barbarian: Improved Brutal Strike keeps both of its printed levels", () => {
+  it("carries the level-13 effects and the level-17 upgrade in one description", () => {
+    const feature = view.classRecord("barbarian")!.features.find((entry) => entry.id === "improved-brutal-strike")!;
+    expect(feature.description).toContain("Staggering Blow");
+    expect(feature.description).toContain("At level 17: The extra damage of your Brutal Strike increases to 2d10");
   });
 });
 
@@ -857,6 +866,19 @@ describe("Monk: the sheet's own numbers", () => {
   it("Unarmored Defense is 10 + Dex + WISDOM - the other half of the shared feature id", () => {
     expect(twenty.abilityScores).toMatchObject({ dex: 24, wis: 24 });
     expect(twenty.armorClass).toBe(24); // 10 + 7 + 7
+  });
+
+  it("Unarmored Movement follows the printed column on the speed the token moves at", () => {
+    // Halfling 30. The bonus waits for the live loadout, so the stored walking speed stays 30.
+    const speedAt = (level: number) => {
+      const built = onTheTable(build(monkInput(level)), { fight: false });
+      return currentSpeedFeet(built.hero, derivationOf(built));
+    };
+    expect(twenty.speedFeet).toBe(30);
+    expect(speedAt(1)).toBe(30);
+    expect(speedAt(2)).toBe(40);
+    expect(speedAt(6)).toBe(45);
+    expect(speedAt(20)).toBe(60);
   });
 
   it("Body and Mind passes 20, and Disciplined Survivor makes every save proficient", () => {

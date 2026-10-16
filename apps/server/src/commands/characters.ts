@@ -6,7 +6,8 @@ import {
   rebuildActorDefinition,
   resolvePendingImport,
   storedDefinition,
-  submitPendingImport
+  submitPendingImport,
+  withDerivedSlots
 } from "../actor-roster.js";
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { ABILITY_ROLL_LABEL, recordHitPointRoll, settleBuilderDice } from "../builder-dice.js";
@@ -396,8 +397,11 @@ export const characterCommands = [
     schema: CharacterSubmitImportSchema,
     malformed: "The import submission is malformed.",
     // Any joined session may submit; the GM's approval is the gate.
-    async run({ principal, request, execute }) {
-      const definition = importedDefinition(request.definition, "character");
+    async run({ principal, request, execute }, kit) {
+      const definition = withDerivedSlots(
+        importedDefinition(request.definition, "character"),
+        kit.contentLibrary.forAudience("gm").classProgressionTable()
+      );
       await execute((state) => submitPendingImport(state, definition, request.commandId, sessionIdOf(principal)));
     }
   }),

@@ -650,6 +650,9 @@ describe("character-builder content records", () => {
       if (slug === "weapons") return weaponCount > 0;
       if (slug === "tools") return toolCount > 0;
       if (slug === "languages") return languages.length > 0;
+      if (slug === "feats") return feats.length > 0;
+      const school = /^(.+)-spells-of-([a-z0-9]+)$/.exec(slug);
+      if (school) return spells.some((spell) => spell.classes.includes(school[1]) && spell.school === school[2]);
       if (slug.endsWith("-languages"))
         return languages.some((entry) => entry.table === slug.slice(0, -"-languages".length));
       if (slug.endsWith("-spells"))
@@ -1081,6 +1084,24 @@ describe("2a - no class or subclass feature falls back to a pointer at an extern
     for (const feature of arcana) expect(feature.description).toContain("a magical secret called an arcanum");
   });
 
+  it("reads each invocation's printed prerequisite into a class level and the invocation it needs", () => {
+    const options = new Map(
+      classes
+        .find((record) => record.id === "warlock")!
+        .features.find((feature) => feature.id === "eldritch-invocations")!
+        .choice!.options!.map((option) => [option.id, option])
+    );
+    expect(options.get("armor-of-shadows")?.level).toBeUndefined();
+    expect(options.get("witch-sight")?.level).toBe(15);
+    expect(options.get("devouring-blade")).toMatchObject({
+      level: 12,
+      requires: { offer: "feature:eldritch-invocations", id: "thirsting-blade" }
+    });
+    // "a Warlock Cantrip That Deals Damage" names no invocation: the level is read and the rest stays in the text.
+    expect(options.get("agonizing-blast")?.level).toBe(2);
+    expect(options.get("agonizing-blast")?.requires).toBeUndefined();
+  });
+
   it('drops the table\'s "Subclass feature" reminder rows, as the hand-authored three already do', () => {
     // It is not a class feature: the SRD prints no heading for it, so it can carry no prose, and the
     // real feature is on the subclass record. Cleric's empty levels 6 and 17 are the oracle.
@@ -1114,8 +1135,12 @@ describe("the subclass authoring surface, and the tables the parser used to thro
   it("merges SUBCLASS_MECHANICS into an ETL-GENERATED subclass", () => {
     // Draconic Sorcery is ETL-generated, so this rider can only come from SUBCLASS_MECHANICS.
     const resilience = featureOf(subclasses, "draconic-sorcery", "draconic-resilience");
-    // `allowShield: true` is authored: the printed sentence restricts only wearing armor.
-    expect(resilience.modifiers).toEqual([{ type: "unarmored-defense", ability: "cha", allowShield: true }]);
+    // `allowShield: true` is authored: the printed sentence restricts only wearing armor. The Hit Point half is
+    // +1 per level, the feature arriving at 3.
+    expect(resilience.modifiers).toEqual([
+      { type: "unarmored-defense", ability: "cha", allowShield: true },
+      { type: "hit-points-per-level", amount: 1 }
+    ]);
   });
 
   it("carries the spell tables of the four subclass spell features into their descriptions", () => {

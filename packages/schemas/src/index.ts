@@ -329,7 +329,8 @@ export const ModifierSchema = z.discriminatedUnion("type", [
     })
     .strict(),
   z.object({ type: z.literal("hit-points-per-level"), amount: z.number().int().min(-5).max(5), ...riderGate }).strict(),
-  /** Baked into the sheet's speed at build time on a feature; summed live on an effect, so it ends with it. */
+  /** Baked into the sheet's speed at build time on a feature unless gated (then read with the live loadout);
+   *  summed live on an effect, so it ends with it. */
   z.object({ type: z.literal("speed"), amount: z.number().int().min(-30).max(60), ...riderGate }).strict(),
   /**
    * Flat AC. `whileArmored` (the Defense fighting style) predates `when: [{type: "while-armored"}]` and

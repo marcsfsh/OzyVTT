@@ -2615,6 +2615,7 @@
           "kind": "spell",
           "choose": 2,
           "fromCatalog": "wizard-spells",
+          "minSpellLevel": 3,
           "maxSpellLevel": 3
         }
       }

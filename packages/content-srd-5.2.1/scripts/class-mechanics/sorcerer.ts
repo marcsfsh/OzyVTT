@@ -5,7 +5,7 @@
  * `sorcery-points` pool. Heightened and Quickened Spell cost 2 and keep their price in prose.
  */
 import type { DamageType } from "@vtt/schemas";
-import type { ClassMechanicsModule } from "./overlay.js";
+import { spellTableStages, type ClassMechanicsModule } from "./overlay.js";
 
 // One debit off the shared pool, which reads the printed Sorcery Points column.
 const ONE_SORCERY_POINT = {
@@ -83,20 +83,47 @@ export const sorcerer: ClassMechanicsModule = {
     // Not modeled: Sorcery Incarnate (substitute cost, two Metamagic per spell), Arcane Apotheosis
     // (cost waiver) and the cantrip replacement clauses.
   },
+  subclassStages: {
+    "draconic-sorcery": spellTableStages("draconic-spells", "Draconic Spells", "Sorcerer", [
+      [
+        5,
+        [
+          ["fear", "Fear", 3],
+          ["fly", "Fly", 3]
+        ]
+      ],
+      [
+        7,
+        [
+          ["arcane-eye", "Arcane Eye", 4],
+          ["charm-monster", "Charm Monster", 4]
+        ]
+      ],
+      [
+        9,
+        [
+          ["legend-lore", "Legend Lore", 5],
+          ["summon-dragon", "Summon Dragon", 5]
+        ]
+      ]
+    ])
+  },
   subclasses: {
     "draconic-sorcery": {
       /**
        * 10 + Dexterity + Charisma while unarmored. `allowShield` is authored true: the printed sentence
        * restricts only wearing armor, and the SRD treats a Shield separately (the Monk's text names it,
-       * this one does not). The Hit Point half (+3 at level 3, +1 per level after) stays prose.
+       * this one does not). "+3, and +1 whenever you gain another Sorcerer level": +1 per level, taken at 3.
        */
       "draconic-resilience": {
-        modifiers: [{ type: "unarmored-defense", ability: "cha", allowShield: true }]
+        modifiers: [
+          { type: "unarmored-defense", ability: "cha", allowShield: true },
+          { type: "hit-points-per-level", amount: 1 }
+        ]
       },
       /**
-       * Only the level-3 tier is authored: `grants.spells` has no character-level gate, and the overlay
-       * cannot split the feature into staged records. Granted spells are always prepared and do not use
-       * prepared slots; Command is not otherwise on the Sorcerer list.
+       * The level-3 tier; the table's later rows are staged features (`subclassStages`). Granted spells are
+       * always prepared and do not use prepared slots; Command is not otherwise on the Sorcerer list.
        */
       "draconic-spells": {
         grants: {
