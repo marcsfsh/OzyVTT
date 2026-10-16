@@ -1,0 +1,54 @@
+import { describe, expect, it } from "vitest";
+import { loadSpells } from "../src/index.js";
+import { healingOfText, spellEffectFromColumns } from "../src/spell-effect.js";
+import { SPELL_EFFECT_REVIEWED_IDS } from "../scripts/spell-effects.js";
+
+const effectOf = (id: string) => loadSpells().find((spell) => spell.id === id)!.effect;
+
+describe("what one cast of an SRD spell does", () => {
+  it("heals, and deals no damage, where the text restores hit points", () => {
+    expect(effectOf("cure-wounds")).toEqual({
+      attacks: 0,
+      damage: [],
+      healing: { formula: "2d8", addsModifier: true }
+    });
+    expect(effectOf("heal")!.healing).toEqual({ formula: "70", addsModifier: false });
+    expect(effectOf("regenerate")!.healing).toEqual({ formula: "4d8 + 15", addsModifier: false });
+  });
+
+  it("deals the whole cast's damage, and none the text only threatens", () => {
+    expect(effectOf("magic-missile")!.damage).toEqual([{ formula: "3d4 + 3", type: "force" }]);
+    expect(effectOf("flame-strike")!.damage).toEqual([
+      { formula: "5d6", type: "fire" },
+      { formula: "5d6", type: "radiant" }
+    ]);
+    expect(effectOf("fireball")!.damage).toEqual([{ formula: "8d6", type: "fire" }]);
+    for (const id of ["web", "hex", "hunters-mark", "spirit-guardians"]) expect(effectOf(id)!.damage, id).toEqual([]);
+  });
+
+  it("attacks only where the caster makes the spell attack", () => {
+    expect(effectOf("fire-bolt")!.attacks).toBe(1);
+    expect(effectOf("scorching-ray")!.attacks).toBe(3);
+    for (const id of ["faerie-fire", "protection-from-evil-and-good", "ray-of-enfeeblement", "bless"])
+      expect(effectOf(id)!.attacks, id).toBe(0);
+  });
+
+  it("reviews only spells that exist", () => {
+    const ids = new Set(loadSpells().map((spell) => spell.id));
+    expect(SPELL_EFFECT_REVIEWED_IDS.filter((id) => !ids.has(id))).toEqual([]);
+  });
+});
+
+describe("a homebrew spell's cast model, from what its author set", () => {
+  const cureWounds = loadSpells().find((spell) => spell.id === "cure-wounds")!;
+  it("reads a typed roll as damage and the text's restoring as healing", () => {
+    const bolt = { ...cureWounds, description: "A bolt.", attackRoll: true, damage: { roll: "2d10", types: ["fire"] } };
+    expect(spellEffectFromColumns(bolt)).toEqual({
+      attacks: 1,
+      damage: [{ formula: "2d10", type: "fire" }],
+      healing: null
+    });
+    expect(spellEffectFromColumns(cureWounds).damage).toEqual([]);
+    expect(healingOfText("It deals 2d8 Fire damage.")).toBeNull();
+  });
+});

@@ -11,6 +11,9 @@ import {
   AbilitySchema,
   ActionAreaSchema,
   ActorDefinitionSchema,
+  DamageTypeSchema,
+  DiceFormulaSchema,
+  HealingFormulaSchema,
   ItemSlotSchema,
   SaveOutcomeFields
 } from "@vtt/schemas";
@@ -48,6 +51,19 @@ export type ConditionReference = z.infer<typeof ConditionReferenceSchema>;
 
 const AbilityShortSchema = z.enum(["str", "dex", "con", "int", "wis", "cha"]);
 
+/** One cast's mechanical effect; see `SpellReference.effect`. */
+export const SpellEffectSchema = z
+  .object({
+    /** Spell attack rolls one cast makes (Scorching Ray's three rays); 0 for none. */
+    attacks: z.number().int().min(0).max(10),
+    /** Damage to each target, every part rolled (all three of Magic Missile's darts). */
+    damage: z.array(z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema }).strict()).max(4),
+    /** Hit points each target regains; `addsModifier` adds the caster's spellcasting ability modifier. */
+    healing: z.object({ formula: HealingFormulaSchema, addsModifier: z.boolean() }).strict().nullable()
+  })
+  .strict();
+export type SpellEffect = z.infer<typeof SpellEffectSchema>;
+
 export const SpellReferenceSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   name: z.string().min(1).max(120),
@@ -81,6 +97,11 @@ export const SpellReferenceSchema = z.object({
   /** The area a cast covers, for the map template, read from the text at build time. `shape` above is the source's
    *  own field, which records a line's width as its size and has no emanations. */
   area: ActionAreaSchema.nullable().default(null),
+  /** What one cast does to its targets: the spell attacks it makes, the damage it deals, the hit points it restores.
+   *  Read from the text at build time with a reviewed table, because the source's `damage` and `attackRoll` columns
+   *  describe the prose (Hex's later 1d6, Faerie Fire's "attack rolls against"), not a cast. A zone, a summons or a
+   *  rider on later hits casts with none of these, and stays for the GM. Actions built from a spell read this. */
+  effect: SpellEffectSchema.nullable().default(null),
   classes: z.array(z.string()),
   description: z.string().min(1).max(20000),
   higherLevel: z.string().max(4000).nullable(),

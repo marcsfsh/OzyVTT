@@ -1,5 +1,11 @@
 import type { FeatureAction, FeatureSaveDc, FeatureUses, ItemSpellCast, SpellReference } from "@vtt/content-srd-5.2.1";
-import { abilityModifier, isMonkWeapon, weaponAbilityModifierFrom, type RiderAbility } from "@vtt/rules-5e";
+import {
+  abilityModifier,
+  formulaPlus,
+  isMonkWeapon,
+  weaponAbilityModifierFrom,
+  type RiderAbility
+} from "@vtt/rules-5e";
 import type { ActorAction, ActorDefinition, InventoryItem } from "@vtt/schemas";
 
 /**
@@ -151,8 +157,6 @@ export function castAction(
     level > spell.level
       ? (spell.castingOptions.find((option) => option.type === `slot_level_${level}`)?.damageRoll ?? null)
       : null;
-  const formula = upcast ?? spell.damage.roll;
-  const damageType = spell.damage.types[0] ?? "force";
   const attackBonus =
     cast.ability !== undefined || caster.attackBonus === null
       ? scoreModifierOf(definition, ability) + caster.proficiencyBonus
@@ -164,14 +168,41 @@ export function castAction(
     (cast.ability !== undefined || caster.saveDc === null
       ? 8 + scoreModifierOf(definition, ability) + caster.proficiencyBonus
       : caster.saveDc);
+  const mechanics = spellCastMechanics(
+    spell,
+    { attackBonus, saveDc: clampDc(saveDc), bearersDc, modifier: scoreModifierOf(definition, ability) },
+    { roll: upcast }
+  );
+  return { ...base, ...(spell.area ? { area: spell.area } : {}), ...mechanics };
+}
+
+/** What an action casting this spell does, from the spell's cast model (`SpellReference.effect`): its spell
+ *  attacks, its save, its damage and its healing. `scaled.roll` (an upcast row, a cantrip's tier) replaces only dice
+ *  the source's own roll gave, so a reviewed whole-cast roll (Magic Missile's three darts) stands. An attack
+ *  spell's save is left to the GM (Ice Knife's burst). */
+export function spellCastMechanics(
+  spell: SpellReference,
+  numbers: Readonly<{ attackBonus: number; saveDc: number; bearersDc: boolean; modifier: number }>,
+  scaled: Readonly<{ roll?: string | null; attacks?: number }> = {}
+): Pick<ActorAction, "damage"> & Partial<Pick<ActorAction, "attack" | "save" | "healing">> {
+  // No cast model: the save still applies, and the rest is the GM's.
+  const effect = spell.effect ?? { attacks: 0, damage: [], healing: null };
+  const scale = (formula: string) => (scaled.roll && formula === spell.damage.roll ? scaled.roll : formula);
+  const attacks = scaled.attacks ?? effect.attacks;
   return {
-    ...base,
-    ...(spell.area ? { area: spell.area } : {}),
-    ...(spell.attackRoll ? { attack: { bonus: attackBonus } } : {}),
-    ...(spell.save
-      ? { save: { ...spell.save, dc: clampDc(saveDc), ...(bearersDc ? { spellcasting: true } : {}) } }
-      : {}),
-    ...(formula ? { damage: [{ formula, type: damageType }] } : {})
+    damage: effect.damage.map((part) => ({ formula: scale(part.formula), type: part.type })),
+    ...(attacks > 0
+      ? { attack: { bonus: numbers.attackBonus, ...(attacks > 1 ? { count: Math.min(10, attacks) } : {}) } }
+      : spell.save
+        ? { save: { ...spell.save, dc: numbers.saveDc, ...(numbers.bearersDc ? { spellcasting: true } : {}) } }
+        : {}),
+    ...(effect.healing
+      ? {
+          healing: {
+            formula: formulaPlus(scale(effect.healing.formula), effect.healing.addsModifier ? numbers.modifier : 0)
+          }
+        }
+      : {})
   };
 }
 

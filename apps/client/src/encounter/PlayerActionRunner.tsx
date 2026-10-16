@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { type ActorDefinition, type ContentActionSummary } from "@vtt/domain";
-import { ActionResultHead } from "./ActionResultHead";
+import { ActionResultHead, HealingOutcome } from "./ActionResultHead";
 import { ActionRow } from "./ActionRow";
 import { ActionTargetPicker } from "./ActionTargetPicker";
 import { actionSummaryParts } from "./action-summary";
@@ -192,6 +192,7 @@ export function PlayerActionRunner({
                 </p>
               );
             })()}
+          {result.healing && <HealingOutcome healing={result.healing} />}
           {/* Players never apply damage: a committed hit goes to the GM (proposal) or is auto-applied
           (direct), unless a target's reaction (Uncanny Dodge) parked it on a prompt instead. */}
           {!result.preview &&

@@ -268,6 +268,14 @@
   font-size: 1rem;
   color: var(--danger-text);
 }
+.action-healing {
+  margin: 0.35rem 0 0;
+  font-size: var(--fs-sm);
+  color: var(--cyan-hi);
+}
+.action-healing strong {
+  font-size: 1rem;
+}
 .action-preview {
   display: flex;
   flex-direction: column;

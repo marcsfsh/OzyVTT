@@ -42,6 +42,7 @@ function combatantsOf(
     !action.attack &&
     !action.save &&
     action.damage.length === 0 &&
+    !action.healing &&
     action.grants === undefined &&
     action.multiattack === undefined &&
     !spendsALimitedUse &&
@@ -106,6 +107,7 @@ export function openResolve(
     },
     warnings,
     tableNarration: [],
+    healing: null,
     rollMode: undefined,
     check: null,
     attack: null,

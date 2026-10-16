@@ -34,7 +34,8 @@ export function SheetActions({
   inline,
   runnerRef,
   routeAttack,
-  structuredActionFor
+  structuredActionFor,
+  onLooseUse
 }: Readonly<{
   actor: GmActor | PlayerActor;
   definition: ActorDefinition;
@@ -51,6 +52,8 @@ export function SheetActions({
   runnerRef: RefObject<HTMLDivElement | null>;
   routeAttack: (action: DefinitionAction) => void;
   structuredActionFor: (opts: { actionId?: string; name?: string }) => DefinitionAction | null;
+  /** Outside the fight: uses an item's action through the server, which rolls it and spends its charges. */
+  onLooseUse: ((actionId: string) => void) | null;
 }>) {
   const { rolling, rollD20, rollFlat } = rolls;
   const { rollMode, bonusMode } = useRollPreference();
@@ -255,55 +258,74 @@ export function SheetActions({
             {!inlineRunner && itemActions.length > 0 && (
               <div className="sheet-action-group">
                 <h4 className="sheet-action-head">From your items</h4>
-                {itemActions.map((row) => (
-                  <div key={row.id} className="sheet-entry">
-                    <p>
-                      <strong>{row.name}.</strong> <RichText text={row.description} />
-                      {row.usesLimit !== null && (
-                        <span className="sheet-weapon-meta">
-                          {" "}
-                          · {row.usesLimit} {row.usesLimit === 1 ? "charge" : "charges"}
-                          {row.usesPer ? ` per ${row.usesPer.replace(/-/g, " ")}` : ""}
-                        </span>
-                      )}
-                    </p>
-                    {(row.attackBonus !== null || row.damage.length > 0) && (
-                      <div className="sheet-roll-row">
-                        {row.attackBonus !== null && (
-                          <button
-                            type="button"
-                            className="sheet-roll-chip"
-                            disabled={rolling}
-                            onClick={() => {
-                              if (structuredAttacks)
-                                routeAttack({
-                                  ...EMPTY_ACTION,
-                                  id: row.id,
-                                  name: row.name,
-                                  attack: { bonus: row.attackBonus! },
-                                  damage: [...row.damage]
-                                });
-                              else void rollD20(row.attackBonus!, "attack", `${row.name} to hit`);
-                            }}
-                          >
-                            {signed(row.attackBonus)} to hit
-                          </button>
+                {itemActions.map((row) => {
+                  // Shown only while the counts are this sheet's to see (always for your own character).
+                  const spent = actor.actionUses?.[row.usesPool ?? row.id];
+                  const left =
+                    row.usesLimit !== null && spent !== undefined ? Math.max(0, row.usesLimit - spent) : null;
+                  return (
+                    <div key={row.id} className="sheet-entry">
+                      <p>
+                        <strong>{row.name}.</strong> <RichText text={row.description} />
+                        {row.usesLimit !== null && (
+                          <span className="sheet-weapon-meta">
+                            {" "}
+                            · {left !== null ? `${left} of ` : ""}
+                            {row.usesLimit} {row.usesLimit === 1 ? "charge" : "charges"}
+                            {left !== null ? " left" : ""}
+                            {row.usesPer ? ` per ${row.usesPer.replace(/-/g, " ")}` : ""}
+                          </span>
                         )}
-                        {row.damage.map((part, index) => (
-                          <button
-                            type="button"
-                            key={index}
-                            className="sheet-roll-chip"
-                            disabled={rolling}
-                            onClick={() => void rollFlat(part.formula, "damage", `${row.name} damage`)}
-                          >
-                            {part.formula}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                      </p>
+                      {(row.attackBonus !== null || row.damage.length > 0 || onLooseUse) && (
+                        <div className="sheet-roll-row">
+                          {onLooseUse && row.attackBonus === null && (
+                            <button
+                              type="button"
+                              className="sheet-roll-chip"
+                              disabled={rolling || left === 0}
+                              onClick={() => onLooseUse(row.id)}
+                            >
+                              Use
+                            </button>
+                          )}
+                          {row.attackBonus !== null && (
+                            <button
+                              type="button"
+                              className="sheet-roll-chip"
+                              disabled={rolling || (onLooseUse !== null && left === 0)}
+                              onClick={() => {
+                                if (structuredAttacks)
+                                  routeAttack({
+                                    ...EMPTY_ACTION,
+                                    id: row.id,
+                                    name: row.name,
+                                    attack: { bonus: row.attackBonus! },
+                                    damage: [...row.damage]
+                                  });
+                                else if (onLooseUse) onLooseUse(row.id);
+                                else void rollD20(row.attackBonus!, "attack", `${row.name} to hit`);
+                              }}
+                            >
+                              {signed(row.attackBonus)} to hit
+                            </button>
+                          )}
+                          {row.damage.map((part, index) => (
+                            <button
+                              type="button"
+                              key={index}
+                              className="sheet-roll-chip"
+                              disabled={rolling}
+                              onClick={() => void rollFlat(part.formula, "damage", `${row.name} damage`)}
+                            >
+                              {part.formula}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
             {!inlineRunner && hasSpellActions && (

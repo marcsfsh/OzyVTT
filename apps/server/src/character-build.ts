@@ -34,7 +34,7 @@ import {
 } from "./character-offers.js";
 import type { ContentView } from "./content-library.js";
 import { BUILDER_BAKED_MODIFIER_TYPES, type CharacterFeatureRef } from "./equipment-derivation.js";
-import { UNARMED_STRIKE_ACTION_ID } from "./item-actions.js";
+import { spellCastMechanics, UNARMED_STRIKE_ACTION_ID } from "./item-actions.js";
 import { bindTemplateItem } from "./inventory.js";
 import { CommandRejectedError } from "./game-store.js";
 
@@ -242,10 +242,15 @@ function cantripActionFor(
 ): ActorAction | null {
   if (spell.level !== 0) return null;
   const tier = cantripTierAt(cantripScalingOf(spell.castingOptions), numbers.characterLevel);
-  const roll = tier?.damageRoll ?? spell.damage.roll;
-  const beams = tier?.targetCount ?? 1;
-  const typedDamage = roll !== null && spell.damage.types.length > 0;
-  if (!typedDamage && spell.save === null) return null;
+  const mechanics = spellCastMechanics(
+    spell,
+    { attackBonus: numbers.attackBonus, saveDc: numbers.saveDc, bearersDc: true, modifier: 0 },
+    {
+      roll: tier?.damageRoll ?? null,
+      ...(tier?.targetCount && spell.effect?.attacks ? { attacks: tier.targetCount } : {})
+    }
+  );
+  if (mechanics.damage.length === 0 && !mechanics.save) return null;
   const activation: ActorAction["activation"] = /bonus/i.test(spell.castingTime)
     ? "bonus-action"
     : /reaction/i.test(spell.castingTime)
@@ -258,12 +263,7 @@ function cantripActionFor(
     name: spell.name,
     activation,
     description: spell.description.slice(0, 12000),
-    damage: typedDamage ? [{ formula: roll, type: spell.damage.types[0] }] : [],
-    ...(spell.save !== null
-      ? { save: { ...spell.save, dc: numbers.saveDc, spellcasting: true } }
-      : spell.attackRoll
-        ? { attack: { bonus: numbers.attackBonus, ...(beams > 1 ? { count: Math.min(10, beams) } : {}) } }
-        : {}),
+    ...mechanics,
     ...(spell.area ? { area: spell.area } : {}),
     // `spell-id-is` riders (Agonizing Blast) match on this field alone.
     spellId: spell.id

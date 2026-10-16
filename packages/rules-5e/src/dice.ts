@@ -124,3 +124,12 @@ export function d20Die(mode: RollMode): string {
 export function d20TestFormula(mode: RollMode, modifier: number): string {
   return `${d20Die(mode)} ${modifier < 0 ? "-" : "+"} ${Math.abs(modifier)}`;
 }
+
+/** A "XdY + N" or flat formula with a modifier folded into its one constant ("2d8" + 3 = "2d8 + 3"), so the result
+ *  stays a single safe formula. */
+export function formulaPlus(formula: string, modifier: number): string {
+  const match = /^(\d+d\d+)(?:\s*([+-])\s*(\d+))?$/i.exec(formula.trim());
+  if (!match) return String(Number(formula) + modifier);
+  const constant = (match[2] === "-" ? -1 : 1) * Number(match[3] ?? 0) + modifier;
+  return constant === 0 ? match[1] : `${match[1]} ${constant > 0 ? "+" : "-"} ${Math.abs(constant)}`;
+}

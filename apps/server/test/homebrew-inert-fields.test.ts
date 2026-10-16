@@ -652,6 +652,8 @@ describe("row 6: an item that casts a spell, with its cast details", () => {
     attackRoll: false,
     damage: { roll: "8d6", types: ["fire"] },
     save: { ability: "dex", successDamage: "half", failureConditions: [] },
+    // As the content build or the homebrew catalog fills it.
+    effect: { attacks: 0, damage: [{ formula: "8d6", type: "fire" }], healing: null },
     description: "A bright streak flashes from you.",
     castingOptions: [
       { type: "slot_level_4", damageRoll: "9d6", targetCount: null, description: null },

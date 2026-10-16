@@ -55,6 +55,7 @@ const PURPOSE_LABELS: Readonly<Record<RollRecord["purpose"], string>> = {
   save: "a saving throw",
   check: "a check",
   damage: "damage",
+  healing: "healing",
   manual: "a roll"
 };
 

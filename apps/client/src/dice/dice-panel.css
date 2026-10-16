@@ -200,6 +200,9 @@
 .roll-badge--check {
   background: color-mix(in srgb, var(--cyan) 15%, var(--surface-3));
 }
+.roll-badge--healing {
+  background: color-mix(in srgb, var(--cyan) 36%, var(--surface-3));
+}
 .roll-badge--manual {
   background: var(--surface-3);
   color: var(--text-muted);

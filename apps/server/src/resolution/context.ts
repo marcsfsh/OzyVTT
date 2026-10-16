@@ -141,6 +141,7 @@ export type ResolveContext = {
   readonly reactionPrompts: Array<{ actorId: string; actorName: string; actionName: string }>;
   /** A save a builtin forced (grapple, shove); an action's own `save` is reported from the action. */
   builtinSave: ActionResolution["save"];
+  healing: ActionResolution["healing"];
 };
 
 /** Records one rolled formula in the shared history, attributed like every roll of this resolve. */

@@ -61,7 +61,7 @@ export type ActionRollMode = Readonly<{
  * re-checking `actorIds` for `visibility !== "public"`. A leak needs both to fail. */
 export type ActionTableNarration = Readonly<{
   /** The feed row's kind, from the `CombatLogEntry` vocabulary. */
-  kind: "movement" | "save";
+  kind: "movement" | "save" | "heal";
   text: string;
   /** Everyone the line names. The feed keeps it from players when any of them is a hidden combatant. */
   actorIds: readonly string[];
@@ -97,6 +97,11 @@ export type ActionResolution = Readonly<{
   tableNarration?: readonly ActionTableNarration[];
   /** Present when the GM overrode a strict-mode rejection; the override is logged and journaled. */
   overridden?: Readonly<{ rule: string; reason: string }> | null;
+  /** Hit points the action restored (Cure Wounds): the one roll, and what each target regained, capped at its maximum. */
+  healing?: Readonly<{
+    total: number;
+    targets: ReadonlyArray<Readonly<{ targetId: string; targetName: string; regained: number }>>;
+  }> | null;
   /** On a previewed hit, the push its weapon mastery offers (SRD "up to 10 feet"); the confirm says how far with `pushFeet`. */
   push?: Readonly<{ targetName: string; maxFeet: number }> | null;
   /** Reaction prompts this hit opened (Uncanny Dodge): the triggering damage waits on the answer instead of the apply button. */

@@ -9,6 +9,7 @@ const PURPOSE_LABELS: Record<RollPurpose, string> = {
   manual: "Roll",
   attack: "Attack",
   damage: "Damage",
+  healing: "Healing",
   save: "Save",
   check: "Check"
 };

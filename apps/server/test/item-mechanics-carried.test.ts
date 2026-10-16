@@ -12,7 +12,7 @@ import { setInventoryItem } from "../src/inventory.js";
 import { answerSave, createPendingSaves, saveTotalFor } from "../src/saving-throws.js";
 import { startEncounter } from "../src/encounter.js";
 import { builtinAction } from "../src/builtin-actions.js";
-import { looseRollPlan } from "../src/tap-routing.js";
+import { looseRollPlan, spendLooseUses } from "../src/tap-routing.js";
 
 // Carried wondrous items and potions (the carried section of `item-mechanics/items.ts`): the authored rows reach the table, and
 // the absences stay absent for their recorded reasons. Runs the real `ContentLibrary` over the committed
@@ -380,9 +380,9 @@ describe("the Stone of Good Luck - both halves reach the roll", () => {
 });
 
 describe("what the carried items' buttons do outside an encounter", () => {
-  it("refuses every one of them, by the server's own words", () => {
-    // Most authored rows do nothing out of combat, and their printed uses (scrying, messaging, Truesight)
-    // are not combat activities. The failure mode is a button that refuses rather than one that lies.
+  it("leaves them to the loose route, which uses each and spends its charges", () => {
+    // Their printed uses (scrying, messaging, Truesight) are not combat activities: the structured resolver
+    // refuses them, and the loose `action.use` route uses them with nothing to roll, charge by charge.
     const definition = definitionOf();
     for (const [id, name, actionId] of [
       ["crystal-ball", "Crystal Ball", "item-crystal-ball-cast-scrying"],
@@ -401,23 +401,27 @@ describe("what the carried items' buttons do outside an encounter", () => {
           deps([], definition)
         )
       ).toThrow("Start an encounter before resolving actions.");
-      // The loose `action.use` route builds from `attack`/`damage` only, and none of these carries either.
       expect({ id, plan: looseRollPlan(action, { includeDamage: true }) }).toEqual({ id, plan: [] });
+      if (!action.uses) continue;
+      // Every printed charge, then a refusal.
+      const available = effectiveActions(definition, state.actors[0], catalog);
+      for (let charge = 0; charge < action.uses.limit; charge++) spendLooseUses(state.actors[0], action, available);
+      expect(() => spendLooseUses(state.actors[0], action, available), id).toThrow("no uses remaining");
     }
   });
 
-  it("except the Iron Bands, which the loose route WILL roll - and it spends no charge", () => {
-    // Known limitation: the loose `action.use` path touches no combat state, so `actionUses` is never
-    // incremented and outside a fight the bands throw unlimited +5 attacks where the SRD prints one per
-    // dawn. Engine-wide, so this pins the leak rather than removing the rider.
+  it("rolls the Iron Bands' attack loose, and spends their one charge a dawn", () => {
     const definition = definitionOf();
     const state = stateWith([carried("iron-bands", "Iron Bands", { attuned: false })]);
-    const action = effectiveActions(definition, state.actors[0], catalog).find(
-      (entry) => entry.id === "item-iron-bands-throw"
-    )!;
+    const available = effectiveActions(definition, state.actors[0], catalog);
+    const action = available.find((entry) => entry.id === "item-iron-bands-throw")!;
     expect(looseRollPlan(action, { includeDamage: true })).toEqual([
       { formula: "1d20 + 5", purpose: "attack", label: "Throw the Bands" }
     ]);
+    expect(spendLooseUses(state.actors[0], action, available)).toEqual({ usesLeft: 0, spent: true });
+    expect(() => spendLooseUses(state.actors[0], action, available)).toThrow(
+      "Throw the Bands: no uses remaining (1/long rest)."
+    );
   });
 });
 

@@ -1,8 +1,9 @@
-import type { CombatState, GameState } from "@vtt/domain";
+import type { Actor, CombatState, GameState } from "@vtt/domain";
 import { d20Die } from "@vtt/rules-5e";
 import type { ActorAction } from "@vtt/schemas";
 import { effectiveModeFor, overrideCovers, type RuleId } from "./rules-families.js";
-import { RulesBlockedError } from "./game-store.js";
+import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
+import { noUsesRemaining, useLimitFor } from "./resolution/economy.js";
 
 /**
  * Where an action tap goes, decided by the server. The sheet sends intent; the server answers:
@@ -66,4 +67,28 @@ export function looseRollPlan(
       plan.push({ formula: part.formula, purpose: "damage", label: `${action.name} (${part.type})` });
   }
   return plan;
+}
+
+/** What a loose use spends: an item's charges or a feature's per-rest uses count outside a fight as in one, and so
+ *  does a spell slot an item cast consumes. Per-turn and per-encounter limits have no fight to count against.
+ *  Mutates the actor, refusing before anything is spent when nothing remains. */
+export function spendLooseUses(
+  actor: Actor,
+  action: ActorAction,
+  siblings: readonly ActorAction[]
+): Readonly<{ usesLeft: number | null; spent: boolean }> {
+  const uses = action.uses && action.uses.per !== "turn" && action.uses.per !== "encounter" ? action.uses : null;
+  const key = uses ? (uses.pool ?? action.id) : null;
+  const limit = uses ? useLimitFor(siblings, action) : 0;
+  const used = key ? (actor.actionUses[key] ?? 0) : 0;
+  if (key && used >= limit) throw new CommandRejectedError(noUsesRemaining(action, limit));
+  const level = action.spellSlot?.level;
+  if (level !== undefined && !actor.spellSlots?.some((slot) => slot.level === level && slot.remaining > 0))
+    throw new CommandRejectedError(`${action.name} spends a level-${level} spell slot - ${actor.name} has none left.`);
+  if (key) actor.actionUses = { ...actor.actionUses, [key]: used + 1 };
+  if (level !== undefined)
+    actor.spellSlots = actor.spellSlots!.map((slot) =>
+      slot.level === level ? { ...slot, remaining: slot.remaining - 1 } : slot
+    );
+  return { usesLeft: key ? limit - used - 1 : null, spent: key !== null || level !== undefined };
 }
