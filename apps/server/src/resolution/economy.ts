@@ -4,6 +4,7 @@ import type { GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { effectiveSlot } from "@vtt/rules-5e";
 import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
+import { areAllies } from "../creature-sides.js";
 import { hasEffectTag, RAGING_TAG, READIED_TAG } from "../effects.js";
 import { ammunitionFor, ammunitionLabel, launcherKind } from "../ammunition.js";
 import { armorTrainingGaps, type EquipmentCatalog } from "../equipment-derivation.js";
@@ -64,6 +65,7 @@ type Evaluation = Readonly<{
   siblings: ReadonlyArray<DefinitionAction>;
   /** The slot level the caster asked for; see `castSlotLevel`. */
   slotLevel: number | undefined;
+  resolveDefinition: ((definitionId: string) => ActorDefinition | undefined) | undefined;
   onOwnTurn: boolean;
   /** A prose-only Multiattack hides extra attacks from the engine, so action-slot violations degrade to warnings. */
   proseMultiattack: boolean;
@@ -100,7 +102,9 @@ export function evaluateActionEconomy(
   asHitRider = false,
   catalog?: EquipmentCatalog,
   /** The spell the action casts, for the slot, preparation and targeting checks. */
-  spell?: SpellReference
+  spell?: SpellReference,
+  /** Any combatant's stat block, for the side a creature fights on (Help distracts an enemy). */
+  resolveDefinition?: (definitionId: string) => ActorDefinition | undefined
 ): EconomyEvaluation {
   const evaluation: Evaluation = {
     state,
@@ -109,6 +113,7 @@ export function evaluateActionEconomy(
     targetIds,
     siblings,
     slotLevel,
+    resolveDefinition,
     onOwnTurn: state.combat.turnActorId === attacker.id,
     proseMultiattack: siblings.some((candidate) => candidate.untrackedMultiattack === true),
     violations: [],
@@ -759,6 +764,26 @@ function checkTargeting(
     }
   }
 
+  // SRD Help: "You momentarily distract an enemy within 5 feet of you."
+  if (builtinHandlerFor(action.id)?.distractsAnEnemy) {
+    for (const target of targets) {
+      if (target.id === attacker.id || areAllies(attacker, target, evaluation.resolveDefinition))
+        violations.push({
+          rule: "target.not-an-enemy",
+          message:
+            target.id === attacker.id
+              ? `${action.name} distracts an enemy, not ${attacker.name} itself.`
+              : `${target.name} is ${attacker.name}'s ally - ${action.name} distracts an enemy.`
+        });
+      const apart = distanceFeet?.(attacker.id, target.id) ?? null;
+      if (apart !== null && apart > 5 + DISTANCE_TOLERANCE_FEET)
+        violations.push({
+          rule: "range.out-of-reach",
+          message: `${target.name} is ${Math.round(apart * 10) / 10} ft away; ${action.name} distracts an enemy within 5 feet.`
+        });
+    }
+  }
+
   // Unarmed grapple/shove only work on targets at most one size larger (SRD Unarmed Strike).
   if (builtinHandlerFor(action.id)?.atMostOneSizeLarger) {
     for (const target of targets) {
@@ -886,7 +911,8 @@ export function planEconomy(
   siblings: ReadonlyArray<DefinitionAction>,
   asHitRider = false,
   catalog?: EquipmentCatalog,
-  spell?: SpellReference
+  spell?: SpellReference,
+  resolveDefinition?: (definitionId: string) => ActorDefinition | undefined
 ): { plan: EconomyPlan; overridden: { rule: RuleId; reason: string } | null } {
   const { violations, softViolations, plan, proseMultiattack, notes } = evaluateActionEconomy(
     state,
@@ -899,7 +925,8 @@ export function planEconomy(
     input.slotLevel,
     asHitRider,
     catalog,
-    spell
+    spell,
+    resolveDefinition
   );
   warnings.push(...notes);
 

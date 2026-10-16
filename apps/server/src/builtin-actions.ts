@@ -80,13 +80,14 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     name: "Help",
     activation: "action",
     description:
-      "Choose one ally: they gain Advantage on their attack rolls until the start of your next turn (the SRD's distract variant, simplified from next-attack-only - documented). The Help action also covers assisting a check or stabilizing a dying creature; adjudicate those narratively. (SRD 5.2.1, Help [Action])",
+      "Distract an enemy within 5 feet of you: the next attack roll one of your allies makes against it has Advantage. The benefit expires at the start of your next turn. Help can also assist an ally's ability check with one of your skill or tool proficiencies; adjudicate that one at the table. (SRD 5.2.1, Help [Action])",
     damage: [],
+    // The effect sits on the distracted enemy; the attack roll reads and spends it (`resolution/attack.ts`).
     grants: {
-      name: "Helped",
-      tags: ["helped"],
+      name: "Distracted",
+      tags: ["distracted"],
       duration: { type: "until-source-next-turn" },
-      modifiers: [{ type: "roll-mode", roll: "attack", mode: "advantage" }],
+      modifiers: [],
       onEnd: [],
       target: "target",
       voidWhileIncapacitated: false,

@@ -25,6 +25,8 @@ export type BuiltinHandler = Readonly<{
   /** Targets at most one size larger than the actor (SRD Unarmed Strike). A target rule, so it is checked
    *  by id wherever the action's economy is evaluated. */
   atMostOneSizeLarger?: boolean;
+  /** Targets an enemy within 5 feet (SRD Help); checked by id like the size rule. */
+  distractsAnEnemy?: boolean;
 }>;
 
 type CheckNarrowing = Readonly<{ ability: RiderAbility; skill?: string }>;
@@ -200,7 +202,9 @@ const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
   "unarmed-shove-push": { forcedSave: unarmedSave("pushed"), atMostOneSizeLarger: true },
 
   /** The free-text trigger travels in the Readied effect's name so the table sees it. */
-  ready: { grantName: ({ input }) => (input.note ? `Readied: ${input.note.slice(0, 100)}` : null) }
+  ready: { grantName: ({ input }) => (input.note ? `Readied: ${input.note.slice(0, 100)}` : null) },
+  /** The distracted enemy carries the effect, named for the helper whose allies it favours. */
+  help: { grantName: ({ attacker }) => `Distracted by ${attacker.name}`, distractsAnEnemy: true }
 };
 
 /** The special cases for a builtin action id, or undefined when it has none. */

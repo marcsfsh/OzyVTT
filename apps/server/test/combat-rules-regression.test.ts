@@ -1655,32 +1655,78 @@ describe("SRD generic actions - builtin catalog (rules glossary [Action] entries
     );
   });
 
-  it("Help grants the chosen ally attack advantage that expires at the helper's next turn", () => {
+  it("Help distracts an enemy: one ally's next attack roll against it has Advantage, then it is spent (SRD Help)", () => {
     const game = buildGame([
       { actorId: IDS.pip, score: 20 },
       { actorId: IDS.torva, score: 12 },
       { actorId: IDS.croc1, score: 8 }
     ]);
-    const help = resolveBuiltin(game, "help", { actorId: IDS.pip, targetIds: [IDS.torva] }, [], pipDefinition);
+    const help = resolveBuiltin(game, "help", { actorId: IDS.pip, targetIds: [IDS.croc1] }, [], pipDefinition);
     expect(help.effectsApplied).toEqual([
-      { targetId: IDS.torva, targetName: "Torva Grimtusk", name: "Helped", conditionIds: [] }
+      { targetId: IDS.croc1, targetName: "Giant Crocodile", name: "Distracted by Pip Underbough", conditionIds: [] }
     ]);
 
-    nextInitiativeTurn(game); // Torva's turn - the bearer attacks with advantage.
-    const swing = resolve(
+    nextInitiativeTurn(game); // Torva's turn: her first swing at the crocodile has Advantage...
+    const first = resolve(
       game,
       torvaDefinition,
       "greataxe",
       { actorId: IDS.torva, targetIds: [IDS.croc1] },
       [3, 15, 6]
     );
-    expect(swing.rollMode?.advantage).toContain("Helped");
+    expect(first.rollMode?.advantage).toEqual(["Help (Pip Underbough)"]);
+    // ...and the second, Extra Attack's, has none: Help gives Advantage to one attack roll.
+    const second = resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [12, 6]);
+    expect(second.rollMode).toBeUndefined();
+    expect(game.actors.find((actor) => actor.id === IDS.croc1)!.effects).toEqual([]);
+  });
 
-    nextInitiativeTurn(game); // croc
-    nextInitiativeTurn(game); // Pip's next turn: the help (sustained by Pip) expires.
-    expect(
-      game.actors.find((actor) => actor.id === IDS.torva)!.effects.some((effect) => effect.name === "Helped")
-    ).toBe(false);
+  it("Help gives nothing against another creature, and expires at the helper's next turn", () => {
+    const game = buildGame([
+      { actorId: IDS.pip, score: 20 },
+      { actorId: IDS.torva, score: 12 },
+      { actorId: IDS.croc1, score: 8 },
+      { actorId: IDS.croc2, score: 6 }
+    ]);
+    resolveBuiltin(game, "help", { actorId: IDS.pip, targetIds: [IDS.croc1] }, [], pipDefinition);
+    nextInitiativeTurn(game);
+    const elsewhere = resolve(
+      game,
+      torvaDefinition,
+      "greataxe",
+      { actorId: IDS.torva, targetIds: [IDS.croc2] },
+      [12, 6]
+    );
+    expect(elsewhere.rollMode).toBeUndefined();
+    nextInitiativeTurn(game); // croc1
+    nextInitiativeTurn(game); // croc2
+    nextInitiativeTurn(game); // Pip's next turn: the distraction is gone.
+    expect(game.actors.find((actor) => actor.id === IDS.croc1)!.effects).toEqual([]);
+  });
+
+  it("Help refuses the helper itself, an ally, and an enemy beyond 5 feet", () => {
+    const game = buildGame([
+      { actorId: IDS.pip, score: 20 },
+      { actorId: IDS.torva, score: 12 },
+      { actorId: IDS.croc1, score: 8 }
+    ]);
+    const rule = (targetId: string, distanceFeet?: (a: string, b: string) => number | null) => {
+      try {
+        resolveDefinitionAction(
+          game,
+          builtinAction("help")!,
+          { actorId: IDS.pip, targetIds: [targetId], commandId: nextCommandId(), builtin: true },
+          { ...deps([], pipDefinition, distanceFeet) }
+        );
+      } catch (error) {
+        return (error as RulesBlockedError).rule;
+      }
+      return null;
+    };
+    expect(rule(IDS.pip)).toBe("target.not-an-enemy");
+    expect(rule(IDS.torva)).toBe("target.not-an-enemy");
+    expect(rule(IDS.croc1, () => 10)).toBe("range.out-of-reach");
+    expect(rule(IDS.croc1, () => 5)).toBeNull();
   });
 
   it("Hide rolls Dex (Stealth) vs DC 15, grants Invisible on success, and attacking reveals", () => {

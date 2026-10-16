@@ -51,6 +51,8 @@ const RULE_FAMILIES = {
   "range.underwater": "targeting",
   "target.grappled-by-source": "targeting",
   "target.too-large-to-grapple": "targeting",
+  // Help distracts an enemy, so not the helper or one of its allies.
+  "target.not-an-enemy": "targeting",
   "cover.total": "targeting",
   // Cleave's second creature: another one, within 5 feet of the first.
   "attack.cleave-same-target": "targeting",

@@ -10,7 +10,7 @@ import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { masteryMissDamage } from "./weapon-mastery.js";
 import { spendAmmunition } from "./resolution/ammunition.js";
 import { useUpConsumable } from "./resolution/consumables.js";
-import { rollAttack, spendUntilAttacked } from "./resolution/attack.js";
+import { rollAttack, spendDistraction, spendUntilAttacked } from "./resolution/attack.js";
 import { rollLastCharge } from "./resolution/charges.js";
 import type { DefinitionAction, ResolveContext, ResolveDependencies, ResolveInput } from "./resolution/context.js";
 import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage } from "./resolution/damage.js";
@@ -53,6 +53,7 @@ export function resolveDefinitionAction(
   if (input.economyPaid !== true) {
     spendVex(ctx);
     spendSap(ctx);
+    spendDistraction(ctx);
     spendUntilAttacked(ctx);
   }
   // A hit the target's Parry or Shield may still turn into a miss: the attack is spent, and the answer finishes it.

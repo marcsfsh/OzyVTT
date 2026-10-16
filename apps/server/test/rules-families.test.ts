@@ -76,6 +76,8 @@ describe("rule families", () => {
       ["range.underwater", "targeting"],
       ["target.grappled-by-source", "targeting"],
       ["target.too-large-to-grapple", "targeting"],
+      // Help distracts an enemy: not the helper, not an ally.
+      ["target.not-an-enemy", "targeting"],
       ["cover.total", "targeting"],
       ["condition.charmed-charmer", "targeting"],
       ["target.too-many", "targeting"],

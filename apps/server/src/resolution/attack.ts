@@ -23,7 +23,7 @@ import {
 } from "../equipment-derivation.js";
 import { UNARMED_STRIKE_ACTION_ID } from "../item-actions.js";
 import { VEXED_TAG } from "../weapon-mastery.js";
-import { areEnemies } from "../creature-sides.js";
+import { areAllies, areEnemies } from "../creature-sides.js";
 import { statblockFacts, swimSpeedFeet } from "../statblock-facts.js";
 import { naturalFace, recordRoll, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
 
@@ -117,6 +117,19 @@ const has = (actor: LiveActor, id: string) => actor.conditions.some((condition) 
 export const OUTLINED_TAG = "outlined";
 /** An effect that lasts until the next attack roll against its bearer, whoever makes it (Guiding Bolt's light). */
 export const UNTIL_ATTACKED_TAG = "until-attacked";
+/** The Help action's mark on the distracted enemy: the next attack roll against it by an ally of the helper. */
+export const DISTRACTED_TAG = "distracted";
+
+/** The Help the attacker's side put on this target, if any: one of its allies distracted it (SRD Help: "giving
+ *  Advantage to the next attack roll by one of your allies against that enemy"). The helper gets nothing from it. */
+function distractionOf(ctx: ResolveContext, target: LiveActor) {
+  return target.effects.find((effect) => {
+    if (!effect.tags.includes(DISTRACTED_TAG) || effect.sourceActorId === null) return false;
+    if (effect.sourceActorId === ctx.attacker.id) return false;
+    const helper = ctx.state.actors.find((actor) => actor.id === effect.sourceActorId);
+    return helper !== undefined && areAllies(ctx.attacker, helper, ctx.deps.resolveDefinition);
+  });
+}
 const outlined = (actor: LiveActor) => actor.effects.some((effect) => effect.tags.includes(OUTLINED_TAG));
 
 /** Riders on both sides at `on-attack-roll`, read whoever's turn it is (opportunity attacks are off-turn): the
@@ -155,6 +168,16 @@ function conditionClaims(ctx: ResolveContext, target: LiveActor, distance: numbe
   // Vex: the attacker's earlier hit marked this creature for their next attack roll (spent by it, `spendVex`).
   if (target.effects.some((effect) => effect.tags.includes(VEXED_TAG) && effect.sourceActorId === attacker.id))
     sources.advantage.push({ source: "vex", label: `Vex (${attacker.name}'s earlier hit)` });
+  // Help: an ally distracted it, for this attack roll alone (spent by it, `spendDistraction`). A helper the table
+  // can't see isn't named.
+  const distraction = distractionOf(ctx, target);
+  if (distraction) {
+    const helper = ctx.state.actors.find((actor) => actor.id === distraction.sourceActorId);
+    sources.advantage.push({
+      source: "help",
+      label: helper?.visibility === "public" ? `Help (${helper.name})` : "Help"
+    });
+  }
   // 2024 rule: advantage within 5 feet, disadvantage beyond. Unknown distance contributes nothing.
   if (has(target, "prone") && distance !== null) {
     if (distance <= 5) sources.advantage.push({ source: "target-prone", label: "Target is Prone (within 5 ft)" });
@@ -378,6 +401,17 @@ export function rollAttack(ctx: ResolveContext): void {
     ...(input.reactionAcBonus ? { reactionAcBonus: { ...input.reactionAcBonus } } : {}),
     ...(bonusDice.length > 0 ? { bonusDice } : {})
   };
+}
+
+/** The attack roll spends the Help it had, hit or miss: Help gives Advantage to one attack roll. */
+export function spendDistraction(ctx: ResolveContext): void {
+  const { state, attack, targets, effectsEnded } = ctx;
+  if (attack === null) return;
+  const target = targets[0];
+  const distraction = distractionOf(ctx, target);
+  if (!distraction) return;
+  endEffect(state, target.id, distraction.id);
+  effectsEnded.push({ actorId: target.id, actorName: target.name, name: distraction.name });
 }
 
 /** The attack roll spends what lasts only until the next attack roll against its bearer (Guiding Bolt's light), hit

@@ -107,7 +107,8 @@ export function openResolve(
         siblings,
         false,
         deps.catalog,
-        spell
+        spell,
+        deps.resolveDefinition
       );
   let overridden = economy.overridden;
 
