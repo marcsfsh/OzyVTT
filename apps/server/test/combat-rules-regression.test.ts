@@ -2291,6 +2291,25 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     ).toBe(30);
   });
 
+  it("a second Dash in one turn adds its movement to the first (Action Surge: 90 ft at Speed 30)", () => {
+    const game = buildGame([
+      { actorId: IDS.sable, score: 20 },
+      { actorId: IDS.croc1, score: 8 }
+    ]);
+    dashFor(game, IDS.sable, sableDefinition);
+    // A second action this turn, as Action Surge gives.
+    game.combat = { ...game.combat, turn: { ...game.combat.turn, actionUsed: false } };
+    dashFor(game, IDS.sable, sableDefinition);
+    const sable = game.actors.find((actor) => actor.id === IDS.sable)!;
+    expect(sable.effects.filter((effect) => effect.tags.includes("dashing")).map((e) => e.movementGrantFeet)).toEqual([
+      30, 30
+    ]);
+    expect(() => moveRules(game, IDS.sable, { x: 0, y: 0 }, { x: 95, y: 0 })).toThrow(
+      "Sable Vex has 90 ft of movement left (this move needs 95 ft)."
+    );
+    expect(moveRules(game, IDS.sable, { x: 0, y: 0 }, { x: 90, y: 0 }).warning).toBeNull();
+  });
+
   it("a Dash taken while ALREADY slowed grants the reduced Speed, and the total is the same 40", () => {
     // The other ordering: slowed first, so "your Speed after modifiers" is 20 when Dash is taken.
     // 20 granted + 20 live = 40.

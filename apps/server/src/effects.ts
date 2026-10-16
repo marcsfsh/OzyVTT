@@ -207,8 +207,11 @@ export function addEffect(
   // What some effect already held (the one a refresh replaces included), so only a condition set on its own is
   // marked as outliving this effect.
   const heldBefore = new Set(actor.effects.flatMap((candidate) => candidate.linkedConditionIds));
+  // Extra movement adds up (SRD Dash: each one gains "extra movement for the current turn"), so a second Dash stands
+  // beside the first rather than refreshing it.
+  const stacks = effect.movementGrantFeet !== undefined;
   const replaced =
-    effect.sourceActionId !== null
+    effect.sourceActionId !== null && !stacks
       ? actor.effects.find(
           (candidate) =>
             candidate.sourceActorId === effect.sourceActorId && candidate.sourceActionId === effect.sourceActionId
