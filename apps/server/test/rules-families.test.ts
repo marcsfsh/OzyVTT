@@ -51,7 +51,6 @@ describe("rule families", () => {
       ["attack.cleave-needs-hit", "economy"],
       ["feature.no-uses-remaining", "resources"],
       ["feature.requires-effect", "resources"],
-      ["feature.no-spell-slot", "resources"],
       ["legendary.no-actions-remaining", "resources"],
       ["range.out-of-range", "targeting"],
       ["range.out-of-reach", "targeting"],
@@ -62,8 +61,10 @@ describe("rule families", () => {
       ["condition.charmed-charmer", "targeting"],
       ["attack.cleave-same-target", "targeting"],
       ["attack.cleave-too-far", "targeting"],
-      // Not thrown yet, but the family is already part of the wire vocabulary.
-      ["slots.none-remaining", "slots"]
+      // "Don't police spell slots" relaxes exactly these.
+      ["slots.none-remaining", "slots"],
+      ["slots.below-spell-level", "slots"],
+      ["slots.one-per-turn", "slots"]
     ];
     for (const [rule, family] of expected) expect(familyOf(rule), rule).toBe(family);
     expect(expected.map(([rule]) => rule).sort()).toEqual([...RULE_IDS].sort());

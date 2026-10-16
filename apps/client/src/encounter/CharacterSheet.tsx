@@ -169,7 +169,12 @@ export function CharacterSheet({
   // "inline" drives the runner in the Actions section.
   const routeAttack = (action: ActorDefinition["actions"][number], slotLevel?: number) => {
     setTargetingResult(null);
-    beginTargeting(summaryOfOwnAction(action), actor.id, slotLevel);
+    // Magic Missile makes one more dart for each slot level above its own; the server counts them again.
+    const darts =
+      action.darts !== undefined && slotLevel !== undefined && action.spellSlot
+        ? action.darts + Math.max(0, slotLevel - action.spellSlot.level)
+        : undefined;
+    beginTargeting(summaryOfOwnAction(action), actor.id, slotLevel, darts);
     if (effectiveAttackMode === "jump") onJumpToInitiative?.();
   };
   // A leveled spell's cast: on your turn it goes through targeting with its slot; otherwise the server routes it,

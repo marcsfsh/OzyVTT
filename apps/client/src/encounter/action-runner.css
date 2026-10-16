@@ -178,6 +178,13 @@
   margin: 0;
   accent-color: var(--magenta);
 }
+/* A darts spell's row: the target, then how many darts it takes. */
+.action-target-list li:has(.nh-stepper) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
 .action-targeting-buttons {
   display: flex;
   gap: var(--space-2);
@@ -267,6 +274,15 @@
 .action-damage strong {
   font-size: 1rem;
   color: var(--danger-text);
+}
+/* Magic Missile's darts: one line per creature, each with its own Apply. */
+.action-split-damage {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.action-split-damage .action-apply {
+  margin-left: var(--space-1);
 }
 .action-healing {
   margin: 0.35rem 0 0;

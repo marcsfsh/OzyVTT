@@ -17,7 +17,9 @@ describe("what one cast of an SRD spell does", () => {
   });
 
   it("deals the whole cast's damage, and none the text only threatens", () => {
-    expect(effectOf("magic-missile")!.damage).toEqual([{ formula: "3d4 + 3", type: "force" }]);
+    // Magic Missile's damage is per dart, each one assigned to its own target.
+    expect(effectOf("magic-missile")!.damage).toEqual([{ formula: "1d4 + 1", type: "force" }]);
+    expect(effectOf("magic-missile")!.darts).toBe(3);
     expect(effectOf("flame-strike")!.damage).toEqual([
       { formula: "5d6", type: "fire" },
       { formula: "5d6", type: "radiant" }

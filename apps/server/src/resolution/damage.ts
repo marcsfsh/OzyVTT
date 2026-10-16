@@ -35,10 +35,23 @@ export function damagePartsOf(
   ].filter((part) => part.amount > 0);
 }
 
-/** The action's own damage dice: crit-doubled, Savage Attacks on the first part. */
+/** The action's own damage dice: crit-doubled, Savage Attacks on the first part. A darts action rolls each dart on
+ *  its own and assigns it: dart i strikes the i-th target listed, the list wrapping round when darts remain. */
 export function rollWeaponDamage(ctx: ResolveContext): void {
-  const { action, deps, damage } = ctx;
+  const { action, deps, damage, input } = ctx;
   if (action.damage.length === 0 || !rollsDamage(ctx.attack)) return;
+  if (action.darts !== undefined && input.targetIds.length > 0) {
+    for (let dart = 0; dart < action.darts; dart += 1) {
+      const targetId = input.targetIds[dart % input.targetIds.length]!;
+      for (const part of action.damage) {
+        const rolled = resolveDice(parseDiceFormula(part.formula), deps.random);
+        recordRoll(ctx, rolled, "damage");
+        damage.push({ formula: rolled.expression.source, type: part.type, total: rolled.total });
+        ctx.dartTargetIds.push(targetId);
+      }
+    }
+    return;
+  }
   action.damage.forEach((part, index) => {
     const expression = parseDiceFormula(part.formula);
     const extraCritDice = index === 0 ? (action.attack?.criticalBonusDice ?? 0) : 0;
@@ -46,6 +59,29 @@ export function rollWeaponDamage(ctx: ResolveContext): void {
     recordRoll(ctx, rolled, "damage");
     damage.push({ formula: rolled.expression.source, type: part.type, total: rolled.total });
   });
+}
+
+/** A darts action's damage regrouped by the creature each dart struck; anything a rider added beyond the darts goes
+ *  to the first. Null for any other action. */
+export function damageByTargetOf(ctx: ResolveContext): ActionResolution["damageByTarget"] | null {
+  if (ctx.dartTargetIds.length === 0) return null;
+  const first = ctx.dartTargetIds[0]!;
+  const groups = new Map<string, Array<{ formula: string; type: string; total: number }>>();
+  ctx.damage.forEach((part, index) => {
+    const targetId = ctx.dartTargetIds[index] ?? first;
+    groups.set(targetId, [...(groups.get(targetId) ?? []), part]);
+  });
+  for (const bonus of ctx.bonusDamage)
+    groups.set(first, [
+      ...(groups.get(first) ?? []),
+      { formula: String(bonus.amount), type: bonus.type, total: bonus.amount }
+    ]);
+  return [...groups].map(([targetId, parts]) => ({
+    targetId,
+    targetName: ctx.targets.find((target) => target.id === targetId)?.name ?? "The target",
+    parts,
+    total: parts.reduce((sum, part) => sum + part.total, 0)
+  }));
 }
 
 /** Riders that add damage, from every carrier (items, feats, features, live effects): typed `extra-damage` as

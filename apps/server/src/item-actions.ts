@@ -185,13 +185,14 @@ export function spellCastMechanics(
   spell: SpellReference,
   numbers: Readonly<{ attackBonus: number; saveDc: number; bearersDc: boolean; modifier: number }>,
   scaled: Readonly<{ roll?: string | null; attacks?: number }> = {}
-): Pick<ActorAction, "damage"> & Partial<Pick<ActorAction, "attack" | "save" | "healing">> {
+): Pick<ActorAction, "damage"> & Partial<Pick<ActorAction, "attack" | "save" | "healing" | "darts">> {
   // No cast model: the save still applies, and the rest is the GM's.
   const effect = spell.effect ?? { attacks: 0, damage: [], healing: null };
   const scale = (formula: string) => (scaled.roll && formula === spell.damage.roll ? scaled.roll : formula);
   const attacks = scaled.attacks ?? effect.attacks;
   return {
     damage: effect.damage.map((part) => ({ formula: scale(part.formula), type: part.type })),
+    ...(effect.darts ? { darts: effect.darts } : {}),
     ...(attacks > 0
       ? {
           attack: {
@@ -388,22 +389,34 @@ export function extraAttackAction(
   };
 }
 
-/** The action cast with a higher slot: the spell's printed row for that slot replaces the dice its own roll gave, in
- *  the damage and the healing. Unchanged where the spell prints no dice for the slot (Magic Missile adds darts). */
+/** The action cast with a higher slot, from the spell's printed row for that slot: its roll replaces the one the
+ *  cast's own roll gave, in the damage and the healing (Cure Wounds' 4d8, Heal's 80), and its count is the rays or
+ *  darts the cast makes (Scorching Ray's fourth ray, Magic Missile's fourth dart). A count of targets (Bless, Hold
+ *  Person) is a targeting limit, not read here. */
 export function upcastAction(action: ActorAction, spell: SpellReference, level: number): ActorAction {
-  const roll = spell.castingOptions.find((option) => option.type === `slot_level_${level}`)?.damageRoll;
-  const base = spell.damage.roll;
-  if (!roll || !base) return action;
-  const swap = (formula: string): string => {
-    if (formula === base) return roll;
-    const match = /^(\d+d\d+)(?:\s*([+-])\s*(\d+))?$/i.exec(formula.trim());
-    return match && match[1] === base
-      ? formulaPlus(roll, (match[2] === "-" ? -1 : 1) * Number(match[3] ?? 0))
-      : formula;
-  };
+  const row = spell.castingOptions.find((option) => option.type === `slot_level_${level}`);
+  if (!row) return action;
+  const roll = row.damageRoll;
+  const swapFrom =
+    (base: string | null | undefined) =>
+    (formula: string): string => {
+      if (!roll || !base) return formula;
+      if (formula === base) return roll;
+      const match = /^(\d+d\d+)(?:\s*([+-])\s*(\d+))?$/i.exec(formula.trim());
+      return match && match[1] === base
+        ? formulaPlus(roll, (match[2] === "-" ? -1 : 1) * Number(match[3] ?? 0))
+        : formula;
+    };
+  const damage = swapFrom(spell.damage.roll);
+  const healing = swapFrom(spell.effect?.healing?.formula ?? spell.damage.roll);
+  const count = row.targetCount;
+  const rays = count !== null && action.attack !== undefined && (spell.effect?.attacks ?? 0) > 1;
+  const darts = count !== null && action.darts !== undefined;
   return {
     ...action,
-    damage: action.damage.map((part) => ({ ...part, formula: swap(part.formula) })),
-    ...(action.healing ? { healing: { formula: swap(action.healing.formula) } } : {})
+    damage: action.damage.map((part) => ({ ...part, formula: damage(part.formula) })),
+    ...(action.healing ? { healing: { formula: healing(action.healing.formula) } } : {}),
+    ...(rays ? { attack: { ...action.attack!, count: Math.min(10, count) } } : {}),
+    ...(darts ? { darts: Math.min(20, count) } : {})
   };
 }

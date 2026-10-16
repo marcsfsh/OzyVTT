@@ -5769,19 +5769,19 @@
   "castingOptions": [
    {
     "type": "slot_level_7",
-    "damageRoll": "13d6",
+    "damageRoll": "13d6 + 40",
     "targetCount": null,
     "description": null
    },
    {
     "type": "slot_level_8",
-    "damageRoll": "16d6",
+    "damageRoll": "16d6 + 40",
     "targetCount": null,
     "description": null
    },
    {
     "type": "slot_level_9",
-    "damageRoll": "19d6",
+    "damageRoll": "19d6 + 40",
     "targetCount": null,
     "description": null
    }
@@ -5985,7 +5985,56 @@
   ],
   "description": "One creature of your choice that you can see within range hears a discordant melody in its mind. The target makes a Wisdom saving throw. On a failed save, it takes 3d6 Psychic damage and must immediately use its Reaction, if available, to move as far away from you as it can, using the safest route. On a successful save, the target takes half as much damage only.",
   "higherLevel": null,
-  "castingOptions": []
+  "castingOptions": [
+   {
+    "type": "slot_level_2",
+    "damageRoll": "4d6",
+    "targetCount": null,
+    "description": null
+   },
+   {
+    "type": "slot_level_3",
+    "damageRoll": "5d6",
+    "targetCount": null,
+    "description": null
+   },
+   {
+    "type": "slot_level_4",
+    "damageRoll": "6d6",
+    "targetCount": null,
+    "description": null
+   },
+   {
+    "type": "slot_level_5",
+    "damageRoll": "7d6",
+    "targetCount": null,
+    "description": null
+   },
+   {
+    "type": "slot_level_6",
+    "damageRoll": "8d6",
+    "targetCount": null,
+    "description": null
+   },
+   {
+    "type": "slot_level_7",
+    "damageRoll": "9d6",
+    "targetCount": null,
+    "description": null
+   },
+   {
+    "type": "slot_level_8",
+    "damageRoll": "10d6",
+    "targetCount": null,
+    "description": null
+   },
+   {
+    "type": "slot_level_9",
+    "damageRoll": "11d6",
+    "targetCount": null,
+    "description": null
+   }
+  ]
  },
  {
   "id": "divination",
@@ -10529,19 +10578,19 @@
   "castingOptions": [
    {
     "type": "slot_level_7",
-    "damageRoll": null,
+    "damageRoll": "80",
     "targetCount": null,
     "description": "The target regains 80 Hit Points."
    },
    {
     "type": "slot_level_8",
-    "damageRoll": null,
+    "damageRoll": "90",
     "targetCount": null,
     "description": "The target regains 90 Hit Points."
    },
    {
     "type": "slot_level_9",
-    "damageRoll": null,
+    "damageRoll": "100",
     "targetCount": null,
     "description": "The target regains 100 Hit Points."
    }
@@ -11658,49 +11707,49 @@
   "castingOptions": [
    {
     "type": "slot_level_2",
-    "damageRoll": "2d10",
+    "damageRoll": null,
     "targetCount": null,
     "description": null
    },
    {
     "type": "slot_level_3",
-    "damageRoll": "3d10",
+    "damageRoll": null,
     "targetCount": null,
     "description": null
    },
    {
     "type": "slot_level_4",
-    "damageRoll": "4d10",
+    "damageRoll": null,
     "targetCount": null,
     "description": null
    },
    {
     "type": "slot_level_5",
-    "damageRoll": "5d10",
+    "damageRoll": null,
     "targetCount": null,
     "description": null
    },
    {
     "type": "slot_level_6",
-    "damageRoll": "6d10",
+    "damageRoll": null,
     "targetCount": null,
     "description": null
    },
    {
     "type": "slot_level_7",
-    "damageRoll": "7d10",
+    "damageRoll": null,
     "targetCount": null,
     "description": null
    },
    {
     "type": "slot_level_8",
-    "damageRoll": "8d10",
+    "damageRoll": null,
     "targetCount": null,
     "description": null
    },
    {
     "type": "slot_level_9",
-    "damageRoll": "9d10",
+    "damageRoll": null,
     "targetCount": null,
     "description": null
    }
@@ -13364,10 +13413,11 @@
    "attacks": 0,
    "damage": [
     {
-     "formula": "3d4 + 3",
+     "formula": "1d4 + 1",
      "type": "force"
     }
    ],
+   "darts": 3,
    "healing": null
   },
   "classes": [

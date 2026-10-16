@@ -3,7 +3,7 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { masteryMissDamage } from "./weapon-mastery.js";
 import { rollAttack } from "./resolution/attack.js";
 import type { DefinitionAction, ResolveContext, ResolveDependencies, ResolveInput } from "./resolution/context.js";
-import { rollRiderDamage, rollWeaponDamage } from "./resolution/damage.js";
+import { damageByTargetOf, rollRiderDamage, rollWeaponDamage } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
 import { applyHealing } from "./resolution/heal.js";
@@ -94,6 +94,7 @@ function previewOf(ctx: ResolveContext): ActionResolution {
 function resolutionOf(ctx: ResolveContext): ActionResolution {
   const { state, action, attacker, targets, damage, bonusDamage, warnings } = ctx;
   const instance = state.combat.turn.actionInstance;
+  const byTarget = damageByTargetOf(ctx);
   return {
     actionName: action.name,
     activation: action.activation,
@@ -111,6 +112,7 @@ function resolutionOf(ctx: ResolveContext): ActionResolution {
     crit: ctx.crit,
     ...rollModeOf(ctx),
     ...(bonusDamage.length > 0 ? { bonusDamage } : {}),
+    ...(byTarget ? { damageByTarget: byTarget } : {}),
     ...(ctx.effectsApplied.length > 0 ? { effectsApplied: ctx.effectsApplied } : {}),
     effectGranted: ctx.effectGranted,
     componentsRemaining:

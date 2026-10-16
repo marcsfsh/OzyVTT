@@ -26,7 +26,6 @@ const RULE_FAMILIES = {
   "legendary.no-actions-remaining": "resources",
   "feature.no-uses-remaining": "resources",
   "feature.requires-effect": "resources",
-  "feature.no-spell-slot": "resources",
   "range.out-of-range": "targeting",
   "range.out-of-reach": "targeting",
   "range.underwater": "targeting",
@@ -38,8 +37,10 @@ const RULE_FAMILIES = {
   "attack.cleave-too-far": "targeting",
   // Being Charmed by your target is a targeting restriction, not an economy one.
   "condition.charmed-charmer": "targeting",
-  // Nothing raises it yet; the slots family is already part of the GM's exceptions.
-  "slots.none-remaining": "slots"
+  // Spell slots are their own family, so "Don't police spell slots" relaxes these and nothing else.
+  "slots.none-remaining": "slots",
+  "slots.below-spell-level": "slots",
+  "slots.one-per-turn": "slots"
 } as const satisfies Record<string, RuleFamily>;
 
 export type RuleId = keyof typeof RULE_FAMILIES;

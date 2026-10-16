@@ -218,6 +218,46 @@ export const clericInput = (spells: readonly string[]) =>
     ]
   }) as CharacterCreateRequestInput;
 
+/** A Fighter 5 (Extra Attack) with Fire Bolt and Magic Missile from Magic Initiate (Wizard). */
+export const fighterInput = () =>
+  ({
+    name: "Borin",
+    speciesId: "human",
+    backgroundId: "soldier",
+    classId: "fighter",
+    level: 5,
+    subclassId: "champion",
+    abilityMethod: "standard-array",
+    baseScores: { str: 15, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
+    backgroundBonusAllocation: [
+      { ability: "str", amount: 2 },
+      { ability: "con", amount: 1 }
+    ],
+    hp: { mode: "average" },
+    choices: [
+      ...shared,
+      { level: 1, classId: "fighter", kind: "skill", id: "survival" },
+      { level: 1, classId: "fighter", kind: "skill", id: "perception" },
+      { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
+      { level: 1, kind: "feat", id: "magic-initiate-wizard", payload: { featureId: "human-versatile" } },
+      { level: 1, kind: "cantrip", id: "fire-bolt", payload: { featureId: "magic-initiate-wizard" } },
+      { level: 1, kind: "cantrip", id: "ray-of-frost", payload: { featureId: "magic-initiate-wizard" } },
+      { level: 1, kind: "spell", id: "magic-missile", payload: { featureId: "magic-initiate-wizard" } },
+      { level: 1, classId: "fighter", kind: "fighting-style", id: "defense", payload: { featureId: "fighting-style" } },
+      { level: 1, classId: "fighter", kind: "weapon-mastery", id: "greatsword" },
+      { level: 1, classId: "fighter", kind: "weapon-mastery", id: "flail" },
+      { level: 1, classId: "fighter", kind: "weapon-mastery", id: "longbow" },
+      { level: 4, classId: "fighter", kind: "weapon-mastery", id: "rapier" },
+      { level: 3, classId: "fighter", kind: "subclass", id: "champion" },
+      { level: 4, classId: "fighter", kind: "asi-or-feat", id: "ability-score-improvement" },
+      { level: 4, kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } },
+      { level: 4, kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } },
+      { level: 1, kind: "tool", id: "gaming-set-dice" },
+      { level: 1, kind: "equipment", id: "fighter-a" },
+      { level: 1, kind: "equipment", id: "soldier-a" }
+    ]
+  }) as CharacterCreateRequestInput;
+
 export const build = (input: CharacterCreateRequestInput): ActorDefinition =>
   buildCharacterDefinition(input, view, POLICY);
 

@@ -103,21 +103,28 @@ export function ActionRunner({
   };
 
   const applyDamage = (targetId: string, targetName: string, key: string, overrideAmount?: number) => {
-    if (!result || (overrideAmount ?? result.damageTotal) <= 0) {
+    // Damage split between targets (Magic Missile's darts) applies each target's own share.
+    const share = result?.damageByTarget?.find((target) => target.targetId === targetId);
+    const total = share?.total ?? result?.damageTotal ?? 0;
+    if (!result || (overrideAmount ?? total) <= 0) {
       setApplied((current) => new Set([...current, key]));
       return;
     }
     setBusy(true);
     // The typed parts always travel with the apply, amended or not: an override is sent as
     // `damageOverride` and the server re-weights the same types to it, so resistances still apply.
-    const parts = [
-      ...result.damage.map((part) => ({ amount: part.total, type: part.type })),
-      ...(result.bonusDamage ?? []).map((part) => ({ amount: part.amount, type: part.type }))
-    ].filter((part) => part.amount > 0);
-    const useOverride = overrideAmount !== undefined && overrideAmount !== result.damageTotal;
+    const parts = (
+      share
+        ? share.parts.map((part) => ({ amount: part.total, type: part.type }))
+        : [
+            ...result.damage.map((part) => ({ amount: part.total, type: part.type })),
+            ...(result.bonusDamage ?? []).map((part) => ({ amount: part.amount, type: part.type }))
+          ]
+    ).filter((part) => part.amount > 0);
+    const useOverride = overrideAmount !== undefined && overrideAmount !== total;
     void command("actor:apply-damage", {
       actorId: targetId,
-      amount: overrideAmount ?? result.damageTotal,
+      amount: overrideAmount ?? total,
       parts,
       ...(useOverride ? { damageOverride: overrideAmount } : {}),
       sourceActorId: actor.id,
@@ -136,7 +143,7 @@ export function ActionRunner({
           `${targetName} took ${application.totalApplied} damage - ${damageAdjustments(application.parts, application.flatReduction)}.`
         );
       } else {
-        onFeedback(`${targetName} took ${application?.totalApplied ?? result.damageTotal} damage.`);
+        onFeedback(`${targetName} took ${application?.totalApplied ?? total} damage.`);
       }
     });
   };

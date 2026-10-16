@@ -134,6 +134,8 @@ export type ResolveContext = {
   /** The roll-specific facts riders filter on (attack kind, target size, damage types...). */
   riderFilters: Omit<Partial<RiderContext>, "moment">;
   readonly damage: Array<{ formula: string; type: string; total: number }>;
+  /** Who each of a darts action's darts strikes, in order (`damage[i]` is dart i). Empty for any other action. */
+  readonly dartTargetIds: string[];
   readonly bonusDamage: Array<{ amount: number; type: string; source: string }>;
   /** The weapon mastery in force on this swing; null unless a mastery applies to an attack that rolled. */
   masterySwing: MasterySwing | null;

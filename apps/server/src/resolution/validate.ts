@@ -6,7 +6,7 @@ import { effectiveModeFor, overrideCovers, overrideReason, overrideWaives } from
 import { upcastAction, withSpellAttackReach } from "../item-actions.js";
 import { builtinHandlerFor } from "./builtins.js";
 import type { DefinitionAction, LiveActor, ResolveContext, ResolveDependencies, ResolveInput } from "./context.js";
-import { planEconomy, type EconomyPlan } from "./economy.js";
+import { castLevelOf, planEconomy, type EconomyPlan } from "./economy.js";
 
 /** The attacker and targets, refused unless the action has something structured to resolve against them. */
 function combatantsOf(
@@ -19,7 +19,8 @@ function combatantsOf(
   const attacker = state.actors.find((item) => item.id === input.actorId);
   if (!attacker) throw new CommandRejectedError("That combatant no longer exists.");
   if (!inFight(input.actorId)) throw new CommandRejectedError("That combatant is not in this encounter.");
-  const targets = input.targetIds.map((targetId) => {
+  // A target named twice is one target (a second dart is the only reason to name it again).
+  const targets = [...new Set(input.targetIds)].map((targetId) => {
     const target = state.actors.find((item) => item.id === targetId);
     if (!target || !inFight(targetId)) throw new CommandRejectedError("Every target must be in this encounter.");
     return target;
@@ -62,12 +63,24 @@ export function openResolve(
   deps: ResolveDependencies
 ): ResolveContext {
   const spell = declared.spellId ? deps.catalog?.spellRecord?.(declared.spellId) : undefined;
-  const action = withSpellAttackReach(declared, spell);
-  const { attacker, targets } = combatantsOf(state, action, input);
+  const reaching = withSpellAttackReach(declared, spell);
+  const { attacker, targets } = combatantsOf(state, reaching, input);
+  // A spell cast with a higher slot rolls that slot's dice and makes its rays (before the economy opens the action's
+  // instance); a paid replay names the slot it was cast with.
+  const castLevel = input.economyPaid ? input.slotLevel : castLevelOf(state, attacker, reaching, input.slotLevel);
+  const action =
+    castLevel !== null && castLevel !== undefined && spell && reaching.spellSlot && castLevel > reaching.spellSlot.level
+      ? upcastAction(reaching, spell, castLevel)
+      : reaching;
   const warnings: string[] = [];
   const derivation = deriveEquipment(attacker, deps.definition, deps.catalog);
   const siblings = effectiveActions(deps.definition, attacker, deps.catalog);
   const riderItemId = sourceItemOf(action, derivation, attacker.inventory);
+  // Magic Missile: each dart at a creature of the caster's choice, the targets listed dart by dart.
+  if (action.darts !== undefined && input.targetIds.length > action.darts)
+    throw new CommandRejectedError(
+      `${action.name} makes ${action.darts} darts; ${input.targetIds.length} were assigned.`
+    );
   const economy = input.economyPaid
     ? { plan: paidPlan(state), overridden: null }
     : planEconomy(state, attacker, action, input, deps.definition, warnings, deps.distanceFeet, siblings);
@@ -119,6 +132,7 @@ export function openResolve(
     crit: false,
     riderFilters: {},
     damage: [],
+    dartTargetIds: [],
     bonusDamage: [],
     masterySwing: null,
     effectsApplied: [],
@@ -129,10 +143,6 @@ export function openResolve(
     opens: null
   };
   if (builtin?.prepare) ctx.action = builtin.prepare(ctx);
-  // A spell cast with a higher slot rolls that slot's dice; a paid replay names the slot it was cast with.
-  const slotLevel = input.economyPaid ? input.slotLevel : economy.plan.spendSpellSlot?.level;
-  if (slotLevel !== undefined && spell && action.spellSlot && slotLevel > action.spellSlot.level)
-    ctx.action = upcastAction(ctx.action, spell, slotLevel);
   return ctx;
 }
 
@@ -146,6 +156,7 @@ function paidPlan(state: GameState): EconomyPlan {
     bonusInstance: state.combat.turn.bonusActionInstance,
     spendUse: null,
     spendLegendary: null,
-    spendSpellSlot: null
+    spendSpellSlot: null,
+    castLevel: null
   };
 }

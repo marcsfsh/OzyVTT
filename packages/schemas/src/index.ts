@@ -1039,6 +1039,9 @@ export const ActionSchema = z.object({
     .default([]),
   /** Hit points each target regains, rolled once and applied when the action resolves (Cure Wounds). */
   healing: z.object({ formula: HealingFormulaSchema }).strict().optional(),
+  /** Missiles that each deal `damage` to a creature of the caster's choice (Magic Missile's darts), rolled one by one.
+   *  The resolve's targets assign them in order, a target named twice taking two. */
+  darts: z.number().int().min(2).max(20).optional(),
   /** Compound action: one shared action slot, components tracked (crocodile Multiattack = one Bite + one Tail). */
   multiattack: z
     .array(z.object({ actionId: z.string().regex(/^[a-z0-9-]+$/), count: z.number().int().min(1).max(4) }).strict())

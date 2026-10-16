@@ -28,6 +28,8 @@ export type TargetingSession = Readonly<{
   template: TargetingTemplate | null;
   /** The spell slot a spell is cast with, sent with every resolve of this session. */
   slotLevel?: number;
+  /** A darts action's darts (Magic Missile at this slot) and how many each selected target takes. */
+  darts?: Readonly<{ total: number; counts: Readonly<Record<string, number>> }>;
 }>;
 
 let session: TargetingSession | null = null;
@@ -54,9 +56,18 @@ const subscribe = (listener: () => void) => {
   };
 };
 
-export function beginTargeting(action: ContentActionSummary, attackerId: string, slotLevel?: number) {
+export function beginTargeting(
+  action: ContentActionSummary,
+  attackerId: string,
+  slotLevel?: number,
+  dartsAtSlot?: number
+) {
   const area = action.area;
-  const slot = slotLevel !== undefined ? { slotLevel } : {};
+  const dartTotal = dartsAtSlot ?? action.darts;
+  const slot = {
+    ...(slotLevel !== undefined ? { slotLevel } : {}),
+    ...(dartTotal !== undefined ? { darts: { total: dartTotal, counts: {} } } : {})
+  };
   if (area) {
     // Map the SRD area shape onto a drawable annotation shape (sphere/emanation → circle, cube → square).
     const shape: AnnotationShapeKind =
@@ -86,17 +97,33 @@ export function beginTargeting(action: ContentActionSummary, attackerId: string,
 }
 export function toggleTarget(actorId: string) {
   if (!session || session.mode === "template") return;
+  const dropping = session.selected.includes(actorId);
   session =
     session.mode === "single"
       ? { ...session, selected: session.selected[0] === actorId ? [] : [actorId] }
       : {
           ...session,
-          selected: session.selected.includes(actorId)
-            ? session.selected.filter((id) => id !== actorId)
-            : [...session.selected, actorId]
+          selected: dropping ? session.selected.filter((id) => id !== actorId) : [...session.selected, actorId]
         };
+  if (session.darts) {
+    const { [actorId]: _dropped, ...counts } = session.darts.counts;
+    session = { ...session, darts: { ...session.darts, counts: dropping ? counts : { ...counts, [actorId]: 1 } } };
+  }
   emit();
 }
+/** Sets how many darts a selected target takes, within the darts the action has left to assign. */
+export function setTargetDarts(actorId: string, count: number) {
+  if (!session?.darts || !session.selected.includes(actorId)) return;
+  const others = Object.entries(session.darts.counts)
+    .filter(([id]) => id !== actorId)
+    .reduce((sum, [, taken]) => sum + taken, 0);
+  const next = Math.max(1, Math.min(session.darts.total - others, count));
+  session = { ...session, darts: { ...session.darts, counts: { ...session.darts.counts, [actorId]: next } } };
+  emit();
+}
+/** The targets as the server reads darts: each named once per dart it takes. */
+const dartTargetIds = (selected: readonly string[], darts: TargetingSession["darts"]) =>
+  darts ? selected.flatMap((id) => Array.from({ length: darts.counts[id] ?? 1 }, () => id)) : [...selected];
 export function setTemplatePlacement(origin: AnnotationPoint, target: AnnotationPoint) {
   if (session?.template) {
     session = { ...session, template: { ...session.template, placed: { origin, target } } };
@@ -147,7 +174,7 @@ export function resolveTargeting(
   opts: ResolveOptions = {}
 ) {
   if (!session || busy) return;
-  const { attackerId, action, mode, selected, template, slotLevel } = session;
+  const { attackerId, action, mode, selected, template, slotLevel, darts } = session;
   // A single-target attack previews first (commit: false) so the result card can offer Adv/Disadv, a
   // typed d20 and Confirm. Templates, multi-target and save/utility actions resolve straight through.
   // An explicit `commit` in opts wins (the Confirm tap).
@@ -175,7 +202,7 @@ export function resolveTargeting(
           }
         : null
       : selected.length > 0
-        ? { actorId: attackerId, actionId: action.id, targetIds: [...selected], ...extra }
+        ? { actorId: attackerId, actionId: action.id, targetIds: dartTargetIds(selected, darts), ...extra }
         : null;
   if (!payload) return;
   busy = true;

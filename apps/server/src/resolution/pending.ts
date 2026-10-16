@@ -121,7 +121,7 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
             (kind): kind is "reaction" | "opportunity" => kind === "reaction" || kind === "opportunity"
           ),
           pushFeet: input.pushFeet ?? null,
-          slotLevel: ctx.plan.spendSpellSlot?.level ?? null,
+          slotLevel: ctx.plan.castLevel,
           distanceFeet: deps.distanceFeet?.(attacker.id, target.id) ?? null,
           initiatorRole: deps.initiatorRole ?? "gm",
           initiatorSessionId: deps.initiatorSessionId ?? deps.gmSessionId,

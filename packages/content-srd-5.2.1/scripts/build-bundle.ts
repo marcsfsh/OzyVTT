@@ -23,7 +23,7 @@ import {
 import { outDir, sourcePath } from "./paths.js";
 import { SPELL_SAVE_OVERRIDE_IDS, spellSaveOutcomeFor, statBlockSaveOutcome } from "./save-outcomes.js";
 import { areaOfProse, withProseFacts } from "../src/action-prose.js";
-import { spellEffectFor } from "./spell-effects.js";
+import { castingOptionsFor, spellEffectFor } from "./spell-effects.js";
 
 const sourceDir = sourcePath("open5e-srd-2024");
 
@@ -879,14 +879,15 @@ const spellRecords = onlySrd(spells).map((spell) => {
     classes: fields.classes.map(slugOf).sort(),
     description: fields.desc,
     higherLevel: fields.higher_level || null,
-    castingOptions: (spellOptionsBySpell.get(spell.pk) ?? [])
-      .sort((left, right) => left.fields.type.localeCompare(right.fields.type))
-      .map((option) => ({
+    castingOptions: castingOptionsFor(
+      slugOf(spell.pk),
+      (spellOptionsBySpell.get(spell.pk) ?? []).map((option) => ({
         type: option.fields.type,
         damageRoll: option.fields.damage_roll || null,
         targetCount: option.fields.target_count,
         description: option.fields.desc || null
       }))
+    )
   };
 });
 

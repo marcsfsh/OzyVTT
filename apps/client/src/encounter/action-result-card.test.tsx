@@ -64,4 +64,25 @@ describe("the GM's result card", () => {
     fireEvent.click(screen.getByRole("button", { name: "Apply to Goblin" }));
     expect(applyDamage).toHaveBeenCalledWith(FOE, "Goblin", FOE, 3);
   });
+
+  it("splits Magic Missile's darts by target, each with its own Apply", () => {
+    const OTHER = "10000000-0000-4000-8000-000000000003";
+    const dart = (total: number) => ({ formula: "1d4 + 1", type: "force", total });
+    const { applyDamage } = card({
+      actionName: "Magic Missile",
+      activation: "action",
+      attack: null,
+      save: null,
+      damage: [dart(3), dart(4), dart(2)],
+      damageTotal: 9,
+      crit: false,
+      damageByTarget: [
+        { targetId: FOE, targetName: "Goblin", parts: [dart(3), dart(4)], total: 7 },
+        { targetId: OTHER, targetName: "Orc", parts: [dart(2)], total: 2 }
+      ]
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Apply to Orc" }));
+    expect(applyDamage).toHaveBeenCalledWith(OTHER, "Orc", OTHER);
+    expect(screen.getByRole("button", { name: "Apply to Goblin" })).toBeTruthy();
+  });
 });

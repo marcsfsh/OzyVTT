@@ -86,6 +86,16 @@ export type ActionResolution = Readonly<{
   rollMode?: ActionRollMode;
   /** Flat typed damage added by active effects (Rage +2 melee), included in damageTotal. */
   bonusDamage?: ReadonlyArray<{ amount: number; type: string; source: string }>;
+  /** Damage split between targets, each part applied only to its own (Magic Missile's darts, one part per dart). The
+   *  parts are `damage` and `bonusDamage` regrouped; their totals add up to damageTotal. */
+  damageByTarget?: ReadonlyArray<
+    Readonly<{
+      targetId: string;
+      targetName: string;
+      parts: ReadonlyArray<{ formula: string; type: string; total: number }>;
+      total: number;
+    }>
+  >;
   /** Source-linked effects the hit applied to targets (Bite: Grappled + Restrained). */
   effectsApplied?: ReadonlyArray<{
     targetId: string;

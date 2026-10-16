@@ -63,8 +63,10 @@ export const SpellEffectSchema = z
       .object({ kind: z.enum(["melee", "ranged"]), feet: z.number().int().min(5).max(5280) })
       .strict()
       .optional(),
-    /** Damage to each target, every part rolled (all three of Magic Missile's darts). */
+    /** Damage to each target, every part rolled; with `darts`, what each dart deals. */
     damage: z.array(z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema }).strict()).max(4),
+    /** Missiles one cast makes, each at a creature of the caster's choice (Magic Missile's three darts). */
+    darts: z.number().int().min(2).max(20).optional(),
     /** Hit points each target regains; `addsModifier` adds the caster's spellcasting ability modifier. */
     healing: z.object({ formula: HealingFormulaSchema, addsModifier: z.boolean() }).strict().nullable(),
     /** A reaction spell's trigger and response (Shield, Hellish Rebuke), so the table offers it as a prompt. */

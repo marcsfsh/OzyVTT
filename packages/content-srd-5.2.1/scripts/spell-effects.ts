@@ -6,7 +6,7 @@
  * pins the cases.
  */
 import { DamageTypeSchema } from "@vtt/schemas";
-import type { SpellEffect } from "../src/schemas.js";
+import type { SpellEffect, SpellReference } from "../src/schemas.js";
 import { healingOfText, spellAttackRangeOf, type SpellRange } from "../src/spell-effect.js";
 
 /** Spells whose printed damage is not dealt by the cast to its targets, and why. They cast with no damage and the
@@ -62,8 +62,8 @@ type Damage = SpellEffect["damage"];
 
 /** One cast's damage where the source's single roll and type list cannot say it. */
 const CAST_DAMAGE: Readonly<Record<string, Damage>> = {
-  // Three darts at one target, each 1d4 + 1.
-  "magic-missile": [{ formula: "3d4 + 3", type: "force" }],
+  // Each dart; the cast makes three (`CAST_DARTS`).
+  "magic-missile": [{ formula: "1d4 + 1", type: "force" }],
   "flame-strike": [
     { formula: "5d6", type: "fire" },
     { formula: "5d6", type: "radiant" }
@@ -88,6 +88,9 @@ const CAST_ATTACKS: Readonly<Record<string, number>> = {
   "arcane-sword": 0,
   "flame-blade": 0
 };
+
+/** Missiles one cast makes, each striking a creature of the caster's choice. */
+const CAST_DARTS: Readonly<Record<string, number>> = { "magic-missile": 3 };
 
 /** Where a cast's spell attack reaches, where the spell's own range doesn't say it: the hurled flame of a Self spell. */
 const ATTACK_RANGES: Readonly<Record<string, NonNullable<SpellEffect["attackRange"]>>> = {
@@ -114,10 +117,12 @@ export function spellEffectFor(
   const attacks = CAST_ATTACKS[id] ?? (/\bmakes? an? (?:ranged|melee) spell attack\b/i.test(description) ? 1 : 0);
   const attackRange = attacks > 0 ? (ATTACK_RANGES[id] ?? spellAttackRangeOf(description, range)) : null;
   const reaction = CAST_REACTIONS[id];
+  const darts = CAST_DARTS[id];
   return {
     attacks,
     ...(attackRange ? { attackRange } : {}),
     damage: castDamage(id, roll, types, healing !== null),
+    ...(darts ? { darts } : {}),
     healing,
     ...(reaction ? { reaction } : {})
   };
@@ -130,11 +135,47 @@ function castDamage(id: string, roll: string | null, types: readonly string[], h
   return [{ formula: roll, type: DamageTypeSchema.parse(types[0]) }];
 }
 
+type CastingOption = SpellReference["castingOptions"][number];
+type UpcastRow = Readonly<{ roll?: string | null; count?: number | null }>;
+
+/** Printed higher-slot rows the source gets wrong, by slot level: the roll that replaces the cast's own (`roll`),
+ *  and how many rays, darts or targets (`count`). */
+const UPCAST_CORRECTIONS: Readonly<Record<string, Readonly<Record<number, UpcastRow>>>> = {
+  // The source drops the +40 from every row.
+  disintegrate: { 7: { roll: "13d6 + 40" }, 8: { roll: "16d6 + 40" }, 9: { roll: "19d6 + 40" } },
+  // The source prints no rows: +1d6 for each slot level above 1.
+  "dissonant-whispers": Object.fromEntries(
+    [2, 3, 4, 5, 6, 7, 8, 9].map((level) => [level, { roll: `${level + 2}d6` }] as const)
+  ),
+  // The source scales the 1d10 Piercing hit; the SRD scales the 2d6 Cold burst, which stays with the GM.
+  "ice-knife": Object.fromEntries([2, 3, 4, 5, 6, 7, 8, 9].map((level) => [level, { roll: null }] as const)),
+  // +10 Hit Points for each slot level above 6; the source prints no amounts.
+  heal: { 7: { roll: "80" }, 8: { roll: "90" }, 9: { roll: "100" } }
+};
+
+/** One spell's higher-slot and cantrip rows with the reviewed corrections, sorted as the source sorts them. */
+export function castingOptionsFor(id: string, options: readonly CastingOption[]): CastingOption[] {
+  const corrections = UPCAST_CORRECTIONS[id] ?? {};
+  const rows = new Map(options.map((option) => [option.type, { ...option }]));
+  for (const [level, row] of Object.entries(corrections)) {
+    const type = `slot_level_${level}`;
+    const current = rows.get(type) ?? { type, damageRoll: null, targetCount: null, description: null };
+    rows.set(type, {
+      ...current,
+      ...(row.roll !== undefined ? { damageRoll: row.roll } : {}),
+      ...(row.count !== undefined ? { targetCount: row.count } : {})
+    });
+  }
+  return [...rows.values()].sort((left, right) => left.type.localeCompare(right.type));
+}
+
 /** The reviewed ids, so a test can check every row still names a real spell. */
 export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...Object.keys(NO_CAST_DAMAGE),
   ...Object.keys(CAST_DAMAGE),
   ...Object.keys(CAST_ATTACKS),
   ...Object.keys(ATTACK_RANGES),
+  ...Object.keys(CAST_DARTS),
+  ...Object.keys(UPCAST_CORRECTIONS),
   ...Object.keys(CAST_REACTIONS)
 ];

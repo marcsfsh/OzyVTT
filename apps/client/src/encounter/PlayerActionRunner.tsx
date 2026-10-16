@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { type ActorDefinition, type ContentActionSummary } from "@vtt/domain";
-import { ActionResultHead, HealingOutcome } from "./ActionResultHead";
+import { ActionResultHead, HealingOutcome, SplitDamageOutcome } from "./ActionResultHead";
 import { ActionRow } from "./ActionRow";
 import { ActionTargetPicker } from "./ActionTargetPicker";
 import { actionSummaryParts } from "./action-summary";
@@ -44,7 +44,8 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
       ? action.multiattack.map((component) => ({ actionId: component.actionId, count: component.count }))
       : null,
     grants: action.grants !== undefined,
-    reaction: action.reaction ?? null
+    reaction: action.reaction ?? null,
+    ...(action.darts !== undefined ? { darts: action.darts } : {})
   };
 }
 
@@ -203,6 +204,12 @@ export function PlayerActionRunner({
               );
             })()}
           {result.healing && <HealingOutcome healing={result.healing} />}
+          {!result.preview && result.damageByTarget && (
+            <SplitDamageOutcome
+              split={result.damageByTarget}
+              after={() => (playerDamageMode === "direct" ? "- applied." : "- handed to the GM.")}
+            />
+          )}
           {/* Players never apply damage: a committed hit goes to the GM (proposal) or is auto-applied
           (direct), unless a target's reaction (Uncanny Dodge) parked it on a prompt instead. */}
           {/* A miss owes damage only through Graze, which is already in the total. */}

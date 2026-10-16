@@ -30,6 +30,7 @@ describe("a built Warlock's Pact Magic", () => {
     resolve("spell-misty-step", { targetIds: [] });
     expect(hero.pactSlots).toEqual({ level: 3, remaining: 0 });
     heroTurnAgain(state);
+    state.combat = { ...state.combat, ruleExceptions: { slots: "strict" } };
     expect(() => resolve("spell-hold-person", {})).toThrowError(/level-3 Pact Magic slot - Vex has none left/);
   });
 

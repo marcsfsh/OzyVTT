@@ -102,6 +102,59 @@ export function settlePlayerHit(
 }
 
 /**
+ * Settles a player's darts (Magic Missile) the same way, target by target: each creature's own darts are parked as a
+ * proposal for the GM, or applied at once in "direct" mode. Returns what was applied (direct mode), in target order.
+ */
+export function settlePlayerDarts(
+  state: GameState,
+  resolution: ActionResolution,
+  attackerName: string,
+  sourceActorId: string,
+  mode: "proposal" | "direct",
+  deps: PlayerDamageDeps
+): AppliedDamage[] {
+  if (resolution.preview || !resolution.damageByTarget) return [];
+  const label = `${attackerName}'s ${resolution.actionName}`;
+  const applied: AppliedDamage[] = [];
+  for (const target of resolution.damageByTarget) {
+    const parts = target.parts
+      .map((part) => ({ amount: part.total, type: part.type }))
+      .filter((part) => part.amount > 0);
+    if (target.total <= 0) continue;
+    if (mode === "direct") {
+      const outcome = applyDamageDetailed(
+        state,
+        target.targetId,
+        { amount: target.total, parts, critical: false, sourceName: label, sourceActorId },
+        { role: "gm" },
+        damageDepsOf(deps)
+      );
+      applied.push({ outcome, targetId: target.targetId, sourceActorId, label });
+      continue;
+    }
+    state.combat = {
+      ...state.combat,
+      pendingDamage: [
+        ...state.combat.pendingDamage,
+        {
+          id: deps.newId(),
+          sourceActorId,
+          sourceName: attackerName,
+          actionName: resolution.actionName,
+          targetActorId: target.targetId,
+          targetName: target.targetName,
+          proposedDamageParts: parts,
+          proposedTotal: target.total,
+          critical: false,
+          createdAt: deps.now()
+        }
+      ]
+    };
+  }
+  return applied;
+}
+
+/**
  * The GM applies or dismisses a parked proposal. Apply reduces HP through the typed-defense pipeline
  * and removes the proposal; an `amount` override re-weights the proposal's typed parts to that total
  * (`rescaleDamageParts`), so resistances still apply to the edited number. Dismiss just removes it. Returns the applied outcome, or null (dismissed, overridden to nothing, or already

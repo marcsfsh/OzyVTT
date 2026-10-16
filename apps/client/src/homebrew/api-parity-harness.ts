@@ -523,6 +523,12 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "permanent: system-synthesised"
   },
   {
+    at: "actions[].darts",
+    types: ACTION_CARRIERS,
+    reason: "synthesised from a spell's cast model by the character build (Magic Missile), zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
     at: "actions[].area.**",
     types: ACTION_CARRIERS,
     reason: "read from the action's description as the catalog is built; the editor writes the description",
