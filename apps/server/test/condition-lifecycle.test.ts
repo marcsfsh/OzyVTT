@@ -577,6 +577,16 @@ describe("the fight's end and a long rest end only what they should", () => {
     expect(actor(state, IDS.hero).effects.map((effect) => effect.id)).toEqual(["curse"]);
     expect(actor(state, IDS.foe).effects).toEqual([]);
   });
+
+  it("a long rest wakes a knocked-out creature, since its hit points come back", () => {
+    const state = game();
+    applyDamageDetailed(state, IDS.hero, { amount: 40, nonlethal: true }, GM, { resolveDefinition });
+    expect(actor(state, IDS.hero).effects.map((effect) => effect.name)).toEqual(["Knocked out"]);
+    state.combat = { ...state.combat, active: false, initiative: [], turnActorId: null };
+    applyRest(state, IDS.hero, "long", resolveDefinition);
+    expect(actor(state, IDS.hero).effects).toEqual([]);
+    expect(conditionIds(state, IDS.hero)).toEqual(["prone"]);
+  });
 });
 
 describe("the turn-start reminder", () => {

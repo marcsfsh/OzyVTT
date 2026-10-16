@@ -510,5 +510,7 @@ export function endEffectsAtLongRest(state: GameState, actorId: string): EffectN
   const events: EffectNarration[] = [...endConcentrationSustainedBy(state, actorId)];
   for (const effect of [...actor.effects])
     if (ENDS_WITH_THE_FIGHT.has(effect.duration.type)) endEffectInternal(state, actor, effect.id, events);
+  // The rest restores its hit points, and a knocked-out creature wakes when it regains any.
+  events.push(...endKnockOut(state, actor));
   return events;
 }
