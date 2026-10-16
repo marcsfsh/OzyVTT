@@ -8,6 +8,7 @@ import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.j
 import { endEffect, removeConditionDirect, type EffectNarration } from "./effects.js";
 import { requireActorAccess, type Initiator } from "./authorization.js";
 import { healActor } from "./hit-points.js";
+import { chargesAfterDawn } from "./item-charges.js";
 
 /** Takes `count` dice off a multiclass pool, biggest die first (the order the roll uses). The caller has
  *  already checked the pool holds enough. */
@@ -62,14 +63,16 @@ function clearOverrides(overrides: Actor["choiceOverrides"], kind: "long" | "sho
  * Applies a rest to a rostered actor outside combat (SRD Resting, ADR-0020).
  * Short: per-short-rest and recharge pools re-arm; healing is only by spending Hit Point Dice.
  * Long: remaining effects end first (onEnd grants land), then HP to max, temp HP cleared, dying
- * cleared, all pools refreshed, all Hit Point Dice restored, Exhaustion drops one level.
+ * cleared, all pools refreshed, all Hit Point Dice restored, Exhaustion drops one level. With `charges.random`, a
+ * charged item regains its printed dice rather than every charge, and `charges.lines` hears what each regained.
  */
 export function applyRest(
   state: GameState,
   actorId: string,
   kind: "long" | "short",
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
-  catalog?: EquipmentCatalog
+  catalog?: EquipmentCatalog,
+  charges?: Readonly<{ random: (sides: number) => number; lines: string[] }>
 ): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
@@ -100,7 +103,12 @@ export function applyRest(
     actor.hitDice = makeHitDicePool(actor.hitDice.entries.map((entry) => ({ ...entry, remaining: entry.maximum })));
   actor.deathSaves = null;
   removeConditionDirect(actor, "unconscious");
-  actor.actionUses = {};
+  const longRestDefinition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
+  if (charges) {
+    const dawn = chargesAfterDawn(actor, longRestDefinition, catalog, charges.random);
+    actor.actionUses = dawn.stillSpent;
+    charges.lines.push(...dawn.lines);
+  } else actor.actionUses = {};
   // Both kinds lapse on a long rest.
   actor.choiceOverrides = clearOverrides(actor.choiceOverrides, "long");
   const exhaustion = actor.conditions.find((condition) => condition.id === "exhaustion");
@@ -113,7 +121,6 @@ export function applyRest(
   }
   // SRD long rest: spell slots (and Pact Magic) refill and prepared spells reset to the sheet's defaults.
   // No spellcasting leaves these untouched.
-  const longRestDefinition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
   if (actor.spellSlots && longRestDefinition?.spellcasting) {
     // `spellSlotMaxima` covers derived multiclass tables and item-added slots, shared with seeding and the
     // spend clamp.

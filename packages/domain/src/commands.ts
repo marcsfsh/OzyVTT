@@ -714,6 +714,19 @@ export const CharacterSetInventorySchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** Moves one carried row, whole, from one character to another, with the charges it has spent (GM). */
+export const CharacterGiveItemSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    toActorId: z.uuid(),
+    itemId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const CharacterSetCurrencySchema = z
   .object({
     commandId: z.uuid(),

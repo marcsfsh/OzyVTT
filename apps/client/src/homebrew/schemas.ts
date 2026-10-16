@@ -765,6 +765,7 @@ const MAGIC_KEYS = [
   "rarity",
   "attunement",
   "cursed",
+  "charges",
   "casts",
   "grantsFeatIds",
   "modifiers",
@@ -868,6 +869,22 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           kind: "switch",
           help: "Players can't unattune, unequip or drop it — only you can. Its magic stays hidden from them until they attune.",
           visibleWhen: (draft) => draft.isMagic === true && getAt(draft, "attunement.required") === true
+        },
+        // The charges themselves are the `uses` on its spells and actions; these say how they come back.
+        {
+          key: "charges.regain",
+          label: "Charges regained at dawn",
+          placeholder: "1d6 + 1",
+          emptyValue: "omit",
+          help: "Dice, as printed. Leave empty and a long rest gives every charge back.",
+          visibleWhen: (draft) => draft.isMagic === true
+        },
+        {
+          key: "charges.lastChargeRoll",
+          label: "Roll a d20 when the last charge is spent",
+          kind: "switch",
+          help: "On a 1 the item's own text says what happens. You are told the roll.",
+          visibleWhen: (draft) => draft.isMagic === true
         },
         // Template pair, like the SRD's "Weapon, +1 (Any Simple or Martial)": with both set, the
         // player picks the base when the item lands on a sheet and the server copies its stats.

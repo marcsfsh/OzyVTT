@@ -262,11 +262,16 @@ export const actorHealthCommands = [
     async run({ principal, request, execute }, kit) {
       const { actorId, kind } = request;
       let events: EffectNarration[] = [];
+      const chargeLines: string[] = [];
       // Authorized inside the mutation against live state (applyRest still refuses a combatant in a running
-      // encounter).
+      // encounter). A charged item's dawn regain is rolled with the server's dice.
       const { duplicate } = await execute((state) => {
         requireActorAccess(initiatorOf(principal), state, actorId, "resource");
-        events = applyRest(state, actorId, kind, kit.resolveDefinition, kit.equipmentCatalog());
+        chargeLines.length = 0;
+        events = applyRest(state, actorId, kind, kit.resolveDefinition, kit.equipmentCatalog(), {
+          random: (sides) => kit.context.random(sides),
+          lines: chargeLines
+        });
       });
       if (duplicate) return;
       kit.context.appendLog({
@@ -275,6 +280,8 @@ export const actorHealthCommands = [
         actorIds: [actorId],
         gmOnly: kit.actorHidden(actorId)
       });
+      for (const line of chargeLines)
+        kit.context.appendLog({ kind: "heal", text: line, actorIds: [actorId], gmOnly: kit.actorHidden(actorId) });
       kit.publishNarrations(events);
     }
   }),

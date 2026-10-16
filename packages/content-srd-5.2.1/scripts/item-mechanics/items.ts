@@ -182,6 +182,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
    * "Beast with a Swim Speed" target restriction stays prose.
    */
   "trident-of-fish-command": {
+    charges: { regain: "1d3" },
     casts: [{ spellId: "dominate-beast", saveDc: 15, uses: { limit: 3, per: "long-rest" } }]
   },
 
@@ -344,7 +345,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //
   // Recurring limits:
   //   - One use spends exactly one charge, so only one-charge properties are authored.
-  //   - "Regains 1d6 + 1 expended charges daily at dawn" becomes a full recharge on a long rest.
+  //   - "Regains 1d6 + 1 expended charges daily at dawn" is `charges.regain`, rolled on a long rest, and "if you
+  //     expend the last charge, roll 1d20" is `charges.lastChargeRoll`. Charges count per carried copy.
   //   - Use pools are capped at 20.
   //   - Staffs and rods have no weapon block, so "+N to attack and damage rolls made with it" would be
   //     bearer-scoped (every weapon) or inert; it is not authored.
@@ -364,6 +366,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
    * carries no `saveDc`. "Fear (affects Beasts only)" stays prose.
    */
   "ring-of-animal-influence": {
+    charges: { regain: "1d3" },
     casts: [
       {
         spellId: "animal-friendship",
@@ -381,6 +384,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Auto-succeeding a save is not expressible; the reaction and its 3-charge pool are, and the GM rules the success.
   "ring-of-evasion": {
+    charges: { regain: "1d3" },
     actions: [
       {
         id: "evade",
@@ -423,6 +427,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
    * 2-3 charge Shooting Stars (multi-charge).
    */
   "ring-of-shooting-stars": {
+    charges: { regain: "1d6" },
     casts: [{ spellId: "dancing-lights" }, { spellId: "light" }],
     actions: [
       {
@@ -524,6 +529,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // All three one-charge casts on one pool. No `saveDc`: the cast uses the wielder's own DC, as
   // printed. Reflect and Resist Enchantment (save outcomes) are not expressible.
   "staff-of-charming": {
+    charges: { regain: "1d8 + 2", lastChargeRoll: true },
     casts: [
       { spellId: "charm-person", uses: { limit: 10, per: "long-rest", pool: "staff-of-charming-charges" } },
       { spellId: "command", uses: { limit: 10, per: "long-rest", pool: "staff-of-charming-charges" } },
@@ -533,12 +539,14 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Fireball (3) and Wall of Fire (4) are multi-charge.
   "staff-of-fire": {
+    charges: { regain: "1d6 + 4", lastChargeRoll: true },
     grants: { damageResistances: ["fire"] },
     casts: [{ spellId: "burning-hands", uses: { limit: 10, per: "long-rest", pool: "staff-of-fire-charges" } }]
   },
 
   // Wall of Ice, Ice Storm and Cone of Cold are multi-charge.
   "staff-of-frost": {
+    charges: { regain: "1d6 + 4", lastChargeRoll: true },
     grants: { damageResistances: ["cold"] },
     casts: [{ spellId: "fog-cloud", uses: { limit: 10, per: "long-rest", pool: "staff-of-frost-charges" } }]
   },
@@ -562,6 +570,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Insect Cloud's counter; the Heavily Obscured area is a GM ruling. Giant Insect and Insect Plague are multi-charge.
   "staff-of-swarming-insects": {
+    charges: { regain: "1d6 + 4", lastChargeRoll: true },
     actions: [
       {
         id: "insect-cloud",
@@ -589,6 +598,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // The three one-charge properties on the 6-charge pool. Not authored: the spell attack bonus, the
   // +2 Quarterstaff, the multi-charge spells.
   "staff-of-the-woodlands": {
+    charges: { regain: "1d6", lastChargeRoll: true },
     casts: [
       { spellId: "animal-friendship", uses: { limit: 6, per: "long-rest", pool: "staff-of-the-woodlands-charges" } },
       { spellId: "speak-with-animals", uses: { limit: 6, per: "long-rest", pool: "staff-of-the-woodlands-charges" } }
@@ -643,6 +653,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // The detection is GM information; the charge is real.
   "wand-of-enemy-detection": {
+    charges: { regain: "1d6 + 1", lastChargeRoll: true },
     actions: [
       {
         id: "detect-enemies",
@@ -657,6 +668,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Command at the wand's printed DC. Fear (3 charges) is multi-charge.
   "wand-of-fear": {
+    charges: { regain: "1d6 + 1", lastChargeRoll: true },
     casts: [{ spellId: "command", saveDc: 15, uses: { limit: 7, per: "long-rest", pool: "wand-of-fear-charges" } }]
   },
 
@@ -665,6 +677,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
    * level. The 2-3 charge upcasts are multi-charge.
    */
   "wand-of-fireballs": {
+    charges: { regain: "1d6 + 1", lastChargeRoll: true },
     casts: [
       {
         spellId: "fireball",
@@ -676,6 +689,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   /** The Fireball wand's twin: Lightning Bolt (save DC 15), 1 charge, 7 charges. Upcasts are multi-charge. */
   "wand-of-lightning-bolts": {
+    charges: { regain: "1d6 + 1", lastChargeRoll: true },
     casts: [
       {
         spellId: "lightning-bolt",
@@ -687,6 +701,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   /** "This wand has 3 charges. While holding it, you can expend 1 charge to cast Detect Magic from it." Complete. */
   "wand-of-magic-detection": {
+    charges: { regain: "1d3" },
     casts: [{ spellId: "detect-magic", uses: { limit: 3, per: "long-rest", pool: "wand-of-magic-detection-charges" } }]
   },
 
@@ -694,6 +709,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // The wand's own effect.
   "wand-of-paralysis": {
+    charges: { regain: "1d6 + 1", lastChargeRoll: true },
     actions: [
       {
         id: "paralyzing-ray",
@@ -709,12 +725,14 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   /** "expend 1 charge to cast Polymorph (save DC 15) from it." One charge, one spell, printed DC. Complete. */
   "wand-of-polymorph": {
+    charges: { regain: "1d6 + 1", lastChargeRoll: true },
     casts: [
       { spellId: "polymorph", saveDc: 15, uses: { limit: 7, per: "long-rest", pool: "wand-of-polymorph-charges" } }
     ]
   },
 
   "wand-of-secrets": {
+    charges: { regain: "1d3" },
     actions: [
       {
         id: "find-secrets",
@@ -734,6 +752,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // The d100 effect table is GM-rolled; the charge is real.
   "wand-of-wonder": {
+    charges: { regain: "1d6 + 1", lastChargeRoll: true },
     actions: [
       {
         id: "wild-surge",
@@ -803,6 +822,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Charge-alone: 4 charges exact; the Fly Speed is GM-adjudicated.
   "winged-boots": {
+    charges: { regain: "1d4" },
     actions: [
       {
         id: "fly",
@@ -896,6 +916,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   "brooch-of-shielding": { grants: { damageResistances: ["force"] } },
 
   "medallion-of-thoughts": {
+    charges: { regain: "1d4" },
     casts: [
       {
         spellId: "detect-thoughts",
@@ -952,6 +973,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Charge-alone: 3 charges exact; the GM applies the Invisible condition.
   "cloak-of-invisibility": {
+    charges: { regain: "1d3" },
     actions: [
       {
         id: "vanish",
@@ -996,6 +1018,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
    * for the duration, and the stun ending with the effect (the GM clears it).
    */
   "robe-of-scintillating-colors": {
+    charges: { regain: "1d3" },
     actions: [
       {
         id: "dazzle",
@@ -1030,13 +1053,13 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //     is no healing or temporary-HP rider.
   //   - One use spends one charge, and pools are capped at 20.
   //   - `ability-score` is refused on items.
-  //   - Item actions only resolve inside an encounter. Outside one, `iron-bands` (the only one with an
-  //     attack) can still be rolled through the loose route, which spends no charge.
+  //   - Item actions only resolve inside an encounter. Outside one, the loose route rolls them and spends the
+  //     charge, as `action.use` says.
   //
   // A charged item may be authored for its charge alone (count and recharge exact) when the GM can
   // already produce what the charge buys: the elemental summons, `bag-of-tricks`, `gem-of-seeing`,
   // `pipes-of-the-sewers`, `cubic-gate` and `iron-bands`. Not when the sheet would then be wrong
-  // (`pearl-of-power`). "Regains 1dN at dawn" becomes a full refill on a long rest.
+  // (`pearl-of-power`). "Regains 1dN at dawn" is `charges.regain`, rolled on a long rest.
   //
   // Trap items (`bag-of-devouring`, `potion-of-poison`, `dust-of-sneezing-and-choking`) are not
   // authored: a button naming the real effect would spoil the trap.
@@ -1147,6 +1170,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Gate and Plane Shift on one shared 3-charge pool. Which plane each side opens is the GM's.
   "cubic-gate": {
+    charges: { regain: "1d3" },
     casts: [
       { spellId: "gate", uses: { limit: 3, per: "long-rest", pool: "cubic-gate-charges" } },
       { spellId: "plane-shift", uses: { limit: 3, per: "long-rest", pool: "cubic-gate-charges" } }
@@ -1186,6 +1210,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Charge-alone. Not cast as True Seeing (that spell targets someone you touch); the Truesight is narrated.
   "gem-of-seeing": {
+    charges: { regain: "1d3" },
     actions: [
       {
         id: "peer",
@@ -1260,6 +1285,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
    * repeat save, and the 24-hour immunity after a success.
    */
   "pipes-of-haunting": {
+    charges: { regain: "1d3" },
     actions: [
       {
         id: "play",
@@ -1279,6 +1305,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
    * made by the swarm, so it is not this action's `save`.
    */
   "pipes-of-the-sewers": {
+    charges: { regain: "1d3" },
     actions: [
       {
         id: "call",

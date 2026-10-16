@@ -2,6 +2,7 @@ import type { ActionAvailability, ActionResolution, GameState } from "@vtt/domai
 import type { ActorDefinition } from "@vtt/schemas";
 import { masteryMissDamage } from "./weapon-mastery.js";
 import { rollAttack } from "./resolution/attack.js";
+import { rollLastCharge } from "./resolution/charges.js";
 import type { DefinitionAction, ResolveContext, ResolveDependencies, ResolveInput } from "./resolution/context.js";
 import { rollRiderDamage, rollWeaponDamage } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
@@ -43,6 +44,7 @@ export function resolveDefinitionAction(
   // A hit the target's Parry or Shield may still turn into a miss: the attack is spent, and the answer finishes it.
   if (parkForAcReaction(ctx)) {
     commitEconomy(ctx);
+    rollLastCharge(ctx);
     recordLightAttack(ctx);
     recordLoadingShot(ctx);
     releaseHideAndReady(ctx);
@@ -66,6 +68,7 @@ export function resolveDefinitionAction(
   parkActionSave(ctx);
 
   commitEconomy(ctx);
+  rollLastCharge(ctx);
   recordLightAttack(ctx);
   recordLoadingShot(ctx);
   recordCleaveOpening(ctx);

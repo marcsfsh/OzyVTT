@@ -33,11 +33,28 @@ function bearerLevel(definition: ActorDefinition | undefined): number {
   return total >= 1 ? total : 1;
 }
 
+/** A carried item: its row id, and the catalog record it copies. */
+export type CarriedItem = Readonly<{ id: string; recordId?: string }>;
+
+/**
+ * An item's shared charge pool, counted per carried copy: the row's id stands in for the record's, so two Wands of
+ * Fireballs are two pools and a wand's spent charges are its own ("wand-of-fireballs-charges" on the row
+ * "wand-of-fireballs-2" counts as "wand-of-fireballs-2-charges"). Kept within the pool slug's 60 characters.
+ */
+export function itemPool(item: CarriedItem, pool: string): string {
+  const catalogId = catalogIdOf(item);
+  const suffix = pool.startsWith(`${catalogId}-`) ? pool.slice(catalogId.length + 1) : pool;
+  const key = `${item.id}-${suffix}`;
+  return key.length <= 60 ? key : `${item.id.slice(0, Math.max(1, 59 - suffix.length))}-${suffix}`.slice(0, 60);
+}
+
 /** Authored uses to `ActionUsesSchema`, clamped to 1-20 like `resolvedUseLimit`; below 1 means no charges. An
- *  item action carries the action form (with `recharge`), a cast the feature form (with `scaling`). */
+ *  item action carries the action form (with `recharge`), a cast the feature form (with `scaling`). A shared pool
+ *  is counted per carried copy (`itemPool`); an unpooled use is already, by the action's own id. */
 function usesOf(
   uses: FeatureUses | ActorAction["uses"],
-  definition: ActorDefinition | undefined
+  definition: ActorDefinition | undefined,
+  item: CarriedItem
 ): ActorAction["uses"] | undefined {
   if (!uses) return undefined;
   const limit = uses.limit ?? ("scaling" in uses ? scaledLimit(uses.scaling, definition) : undefined);
@@ -45,7 +62,7 @@ function usesOf(
   return {
     limit: Math.min(20, limit),
     per: uses.per,
-    ...(uses.pool ? { pool: uses.pool } : {}),
+    ...(uses.pool ? { pool: itemPool(item, uses.pool) } : {}),
     ...("recharge" in uses && uses.recharge !== undefined ? { recharge: uses.recharge } : {})
   };
 }
@@ -77,10 +94,11 @@ const scoreModifierOf = (definition: ActorDefinition | undefined, ability: Rider
 
 /** An item action with attack and save resolved: the read-time twin of `interpretAction`. */
 export function itemAction(
-  itemId: string,
+  item: CarriedItem,
   declared: FeatureAction,
   definition: ActorDefinition | undefined
 ): ActorAction {
+  const itemId = item.id;
   const caster = casterNumbers(definition);
   let attack: ActorAction["attack"];
   if (declared.attack) {
@@ -100,7 +118,7 @@ export function itemAction(
         ...(declared.save.dc === "spellcasting" ? { spellcasting: true } : {})
       }
     : undefined;
-  const uses = usesOf(declared.uses, definition);
+  const uses = usesOf(declared.uses, definition, item);
   return {
     id: itemActionId(itemId, declared.id),
     name: declared.name,
@@ -128,15 +146,16 @@ const clampDc = (value: number) => Math.max(1, Math.min(40, Math.round(value)));
 /** A synthesised cast action with the spell's mechanics. `atLevel` picks the SRD upcast row; `ability`
  *  and `saveDc` override; an unresolvable spell degrades to a name-only action. */
 export function castAction(
-  itemId: string,
+  item: CarriedItem,
   cast: ItemSpellCast,
   itemName: string,
   definition: ActorDefinition | undefined,
   spell: SpellReference | undefined
 ): ActorAction {
+  const itemId = item.id;
   const spellName = spell?.name ?? cast.spellId.replace(/-/g, " ");
   const level = cast.atLevel ?? spell?.level ?? 0;
-  const uses = usesOf(cast.uses, definition);
+  const uses = usesOf(cast.uses, definition, item);
   const base: ActorAction = {
     id: itemActionId(itemId, `cast-${cast.spellId}`),
     name: `Cast ${spellName} (${itemName})`,

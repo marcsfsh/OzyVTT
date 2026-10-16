@@ -216,6 +216,23 @@ export const ItemSpellCastSchema = z
   .strict();
 export type ItemSpellCast = z.infer<typeof ItemSpellCastSchema>;
 
+/**
+ * How a charged item's charges come back, beside the pools its actions and casts declare: `regain` is rolled on a
+ * long rest ("regains 1d6 + 1 expended charges daily at dawn"; absent = all come back), and `lastChargeRoll` rolls a
+ * d20 when the last charge is spent, whose 1 does what the item's text says (most crumble).
+ */
+export const ItemChargesSchema = z
+  .object({
+    // The SRD's own grammar here includes a d3 ("regains 1d3 expended charges"), which the dice roller lacks.
+    regain: z
+      .string()
+      .regex(/^\d+d(?:3|4|6|8|10|12|20)(?:\s*[+-]\s*\d+)?$/i, "Use a dice formula such as 1d6 + 1.")
+      .optional(),
+    lastChargeRoll: z.boolean().default(false)
+  })
+  .strict();
+export type ItemCharges = z.infer<typeof ItemChargesSchema>;
+
 /** Attunement. `restrictedTo` is advisory: shown on the sheet, never enforced. */
 export const ItemAttunementSchema = z
   .object({
@@ -323,6 +340,7 @@ export const EquipmentReferenceSchema = z
     /** Cannot be voluntarily removed once attuned; its magic is hidden from the player until attunement, and only until then. */
     cursed: z.boolean().default(false),
     casts: z.array(ItemSpellCastSchema).max(8).default([]),
+    charges: ItemChargesSchema.optional(),
     /** Feats granted while active, depth 1. Nothing has `grants.items`, so a grant cycle cannot be expressed. */
     grantsFeatIds: z.array(ContentIdSchema).max(4).default([]),
 

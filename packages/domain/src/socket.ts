@@ -68,6 +68,7 @@ import type {
   CharacterSetCurrencySchema,
   CharacterSetIdentitySchema,
   CharacterSetInventorySchema,
+  CharacterGiveItemSchema,
   CharacterSetPreparedSchema,
   CharacterSetProficienciesSchema,
   CharacterSetSlotSchema,
@@ -430,6 +431,10 @@ export interface ClientToServerEvents {
   // Optional item keys are declared so the type states the whole wire contract; the server validates `baseId`.
   "character:set-inventory": (
     payload: CommandPayload<typeof CharacterSetInventorySchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "character:give-item": (
+    payload: CommandPayload<typeof CharacterGiveItemSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "character:set-currency": (

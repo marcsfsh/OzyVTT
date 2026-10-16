@@ -441,9 +441,9 @@ export function deriveEquipment(
     carriers.push({ label, modifiers: record.modifiers, sourceItemId: item.id, isWeapon });
     takeGrants(record, item.id, label);
     takeEffects(record, item.id, label);
-    for (const declared of record.actions) actions.push(itemAction(item.id, declared, definition));
+    for (const declared of record.actions) actions.push(itemAction(item, declared, definition));
     for (const cast of record.casts)
-      actions.push(castAction(item.id, cast, label, definition, catalog!.spellRecord?.(cast.spellId)));
+      actions.push(castAction(item, cast, label, definition, catalog!.spellRecord?.(cast.spellId)));
     // Depth 1: the feat's riders join this block, so unequipping removes them in one recomputation.
     for (const featId of record.grantsFeatIds) {
       // Already a builder carrier (with its baked half in the definition); granting again would double it.

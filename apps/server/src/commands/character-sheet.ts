@@ -3,6 +3,7 @@ import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } fr
 import { setCharacterIdentity, setCharacterProficiencies } from "../character-edit.js";
 import {
   ActorRemoveSchema,
+  CharacterGiveItemSchema,
   CharacterSetCurrencySchema,
   CharacterSetIdentitySchema,
   CharacterSetInventorySchema,
@@ -11,7 +12,7 @@ import {
   CharacterSetSlotSchema,
   CommandIdentitySchema
 } from "@vtt/domain/commands";
-import { setCurrency, setInventoryItem } from "../inventory.js";
+import { giveItem, setCurrency, setInventoryItem } from "../inventory.js";
 import { setPreparedSpell, setSpellSlotRemaining } from "../spellcasting.js";
 import { initiatorOf, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
@@ -121,6 +122,41 @@ export const characterSheetCommands = [
           role: initiatorOf(principal).role
         });
       });
+    }
+  }),
+
+  defineCommand({
+    type: "character.give-item",
+    operationId: "giveItem",
+    description:
+      "Moves one carried item row, whole, from one character to another (GM-grade only). It arrives unequipped and unattuned, and the charges it has spent go with it: a wand's charges belong to the wand, not to whoever held it.",
+    summary: "Hand one carried item, with its spent charges, to another character (GM).",
+    schema: CharacterGiveItemSchema,
+    malformed: "The give-item command is malformed.",
+    gmOnly: "Only the GM can move an item to another character.",
+    async run({ request, execute }, kit) {
+      const { actorId, toActorId, itemId } = request;
+      let name = "";
+      const { duplicate } = await execute((state) => {
+        name = giveItem(
+          state,
+          actorId,
+          toActorId,
+          itemId,
+          (definitionId) => kit.resolveDefinitionIn(state, definitionId),
+          {
+            catalog: kit.equipmentCatalog(),
+            role: "gm"
+          }
+        ).name;
+      });
+      if (!duplicate)
+        kit.context.appendLog({
+          kind: "encounter",
+          text: `${kit.actorName(actorId)} hands ${name} to ${kit.actorName(toActorId)}.`,
+          actorIds: [actorId, toActorId],
+          gmOnly: kit.actorHidden(actorId) || kit.actorHidden(toActorId)
+        });
     }
   }),
 

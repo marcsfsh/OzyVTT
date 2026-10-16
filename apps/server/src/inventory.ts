@@ -3,6 +3,7 @@ import { catalogIdOf, type ActorDefinition, type Currency, type InventoryItem } 
 import { effectiveSlot } from "@vtt/rules-5e";
 import { spellSlotMaxima, storedArmorClass } from "./actor-roster.js";
 import { deriveEquipment, itemIsActive, type EquipmentCatalog } from "./equipment-derivation.js";
+import { castAction, itemAction } from "./item-actions.js";
 import { CommandRejectedError } from "./game-store.js";
 
 const MAX_ITEMS = 200;
@@ -282,8 +283,16 @@ export function setInventoryItem(
   const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
   enforceCurse(actor, item, deps);
   enforceEquipRules(actor, item, definition, deps);
-  if (item.quantity <= 0) actor.inventory = actor.inventory.filter((entry) => entry.id !== item.id);
-  else {
+  if (item.quantity <= 0) {
+    // The charges a row spent leave with it, so a new copy under the same id starts full.
+    const removed = actor.inventory.find((entry) => entry.id === item.id);
+    const spentKeys = removed ? chargeKeysOf(removed, definition, deps) : [];
+    if (spentKeys.length > 0)
+      actor.actionUses = Object.fromEntries(
+        Object.entries(actor.actionUses).filter(([key]) => !spentKeys.includes(key))
+      );
+    actor.inventory = actor.inventory.filter((entry) => entry.id !== item.id);
+  } else {
     const index = actor.inventory.findIndex((entry) => entry.id === item.id);
     if (index >= 0)
       actor.inventory = actor.inventory.map((entry, position) => (position === index ? { ...item } : entry));
@@ -294,6 +303,73 @@ export function setInventoryItem(
     }
   }
   reconcileEquipment(actor, definition, deps);
+}
+
+/** The charge pools a row's own actions and casts count in, in the record's order, whether or not the row is worn. */
+function chargeKeysOf(item: InventoryItem, definition: ActorDefinition | undefined, deps: InventoryDeps): string[] {
+  const record = deps.catalog?.equipmentRecord(catalogIdOf(item));
+  if (!record) return [];
+  const actions = [
+    ...record.actions.map((declared) => itemAction(item, declared, definition)),
+    ...record.casts.map((cast) => castAction(item, cast, item.name, definition, undefined))
+  ];
+  const keys = actions.flatMap((action) =>
+    action.uses && action.uses.per !== "turn" ? [action.uses.pool ?? action.id] : []
+  );
+  return keys.filter((key, index) => keys.indexOf(key) === index);
+}
+
+/**
+ * Hands one carried row, whole, from one character to another (the GM's "pass me the wand"): it arrives
+ * unequipped and unattuned, under a free row id, and the charges it has spent go with it, since they belong to the
+ * item and not to whoever held it.
+ */
+export function giveItem(
+  state: GameState,
+  fromActorId: string,
+  toActorId: string,
+  itemId: string,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
+  deps: InventoryDeps = {}
+): Readonly<{ name: string }> {
+  const from = state.actors.find((candidate) => candidate.id === fromActorId);
+  const to = state.actors.find((candidate) => candidate.id === toActorId);
+  if (!from || !to) throw new CommandRejectedError("That combatant no longer exists.");
+  if (from.id === to.id) throw new CommandRejectedError("Choose another character to give it to.");
+  const row = from.inventory.find((entry) => entry.id === itemId);
+  if (!row) throw new CommandRejectedError("That item is no longer in the pack.");
+  if (to.inventory.length >= MAX_ITEMS)
+    throw new CommandRejectedError(`${to.name}'s pack is full - remove something first.`);
+  const catalogId = catalogIdOf(row);
+  const taken = new Set(to.inventory.map((entry) => entry.id));
+  let id = catalogId;
+  for (let copy = 2; taken.has(id); copy += 1) id = `${catalogId.slice(0, 76)}-${copy}`;
+  const { recordId: _recordId, ...plain } = row;
+  const moved: InventoryItem = {
+    ...plain,
+    id,
+    ...(id !== catalogId ? { recordId: catalogId } : {}),
+    equipped: false,
+    attuned: false
+  };
+  const fromDefinition = from.definitionId ? resolveDefinition(from.definitionId) : undefined;
+  const toDefinition = to.definitionId ? resolveDefinition(to.definitionId) : undefined;
+  const oldKeys = chargeKeysOf(row, fromDefinition, deps);
+  const newKeys = chargeKeysOf(moved, toDefinition, deps);
+  const fromUses = { ...from.actionUses };
+  const toUses = { ...to.actionUses };
+  oldKeys.forEach((key, index) => {
+    const spent = fromUses[key];
+    delete fromUses[key];
+    if (spent !== undefined && newKeys[index] !== undefined) toUses[newKeys[index]] = spent;
+  });
+  from.actionUses = fromUses;
+  to.actionUses = toUses;
+  from.inventory = from.inventory.filter((entry) => entry.id !== itemId);
+  to.inventory = [...to.inventory, moved];
+  reconcileEquipment(from, fromDefinition, deps);
+  reconcileEquipment(to, toDefinition, deps);
+  return { name: row.name };
 }
 
 /** Set the whole coin purse. Owner-scoped by the caller. */
