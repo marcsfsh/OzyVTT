@@ -13,7 +13,7 @@ vi.mock("../socket", () => {
 
 import { socket } from "../socket";
 import { ActorStabilizeSchema } from "@vtt/domain/commands";
-import { StabilizeControl, stabilizeLine, type AidGiver } from "./StabilizeControl";
+import { aidGiverOf, StabilizeControl, stabilizeLine, type AidGiver } from "./StabilizeControl";
 
 type EmitCall = [event: string, payload: Record<string, unknown>, ack: (result: unknown) => void];
 const emitted = () => (socket.emit as unknown as { mock: { calls: EmitCall[] } }).mock.calls;
@@ -56,6 +56,13 @@ describe("the stabilize buttons", () => {
     const [, payload] = emitted().at(-1)!;
     expect(valid(payload)).toEqual(expect.objectContaining({ actorId: TARGET, method: "gm" }));
     expect("helperId" in payload).toBe(false);
+  });
+
+  it("count a second carried kit, read by the record it copies", () => {
+    const carrying = (inventory: ReadonlyArray<{ id: string; recordId?: string; quantity: number }>) =>
+      aidGiverOf({ id: ILSE.id, name: "Ilse", inventory }, null).hasKit;
+    expect(carrying([{ id: "healers-kit-2", recordId: "healers-kit", quantity: 1 }])).toBe(true);
+    expect(carrying([{ id: "healers-kit", quantity: 0 }])).toBe(false);
   });
 
   it("say what the check came to", () => {

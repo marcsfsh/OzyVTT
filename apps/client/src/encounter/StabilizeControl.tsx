@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button, Select } from "@vtt/ui";
 import { rosterActors, type ActorDefinition, type GmView, type StabilizeResult } from "@vtt/domain";
+import { catalogIdOf } from "@vtt/schemas";
 import { command } from "../lib/command";
 import "./stabilize-control.css";
 
@@ -9,13 +10,17 @@ export type AidGiver = Readonly<{ id: string; name: string; hasKit: boolean; kno
 
 /** What a creature can stabilize with, read off the inventory and sheet this viewer holds. The server decides. */
 export function aidGiverOf(
-  actor: Readonly<{ id: string; name: string; inventory?: ReadonlyArray<Readonly<{ id: string; quantity: number }>> }>,
+  actor: Readonly<{
+    id: string;
+    name: string;
+    inventory?: ReadonlyArray<Readonly<{ id: string; recordId?: string; quantity: number }>>;
+  }>,
   definition: ActorDefinition | null | undefined
 ): AidGiver {
   return {
     id: actor.id,
     name: actor.name,
-    hasKit: (actor.inventory ?? []).some((item) => item.id === "healers-kit" && item.quantity > 0),
+    hasKit: (actor.inventory ?? []).some((item) => catalogIdOf(item) === "healers-kit" && item.quantity > 0),
     knowsSpareTheDying: definition?.spellcasting?.spells.some((spell) => spell.id === "spare-the-dying") ?? false
   };
 }

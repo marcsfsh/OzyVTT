@@ -154,6 +154,22 @@ describe("a Healer's Kit and Spare the Dying stabilize without a check", () => {
     );
   });
 
+  it("finds a second carried kit by the record it copies, and uses that one", () => {
+    const state = game({
+      helper: {
+        inventory: [
+          { id: "rope-hempen", name: "Rope", quantity: 1, equipped: false },
+          { id: "healers-kit-2", recordId: "healers-kit", name: "Healer's Kit", quantity: 3, equipped: false }
+        ]
+      }
+    });
+    expect(stabilizeCreature(state, aid("healers-kit"), { role: "gm" }, deps(state)).stabilized).toBe(true);
+    expect(state.actors[0].inventory.map((row) => [row.id, row.quantity])).toEqual([
+      ["rope-hempen", 1],
+      ["healers-kit-2", 2]
+    ]);
+  });
+
   it("needs the cantrip known", () => {
     const state = game();
     expect(stabilizeCreature(state, aid("spare-the-dying"), { role: "gm" }, deps(state)).stabilized).toBe(true);

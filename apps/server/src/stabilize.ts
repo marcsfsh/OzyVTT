@@ -1,10 +1,11 @@
 import { isDead, type DeathSaves, type GameState, type RollRecord } from "@vtt/domain";
 import { d20TestFormula, parseDiceFormula, resolveDice, type RandomSource } from "@vtt/rules-5e";
-import type { ActorDefinition } from "@vtt/schemas";
+import { catalogIdOf, type ActorDefinition } from "@vtt/schemas";
 import { checkRollMode } from "./ability-checks.js";
 import { deriveActorSheet } from "./actor-derived.js";
 import { canPlayerTarget, requireActorAccess, requireGm, type Initiator } from "./authorization.js";
 import { conditionLabel, exhaustionPenalty, incapacitatingCondition } from "./condition-rules.js";
+import { withOneUsedUp } from "./consumables.js";
 import { endKnockOut, KNOCKED_OUT_TAG, type EffectNarration } from "./effects.js";
 import { effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
@@ -201,7 +202,8 @@ export function stabilizeCreature(
   if (helper.hp.current <= 0) throw new CommandRejectedError(`${helper.name} is down and can't give aid.`);
   const definition = helper.definitionId ? deps.resolveDefinition(helper.definitionId) : undefined;
   const aid = AIDS[input.method];
-  const kit = helper.inventory.find((item) => item.id === KIT_ID && item.quantity > 0);
+  // Any carried copy of the kit, by the catalog record it copies.
+  const kit = helper.inventory.find((item) => catalogIdOf(item) === KIT_ID && item.quantity > 0);
   if (input.method === "healers-kit" && !kit) throw new CommandRejectedError(`${helper.name} has no Healer's Kit.`);
   if (
     input.method === "spare-the-dying" &&
@@ -281,11 +283,8 @@ export function stabilizeCreature(
     events.push(...settle(state, target, condition, line));
     return { stabilized: condition === "dying", woke: condition === "knocked-out", check, events, overridden };
   }
-  if (input.method === "healers-kit")
-    // One use of the kit, counted on the carried row's quantity; the last one takes the row.
-    helper.inventory = helper.inventory.flatMap((item) =>
-      item !== kit ? [item] : item.quantity > 1 ? [{ ...item, quantity: item.quantity - 1 }] : []
-    );
+  // One use of the kit, counted on the carried row's quantity as a potion is; the last one takes the row.
+  if (input.method === "healers-kit" && kit) helper.inventory = withOneUsedUp(helper.inventory, kit.id);
   const line =
     input.method === "healers-kit"
       ? `${helper.name} stabilized ${target.name} with a Healer's Kit.`
