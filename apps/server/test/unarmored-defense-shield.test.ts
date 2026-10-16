@@ -231,7 +231,7 @@ describe("Unarmored Defense and a shield", () => {
     expect(equip(sorcerer, "shield")).toBe(17);
   });
 
-  // `unarmoredDefenseOf` reads the content before the build-time extension bag, so a sheet saved with a stale
+  // `unarmoredDefensesOf` reads the content before the build-time extension bag, so a sheet saved with a stale
   // `allowShield: false` still gains the shield. The definition is JSON round-tripped as `GameStore` reloads it.
   it("prefers the corrected content over a pre-fix snapshot stored on the sheet", () => {
     const built = buildCharacterDefinition(sorcererInput() as CharacterCreateRequestInput, view, POLICY);

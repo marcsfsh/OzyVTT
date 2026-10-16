@@ -182,6 +182,12 @@ const warlockInput = (): MutableCreateInput => ({
       id: "repelling-blast",
       payload: { featureId: "eldritch-invocations" }
     },
+    // Agonizing Blast, Eldritch Spear and Repelling Blast each need a known Warlock cantrip that deals damage, and
+    // each points at one.
+    { level: 1, classId: "warlock", kind: "cantrip", id: "eldritch-blast" },
+    { level: 1, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "agonizing-blast" } },
+    { level: 5, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "eldritch-spear" } },
+    { level: 5, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "repelling-blast" } },
     { level: 3, classId: "warlock", kind: "subclass", id: "fiend-patron" },
     { level: 4, classId: "warlock", kind: "asi-or-feat", id: "ability-score-improvement" },
     { level: 4, kind: "ability-score", id: "cha", payload: { featureId: "ability-score-improvement" } },
@@ -961,8 +967,14 @@ describe("extra picks raise the budget the server validates against", () => {
   ];
   const warlockWithInvocations = (count: number): MutableCreateInput => {
     const input = warlockInput();
+    const taken = INVOCATIONS.slice(0, count);
     input.choices = input.choices
       .filter((row) => row.kind !== "eldritch-invocation")
+      // An invocation not taken has no cantrip of its own to point at.
+      .filter((row) => {
+        const featureId = row.payload?.featureId;
+        return typeof featureId !== "string" || !INVOCATIONS.includes(featureId) || taken.includes(featureId);
+      })
       .concat(
         INVOCATIONS.slice(0, count).map((id) => ({
           level: 1,

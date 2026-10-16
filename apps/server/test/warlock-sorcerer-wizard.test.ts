@@ -744,7 +744,7 @@ describe("Warlock invocations: Agonizing Blast adds the caster's Charisma to the
 
   it("leaves a swing that is not that spell alone", () => {
     // `spell-id-is` filters: the Warlock's starting sickle is not Eldritch Blast and gains nothing.
-    const built = table(withInvocation("agonizing-blast"));
+    const built = table(withInvocation("agonizing-blast", [...KNOWS_ELDRITCH_BLAST, ...pointedAtTheBlast]));
     const swung = resolveDefinitionAction(
       built.state,
       actionOf(built, "item-sickle"),

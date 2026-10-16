@@ -284,11 +284,11 @@ export function meetsMulticlassMinimums(
  * new class and your current classes." The classes whose minimums these scores miss, the new class first; empty
  * when the new class may be taken.
  */
-export function multiclassShortfalls<Class extends MulticlassCandidate>(
+export function multiclassShortfalls<New extends MulticlassCandidate, Current extends MulticlassCandidate>(
   abilityScores: Readonly<Partial<Record<Ability, number>>>,
-  newClass: Class,
-  currentClasses: readonly Class[]
-): Class[] {
+  newClass: New,
+  currentClasses: readonly Current[]
+): Array<New | Current> {
   return [newClass, ...currentClasses.filter((entry) => entry.id !== newClass.id)].filter(
     (entry) => !meetsMulticlassMinimums(abilityScores, entry.multiclassPrerequisites)
   );

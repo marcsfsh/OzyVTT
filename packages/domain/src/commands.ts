@@ -775,6 +775,17 @@ export const CharacterSetProficienciesSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** The class each character level went to, in order: index 0 is level 1, the starting class. */
+const ClassLevelsSchema = z
+  .array(
+    z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+  )
+  .min(1)
+  .max(20);
+
 /** Create a character from choices, not a finished sheet; `character-build.ts` validates and assembles it. */
 export const CharacterCreateSchema = z
   .object({
@@ -798,6 +809,9 @@ export const CharacterCreateSchema = z
       .regex(/^[a-z0-9-]+$/)
       .max(80)
       .optional(),
+    /** A multiclass build: the class each character level went to, in order. Index 0 is level 1 and must be
+     *  `classId`; the list is `level` long. Absent when every level is `classId`. */
+    classLevels: ClassLevelsSchema.optional(),
     abilityMethod: BuilderAbilityMethodSchema,
     baseScores: z
       .object({
@@ -839,6 +853,7 @@ export const BuilderOffersSchema = z
     backgroundId: BuilderContentIdSchema.optional(),
     classId: BuilderContentIdSchema.optional(),
     level: z.number().int().min(1).max(20),
+    classLevels: ClassLevelsSchema.optional(),
     picks: z
       .record(OfferKeySchema, z.array(BuilderContentIdSchema).max(40))
       .refine((picks) => Object.keys(picks).length <= 200)
@@ -872,6 +887,22 @@ export const CharacterGenerateSchema = z
       .string()
       .regex(/^[a-z0-9-]+$/)
       .max(80)
+      .optional(),
+    /** A multiclass character: each class with its levels, the starting class first; the levels add up to `level`. */
+    classes: z
+      .array(
+        z
+          .object({
+            classId: z
+              .string()
+              .regex(/^[a-z0-9-]+$/)
+              .max(80),
+            level: z.number().int().min(1).max(20)
+          })
+          .strict()
+      )
+      .min(1)
+      .max(4)
       .optional(),
     name: z.string().trim().min(1).max(120).optional(),
     expectedRevision: z.number().int().nonnegative().optional()

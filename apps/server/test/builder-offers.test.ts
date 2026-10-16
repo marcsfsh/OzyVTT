@@ -173,7 +173,7 @@ describe("a chosen option's own pick", () => {
     );
   });
 
-  it("offers Agonizing Blast only the damaging cantrips this Warlock knows, and waits until there is one", () => {
+  it("offers Agonizing Blast once this Warlock knows a damaging cantrip, and then only those cantrips", () => {
     const warlock = (cantrips: readonly string[]) =>
       offers({
         speciesId: "human",
@@ -182,7 +182,15 @@ describe("a chosen option's own pick", () => {
         level: 2,
         picks: { "feature:eldritch-invocations": ["agonizing-blast"], "class-cantrips": cantrips }
       });
-    expect(offerNamed(warlock([]), "feature:agonizing-blast")?.unresolvable).toMatch(/deals damage/);
+    // SRD prerequisite: "a Warlock Cantrip That Deals Damage". Without one the invocation stays listed, greyed, and
+    // its own pick is not asked.
+    for (const known of [[], ["prestidigitation"]]) {
+      const reply = warlock(known);
+      expect(offerNamed(reply, "feature:eldritch-invocations")?.unavailable?.["agonizing-blast"]).toBe(
+        "unavailable until you know a Warlock cantrip that deals damage"
+      );
+      expect(offerNamed(reply, "feature:agonizing-blast")).toBeUndefined();
+    }
     const blast = offerNamed(warlock(["eldritch-blast", "prestidigitation"]), "feature:agonizing-blast");
     expect(blast?.unresolvable).toBeNull();
     expect(ids(blast)).toEqual(["eldritch-blast"]);

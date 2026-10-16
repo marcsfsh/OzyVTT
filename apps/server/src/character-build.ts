@@ -14,9 +14,12 @@ import {
   formulaPlus,
   hitDieFaces,
   hitPointPool,
+  multiclassShortfalls,
+  multiclassShortfallText,
   spellAttackBonus,
   spellSaveDc,
-  type Ability
+  type Ability,
+  type UnarmoredDefense
 } from "@vtt/rules-5e";
 import {
   cantripScalingOf,
@@ -29,12 +32,13 @@ import {
   type SpellReference
 } from "@vtt/content-srd-5.2.1";
 import {
-  CLASS_CANTRIP_BUDGET,
-  CLASS_SPELL_BUDGET,
-  classSpellListSlug,
+  CLASS_LEVELS_KIND,
+  classLevelsRow,
   levelOfPick,
   SPELLCASTING_ABILITY_KIND,
+  spellSlotsOf,
   surveyForBuild,
+  type BuildClass,
   type CharacterFeatureOrigin
 } from "./character-offers.js";
 import type { ContentView } from "./content-library.js";
@@ -68,9 +72,14 @@ export type CharacterCreateRequestInput = Readonly<{
   name: string;
   speciesId: string;
   backgroundId: string;
+  /** The starting class: the class taken at level 1. */
   classId: string;
+  /** The total character level. */
   level: number;
+  /** The starting class's subclass; a later class names its own in its `subclass` ledger row. */
   subclassId?: string;
+  /** The class each character level went to, in order (index 0 is level 1); absent when every level is `classId`. */
+  classLevels?: readonly string[];
   abilityMethod: BuilderPolicy["allowedAbilityMethods"][number];
   baseScores: Readonly<Record<Ability, number>>;
   backgroundBonusAllocation: ReadonlyArray<Readonly<{ ability: Ability; amount: number }>>;
@@ -125,14 +134,31 @@ type InterpretedFeatures = {
   }>;
   /** The free casting a feature with limited uses gives the spell picked for it (Magic Initiate's level 1 spell). */
   pickedSpellUses: Map<string, NonNullable<ActorAction["uses"]>>;
-  hitPointsPerLevel: number;
+  /** Hit points the features add: each `hit-points-per-level` rider times the level that scales it (a Sorcerer level
+   *  for Draconic Resilience, the character level for Tough). */
+  hitPointBonus: number;
   speedBonus: number;
   armorClassBonus: number;
   /** Flat AC that applies only while body armor is worn (Defense fighting style). */
   armorClassBonusWhileArmored: number;
   initiativeBonus: number;
-  unarmoredDefense: { ability: Ability; allowShield: boolean } | null;
+  /** Every alternative AC calculation (a Monk's and a Barbarian's Unarmored Defense, Draconic Resilience). */
+  unarmoredDefenses: Array<{ ability: Ability; allowShield: boolean }>;
+  /** The class that minted each action and use-pool id (null for species, background and feats). */
+  idOwners: Map<string, string | null>;
 };
+
+/**
+ * The id a class feature's action or use pool takes: its own, unless an earlier class already uses it, as a
+ * Paladin's Channel Divinity beside a Cleric's does. Then it takes its class's suffix, so each class keeps "this
+ * class's Channel Divinity" uses.
+ */
+function ownId(id: string, classId: string | null, into: InterpretedFeatures): string {
+  const owner = into.idOwners.get(id);
+  const own = owner !== undefined && owner !== null && classId !== null && owner !== classId ? `${id}-${classId}` : id;
+  if (!into.idOwners.has(own)) into.idOwners.set(own, classId);
+  return own;
+}
 
 // Rider ownership: of the `ModifierSchema` variants, this fold bakes some and the roll-time collector owns
 // the rest. Both halves are named so neither can grow a hole.
@@ -445,22 +471,37 @@ function martialArtsStrike(context: BuildContext): ActorAction | null {
 }
 
 /**
- * Whose spellcasting ability a spell is cast with: the class's, the species' (its traits and lineage share one
- * pick, Elven Lineage), or one feat's (Magic Initiate).
+ * Whose spellcasting ability a spell is cast with: one class's (SRD Multiclassing: "you use the spellcasting ability of
+ * that class"), the species' (its traits and lineage share one pick, Elven Lineage), or one feat's (Magic Initiate).
  */
-type SpellSource = "class" | "species" | `feat:${string}`;
+type SpellSource = `class:${string}` | "species" | `feat:${string}`;
 
-/** Interprets one feature's riders into the running build. Prose always lands as a trait; riders add mechanics on top. */
+/**
+ * Interprets one feature's riders into the running build. Prose always lands as a trait; riders add mechanics on top.
+ * `classId` is the class whose level scales it (null for species, background and feats), and `className` names a
+ * second class's action when its id is taken.
+ */
 function interpretFeature(
   feature: FeatureRecord,
   into: InterpretedFeatures,
   context: BuildContext,
-  source: SpellSource
+  source: SpellSource,
+  classId: string | null = null,
+  className: string | null = null
 ): void {
   into.traits.push({ name: feature.name, description: feature.description });
+  /** An action or pool id as this class owns it, and the action's name when that id had to change. */
+  const owned = (id: string) => ownId(id, classId, into);
+  const renamed = (action: { id: string; name: string }, own: string) =>
+    own === action.id || !className ? action.name : `${action.name} (${className})`;
+  const ownedUses = (uses: ActorAction["uses"] | undefined): ActorAction["uses"] | undefined =>
+    uses?.pool ? { ...uses, pool: owned(uses.pool) } : uses;
   for (const action of feature.actions) {
     const interpreted = interpretAction(feature, action, context);
-    if (!into.actions.some((existing) => existing.id === interpreted.id)) into.actions.push(interpreted);
+    const id = owned(interpreted.id);
+    const uses = ownedUses(interpreted.uses);
+    const own = { ...interpreted, id, name: renamed(interpreted, id), ...(uses ? { uses } : {}) } as ActorAction;
+    if (!into.actions.some((existing) => existing.id === own.id)) into.actions.push(own);
   }
   // A feature with no action gets a synthesized activation when a rider needs a trigger (an effect grant)
   // or it has limited uses (so the pool is trackable and rests can reset it by action id).
@@ -468,21 +509,22 @@ function interpretFeature(
   const carriesUses = feature.uses !== undefined && synthesizedUses >= 1;
   // The counter of a free-cast grant (Divine Smite once per Long Rest) rides its spell's free-cast action instead.
   const freeUses: ActorAction["uses"] | undefined = carriesUses
-    ? { limit: synthesizedUses, per: feature.uses!.per, pool: feature.uses!.pool ?? feature.id }
+    ? { limit: synthesizedUses, per: feature.uses!.per, pool: owned(feature.uses!.pool ?? feature.id) }
     : undefined;
   const freeCastGrant = feature.grants?.spells.some((spell) => spell.withoutSlot === "free") === true;
   // A spell picked for a feature with limited uses is cast with them (Magic Initiate once per Long Rest, Mystic
   // Arcanum), so the counter rides that spell's free-cast action rather than an action of its own.
   const freeCastPick = carriesUses && featurePicks(feature).some((pick) => pick.kind === "spell");
   if (freeCastPick) into.pickedSpellUses.set(feature.id, freeUses!);
+  const synthesizedId = owned(feature.id);
   if (
     feature.actions.length === 0 &&
     (feature.effects.length > 0 || (carriesUses && !freeCastGrant && !freeCastPick)) &&
-    !into.actions.some((existing) => existing.id === feature.id)
+    !into.actions.some((existing) => existing.id === synthesizedId)
   ) {
     into.actions.push({
-      id: feature.id,
-      name: feature.name,
+      id: synthesizedId,
+      name: renamed(feature, synthesizedId),
       activation: "other",
       description: feature.description.slice(0, 12000),
       damage: [],
@@ -492,7 +534,7 @@ function interpretFeature(
             uses: {
               limit: synthesizedUses,
               per: feature.uses!.per,
-              ...(feature.uses!.pool ? { pool: feature.uses!.pool } : {})
+              ...(feature.uses!.pool ? { pool: owned(feature.uses!.pool) } : {})
             }
           }
         : {})
@@ -533,8 +575,9 @@ function interpretFeature(
       // for this feature's DC. Kept as an explicit case to document the partition.
       case "ability-score":
         break;
+      // Per level of whatever scales the feature: Draconic Resilience counts Sorcerer levels, Tough every level.
       case "hit-points-per-level":
-        into.hitPointsPerLevel += modifier.amount;
+        into.hitPointBonus += modifier.amount * context.level;
         break;
       // A gated one (Unarmored Movement) waits for the live loadout: `deriveEquipment` carries it to the movement rules.
       case "speed":
@@ -549,8 +592,14 @@ function interpretFeature(
       case "initiative":
         into.initiativeBonus += modifier.amount + (modifier.proficiencyBonus ? context.proficiencyBonus : 0);
         break;
+      // Each one is a way to calculate AC; step 11 uses the best, since only one applies at a time (SRD Multiclassing).
       case "unarmored-defense":
-        into.unarmoredDefense = { ability: modifier.ability, allowShield: modifier.allowShield };
+        if (
+          !into.unarmoredDefenses.some(
+            (entry) => entry.ability === modifier.ability && entry.allowShield === modifier.allowShield
+          )
+        )
+          into.unarmoredDefenses.push({ ability: modifier.ability, allowShield: modifier.allowShield });
         break;
       case "darkvision":
         break; // display-only: the trait prose carries the senses; no definition field models them
@@ -583,11 +632,17 @@ function dedupeFeatureRefs(
 // The build. `library` is always an audience-scoped view, so a player can never build against (or
 // name) a homebrew record the GM has not made player-visible.
 
-/** Rolled HP entries as ledger rows (level N is entry N-2), replacing any already in the input. */
-export function hitPointRollRows(input: Pick<CharacterCreateRequestInput, "hp" | "choices">): CharacterChoice[] {
+/** Rolled HP entries as ledger rows (level N is entry N-2), replacing any already in the input. A multiclass sheet's
+ *  rows name the class each roll was for, so a later rebuild reuses a roll only where that class still is. */
+export function hitPointRollRows(
+  input: Pick<CharacterCreateRequestInput, "hp" | "choices">,
+  sequence: readonly string[] = []
+): CharacterChoice[] {
   if (input.hp.mode !== "entries") return [];
+  const multiclass = new Set(sequence).size > 1;
   return (input.hp.entries ?? []).map((roll, index) => ({
     level: index + 2,
+    ...(multiclass && sequence[index + 1] ? { classId: sequence[index + 1] } : {}),
     kind: "hp-roll",
     id: "hp",
     payload: { roll }
@@ -658,25 +713,24 @@ export function buildCharacterDefinition(
   const survey = surveyForBuild(input, library, policy);
   const {
     offers,
+    classes,
+    sequence,
     classRecord,
     species,
     background,
-    subclass,
     lineage,
     originFeat,
-    levelRow,
     granted,
     chosenFeats,
-    extraPickBudgets,
-    preparedSpellRows,
-    classCantripRows,
-    printedCantrips,
-    printedPrepared,
+    classSpells,
+    strayClassSpellRows,
     catalogs,
     progression,
     proficiencyBonus
   } = survey;
   const finalScores = survey.scoresBeforeIncreases;
+  const startingId = classRecord.id;
+  const classOf = new Map(classes.map((entry) => [entry.record.id, entry]));
 
   // Completeness check: every offer answered. Not in the survey, because the generator surveys
   // half-answered builds on purpose.
@@ -687,10 +741,15 @@ export function buildCharacterDefinition(
     }
   }
 
-  // ---- 5. Ability increases and feat prerequisites, level by level: a feat taken at a level is checked
-  // against the scores just before that level's increases, its own included. ----
+  // ---- 5. Ability increases, feat prerequisites and multiclass prerequisites, level by level: a feat taken at a
+  // level is checked against the scores just before that level's increases, its own included, and so is a class
+  // taken there (SRD: 13 in the primary ability of the new class and of every current class). ----
   const increases: Array<{ level: number; ability: Ability; amount: number; maximum: number; source: string }> = [];
-  for (const row of input.choices.filter((candidate) => candidate.kind === "asi-or-feat" && candidate.id === "asi")) {
+  const asiRows = input.choices.filter((candidate) => candidate.kind === "asi-or-feat" && candidate.id === "asi");
+  for (const [index, row] of asiRows.entries()) {
+    // The improvement's own class level sets when it lands, so a row can't move an increase ahead of a class it
+    // qualifies for.
+    const level = survey.asiLevels[index] ?? row.level;
     const payload = row.payload as { increases?: unknown } | undefined;
     if (!Array.isArray(payload?.increases) || payload.increases.length === 0)
       reject("An ASI choice needs payload.increases ([{ability, amount}]).");
@@ -707,7 +766,7 @@ export function buildCharacterDefinition(
           ? increase.amount
           : reject("An ASI increase must be +1 or +2.");
       total += amount;
-      increases.push({ level: row.level, ability, amount, maximum: 20, source: "the Ability Score Improvement" });
+      increases.push({ level, ability, amount, maximum: 20, source: "the Ability Score Improvement" });
     }
     if (total !== 2) reject("An Ability Score Improvement grants exactly +2 (one ability +2, or two abilities +1).");
   }
@@ -725,12 +784,21 @@ export function buildCharacterDefinition(
       });
     });
   }
-  const holdings = featHoldings({ classRecord, subclass, granted });
+  const holdings = featHoldings({ classes, granted });
   const featChecks = [
     ...(originFeat ? [{ feat: originFeat, level: 1 }] : []),
     ...chosenFeats.map((feat, index) => ({ feat, level: survey.chosenFeatLevels[index] ?? input.level }))
   ];
   for (let level = 1; level <= input.level; level += 1) {
+    const joining = classes.find((entry, index) => index > 0 && entry.characterLevels[0] === level);
+    if (joining) {
+      const current = classes.filter((entry) => entry.characterLevels[0] < level).map((entry) => entry.record);
+      const shortfalls = multiclassShortfalls(finalScores, joining.record, current);
+      if (shortfalls.length > 0)
+        reject(
+          `To take ${joining.record.name} at level ${level}: ${multiclassShortfallText(finalScores, joining.record, shortfalls)}`
+        );
+    }
     for (const check of featChecks.filter((candidate) => candidate.level === level)) {
       const failure = featPrerequisiteFailure(check.feat, { ...holdings, level, scores: finalScores });
       if (failure) reject(failure);
@@ -754,15 +822,32 @@ export function buildCharacterDefinition(
     }
   }
 
-  // ---- 6. Interpret every granted feature. Roll-time riders reach the table as carriers. ----
-  const casting = subclass?.spellcasting ?? classRecord.spellcasting ?? null;
-  const context: BuildContext = {
+  // ---- 6. Interpret every granted feature. Roll-time riders reach the table as carriers. A class's feature reads
+  // that class's own level and table row ("1d10 plus your Fighter level"); species, background and feat features
+  // read the character level. ----
+  const castingOf = (entry: BuildClass) => entry.subclass?.spellcasting ?? entry.record.spellcasting ?? null;
+  const leadCasting = classes.map(castingOf).find((casting) => casting !== null) ?? null;
+  const classContexts = new Map(
+    classes.map((entry): [string, BuildContext] => [
+      entry.record.id,
+      {
+        level: entry.level,
+        proficiencyBonus,
+        finalScores,
+        spellcastingAbility: castingOf(entry)?.ability ?? null,
+        classResources: entry.row.classResources
+      }
+    ])
+  );
+  const characterContext: BuildContext = {
     level: input.level,
     proficiencyBonus,
     finalScores,
-    spellcastingAbility: casting?.ability ?? null,
-    classResources: levelRow.classResources
+    spellcastingAbility: (castingOf(classes[0]) ?? leadCasting)?.ability ?? null,
+    classResources: classes[0].row.classResources
   };
+  const contextOf = (classId: string | null): BuildContext =>
+    (classId === null ? undefined : classContexts.get(classId)) ?? characterContext;
   const interpreted: InterpretedFeatures = {
     actions: [],
     traits: [],
@@ -778,64 +863,86 @@ export function buildCharacterDefinition(
     conditionImmunities: [],
     grantedSpells: [],
     pickedSpellUses: new Map(),
-    hitPointsPerLevel: 0,
+    hitPointBonus: 0,
     speedBonus: 0,
     armorClassBonus: 0,
     armorClassBonusWhileArmored: 0,
     initiativeBonus: 0,
-    unarmoredDefense: null
+    unarmoredDefenses: [],
+    idOwners: new Map()
   };
   // Whose spellcasting ability a feature's spells use: the species' traits share one, each feat has its own.
   const speciesFeatureIds = new Set([...species.traits, ...(lineage?.traits ?? [])].map((trait) => trait.id));
   const featFeatureIds = new Set([originFeat, ...chosenFeats].flatMap((feat) => (feat ? [feat.feature.id] : [])));
-  const sourceOfFeature = (featureId: string | null): SpellSource =>
+  const sourceOfFeature = (featureId: string | null, classId: string | null): SpellSource =>
     featureId !== null && speciesFeatureIds.has(featureId)
       ? "species"
       : featureId !== null && featFeatureIds.has(featureId)
         ? `feat:${featureId}`
-        : "class";
-  const spellSourceOf = (record: FeatureRecord, origin: CharacterFeatureOrigin | null): SpellSource =>
+        : `class:${classId ?? startingId}`;
+  const spellSourceOf = (
+    record: FeatureRecord,
+    origin: CharacterFeatureOrigin | null,
+    classId: string | null
+  ): SpellSource =>
     origin === null
       ? `feat:${record.id}`
       : origin.kind === "species" || origin.kind === "lineage"
         ? "species"
         : origin.kind === "option"
-          ? sourceOfFeature(origin.sourceId)
-          : "class";
-  for (const { record, origin } of granted)
-    interpretFeature(record, interpreted, context, spellSourceOf(record, origin));
-  // Martial Arts runs after the features so an id a feature already declared keeps it.
-  const strike = martialArtsStrike(context);
-  const martialArtsDie = strike ? martialArtsDieOf(context) : null;
+          ? sourceOfFeature(origin.sourceId, classId)
+          : `class:${classId ?? startingId}`;
+  for (const { record, origin, classId } of granted)
+    interpretFeature(
+      record,
+      interpreted,
+      contextOf(classId),
+      spellSourceOf(record, origin, classId),
+      classId,
+      classId === null ? null : (classOf.get(classId)?.record.name ?? null)
+    );
+  // Martial Arts reads its own class's column (a Monk's), and runs after the features so an id a feature already
+  // declared keeps it.
+  const martialContext = [...classContexts.values()].find((context) => martialArtsDieOf(context) !== null);
+  const strike = martialContext ? martialArtsStrike(martialContext) : null;
+  const martialArtsDie = strike && martialContext ? martialArtsDieOf(martialContext) : null;
   if (strike && !interpreted.actions.some((existing) => existing.id === strike.id)) interpreted.actions.push(strike);
   // `definition.character.features`, deduped on `{kind, sourceId, id}` so no record gets two carriers.
   // `origin: null` rows are skipped: they are already on `character.feats`.
   const heldFeatures = dedupeFeatureRefs(granted);
 
-  // ---- 7. Hit points: rules-5e pool math. A rolled level counts the roll (SRD); a table may raise it to the
-  // average (`builderPolicy.hitPointRollFloor`). ----
+  // ---- 7. Hit points: rules-5e pool math over the levels in the order taken. Only the starting class's level 1
+  // takes its die's maximum (SRD Multiclassing: "You gain the level 1 Hit Points for a class only when your total
+  // character level is 1"); every other level, in whichever class, is that class's average or a roll of its die. A
+  // rolled level counts the roll (SRD); a table may raise it to the average (`builderPolicy.hitPointRollFloor`). ----
   const conModifier = abilityModifier(finalScores.con);
-  const faces = hitDieFaces(classRecord.hitDie);
-  const classLevels = [{ classId: classRecord.id, level: input.level, hitDie: classRecord.hitDie }];
+  const levelDice = sequence.map((classId) => classOf.get(classId)!.record.hitDie);
+  const perLevel = sequence.map((classId, index) => ({ classId, level: 1, hitDie: levelDice[index] }));
   let hitPointMaximum: number;
   if (input.hp.mode === "average") {
-    hitPointMaximum = hitPointPool(classLevels, conModifier, "average", [], progression);
+    hitPointMaximum = hitPointPool(perLevel, conModifier, "average", [], progression);
   } else {
     const entries = input.hp.entries ?? [];
     if (entries.length !== input.level - 1)
       reject(
         `Rolled hit points need exactly ${input.level - 1} entries (levels 2-${input.level}); got ${entries.length}.`
       );
-    for (const entry of entries) {
+    entries.forEach((entry, index) => {
+      const die = levelDice[index + 1];
+      const faces = hitDieFaces(die);
       if (!Number.isInteger(entry) || entry < 1 || entry > faces)
-        reject(`A ${classRecord.hitDie} hit-point roll must be 1-${faces}; got ${entry}.`);
-    }
+        reject(`A ${die} hit-point roll must be 1-${faces}; got ${entry}.`);
+    });
     const mode = policy.hitPointRollFloor === "average" ? "max-of-both" : "roll";
-    hitPointMaximum = hitPointPool(classLevels, conModifier, mode, entries, progression);
+    hitPointMaximum = hitPointPool(perLevel, conModifier, mode, entries, progression);
   }
-  hitPointMaximum = Math.max(1, hitPointMaximum + interpreted.hitPointsPerLevel * input.level);
+  hitPointMaximum = Math.max(1, hitPointMaximum + interpreted.hitPointBonus);
 
-  // ---- 8. Proficiencies: class saves + every consumed pick + fixed grants from all sources. ----
+  // ---- 8. Proficiencies: the starting class's saves and training, the multiclass training of every later class
+  // (SRD: "you gain only some of the new class's starting proficiencies"), every consumed pick, and fixed grants. ----
+  const laterClasses = classes.slice(1);
+  const multiclassTraining = (field: "armor" | "weapons" | "tools") =>
+    laterClasses.flatMap((entry) => entry.record.multiclassProficiencies?.[field] ?? []);
   const takenOf = (kind: string) => offers.filter((offer) => offer.kind === kind).flatMap((offer) => offer.taken);
   // "skill-or-tool" picks (the Skilled feat) split by what the id actually is in the skills catalog.
   const skillIds = new Set(catalogs.skills.map((skill) => skill.id));
@@ -863,7 +970,12 @@ export function buildCharacterDefinition(
   refuseRepeatPicks(
     "tool",
     [...takenOf("tool"), ...skillOrTool.filter((id) => !skillIds.has(id))],
-    [...classRecord.toolProficiencies, ...background.toolProficiencies, ...interpreted.grantedTools]
+    [
+      ...classRecord.toolProficiencies,
+      ...multiclassTraining("tools"),
+      ...background.toolProficiencies,
+      ...interpreted.grantedTools
+    ]
   );
   refuseRepeatPicks("language", takenOf("language"), [
     ...species.languages,
@@ -880,10 +992,15 @@ export function buildCharacterDefinition(
       id,
       proficiency: expertiseTaken.includes(id) ? "expertise" : "proficient"
     })),
-    armor: dedupe([...classRecord.armorProficiencies, ...interpreted.grantedArmor]),
-    weapons: dedupe([...classRecord.weaponProficiencies, ...interpreted.grantedWeapons]),
+    armor: dedupe([...classRecord.armorProficiencies, ...multiclassTraining("armor"), ...interpreted.grantedArmor]),
+    weapons: dedupe([
+      ...classRecord.weaponProficiencies,
+      ...multiclassTraining("weapons"),
+      ...interpreted.grantedWeapons
+    ]),
     tools: dedupe([
       ...classRecord.toolProficiencies,
+      ...multiclassTraining("tools"),
       ...takenOf("tool"),
       ...skillOrTool.filter((id) => !skillIds.has(id)),
       ...background.toolProficiencies,
@@ -897,29 +1014,40 @@ export function buildCharacterDefinition(
     ])
   };
 
-  // ---- 9. Spellcasting: the class's level row (slots, cantrips, prepared cap) + chosen + granted spells. ----
+  // ---- 9. Spellcasting: each casting class's own row (cantrips, prepared cap, the highest level it prepares, its
+  // list and ability) over one shared slot pool, plus chosen and granted spells. ----
   // Feature-consumed spell/cantrip picks join the list outside the class budgets and are always prepared (Magic
   // Initiate, Magical Discoveries); a feature with limited uses casts its pick free with them. A feature tagged
   // "spellbook" (Evocation Savant) adds spells to prepare from instead.
   const featurePicksOf = (kind: "spell" | "cantrip") =>
     offers
       .filter((offer) => offer.kind === kind && offer.featureId !== null)
-      .flatMap((offer) => offer.taken.map((id) => ({ id, featureId: offer.featureId! })));
+      .flatMap((offer) => offer.taken.map((id) => ({ id, featureId: offer.featureId!, classId: offer.classId })));
   const spellbookFeatures = new Set(
     granted.filter(({ record }) => record.tags.includes(SPELLBOOK_TAG)).map(({ record }) => record.id)
   );
-  const pickedEntry = (pick: Readonly<{ id: string; featureId: string }>, kind: "spell" | "cantrip"): SpellEntry => {
+  const castingClassIds = new Set(classSpells.map((budget) => budget.classId));
+  /** The casting class a source casts as, or null for a species, a feat, or a class that casts nothing. */
+  const castingClassOf = (source: SpellSource): string | null => {
+    const classId = source.startsWith("class:") ? source.slice("class:".length) : null;
+    return classId !== null && castingClassIds.has(classId) ? classId : null;
+  };
+  const pickedEntry = (
+    pick: Readonly<{ id: string; featureId: string; classId: string | null }>,
+    kind: "spell" | "cantrip"
+  ): SpellEntry => {
     const record = library.spellRecord(pick.id);
-    const source = sourceOfFeature(pick.featureId);
+    const source = sourceOfFeature(pick.featureId, pick.classId);
     const spellbook = spellbookFeatures.has(pick.featureId);
     const uses = kind === "spell" ? interpreted.pickedSpellUses.get(pick.featureId) : undefined;
+    const castsAs = castingClassOf(source);
     return {
       id: pick.id,
       name: record?.name ?? pick.id,
       level: record?.level ?? (kind === "cantrip" ? 0 : 1),
       prepared: !spellbook,
       alwaysPrepared: !spellbook,
-      ...(casting && source === "class" ? { classId: classRecord.id } : {}),
+      ...(castsAs ? { classId: castsAs } : {}),
       source,
       ...(uses ? { free: uses } : {})
     };
@@ -949,23 +1077,24 @@ export function buildCharacterDefinition(
       existing.alwaysPrepared = true;
     }
   };
-  // The ability each source casts with: the species' or a feat's chosen one, else an ability the grant names, else
-  // the class's (a non-caster falls back to the first of those, then Intelligence).
+  // The ability each source casts with: a class's own, the species' or a feat's chosen one, else an ability the grant
+  // names, else the first caster's (a non-caster falls back to the first of those, then Intelligence).
   const chosenAbility = new Map<SpellSource, Ability>();
   for (const offer of offers) {
     if (offer.kind !== SPELLCASTING_ABILITY_KIND) continue;
     const ability = ABILITIES.find((candidate) => candidate === offer.taken[0]);
-    if (ability && !chosenAbility.has(sourceOfFeature(offer.featureId)))
-      chosenAbility.set(sourceOfFeature(offer.featureId), ability);
+    const source = sourceOfFeature(offer.featureId, offer.classId);
+    if (ability && !chosenAbility.has(source)) chosenAbility.set(source, ability);
   }
   const grantAbility = new Map<SpellSource, Ability>();
   for (const grantedSpell of interpreted.grantedSpells)
     if (grantedSpell.ability && !grantAbility.has(grantedSpell.source))
       grantAbility.set(grantedSpell.source, grantedSpell.ability);
+  const casterAbility = new Map(classSpells.map((budget) => [budget.classId, budget.casting.ability] as const));
   const fallbackAbility: Ability =
-    casting?.ability ?? [...chosenAbility.values(), ...grantAbility.values()][0] ?? "int";
+    classSpells[0]?.casting.ability ?? [...chosenAbility.values(), ...grantAbility.values()][0] ?? "int";
   const abilityOf = (source: SpellSource): Ability =>
-    (source === "class" && casting ? casting.ability : undefined) ??
+    (castingClassOf(source) !== null ? casterAbility.get(castingClassOf(source)!) : undefined) ??
     chosenAbility.get(source) ??
     grantAbility.get(source) ??
     fallbackAbility;
@@ -978,112 +1107,119 @@ export function buildCharacterDefinition(
       modifier: abilityModifier(score)
     };
   };
+  for (const row of strayClassSpellRows) {
+    const named = classOf.get(row.classId ?? startingId);
+    reject(
+      named
+        ? `${named.record.name} has no spell list to choose spells from.`
+        : `"${row.id}" is chosen for "${row.classId}", a class this character has no levels in.`
+    );
+  }
   let spellcasting: Record<string, unknown> | undefined;
-  if (casting) {
-    const listSlug = classSpellListSlug(casting.spellListId ?? classRecord.id, survey.extraSpellLists);
-    let listOptions: Map<string, { id: string; name: string; level?: number }>;
-    try {
-      listOptions = new Map(resolveCatalogChoice(listSlug, catalogs).map((option) => [option.id, option]));
-    } catch (error) {
-      if (error instanceof CatalogChoiceError)
-        reject(`The ${classRecord.name} spell list could not be resolved: ${error.message}`);
-      throw error;
-    }
-    // Pact Magic is N slots all of one level, rising by replacing that level, so `pactSlots` replaces
-    // `spellSlots` rather than merging with it.
-    const slots = levelRow.pactSlots
-      ? levelRow.pactSlots.slots > 0
-        ? [{ level: levelRow.pactSlots.level, max: levelRow.pactSlots.slots }]
-        : []
-      : (levelRow.spellSlots ?? [])
-          .map((count, index) => ({ level: index + 1, max: count }))
-          .filter((slot) => slot.max > 0);
-    const maxSlotLevel = slots.reduce((highest, slot) => Math.max(highest, slot.level), 0);
+  if (classSpells.length > 0) {
+    const { slots, pact } = spellSlotsOf(classes);
     // SRD: an always-prepared granted spell doesn't count against the prepared limit, so the grant wins
     // and a matching pick is not charged to the cap. A feature's always-prepared spell (Magic Initiate) counts too.
     const alwaysPreparedGrants = new Set([
-      ...interpreted.grantedSpells.filter((granted) => granted.alwaysPrepared).map((granted) => granted.id),
+      ...interpreted.grantedSpells.filter((entry) => entry.alwaysPrepared).map((entry) => entry.id),
       ...featureSpellEntries.filter((entry) => entry.alwaysPrepared).map((entry) => entry.id)
     ]);
-    const chargedCantripRows = classCantripRows.filter((row) => !alwaysPreparedGrants.has(row.id));
-    const chargedPreparedRows = preparedSpellRows.filter((row) => !alwaysPreparedGrants.has(row.id));
-    // The printed row plus granted extras (Thaumaturge's extra cantrip); the wizard composes the same sum.
-    const cantripCap = printedCantrips + (extraPickBudgets.get(CLASS_CANTRIP_BUDGET) ?? 0);
-    if (chargedCantripRows.length > cantripCap)
-      reject(
-        `${classRecord.name} knows ${cantripCap} cantrips at level ${input.level}; got ${chargedCantripRows.length}.`
-      );
-    const preparedCap = printedPrepared + (extraPickBudgets.get(CLASS_SPELL_BUDGET) ?? 0);
-    if (chargedPreparedRows.length > preparedCap)
-      reject(
-        `${classRecord.name} ${casting.prepares === "prepared" ? "prepares" : "knows"} ${preparedCap} spells at level ${input.level}; got ${chargedPreparedRows.length}.`
-      );
     const spells: SpellEntry[] = [];
-    // Every id the ledger claimed, so "chosen twice" still rejects when both rows defer to one grant.
-    const claimedSpellIds = new Set<string>();
-    for (const row of classCantripRows) {
-      const option = listOptions.get(row.id) ?? reject(`"${row.id}" is not on the ${classRecord.name} spell list.`);
-      if (option.level !== 0) reject(`"${row.id}" is a level-${option.level} spell, not a cantrip.`);
-      if (claimedSpellIds.has(option.id)) reject(`"${row.id}" is chosen twice.`);
-      claimedSpellIds.add(option.id);
-      if (alwaysPreparedGrants.has(option.id)) continue; // the grant supplies it, uncharged
-      spells.push({
-        id: option.id,
-        name: option.name,
-        level: 0,
-        prepared: true,
-        alwaysPrepared: true,
-        source: "class"
-      });
-    }
-    for (const row of preparedSpellRows) {
-      const option = listOptions.get(row.id) ?? reject(`"${row.id}" is not on the ${classRecord.name} spell list.`);
-      const spellLevel = option.level ?? 0;
-      if (spellLevel < 1) reject(`"${row.id}" is a cantrip - record it as a "cantrip" choice.`);
-      if (spellLevel > maxSlotLevel)
+    // Every id the ledger claimed, and for which class, so "chosen twice" still rejects when both rows defer to one
+    // grant. A spell sits on the sheet once, so two classes cannot both prepare it.
+    const claimedBy = new Map<string, string>();
+    for (const budget of classSpells) {
+      const entry = classOf.get(budget.classId)!;
+      let listOptions: Map<string, { id: string; name: string; level?: number }>;
+      try {
+        listOptions = new Map(resolveCatalogChoice(budget.listSlug, catalogs).map((option) => [option.id, option]));
+      } catch (error) {
+        if (error instanceof CatalogChoiceError)
+          reject(`The ${budget.className} spell list could not be resolved: ${error.message}`);
+        throw error;
+      }
+      const chargedCantripRows = budget.cantripRows.filter((row) => !alwaysPreparedGrants.has(row.id));
+      const chargedPreparedRows = budget.spellRows.filter((row) => !alwaysPreparedGrants.has(row.id));
+      // The printed row plus granted extras (Thaumaturge's extra cantrip); the wizard composes the same sum.
+      if (chargedCantripRows.length > budget.cantrips)
         reject(
-          `"${row.id}" is level ${spellLevel}, above the highest slot level (${maxSlotLevel}) at ${classRecord.name} ${input.level}.`
+          `${budget.className} knows ${budget.cantrips} cantrips at level ${entry.level}; got ${chargedCantripRows.length}.`
         );
-      if (claimedSpellIds.has(option.id)) reject(`"${row.id}" is chosen twice.`);
-      claimedSpellIds.add(option.id);
-      if (alwaysPreparedGrants.has(option.id)) continue; // the grant supplies it, uncharged and always prepared
-      spells.push({
-        id: option.id,
-        name: option.name,
-        level: spellLevel,
-        prepared: true,
-        alwaysPrepared: false,
-        classId: classRecord.id,
-        source: "class"
-      });
+      if (chargedPreparedRows.length > budget.prepared)
+        reject(
+          `${budget.className} ${budget.casting.prepares === "prepared" ? "prepares" : "knows"} ${budget.prepared} spells at level ${entry.level}; got ${chargedPreparedRows.length}.`
+        );
+      const claim = (row: CharacterChoice) => {
+        const earlier = claimedBy.get(row.id);
+        if (earlier === budget.className) reject(`"${row.id}" is chosen twice.`);
+        if (earlier !== undefined)
+          reject(`"${row.id}" is already chosen for ${earlier}; a spell is on the sheet once.`);
+        claimedBy.set(row.id, budget.className);
+      };
+      for (const row of budget.cantripRows) {
+        const option = listOptions.get(row.id) ?? reject(`"${row.id}" is not on the ${budget.className} spell list.`);
+        if (option.level !== 0) reject(`"${row.id}" is a level-${option.level} spell, not a cantrip.`);
+        claim(row);
+        if (alwaysPreparedGrants.has(option.id)) continue; // the grant supplies it, uncharged
+        spells.push({
+          id: option.id,
+          name: option.name,
+          level: 0,
+          prepared: true,
+          alwaysPrepared: true,
+          source: `class:${budget.classId}`
+        });
+      }
+      for (const row of budget.spellRows) {
+        const option = listOptions.get(row.id) ?? reject(`"${row.id}" is not on the ${budget.className} spell list.`);
+        const spellLevel = option.level ?? 0;
+        if (spellLevel < 1) reject(`"${row.id}" is a cantrip - record it as a "cantrip" choice.`);
+        if (spellLevel > budget.maxSlotLevel)
+          reject(
+            `"${row.id}" is level ${spellLevel}, above the highest slot level (${budget.maxSlotLevel}) at ${budget.className} ${entry.level}.`
+          );
+        claim(row);
+        if (alwaysPreparedGrants.has(option.id)) continue; // the grant supplies it, uncharged and always prepared
+        spells.push({
+          id: option.id,
+          name: option.name,
+          level: spellLevel,
+          prepared: true,
+          alwaysPrepared: false,
+          classId: budget.classId,
+          source: `class:${budget.classId}`
+        });
+      }
     }
     for (const entry of [...featureCantripEntries, ...featureSpellEntries]) addSpell(spells, entry);
     for (const grantedSpell of interpreted.grantedSpells) addSpell(spells, grantedSpellEntry(grantedSpell));
-    const { saveDc, attackBonus } = numbersOf("class");
+    const lead = classSpells[0];
+    const { saveDc, attackBonus } = numbersOf(`class:${lead.classId}`);
     // Spells become actions with the numbers of the ability their source casts with; the sheet sends only an id.
     linkSpellActions(spells, interpreted.actions, numbersOf, library, slots.length > 0);
-    // Top-level fields stay populated (the schema demands the combined pool when per-class slots exist).
+    // Top-level fields stay populated (the schema demands the combined pool when per-class slots exist); a lone
+    // caster also records the pool as its own.
     spellcasting = {
-      ability: casting.ability,
+      ability: lead.casting.ability,
       saveDc,
       attackBonus,
       slots,
+      ...(pact ? { pact } : {}),
       // `prepared` is the composed cap the sheet shows.
-      classes: [
-        {
-          classId: classRecord.id,
-          ability: casting.ability,
-          saveDc,
-          attackBonus,
-          slots,
-          ...(levelRow.preparedCount !== undefined ? { prepared: preparedCap } : {})
-        }
-      ],
+      classes: classSpells.map((budget) => {
+        const numbers = numbersOf(`class:${budget.classId}`);
+        return {
+          classId: budget.classId,
+          ability: budget.casting.ability,
+          saveDc: numbers.saveDc,
+          attackBonus: numbers.attackBonus,
+          ...(classSpells.length === 1 ? { slots } : {}),
+          ...(classOf.get(budget.classId)!.row.preparedCount !== undefined ? { prepared: budget.prepared } : {})
+        };
+      }),
       spells: spells.map(sheetSpell)
     };
   } else {
-    if (preparedSpellRows.length > 0 || classCantripRows.length > 0)
-      reject(`${classRecord.name} has no spell list to choose spells from.`);
     const extraSpells: SpellEntry[] = [];
     for (const entry of [
       ...interpreted.grantedSpells.map(grantedSpellEntry),
@@ -1094,7 +1230,7 @@ export function buildCharacterDefinition(
     if (extraSpells.length > 0) {
       // A non-caster with granted/feat spells: model them so the sheet can cast them. With no slots, only the
       // free casts are actions.
-      const { saveDc, attackBonus } = numbersOf("class");
+      const { saveDc, attackBonus } = numbersOf(`class:${startingId}`);
       linkSpellActions(extraSpells, interpreted.actions, numbersOf, library, false);
       spellcasting = {
         ability: fallbackAbility,
@@ -1106,7 +1242,8 @@ export function buildCharacterDefinition(
     }
   }
 
-  // ---- 10. Starting inventory: the chosen class + background equipment options, catalog-resolved. ----
+  // ---- 10. Starting inventory: the starting class's and the background's equipment options, catalog-resolved. A
+  // class taken later brings no equipment. ----
   const equipmentRows = input.choices.filter((row) => row.kind === "equipment");
   const inventory: InventoryItem[] = [];
   let goldPieces = 0;
@@ -1211,15 +1348,15 @@ export function buildCharacterDefinition(
   const speedFeet = Math.max(0, species.speedFeet + interpreted.speedBonus);
   const dexModifier = abilityModifier(finalScores.dex);
   // The same AC function `instantiate` re-runs. Unarmored Defense is passed into the equipment step
-  // because a shield alone makes it answer; `allowShield` decides whether it still applies.
-  const unarmoredDefense = interpreted.unarmoredDefense
-    ? {
-        bonus: abilityModifier(finalScores[interpreted.unarmoredDefense.ability]),
-        allowShield: interpreted.unarmoredDefense.allowShield
-      }
-    : null;
-  const equipmentAc = armorClassFromEquipment(dexModifier, inventory, unarmoredDefense);
-  const unarmoredAc = unarmoredDefense ? 10 + dexModifier + unarmoredDefense.bonus : null;
+  // because a shield alone makes it answer; `allowShield` decides whether it still applies. With several ways to
+  // calculate AC only one applies at a time (SRD Multiclassing), so the best one for this loadout is used.
+  const unarmoredDefenses = interpreted.unarmoredDefenses.map((entry) => ({
+    bonus: abilityModifier(finalScores[entry.ability]),
+    allowShield: entry.allowShield
+  }));
+  const equipmentAc = bestArmorClass(dexModifier, inventory, unarmoredDefenses);
+  const unarmoredAc =
+    unarmoredDefenses.length > 0 ? Math.max(...unarmoredDefenses.map((entry) => 10 + dexModifier + entry.bonus)) : null;
   const wearingArmor = inventory.some((item) => item.equipped && item.category === "armor" && item.armor);
   // The flat non-equipment part of AC travels in the definition's extension bag so `instantiate` can
   // re-derive AC from the live loadout without dropping it (`armorClassRiderOf` in actor-roster.ts).
@@ -1228,12 +1365,19 @@ export function buildCharacterDefinition(
   const initiativeBonus = dexModifier + interpreted.initiativeBonus;
 
   // ---- 12. Assemble, validate through the canonical schema, done. ----
+  const classLine = classes
+    .map(
+      (entry) =>
+        `${entry.record.name}${classes.length > 1 ? ` ${entry.level}` : ""}${entry.subclass ? ` (${entry.subclass.name})` : ""}`
+    )
+    .join(" / ");
   const summary = [
-    `Level ${input.level} ${species.name}${lineage ? ` (${lineage.name})` : ""} ${classRecord.name}${subclass ? ` (${subclass.name})` : ""}`,
+    `Level ${input.level} ${species.name}${lineage ? ` (${lineage.name})` : ""} ${classLine}`,
     background.name
   ]
     .join(" · ")
     .slice(0, 280);
+  const sequenceRow = classLevelsRow(sequence);
   return ActorDefinitionSchema.parse({
     schemaId: "vtt.actor-character",
     schemaVersion: 1,
@@ -1244,7 +1388,11 @@ export function buildCharacterDefinition(
     abilityScores: finalScores,
     proficiencyBonus,
     armorClass,
-    hitPoints: { maximum: hitPointMaximum, formula: `${input.level}d${faces}` },
+    // The one-term formula can only name one die; a multiclass sheet's Hit Dice come from its class rows.
+    hitPoints: {
+      maximum: hitPointMaximum,
+      ...(classes.length === 1 ? { formula: `${input.level}d${hitDieFaces(classRecord.hitDie)}` } : {})
+    },
     initiativeBonus,
     speedFeet,
     actions: interpreted.actions,
@@ -1254,14 +1402,8 @@ export function buildCharacterDefinition(
       "open5e.srd-2024": {
         traits: interpreted.traits,
         ...(armorClassRider !== 0 ? { armorClassBonus: armorClassRider } : {}),
-        ...(interpreted.unarmoredDefense
-          ? {
-              unarmoredDefense: {
-                ability: interpreted.unarmoredDefense.ability,
-                allowShield: interpreted.unarmoredDefense.allowShield
-              }
-            }
-          : {})
+        ...(interpreted.unarmoredDefenses.length > 0 ? { unarmoredDefense: interpreted.unarmoredDefenses[0] } : {}),
+        ...(interpreted.unarmoredDefenses.length > 1 ? { unarmoredDefenses: interpreted.unarmoredDefenses } : {})
       }
     },
     ...(interpreted.damageResistances.length > 0 ? { damageResistances: dedupe(interpreted.damageResistances) } : {}),
@@ -1270,15 +1412,13 @@ export function buildCharacterDefinition(
       ? { conditionImmunities: dedupe(interpreted.conditionImmunities) }
       : {}),
     character: {
-      classes: [
-        {
-          id: classRecord.id,
-          name: classRecord.name,
-          level: input.level,
-          hitDie: classRecord.hitDie,
-          ...(subclass ? { subclass: { id: subclass.id, name: subclass.name } } : {})
-        }
-      ],
+      classes: classes.map((entry) => ({
+        id: entry.record.id,
+        name: entry.record.name,
+        level: entry.level,
+        hitDie: entry.record.hitDie,
+        ...(entry.subclass ? { subclass: { id: entry.subclass.id, name: entry.subclass.name } } : {})
+      })),
       race: {
         id: species.id,
         name: species.name,
@@ -1299,11 +1439,14 @@ export function buildCharacterDefinition(
       // Ids and provenance only; riders stay on the catalog record and are recomputed on every read.
       features: heldFeatures,
       // The provenance ledger verbatim (level-up and respec prefill from it), plus the rolled hit points
-      // so a level-down/level-up round trip can restore the character.
+      // so a level-down/level-up round trip can restore the character, and a multiclass sheet's level order.
       choices: [
-        ...input.choices.filter((row) => row.kind !== "hp-roll" && row.kind !== ABILITY_SCORES_KIND),
+        ...input.choices.filter(
+          (row) => row.kind !== "hp-roll" && row.kind !== ABILITY_SCORES_KIND && row.kind !== CLASS_LEVELS_KIND
+        ),
         abilityScoresRow(input),
-        ...hitPointRollRows(input)
+        ...(sequenceRow ? [sequenceRow] : []),
+        ...hitPointRollRows(input, sequence)
       ]
     },
     proficiencies,
@@ -1311,4 +1454,18 @@ export function buildCharacterDefinition(
     startingInventory: inventory,
     startingCurrency: { cp: 0, sp: 0, ep: 0, gp: goldPieces, pp: 0 }
   });
+}
+
+/** The best Armor Class equipped items give with any one of these alternative calculations (or none), or null when
+ *  nothing equipped answers (no armor or shield). */
+function bestArmorClass(
+  dexModifier: number,
+  inventory: readonly InventoryItem[],
+  unarmoredDefenses: readonly UnarmoredDefense[]
+): number | null {
+  const options = [null, ...unarmoredDefenses].map((unarmored) =>
+    armorClassFromEquipment(dexModifier, inventory, unarmored)
+  );
+  const answered = options.filter((value): value is number => value !== null);
+  return answered.length > 0 ? Math.max(...answered) : null;
 }

@@ -377,6 +377,8 @@ export type BuilderOffersRequest = Readonly<{
   backgroundId?: string;
   classId?: string;
   level: number;
+  /** The class each character level went to, in order (index 0 is level 1); absent for one class. */
+  classLevels?: readonly string[];
   picks?: Readonly<Record<string, readonly string[]>>;
   asiIncreases?: Readonly<Record<string, readonly BuilderAbilityIncrease[]>>;
   choices?: readonly CharacterChoice[];
