@@ -36,7 +36,10 @@ ability-only`. The builder later _fills the same fields_; no consumer changes. (
 3. **Immutable definition vs. live actor split**, mirroring `hitDice`/`actionUses`:
    identity, proficiency selections, and spell _capability_ live on `ActorDefinition`; live
    `spellSlots`/`pactSlots`/`preparedSpellIds`/`inventory`/`currency` live on `Actor`, seeded
-   in `instantiate()` and projected **owner-only**.
+   in `instantiate()` and projected **owner-only**. (Since 2026-10-16 a Long Rest keeps the
+   prepared list and opens a prepare step, `Actor.preparation`, in which a Cleric, Druid or
+   Wizard player changes it within the cap, a Paladin or Ranger one spell; the GM may change it
+   any time, and `character.finish-preparing` closes the step.)
 
 4. **Players initiate their own rolls; the server still resolves and authorizes.** Damage to
    monsters stays a GM-applied step — players never reduce another creature's HP. All

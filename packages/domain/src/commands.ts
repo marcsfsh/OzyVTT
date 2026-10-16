@@ -713,6 +713,14 @@ export const CharacterSetPreparedSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** Closes the prepare step a Long Rest opened: the prepared list stands until the next one. */
+export const CharacterFinishPreparingSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const CharacterSetInventorySchema = z
   .object({
     commandId: z.uuid(),

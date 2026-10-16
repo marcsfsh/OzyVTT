@@ -6,7 +6,7 @@ machine-derivable surfaces of the app (state shape, command catalog, HTTP paths)
 file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.
 
 - API version `1` · realtime protocol `1`
-- 11 GameState fields · 92 commands · 209 HTTP paths
+- 11 GameState fields · 93 commands · 210 HTTP paths
 
 ## GameState shape
 
@@ -70,6 +70,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `
 | `character.claim` | `actor:write` |
 | `character.create` | `actor:write` |
 | `character.discard-draft` | `actor:write` |
+| `character.finish-preparing` | `actor:write` |
 | `character.force-release` | `actor:write` |
 | `character.generate` | `actor:write` |
 | `character.rebuild` | `actor:write` |
@@ -219,6 +220,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/actors/{actorId}/death-save`
 - `POST /api/v1/game/actors/{actorId}/effects`
 - `POST /api/v1/game/actors/{actorId}/effects/{effectId}/end`
+- `POST /api/v1/game/actors/{actorId}/finish-preparing`
 - `POST /api/v1/game/actors/{actorId}/heal`
 - `POST /api/v1/game/actors/{actorId}/health-display`
 - `POST /api/v1/game/actors/{actorId}/hp`

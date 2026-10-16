@@ -7,6 +7,7 @@ import { effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { endEffect, removeConditionDirect, type EffectNarration } from "./effects.js";
 import { requireActorAccess, type Initiator } from "./authorization.js";
+import { openPreparation } from "./spellcasting.js";
 import { healActor } from "./hit-points.js";
 
 /** Takes `count` dice off a multiclass pool, biggest die first (the order the roll uses). The caller has
@@ -118,7 +119,7 @@ export function applyRest(
         condition.id === "exhaustion" ? { ...condition, level: (condition.level ?? 1) - 1 } : condition
       );
   }
-  // SRD long rest: spell slots (and Pact Magic) refill and prepared spells reset to the sheet's defaults.
+  // SRD long rest: spell slots (and Pact Magic) refill.
   // No spellcasting leaves these untouched.
   const longRestDefinition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
   if (actor.spellSlots && longRestDefinition?.spellcasting) {
@@ -135,9 +136,7 @@ export function applyRest(
       .map((slot) => ({ ...slot, remaining: maxByLevel.get(slot.level)! }));
   }
   restorePactSlots(actor, longRestDefinition);
-  if (longRestDefinition?.spellcasting)
-    actor.preparedSpellIds = longRestDefinition.spellcasting.spells
-      .filter((spell) => spell.prepared || spell.alwaysPrepared)
-      .map((spell) => spell.id);
+  // The prepared list stands; a caster that prepares after a Long Rest gets the step to change it.
+  openPreparation(actor, longRestDefinition);
   return events;
 }

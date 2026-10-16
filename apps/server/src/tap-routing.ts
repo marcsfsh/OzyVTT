@@ -1,9 +1,9 @@
 import type { Actor, CombatState, GameState, RuleMode } from "@vtt/domain";
 import { d20Die } from "@vtt/rules-5e";
-import type { ActorAction } from "@vtt/schemas";
+import type { ActorAction, ActorDefinition } from "@vtt/schemas";
 import { effectiveModeFor, familyModeFor, overrideCovers, type RuleId } from "./rules-families.js";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
-import { castSlot, noUsesRemaining, slotsLeft, spendSlot, useLimitFor } from "./resolution/economy.js";
+import { castSlot, noUsesRemaining, slotsLeft, spendSlot, unpreparedSpell, useLimitFor } from "./resolution/economy.js";
 
 /**
  * Where an action tap goes, decided by the server. The sheet sends intent; the server answers:
@@ -79,7 +79,8 @@ export function spendLooseUses(
   action: ActorAction,
   siblings: readonly ActorAction[],
   slotLevel?: number,
-  slots: RuleMode = "strict"
+  slots: RuleMode = "strict",
+  definition?: ActorDefinition
 ): Readonly<{ usesLeft: number | null; spent: boolean; warning?: string }> {
   const uses = action.uses && action.uses.per !== "turn" && action.uses.per !== "encounter" ? action.uses : null;
   const key = uses ? (uses.pool ?? action.id) : null;
@@ -87,18 +88,20 @@ export function spendLooseUses(
   const used = key ? (actor.actionUses[key] ?? 0) : 0;
   if (key && used >= limit) throw new CommandRejectedError(noUsesRemaining(action, limit));
   const slot = action.spellSlot ? castSlot(actor, action.spellSlot.level, slotLevel) : null;
-  const refusal =
+  const slotRefusal =
     slot && action.spellSlot && slot.level < action.spellSlot.level
       ? `${action.name} needs a slot of level ${action.spellSlot.level} or higher.`
       : slot && slotsLeft(actor, slot.level, slot.pact) <= 0
         ? `${action.name} spends a level-${slot.level} ${slot.pact ? "Pact Magic" : "spell"} slot - ${actor.name} has none left.`
         : null;
+  const refusal = unpreparedSpell(actor, action, definition) ?? slotRefusal;
   if (refusal !== null && slots === "strict") throw new CommandRejectedError(refusal);
   if (key) actor.actionUses = { ...actor.actionUses, [key]: used + 1 };
-  if (slot && refusal === null) spendSlot(actor, slot);
+  const spendsSlot = slot !== null && slotRefusal === null;
+  if (spendsSlot) spendSlot(actor, slot);
   return {
     usesLeft: key ? limit - used - 1 : null,
-    spent: key !== null || (slot !== null && refusal === null),
+    spent: key !== null || spendsSlot,
     ...(refusal !== null && slots === "assisted" ? { warning: refusal } : {})
   };
 }

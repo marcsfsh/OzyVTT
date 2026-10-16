@@ -282,6 +282,7 @@ export function CharacterSheet({
             onFeedback={setFeedback}
             spellSaveDcBonus={derived?.spellSaveDcBonus ?? 0}
             policeSlots={slotsPoliced}
+            canPrepare={role === "gm" || Boolean(actor.preparation)}
             castSpellAction={castSpellAction}
             routeSpell={(spell) => {
               const structured = structuredAttacks

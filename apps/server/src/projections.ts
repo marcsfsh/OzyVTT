@@ -362,6 +362,7 @@ const PLAYER_ACTOR_FIELDS = {
   spellSlots: "derived",
   pactSlots: "derived",
   preparedSpellIds: "derived",
+  preparation: "derived",
   inventory: "derived",
   currency: "derived",
   notes: "never",
@@ -407,6 +408,7 @@ function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): P
  * | definition (the imported sheet)         |  Y   |  -  |       -        |     Y      |          Y          |
  * | actionUses, hitDice                     |  Y   |  -  |       -        |     -      |          Y          |
  * | spellSlots, pactSlots, preparedSpellIds |  Y   |  -  |       -        |     -      |          Y          |
+ * | preparation (Long Rest prepare step)    |  Y   |  -  |       -        |     -      |          Y          |
  * | inventory, currency                     |  Y   |  -  |       -        |     -      |          Y          |
  * | notes, ownerSessionId, conditionImmunities, legendary, lastUsedAt, archived, sheetPreview: never, at any tier. |
  *
@@ -456,6 +458,7 @@ export function projectPlayerView(
           spellSlots,
           pactSlots,
           preparedSpellIds,
+          preparation,
           inventory,
           currency,
           replaySceneId
@@ -512,6 +515,7 @@ export function projectPlayerView(
                 spellSlots: spellSlots === null ? null : spellSlots.map((slot) => ({ ...slot })),
                 pactSlots: pactSlots === null ? null : { ...pactSlots },
                 preparedSpellIds: [...preparedSpellIds],
+                preparation: preparation === null ? null : { ...preparation },
                 inventory: inventory.map((item) => ({ ...item })),
                 currency: { ...currency }
               }

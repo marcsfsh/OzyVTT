@@ -37,10 +37,12 @@ const RULE_FAMILIES = {
   "attack.cleave-too-far": "targeting",
   // Being Charmed by your target is a targeting restriction, not an economy one.
   "condition.charmed-charmer": "targeting",
-  // Spell slots are their own family, so "Don't police spell slots" relaxes these and nothing else.
+  // Spellcasting is its own family, so "Don't police spell slots or prepared spells" relaxes these and nothing else.
   "slots.none-remaining": "slots",
   "slots.below-spell-level": "slots",
-  "slots.one-per-turn": "slots"
+  "slots.one-per-turn": "slots",
+  // Casting a spell the character hasn't prepared is spellcasting bookkeeping too.
+  "slots.not-prepared": "slots"
 } as const satisfies Record<string, RuleFamily>;
 
 export type RuleId = keyof typeof RULE_FAMILIES;

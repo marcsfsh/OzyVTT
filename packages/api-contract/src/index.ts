@@ -204,6 +204,7 @@ export const GAME_PATHS = {
   actorSpendHitDice: `${API_NAMESPACE}/game/actors/{actorId}/spend-hit-dice`,
   characterSetSlot: `${API_NAMESPACE}/game/actors/{actorId}/spell-slot`,
   characterSetPrepared: `${API_NAMESPACE}/game/actors/{actorId}/prepared-spell`,
+  characterFinishPreparing: `${API_NAMESPACE}/game/actors/{actorId}/finish-preparing`,
   characterSetInventory: `${API_NAMESPACE}/game/actors/{actorId}/inventory`,
   characterSetCurrency: `${API_NAMESPACE}/game/actors/{actorId}/currency`,
   characterSetIdentity: `${API_NAMESPACE}/game/actors/{actorId}/identity`,
@@ -538,6 +539,11 @@ export const GAME_COMMANDS = {
   "actor.spend-hit-dice": { scope: "actor:write", method: "post", path: GAME_PATHS.actorSpendHitDice },
   "character.set-slot": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetSlot },
   "character.set-prepared": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetPrepared },
+  "character.finish-preparing": {
+    scope: "actor:write",
+    method: "post",
+    path: GAME_PATHS.characterFinishPreparing
+  },
   "character.set-inventory": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetInventory },
   "character.set-currency": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetCurrency },
   "character.set-identity": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetIdentity },

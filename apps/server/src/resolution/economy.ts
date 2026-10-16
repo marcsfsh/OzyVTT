@@ -110,6 +110,10 @@ export function evaluateActionEconomy(
   const slots = checkActionSlots(evaluation);
   const spendLegendary = checkLegendary(evaluation, definition);
   const spendSpellSlot = continued === null ? checkSpellSlot(evaluation) : null;
+  if (continued === null) {
+    const unprepared = unpreparedSpell(attacker, action, definition);
+    if (unprepared) evaluation.violations.push({ rule: "slots.not-prepared", message: unprepared });
+  }
   checkTargeting(evaluation, distanceFeet);
   const opensSpell = spendSpellSlot !== null && slots.markAction && slots.instance?.components[action.id] !== undefined;
   return {
@@ -439,6 +443,23 @@ function checkSpellSlot({ state, attacker, action, slotLevel, violations }: Eval
       message: `${attacker.name} has already cast a spell with a spell slot this turn - only one per turn.`
     });
   return pact ? { level, pact: true } : { level };
+}
+
+/** Why a spell cast with a slot is refused for not being prepared (SRD: you cast the spells you have prepared), or
+ *  null. Cantrips, always-prepared spells, anything not on the sheet's list (an item's cast) and a sheet that keeps
+ *  no prepared list (an import with no prepared cap) need nothing. */
+export function unpreparedSpell(
+  actor: Pick<LiveActor, "name" | "preparedSpellIds">,
+  action: Pick<DefinitionAction, "spellSlot" | "spellId">,
+  definition: ActorDefinition | undefined
+): string | null {
+  if (!action.spellSlot || action.spellId === undefined) return null;
+  const spell = definition?.spellcasting?.spells.find((entry) => entry.id === action.spellId);
+  if (!spell || spell.level === 0 || spell.alwaysPrepared || actor.preparedSpellIds.includes(spell.id)) return null;
+  const classes = definition!.spellcasting!.classes ?? [];
+  const casting = classes.length === 1 ? classes[0] : classes.find((entry) => entry.classId === spell.classId);
+  if (casting?.prepared === undefined) return null;
+  return `${actor.name} hasn't prepared ${spell.name}.`;
 }
 
 type SlotPools = Pick<LiveActor, "spellSlots"> & Partial<Pick<LiveActor, "pactSlots">>;

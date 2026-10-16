@@ -350,7 +350,7 @@ export const actionCommands = [
       const { state, duplicate } = await execute((draft) => {
         requireActorAccess(initiator, draft, actorId, "attack");
         const live = draft.actors.find((candidate) => candidate.id === actorId)!;
-        spend = spendLooseUses(live, action, available, castLevel, slotsModeFor(draft));
+        spend = spendLooseUses(live, action, available, castLevel, slotsModeFor(draft), definition);
         plan.forEach((entry, index) => {
           const resolution = rollDice(entry.formula, (sides) => kit.context.random(sides));
           recordRoll(draft, {

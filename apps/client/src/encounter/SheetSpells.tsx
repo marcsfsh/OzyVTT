@@ -66,6 +66,7 @@ function SpellCastControls({
   liveRemaining,
   pact,
   policeSlots,
+  prepared,
   free,
   busy,
   onCastSlot,
@@ -79,8 +80,10 @@ function SpellCastControls({
   liveRemaining: ReadonlyMap<number, number>;
   /** Pact Magic slots, which cast any of the character's spells at their level; the server spends them first. */
   pact: PactPool | null;
-  /** Whether an empty slot level blocks the cast here. */
+  /** Whether an empty slot level, or an unprepared spell, blocks the cast here. */
   policeSlots: boolean;
+  /** Prepared (or always prepared): the spells a caster casts with a slot. */
+  prepared: boolean;
   /** A free casting: the uses it has left, or null at will. */
   free: Readonly<{ left: number | null }> | null;
   busy: boolean;
@@ -107,7 +110,7 @@ function SpellCastControls({
     isCantrip ||
     (chosen === "free"
       ? free !== null && free.left !== 0
-      : options.length > 0 && (!policeSlots || remainingAt(level) > 0));
+      : options.length > 0 && (!policeSlots || (prepared && remainingAt(level) > 0)));
   return (
     <>
       <span
@@ -207,7 +210,8 @@ export function SheetSpells({
   routeSpell,
   castSpellAction,
   spellSaveDcBonus = 0,
-  policeSlots = true
+  policeSlots = true,
+  canPrepare = true
 }: Readonly<{
   actor: GmActor | PlayerActor;
   definition: ActorDefinition;
@@ -221,9 +225,11 @@ export function SheetSpells({
   castSpellAction: (actionId: string, slotLevel?: number) => void;
   /** The server's sum of standing spell-save-DC riders (an item, a feat), which the cast DC includes. */
   spellSaveDcBonus?: number;
-  /** Whether a cast with no slot left is refused here; otherwise the server warns or lets it pass ("Don't police
-   *  spell slots"). */
+  /** Whether a cast with no slot left, or of a spell not prepared, is refused here; otherwise the server warns or
+   *  lets it pass ("Don't police spell slots or prepared spells"). */
   policeSlots?: boolean;
+  /** Whether the prepared toggles work now: the GM's always do, a player's in the step a Long Rest opens. */
+  canPrepare?: boolean;
 }>) {
   const { rollFlat } = rolls;
   const spellcasting = definition.spellcasting;
@@ -248,6 +254,8 @@ export function SheetSpells({
   // `resolveSpellcasting` applies the resolution order (per-class entry by classId, the lone-entry
   // shortcut, then top-level fields), so a multiclass caster gets one row per casting class.
   const casterEntries = spellcasting.classes ?? [];
+  // A sheet with a prepared cap keeps a prepared list; an import without one casts whatever it lists.
+  const keepsPreparedList = casterEntries.some((entry) => entry.prepared !== undefined);
   const casterRows = (casterEntries.length > 0 ? casterEntries.map((entry) => entry.classId) : [undefined]).flatMap(
     (classId) => {
       const resolved = resolveSpellcasting(spellcasting, classId);
@@ -358,6 +366,24 @@ export function SheetSpells({
             </Fragment>
           ))}
         </div>
+        {actor.preparation && (
+          <div className="sheet-prepare-step" role="group" aria-label="Change prepared spells">
+            <p>
+              Long Rest: change your prepared spells
+              {actor.preparation.changesLeft === null
+                ? "."
+                : ` - ${actor.preparation.changesLeft} ${actor.preparation.changesLeft === 1 ? "swap" : "swaps"} left.`}
+            </p>
+            <button
+              type="button"
+              className="secondary"
+              disabled={busy}
+              onClick={() => void edit("character:finish-preparing", { actorId: actor.id })}
+            >
+              Done
+            </button>
+          </div>
+        )}
         {pact && pact.max > 0 && (
           <div className="sheet-spell-group-head">
             <h4>Pact Magic · {ordinal(pact.level)} level</h4>
@@ -414,8 +440,14 @@ export function SheetSpells({
                             <button
                               type="button"
                               className={`sheet-prep-tag toggle${isPrepared ? " on" : ""}`}
-                              disabled={busy}
-                              title={isPrepared ? "Prepared - tap to unprepare" : "Not prepared - tap to prepare"}
+                              disabled={busy || !canPrepare}
+                              title={
+                                !canPrepare
+                                  ? `${isPrepared ? "Prepared" : "Not prepared"} - change it after a Long Rest`
+                                  : isPrepared
+                                    ? "Prepared - tap to unprepare"
+                                    : "Not prepared - tap to prepare"
+                              }
                               onClick={() => {
                                 void edit("character:set-prepared", {
                                   actorId: actor.id,
@@ -455,6 +487,7 @@ export function SheetSpells({
                               liveRemaining={liveSlotRemaining}
                               pact={pact}
                               policeSlots={policeSlots}
+                              prepared={isPrepared || !keepsPreparedList}
                               free={freeCastOf(spell)}
                               busy={busy}
                               onCastSlot={(castLevel) => castSpell(spell, castLevel)}

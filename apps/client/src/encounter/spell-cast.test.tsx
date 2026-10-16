@@ -198,3 +198,47 @@ describe("a Warlock's Pact Magic on the sheet", () => {
     });
   });
 });
+
+describe("the prepare step after a Long Rest", () => {
+  const cleric = {
+    ...definition,
+    actions: [],
+    spellcasting: {
+      ability: "wis",
+      slots: [{ level: 1, max: 2 }],
+      classes: [{ classId: "cleric", ability: "wis", prepared: 1 }],
+      spells: [{ id: "bless", name: "Bless", level: 1, prepared: true, alwaysPrepared: false, classId: "cleric" }]
+    }
+  } as unknown as ActorDefinition;
+  const mountCleric = (preparation: { changesLeft: number | null } | null, canPrepare: boolean) => {
+    const edit = vi.fn(() => Promise.resolve({ ok: true }));
+    render(
+      <SheetSpells
+        actor={{ ...actor, preparedSpellIds: [], preparation } as unknown as GmActor}
+        definition={cleric}
+        busy={false}
+        edit={edit as unknown as SheetEdit}
+        rolls={{ rollFlat: vi.fn() } as unknown as SheetRolls}
+        onFeedback={() => {}}
+        routeSpell={() => false}
+        castSpellAction={vi.fn()}
+        canPrepare={canPrepare}
+      />
+    );
+    return edit;
+  };
+
+  it("offers the step and its Done, with the prepare toggles live", () => {
+    const edit = mountCleric({ changesLeft: null }, true);
+    expect(screen.getByText("Long Rest: change your prepared spells.")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Prepare" }) as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(edit).toHaveBeenLastCalledWith("character:finish-preparing", { actorId: actor.id });
+  });
+
+  it("holds the toggles, and won't cast an unprepared spell, outside the step", () => {
+    mountCleric(null, false);
+    expect((screen.getByRole("button", { name: "Prepare" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Cast" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+});

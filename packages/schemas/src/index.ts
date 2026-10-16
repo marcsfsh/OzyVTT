@@ -849,6 +849,13 @@ export const ActorSchema = z.object({
     .default(null),
   /** Spell ids prepared right now, re-chosen on a long rest. Owner-only. */
   preparedSpellIds: z.array(z.string().max(80)).max(400).default([]),
+  /** Open after a Long Rest for a caster that changes its prepared spells then (SRD Spell Preparation by Class): the
+   *  spells it may still swap in (null: any number). Null when closed. Owner-only. */
+  preparation: z
+    .object({ changesLeft: z.number().int().min(0).max(60).nullable() })
+    .strict()
+    .nullable()
+    .default(null),
   /** Carried inventory, seeded from the definition's starting loadout. Owner-only. */
   inventory: z.array(InventoryItemSchema).max(200).default([]),
   /** Coin purse, seeded from the definition's starting currency. Owner-only. */

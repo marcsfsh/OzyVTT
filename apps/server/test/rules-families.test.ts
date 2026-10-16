@@ -61,10 +61,11 @@ describe("rule families", () => {
       ["condition.charmed-charmer", "targeting"],
       ["attack.cleave-same-target", "targeting"],
       ["attack.cleave-too-far", "targeting"],
-      // "Don't police spell slots" relaxes exactly these.
+      // "Don't police spell slots or prepared spells" relaxes exactly these.
       ["slots.none-remaining", "slots"],
       ["slots.below-spell-level", "slots"],
-      ["slots.one-per-turn", "slots"]
+      ["slots.one-per-turn", "slots"],
+      ["slots.not-prepared", "slots"]
     ];
     for (const [rule, family] of expected) expect(familyOf(rule), rule).toBe(family);
     expect(expected.map(([rule]) => rule).sort()).toEqual([...RULE_IDS].sort());
