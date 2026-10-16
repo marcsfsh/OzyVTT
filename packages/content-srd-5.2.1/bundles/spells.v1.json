@@ -1009,7 +1009,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": false,
+  "attackRoll": true,
   "damage": {
    "roll": null,
    "types": []
@@ -1446,7 +1446,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": "1d4",
    "types": []
@@ -1832,7 +1832,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": "1d8",
    "types": [
@@ -2081,7 +2081,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": "1d4",
    "types": []
@@ -2457,7 +2457,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -4336,7 +4336,7 @@
   "duration": "10 minutes",
   "concentration": true,
   "ritual": false,
-  "attackRoll": false,
+  "attackRoll": true,
   "damage": {
    "roll": "3d12",
    "types": [
@@ -6157,7 +6157,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -7900,7 +7900,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -8626,7 +8626,7 @@
   "duration": "10 minutes",
   "concentration": false,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": "2d8",
    "types": [
@@ -9560,7 +9560,7 @@
   "duration": "8 hours",
   "concentration": false,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -11291,7 +11291,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": "2d8",
    "types": [
@@ -11675,7 +11675,7 @@
   "duration": "1 hour",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": "1d6",
    "types": [
@@ -12097,7 +12097,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -12147,7 +12147,7 @@
   "duration": "1 hour",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": "1d6",
    "types": [
@@ -13039,7 +13039,7 @@
   "duration": "1 hour",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -13135,7 +13135,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -14004,7 +14004,7 @@
   "duration": "1 hour",
   "concentration": false,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -14300,7 +14300,7 @@
   "duration": "1 hour",
   "concentration": false,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -15355,7 +15355,7 @@
   "duration": "1 minute",
   "concentration": false,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -15404,7 +15404,7 @@
   "duration": "1 hour",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -15959,7 +15959,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": "4d10",
    "types": [
@@ -17199,7 +17199,7 @@
   "duration": "10 minutes",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -17404,7 +17404,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": "1d8",
    "types": []
@@ -18156,7 +18156,7 @@
   "duration": "1 minute",
   "concentration": false,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -18388,6 +18388,7 @@
      "type": "fire"
     }
    ],
+   "noCastSave": true,
    "healing": null
   },
   "classes": [
@@ -19051,7 +19052,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": "2d6",
    "types": [
@@ -20147,7 +20148,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": false,
+  "attackRoll": true,
   "damage": {
    "roll": "1d8",
    "types": [
@@ -21924,7 +21925,7 @@
   "duration": "instantaneous",
   "concentration": false,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": "1d6",
    "types": [

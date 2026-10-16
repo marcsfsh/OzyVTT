@@ -157,10 +157,10 @@ const REFUSED_CASTS: ReadonlyArray<readonly [string, string]> = [
   ["web", "{roll: '2d4', types: ['fire']} is the damage of BURNING webs, and the cast rolls it on every press"],
   [
     "ray-of-enfeeblement",
-    "attackRoll true + {roll: '1d8', types: []} -> a 1d8 Force SPELL ATTACK; the SRD prints neither, and the 1d8 is what the TARGET subtracts from its own damage rolls"
+    "{roll: '1d8', types: []} -> a 1d8 Force damage action; the 1d8 is what the TARGET subtracts from its own damage rolls"
   ],
-  ["protection-from-evil-and-good", "attackRoll true on a ward that rolls nothing at anybody"],
-  ["faerie-fire", "attackRoll true on a spell whose only roll is the target's Dexterity save"]
+  ["protection-from-evil-and-good", "a ward that rolls nothing at anybody"],
+  ["faerie-fire", "a spell whose only roll is the target's Dexterity save"]
 ];
 
 describe("the cast rules apply to every authored cast", () => {
@@ -190,8 +190,7 @@ describe("the cast rules apply to every authored cast", () => {
   });
 
   it("names no spell the record marks as an attack roll", () => {
-    // The `attackRoll` column is set by any mention of an attack roll in the text, including other
-    // creatures' attacks, so no authored cast may rely on it.
+    // An item's cast takes its attack from the spell's cast model, so none of them relies on this column.
     for (const cast of AUTHORED_CASTS) {
       const spell = view.spellRecord!(cast.spellId)!;
       expect(

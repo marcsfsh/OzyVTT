@@ -23,7 +23,7 @@ import {
 import { outDir, sourcePath } from "./paths.js";
 import { SPELL_SAVE_OVERRIDE_IDS, spellSaveOutcomeFor, statBlockSaveOutcome } from "./save-outcomes.js";
 import { areaOfProse, withProseFacts } from "../src/action-prose.js";
-import { castingOptionsFor, spellEffectFor } from "./spell-effects.js";
+import { castingOptionsFor, makesSpellAttack, spellEffectFor } from "./spell-effects.js";
 import { castingTimeText, SPELL_FIELD_CORRECTIONS } from "./spell-corrections.js";
 
 const sourceDir = sourcePath("open5e-srd-2024");
@@ -839,6 +839,11 @@ const spellRecords = onlySrd(spells).map((spell) => {
   const fields = { ...spell.fields, ...correction };
   if (fields.saving_throw_ability && !abilityShort[fields.saving_throw_ability])
     throw new Error(`${spell.pk}: unexpected save ability ${fields.saving_throw_ability}`);
+  const effect = spellEffectFor(slugOf(spell.pk), fields.desc, fields.damage_roll || null, fields.damage_types, {
+    distance: fields.range,
+    unit: fields.range_unit,
+    text: fields.range_text || null
+  });
   return {
     id: slugOf(spell.pk),
     name: fields.name,
@@ -857,7 +862,7 @@ const spellRecords = onlySrd(spells).map((spell) => {
     duration: fields.duration,
     concentration: fields.concentration,
     ritual: fields.ritual,
-    attackRoll: fields.attack_roll,
+    attackRoll: makesSpellAttack(fields.desc, effect),
     damage: { roll: fields.damage_roll || null, types: [...fields.damage_types] },
     save: fields.saving_throw_ability
       ? { ability: abilityShort[fields.saving_throw_ability], ...spellSaveOutcomeFor(slugOf(spell.pk), fields.desc) }
@@ -867,11 +872,7 @@ const spellRecords = onlySrd(spells).map((spell) => {
       ? { type: fields.shape_type, size: fields.shape_size, unit: fields.shape_size_unit }
       : null,
     area: areaOfProse(fields.desc),
-    effect: spellEffectFor(slugOf(spell.pk), fields.desc, fields.damage_roll || null, fields.damage_types, {
-      distance: fields.range,
-      unit: fields.range_unit,
-      text: fields.range_text || null
-    }),
+    effect,
     classes: fields.classes.map(slugOf).sort(),
     description: fields.desc,
     higherLevel: fields.higher_level || null,

@@ -173,6 +173,8 @@ const NO_CAST_SAVE: ReadonlySet<string> = new Set([
   "power-word-stun",
   "prismatic-wall",
   "sanctuary",
+  // The save comes at the start of each of the target's turns, after the fire; the hit carries the first 1d6.
+  "searing-smite",
   "sleet-storm",
   "spirit-guardians",
   "stinking-cloud",
@@ -571,6 +573,17 @@ export function spellEffectFor(
     ...(failureEffect ? { failureEffect: structuredClone(failureEffect) } : {}),
     ...(reaction ? { reaction } : {})
   };
+}
+
+/** Whether the caster makes a spell attack roll, when it casts or on a later turn (Flame Blade's slashes, Arcane
+ *  Hand's Clenched Fist). The source's `attack_roll` is set by any mention of an attack roll, so it marks Bless and
+ *  Shining Smite too. */
+export function makesSpellAttack(description: string, effect: SpellEffect): boolean {
+  return (
+    effect.attacks > 0 ||
+    (effect.laterActions ?? []).some((row) => row.attackRange !== undefined) ||
+    /\bmakes? (?:an?|one) (?:ranged|melee) spell attack\b/i.test(description)
+  );
 }
 
 function castDamage(id: string, roll: string | null, types: readonly string[], heals: boolean): Damage {

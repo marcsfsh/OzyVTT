@@ -34,3 +34,21 @@ describe("a spell card's header", () => {
     expect(spell("jump").components.materialText).toBe("a grasshopper's hind leg");
   });
 });
+
+describe("what a spell card says a cast rolls", () => {
+  it("marks an attack roll only where the caster makes a spell attack, now or on a later turn", () => {
+    for (const id of ["fire-bolt", "guiding-bolt", "spiritual-weapon", "arcane-hand", "flame-blade"])
+      expect(spell(id).attackRoll, id).toBe(true);
+    // Each only mentions attack rolls: other creatures', or ones against the target.
+    for (const id of ["shining-smite", "bless", "faerie-fire", "hunters-mark", "vicious-mockery"])
+      expect(spell(id).attackRoll, id).toBe(false);
+  });
+
+  it("asks for Searing Smite's save at the start of the target's turns, not when it is cast", () => {
+    expect(spell("searing-smite").save?.ability).toBe("con");
+    expect(spell("searing-smite").effect).toMatchObject({
+      noCastSave: true,
+      damage: [{ formula: "1d6", type: "fire" }]
+    });
+  });
+});

@@ -145,6 +145,8 @@ export const SpellReferenceSchema = z.object({
   duration: z.string().min(1).max(120),
   concentration: z.boolean(),
   ritual: z.boolean(),
+  /** The caster makes a spell attack roll, when it casts or on a later turn: read from the cast model for the SRD,
+   *  since the source marks every spell whose text mentions an attack roll (Bless, Shining Smite). */
   attackRoll: z.boolean(),
   damage: z.object({ roll: z.string().nullable(), types: z.array(z.string()) }),
   /** The save the spell forces: the ability the target rolls and what the save does. The caster supplies the DC. */
@@ -158,7 +160,7 @@ export const SpellReferenceSchema = z.object({
    *  own field, which records a line's width as its size and has no emanations. */
   area: ActionAreaSchema.nullable().default(null),
   /** What one cast does to its targets: the spell attacks it makes, the damage it deals, the hit points it restores.
-   *  Read from the text at build time with a reviewed table, because the source's `damage` and `attackRoll` columns
+   *  Read from the text at build time with a reviewed table, because the source's `damage` and `attack_roll` columns
    *  describe the prose (Hex's later 1d6, Faerie Fire's "attack rolls against"), not a cast. A zone, a summons or a
    *  rider on later hits casts with none of these, and stays for the GM. Actions built from a spell read this. */
   effect: SpellEffectSchema.nullable().default(null),
