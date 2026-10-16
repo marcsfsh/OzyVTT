@@ -998,7 +998,7 @@ describe("Agonizing Blast: a spell-gated rider adds the caster's own ability mod
 
 // `FeatureChoiceSchema.maximum`. An `ability-score` rider raises a named ability and honours its own
 // `maximum`; a choice lets the player pick the ability, as the epic boons do ("increase one ability
-// score by 1, to a maximum of 30"). Without a choice-level ceiling the offer consumer clamps at 20,
+// score by 1, to a maximum of 30"). Without a choice-level ceiling the build refuses a pick past 20,
 // which would make every boon useless for a character already at 20.
 describe("an ability-score choice raises past 20 when it says so", () => {
   /** STR 18 rolled + the background's +2 = exactly 20 before the boon. */
@@ -1018,16 +1018,15 @@ describe("an ability-score choice raises past 20 when it says so", () => {
     expect(actionOf(built, "item-greatsword").attack!.bonus).toBe(8);
   });
 
-  it("stops at 20 when the choice names no maximum - the SRD default is unchanged", () => {
-    // Negative control: the cap is not lifted for every choice.
-    const built = build({ ...AT_TWENTY, boon: false });
-    expect(built.definition.abilityScores.str).toBe(20);
-    expect(actionOf(built, "item-greatsword").attack!.bonus).toBe(8); // +5 either way; the score is the assertion
+  it("refuses a pick past 20 when the choice names no maximum - the SRD default is unchanged", () => {
+    // Negative control: the cap is not lifted for every choice. The pick is refused, not quietly dropped.
+    expect(() => build({ ...AT_TWENTY, boon: false })).toThrowError(
+      /STR would be 21; Rift Apotheosis cannot raise a score above 20/
+    );
   });
 
   it("honours a maximum BELOW 20 too, because the field is a ceiling and not a boon flag", () => {
-    const built = build({ ...AT_TWENTY, boon: 20 });
-    expect(built.definition.abilityScores.str).toBe(20);
+    expect(() => build({ ...AT_TWENTY, boon: 20 })).toThrowError(/cannot raise a score above 20/);
   });
 
   it("still climbs when the score is nowhere near either ceiling", () => {

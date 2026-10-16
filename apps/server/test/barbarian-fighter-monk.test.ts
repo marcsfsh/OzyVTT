@@ -12,6 +12,7 @@ import { criticalThreshold, effectiveActions } from "../src/effective-actions.js
 import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { initiativeRollMode, startEncounter } from "../src/encounter.js";
 import { saveRollSources } from "../src/saving-throws.js";
+import { currentSpeedFeet } from "../src/speed.js";
 
 // Barbarian, Fighter and Monk mechanics, asserted as numbers a player can act on: sheet AC, the DC a
 // target is held to, the die the engine keeps, the counter it spends, or the refusal it prints. Runs
@@ -311,6 +312,14 @@ describe("Barbarian: the sheet's own numbers", () => {
   });
 });
 
+describe("Barbarian: Improved Brutal Strike keeps both of its printed levels", () => {
+  it("carries the level-13 effects and the level-17 upgrade in one description", () => {
+    const feature = view.classRecord("barbarian")!.features.find((entry) => entry.id === "improved-brutal-strike")!;
+    expect(feature.description).toContain("Staggering Blow");
+    expect(feature.description).toContain("At level 17: The extra damage of your Brutal Strike increases to 2d10");
+  });
+});
+
 describe("Barbarian: Primal Knowledge raises a budget the wizard already had", () => {
   it("accepts a THIRD class skill and refuses a fourth, naming 3", () => {
     // The printed `skillChoices.choose` is 2; the third skill comes from
@@ -571,18 +580,29 @@ describe("Barbarian: the Epic Boon a level-19 Barbarian lost outright", () => {
     expect(featIds(build(barbarianInput(18)))).toEqual(["savage-attacker"]);
   });
 
-  it("refuses a feat that is not an Epic Boon, and refuses the boon before level 19", () => {
-    const wrongCategory = barbarianInput();
-    wrongCategory.choices = wrongCategory.choices
-      .filter(
-        (row) =>
-          row.id !== "boon-of-combat-prowess" &&
-          !(row.kind === "ability-score" && row.payload?.featureId === "boon-of-combat-prowess")
-      )
-      .concat([
-        { level: 19, classId: "barbarian", kind: "feat", id: "alert", payload: { featureId: "epic-boon" } }
-      ] as Row[]);
-    expect(() => build(wrongCategory)).toThrowError(/alert/i);
+  it("takes any feat the Barbarian qualifies for, refuses one it does not, and refuses the boon before level 19", () => {
+    // SRD: "You gain an Epic Boon feat or another feat of your choice for which you qualify."
+    const withFeat = (id: string) => {
+      const input = barbarianInput();
+      input.choices = input.choices
+        .filter(
+          (row) =>
+            row.id !== "boon-of-combat-prowess" &&
+            !(row.kind === "ability-score" && row.payload?.featureId === "boon-of-combat-prowess")
+        )
+        .concat([{ level: 19, classId: "barbarian", kind: "feat", id, payload: { featureId: "epic-boon" } }] as Row[]);
+      return input;
+    };
+    expect(featIds(build(withFeat("alert")))).toEqual(["savage-attacker", "alert"]);
+    // Boon of Spell Recall needs the Spellcasting feature, which a Barbarian lacks.
+    const recall = withFeat("boon-of-spell-recall");
+    recall.choices.push({
+      level: 19,
+      kind: "ability-score",
+      id: "cha",
+      payload: { featureId: "boon-of-spell-recall" }
+    } as Row);
+    expect(() => build(recall)).toThrowError(/Boon of Spell Recall needs the Spellcasting feature/);
 
     const tooEarly = barbarianInput(18);
     tooEarly.choices.push({
@@ -922,6 +942,19 @@ describe("Monk: the sheet's own numbers", () => {
   it("Unarmored Defense is 10 + Dex + WISDOM - the other half of the shared feature id", () => {
     expect(twenty.abilityScores).toMatchObject({ dex: 24, wis: 24 });
     expect(twenty.armorClass).toBe(24); // 10 + 7 + 7
+  });
+
+  it("Unarmored Movement follows the printed column on the speed the token moves at", () => {
+    // Halfling 30. The bonus waits for the live loadout, so the stored walking speed stays 30.
+    const speedAt = (level: number) => {
+      const built = onTheTable(build(monkInput(level)), { fight: false });
+      return currentSpeedFeet(built.hero, derivationOf(built));
+    };
+    expect(twenty.speedFeet).toBe(30);
+    expect(speedAt(1)).toBe(30);
+    expect(speedAt(2)).toBe(40);
+    expect(speedAt(6)).toBe(45);
+    expect(speedAt(20)).toBe(60);
   });
 
   it("Body and Mind passes 20, and Disciplined Survivor makes every save proficient", () => {

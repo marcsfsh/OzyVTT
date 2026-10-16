@@ -873,7 +873,7 @@
         "choice": {
           "kind": "asi-or-feat",
           "choose": 1,
-          "fromCatalog": "general-feats",
+          "fromCatalog": "feats",
           "repeatable": true
         }
       },
@@ -966,7 +966,7 @@
         "choice": {
           "kind": "feat",
           "choose": 1,
-          "fromCatalog": "epic-boon-feats"
+          "fromCatalog": "feats"
         }
       },
       {
@@ -1813,7 +1813,7 @@
         "choice": {
           "kind": "asi-or-feat",
           "choose": 1,
-          "fromCatalog": "general-feats",
+          "fromCatalog": "feats",
           "repeatable": true
         }
       },
@@ -1897,7 +1897,7 @@
         "choice": {
           "kind": "feat",
           "choose": 1,
-          "fromCatalog": "epic-boon-feats"
+          "fromCatalog": "feats"
         }
       },
       {
@@ -2617,7 +2617,7 @@
         "choice": {
           "kind": "asi-or-feat",
           "choose": 1,
-          "fromCatalog": "general-feats",
+          "fromCatalog": "feats",
           "repeatable": true
         }
       },
@@ -2644,7 +2644,7 @@
         "choice": {
           "kind": "feat",
           "choose": 1,
-          "fromCatalog": "epic-boon-feats"
+          "fromCatalog": "feats"
         }
       },
       {
@@ -2656,6 +2656,7 @@
           "kind": "spell",
           "choose": 2,
           "fromCatalog": "wizard-spells",
+          "minSpellLevel": 3,
           "maxSpellLevel": 3
         }
       }

@@ -94,6 +94,7 @@ const wizardInput = (): MutableCreateInput => ({
     { level: 1, classId: "wizard", kind: "skill", id: "insight" },
     { level: 1, kind: "skill", id: "perception", payload: { featureId: "elf-keen-senses" } },
     { level: 1, kind: "lineage", id: "high-elf" },
+    { level: 1, kind: "spellcasting-ability", id: "int", payload: { featureId: "elf-lineage" } },
     { level: 2, classId: "wizard", kind: "expertise", id: "arcana", payload: { featureId: "scholar" } },
     { level: 3, classId: "wizard", kind: "subclass", id: "evoker" },
     { level: 3, kind: "spell", id: "shatter", payload: { featureId: "evocation-savant" } },
@@ -105,6 +106,7 @@ const wizardInput = (): MutableCreateInput => ({
     { level: 1, kind: "cantrip", id: "dancing-lights", payload: { featureId: "magic-initiate-wizard" } },
     // Magic Initiate's level-1 spell pick.
     { level: 1, kind: "spell", id: "magic-missile", payload: { featureId: "magic-initiate-wizard" } },
+    { level: 1, kind: "spellcasting-ability", id: "int", payload: { featureId: "magic-initiate-wizard" } },
     { level: 1, kind: "spell", id: "magic-missile" },
     { level: 1, kind: "spell", id: "mage-armor" },
     { level: 1, kind: "spell", id: "detect-magic" },
@@ -187,6 +189,7 @@ const warlockInput = (): MutableCreateInput => ({
     { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "spellcasting-ability", id: "wis", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "equipment", id: "warlock-a" },
     { level: 1, kind: "equipment", id: "acolyte-a" }
   ]
@@ -230,9 +233,19 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
     expect(definition.initiativeBonus).toBe(4);
   });
 
-  it("computes rolled HP as max(roll, average) per level on the class hit die", () => {
-    // Level 1: 10+2. Rolls 1/10/4/6 vs d10 average 6 -> 6/10/6/6, +2 Con each = 48.
-    expect(definition.hitPoints.maximum).toBe(48);
+  it("counts each rolled level as rolled, on the class hit die (SRD)", () => {
+    // Level 1: 10+2. Rolls 1/10/4/6, +2 Con each = 41.
+    expect(definition.hitPoints.maximum).toBe(41);
+  });
+
+  it("raises a roll below the average to it only when the table's policy says so", () => {
+    // Rolls 1/10/4/6 vs the d10 average 6 -> 6/10/6/6, +2 Con each = 48.
+    const floored = buildCharacterDefinition(
+      fighterInput(),
+      library,
+      BuilderPolicySchema.parse({ hitPointRollFloor: "average" })
+    );
+    expect(floored.hitPoints.maximum).toBe(48);
   });
 
   it("derives AC from the equipped starting armor via the shared rules function, plus the Defense rider", () => {
@@ -311,11 +324,22 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
       "defense",
       "savage-attacker"
     ]);
-    // The ledger is the input's rows verbatim, plus the rolled hit points the build consumed, so a
-    // level-down/level-up round trip lands on the same maximum.
-    expect((definition.character?.choices ?? []).filter((row) => row.kind !== "hp-roll")).toEqual(
-      fighterInput().choices
-    );
+    // The ledger is the input's rows verbatim, plus how the scores were made and the rolled hit points the
+    // build consumed, so a level-down/level-up round trip lands on the same sheet.
+    expect(
+      (definition.character?.choices ?? []).filter((row) => row.kind !== "hp-roll" && row.kind !== "ability-scores")
+    ).toEqual(fighterInput().choices);
+    expect((definition.character?.choices ?? []).filter((row) => row.kind === "ability-scores")).toEqual([
+      {
+        level: 1,
+        kind: "ability-scores",
+        id: "standard-array",
+        payload: {
+          baseScores: fighterInput().baseScores,
+          backgroundBonusAllocation: fighterInput().backgroundBonusAllocation
+        }
+      }
+    ]);
     expect((definition.character?.choices ?? []).filter((row) => row.kind === "hp-roll")).toEqual(
       (fighterInput().hp.entries ?? []).map((roll, index) => ({
         level: index + 2,
@@ -375,7 +399,7 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
     expect(actor.kind).toBe("player-character");
     expect(actor.definitionId).toBe(`import-${ACTOR_ID}`);
     expect(state.definitions.map((entry) => entry.id)).toEqual([`import-${ACTOR_ID}`]);
-    expect(actor.hp).toEqual({ current: 48, maximum: 48, temporary: 0 });
+    expect(actor.hp).toEqual({ current: 41, maximum: 41, temporary: 0 });
     // `instantiate` re-derives AC from the loadout, so the builder's flat rider (Defense +1) must survive.
     expect(actor.armorClass).toBe(17);
     expect(actor.armorClass).toBe(definition.armorClass);
@@ -439,13 +463,17 @@ describe("buildCharacterDefinition - Wizard 3 (high-elf sage, Evoker)", () => {
     ]);
     expect(spells.get("fire-bolt")?.alwaysPrepared).toBe(true); // class cantrip
     expect(spells.get("prestidigitation")?.alwaysPrepared).toBe(true); // High Elf lineage grant
+    // Magic Initiate keeps its level 1 spell always prepared with a free casting, so the class pick of the
+    // same spell is not charged to the prepared cap.
     expect(spells.get("magic-missile")).toMatchObject({
       level: 1,
       prepared: true,
-      alwaysPrepared: false,
-      classId: "wizard"
+      alwaysPrepared: true,
+      freeActionId: "spell-magic-missile-free"
     });
-    expect(spells.get("shatter")).toMatchObject({ level: 2, prepared: true }); // savant pick, outside the prepared cap
+    expect(spells.get("mage-armor")).toMatchObject({ alwaysPrepared: false, classId: "wizard" });
+    // Evocation Savant adds to the spellbook ("add them to your spellbook for free"): known, not prepared.
+    expect(spells.get("shatter")).toMatchObject({ level: 2, prepared: false, alwaysPrepared: false });
   });
 
   it("marks Scholar expertise on a proficient skill and folds species + background proficiencies", () => {
@@ -454,7 +482,8 @@ describe("buildCharacterDefinition - Wizard 3 (high-elf sage, Evoker)", () => {
     expect(skills.get("arcana")).toBe("expertise");
     expect(definition.proficiencies?.saves).toEqual(["int", "wis"]);
     expect(definition.proficiencies?.tools).toEqual(["calligraphers-supplies"]);
-    expect(definition.proficiencies?.languages).toEqual(["common", "elvish", "dwarvish", "giant"]);
+    // SRD 5.2.1: Common plus two standard languages; the 2024 Elf grants no language of its own.
+    expect(definition.proficiencies?.languages).toEqual(["common", "dwarvish", "giant"]);
     expect(definition.character?.race).toEqual({
       id: "elf",
       name: "Elf",
@@ -514,9 +543,7 @@ describe("buildCharacterDefinition - Wizard 3 (high-elf sage, Evoker)", () => {
       "magic-missile",
       "minor-illusion",
       "misty-step",
-      "prestidigitation",
-      "shatter",
-      "thunderwave"
+      "prestidigitation"
     ]);
   });
 });
@@ -565,10 +592,14 @@ describe("buildCharacterDefinition - loud rejections", () => {
       /not on the Wizard spell list/
     );
     const overCap = wizardInput();
+    // Mage Armor and Misty Step are charged; Magic Missile is Magic Initiate's and Detect Magic the level-3 High
+    // Elf's, both always prepared and uncharged.
     overCap.choices.push(
       { level: 1, kind: "spell", id: "shield" },
       { level: 1, kind: "spell", id: "sleep" },
-      { level: 1, kind: "spell", id: "burning-hands" }
+      { level: 1, kind: "spell", id: "burning-hands" },
+      { level: 1, kind: "spell", id: "chromatic-orb" },
+      { level: 1, kind: "spell", id: "feather-fall" }
     );
     expect(() => buildCharacterDefinition(overCap, library, defaultPolicy)).toThrowError(
       /prepares 6 spells at level 3; got 7/
@@ -692,6 +723,7 @@ const clericInput = (): MutableCreateInput => ({
     { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "resistance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "spellcasting-ability", id: "wis", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "light" },
     { level: 1, kind: "cantrip", id: "sacred-flame" },
     { level: 1, kind: "cantrip", id: "spare-the-dying" },
@@ -1196,7 +1228,8 @@ describe("the same feat cannot be taken twice across different offers", () => {
     differentList.choices.push(
       { level: 1, kind: "cantrip", id: "fire-bolt", payload: { featureId: "magic-initiate-wizard" } },
       { level: 1, kind: "cantrip", id: "prestidigitation", payload: { featureId: "magic-initiate-wizard" } },
-      { level: 1, kind: "spell", id: "magic-missile", payload: { featureId: "magic-initiate-wizard" } }
+      { level: 1, kind: "spell", id: "magic-missile", payload: { featureId: "magic-initiate-wizard" } },
+      { level: 1, kind: "spellcasting-ability", id: "int", payload: { featureId: "magic-initiate-wizard" } }
     );
     const built = buildCharacterDefinition(differentList, library, defaultPolicy);
     // The Versatile pick replaced Alert here, so the sheet holds both Magic Initiate flavours: same feat

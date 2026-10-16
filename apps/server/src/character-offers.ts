@@ -170,7 +170,7 @@ function optionAsFeature(option: FeatureOption): FeatureRecord {
 const spreadKey = (amounts: readonly number[]) => [...amounts].sort((left, right) => right - left).join("/");
 
 function validateBaseScores(input: CharacterCreateRequestInput, policy: BuilderPolicy): void {
-  if (!policy.allowedAbilityMethods.includes(input.abilityMethod)) {
+  if (!policy.allowedAbilityMethods.includes(input.abilityMethod) && !input.keepsRecordedScores) {
     reject(`The table's builder policy does not allow the "${input.abilityMethod}" ability method.`);
   }
   const values = ABILITIES.map((ability) => input.baseScores[ability]);
@@ -188,6 +188,8 @@ function validateBaseScores(input: CharacterCreateRequestInput, policy: BuilderP
   // "roll" and "custom": the server cannot verify dice it did not throw (physical dice are supported),
   // so it bound-checks each score against what the formula can produce.
   if (input.abilityMethod === "custom" && !policy.customFormula) {
+    // Recorded custom scores were checked against the formula of their day.
+    if (input.keepsRecordedScores) return;
     reject("The custom ability method needs the GM to configure a formula first (builder policy).");
   }
   const formula = input.abilityMethod === "custom" ? policy.customFormula! : ABILITY_ROLL_FORMULA;
@@ -227,6 +229,12 @@ function validateBackgroundAllocation(input: CharacterCreateRequestInput, backgr
     );
   }
 }
+
+/** Whether a record with an optional `level` has arrived by this character level. */
+const reachedBy =
+  (level: number) =>
+  (record: Pick<FeatureRecord, "level">): boolean =>
+    (record.level ?? 1) <= level;
 
 /** Features the class's level rows 1..level grant, with grant counts and grant levels, plus the row for `level`. */
 function grantedClassFeatures(
@@ -287,11 +295,15 @@ type PlacedChoices = Readonly<{
   /** Every feature held so far with its provenance (the origin feat and chosen feats carry `origin: null`). */
   granted: ReadonlyArray<{ record: FeatureRecord; count: number; origin: CharacterFeatureOrigin | null }>;
   chosenFeats: readonly FeatReference[];
+  /** The character level each chosen feat was taken at, by index: what its prerequisites are checked at. */
+  chosenFeatLevels: readonly number[];
   /** Every feat id already held: the cross-offer duplicate guard. */
   heldFeatIds: ReadonlySet<string>;
   extraPickBudgets: ReadonlyMap<string, number>;
   preparedSpellRows: readonly CharacterChoice[];
   classCantripRows: readonly CharacterChoice[];
+  /** Spell lists the class's own spell picks also draw on (Magical Secrets), beside the class's own. */
+  extraSpellLists: readonly string[];
   /** The printed level-row columns, before `extraPickBudgets` is added (step 9 does that sum). */
   printedCantrips: number;
   printedPrepared: number;
@@ -299,6 +311,8 @@ type PlacedChoices = Readonly<{
 }>;
 
 export const CLASS_CANTRIP_BUDGET: NamedPickBudget = "class-cantrips";
+/** The pick of the ability a species' or a feat's spells are cast with (Elven Lineage, Magic Initiate). */
+export const SPELLCASTING_ABILITY_KIND = "spellcasting-ability";
 export const CLASS_SPELL_BUDGET: NamedPickBudget = "class-spells";
 
 /** Steps 1-4 of `buildCharacterDefinition`: every id resolved and every ledger row placed. */
@@ -373,7 +387,7 @@ function surveyBuild(
   if (
     mode === "build" &&
     !input.choices.some((row) => row.kind === "lineage") &&
-    species.traits.some((trait) => trait.choice?.kind === "lineage")
+    species.traits.some((trait) => featurePicks(trait).some((pick) => pick.kind === "lineage"))
   )
     reject(`${species.name} asks for a lineage choice.`);
 
@@ -445,6 +459,7 @@ function placeChoices(
   const catalogs = library.catalogChoiceCatalogs();
   const classFeatures = classRecord ? grantedClassFeatures(classRecord, level).features : new Map();
   const levelRow = classRecord ? classRecord.levelTable[level - 1] : null;
+  const highestSlotLevel = levelRow ? maxSlotLevelOf(levelRow) : 0;
 
   // ---- 3. Collect every granted feature (class rows, subclass, species + lineage, background, origin feat). ----
   const chosenLineageId = choices.find((row) => row.kind === "lineage")?.id ?? null;
@@ -491,13 +506,15 @@ function placeChoices(
         parent: null
       } as const
     })),
-    ...(species?.traits ?? []).map((record) => ({
+    // A species trait's `level` is the character level it arrives at (Draconic Flight at 5, the
+    // Fiendish Legacy spells at 3 and 5).
+    ...(species?.traits ?? []).filter(reachedBy(level)).map((record) => ({
       record,
       count: 1,
       origin: { kind: "species", sourceId: species!.id } as const,
       site: speciesSite
     })),
-    ...(lineage?.traits ?? []).map((record) => ({
+    ...(lineage?.traits ?? []).filter(reachedBy(level)).map((record) => ({
       record,
       count: 1,
       origin: { kind: "lineage", sourceId: lineage!.id } as const,
@@ -680,8 +697,15 @@ function placeChoices(
       }
     }
     /** Options gated on an earlier answer: unmet gates drop out, and if the survivors exactly fill the
-     *  capacity they are adopted without pushing an offer. */
+     *  capacity they are adopted without pushing an offer. An option above this build's level is not offered. */
     let optionRecords = choice.options ?? null;
+    if (optionRecords?.some((option) => (option.level ?? 1) > level)) {
+      optionRecords = optionRecords.filter((option) => (option.level ?? 1) <= level);
+      const reached = new Set(optionRecords.map((option) => option.id));
+      options = new Set(
+        [...options].filter((id) => reached.has(id) || !choice.options!.some((option) => option.id === id))
+      );
+    }
     if (optionRecords?.some((option) => option.requires)) {
       const legal = optionRecords.filter(
         (option) => !option.requires || ledgerAnswered(option.requires.offer, option.requires.id)
@@ -706,10 +730,15 @@ function placeChoices(
         optionRecords,
         unresolvable,
         repeatable: choice.repeatable,
-        maxSpellLevel: choice.maxSpellLevel ?? null,
+        // A class feature's spell pick with no printed ceiling is a spell this caster has slots for (Magical
+        // Discoveries); Mystic Arcanum prints its own level above the slots.
+        maxSpellLevel:
+          choice.maxSpellLevel ??
+          (choice.kind === "spell" && site.classId !== null && highestSlotLevel > 0 ? highestSlotLevel : null),
         minSpellLevel: choice.minSpellLevel ?? null,
         maximum: choice.maximum ?? null,
-        label: record.name,
+        // The ability pick shares its record with the lineage or the feat's spells, so it names itself.
+        label: choice.kind === SPELLCASTING_ABILITY_KIND ? `${record.name}: spellcasting ability` : record.name,
         help: record.description || null,
         ...site
       })
@@ -926,8 +955,8 @@ function placeChoices(
   }
 
   // Pass B: everything else. Class spells/cantrips (step 9), equipment, size and the subclass row aren't
-  // offers. `hp-roll` rows are build output, so an echoed ledger is accepted.
-  const separateKinds = new Set(["equipment", "size", "hp-roll"]);
+  // offers. `hp-roll` and `ability-scores` rows are build output, so an echoed ledger is accepted.
+  const separateKinds = new Set(["equipment", "size", "hp-roll", "ability-scores"]);
   const preparedSpellRows: CharacterChoice[] = [];
   const classCantripRows: CharacterChoice[] = [];
   for (const row of choices) {
@@ -968,6 +997,8 @@ function placeChoices(
     originFeat,
     granted,
     chosenFeats,
+    chosenFeatLevels: chosenFeatSites.map((site) => site.levels[0] ?? 1),
+    extraSpellLists: [...new Set(granted.flatMap(({ record }) => record.extraSpellLists ?? []))],
     heldFeatIds,
     extraPickBudgets,
     preparedSpellRows,
@@ -978,24 +1009,38 @@ function placeChoices(
   };
 }
 
-/** The spell list a class's own cantrip and prepared budgets draw from, and the highest slot level it can
- *  cast; null when the build casts nothing. Pact Magic is all one slot level. */
-export function classSpellList(
-  classRecord: ClassReference,
-  subclass: SubclassReference | null,
-  levelRow: ClassLevelRow,
-  catalogs: CatalogChoiceCatalogs
-): Readonly<{ options: readonly CatalogChoiceOption[]; maxSlotLevel: number; unresolvable: string | null }> | null {
-  const casting = subclass?.spellcasting ?? classRecord.spellcasting ?? null;
-  if (!casting) return null;
+/** The highest spell slot level a class table row gives; Pact Magic is all one level. */
+export function maxSlotLevelOf(levelRow: ClassLevelRow): number {
   const slots = levelRow.pactSlots
     ? levelRow.pactSlots.slots > 0
       ? [levelRow.pactSlots.level]
       : []
     : (levelRow.spellSlots ?? []).flatMap((count, index) => (count > 0 ? [index + 1] : []));
-  const maxSlotLevel = slots.reduce((highest, slotLevel) => Math.max(highest, slotLevel), 0);
+  return slots.reduce((highest, slotLevel) => Math.max(highest, slotLevel), 0);
+}
+
+/** The catalog slug of a class's own spell list, widened by the lists its features add (Magical Secrets). */
+export function classSpellListSlug(listId: string, extraSpellLists: readonly string[]): string {
+  return [listId, ...extraSpellLists.filter((extra) => extra !== listId)].map((id) => `${id}-spells`).join("-or-");
+}
+
+/** The spell list a class's own cantrip and prepared budgets draw from, and the highest slot level it can
+ *  cast; null when the build casts nothing. */
+export function classSpellList(
+  classRecord: ClassReference,
+  subclass: SubclassReference | null,
+  levelRow: ClassLevelRow,
+  catalogs: CatalogChoiceCatalogs,
+  extraSpellLists: readonly string[] = []
+): Readonly<{ options: readonly CatalogChoiceOption[]; maxSlotLevel: number; unresolvable: string | null }> | null {
+  const casting = subclass?.spellcasting ?? classRecord.spellcasting ?? null;
+  if (!casting) return null;
+  const maxSlotLevel = maxSlotLevelOf(levelRow);
   try {
-    const options = resolveCatalogChoice(`${casting.spellListId ?? classRecord.id}-spells`, catalogs);
+    const options = resolveCatalogChoice(
+      classSpellListSlug(casting.spellListId ?? classRecord.id, extraSpellLists),
+      catalogs
+    );
     return { options, maxSlotLevel, unresolvable: null };
   } catch (error) {
     if (!(error instanceof CatalogChoiceError)) throw error;

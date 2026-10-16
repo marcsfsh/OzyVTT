@@ -18,15 +18,17 @@ type OptionInput = z.input<typeof FeatureOptionSchema>;
  */
 type RiderKey =
   "tags" | "actions" | "effects" | "modifiers" | "grants" | "uses" | "extraPicks" | "replaces" | "choice" | "choices";
+/** Feature-only rider keys (an option cannot carry them). */
+type FeatureRiderKey = RiderKey | "extraSpellLists";
 
 /** The rider fields an overlay may add to one pickable option inside a feature's choice. */
-export type OptionMechanics = Partial<Pick<OptionInput, RiderKey>>;
+export type OptionMechanics = Partial<Pick<OptionInput, RiderKey | "requires" | "level">>;
 
 /**
  * The rider fields an overlay may add to a feature. Typed off the schema's input so `.default()`ed
  * keys need not be restated; the build re-parses each finished record.
  */
-export type FeatureMechanics = Partial<Pick<FeatureInput, RiderKey>> & {
+export type FeatureMechanics = Partial<Pick<FeatureInput, FeatureRiderKey>> & {
   /**
    * Riders merged into the feature's inline `choice.options`, by option id. The option must already
    * exist; an id matching nothing fails the build.
@@ -37,12 +39,48 @@ export type FeatureMechanics = Partial<Pick<FeatureInput, RiderKey>> & {
 /** Riders by record id (a class id or a subclass id), then feature id. */
 export type MechanicsOverlay = Readonly<Record<string, Readonly<Record<string, FeatureMechanics>>>>;
 
+/**
+ * A feature the printed text folds into one entry but the rules grant in stages: a spells table's later rows
+ * ("when you reach a Paladin level specified in the table"), a column that grows (Unarmored Movement). A whole
+ * record with its own level, added beside the printed features; prose included, since no heading carries it.
+ */
+export type StagedFeature = FeatureInput & Readonly<{ level: number }>;
+
+/** One spell in a subclass spells table: id, printed name, spell level. */
+export type TableSpell = readonly [id: string, name: string, level: number];
+
+/**
+ * A subclass spells table's rows after the first as staged features ("Oath of Devotion Spells (Level 5)"), each
+ * granting its row's spells always prepared from that class level on, as the hand-authored Life Domain does.
+ */
+export function spellTableStages(
+  featureId: string,
+  name: string,
+  className: string,
+  rows: ReadonlyArray<readonly [level: number, spells: readonly TableSpell[]]>
+): StagedFeature[] {
+  return rows.map(([level, spells]) => ({
+    id: `${featureId}-${level}`,
+    name: `${name} (Level ${level})`,
+    level,
+    description: `When you reach ${className} level ${level}, you always have the ${spells
+      .map(([, spellName]) => spellName)
+      .join(" and ")} spells prepared.`,
+    tags: ["spellcasting"],
+    grants: { spells: spells.map(([id, , spellLevel]) => ({ id, level: spellLevel, alwaysPrepared: true })) }
+  }));
+}
+
 /** What one class file contributes: class features, its subclass's features, and live resource columns. */
 export type ClassMechanicsModule = Readonly<{
   /** Riders keyed by this class's own feature ids. */
   features?: Readonly<Record<string, FeatureMechanics>>;
   /** Riders keyed by SUBCLASS id, then feature id. SRD 5.2.1 prints exactly one subclass per class. */
   subclasses?: Readonly<Record<string, Readonly<Record<string, FeatureMechanics>>>>;
+  /** Staged class features; each joins its level's row of the class table. */
+  stages?: readonly StagedFeature[];
+  /** Staged subclass features, by subclass id. */
+  subclassStages?: Readonly<Record<string, readonly StagedFeature[]>>;
   /**
    * Printed `classResources` columns this module wired to a live pool, so `build-class-bundle.ts`
    * drops their `display: true` and `class-resource-pools.test.ts` requires the pool.

@@ -247,9 +247,10 @@ export type AbilityCapPreview = Readonly<{
 }>;
 
 /**
- * Walks the ability scores in the server's order and reports the first increase past 20. An input
- * check, not a game outcome: the background spread and each ASI row reject above 20, while species
- * increases and feat `ability-score` picks clamp. The server recomputes all of it.
+ * Walks the ability scores in the server's order and reports the first increase past its ceiling. An input
+ * check, not a game outcome: the background spread, each ASI and each feat's ability pick reject above the
+ * ceiling (20, or an Epic Boon's 30), level by level, while species increases clamp. The server recomputes all
+ * of it.
  */
 export function abilityCapPreview(
   draft: BuilderDraft,
@@ -262,13 +263,13 @@ export function abilityCapPreview(
   const scores = Object.fromEntries(ABILITIES.map((ability) => [ability, base[ability]!])) as Record<Ability, number>;
 
   let breach: AbilityCapBreach | null = null;
-  const overflowed = (ability: Ability, offerKey: string | null, fix: string) => {
-    if (scores[ability] <= ABILITY_SCORE_CAP || breach) return;
+  const overflowed = (ability: Ability, maximum: number, offerKey: string | null, fix: string) => {
+    if (scores[ability] <= maximum || breach) return;
     breach = {
       ability,
       total: scores[ability],
       offerKey,
-      reason: `${ABILITY_LABELS[ability]} would be ${scores[ability]} — no ability may go above ${ABILITY_SCORE_CAP}. ${fix}`
+      reason: `${ABILITY_LABELS[ability]} would be ${scores[ability]} - no ability may go above ${maximum} here. ${fix}`
     };
   };
 
@@ -277,6 +278,7 @@ export function abilityCapPreview(
     scores[entry.ability] += entry.amount;
     overflowed(
       entry.ability,
+      ABILITY_SCORE_CAP,
       null,
       `Move ${background ? `${background.name}'s` : "the background's"} increase, or lower ${ABILITY_LABELS[entry.ability]}.`
     );
@@ -288,16 +290,35 @@ export function abilityCapPreview(
       scores[ability] = Math.min(ABILITY_SCORE_CAP, scores[ability] + bonus.amount);
     }
   }
-  for (const offer of offers) {
-    if (offer.kind !== "asi-or-feat") continue;
-    before.set(offer.key, { ...scores });
-    if ((draft.picks[offer.key] ?? [])[0] !== ASI_SHORTHAND) continue;
-    for (const increase of draft.asiIncreases[offer.key] ?? []) {
-      scores[increase.ability] += increase.amount;
+  // Improvements and feat picks in level order, as the server applies them.
+  const raises = offers
+    .filter((offer) => offer.kind === "asi-or-feat" || offer.kind === "ability-score")
+    .sort((left, right) => left.level - right.level);
+  for (const offer of raises) {
+    const picks = draft.picks[offer.key] ?? [];
+    if (offer.kind === "asi-or-feat") {
+      before.set(offer.key, { ...scores });
+      if (picks[0] !== ASI_SHORTHAND) continue;
+      for (const increase of draft.asiIncreases[offer.key] ?? []) {
+        scores[increase.ability] += increase.amount;
+        overflowed(
+          increase.ability,
+          ABILITY_SCORE_CAP,
+          offer.key,
+          `Change the level ${offer.level} improvement, or lower ${ABILITY_LABELS[increase.ability]}.`
+        );
+      }
+      continue;
+    }
+    for (const pick of picks) {
+      if (!ABILITIES.includes(pick as Ability)) continue;
+      const ability = pick as Ability;
+      scores[ability] += 1;
       overflowed(
-        increase.ability,
+        ability,
+        offer.maximum ?? ABILITY_SCORE_CAP,
         offer.key,
-        `Change the level ${offer.level} improvement, or lower ${ABILITY_LABELS[increase.ability]}.`
+        `Choose another ability for ${offer.label}, or lower ${ABILITY_LABELS[ability]}.`
       );
     }
   }
@@ -322,7 +343,9 @@ export type CharacterCreatePayload = Readonly<{
   abilityMethod: BuilderAbilityMethod;
   baseScores: Record<Ability, number>;
   backgroundBonusAllocation: ReadonlyArray<{ ability: Ability; amount: number }>;
-  hp: { mode: "average" | "entries"; entries?: readonly number[] };
+  hp: { mode: "average" | "entries" | "roll"; entries?: readonly number[] };
+  /** The server roll the "roll"/"custom" scores came from, when the wizard rolled them there. */
+  abilityRollId?: string;
   choices: readonly CharacterChoice[];
 }>;
 
@@ -348,7 +371,13 @@ export function buildCreatePayload(draft: BuilderDraft, choices: readonly Charac
     abilityMethod: draft.abilityMethod,
     baseScores: scores,
     backgroundBonusAllocation: draft.backgroundBonus,
-    hp: draft.hpMode === "average" ? { mode: "average" } : { mode: "entries", entries: draft.hpEntries },
+    hp:
+      draft.hpMode === "entries"
+        ? { mode: "entries", entries: draft.hpEntries }
+        : { mode: draft.hpMode === "roll" ? "roll" : "average" },
+    ...(draft.abilityRollId && (draft.abilityMethod === "roll" || draft.abilityMethod === "custom")
+      ? { abilityRollId: draft.abilityRollId }
+      : {}),
     choices
   };
 }

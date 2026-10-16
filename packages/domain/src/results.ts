@@ -350,6 +350,8 @@ const BuilderOfferSchema = z.strictObject({
   capacity: z.number().int().min(0),
   options: z.array(z.strictObject({ id: z.string(), name: z.string(), level: z.number().int().optional() })),
   maxSpellLevel: z.number().int().nullable(),
+  /** The ceiling an ability-score pick from this offer may reach (an Epic Boon's 30); null is the SRD's 20. */
+  maximum: z.number().int().nullable(),
   /** Character level stamped on this offer's ledger rows. */
   level: z.number().int().min(1).max(20),
   classId: z.string().nullable(),

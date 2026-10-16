@@ -725,6 +725,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     reason: "supersession at species-trait scope — the control exists on class features, not here",
     status: "gap"
   },
+  {
+    at: "extraSpellLists",
+    types: "*",
+    reason:
+      "spell lists a feature adds to the class's own picks (Magical Secrets) — no list control at feature scope yet",
+    status: "gap"
+  },
 
   // ---- record-scope gaps, per type ----
   {

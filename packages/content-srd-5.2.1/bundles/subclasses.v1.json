@@ -145,22 +145,98 @@
       {
        "id": "arid",
        "name": "Arid Land",
-       "description": "Blur, Burning Hands, Fire Bolt, Blight, Fireball, Wall of Fire."
+       "description": "Level 3: Blur, Burning Hands, Fire Bolt. Level 5: Fireball. Level 7: Blight. Level 9: Wall of Stone.",
+       "grants": {
+        "spells": [
+         {
+          "id": "blur",
+          "level": 2,
+          "alwaysPrepared": true
+         },
+         {
+          "id": "burning-hands",
+          "level": 1,
+          "alwaysPrepared": true
+         },
+         {
+          "id": "fire-bolt",
+          "level": 0,
+          "alwaysPrepared": true
+         }
+        ]
+       }
       },
       {
        "id": "polar",
        "name": "Polar Land",
-       "description": "Fog Cloud, Hold Person, Ray of Frost, Sleet Storm, Slow, Ice Storm."
+       "description": "Level 3: Fog Cloud, Hold Person, Ray of Frost. Level 5: Sleet Storm. Level 7: Ice Storm. Level 9: Cone of Cold.",
+       "grants": {
+        "spells": [
+         {
+          "id": "fog-cloud",
+          "level": 1,
+          "alwaysPrepared": true
+         },
+         {
+          "id": "hold-person",
+          "level": 2,
+          "alwaysPrepared": true
+         },
+         {
+          "id": "ray-of-frost",
+          "level": 0,
+          "alwaysPrepared": true
+         }
+        ]
+       }
       },
       {
        "id": "temperate",
        "name": "Temperate Land",
-       "description": "Misty Step, Shocking Grasp, Lightning Bolt, Sleet Storm, Freedom of Movement, Ice Storm."
+       "description": "Level 3: Misty Step, Shocking Grasp, Sleep. Level 5: Lightning Bolt. Level 7: Freedom of Movement. Level 9: Tree Stride.",
+       "grants": {
+        "spells": [
+         {
+          "id": "misty-step",
+          "level": 2,
+          "alwaysPrepared": true
+         },
+         {
+          "id": "shocking-grasp",
+          "level": 0,
+          "alwaysPrepared": true
+         },
+         {
+          "id": "sleep",
+          "level": 1,
+          "alwaysPrepared": true
+         }
+        ]
+       }
       },
       {
        "id": "tropical",
        "name": "Tropical Land",
-       "description": "Acid Splash, Ray of Sickness, Web, Stinking Cloud, Polymorph, Insect Plague."
+       "description": "Level 3: Acid Splash, Ray of Sickness, Web. Level 5: Stinking Cloud. Level 7: Polymorph. Level 9: Insect Plague.",
+       "grants": {
+        "spells": [
+         {
+          "id": "acid-splash",
+          "level": 0,
+          "alwaysPrepared": true
+         },
+         {
+          "id": "ray-of-sickness",
+          "level": 1,
+          "alwaysPrepared": true
+         },
+         {
+          "id": "web",
+          "level": 2,
+          "alwaysPrepared": true
+         }
+        ]
+       }
       }
      ]
     }
@@ -327,6 +403,267 @@
      "per": "long-rest",
      "pool": "wild-shape"
     }
+   },
+   {
+    "id": "circle-of-the-land-spells-5",
+    "name": "Circle of the Land Spells (Level 5)",
+    "level": 5,
+    "description": "When you reach Druid level 5, you always have your land's level 5 spell prepared: Arid, Fireball; Polar, Sleet Storm; Temperate, Lightning Bolt; Tropical, Stinking Cloud.",
+    "tags": [
+     "spellcasting"
+    ],
+    "choice": {
+     "kind": "land-spells-5",
+     "choose": 1,
+     "options": [
+      {
+       "id": "arid-5",
+       "name": "Arid Land (Level 5)",
+       "description": "Fireball, always prepared.",
+       "requires": {
+        "offer": "feature:circle-of-the-land-spells",
+        "id": "arid"
+       },
+       "grants": {
+        "spells": [
+         {
+          "id": "fireball",
+          "level": 3,
+          "alwaysPrepared": true
+         }
+        ]
+       }
+      },
+      {
+       "id": "polar-5",
+       "name": "Polar Land (Level 5)",
+       "description": "Sleet Storm, always prepared.",
+       "requires": {
+        "offer": "feature:circle-of-the-land-spells",
+        "id": "polar"
+       },
+       "grants": {
+        "spells": [
+         {
+          "id": "sleet-storm",
+          "level": 3,
+          "alwaysPrepared": true
+         }
+        ]
+       }
+      },
+      {
+       "id": "temperate-5",
+       "name": "Temperate Land (Level 5)",
+       "description": "Lightning Bolt, always prepared.",
+       "requires": {
+        "offer": "feature:circle-of-the-land-spells",
+        "id": "temperate"
+       },
+       "grants": {
+        "spells": [
+         {
+          "id": "lightning-bolt",
+          "level": 3,
+          "alwaysPrepared": true
+         }
+        ]
+       }
+      },
+      {
+       "id": "tropical-5",
+       "name": "Tropical Land (Level 5)",
+       "description": "Stinking Cloud, always prepared.",
+       "requires": {
+        "offer": "feature:circle-of-the-land-spells",
+        "id": "tropical"
+       },
+       "grants": {
+        "spells": [
+         {
+          "id": "stinking-cloud",
+          "level": 3,
+          "alwaysPrepared": true
+         }
+        ]
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "circle-of-the-land-spells-7",
+    "name": "Circle of the Land Spells (Level 7)",
+    "level": 7,
+    "description": "When you reach Druid level 7, you always have your land's level 7 spell prepared: Arid, Blight; Polar, Ice Storm; Temperate, Freedom of Movement; Tropical, Polymorph.",
+    "tags": [
+     "spellcasting"
+    ],
+    "choice": {
+     "kind": "land-spells-7",
+     "choose": 1,
+     "options": [
+      {
+       "id": "arid-7",
+       "name": "Arid Land (Level 7)",
+       "description": "Blight, always prepared.",
+       "requires": {
+        "offer": "feature:circle-of-the-land-spells",
+        "id": "arid"
+       },
+       "grants": {
+        "spells": [
+         {
+          "id": "blight",
+          "level": 4,
+          "alwaysPrepared": true
+         }
+        ]
+       }
+      },
+      {
+       "id": "polar-7",
+       "name": "Polar Land (Level 7)",
+       "description": "Ice Storm, always prepared.",
+       "requires": {
+        "offer": "feature:circle-of-the-land-spells",
+        "id": "polar"
+       },
+       "grants": {
+        "spells": [
+         {
+          "id": "ice-storm",
+          "level": 4,
+          "alwaysPrepared": true
+         }
+        ]
+       }
+      },
+      {
+       "id": "temperate-7",
+       "name": "Temperate Land (Level 7)",
+       "description": "Freedom of Movement, always prepared.",
+       "requires": {
+        "offer": "feature:circle-of-the-land-spells",
+        "id": "temperate"
+       },
+       "grants": {
+        "spells": [
+         {
+          "id": "freedom-of-movement",
+          "level": 4,
+          "alwaysPrepared": true
+         }
+        ]
+       }
+      },
+      {
+       "id": "tropical-7",
+       "name": "Tropical Land (Level 7)",
+       "description": "Polymorph, always prepared.",
+       "requires": {
+        "offer": "feature:circle-of-the-land-spells",
+        "id": "tropical"
+       },
+       "grants": {
+        "spells": [
+         {
+          "id": "polymorph",
+          "level": 4,
+          "alwaysPrepared": true
+         }
+        ]
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "circle-of-the-land-spells-9",
+    "name": "Circle of the Land Spells (Level 9)",
+    "level": 9,
+    "description": "When you reach Druid level 9, you always have your land's level 9 spell prepared: Arid, Wall of Stone; Polar, Cone of Cold; Temperate, Tree Stride; Tropical, Insect Plague.",
+    "tags": [
+     "spellcasting"
+    ],
+    "choice": {
+     "kind": "land-spells-9",
+     "choose": 1,
+     "options": [
+      {
+       "id": "arid-9",
+       "name": "Arid Land (Level 9)",
+       "description": "Wall of Stone, always prepared.",
+       "requires": {
+        "offer": "feature:circle-of-the-land-spells",
+        "id": "arid"
+       },
+       "grants": {
+        "spells": [
+         {
+          "id": "wall-of-stone",
+          "level": 5,
+          "alwaysPrepared": true
+         }
+        ]
+       }
+      },
+      {
+       "id": "polar-9",
+       "name": "Polar Land (Level 9)",
+       "description": "Cone of Cold, always prepared.",
+       "requires": {
+        "offer": "feature:circle-of-the-land-spells",
+        "id": "polar"
+       },
+       "grants": {
+        "spells": [
+         {
+          "id": "cone-of-cold",
+          "level": 5,
+          "alwaysPrepared": true
+         }
+        ]
+       }
+      },
+      {
+       "id": "temperate-9",
+       "name": "Temperate Land (Level 9)",
+       "description": "Tree Stride, always prepared.",
+       "requires": {
+        "offer": "feature:circle-of-the-land-spells",
+        "id": "temperate"
+       },
+       "grants": {
+        "spells": [
+         {
+          "id": "tree-stride",
+          "level": 5,
+          "alwaysPrepared": true
+         }
+        ]
+       }
+      },
+      {
+       "id": "tropical-9",
+       "name": "Tropical Land (Level 9)",
+       "description": "Insect Plague, always prepared.",
+       "requires": {
+        "offer": "feature:circle-of-the-land-spells",
+        "id": "tropical"
+       },
+       "grants": {
+        "spells": [
+         {
+          "id": "insect-plague",
+          "level": 5,
+          "alwaysPrepared": true
+         }
+        ]
+       }
+      }
+     ]
+    }
    }
   ]
  },
@@ -430,6 +767,10 @@
       "type": "unarmored-defense",
       "ability": "cha",
       "allowShield": true
+     },
+     {
+      "type": "hit-points-per-level",
+      "amount": 1
      }
     ]
    },
@@ -648,6 +989,75 @@
      "limit": 1,
      "per": "long-rest"
     }
+   },
+   {
+    "id": "draconic-spells-5",
+    "name": "Draconic Spells (Level 5)",
+    "level": 5,
+    "description": "When you reach Sorcerer level 5, you always have the Fear and Fly spells prepared.",
+    "tags": [
+     "spellcasting"
+    ],
+    "grants": {
+     "spells": [
+      {
+       "id": "fear",
+       "level": 3,
+       "alwaysPrepared": true
+      },
+      {
+       "id": "fly",
+       "level": 3,
+       "alwaysPrepared": true
+      }
+     ]
+    }
+   },
+   {
+    "id": "draconic-spells-7",
+    "name": "Draconic Spells (Level 7)",
+    "level": 7,
+    "description": "When you reach Sorcerer level 7, you always have the Arcane Eye and Charm Monster spells prepared.",
+    "tags": [
+     "spellcasting"
+    ],
+    "grants": {
+     "spells": [
+      {
+       "id": "arcane-eye",
+       "level": 4,
+       "alwaysPrepared": true
+      },
+      {
+       "id": "charm-monster",
+       "level": 4,
+       "alwaysPrepared": true
+      }
+     ]
+    }
+   },
+   {
+    "id": "draconic-spells-9",
+    "name": "Draconic Spells (Level 9)",
+    "level": 9,
+    "description": "When you reach Sorcerer level 9, you always have the Legend Lore and Summon Dragon spells prepared.",
+    "tags": [
+     "spellcasting"
+    ],
+    "grants": {
+     "spells": [
+      {
+       "id": "legend-lore",
+       "level": 5,
+       "alwaysPrepared": true
+      },
+      {
+       "id": "summon-dragon",
+       "level": 5,
+       "alwaysPrepared": true
+      }
+     ]
+    }
    }
   ]
  },
@@ -665,10 +1075,14 @@
     "name": "Evocation Savant",
     "level": 3,
     "description": "Choose two Wizard spells from the Evocation school, each of which must be level 1 or 2, and add them to your spellbook for free.",
+    "tags": [
+     "spellbook"
+    ],
     "choice": {
      "kind": "spell",
      "choose": 2,
-     "fromCatalog": "wizard-spells",
+     "fromCatalog": "wizard-spells-of-evocation",
+     "minSpellLevel": 1,
      "maxSpellLevel": 2
     }
    },
@@ -927,6 +1341,75 @@
       ]
      }
     ]
+   },
+   {
+    "id": "fiend-spells-5",
+    "name": "Fiend Spells (Level 5)",
+    "level": 5,
+    "description": "When you reach Warlock level 5, you always have the Fireball and Stinking Cloud spells prepared.",
+    "tags": [
+     "spellcasting"
+    ],
+    "grants": {
+     "spells": [
+      {
+       "id": "fireball",
+       "level": 3,
+       "alwaysPrepared": true
+      },
+      {
+       "id": "stinking-cloud",
+       "level": 3,
+       "alwaysPrepared": true
+      }
+     ]
+    }
+   },
+   {
+    "id": "fiend-spells-7",
+    "name": "Fiend Spells (Level 7)",
+    "level": 7,
+    "description": "When you reach Warlock level 7, you always have the Fire Shield and Wall of Fire spells prepared.",
+    "tags": [
+     "spellcasting"
+    ],
+    "grants": {
+     "spells": [
+      {
+       "id": "fire-shield",
+       "level": 4,
+       "alwaysPrepared": true
+      },
+      {
+       "id": "wall-of-fire",
+       "level": 4,
+       "alwaysPrepared": true
+      }
+     ]
+    }
+   },
+   {
+    "id": "fiend-spells-9",
+    "name": "Fiend Spells (Level 9)",
+    "level": 9,
+    "description": "When you reach Warlock level 9, you always have the Geas and Insect Plague spells prepared.",
+    "tags": [
+     "spellcasting"
+    ],
+    "grants": {
+     "spells": [
+      {
+       "id": "geas",
+       "level": 5,
+       "alwaysPrepared": true
+      },
+      {
+       "id": "insect-plague",
+       "level": 5,
+       "alwaysPrepared": true
+      }
+     ]
+    }
    }
   ]
  },
@@ -1252,6 +1735,98 @@
       "damage": []
      }
     ]
+   },
+   {
+    "id": "oath-of-devotion-spells-5",
+    "name": "Oath of Devotion Spells (Level 5)",
+    "level": 5,
+    "description": "When you reach Paladin level 5, you always have the Aid and Zone of Truth spells prepared.",
+    "tags": [
+     "spellcasting"
+    ],
+    "grants": {
+     "spells": [
+      {
+       "id": "aid",
+       "level": 2,
+       "alwaysPrepared": true
+      },
+      {
+       "id": "zone-of-truth",
+       "level": 2,
+       "alwaysPrepared": true
+      }
+     ]
+    }
+   },
+   {
+    "id": "oath-of-devotion-spells-9",
+    "name": "Oath of Devotion Spells (Level 9)",
+    "level": 9,
+    "description": "When you reach Paladin level 9, you always have the Beacon of Hope and Dispel Magic spells prepared.",
+    "tags": [
+     "spellcasting"
+    ],
+    "grants": {
+     "spells": [
+      {
+       "id": "beacon-of-hope",
+       "level": 3,
+       "alwaysPrepared": true
+      },
+      {
+       "id": "dispel-magic",
+       "level": 3,
+       "alwaysPrepared": true
+      }
+     ]
+    }
+   },
+   {
+    "id": "oath-of-devotion-spells-13",
+    "name": "Oath of Devotion Spells (Level 13)",
+    "level": 13,
+    "description": "When you reach Paladin level 13, you always have the Freedom of Movement and Guardian of Faith spells prepared.",
+    "tags": [
+     "spellcasting"
+    ],
+    "grants": {
+     "spells": [
+      {
+       "id": "freedom-of-movement",
+       "level": 4,
+       "alwaysPrepared": true
+      },
+      {
+       "id": "guardian-of-faith",
+       "level": 4,
+       "alwaysPrepared": true
+      }
+     ]
+    }
+   },
+   {
+    "id": "oath-of-devotion-spells-17",
+    "name": "Oath of Devotion Spells (Level 17)",
+    "level": 17,
+    "description": "When you reach Paladin level 17, you always have the Commune and Flame Strike spells prepared.",
+    "tags": [
+     "spellcasting"
+    ],
+    "grants": {
+     "spells": [
+      {
+       "id": "commune",
+       "level": 5,
+       "alwaysPrepared": true
+      },
+      {
+       "id": "flame-strike",
+       "level": 5,
+       "alwaysPrepared": true
+      }
+     ]
+    }
    }
   ]
  },

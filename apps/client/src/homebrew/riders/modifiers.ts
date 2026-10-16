@@ -274,7 +274,7 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       label: "Also add the Proficiency Bonus",
       kind: "switch",
       visibleWhen: hasType("initiative"),
-      help: "Alert's rule. Built into the character when it is built or levelled."
+      help: "Alert's rule. A feature's or feat's is built into the character when it is built or levelled; an item's counts while the item is in use."
     },
     /* On an item nothing reads `unarmored-defense` (it is builder-baked from features and feats
        only), so items get a note; features and feats need none. */

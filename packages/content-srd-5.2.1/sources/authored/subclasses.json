@@ -66,10 +66,14 @@
         "name": "Evocation Savant",
         "level": 3,
         "description": "Choose two Wizard spells from the Evocation school, each of which must be level 1 or 2, and add them to your spellbook for free.",
+        "tags": [
+          "spellbook"
+        ],
         "choice": {
           "kind": "spell",
           "choose": 2,
-          "fromCatalog": "wizard-spells",
+          "fromCatalog": "wizard-spells-of-evocation",
+          "minSpellLevel": 1,
           "maxSpellLevel": 2
         }
       },

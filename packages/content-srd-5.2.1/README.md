@@ -61,7 +61,11 @@ scratch directory and requires every committed bundle back byte for byte, so edi
 - `scripts/build-class-bundle.ts`: generates the other nine classes and their subclasses from
   `classes.md`. The markdown carries no riders, so mechanics are authored per class in
   `scripts/class-mechanics/` and merged into every class record, generated or hand-authored. A
-  rider may live in only one place: the merge refuses one the record already carries.
+  rider may live in only one place: the merge refuses one the record already carries. A feature
+  the text prints once but the rules grant in steps (a subclass spells table's later rows,
+  Unarmored Movement's column) is a staged feature (`stages`, `subclassStages`), a whole record
+  with its own level added beside the printed ones. An option's printed "Prerequisite: Level N+"
+  becomes its `level`, and a prerequisite naming another option of the same pick its `requires`.
 - `scripts/build-magic-items.ts`: parses `magic-items.md` into one row per item (the five
   "+1, +2, or +3" ladders expand to one row per tier), with slot, rarity, attunement, prose and the
   `appliesTo` base-item column. Mechanics are authored in `scripts/item-mechanics/items.ts`, a map
@@ -79,7 +83,8 @@ scratch directory and requires every committed bundle back byte for byte, so edi
   - `attribution.json`: the required CC BY 4.0 attribution (wording verified against the SRD's
     own Legal Information page); any surface that displays this content must show it.
   - `classes.v1.json` (all twelve classes, each a complete 20-row table) and `subclasses.v1.json`
-    (the one SRD subclass per class). Domain and patron spells are staged always-prepared grants;
+    (the one SRD subclass per class). Domain, oath, patron, draconic and land spells are staged
+    always-prepared grants, one record per table row;
     shared resources (e.g. `channel-divinity`) draw on one uses pool.
   - `magic-items.v1.json`: every SRD magic item, folded into `loadEquipment()`. A magic shield
     carries the base shield's armor block, so its own bonus stacks on the shield's +2.

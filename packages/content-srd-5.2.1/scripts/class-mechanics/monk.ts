@@ -68,7 +68,12 @@ export const monk: ClassMechanicsModule = {
     "uncanny-metabolism": {
       uses: { limit: 1, per: "long-rest" }
     },
-    // Same caveat as the Barbarian's: it reaches feature actions only, not inventory-derived swings.
+    // "+10 feet while you aren't wearing armor or wielding a Shield", read with the live loadout. The column's
+    // later steps are staged features below.
+    "unarmored-movement": {
+      modifiers: [{ type: "speed", amount: 10, when: [{ type: "while-unarmored" }] }]
+    },
+    // `effective-actions` folds it onto every weapon swing and the Martial Arts strike.
     "extra-attack": {
       modifiers: [{ type: "extra-attack", count: 1 }]
     },
@@ -113,7 +118,7 @@ export const monk: ClassMechanicsModule = {
       ]
     },
     "epic-boon": {
-      choice: { kind: "feat", choose: 1, fromCatalog: "epic-boon-feats" }
+      choice: { kind: "feat", choose: 1, fromCatalog: "feats" }
     },
     /** "Your Dexterity and Wisdom scores increase by 4, to a maximum of 25." */
     "body-and-mind": {
@@ -124,10 +129,19 @@ export const monk: ClassMechanicsModule = {
     }
     // Not modeled here: Martial Arts' Unarmed Strike is minted by the builder (`martialArtsStrike`),
     // but its die and Dexterity do not reach inventory Monk weapons. Martial-Arts-die features (Deflect
-    // Attacks/Energy, temp HP amounts), Unarmored Movement's scaling speed, and Slow Fall, Acrobatic
-    // Movement, Empowered Strikes, Self-Restoration and Perfect Focus stay prose. Evasion is read by the save
-    // outcome (`hasEvasion` in the server) from the held feature.
+    // Attacks/Energy, temp HP amounts), and Slow Fall, Acrobatic Movement, Empowered Strikes, Self-Restoration
+    // and Perfect Focus stay prose. Evasion is read by the save outcome (`hasEvasion` in the server) from the
+    // held feature.
   },
+  // The Unarmored Movement column's steps (+15 at 6, +20 at 10, +25 at 14, +30 at 18), each replacing the last.
+  stages: [6, 10, 14, 18].map((level, index, levels) => ({
+    id: `unarmored-movement-${level}`,
+    name: "Unarmored Movement",
+    level,
+    description: `Your speed increases by ${15 + 5 * index} feet while you aren't wearing armor or wielding a Shield.`,
+    replacesFeatureId: index === 0 ? "unarmored-movement" : `unarmored-movement-${levels[index - 1]}`,
+    modifiers: [{ type: "speed" as const, amount: 15 + 5 * index, when: [{ type: "while-unarmored" as const }] }]
+  })),
   subclasses: {
     "warrior-of-the-open-hand": {
       // Uses equal the Wisdom modifier (minimum 1); the heal is the Martial Arts die plus the Wisdom modifier.

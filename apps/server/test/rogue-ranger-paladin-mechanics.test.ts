@@ -12,6 +12,7 @@ import { setCondition } from "../src/actor-conditions.js";
 import { startEncounter } from "../src/encounter.js";
 import type { ActorDefinition } from "@vtt/schemas";
 import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
+import { asiRows } from "./asi-rows.js";
 
 // Rogue, Ranger and Paladin mechanics, asserted as rolled numbers, spent counters, refused builds or
 // text the table reads; never "the rider survived derivation". Runs against the real SRD bundles
@@ -183,11 +184,7 @@ const rogueInput = (level: number): MutableInput => {
             ]
       ),
       ...(level >= 3 ? [{ level: 3, classId: "rogue", kind: "subclass", id: "thief" }] : []),
-      ...asiLevels.flatMap((asi) => [
-        { level: asi, classId: "rogue", kind: "asi-or-feat", id: "ability-score-improvement" },
-        { level: asi, kind: "ability-score", id: "dex", payload: { featureId: "ability-score-improvement" } },
-        { level: asi, kind: "ability-score", id: "dex", payload: { featureId: "ability-score-improvement" } }
-      ]),
+      ...asiRows("rogue", asiLevels, ["dex", "con", "wis"], { dex: 17, con: 15, wis: 12 }),
       ...(level >= 19
         ? [
             {
@@ -591,11 +588,7 @@ const rangerInput = (level: number, options: { wisFocus?: boolean } = {}): Mutab
             { level: 9, classId: "ranger", kind: "expertise", id: "nature", payload: { featureId: "expertise" } }
           ]
         : []),
-      ...asiLevels.flatMap((asi) => [
-        { level: asi, classId: "ranger", kind: "asi-or-feat", id: "ability-score-improvement" },
-        { level: asi, kind: "ability-score", id: bumped, payload: { featureId: "ability-score-improvement" } },
-        { level: asi, kind: "ability-score", id: bumped, payload: { featureId: "ability-score-improvement" } }
-      ]),
+      ...asiRows("ranger", asiLevels, [bumped, "con", "str"], { dex: 16, wis: 15, con: 14, str: 12 }),
       ...(level >= 19
         ? [
             {
@@ -778,7 +771,10 @@ describe("Ranger - Hunter's Prey and Defensive Tactics, audit rows 21 and 22", (
 const paladinGranted = (level: number): string[] => [
   ...(level >= 2 ? ["divine-smite"] : []),
   ...(level >= 3 ? ["protection-from-evil-and-good", "shield-of-faith"] : []),
-  ...(level >= 5 ? ["find-steed"] : [])
+  ...(level >= 5 ? ["find-steed", "aid", "zone-of-truth"] : []),
+  ...(level >= 9 ? ["beacon-of-hope", "dispel-magic"] : []),
+  ...(level >= 13 ? ["freedom-of-movement", "guardian-of-faith"] : []),
+  ...(level >= 17 ? ["commune", "flame-strike"] : [])
 ];
 
 /** A Halfling Criminal Paladin of Devotion. Charisma 14 after the array, so the spell save DC moves with proficiency. */
@@ -817,11 +813,7 @@ const paladinInput = (level: number): MutableInput => {
           ]
         : []),
       ...(level >= 3 ? [{ level: 3, classId: "paladin", kind: "subclass", id: "oath-of-devotion" }] : []),
-      ...asiLevels.flatMap((asi) => [
-        { level: asi, classId: "paladin", kind: "asi-or-feat", id: "ability-score-improvement" },
-        { level: asi, kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } },
-        { level: asi, kind: "ability-score", id: "str", payload: { featureId: "ability-score-improvement" } }
-      ]),
+      ...asiRows("paladin", asiLevels, ["str", "con", "cha"], { str: 15, con: 14, cha: 14 }),
       ...(level >= 19
         ? [
             {
@@ -846,7 +838,7 @@ describe("Paladin - the two free casts, audit rows 30 and 31", () => {
     const built = table(paladinInput(5));
     const spells = built.definition.spellcasting?.spells ?? [];
     expect(spells.find((spell) => spell.id === "divine-smite")).toMatchObject({ alwaysPrepared: true });
-    // The printed budget at level 5 is 6: six chosen spells plus the four its features grant.
+    // The printed budget at level 5 is 6: six chosen spells plus the six its features grant.
     expect(built.definition.spellcasting?.classes?.[0]).toMatchObject({ prepared: 6 });
     expect(spells.filter((spell) => spell.level >= 1 && !spell.alwaysPrepared)).toHaveLength(6);
 
@@ -1049,7 +1041,7 @@ describe("Paladin - Radiant Strikes rolls extra dice on a melee hit", () => {
   });
 });
 
-describe("Paladin - Oath of Devotion, audit row 28 (first tier only)", () => {
+describe("Paladin - Oath of Devotion, audit row 28", () => {
   it("always has the level-3 pair prepared, uncharged", () => {
     const built = table(paladinInput(3));
     const spells = built.definition.spellcasting?.spells ?? [];
@@ -1060,17 +1052,26 @@ describe("Paladin - Oath of Devotion, audit row 28 (first tier only)", () => {
     expect(spells.filter((spell) => spell.level >= 1 && !spell.alwaysPrepared)).toHaveLength(4);
   });
 
-  it("does NOT hand a level-17 Paladin the higher tiers, which no record can carry", () => {
-    // Known limitation: `grants.spells` has no level gate and the overlay cannot mint per-tier records,
-    // so the level-5/9/13/17 oath spells stay in the prose.
-    const built = table(paladinInput(17));
-    const ids = (built.definition.spellcasting?.spells ?? [])
-      .filter((spell) => spell.alwaysPrepared)
-      .map((spell) => spell.id);
-    expect(ids).toEqual(expect.arrayContaining(["protection-from-evil-and-good", "shield-of-faith"]));
-    for (const later of ["aid", "zone-of-truth", "beacon-of-hope", "commune", "flame-strike"]) {
-      expect(ids).not.toContain(later);
-    }
+  it("hands each later tier over at its Paladin level, always prepared", () => {
+    // "When you reach a Paladin level specified in the table, you thereafter always have the listed spells
+    // prepared": each row is its own staged feature.
+    const alwaysPrepared = (level: number) =>
+      (table(paladinInput(level)).definition.spellcasting?.spells ?? [])
+        .filter((spell) => spell.alwaysPrepared)
+        .map((spell) => spell.id);
+    const nine = alwaysPrepared(9);
+    expect(nine).toEqual(expect.arrayContaining(["aid", "zone-of-truth", "beacon-of-hope", "dispel-magic"]));
+    expect(nine).not.toContain("guardian-of-faith");
+    // Beacon of Hope, Guardian of Faith, Commune and Flame Strike are on no Paladin list: only the tier gives them.
+    expect(alwaysPrepared(17)).toEqual(
+      expect.arrayContaining([
+        "protection-from-evil-and-good",
+        "shield-of-faith",
+        "guardian-of-faith",
+        "commune",
+        "flame-strike"
+      ])
+    );
     // ...and the description carries the table the player reads them from.
     const oath = library
       .subclassRecord("oath-of-devotion")!

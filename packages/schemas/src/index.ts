@@ -334,7 +334,8 @@ export const ModifierSchema = z.discriminatedUnion("type", [
     })
     .strict(),
   z.object({ type: z.literal("hit-points-per-level"), amount: z.number().int().min(-5).max(5), ...riderGate }).strict(),
-  /** Baked into the sheet's speed at build time on a feature; summed live on an effect, so it ends with it. */
+  /** Baked into the sheet's speed at build time on a feature unless gated (then read with the live loadout);
+   *  summed live on an effect, so it ends with it. */
   z.object({ type: z.literal("speed"), amount: z.number().int().min(-30).max(60), ...riderGate }).strict(),
   /**
    * Flat AC. `whileArmored` (the Defense fighting style) predates `when: [{type: "while-armored"}]` and
@@ -348,7 +349,7 @@ export const ModifierSchema = z.discriminatedUnion("type", [
       ...riderGate
     })
     .strict(),
-  /** `proficiencyBonus` adds the creature's Proficiency Bonus on top of `amount` (Alert). */
+  /** `proficiencyBonus` adds the creature's Proficiency Bonus on top of `amount` (Alert's Initiative Proficiency). */
   z
     .object({
       type: z.literal("initiative"),
@@ -1111,6 +1112,9 @@ export const ActionSchema = z.object({
     })
     .strict()
     .optional(),
+  /** Taken in place of one attack of the Attack action (Breath Weapon: "replace one of your attacks"): it opens the
+   *  Attack action, or spends one attack the action has left. Pairs with activation "action". */
+  replacesAttack: z.boolean().optional(),
   /** SRD Legendary Action: taken on other creatures' turns, spending `cost` from the per-round pool that refills on the creature's own turn. Pairs with activation "other". */
   legendary: z
     .object({ cost: z.number().int().min(1).max(5) })

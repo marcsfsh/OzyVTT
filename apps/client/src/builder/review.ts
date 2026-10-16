@@ -103,9 +103,11 @@ export function reviewSections(input: ReviewInput): ReviewSection[] {
         value:
           draft.hpMode === "average"
             ? "Average each level"
-            : draft.hpEntries.length > 0
-              ? `Rolled ${draft.hpEntries.join(", ")}`
-              : "Rolled (none entered)"
+            : draft.hpMode === "roll"
+              ? "Rolled by the table"
+              : draft.hpEntries.length > 0
+                ? `Rolled ${draft.hpEntries.join(", ")}`
+                : "Rolled (none entered)"
       }
     ]),
     sectionFor(input, "equipment", "equipment", [])

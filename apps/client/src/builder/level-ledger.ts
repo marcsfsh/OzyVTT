@@ -1,5 +1,5 @@
 import type { ActorDefinition, CharacterChoice } from "@vtt/schemas";
-import { ABILITIES } from "@vtt/rules-5e";
+import { ABILITIES, type Ability } from "@vtt/rules-5e";
 import type { BuilderAbilityMethod, BuilderOffersReply, BuilderPolicy } from "@vtt/domain";
 import { abilityBonusesOf, emptyDraft, type BuilderDraft } from "./build-payload";
 import type { BuilderCatalogs } from "../content/catalogs";
@@ -7,9 +7,9 @@ import type { BuilderCatalogs } from "../content/catalogs";
 /**
  * Reads a character back into the wizard for a rebuild (level up or down, respec) from the
  * choice-provenance ledger. The table reads the ledger back onto the offers (`builder:offers` with
- * `choices`); this turns that answer into a draft. The ability method is not stored, so base scores are
- * the sheet minus the bonuses the ledger explains. Older characters may lack some hp-roll rows; see
- * `hpRollGap`.
+ * `choices`); this turns that answer into a draft. The ability method, base scores and background increase
+ * come from the ledger's `ability-scores` row; a sheet built before that row existed falls back to the sheet
+ * minus the bonuses the ledger explains. Hit points re-send the recorded rolls; see `hpPlan`.
  */
 
 /** The ledger, or null when this sheet carries no provenance (absent differs from empty). */
@@ -54,7 +54,8 @@ export function draftFromLedger(
   read: BuilderOffersReply
 ): BuilderDraft {
   // Recorded rolls are re-sent verbatim so a level-down/level-up round trip restores the same max HP.
-  const rolls = hpRolls(choices, targetLevel);
+  const hp = hpPlan(choices, targetLevel);
+  const recorded = recordedAbilities(choices);
   const draft: BuilderDraft = {
     ...emptyDraft(),
     speciesId: identity.speciesId,
@@ -63,25 +64,67 @@ export function draftFromLedger(
     subclassId: read.subclassId,
     level: targetLevel,
     name: definition.name,
-    abilityMethod: methodFor(policy),
-    ...(rolls ? { hpMode: "entries" as const, hpEntries: rolls } : { hpMode: "average" as const, hpEntries: [] }),
+    abilityMethod: recorded?.method ?? methodFor(policy),
+    backgroundBonus: recorded?.backgroundBonus ?? [],
+    hpMode: hp.mode,
+    hpEntries: hp.mode === "entries" ? hp.entries : [],
     picks: read.picks,
     asiIncreases: read.asiIncreases
   };
 
-  // Ability scores last: bonuses depend on the picks above (an ASI is a pick). Base = sheet score
-  // minus explained bonus.
-  const bonuses = abilityBonusesOf(draft, catalogs, read.offers);
+  // Ability scores last: the recorded base scores, or for an older sheet the sheet score minus the bonuses the
+  // picks above explain (an ASI is a pick).
+  const bonuses = recorded ? null : abilityBonusesOf(draft, catalogs, read.offers);
   const pool: Array<{ id: string; value: number }> = [];
   const poolAssignment: Record<string, string | null> = {};
   const spendScores: Record<string, number> = {};
   for (const [index, ability] of ABILITIES.entries()) {
-    const base = Math.max(1, (definition.abilityScores[ability] ?? 10) - bonuses[ability]);
+    const base = recorded
+      ? recorded.base[ability]
+      : Math.max(1, (definition.abilityScores[ability] ?? 10) - bonuses![ability]);
     pool.push({ id: `lv-${index}`, value: base });
     poolAssignment[ability] = `lv-${index}`;
     spendScores[ability] = base;
   }
   return { ...draft, abilityPool: pool, poolAssignment, spendScores };
+}
+
+/** The ledger's record of how the scores were made, or null for a sheet built before it was kept. Mirrors the
+ *  server's `storedAbilityScores`. */
+export function recordedAbilities(choices: readonly CharacterChoice[]): Readonly<{
+  method: BuilderAbilityMethod;
+  base: Readonly<Record<Ability, number>>;
+  backgroundBonus: BuilderDraft["backgroundBonus"];
+}> | null {
+  const row = choices.find((entry) => entry.kind === "ability-scores");
+  const payload = row?.payload as
+    { baseScores?: Record<string, unknown>; backgroundBonusAllocation?: unknown } | undefined;
+  const base = payload?.baseScores;
+  if (!row || !base || !ABILITIES.every((ability) => typeof base[ability] === "number")) return null;
+  if (!(METHODS as readonly string[]).includes(row.id)) return null;
+  const allocation = Array.isArray(payload?.backgroundBonusAllocation) ? payload.backgroundBonusAllocation : [];
+  return {
+    method: row.id as BuilderAbilityMethod,
+    base: Object.fromEntries(ABILITIES.map((ability) => [ability, base[ability] as number])) as Record<Ability, number>,
+    backgroundBonus: allocation.flatMap((entry: { ability?: unknown; amount?: unknown }) =>
+      ABILITIES.includes(entry?.ability as Ability) && typeof entry?.amount === "number"
+        ? [{ ability: entry.ability as Ability, amount: entry.amount }]
+        : []
+    )
+  };
+}
+
+const METHODS: readonly BuilderAbilityMethod[] = ["standard-array", "point-buy", "roll", "custom"];
+
+/**
+ * How a rebuild's hit points are sent: a rolled sheet asks the table to roll, which reuses every recorded roll
+ * and throws only the levels that have none (a new level); a sheet that took the average keeps it.
+ */
+export function hpPlan(
+  choices: readonly CharacterChoice[],
+  _targetLevel: number
+): Readonly<{ mode: "entries"; entries: number[] } | { mode: "roll" | "average" }> {
+  return choices.some((row) => row.kind === "hp-roll") ? { mode: "roll" } : { mode: "average" };
 }
 
 /**
@@ -107,15 +150,14 @@ export function hpRolls(choices: readonly CharacterChoice[], level: number): num
   return rolls;
 }
 
-/** The levels missing an hp roll; reported only for a partial set (none means the average was taken). */
-export function hpRollGap(
-  choices: readonly CharacterChoice[],
-  targetLevel: number
-): Readonly<{ from: number; to: number }> | null {
-  const recorded = choices.filter((row) => row.kind === "hp-roll");
-  if (recorded.length === 0) return null;
-  if (hpRolls(choices, targetLevel)) return null;
-  return { from: 2, to: Math.max(2, targetLevel) };
+/** The levels the table will roll hit points for on a rebuild: those with no recorded roll, when the sheet was
+ *  rolled. Null when nothing is rolled (all recorded, or the average was taken). */
+export function hpRollGap(choices: readonly CharacterChoice[], targetLevel: number): readonly number[] | null {
+  if (hpPlan(choices, targetLevel).mode !== "roll") return null;
+  const missing: number[] = [];
+  for (let level = 2; level <= targetLevel; level += 1)
+    if (!choices.some((row) => row.kind === "hp-roll" && row.level === level)) missing.push(level);
+  return missing.length > 0 ? missing : null;
 }
 
 /** Every ledger decision above `level`: what levelling down gives up. */

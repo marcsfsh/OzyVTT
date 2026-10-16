@@ -644,7 +644,8 @@ describe("public game API over /api/v1", () => {
     const soldier = backgrounds.data.backgrounds.find((entry: { id: string }) => entry.id === "soldier");
     expect(soldier.toolChoices).toEqual({
       choose: 1,
-      from: ["gaming-set-dice", "gaming-set-playing-cards"],
+      // SRD: "Choose one kind of Gaming Set", all four variants.
+      from: ["gaming-set-dice", "gaming-set-dragonchess", "gaming-set-playing-cards", "gaming-set-three-dragon-ante"],
       fromCatalog: null
     });
     expect(soldier).toHaveProperty("skillChoices");
@@ -663,7 +664,10 @@ describe("public game API over /api/v1", () => {
       customFormula: null,
       maxLevel: 20,
       playerBuilder: "open",
-      playerRandom: "gm-only"
+      playerRandom: "gm-only",
+      // Players' rolls are thrown by the server, and a rolled level counts as rolled (SRD).
+      typedRolls: "gm-only",
+      hitPointRollFloor: "none"
     });
 
     // Player write refused; the policy is the GM's.
@@ -695,7 +699,10 @@ describe("public game API over /api/v1", () => {
       customFormula: "3d6",
       maxLevel: 20,
       playerBuilder: "open",
-      playerRandom: "gm-only"
+      playerRandom: "gm-only",
+      // Players' rolls are thrown by the server, and a rolled level counts as rolled (SRD).
+      typedRolls: "gm-only",
+      hitPointRollFloor: "none"
     });
   });
 

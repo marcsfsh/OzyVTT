@@ -1,5 +1,5 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { BuilderOffer, GmView, PlayerView } from "@vtt/domain";
+import type { BuilderAbilityMethod, BuilderOffer, GmView, PlayerView } from "@vtt/domain";
 import type { Ability } from "@vtt/rules-5e";
 import { Alert, Button, NameField, ReviewSummary, Stepper, useToast, WizardShell } from "@vtt/ui";
 import type { DiceEntryMode, StepItem } from "@vtt/ui";
@@ -64,7 +64,15 @@ export type CharacterBuilderProps = Readonly<{
    * its identity locked, submitted as `character.rebuild` instead of `character.create`. Sharing the
    * wizard keeps a level-up from drifting from a fresh build.
    */
-  rebuild?: Readonly<{ actorId: string; name: string; seed: BuilderDraft; startStep?: StepId; notice?: ReactNode }>;
+  rebuild?: Readonly<{
+    actorId: string;
+    name: string;
+    seed: BuilderDraft;
+    /** The method the character's scores were made with, kept even if the table no longer offers it. */
+    recordedMethod?: BuilderAbilityMethod;
+    startStep?: StepId;
+    notice?: ReactNode;
+  }>;
 }>;
 
 /** Before the table's first answer there is nothing to pick. */
@@ -89,7 +97,18 @@ function nameSuggestions(names: BuilderCatalogs["names"], speciesId: string | nu
 export function CharacterBuilder({ state, connection = "online", onClose, onCreated, rebuild }: CharacterBuilderProps) {
   const catalogs = useBuilderCatalogs();
   const { toast } = useToast();
-  const policy = state.builderPolicy;
+  // A rebuild keeps the method its scores were made with, though the table may offer others today.
+  const recordedMethod = rebuild?.recordedMethod;
+  const policy = useMemo(
+    () =>
+      recordedMethod && !state.builderPolicy.allowedAbilityMethods.includes(recordedMethod)
+        ? {
+            ...state.builderPolicy,
+            allowedAbilityMethods: [...state.builderPolicy.allowedAbilityMethods, recordedMethod]
+          }
+        : state.builderPolicy,
+    [state.builderPolicy, recordedMethod]
+  );
   const [draft, setDraft] = useState<BuilderDraft>(() => rebuild?.seed ?? emptyDraft());
   const [stepIndex, setStepIndex] = useState(0);
   /**
@@ -528,6 +547,7 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
           <AbilitiesStep
             draft={draft}
             policy={policy}
+            mayTypeDice={"definitions" in state || policy.typedRolls === "open"}
             context={context}
             base={base}
             bonuses={bonuses}
@@ -537,6 +557,7 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
             hpEntry={hpEntry}
             onAbilityEntryChange={setAbilityEntry}
             onHpEntryChange={setHpEntry}
+            onRollRefused={(text) => setRejection({ title: "That roll was rejected", text })}
             editDraft={editDraft}
           />
         );

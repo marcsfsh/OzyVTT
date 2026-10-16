@@ -3,9 +3,10 @@ import { BuilderPolicySchema, GameStateSchema, type Actor, type GameState } from
 import type { ActorDefinition, InventoryItem } from "@vtt/schemas";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { ContentLibrary } from "../src/content-library.js";
-import { equipmentCatalogOf } from "../src/equipment-derivation.js";
+import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { importActorDefinition, rebuildActorDefinition } from "../src/actor-roster.js";
 import { setInventoryItem } from "../src/inventory.js";
+import { currentSpeedFeet } from "../src/speed.js";
 
 // Unarmored Defense and `allowShield`: a shield must not short-circuit the feature into 10 + Dex + shield.
 // The Barbarian prints `allowShield: true`, the Monk `false`; both build to a bare-handed AC 15, so the
@@ -77,6 +78,7 @@ const monkInput = (level = 1): MutableInput => ({
     { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "spellcasting-ability", id: "wis", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "equipment", id: "monk-a" },
     { level: 1, kind: "equipment", id: "acolyte-a" }
   ] as Row[]
@@ -106,6 +108,7 @@ const sorcererInput = (): MutableInput => ({
     { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "spellcasting-ability", id: "wis", payload: { featureId: "magic-initiate-cleric" } },
     // Metamagic is a level-2 feature that refuses to build without its two picks; neither touches AC.
     { level: 2, classId: "sorcerer", kind: "metamagic", id: "careful-spell" },
     { level: 2, classId: "sorcerer", kind: "metamagic", id: "distant-spell" },
@@ -362,5 +365,26 @@ describe("Unarmored Defense and a shield", () => {
       { catalog, role: "player" }
     );
     expect(actor.armorClass).toBe(14); // 10 + 2 + 2: the Monk's printing refuses the Shield
+  });
+});
+
+// Unarmored Movement prints the same condition with the Shield named: "while you aren't wearing armor or
+// wielding a Shield". The speed is read with the live loadout, as the movement budget reads it.
+describe("Unarmored Movement and a shield", () => {
+  const speedOf = (table: Table) =>
+    currentSpeedFeet(table.hero, deriveEquipment(table.hero, table.definition, catalog));
+
+  it("gives a Monk 2 ten more feet bare-handed, and none with a Shield", () => {
+    const monk = onTheTable(monkInput(2));
+    expect(monk.definition.speedFeet).toBe(30);
+    expect(speedOf(monk)).toBe(40);
+    equip(monk, "shield");
+    expect(speedOf(monk)).toBe(30);
+  });
+
+  it("gives none in armor", () => {
+    const monk = onTheTable(monkInput(2));
+    equip(monk, "leather-armor");
+    expect(speedOf(monk)).toBe(30);
   });
 });
