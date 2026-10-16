@@ -829,6 +829,12 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           allowDecimal: true,
           emptyValue: "null"
         },
+        {
+          key: "consumedOnUse",
+          label: "Used up when used",
+          kind: "switch",
+          help: "A potion or a flask: each use of its actions takes one from the stack, and it works from the pack."
+        },
         // Ammunition sold in bundles counts its pieces: each shot spends one, and half come back after the fight.
         {
           key: "ammunition.kind",

@@ -373,19 +373,23 @@ export function deriveEquipment(
   // An unattuned cursed blade is indistinguishable from a mundane one.
   const equipped: ActiveItem[] = [];
   const active: ActiveItem[] = [];
+  /** Potions and flasks in the pack: only their actions, which use one up. */
+  const packed: ActiveItem[] = [];
   for (const item of catalog ? actor.inventory : []) {
-    if (item.quantity <= 0 || !item.equipped) continue;
+    if (item.quantity <= 0) continue;
     const record = catalog!.equipmentRecord(catalogIdOf(item));
     const entry = { item, record };
-    equipped.push(entry);
-    if (itemIsActive(item, record)) active.push(entry);
+    if (item.equipped) equipped.push(entry);
+    if (item.equipped && itemIsActive(item, record)) active.push(entry);
+    else if (record?.consumedOnUse) packed.push(entry);
   }
   const carriers: RiderCarrier[] = [
     ...(catalog ? characterCarriers(definition, catalog) : []),
     ...effectCarriers(actor)
   ];
   const gatedGrants = catalog ? characterGatedGrants(definition, catalog) : [];
-  if (equipped.length === 0 && carriers.length === 0 && gatedGrants.length === 0) return EMPTY_DERIVATION;
+  if (equipped.length === 0 && packed.length === 0 && carriers.length === 0 && gatedGrants.length === 0)
+    return EMPTY_DERIVATION;
   /** Feats the character already holds, so an item granting one adds nothing twice. */
   const heldFeatIds = new Set((definition?.character?.feats ?? []).map((feat) => feat.id));
 
@@ -458,6 +462,8 @@ export function deriveEquipment(
     if (record.modifiers.length > 0 || record.grants || record.effects.length > 0 || record.grantsFeatIds.length > 0)
       sources.push({ itemId: item.id, itemName: label, summary: summarise(record) });
   }
+  for (const { item, record } of packed)
+    for (const declared of record?.actions ?? []) actions.push(itemAction(item, declared, definition));
   // Gated grants on own feats/features (the builder baked only ungated ones). The `feature:<id>` source
   // is never in `attunedItemIds`, so an `attuned` gate on a feature fails closed.
   for (const { id, name, block } of gatedGrants) {

@@ -127,6 +127,8 @@ export function itemAction(
     ...(attack ? { attack } : {}),
     ...(save ? { save } : {}),
     damage: declared.damage.map((part) => ({ ...part })),
+    // A Potion of Healing's 2d4 + 2.
+    ...(declared.healing ? { healing: { ...declared.healing } } : {}),
     ...(uses ? { uses } : {})
   };
 }

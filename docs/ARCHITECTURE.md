@@ -178,7 +178,8 @@ A magic item's charges are an `actionUses` pool keyed by the carried row (`itemP
 it over (`character.give-item`). A long rest gives back the item's printed dice (`charges.regain`), not
 every charge, and spending the last one rolls the SRD's d20 for the GM (`item-charges.ts`). Ammunition is
 counted on its row too (`ammunition.ts`): a shot from an Ammunition weapon needs a piece of the kind it fires
-and spends one, and half of the pieces fired come back when the encounter ends.
+and spends one, and half of the pieces fired come back when the encounter ends. A potion or a flask whose
+record is `consumedOnUse` acts from the pack and leaves the stack one smaller each time (`consumables.ts`).
 
 What a save does is data on the action's save block, not read from its description: `successDamage`
 (half or none) and the `failureCondition` a failed save imposes. They are written where the content

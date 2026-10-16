@@ -346,6 +346,9 @@ export const EquipmentReferenceSchema = z
     cursed: z.boolean().default(false),
     casts: z.array(ItemSpellCastSchema).max(8).default([]),
     charges: ItemChargesSchema.optional(),
+    /** Each use of one of its actions uses one up (a potion drunk, a flask thrown), and its actions work from the
+     *  pack: drinking or throwing one needs no equipping. */
+    consumedOnUse: z.boolean().optional(),
     /** This row is ammunition sold in bundles: each one quantity is `count` pieces of `kind` ("Arrows (20)"). */
     ammunition: z
       .object({ kind: AmmunitionKindSchema, count: z.number().int().min(1).max(100) })

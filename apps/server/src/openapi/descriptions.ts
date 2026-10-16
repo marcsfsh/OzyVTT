@@ -199,6 +199,8 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     casts: "Spells the item can cast (Amulet of Message, Wand of Fireballs)",
     charges:
       "How a charged item's charges come back. `regain` is the dice a long rest rolls (absent: every charge returns); `lastChargeRoll` rolls a d20 when the last charge is spent and tells the GM, since a 1 does what the item's text says. The charges themselves are the `uses` on its casts and actions, counted per carried copy",
+    consumedOnUse:
+      "Each use of one of its actions takes one from the carried stack (a potion drunk, a flask thrown), on the fight's resolve and on the loose route alike, and its actions work from the pack without equipping it",
     ammunition:
       'This row is ammunition sold in bundles: each one of its quantity is `count` pieces of `kind` ("Arrows (20)" is 20 arrows). A shot from a weapon that fires that kind spends a piece, and half the pieces fired come back when the encounter ends. Absent on magic ammunition, counted one piece per quantity',
     damageTypeChoice:

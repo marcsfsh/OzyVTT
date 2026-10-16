@@ -3,6 +3,7 @@ import type { ActorDefinition } from "@vtt/schemas";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { masteryMissDamage } from "./weapon-mastery.js";
 import { spendAmmunition } from "./resolution/ammunition.js";
+import { useUpConsumable } from "./resolution/consumables.js";
 import { rollAttack } from "./resolution/attack.js";
 import { rollLastCharge } from "./resolution/charges.js";
 import type { DefinitionAction, ResolveContext, ResolveDependencies, ResolveInput } from "./resolution/context.js";
@@ -48,6 +49,7 @@ export function resolveDefinitionAction(
     commitEconomy(ctx);
     rollLastCharge(ctx);
     spendAmmunition(ctx);
+    useUpConsumable(ctx);
     recordLightAttack(ctx);
     recordLoadingShot(ctx);
     releaseHideAndReady(ctx);
@@ -73,6 +75,7 @@ export function resolveDefinitionAction(
   commitEconomy(ctx);
   rollLastCharge(ctx);
   spendAmmunition(ctx);
+  useUpConsumable(ctx);
   recordLightAttack(ctx);
   recordLoadingShot(ctx);
   recordCleaveOpening(ctx);

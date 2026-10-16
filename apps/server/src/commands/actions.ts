@@ -17,6 +17,7 @@ import { overrideReason, overrideWaives, rememberOverride } from "../rules-famil
 import { looseRollPlan, NOT_YOUR_TURN, offTurnVerdict, routeForTap, spendLooseUses } from "../tap-routing.js";
 import { upcastAction } from "../item-actions.js";
 import { lastChargeLine, lastChargeRollFor } from "../item-charges.js";
+import { consumableRowFor, withOneUsedUp } from "../consumables.js";
 import { castSlotLevel } from "../resolution/economy.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, principalTag, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
@@ -327,10 +328,15 @@ export const actionCommands = [
       const rollIds = plan.map(() => kit.context.newId());
       let spend: ReturnType<typeof spendLooseUses> = { usesLeft: null, spent: false };
       let lastCharge: string | null = null;
+      let usedUp = false;
       const { state, duplicate } = await execute((draft) => {
         requireActorAccess(initiator, draft, actorId, "attack");
         const live = draft.actors.find((candidate) => candidate.id === actorId)!;
         spend = spendLooseUses(live, action, available, castLevel);
+        // A potion drunk or a flask thrown outside a fight is used up all the same.
+        const consumable = consumableRowFor(action, live.inventory, kit.equipmentCatalog());
+        if (consumable) live.inventory = withOneUsedUp(live.inventory, consumable.id);
+        usedUp = consumable !== null;
         // SRD charged items: spending the last charge rolls a d20, whose 1 is the item's own text.
         const due = spend.usesLeft === 0 ? lastChargeRollFor(action, live.inventory, kit.equipmentCatalog()) : null;
         lastCharge = null;
@@ -386,7 +392,7 @@ export const actionCommands = [
           gmOnly: kit.actorHidden(actorId)
         });
       // Rolls narrate themselves; a use with nothing to roll, or one that cost a charge, says so.
-      if (plan.length === 0 || spend.spent) {
+      if (plan.length === 0 || spend.spent || usedUp) {
         const left =
           spend.usesLeft === null ? "" : ` (${spend.usesLeft} ${spend.usesLeft === 1 ? "use" : "uses"} left)`;
         kit.context.appendLog({
