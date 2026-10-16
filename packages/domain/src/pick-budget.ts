@@ -1,8 +1,11 @@
 // How many picks an `extraPicks` grant is worth. The server's offer survey reads it for a create and for
 // the builder's offers alike.
 
+import type { z } from "zod";
+import type { PickBudgetScalingSchema } from "@vtt/schemas";
+
 /** The printed-column scaling an extra pick may name. */
-export type PickBudgetScaling = Readonly<{ type: "class-resource-growth"; id: string }>;
+export type PickBudgetScaling = Readonly<z.infer<typeof PickBudgetScalingSchema>>;
 
 /** One `extraPicks` entry as it crosses the wire and as the bundle authors it. */
 export type PickBudgetGrant = Readonly<{ offer: string; amount?: number | null; scaling?: PickBudgetScaling | null }>;

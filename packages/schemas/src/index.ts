@@ -19,6 +19,13 @@ const RiderSlugSchema = z
   .regex(/^[a-z0-9-]+$/)
   .max(80);
 const SizeSchema = z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]);
+/** A pick budget that follows a printed class-table column's growth (Eldritch Invocations 1 -> 10). Here because the
+ *  content bundle authors it and the catalog rows carry it. */
+export const PickBudgetScalingSchema = z.strictObject({
+  type: z.literal("class-resource-growth"),
+  /** The `classResources.id` of the printed column - `eldritch-invocations`, `weapon-mastery`. */
+  id: RiderSlugSchema
+});
 /** A safe dice expression, one die term plus at most one flat modifier - never an evaluable string (ADR-0008). */
 export const DiceFormulaSchema = z
   .string()

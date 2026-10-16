@@ -18,6 +18,18 @@ const GM_REV =
   "GM-only optimistic-concurrency counter; absent from a player projection. Pass it back as `expectedRev` to reject a stale edit.";
 const REVEALED_SUBSET = "Filtered to the revealed subset.";
 
+// Prose the content catalogs share.
+const CHOICE_CATALOG =
+  'An open catalog slug supplying the options instead of (or beside) `from` - the same grammar a feature\'s `fromCatalog` uses, resolved by the same function on both sides. Species language choices use "standard-languages"; null when `from` names the options outright';
+const ATTRIBUTION =
+  "The bundle's canonical CC BY 4.0 statement - ADR-0015 requires it on any surface that displays this content";
+const CASTER_PROGRESSION = "How this class's levels count toward the shared multiclass caster level";
+const PREPARES = "known = a fixed spells-known list; prepared = re-chosen on a long rest";
+const FOCUS = "Spellcasting focus slug (arcane-focus, holy-symbol); null = none";
+const SPELL_LIST = "The spell list this class draws from - an open slug matched against each spell's `classes` tags";
+const STARTING_EQUIPMENT =
+  "Starting-equipment bundles with their items and the \"or take N gp\" alternative; the chosen option's id is recorded in the character's choice ledger";
+
 /** Prose for the generated components, keyed by component and then by path: "" is the component itself, "a.b" a
  *  nested property and "a[]" an array's items. A path that no longer exists fails the document build. */
 export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
@@ -1247,5 +1259,169 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "": "What the database actually holds after the restore - its own row counts, not what the bundle claimed.",
     connections:
       "DECLARED connections. Mention edges are derived from body text and are rebuilt by the restore, so counting them would double-count the rebuild's own output."
+  },
+  ContentConditionsData: {
+    attribution: ATTRIBUTION
+  },
+  ContentSkillsData: {
+    "skills[].ability": "The ability this skill's check uses; null only for a record that has not declared one yet",
+    attribution: ATTRIBUTION
+  },
+  ContentLanguagesData: {
+    "languages[].table":
+      'Which SRD table the language is printed in - "standard" (widespread) or "rare" (secret or planar). An open slug: a homebrew table needs no schema change. The base "Common plus two languages" budget draws from `standard`; Druidic and Thieves\' Cant are `rare` and arrive from a class feature',
+    attribution: ATTRIBUTION
+  },
+  ContentSpellsData: {
+    "spells[].level": "0 is a cantrip",
+    "spells[].attackRoll":
+      'Whether casting it rolls an attack. One of the three closed `fromPicks` predicates - "a cantrip that requires an attack roll" (Repelling Blast)',
+    "spells[].rangeFeet":
+      'Range in FEET when the printed range IS a distance, else null (Self and Touch are not ranges of zero). Read by the `ranged` predicate - "a cantrip with a range of 10+ feet" (Eldritch Spear)',
+    "spells[].componentsText": '"V, S, M (a pinch of soot)", or "None"',
+    "spells[].classes":
+      "Spell-list ids this spell belongs to (\"wizard\", a homebrew list slug) - the builder filters a class's spell step on these, paired with the class record's spellcasting.spellListId",
+    "spells[].damageRoll": 'Base damage/healing roll ("8d6"), or null when the spell rolls nothing',
+    "spells[].castingOptions":
+      "Per-slot-level upcast scaling; the sheet applies the row matching the chosen cast level",
+    "spells[].cantripScaling":
+      "A cantrip's character-level scaling (Fire Bolt's 2d10 at 5, Eldritch Blast's 2 beams), lowest level first; the row in force is the highest at or below the caster's level. Empty for a leveled spell",
+    attribution: ATTRIBUTION
+  },
+  ContentEquipmentData: {
+    "equipment[].category":
+      "Open slug: weapon, armor, shield, ammunition, adventuring-gear, tool, equipment-pack, consumable, focus, wondrous, or any homebrew kind. Not a closed set - derive groupings from the data.",
+    "equipment[].weapon": "Populated for weapons only",
+    "equipment[].weapon.mastery":
+      "The SRD weapon-mastery property this weapon has. Browse-only: it is NOT copied onto an inventory row, and it does nothing until a character unlocks THIS weapon through Weapon Mastery. Absent on gear and on homebrew weapons that declare none.",
+    "equipment[].weapon.properties":
+      "The SRD weapon table's Properties column (finesse, light, thrown, versatile, reach, heavy, two-handed, loading, ammunition). Unlike `mastery` these ARE copied onto an inventory row and the engine reads them there - finesse decides whether the swing uses Dexterity, reach decides 10 feet versus 5. An empty array means the weapon genuinely has none.",
+    "equipment[].armor": "Populated for armor and shields only",
+    "equipment[].appliesTo":
+      'The eligibility column for a TEMPLATE magic item - the printed type-line qualifier ("Any Simple or Martial") plus the base ids it RESOLVED to at build/authoring time. Null everywhere except weapon/armor templates. A template row derives nothing until the player\'s pick binds it to one of `baseIds`, validated and copied server-side at set-inventory.'
+  },
+  ContentFeature: {
+    "": "The browse-and-pick projection of a bundle FeatureRecord. Prose is the display source of truth; a feature's structured riders (granted actions, effects, modifiers, limited uses) stay server-side - the server applies them when it builds the character, so the wizard never becomes a second rules engine.",
+    level: "The class/subclass level the feature lands at; null when it is not level-gated (species traits, feats)",
+    tags: "Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity)",
+    choices:
+      "Every pick this feature asks for, in authored order; each writes a row in the character's choice-provenance ledger. One record may owe more than one, with different kinds and ceilings: Magic Initiate owes two cantrips and one level-1 spell. Empty when the feature grants without asking.",
+    grantedAtLevels:
+      "Every level at which the owning class's table grants this feature - the authoritative repeat count. A feature granted at 4, 8, 12 and 16 asks its choice FOUR times and the server's capacity is choose x grants, so a client that ignores this offers too few picks and the build is rejected at creation. Empty when no class level table grants the feature (species traits, feats, subclass features).",
+    extraPicks:
+      "Budgets this feature RAISES rather than picks it asks for. Travels although riders do not, because it is an input to picking: a wizard that ignores it caps the player at the printed level row and the extra pick the text promised is unselectable."
+  },
+  ContentFeatureChoice: {
+    "": "One pick a feature asks for. Options arrive either as plain ids in `from`, as an open catalog slug in `fromCatalog`, or as inline `options` carrying their own name and any second-order pick.",
+    from: "Explicit option ids; empty when fromCatalog names an open list instead",
+    fromCatalog: "An open catalog slug resolved at pick time (skills, feats, wizard-spells)",
+    maxSpellLevel:
+      "Ceiling on a spell pick's level (Evocation Savant: 2; Magic Initiate: 0, i.e. cantrips only). null when the pick has no ceiling \u2014 a picker that ignores it offers spells the server then rejects",
+    minSpellLevel:
+      'Floor on a spell pick\'s level (Mystic Arcanum: 6, so the level-6 arcanum is EXACTLY a level-6 spell rather than "6 or lower"). null when the pick has no floor',
+    fromPicks:
+      'The options are the character\'s OWN earlier answers rather than a catalog - "choose one of your known Warlock cantrips that deals damage". null for every ordinary pick.',
+    "fromPicks.offer": 'The budget whose answers are the option list ("class-cantrips", "feature:<id>")',
+    "fromPicks.where": "Closed predicate narrowing those answers; null means all of them",
+    options:
+      "Inline options with their authored names and any nested pick; empty when the options are plain ids or come from a catalog"
+  },
+  ContentFeatureOption: {
+    "": "One inline option of a feature's pick. Carries its authored name (an id alone would force the client to titleize) and any SECOND-ORDER pick it owes - Cleric Divine Order's Thaumaturge grants an extra cantrip, so choosing it opens another choice. Riders stay server-side.",
+    requires:
+      'The earlier answer that makes this option legal, or null when it is always offerable. "The option you chose for Blessed Strikes grows more powerful": the later feature\'s options are gated on a pick already in the ledger. When gating leaves exactly as many legal options as the capacity, the answer is a CONSEQUENCE rather than a choice and neither side renders a pick for it.',
+    "requires.offer": 'The offer key holding the earlier answer ("feature:blessed-strikes", or a named budget)',
+    choices:
+      "Every nested pick this option owes, in authored order. Bounded at one level: a nested pick never carries its own options.",
+    extraPicks:
+      "Budgets this option RAISES once chosen - Divine Order's Thaumaturge adds one to the Cleric cantrip budget."
+  },
+  ContentExtraPick: {
+    "": "ONE pick budget a feature or a chosen option raises. `offer` is the offer key the wizard and the server share verbatim (class-cantrips, class-spells, class-skills, class-tools, background-skills, background-tools, background-languages, species-languages, or feature:<featureId>); the printed level row and every grant naming it are SUMMED, so two features each granting +1 yield +2.",
+    offer: "The offer key whose capacity this raises",
+    amount: "How many extra picks, as a flat number; null when `scaling` states it instead",
+    scaling:
+      "The budget follows a printed class-table column instead of a constant - Eldritch Invocations 1 -> 10, Weapon Mastery 3 -> 6. Resolved against the same level table on both sides. Null for a flat grant."
+  },
+  ContentClassesData: {
+    "classes[].hitDie": "The multiclass hit-dice pool keys on this",
+    "classes[].statPriority":
+      "All six abilities, best first - the random generator's core input, as data rather than a hardcoded table",
+    "classes[].skillChoiceCount": "How many entries of skillChoices the character picks at level 1",
+    "classes[].armorProficiencies": "Granted armor training, as open slugs (light, medium, heavy, shields)",
+    "classes[].weaponProficiencies": "Granted weapon training - a group (simple, martial) or a single weapon id",
+    "classes[].toolChoices": '"Choose N tools" where the class offers one; null otherwise',
+    "classes[].toolChoices.fromCatalog": CHOICE_CATALOG,
+    "classes[].multiclassProficiencies":
+      "Proficiencies gained when this class is taken as a MULTICLASS (narrower than the level-1 set); null when the record declares none",
+    "classes[].multiclassProficiencies.skillChoices.fromCatalog": CHOICE_CATALOG,
+    "classes[].multiclassPrerequisites":
+      'Ability minimums for multiclassing INTO this class; mode "any" covers "STR 13 or DEX 13". null = always allowed. Display data - the server re-validates',
+    "classes[].subclassLabel": 'What this class calls its subclass ("Martial Archetype")',
+    "classes[].asiLevels": "Levels granting an Ability Score Improvement, or a feat instead",
+    "classes[].spellcastingAbility":
+      "Ability slug for this class's spellcasting; null for a non-caster. Per class, so Paladin CHA + Wizard INT is expressible",
+    "classes[].spellcastingProgression": CASTER_PROGRESSION,
+    "classes[].spellcasting":
+      "The full spellcasting header (ability, known/prepared, ritual, focus, progression, spell-list id); null for a non-caster. The flat spellcastingAbility/spellcastingProgression mirror it for existing readers",
+    "classes[].spellcasting.prepares": PREPARES,
+    "classes[].spellcasting.focus": FOCUS,
+    "classes[].spellcasting.progression": CASTER_PROGRESSION,
+    "classes[].spellcasting.spellListId": SPELL_LIST,
+    "classes[].levelTable":
+      "The class's full 20-row printed progression: slot columns, cantrips/spells known, the prepared-spell formula, and the named resources that grow with level (Second Wind 2 to 4, Rage 3, Sneak Attack 3d6)",
+    "classes[].levelTable[].spellSlots": "Nine counts, index 0 = 1st-level slots; null for a non-caster row",
+    "classes[].levelTable[].pactSlots": "Warlock Pact Magic: one uniform slot level with its own count",
+    "classes[].levelTable[].preparedFormula":
+      'The SRD prepared-spell rule as data ("<ability> modifier + <class> level") so homebrew can print its own wording',
+    "classes[].levelTable[].classResources[].amount": 'A count, or a dice string ("3d6" for Sneak Attack)',
+    "classes[].startingEquipmentOptions": STARTING_EQUIPMENT
+  },
+  ContentSubclassesData: {
+    "subclasses[].subclassLevel":
+      "The class level this subclass is taken at; null inherits the parent class's subclassLevel",
+    "subclasses[].spellcastingAbility": "Set by third-caster subclasses (Eldritch Knight, Arcane Trickster)",
+    "subclasses[].spellcasting":
+      "A third-caster subclass's full spellcasting header, same shape as a class's; null otherwise",
+    "subclasses[].spellcasting.prepares": PREPARES,
+    "subclasses[].spellcasting.focus": FOCUS,
+    "subclasses[].spellcasting.progression": CASTER_PROGRESSION,
+    "subclasses[].spellcasting.spellListId": SPELL_LIST
+  },
+  ContentSpeciesData: {
+    "species[].sizes": "A list because several 2024 species let the player pick Small or Medium",
+    "species[].abilityBonuses":
+      "Fixed ability increases, as data. Empty for every SRD 5.2.1 species (increases live on the background); a 2014-style or homebrew record populates it and the builder applies whatever is declared",
+    "species[].abilityBonusChoice":
+      '"Choose N abilities to raise by M" (the 2014 variant-human pattern); null when the species has none',
+    "species[].languageChoices": '"Choose N languages" where the species offers one; null otherwise',
+    "species[].languageChoices.fromCatalog": CHOICE_CATALOG,
+    "species[].lineages": "Lineages/subraces; each one's traits are also folded into features",
+    "species[].features":
+      "Species traits plus every lineage's traits. NOTE: SRD 5.2.1 puts ability increases on the BACKGROUND, not the species"
+  },
+  ContentBackgroundsData: {
+    "backgrounds[].abilityOptions":
+      "SRD 5.2.1 ability increases: which abilities, and the legal distributions (+2/+1 or +1/+1/+1) as data",
+    "backgrounds[].originFeatId": "The origin feat this background grants, keyed into the feat catalog",
+    "backgrounds[].skillChoices":
+      '"Choose N skills" where the background offers one; null otherwise (fixed grants stay in skillProficiencies)',
+    "backgrounds[].skillChoices.fromCatalog": CHOICE_CATALOG,
+    "backgrounds[].toolChoices": '"Choose N tools" where the background offers one; null otherwise',
+    "backgrounds[].toolChoices.fromCatalog": CHOICE_CATALOG,
+    "backgrounds[].languageChoices": '"Choose N languages" where the background offers one; null otherwise',
+    "backgrounds[].languageChoices.fromCatalog": CHOICE_CATALOG,
+    "backgrounds[].startingEquipmentOptions": STARTING_EQUIPMENT
+  },
+  ContentFeatsData: {
+    "feats[].category": "Open slug (origin / general / fighting-style / epic-boon)",
+    "feats[].prerequisiteRequires": "Proficiency or feature slugs the character must already have",
+    "feats[].prerequisiteText":
+      "Anything not modeled above, printed for the player. The SERVER decides whether a prerequisite is met - never the client",
+    "feats[].feature": "A feat IS a feature plus catalog metadata - hence one record, not a list"
+  },
+  ContentNamesData: {
+    "names[].pools": "Ordered by the data, never by a hardcoded client list",
+    "names[].pools[].label": 'What this pool is ("Masculine", "Family", "Clan")'
   }
 };
