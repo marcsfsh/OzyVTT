@@ -101,6 +101,38 @@
   align-items: center;
   gap: 0.4rem;
 }
+.sheet-pools-block {
+  margin-top: 0.85rem;
+}
+.sheet-pools {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sheet-pool {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.7rem;
+}
+.sheet-pool-name {
+  color: var(--text);
+  font-weight: 700;
+}
+.sheet-pool-count {
+  color: var(--text-dim);
+  font: 700 var(--fs-sm) var(--font-numeric);
+}
+.sheet-pool-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+}
 .sheet-rest-asked {
   color: var(--cyan-hi);
   font-size: var(--fs-sm);

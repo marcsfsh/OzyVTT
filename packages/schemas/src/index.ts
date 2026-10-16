@@ -974,11 +974,14 @@ export const EffectGrantSchema = z
   })
   .strict();
 
+/** The most a limited-use pool can hold: Lay on Hands at Paladin 20 is 100 points. */
+export const MAX_ACTION_USES = 100;
+
 /** Limited uses. "turn"/"encounter"/rests reset as named; "recharge" on a start-of-turn d6 >= `recharge`.
  * `pool` shares one counter across actions (Sneak Attack once per turn regardless of weapon). */
 export const ActionUsesSchema = z
   .object({
-    limit: z.number().int().min(1).max(20),
+    limit: z.number().int().min(1).max(MAX_ACTION_USES),
     per: z.enum(["turn", "encounter", "long-rest", "short-rest", "recharge"]),
     pool: z
       .string()
@@ -1142,10 +1145,17 @@ export const ActionSchema = z.object({
       /** The roll is one pool divided among the targets (Preserve Life), not regained by each. */
       divided: z.literal(true).optional(),
       /** No target is healed past this fraction of its maximum (Preserve Life: half). */
-      upToFractionOfMaximum: z.number().min(0.1).max(1).optional()
+      upToFractionOfMaximum: z.number().min(0.1).max(1).optional(),
+      /** The formula is regained once for each use spent (Lay on Hands: 1 hit point per point of its pool). */
+      perUse: z.literal(true).optional()
     })
     .strict()
     .optional(),
+  /** How many of its uses one activation spends: a fixed number (Lay on Hands' 5 points to cure a poison), or
+   *  `chosen`, picked by the user each time (Lay on Hands' healing). Absent: one. */
+  useCost: z.union([z.number().int().min(2).max(MAX_ACTION_USES), z.literal("chosen")]).optional(),
+  /** Conditions this action ends on each target (Lay on Hands: Poisoned). */
+  endsConditions: z.array(ConditionIdSchema).min(1).max(4).optional(),
   /** Compound action: one shared action slot, components tracked (crocodile Multiattack = one Bite + one Tail). */
   multiattack: z
     .array(z.object({ actionId: z.string().regex(/^[a-z0-9-]+$/), count: z.number().int().min(1).max(4) }).strict())

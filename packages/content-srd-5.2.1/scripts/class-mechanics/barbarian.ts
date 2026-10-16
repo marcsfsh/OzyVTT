@@ -112,7 +112,7 @@ export const barbarian: ClassMechanicsModule = {
     "feral-instinct": {
       modifiers: [{ type: "roll-mode", roll: "initiative", mode: "advantage" }]
     },
-    // The once-per-Long-Rest permission only; refilling Rage uses is done by hand.
+    // The once-per-Long-Rest permission only; the GM gives the Rage uses back from the sheet's Limited uses.
     "persistent-rage": {
       uses: { limit: 1, per: "long-rest" }
     },

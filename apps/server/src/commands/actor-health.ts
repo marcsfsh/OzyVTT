@@ -5,9 +5,11 @@ import { replaceableOffers } from "../choice-overrides.js";
 import type { EffectNarration } from "../effects.js";
 import {
   ActorRechooseSchema,
+  ActorRestoreUsesSchema,
   ActorRestSchema,
   ActorReviveSchema,
   ActorSpendHitDiceSchema,
+  ActorSpendUsesSchema,
   ApplyDamageSchema,
   HpAmountSchema,
   SetConditionSchema,
@@ -29,6 +31,7 @@ import {
   UNTYPED_DAMAGE
 } from "../hit-points.js";
 import { applyRest, hitDieSizesToSpend, spendHitDice } from "../rests.js";
+import { restoreUses, spendUses } from "../use-pools.js";
 import { builtinAction } from "../builtin-actions.js";
 import { effectiveActions } from "../effective-actions.js";
 import type { EquipmentCatalog } from "../equipment-derivation.js";
@@ -345,6 +348,61 @@ export const actorHealthCommands = [
         gmOnly: kit.actorHidden(actorId)
       });
       kit.publishNarrations(events);
+    }
+  }),
+
+  defineCommand({
+    type: "actor.spend-uses",
+    operationId: "spendUses",
+    description:
+      "Spends several uses of one of the actor's limited-use pools at once, keyed as the counters are (`uses.pool ?? action.id`): Lay on Hands' points outside a fight, or Focus Points for a feature the engine doesn't run. A player session only on their claimed character, the GM anyone. Refused when the pool holds fewer, and for a pool that comes back every turn.",
+    summary: "Spend several uses of a limited-use pool at once (your own character; GM anyone).",
+    schema: ActorSpendUsesSchema,
+    malformed: "The spend is malformed.",
+    async run({ principal, request, execute }, kit) {
+      const { actorId, poolId, amount } = request;
+      let spent = { name: "", left: 0 };
+      const { duplicate } = await execute((state) => {
+        spent = spendUses(state, actorId, poolId, amount, initiatorOf(principal), {
+          resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
+          catalog: kit.equipmentCatalog()
+        });
+      });
+      if (duplicate) return;
+      kit.context.appendLog({
+        kind: "action",
+        text: `${kit.actorName(actorId)} spends ${amount} of ${spent.name} (${spent.left} left).`,
+        actorIds: [actorId],
+        gmOnly: kit.actorHidden(actorId)
+      });
+    }
+  }),
+
+  defineCommand({
+    type: "actor.restore-uses",
+    operationId: "restoreUses",
+    description:
+      "GM-only: gives back up to `amount` spent uses of one of the actor's limited-use pools (a feature that refills it, such as Uncanny Metabolism or Persistent Rage, or a ruling). Refused when the pool is already full and for a pool that comes back every turn.",
+    summary: "Give back spent uses of a limited-use pool (GM).",
+    schema: ActorRestoreUsesSchema,
+    malformed: "The restore is malformed.",
+    gmOnly: "Only the GM gives uses back.",
+    async run({ principal, request, execute }, kit) {
+      const { actorId, poolId, amount } = request;
+      let back = { name: "", restored: 0, left: 0 };
+      const { duplicate } = await execute((state) => {
+        back = restoreUses(state, actorId, poolId, amount, initiatorOf(principal), {
+          resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
+          catalog: kit.equipmentCatalog()
+        });
+      });
+      if (duplicate) return;
+      kit.context.appendLog({
+        kind: "action",
+        text: `${kit.actorName(actorId)} gets ${back.restored} of ${back.name} back (${back.left} left).`,
+        actorIds: [actorId],
+        gmOnly: kit.actorHidden(actorId)
+      });
     }
   }),
 

@@ -1,8 +1,8 @@
 /**
  * Sorcerer and Draconic Sorcery mechanics, merged over the ETL-generated prose.
  *
- * Uses count one per spend, so only options costing exactly 1 Sorcery Point ride the
- * `sorcery-points` pool. Heightened and Quickened Spell cost 2 and keep their price in prose.
+ * A Metamagic option is a pick, not an action, so it can't carry a price of its own: the 1-point options ride the
+ * `sorcery-points` pool, and Heightened and Quickened Spell's 2 points are spent from the sheet's Limited uses.
  */
 import type { DamageType } from "@vtt/schemas";
 import { spellTableStages, type ClassMechanicsModule } from "./overlay.js";
@@ -77,7 +77,7 @@ export const sorcerer: ClassMechanicsModule = {
         "twinned-spell": ONE_SORCERY_POINT
       }
     },
-    // The once-per-Long-Rest permission only; the points it returns are refilled by hand.
+    // The once-per-Long-Rest permission only; the GM gives the points back from the sheet's Limited uses.
     "sorcerous-restoration": { uses: { limit: 1, per: "long-rest" } },
     "epic-boon": { choice: { kind: "feat", choose: 1, fromCatalog: "feats" } }
     // Not modeled: Sorcery Incarnate (substitute cost, two Metamagic per spell), Arcane Apotheosis

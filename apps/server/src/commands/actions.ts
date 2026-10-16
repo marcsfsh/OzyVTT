@@ -17,6 +17,7 @@ import { overrideReason, overrideWaives, rememberOverride } from "../rules-famil
 import { looseRollPlan, NOT_YOUR_TURN, offTurnVerdict, routeForTap, spendLooseUses } from "../tap-routing.js";
 import { upcastAction } from "../item-actions.js";
 import { castSlotLevel } from "../resolution/economy.js";
+import { useCostOf, withChosenCost } from "../use-cost.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, principalTag, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -80,8 +81,10 @@ export const actionCommands = [
         const statBlockAction = effectiveActions(definition, attacker, kit.equipmentCatalog()).find(
           (candidate) => candidate.id === actionId
         );
-        const action = statBlockAction ?? builtinAction(actionId);
-        if (!action) throw new CommandRejectedError("That action is not on the stat block.");
+        const listed = statBlockAction ?? builtinAction(actionId);
+        if (!listed) throw new CommandRejectedError("That action is not on the stat block.");
+        // An action whose user picks its cost (Lay on Hands) resolves at the amount picked.
+        const action = withChosenCost(listed, request.spend);
         let resolvedTargetIds: readonly string[];
         if (template) {
           if (action.attack)
@@ -249,6 +252,7 @@ export const actionCommands = [
         includeDamage,
         override,
         slotLevel,
+        spend: chosenSpend,
         expectedRevision
       } = request;
       if (override && !isGmGrade(principal)) throw new GameAccessDeniedError("Your GM adjudicates rules overrides.");
@@ -266,6 +270,7 @@ export const actionCommands = [
           ...(rollMode ? { rollMode } : {}),
           ...(withOverride && override ? { override } : {}),
           ...(slotLevel === undefined ? {} : { slotLevel }),
+          ...(chosenSpend === undefined ? {} : { spend: chosenSpend }),
           ...(expectedRevision === undefined ? {} : { expectedRevision })
         });
 
@@ -274,8 +279,9 @@ export const actionCommands = [
 
       const definition = actor.definitionId ? kit.resolveDefinitionIn(snapshot, actor.definitionId) : undefined;
       const available = effectiveActions(definition, actor, kit.equipmentCatalog());
-      const listed = available.find((candidate) => candidate.id === actionId) ?? builtinAction(actionId);
-      if (!listed) throw new CommandRejectedError("That action is not on the stat block.");
+      const found = available.find((candidate) => candidate.id === actionId) ?? builtinAction(actionId);
+      if (!found) throw new CommandRejectedError("That action is not on the stat block.");
+      const listed = withChosenCost(found, chosenSpend);
       // A spell cast with a higher slot rolls that slot's dice, on the loose route as in the fight.
       const castLevel = listed.spellSlot ? castSlotLevel(actor, listed.spellSlot.level, slotLevel) : undefined;
       const spell = listed.spellId ? kit.equipmentCatalog().spellRecord?.(listed.spellId) : undefined;
@@ -359,8 +365,13 @@ export const actionCommands = [
       kit.publishRolls(state, commandId);
       // Rolls narrate themselves; a use with nothing to roll, or one that cost a charge, says so.
       if (plan.length === 0 || spend.spent) {
+        const cost = useCostOf(action);
         const left =
-          spend.usesLeft === null ? "" : ` (${spend.usesLeft} ${spend.usesLeft === 1 ? "use" : "uses"} left)`;
+          spend.usesLeft === null
+            ? ""
+            : cost > 1
+              ? ` (${cost} spent, ${spend.usesLeft} left)`
+              : ` (${spend.usesLeft} ${spend.usesLeft === 1 ? "use" : "uses"} left)`;
         kit.context.appendLog({
           kind: "action",
           text: `${kit.actorName(actorId)} uses ${action.name}${left}.`,

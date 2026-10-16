@@ -39,7 +39,9 @@ function combatantsOf(
     action.multiattack !== undefined ||
     spendsALimitedUse ||
     input.builtin === true;
-  if (targets.length === 0 && !structuredWithoutTargets && action.grants?.target !== "target")
+  // A touch that heals by the points spent or ends a condition (Lay on Hands) is spent on someone.
+  const touchesSomeone = action.endsConditions !== undefined || action.healing?.perUse === true;
+  if (targets.length === 0 && (touchesSomeone || (!structuredWithoutTargets && action.grants?.target !== "target")))
     throw new CommandRejectedError("Choose at least one target.");
   if (
     !action.attack &&

@@ -2,6 +2,7 @@ import type { BuilderPolicy } from "@vtt/domain";
 import { CatalogChoiceError, resolveCatalogChoice } from "@vtt/domain";
 import {
   ActorDefinitionSchema,
+  MAX_ACTION_USES,
   type ActorAction,
   type ActorDefinition,
   type CharacterChoice,
@@ -263,7 +264,7 @@ function interpretAction(
     const limit = resolvedUseLimit(feature.uses, context);
     if (limit >= 1) {
       assembled.uses = {
-        limit: Math.min(20, limit),
+        limit: Math.min(MAX_ACTION_USES, limit),
         per: feature.uses.per,
         ...(feature.uses.pool ? { pool: feature.uses.pool } : {})
       };
@@ -465,7 +466,7 @@ function interpretFeature(
   }
   // A feature with no action gets a synthesized activation when a rider needs a trigger (an effect grant)
   // or it has limited uses (so the pool is trackable and rests can reset it by action id).
-  const synthesizedUses = feature.uses ? Math.min(20, resolvedUseLimit(feature.uses, context)) : 0;
+  const synthesizedUses = feature.uses ? Math.min(MAX_ACTION_USES, resolvedUseLimit(feature.uses, context)) : 0;
   const carriesUses = feature.uses !== undefined && synthesizedUses >= 1;
   // The counter of a free-cast grant (Divine Smite once per Long Rest) rides its spell's free-cast action instead.
   const freeUses: ActorAction["uses"] | undefined = carriesUses

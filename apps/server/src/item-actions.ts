@@ -6,7 +6,7 @@ import {
   weaponAbilityModifierFrom,
   type RiderAbility
 } from "@vtt/rules-5e";
-import type { ActorAction, ActorDefinition, InventoryItem } from "@vtt/schemas";
+import { MAX_ACTION_USES, type ActorAction, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
 
 /**
  * Actions synthesised from what a character carries: an equipped weapon's swing, an item's declared actions and
@@ -32,7 +32,7 @@ function bearerLevel(definition: ActorDefinition | undefined): number {
   return total >= 1 ? total : 1;
 }
 
-/** Authored uses to `ActionUsesSchema`, clamped to 1-20 like `resolvedUseLimit`; below 1 means no charges. An
+/** Authored uses to `ActionUsesSchema`, clamped to its range like `resolvedUseLimit`; below 1 means no charges. An
  *  item action carries the action form (with `recharge`), a cast the feature form (with `scaling`). */
 function usesOf(
   uses: FeatureUses | ActorAction["uses"],
@@ -42,7 +42,7 @@ function usesOf(
   const limit = uses.limit ?? ("scaling" in uses ? scaledLimit(uses.scaling, definition) : undefined);
   if (limit === undefined || limit < 1) return undefined;
   return {
-    limit: Math.min(20, limit),
+    limit: Math.min(MAX_ACTION_USES, limit),
     per: uses.per,
     ...(uses.pool ? { pool: uses.pool } : {}),
     ...("recharge" in uses && uses.recharge !== undefined ? { recharge: uses.recharge } : {})

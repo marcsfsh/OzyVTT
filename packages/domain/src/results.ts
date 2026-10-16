@@ -268,6 +268,8 @@ export const ActionAvailabilitySchema = z.strictObject({
   usesLimit: z.number().int().nullable(),
   usesPer: z.enum(["turn", "encounter", "long-rest", "short-rest", "recharge"]).nullable(),
   usesPool: z.string().nullable(),
+  /** How many uses one activation spends when it is more than one, or `chosen` when the user picks it each time. */
+  useCost: z.union([z.number().int(), z.literal("chosen")]).nullable(),
   requiresEffectTag: z.string().nullable(),
   multiattack: z.array(z.strictObject({ actionId: z.string(), count: z.number().int() })).nullable(),
   reaction: ActionReactionSchema.nullable()

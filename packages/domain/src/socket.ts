@@ -52,6 +52,8 @@ import type {
   ActorSetSpeedSchema,
   ActorStabilizeSchema,
   ActorSpendHitDiceSchema,
+  ActorSpendUsesSchema,
+  ActorRestoreUsesSchema,
   AddCombatantSchema,
   AnnotationAddSchema,
   AnnotationClearSchema,
@@ -437,6 +439,16 @@ export interface ClientToServerEvents {
   ) => void;
   "actor:spend-hit-dice": (
     payload: CommandPayload<typeof ActorSpendHitDiceSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** Spend several uses of a limited-use pool at once (the character's player or the GM). */
+  "actor:spend-uses": (
+    payload: CommandPayload<typeof ActorSpendUsesSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: give back spent uses of a limited-use pool. */
+  "actor:restore-uses": (
+    payload: CommandPayload<typeof ActorRestoreUsesSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** A player asks the GM for a Long Rest for their character, or takes the ask back. */

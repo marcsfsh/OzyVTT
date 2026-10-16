@@ -27,6 +27,7 @@ import { SheetActions } from "./SheetActions";
 import { SheetIdentityEditor } from "./SheetIdentityEditor";
 import { SheetInventory } from "./SheetInventory";
 import { SheetProficiencies } from "./SheetProficiencies";
+import { SheetPools } from "./SheetPools";
 import { SheetRest } from "./SheetRest";
 import { SheetSpells } from "./SheetSpells";
 import { SheetVitals } from "./SheetVitals";
@@ -335,6 +336,9 @@ export function CharacterSheet({
             onFeedback={setFeedback}
           />
         </div>
+      )}
+      {actor.actionUses && (role === "gm" || actor.kind === "player-character") && (
+        <SheetPools actorId={actor.id} role={role} actions={serverActions} spent={actor.actionUses} />
       )}
 
       {definition && (

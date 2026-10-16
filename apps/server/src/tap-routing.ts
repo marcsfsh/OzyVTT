@@ -4,6 +4,7 @@ import type { ActorAction } from "@vtt/schemas";
 import { effectiveModeFor, overrideCovers, type RuleId } from "./rules-families.js";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
 import { noUsesRemaining, useLimitFor } from "./resolution/economy.js";
+import { notEnoughUses, useCostOf } from "./use-cost.js";
 
 /**
  * Where an action tap goes, decided by the server. The sheet sends intent; the server answers:
@@ -62,7 +63,9 @@ export function looseRollPlan(
       label: action.name
     });
   }
-  if (action.healing) plan.push({ formula: action.healing.formula, purpose: "healing", label: action.name });
+  // A heal counted per use spent (Lay on Hands' points) has no die of its own to roll.
+  if (action.healing && !action.healing.perUse)
+    plan.push({ formula: action.healing.formula, purpose: "healing", label: action.name });
   if (options.includeDamage) {
     for (const part of action.damage)
       plan.push({ formula: part.formula, purpose: "damage", label: `${action.name} (${part.type})` });
@@ -83,16 +86,18 @@ export function spendLooseUses(
   const key = uses ? (uses.pool ?? action.id) : null;
   const limit = uses ? useLimitFor(siblings, action) : 0;
   const used = key ? (actor.actionUses[key] ?? 0) : 0;
+  const cost = useCostOf(action);
   if (key && used >= limit) throw new CommandRejectedError(noUsesRemaining(action, limit));
+  if (key && used + cost > limit) throw new CommandRejectedError(notEnoughUses(action.name, limit - used, cost));
   const level = action.spellSlot ? slotLevel : undefined;
   if (level !== undefined && action.spellSlot && level < action.spellSlot.level)
     throw new CommandRejectedError(`${action.name} needs a slot of level ${action.spellSlot.level} or higher.`);
   if (level !== undefined && !actor.spellSlots?.some((slot) => slot.level === level && slot.remaining > 0))
     throw new CommandRejectedError(`${action.name} spends a level-${level} spell slot - ${actor.name} has none left.`);
-  if (key) actor.actionUses = { ...actor.actionUses, [key]: used + 1 };
+  if (key) actor.actionUses = { ...actor.actionUses, [key]: used + cost };
   if (level !== undefined)
     actor.spellSlots = actor.spellSlots!.map((slot) =>
       slot.level === level ? { ...slot, remaining: slot.remaining - 1 } : slot
     );
-  return { usesLeft: key ? limit - used - 1 : null, spent: key !== null || level !== undefined };
+  return { usesLeft: key ? limit - used - cost : null, spent: key !== null || level !== undefined };
 }

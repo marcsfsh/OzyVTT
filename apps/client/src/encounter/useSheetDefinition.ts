@@ -29,6 +29,7 @@ type AvailabilityRow = Readonly<{
   usesLimit?: number | null;
   usesPer?: ContentActionSummary["usesPer"];
   usesPool?: string | null;
+  useCost?: number | "chosen" | null;
   requiresEffectTag?: string | null;
   multiattack?: ReadonlyArray<{ actionId: string; count: number }> | null;
   reaction?: ContentActionSummary["reaction"];
@@ -54,6 +55,7 @@ function summaryOfAvailability(row: AvailabilityRow): ContentActionSummary {
     usesPer: row.usesPer ?? null,
     usesRecharge: null,
     usesPool: row.usesPool ?? null,
+    ...(row.useCost !== undefined && row.useCost !== null ? { useCost: row.useCost } : {}),
     requiresEffectTag: row.requiresEffectTag ?? null,
     multiattack: row.multiattack ?? null,
     grants: false,

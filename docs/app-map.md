@@ -6,7 +6,7 @@ machine-derivable surfaces of the app (state shape, command catalog, HTTP paths)
 file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.
 
 - API version `1` · realtime protocol `1`
-- 12 GameState fields · 101 commands · 219 HTTP paths
+- 12 GameState fields · 103 commands · 221 HTTP paths
 
 ## GameState shape
 
@@ -47,6 +47,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `
 | `actor.rechoose` | `actor:write` |
 | `actor.remove` | `actor:write` |
 | `actor.rest` | `actor:write` |
+| `actor.restore-uses` | `actor:write` |
 | `actor.revive` | `actor:write` |
 | `actor.set-archived` | `actor:write` |
 | `actor.set-condition` | `actor:write` |
@@ -59,6 +60,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `
 | `actor.set-token-image` | `actor:write` |
 | `actor.set-visibility` | `actor:write` |
 | `actor.spend-hit-dice` | `actor:write` |
+| `actor.spend-uses` | `actor:write` |
 | `actor.stabilize` | `combat:write` |
 | `annotation.add` | `combat:write` |
 | `annotation.clear` | `combat:write` |
@@ -252,6 +254,8 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/actors/{actorId}/stabilize`
 - `POST /api/v1/game/actors/{actorId}/temp-hp`
 - `POST /api/v1/game/actors/{actorId}/token-image`
+- `POST /api/v1/game/actors/{actorId}/uses/restore`
+- `POST /api/v1/game/actors/{actorId}/uses/spend`
 - `POST /api/v1/game/actors/{actorId}/visibility`
 - `POST /api/v1/game/annotations`
 - `DELETE /api/v1/game/annotations/{id}`

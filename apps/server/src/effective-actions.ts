@@ -1,5 +1,5 @@
 import type { Actor } from "@vtt/domain";
-import type { ActorAction, ActorDefinition } from "@vtt/schemas";
+import { MAX_ACTION_USES, type ActorAction, type ActorDefinition } from "@vtt/schemas";
 import { collectRiders, sumRiders, type RiderContext } from "@vtt/rules-5e";
 import {
   deriveEquipment,
@@ -66,7 +66,7 @@ export function withStandingRiders(action: ActorAction, derivation: EquipmentDer
       ? { save: { ...action.save, dc: Math.max(1, Math.min(40, action.save.dc + saveDc)) } }
       : {}),
     ...(action.uses && poolBonus !== 0
-      ? { uses: { ...action.uses, limit: Math.max(1, Math.min(20, action.uses.limit + poolBonus)) } }
+      ? { uses: { ...action.uses, limit: Math.max(1, Math.min(MAX_ACTION_USES, action.uses.limit + poolBonus)) } }
       : {}),
     // A standing `damage-bonus` (a +1 weapon) folds into the first damage part's formula, so sheet, roll
     // and resolver read one number; the constant is never crit-doubled. Moment-gated ones are added by

@@ -361,6 +361,8 @@ export const ActionResolveSchema = z
     /** Extras to add to this hit, from the preview's `hitOffers` (Sneak Attack, a smite and its slot, Divine Strike's
      *  type, a charge). Each is checked and spent with the hit; on a miss nothing is spent. */
     hitOptions: z.array(HitOptionChoiceSchema).max(6).optional(),
+    /** How much of its pool an action that lets its user choose spends (Lay on Hands' points); refused otherwise. */
+    spend: z.number().int().min(1).max(100).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
@@ -555,6 +557,8 @@ export const ActionUseSchema = z
     override: RulesOverrideSchema.optional(),
     /** The spell slot to cast with; see `action.resolve`. */
     slotLevel: z.number().int().min(1).max(9).optional(),
+    /** How much of its pool an action that lets its user choose spends; see `action.resolve`. */
+    spend: z.number().int().min(1).max(100).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -755,6 +759,21 @@ export const ActorSpendHitDiceSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** A limited-use pool, as its counter is keyed (`uses.pool ?? action.id`), and how many uses to move. */
+const PoolAmountFields = {
+  commandId: z.uuid(),
+  actorId: z.uuid(),
+  poolId: z
+    .string()
+    .regex(/^[a-z0-9-]+$/)
+    .max(120),
+  amount: z.number().int().min(1).max(100),
+  expectedRevision: z.number().int().nonnegative().optional()
+} as const;
+/** Spend several uses of a pool at once: the character's player or the GM. */
+export const ActorSpendUsesSchema = z.object(PoolAmountFields).strict();
+/** Give back spent uses of a pool (GM). */
+export const ActorRestoreUsesSchema = z.object(PoolAmountFields).strict();
 /** A player asks the GM for a Long Rest for their character, or takes the ask back (`withdraw`). */
 export const RestAskSchema = z
   .object({

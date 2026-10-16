@@ -843,13 +843,14 @@ describe("what an effect DOES — through both paths, across two carriers", () =
       modifiers: RECKLESS.srdModifiers
     });
 
-    // Only two bundled records (both Barbarian features) author `effects[].modifiers`.
+    // Only one bundled class feature authors `effects[].modifiers`. Superior Defense grants its effect from an
+    // action instead, which is what lets it cost 3 Focus Points.
     const library = new ContentLibrary().forAudience("gm");
     const carriers = library
       .classSummaries()
       .flatMap((summary) => library.classRecord(summary.id)?.features ?? [])
       .filter((entry) => entry.effects.some((effect) => effect.modifiers.length > 0));
-    expect(carriers.map((entry) => entry.id).sort()).toEqual(["reckless-attack", "superior-defense"]);
+    expect(carriers.map((entry) => entry.id).sort()).toEqual(["reckless-attack"]);
   });
 
   it("3. one assertion body over both: the swing rolls two d20s and keeps the higher", () => {

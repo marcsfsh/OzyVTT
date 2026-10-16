@@ -78,7 +78,7 @@ export const FeatureUsesSchema = z
           .object({
             type: z.literal("by-level"),
             table: z
-              .array(z.object({ level: ContentLevelSchema, limit: z.number().int().min(0).max(99) }).strict())
+              .array(z.object({ level: ContentLevelSchema, limit: z.number().int().min(0).max(100) }).strict())
               .min(1)
               .max(20)
           })

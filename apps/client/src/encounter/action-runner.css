@@ -567,3 +567,8 @@
 .action-reference-group .action-list {
   margin-top: var(--space-1);
 }
+
+/* Lay on Hands' points: the amount sits between the targets and the Roll button. */
+.action-targeting-spend {
+  margin-top: 0.6rem;
+}

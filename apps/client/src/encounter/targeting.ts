@@ -29,6 +29,8 @@ export type TargetingSession = Readonly<{
   template: TargetingTemplate | null;
   /** The spell slot a spell is cast with, sent with every resolve of this session. */
   slotLevel?: number;
+  /** How much of its pool an action whose user picks the cost spends (Lay on Hands' points). */
+  spend?: number;
 }>;
 
 let session: TargetingSession | null = null;
@@ -57,7 +59,11 @@ const subscribe = (listener: () => void) => {
 
 export function beginTargeting(action: ContentActionSummary, attackerId: string, slotLevel?: number) {
   const area = action.area;
-  const slot = slotLevel !== undefined ? { slotLevel } : {};
+  const slot = {
+    ...(slotLevel !== undefined ? { slotLevel } : {}),
+    // A picked cost starts at one; the picker raises it.
+    ...(action.useCost === "chosen" ? { spend: 1 } : {})
+  };
   if (area) {
     // Map the SRD area shape onto a drawable annotation shape (sphere/emanation → circle, cube → square).
     const shape: AnnotationShapeKind =
@@ -103,6 +109,12 @@ export function setTemplatePlacement(origin: AnnotationPoint, target: Annotation
     session = { ...session, template: { ...session.template, placed: { origin, target } } };
     emit();
   }
+}
+/** How much of its pool the action being targeted spends (Lay on Hands' points). */
+export function setTargetingSpend(spend: number) {
+  if (!session || session.action.useCost !== "chosen") return;
+  session = { ...session, spend };
+  emit();
 }
 export function clearTargeting() {
   if (session !== null || blockedPrompt !== null) {
@@ -150,7 +162,7 @@ export function resolveTargeting(
   opts: ResolveOptions = {}
 ) {
   if (!session || busy) return;
-  const { attackerId, action, mode, selected, template, slotLevel } = session;
+  const { attackerId, action, mode, selected, template, slotLevel, spend } = session;
   // A single-target attack previews first (commit: false) so the result card can offer Adv/Disadv, a
   // typed d20 and Confirm. Templates, multi-target and save/utility actions resolve straight through.
   // An explicit `commit` in opts wins (the Confirm tap).
@@ -165,6 +177,7 @@ export function resolveTargeting(
     ...(opts.pushFeet !== undefined ? { pushFeet: opts.pushFeet } : {}),
     ...(opts.hitOptions && opts.hitOptions.length > 0 ? { hitOptions: [...opts.hitOptions] } : {}),
     ...(slotLevel !== undefined ? { slotLevel } : {}),
+    ...(spend !== undefined ? { spend } : {}),
     commit,
     ...(revision !== undefined ? { expectedRevision: revision } : {})
   };
