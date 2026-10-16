@@ -1,10 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { loadEquipment } from "@vtt/content-srd-5.2.1";
+import { loadEquipment, loadSpells } from "@vtt/content-srd-5.2.1";
 import { loadActorFixture } from "@vtt/test-fixtures";
 import { ActorDefinitionSchema } from "@vtt/schemas";
-import type { ContentEquipmentSummary, GmActor, GmView } from "@vtt/domain";
+import type { ContentEquipmentSummary, ContentSpellSummary, GmActor, GmView } from "@vtt/domain";
 
 // `command()` sends through `socket.timeout(ms).emit` with an error-first ack; routed to `socket.emit` here.
 vi.mock("../socket", () => {
@@ -34,14 +34,24 @@ const CATALOG: readonly ContentEquipmentSummary[] = loadEquipment().map((item) =
   weapon: item.weapon ?? null,
   armor: item.armor ?? null,
   appliesTo: item.appliesTo ?? null,
-  ...(item.damageTypeChoice ? { damageTypeChoice: [...item.damageTypeChoice] } : {})
+  ...(item.damageTypeChoice ? { damageTypeChoice: [...item.damageTypeChoice] } : {}),
+  ...(item.spellScroll ? { spellScroll: { ...item.spellScroll } } : {})
 }));
+/** The spell reference's fields a scroll's spell list reads. */
+const SPELLS = loadSpells().map((spell) => ({
+  id: spell.id,
+  name: spell.name,
+  level: spell.level,
+  school: spell.school,
+  classes: [...spell.classes]
+})) as unknown as readonly ContentSpellSummary[];
 
 const emit = socket.emit as unknown as ReturnType<typeof vi.fn>;
-/** Answers the catalog read, the sheet's derived numbers (`attunementSlots`), and every command with ok. */
+/** Answers the catalog and spell reads, the sheet's derived numbers (`attunementSlots`), and every command with ok. */
 function serve(attunementSlots = 3) {
   emit.mockImplementation((event: string, _payload: unknown, ack?: (result: unknown) => void) => {
     if (event === "content:equipment") ack?.({ ok: true, equipment: CATALOG, attribution: "SRD 5.2.1, CC BY 4.0." });
+    else if (event === "content:spells") ack?.({ ok: true, spells: SPELLS, attribution: "SRD 5.2.1, CC BY 4.0." });
     else if (event === "actor:available-actions")
       ack?.({
         ok: true,
@@ -211,6 +221,60 @@ describe("the sheet's inventory", () => {
     expect(bolts.textContent).toContain("Bolts for a Hand Crossbow, Light Crossbow or Heavy Crossbow");
     await user.click(screen.getByRole("button", { name: "Make it Crossbow Bolts" }));
     expect(added).toHaveBeenCalledWith(expect.objectContaining({ id: "ammunition-1" }), "crossbow-bolts-20");
+  });
+
+  it("asks which spell a Spell Scroll bears, from the levels it can hold", async () => {
+    serve();
+    const added = vi.fn();
+    render(<EquipmentPicker ownedCounts={new Map()} busy={false} onAdd={added} onClose={() => {}} />);
+    const user = userEvent.setup();
+    await user.type(await screen.findByRole("searchbox", { name: "Search equipment" }), "spell scroll (level 1)");
+    await user.click(screen.getByRole("button", { name: "Add Spell Scroll (Level 1)" }));
+    const step = screen.getByRole("dialog", { name: "Choose the spell on Spell Scroll (Level 1)" });
+    // Level 1 only: no cantrip, and the spell lists say who can read it.
+    expect(await within(step).findByRole("button", { name: "Put Magic Missile on the scroll" })).toBeTruthy();
+    expect(within(step).queryByRole("button", { name: "Put Fire Bolt on the scroll" })).toBeNull();
+    const missile = within(step).getByRole("button", { name: "Put Magic Missile on the scroll" }).closest("li")!;
+    expect(missile.textContent).toContain("Level 1 · Evocation · Sorcerer, Wizard");
+    await user.click(within(step).getByRole("button", { name: "Put Magic Missile on the scroll" }));
+    expect(added).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "spell-scroll-level-1" }),
+      undefined,
+      "magic-missile"
+    );
+  });
+
+  it("names a scroll's spell on its row, and asks for one on a scroll that has none", async () => {
+    serve();
+    const reader = hero();
+    reader.inventory = [
+      { id: "spell-scroll", name: "Spell Scroll", quantity: 1, equipped: false, attuned: false, spellId: "fireball" },
+      {
+        id: "spell-scroll-2",
+        recordId: "spell-scroll",
+        name: "Spell Scroll",
+        quantity: 1,
+        equipped: false,
+        attuned: false
+      }
+    ];
+    render(<CharacterSheet actor={reader} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    const [bearing, blank] = screen
+      .getAllByText("Spell Scroll")
+      .map((name) => name.closest(".sheet-inv-row") as HTMLElement);
+    expect(await within(bearing).findByText("(Fireball)")).toBeTruthy();
+    expect(within(bearing).queryByRole("button", { name: "Choose its spell" })).toBeNull();
+    const user = userEvent.setup();
+    await user.click(await within(blank).findByRole("button", { name: "Choose its spell" }));
+    const step = screen.getByRole("dialog", { name: "Choose the spell on Spell Scroll" });
+    // Any level: the chips narrow the list.
+    await user.click(within(step).getByRole("button", { name: "Level 3" }));
+    expect(within(step).queryByRole("button", { name: "Put Magic Missile on the scroll" })).toBeNull();
+    await user.click(within(step).getByRole("button", { name: "Put Fireball on the scroll" }));
+    expect(sent("character:set-inventory").at(-1)).toMatchObject({
+      actorId: HERO,
+      item: { id: "spell-scroll-2", spellId: "fireball" }
+    });
   });
 });
 

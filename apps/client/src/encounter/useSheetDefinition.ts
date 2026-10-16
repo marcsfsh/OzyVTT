@@ -91,7 +91,10 @@ export function useSheetDefinition(
   const [derived, setDerived] = useState<ActorDerivedSheet | null>(null);
   const loadoutSignature = [
     (actor.inventory ?? [])
-      .map((item) => `${item.id}:${item.equipped ? 1 : 0}${item.attuned ? 1 : 0}:${item.quantity}`)
+      .map(
+        (item) =>
+          `${item.id}:${item.equipped ? 1 : 0}${item.attuned ? 1 : 0}:${item.quantity}:${item.baseId ?? ""}:${item.spellId ?? ""}`
+      )
       .join(","),
     (actor.conditions ?? []).map((condition) => (typeof condition === "string" ? condition : condition.id)).join(","),
     (actor.effects ?? []).map((effect) => effect.id).join(","),
