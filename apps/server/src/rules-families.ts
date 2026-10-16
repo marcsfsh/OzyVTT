@@ -26,6 +26,9 @@ const RULE_FAMILIES = {
   "attack.loading": "economy",
   // A Two-Handed weapon can't swing while a Shield takes one hand.
   "attack.two-handed": "economy",
+  // No spellcasting in armor the caster isn't trained with: what the character can do at all, not a spent slot
+  // (the slots family is advisory by default, and this rule is not).
+  "spell.untrained-armor": "economy",
   // ...while "no legendary actions left this round" is a spent resource, like limited uses.
   "legendary.no-actions-remaining": "resources",
   "feature.no-uses-remaining": "resources",

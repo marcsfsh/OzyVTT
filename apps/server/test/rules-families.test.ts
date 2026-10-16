@@ -53,6 +53,8 @@ describe("rule families", () => {
       ["attack.loading", "economy"],
       // What the character's hands are holding, like what the action has already done.
       ["attack.two-handed", "economy"],
+      // Casting in untrained armor: what the character can do at all, like the hands rule.
+      ["spell.untrained-armor", "economy"],
       ["feature.no-uses-remaining", "resources"],
       ["feature.requires-effect", "resources"],
       ["feature.no-spell-slot", "resources"],

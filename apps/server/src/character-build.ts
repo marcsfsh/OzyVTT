@@ -36,6 +36,7 @@ import type { ContentView } from "./content-library.js";
 import { BUILDER_BAKED_MODIFIER_TYPES, type CharacterFeatureRef } from "./equipment-derivation.js";
 import { spellCastMechanics, UNARMED_STRIKE_ACTION_ID } from "./item-actions.js";
 import { bindTemplateItem } from "./inventory.js";
+import { BUILDER_SOURCE_NAME } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
 
 /**
@@ -136,6 +137,8 @@ const CARRIER_RIDER_DISPOSITION: Readonly<
   "critical-range": "standing", // effective-actions criticalThreshold
   "critical-bonus-dice": "standing", // effective-actions folds it into attack.criticalBonusDice
   "extra-attack": "standing", // effective-actions extraAttacksFor raises attack.count on a weapon swing
+  "armor-class": "standing", // storedArmorClass, via derivation.armorClass, so Defense follows the armor worn now
+  "attunement-slots": "standing", // inventory.ts, the attunement limit
   "roll-mode": "at-its-moment", // rollModeClaims: attacks, saves, checks, initiative
   "extra-damage": "at-its-moment", // resolution/damage.ts rolls it as its own typed damage entry
   "damage-bonus": "standing", // effective-actions folds it into the first damage part's formula; a moment-gated one lands as a bonusDamage line in resolution/damage.ts
@@ -455,8 +458,8 @@ function interpretFeature(feature: FeatureRecord, into: InterpretedFeatures, con
       case "speed":
         into.speedBonus += modifier.amount;
         break;
-      // Defense is "+1 AC while wearing armor": a `whileArmored` rider waits for step 11, which knows the
-      // final loadout. An unconditional rider applies either way.
+      // Only the starting AC printed on the definition. The live AC collects these riders from the feature
+      // itself (`storedArmorClass`), so Defense follows whatever armor is worn later.
       case "armor-class":
         if (modifier.whileArmored) into.armorClassBonusWhileArmored += modifier.amount;
         else into.armorClassBonus += modifier.amount;
@@ -1018,8 +1021,7 @@ export function buildCharacterDefinition(
   const equipmentAc = armorClassFromEquipment(dexModifier, inventory, unarmoredDefense);
   const unarmoredAc = unarmoredDefense ? 10 + dexModifier + unarmoredDefense.bonus : null;
   const wearingArmor = inventory.some((item) => item.equipped && item.category === "armor" && item.armor);
-  // The flat non-equipment part of AC travels in the definition's extension bag so `instantiate` can
-  // re-derive AC from the live loadout without dropping it (`armorClassRiderOf` in actor-roster.ts).
+  // The starting AC the definition prints; the live AC is re-derived from what is worn (`storedArmorClass`).
   const armorClassRider = interpreted.armorClassBonus + (wearingArmor ? interpreted.armorClassBonusWhileArmored : 0);
   const armorClass = (equipmentAc ?? unarmoredAc ?? 10 + dexModifier) + armorClassRider;
   const initiativeBonus = dexModifier + interpreted.initiativeBonus;
@@ -1034,7 +1036,7 @@ export function buildCharacterDefinition(
   return ActorDefinitionSchema.parse({
     schemaId: "vtt.actor-character",
     schemaVersion: 1,
-    source: { name: "OzyVTT Character Builder", version: "1" },
+    source: { name: BUILDER_SOURCE_NAME, version: "1" },
     name: input.name,
     summary,
     size,
@@ -1050,7 +1052,6 @@ export function buildCharacterDefinition(
     extensions: {
       "open5e.srd-2024": {
         traits: interpreted.traits,
-        ...(armorClassRider !== 0 ? { armorClassBonus: armorClassRider } : {}),
         ...(interpreted.unarmoredDefense
           ? {
               unarmoredDefense: {

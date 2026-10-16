@@ -47,14 +47,16 @@ const ROLL_TIME_RIDERS: ReadonlyArray<Record<string, unknown>> = [
   { type: "spell-attack-bonus", amount: 1 },
   { type: "spell-slot", level: 1, amount: 1 },
   { type: "resource-bonus", poolId: "second-wind", amount: 1 },
-  { type: "sense", sense: "tremorsense", feet: 30 }
+  { type: "sense", sense: "tremorsense", feet: 30 },
+  // Collected live so it follows the armor worn now (Defense applies only while armor is worn).
+  { type: "armor-class", amount: 1 },
+  { type: "attunement-slots", amount: 1 }
 ];
 /** The variants the builder bakes into the definition; none may appear as a carrier, or it applies twice. */
 const BUILD_TIME_RIDERS: ReadonlyArray<Record<string, unknown>> = [
   { type: "ability-score", ability: "wis", amount: 1 },
   { type: "hit-points-per-level", amount: 1 },
   { type: "speed", amount: 10 },
-  { type: "armor-class", amount: 1 },
   { type: "initiative", amount: 2 },
   { type: "unarmored-defense", ability: "con" },
   { type: "darkvision", feet: 60 }
@@ -236,7 +238,7 @@ describe("a feat the builder put on the sheet is a rider carrier", () => {
     expect(carrier.isWeapon).toBeUndefined();
   });
 
-  it("reaches all FOURTEEN roll-time variants, and NONE of the seven the builder already baked", () => {
+  it("reaches all SIXTEEN roll-time variants, and NONE of the six the builder already baked", () => {
     for (const modifier of ROLL_TIME_RIDERS) {
       const carrier = featCarrier(build({ modifiers: [modifier] }));
       expect(
@@ -481,16 +483,16 @@ describe("a this-item-scoped rider on a feat does not become an 'always' rider",
 
 describe("nothing the builder baked is counted a second time as a carrier", () => {
   it("keeps the SHIPPED Defense fighting style at +1 AC, not +2", () => {
-    // `defense` is a catalog feat whose only rider is `armor-class`; feat carriers must exclude the
-    // baked families or this number drifts.
+    // `defense` is a catalog feat whose only rider is `armor-class`. The live AC collects it from the feat while
+    // armor is worn; the definition's printed starting AC counts it too, and is never added on top.
     const built = build();
     expect(built.definition.character?.feats.map((feat) => feat.id)).toContain("defense");
     expect(built.definition.armorClass).toBe(17); // chain mail 16 + Defense 1
     expect(built.hero.armorClass).toBe(17); // and the live actor agrees
-    expect(deriveEquipment(built.hero, built.definition, built.catalog).armorClass).toBe(0);
+    expect(deriveEquipment(built.hero, built.definition, built.catalog).armorClass).toBe(1);
   });
 
-  it("bakes a homebrew feat's speed / initiative / AC exactly once", () => {
+  it("bakes a homebrew feat's speed / initiative exactly once, and collects its AC live", () => {
     const built = build({
       modifiers: [
         { type: "speed", amount: 10 },
@@ -501,7 +503,7 @@ describe("nothing the builder baked is counted a second time as a carrier", () =
     const derivation = deriveEquipment(built.hero, built.definition, built.catalog);
     expect(currentSpeedFeet(built.hero, derivation)).toBe(40);
     expect(derivation.initiative).toBe(0);
-    expect(derivation.armorClass).toBe(0);
+    expect(derivation.armorClass).toBe(2); // Defense 1 + rider 1
 
     expect(built.definition.speedFeet).toBe(40); // 30 + 10, once
     expect(built.hero.speedFeet).toBe(40);

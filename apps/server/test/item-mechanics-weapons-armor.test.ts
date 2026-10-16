@@ -47,7 +47,14 @@ function definitionOf(): ActorDefinition {
     actions: [],
     extensions: {},
     character: { classes: [{ id: "paladin", name: "Paladin", level: 5 }], feats: [] },
-    proficiencies: { saves: [], skills: [], weapons: ["martial"], armor: [], tools: [] }
+    // A Paladin's armor training: a Shield's +2 lands only with it (SRD Armor Training).
+    proficiencies: {
+      saves: [],
+      skills: [],
+      weapons: ["martial"],
+      armor: ["light", "medium", "heavy", "shields"],
+      tools: []
+    }
   } as unknown as ActorDefinition;
 }
 
@@ -225,7 +232,7 @@ describe("the armour and shield rows move a real Armor Class", () => {
   it("raises actor.armorClass on equip and gives it back on unequip", () => {
     // `armor-class` is not in `THIS_ITEM_BY_DEFAULT`, so it is a standing bearer rider and needs no
     // `armor` block. A shield adds the plain shield's +2 from its block on top of its own bonus: Dex 14
-    // and no body armor make 10 + 2 + 2 = 14 before the rider.
+    // and no body armor make 10 + 2 + 2 = 14 before the rider. Built, so a Shield alone derives the AC.
     for (const [id, amount] of [
       ["armor-1", 1],
       ["shield-2", 2 + 2],
@@ -233,7 +240,7 @@ describe("the armour and shield rows move a real Armor Class", () => {
       ["dwarven-plate", 2]
     ] as const) {
       const catalog = catalogOf([shipped(id)]);
-      const definition = definitionOf();
+      const definition = { ...definitionOf(), source: { name: "OzyVTT Character Builder", version: "1" } };
       const state = stateWith([]);
       setInventoryItem(state, IDS.hero, asPicked(id), () => definition, { catalog });
       expect(state.actors[0].armorClass, `${id}: +${amount} did not reach the sheet's AC`).toBe(12 + amount);

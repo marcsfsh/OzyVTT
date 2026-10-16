@@ -35,7 +35,8 @@ const MODIFIER_LABELS: Readonly<
   "extra-attack": ["The character", "Extra attack"],
   darkvision: ["The character", "Darkvision"],
   sense: ["The character", "Another sense"],
-  "resource-bonus": ["The character", "A limited-use pool"]
+  "resource-bonus": ["The character", "A limited-use pool"],
+  "attunement-slots": ["The character", "Attunement slots"]
 };
 
 const MODIFIER_TYPES: readonly SelectOption[] = Object.entries(MODIFIER_LABELS).map(([type, [group, label]]) =>
@@ -87,6 +88,8 @@ function blankModifier(type: string): Draft {
       return { type, level: 1, amount: 1 };
     case "resource-bonus":
       return { type, poolId: "", amount: 1 };
+    case "attunement-slots":
+      return { type, amount: 1 };
     case "critical-range":
       return { type, threshold: 19 };
     case "critical-bonus-dice":
@@ -230,6 +233,15 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       min: -20,
       max: 20,
       visibleWhen: hasType("resource-bonus")
+    },
+    {
+      key: "amount",
+      label: "Extra attuned items",
+      kind: "number",
+      min: 1,
+      max: 3,
+      visibleWhen: hasType("attunement-slots"),
+      help: "Beyond the usual three. Use Magic Device is 1."
     },
     {
       key: "amount",

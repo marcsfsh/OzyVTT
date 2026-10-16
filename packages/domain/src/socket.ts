@@ -47,6 +47,7 @@ import type {
   ActorRemoveSchema,
   ActorRestSchema,
   ActorSetSpeedSchema,
+  ActorSetArmorClassSchema,
   ActorSpendHitDiceSchema,
   AddCombatantSchema,
   AnnotationAddSchema,
@@ -303,6 +304,10 @@ export interface ClientToServerEvents {
   ) => void;
   "actor:set-speed": (
     payload: CommandPayload<typeof ActorSetSpeedSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "actor:set-armor-class": (
+    payload: CommandPayload<typeof ActorSetArmorClassSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** `damageType` types a bare manual `amount` (ignored when `parts` is present); `damageOverride` replaces a

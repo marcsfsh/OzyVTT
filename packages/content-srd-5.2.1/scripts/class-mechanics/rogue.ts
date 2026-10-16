@@ -94,6 +94,10 @@ export const rogue: ClassMechanicsModule = {
   },
   subclasses: {
     thief: {
+      // The fourth attunement is read when an item is attuned; the charge and Spell Scroll clauses stay prose.
+      "use-magic-device": {
+        modifiers: [{ type: "attunement-slots", amount: 1 }]
+      },
       // Adds the Bonus Action activation; the Sleight of Hand check is rolled from the skill block.
       "fast-hands": {
         actions: [

@@ -1749,7 +1749,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
     expect(
       FeatureRecordSchema.parse({ id: "f", name: "F", description: "d", modifiers: everyRider }).modifiers
     ).toHaveLength(8);
-    expect(ModifierSchema.options).toHaveLength(24);
+    expect(ModifierSchema.options).toHaveLength(25);
   });
 
   it("15. an item that grants a feat", () => {
@@ -1771,10 +1771,12 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
 
   // ---- the refusals, verified by injection ------------------------------------------------------
 
-  it("refuses hit points and ability scores on an ITEM carrier only - a feat keeps both", () => {
+  it("refuses hit points, ability scores and attunement slots on an ITEM carrier only - a feat keeps all three", () => {
     for (const modifier of [
       { type: "hit-points-per-level", amount: 1 },
-      { type: "ability-score", ability: "str", amount: 2 }
+      { type: "ability-score", ability: "str", amount: 2 },
+      // An item that raised the attunement limit would decide its own attunement.
+      { type: "attunement-slots", amount: 1 }
     ]) {
       const refused = EquipmentReferenceSchema.safeParse({
         id: "hb-x",
@@ -1785,7 +1787,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
       });
       expect(refused.success, modifier.type).toBe(false);
       expect(!refused.success && JSON.stringify(refused.error.issues), modifier.type).toContain(
-        "cannot change hit points or an ability score"
+        "cannot change hit points, an ability score or the attunement limit"
       );
       // The same rider on a feat is fine: a feat is never un-granted, so baking it in is correct.
       expect(feat([modifier]).feature.modifiers, modifier.type).toHaveLength(1);

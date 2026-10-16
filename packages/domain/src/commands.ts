@@ -900,6 +900,15 @@ export const ActorSetSpeedSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** GM-set Armor Class that replaces the one derived from equipment; null clears it back to the derived AC. */
+export const ActorSetArmorClassSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    armorClass: z.number().int().min(1).max(40).nullable(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const SceneNameSchema = z.string().trim().min(1).max(120);
 /** `activate: true` goes live on the new scene in the same command, parking whatever was live (as `scene.activate` does). */
 export const SceneCreateSchema = z

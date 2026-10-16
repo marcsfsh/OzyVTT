@@ -755,7 +755,10 @@ describe("Champion: Remarkable Athlete changes the initiative die", () => {
         },
         deps(built, [4, 18])
       );
-      expect(resolution.rollMode, `${actionId} must not see an Athletics-narrowed rider`).toBeUndefined();
+      // Hide is a Dexterity (Stealth) check, which this fighter's Chain Mail puts at Disadvantage; no
+      // Advantage reaches any of the three.
+      expect(resolution.rollMode?.advantage ?? [], `${actionId} must not see an Athletics-narrowed rider`).toEqual([]);
+      expect(resolution.rollMode?.disadvantage ?? []).toEqual(actionId === "hide" ? ["Chain Mail (Stealth)"] : []);
       expect(resolution.check!.naturalRoll).toBe(4);
     }
   });

@@ -359,6 +359,8 @@ export const ModifierSchema = z.discriminatedUnion("type", [
   z
     .object({ type: z.literal("sense"), sense: RiderSlugSchema, feet: z.number().int().min(0).max(240), ...riderGate })
     .strict(),
+  /** More magic items attuned at once than the SRD's three (Use Magic Device: four). Read when an item is attuned. */
+  z.object({ type: z.literal("attunement-slots"), amount: z.number().int().min(1).max(3), ...riderGate }).strict(),
   /** One more use of a limited resource. `poolId` is the live `actionUses` key, not a `classResources` column. */
   z
     .object({
@@ -458,6 +460,7 @@ export type Modifier = z.infer<typeof ModifierSchema>;
  * never give it back.
  */
 export const EFFECT_REFUSED_MODIFIER_TYPES: readonly Modifier["type"][] = Object.freeze([
+  "attunement-slots",
   "ability-score",
   "hit-points-per-level",
   "armor-class",
@@ -762,6 +765,9 @@ export const ActorSchema = z.object({
     temporary: z.number().int().nonnegative().default(0)
   }),
   armorClass: z.number().int().positive().optional(),
+  /** A GM-set Armor Class that `armorClass` takes in place of the one derived from equipment, until cleared (a stat
+   *  the sheet can't derive: Mage Armor, natural armor, a ruling). The sheet shows it as set by the GM. */
+  armorClassOverride: z.number().int().min(1).max(40).optional(),
   initiative: z.number().int().optional(),
   ownerSessionId: z.uuid().nullable().default(null),
   notes: z.string().max(10000).optional(),

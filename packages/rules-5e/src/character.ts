@@ -93,24 +93,31 @@ export type EquippedItem = Readonly<{
  * and whether a shield keeps it (Barbarian: yes; Monk: no). */
 export type UnarmoredDefense = Readonly<{ bonus: number; allowShield: boolean }>;
 
+/** The equipped body armor with an armor block, if any (only one is ever worn). */
+export function wornBodyArmor<T extends EquippedItem>(items: readonly T[]): T | undefined {
+  return items.find((item) => item.equipped && item.armor && effectiveSlot(item) === "armor");
+}
+
 /**
  * SRD Armor Class from equipped armor and shields, or null with neither (the caller keeps its base AC: natural
  * armor, Unarmored Defense, a stat block). Armor: acBase + Dex per addDexModifier/dexModifierCap. Shield alone:
- * 10 + Dex, plus `unarmored.bonus` if that feature allows a shield. Only the best equipped shield counts.
- * Slots come from `effectiveSlot`, so a homebrew category with an explicit slot derives AC too.
+ * 10 + Dex, plus `unarmored.bonus` if that feature allows a shield. Only the best equipped shield counts, and only
+ * for a bearer with Shield training (SRD: "You gain the Armor Class benefit of a Shield only if you have training
+ * with it"). Slots come from `effectiveSlot`, so a homebrew category with an explicit slot derives AC too.
  */
 export function armorClassFromEquipment(
   dexModifier: number,
   items: readonly EquippedItem[],
-  unarmored?: UnarmoredDefense | null
+  unarmored?: UnarmoredDefense | null,
+  training: Readonly<{ shield: boolean }> = { shield: true }
 ): number | null {
   const worn = items.filter((item) => item.equipped && item.armor);
-  const equippedArmor = worn.find((item) => effectiveSlot(item) === "armor");
-  const shieldBonus = worn.reduce(
-    (best, item) => (effectiveSlot(item) === "shield" ? Math.max(best, item.armor!.acBase) : best),
-    0
-  );
-  if (!equippedArmor && shieldBonus === 0) return null;
+  const equippedArmor = wornBodyArmor(worn);
+  const shieldWorn = worn.some((item) => effectiveSlot(item) === "shield");
+  const shieldBonus = training.shield
+    ? worn.reduce((best, item) => (effectiveSlot(item) === "shield" ? Math.max(best, item.armor!.acBase) : best), 0)
+    : 0;
+  if (!equippedArmor && !shieldWorn) return null;
   const dexAllowed = (armor: ItemArmorStats) =>
     armor.addDexModifier ? Math.min(dexModifier, armor.dexModifierCap ?? Number.POSITIVE_INFINITY) : 0;
   // Unarmored Defense requires no armor, so it applies only in the shield-only branch.

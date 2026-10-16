@@ -1,4 +1,4 @@
-import { addActorFromDefinition, importActorDefinition, removeActor } from "../actor-roster.js";
+import { addActorFromDefinition, importActorDefinition, removeActor, storedArmorClass } from "../actor-roster.js";
 import { requireActorAccess } from "../authorization.js";
 import { forceReleaseCharacter } from "../character-claims.js";
 import { addCombatant } from "../encounter.js";
@@ -7,6 +7,7 @@ import {
   ActorImportDefinitionSchema,
   ActorRemoveSchema,
   ActorSetSpeedSchema,
+  ActorSetArmorClassSchema,
   SetActorArchivedSchema,
   SetActorHealthDisplaySchema,
   SetActorSheetPreviewSchema,
@@ -230,6 +231,39 @@ export const actorCommands = [
         if (speedFeet === null) delete actor.speedFeet;
         else actor.speedFeet = speedFeet;
       });
+    }
+  }),
+
+  defineCommand({
+    type: "actor.set-armor-class",
+    operationId: "setActorArmorClass",
+    description:
+      "Sets a combatant's Armor Class by hand (GM-grade only), replacing the one derived from what it wears until cleared with null - for what the sheet can't derive (Mage Armor, natural armor, a ruling). Live effects such as the Shield spell still add to it. Players see that the GM set their character's AC.",
+    summary: "Set or clear a combatant's Armor Class by hand (null returns to the derived AC) (GM).",
+    schema: ActorSetArmorClassSchema,
+    malformed: "The armor class command is malformed.",
+    gmOnly: "Only the GM can set Armor Class by hand.",
+    async run({ request, execute }, kit) {
+      const { actorId, armorClass } = request;
+      const { duplicate } = await execute((state) => {
+        const actor = state.actors.find((candidate) => candidate.id === actorId);
+        if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+        if (armorClass === null) delete actor.armorClassOverride;
+        else actor.armorClassOverride = armorClass;
+        const definition = actor.definitionId ? kit.resolveDefinitionIn(state, actor.definitionId) : undefined;
+        if (definition) actor.armorClass = storedArmorClass(actor, definition, kit.equipmentCatalog());
+        else if (armorClass !== null) actor.armorClass = armorClass;
+      });
+      if (!duplicate)
+        kit.context.appendLog({
+          kind: "encounter",
+          text:
+            armorClass === null
+              ? `${kit.actorName(actorId)}'s Armor Class follows their gear again.`
+              : `The GM set ${kit.actorName(actorId)}'s Armor Class to ${armorClass}.`,
+          actorIds: [actorId],
+          gmOnly: true
+        });
     }
   }),
 

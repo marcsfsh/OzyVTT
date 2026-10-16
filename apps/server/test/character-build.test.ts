@@ -13,7 +13,7 @@ import { importActorDefinition } from "../src/actor-roster.js";
 import { ContentLibrary, type ContentView } from "../src/content-library.js";
 import { CommandRejectedError } from "../src/game-store.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
-import { deriveEquipment, weaponPropertiesOf } from "../src/equipment-derivation.js";
+import { deriveEquipment, equipmentCatalogOf, weaponPropertiesOf } from "../src/equipment-derivation.js";
 import { startEncounter } from "../src/encounter.js";
 
 // End-to-end `character.create` assembly against the real content bundles: a Fighter 5 and a Wizard 3
@@ -236,9 +236,9 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
     const chainMail = definition.startingInventory?.find((item) => item.id === "chain-mail");
     expect(chainMail?.equipped).toBe(true);
     expect(chainMail?.armor?.acBase).toBe(16);
-    // The flat, non-equipment part travels with the sheet so every path that re-derives AC from the live
-    // loadout can add it back.
-    expect((definition.extensions["open5e.srd-2024"] as { armorClassBonus?: number }).armorClassBonus).toBe(1);
+    // No flat rider is stored on the sheet: the live AC collects Defense from the feat itself, so it follows the
+    // armor worn later rather than the armor worn at build.
+    expect((definition.extensions["open5e.srd-2024"] as { armorClassBonus?: number }).armorClassBonus).toBeUndefined();
   });
 
   it("holds a whileArmored AC rider back when no armor is worn", () => {
@@ -364,14 +364,14 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
 
   it("lands through importActorDefinition with the non-negotiable import-<actorId> keying and seeded pools", () => {
     const state = emptyState();
-    importActorDefinition(state, definition, ACTOR_ID, "public");
+    importActorDefinition(state, definition, ACTOR_ID, "public", equipmentCatalogOf(library));
     const actor = state.actors[0];
     expect(actor.id).toBe(ACTOR_ID);
     expect(actor.kind).toBe("player-character");
     expect(actor.definitionId).toBe(`import-${ACTOR_ID}`);
     expect(state.definitions.map((entry) => entry.id)).toEqual([`import-${ACTOR_ID}`]);
     expect(actor.hp).toEqual({ current: 48, maximum: 48, temporary: 0 });
-    // `instantiate` re-derives AC from the loadout, so the builder's flat rider (Defense +1) must survive.
+    // `instantiate` re-derives AC from the loadout, and Defense (+1 while armored) rides the feat's own rider.
     expect(actor.armorClass).toBe(17);
     expect(actor.armorClass).toBe(definition.armorClass);
     expect(actor.hitDice).toMatchObject({

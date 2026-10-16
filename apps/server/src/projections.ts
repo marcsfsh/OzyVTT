@@ -348,6 +348,8 @@ const PLAYER_ACTOR_FIELDS = {
   conditions: "table",
   deathSaves: "table",
   armorClass: "party",
+  // Only says the GM set the character's AC by hand; the number is `armorClass`, which the party already sees.
+  armorClassOverride: "party",
   initiative: "party",
   speedFeet: "party",
   definitionId: "party",
@@ -398,7 +400,7 @@ function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): P
  * | --------------------------------------- | ---- | --- | -------------- | ---------- | ------------------- |
  * | (the actor entry exists at all)         |  Y   |  Y  |       Y        |     Y      |          Y          |
  * | id, name, kind, visibility              |  Y   |  Y  |       Y        |     Y      |          Y          |
- * | armorClass, initiative, speedFeet       |  Y   |  Y  |       Y        |     Y      |          Y          |
+ * | armorClass(Override), initiative, speed |  Y   |  Y  |       Y        |     Y      |          Y          |
  * | size, sizeCells, tokenAssetId           |  Y   |  Y  |       Y        |     Y      |          Y          |
  * | definitionId, conditions, deathSaves    |  Y   |  Y  |       Y        |     Y      |          Y          |
  * | hp (exact for a PC), effects (masked)   |  Y   |  Y  |       Y        |     Y      |          Y          |

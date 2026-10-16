@@ -996,68 +996,101 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
       id: "weapon",
       title: "Weapon",
       blurb: "Fill these in only for a weapon. The category has to be “weapon” too, or nothing here is read.",
-      fields: inContainer("weapon", SUB_OBJECT_DEFAULTS.equipment!.weapon, [
+      fields: [
+        ...inContainer("weapon", SUB_OBJECT_DEFAULTS.equipment!.weapon, [
+          {
+            key: "weapon.category",
+            label: "Weapon kind",
+            kind: "select",
+            options: [opt("simple", "Simple"), opt("martial", "Martial")]
+          },
+          { key: "weapon.damageDice", label: "Damage", placeholder: "1d8", validate: diceValidate },
+          {
+            key: "weapon.damageType",
+            label: "Damage type",
+            pick: true,
+            placeholder: "slashing",
+            suggestions: (ctx) => ctx.damageTypes
+          },
+          {
+            key: "weapon.rangeFeet",
+            label: "Range",
+            kind: "number",
+            min: 1,
+            max: 1000,
+            unit: "ft",
+            emptyValue: "null",
+            help: "Leave both empty for a melee weapon."
+          },
+          {
+            key: "weapon.longRangeFeet",
+            label: "Long range",
+            kind: "number",
+            min: 1,
+            max: 5000,
+            unit: "ft",
+            emptyValue: "null"
+          },
+          /**
+           * Weapon properties are mechanics, not labels: `finesse` (better of Str/Dex), `reach`,
+           * `thrown`, and `weapon-property-is` riders all read this column. Uses
+           * `WEAPON_PROPERTY_IDS`, not `ctx.weaponProperties` (which also includes masteries). Open
+           * like other SRD vocabularies, so homebrew properties stay typeable.
+           */
+          {
+            key: "weapon.properties",
+            label: "Properties",
+            kind: "tags",
+            pick: true,
+            max: 12,
+            maxRowsReason: "Twelve properties is as many as the column stores.",
+            suggestions: WEAPON_PROPERTY_IDS,
+            placeholder: "finesse",
+            help: "Finesse lets it swing off Dexterity; reach threatens at 10 feet."
+          },
+          // Closed: each mastery is engine behaviour, so the select offers exactly the eight the engine runs.
+          {
+            key: "weapon.mastery",
+            label: "Mastery",
+            kind: "select",
+            options: WEAPON_MASTERY_IDS.map((id) => opt(id, humanise(id))),
+            placeholder: "None",
+            emptyValue: "omit",
+            help: "What a wielder with Weapon Mastery gets from it: Graze, Cleave, Topple and the rest."
+          },
+          {
+            key: "weapon.versatileDice",
+            label: "Two-handed damage",
+            placeholder: "1d10",
+            validate: diceValidate,
+            emptyValue: "omit",
+            help: "For a Versatile weapon: the die it deals held in both hands."
+          }
+        ]),
+        // Outside `inContainer`, whose plain path write can't turn the choice into a boolean.
         {
-          key: "weapon.category",
-          label: "Weapon kind",
+          key: "weapon.melee",
+          label: "Melee or ranged",
           kind: "select",
-          options: [opt("simple", "Simple"), opt("martial", "Martial")]
-        },
-        { key: "weapon.damageDice", label: "Damage", placeholder: "1d8", validate: diceValidate },
-        {
-          key: "weapon.damageType",
-          label: "Damage type",
-          pick: true,
-          placeholder: "slashing",
-          suggestions: (ctx) => ctx.damageTypes
-        },
-        {
-          key: "weapon.rangeFeet",
-          label: "Range",
-          kind: "number",
-          min: 1,
-          max: 1000,
-          unit: "ft",
-          emptyValue: "null",
-          help: "Leave both empty for a melee weapon."
-        },
-        {
-          key: "weapon.longRangeFeet",
-          label: "Long range",
-          kind: "number",
-          min: 1,
-          max: 5000,
-          unit: "ft",
-          emptyValue: "null"
-        },
-        /**
-         * Weapon properties are mechanics, not labels: `finesse` (better of Str/Dex), `reach`,
-         * `thrown`, and `weapon-property-is` riders all read this column. Uses
-         * `WEAPON_PROPERTY_IDS`, not `ctx.weaponProperties` (which also includes masteries). Open
-         * like other SRD vocabularies, so homebrew properties stay typeable.
-         */
-        {
-          key: "weapon.properties",
-          label: "Properties",
-          kind: "tags",
-          pick: true,
-          max: 12,
-          maxRowsReason: "Twelve properties is as many as the column stores.",
-          suggestions: WEAPON_PROPERTY_IDS,
-          placeholder: "finesse",
-          help: "Finesse lets it swing off Dexterity; reach threatens at 10 feet."
-        },
-        // Closed: each mastery is engine behaviour, so the select offers exactly the eight the engine runs.
-        {
-          key: "weapon.mastery",
-          label: "Mastery",
-          kind: "select",
-          options: WEAPON_MASTERY_IDS.map((id) => opt(id, humanise(id))),
-          placeholder: "None",
-          emptyValue: "omit",
-          help: "What a wielder with Weapon Mastery gets from it: Graze, Cleave, Topple and the rest."
+          options: [opt("melee", "Melee weapon"), opt("ranged", "Ranged weapon")],
+          placeholder: "From its range",
+          help: "A Dagger is a melee weapon you can throw; a Dart is a ranged one. Only a melee weapon has a reach.",
+          read: (scope) => {
+            const melee = (scope.weapon as Draft | undefined)?.melee;
+            return melee === true ? "melee" : melee === false ? "ranged" : "";
+          },
+          write: (next, scope) => {
+            const { melee: _melee, ...held } = {
+              ...SUB_OBJECT_DEFAULTS.equipment!.weapon,
+              ...((scope.weapon as Draft | undefined) ?? {})
+            };
+            return {
+              ...scope,
+              weapon: next === "melee" ? { ...held, melee: true } : next === "ranged" ? { ...held, melee: false } : held
+            };
+          }
         }
-      ])
+      ]
     },
     {
       id: "armor",

@@ -6,6 +6,7 @@ import { deriveEquipment, itemIsActive, type EquipmentCatalog } from "./equipmen
 import { CommandRejectedError } from "./game-store.js";
 
 const MAX_ITEMS = 200;
+/** SRD: "a creature can't be attuned to more than three magic items at a time"; Use Magic Device raises it. */
 const MAX_ATTUNED = 3;
 
 /** How many of a slot may be equipped at once. Anything unlisted is unlimited (weapons, gear, consumables). */
@@ -65,17 +66,35 @@ export function reconcileEquipment(
 const maxOf = (definition: ActorDefinition, level: number) =>
   spellSlotMaxima(definition).find((entry) => entry.level === level)?.max ?? 0;
 
-/** SRD attunement cap (3) and slot capacity; a GM write bypasses both. Items with no record may still
- *  attune (counted) but get no slot. */
-function enforceEquipRules(actor: Actor, incoming: InventoryItem, deps: InventoryDeps): void {
+/** Whether an attuned row takes one of the bearer's attunement slots: a catalog item only when it needs attunement (a
+ *  mundane dagger marked attuned takes none); a row the catalog doesn't know always does. */
+function needsAttunement(item: InventoryItem, deps: InventoryDeps): boolean {
+  const record = deps.catalog?.equipmentRecord(item.id);
+  return record ? record.attunement?.required === true : true;
+}
+
+/** How many magic items the bearer may attune at once: three, plus any `attunement-slots` rider (Use Magic Device). */
+export function attunementLimit(actor: Actor, definition: ActorDefinition | undefined, deps: InventoryDeps): number {
+  return MAX_ATTUNED + deriveEquipment(actor, definition, deps.catalog).attunementSlots;
+}
+
+/** SRD attunement limit and slot capacity; a GM write bypasses both. Items with no record may still attune
+ *  (counted when their marker needs it) but get no slot. */
+function enforceEquipRules(
+  actor: Actor,
+  incoming: InventoryItem,
+  definition: ActorDefinition | undefined,
+  deps: InventoryDeps
+): void {
   if (deps.role === "gm") return;
   const others = actor.inventory.filter((entry) => entry.id !== incoming.id);
-  if (incoming.attuned && incoming.quantity > 0) {
-    const attuned = others.filter((entry) => entry.attuned);
-    if (attuned.length >= MAX_ATTUNED) {
+  if (incoming.attuned && incoming.quantity > 0 && needsAttunement(incoming, deps)) {
+    const attuned = others.filter((entry) => entry.attuned && needsAttunement(entry, deps));
+    const limit = attunementLimit(actor, definition, deps);
+    if (attuned.length >= limit) {
       throw new CommandRejectedError(
-        `Already attuned to ${MAX_ATTUNED} items (${attuned
-          .slice(0, MAX_ATTUNED)
+        `Already attuned to ${limit} items (${attuned
+          .slice(0, limit)
           .map((entry) => entry.name)
           .join(", ")}) - break one first.`
       );
@@ -126,6 +145,25 @@ function enforceCurse(actor: Actor, incoming: InventoryItem, deps: InventoryDeps
  *   - a stale pick on an already-bound row fails open, keeping its stored stats.
  */
 export function bindTemplateItem(item: InventoryItem, deps: InventoryDeps, stored?: InventoryItem): InventoryItem {
+  return withMagicMarker(bindTemplateStats(item, deps, stored), deps);
+}
+
+/** The sheet's Attune control reads the row's marker, so a catalog magic item gets one from its record; a mundane
+ *  record clears any marker. Only what the item's printed type line already says (magic, needs attunement, where it
+ *  is worn), never a rider. A row the catalog doesn't know keeps what it was sent. */
+function withMagicMarker(item: InventoryItem, deps: InventoryDeps): InventoryItem {
+  const record = deps.catalog?.equipmentRecord(item.id);
+  if (!record) return item;
+  const { magic: _sent, ...rest } = item;
+  const attunementRequired = record.attunement?.required === true;
+  if (!record.isMagic && !attunementRequired) return rest;
+  return {
+    ...rest,
+    magic: { isMagic: record.isMagic, attunementRequired, ...(record.slot ? { slot: record.slot } : {}) }
+  };
+}
+
+function bindTemplateStats(item: InventoryItem, deps: InventoryDeps, stored?: InventoryItem): InventoryItem {
   const record = deps.catalog?.equipmentRecord(item.id);
   const appliesTo = record?.appliesTo;
   if (!record || !appliesTo) {
@@ -236,8 +274,9 @@ export function setInventoryItem(
       deps,
       actor.inventory.find((entry) => entry.id === item.id)
     );
+  const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
   enforceCurse(actor, item, deps);
-  enforceEquipRules(actor, item, deps);
+  enforceEquipRules(actor, item, definition, deps);
   if (item.quantity <= 0) actor.inventory = actor.inventory.filter((entry) => entry.id !== item.id);
   else {
     const index = actor.inventory.findIndex((entry) => entry.id === item.id);
@@ -249,7 +288,7 @@ export function setInventoryItem(
       actor.inventory = [...actor.inventory, { ...item }];
     }
   }
-  reconcileEquipment(actor, actor.definitionId ? resolveDefinition(actor.definitionId) : undefined, deps);
+  reconcileEquipment(actor, definition, deps);
 }
 
 /** Set the whole coin purse. Owner-scoped by the caller. */

@@ -334,6 +334,7 @@ describe("generated OpenAPI components", () => {
       "spell-attack-bonus": { amount: 2 },
       "spell-slot": { level: 3, amount: 1 },
       "resource-bonus": { poolId: "channel-divinity", amount: 1 },
+      "attunement-slots": { amount: 1 },
       "critical-range": { threshold: 19 },
       "critical-bonus-dice": { count: 1 },
       "damage-reduction": {

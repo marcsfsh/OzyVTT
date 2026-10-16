@@ -3,6 +3,7 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { effectiveSlot } from "@vtt/rules-5e";
 import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
 import { hasEffectTag } from "../effects.js";
+import { armorTrainingGaps } from "../equipment-derivation.js";
 import { RulesBlockedError } from "../game-store.js";
 import { isItemActionId, itemActionRest, TWO_HANDED_SUFFIX } from "../item-actions.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
@@ -104,6 +105,7 @@ export function evaluateActionEconomy(
   checkExtraAttackOpened(evaluation);
   checkLoading(evaluation);
   checkHands(evaluation);
+  checkArmorTraining(evaluation, definition);
   const spendUse = checkLimitedUse(evaluation);
   const slots = checkActionSlots(evaluation);
   const spendLegendary = checkLegendary(evaluation, definition);
@@ -178,6 +180,19 @@ function swingItemOf(attacker: LiveActor, action: DefinitionAction) {
       (item) => item.weapon !== undefined && (item.id === rest || `${item.id}-${TWO_HANDED_SUFFIX}` === rest)
     ) ?? null
   );
+}
+
+/** SRD Armor Training: in Light, Medium or Heavy armor you lack training with, "you can't cast spells". Any action
+ *  that casts a spell counts, a wand's included. Read from the sheet's own training; armor training an item grants
+ *  is the GM's to allow. */
+function checkArmorTraining({ attacker, action, violations }: Evaluation, definition: ActorDefinition | undefined) {
+  if (action.spellId === undefined && action.spellSlot === undefined) return;
+  const { untrainedArmor } = armorTrainingGaps(attacker.inventory, definition);
+  if (untrainedArmor)
+    violations.push({
+      rule: "spell.untrained-armor",
+      message: `${attacker.name} can't cast spells while wearing ${untrainedArmor.name} without training in it.`
+    });
 }
 
 /** SRD: a Two-Handed weapon "requires two hands when you attack with it", and a Shield is strapped to one arm. Read

@@ -269,7 +269,8 @@ describe("criterion 2: `slot` makes an open category mechanically real", () => {
   });
 
   it("counts only ONE shield - three equipped shields used to read +6 AC", () => {
-    const definition = definitionOf();
+    // A built character: a printed AC would stand under a Shield alone, since it may already count one.
+    const definition = definitionOf({ source: { name: "OzyVTT Character Builder", version: "1" } });
     const state = stateWith([]);
     const shield = (n: number) =>
       item({

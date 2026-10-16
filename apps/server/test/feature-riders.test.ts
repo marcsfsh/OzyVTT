@@ -51,14 +51,16 @@ const ROLL_TIME_RIDERS: ReadonlyArray<Record<string, unknown>> = [
   { type: "spell-attack-bonus", amount: 1 },
   { type: "spell-slot", level: 1, amount: 1 },
   { type: "resource-bonus", poolId: "rift-surge", amount: 1 },
-  { type: "sense", sense: "tremorsense", feet: 30 }
+  { type: "sense", sense: "tremorsense", feet: 30 },
+  // Collected live so it follows the armor worn now (Defense applies only while armor is worn).
+  { type: "armor-class", amount: 1 },
+  { type: "attunement-slots", amount: 1 }
 ];
 /** The variants the builder bakes into the definition; none may appear as a carrier, or it applies twice. */
 const BUILD_TIME_RIDERS: ReadonlyArray<Record<string, unknown>> = [
   { type: "ability-score", ability: "wis", amount: 1 },
   { type: "hit-points-per-level", amount: 1 },
   { type: "speed", amount: 10 },
-  { type: "armor-class", amount: 1 },
   { type: "initiative", amount: 2 },
   { type: "unarmored-defense", ability: "con" },
   { type: "darkvision", feet: 60 }
@@ -436,7 +438,7 @@ describe("the builder records every granted feature by id and provenance", () =>
     }
   });
 
-  it("reaches all FOURTEEN roll-time variants from all SIX carriers, and none of the seven baked ones", () => {
+  it("reaches all SIXTEEN roll-time variants from all SIX carriers, and none of the six baked ones", () => {
     // One assertion per (carrier, variant) pair, each way.
     for (const on of CARRIERS) {
       for (const modifier of ROLL_TIME_RIDERS) {
@@ -456,10 +458,17 @@ describe("the builder records every granted feature by id and provenance", () =>
   it("contributes nothing when no feature carries a rider at all", () => {
     const built = build();
     for (const on of CARRIERS) expect(carrierOf(built, LABEL[on])).toBeUndefined();
-    // The equipped gear is still carried, but nothing it holds carries a rider.
+    // The equipped gear is still carried; the only rider it holds is the Chain Mail's Stealth Disadvantage.
     expect(
       deriveEquipment(built.hero, built.definition, built.catalog).carriers.flatMap((carrier) => carrier.modifiers)
-    ).toEqual([]);
+    ).toEqual([
+      {
+        type: "roll-mode",
+        roll: "check",
+        mode: "disadvantage",
+        when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["stealth"] }]
+      }
+    ]);
   });
 });
 
@@ -742,7 +751,7 @@ describe("a this-item-scoped rider on a feature does not become an 'always' ride
 });
 
 describe("nothing the builder baked is counted a second time as a carrier", () => {
-  it("bakes a feature's speed / initiative / AC exactly once", () => {
+  it("bakes a feature's speed / initiative exactly once, and collects its AC live", () => {
     const built = build({
       on: "species",
       modifiers: [
@@ -754,7 +763,7 @@ describe("nothing the builder baked is counted a second time as a carrier", () =
     const derivation = deriveEquipment(built.hero, built.definition, built.catalog);
     expect(currentSpeedFeet(built.hero, derivation)).toBe(40);
     expect(derivation.initiative).toBe(0);
-    expect(derivation.armorClass).toBe(0);
+    expect(derivation.armorClass).toBe(1); // the rider, read live rather than baked
 
     expect(built.definition.speedFeet).toBe(40); // 30 + 10, once
     expect(built.hero.speedFeet).toBe(40);
@@ -795,8 +804,16 @@ describe("the feature carriers fail open", () => {
     expect(legacy.character?.features).toBeUndefined();
 
     const derivation = deriveEquipment(built.hero, legacy, built.catalog);
-    expect(derivation.carriers.map((carrier) => carrier.label)).toEqual(["Greatsword", "Shortbow", "Chain Mail"]); // gear only
-    expect(derivation.carriers.flatMap((carrier) => carrier.modifiers)).toEqual([]); // no array, no feature riders
+    // Gear only, and the Chain Mail's own Stealth rider.
+    expect(derivation.carriers.map((carrier) => carrier.label)).toEqual([
+      "Greatsword",
+      "Shortbow",
+      "Chain Mail",
+      "Chain Mail (Stealth)"
+    ]);
+    expect(derivation.carriers.flatMap((carrier) => carrier.modifiers).map((modifier) => modifier.type)).toEqual([
+      "roll-mode"
+    ]); // no array, no feature riders
     expect(
       effectiveActions(legacy, built.hero, built.catalog).find((entry) => entry.id === "item-greatsword")!.attack!.bonus
     ).toBe(6);

@@ -61,7 +61,6 @@ export const BUILDER_BAKED_MODIFIER_TYPES = [
   "ability-score",
   "hit-points-per-level",
   "speed",
-  "armor-class",
   "initiative",
   "unarmored-defense",
   "darkvision"
@@ -128,7 +127,17 @@ export type EquipmentDerivation = Readonly<{
   masteryByActionId: Readonly<Record<string, MasteryInForce>>;
   /** Provenance for the sheet ("Stealth (Circlet of Shadows)"). */
   sources: readonly Readonly<{ itemId: string; itemName: string; summary: string }>[];
+  /** Magic items the bearer may attune beyond the SRD's three (Use Magic Device). */
+  attunementSlots: number;
+  /** Equipped body armor the bearer has no training with (SRD Armor Training: Disadvantage on Strength and
+   *  Dexterity D20 Tests, and no spellcasting), or null. */
+  untrainedArmor: WornItem | null;
+  /** An equipped Shield the bearer has no training with: it gives no AC. */
+  untrainedShield: WornItem | null;
 }>;
+
+/** An equipped item the rules name in a refusal or a roll card. */
+export type WornItem = Readonly<{ itemId: string; name: string }>;
 
 export const EMPTY_DERIVATION: EquipmentDerivation = Object.freeze({
   skills: [],
@@ -147,7 +156,10 @@ export const EMPTY_DERIVATION: EquipmentDerivation = Object.freeze({
   actions: [],
   weaponActionIds: [],
   masteryByActionId: {},
-  sources: []
+  sources: [],
+  attunementSlots: 0,
+  untrainedArmor: null,
+  untrainedShield: null
 });
 
 /** Whether an item's riders apply: equipped, present and (if required) attuned. A cursed item contributes
@@ -164,6 +176,95 @@ const slotView = (entry: ActiveItem) => ({
   slot: entry.record?.slot ?? entry.item.magic?.slot,
   category: entry.item.category
 });
+
+/** Whether recorded armor training covers one weight, or Shields. A sheet that records no armor training at all (an
+ *  import, a monster: "a monster has training with any armor in its stat block") counts as trained. Slugs are
+ *  matched as content and imports spell them ("heavy", "heavy-armor", "shields", "all-armor"). */
+export function armorTrainingCovers(
+  recorded: readonly string[] | undefined,
+  granted: readonly string[],
+  kind: "light" | "medium" | "heavy" | "shields"
+): boolean {
+  if (recorded === undefined) return true;
+  return [...recorded, ...granted].some((raw) => {
+    const slug = raw.replace(/-armor$/, "");
+    return slug === kind || slug === "all" || (kind === "shields" && slug === "shield");
+  });
+}
+
+/** The worn body armor and Shield the bearer lacks training with. `granted` is item-granted armor training. */
+export function armorTrainingGaps(
+  inventory: readonly (InventoryItem & { slot?: string })[],
+  definition: ActorDefinition | undefined,
+  granted: readonly string[] = []
+): Readonly<{ untrainedArmor: WornItem | null; untrainedShield: WornItem | null }> {
+  const recorded = definition?.proficiencies?.armor;
+  const worn = inventory.filter((item) => item.equipped && item.quantity > 0 && item.armor !== undefined);
+  const view = (item: InventoryItem & { slot?: string }) => ({
+    slot: item.slot ?? item.magic?.slot,
+    category: item.category
+  });
+  const body = worn.find((item) => effectiveSlot(view(item)) === "armor");
+  const shield = worn.find((item) => effectiveSlot(view(item)) === "shield");
+  const untrained = (item: InventoryItem | undefined, kind: "light" | "medium" | "heavy" | "shields") =>
+    item && !armorTrainingCovers(recorded, granted, kind) ? { itemId: item.id, name: item.name } : null;
+  return {
+    untrainedArmor: untrained(body, body ? armorWeightOf(body.armor!) : "light"),
+    untrainedShield: untrained(shield, "shields")
+  };
+}
+
+/** What wearing body armor costs (SRD Armor), as carriers every roll reads like any other rider: the Strength
+ *  requirement's -10 feet, Disadvantage on Dexterity (Stealth) checks, and, without training, Disadvantage on
+ *  Strength and Dexterity D20 Tests (attack rolls, saves, checks and Initiative, a Dexterity check). */
+function bodyArmorCarriers(
+  body: InventoryItem | undefined,
+  definition: ActorDefinition | undefined,
+  untrained: boolean
+): RiderCarrier[] {
+  const armor = body?.armor;
+  if (!body || !armor) return [];
+  const carriers: RiderCarrier[] = [];
+  const strength = definition?.abilityScores.str;
+  if (armor.strengthRequired !== null && strength !== undefined && strength < armor.strengthRequired)
+    carriers.push({
+      label: `${body.name} (needs Strength ${armor.strengthRequired})`,
+      sourceItemId: body.id,
+      modifiers: [{ type: "speed", amount: -10 }]
+    });
+  if (armor.stealthDisadvantage)
+    carriers.push({
+      label: `${body.name} (Stealth)`,
+      sourceItemId: body.id,
+      modifiers: [
+        {
+          type: "roll-mode",
+          roll: "check",
+          mode: "disadvantage",
+          when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["stealth"] }]
+        }
+      ]
+    });
+  if (untrained) {
+    const strOrDex = { type: "ability-is", abilities: ["str", "dex"] } as const;
+    carriers.push({
+      label: `${body.name} (no armor training)`,
+      sourceItemId: body.id,
+      modifiers: [
+        {
+          type: "roll-mode",
+          roll: "attack",
+          mode: "disadvantage",
+          when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["melee", "ranged"] }]
+        },
+        { type: "roll-mode", roll: "save", mode: "disadvantage", when: [{ type: "on-saving-throw" }, strOrDex] },
+        { type: "roll-mode", roll: "check", mode: "disadvantage", when: [{ type: "on-ability-check" }, strOrDex] },
+        { type: "roll-mode", roll: "initiative", mode: "disadvantage" }
+      ]
+    });
+  }
+  return carriers;
+}
 
 /** The bearer's facts flattened once; `granted` adds item-granted training and effect tags to the sheet's own. */
 function bearerContext(
@@ -435,6 +536,13 @@ export function deriveEquipment(
     weaponActionIds.push(UNARMED_STRIKE_ACTION_ID);
   }
 
+  // Armor training counts what items grant in this same recomputation (Elven Chain-style training).
+  const training = armorTrainingGaps(withResolvedSlots(actor.inventory, catalog), definition, armorProficiencies);
+  const body = equipped.find(
+    (entry) => entry.item.armor !== undefined && effectiveSlot(slotView(entry)) === "armor"
+  )?.item;
+  carriers.push(...bodyArmorCarriers(body, definition, training.untrainedArmor !== null));
+
   // The standing + conditional pass: riders naming no moment whose static and dynamic gates pass.
   const context = bearerContext(actor, definition, equipped, {
     weapons: weaponProficiencies,
@@ -464,7 +572,9 @@ export function deriveEquipment(
     actions,
     weaponActionIds,
     masteryByActionId,
-    sources
+    sources,
+    attunementSlots: sumRiders(standing, "attunement-slots"),
+    ...training
   };
 }
 

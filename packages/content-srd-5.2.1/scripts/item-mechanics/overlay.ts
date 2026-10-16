@@ -76,6 +76,8 @@ export const CARRIER_RIDER_DISPOSITION_MIRROR: Readonly<
   "critical-range": "standing",
   "critical-bonus-dice": "standing",
   "extra-attack": "standing",
+  "armor-class": "standing",
+  "attunement-slots": "standing",
   "roll-mode": "at-its-moment",
   "extra-damage": "at-its-moment",
   "damage-bonus": "standing",

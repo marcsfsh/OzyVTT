@@ -34,7 +34,7 @@ export type PlayerEffect = Omit<EffectInstance, "sourceActorId" | "sourceActionI
 export type PlayerActorTableField =
   "id" | "name" | "kind" | "visibility" | "size" | "sizeCells" | "tokenAssetId" | "conditions" | "deathSaves";
 /** Actor fields players receive only on player characters; a monster's stats are GM knowledge. */
-export type PlayerActorPartyField = "armorClass" | "initiative" | "speedFeet" | "definitionId";
+export type PlayerActorPartyField = "armorClass" | "armorClassOverride" | "initiative" | "speedFeet" | "definitionId";
 export type PlayerActor = Pick<Actor, PlayerActorTableField> &
   Partial<Pick<Actor, PlayerActorPartyField>> & {
     replaySceneId?: string;
