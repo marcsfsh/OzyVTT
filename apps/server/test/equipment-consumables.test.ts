@@ -10,6 +10,7 @@ import {
   resolveAt,
   serve,
   tableOf,
+  wizardInput,
   write,
   type Table
 } from "./equipment-table.js";
@@ -76,6 +77,44 @@ describe("thrown flasks and the Net", () => {
     resolveAt(table, IDS.fighter, "item-net-throw", []);
     expect(table.state.combat.pendingSaves[0]).toMatchObject({ dc: 12, conditionIds: ["restrained"] });
     expect(row(table, "net")).toBeUndefined();
+  });
+});
+
+describe("a thrown flask in the Attack action", () => {
+  const throwIt = (table: Table, faces: number[]) => resolveAt(table, IDS.fighter, "item-acid-throw", faces);
+
+  it("replaces one attack, so Extra Attack leaves the other for a weapon", () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput() });
+    write(table, IDS.fighter, catalogRow("acid", { quantity: 3, equipped: false }));
+    expect(actionOf(table, IDS.fighter, "item-acid-throw")).toMatchObject({
+      activation: "action",
+      replacesAttack: true
+    });
+    fight(table, IDS.fighter);
+    throwIt(table, [5, 6]);
+    expect(table.state.combat.turn.actionInstance).toEqual({ actorId: IDS.fighter, components: { attack: 1 } });
+    // The greatsword takes the second attack (a natural 1 rolls no damage).
+    expect(resolveAt(table, IDS.fighter, "item-greatsword", [1]).attack?.outcome).toBe("fumble");
+    expect(() => throwIt(table, [5, 6])).toThrow(/no attacks remaining/);
+  });
+
+  it("can be the second attack, after a weapon swing", () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput() });
+    write(table, IDS.fighter, catalogRow("holy-water", { equipped: false }));
+    fight(table, IDS.fighter);
+    resolveAt(table, IDS.fighter, "item-greatsword", [1]);
+    resolveAt(table, IDS.fighter, "item-holy-water-throw", [3, 3]);
+    expect(table.state.combat.pendingSaves[0]).toMatchObject({ ability: "dex", proposedDamage: 6 });
+    expect(table.state.combat.turn.actionInstance?.components).toEqual({ attack: 0 });
+  });
+
+  it("is the whole action for a creature that makes one attack", () => {
+    const table = tableOf({ [IDS.wizard]: wizardInput() });
+    write(table, IDS.wizard, catalogRow("net", { quantity: 2, equipped: false }), "gm");
+    fight(table, IDS.wizard);
+    resolveAt(table, IDS.wizard, "item-net-throw", []);
+    expect(table.state.combat.turn.actionUsed).toBe(true);
+    expect(() => resolveAt(table, IDS.wizard, "item-net-throw", [])).toThrow(/already used an action/);
   });
 });
 

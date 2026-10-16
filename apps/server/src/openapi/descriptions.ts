@@ -423,7 +423,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     legendary:
       'SRD Legendary Action: taken on OTHER creatures\' turns, spending `cost` from the per-round pool. Pairs with activation "other"',
     replacesAttack:
-      'Taken in place of ONE attack of the Attack action (Breath Weapon): it opens the Attack action, leaving the rest of its attacks for weapon swings, or spends one attack the action has left. Pairs with activation "action"',
+      'Taken in place of ONE attack of the Attack action (Breath Weapon, a thrown flask of Acid): it opens the Attack action, leaving the rest of its attacks for weapon swings, or spends one attack the action has left. Pairs with activation "action"',
     spellSlot:
       "Resolving this action ALSO spends one of the bearer's own spell slots of this level - the mechanical half of an item cast authored with `consumesSpellSlot`. Checked and spent by the same economy pass that owns limited uses, so a preview never spends one and an empty pool refuses in the same voice as an empty charge",
     spellId:
@@ -458,7 +458,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     legendary:
       'SRD Legendary Action: taken on OTHER creatures\' turns, spending `cost` from the per-round pool. Pairs with activation "other"',
     replacesAttack:
-      'Taken in place of ONE attack of the Attack action (Breath Weapon): it opens the Attack action, leaving the rest of its attacks for weapon swings, or spends one attack the action has left. Pairs with activation "action"',
+      'Taken in place of ONE attack of the Attack action (Breath Weapon, a thrown flask of Acid): it opens the Attack action, leaving the rest of its attacks for weapon swings, or spends one attack the action has left. Pairs with activation "action"',
     spellSlot:
       "Resolving this action ALSO spends one of the bearer's own spell slots of this level - the mechanical half of an item cast authored with `consumesSpellSlot`. Checked and spent by the same economy pass that owns limited uses, so a preview never spends one and an empty pool refuses in the same voice as an empty charge",
     spellId:
