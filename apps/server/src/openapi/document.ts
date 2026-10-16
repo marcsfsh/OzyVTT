@@ -2093,6 +2093,14 @@ export const openApiDocument = {
           backgroundId: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 80 },
           classId: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 80 },
           level: { type: "integer", minimum: 1, maximum: 20 },
+          classLevels: {
+            type: "array",
+            minItems: 1,
+            maxItems: 20,
+            items: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 80 },
+            description:
+              "A multiclass draft: the class each level went to, in order. Index 0 is level 1 and is `classId`; absent for one class."
+          },
           picks: {
             type: "object",
             maxProperties: 200,
@@ -2114,6 +2122,27 @@ export const openApiDocument = {
             maxItems: 200,
             items: { $ref: "#/components/schemas/BuilderChoiceRow" },
             description: "A stored choice ledger, read back onto the offers it answers."
+          },
+          sheet: {
+            type: "object",
+            additionalProperties: false,
+            required: ["level", "abilityScores"],
+            description:
+              "With `choices`: the stored sheet's own level and ability scores, so the reply's `abilities` can say how those scores were made.",
+            properties: {
+              level: { type: "integer", minimum: 1, maximum: 20 },
+              abilityScores: {
+                type: "object",
+                additionalProperties: false,
+                required: ["str", "dex", "con", "int", "wis", "cha"],
+                properties: Object.fromEntries(
+                  ["str", "dex", "con", "int", "wis", "cha"].map((ability) => [
+                    ability,
+                    { type: "integer", minimum: 1, maximum: 30 }
+                  ])
+                )
+              }
+            }
           }
         }
       },

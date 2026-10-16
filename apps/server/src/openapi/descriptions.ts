@@ -1504,7 +1504,11 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "offers[].unavailable": "Option id -> why this build cannot usefully take it (already held, or no proficiency)",
     picks: "The answers the build still accepts, by offer key",
     subclassId: "The subclass offer's answer",
-    choices: "The ledger rows these answers make: a create's `choices`"
+    choices: "The ledger rows these answers make: a create's `choices`",
+    abilities:
+      "For a draft that sent `sheet`: how that sheet's ability scores were made, which a rebuild re-sends as the scores the character already has. The ledger's own record, or for a sheet built before the ledger kept one, the base scores and background increase that rebuild its totals exactly. Null when not asked, or when nothing reproduces them.",
+    "abilities.derived":
+      "True when worked out from the sheet's totals rather than read from its ledger. A rebuild may re-send these whatever ability methods the table allows today."
   },
   MapAssetMetadata: {
     folder: MAP_FOLDER

@@ -22,6 +22,7 @@ import {
 } from "./character-offers.js";
 import type { ContentView } from "./content-library.js";
 import { featHoldings, featPrerequisiteFailure } from "./feat-prerequisites.js";
+import { sheetAbilityScores } from "./sheet-abilities.js";
 
 /**
  * The character builder's offers for a draft (`builder:offers`): the survey `character.create` validates
@@ -100,8 +101,27 @@ export function builderOffers(request: BuilderOffersRequest, library: ContentVie
     picks,
     asiIncreases: increases,
     subclassId: subclassesOf(offers, picks, request.classId).subclassId ?? null,
-    choices: rowsOf(offers, picks, increases)
+    choices: rowsOf(offers, picks, increases),
+    abilities: abilitiesOf(request, library)
   };
+}
+
+/** How the stored sheet a rebuild reads back made its scores, when the draft sent that sheet. */
+function abilitiesOf(request: BuilderOffersRequest, library: ContentView): BuilderOffersReply["abilities"] {
+  const { sheet, choices, speciesId, backgroundId, classId } = request;
+  if (!sheet || !choices || !speciesId || !backgroundId || !classId) return null;
+  const found = sheetAbilityScores(
+    { speciesId, backgroundId, classId, level: sheet.level, abilityScores: sheet.abilityScores, choices },
+    library
+  );
+  return found
+    ? {
+        abilityMethod: found.abilityMethod,
+        baseScores: { ...found.baseScores },
+        backgroundBonusAllocation: found.backgroundBonusAllocation.map((entry) => ({ ...entry })),
+        derived: found.derived
+      }
+    : null;
 }
 
 /** Every class's subclass in a draft: the starting class's as `subclassId`, a later class's by its id. */

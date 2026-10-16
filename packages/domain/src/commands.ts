@@ -865,7 +865,23 @@ export const BuilderOffersSchema = z
       )
       .refine((increases) => Object.keys(increases).length <= 40)
       .optional(),
-    choices: z.array(CharacterChoiceSchema).max(200).optional()
+    choices: z.array(CharacterChoiceSchema).max(200).optional(),
+    sheet: z
+      .object({
+        level: z.number().int().min(1).max(20),
+        abilityScores: z
+          .object({
+            str: z.number().int().min(1).max(30),
+            dex: z.number().int().min(1).max(30),
+            con: z.number().int().min(1).max(30),
+            int: z.number().int().min(1).max(30),
+            wis: z.number().int().min(1).max(30),
+            cha: z.number().int().min(1).max(30)
+          })
+          .strict()
+      })
+      .strict()
+      .optional()
   })
   .strict()
   .refine((draft) => !(draft.picks && draft.choices), "Send the answers as picks or as a ledger, not both.");

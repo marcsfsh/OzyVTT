@@ -196,7 +196,7 @@ describe("The scores a character was made with", () => {
       {} as BuilderCatalogs,
       4,
       tablePolicy,
-      { offers: [], picks: {}, asiIncreases: {}, subclassId: null, choices: [] }
+      { offers: [], picks: {}, asiIncreases: {}, subclassId: null, choices: [], abilities: null }
     );
     expect(seeded.abilityMethod).toBe("standard-array");
     expect(seeded.backgroundBonus).toEqual([

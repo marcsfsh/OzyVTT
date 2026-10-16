@@ -28,6 +28,7 @@ import {
 import type { ContentView } from "../content-library.js";
 import { CommandRejectedError } from "../game-store.js";
 import { recordRoll } from "../roll-history.js";
+import { sendsSheetScores, sheetAbilityScores, sheetSourceOf } from "../sheet-abilities.js";
 import type { HitDie } from "@vtt/rules-5e";
 import { GameInputError } from "./failures.js";
 import { initiatorOf, isGmGrade, sessionIdOf, type GamePrincipal, type Kit } from "./kit.js";
@@ -264,6 +265,11 @@ export const characterCommands = [
             sessionId: sessionIdOf(principal),
             previous,
             hitDieOf: hitDieIn(catalog),
+            // A sheet built before the ledger kept its scores may re-send the base scores its totals imply.
+            derivedScoresMatch: (sent) => {
+              const source = sheetSourceOf(previous);
+              return source !== null && sendsSheetScores(sent, sheetAbilityScores(source, catalog));
+            },
             random: (sides) => kit.context.random(sides)
           }
         );
