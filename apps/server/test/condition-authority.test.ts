@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,7 +8,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createServer } from "../src/server.js";
 import { png } from "./image-fixtures.js";
 
-// Effects and hit points over the command pipeline: a GM-added Concentration effect's caster, and knocking out.
+// Who may end a condition or an effect (SRD: each ends by its own rules; a grappler may release, a caster drop its
+// Concentration, at any time). A player takes off what they put on and ends what their character is the source of;
+// anything imposed on them is a rules block they can ask the GM about. The GM may end anything.
 
 const HERO = "10000000-0000-4000-8000-000000000001";
 const GOBLIN = "10000000-0000-4000-8000-000000000002";
@@ -126,7 +129,77 @@ async function boot() {
   return { server, gm, player, post, actor, conditions, setCondition };
 }
 
-describe("effects the GM adds", () => {
+describe("taking conditions off", () => {
+  it("a player takes off what they put on; one the GM imposed is a block they can ask the GM to lift", async () => {
+    const { gm, player, post, conditions, setCondition } = await boot();
+    expect((await setCondition(player, HERO, "poisoned", true)).status).toBe(200);
+    expect((await setCondition(player, HERO, "poisoned", false)).status).toBe(200);
+    expect(conditions(HERO)).toEqual([]);
+
+    expect((await setCondition(gm, HERO, "restrained", true)).status).toBe(200);
+    // Re-marking it themselves doesn't make it theirs.
+    expect((await setCondition(player, HERO, "restrained", true)).status).toBe(200);
+    const refused = await setCondition(player, HERO, "restrained", false);
+    expect(refused.status).toBe(409);
+    expect(refused.body.error.details.reason).toBe("condition.imposed");
+    expect(conditions(HERO)).toEqual(["restrained"]);
+
+    const asked = await post(GAME_PATHS.rulesAsk, player, {
+      type: "actor.set-condition",
+      payload: { commandId: randomUUID(), actorId: HERO, conditionId: "restrained", active: false }
+    });
+    expect(asked.status).toBe(200);
+    expect(asked.body.data.ran).toBe(false);
+    const allowed = await post(GAME_PATHS.rulesAnswer, gm, { askId: asked.body.data.askId, allow: true });
+    expect(allowed.status).toBe(200);
+    expect(conditions(HERO)).toEqual([]);
+    // The GM may always take one off.
+    await setCondition(gm, HERO, "blinded", true);
+    expect((await setCondition(gm, HERO, "blinded", false)).status).toBe(200);
+  });
+
+  it("standing from Prone happens on your own turn, for half your Speed", async () => {
+    const { gm, player, post, server, conditions, setCondition } = await boot();
+    await setCondition(gm, HERO, "prone", true);
+    const offTurn = await setCondition(player, HERO, "prone", false);
+    expect(offTurn.status).toBe(409);
+    expect(offTurn.body.error.details.reason).toBe("movement.stand-up-off-turn");
+    expect(conditions(HERO)).toEqual(["prone"]);
+    await post(GAME_PATHS.initiativeNext, gm, {});
+    expect((await setCondition(player, HERO, "prone", false)).status).toBe(200);
+    expect(conditions(HERO)).toEqual([]);
+    expect(server.store.snapshot.combat.turn.movementUsedFeet).toBe(15);
+  });
+});
+
+describe("ending effects", () => {
+  it("a player ends what their character is the source of, on anyone, but not what was imposed on them", async () => {
+    const { gm, player, post, actor } = await boot();
+    const grapple = await post(GAME_PATHS.effects.replace("{actorId}", GOBLIN), gm, {
+      name: "Grappled by Hero",
+      tags: ["grapple"],
+      sourceActorId: HERO
+    });
+    const grappleId = grapple.body.data.effectId as string;
+    expect(
+      (await post(GAME_PATHS.effectEnd.replace("{actorId}", GOBLIN).replace("{effectId}", grappleId), player)).status
+    ).toBe(200);
+    expect(actor(GOBLIN).effects).toEqual([]);
+
+    const curse = await post(GAME_PATHS.effects.replace("{actorId}", HERO), gm, { name: "Cursed" });
+    const curseId = curse.body.data.effectId as string;
+    const refused = await post(GAME_PATHS.effectEnd.replace("{actorId}", HERO).replace("{effectId}", curseId), player);
+    expect(refused.status).toBe(409);
+    expect(refused.body.error.details.reason).toBe("condition.imposed");
+    expect(actor(HERO).effects.map((effect) => effect.name)).toEqual(["Cursed"]);
+    // Someone else's creature's effect from someone else is simply not theirs.
+    const other = await post(GAME_PATHS.effects.replace("{actorId}", GOBLIN), gm, { name: "Bane" });
+    const otherId = other.body.data.effectId as string;
+    expect(
+      (await post(GAME_PATHS.effectEnd.replace("{actorId}", GOBLIN).replace("{effectId}", otherId), player)).status
+    ).toBe(403);
+  });
+
   it("a GM-added Concentration effect is sustained by its named caster, not its bearer", async () => {
     const { gm, post, server } = await boot();
     const bless = await post(GAME_PATHS.effects.replace("{actorId}", ALLY), gm, {

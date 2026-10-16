@@ -325,13 +325,17 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
   };
 }
 
-/** An effect as players see it: no source or cast ids, and a hidden source masked in both `sourceName` and `name`. */
+/** An effect as players see it: no source or cast ids, and a hidden source masked in both `sourceName` and `name`.
+ *  `yours` marks one the viewer's own character is the source of, which they may end (their grapple, their
+ *  Concentration); a hidden source is never a player's character, so the flag says nothing about one. */
 function playerEffect(
   effect: GameState["actors"][number]["effects"][number],
-  publicActorIds: ReadonlySet<string>
+  publicActorIds: ReadonlySet<string>,
+  yourActorIds: ReadonlySet<string> = new Set()
 ): PlayerEffect {
   const { sourceActorId, sourceActionId: _sourceActionId, castId: _castId, ...visible } = effect;
-  if (!isHiddenSource(sourceActorId, publicActorIds)) return visible;
+  const yours = sourceActorId !== null && yourActorIds.has(sourceActorId) ? { yours: true as const } : {};
+  if (!isHiddenSource(sourceActorId, publicActorIds)) return { ...visible, ...yours };
   return { ...visible, name: withoutSourceName(visible.name, effect.sourceName), sourceName: HIDDEN_SOURCE };
 }
 
@@ -440,6 +444,12 @@ export function projectPlayerView(
     state.actors.filter((actor) => actor.visibility === "public" && !actor.archived).map((actor) => actor.id)
   );
   const tier = state.partyVisibility;
+  // The viewer's own characters, so the effects they are the source of are marked theirs to end.
+  const yourActorIds = new Set(
+    state.actors
+      .filter((actor) => playerSessionId !== undefined && actor.ownerSessionId === playerSessionId)
+      .map((actor) => actor.id)
+  );
   return {
     revision: state.revision,
     // The tier actually applied, so the client can tell "no sheet" from "sheet withheld".
@@ -495,7 +505,7 @@ export function projectPlayerView(
         return {
           ...pickFields(source, source.kind === "player-character" ? PARTY_FIELDS : TABLE_FIELDS),
           hp: playerHp(source),
-          effects: source.effects.map((effect) => playerEffect(effect, publicActorIds)),
+          effects: source.effects.map((effect) => playerEffect(effect, publicActorIds, yourActorIds)),
           claimStatus:
             ownerSessionId === null ? ("available" as const) : mine ? ("mine" as const) : ("claimed" as const),
           presence: ownerSessionId === null ? null : presenceFor(ownerSessionId),

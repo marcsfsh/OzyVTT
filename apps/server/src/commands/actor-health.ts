@@ -195,7 +195,7 @@ export const actorHealthCommands = [
     type: "actor.set-condition",
     operationId: "setCondition",
     description:
-      "Applies or clears a bundled SRD condition (exhaustion carries a level). Player sessions may target only their claimed character.",
+      "Applies or clears a bundled SRD condition. Exhaustion is cumulative: without `level` it gains one level, with one it is set to that level. Player sessions may target only their claimed character: they may add any condition and clear one they added, while clearing one imposed by a save, an effect or the GM is a rules block (`condition.imposed`) they can ask the GM about; standing from Prone is allowed only on their own turn in a fight (`movement.stand-up-off-turn`) and costs half their Speed.",
     summary: "Apply or clear an SRD condition, with exhaustion levels.",
     schema: SetConditionSchema,
     malformed: "The condition command is malformed.",

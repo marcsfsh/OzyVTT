@@ -241,6 +241,21 @@ describe("casting a Concentration spell starts Concentration", () => {
   });
 });
 
+describe("what players see of a Concentration", () => {
+  it("the caster's player sees both effects as theirs to end, with no cast id; another player sees neither as theirs", () => {
+    const state = game();
+    cast(state, "hold-person", [IDS.captain]);
+    answer(state, IDS.captain, 3);
+    const mine = projectPlayerView(state, IDS.session, () => null);
+    const effectsOf = (view: typeof mine, id: string) => view.actors.find((entry) => entry.id === id)!.effects;
+    expect(effectsOf(mine, IDS.wizard)).toMatchObject([{ name: "Concentrating on Hold Person", yours: true }]);
+    expect(effectsOf(mine, IDS.captain)).toMatchObject([{ name: "Paralyzed by Wizard (Hold Person)", yours: true }]);
+    expect(JSON.stringify(mine)).not.toContain('"castId"');
+    const theirs = projectPlayerView(state, "30000000-0000-4000-8000-000000000002", () => null);
+    expect(effectsOf(theirs, IDS.captain)[0]).not.toHaveProperty("yours");
+  });
+});
+
 describe("a hidden source stays hidden", () => {
   it("masks a hidden caster's name in the repeated save a player owes", () => {
     const state = game();

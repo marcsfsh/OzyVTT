@@ -436,7 +436,13 @@ export type RuleExceptions = z.infer<typeof RuleExceptionsSchema>;
 export const DEFAULT_RULE_EXCEPTIONS: RuleExceptions = { slots: "assisted" };
 
 /** Closed list: `rules.answer` replays the parked payload under GM authority. */
-export const AskableCommandSchema = z.enum(["action.resolve", "action.use", "token.move", "actor.set-condition"]);
+export const AskableCommandSchema = z.enum([
+  "action.resolve",
+  "action.use",
+  "token.move",
+  "actor.set-condition",
+  "effect.end"
+]);
 export type AskableCommand = z.infer<typeof AskableCommandSchema>;
 
 /** A player's parked "Ask the GM": a blocked command waiting for the GM to allow or deny it. The owner is not

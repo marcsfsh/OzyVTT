@@ -10,6 +10,8 @@ const RULE_FAMILIES = {
   "movement.exceeds-speed": "movement",
   "movement.no-movement-remaining": "movement",
   "movement.stand-up-cost": "movement",
+  // Standing spends movement, which a creature has only on its own turn.
+  "movement.stand-up-off-turn": "movement",
   "economy.action-used": "economy",
   "economy.bonus-action-used": "economy",
   "economy.reaction-used": "economy",
@@ -17,6 +19,8 @@ const RULE_FAMILIES = {
   // Being incapacitated or down means you have no actions: an economy block, not a targeting one.
   "condition.incapacitated": "economy",
   "condition.down": "economy",
+  // Ending a condition or effect someone else imposed skips the action (Escape) or the save its own rules ask for.
+  "condition.imposed": "economy",
   // A raging Barbarian can't cast spells (SRD Rage).
   "condition.raging": "economy",
   // "Legendary actions are taken on other creatures' turns" is a timing/economy rule...

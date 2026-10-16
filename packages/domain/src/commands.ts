@@ -270,8 +270,8 @@ export const SetConditionSchema = z
       .max(60),
     active: z.boolean(),
     level: z.number().int().min(1).max(6).optional(),
-    /** Bypass a movement-rule rejection (standing from Prone costs half Speed); audited. */ override:
-      RulesOverrideSchema.optional(),
+    /** Bypass a rules rejection (standing from Prone costs half Speed, on your own turn; a condition someone else
+     *  imposed is theirs to end); audited. */ override: RulesOverrideSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -458,6 +458,8 @@ export const EffectEndSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     effectId: z.string().min(1).max(120),
+    /** Bypass the rules block on ending an effect someone else imposed (an Allow from the GM); audited. */
+    override: RulesOverrideSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

@@ -815,6 +815,9 @@ export const ActorSchema = z.object({
             .regex(/^[a-z0-9-]+$/)
             .max(60),
           level: z.number().int().min(1).max(6).optional(),
+          /** The owning player put it on their own character, so they may take it off again. Anything imposed (by
+           * the GM, a failed save, the engine) ends by its own rules or the GM's say. */
+          selfApplied: z.literal(true).optional(),
           /** Set on its own as well as linked by an effect, so that effect ending leaves it in place. */
           standalone: z.literal(true).optional()
         })

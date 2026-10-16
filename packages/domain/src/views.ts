@@ -26,9 +26,10 @@ export type HealthBand = "healthy" | "bloodied" | "down";
 /** Player characters stay exact for the whole party; monsters/NPCs reach players only as a band so the GM keeps exact numbers. */
 export type PlayerHp =
   { kind: "exact"; current: number; maximum: number; temporary: number } | { kind: "band"; band: HealthBand };
-/** An effect as players see it: source and cast ids never cross the wire, and a hidden source's name is masked
- * server-side (viewer safety). */
-export type PlayerEffect = Omit<EffectInstance, "sourceActorId" | "sourceActionId" | "castId">;
+/** An effect as players see it: source ids never cross the wire, and a hidden source's name is masked server-side
+ * (viewer safety). `yours` marks one the viewing player's own character is the source of (their grapple, their
+ * Concentration), which they may end. */
+export type PlayerEffect = Omit<EffectInstance, "sourceActorId" | "sourceActionId" | "castId"> & { yours?: true };
 /** A creature as one player sees it. Their own claimed character gets everything; another player's is limited by
  * `GameState.partyVisibility` (see apps/server/src/projections.ts). */
 /** Actor fields every player receives for every visible actor (apps/server/src/projections.ts). */

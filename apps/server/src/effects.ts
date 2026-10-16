@@ -123,20 +123,24 @@ function writeCondition(actor: Actor, entry: ConditionEntry): void {
  * full condition list; the caller decides whether to narrate or reject. Exhaustion is cumulative (SRD: "each time you
  * receive it, you gain 1 Exhaustion level"), so an Exhaustion with no `level` adds one; a `level` sets it outright
  * (the GM's stepper). Unconscious brings Prone with it, which stays when Unconscious ends, and Petrified drops
- * Poisoned, which it is immune to. An effect's own linked conditions go through `addEffect` instead.
+ * Poisoned, which it is immune to. `selfApplied` marks a player's own mark on their character; an effect's own
+ * linked conditions go through `addEffect` instead.
  */
 export function applyCondition(
   actor: Actor,
   conditionId: string,
-  options: Readonly<{ level?: number; immunities?: ConditionImmunitySource }> = {}
+  options: Readonly<{ level?: number; immunities?: ConditionImmunitySource; selfApplied?: boolean }> = {}
 ): "applied" | "immune" | "full" {
   if (immuneToCondition(actor, conditionId, options.immunities)) return "immune";
   const existing = actor.conditions.find((condition) => condition.id === conditionId);
   if (!existing && actor.conditions.length >= 20) return "full";
   const level = conditionId === "exhaustion" ? { level: options.level ?? Math.min(6, (existing?.level ?? 0) + 1) } : {};
-  // A condition an effect also holds stays when that effect ends.
+  // A condition an effect also holds stays when that effect ends; a player's own mark stays theirs to remove only
+  // while nothing else imposed it.
   const standalone = linkedByAnEffect(actor, conditionId) ? { standalone: true as const } : {};
-  writeCondition(actor, { id: conditionId, ...level, ...standalone });
+  const selfApplied =
+    options.selfApplied === true && (!existing || existing.selfApplied === true) ? { selfApplied: true as const } : {};
+  writeCondition(actor, { id: conditionId, ...level, ...selfApplied, ...standalone });
   if (conditionId === "unconscious" && !hasCondition(actor, "prone")) applyCondition(actor, "prone", options);
   if (conditionId === "petrified") removeConditionDirect(actor, "poisoned");
   return "applied";
