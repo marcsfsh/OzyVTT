@@ -106,12 +106,16 @@ function metaLine(item: ContentEquipmentSummary): string {
         `range ${item.weapon.rangeFeet}${item.weapon.longRangeFeet ? `/${item.weapon.longRangeFeet}` : ""} ft`
       );
   }
-  if (item.armor)
-    parts.push(
-      item.category === "shield"
-        ? `+${item.armor.acBase} AC`
-        : `AC ${item.armor.acBase}${item.armor.addDexModifier ? " + Dex" : ""}`
-    );
+  if (item.armor) {
+    const dex = !item.armor.addDexModifier
+      ? ""
+      : item.armor.dexModifierCap !== null
+        ? ` + Dex (max ${item.armor.dexModifierCap})`
+        : " + Dex";
+    parts.push(item.category === "shield" ? `+${item.armor.acBase} AC` : `AC ${item.armor.acBase}${dex}`);
+    if (item.armor.strengthRequired) parts.push(`Str ${item.armor.strengthRequired}`);
+    if (item.armor.stealthDisadvantage) parts.push("Stealth Disadvantage");
+  }
   const cost = formatCost(item.costGp);
   if (cost) parts.push(cost);
   if (item.weightLb) parts.push(`${item.weightLb} lb`);

@@ -126,7 +126,9 @@ describe("the far end of the magic-item ETL", () => {
       equipped: false,
       attuned: false,
       category: chosen!.category,
-      ...(chosen!.description ? { description: chosen!.description } : {})
+      ...(chosen!.description ? { description: chosen!.description } : {}),
+      // The marker the server stamps from the record, which the Attune control reads.
+      magic: { isMagic: true, attunementRequired: true, slot: "held" }
     };
     const holding = { ...ACTOR, inventory: [stored] } as unknown as PlayerActor;
     render(<CharacterSheet actor={holding} role="player" onClose={() => {}} />, { wrapper: ToastProvider });

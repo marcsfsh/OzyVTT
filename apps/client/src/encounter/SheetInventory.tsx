@@ -1,18 +1,28 @@
 import { useEffect, useState } from "react";
 import { catalogIdOf, type ContentEquipmentSummary, type GmActor, type PlayerActor } from "@vtt/domain";
-import { Badge, Button, IconButton, Stepper, IconX } from "@vtt/ui";
+import { Badge, Button, IconButton, Select, Stepper, IconX } from "@vtt/ui";
 import { BindItemModal, EquipmentPicker, inventoryWeaponFrom, useEquipmentReference } from "./equipment";
 import { slugify, titleCase } from "./format";
 import type { SheetEdit } from "./useSheetEdit";
 
 const COINS = ["pp", "gp", "ep", "sp", "cp"] as const;
 
-/** A player character's gear: custom and SRD items, equip and attune toggles, and the purse. */
+/** A player character's gear: custom and SRD items, equip and attune toggles, and the purse. The GM also picks a
+ *  resistance item's type and hands items to other characters. */
 export function SheetInventory({
   actor,
   busy,
-  edit
-}: Readonly<{ actor: GmActor | PlayerActor; busy: boolean; edit: SheetEdit }>) {
+  edit,
+  role = "player",
+  others = []
+}: Readonly<{
+  actor: GmActor | PlayerActor;
+  busy: boolean;
+  edit: SheetEdit;
+  role?: "gm" | "player";
+  /** The characters the GM can hand an item to. */
+  others?: readonly Readonly<{ id: string; name: string }>[];
+}>) {
   const inventory = actor.inventory ?? [];
   const currency = actor.currency ?? null;
   const [newItem, setNewItem] = useState("");
@@ -20,6 +30,8 @@ export function SheetInventory({
   // Which unbound template row (a magic weapon/armor with no base picked) has its chooser open, and
   // the catalog its detail resolves against.
   const [bindingRowId, setBindingRowId] = useState<string | null>(null);
+  const [giveItemId, setGiveItemId] = useState("");
+  const [giveTo, setGiveTo] = useState("");
   const { catalog: equipmentCatalog } = useEquipmentReference();
   const [coins, setCoins] = useState({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 });
   // Keep the coin editor in sync with the authoritative purse.
@@ -136,6 +148,37 @@ export function SheetInventory({
                     </button>
                   ) : null;
                 })()}
+                {(() => {
+                  // "The GM chooses the type": only the GM sees and sets the pick (the server refuses anyone else).
+                  const choices = equipmentCatalog.find((entry) => entry.id === catalogIdOf(item))?.damageTypeChoice;
+                  if (role !== "gm" || !choices) return null;
+                  return (
+                    <Select
+                      className="sheet-item-choice"
+                      aria-label={`Resistance type of ${item.name}`}
+                      disabled={busy}
+                      value={item.chosenDamageType ?? ""}
+                      onChange={(event) => {
+                        const { chosenDamageType: _old, ...row } = item;
+                        const picked = choices.find((type) => type === event.target.value);
+                        void edit("character:set-inventory", {
+                          actorId: actor.id,
+                          item: picked ? { ...row, chosenDamageType: picked as typeof item.chosenDamageType } : row
+                        });
+                      }}
+                    >
+                      <option value="">Resists: as printed</option>
+                      {choices.map((type) => (
+                        <option key={type} value={type}>
+                          Resists {titleCase(type)}
+                        </option>
+                      ))}
+                    </Select>
+                  );
+                })()}
+                {role === "player" && item.chosenDamageType ? (
+                  <span className="sheet-item-cat">Resists {titleCase(item.chosenDamageType)}</span>
+                ) : null}
                 {item.description ? <span className="sheet-item-desc">{item.description}</span> : null}
               </span>
               <Stepper
@@ -165,20 +208,25 @@ export function SheetInventory({
               >
                 {item.equipped ? "Equipped" : "Equip"}
               </button>
-              <button
-                type="button"
-                className={`sheet-toggle-btn${item.attuned ? " on" : ""}`}
-                disabled={busy}
-                aria-pressed={item.attuned}
-                onClick={() => {
-                  void edit("character:set-inventory", {
-                    actorId: actor.id,
-                    item: { ...item, attuned: !item.attuned }
-                  });
-                }}
-              >
-                {item.attuned ? "Attuned" : "Attune"}
-              </button>
+              {/* Only an item that needs attunement takes one of the slots; a stale attuned row can still be cleared. */}
+              {item.magic?.attunementRequired || item.attuned ? (
+                <button
+                  type="button"
+                  className={`sheet-toggle-btn${item.attuned ? " on" : ""}`}
+                  disabled={busy}
+                  aria-pressed={item.attuned}
+                  onClick={() => {
+                    void edit("character:set-inventory", {
+                      actorId: actor.id,
+                      item: { ...item, attuned: !item.attuned }
+                    });
+                  }}
+                >
+                  {item.attuned ? "Attuned" : "Attune"}
+                </button>
+              ) : (
+                <span className="sheet-inv-blank" aria-hidden="true" />
+              )}
               <IconButton
                 label={`Remove ${item.name}`}
                 size="sm"
@@ -196,6 +244,41 @@ export function SheetInventory({
             </div>
           ))}
         </div>
+      )}
+      {role === "gm" && others.length > 0 && inventory.length > 0 && (
+        <form
+          className="sheet-give"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!giveItemId || !giveTo) return;
+            void edit("character:give-item", { actorId: actor.id, toActorId: giveTo, itemId: giveItemId }).then(
+              (result) => {
+                if (result.ok) setGiveItemId("");
+              }
+            );
+          }}
+        >
+          <Select aria-label="Item to give" value={giveItemId} onChange={(event) => setGiveItemId(event.target.value)}>
+            <option value="">Item to give</option>
+            {inventory.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+                {item.quantity > 1 ? ` (${item.quantity})` : ""}
+              </option>
+            ))}
+          </Select>
+          <Select aria-label="Give it to" value={giveTo} onChange={(event) => setGiveTo(event.target.value)}>
+            <option value="">Give it to</option>
+            {others.map((other) => (
+              <option key={other.id} value={other.id}>
+                {other.name}
+              </option>
+            ))}
+          </Select>
+          <Button type="submit" size="sm" disabled={busy || !giveItemId || !giveTo}>
+            Give
+          </Button>
+        </form>
       )}
       {attunedCount > 0 && (
         <p className="sheet-attunement">

@@ -10,7 +10,7 @@ import { importActorDefinition, reconcileArmorClasses, storedArmorClass } from "
 import { initiativeRollMode } from "../src/encounter.js";
 import { deriveEquipment } from "../src/equipment-derivation.js";
 import { RulesBlockedError } from "../src/game-store.js";
-import { setInventoryItem } from "../src/inventory.js";
+import { reconcileMagicMarkers, setInventoryItem } from "../src/inventory.js";
 import { projectPlayerView } from "../src/projections.js";
 import { saveRollSources } from "../src/saving-throws.js";
 import { createServer } from "../src/server.js";
@@ -401,5 +401,25 @@ describe("an item whose resistance the GM chooses", () => {
     expect(seen().chosenDamageType).toBeUndefined();
     write(table, IDS.fighter, edit(table, IDS.fighter, "ring-of-resistance", { attuned: true }));
     expect(seen().chosenDamageType).toBe("psychic");
+  });
+});
+
+describe("the sheet's Attune control reads the catalog record", () => {
+  it("stamps the magic marker on rows stored before it existed, and only on magic items", () => {
+    const table = tableOf({ [IDS.wizard]: wizardInput() }, false);
+    write(table, IDS.wizard, catalogRow("wand-of-fireballs", { equipped: false }));
+    const wizard = table.actor(IDS.wizard);
+    wizard.inventory = wizard.inventory.map(({ magic: _marker, ...row }) => row);
+
+    expect(reconcileMagicMarkers(table.state, catalog)).toBe(true);
+    expect(wizard.inventory.find((row) => row.id === "wand-of-fireballs")!.magic).toEqual({
+      isMagic: true,
+      attunementRequired: true,
+      slot: "held"
+    });
+    expect(wizard.inventory.filter((row) => row.magic !== undefined).map((row) => row.id)).toEqual([
+      "wand-of-fireballs"
+    ]);
+    expect(reconcileMagicMarkers(table.state, catalog)).toBe(false);
   });
 });

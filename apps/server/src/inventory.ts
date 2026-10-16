@@ -170,6 +170,27 @@ export function bindTemplateItem(item: InventoryItem, deps: InventoryDeps, store
 /** The sheet's Attune control reads the row's marker, so a catalog magic item gets one from its record; a mundane
  *  record clears any marker. Only what the item's printed type line already says (magic, needs attunement, where it
  *  is worn), never a rider. A row the catalog doesn't know keeps what it was sent. */
+/** Stamps the catalog's magic marker on every carried row, for rows stored before the marker existed or whose
+ *  record changed since, so the sheet's Attune control reads the record. True when any row changed. */
+export function reconcileMagicMarkers(state: GameState, catalog: EquipmentCatalog): boolean {
+  let changed = false;
+  for (const actor of state.actors) {
+    const rows = actor.inventory.map((item) => {
+      const next = withMagicMarker(item, { catalog });
+      const same =
+        next.magic?.isMagic === item.magic?.isMagic &&
+        next.magic?.attunementRequired === item.magic?.attunementRequired &&
+        next.magic?.slot === item.magic?.slot;
+      return same ? item : next;
+    });
+    if (rows.some((row, index) => row !== actor.inventory[index])) {
+      actor.inventory = rows;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 function withMagicMarker(item: InventoryItem, deps: InventoryDeps): InventoryItem {
   const record = deps.catalog?.equipmentRecord(catalogIdOf(item));
   if (!record) return item;
