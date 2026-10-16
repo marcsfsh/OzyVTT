@@ -463,7 +463,24 @@ const sceneCombatShape = {
       /** Feet of movement the current turn's actor has spent (fractional on gridless maps). */
       movementUsedFeet: z.number().nonnegative().max(100000).default(0),
       /** Rule families the GM already waved through this turn. Stripped from player projections. */
-      rulesOverriddenFamilies: z.array(RuleFamilySchema).max(5).optional()
+      rulesOverriddenFamilies: z.array(RuleFamilySchema).max(5).optional(),
+      /** What this turn's attacks opened for an extra attack: the Light weapons its actor swung in the Attack action,
+       *  and the creature a Cleave weapon hit. Engine bookkeeping, never projected. */
+      extraAttacks: z
+        .object({
+          light: z
+            .object({ actorId: z.uuid(), itemIds: z.array(z.string().max(120)).max(10) })
+            .strict()
+            .nullable()
+            .default(null),
+          cleave: z
+            .object({ actorId: z.uuid(), itemId: z.string().max(120), targetId: z.uuid() })
+            .strict()
+            .nullable()
+            .default(null)
+        })
+        .strict()
+        .optional()
     })
     .prefault({
       actionUsed: false,

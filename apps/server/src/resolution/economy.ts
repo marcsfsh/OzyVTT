@@ -99,6 +99,7 @@ export function evaluateActionEconomy(
     notes: []
   };
   checkAbleToAct(evaluation);
+  checkExtraAttackOpened(evaluation);
   const spendUse = checkLimitedUse(evaluation);
   const slots = checkActionSlots(evaluation);
   const spendLegendary = checkLegendary(evaluation, definition);
@@ -136,6 +137,31 @@ function checkAbleToAct({ attacker, action, violations }: Evaluation): void {
       message: `${action.name} requires an active ${conditionLabel(action.requiresEffectTag)} effect.`
     });
   }
+}
+
+/** An extra attack (SRD Light, Cleave) is owed only once the swing that opens it has happened this turn: an attack
+ *  with a different Light weapon in the Attack action, or a melee hit with the Cleave weapon. */
+function checkExtraAttackOpened({ state, attacker, action, violations }: Evaluation): void {
+  const extra = action.extraAttack;
+  if (!extra) return;
+  const opened = state.combat.turn.extraAttacks;
+  if (extra.kind === "light") {
+    const swung = opened?.light?.actorId === attacker.id ? opened.light.itemIds : [];
+    const pair = (attacker.inventory.find((item) => item.id === extra.itemId)?.quantity ?? 1) >= 2;
+    // "A different Light weapon": another item, or the second of a pair.
+    if (!swung.some((itemId) => itemId !== extra.itemId || pair))
+      violations.push({
+        rule: "attack.light-needs-attack",
+        message: `${action.name} follows an attack with a different Light weapon in the Attack action this turn.`
+      });
+    return;
+  }
+  const cleave = opened?.cleave;
+  if (!cleave || cleave.actorId !== attacker.id || cleave.itemId !== extra.itemId)
+    violations.push({
+      rule: "attack.cleave-needs-hit",
+      message: `${action.name} follows a melee hit with this weapon this turn.`
+    });
 }
 
 const USE_SCOPE_LABELS: Readonly<Record<"turn" | "encounter" | "short-rest" | "long-rest", string>> = {
@@ -397,6 +423,26 @@ function checkTargeting(
   }
 
   if (action.attack !== undefined && distanceFeet !== undefined) checkRange(evaluation, distanceFeet);
+
+  // Cleave (SRD): a second creature, within 5 feet of the first (when the map can tell).
+  const first = action.extraAttack?.kind === "cleave" ? state.combat.turn.extraAttacks?.cleave : null;
+  if (first && first.actorId === attacker.id) {
+    for (const target of targets) {
+      if (target.id === first.targetId) {
+        violations.push({
+          rule: "attack.cleave-same-target",
+          message: `Cleave swings at another target, not ${target.name} again.`
+        });
+        continue;
+      }
+      const apart = distanceFeet?.(first.targetId, target.id) ?? null;
+      if (apart !== null && apart > 5 + DISTANCE_TOLERANCE_FEET)
+        violations.push({
+          rule: "attack.cleave-too-far",
+          message: `${target.name} is ${Math.round(apart * 10) / 10} ft from the target Cleave follows; it must be within 5 feet of it.`
+        });
+    }
+  }
 
   // Unarmed grapple/shove only work on targets at most one size larger (SRD Unarmed Strike).
   if (builtinHandlerFor(action.id)?.atMostOneSizeLarger) {

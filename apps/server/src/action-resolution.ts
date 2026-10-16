@@ -7,7 +7,8 @@ import { rollRiderDamage, rollWeaponDamage } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
 import { applyHealing } from "./resolution/heal.js";
-import { applyMasteryForces, masterySwingOf, offeredPush } from "./resolution/masteries.js";
+import { recordCleaveOpening, recordLightAttack } from "./resolution/extra-attacks.js";
+import { applyMasteryForces, masterySwingOf, offeredPush, spendVex } from "./resolution/masteries.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
 import { parkActionSave, parkForAcReaction, parkReaction } from "./resolution/pending.js";
 import { releaseHideAndReady } from "./resolution/release.js";
@@ -34,9 +35,12 @@ export function resolveDefinitionAction(
   // Preview: the d20 is rolled and shown, nothing else applies. The economy was validated already, so an
   // illegal attack is blocked before the preview roll.
   if (ctx.attack !== null && input.commit === false) return previewOf(ctx);
+  // The roll is made, so a Vex marker it read is spent; a finishing replay already spent it.
+  if (input.economyPaid !== true) spendVex(ctx);
   // A hit the target's Parry or Shield may still turn into a miss: the attack is spent, and the answer finishes it.
   if (parkForAcReaction(ctx)) {
     commitEconomy(ctx);
+    recordLightAttack(ctx);
     releaseHideAndReady(ctx);
     return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
   }
@@ -58,6 +62,8 @@ export function resolveDefinitionAction(
   parkActionSave(ctx);
 
   commitEconomy(ctx);
+  recordLightAttack(ctx);
+  recordCleaveOpening(ctx);
   releaseHideAndReady(ctx);
   return resolutionOf(ctx);
 }
@@ -117,7 +123,8 @@ function resolutionOf(ctx: ResolveContext): ActionResolution {
     ...(ctx.reactionPrompts.length > 0 ? { reactionPrompts: ctx.reactionPrompts } : {}),
     ...(ctx.check ? { check: ctx.check } : {}),
     ...(ctx.effectsEnded.length > 0 ? { effectsEnded: ctx.effectsEnded } : {}),
-    ...(ctx.healing ? { healing: ctx.healing } : {})
+    ...(ctx.healing ? { healing: ctx.healing } : {}),
+    ...(ctx.opens ? { opens: ctx.opens } : {})
   };
 }
 

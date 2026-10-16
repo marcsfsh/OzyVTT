@@ -271,6 +271,18 @@ export function weaponAction(
   grantedWeapons: readonly string[] = [],
   martialArtsInForce = false
 ): ActorAction | null {
+  return weaponSwing(item, definition, grantedWeapons, martialArtsInForce)?.action ?? null;
+}
+
+/** A weapon's attack action, with the dice and ability modifier its damage was built from. */
+export type WeaponSwing = Readonly<{ action: ActorAction; dice: string; modifier: number }>;
+
+export function weaponSwing(
+  item: InventoryItem,
+  definition: ActorDefinition | undefined,
+  grantedWeapons: readonly string[] = [],
+  martialArtsInForce = false
+): WeaponSwing | null {
   const weapon = item.weapon;
   if (!weapon || !definition) return null;
   const properties = weapon.properties ?? [];
@@ -284,8 +296,7 @@ export function weaponAction(
   const proficient =
     trained === undefined || trainingCovers(grantedWeapons, weapon, ids) || trainingCovers(trained, weapon, ids);
   const bonus = modifier + (proficient ? definition.proficiencyBonus : 0);
-  const damageFormula = `${dice}${modifier === 0 ? "" : modifier > 0 ? ` + ${modifier}` : ` - ${Math.abs(modifier)}`}`;
-  return {
+  const action: ActorAction = {
     id: itemActionId(item.id),
     name: item.name,
     activation: "action",
@@ -299,7 +310,47 @@ export function weaponAction(
         ? { rangeFeet: weapon.longRangeFeet ?? weapon.rangeFeet, rangeNormalFeet: weapon.rangeFeet }
         : {})
     },
-    damage: [{ formula: damageFormula, type: weapon.damageType }]
+    damage: [{ formula: withModifier(dice, modifier), type: weapon.damageType }]
+  };
+  return { action, dice, modifier };
+}
+
+/** "1d8 + 3", "1d4 - 1", or the dice alone; a flat die ("1", a blowgun) keeps its own term. */
+const withModifier = (dice: string, modifier: number) =>
+  `${dice}${modifier === 0 ? "" : modifier > 0 ? ` + ${modifier}` : ` - ${Math.abs(modifier)}`}`;
+
+/**
+ * The extra attack a weapon can make beside its own (SRD 5.2.1), minted with it: the Light property's (after an
+ * attack with a different Light weapon in the Attack action, as a Bonus Action, or inside that action with Nick) and
+ * Cleave's (after a melee hit, at a second creature). Either is once per turn, and neither adds a positive ability
+ * modifier to its damage, unless Two-Weapon Fighting puts it back on the Light one. The economy checks what opens it.
+ */
+export function extraAttackAction(
+  item: InventoryItem,
+  swing: WeaponSwing,
+  kind: "light" | "cleave",
+  options: Readonly<{ insideAttackAction?: boolean; keepModifier?: boolean }> = {}
+): ActorAction {
+  const { action, dice, modifier } = swing;
+  const attack = action.attack!;
+  const light = kind === "light";
+  return {
+    id: itemActionId(item.id, kind),
+    name: light ? `${item.name} (Light extra attack)` : `${item.name} (Cleave)`,
+    activation: light && !options.insideAttackAction ? "bonus-action" : "other",
+    description: light
+      ? `The Light property's extra attack with ${item.name}, after attacking with a different Light weapon in the Attack action this turn${options.insideAttackAction ? ", made as part of that action (Nick)" : ""}. Once per turn.`
+      : `Cleave: after a melee hit with ${item.name}, attack another target within 5 feet of the one you hit and within your reach. Once per turn.`,
+    // Cleave is a melee swing even with a thrown weapon.
+    attack: light ? attack : { bonus: attack.bonus, reachFeet: attack.reachFeet ?? 5 },
+    damage: [
+      {
+        formula: withModifier(dice, options.keepModifier ? modifier : Math.min(0, modifier)),
+        type: action.damage[0]!.type
+      }
+    ],
+    uses: { limit: 1, per: "turn", pool: light ? "light-extra-attack" : "cleave" },
+    extraAttack: { kind, itemId: item.id }
   };
 }
 

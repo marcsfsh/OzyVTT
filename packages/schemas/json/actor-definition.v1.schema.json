@@ -1024,6 +1024,15 @@
             }
           ]
         },
+        "extraAttack": {
+          "type": "object",
+          "required": ["kind", "itemId"],
+          "properties": {
+            "kind": { "enum": ["light", "cleave"] },
+            "itemId": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 120 }
+          },
+          "additionalProperties": false
+        },
         "legendary": {
           "type": "object",
           "required": ["cost"],

@@ -1074,6 +1074,18 @@ export const ActionSchema = z.object({
     .optional(),
   /** Declared reaction the engine can offer as a pending prompt; see `ActionReactionSchema`. */
   reaction: ActionReactionSchema.optional(),
+  /** Minted by the engine from an equipped weapon, not authored: the Light property's extra attack (`light`), or
+   *  Cleave's swing at a second creature (`cleave`), made with the inventory item `itemId`. */
+  extraAttack: z
+    .object({
+      kind: z.enum(["light", "cleave"]),
+      itemId: z
+        .string()
+        .regex(/^[a-z0-9-]+$/)
+        .max(120)
+    })
+    .strict()
+    .optional(),
   /** SRD Legendary Action: taken on other creatures' turns, spending `cost` from the per-round pool that refills on the creature's own turn. Pairs with activation "other". */
   legendary: z
     .object({ cost: z.number().int().min(1).max(5) })

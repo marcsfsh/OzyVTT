@@ -1,0 +1,56 @@
+import { weaponPropertiesOf } from "../equipment-derivation.js";
+import { itemActionId } from "../item-actions.js";
+import { masteryOpensCleave } from "../weapon-mastery.js";
+import type { ResolveContext } from "./context.js";
+
+// What a swing opens for an extra attack (SRD 5.2.1), kept in the turn record that the economy reads
+// (`checkExtraAttackOpened`): the Light property's, and Cleave's.
+
+const opened = (ctx: ResolveContext) => ctx.state.combat.turn.extraAttacks ?? { light: null, cleave: null };
+
+/** An attack with a Light weapon in the Attack action, on the attacker's own turn, opens the Light extra attack
+ *  with a different Light weapon. The extra attack itself opens nothing. */
+export function recordLightAttack(ctx: ResolveContext): void {
+  const { state, action, attacker, attack, input, riderItemId } = ctx;
+  if (
+    attack === null ||
+    input.economyPaid === true ||
+    action.extraAttack !== undefined ||
+    action.activation !== "action" ||
+    state.combat.turnActorId !== attacker.id ||
+    !weaponPropertiesOf(riderItemId, attacker.inventory).includes("light")
+  )
+    return;
+  const current = opened(ctx);
+  const itemIds = current.light?.actorId === attacker.id ? current.light.itemIds : [];
+  if (itemIds.includes(riderItemId!)) return;
+  state.combat = {
+    ...state.combat,
+    turn: {
+      ...state.combat.turn,
+      extraAttacks: { ...current, light: { actorId: attacker.id, itemIds: [...itemIds, riderItemId!] } }
+    }
+  };
+}
+
+/** A melee hit with a Cleave weapon opens its swing at a second creature, which the result card offers. */
+export function recordCleaveOpening(ctx: ResolveContext): void {
+  const { state, action, attacker, attack, riderItemId } = ctx;
+  if (
+    attack === null ||
+    riderItemId === null ||
+    action.extraAttack !== undefined ||
+    ctx.riderFilters.attackKinds?.includes("melee") !== true ||
+    !masteryOpensCleave(ctx.masterySwing)
+  )
+    return;
+  state.combat = {
+    ...state.combat,
+    turn: {
+      ...state.combat.turn,
+      extraAttacks: { ...opened(ctx), cleave: { actorId: attacker.id, itemId: riderItemId, targetId: attack.targetId } }
+    }
+  };
+  const swing = ctx.siblings.find((candidate) => candidate.id === itemActionId(riderItemId, "cleave"));
+  if (swing) ctx.opens = { actionId: swing.id, actionName: swing.name };
+}

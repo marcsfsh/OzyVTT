@@ -112,6 +112,8 @@ export type ActionResolution = Readonly<{
   push?: Readonly<{ targetName: string; maxFeet: number }> | null;
   /** Reaction prompts this hit opened (Uncanny Dodge): the triggering damage waits on the answer instead of the apply button. */
   reactionPrompts?: ReadonlyArray<Readonly<{ actorId: string; actorName: string; actionName: string }>>;
+  /** An extra attack this swing opened (Cleave's swing at a second creature), for the result card to offer. */
+  opens?: Readonly<{ actionId: string; actionName: string }>;
   /** The attack would hit, and the target's reaction (Parry, Shield) may still turn it into a miss. Nothing past the
    *  roll has happened yet: answering the prompt finishes the attack, damage included. */
   waitingOnReaction?: true;

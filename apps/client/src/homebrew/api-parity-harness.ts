@@ -506,8 +506,15 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
   {
     at: "actions[].reaction.**",
     types: ACTION_CARRIERS,
-    reason: "one SRD author (rogue uncanny-dodge), so no second record shows the shape",
-    status: "permanent: lone SRD record"
+    reason:
+      "authored in the class overlays, spell effects and stat-block prose (Uncanny Dodge, Shield, Parry); no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].extraAttack.**",
+    types: ACTION_CARRIERS,
+    reason: "minted by the engine beside an equipped weapon (Light, Cleave), never authored",
+    status: "permanent: system-synthesised"
   },
   {
     at: "actions[].spellId",

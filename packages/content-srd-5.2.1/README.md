@@ -125,14 +125,15 @@ scratch directory and requires every committed bundle back byte for byte, so edi
 
 ## What deliberately stays prose (ADR-0008)
 
+Weapon Mastery is engine behaviour rather than a rider: each weapon row carries its SRD mastery,
+the Fighter's picks land in the choice ledger, and all eight properties run in the server's
+resolver (`apps/server/src/weapon-mastery.ts`), as does the Light property's extra attack that
+Nick depends on.
+
 The rider vocabulary is bounded on purpose. These printed effects have **no** structured
 encoding, so they are authored as description text and adjudicated at the table rather than
 mis-encoded into a rider that means something else:
 
-- **Weapon Mastery** (Fighter level 1). The pick is real and lands in the choice ledger, but
-  the eight mastery properties (Cleave, Graze, Nick, Push, Sap, Slow, Topple, Vex) are combat
-  behaviors with no counterpart in `Modifier`/`onHit`, and the SRD's per-weapon mastery
-  column is not in the vendored fixtures. The chosen weapons are provenance and display only.
 - **Potent Spellcasting** (Cleric Blessed Strikes) — "add your Wisdom modifier to Cleric cantrip
   damage": `damage-bonus` carries a flat integer for weapon attacks, not an ability-derived
   bonus scoped to cantrips.

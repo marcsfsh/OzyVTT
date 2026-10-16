@@ -146,8 +146,8 @@ export function ActionResultCard({
           );
         })()}
       {result.healing && <HealingOutcome healing={result.healing} />}
+      {/* A miss owes damage only through Graze, which is already in the total. */}
       {result.attack &&
-        (result.attack.outcome === "crit" || result.attack.outcome === "hit" || result.attack.outcome === "unknown") &&
         result.damageTotal > 0 &&
         (() => {
           // A reaction window (Uncanny Dodge) parked this damage on a prompt whose answer applies it
@@ -227,6 +227,24 @@ export function ActionResultCard({
           ) : (
             <p className="action-save-note resolved">All saving throws for {result.actionName} resolved.</p>
           );
+        })()}
+      {result.opens &&
+        (() => {
+          // Cleave: the hit opened a swing at a second creature, picked like any target.
+          const swing = actions?.find((candidate) => candidate.id === result.opens!.actionId);
+          return swing ? (
+            <p className="action-result-hint">
+              <button
+                type="button"
+                className="action-again"
+                disabled={busy || resolveBusy}
+                onClick={() => onAgain(swing)}
+              >
+                {result.opens!.actionName}
+              </button>{" "}
+              swings at another target within 5 feet of {result.attack?.targetName ?? "the first"}.
+            </p>
+          ) : null;
         })()}
       {result.componentsRemaining && Object.values(result.componentsRemaining).some((remaining) => remaining > 0) && (
         <p className="action-result-hint">
