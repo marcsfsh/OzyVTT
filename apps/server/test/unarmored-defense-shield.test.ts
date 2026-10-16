@@ -205,7 +205,9 @@ describe("Unarmored Defense and a shield", () => {
     const monk = onTheTable(monkInput());
     expect(monk.definition.armorClass).toBe(15); // 10 + 2 Dex + 3 Wis, the same number on purpose
     expect(monk.hero.armorClass).toBe(15);
-    expect(equip(monk, "shield")).toBe(14); // Unarmored Defense is lost while wielding a shield: 10 + 2 + 2
+    // Unarmored Defense is lost while wielding a shield, and a Monk has no Shield training, so the Shield adds
+    // nothing either (SRD Armor Training): 10 + 2.
+    expect(equip(monk, "shield")).toBe(12);
   });
 
   /** The authored flags the four numbers rest on; a flipped flag would still pass the test above in one direction. */
@@ -222,13 +224,13 @@ describe("Unarmored Defense and a shield", () => {
     expect(flagIn(view.subclassRecord("draconic-sorcery")?.features)).toBe(true);
   });
 
-  // The Draconic Sorcerer: 15 bare-handed, 17 with a Shield. Known limitation: the engine has no
-  // armor-training gate ("only if you have training with it"), so 17 is derived for anyone.
-  it("adds a shield on top of the Draconic Sorcerer's Charisma", () => {
+  // The Draconic Sorcerer keeps Draconic Resilience under a Shield, but a Sorcerer has no Shield training, so
+  // the Shield's +2 never lands ("only if you have training with it"): 15 either way.
+  it("keeps the Draconic Sorcerer's Charisma under a shield it isn't trained to use", () => {
     const sorcerer = onTheTable(sorcererInput());
     expect(sorcerer.definition.armorClass).toBe(15); // 10 + 2 Dex + 3 Cha
     expect(sorcerer.hero.armorClass).toBe(15);
-    expect(equip(sorcerer, "shield")).toBe(17);
+    expect(equip(sorcerer, "shield")).toBe(15);
   });
 
   // `unarmoredDefenseOf` reads the content before the build-time extension bag, so a sheet saved with a stale
@@ -268,8 +270,9 @@ describe("Unarmored Defense and a shield", () => {
       (id) => state.definitions.find((entry) => entry.id === id)?.definition,
       { catalog, role: "player" }
     );
-    // 17, not 14: the live rider wins over the stale flag.
-    expect(hero.armorClass, "a sheet saved before the content fix must still gain the shield").toBe(17);
+    // 15, not 12: the live rider wins over the stale flag, so Draconic Resilience survives the Shield (whose +2
+    // needs training this Sorcerer lacks).
+    expect(hero.armorClass, "a sheet saved before the content fix must keep its Charisma under the shield").toBe(15);
   });
 
   // Body armor replaces Unarmored Defense (both printings begin "while you aren't wearing armor") and the
@@ -298,12 +301,16 @@ describe("Unarmored Defense and a shield", () => {
     expect(actor.armorClass).toBe(17);
   });
 
-  // The reader fails open: a definition claiming no feature (monster, PDF import) derives an ordinary shield
-  // AC rather than NaN, and no Unarmored Defense is inferred from a class name.
-  it("derives an ordinary shield AC for a definition that claims no feature at all", () => {
+  // The reader fails open: a definition claiming no feature (monster, PDF import) derives an ordinary AC from
+  // armor rather than NaN, and no Unarmored Defense is inferred from a class name.
+  it("derives an ordinary armor AC for a definition that claims no feature at all", () => {
     const { definition } = onTheTable(barbarianInput());
     const { character: _dropped, ...stripped } = definition;
-    const anonymous = { ...stripped, extensions: {} } as ActorDefinition;
+    const anonymous = {
+      ...stripped,
+      source: { name: "D&D Beyond PDF (2024)", version: "1" },
+      extensions: {}
+    } as ActorDefinition;
     const state = GameStateSchema.parse({ schemaVersion: 1 }) as GameState;
     importActorDefinition(state, anonymous, IDS.other, "public", catalog);
     const actor = state.actors.find((entry) => entry.id === IDS.other)!;
@@ -315,7 +322,16 @@ describe("Unarmored Defense and a shield", () => {
       (id) => state.definitions.find((entry) => entry.id === id)?.definition,
       { catalog, role: "player" }
     );
-    expect(actor.armorClass).toBe(14); // 10 + 2 + 2 - no feature is claimed, so none is granted
+    // A printed total may already count the Shield, so a Shield alone leaves it standing.
+    expect(actor.armorClass).toBe(15);
+    setInventoryItem(
+      state,
+      IDS.other,
+      equippedFromCatalog("chain-mail"),
+      (id) => state.definitions.find((entry) => entry.id === id)?.definition,
+      { catalog, role: "player" }
+    );
+    expect(actor.armorClass).toBe(18); // Chain Mail 16 + Shield 2 - no feature is claimed, so none is granted
   });
 
   // A sheet saved before the `unarmoredDefense` extension key existed (only that sub-key deleted, JSON round
@@ -364,7 +380,7 @@ describe("Unarmored Defense and a shield", () => {
       (id) => state.definitions.find((entry) => entry.id === id)?.definition,
       { catalog, role: "player" }
     );
-    expect(actor.armorClass).toBe(14); // 10 + 2 + 2: the Monk's printing refuses the Shield
+    expect(actor.armorClass).toBe(12); // 10 + 2: the Monk's printing refuses the Shield, and so does its training
   });
 });
 

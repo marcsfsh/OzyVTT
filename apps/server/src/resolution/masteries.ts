@@ -1,7 +1,7 @@
 import { conditionLabel } from "../condition-rules.js";
 import { endEffect } from "../effects.js";
 import { createPendingSaves } from "../saving-throws.js";
-import { masteryHitPushes, masteryHitSaves, VEXED_TAG, type MasterySwing } from "../weapon-mastery.js";
+import { masteryHitPushes, masteryHitSaves, SAPPED_TAG, VEXED_TAG, type MasterySwing } from "../weapon-mastery.js";
 import { sizeAtMost, type ResolveContext } from "./context.js";
 
 /** The weapon mastery in force on this swing (rules in `weapon-mastery.ts`); null unless a mastery
@@ -119,6 +119,16 @@ function pushMasteryTargets(ctx: ResolveContext): void {
     warnings.push(
       `${forced.targetName} is pushed straight away from ${attacker.name}, but the map has nowhere to put it - the token stays where it is.`
     );
+  }
+}
+
+/** Sap is spent by the sapped creature's next attack roll, hit or miss (SRD: "Disadvantage on its next attack roll"). */
+export function spendSap(ctx: ResolveContext): void {
+  const { state, attack, attacker, effectsEnded } = ctx;
+  if (attack === null) return;
+  for (const sapped of attacker.effects.filter((effect) => effect.tags.includes(SAPPED_TAG))) {
+    endEffect(state, attacker.id, sapped.id);
+    effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name: sapped.name });
   }
 }
 

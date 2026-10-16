@@ -68,6 +68,13 @@ weapons render as tap-to-roll to-hit/damage on the sheet (Str melee / Dex ranged
 versatile, and per-weapon proficiency remain builder work as that data isn't vendored). The
 guided builder, point-buy, level-up, and full content/derivation are still deferred.
 
+**Amendment (2026-10-16): Armor Class follows what is worn now.** A built character's AC is no longer
+frozen at build: with no armor or Shield it is 10 + Dex (or its Unarmored Defense), and its features'
+`armor-class` riders are read live, so the Defense fighting style follows armor bought or removed later.
+A Shield adds its +2 only with Shield training. A printed total (a stat block, a PDF import) stands
+until body armor is equipped, since it may already count a Shield. The GM can set an AC by hand
+(`actor.set-armor-class`), shown to the party as set by the GM, until cleared.
+
 ## Consequences
 
 - The `CLAUDE.md` scope line changes from _"not a character builder"_ to _"not a character

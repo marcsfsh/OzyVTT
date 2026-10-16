@@ -590,6 +590,11 @@ describe("Push moves the target's token 10 feet straight away", () => {
     // A heavy crossbow three cells across and one down: two cells of push lands off a cell centre, so the snap
     // does visible work. Dex 13 (+1) + proficiency 2 = +3 to hit; a natural 15 is 18 vs AC 13.
     const built = battlefield(["heavy-crossbow", "longbow", "rapier"], ["heavy-crossbow"], cell(2, 2), cell(5, 3));
+    // A crossbow fires only with bolts to fire (SRD Ammunition).
+    built.hero.inventory = [
+      ...built.hero.inventory,
+      InventoryItemSchema.parse({ id: "crossbow-bolts-20", name: "Crossbow Bolts (20)", category: "ammunition" })
+    ];
     const before = positionOf(built, IDS.foe)!;
     const hit = pushSwing(built, "item-heavy-crossbow", [15, 4]);
     expect(hit.attack?.outcome).toBe("hit");

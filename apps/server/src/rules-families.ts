@@ -30,6 +30,14 @@ const RULE_FAMILIES = {
   // An extra attack (Light, Cleave) is owed only once the swing that opens it has happened this turn.
   "attack.light-needs-attack": "economy",
   "attack.cleave-needs-hit": "economy",
+  // A Loading weapon fires once per action, however many attacks the action allows.
+  "attack.loading": "economy",
+  "attack.no-ammunition": "economy",
+  // A Two-Handed weapon can't swing while a Shield takes one hand.
+  "attack.two-handed": "economy",
+  // No spellcasting in armor the caster isn't trained with: what the character can do at all, not a spent slot
+  // (the slots family is advisory by default, and this rule is not).
+  "spell.untrained-armor": "economy",
   // Sneak Attack, a smite and the like add to a hit: they're chosen when the hit is confirmed, not taken alone.
   "attack.rides-a-hit": "economy",
   // ...while "no legendary actions left this round" is a spent resource, like limited uses.

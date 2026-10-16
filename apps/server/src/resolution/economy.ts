@@ -1,8 +1,12 @@
 import type { GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
+import { effectiveSlot } from "@vtt/rules-5e";
 import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
 import { hasEffectTag, RAGING_TAG } from "../effects.js";
+import { ammunitionFor, ammunitionLabel, launcherKind } from "../ammunition.js";
+import { armorTrainingGaps, type EquipmentCatalog } from "../equipment-derivation.js";
 import { RulesBlockedError } from "../game-store.js";
+import { isItemActionId, itemActionRest, TWO_HANDED_SUFFIX } from "../item-actions.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import {
   effectiveModeFor,
@@ -86,7 +90,8 @@ export function evaluateActionEconomy(
   siblings: ReadonlyArray<DefinitionAction> = definition?.actions ?? [],
   slotLevel?: number,
   /** The action rides a hit it was chosen for (Sneak Attack), rather than being taken alone. */
-  asHitRider = false
+  asHitRider = false,
+  catalog?: EquipmentCatalog
 ): EconomyEvaluation {
   const evaluation: Evaluation = {
     state,
@@ -104,6 +109,10 @@ export function evaluateActionEconomy(
   checkAbleToAct(evaluation);
   checkTurnsBegun(evaluation);
   checkExtraAttackOpened(evaluation);
+  checkLoading(evaluation);
+  checkHands(evaluation);
+  checkArmorTraining(evaluation, definition);
+  checkAmmunition(evaluation, catalog);
   if (!asHitRider) checkTakenAlone(evaluation);
   const spendUse = checkLimitedUse(evaluation);
   const slots = checkActionSlots(evaluation);
@@ -200,6 +209,82 @@ function checkExtraAttackOpened({ state, attacker, action, violations }: Evaluat
     violations.push({
       rule: "attack.cleave-needs-hit",
       message: `${action.name} follows a melee hit with this weapon this turn.`
+    });
+}
+
+/** The inventory row a weapon swing is made with (`item-<id>`, or a Versatile weapon's `item-<id>-two-handed`), or
+ *  null for any other action. */
+function swingItemOf(attacker: LiveActor, action: DefinitionAction) {
+  if (!isItemActionId(action.id)) return null;
+  const rest = itemActionRest(action.id);
+  return (
+    attacker.inventory.find(
+      (item) => item.weapon !== undefined && (item.id === rest || `${item.id}-${TWO_HANDED_SUFFIX}` === rest)
+    ) ?? null
+  );
+}
+
+/** SRD Armor Training: in Light, Medium or Heavy armor you lack training with, "you can't cast spells". Any action
+ *  that casts a spell counts, a wand's included. Read from the sheet's own training; armor training an item grants
+ *  is the GM's to allow. */
+function checkArmorTraining({ attacker, action, violations }: Evaluation, definition: ActorDefinition | undefined) {
+  if (action.spellId === undefined && action.spellSlot === undefined) return;
+  const { untrainedArmor } = armorTrainingGaps(attacker.inventory, definition);
+  if (untrainedArmor)
+    violations.push({
+      rule: "spell.untrained-armor",
+      message: `${attacker.name} can't cast spells while wearing ${untrainedArmor.name} without training in it.`
+    });
+}
+
+/** SRD: a Two-Handed weapon "requires two hands when you attack with it", and a Shield is strapped to one arm. Read
+ *  from the row, since a magic shield's slot travels on its marker. The Lance's "unless mounted" is the GM's call. */
+function checkHands({ attacker, action, violations }: Evaluation): void {
+  const item = swingItemOf(attacker, action);
+  if (!item) return;
+  const twoHands =
+    item.weapon?.properties?.includes("two-handed") === true ||
+    itemActionRest(action.id) === `${item.id}-${TWO_HANDED_SUFFIX}`;
+  if (!twoHands) return;
+  const shield = attacker.inventory.find(
+    (entry) =>
+      entry.equipped &&
+      entry.quantity > 0 &&
+      entry.armor !== undefined &&
+      effectiveSlot({ slot: entry.magic?.slot, category: entry.category }) === "shield"
+  );
+  if (shield)
+    violations.push({
+      rule: "attack.two-handed",
+      message: `${item.name} needs two hands, and ${attacker.name} has ${shield.name} on one arm. Unequip the shield first.`
+    });
+}
+
+/** SRD Ammunition: "You can use a weapon that has the Ammunition property to make a ranged attack only if you have
+ *  ammunition to fire from it." Unchecked without the catalog, which says what each row is. */
+function checkAmmunition({ attacker, action, violations }: Evaluation, catalog: EquipmentCatalog | undefined): void {
+  const item = catalog ? swingItemOf(attacker, action) : null;
+  if (!item) return;
+  const kind = launcherKind(item, catalog);
+  if (kind === null || ammunitionFor(attacker, kind, catalog)) return;
+  violations.push({
+    rule: "attack.no-ammunition",
+    message: `${attacker.name} has no ${ammunitionLabel(kind)} to fire from ${item.name}.`
+  });
+}
+
+/** SRD Loading: "You can fire only one piece of ammunition from a Loading weapon when you use an action ... to fire
+ *  it, regardless of the number of attacks you can normally make." Extra Attack's other swings stay open for
+ *  another weapon. */
+function checkLoading({ state, attacker, action, onOwnTurn, violations }: Evaluation): void {
+  if (!onOwnTurn || action.activation !== "action") return;
+  const item = swingItemOf(attacker, action);
+  if (!item?.weapon?.properties?.includes("loading")) return;
+  const fired = state.combat.turn.extraAttacks?.loading;
+  if (fired?.actorId === attacker.id && fired.itemIds.includes(item.id))
+    violations.push({
+      rule: "attack.loading",
+      message: `${action.name} has the Loading property: it fires once per action. Use another weapon for the remaining attacks.`
     });
 }
 
@@ -593,7 +678,8 @@ export function planEconomy(
   warnings: string[],
   distanceFeet: ((actorIdA: string, actorIdB: string) => number | null) | undefined,
   siblings: ReadonlyArray<DefinitionAction>,
-  asHitRider = false
+  asHitRider = false,
+  catalog?: EquipmentCatalog
 ): { plan: EconomyPlan; overridden: { rule: RuleId; reason: string } | null } {
   const { violations, softViolations, plan, proseMultiattack, notes } = evaluateActionEconomy(
     state,
@@ -604,7 +690,8 @@ export function planEconomy(
     distanceFeet,
     siblings,
     input.slotLevel,
-    asHitRider
+    asHitRider,
+    catalog
   );
   warnings.push(...notes);
 

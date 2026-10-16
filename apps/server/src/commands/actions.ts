@@ -16,6 +16,8 @@ import { recordRoll, rolledTerms } from "../roll-history.js";
 import { overrideReason, overrideWaives, rememberOverride } from "../rules-families.js";
 import { looseRollPlan, NOT_YOUR_TURN, offTurnVerdict, routeForTap, spendLooseUses } from "../tap-routing.js";
 import { upcastAction } from "../item-actions.js";
+import { lastChargeLine, lastChargeRollFor } from "../item-charges.js";
+import { consumableRowFor, withOneUsedUp } from "../consumables.js";
 import { castSlotLevel } from "../resolution/economy.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, principalTag, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
@@ -233,7 +235,7 @@ export const actionCommands = [
     type: "action.use",
     operationId: "useAction",
     description:
-      "Uses an action and lets the SERVER decide what that means. In the fight on this creature's turn it delegates to the full structured resolution and acks `route: \"resolved\"`. Off turn it is refused with the overridable, askable rules block `economy.not-your-turn` (reactions and legendary actions are exempt - taking those off turn is the point); under an `economy` exception of advise/off it resolves, with a GM-only warning line under advise. With no fight running - or with this creature not in the turn order - the server rolls the action's own attack die (and, only with `includeDamage`, its damage parts) as attributed rolls, spends what the action costs (an item's charges or a feature's per-rest uses, and any spell slot an item cast consumes; refused when none remain), touches no combat state, and acks `route: \"loose\"` with the roll ids. An action with nothing to roll is still used, with a feed line. No hit points ever move on the loose route. GM-grade for any combatant, including a monster's sheet; a player session only for their own claimed character.",
+      "Uses an action and lets the SERVER decide what that means. In the fight on this creature's turn it delegates to the full structured resolution and acks `route: \"resolved\"`. Off turn it is refused with the overridable, askable rules block `economy.not-your-turn` (reactions and legendary actions are exempt - taking those off turn is the point); under an `economy` exception of advise/off it resolves, with a GM-only warning line under advise. With no fight running - or with this creature not in the turn order - the server rolls the action's own attack die (and, only with `includeDamage`, its damage parts) as attributed rolls, spends what the action costs (an item's charges or a feature's per-rest uses, and any spell slot an item cast consumes; refused when none remain; an item's last charge rolls its d20 for the GM), touches no combat state, and acks `route: \"loose\"` with the roll ids. An action with nothing to roll is still used, with a feed line. No hit points ever move on the loose route. GM-grade for any combatant, including a monster's sheet; a player session only for their own claimed character.",
     summary:
       "Use an action and let the SERVER route it: resolved in the fight on your turn, refused off turn, loose dice outside a fight (GM anyone; a player their own claimed character).",
     schema: ActionUseSchema,
@@ -331,10 +333,40 @@ export const actionCommands = [
       const initiator = initiatorOf(principal);
       const rollIds = plan.map(() => kit.context.newId());
       let spend: ReturnType<typeof spendLooseUses> = { usesLeft: null, spent: false };
+      let lastCharge: string | null = null;
+      let usedUp = false;
       const { state, duplicate } = await execute((draft) => {
         requireActorAccess(initiator, draft, actorId, "attack");
         const live = draft.actors.find((candidate) => candidate.id === actorId)!;
         spend = spendLooseUses(live, action, available, castLevel);
+        // A potion drunk or a flask thrown outside a fight is used up all the same.
+        const consumable = consumableRowFor(action, live.inventory, kit.equipmentCatalog());
+        if (consumable) live.inventory = withOneUsedUp(live.inventory, consumable.id);
+        usedUp = consumable !== null;
+        // SRD charged items: spending the last charge rolls a d20, whose 1 is the item's own text.
+        const due = spend.usesLeft === 0 ? lastChargeRollFor(action, live.inventory, kit.equipmentCatalog()) : null;
+        lastCharge = null;
+        if (due) {
+          const face = kit.context.random(20);
+          recordRoll(draft, {
+            id: kit.context.newId(),
+            commandId,
+            initiatorSessionId: sessionIdOf(principal),
+            initiatorRole: initiator.role,
+            initiatorLabel: live.name,
+            label: `${due.item.name}: last charge`,
+            actorId,
+            purpose: "manual",
+            visibility: live.visibility === "gm-only" ? "gm-only" : "public",
+            formula: "1d20",
+            normalizedFormula: "1d20",
+            dice: [{ group: 0, sides: 20, face, kept: true, sign: 1 as const }],
+            modifiers: [],
+            total: face,
+            createdAt: new Date().toISOString()
+          });
+          lastCharge = lastChargeLine(due.item.name, face);
+        }
         plan.forEach((entry, index) => {
           const resolution = rollDice(entry.formula, (sides) => kit.context.random(sides));
           recordRoll(draft, {
@@ -357,8 +389,16 @@ export const actionCommands = [
       });
       if (duplicate) return { route: "loose", rollIds };
       kit.publishRolls(state, commandId);
+      if (lastCharge !== null)
+        kit.context.appendLog({
+          kind: "action",
+          text: lastCharge,
+          actorId,
+          actorIds: [actorId],
+          gmOnly: kit.actorHidden(actorId)
+        });
       // Rolls narrate themselves; a use with nothing to roll, or one that cost a charge, says so.
-      if (plan.length === 0 || spend.spent) {
+      if (plan.length === 0 || spend.spent || usedUp) {
         const left =
           spend.usesLeft === null ? "" : ` (${spend.usesLeft} ${spend.usesLeft === 1 ? "use" : "uses"} left)`;
         kit.context.appendLog({

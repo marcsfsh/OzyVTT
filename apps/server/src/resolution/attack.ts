@@ -48,7 +48,9 @@ function attackKindsOf(ctx: ResolveContext, distance: number | null): AttackKind
     const ranged = attack.rangeFeet !== undefined;
     if (attackUsedAsRanged(attack, distance)) kinds.add("ranged");
     else if (melee) kinds.add("melee");
-    if (melee && ranged) kinds.add("thrown");
+    // A Dart is a ranged weapon with Thrown: it has no reach, and is still thrown.
+    const thrownWeapon = weaponPropertiesOf(ctx.riderItemId, ctx.attacker.inventory).includes("thrown");
+    if ((melee && ranged) || (ranged && thrownWeapon)) kinds.add("thrown");
     if (action.spellId !== undefined) kinds.add("spell");
     // A weapon attack (Improved Critical, Divine Smite): a swing with a carried weapon, or a character's own
     // non-spell attack (an imported sheet lists its Longsword as an action). A monster's Bite is neither.

@@ -1463,3 +1463,45 @@
     min-width: 6rem;
   }
 }
+/* The GM's AC chip opens the hand-set editor, so it is a full tap target. */
+.sheet-vital-button {
+  min-height: var(--tap-min);
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.sheet-vital-button:hover {
+  border-color: color-mix(in srgb, var(--cyan) 45%, transparent);
+}
+.sheet-vital-note {
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+  line-height: 1;
+}
+.sheet-ac-edit {
+  display: flex;
+  flex: 1 0 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.sheet-ac-edit > input {
+  width: 4.2rem;
+  margin: 0;
+  text-align: center;
+}
+.sheet-item-choice {
+  margin-top: var(--space-1);
+  max-width: 14rem;
+}
+.sheet-give {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.sheet-give > select {
+  flex: 1 1 9rem;
+  min-width: 0;
+}

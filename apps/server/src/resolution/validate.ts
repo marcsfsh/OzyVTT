@@ -70,7 +70,18 @@ export function openResolve(
   const riderItemId = sourceItemOf(action, derivation, attacker.inventory);
   const economy = input.economyPaid
     ? { plan: paidPlan(state), overridden: null }
-    : planEconomy(state, attacker, action, input, deps.definition, warnings, deps.distanceFeet, siblings);
+    : planEconomy(
+        state,
+        attacker,
+        action,
+        input,
+        deps.definition,
+        warnings,
+        deps.distanceFeet,
+        siblings,
+        false,
+        deps.catalog
+      );
   let overridden = economy.overridden;
 
   // GM-adjudicated cover (SRD Cover, no line-of-sight engine): the GM's choice for this resolve, else the cover the

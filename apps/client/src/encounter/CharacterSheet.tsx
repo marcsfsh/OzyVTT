@@ -318,7 +318,27 @@ export function CharacterSheet({
               return structured !== null;
             }}
           />
-          {actor.kind === "player-character" && <SheetInventory actor={actor} busy={busy} edit={edit} />}
+          {actor.kind === "player-character" && (
+            <SheetInventory
+              actor={actor}
+              busy={busy}
+              edit={edit}
+              role={role}
+              attunementSlots={derived?.attunementSlots ?? 3}
+              others={
+                role === "gm" && state
+                  ? state.actors
+                      .filter(
+                        (other) =>
+                          other.kind === "player-character" &&
+                          other.id !== actor.id &&
+                          !("archived" in other && other.archived)
+                      )
+                      .map((other) => ({ id: other.id, name: other.name }))
+                  : []
+              }
+            />
+          )}
           {extension.traits && extension.traits.length > 0 && (
             <section className="sheet-section">
               <h3>Traits</h3>

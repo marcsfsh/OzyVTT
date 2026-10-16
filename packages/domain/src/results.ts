@@ -301,7 +301,9 @@ const ActorDerivedSheetSchema = z.strictObject({
     vulnerabilities: z.array(DerivedDefenceSchema)
   }),
   /** What standing `spell-save-dc` riders add to the bearer's spell save DC, and so to every action that uses it. */
-  spellSaveDcBonus: z.number().int()
+  spellSaveDcBonus: z.number().int(),
+  /** How many items the bearer can attune to at once: 3, or 4 with Use Magic Device. */
+  attunementSlots: z.number().int().min(1).max(10)
 });
 export type ActorDerivedSheet = Wire<z.infer<typeof ActorDerivedSheetSchema>>;
 /** What `actor:available-actions` answers: the table's rules mode, each action's availability, and the sheet. */

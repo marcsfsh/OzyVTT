@@ -756,6 +756,19 @@ export const CharacterSetInventorySchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** Moves one carried row, whole, from one character to another, with the charges it has spent (GM). */
+export const CharacterGiveItemSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    toActorId: z.uuid(),
+    itemId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const CharacterSetCurrencySchema = z
   .object({
     commandId: z.uuid(),
@@ -948,6 +961,15 @@ export const ActorSetSpeedSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     speedFeet: z.number().int().min(0).max(500).nullable(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** GM-set Armor Class that replaces the one derived from equipment; null clears it back to the derived AC. */
+export const ActorSetArmorClassSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    armorClass: z.number().int().min(1).max(40).nullable(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

@@ -291,8 +291,12 @@
         "equipped": { "type": "boolean" },
         "attuned": { "type": "boolean" },
         "weightEach": { "type": "number", "minimum": 0 },
-        "description": { "type": "string", "maxLength": 4000 },
+        "description": { "type": "string", "maxLength": 12000 },
         "category": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 40 },
+        "recordId": { "$ref": "#/$defs/slug" },
+        "chosenDamageType": { "$ref": "#/$defs/damageType" },
+        "ammunitionLeft": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+        "ammunitionFired": { "type": "integer", "minimum": 0, "maximum": 10000 },
         "weapon": {
           "type": "object",
           "additionalProperties": false,
@@ -303,6 +307,8 @@
             "damageType": { "type": "string", "minLength": 1, "maxLength": 40 },
             "rangeFeet": { "type": ["integer", "null"], "minimum": 1 },
             "longRangeFeet": { "type": ["integer", "null"], "minimum": 1 },
+            "melee": { "type": "boolean" },
+            "versatileDice": { "type": "string", "minLength": 1, "maxLength": 20 },
             "properties": {
               "type": "array",
               "maxItems": 12,

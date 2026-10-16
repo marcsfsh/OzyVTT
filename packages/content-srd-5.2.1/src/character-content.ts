@@ -259,10 +259,11 @@ export const FeatureGrantsSchema = FeatureGrantsFieldsSchema.superRefine((grants
  */
 export const ITEM_REFUSED_MODIFIER_TYPES: readonly Modifier["type"][] = Object.freeze([
   "hit-points-per-level",
-  "ability-score"
+  "ability-score",
+  "attunement-slots"
 ]);
 export const ITEM_REFUSED_MODIFIER_MESSAGE =
-  "An item cannot change hit points or an ability score yet - those are baked into the sheet and cannot be un-granted when the item comes off. Use a specific bonus instead: armor-class, save-bonus, check-bonus, or spell-save-dc. (Both stay available on a feat.)";
+  "An item cannot change hit points, an ability score or the attunement limit - those are baked into the sheet or decide the item's own attunement, and cannot be un-granted when the item comes off. Use a specific bonus instead: armor-class, save-bonus, check-bonus, or spell-save-dc. (All three stay available on a feat.)";
 
 /** The rider fields shared by `FeatureRecord`, `FeatureOption` and magic items (spread into `EquipmentReferenceSchema`). */
 export const featureRiders = {

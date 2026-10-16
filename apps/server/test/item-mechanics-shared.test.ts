@@ -205,7 +205,7 @@ describe("the cast rules apply to every authored cast", () => {
 // Rider families the per-category files only check survive into the bundle (`ammunition-3`,
 // `sentinel-shield`, `demon-armor`), driven here to an engine outcome.
 describe("the rider families held only by a bundle assertion, driven", () => {
-  it("ammunition's attack-bonus lands on a RANGED to-hit and stays off a MELEE one", () => {
+  it("ammunition's bonuses land on a shot from a launcher and stay off a melee swing or a thrown weapon", () => {
     const definition = definitionOf();
     const shot = (inventory: InventoryItem[], actionId: string) => {
       const state = fight(stateWith(inventory));
@@ -222,9 +222,28 @@ describe("the rider families held only by a bundle assertion, driven", () => {
       shot([fromCatalog("longbow"), picked("ammunition-3")], "item-longbow"),
       "the +3 did not reach the shot"
     ).toBe(14);
-    expect(shot([fromCatalog("longbow")], "item-longbow"), "the control: Dex +2 alone").toBe(11);
-    // `attack-kind-is: ["ranged"]` keeps this from being a blanket +3.
+    expect(shot([fromCatalog("longbow"), picked("arrows-20")], "item-longbow"), "the control: Dex +2 alone").toBe(11);
+    // `weapon-property-is: ["ammunition"]` keeps this from being a blanket +3.
     expect(shot([fromCatalog("mace"), picked("ammunition-3")], "item-mace"), "the arrow reached a melee swing").toBe(9);
+    // A thrown dagger is a ranged attack that fires no ammunition: d20 9 + Dex 2 + PB 3.
+    expect(
+      shot([fromCatalog("dagger"), picked("ammunition-3")], "item-dagger"),
+      "the arrow reached a thrown dagger"
+    ).toBe(11);
+  });
+
+  it("ammunition's damage half lands on the launcher's hit", () => {
+    const definition = definitionOf();
+    const state = fight(stateWith([fromCatalog("longbow"), picked("ammunition-2")]));
+    const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === "item-longbow")!;
+    const resolution = resolveDefinitionAction(
+      state,
+      action,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000001" },
+      deps([19, 4], definition)
+    );
+    expect(resolution.attack!.outcome).toBe("hit");
+    expect(resolution.bonusDamage).toEqual([{ amount: 2, type: "piercing", source: "Ammunition, +2" }]);
   });
 
   it("a roll-mode rider really reaches the initiative die, on all three of its carriers", () => {
@@ -313,7 +332,9 @@ describe("the rider families held only by a bundle assertion, driven", () => {
     const definition = definitionOf();
     for (const [id, name] of [
       ["demon-armor", "Demon Armor"],
-      ["shield-of-missile-attraction", "Shield of Missile Attraction"]
+      ["shield-of-missile-attraction", "Shield of Missile Attraction"],
+      ["berserker-axe", "Berserker Axe"],
+      ["armor-of-vulnerability", "Armor of Vulnerability"]
     ] as const) {
       const worn = stateWith([picked(id)]);
       // Captured rather than asserted with `.toThrow`, so a failure shows the item's id in the diff.
@@ -333,10 +354,11 @@ describe("the rider families held only by a bundle assertion, driven", () => {
       setInventoryItem(gm, IDS.hero, picked(id, { equipped: false }), () => definition, { catalog, role: "gm" });
       expect(gm.actors[0].inventory[0].equipped, `${id}: the GM must be able to take it off`).toBe(false);
     }
-    // These two are the whole population, so a third cursed carrier has to be looked at.
-    expect(ROWS.filter((row) => row.cursed === true).map((row) => row.id)).toEqual([
-      "demon-armor",
-      "shield-of-missile-attraction"
-    ]);
+    // The SRD prints a Curse on exactly these four, so a fifth cursed carrier has to be looked at.
+    expect(
+      ROWS.filter((row) => row.cursed === true)
+        .map((row) => row.id)
+        .sort()
+    ).toEqual(["armor-of-vulnerability", "berserker-axe", "demon-armor", "shield-of-missile-attraction"]);
   });
 });

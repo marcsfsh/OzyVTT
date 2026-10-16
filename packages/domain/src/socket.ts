@@ -48,6 +48,7 @@ import type {
   ActorRemoveSchema,
   ActorRestSchema,
   ActorSetSpeedSchema,
+  ActorSetArmorClassSchema,
   ActorSpendHitDiceSchema,
   AddCombatantSchema,
   AnnotationAddSchema,
@@ -68,6 +69,7 @@ import type {
   CharacterSetCurrencySchema,
   CharacterSetIdentitySchema,
   CharacterSetInventorySchema,
+  CharacterGiveItemSchema,
   CharacterSetPreparedSchema,
   CharacterSetProficienciesSchema,
   CharacterSetSlotSchema,
@@ -307,6 +309,10 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof ActorSetSpeedSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  "actor:set-armor-class": (
+    payload: CommandPayload<typeof ActorSetArmorClassSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
   /** `damageType` types a bare manual `amount` (ignored when `parts` is present); `damageOverride` replaces a
    * rolled total while keeping its types. */
   "actor:apply-damage": (
@@ -431,6 +437,10 @@ export interface ClientToServerEvents {
   // Optional item keys are declared so the type states the whole wire contract; the server validates `baseId`.
   "character:set-inventory": (
     payload: CommandPayload<typeof CharacterSetInventorySchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "character:give-item": (
+    payload: CommandPayload<typeof CharacterGiveItemSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "character:set-currency": (

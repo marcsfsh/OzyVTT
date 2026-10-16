@@ -1,15 +1,30 @@
 import { setCondition } from "../actor-conditions.js";
 import { conditionLabel } from "../condition-rules.js";
 import { addEffect, effectDurationOf, makeEffect, type EffectNarration } from "../effects.js";
+import { previewDamage } from "../hit-points.js";
 import { masteryHitEffects } from "../weapon-mastery.js";
 import { sizeAtMost, type ResolveContext } from "./context.js";
+import { damagePartsOf } from "./damage.js";
+
+/** Whether this hit deals its target any damage after the target's defences: what Slow and Vex need. */
+function dealsDamage(ctx: ResolveContext): boolean {
+  const { state, targets, deps } = ctx;
+  const target = targets[0];
+  if (!target) return false;
+  const parts = damagePartsOf(ctx);
+  if (parts.length === 0) return false;
+  const damageDeps = deps.resolveDefinition
+    ? { resolveDefinition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) }
+    : undefined;
+  return previewDamage(state, target.id, { amount: 0, parts }, damageDeps).totalApplied > 0;
+}
 
 /** What a landed hit puts on its target: the action's declared on-hit riders and the weapon mastery's
- *  effects (Sap, Slow). */
+ *  effects (Sap, Slow, Vex). */
 export function applyOnHitEffects(ctx: ResolveContext): void {
   applyDeclaredRiders(ctx);
   // `addEffect` is idempotent by id, so its return is what gets narrated.
-  for (const applied of masteryHitEffects(ctx.masterySwing)) {
+  for (const applied of masteryHitEffects(ctx.masterySwing, ctx.masterySwing ? dealsDamage(ctx) : true)) {
     const effect = addEffect(ctx.state, applied.targetId, makeEffect(applied.effect), undefined, ctx.deps);
     ctx.effectsApplied.push({
       targetId: applied.targetId,

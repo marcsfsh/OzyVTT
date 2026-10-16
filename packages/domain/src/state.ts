@@ -522,10 +522,16 @@ const sceneCombatShape = {
       /** The turn's actor has made its one death save (SRD: at the start of its turn). Never projected. */
       deathSaveRolled: z.boolean().optional(),
       /** What this turn's attacks opened for an extra attack: the Light weapons its actor swung in the Attack action,
-       *  and the creature a Cleave weapon hit. Engine bookkeeping, never projected. */
+       *  and the creature a Cleave weapon hit; and the Loading weapons already fired in that action, which can't
+       *  fire again in it. Engine bookkeeping, never projected. */
       extraAttacks: z
         .object({
           light: z
+            .object({ actorId: z.uuid(), itemIds: z.array(z.string().max(120)).max(10) })
+            .strict()
+            .nullable()
+            .default(null),
+          loading: z
             .object({ actorId: z.uuid(), itemIds: z.array(z.string().max(120)).max(10) })
             .strict()
             .nullable()

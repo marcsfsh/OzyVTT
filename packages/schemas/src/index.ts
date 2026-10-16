@@ -88,9 +88,12 @@ export const ItemSlotSchema = z.enum([
   "shield",
   "armor",
   "head",
+  "eyes", // lenses and goggles, apart from headwear
   "neck",
-  "shoulders",
-  "hands",
+  "shoulders", // a cloak or cape
+  "body", // a robe, worn over clothes and under a cloak
+  "hands", // gloves or gauntlets
+  "bracers",
   "ring",
   "belt",
   "feet", // worn
@@ -373,6 +376,8 @@ export const ModifierSchema = z.discriminatedUnion("type", [
   z
     .object({ type: z.literal("sense"), sense: RiderSlugSchema, feet: z.number().int().min(0).max(240), ...riderGate })
     .strict(),
+  /** More magic items attuned at once than the SRD's three (Use Magic Device: four). Read when an item is attuned. */
+  z.object({ type: z.literal("attunement-slots"), amount: z.number().int().min(1).max(3), ...riderGate }).strict(),
   /** One more use of a limited resource. `poolId` is the live `actionUses` key, not a `classResources` column. */
   z
     .object({
@@ -473,6 +478,7 @@ export type Modifier = z.infer<typeof ModifierSchema>;
  * never give it back.
  */
 export const EFFECT_REFUSED_MODIFIER_TYPES: readonly Modifier["type"][] = Object.freeze([
+  "attunement-slots",
   "ability-score",
   "hit-points-per-level",
   "armor-class",
@@ -649,6 +655,10 @@ const ProficiencyIdSchema = z
   .string()
   .regex(/^[a-z0-9-]+$/)
   .max(60);
+/** What an Ammunition weapon fires (SRD Weapons table: "Ammunition (Range 150/600; Arrow)"). The table's one
+ *  "Bullet" is two items, so a Sling's and a firearm's are told apart. */
+export const AmmunitionKindSchema = z.enum(["arrow", "bolt", "firearm-bullet", "needle", "sling-bullet"]);
+export type AmmunitionKind = z.infer<typeof AmmunitionKindSchema>;
 /** Mechanical stats of an item added from the SRD catalog (weapon → attack action, armor/shield → derived AC).
  * Absent on homebrew or older items, which are then display-only. */
 export const ItemWeaponSchema = z
@@ -658,6 +668,11 @@ export const ItemWeaponSchema = z
     damageType: z.string().min(1).max(40),
     rangeFeet: z.number().int().positive().nullable(),
     longRangeFeet: z.number().int().positive().nullable(),
+    /** The Weapons table's band, copied from the catalog: a thrown Dagger is a melee weapon, a Dart a ranged one.
+     *  Absent = read from the range and Thrown, as before the band was recorded. */
+    melee: z.boolean().optional(),
+    /** A Versatile weapon's two-handed die ("1d10" for a Longsword), copied from the catalog. */
+    versatileDice: z.string().min(1).max(20).optional(),
     /** SRD weapon property slugs ("finesse", "thrown", ...), open for homebrew. Absent = not recorded; an empty array = no properties. */
     properties: z
       .array(
@@ -700,12 +715,20 @@ export const InventoryItemSchema = z
     equipped: z.boolean().default(false),
     attuned: z.boolean().default(false),
     weightEach: z.number().nonnegative().max(1_000_000).optional(),
-    description: z.string().max(4000).optional(),
+    /** The catalog text copied on add; as long as `EquipmentReferenceSchema.description` allows. */
+    description: z.string().max(12000).optional(),
     /** Equipment category slug (weapon/armor/tool/...), open for homebrew. Drives sheet grouping. */
     category: z
       .string()
       .regex(/^[a-z0-9-]+$/)
       .max(40)
+      .optional(),
+    /** The catalog record this row is a copy of, when the row's own id can't be it: a second Weapon, +1 bound to
+     *  another base is its own row (`weapon-1-2`) with `recordId: "weapon-1"`. Absent means the id is the record. */
+    recordId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
       .optional(),
     /** The base a template magic item is bound to ("dwarven-thrower" -> "warhammer"). The server validates it and
      * overwrites `weapon`/`armor` with the base's stats; weapon stats are never trusted from a client. */
@@ -716,11 +739,25 @@ export const InventoryItemSchema = z
       .optional(),
     weapon: ItemWeaponSchema.optional(),
     armor: ItemArmorSchema.optional(),
+    /** The type the GM picked for an item whose record lets the GM choose its resistance (Ring of Resistance). Only
+     *  the GM sets it; the server checks it against the record's `damageTypeChoice`. */
+    chosenDamageType: DamageTypeSchema.optional(),
+    /** Ammunition pieces left in a row sold in bundles ("Arrows (20)"), when some are spent; absent = every bundle
+     *  full. The server keeps it: shots spend it and a quantity change moves it by whole bundles. */
+    ammunitionLeft: z.number().int().min(0).max(1_000_000).optional(),
+    /** Pieces fired from this row in the running fight that can be picked up after it (half come back). The
+     *  server keeps it. */
+    ammunitionFired: z.number().int().min(0).max(10_000).optional(),
     /** Display-only marker so the sheet can offer Attune without the catalog; never the riders. */
     magic: ItemMagicMarkerSchema.optional()
   })
   .strict();
 export type InventoryItem = z.infer<typeof InventoryItemSchema>;
+
+/** The catalog id an inventory row is a copy of: its `recordId`, else its own id. Every catalog lookup reads this. */
+export function catalogIdOf(item: Readonly<{ id: string; recordId?: string | undefined }>): string {
+  return item.recordId ?? item.id;
+}
 export const CurrencySchema = z
   .object({
     cp: z.number().int().min(0).max(1_000_000).default(0),
@@ -828,6 +865,9 @@ export const ActorSchema = z.object({
     temporary: z.number().int().nonnegative().default(0)
   }),
   armorClass: z.number().int().positive().optional(),
+  /** A GM-set Armor Class that `armorClass` takes in place of the one derived from equipment, until cleared (a stat
+   *  the sheet can't derive: Mage Armor, natural armor, a ruling). The sheet shows it as set by the GM. */
+  armorClassOverride: z.number().int().min(1).max(40).optional(),
   initiative: z.number().int().optional(),
   ownerSessionId: z.uuid().nullable().default(null),
   notes: z.string().max(10000).optional(),
