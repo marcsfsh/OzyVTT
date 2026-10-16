@@ -1,4 +1,4 @@
-import { isDead, makeHitDicePool, type GameState, type HitDiceEntry } from "@vtt/domain";
+import { isDead, longRestWait, makeHitDicePool, type GameState, type HitDiceEntry } from "@vtt/domain";
 import type { Actor, ActorAction, ActorDefinition } from "@vtt/schemas";
 import { abilityModifier as scoreModifier, collectRiders } from "@vtt/rules-5e";
 import { pactSlotMaximum, spellSlotMaxima } from "./actor-roster.js";
@@ -6,8 +6,16 @@ import { CommandRejectedError } from "./game-store.js";
 import { effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 import { endEffectsAtLongRest, reduceExhaustion, removeConditionDirect, type EffectNarration } from "./effects.js";
-import { requireActorAccess, type Initiator } from "./authorization.js";
+import { requireActorAccess, requireGm, type Initiator } from "./authorization.js";
 import { healActor } from "./hit-points.js";
+
+/** SRD Resting: a Short Rest is 1 hour and a Long Rest at least 8. */
+export const SHORT_REST_HOURS = 1;
+export const LONG_REST_HOURS = 8;
+/** The clock's ceiling, as the state schema bounds it. */
+const CLOCK_LIMIT_HOURS = 10_000_000;
+
+const hoursText = (hours: number) => `${hours} ${hours === 1 ? "hour" : "hours"}`;
 
 /** Takes `count` dice off a multiclass pool, biggest die first (the order the roll uses). The caller has
  *  already checked the pool holds enough. */
@@ -65,10 +73,28 @@ export function spendHitDice(
 
 /** SRD Resting: "To start a Short Rest [or a Long Rest], you must have at least 1 Hit Point", and nothing brings
  *  the dead back but a revival. `needs` finishes the refusal: what asks for that 1 Hit Point. */
+function atZeroRefusal(actor: Actor, needs: string): string | null {
+  if (isDead(actor)) return `${actor.name} is dead - a rest can't bring them back.`;
+  if (actor.hp.current < 1) return `${actor.name} has 0 Hit Points - ${needs} at least 1. Heal them first.`;
+  return null;
+}
+
 function refuseRestAtZero(actor: Actor, needs: string): void {
-  if (isDead(actor)) throw new CommandRejectedError(`${actor.name} is dead - a rest can't bring them back.`);
-  if (actor.hp.current < 1)
-    throw new CommandRejectedError(`${actor.name} has 0 Hit Points - ${needs} at least 1. Heal them first.`);
+  const refusal = atZeroRefusal(actor, needs);
+  if (refusal) throw new CommandRejectedError(refusal);
+}
+
+/** Why `actor` can't start this rest now, in words the table reads; null when it can. */
+export function restRefusal(state: GameState, actor: Actor, kind: "long" | "short"): string | null {
+  if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actor.id))
+    return `End the encounter before resting ${actor.name}, who is in it.`;
+  const atZero = atZeroRefusal(actor, `a ${kind === "long" ? "Long" : "Short"} Rest needs`);
+  if (atZero) return atZero;
+  const wait = kind === "long" ? longRestWait(actor.lastLongRestAt, state.rest.clockHours) : 0;
+  if (wait === 0) return null;
+  const since = state.rest.clockHours - (actor.lastLongRestAt ?? 0);
+  const finished = since <= 0 ? "just finished a Long Rest" : `finished a Long Rest ${hoursText(since)} ago`;
+  return `${actor.name} ${finished} - another can start in ${hoursText(wait)}.`;
 }
 
 /** The pools a Short Rest partly or wholly refills beyond their own recharge, from the `short-rest-regain` riders the
@@ -124,11 +150,12 @@ function clearOverrides(overrides: Actor["choiceOverrides"], kind: "long" | "sho
 
 /**
  * Applies a rest to a rostered actor outside combat (SRD Resting, ADR-0020). Either needs at least 1 Hit Point, so
- * the dying and the dead get nothing from it.
+ * the dying and the dead get nothing from it, and a Long Rest waits 16 hours of game time after the last one.
  * Short: per-short-rest, recharge and per-encounter pools re-arm, and long-rest pools a feature partly refills
  * (Rage's one use) get those uses back; healing is only by spending Hit Point Dice.
  * Long: Concentration and turn-measured effects end first (onEnd grants land), then HP to max, temp HP cleared, all
- * pools refreshed, all Hit Point Dice restored, Exhaustion drops one level.
+ * pools refreshed, all Hit Point Dice restored, Exhaustion drops one level. It counts as ending at the current game
+ * hour; a party rest moves the clock past it.
  */
 export function applyRest(
   state: GameState,
@@ -139,9 +166,8 @@ export function applyRest(
 ): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
-  if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
-    throw new CommandRejectedError("End the encounter before resting a combatant who is in it.");
-  refuseRestAtZero(actor, `a ${kind === "long" ? "Long" : "Short"} Rest needs`);
+  const refusal = restRefusal(state, actor, kind);
+  if (refusal) throw new CommandRejectedError(refusal);
   const events: EffectNarration[] = [];
   if (kind === "short") {
     const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
@@ -169,6 +195,9 @@ export function applyRest(
   // Both kinds lapse on a long rest.
   actor.choiceOverrides = clearOverrides(actor.choiceOverrides, "long");
   reduceExhaustion(actor);
+  actor.lastLongRestAt = state.rest.clockHours;
+  // Rested, by whatever path: nothing left to ask the GM for.
+  state.rest = { ...state.rest, requests: state.rest.requests.filter((id) => id !== actorId) };
   // SRD long rest: spell slots (and Pact Magic) refill and prepared spells reset to the sheet's defaults.
   // No spellcasting leaves these untouched.
   const longRestDefinition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
@@ -192,4 +221,126 @@ export function applyRest(
       .filter((spell) => spell.prepared || spell.alwaysPrepared)
       .map((spell) => spell.id);
   return events;
+}
+
+/** A player asks for a Long Rest for their own character (the GM's approval gives it), or takes the ask back.
+ *  Refused up front when the rest itself would be, so the player hears why at once. */
+export function askForLongRest(state: GameState, actorId: string, withdraw: boolean, scope: Initiator): void {
+  requireActorAccess(scope, state, actorId, "resource");
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+  const others = state.rest.requests.filter((id) => id !== actorId);
+  if (withdraw) {
+    state.rest = { ...state.rest, requests: others };
+    return;
+  }
+  const refusal = restRefusal(state, actor, "long");
+  if (refusal) throw new CommandRejectedError(refusal);
+  if (others.length !== state.rest.requests.length) return;
+  if (others.length >= 50) throw new CommandRejectedError("Too many Long Rests are waiting for the GM.");
+  state.rest = { ...state.rest, requests: [...others, actorId] };
+}
+
+/** The GM answers a Long Rest request: the rest happens now (the 16-hour rule and 1 Hit Point still apply), or the
+ *  ask is turned down. */
+export function answerLongRest(
+  state: GameState,
+  actorId: string,
+  approve: boolean,
+  scope: Initiator,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
+  catalog?: EquipmentCatalog
+): EffectNarration[] {
+  requireGm(scope, "Only the GM answers a Long Rest request.");
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+  if (!state.rest.requests.includes(actorId))
+    throw new CommandRejectedError(`${actor.name} isn't waiting for a Long Rest.`);
+  // The rest clears the request itself, so a refused one leaves it waiting.
+  if (approve) return applyRest(state, actorId, "long", resolveDefinition, catalog);
+  state.rest = { ...state.rest, requests: state.rest.requests.filter((id) => id !== actorId) };
+  return [];
+}
+
+/**
+ * The GM rests several characters together. Every one must be able to, or none rests: the refusal names who can't and
+ * why. Long: each rests now and 8 hours pass. Short: the rest opens for each player to spend Hit Dice on their own
+ * device, and `finishPartyShortRest` ends it.
+ */
+export function startPartyRest(
+  state: GameState,
+  actorIds: readonly string[],
+  kind: "long" | "short",
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
+  catalog?: EquipmentCatalog
+): EffectNarration[] {
+  if (kind === "short" && state.rest.shortRest)
+    throw new CommandRejectedError("A Short Rest is already under way - finish it first.");
+  const members = actorIds.map((actorId) => {
+    const actor = state.actors.find((candidate) => candidate.id === actorId);
+    if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+    return actor;
+  });
+  const refusals = members
+    .map((actor) => restRefusal(state, actor, kind))
+    .filter((refusal): refusal is string => refusal !== null);
+  if (refusals.length > 0) throw new CommandRejectedError(refusals.join(" "));
+  if (kind === "short") {
+    state.rest = { ...state.rest, shortRest: { actorIds: [...actorIds], done: [] } };
+    return [];
+  }
+  const events = members.flatMap((actor) => applyRest(state, actor.id, "long", resolveDefinition, catalog));
+  const clockHours = Math.min(CLOCK_LIMIT_HOURS, state.rest.clockHours + LONG_REST_HOURS);
+  state.rest = { ...state.rest, clockHours };
+  for (const actor of members) actor.lastLongRestAt = clockHours;
+  return events;
+}
+
+/** A member of the party's Short Rest is done spending Hit Dice (or not after all). Their player or the GM. */
+export function markShortRestDone(state: GameState, actorId: string, done: boolean, scope: Initiator): void {
+  requireActorAccess(scope, state, actorId, "resource");
+  const rest = state.rest.shortRest;
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+  if (!rest?.actorIds.includes(actorId)) throw new CommandRejectedError(`${actor.name} isn't in a Short Rest.`);
+  const others = rest.done.filter((id) => id !== actorId);
+  state.rest = { ...state.rest, shortRest: { ...rest, done: done ? [...others, actorId] : others } };
+}
+
+/**
+ * Ends the party's Short Rest. With `apply`, each member who can still rest gets its benefits and an hour passes;
+ * anyone who can't any more (down, or pulled into a fight) gets nothing and a line saying why. Without, it is called
+ * off and no time passes.
+ */
+export function finishPartyShortRest(
+  state: GameState,
+  apply: boolean,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
+  catalog?: EquipmentCatalog
+): Readonly<{ events: EffectNarration[]; rested: string[] }> {
+  const rest = state.rest.shortRest;
+  if (!rest) throw new CommandRejectedError("No Short Rest is under way.");
+  state.rest = { ...state.rest, shortRest: null };
+  if (!apply) return { events: [], rested: [] };
+  const events: EffectNarration[] = [];
+  const rested: string[] = [];
+  for (const actorId of rest.actorIds) {
+    const actor = state.actors.find((candidate) => candidate.id === actorId);
+    if (!actor) continue;
+    if (restRefusal(state, actor, "short")) {
+      const inFight = state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId);
+      const why = inFight ? "is in a fight" : isDead(actor) ? "is dead" : "has 0 Hit Points";
+      events.push({ kind: "effect", text: `${actor.name} ${why}, so the Short Rest gives them nothing.`, actorId });
+      continue;
+    }
+    events.push(...applyRest(state, actorId, "short", resolveDefinition, catalog));
+    rested.push(actor.name);
+  }
+  state.rest = { ...state.rest, clockHours: Math.min(CLOCK_LIMIT_HOURS, state.rest.clockHours + SHORT_REST_HOURS) };
+  return { events, rested };
+}
+
+/** The GM moves game time forward. */
+export function passTime(state: GameState, hours: number): void {
+  state.rest = { ...state.rest, clockHours: Math.min(CLOCK_LIMIT_HOURS, state.rest.clockHours + hours) };
 }

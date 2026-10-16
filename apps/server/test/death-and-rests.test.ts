@@ -143,16 +143,14 @@ describe("over the API", () => {
     for (const cleanup of cleanups.splice(0)) await cleanup();
   });
 
-  it("a player can't Long Rest or heal their dead character back, and the GM revives them", async () => {
+  it("a player can't ask for a Long Rest or heal their dead character back, and the GM revives them", async () => {
     const { server, gmToken, post, close } = await bootServer(game({ ...dead, ownerSessionId: null }));
     cleanups.push(close);
     const player = server.auth.issuePlayerSession();
     expect((await post(GAME_PATHS.claims, player, { commandId: randomUUID(), actorId: HERO })).status).toBe(200);
-    const rest = await post(GAME_PATHS.actorRest.replace("{actorId}", HERO), player, {
-      commandId: randomUUID(),
-      kind: "long"
-    });
-    expect(rest.status).toBe(409);
+    const ask = await post(GAME_PATHS.restAsk.replace("{actorId}", HERO), player, { commandId: randomUUID() });
+    expect(ask.status).toBe(409);
+    expect((await ask.json()).error.message).toBe("Torva is dead - a rest can't bring them back.");
     const heal = await post(GAME_PATHS.actorHeal.replace("{actorId}", HERO), gmToken, {
       commandId: randomUUID(),
       amount: 10

@@ -7,6 +7,7 @@ import { RandomCharacterModal } from "../builder/RandomCharacter";
 import { CLAIM_WORD, classLine, hpLabel, presenceDot, presenceLabel } from "./actor-display";
 import { command } from "../lib/command";
 import { aidGiverOf, isKnockedOut, StabilizeControl } from "../encounter/StabilizeControl";
+import { ShortRestPrompt } from "../rest/ShortRestPrompt";
 import "./my-character.css";
 
 /** Dying and not yet stable: what first aid, a Healer's Kit or Spare the Dying is for. */
@@ -182,6 +183,8 @@ export function MyCharacter({
       </div>
 
       <div className="my-character-body scroll-y frame-fill">
+        {/* The party's Short Rest, when the GM opened one with this player's character in it. */}
+        <ShortRestPrompt state={state} />
         {mine ? (
           <div className="my-character-card">
             <Avatar name={mine.name} size="lg" presence={mine.presence ? presenceDot(mine.presence) : undefined} />

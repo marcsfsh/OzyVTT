@@ -8,6 +8,8 @@ export * from "./armor-class.js";
 export * from "./damage-parts.js";
 /** Who is dead, shared so healing, rests and the sheets agree. */
 export * from "./death.js";
+/** Game time for rests, shared so the 16-hour rule and the GM's rest panel agree. */
+export * from "./rest-clock.js";
 
 /** Codex field vocabulary, shared so the GM UI and the server's prune-and-seal read one copy. */
 export * from "./codex-entities.js";

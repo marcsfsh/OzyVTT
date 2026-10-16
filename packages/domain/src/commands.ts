@@ -755,6 +755,63 @@ export const ActorSpendHitDiceSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** A player asks the GM for a Long Rest for their character, or takes the ask back (`withdraw`). */
+export const RestAskSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    withdraw: z.boolean().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM answers a Long Rest request: `approve` gives the rest now, otherwise it is turned down. */
+export const RestAnswerSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    approve: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM rests several characters at once. Long: the rest happens now and 8 hours pass. Short: it opens, each
+ *  player spends Hit Dice on their own device, and it ends when the GM finishes it. */
+export const RestPartySchema = z
+  .object({
+    commandId: z.uuid(),
+    kind: z.enum(["short", "long"]),
+    actorIds: z.array(z.uuid()).min(1).max(12),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict()
+  .refine((value) => new Set(value.actorIds).size === value.actorIds.length, {
+    message: "Each character can rest only once.",
+    path: ["actorIds"]
+  });
+/** A member of the party's Short Rest is done choosing (or not, with `done: false`). */
+export const RestMarkDoneSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    done: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM ends the party's Short Rest: `apply` gives its benefits and an hour passes; otherwise it is called off. */
+export const RestFinishSchema = z
+  .object({
+    commandId: z.uuid(),
+    apply: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM moves game time forward, which the 16-hour rule between Long Rests reads. */
+export const TimePassSchema = z
+  .object({
+    commandId: z.uuid(),
+    hours: z.number().int().min(1).max(720),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const CharacterSetSlotSchema = z
   .object({
     commandId: z.uuid(),

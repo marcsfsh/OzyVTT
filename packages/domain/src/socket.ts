@@ -97,6 +97,11 @@ import type {
   ReactionAnswerSchema,
   ReactionDismissSchema,
   ReplayLaunchSchema,
+  RestAnswerSchema,
+  RestAskSchema,
+  RestFinishSchema,
+  RestMarkDoneSchema,
+  RestPartySchema,
   RulesAnswerSchema,
   RulesAskSchema,
   RulesSetPolicySchema,
@@ -124,6 +129,7 @@ import type {
   TableSetPartyVisibilitySchema,
   TableSetStagingDefaultsSchema,
   TempHpSchema,
+  TimePassSchema,
   TokenMoveSchema,
   TurnLegendarySchema,
   TurnReactionSchema,
@@ -431,6 +437,36 @@ export interface ClientToServerEvents {
   ) => void;
   "actor:spend-hit-dice": (
     payload: CommandPayload<typeof ActorSpendHitDiceSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** A player asks the GM for a Long Rest for their character, or takes the ask back. */
+  "rest:ask": (
+    payload: CommandPayload<typeof RestAskSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: approve a Long Rest request (the rest happens now) or turn it down. */
+  "rest:answer": (
+    payload: CommandPayload<typeof RestAnswerSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: rest several characters at once; a Short Rest stays open until the GM finishes it. */
+  "rest:party": (
+    payload: CommandPayload<typeof RestPartySchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** A member of the party's Short Rest is done spending Hit Dice. */
+  "rest:mark-done": (
+    payload: CommandPayload<typeof RestMarkDoneSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: end the party's Short Rest, with its benefits or without. */
+  "rest:finish": (
+    payload: CommandPayload<typeof RestFinishSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: move game time forward. */
+  "time:pass": (
+    payload: CommandPayload<typeof TimePassSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "character:set-slot": (

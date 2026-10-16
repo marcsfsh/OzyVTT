@@ -97,7 +97,14 @@
 }
 .sheet-rest-buttons {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 0.4rem;
+}
+.sheet-rest-asked {
+  color: var(--cyan-hi);
+  font-size: var(--fs-sm);
+  font-weight: 700;
 }
 .sheet-settings-label {
   color: var(--text-muted);

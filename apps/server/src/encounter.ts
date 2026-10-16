@@ -60,6 +60,18 @@ function clearPerEncounterUses(
   }
 }
 
+/** Rolling Initiative stops a Short Rest (SRD Resting): a combatant leaves the party's Short Rest without its
+ *  benefits, and the rest closes when nobody is left in it. */
+function interruptShortRest(state: GameState, combatantIds: ReadonlySet<string>) {
+  const rest = state.rest.shortRest;
+  if (!rest?.actorIds.some((id) => combatantIds.has(id))) return;
+  const actorIds = rest.actorIds.filter((id) => !combatantIds.has(id));
+  state.rest = {
+    ...state.rest,
+    shortRest: actorIds.length > 0 ? { actorIds, done: rest.done.filter((id) => !combatantIds.has(id)) } : null
+  };
+}
+
 const validScore = (value: number) => Number.isInteger(value) && value >= -1000 && value <= 1000;
 
 type RollMode = "advantage" | "disadvantage" | "normal";
@@ -273,6 +285,7 @@ export function startEncounter(
     historyDirty: false
   };
   if (resolveDefinition) clearPerEncounterUses(state, actorIds, resolveDefinition, catalog);
+  interruptShortRest(state, actorIds);
 }
 
 /** Drops a new combatant into a running encounter: rolls (or takes) its initiative, re-sorts, and places its
@@ -318,6 +331,7 @@ export function addCombatant(
     ]
   };
   if (deps.resolveDefinition) clearPerEncounterUses(state, new Set([actorId]), deps.resolveDefinition, deps.catalog);
+  interruptShortRest(state, new Set([actorId]));
 }
 
 export function endEncounter(state: GameState) {

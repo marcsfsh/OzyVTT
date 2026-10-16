@@ -319,18 +319,22 @@ export const actorHealthCommands = [
     type: "actor.rest",
     operationId: "restActor",
     description:
-      "Applies a rest to a rostered actor outside combat; a player session may rest only their claimed character, the GM anyone. Either rest needs at least 1 hit point (SRD) and is refused for a creature at 0 or dead. Long: the actor's Concentration and its effects measured in turns or rounds end (their on-end grants fire first; effects that last until ended stay), hit points restore to maximum, temporary HP clears, limited-use pools refresh, all spent Hit Point Dice restore, spell slots and prepared spells reset to the sheet defaults, and Exhaustion drops one level. Short: per-short-rest, recharge and per-encounter pools re-arm, and features that say so give back uses of a long-rest pool (Rage, Second Wind, Channel Divinity, Wild Shape: one; Bardic Inspiration from Bard 5: all); healing is the separate spend-hit-dice call.",
+      "Applies a rest to a rostered actor outside combat; a player session may take a Short Rest on their claimed character and asks the GM for a Long Rest (rest.ask), the GM rests anyone. Either rest needs at least 1 hit point (SRD) and is refused for a creature at 0 or dead, and a Long Rest is refused within 16 hours of game time after the actor's last one (the refusal says how long is left; time.pass moves the clock). Long: the actor's Concentration and its effects measured in turns or rounds end (their on-end grants fire first; effects that last until ended stay), hit points restore to maximum, temporary HP clears, limited-use pools refresh, all spent Hit Point Dice restore, spell slots and prepared spells reset to the sheet defaults, and Exhaustion drops one level. Short: per-short-rest, recharge and per-encounter pools re-arm, and features that say so give back uses of a long-rest pool (Rage, Second Wind, Channel Divinity, Wild Shape: one; Bardic Inspiration from Bard 5: all); healing is the separate spend-hit-dice call.",
     summary:
-      "Take a rest on your own character (GM: anyone, at 1 HP or more): short re-arms short-rest uses and gives back what features say; long restores HP, hit dice, spell slots, prepared spells and limited uses, and drops one Exhaustion level.",
+      "Take a Short Rest on your own character (GM: either rest on anyone, at 1 HP or more): short re-arms short-rest uses and gives back what features say; long restores HP, hit dice, spell slots, prepared spells and limited uses, and drops one Exhaustion level.",
     schema: ActorRestSchema,
     malformed: "The rest command is malformed.",
     async run({ principal, request, execute }, kit) {
       const { actorId, kind } = request;
+      const initiator = initiatorOf(principal);
+      // A Long Rest is the GM's to give: a player asks for one (rest.ask) instead.
+      if (kind === "long" && initiator.role !== "gm")
+        throw new GameAccessDeniedError("Ask the GM for a Long Rest - they approve it.");
       let events: EffectNarration[] = [];
       // Authorized inside the mutation against live state (applyRest still refuses a combatant in a running
       // encounter).
       const { duplicate } = await execute((state) => {
-        requireActorAccess(initiatorOf(principal), state, actorId, "resource");
+        requireActorAccess(initiator, state, actorId, "resource");
         events = applyRest(state, actorId, kind, kit.resolveDefinition, kit.equipmentCatalog());
       });
       if (duplicate) return;

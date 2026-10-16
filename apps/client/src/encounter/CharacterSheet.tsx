@@ -325,7 +325,13 @@ export function CharacterSheet({
       {actor.kind === "player-character" && (
         <div className="sheet-rest-block">
           <span className="sheet-section-label">Rest</span>
-          <SheetRest actorId={actor.id} hitDice={"hitDice" in actor ? actor.hitDice : null} onFeedback={setFeedback} />
+          <SheetRest
+            actorId={actor.id}
+            role={role}
+            hitDice={"hitDice" in actor ? actor.hitDice : null}
+            asked={state?.rest?.requests.includes(actor.id) ?? false}
+            onFeedback={setFeedback}
+          />
         </div>
       )}
 

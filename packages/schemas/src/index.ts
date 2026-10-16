@@ -909,6 +909,9 @@ export const ActorSchema = z.object({
     .optional(),
   /** Short-rest healing pool (SRD Hit Point Dice); null = not modeled. Reaches players only on their own claimed character. */
   hitDice: HitDicePoolSchema.default(null),
+  /** The game hour (`rest.clockHours`) this creature's last Long Rest ended; null before its first. Another may start
+   * 16 hours later (SRD Resting). GM-only: a refused rest explains the wait. */
+  lastLongRestAt: z.number().int().min(0).max(10_000_000).nullable().default(null),
   /** Per-token health-display override; absent = inherit `combat.healthDisplay`. Audience-gated in the player/viewer projections. */
   healthDisplay: HealthDisplaySchema.optional(),
   /** Epoch ms when this actor last entered a fight; powers the scene-setup "Recent" list. GM-only, stripped from the player projection. */

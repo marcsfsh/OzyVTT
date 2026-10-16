@@ -11,6 +11,7 @@ import { createKit, type CommandContext, type GamePrincipal } from "./kit.js";
 import { mapCommands } from "./map.js";
 import { createCommandRunner, runRead, type AnyCommand, type ReadSpec, type SocketEventOf } from "./pipeline.js";
 import { reactionCommands } from "./reactions.js";
+import { restingCommands } from "./resting.js";
 import { gameReads, viewFor } from "./reads.js";
 import { rulingCommands } from "./rulings.js";
 import { saveCommands } from "./saves.js";
@@ -27,6 +28,7 @@ export const gameCommands: readonly AnyCommand[] = [
   ...encounterCommands,
   ...actorCommands,
   ...actorHealthCommands,
+  ...restingCommands,
   ...characterCommands,
   ...characterSheetCommands,
   ...actionCommands,
