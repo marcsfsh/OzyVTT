@@ -464,20 +464,22 @@ describe("Ranger - Favored Enemy, audit row 32", () => {
   });
 
   it("gives exactly as many free casts as the printed Favored Enemy column, at two levels", () => {
-    // The column reads 2 at level 1 and 6 at level 17, via `scaling: {type: "class-resource"}`.
+    // The column reads 2 at level 1 and 6 at level 17, via `scaling: {type: "class-resource"}`. The free casts
+    // are Hunter's Mark cast without a slot, counted on the feature's pool.
+    // A bonus action each, so each cast is its own turn.
     const first = table(rangerInput(1));
-    resolve(first, "favored-enemy", [], []);
-    resolve(first, "favored-enemy", [], []);
+    spend(first, "spell-hunters-mark-free");
+    spend(first, "spell-hunters-mark-free");
     expect(first.hero.actionUses["favored-enemy"]).toBe(2);
-    expect(() => resolve(first, "favored-enemy", [], [])).toThrowError(
-      /Favored Enemy: no uses remaining \(2\/long rest\)/
+    expect(() => spend(first, "spell-hunters-mark-free")).toThrowError(
+      /Hunter's Mark \(no slot\): no uses remaining \(2\/long rest\)/
     );
 
     const late = table(rangerInput(17));
-    for (let cast = 0; cast < 6; cast += 1) resolve(late, "favored-enemy", [], []);
+    for (let cast = 0; cast < 6; cast += 1) spend(late, "spell-hunters-mark-free");
     expect(late.hero.actionUses["favored-enemy"]).toBe(6);
-    expect(() => resolve(late, "favored-enemy", [], [])).toThrowError(
-      /Favored Enemy: no uses remaining \(6\/long rest\)/
+    expect(() => spend(late, "spell-hunters-mark-free")).toThrowError(
+      /Hunter's Mark \(no slot\): no uses remaining \(6\/long rest\)/
     );
   });
 });
@@ -685,11 +687,13 @@ describe("Paladin - the two free casts, audit rows 30 and 31", () => {
     expect(built.definition.spellcasting?.classes?.[0]).toMatchObject({ prepared: 6 });
     expect(spells.filter((spell) => spell.level >= 1 && !spell.alwaysPrepared)).toHaveLength(6);
 
-    spend(built, "paladins-smite");
+    // The free cast is Divine Smite without a slot, counted on the feature's own pool.
+    newTurn(built);
+    resolve(built, "spell-divine-smite-free", [3, 4], []);
     expect(built.hero.actionUses["paladins-smite"]).toBe(1);
     newTurn(built);
-    expect(() => resolve(built, "paladins-smite", [], [])).toThrowError(
-      /Paladins Smite: no uses remaining \(1\/long rest\)/
+    expect(() => resolve(built, "spell-divine-smite-free", [3, 4], [])).toThrowError(
+      /Divine Smite \(no slot\): no uses remaining \(1\/long rest\)/
     );
   });
 
@@ -699,7 +703,7 @@ describe("Paladin - the two free casts, audit rows 30 and 31", () => {
       alwaysPrepared: true,
       level: 2
     });
-    spend(built, "faithful-steed");
+    spend(built, "spell-find-steed-free");
     expect(built.hero.actionUses["faithful-steed"]).toBe(1);
     expect(built.hero.actionUses["paladins-smite"]).toBeUndefined();
     // ...and a level-4 Paladin has neither the spell nor the pool.

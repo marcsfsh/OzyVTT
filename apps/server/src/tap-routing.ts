@@ -45,14 +45,14 @@ export function offTurnVerdict(
   return { blocked: false, warning: message };
 }
 
-/** The dice a loose tap rolls: the attack roll (honouring an explicit roll mode) and, only if asked, each
- *  damage part (opt-in so a sheet with its own damage chip can't double-roll). Never moves hit points;
+/** The dice a loose tap rolls: the attack roll (honouring an explicit roll mode), the healing, and, only if asked,
+ *  each damage part (opt-in so a sheet with its own damage chip can't double-roll). Never moves hit points;
  *  returns formulas for the caller to roll and attribute. */
 export function looseRollPlan(
-  action: Pick<ActorAction, "name" | "attack" | "damage">,
+  action: Pick<ActorAction, "name" | "attack" | "damage" | "healing">,
   options: Readonly<{ includeDamage: boolean; rollMode?: "advantage" | "disadvantage" | "normal" }>
-): ReadonlyArray<Readonly<{ formula: string; purpose: "attack" | "damage"; label: string }>> {
-  const plan: Array<{ formula: string; purpose: "attack" | "damage"; label: string }> = [];
+): ReadonlyArray<Readonly<{ formula: string; purpose: "attack" | "damage" | "healing"; label: string }>> {
+  const plan: Array<{ formula: string; purpose: "attack" | "damage" | "healing"; label: string }> = [];
   if (action.attack) {
     const die = d20Die(options.rollMode);
     const bonus = action.attack.bonus;
@@ -62,6 +62,7 @@ export function looseRollPlan(
       label: action.name
     });
   }
+  if (action.healing) plan.push({ formula: action.healing.formula, purpose: "healing", label: action.name });
   if (options.includeDamage) {
     for (const part of action.damage)
       plan.push({ formula: part.formula, purpose: "damage", label: `${action.name} (${part.type})` });
@@ -75,14 +76,17 @@ export function looseRollPlan(
 export function spendLooseUses(
   actor: Actor,
   action: ActorAction,
-  siblings: readonly ActorAction[]
+  siblings: readonly ActorAction[],
+  slotLevel: number | undefined = action.spellSlot?.level
 ): Readonly<{ usesLeft: number | null; spent: boolean }> {
   const uses = action.uses && action.uses.per !== "turn" && action.uses.per !== "encounter" ? action.uses : null;
   const key = uses ? (uses.pool ?? action.id) : null;
   const limit = uses ? useLimitFor(siblings, action) : 0;
   const used = key ? (actor.actionUses[key] ?? 0) : 0;
   if (key && used >= limit) throw new CommandRejectedError(noUsesRemaining(action, limit));
-  const level = action.spellSlot?.level;
+  const level = action.spellSlot ? slotLevel : undefined;
+  if (level !== undefined && action.spellSlot && level < action.spellSlot.level)
+    throw new CommandRejectedError(`${action.name} needs a slot of level ${action.spellSlot.level} or higher.`);
   if (level !== undefined && !actor.spellSlots?.some((slot) => slot.level === level && slot.remaining > 0))
     throw new CommandRejectedError(`${action.name} spends a level-${level} spell slot - ${actor.name} has none left.`);
   if (key) actor.actionUses = { ...actor.actionUses, [key]: used + 1 };

@@ -50,6 +50,8 @@ type Evaluation = Readonly<{
   action: DefinitionAction;
   targetIds: readonly string[];
   siblings: ReadonlyArray<DefinitionAction>;
+  /** The slot level the caster asked for; see `castSlotLevel`. */
+  slotLevel: number | undefined;
   onOwnTurn: boolean;
   /** A prose-only Multiattack hides extra attacks from the engine, so action-slot violations degrade to warnings. */
   proseMultiattack: boolean;
@@ -80,7 +82,8 @@ export function evaluateActionEconomy(
   targetIds: readonly string[],
   definition: ActorDefinition | undefined,
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null,
-  siblings: ReadonlyArray<DefinitionAction> = definition?.actions ?? []
+  siblings: ReadonlyArray<DefinitionAction> = definition?.actions ?? [],
+  slotLevel?: number
 ): EconomyEvaluation {
   const evaluation: Evaluation = {
     state,
@@ -88,6 +91,7 @@ export function evaluateActionEconomy(
     action,
     targetIds,
     siblings,
+    slotLevel,
     onOwnTurn: state.combat.turnActorId === attacker.id,
     proseMultiattack: siblings.some((candidate) => candidate.untrackedMultiattack === true),
     violations: [],
@@ -334,19 +338,39 @@ function checkLegendary(
   return { cost };
 }
 
-/** An item cast with `consumesSpellSlot` spends the wearer's own slot on top of the item's charges;
- *  refused here if no slot remains. */
-function checkSpellSlot({ attacker, action, violations }: Evaluation): EconomyPlan["spendSpellSlot"] {
+/** A spell cast with a slot (a prepared spell, or an item cast with `consumesSpellSlot`) spends one from the
+ *  caster's own pool at `castSlotLevel`; refused here if none remains or the slot is below the spell. */
+function checkSpellSlot({ attacker, action, slotLevel, violations }: Evaluation): EconomyPlan["spendSpellSlot"] {
   if (!action.spellSlot) return null;
-  const level = action.spellSlot.level;
+  const level = castSlotLevel(attacker, action.spellSlot.level, slotLevel);
   const slot = attacker.spellSlots?.find((entry) => entry.level === level);
-  if (!slot || slot.remaining <= 0) {
+  if (level < action.spellSlot.level)
+    violations.push({
+      rule: "feature.no-spell-slot",
+      message: `${action.name} needs a slot of level ${action.spellSlot.level} or higher.`
+    });
+  else if (!slot || slot.remaining <= 0) {
     violations.push({
       rule: "feature.no-spell-slot",
       message: `${action.name} spends a level-${level} spell slot - ${attacker.name} has none left.`
     });
   }
   return { level };
+}
+
+/** The slot level a cast spends: the one asked for; else the spell's own level when a slot is left there; else the
+ *  lowest above it with one left (a Warlock's Pact Magic slots are all one level). */
+export function castSlotLevel(
+  attacker: Pick<LiveActor, "spellSlots">,
+  base: number,
+  requested: number | undefined
+): number {
+  if (requested !== undefined) return requested;
+  const open = (attacker.spellSlots ?? [])
+    .filter((slot) => slot.level >= base && slot.remaining > 0)
+    .map((slot) => slot.level)
+    .sort((left, right) => left - right);
+  return open[0] ?? base;
 }
 
 /** Who and what this action may target: declared target rules, range and reach, size limits and Charmed. */
@@ -465,7 +489,8 @@ export function planEconomy(
     input.targetIds,
     definition,
     distanceFeet,
-    siblings
+    siblings,
+    input.slotLevel
   );
   warnings.push(...notes);
 

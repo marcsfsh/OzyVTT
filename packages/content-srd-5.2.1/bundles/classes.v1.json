@@ -3429,12 +3429,21 @@
     "name": "Wild Companion",
     "level": 2,
     "description": "You can summon a nature spirit that assumes an animal form to aid you. As a Magic action, you can expend a spell slot or a use of Wild Shape to cast the Find Familiar spell without Material components. When you cast the spell in this way, the familiar is Fey and disappears when you finish a Long Rest.",
+    "uses": {
+     "scaling": {
+      "type": "class-resource",
+      "id": "wild-shape"
+     },
+     "per": "long-rest",
+     "pool": "wild-shape"
+    },
     "grants": {
      "spells": [
       {
        "id": "find-familiar",
        "level": 1,
-       "alwaysPrepared": true
+       "alwaysPrepared": true,
+       "withoutSlot": "free"
       }
      ]
     }
@@ -6107,7 +6116,8 @@
       {
        "id": "divine-smite",
        "level": 1,
-       "alwaysPrepared": true
+       "alwaysPrepared": true,
+       "withoutSlot": "free"
       }
      ]
     }
@@ -6187,7 +6197,8 @@
       {
        "id": "find-steed",
        "level": 2,
-       "alwaysPrepared": true
+       "alwaysPrepared": true,
+       "withoutSlot": "free"
       }
      ]
     }
@@ -6963,7 +6974,8 @@
       {
        "id": "hunters-mark",
        "level": 1,
-       "alwaysPrepared": true
+       "alwaysPrepared": true,
+       "withoutSlot": "free"
       }
      ]
     }
@@ -9282,7 +9294,9 @@
         "spells": [
          {
           "id": "mage-armor",
-          "level": 1
+          "level": 1,
+          "withoutSlot": "at-will",
+          "withSlot": false
          }
         ]
        }
@@ -9295,7 +9309,9 @@
         "spells": [
          {
           "id": "levitate",
-          "level": 2
+          "level": 2,
+          "withoutSlot": "at-will",
+          "withSlot": false
          }
         ]
        }
@@ -9341,7 +9357,9 @@
         "spells": [
          {
           "id": "false-life",
-          "level": 1
+          "level": 1,
+          "withoutSlot": "at-will",
+          "withSlot": false
          }
         ]
        }
@@ -9359,7 +9377,9 @@
         "spells": [
          {
           "id": "water-breathing",
-          "level": 3
+          "level": 3,
+          "withoutSlot": "free",
+          "withSlot": false
          }
         ]
        },
@@ -9396,7 +9416,9 @@
         "spells": [
          {
           "id": "disguise-self",
-          "level": 1
+          "level": 1,
+          "withoutSlot": "at-will",
+          "withSlot": false
          }
         ]
        }
@@ -9409,7 +9431,9 @@
         "spells": [
          {
           "id": "alter-self",
-          "level": 2
+          "level": 2,
+          "withoutSlot": "at-will",
+          "withSlot": false
          }
         ]
        }
@@ -9422,7 +9446,9 @@
         "spells": [
          {
           "id": "silent-image",
-          "level": 1
+          "level": 1,
+          "withoutSlot": "at-will",
+          "withSlot": false
          }
         ]
        }
@@ -9435,7 +9461,9 @@
         "spells": [
          {
           "id": "invisibility",
-          "level": 2
+          "level": 2,
+          "withoutSlot": "at-will",
+          "withSlot": false
          }
         ]
        }
@@ -9448,7 +9476,9 @@
         "spells": [
          {
           "id": "jump",
-          "level": 1
+          "level": 1,
+          "withoutSlot": "at-will",
+          "withSlot": false
          }
         ]
        }
@@ -9471,7 +9501,8 @@
         "spells": [
          {
           "id": "find-familiar",
-          "level": 1
+          "level": 1,
+          "withoutSlot": "at-will"
          }
         ]
        }
@@ -9513,7 +9544,9 @@
         "spells": [
          {
           "id": "arcane-eye",
-          "level": 4
+          "level": 4,
+          "withoutSlot": "at-will",
+          "withSlot": false
          }
         ]
        }
@@ -9526,7 +9559,9 @@
         "spells": [
          {
           "id": "speak-with-dead",
-          "level": 3
+          "level": 3,
+          "withoutSlot": "at-will",
+          "withSlot": false
          }
         ]
        }
@@ -9599,7 +9634,8 @@
      "spells": [
       {
        "id": "contact-other-plane",
-       "level": 5
+       "level": 5,
+       "withoutSlot": "free"
       }
      ]
     },

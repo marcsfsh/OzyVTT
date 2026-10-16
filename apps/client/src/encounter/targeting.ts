@@ -26,6 +26,8 @@ export type TargetingSession = Readonly<{
   mode: "single" | "multi" | "template";
   selected: readonly string[];
   template: TargetingTemplate | null;
+  /** The spell slot a spell is cast with, sent with every resolve of this session. */
+  slotLevel?: number;
 }>;
 
 let session: TargetingSession | null = null;
@@ -52,8 +54,9 @@ const subscribe = (listener: () => void) => {
   };
 };
 
-export function beginTargeting(action: ContentActionSummary, attackerId: string) {
+export function beginTargeting(action: ContentActionSummary, attackerId: string, slotLevel?: number) {
   const area = action.area;
+  const slot = slotLevel !== undefined ? { slotLevel } : {};
   if (area) {
     // Map the SRD area shape onto a drawable annotation shape (sphere/emanation → circle, cube → square).
     const shape: AnnotationShapeKind =
@@ -63,7 +66,8 @@ export function beginTargeting(action: ContentActionSummary, attackerId: string)
       attackerId,
       mode: "template",
       selected: [],
-      template: { shape, sizeFeet: area.sizeFeet, widthFeet: area.widthFeet, placed: null }
+      template: { shape, sizeFeet: area.sizeFeet, widthFeet: area.widthFeet, placed: null },
+      ...slot
     };
   } else {
     // An attack lands on exactly one target; single-target builtins (Help, Unarmed Strike) too;
@@ -73,7 +77,8 @@ export function beginTargeting(action: ContentActionSummary, attackerId: string)
       attackerId,
       mode: action.attackBonus !== null || action.targeting === "single" ? "single" : "multi",
       selected: [],
-      template: null
+      template: null,
+      ...slot
     };
   }
   result = null;
@@ -142,7 +147,7 @@ export function resolveTargeting(
   opts: ResolveOptions = {}
 ) {
   if (!session || busy) return;
-  const { attackerId, action, mode, selected, template } = session;
+  const { attackerId, action, mode, selected, template, slotLevel } = session;
   // A single-target attack previews first (commit: false) so the result card can offer Adv/Disadv, a
   // typed d20 and Confirm. Templates, multi-target and save/utility actions resolve straight through.
   // An explicit `commit` in opts wins (the Confirm tap).
@@ -155,6 +160,7 @@ export function resolveTargeting(
     ...(opts.attackTotal !== undefined ? { attackTotal: opts.attackTotal } : {}),
     ...(opts.critical !== undefined ? { critical: opts.critical } : {}),
     ...(opts.pushFeet !== undefined ? { pushFeet: opts.pushFeet } : {}),
+    ...(slotLevel !== undefined ? { slotLevel } : {}),
     commit,
     ...(revision !== undefined ? { expectedRevision: revision } : {})
   };

@@ -488,7 +488,7 @@ describe("character-builder content records", () => {
       "fire-bolt"
     );
     expect(tiefling.traits.find((trait) => trait.id === "tiefling-otherworldly-presence")!.grants!.spells).toEqual([
-      { id: "thaumaturgy", level: 0, alwaysPrepared: true }
+      { id: "thaumaturgy", level: 0, alwaysPrepared: true, withSlot: true }
     ]);
     // Gnome: two lineages; the Forest Gnome casts Speak with Animals PB times per Long Rest.
     const gnome = byId("gnome");
@@ -1393,7 +1393,7 @@ describe("content-record schema guards", () => {
     // Defaults fill in so consumers can read unconditionally.
     expect(rich.actions[0].attack).toEqual({ ability: "str", proficient: true, reachFeet: 5 });
     expect(rich.grants!.tools).toEqual([]);
-    expect(rich.grants!.spells[0]).toEqual({ id: "guidance", level: 0, alwaysPrepared: true });
+    expect(rich.grants!.spells[0]).toEqual({ id: "guidance", level: 0, alwaysPrepared: true, withSlot: true });
     expect(rich.modifiers[0]).toEqual({ type: "unarmored-defense", ability: "con", allowShield: false });
     expect(rich.effects[0].target).toBe("self");
   });

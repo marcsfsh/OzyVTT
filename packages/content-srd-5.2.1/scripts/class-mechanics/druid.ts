@@ -57,9 +57,10 @@ export const druid: ClassMechanicsModule = {
       ]
     },
 
-    // Find Familiar always prepared. Casting it with a Wild Shape use instead of a slot stays prose.
+    // Find Familiar always prepared, and cast with a slot or a use of Wild Shape (the shared pool).
     "wild-companion": {
-      grants: { spells: [{ id: "find-familiar", level: 1, alwaysPrepared: true }] }
+      uses: { scaling: { type: "class-resource", id: "wild-shape" }, per: "long-rest", pool: "wild-shape" },
+      grants: { spells: [{ id: "find-familiar", level: 1, alwaysPrepared: true, withoutSlot: "free" }] }
     },
 
     /**

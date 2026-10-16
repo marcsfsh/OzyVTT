@@ -1116,7 +1116,8 @@
                 {
                   "id": "speak-with-animals",
                   "level": 1,
-                  "alwaysPrepared": true
+                  "alwaysPrepared": true,
+                  "withoutSlot": "free"
                 }
               ]
             },
@@ -1618,7 +1619,8 @@
                 {
                   "id": "ray-of-sickness",
                   "level": 1,
-                  "alwaysPrepared": true
+                  "alwaysPrepared": true,
+                  "withoutSlot": "free"
                 }
               ]
             },
@@ -1637,7 +1639,8 @@
                 {
                   "id": "hold-person",
                   "level": 2,
-                  "alwaysPrepared": true
+                  "alwaysPrepared": true,
+                  "withoutSlot": "free"
                 }
               ]
             },
@@ -1680,7 +1683,8 @@
                 {
                   "id": "false-life",
                   "level": 1,
-                  "alwaysPrepared": true
+                  "alwaysPrepared": true,
+                  "withoutSlot": "free"
                 }
               ]
             },
@@ -1699,7 +1703,8 @@
                 {
                   "id": "ray-of-enfeeblement",
                   "level": 2,
-                  "alwaysPrepared": true
+                  "alwaysPrepared": true,
+                  "withoutSlot": "free"
                 }
               ]
             },
@@ -1742,7 +1747,8 @@
                 {
                   "id": "hellish-rebuke",
                   "level": 1,
-                  "alwaysPrepared": true
+                  "alwaysPrepared": true,
+                  "withoutSlot": "free"
                 }
               ]
             },
@@ -1761,7 +1767,8 @@
                 {
                   "id": "darkness",
                   "level": 2,
-                  "alwaysPrepared": true
+                  "alwaysPrepared": true,
+                  "withoutSlot": "free"
                 }
               ]
             },
