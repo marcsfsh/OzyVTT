@@ -105,8 +105,10 @@ export type DeathSaveRoll = Readonly<{
   dead: boolean;
 }>;
 
-/** One death saving throw (SRD 5.2.1): 20 → regain 1 HP; 1 → two failures; 10+ → success (3 → stable); else failure (3 → dead). */
-export function resolveDeathSave(current: DeathSaveState, naturalRoll: number): DeathSaveRoll {
+/** One death saving throw (SRD 5.2.1): 20 → regain 1 HP; 1 → two failures; 10+ → success (3 → stable); else failure (3 → dead).
+ *  A death save is a saving throw, so its `total` carries Exhaustion and save bonuses; the natural die alone
+ *  decides a 1 or a 20. */
+export function resolveDeathSave(current: DeathSaveState, naturalRoll: number, total = naturalRoll): DeathSaveRoll {
   if (naturalRoll === 20) {
     return {
       state: { successes: 0, failures: 0, stable: false },
@@ -124,7 +126,7 @@ export function resolveDeathSave(current: DeathSaveState, naturalRoll: number): 
       dead: failures >= 3
     };
   }
-  if (naturalRoll >= 10) {
+  if (total >= 10) {
     const successes = Math.min(3, current.successes + 1);
     // Becoming stable resets both counters (SRD 5.2.1).
     if (successes >= 3)
