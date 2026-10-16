@@ -263,6 +263,19 @@ describe("SRD 5.2.1 reference bundles", () => {
     ]);
   });
 
+  it("prints every condition's rules as clean bullets, with the upstream extraction glitches fixed", () => {
+    const text = (id: string) => loadConditions().find((condition) => condition.id === id)!.description;
+    for (const condition of loadConditions()) {
+      // Every bullet has a space after its star, and no word is split across a line ("move- ment").
+      expect(condition.description, condition.id).not.toMatch(/\n\*\S/);
+      expect(condition.description, condition.id).not.toMatch(/[a-z]- [a-z]/);
+    }
+    expect(text("prone")).toContain("amount of movement equal to half your Speed");
+    // Unaware is its own bullet, not the tail of Automatic Critical Hits.
+    expect(text("unconscious")).toMatch(/within 5 feet of you\. \n\* Unaware\. You’re unaware/);
+    expect(text("invisible")).toContain("\n* Attacks Affected.");
+  });
+
   it("carries all 339 spells with faithful structured fields (fireball spot-check)", () => {
     const spells = loadSpells();
     expect(spells.length).toBe(339);

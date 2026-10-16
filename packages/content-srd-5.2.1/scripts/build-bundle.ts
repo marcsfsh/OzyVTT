@@ -798,6 +798,27 @@ if (report.skipped.length > 0) {
   process.exit(1);
 }
 
+/**
+ * The upstream condition texts carry PDF-extraction glitches, fixed here so the vendored source stays
+ * byte-identical: a bullet with no space after its star, a word hyphenated across a line ("move- ment"), and
+ * Unconscious's last bullet run into the one before it.
+ */
+const CONDITION_TEXT_FIXES: Readonly<Record<string, ReadonlyArray<readonly [string, string]>>> = {
+  unconscious: [[" of you. Unaware. ", " of you. \n* Unaware. "]]
+};
+for (const id of Object.keys(CONDITION_TEXT_FIXES)) {
+  if (!conditions.some((condition) => condition.fields.document === "srd-2024" && condition.fields.describes === id))
+    throw new Error(`Condition text fix targets unknown condition ${id} - check for a typo or an upstream rename.`);
+}
+const conditionText = (id: string, text: string): string => {
+  let fixed = text.replace(/\n\*(?=\S)/g, "\n* ").replace(/([a-z])- ([a-z])/g, "$1$2");
+  for (const [from, to] of CONDITION_TEXT_FIXES[id] ?? []) {
+    if (!fixed.includes(from)) throw new Error(`Condition text fix for ${id} no longer matches - review it.`);
+    fixed = fixed.replace(from, to);
+  }
+  return fixed;
+};
+
 const conditionRecords = conditions
   .filter((condition) => condition.fields.document === "srd-2024")
   .sort((left, right) => left.pk.localeCompare(right.pk))
@@ -807,7 +828,7 @@ const conditionRecords = conditions
       .split("-")
       .map((part) => `${part[0].toUpperCase()}${part.slice(1)}`)
       .join(" "),
-    description: condition.fields.desc
+    description: conditionText(condition.fields.describes, condition.fields.desc)
   }));
 
 /** Printed English title case: interior particles stay lowercase ("sleight-of-hand" -> "Sleight of Hand"). */
