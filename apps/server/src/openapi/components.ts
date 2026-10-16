@@ -166,6 +166,28 @@ const CODEX_RESPONSES: ReadonlyArray<readonly [string, z.ZodType]> = [
   ["CodexAsset", wire.CodexAssetSchema]
 ];
 
+/** A content catalog read: its rows, and the attribution line any surface showing them must carry. */
+const catalog = (key: string, row: z.ZodType) => z.strictObject({ [key]: z.array(row), attribution: z.string() });
+/** The content catalogs, and the feature shapes the builder catalogs share. */
+const CONTENT_CATALOGS: ReadonlyArray<readonly [string, z.ZodType]> = [
+  ["ContentFeature", wire.ContentFeatureSummarySchema],
+  ["ContentFeatureChoice", wire.ContentFeatureChoiceSummarySchema],
+  ["ContentFeatureOption", wire.ContentFeatureOptionSummarySchema],
+  ["ContentExtraPick", wire.ContentExtraPickSummarySchema],
+  ["ContentMonstersData", catalog("monsters", wire.ContentMonsterSummarySchema)],
+  ["ContentConditionsData", catalog("conditions", wire.ContentConditionSummarySchema)],
+  ["ContentSkillsData", catalog("skills", wire.ContentSkillSummarySchema)],
+  ["ContentLanguagesData", catalog("languages", wire.ContentLanguageSummarySchema)],
+  ["ContentSpellsData", catalog("spells", wire.ContentSpellSummarySchema)],
+  ["ContentEquipmentData", catalog("equipment", wire.ContentEquipmentSummarySchema)],
+  ["ContentClassesData", catalog("classes", wire.ContentClassSummarySchema)],
+  ["ContentSubclassesData", catalog("subclasses", wire.ContentSubclassSummarySchema)],
+  ["ContentSpeciesData", catalog("species", wire.ContentSpeciesSummarySchema)],
+  ["ContentBackgroundsData", catalog("backgrounds", wire.ContentBackgroundSummarySchema)],
+  ["ContentFeatsData", catalog("feats", wire.ContentFeatSummarySchema)],
+  ["ContentNamesData", catalog("names", wire.ContentNameBundleSchema)]
+];
+
 /** The record body a homebrew type is authored as; a monster's is an ActorDefinition. */
 const recordName = (type: contract.HomebrewContentType) => `Homebrew${pascal(type)}Record`;
 const RECORD_TYPES = contract.HomebrewContentTypeSchema.options;
@@ -239,8 +261,8 @@ function describe(schemas: Record<string, JsonSchema>) {
 
 /**
  * The components generated from Zod schemas: the HTTP contract's shapes, the homebrew authoring vocabulary and
- * record bodies, the Codex write bodies and records, and each game command's request body, plus the game command
- * operations.
+ * record bodies, the Codex write bodies and records, the content catalogs, and each game command's request body, plus
+ * the game command operations.
  * One registry, so a schema that appears in several places is one `$ref`'d component. Prose comes from
  * `descriptions.ts`.
  */
@@ -256,6 +278,7 @@ export function generatedDocs() {
   for (const [id, schema] of VOCABULARY) register(id, schema);
   for (const [id, schema] of CODEX_BODIES) register(id, schema);
   for (const [id, schema] of CODEX_RESPONSES) register(id, schema);
+  for (const [id, schema] of CONTENT_CATALOGS) register(id, schema);
   for (const type of RECORD_TYPES) register(recordName(type), content.HOMEBREW_BODY_SCHEMAS[type] as z.ZodType);
   // Commands that share a payload schema (several take only the optional revision) share its generated body.
   const aliases: Array<readonly [string, string]> = [];

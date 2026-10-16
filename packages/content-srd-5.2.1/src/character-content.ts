@@ -15,6 +15,7 @@ import {
   GrantWhenSchema,
   HitDieSchema,
   ModifierSchema,
+  PickBudgetScalingSchema,
   SaveOutcomeFields,
   type Modifier
 } from "@vtt/schemas";
@@ -280,14 +281,7 @@ export const ExtraPickSchema = z
      * Scale by a printed class-table column's growth above its first value (Eldritch Invocations 1 -> 10),
      * added to the feature's own `choose`. A dice-string column gives 0.
      */
-    scaling: z
-      .object({
-        type: z.literal("class-resource-growth"),
-        /** The `classResources.id` of the printed column - `eldritch-invocations`, `weapon-mastery`. */
-        id: ContentIdSchema
-      })
-      .strict()
-      .optional()
+    scaling: PickBudgetScalingSchema.optional()
   })
   .strict()
   .superRefine((grant, context) => {
