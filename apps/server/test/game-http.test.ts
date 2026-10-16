@@ -124,10 +124,12 @@ describe("death saves over the API", () => {
       actorId: HERO_ID,
       current: 0
     });
+    // A typed 12: a plain success, so a random natural 20 can't bring the hero back up mid-test.
     const roll = (token: string) =>
       post(base, GAME_PATHS.deathSaveRoll.replace("{actorId}", HERO_ID), token, {
         commandId: randomUUID(),
-        actorId: HERO_ID
+        actorId: HERO_ID,
+        naturalRoll: 12
       });
     // The Tyrant's turn: not yet.
     expect((await roll(playerToken)).status).toBe(409);

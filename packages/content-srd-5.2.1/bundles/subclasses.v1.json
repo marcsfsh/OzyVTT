@@ -16,7 +16,19 @@
     "modifiers": [
      {
       "type": "critical-range",
-      "threshold": 19
+      "threshold": 19,
+      "when": [
+       {
+        "type": "on-attack-roll"
+       },
+       {
+        "type": "attack-kind-is",
+        "kinds": [
+         "weapon",
+         "unarmed"
+        ]
+       }
+      ]
      }
     ]
    },
@@ -81,7 +93,19 @@
     "modifiers": [
      {
       "type": "critical-range",
-      "threshold": 18
+      "threshold": 18,
+      "when": [
+       {
+        "type": "on-attack-roll"
+       },
+       {
+        "type": "attack-kind-is",
+        "kinds": [
+         "weapon",
+         "unarmed"
+        ]
+       }
+      ]
      }
     ]
    },
@@ -1109,8 +1133,16 @@
       "id": "preserve-life",
       "name": "Channel Divinity: Preserve Life",
       "activation": "action",
-      "description": "Expend a use of Channel Divinity to divide up to five times your Cleric level in Hit Points among Bloodied creatures within 30 feet (up to half each target's Hit Point maximum).",
-      "damage": []
+      "description": "Expend a use of Channel Divinity to divide up to five times your Cleric level in Hit Points among Bloodied creatures within 30 feet (up to half each target's Hit Point maximum). The engine splits it evenly among the creatures you pick.",
+      "damage": [],
+      "healing": {
+       "formula": "0",
+       "divided": true,
+       "upToFractionOfMaximum": 0.5
+      },
+      "adds": {
+       "classLevel": 5
+      }
      }
     ],
     "uses": {
@@ -1400,7 +1432,28 @@
       "name": "Wholeness of Body",
       "activation": "bonus-action",
       "description": "Roll your Martial Arts die and regain a number of Hit Points equal to the number rolled plus your Wisdom modifier (minimum of 1 Hit Point regained).",
-      "damage": []
+      "damage": [],
+      "healing": {
+       "formula": "1d8",
+       "self": true
+      },
+      "healingByLevel": [
+       {
+        "level": 6,
+        "formula": "1d8"
+       },
+       {
+        "level": 11,
+        "formula": "1d10"
+       },
+       {
+        "level": 17,
+        "formula": "1d12"
+       }
+      ],
+      "adds": {
+       "abilityModifier": "wis"
+      }
      }
     ]
    },

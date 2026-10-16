@@ -11,6 +11,7 @@ import {
   AbilitySchema,
   ActionSchema,
   DiceFormulaSchema,
+  HealingFormulaSchema,
   EffectGrantSchema,
   GrantWhenSchema,
   HitDieSchema,
@@ -153,6 +154,33 @@ export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true 
       z.object({ level: ContentLevelSchema, formula: DiceFormulaSchema, type: z.string().min(1).max(40) }).strict()
     )
     .max(20)
+    .optional(),
+  /** Healing that grows with level, replacing `healing.formula` at the highest matching level (Divine Spark's heal,
+   *  Wholeness of Body's Martial Arts die). */
+  healingByLevel: z
+    .array(z.object({ level: ContentLevelSchema, formula: HealingFormulaSchema }).strict())
+    .max(20)
+    .optional(),
+  /** What the built action adds to its first damage part and its healing, read off the character when it is built:
+   *  a multiple of its level ("1d10 plus your Fighter level", "five times your Cleric level") and an ability
+   *  modifier ("add your Wisdom modifier"). */
+  adds: z
+    .object({
+      classLevel: z.number().int().min(1).max(10).optional(),
+      abilityModifier: AbilitySchema.optional()
+    })
+    .strict()
+    .optional(),
+  /** The `amount` of the granted effect's `damage-bonus` riders is the printed class column at the character's
+   *  level (Rage Damage), so the bonus grows as the table does. */
+  grantScaling: z
+    .object({
+      resource: z
+        .string()
+        .regex(/^[a-z0-9-]+$/)
+        .max(60)
+    })
+    .strict()
     .optional(),
   /** A compound plan that grows with level, replacing `multiattack` at the highest matching level (Flurry of
    *  Blows' third strike at Monk 10). */

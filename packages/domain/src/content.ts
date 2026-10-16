@@ -475,7 +475,8 @@ export type ContentActionSummary = Readonly<{
   grants: boolean;
   reaction: Wire<ActionReaction> | null;
   /** SRD generic action rows (Dodge, Dash, Help, ...) appended after the stat block's own. */ builtin?: boolean;
-  /** Builtin targeting: "single" picks one combatant, "none" is a direct tap. */ targeting?: "single" | "none";
+  /** Targeting: "single" picks one combatant, "multi" several (Preserve Life), "none" is a direct tap. */ targeting?:
+    "single" | "multi" | "none";
   /** SRD Legendary Action cost against the creature's per-round pool (taken on other creatures' turns). */ legendaryCost?: number;
 }>;
 export type ContentActionsResult = {

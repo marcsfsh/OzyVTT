@@ -13,6 +13,7 @@ import {
   type RuleId
 } from "../rules-families.js";
 import { builtinHandlerFor } from "./builtins.js";
+import { hitRiderOf } from "./hit-riders.js";
 import { sizeRank, type DefinitionAction, type LiveActor, type ResolveContext, type ResolveInput } from "./context.js";
 
 type RuleViolation = Readonly<{ rule: RuleId; message: string }>;
@@ -83,7 +84,9 @@ export function evaluateActionEconomy(
   definition: ActorDefinition | undefined,
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null,
   siblings: ReadonlyArray<DefinitionAction> = definition?.actions ?? [],
-  slotLevel?: number
+  slotLevel?: number,
+  /** The action rides a hit it was chosen for (Sneak Attack), rather than being taken alone. */
+  asHitRider = false
 ): EconomyEvaluation {
   const evaluation: Evaluation = {
     state,
@@ -101,6 +104,7 @@ export function evaluateActionEconomy(
   checkAbleToAct(evaluation);
   checkTurnsBegun(evaluation);
   checkExtraAttackOpened(evaluation);
+  if (!asHitRider) checkTakenAlone(evaluation);
   const spendUse = checkLimitedUse(evaluation);
   const slots = checkActionSlots(evaluation);
   const spendLegendary = checkLegendary(evaluation, definition);
@@ -173,6 +177,16 @@ function checkExtraAttackOpened({ state, attacker, action, violations }: Evaluat
     violations.push({
       rule: "attack.cleave-needs-hit",
       message: `${action.name} follows a melee hit with this weapon this turn.`
+    });
+}
+
+/** Sneak Attack, a smite and the like add their dice to a hit, so they're chosen on the attack's result before it
+ *  is confirmed; taken alone they would deal damage with no hit to ride. */
+function checkTakenAlone({ action, violations }: Evaluation): void {
+  if (hitRiderOf(action))
+    violations.push({
+      rule: "attack.rides-a-hit",
+      message: `${action.name} adds to a hit: choose it on the attack's result before you confirm the hit.`
     });
 }
 
@@ -538,7 +552,8 @@ export function planEconomy(
   definition: ActorDefinition | undefined,
   warnings: string[],
   distanceFeet: ((actorIdA: string, actorIdB: string) => number | null) | undefined,
-  siblings: ReadonlyArray<DefinitionAction>
+  siblings: ReadonlyArray<DefinitionAction>,
+  asHitRider = false
 ): { plan: EconomyPlan; overridden: { rule: RuleId; reason: string } | null } {
   const { violations, softViolations, plan, proseMultiattack, notes } = evaluateActionEconomy(
     state,
@@ -548,7 +563,8 @@ export function planEconomy(
     definition,
     distanceFeet,
     siblings,
-    input.slotLevel
+    input.slotLevel,
+    asHitRider
   );
   warnings.push(...notes);
 

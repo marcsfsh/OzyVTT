@@ -302,6 +302,21 @@ export const TurnUseSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** One extra chosen for a hit: the offer's id, and a damage type or slot where the offer asks for one. */
+export const HitOptionChoiceSchema = z
+  .object({
+    id: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(120),
+    damageType: z
+      .string()
+      .regex(/^[a-z]+$/)
+      .max(40)
+      .optional(),
+    slotLevel: z.number().int().min(1).max(9).optional()
+  })
+  .strict();
 export const ActionResolveSchema = z
   .object({
     commandId: z.uuid(),
@@ -343,6 +358,9 @@ export const ActionResolveSchema = z
     /** The spell slot to cast with (upcasting rolls that slot's dice); absent, the spell's own level, else the lowest
      *  above it with a slot left. */
     slotLevel: z.number().int().min(1).max(9).optional(),
+    /** Extras to add to this hit, from the preview's `hitOffers` (Sneak Attack, a smite and its slot, Divine Strike's
+     *  type, a charge). Each is checked and spent with the hit; on a miss nothing is spent. */
+    hitOptions: z.array(HitOptionChoiceSchema).max(6).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()

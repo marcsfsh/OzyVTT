@@ -89,7 +89,7 @@ export const druid: ClassMechanicsModule = {
                 name: "Primal Strike",
                 activation: "other",
                 description:
-                  "Once on each of your turns, when you hit a creature with an attack roll using a weapon or a Beast form's attack, add this damage to that hit. The printed damage is Cold, Fire, Lightning or Thunder, your choice each time; the rollable below is recorded as Lightning.",
+                  "Once on each of your turns, when you hit a creature with an attack roll using a weapon or a Beast form's attack, add this damage to that hit: Cold, Fire, Lightning or Thunder, your choice each time. Add it when you confirm the hit.",
                 damage: [{ formula: "1d8", type: "lightning" }],
                 damageByLevel: [
                   { level: 7, formula: "1d8", type: "lightning" },

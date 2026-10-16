@@ -2404,6 +2404,45 @@ describe("range and reach validation (SRD Making an Attack / Range)", () => {
     expect(JSON.stringify(unseen)).not.toContain("Giant Crocodile 2");
     expect(unseen.rollMode?.disadvantage ?? []).toEqual([]);
   });
+
+  it("an adjacent creature spoils the shot only while it is an able, living enemy", () => {
+    const shoot = (game: GameState) =>
+      resolveDefinitionAction(
+        game,
+        actionOf(pipDefinition, "shortbow"),
+        { actorId: IDS.pip, targetIds: [IDS.croc1], commandId: nextCommandId() },
+        {
+          ...deps([18, 3], pipDefinition, (_a, b) => (b === IDS.croc2 ? 5 : 40)),
+          resolveDefinition: (id) => game.definitions.find((entry) => entry.id === id)?.definition
+        }
+      );
+    const crowded = () =>
+      buildGame([
+        { actorId: IDS.pip, score: 20 },
+        { actorId: IDS.croc1, score: 12 },
+        { actorId: IDS.croc2, score: 8 }
+      ]);
+    const neighbour = (game: GameState) => game.actors.find((actor) => actor.id === IDS.croc2)!;
+
+    // A monster at 0 HP is dead (SRD Monster Death), even with its token still on the map.
+    const dead = crowded();
+    neighbour(dead).hp.current = 0;
+    expect(shoot(dead).rollMode?.disadvantage ?? []).toEqual([]);
+
+    // A hostile NPC is an enemy like a monster.
+    const bandit = crowded();
+    neighbour(bandit).kind = "npc";
+    expect(shoot(bandit).rollMode?.disadvantage).toContain("Enemy within 5 feet (Giant Crocodile 2)");
+
+    // A creature whose stat block is friendly stands with the party (a summoned ally), whatever its kind.
+    const ally = crowded();
+    ally.definitions.push({
+      id: "friendly-croc",
+      definition: { ...crocodileDefinition, token: { ...crocodileDefinition.token, disposition: "friendly" } }
+    });
+    neighbour(ally).definitionId = "friendly-croc";
+    expect(shoot(ally).rollMode?.disadvantage ?? []).toEqual([]);
+  });
 });
 
 describe("cover - GM-adjudicated, server math (SRD Cover)", () => {
@@ -2760,6 +2799,38 @@ describe("underwater combat (SRD Underwater Combat) - GM environment toggle", ()
     expect(rapier.rollMode?.disadvantage ?? []).not.toContain("Underwater (non-piercing melee)");
   });
 
+  it("a creature with a Swim Speed is not impeded, and ranged weapons have Disadvantage within normal range", () => {
+    // The Giant Crocodile swims 50 ft, so its bludgeoning Tail is not impeded.
+    const game = buildGame([
+      { actorId: IDS.croc1, score: 20 },
+      { actorId: IDS.torva, score: 8 }
+    ]);
+    game.combat = { ...game.combat, underwater: true };
+    const tail = resolve(
+      game,
+      crocodileDefinition,
+      "tail",
+      { actorId: IDS.croc1, targetIds: [IDS.torva] },
+      [15, 3, 3, 3]
+    );
+    expect(tail.rollMode?.disadvantage ?? []).not.toContain("Underwater (non-piercing melee)");
+
+    const archer = buildGame([
+      { actorId: IDS.pip, score: 20 },
+      { actorId: IDS.croc1, score: 8 }
+    ]);
+    archer.combat = { ...archer.combat, underwater: true };
+    const shot = resolve(
+      archer,
+      pipDefinition,
+      "shortbow",
+      { actorId: IDS.pip, targetIds: [IDS.croc1] },
+      [18, 3, 3],
+      () => 30
+    );
+    expect(shot.rollMode?.disadvantage).toContain("Underwater (ranged weapon)");
+  });
+
   it("ranged attacks automatically miss beyond normal range (strict violation range.underwater)", () => {
     const game = buildGame([
       { actorId: IDS.pip, score: 20 },
@@ -2774,15 +2845,17 @@ describe("underwater combat (SRD Underwater Combat) - GM environment toggle", ()
       expect(error).toBeInstanceOf(RulesBlockedError);
       expect((error as RulesBlockedError).rule).toBe("range.underwater");
     }
+    // Within normal range it can hit, at Disadvantage (two d20s, the lower kept).
     const close = resolve(
       game,
       pipDefinition,
       "shortbow",
       { actorId: IDS.pip, targetIds: [IDS.croc1] },
-      [18, 3],
+      [18, 17, 3],
       () => 60
     );
     expect(close.attack?.outcome).toBe("hit");
+    expect(close.rollMode?.disadvantage).toContain("Underwater (ranged weapon)");
   });
 
   it("everyone underwater resists fire damage, attributed to the environment", () => {

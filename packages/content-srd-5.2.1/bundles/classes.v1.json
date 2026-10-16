@@ -631,6 +631,9 @@
       "activation": "bonus-action",
       "description": "You enter a Rage: Resistance to Bludgeoning, Piercing and Slashing damage, Advantage on Strength checks and Strength saving throws, and a bonus to Strength-based damage. You can't concentrate or cast spells while raging.",
       "damage": [],
+      "grantScaling": {
+       "resource": "rage-damage"
+      },
       "grants": {
        "name": "Raging",
        "tags": [
@@ -646,6 +649,21 @@
           "bludgeoning",
           "piercing",
           "slashing"
+         ]
+        },
+        {
+         "type": "damage-bonus",
+         "amount": 2,
+         "when": [
+          {
+           "type": "on-damage-roll"
+          },
+          {
+           "type": "ability-is",
+           "abilities": [
+            "str"
+           ]
+          }
          ]
         },
         {
@@ -2465,7 +2483,7 @@
       "id": "divine-spark",
       "name": "Channel Divinity: Divine Spark",
       "activation": "action",
-      "description": "As a Magic action, you point your Holy Symbol at another creature you can see within 30 feet of yourself and focus divine energy at it. Roll 1d8 and add your Wisdom modifier. You either restore Hit Points to the creature equal to that total or force the creature to make a Constitution saving throw. On a failed save, the creature takes Necrotic or Radiant damage (your choice) equal to that total. On a successful save, the creature takes half as much damage (round down). You roll an additional d8 when you reach Cleric levels 7 (2d8), 13 (3d8), and 18 (4d8). The rollable below is the damaging branch, recorded as Radiant; the healing branch and the added Wisdom modifier are resolved from this text.",
+      "description": "As a Magic action, you point your Holy Symbol at another creature you can see within 30 feet of yourself and focus divine energy at it. Roll 1d8 and add your Wisdom modifier. You either restore Hit Points to the creature equal to that total or force the creature to make a Constitution saving throw. On a failed save, the creature takes Necrotic or Radiant damage (your choice) equal to that total. On a successful save, the creature takes half as much damage (round down). You roll an additional d8 when you reach Cleric levels 7 (2d8), 13 (3d8), and 18 (4d8). This is the damaging branch, recorded as Radiant; the healing branch is its own action.",
       "save": {
        "ability": "con",
        "dc": "spellcasting",
@@ -2499,7 +2517,41 @@
         "formula": "4d8",
         "type": "radiant"
        }
-      ]
+      ],
+      "adds": {
+       "abilityModifier": "wis"
+      }
+     },
+     {
+      "id": "divine-spark-heal",
+      "name": "Channel Divinity: Divine Spark (heal)",
+      "activation": "action",
+      "description": "As a Magic action, you point your Holy Symbol at another creature you can see within 30 feet of yourself and focus divine energy at it. Roll 1d8 and add your Wisdom modifier: the creature regains Hit Points equal to that total. You roll an additional d8 when you reach Cleric levels 7 (2d8), 13 (3d8), and 18 (4d8).",
+      "damage": [],
+      "healing": {
+       "formula": "1d8"
+      },
+      "healingByLevel": [
+       {
+        "level": 2,
+        "formula": "1d8"
+       },
+       {
+        "level": 7,
+        "formula": "2d8"
+       },
+       {
+        "level": 13,
+        "formula": "3d8"
+       },
+       {
+        "level": 18,
+        "formula": "4d8"
+       }
+      ],
+      "adds": {
+       "abilityModifier": "wis"
+      }
      },
      {
       "id": "turn-undead",
@@ -2595,7 +2647,7 @@
          "id": "divine-strike",
          "name": "Divine Strike",
          "activation": "other",
-         "description": "Once on each of your turns, when you hit a creature with an attack roll using a weapon, add this damage to that hit. The printed damage is Necrotic or Radiant, your choice each time; the rollable below is recorded as Radiant.",
+         "description": "Once on each of your turns, when you hit a creature with an attack roll using a weapon, add this damage to that hit: Necrotic or Radiant, your choice each time. Add it when you confirm the hit.",
          "damage": [
           {
            "formula": "1d8",
@@ -3500,7 +3552,7 @@
          "id": "primal-strike",
          "name": "Primal Strike",
          "activation": "other",
-         "description": "Once on each of your turns, when you hit a creature with an attack roll using a weapon or a Beast form's attack, add this damage to that hit. The printed damage is Cold, Fire, Lightning or Thunder, your choice each time; the rollable below is recorded as Lightning.",
+         "description": "Once on each of your turns, when you hit a creature with an attack roll using a weapon or a Beast form's attack, add this damage to that hit: Cold, Fire, Lightning or Thunder, your choice each time. Add it when you confirm the hit.",
          "damage": [
           {
            "formula": "1d8",
@@ -4320,7 +4372,14 @@
       "name": "Second Wind",
       "activation": "bonus-action",
       "description": "Regain Hit Points equal to 1d10 plus your Fighter level.",
-      "damage": []
+      "damage": [],
+      "healing": {
+       "formula": "1d10",
+       "self": true
+      },
+      "adds": {
+       "classLevel": 1
+      }
      }
     ],
     "uses": {
@@ -7629,7 +7688,7 @@
       "id": "sneak-attack",
       "name": "Sneak Attack",
       "activation": "other",
-      "description": "Once per turn, deal this extra damage to one creature you hit with an attack roll, if you have Advantage on the roll (or an ally is within 5 feet of the target, that ally isn't Incapacitated, and you don't have Disadvantage) and the attack uses a Finesse or a Ranged weapon. The extra damage's type is the same as the weapon's, which is why the part below is labelled \"weapon\" rather than a fixed type.",
+      "description": "Once per turn, deal this extra damage to one creature you hit with an attack roll, if you have Advantage on the roll (or an ally is within 5 feet of the target, that ally isn't Incapacitated, and you don't have Disadvantage) and the attack uses a Finesse or a Ranged weapon. The extra damage's type is the same as the weapon's. Add it when you confirm a qualifying hit.",
       "damage": [],
       "damageByLevel": [
        {

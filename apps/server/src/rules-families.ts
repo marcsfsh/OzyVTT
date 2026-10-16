@@ -24,6 +24,8 @@ const RULE_FAMILIES = {
   // An extra attack (Light, Cleave) is owed only once the swing that opens it has happened this turn.
   "attack.light-needs-attack": "economy",
   "attack.cleave-needs-hit": "economy",
+  // Sneak Attack, a smite and the like add to a hit: they're chosen when the hit is confirmed, not taken alone.
+  "attack.rides-a-hit": "economy",
   // ...while "no legendary actions left this round" is a spent resource, like limited uses.
   "legendary.no-actions-remaining": "resources",
   "feature.no-uses-remaining": "resources",
@@ -38,6 +40,8 @@ const RULE_FAMILIES = {
   // Cleave's second creature: another one, within 5 feet of the first.
   "attack.cleave-same-target": "targeting",
   "attack.cleave-too-far": "targeting",
+  // The hit an extra is added to can't carry it (no Advantage or ally for Sneak Attack, a ranged smite).
+  "attack.hit-option-unqualified": "targeting",
   // Being Charmed by your target is a targeting restriction, not an economy one.
   "condition.charmed-charmer": "targeting",
   // Nothing raises it yet; the slots family is already part of the GM's exceptions.

@@ -51,6 +51,8 @@ describe("rule families", () => {
       // An extra attack waits on the swing that opens it: a matter of what this turn has done.
       ["attack.light-needs-attack", "economy"],
       ["attack.cleave-needs-hit", "economy"],
+      // Sneak Attack or a smite taken alone, with no hit to add to.
+      ["attack.rides-a-hit", "economy"],
       ["feature.no-uses-remaining", "resources"],
       ["feature.requires-effect", "resources"],
       ["feature.no-spell-slot", "resources"],
@@ -64,6 +66,8 @@ describe("rule families", () => {
       ["condition.charmed-charmer", "targeting"],
       ["attack.cleave-same-target", "targeting"],
       ["attack.cleave-too-far", "targeting"],
+      // The hit can't carry the extra: no Advantage or ally for Sneak Attack, no melee weapon for a smite.
+      ["attack.hit-option-unqualified", "targeting"],
       // Not thrown yet, but the family is already part of the wire vocabulary.
       ["slots.none-remaining", "slots"]
     ];

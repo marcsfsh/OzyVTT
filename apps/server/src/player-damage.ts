@@ -68,17 +68,65 @@ export function settlePlayerHit(
 ): AppliedDamage | null {
   const attack = resolution.attack;
   if (!attack || !playerHitOwesDamage(resolution)) return null;
-  const parts = damagePartsOf(resolution);
+  return settleOne(
+    state,
+    {
+      targetId: attack.targetId,
+      targetName: attack.targetName,
+      parts: damagePartsOf(resolution),
+      total: resolution.damageTotal
+    },
+    resolution,
+    attackerName,
+    sourceActorId,
+    mode,
+    deps
+  );
+}
+
+/** Everything a player's committed resolve owes, settled per the player-damage policy: a hit's damage, or each
+ *  target's damage from an action with no attack roll and no save (Magic Missile). Returns what applied directly. */
+export function settlePlayerDamage(
+  state: GameState,
+  resolution: ActionResolution,
+  attackerName: string,
+  sourceActorId: string,
+  mode: "proposal" | "direct",
+  deps: PlayerDamageDeps
+): AppliedDamage[] {
+  if (resolution.attack) {
+    const applied = settlePlayerHit(state, resolution, attackerName, sourceActorId, mode, deps);
+    return applied ? [applied] : [];
+  }
+  if (resolution.preview) return [];
+  return (resolution.damageTargets ?? []).flatMap((owed) => {
+    if (owed.total <= 0) return [];
+    const applied = settleOne(state, owed, resolution, attackerName, sourceActorId, mode, deps);
+    return applied ? [applied] : [];
+  });
+}
+
+/** One target's damage: applied GM-scoped in direct mode, or parked as a proposal for the GM. */
+function settleOne(
+  state: GameState,
+  owed: NonNullable<ActionResolution["damageTargets"]>[number],
+  resolution: ActionResolution,
+  attackerName: string,
+  sourceActorId: string,
+  mode: "proposal" | "direct",
+  deps: PlayerDamageDeps
+): AppliedDamage | null {
+  const parts = owed.parts.map((part) => ({ amount: part.amount, type: part.type }));
   const label = `${attackerName}'s ${resolution.actionName}`;
   if (mode === "direct") {
     const outcome = applyDamageDetailed(
       state,
-      attack.targetId,
-      { amount: resolution.damageTotal, parts, critical: resolution.crit, sourceName: label, sourceActorId },
+      owed.targetId,
+      { amount: owed.total, parts, critical: resolution.crit, sourceName: label, sourceActorId },
       { role: "gm" },
       damageDepsOf(deps)
     );
-    return { outcome, targetId: attack.targetId, sourceActorId, label };
+    return { outcome, targetId: owed.targetId, sourceActorId, label };
   }
   state.combat = {
     ...state.combat,
@@ -89,10 +137,10 @@ export function settlePlayerHit(
         sourceActorId,
         sourceName: attackerName,
         actionName: resolution.actionName,
-        targetActorId: attack.targetId,
-        targetName: attack.targetName,
+        targetActorId: owed.targetId,
+        targetName: owed.targetName,
         proposedDamageParts: parts,
-        proposedTotal: resolution.damageTotal,
+        proposedTotal: owed.total,
         critical: resolution.crit,
         createdAt: deps.now()
       }

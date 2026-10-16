@@ -4,11 +4,13 @@ import {
   collectRiders,
   damageWhileDying,
   droppedToZero,
+  halveDamageParts,
   normalizeDamageType,
-  reduceDamageTotal,
+  reduceDamageParts,
   rescaleDamageParts,
-  sumRiders,
-  type DamagePart
+  type DamagePart,
+  type DamageReduction,
+  type ResolvedRider
 } from "@vtt/rules-5e";
 import { DAMAGE_TYPE_IDS } from "@vtt/content-srd-5.2.1/schemas";
 import type { ActorDefinition } from "@vtt/schemas";
@@ -88,31 +90,54 @@ export function damagePartsOf(input: DamageInput): readonly DamagePart[] | null 
   return [{ amount: input.damageOverride ?? input.amount, type: named }];
 }
 
+/** How a defence reads on a damage line. */
+export function adjustmentLabel(adjustment: NonNullable<DamageApplication["parts"][number]["adjustment"]>): string {
+  return adjustment === "resistance-and-vulnerability" ? "resistance and vulnerability" : adjustment;
+}
+
 /** The damage-adjustment line ("17 bludgeoning → 8, resistance: Rage"); "" when nothing adjusted the hit. */
 export function damageAdjustmentDetail(
   application: Readonly<{ parts: DamageApplication["parts"]; flatReduction?: number }>
 ): string {
-  const clauses = application.parts
-    .filter((part) => part.adjustment !== null)
-    .map(
-      (part) =>
-        `${part.amount} ${part.type} → ${part.adjusted}, ${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""}`
-    );
-  // The flat step is not per-type: it comes once, after the halving.
-  if ((application.flatReduction ?? 0) > 0) clauses.push(`then -${application.flatReduction}, reduction`);
+  // The flat step comes first (SRD Order of Application), so each part's line starts from what was left.
+  const clauses = (application.flatReduction ?? 0) > 0 ? [`-${application.flatReduction}, reduction`] : [];
+  for (const part of application.parts)
+    if (part.adjustment !== null)
+      clauses.push(
+        `${part.amount} ${part.type} → ${part.adjusted}, ${adjustmentLabel(part.adjustment)}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""}`
+      );
   return clauses.length > 0 ? ` (${clauses.join("; ")})` : "";
 }
 
-/** Flat `damage-reduction` riders on the receiving side: standing ones plus `on-taking-damage` ones whose
- *  `damage-type-is` matches the incoming types. */
-function damageReductionFor(derivation: EquipmentDerivation, damageTypes: readonly string[]): number {
-  const standing = collectRiders(derivation.carriers, { ...derivation.context, moment: null });
-  const onTakingDamage = collectRiders(derivation.carriers, {
-    ...derivation.context,
-    moment: "on-taking-damage",
-    damageTypes
-  });
-  return sumRiders(standing, "damage-reduction") + sumRiders(onTakingDamage, "damage-reduction");
+/** Flat `damage-reduction` riders on the receiving side, each with the types it covers: standing ones cover every
+ *  type, `on-taking-damage` ones the incoming types their `damage-type-is` matches. Riders sharing a `stackKey` are
+ *  one game effect, so only the largest counts. */
+function damageReductionsFor(derivation: EquipmentDerivation, damageTypes: readonly string[]): DamageReduction[] {
+  const isReduction = (rider: ResolvedRider) => rider.modifier.type === "damage-reduction";
+  const covered = new Map<ResolvedRider["modifier"], { rider: ResolvedRider; types: string[] | null }>();
+  for (const rider of collectRiders(derivation.carriers, { ...derivation.context, moment: null }).filter(isReduction))
+    covered.set(rider.modifier, { rider, types: null });
+  for (const type of new Set(damageTypes)) {
+    const riders = collectRiders(derivation.carriers, {
+      ...derivation.context,
+      moment: "on-taking-damage",
+      damageTypes: [type]
+    }).filter(isReduction);
+    for (const rider of riders) {
+      const entry = covered.get(rider.modifier) ?? { rider, types: [] };
+      entry.types?.push(type);
+      covered.set(rider.modifier, entry);
+    }
+  }
+  const strongest = new Map<string, { amount: number; types: string[] | null }>();
+  const reductions: DamageReduction[] = [];
+  for (const { rider, types } of covered.values()) {
+    const amount = rider.modifier.amount ?? 0;
+    if (amount <= 0) continue;
+    if (rider.stackKey === undefined) reductions.push({ amount, types });
+    else if ((strongest.get(rider.stackKey)?.amount ?? 0) < amount) strongest.set(rider.stackKey, { amount, types });
+  }
+  return [...reductions, ...strongest.values()];
 }
 
 /** The stat block's defences minus any a rest-time re-choice superseded (chosen options are baked in). */
@@ -177,22 +202,39 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
     // Effects, items, feats and features are derived whole each time, so removing the ring or ending the Rage
     // removes the resistance on the next hit.
     const derivation = deriveEquipment(actor, definition, deps?.catalog);
-    const derivedSourceOf = (adjustment: "resistance" | "immunity" | "vulnerability", type: string) => {
-      const list =
+    const derivedSourceOf = (
+      adjustment: NonNullable<DamageApplication["parts"][number]["adjustment"]>,
+      type: string
+    ) => {
+      const lists =
         adjustment === "immunity"
-          ? derivation.damageImmunities
+          ? [derivation.damageImmunities]
           : adjustment === "vulnerability"
-            ? derivation.damageVulnerabilities
-            : derivation.damageResistances;
-      return list.find((entry) => entry.id === type)?.source ?? null;
+            ? [derivation.damageVulnerabilities]
+            : adjustment === "resistance"
+              ? [derivation.damageResistances]
+              : [derivation.damageResistances, derivation.damageVulnerabilities];
+      const sources = lists.flatMap((list) => list.filter((entry) => entry.id === type).map((entry) => entry.source));
+      return sources.length > 0 ? [...new Set(sources)].join(", ") : null;
     };
+    const resisted = (adjustment: DamageApplication["parts"][number]["adjustment"]) =>
+      adjustment === "resistance" || adjustment === "resistance-and-vulnerability";
     // SRD Petrified: resistance to all damage + immunity to poison, on top of innate/effect defenses.
     const petrified = actor.conditions.some((condition) => condition.id === "petrified");
     // SRD Underwater Combat: everything fully underwater has resistance to fire damage.
     const underwater = state.combat.active && state.combat.underwater;
     const standing = standingDefences(definition, fromChoices, derivation);
     const types = (rows: readonly DerivedDefence[]) => rows.map((row) => row.type);
-    const adjusted = adjustDamageParts(typed, {
+    // SRD Order of Application: flat reductions first, then Resistance, then Vulnerability.
+    const reduction = reduceDamageParts(
+      typed,
+      damageReductionsFor(
+        derivation,
+        typed.map((part) => normalizeDamageType(part.type))
+      )
+    );
+    flatReduction = reduction.reduced;
+    const adjusted = adjustDamageParts(reduction.parts, {
       resistances: [...types(standing.resistances), ...(underwater ? ["fire"] : [])],
       immunities: [...types(standing.immunities), ...(petrified ? ["poison"] : [])],
       // Effects and items can make a target vulnerable as a stat block can; a same-type resistance cancels it.
@@ -211,13 +253,13 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
         petrified &&
         choiceSource === null &&
         derivedSource === null &&
-        ((part.adjustment === "resistance" && !innateHas(innate.resistances)) ||
+        ((resisted(part.adjustment) && !innateHas(innate.resistances)) ||
           (part.adjustment === "immunity" && type === "poison" && !innateHas(innate.immunities)))
           ? "Petrified"
           : null;
       const underwaterSource =
         underwater &&
-        part.adjustment === "resistance" &&
+        resisted(part.adjustment) &&
         type === "fire" &&
         !innateHas(innate.resistances) &&
         derivedSource === null &&
@@ -228,17 +270,7 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
       return { ...part, adjustmentSource: derivedSource ?? choiceSource ?? petrifiedSource ?? underwaterSource };
     });
     totalRequested = typed.reduce((sum, part) => sum + part.amount, 0);
-    const afterDefenses = adjusted.reduce((sum, part) => sum + part.adjusted, 0);
-    // Last, on the total: flat reduction subtracts from what the per-type math produced.
-    flatReduction = Math.max(
-      0,
-      damageReductionFor(
-        derivation,
-        adjusted.map((part) => normalizeDamageType(part.type))
-      )
-    );
-    totalAdjusted = reduceDamageTotal(afterDefenses, flatReduction);
-    flatReduction = afterDefenses - totalAdjusted;
+    totalAdjusted = adjusted.reduce((sum, part) => sum + part.adjusted, 0);
   } else {
     // The untyped fast path: a manual correction that names no type is exact by design.
     totalRequested = input.damageOverride ?? input.amount;
@@ -255,9 +287,9 @@ type DamageWeighing = Readonly<{
   parts: DamageApplication["parts"];
 }>;
 
-/** Half of each typed part, floored per part (Uncanny Dodge); parts that halve to nothing drop out. */
+/** Half the hit (Uncanny Dodge), rounded down once on the total and spread back over its types. */
 export function halvedDamageParts(parts: readonly DamagePart[]): DamagePart[] {
-  return parts.map((part) => ({ ...part, amount: Math.floor(part.amount / 2) })).filter((part) => part.amount > 0);
+  return halveDamageParts(parts);
 }
 
 /** A dry run of `applyDamageDetailed`: the typed breakdown and total it would apply, with nothing moved. */
@@ -304,10 +336,11 @@ export function applyDamageDetailed(
   let defeated = false;
   const isPlayerCharacter = actor.kind === "player-character";
 
-  if (isPlayerCharacter && wasAtZero && damageToHp > 0) {
-    // Damage while dying: automatic failures (two on a crit), instant death at max-HP damage.
+  if (isPlayerCharacter && wasAtZero && totalAdjusted > 0) {
+    // Damage while dying: automatic failures (two on a crit), even when Temporary Hit Points soak it all ("If
+    // you take any damage while you have 0 Hit Points"); instant death when what carries over reaches the maximum.
     const current = actor.deathSaves ?? { successes: 0, failures: 0, stable: false };
-    const outcome = damageWhileDying(current, damageToHp, input.critical === true, actor.hp.maximum);
+    const outcome = damageWhileDying(current, totalAdjusted, input.critical === true, actor.hp.maximum, damageToHp);
     actor.deathSaves = outcome.state;
     deathSaveFailuresAdded = outcome.failuresAdded;
     instantDeath = outcome.dead && damageToHp >= actor.hp.maximum;
