@@ -1599,8 +1599,8 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
     });
     const rider = mace.modifiers[0];
     expect(rider).toMatchObject({ type: "extra-damage", formula: "1d6", damageType: "fire" });
-    // 5e does not double dice added after the attack, so the default is false and a GM opts in.
-    expect(rider).toMatchObject({ doubleOnCritical: false });
+    // A Critical Hit rolls the attack's other damage dice twice too (SRD), so the default is true and a GM opts out.
+    expect(rider).toMatchObject({ doubleOnCritical: true });
     expect(riderLayer(rider.when)).toBe("momentary");
     // `critical-bonus-dice` is an untyped count of extra weapon dice, a different thing from typed extra damage.
     expect(ModifierSchema.parse({ type: "critical-bonus-dice", count: 2 })).toMatchObject({ count: 2 });

@@ -47,8 +47,8 @@ export function rollWeaponDamage(ctx: ResolveContext): void {
 }
 
 /** Riders that add damage, from every carrier (items, feats, features, live effects): typed `extra-damage` as
- *  its own `damage[]` entry (crit-doubled only with `doubleOnCritical`, since 5e doesn't double dice added
- *  after the attack) and moment-gated flat `damage-bonus` as a bonus line. A rider with no `when` fires on
+ *  its own `damage[]` entry (crit-doubled unless `doubleOnCritical` is false: a Critical Hit rolls the attack's
+ *  other damage dice twice too) and moment-gated flat `damage-bonus` as a bonus line. A rider with no `when` fires on
  *  every damage roll of its action; `on-hit`/`on-critical-hit` narrow it. The moments collected here are
  *  `DAMAGE_ROLL_MOMENTS`. */
 export function rollRiderDamage(ctx: ResolveContext): void {
@@ -86,7 +86,7 @@ export function rollRiderDamage(ctx: ResolveContext): void {
       }
       const expression = parseDiceFormula(modifier.formula);
       const rolled = resolveDice(
-        crit && modifier.doubleOnCritical === true ? criticalExpression(expression) : expression,
+        crit && modifier.doubleOnCritical !== false ? criticalExpression(expression) : expression,
         deps.random
       );
       recordRoll(ctx, rolled, "damage");

@@ -16,7 +16,19 @@
     "modifiers": [
      {
       "type": "critical-range",
-      "threshold": 19
+      "threshold": 19,
+      "when": [
+       {
+        "type": "on-attack-roll"
+       },
+       {
+        "type": "attack-kind-is",
+        "kinds": [
+         "weapon",
+         "unarmed"
+        ]
+       }
+      ]
      }
     ]
    },
@@ -81,7 +93,19 @@
     "modifiers": [
      {
       "type": "critical-range",
-      "threshold": 18
+      "threshold": 18,
+      "when": [
+       {
+        "type": "on-attack-roll"
+       },
+       {
+        "type": "attack-kind-is",
+        "kinds": [
+         "weapon",
+         "unarmed"
+        ]
+       }
+      ]
      }
     ]
    },

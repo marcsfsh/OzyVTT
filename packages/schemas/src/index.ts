@@ -30,6 +30,11 @@ export const PickBudgetScalingSchema = z.strictObject({
 export const DiceFormulaSchema = z
   .string()
   .regex(/^\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?$/i, "Use a safe dice formula such as 1d8 + 3.");
+/** Damage an action deals: dice, or a fixed amount that doesn't use a roll ("1 Piercing damage", a Blowgun). A crit
+ * doubles only dice, so a fixed amount stays as it is. */
+export const DamageFormulaSchema = z
+  .string()
+  .regex(/^(?:\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?|\d+)$/i, "Use dice such as 1d8 + 3, or a number.");
 /** Hit points restored: dice, or a flat number (Heal's 70). */
 export const HealingFormulaSchema = z
   .string()
@@ -161,15 +166,15 @@ export const RiderTriggerSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("on-initiative-roll") }).strict(),
   z.object({ type: z.literal("on-taking-damage") }).strict(),
   // ---- filters ----
-  /** `spell` is an attack that casts a spell; `reaction` and `opportunity` match only when the resolver announces
-   * that trigger. */
+  /** `spell` is an attack that casts a spell; `weapon` one made with a weapon (not a spell, an Unarmed Strike or a
+   * monster's natural attack); `reaction` and `opportunity` match only when the resolver announces that trigger. */
   z
     .object({
       type: z.literal("attack-kind-is"),
       kinds: z
-        .array(z.enum(["melee", "ranged", "spell", "unarmed", "thrown", "reaction", "opportunity"]))
+        .array(z.enum(["melee", "ranged", "spell", "unarmed", "thrown", "reaction", "opportunity", "weapon"]))
         .min(1)
-        .max(7)
+        .max(8)
     })
     .strict(),
   z.object({ type: z.literal("weapon-property-is"), properties: z.array(RiderSlugSchema).min(1).max(12) }).strict(),
@@ -390,14 +395,14 @@ export const ModifierSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("damage-bonus"), amount: z.number().int().min(-10).max(10), ...riderGate }).strict(),
   /** Extra typed damage as dice (`formula`), the bearer's ability modifier (`abilityModifier`), or both.
    * `damageType` absent takes the attack's own type (Empowered Evocation follows the spell). `doubleOnCritical`
-   * defaults false: 5e does not double dice added after the attack. */
+   * defaults true: a Critical Hit rolls the attack's other damage dice twice too (SRD "Critical Hits"). */
   z
     .object({
       type: z.literal("extra-damage"),
       formula: DiceFormulaSchema.optional(),
       abilityModifier: AbilitySchema.optional(),
       damageType: DamageTypeSchema.optional(),
-      doubleOnCritical: z.boolean().default(false),
+      doubleOnCritical: z.boolean().default(true),
       ...riderGate
     })
     .strict(),
@@ -1022,7 +1027,7 @@ export const ActionSchema = z.object({
     })
     .optional(),
   damage: z
-    .array(z.object({ formula: DiceFormulaSchema, type: z.string().min(1).max(40) }))
+    .array(z.object({ formula: DamageFormulaSchema, type: z.string().min(1).max(40) }))
     .max(8)
     .default([]),
   /** Hit points each target regains, rolled once and applied when the action resolves (Cure Wounds). */

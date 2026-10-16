@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema, type GameState } from "@vtt/domain";
+import { ActionSchema, ActorDefinitionSchema, InventoryItemSchema } from "@vtt/schemas";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { startEncounter } from "../src/encounter.js";
 import { applyDamageDetailed, halvedDamageParts } from "../src/hit-points.js";
+import { weaponAction } from "../src/item-actions.js";
 import { settlePlayerHit } from "../src/player-damage.js";
 import { answerSave, createPendingSaves } from "../src/saving-throws.js";
 
@@ -165,5 +167,49 @@ describe("damage at 0 hit points", () => {
     const outcome = applyDamageDetailed(game, IDS.hero, { amount: 25 }, GM);
     expect(outcome.application.instantDeath).toBe(false);
     expect(outcome.application.deathSaveFailuresAdded).toBe(1);
+  });
+});
+
+describe("fixed damage that doesn't use a roll", () => {
+  it("adds no ability modifier to a Blowgun's 1, and a crit leaves it at 1", () => {
+    const definition = ActorDefinitionSchema.parse({
+      schemaId: "vtt.actor-character",
+      schemaVersion: 1,
+      source: { name: "test", version: "1" },
+      name: "Pip",
+      size: "small",
+      armorClass: 14,
+      proficiencyBonus: 2,
+      speedFeet: 25,
+      abilityScores: { str: 8, dex: 18, con: 12, int: 10, wis: 10, cha: 10 },
+      hitPoints: { maximum: 10 },
+      token: { disposition: "friendly" }
+    });
+    const blowgun = InventoryItemSchema.parse({
+      id: "blowgun",
+      name: "Blowgun",
+      equipped: true,
+      weapon: {
+        category: "martial",
+        damageDice: "1",
+        damageType: "piercing",
+        rangeFeet: 25,
+        longRangeFeet: 100,
+        properties: ["ammunition", "loading"]
+      }
+    });
+    const action = weaponAction(blowgun, definition)!;
+    expect(action.damage).toEqual([{ formula: "1", type: "piercing" }]);
+    expect(ActionSchema.safeParse(action).success).toBe(true);
+
+    const game = fight();
+    const crit = resolveDefinitionAction(
+      game,
+      action,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd() },
+      queuedDeps([20])
+    );
+    expect(crit.attack?.outcome).toBe("crit");
+    expect(crit.damageTotal).toBe(1);
   });
 });

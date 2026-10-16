@@ -622,16 +622,46 @@ describe("Barbarian: Intimidating Presence holds the target to the Barbarian's o
 
 describe("Champion: the crit range the resolver reads", () => {
   it("is 19 at level 3, 18 at level 15, and 20 for a Fighter with no subclass yet", () => {
+    // The riders name the kinds of attack they widen, so the roll's filters are passed.
+    const swing = { attackKinds: ["melee" as const, "weapon" as const] };
     const five = onTheTable(build(fighterInput(5)), { fight: false });
-    expect(criticalThreshold(derivationOf(five), five.hero, actionOf(five, "item-greatsword"))).toBe(19);
+    expect(criticalThreshold(derivationOf(five), five.hero, actionOf(five, "item-greatsword"), swing)).toBe(19);
 
     // Superior Critical does not replace Improved Critical: `criticalThreshold` takes the lowest any
     // carrier names, so the two compose without an ordering rule.
     const fifteen = onTheTable(build(fighterInput(15)), { fight: false });
-    expect(criticalThreshold(derivationOf(fifteen), fifteen.hero, actionOf(fifteen, "item-greatsword"))).toBe(18);
+    expect(criticalThreshold(derivationOf(fifteen), fifteen.hero, actionOf(fifteen, "item-greatsword"), swing)).toBe(
+      18
+    );
 
     const bare = onTheTable(build(fighterInput(2)), { fight: false });
-    expect(criticalThreshold(derivationOf(bare), bare.hero, actionOf(bare, "item-greatsword"))).toBe(20);
+    expect(criticalThreshold(derivationOf(bare), bare.hero, actionOf(bare, "item-greatsword"), swing)).toBe(20);
+  });
+
+  it("widens weapon and Unarmed Strike attacks only, never a spell attack", () => {
+    // "Your attack rolls with weapons and Unarmed Strikes can score a Critical Hit on a roll of 19 or 20."
+    const built = onTheTable(build(fighterInput(5)));
+    const fireBolt = {
+      id: "fire-bolt",
+      name: "Fire Bolt",
+      activation: "action" as const,
+      description: "Make a ranged spell attack.",
+      spellId: "fire-bolt",
+      attack: { bonus: 5, rangeFeet: 120 },
+      damage: [{ formula: "1d10", type: "fire" }]
+    };
+    const cast = resolveDefinitionAction(
+      built.state,
+      fireBolt,
+      {
+        actorId: IDS.hero,
+        targetIds: [IDS.foe],
+        commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`
+      },
+      deps(built, [19, 6])
+    );
+    expect(cast.attack).toMatchObject({ naturalRoll: 19, outcome: "hit" });
+    expect(cast.damageTotal).toBe(6);
   });
 
   it("turns a natural 19 into a critical hit, and doubles the dice it rolls", () => {

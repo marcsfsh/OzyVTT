@@ -794,6 +794,14 @@ describe("Paladin - Radiant Strikes rolls extra dice on a melee hit", () => {
     expect(plain.damage.some((part) => part.type === "radiant")).toBe(false);
   });
 
+  it("rolls its 1d8 twice on a critical hit, like the weapon's own dice", () => {
+    // SRD Critical Hits: "If the attack involves other damage dice ... you also roll those dice twice."
+    const built = table(paladinInput(11));
+    const crit = resolve(built, "item-longsword", [20, 6, 5, 7, 3]);
+    expect(crit.attack?.outcome).toBe("crit");
+    expect(crit.damage.find((part) => part.type === "radiant")).toMatchObject({ formula: "2d8", total: 10 });
+  });
+
   it("adds nothing to the javelin the SAME Paladin THROWS, and does add it when they stab with it", () => {
     // A Javelin is thrown, so its derived action has a reach and a range, and `attackKindsOf`
     // (`action-resolution.ts`) decides from the measured distance: past reach it is ranged and Radiant
