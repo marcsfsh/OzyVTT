@@ -73,6 +73,7 @@ export const CARRIER_RIDER_DISPOSITION_MIRROR: Readonly<
   "spell-save-dc": "standing",
   "spell-slot": "standing",
   "resource-bonus": "standing",
+  "short-rest-regain": "standing",
   "critical-range": "standing",
   "critical-bonus-dice": "standing",
   "extra-attack": "standing",

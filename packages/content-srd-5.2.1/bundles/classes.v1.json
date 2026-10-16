@@ -624,6 +624,13 @@
      },
      "per": "long-rest"
     },
+    "modifiers": [
+     {
+      "type": "short-rest-regain",
+      "poolId": "rage",
+      "amount": 1
+     }
+    ],
     "actions": [
      {
       "id": "rage",
@@ -1686,7 +1693,13 @@
     "id": "font-of-inspiration",
     "name": "Font Of Inspiration",
     "level": 5,
-    "description": "You now regain all your expended uses of Bardic Inspiration when you finish a Short or Long Rest. In addition, you can expend a spell slot (no action required) to regain one expended use of Bardic Inspiration."
+    "description": "You now regain all your expended uses of Bardic Inspiration when you finish a Short or Long Rest. In addition, you can expend a spell slot (no action required) to regain one expended use of Bardic Inspiration.",
+    "modifiers": [
+     {
+      "type": "short-rest-regain",
+      "poolId": "bardic-inspiration"
+     }
+    ]
    },
    {
     "id": "countercharm",
@@ -2606,7 +2619,14 @@
        }
       ]
      }
-    }
+    },
+    "modifiers": [
+     {
+      "type": "short-rest-regain",
+      "poolId": "channel-divinity",
+      "amount": 1
+     }
+    ]
    },
    {
     "id": "cleric-subclass",
@@ -3482,6 +3502,13 @@
      },
      "per": "long-rest"
     },
+    "modifiers": [
+     {
+      "type": "short-rest-regain",
+      "poolId": "wild-shape",
+      "amount": 1
+     }
+    ],
     "actions": [
      {
       "id": "wild-shape",
@@ -4417,7 +4444,14 @@
        }
       ]
      }
-    }
+    },
+    "modifiers": [
+     {
+      "type": "short-rest-regain",
+      "poolId": "second-wind",
+      "amount": 1
+     }
+    ]
    },
    {
     "id": "weapon-mastery",
@@ -6300,6 +6334,13 @@
      "per": "long-rest",
      "pool": "channel-divinity"
     },
+    "modifiers": [
+     {
+      "type": "short-rest-regain",
+      "poolId": "channel-divinity",
+      "amount": 1
+     }
+    ],
     "tags": [
      "channel-divinity"
     ],

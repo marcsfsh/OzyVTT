@@ -1,10 +1,10 @@
 import { isDead, makeHitDicePool, type GameState, type HitDiceEntry } from "@vtt/domain";
-import type { Actor, ActorDefinition } from "@vtt/schemas";
-import { abilityModifier as scoreModifier } from "@vtt/rules-5e";
+import type { Actor, ActorAction, ActorDefinition } from "@vtt/schemas";
+import { abilityModifier as scoreModifier, collectRiders } from "@vtt/rules-5e";
 import { pactSlotMaximum, spellSlotMaxima } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
 import { effectiveActions } from "./effective-actions.js";
-import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
+import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 import { endEffectsAtLongRest, reduceExhaustion, removeConditionDirect, type EffectNarration } from "./effects.js";
 import { requireActorAccess, type Initiator } from "./authorization.js";
 import { healActor } from "./hit-points.js";
@@ -71,6 +71,51 @@ function refuseRestAtZero(actor: Actor, needs: string): void {
     throw new CommandRejectedError(`${actor.name} has 0 Hit Points - ${needs} at least 1. Heal them first.`);
 }
 
+/** The pools a Short Rest partly or wholly refills beyond their own recharge, from the `short-rest-regain` riders the
+ *  character's features carry (Rage, Second Wind, Channel Divinity, Wild Shape: one use; Font of Inspiration: all).
+ *  Read live, so a sheet built before a feature gained its rider gets it too. Two printings of one rule don't add. */
+export function shortRestRegains(derivation: EquipmentDerivation): ReadonlyMap<string, number | "all"> {
+  const regains = new Map<string, number | "all">();
+  for (const rider of collectRiders(derivation.carriers, { ...derivation.context, moment: null })) {
+    if (rider.modifier.type !== "short-rest-regain" || !rider.modifier.poolId) continue;
+    const pool = rider.modifier.poolId;
+    const amount = rider.modifier.amount ?? "all";
+    const known = regains.get(pool);
+    if (known === "all" || (typeof known === "number" && amount !== "all" && known >= amount)) continue;
+    regains.set(pool, amount);
+  }
+  return regains;
+}
+
+/**
+ * What is still spent after a Short Rest: short-rest and recharge pools come back, and so do pools that come back
+ * when Initiative is rolled or on any rest (Boon of Fate's "until you roll Initiative or finish a Short or Long Rest");
+ * a long-rest pool with a `short-rest-regain` rider gets that many uses back.
+ */
+function usesAfterShortRest(
+  spent: Actor["actionUses"],
+  actions: readonly ActorAction[],
+  regains: ReadonlyMap<string, number | "all">
+): Actor["actionUses"] {
+  const after: Record<string, number> = { ...spent };
+  const settled = new Set<string>();
+  for (const action of actions) {
+    if (!action.uses || action.uses.per === "turn") continue;
+    const key = action.uses.pool ?? action.id;
+    if (settled.has(key) || after[key] === undefined) continue;
+    settled.add(key);
+    const per = action.uses.per;
+    const regain = regains.get(key);
+    if (per === "short-rest" || per === "recharge" || per === "encounter" || regain === "all") delete after[key];
+    else if (regain !== undefined) {
+      const left = after[key] - regain;
+      if (left > 0) after[key] = left;
+      else delete after[key];
+    }
+  }
+  return after;
+}
+
 /** Which re-choices a rest ends: a short rest clears those naming it; a long rest clears everything. */
 function clearOverrides(overrides: Actor["choiceOverrides"], kind: "long" | "short"): Actor["choiceOverrides"] {
   if (kind === "long") return {};
@@ -80,7 +125,8 @@ function clearOverrides(overrides: Actor["choiceOverrides"], kind: "long" | "sho
 /**
  * Applies a rest to a rostered actor outside combat (SRD Resting, ADR-0020). Either needs at least 1 Hit Point, so
  * the dying and the dead get nothing from it.
- * Short: per-short-rest and recharge pools re-arm; healing is only by spending Hit Point Dice.
+ * Short: per-short-rest, recharge and per-encounter pools re-arm, and long-rest pools a feature partly refills
+ * (Rage's one use) get those uses back; healing is only by spending Hit Point Dice.
  * Long: Concentration and turn-measured effects end first (onEnd grants land), then HP to max, temp HP cleared, all
  * pools refreshed, all Hit Point Dice restored, Exhaustion drops one level.
  */
@@ -99,15 +145,12 @@ export function applyRest(
   const events: EffectNarration[] = [];
   if (kind === "short") {
     const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
-    // Effective actions: a wand's charges live on a derived action and must re-arm too.
-    for (const action of effectiveActions(definition, actor, catalog)) {
-      if (action.uses?.per !== "short-rest" && action.uses?.per !== "recharge") continue;
-      const key = action.uses.pool ?? action.id;
-      if (actor.actionUses[key] !== undefined) {
-        const { [key]: _cleared, ...rest } = actor.actionUses;
-        actor.actionUses = rest;
-      }
-    }
+    actor.actionUses = usesAfterShortRest(
+      actor.actionUses,
+      // Effective actions: a wand's charges live on a derived action and must re-arm too.
+      effectiveActions(definition, actor, catalog),
+      shortRestRegains(deriveEquipment(actor, definition, catalog))
+    );
     // A pick re-made "whenever you finish a Short or Long Rest" lapses here; the build's own answer stands
     // until the character chooses again.
     actor.choiceOverrides = clearOverrides(actor.choiceOverrides, "short");

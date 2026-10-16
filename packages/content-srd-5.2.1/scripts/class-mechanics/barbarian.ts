@@ -9,9 +9,11 @@ export const barbarian: ClassMechanicsModule = {
      * turn, each attack roll or forced save extends it (so does re-declaring it as a Bonus Action, for no use),
      * and Incapacitation or Heavy armor ends it. Rage Damage reads the second column at build (`grantScaling`) onto
      * the damage bonus of attacks using Strength. The 10-minute cap and Persistent Rage's longer form stay prose.
+     * "You regain one expended use when you finish a Short Rest."
      */
     rage: {
       uses: { scaling: { type: "class-resource", id: "rage" }, per: "long-rest" },
+      modifiers: [{ type: "short-rest-regain", poolId: "rage", amount: 1 }],
       actions: [
         {
           id: "rage",

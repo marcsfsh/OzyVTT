@@ -40,11 +40,11 @@ export const paladin: ClassMechanicsModule = {
 
     /**
      * Uses read off the printed column (2 at level 3, 3 from 11). The explicit `pool` lets Abjure Foes
-     * and Sacred Weapon spend the same counter. The SRD returns one use on a Short Rest and all on a
-     * Long Rest; with one `per`, the stingier long-rest reading is used (as for the Cleric).
+     * and Sacred Weapon spend the same counter. One use comes back on a Short Rest, all on a Long Rest.
      */
     "channel-divinity": {
       uses: { scaling: { type: "class-resource", id: "channel-divinity" }, per: "long-rest", pool: "channel-divinity" },
+      modifiers: [{ type: "short-rest-regain", poolId: "channel-divinity", amount: 1 }],
       tags: ["channel-divinity"],
       actions: [
         {

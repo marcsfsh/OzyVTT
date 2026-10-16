@@ -668,6 +668,18 @@
         },
         {
           "type": "object",
+          "required": ["type", "poolId"],
+          "properties": {
+            "type": { "const": "short-rest-regain" },
+            "poolId": { "$ref": "#/$defs/slug" },
+            "amount": { "type": "integer", "minimum": 1, "maximum": 20 },
+            "when": { "$ref": "#/$defs/riderWhen" },
+            "scope": { "$ref": "#/$defs/riderScope" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
           "required": ["type", "amount"],
           "properties": {
             "type": { "const": "attack-bonus" },

@@ -382,6 +382,16 @@ export const ModifierSchema = z.discriminatedUnion("type", [
       ...riderGate
     })
     .strict(),
+  /** A pool a Short Rest refills beyond its own recharge: `amount` expended uses back ("you regain one expended use
+   *  when you finish a Short Rest", Rage), or every one when absent (Font of Inspiration). Read when the rest ends. */
+  z
+    .object({
+      type: z.literal("short-rest-regain"),
+      poolId: RiderSlugSchema,
+      amount: z.number().int().min(1).max(20).optional(),
+      ...riderGate
+    })
+    .strict(),
   // ---- rolls ----
   z.object({ type: z.literal("attack-bonus"), amount: z.number().int().min(-10).max(10), ...riderGate }).strict(),
   /** A flat bonus to saving throws. Narrow it with `when: [{type: "on-saving-throw"}, {type: "ability-is", ...}]`. */

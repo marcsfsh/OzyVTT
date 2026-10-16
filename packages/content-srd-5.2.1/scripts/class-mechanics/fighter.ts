@@ -12,6 +12,11 @@ const WEAPON_OR_UNARMED_ATTACK = [
 
 export const fighter: ClassMechanicsModule = {
   features: {
+    // "You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a
+    // Long Rest."
+    "second-wind": {
+      modifiers: [{ type: "short-rest-regain", poolId: "second-wind", amount: 1 }]
+    },
     // Weapon Mastery grows with the printed column: 3 -> 4 at level 4 -> 5 at 10 -> 6 at 16.
     "weapon-mastery": {
       extraPicks: [

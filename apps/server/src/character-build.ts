@@ -149,6 +149,7 @@ const CARRIER_RIDER_DISPOSITION: Readonly<
   "spell-save-dc": "standing", // effective-actions folds it into save.dc where the DC is the spell save DC
   "spell-slot": "standing", // spellSlotMaxima, via derivation.spellSlots
   "resource-bonus": "standing", // effective-actions usesBonus raises uses.limit
+  "short-rest-regain": "standing", // rests.ts gives the pool's uses back when a Short Rest ends
   "critical-range": "standing", // effective-actions criticalThreshold
   "critical-bonus-dice": "standing", // effective-actions folds it into attack.criticalBonusDice
   "extra-attack": "standing", // effective-actions extraAttacksFor raises attack.count on a weapon swing

@@ -1808,7 +1808,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
     expect(
       FeatureRecordSchema.parse({ id: "f", name: "F", description: "d", modifiers: everyRider }).modifiers
     ).toHaveLength(8);
-    expect(ModifierSchema.options).toHaveLength(24);
+    expect(ModifierSchema.options).toHaveLength(25);
   });
 
   it("15. an item that grants a feat", () => {

@@ -319,9 +319,9 @@ export const actorHealthCommands = [
     type: "actor.rest",
     operationId: "restActor",
     description:
-      "Applies a rest to a rostered actor outside combat; a player session may rest only their claimed character, the GM anyone. Either rest needs at least 1 hit point (SRD) and is refused for a creature at 0 or dead. Long: the actor's Concentration and its effects measured in turns or rounds end (their on-end grants fire first; effects that last until ended stay), hit points restore to maximum, temporary HP clears, limited-use pools refresh, all spent Hit Point Dice restore, spell slots and prepared spells reset to the sheet defaults, and Exhaustion drops one level. Short: per-short-rest and recharge pools re-arm; healing is the separate spend-hit-dice call.",
+      "Applies a rest to a rostered actor outside combat; a player session may rest only their claimed character, the GM anyone. Either rest needs at least 1 hit point (SRD) and is refused for a creature at 0 or dead. Long: the actor's Concentration and its effects measured in turns or rounds end (their on-end grants fire first; effects that last until ended stay), hit points restore to maximum, temporary HP clears, limited-use pools refresh, all spent Hit Point Dice restore, spell slots and prepared spells reset to the sheet defaults, and Exhaustion drops one level. Short: per-short-rest, recharge and per-encounter pools re-arm, and features that say so give back uses of a long-rest pool (Rage, Second Wind, Channel Divinity, Wild Shape: one; Bardic Inspiration from Bard 5: all); healing is the separate spend-hit-dice call.",
     summary:
-      "Take a rest on your own character (GM: anyone): short re-arms short-rest uses; long restores HP, hit dice, spell slots, prepared spells, limited uses, clears dying, and drops one Exhaustion level.",
+      "Take a rest on your own character (GM: anyone, at 1 HP or more): short re-arms short-rest uses and gives back what features say; long restores HP, hit dice, spell slots, prepared spells and limited uses, and drops one Exhaustion level.",
     schema: ActorRestSchema,
     malformed: "The rest command is malformed.",
     async run({ principal, request, execute }, kit) {
