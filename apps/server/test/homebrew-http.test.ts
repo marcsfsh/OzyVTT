@@ -603,8 +603,8 @@ describe("homebrew HTTP CRUD", () => {
 
     // The numbers, not just the absence of a throw, and they match the SRD Fighter's: a duplicate that
     // publishes but computes differently would be wrong.
-    // Level 1: 10+2 Con. Rolls 1/10/4/6 floored at the d10 average -> 6/10/6/6, +2 Con each = 48.
-    expect(built.hitPoints.maximum).toBe(48);
+    // Level 1: 10+2 Con. Rolls 1/10/4/6, +2 Con each = 41.
+    expect(built.hitPoints.maximum).toBe(41);
     expect(built.proficiencyBonus).toBe(3);
     expect(built.abilityScores).toEqual({ str: 19, dex: 13, con: 15, int: 8, wis: 12, cha: 10 });
     // Chain mail 16 from the copied starting-equipment option + the Defense style's +1.

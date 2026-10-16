@@ -98,8 +98,7 @@ export const barbarian: ClassMechanicsModule = {
     "primal-knowledge": {
       extraPicks: [{ offer: "class-skills", amount: 1 }]
     },
-    // Currently reaches nothing: it raises `attack.count` only on feature actions, and martial swings
-    // come from inventory. Kept to match the Fighter's identical rider.
+    // A standing rider `effective-actions` folds onto every weapon swing (attack count 2).
     "extra-attack": {
       modifiers: [{ type: "extra-attack", count: 1 }]
     },
@@ -116,7 +115,7 @@ export const barbarian: ClassMechanicsModule = {
       uses: { limit: 1, per: "long-rest" }
     },
     "epic-boon": {
-      choice: { kind: "feat", choose: 1, fromCatalog: "epic-boon-feats" }
+      choice: { kind: "feat", choose: 1, fromCatalog: "feats" }
     },
     // `maximum: 25` lifts the builder's default clamp at 20.
     "primal-champion": {

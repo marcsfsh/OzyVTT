@@ -49,6 +49,7 @@ const druid = (): CharacterCreateRequestInput =>
       { level: 1, kind: "cantrip", id: "minor-illusion", payload: { featureId: "magic-initiate-wizard" } },
       { level: 1, kind: "cantrip", id: "dancing-lights", payload: { featureId: "magic-initiate-wizard" } },
       { level: 1, kind: "spell", id: "magic-missile", payload: { featureId: "magic-initiate-wizard" } },
+      { level: 1, kind: "spellcasting-ability", id: "int", payload: { featureId: "magic-initiate-wizard" } },
       { level: 3, classId: "druid", kind: "subclass", id: "circle-of-the-land" },
       { level: 3, kind: "land", id: "polar", payload: { featureId: "circle-of-the-land-spells" } },
       { level: 1, kind: "equipment", id: "druid-a" },

@@ -88,6 +88,8 @@ export type RiderTrigger = Readonly<{
 export type RiderModifier = Readonly<{
   type: string;
   amount?: number;
+  /** `initiative`: the bearer's Proficiency Bonus on top of `amount` (Alert). */
+  proficiencyBonus?: boolean;
   ability?: RiderAbility;
   whileArmored?: boolean;
   /** `unarmored-defense`: does the benefit survive a shield? */

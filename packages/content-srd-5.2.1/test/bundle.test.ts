@@ -497,7 +497,7 @@ describe("SRD 5.2.1 reference bundles", () => {
     // the generated magic items.
     const nonImprovisedWeapons = loadWeapons().filter((weapon) => !weapon.improvised).length;
     expect(loadMagicItems().length).toBe(268);
-    expect(equipment.length).toBe(132 + nonImprovisedWeapons + loadArmor().length + 268);
+    expect(equipment.length).toBe(134 + nonImprovisedWeapons + loadArmor().length + 268);
     expect(equipment.length).toBeGreaterThan(150);
 
     // Every category the framework promises is represented (the homebrew update extends these).

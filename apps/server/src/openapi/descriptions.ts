@@ -158,7 +158,10 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     category:
       "Open slug: origin, general, fighting-style, epic-boon, or anything homebrew adds. Feeds the `<category>-feats` catalog slug a feature choice can point at",
     prerequisite: "The SERVER decides whether a prerequisite is met - never the client",
-    "prerequisite.requires": "Proficiency or feature slugs the character must already have",
+    "prerequisite.requires":
+      'Proficiency or feature slugs the character must already have ("fighting-style"); "spellcasting" means a class or subclass Spellcasting feature',
+    "prerequisite.abilityScoreMode":
+      'Whether every ability minimum must be met ("all") or any one of them ("any": Grappler\'s "Strength or Dexterity 13+")',
     "prerequisite.text": "Anything not modeled above, printed for the player to judge (ADR-0008 prose fallback)"
   },
   HomebrewSpellRecord: {
@@ -303,7 +306,8 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   },
   Feature: {
     "": "THE shared feature record: a class feature, a subclass feature, a species trait, a background feature, and a feat's mechanics are all this one shape. `description` is always the display source of truth, and every rider is optional - a prose-only feature is perfectly valid and is how most text starts life. This is the AUTHORING counterpart of `ContentFeature`, which publishes the same feature with its riders stripped.",
-    level: "Class/subclass level this feature is gained at. Omitted for always-on records (species traits, feats)",
+    level:
+      "Class/subclass level this feature is gained at; on a species or lineage trait, the character level it arrives at (Draconic Flight at 5). Omitted for records held from level 1 (most traits, feats)",
     choice:
       "A pick this feature asks the player to make; every one writes a row in the character's choice-provenance ledger, which is what makes level-up and respec possible",
     choices:
@@ -319,7 +323,9 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     uses: "Limited uses recovered on a rest",
     grants: "Flat proficiency/language/spell grants",
     modifiers: "Typed numeric riders",
-    replacesFeatureId: "This feature REPLACES an earlier one of the same id lineage (Indomitable at 9/13/17)"
+    replacesFeatureId: "This feature REPLACES an earlier one of the same id lineage (Indomitable at 9/13/17)",
+    extraSpellLists:
+      "Spell lists the class's OWN prepared and cantrip picks may also draw on, the spells counting as that class's (Magical Secrets: the Bard's picks may come from the Cleric, Druid and Wizard lists). Widens an existing budget; it adds no picks"
   },
   FeatureChoice: {
     "": "A pick a feature asks for, in three increasing richnesses: `fromCatalog` (an open catalog slug resolved at pick time), `from` (explicit ids whose mechanics live elsewhere or nowhere), or `options` (the ids WITH their mechanics inline, for options that exist only here - Divine Order's two sacred roles, Giant Ancestry's six boons). `options` and `from` are mutually exclusive: after parsing, `from` always holds the canonical id list, derived from `options` when they were authored.",
@@ -337,9 +343,11 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     options: "Options carrying their own mechanics. Mutually exclusive with `from`"
   },
   FeatureOption: {
-    "": 'ONE pickable option that carries its OWN mechanics - structurally a HomebrewFeature minus `level`/`replacesFeatureId`, with identical rider fields and identical meanings. That is the point: a chosen option is interpreted by the very same code path that interprets a class feature, so "Divine Order: Protector" carries its Martial-weapon and Heavy-armor training itself instead of being a bare id string nothing downstream can read.',
+    "": 'ONE pickable option that carries its OWN mechanics - structurally a HomebrewFeature minus `replacesFeatureId`, with identical rider fields and identical meanings. That is the point: a chosen option is interpreted by the very same code path that interprets a class feature, so "Divine Order: Protector" carries its Martial-weapon and Heavy-armor training itself instead of being a bare id string nothing downstream can read.',
     requires:
       'This option is legal only when an EARLIER answer says so - "the option you chose for Blessed Strikes grows more powerful". `offer` is the same offer-key namespace `extraPicks` uses. When gating leaves exactly as many legal options as the capacity, the survivors are ADOPTED and no pick is rendered: the answer is a consequence, not a choice.',
+    level:
+      'The class level this option may first be chosen at - an invocation\'s "Prerequisite: Level 5+ Warlock". A build below it is not offered the option',
     choice: "A SECOND-ORDER pick this option owes once chosen, from a list of its own",
     choices:
       "SEVERAL second-order picks (Pact of the Tome asks for three cantrips AND two rituals). Mutually exclusive with `choice`",
@@ -400,6 +408,8 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       'A declared reaction the engine offers as a pending prompt when its trigger happens: half-damage (Uncanny Dodge), ac-bonus (Parry, Shield), strike-back (Hellish Rebuke) or melee-attack (Retaliation). Only meaningful on activation "reaction"',
     legendary:
       'SRD Legendary Action: taken on OTHER creatures\' turns, spending `cost` from the per-round pool. Pairs with activation "other"',
+    replacesAttack:
+      'Taken in place of ONE attack of the Attack action (Breath Weapon): it opens the Attack action, leaving the rest of its attacks for weapon swings, or spends one attack the action has left. Pairs with activation "action"',
     spellSlot:
       "Resolving this action ALSO spends one of the bearer's own spell slots of this level - the mechanical half of an item cast authored with `consumesSpellSlot`. Checked and spent by the same economy pass that owns limited uses, so a preview never spends one and an empty pool refuses in the same voice as an empty charge",
     spellId:
@@ -433,6 +443,8 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       'A declared reaction the engine offers as a pending prompt when its trigger happens: half-damage (Uncanny Dodge), ac-bonus (Parry, Shield), strike-back (Hellish Rebuke) or melee-attack (Retaliation). Only meaningful on activation "reaction"',
     legendary:
       'SRD Legendary Action: taken on OTHER creatures\' turns, spending `cost` from the per-round pool. Pairs with activation "other"',
+    replacesAttack:
+      'Taken in place of ONE attack of the Attack action (Breath Weapon): it opens the Attack action, leaving the rest of its attacks for weapon swings, or spends one attack the action has left. Pairs with activation "action"',
     spellSlot:
       "Resolving this action ALSO spends one of the bearer's own spell slots of this level - the mechanical half of an item cast authored with `consumesSpellSlot`. Checked and spent by the same economy pass that owns limited uses, so a preview never spends one and an empty pool refuses in the same voice as an empty charge",
     spellId:
@@ -515,7 +527,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       'What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer"'
   },
   ModifierSpeed: {
-    "": "Change walking speed in feet, signed (Longstrider +10, the `slow` mastery -10). On a feature it is baked into the sheet's speed when the character is built; on an item or an effect it is summed live into the movement budget, so the feet come back when the item comes off or the effect ends.",
+    "": "Change walking speed in feet, signed (Longstrider +10, the `slow` mastery -10). On a feature it is baked into the sheet's speed when the character is built, unless gated (Unarmored Movement's `while-unarmored`), when it is read with the live loadout; on an item or an effect it is summed live into the movement budget, so the feet come back when the item comes off or the effect ends.",
     when: "AND-list of at most four triggers gating this rider, with at most ONE moment. Absent or empty = always. A filter with no moment is rejected: it has nothing to narrow",
     scope:
       'What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer"'
@@ -528,6 +540,8 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   },
   ModifierInitiative: {
     "": "Change the initiative bonus.",
+    proficiencyBonus:
+      "Also add the bearer's Proficiency Bonus (Alert's Initiative Proficiency). Counted once however many riders say so",
     when: "AND-list of at most four triggers gating this rider, with at most ONE moment. Absent or empty = always. A filter with no moment is rejected: it has nothing to narrow",
     scope:
       'What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer"'

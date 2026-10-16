@@ -36,7 +36,8 @@ const HUMAN: Row[] = [
 const ACOLYTE_FEAT: Row[] = [
   { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
   { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
-  { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } }
+  { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+  { level: 1, kind: "spellcasting-ability", id: "wis", payload: { featureId: "magic-initiate-cleric" } }
 ];
 const asiRows = (classId: string, level: number): Row[] =>
   [4, 8, 12, 16]

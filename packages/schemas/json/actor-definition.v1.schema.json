@@ -1039,6 +1039,7 @@
           },
           "additionalProperties": false
         },
+        "replacesAttack": { "type": "boolean" },
         "legendary": {
           "type": "object",
           "required": ["cost"],

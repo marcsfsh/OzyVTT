@@ -729,7 +729,12 @@ export const BuilderPolicySchema = z
     /** Whether players may run the character builder themselves; enforced in `character.create`. */
     playerBuilder: z.enum(["open", "gm-only"]).default("open"),
     /** Whether players may roll a random character; "gm-only" by default because it fills a roster slot in one tap. */
-    playerRandom: z.enum(["open", "gm-only"]).default("gm-only")
+    playerRandom: z.enum(["open", "gm-only"]).default("gm-only"),
+    /** Whether players may type what their own dice showed for rolled ability scores and hit points. Closed by
+     *  default: a player's rolls are then thrown by the server (the GM may always type). */
+    typedRolls: z.enum(["open", "gm-only"]).default("gm-only"),
+    /** A table rule raising a rolled hit-point level to the class average; "none" is the SRD (the roll stands). */
+    hitPointRollFloor: z.enum(["none", "average"]).default("none")
   })
   .strict();
 export type BuilderPolicy = z.infer<typeof BuilderPolicySchema>;

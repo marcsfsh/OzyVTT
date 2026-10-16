@@ -49,7 +49,8 @@ export const methodChange = (chosen: BuilderAbilityMethod): Partial<BuilderDraft
     ? {
         poolAssignment: {},
         abilityPool:
-          chosen === "standard-array" ? STANDARD_ARRAY.map((value, index) => ({ id: `sa-${index}`, value })) : []
+          chosen === "standard-array" ? STANDARD_ARRAY.map((value, index) => ({ id: `sa-${index}`, value })) : [],
+        abilityRollId: undefined
       }
     : {})
 });
@@ -98,6 +99,7 @@ export function useServerRolls(
 export function AbilitiesStep({
   draft,
   policy,
+  mayTypeDice,
   context,
   base,
   bonuses,
@@ -107,10 +109,14 @@ export function AbilitiesStep({
   hpEntry,
   onAbilityEntryChange,
   onHpEntryChange,
+  onRollRefused,
   editDraft
 }: Readonly<{
   draft: BuilderDraft;
   policy: BuilderPolicy;
+  /** Whether this person may type what their own dice showed (the GM, or a table that allows it); otherwise the
+      table throws the dice and the server holds the result. */
+  mayTypeDice: boolean;
   context: OfferContext;
   base: Readonly<Record<Ability, number | null>>;
   bonuses: Readonly<Record<Ability, number>>;
@@ -121,6 +127,7 @@ export function AbilitiesStep({
   hpEntry: DiceEntryMode;
   onAbilityEntryChange: (mode: DiceEntryMode) => void;
   onHpEntryChange: (mode: DiceEntryMode) => void;
+  onRollRefused: (message: string) => void;
   editDraft: (update: (current: BuilderDraft) => BuilderDraft) => void;
 }>) {
   const patch = (change: Partial<BuilderDraft>) => editDraft((current) => ({ ...current, ...change }));
@@ -146,7 +153,28 @@ export function AbilitiesStep({
             abilityPool: [...current.abilityPool, { id: `r-${current.abilityPool.length}-${total}`, value: total }]
           }
     );
+  const [rollingSix, setRollingSix] = useState(false);
   const rollAllScores = () => {
+    if (!mayTypeDice) {
+      // The six come from one server roll the create names, so the table can see what was rolled.
+      setRollingSix(true);
+      void command("builder:roll-abilities", { method: method === "custom" ? "custom" : "roll" }).then((result) => {
+        setRollingSix(false);
+        if (!result.ok || !result.scores || !result.rollId) {
+          onRollRefused(result.message ?? "The table refused the roll.");
+          return;
+        }
+        const rollId = result.rollId;
+        const scores = result.scores;
+        editDraft((current) => ({
+          ...current,
+          abilityPool: scores.map((value, index) => ({ id: `r-${index}-${value}`, value })),
+          poolAssignment: {},
+          abilityRollId: rollId
+        }));
+      });
+      return;
+    }
     const missing = 6 - draft.abilityPool.length;
     for (let index = 0; index < missing; index += 1)
       rolls.roll(rollFormula, `Ability score ${draft.abilityPool.length + index + 1}`, addRolledScore);
@@ -243,15 +271,24 @@ export function AbilitiesStep({
               rollLabel="Roll the rest for me"
               onRoll={rollAllScores}
               onManual={addRolledScore}
-              onReroll={draft.abilityPool.length > 0 ? () => patch({ abilityPool: [], poolAssignment: {} }) : undefined}
+              onReroll={
+                draft.abilityPool.length > 0
+                  ? () => patch({ abilityPool: [], poolAssignment: {}, abilityRollId: undefined })
+                  : undefined
+              }
               result={
                 draft.abilityPool.length > 0 ? draft.abilityPool.map((entry) => entry.value).join(", ") : undefined
               }
               min={rollBounds.min}
               max={rollBounds.max}
-              busy={rolls.rolling}
+              busy={rolls.rolling || rollingSix}
               complete={draft.abilityPool.length >= 6}
-              hint={`Roll them here, or type what your own dice showed (${rollBounds.min}-${rollBounds.max}).`}
+              manualAllowed={mayTypeDice}
+              hint={
+                mayTypeDice
+                  ? `Roll them here, or type what your own dice showed (${rollBounds.min}-${rollBounds.max}).`
+                  : "The table rolls all six at once, and everyone sees the roll."
+              }
             />
           ) : undefined
         }
@@ -322,20 +359,31 @@ export function AbilitiesStep({
                 : abilityModifier(base.con + bonuses.con)}
           </span>
         </div>
-        {/* The same "max-of-both" rule `character-build.ts` applies, said in table terms. */}
+        {/* The rule `character-build.ts` applies, said in table terms. */}
         <p className="cb-offer-help">
-          Level 1 is always the full die. From level 2 up, take the average or roll — a roll below the average is topped
-          up to it, so rolling can only help. Rolled HP is remembered — leveling down and back up restores it.
+          Level 1 is always the full die. From level 2 up, take the average or roll -{" "}
+          {policy.hitPointRollFloor === "average"
+            ? "at this table a roll below the average is raised to it."
+            : "a roll counts as rolled, even below the average."}{" "}
+          Rolled HP is remembered: leveling down and back up restores it.
         </p>
         <SegmentedControl
           ariaLabel="How to gain hit points"
           value={draft.hpMode}
-          onChange={(next) => patch({ hpMode: next as "average" | "entries", hpEntries: [] })}
+          onChange={(next) => patch({ hpMode: next as BuilderDraft["hpMode"], hpEntries: [] })}
           options={[
-            { value: "average", label: `Take the average (${hitDieAverage(hitDie)}/level)` },
-            { value: "entries", label: "Roll each level" }
+            { value: "average", label: `Average (${hitDieAverage(hitDie)} per level)` },
+            // Typing physical dice is the GM's, or every player's at a table that allows it.
+            ...(mayTypeDice ? [{ value: "entries", label: "Enter rolls" }] : []),
+            { value: "roll", label: "Table rolls" }
           ]}
         />
+        {draft.hpMode === "roll" && draft.level > 1 && (
+          <p className="cb-note">
+            The table rolls a {hitDie} for each level from 2 to {draft.level} when you finish, and everyone sees the
+            roll. Rolls already on this character are kept.
+          </p>
+        )}
         {draft.hpMode === "entries" &&
           (draft.level === 1 ? (
             <p className="cb-note">A level 1 character rolls nothing — your hit points are the full {hitDie}.</p>

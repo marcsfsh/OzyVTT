@@ -13,7 +13,7 @@ import {
 } from "@vtt/domain/commands";
 import { setCurrency, setInventoryItem } from "../inventory.js";
 import { setPreparedSpell, setSpellSlotRemaining } from "../spellcasting.js";
-import { initiatorOf, sessionIdOf } from "./kit.js";
+import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
 // Claims, and the edits a player may make to their own character's sheet.
@@ -144,14 +144,15 @@ export const characterSheetCommands = [
     type: "character.set-identity",
     operationId: "setIdentity",
     description:
-      "Sets a character's identity (class/level/race/background/feats) on its editable imported sheet - a light hand-edit, not a guided builder. Player sessions may target only their claimed character.",
-    summary: "Edit a character's identity (class/level/race/background/feats) on its imported sheet.",
+      "Sets a character's identity (class/level/race/background/feats) on its editable imported sheet - a light hand-edit, not a guided builder. Player sessions may target only their claimed character, and may only rename: classes, levels, species and background ids, feats, features, the choice ledger and Martial Arts are the GM's. On a sheet built here (it carries the choice ledger) those belong to the builder for everyone, and the Level flow (`character.rebuild`) changes them.",
+    summary:
+      "Edit a character's identity (class/level/race/background/feats) on its imported sheet; players only rename.",
     schema: CharacterSetIdentitySchema,
     malformed: "The identity command is malformed.",
     async run({ principal, request, execute }) {
       await execute((state) => {
         requireActorAccess(initiatorOf(principal), state, request.actorId, "edit");
-        setCharacterIdentity(state, request.actorId, request.character);
+        setCharacterIdentity(state, request.actorId, request.character, { gm: isGmGrade(principal) });
       });
     }
   }),

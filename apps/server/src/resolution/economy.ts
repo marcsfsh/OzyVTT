@@ -338,6 +338,9 @@ function checkActionSlot({
     } else if (action.attack && (action.attack.count ?? 1) > 1) {
       // Count-based attacks open a generic pool so Extra Attack can mix weapons legally.
       components = { attack: (action.attack.count ?? 1) - 1 };
+    } else if (action.replacesAttack && attacksInAttackAction(siblings) > 1) {
+      // Breath Weapon as the first attack of the Attack action: the rest stay open for weapon swings.
+      components = { attack: attacksInAttackAction(siblings) - 1 };
     }
     // The instance stays even when exhausted so a further resolve gets "no attacks remaining".
     return {
@@ -377,7 +380,7 @@ function checkActionSlot({
       });
   } else if ((components[action.id] ?? 0) > 0) {
     components[action.id] -= 1;
-  } else if (action.attack && (components["attack"] ?? 0) > 0) {
+  } else if ((action.attack || action.replacesAttack) && (components["attack"] ?? 0) > 0) {
     components["attack"] -= 1;
   } else {
     const named = leftovers();
@@ -390,6 +393,18 @@ function checkActionSlot({
     });
   }
   return { ...plan, instance: { actorId: attacker.id, components } };
+}
+
+/** How many attacks the Attack action makes: the most any one attack action makes, which is where Extra Attack is
+ *  folded (weapon swings and the Unarmed Strike). Spells and Multiattack plans are not the Attack action. */
+function attacksInAttackAction(siblings: ReadonlyArray<DefinitionAction>): number {
+  return siblings.reduce(
+    (most, candidate) =>
+      candidate.attack && candidate.activation === "action" && !candidate.multiattack && !candidate.spellId
+        ? Math.max(most, candidate.attack.count ?? 1)
+        : most,
+    1
+  );
 }
 
 /** SRD Legendary Actions: taken at the end of other creatures' turns from a per-round pool that refills

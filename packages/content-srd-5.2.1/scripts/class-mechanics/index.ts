@@ -2,7 +2,7 @@
  * The class mechanics overlay, composed from one file per class. `./overlay.ts` holds the vocabulary
  * and the merge. The whole overlay is a build-time input to `build-class-bundle.ts`.
  */
-import type { ClassMechanicsModule, MechanicsOverlay } from "./overlay.js";
+import type { ClassMechanicsModule, MechanicsOverlay, StagedFeature } from "./overlay.js";
 import { barbarian } from "./barbarian.js";
 import { bard } from "./bard.js";
 import { cleric } from "./cleric.js";
@@ -17,7 +17,13 @@ import { warlock } from "./warlock.js";
 import { wizard } from "./wizard.js";
 
 export { applyMechanics } from "./overlay.js";
-export type { ClassMechanicsModule, FeatureMechanics, MechanicsOverlay, OptionMechanics } from "./overlay.js";
+export type {
+  ClassMechanicsModule,
+  FeatureMechanics,
+  MechanicsOverlay,
+  OptionMechanics,
+  StagedFeature
+} from "./overlay.js";
 
 /** The twelve SRD 5.2.1 classes. A missing key here is a compile error, not a silent absence. */
 export type ClassId =
@@ -82,4 +88,12 @@ export const LIVE_CLASS_RESOURCES: Readonly<Record<string, readonly string[]>> =
       .map(([id, module]) => [id, module.liveResources ?? []] as const)
       .filter(([, resources]) => resources.length > 0)
   )
+);
+
+/** Staged features by class id, then by subclass id (see `StagedFeature`). */
+export const CLASS_STAGES: Readonly<Record<string, readonly StagedFeature[]>> = Object.freeze(
+  Object.fromEntries(modules.flatMap(([id, module]) => (module.stages?.length ? [[id, module.stages]] : [])))
+);
+export const SUBCLASS_STAGES: Readonly<Record<string, readonly StagedFeature[]>> = Object.freeze(
+  Object.fromEntries(modules.flatMap(([, module]) => Object.entries(module.subclassStages ?? {})))
 );

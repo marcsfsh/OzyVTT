@@ -511,6 +511,7 @@ const highElfInput = (): CharacterCreateRequestInput =>
       { level: 1, classId: "fighter", kind: "weapon-mastery", id: "flail" },
       { level: 1, classId: "fighter", kind: "weapon-mastery", id: "longbow" },
       { level: 1, kind: "lineage", id: "high-elf" },
+      { level: 1, kind: "spellcasting-ability", id: "int", payload: { featureId: "elf-lineage" } },
       { level: 1, kind: "skill", id: "insight", payload: { featureId: "elf-keen-senses" } },
       { level: 1, kind: "tool", id: "gaming-set-dice" },
       { level: 1, kind: "language", id: "giant" },
