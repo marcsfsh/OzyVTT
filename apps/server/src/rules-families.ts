@@ -14,6 +14,8 @@ const RULE_FAMILIES = {
   "economy.bonus-action-used": "economy",
   "economy.reaction-used": "economy",
   "economy.not-your-turn": "economy",
+  // Wait mode: no one acts until every player has rolled initiative.
+  "initiative.gathering": "economy",
   // Being incapacitated or down means you have no actions: an economy block, not a targeting one.
   "condition.incapacitated": "economy",
   "condition.down": "economy",

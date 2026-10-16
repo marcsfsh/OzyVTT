@@ -99,6 +99,7 @@ export function evaluateActionEconomy(
     notes: []
   };
   checkAbleToAct(evaluation);
+  checkTurnsBegun(evaluation);
   checkExtraAttackOpened(evaluation);
   const spendUse = checkLimitedUse(evaluation);
   const slots = checkActionSlots(evaluation);
@@ -112,6 +113,17 @@ export function evaluateActionEconomy(
     proseMultiattack: evaluation.proseMultiattack,
     notes: evaluation.notes
   };
+}
+
+/** In wait mode the order is provisional until every player has rolled, and the turn economy resets when
+ *  turns begin, so an action taken before then would come free. */
+function checkTurnsBegun({ state, violations }: Evaluation): void {
+  const { active, playerInitiativeMode, pendingInitiative } = state.combat;
+  if (active && playerInitiativeMode === "wait" && pendingInitiative.length > 0)
+    violations.push({
+      rule: "initiative.gathering",
+      message: "Players are still rolling initiative - turns begin once everyone has rolled."
+    });
 }
 
 /** Incapacitation and 0 HP forbid all three activation kinds (SRD 2024 "Incapacitated"); a required

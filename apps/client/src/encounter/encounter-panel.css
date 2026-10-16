@@ -71,6 +71,23 @@
   margin-top: 0.2rem;
   color: var(--text-muted);
 }
+.encounter-surprise {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.encounter-surprise legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.encounter-surprise-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
 .encounter-start-blocked {
   margin: 0;
   color: var(--caution-hi);

@@ -225,6 +225,11 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
     expect(definition.proficiencyBonus).toBe(3);
   });
 
+  it("adds Alert's Proficiency Bonus to initiative on top of Dexterity", () => {
+    // Dex 13 (+1) and Alert at level 5 (PB 3).
+    expect(definition.initiativeBonus).toBe(4);
+  });
+
   it("computes rolled HP as max(roll, average) per level on the class hit die", () => {
     // Level 1: 10+2. Rolls 1/10/4/6 vs d10 average 6 -> 6/10/6/6, +2 Con each = 48.
     expect(definition.hitPoints.maximum).toBe(48);

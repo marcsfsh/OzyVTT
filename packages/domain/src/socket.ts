@@ -89,6 +89,7 @@ import type {
   InitiativeRollRemainingSchema,
   InitiativeRollSelfSchema,
   InitiativeScoreSchema,
+  InitiativeSwapSchema,
   ReactionAnswerSchema,
   ReactionDismissSchema,
   ReplayLaunchSchema,
@@ -500,6 +501,10 @@ export interface ClientToServerEvents {
   ) => void;
   "initiative:set": (
     payload: CommandPayload<typeof InitiativeScoreSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "initiative:swap": (
+    payload: CommandPayload<typeof InitiativeSwapSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "initiative:roll-self": (

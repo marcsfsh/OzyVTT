@@ -49,10 +49,20 @@ export const actorCommands = [
           addActorFromDefinition(state, definition, actorId, request.visibility, kit.equipmentCatalog());
           // Ignored out of combat: there is no fight to join, and the roster add is the whole intent.
           if (request.joinEncounter === true && state.combat.active && geometry)
-            addCombatant(state, actorId, undefined, () => kit.context.random(20), geometry);
+            addCombatant(
+              state,
+              actorId,
+              undefined,
+              () => kit.context.random(20),
+              geometry,
+              Date.now(),
+              kit.initiativeRollSink(state, request.commandId, principal),
+              kit.initiativeRollDeps(state)
+            );
         },
         { actorId }
       );
+      kit.publishRolls(kit.read(), request.commandId);
       return { actorId };
     }
   }),
