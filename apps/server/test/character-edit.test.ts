@@ -40,23 +40,61 @@ describe("character edit", () => {
       feats: [],
       choices: [{ level: 4, kind: "asi", id: "str-plus-2" }]
     });
-    setCharacterIdentity(state, actorId, { classes: [{ id: "fighter", name: "Fighter", level: 5 }], feats: [] });
-    expect(state.definitions[0].definition.character?.classes[0].level).toBe(5);
+    // A rename is the one change a built sheet takes by hand.
+    setCharacterIdentity(state, actorId, { classes: [{ id: "fighter", name: "Sellsword", level: 4 }], feats: [] });
+    expect(state.definitions[0].definition.character?.classes[0].name).toBe("Sellsword");
     expect(state.definitions[0].definition.character?.choices).toEqual([{ level: 4, kind: "asi", id: "str-plus-2" }]);
   });
-  it("lets the builder replace the choice ledger explicitly (respec)", () => {
+  it("leaves a built sheet's classes, levels, feats and ledger to the builder, for the GM too", () => {
     const state = stateWith();
     setCharacterIdentity(state, actorId, {
-      classes: [{ id: "fighter", name: "Fighter", level: 4 }],
+      classes: [{ id: "wizard", name: "Wizard", level: 5 }],
       feats: [],
       choices: [{ level: 4, kind: "asi", id: "str-plus-2" }]
     });
-    setCharacterIdentity(state, actorId, {
-      classes: [{ id: "fighter", name: "Fighter", level: 4 }],
-      feats: [],
-      choices: [{ level: 4, kind: "feat", id: "alert" }]
-    });
-    expect(state.definitions[0].definition.character?.choices).toEqual([{ level: 4, kind: "feat", id: "alert" }]);
+    const refused = /built here: change classes, levels and feats in the Level flow/;
+    // A hand-added class row would never be validated, and the next rebuild would drop it.
+    expect(() =>
+      setCharacterIdentity(state, actorId, {
+        classes: [
+          { id: "wizard", name: "Wizard", level: 5 },
+          { id: "fighter", name: "Fighter", level: 1 }
+        ],
+        feats: []
+      })
+    ).toThrow(refused);
+    expect(() =>
+      setCharacterIdentity(state, actorId, {
+        classes: [{ id: "wizard", name: "Wizard", level: 5 }],
+        feats: [],
+        choices: [{ level: 4, kind: "feat", id: "alert" }]
+      })
+    ).toThrow(refused);
+    expect(state.definitions[0].definition.character?.choices).toEqual([{ level: 4, kind: "asi", id: "str-plus-2" }]);
+  });
+  it("lets a player rename their imported sheet but not change what the rules read", () => {
+    const state = stateWith();
+    setCharacterIdentity(state, actorId, { classes: [{ id: "fighter", name: "Fighter", level: 3 }], feats: [] });
+    const player = { gm: false };
+    setCharacterIdentity(state, actorId, { classes: [{ id: "fighter", name: "Blade", level: 3 }], feats: [] }, player);
+    expect(state.definitions[0].definition.character?.classes[0].name).toBe("Blade");
+    const refused = /Only the GM can change a character's classes, levels or feats/;
+    for (const change of [
+      { classes: [{ id: "fighter", name: "Blade", level: 4 }], feats: [] },
+      { classes: [{ id: "fighter", name: "Blade", level: 3 }], feats: [{ id: "two-weapon-fighting", name: "TWF" }] },
+      {
+        classes: [{ id: "fighter", name: "Blade", level: 3 }],
+        feats: [],
+        choices: [{ level: 1, kind: "weapon-mastery", id: "greatsword" }]
+      },
+      {
+        classes: [{ id: "fighter", name: "Blade", level: 3 }],
+        feats: [],
+        features: [{ id: "extra-attack", kind: "class" as const, sourceId: "fighter" }]
+      }
+    ])
+      expect(() => setCharacterIdentity(state, actorId, change, player)).toThrow(refused);
+    expect(state.definitions[0].definition.character?.classes[0].level).toBe(3);
   });
   it("preserves hit dice and the other classes when a single-class editor saves identity", () => {
     const state = stateWith();
