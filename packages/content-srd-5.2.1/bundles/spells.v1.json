@@ -37,6 +37,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 90
+   },
    "damage": [
     {
      "formula": "4d4",
@@ -2861,6 +2865,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "melee",
+    "feet": 5
+   },
    "damage": [
     {
      "formula": "1d10",
@@ -2933,6 +2941,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 90
+   },
    "damage": [],
    "healing": null
   },
@@ -6753,6 +6765,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 120
+   },
    "damage": [
     {
      "formula": "1d10",
@@ -8059,6 +8075,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 120
+   },
    "damage": [
     {
      "formula": "1d10",
@@ -10126,6 +10146,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 120
+   },
    "damage": [
     {
      "formula": "4d6",
@@ -11612,6 +11636,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 60
+   },
    "damage": [
     {
      "formula": "1d10",
@@ -15473,6 +15501,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 30
+   },
    "damage": [
     {
      "formula": "1d12",
@@ -16097,6 +16129,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 60
+   },
    "damage": [
     {
      "formula": "1d8",
@@ -16577,6 +16613,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 60
+   },
    "damage": [
     {
      "formula": "1d8",
@@ -16650,6 +16690,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 60
+   },
    "damage": [
     {
      "formula": "2d8",
@@ -17316,6 +17360,10 @@
   "area": null,
   "effect": {
    "attacks": 3,
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 120
+   },
    "damage": [
     {
      "formula": "2d6",
@@ -18233,6 +18281,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "melee",
+    "feet": 5
+   },
    "damage": [
     {
      "formula": "1d8",
@@ -18640,6 +18692,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 120
+   },
    "damage": [],
    "healing": null
   },
@@ -19255,6 +19311,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 60
+   },
    "damage": [
     {
      "formula": "1d8",
@@ -20784,6 +20844,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "melee",
+    "feet": 5
+   },
    "damage": [
     {
      "formula": "3d6",

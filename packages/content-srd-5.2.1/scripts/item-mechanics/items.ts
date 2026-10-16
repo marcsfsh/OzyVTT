@@ -106,16 +106,16 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // ---- Ammunition ------------------------------------------------------------------------------
 
   /**
-   * Ammunition has no weapon block, so `attack-bonus` is bearer-scoped; the `when` pair limits it to
-   * ranged attacks so melee swings are unaffected. It applies to all of the bearer's ranged attacks,
-   * not only those using this ammunition. The damage half is not authored.
+   * Ammunition has no weapon block, so `attack-bonus` is bearer-scoped; the `when` filter limits it to
+   * ranged weapon attacks so melee swings and spells are unaffected. It applies to all of the bearer's ranged
+   * weapon attacks, not only those using this ammunition. The damage half is not authored.
    */
   "ammunition-1": {
     modifiers: [
       {
         type: "attack-bonus",
         amount: 1,
-        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["ranged"] }]
+        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["ranged-weapon"] }]
       }
     ]
   },
@@ -124,7 +124,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       {
         type: "attack-bonus",
         amount: 2,
-        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["ranged"] }]
+        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["ranged-weapon"] }]
       }
     ]
   },
@@ -133,7 +133,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       {
         type: "attack-bonus",
         amount: 3,
-        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["ranged"] }]
+        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["ranged-weapon"] }]
       }
     ]
   },

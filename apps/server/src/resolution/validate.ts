@@ -3,7 +3,7 @@ import { effectiveActions } from "../effective-actions.js";
 import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
 import { effectiveModeFor, overrideCovers, overrideReason, overrideWaives } from "../rules-families.js";
-import { upcastAction } from "../item-actions.js";
+import { upcastAction, withSpellAttackReach } from "../item-actions.js";
 import { builtinHandlerFor } from "./builtins.js";
 import type { DefinitionAction, LiveActor, ResolveContext, ResolveDependencies, ResolveInput } from "./context.js";
 import { planEconomy, type EconomyPlan } from "./economy.js";
@@ -57,10 +57,12 @@ function combatantsOf(
  *  context every later step reads. Throws before anything is rolled or written. */
 export function openResolve(
   state: GameState,
-  action: DefinitionAction,
+  declared: DefinitionAction,
   input: ResolveInput,
   deps: ResolveDependencies
 ): ResolveContext {
+  const spell = declared.spellId ? deps.catalog?.spellRecord?.(declared.spellId) : undefined;
+  const action = withSpellAttackReach(declared, spell);
   const { attacker, targets } = combatantsOf(state, action, input);
   const warnings: string[] = [];
   const derivation = deriveEquipment(attacker, deps.definition, deps.catalog);
@@ -129,7 +131,6 @@ export function openResolve(
   if (builtin?.prepare) ctx.action = builtin.prepare(ctx);
   // A spell cast with a higher slot rolls that slot's dice; a paid replay names the slot it was cast with.
   const slotLevel = input.economyPaid ? input.slotLevel : economy.plan.spendSpellSlot?.level;
-  const spell = action.spellId ? deps.catalog?.spellRecord?.(action.spellId) : undefined;
   if (slotLevel !== undefined && spell && action.spellSlot && slotLevel > action.spellSlot.level)
     ctx.action = upcastAction(ctx.action, spell, slotLevel);
   return ctx;

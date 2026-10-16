@@ -161,15 +161,28 @@ export const RiderTriggerSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("on-initiative-roll") }).strict(),
   z.object({ type: z.literal("on-taking-damage") }).strict(),
   // ---- filters ----
-  /** `spell` is an attack that casts a spell; `reaction` and `opportunity` match only when the resolver announces
-   * that trigger. */
+  /** `spell` is an attack that casts a spell; `melee-weapon` and `ranged-weapon` are melee and ranged attacks that are
+   * neither spells nor unarmed (a melee spell attack is melee, but no weapon's); `reaction` and `opportunity` match
+   * only when the resolver announces that trigger. */
   z
     .object({
       type: z.literal("attack-kind-is"),
       kinds: z
-        .array(z.enum(["melee", "ranged", "spell", "unarmed", "thrown", "reaction", "opportunity"]))
+        .array(
+          z.enum([
+            "melee",
+            "ranged",
+            "spell",
+            "melee-weapon",
+            "ranged-weapon",
+            "unarmed",
+            "thrown",
+            "reaction",
+            "opportunity"
+          ])
+        )
         .min(1)
-        .max(7)
+        .max(9)
     })
     .strict(),
   z.object({ type: z.literal("weapon-property-is"), properties: z.array(RiderSlugSchema).min(1).max(12) }).strict(),

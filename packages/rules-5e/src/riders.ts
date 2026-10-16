@@ -9,8 +9,10 @@
 
 export type RiderAbility = "str" | "dex" | "con" | "int" | "wis" | "cha";
 export type ArmorWeight = "light" | "medium" | "heavy";
-/** How an attack is being made. `reaction`/`opportunity` are only knowable from the resolve's caller. */
-export type AttackKind = "melee" | "ranged" | "spell" | "unarmed" | "thrown" | "reaction" | "opportunity";
+/** How an attack is being made. `melee-weapon`/`ranged-weapon` are melee/ranged attacks that are neither spells nor
+ *  unarmed. `reaction`/`opportunity` are only knowable from the resolve's caller. */
+export type AttackKind =
+  "melee" | "ranged" | "spell" | "melee-weapon" | "ranged-weapon" | "unarmed" | "thrown" | "reaction" | "opportunity";
 
 /** The named roll or event a rider fires at; at most one per rider. */
 export type RiderMoment =

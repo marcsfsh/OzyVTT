@@ -29,8 +29,18 @@ describe("what one cast of an SRD spell does", () => {
   it("attacks only where the caster makes the spell attack", () => {
     expect(effectOf("fire-bolt")!.attacks).toBe(1);
     expect(effectOf("scorching-ray")!.attacks).toBe(3);
+    expect(effectOf("bless")!.attackRange).toBeUndefined();
     for (const id of ["faerie-fire", "protection-from-evil-and-good", "ray-of-enfeeblement", "bless"])
       expect(effectOf(id)!.attacks, id).toBe(0);
+  });
+
+  it("says how far each spell attack reaches: a ranged one to the spell's range, a melee one 5 feet", () => {
+    expect(effectOf("fire-bolt")!.attackRange).toEqual({ kind: "ranged", feet: 120 });
+    expect(effectOf("scorching-ray")!.attackRange).toEqual({ kind: "ranged", feet: 120 });
+    expect(effectOf("shocking-grasp")!.attackRange).toEqual({ kind: "melee", feet: 5 });
+    // A Self spell's touch, and a Self spell's hurled flame.
+    expect(effectOf("vampiric-touch")!.attackRange).toEqual({ kind: "melee", feet: 5 });
+    expect(effectOf("produce-flame")!.attackRange).toEqual({ kind: "ranged", feet: 60 });
   });
 
   it("declares the reactions the table can offer, and none it can't see the trigger of", () => {
@@ -60,9 +70,17 @@ describe("a homebrew spell's cast model, from what its author set", () => {
     const bolt = { ...cureWounds, description: "A bolt.", attackRoll: true, damage: { roll: "2d10", types: ["fire"] } };
     expect(spellEffectFromColumns(bolt)).toEqual({
       attacks: 1,
+      // A Touch spell's attack is a melee one.
+      attackRange: { kind: "melee", feet: 5 },
       damage: [{ formula: "2d10", type: "fire" }],
       healing: null
     });
+    const ranged = {
+      ...bolt,
+      description: "Make a ranged spell attack.",
+      range: { distance: 60, unit: "feet", text: "60 feet" }
+    };
+    expect(spellEffectFromColumns(ranged).attackRange).toEqual({ kind: "ranged", feet: 60 });
     expect(spellEffectFromColumns(cureWounds).damage).toEqual([]);
     expect(healingOfText("It deals 2d8 Fire damage.")).toBeNull();
   });

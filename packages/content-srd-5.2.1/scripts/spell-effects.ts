@@ -7,7 +7,7 @@
  */
 import { DamageTypeSchema } from "@vtt/schemas";
 import type { SpellEffect } from "../src/schemas.js";
-import { healingOfText } from "../src/spell-effect.js";
+import { healingOfText, spellAttackRangeOf, type SpellRange } from "../src/spell-effect.js";
 
 /** Spells whose printed damage is not dealt by the cast to its targets, and why. They cast with no damage and the
  *  GM applies the rest from the text. */
@@ -89,6 +89,11 @@ const CAST_ATTACKS: Readonly<Record<string, number>> = {
   "flame-blade": 0
 };
 
+/** Where a cast's spell attack reaches, where the spell's own range doesn't say it: the hurled flame of a Self spell. */
+const ATTACK_RANGES: Readonly<Record<string, NonNullable<SpellEffect["attackRange"]>>> = {
+  "produce-flame": { kind: "ranged", feet: 60 }
+};
+
 /** Reaction spells the table offers as prompts: what triggers each and what casting it does. Counterspell and Feather
  *  Fall answer triggers the engine doesn't see (a spell being cast, a fall), so they stay with the GM. */
 const CAST_REACTIONS: Readonly<Record<string, NonNullable<SpellEffect["reaction"]>>> = {
@@ -97,17 +102,25 @@ const CAST_REACTIONS: Readonly<Record<string, NonNullable<SpellEffect["reaction"
   "hellish-rebuke": { trigger: "damaged-by-creature", response: "strike-back", rangeFeet: 60 }
 };
 
-/** The cast model for one SRD spell from its text and the source's damage columns. */
+/** The cast model for one SRD spell from its text, its range and the source's damage columns. */
 export function spellEffectFor(
   id: string,
   description: string,
   roll: string | null,
-  types: readonly string[]
+  types: readonly string[],
+  range: SpellRange
 ): SpellEffect {
   const healing = healingOfText(description);
   const attacks = CAST_ATTACKS[id] ?? (/\bmakes? an? (?:ranged|melee) spell attack\b/i.test(description) ? 1 : 0);
+  const attackRange = attacks > 0 ? (ATTACK_RANGES[id] ?? spellAttackRangeOf(description, range)) : null;
   const reaction = CAST_REACTIONS[id];
-  return { attacks, damage: castDamage(id, roll, types, healing !== null), healing, ...(reaction ? { reaction } : {}) };
+  return {
+    attacks,
+    ...(attackRange ? { attackRange } : {}),
+    damage: castDamage(id, roll, types, healing !== null),
+    healing,
+    ...(reaction ? { reaction } : {})
+  };
 }
 
 function castDamage(id: string, roll: string | null, types: readonly string[], heals: boolean): Damage {
@@ -122,5 +135,6 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...Object.keys(NO_CAST_DAMAGE),
   ...Object.keys(CAST_DAMAGE),
   ...Object.keys(CAST_ATTACKS),
+  ...Object.keys(ATTACK_RANGES),
   ...Object.keys(CAST_REACTIONS)
 ];

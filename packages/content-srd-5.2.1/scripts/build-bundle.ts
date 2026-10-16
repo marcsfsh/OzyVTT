@@ -871,7 +871,11 @@ const spellRecords = onlySrd(spells).map((spell) => {
       ? { type: fields.shape_type, size: fields.shape_size, unit: fields.shape_size_unit }
       : null,
     area: areaOfProse(fields.desc),
-    effect: spellEffectFor(slugOf(spell.pk), fields.desc, fields.damage_roll || null, fields.damage_types),
+    effect: spellEffectFor(slugOf(spell.pk), fields.desc, fields.damage_roll || null, fields.damage_types, {
+      distance: fields.range,
+      unit: fields.range_unit,
+      text: fields.range_text || null
+    }),
     classes: fields.classes.map(slugOf).sort(),
     description: fields.desc,
     higherLevel: fields.higher_level || null,

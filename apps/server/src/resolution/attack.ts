@@ -33,22 +33,25 @@ export function attackUsedAsRanged(
   return distance === null || distance > attack.reachFeet + 1e-6;
 }
 
-/** melee/ranged/thrown derive from reach and range, spell from the spell the action casts; reaction/opportunity
- *  come from `input.attackKinds`. */
+/** melee/ranged/thrown derive from reach and range, spell from the spell the action casts, melee-weapon and
+ *  ranged-weapon from neither a spell nor unarmed; reaction/opportunity come from `input.attackKinds`. */
 function attackKindsOf(ctx: ResolveContext, distance: number | null): AttackKind[] {
   const { action, input } = ctx;
   const kinds = new Set<AttackKind>(input.attackKinds ?? []);
   const attack = action.attack;
+  // Matched by id so a Monk's own strike (which shadows the builtin) still counts as unarmed.
+  const unarmed = action.id === UNARMED_STRIKE_ACTION_ID;
   if (attack) {
     const melee = attack.reachFeet !== undefined;
     const ranged = attack.rangeFeet !== undefined;
-    if (attackUsedAsRanged(attack, distance)) kinds.add("ranged");
-    else if (melee) kinds.add("melee");
-    if (melee && ranged) kinds.add("thrown");
+    const used = attackUsedAsRanged(attack, distance) ? "ranged" : melee ? "melee" : null;
+    if (used) kinds.add(used);
     if (action.spellId !== undefined) kinds.add("spell");
+    // A melee spell attack is melee but no weapon's (Radiant Strikes, magic ammunition).
+    else if (used && !unarmed) kinds.add(used === "melee" ? "melee-weapon" : "ranged-weapon");
+    if (melee && ranged) kinds.add("thrown");
   }
-  // Matched by id so a Monk's own strike (which shadows the builtin) still counts as unarmed.
-  if (action.id === UNARMED_STRIKE_ACTION_ID) kinds.add("unarmed");
+  if (unarmed) kinds.add("unarmed");
   if (action.activation === "reaction") kinds.add("reaction");
   return [...kinds];
 }

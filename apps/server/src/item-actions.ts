@@ -1,4 +1,5 @@
 import type { FeatureAction, FeatureSaveDc, FeatureUses, ItemSpellCast, SpellReference } from "@vtt/content-srd-5.2.1";
+import { spellRangeFeet } from "@vtt/content-srd-5.2.1/spell-effect";
 import {
   abilityModifier,
   formulaPlus,
@@ -192,7 +193,13 @@ export function spellCastMechanics(
   return {
     damage: effect.damage.map((part) => ({ formula: scale(part.formula), type: part.type })),
     ...(attacks > 0
-      ? { attack: { bonus: numbers.attackBonus, ...(attacks > 1 ? { count: Math.min(10, attacks) } : {}) } }
+      ? {
+          attack: {
+            bonus: numbers.attackBonus,
+            ...(attacks > 1 ? { count: Math.min(10, attacks) } : {}),
+            ...spellAttackReach(spell)
+          }
+        }
       : spell.save
         ? { save: { ...spell.save, dc: numbers.saveDc, ...(numbers.bearersDc ? { spellcasting: true } : {}) } }
         : {}),
@@ -204,6 +211,33 @@ export function spellCastMechanics(
         }
       : {})
   };
+}
+
+/** Where a spell's attack reaches, as the attack block carries it: a melee spell attack's `reachFeet` or a ranged
+ *  one's `rangeFeet` (no long range: a spell has one range). A cast model from before the build recorded it falls
+ *  back to the spell's range, Touch and Self being melee. */
+export function spellAttackReach(
+  spell: Pick<SpellReference, "effect" | "range">
+): Pick<NonNullable<ActorAction["attack"]>, "reachFeet" | "rangeFeet"> {
+  const feet = spellRangeFeet(spell.range);
+  const reach =
+    spell.effect?.attackRange ??
+    (feet !== null
+      ? { kind: "ranged" as const, feet }
+      : spell.range.text !== null && !/^(?:touch|self)/i.test(spell.range.text)
+        ? null
+        : { kind: "melee" as const, feet: 5 });
+  // A range the map can't measure (Sight) is left unchecked rather than read as a 5-foot reach.
+  if (reach === null) return { rangeFeet: 5280 };
+  return reach.kind === "melee" ? { reachFeet: reach.feet } : { rangeFeet: reach.feet };
+}
+
+/** A spell action made before its attack carried a range (an older sheet), given the spell's: otherwise the economy
+ *  reads it as a 5-foot melee swing. Unchanged when it has one, or casts no attack. */
+export function withSpellAttackReach(action: ActorAction, spell: SpellReference | undefined): ActorAction {
+  const attack = action.attack;
+  if (!attack || !spell || attack.reachFeet !== undefined || attack.rangeFeet !== undefined) return action;
+  return { ...action, attack: { ...attack, ...spellAttackReach(spell) } };
 }
 
 /** Martial Arts reaches this swing: the bearer has it, it is in force (no armour, no shield) and this is a Monk weapon. */

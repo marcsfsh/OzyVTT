@@ -57,6 +57,12 @@ export const SpellEffectSchema = z
   .object({
     /** Spell attack rolls one cast makes (Scorching Ray's three rays); 0 for none. */
     attacks: z.number().int().min(0).max(10),
+    /** How those attacks are made: a melee spell attack within `feet` of the caster (Touch is 5; a summoned blade
+     *  strikes 5 feet past the spell's range), or a ranged one out to `feet`. Absent, the spell's range decides. */
+    attackRange: z
+      .object({ kind: z.enum(["melee", "ranged"]), feet: z.number().int().min(5).max(5280) })
+      .strict()
+      .optional(),
     /** Damage to each target, every part rolled (all three of Magic Missile's darts). */
     damage: z.array(z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema }).strict()).max(4),
     /** Hit points each target regains; `addsModifier` adds the caster's spellcasting ability modifier. */
