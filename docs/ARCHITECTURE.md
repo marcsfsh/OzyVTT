@@ -208,12 +208,13 @@ the GM calendar are separate clocks; a date reaches players only when it is publ
 envelopes, using the same handlers, authorization and projections as the UI. The OpenAPI
 document is assembled in `apps/server/src/openapi/` and served at `/api/v1/openapi.json`. The
 components with a Zod schema behind them (the contract's shapes, the homebrew vocabulary and record
-bodies, the Codex write bodies and records, the content catalogs, every game command's request body) are
-generated from it in `components.ts`, with their prose in `descriptions.ts`; each game command's operation
-comes from the command table. The Codex records' and catalog rows' TypeScript types are inferred from their
-schemas in `packages/domain/src/codex-wire.ts` and `content.ts`, so a field added to a projection or a
-catalog reaches the document with it. The viewer, map asset and builder-offer components are still written
-by hand. Conventions are in
+bodies, the Codex write bodies and records, the content catalogs, the viewer, map, available-actions and
+builder-offer responses, every game command's request body) are generated from it in `components.ts`,
+with their prose in `descriptions.ts`; each game command's operation comes from the command table. Each
+response's TypeScript type is inferred from its schema (`packages/domain/src/codex-wire.ts`, `content.ts`
+and `results.ts`, and the server's viewer and map modules), so a field added to a projection reaches the
+document with it. `document.ts` keeps the structure around them: the response envelopes, the
+role-projected `oneOf` reads, a few small fixed shapes, and the objects it deliberately leaves opaque. Conventions are in
 ADR-0016; every router builds them from `apps/server/src/http-kit.ts` (bearer tokens, request ids,
 envelopes), and a caught error reaches the caller only as a known refusal, never as raw text.
 

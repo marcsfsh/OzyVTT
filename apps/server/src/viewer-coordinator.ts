@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { z } from "zod";
 import { ViewerAccessDeniedError, type ViewerAccessMetadata, type ViewerAccessStore } from "./viewer-access.js";
 import type {
   ViewerCamera,
@@ -28,12 +29,14 @@ type GmSubscriber = {
   close: CloseListener;
 };
 
-export type ViewerConnectionMetadata = Readonly<{
-  connectionId: string;
-  viewerId: string;
-  name: string;
-  connectedAt: string;
-}>;
+/** A table screen connected right now, under the viewer credential it paired with. */
+export const ViewerConnectionMetadataSchema = z.strictObject({
+  connectionId: z.string(),
+  viewerId: z.uuid(),
+  name: z.string(),
+  connectedAt: z.iso.datetime()
+});
+export type ViewerConnectionMetadata = Readonly<z.infer<typeof ViewerConnectionMetadataSchema>>;
 
 export class ViewerCoordinator {
   private readonly subscribers = new Map<string, ViewerSubscriber>();

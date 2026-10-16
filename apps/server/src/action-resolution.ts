@@ -1,4 +1,4 @@
-import type { ActionResolution, GameState } from "@vtt/domain";
+import type { ActionAvailability, ActionResolution, GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { masteryMissDamage } from "./weapon-mastery.js";
 import { rollAttack } from "./resolution/attack.js";
@@ -123,17 +123,8 @@ export function actionAvailability(
   definition: ActorDefinition | undefined,
   builtin = false,
   siblings: ReadonlyArray<DefinitionAction> = definition?.actions ?? []
-): ReadonlyArray<{
-  id: string;
-  name: string;
-  activation: DefinitionAction["activation"];
-  available: boolean;
-  violations: ReadonlyArray<{ rule: string; message: string }>;
-  usesRemaining: number | null;
-  componentsRemaining: number | null;
-  builtin?: boolean;
-}> {
-  return actions.map((action) => {
+): ReadonlyArray<ActionAvailability> {
+  return actions.map((action): ActionAvailability => {
     const evaluation = evaluateActionEconomy(state, attacker, action, [], definition, undefined, siblings);
     let usesRemaining: number | null = null;
     if (action.uses) {

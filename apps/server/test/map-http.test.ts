@@ -2,12 +2,14 @@ import { createServer } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Ajv2020 } from "ajv/dist/2020.js";
 import express from "express";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { VIEWER_SESSION_COOKIE } from "@vtt/api-contract";
 import { MapAssetStore } from "../src/map-assets.js";
 import { MapCatalogStore } from "../src/map-catalog.js";
 import { createMapRouter } from "../src/map-http.js";
+import { openApiDocument } from "../src/openapi/document.js";
 
 const cleanups: Array<() => Promise<void> | void> = [];
 afterEach(async () => {
@@ -102,6 +104,37 @@ describe("map asset HTTP workflow", () => {
       headers: { authorization: "Bearer gm-token", "if-none-match": whole.headers.get("etag")! }
     });
     expect(notModified.status).toBe(304);
+  });
+
+  it("answers in the shapes the API document publishes, folder included", async () => {
+    const test = await fixture();
+    const ajv = new Ajv2020({ strict: false });
+    ajv.addSchema(openApiDocument as unknown as Record<string, unknown>, "openapi");
+    const expectShape = (schemaName: string, payload: unknown) => {
+      const validate = ajv.compile({ $ref: `openapi#/components/schemas/${schemaName}` });
+      expect(validate(payload), `${schemaName}: ${JSON.stringify(validate.errors)}`).toBe(true);
+    };
+    const path = `${test.base}/api/v1/map-assets?filename=keep.png&name=Keep&kind=battlemap`;
+    const uploaded = await body(await fetch(path, { method: "POST", headers: gm("image/png"), body: test.input }));
+    expectShape("MapAssetUploadData", uploaded.data);
+    const id = uploaded.data.asset.id;
+    const filed = await body(
+      await fetch(`${test.base}/api/v1/map-assets/${id}`, {
+        method: "PATCH",
+        headers: gm(),
+        body: JSON.stringify({ folder: "Dungeons" })
+      })
+    );
+    expect(filed.data.map.folder).toBe("Dungeons");
+    expectShape("MapAssetData", filed.data);
+    expectShape(
+      "MapAssetData",
+      (await body(await fetch(`${test.base}/api/v1/map-assets/${id}`, { headers: gm() }))).data
+    );
+    expectShape(
+      "MapAssetListData",
+      (await body(await fetch(`${test.base}/api/v1/map-assets`, { headers: gm() }))).data
+    );
   });
 
   it("serves grid calibration to anyone who can already read the map's content, but not to strangers", async () => {
