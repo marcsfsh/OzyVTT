@@ -600,6 +600,36 @@ describe("report test 9 - zero HP, dying, and healing", () => {
       expect(game.rolls.length).toBe(recorded); // a confirmed/typed roll records nothing new
     });
 
+    it("adds what a saving throw adds (Exhaustion, save bonuses), while the die alone decides a 1 or a 20", () => {
+      const { game, pip } = dying();
+      // A 12 is a success on its own, but Exhaustion 3 takes 6 off the total.
+      const tired = rollDeathSave(
+        game,
+        pip,
+        { commit: false, modifier: -6 },
+        deps(() => 12)
+      );
+      expect(tired.outcome.outcome).toBe("failure");
+      // A 9 with a +1 Ring of Protection reaches 10.
+      expect(
+        rollDeathSave(
+          game,
+          pip,
+          { commit: false, modifier: 1 },
+          deps(() => 9)
+        ).outcome.outcome
+      ).toBe("success");
+      // A natural 20 is still a 20, whatever the penalty.
+      expect(
+        rollDeathSave(
+          game,
+          pip,
+          { commit: false, modifier: -6 },
+          deps(() => 20)
+        ).outcome.regainsOneHitPoint
+      ).toBe(true);
+    });
+
     it("a natural 20 signals the regain-1-HP heal and resets the pips", () => {
       const { game, pip } = dying();
       pip.deathSaves = { successes: 1, failures: 2, stable: false };

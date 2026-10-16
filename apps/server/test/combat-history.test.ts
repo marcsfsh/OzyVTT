@@ -9,7 +9,7 @@ import { startEncounter, endEncounter } from "../src/encounter.js";
 import { activateScene, createScene } from "../src/scenes.js";
 import { removeActor } from "../src/actor-roster.js";
 import { applyDamage } from "../src/hit-points.js";
-import { planNextTurn, planPreviousTurn, timelineDirtied } from "../src/combat-history.js";
+import { planNextTurn, planPreviousTurn, restartTimeline, timelineDirtied } from "../src/combat-history.js";
 import { buildEncounterArchive } from "../src/encounter-archive.js";
 import type { CombatLogEntry } from "@vtt/domain";
 
@@ -103,6 +103,38 @@ describe("turn time-travel timeline", () => {
     expect(store.snapshot.combat.historyCursor).toBeNull();
     expect(store.snapshot.actors.find((a) => a.id === MON)?.hp.current).toBe(6);
     expect(store.listTurnSnapshots().map((entry) => entry.kind)).toEqual(["turn"]); // return-point consumed
+  });
+
+  it("gives back spell slots, Pact slots and Hit Dice spent in the turn that is undone", async () => {
+    await store.execute({ id: randomUUID(), type: "setup" }, (state) => {
+      const alpha = state.actors.find((actor) => actor.id === PC)!;
+      alpha.spellSlots = [{ level: 3, remaining: 2 }];
+      alpha.pactSlots = { level: 2, remaining: 2 };
+      alpha.hitDice = { die: "d8", maximum: 5, remaining: 5, entries: [{ die: "d8", maximum: 5, remaining: 5 }] };
+    });
+    await next(); // capture Alpha's turn, live on Goblin
+    await store.execute({ id: randomUUID(), type: "spend" }, (state) => {
+      const alpha = state.actors.find((actor) => actor.id === PC)!;
+      alpha.spellSlots = [{ level: 3, remaining: 0 }];
+      alpha.pactSlots = { level: 2, remaining: 0 };
+      alpha.hitDice = { die: "d8", maximum: 5, remaining: 2, entries: [{ die: "d8", maximum: 5, remaining: 2 }] };
+    });
+    await previous();
+    const alpha = store.snapshot.actors.find((actor) => actor.id === PC)!;
+    expect(alpha.spellSlots).toEqual([{ level: 3, remaining: 2 }]);
+    expect(alpha.pactSlots).toEqual({ level: 2, remaining: 2 });
+    expect(alpha.hitDice?.remaining).toBe(5);
+  });
+
+  it("starts a resumed fight's timeline at the swap, so a rewind doesn't tick the turn twice", async () => {
+    await store.executeTimeline({ id: randomUUID(), type: "scene.activate" }, (state, timeline) =>
+      restartTimeline(state, timeline)
+    );
+    expect(store.listTurnSnapshots().map((entry) => entry.kind)).toEqual(["turn"]);
+    await next(); // Alpha's turn ends; Goblin's begins
+    await previous(); // a real restore, not just the turn pointer
+    expect(store.snapshot.combat.historyCursor).not.toBeNull();
+    expect(store.snapshot.combat.turnActorId).toBe(PC);
   });
 
   it("marks the timeline dirty only when a restorable change is made while rewound", async () => {

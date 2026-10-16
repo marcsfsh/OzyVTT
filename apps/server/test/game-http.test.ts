@@ -106,6 +106,40 @@ async function issueCredential(base: string, gmToken: string, name: string, scop
   return { token: body.data.token as string, id: body.data.credential.id as string };
 }
 
+describe("death saves over the API", () => {
+  it("lets a player make one death save, on their dying character's own turn", async () => {
+    const { base, server, gmToken, mapAssetId } = await bootWithBattlemap();
+    const playerToken = server.auth.issuePlayerSession();
+    await post(base, GAME_PATHS.claims, playerToken, { commandId: randomUUID(), actorId: HERO_ID });
+    await post(base, GAME_PATHS.encounterStart, gmToken, {
+      commandId: randomUUID(),
+      mapAssetId,
+      entries: [
+        { actorId: SECRET_ID, score: 20 },
+        { actorId: HERO_ID, score: 10 }
+      ]
+    });
+    await post(base, GAME_PATHS.actorHp.replace("{actorId}", HERO_ID), gmToken, {
+      commandId: randomUUID(),
+      actorId: HERO_ID,
+      current: 0
+    });
+    const roll = (token: string) =>
+      post(base, GAME_PATHS.deathSaveRoll.replace("{actorId}", HERO_ID), token, {
+        commandId: randomUUID(),
+        actorId: HERO_ID
+      });
+    // The Tyrant's turn: not yet.
+    expect((await roll(playerToken)).status).toBe(409);
+    await post(base, GAME_PATHS.initiativeNext, gmToken, { commandId: randomUUID() });
+    expect((await roll(playerToken)).status).toBe(200);
+    // One per turn.
+    expect((await roll(playerToken)).status).toBe(409);
+    // The GM can still roll one as a correction.
+    expect((await roll(gmToken)).status).toBe(200);
+  });
+});
+
 describe("public game API over /api/v1", () => {
   it("serves GM-full and player-safe snapshots by principal, with ETag polling and no hidden-actor leaks", async () => {
     const { base, server, gmToken } = await boot();

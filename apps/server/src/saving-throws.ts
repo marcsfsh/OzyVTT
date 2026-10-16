@@ -86,6 +86,13 @@ export function saveRiderBonus(derivation: EquipmentDerivation, ability: Ability
   return derivation.saveBonus + sumRiders(momentary, "save-bonus");
 }
 
+/** The flat rider bonus to a saving throw that names no ability, such as a death save: riders that apply to
+ *  every save (Ring of Protection, Aura of Protection) and none tied to one ability. */
+export function saveRiderBonusForAnySave(derivation: EquipmentDerivation): number {
+  const momentary = collectRiders(derivation.carriers, { ...derivation.context, moment: "on-saving-throw" });
+  return derivation.saveBonus + sumRiders(momentary, "save-bonus");
+}
+
 const ABILITIES: readonly AbilityId[] = ["str", "dex", "con", "int", "wis", "cha"];
 
 /** Save modifier without situational terms. Precedence: GM-typed `saveOverrides`, the sheet's

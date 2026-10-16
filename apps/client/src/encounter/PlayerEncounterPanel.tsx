@@ -283,7 +283,8 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                           actorId={entry.actorId}
                           name={entry.name}
                           deathSaves={rowActor.deathSaves!}
-                          canRoll
+                          // A death save comes at the start of the character's own turn.
+                          canRoll={myTurn}
                           onFeedback={onFeedback}
                           rollMode={rollMode}
                           isActingTurn={myTurn}

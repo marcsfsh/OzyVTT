@@ -466,6 +466,8 @@ const sceneCombatShape = {
       movementUsedFeet: z.number().nonnegative().max(100000).default(0),
       /** Rule families the GM already waved through this turn. Stripped from player projections. */
       rulesOverriddenFamilies: z.array(RuleFamilySchema).max(5).optional(),
+      /** The turn's actor has made its one death save (SRD: at the start of its turn). Never projected. */
+      deathSaveRolled: z.boolean().optional(),
       /** What this turn's attacks opened for an extra attack: the Light weapons its actor swung in the Attack action,
        *  and the creature a Cleave weapon hit. Engine bookkeeping, never projected. */
       extraAttacks: z
