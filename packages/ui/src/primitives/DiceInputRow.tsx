@@ -34,6 +34,8 @@ interface DiceInputRowProps {
       `busy` (in flight). */
   complete?: boolean;
   hint?: ReactNode;
+  /** False when the table rolls these dice and nobody may type their own: only "roll it for me" is shown. */
+  manualAllowed?: boolean;
   className?: string;
 }
 
@@ -58,6 +60,7 @@ export function DiceInputRow({
   busy = false,
   complete = false,
   hint,
+  manualAllowed = true,
   className
 }: DiceInputRowProps) {
   const [typed, setTyped] = useState("");
@@ -79,24 +82,26 @@ export function DiceInputRow({
       <div className="nh-diceinput-head">
         {label != null && <span className="nh-diceinput-label">{label}</span>}
         {notation != null && <span className="nh-diceinput-notation tabular">{notation}</span>}
-        <SegmentedControl
-          size="sm"
-          className="nh-diceinput-mode"
-          ariaLabel="How to roll"
-          value={mode}
-          onChange={(next) => {
-            setError(null);
-            onModeChange(next as DiceEntryMode);
-          }}
-          options={[
-            { value: "auto", label: "Roll for me" },
-            { value: "manual", label: "I rolled it" }
-          ]}
-        />
+        {manualAllowed && (
+          <SegmentedControl
+            size="sm"
+            className="nh-diceinput-mode"
+            ariaLabel="How to roll"
+            value={mode}
+            onChange={(next) => {
+              setError(null);
+              onModeChange(next as DiceEntryMode);
+            }}
+            options={[
+              { value: "auto", label: "Roll for me" },
+              { value: "manual", label: "I rolled it" }
+            ]}
+          />
+        )}
       </div>
 
       <div className="nh-diceinput-row">
-        {mode === "auto" ? (
+        {mode === "auto" || !manualAllowed ? (
           <Button variant="primary" onClick={onRoll} disabled={busy || complete}>
             <span className="nh-diceinput-die" aria-hidden="true">
               <IconDie />

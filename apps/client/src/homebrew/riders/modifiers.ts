@@ -35,7 +35,8 @@ const MODIFIER_LABELS: Readonly<
   "extra-attack": ["The character", "Extra attack"],
   darkvision: ["The character", "Darkvision"],
   sense: ["The character", "Another sense"],
-  "resource-bonus": ["The character", "A limited-use pool"]
+  "resource-bonus": ["The character", "A limited-use pool"],
+  "attunement-slots": ["The character", "Attunement slots"]
 };
 
 const MODIFIER_TYPES: readonly SelectOption[] = Object.entries(MODIFIER_LABELS).map(([type, [group, label]]) =>
@@ -76,7 +77,7 @@ function blankModifier(type: string): Draft {
     case "check-bonus":
       return { type, amount: 1 };
     case "extra-damage":
-      return { type, formula: "1d6", doubleOnCritical: false };
+      return { type, formula: "1d6", doubleOnCritical: true };
     case "roll-mode":
       return { type, roll: "attack", mode: "advantage" };
     case "spell-save-dc":
@@ -87,6 +88,8 @@ function blankModifier(type: string): Draft {
       return { type, level: 1, amount: 1 };
     case "resource-bonus":
       return { type, poolId: "", amount: 1 };
+    case "attunement-slots":
+      return { type, amount: 1 };
     case "critical-range":
       return { type, threshold: 19 };
     case "critical-bonus-dice":
@@ -233,6 +236,15 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
     },
     {
       key: "amount",
+      label: "Extra attuned items",
+      kind: "number",
+      min: 1,
+      max: 3,
+      visibleWhen: hasType("attunement-slots"),
+      help: "Beyond the usual three. Use Magic Device is 1."
+    },
+    {
+      key: "amount",
       label: "Damage reduced by",
       kind: "number",
       min: 1,
@@ -269,6 +281,13 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       note: "Display only."
     },
     { key: "whileArmored", label: "Only while wearing armour", kind: "switch", visibleWhen: hasType("armor-class") },
+    {
+      key: "proficiencyBonus",
+      label: "Also add the Proficiency Bonus",
+      kind: "switch",
+      visibleWhen: hasType("initiative"),
+      help: "Alert's rule. A feature's or feat's is built into the character when it is built or levelled; an item's counts while the item is in use."
+    },
     /* On an item nothing reads `unarmored-defense` (it is builder-baked from features and feats
        only), so items get a note; features and feats need none. */
     {
@@ -313,7 +332,7 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       label: "Doubled on a critical hit",
       kind: "switch",
       visibleWhen: hasType("extra-damage"),
-      help: "Off is the 5e rule — dice added after the attack aren't doubled."
+      help: "On is the rule: a critical hit rolls the attack's extra dice twice too."
     },
     {
       key: "roll",

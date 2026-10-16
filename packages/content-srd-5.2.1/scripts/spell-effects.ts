@@ -469,8 +469,9 @@ const markDamage = (type: DamageType): Modifier => ({
 
 /**
  * What a cast leaves on the creatures it targets (or the one its attack hits) while it lasts, in the effect vocabulary
- * the engine reads (SRD 5.2.1 text). The durations are the spells' own; the GM ends one early when the caster's
- * Concentration breaks. Mage Armor's AC and Haste's Speed are measured on the creature when it lands (`grant.ts`).
+ * the engine reads (SRD 5.2.1 text). The durations are the spells' own, "until ended" past 10 minutes (the engine keeps
+ * no clock outside a fight); a Concentration spell's effects also end with the caster's Concentration. Mage Armor's AC
+ * and Haste's Speed are measured on the creature when it lands (`grant.ts`).
  */
 const CAST_GRANTS: Readonly<Record<string, Grant>> = {
   bless: spellGrant({
@@ -501,21 +502,21 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     name: "Hunter's Mark",
     tags: ["hunters-mark"],
     target: "target",
-    duration: { type: "encounter" },
+    duration: { type: "manual" },
     modifiers: [markDamage("force")]
   }),
   hex: spellGrant({
     name: "Hex",
     tags: ["hexed"],
     target: "target",
-    duration: { type: "encounter" },
+    duration: { type: "manual" },
     modifiers: [markDamage("necrotic")]
   }),
   "mage-armor": spellGrant({
     name: "Mage Armor",
     tags: ["mage-armor"],
     target: "target",
-    duration: { type: "encounter" }
+    duration: { type: "manual" }
   }),
   haste: spellGrant({
     name: "Haste",

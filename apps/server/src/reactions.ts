@@ -384,6 +384,7 @@ function answerParkedAttack(answer: Answer): ReactionOutcome {
       ...(parked.slotLevel !== null ? { slotLevel: parked.slotLevel } : {}),
       ...(parked.damageType !== null ? { damageType: parked.damageType } : {}),
       attackBonusDice: parked.bonusDice,
+      ...(parked.hitOptions.length > 0 ? { hitOptions: parked.hitOptions } : {}),
       economyPaid: true,
       ...(use && effectName === null && pending.acBonus !== null
         ? { reactionAcBonus: { amount: pending.acBonus, source: pending.actionName } }

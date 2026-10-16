@@ -4,9 +4,10 @@ import type { ClassMechanicsModule } from "./overlay.js";
 export const rogue: ClassMechanicsModule = {
   features: {
     /**
-     * Once per turn (`per: "turn"`, counted in `turnUses`). The damage type is the weapon's, unknowable
-     * at authoring time, so parts are labelled `weapon`. Qualifying (Advantage or an adjacent ally)
-     * stays prose. The printed column stays display-only: "6d6" is a die, not a use count.
+     * Once per turn (`per: "turn"`, counted in `turnUses`). It rides a hit: the server offers it on an attack's
+     * preview when the hit qualifies (Finesse or Ranged weapon; Advantage, or an ally beside the target and no
+     * Disadvantage) and rolls it with the hit in the weapon's type, so the `weapon` label below is never dealt.
+     * The printed column stays display-only: "6d6" is a die, not a use count.
      */
     "sneak-attack": {
       uses: { limit: 1, per: "turn", pool: "sneak-attack" },
@@ -16,7 +17,7 @@ export const rogue: ClassMechanicsModule = {
           name: "Sneak Attack",
           activation: "other",
           description:
-            "Once per turn, deal this extra damage to one creature you hit with an attack roll, if you have Advantage on the roll (or an ally is within 5 feet of the target, that ally isn't Incapacitated, and you don't have Disadvantage) and the attack uses a Finesse or a Ranged weapon. The extra damage's type is the same as the weapon's, which is why the part below is labelled \"weapon\" rather than a fixed type.",
+            "Once per turn, deal this extra damage to one creature you hit with an attack roll, if you have Advantage on the roll (or an ally is within 5 feet of the target, that ally isn't Incapacitated, and you don't have Disadvantage) and the attack uses a Finesse or a Ranged weapon. The extra damage's type is the same as the weapon's. Add it when you confirm a qualifying hit.",
           damage: [],
           damageByLevel: [
             { level: 1, formula: "1d6", type: "weapon" },
@@ -84,7 +85,7 @@ export const rogue: ClassMechanicsModule = {
     },
 
     "epic-boon": {
-      choice: { kind: "feat", choose: 1, fromCatalog: "epic-boon-feats" }
+      choice: { kind: "feat", choose: 1, fromCatalog: "feats" }
     },
 
     // The counter only; turning a failed D20 Test into a 20 is not expressible.
@@ -94,6 +95,10 @@ export const rogue: ClassMechanicsModule = {
   },
   subclasses: {
     thief: {
+      // The fourth attunement is read when an item is attuned; the charge and Spell Scroll clauses stay prose.
+      "use-magic-device": {
+        modifiers: [{ type: "attunement-slots", amount: 1 }]
+      },
       // Adds the Bonus Action activation; the Sleight of Hand check is rolled from the skill block.
       "fast-hands": {
         actions: [

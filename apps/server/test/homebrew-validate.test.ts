@@ -822,7 +822,11 @@ describe("a duplicated SRD record still passes its own gate", () => {
     const copy = rewriteForNewId("species", elf.body, "elf", "hb-shadar-kai-a1b2c3") as Record<string, any>;
     // Keeping `elf-lineages` would resolve against the elf's lineage rows, so lineages added to the copy
     // would never be offered.
-    expect((copy.traits as any[]).map((trait) => trait.choice?.fromCatalog)).toContain("hb-shadar-kai-a1b2c3-lineages");
+    // Elven Lineage asks for the lineage and the spellcasting ability, so the pick sits in `choices`.
+    const catalogs = (copy.traits as any[]).flatMap((trait) =>
+      [trait.choice, ...(trait.choices ?? [])].map((choice) => choice?.fromCatalog)
+    );
+    expect(catalogs).toContain("hb-shadar-kai-a1b2c3-lineages");
     expect(validateForPublish("species", copy, context)).toEqual({ valid: true, issues: [], warnings: [] });
   });
 

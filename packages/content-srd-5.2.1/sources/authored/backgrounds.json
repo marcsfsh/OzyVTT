@@ -240,7 +240,9 @@
       "choose": 1,
       "from": [
         "gaming-set-dice",
-        "gaming-set-playing-cards"
+        "gaming-set-dragonchess",
+        "gaming-set-playing-cards",
+        "gaming-set-three-dragon-ante"
       ]
     },
     "startingEquipment": [

@@ -13,12 +13,14 @@ import {
   CLASS_SPELL_BUDGET,
   classSpellList,
   levelOfPick,
+  SPELLCASTING_ABILITY_KIND,
   surveyDraft,
   withinOfferSpellWindow,
   type ChoiceOffer,
   type DraftSurvey
 } from "./character-offers.js";
 import type { ContentView } from "./content-library.js";
+import { featHoldings, featPrerequisiteFailure } from "./feat-prerequisites.js";
 
 /**
  * The character builder's offers for a draft (`builder:offers`): the survey `character.create` validates
@@ -245,6 +247,7 @@ function cardsOf(offer: ChoiceOffer, survey: DraftSurvey): Card[] {
     capacity: grants.length === 1 ? offer.capacity : perGrant[index],
     options,
     maxSpellLevel: offer.maxSpellLevel,
+    maximum: offer.maximum,
     level,
     classId: offer.classId,
     unresolvable: offer.unresolvable,
@@ -280,7 +283,7 @@ function nameOf(kind: string, id: string, survey: DraftSurvey): string {
         ? catalogs.spells.find((spell) => spell.id === id)?.name
         : kind === "language"
           ? catalogs.languages.find((language) => language.id === id)?.name
-          : kind === "ability-score"
+          : kind === "ability-score" || kind === SPELLCASTING_ABILITY_KIND
             ? ABILITY_NAMES[id]
             : undefined;
   return named ?? titleCase(id);
@@ -303,6 +306,7 @@ function fixedCards(survey: DraftSurvey): Card[] {
       featureId: null,
       help: null,
       maxSpellLevel: null,
+      maximum: null,
       level: 1,
       unresolvable: null,
       unavailable: null,
@@ -319,7 +323,10 @@ function fixedCards(survey: DraftSurvey): Card[] {
       classId: null
     });
   const levelRow = classRecord?.levelTable[survey.level - 1];
-  const list = classRecord && levelRow ? classSpellList(classRecord, subclass, levelRow, survey.catalogs) : null;
+  const list =
+    classRecord && levelRow
+      ? classSpellList(classRecord, subclass, levelRow, survey.catalogs, survey.extraSpellLists)
+      : null;
   if (classRecord && list) {
     // The printed level-row columns plus what features granted (Thaumaturge's extra cantrip).
     if (survey.printedCantrips > 0)
@@ -375,9 +382,11 @@ function fixedCards(survey: DraftSurvey): Card[] {
 
 /**
  * Walks the cards in order and greys what an earlier answer already holds. A feat already held leaves a
- * later feat list unless it may repeat (Magic Initiate repeats only with another spell list); a
- * proficiency held from the background or an earlier pick is disabled with where it came from. An
- * answer never greys its own card, so it stays tappable to undo.
+ * later feat list unless it may repeat (Magic Initiate repeats only with another spell list), and so does a
+ * feat whose level prerequisite this card's level does not reach; one needing a feature the build lacks is
+ * disabled with its prerequisite (ability minimums need the scores, which the build checks). A proficiency
+ * held from the background or an earlier pick is disabled with where it came from. An answer never greys its
+ * own card, so it stays tappable to undo.
  */
 function markUnavailable(cards: Card[], survey: DraftSurvey, library: ContentView, picks: Picks): void {
   const heldFeats = new Set<string>(survey.originFeat ? [survey.originFeat.id] : []);
@@ -406,11 +415,25 @@ function markUnavailable(cards: Card[], survey: DraftSurvey, library: ContentVie
     if (!record.grants || (record.grants.when?.length ?? 0) > 0) continue;
     hold([...record.grants.skills, ...record.grants.tools, ...record.grants.languages], record.name);
   }
+  const holdings = featHoldings(survey);
   for (const card of cards) {
-    if (FEAT_KINDS.has(card.kind))
+    if (FEAT_KINDS.has(card.kind)) {
+      const levelReached = (id: string) => {
+        const needs = library.featRecord(id)?.prerequisite?.level;
+        return needs === undefined || needs <= card.level;
+      };
       card.options = card.options.filter(
-        (option) => option.id === ASI_SHORTHAND || !heldFeats.has(option.id) || repeats(option.id)
+        (option) =>
+          option.id === ASI_SHORTHAND || ((!heldFeats.has(option.id) || repeats(option.id)) && levelReached(option.id))
       );
+      const unmet: Record<string, string> = {};
+      for (const option of card.options) {
+        const feat = option.id === ASI_SHORTHAND ? undefined : library.featRecord(option.id);
+        const failure = feat ? featPrerequisiteFailure(feat, { ...holdings, level: card.level, scores: null }) : null;
+        if (failure) unmet[option.id] = failure.replace(/\.$/, "");
+      }
+      if (Object.keys(unmet).length > 0) card.unavailable = { ...card.unavailable, ...unmet };
+    }
     if (PROVENANCE_KINDS.has(card.kind)) {
       const held: Record<string, string> = {};
       for (const option of card.options) {

@@ -30,6 +30,11 @@ export const PickBudgetScalingSchema = z.strictObject({
 export const DiceFormulaSchema = z
   .string()
   .regex(/^\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?$/i, "Use a safe dice formula such as 1d8 + 3.");
+/** Damage an action deals: dice, or a fixed amount that doesn't use a roll ("1 Piercing damage", a Blowgun). A crit
+ * doubles only dice, so a fixed amount stays as it is. */
+export const DamageFormulaSchema = z
+  .string()
+  .regex(/^(?:\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?|\d+)$/i, "Use dice such as 1d8 + 3, or a number.");
 /** Hit points restored: dice, or a flat number (Heal's 70). */
 export const HealingFormulaSchema = z
   .string()
@@ -83,9 +88,12 @@ export const ItemSlotSchema = z.enum([
   "shield",
   "armor",
   "head",
+  "eyes", // lenses and goggles, apart from headwear
   "neck",
-  "shoulders",
-  "hands",
+  "shoulders", // a cloak or cape
+  "body", // a robe, worn over clothes and under a cloak
+  "hands", // gloves or gauntlets
+  "bracers",
   "ring",
   "belt",
   "feet", // worn
@@ -161,9 +169,10 @@ export const RiderTriggerSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("on-initiative-roll") }).strict(),
   z.object({ type: z.literal("on-taking-damage") }).strict(),
   // ---- filters ----
-  /** `spell` is an attack that casts a spell; `melee-weapon` and `ranged-weapon` are melee and ranged attacks that are
-   * neither spells nor unarmed (a melee spell attack is melee, but no weapon's); `reaction` and `opportunity` match
-   * only when the resolver announces that trigger. */
+  /** `spell` is an attack that casts a spell; `weapon` one made with a weapon (not a spell, an Unarmed Strike or a
+   * monster's natural attack), and `melee-weapon` and `ranged-weapon` such an attack made in melee or at range (a
+   * melee spell attack is melee, but no weapon's); `reaction` and `opportunity` match only when the resolver announces
+   * that trigger. */
   z
     .object({
       type: z.literal("attack-kind-is"),
@@ -173,6 +182,7 @@ export const RiderTriggerSchema = z.discriminatedUnion("type", [
             "melee",
             "ranged",
             "spell",
+            "weapon",
             "melee-weapon",
             "ranged-weapon",
             "unarmed",
@@ -182,7 +192,7 @@ export const RiderTriggerSchema = z.discriminatedUnion("type", [
           ])
         )
         .min(1)
-        .max(9)
+        .max(10)
     })
     .strict(),
   z.object({ type: z.literal("weapon-property-is"), properties: z.array(RiderSlugSchema).min(1).max(12) }).strict(),
@@ -349,7 +359,8 @@ export const ModifierSchema = z.discriminatedUnion("type", [
     })
     .strict(),
   z.object({ type: z.literal("hit-points-per-level"), amount: z.number().int().min(-5).max(5), ...riderGate }).strict(),
-  /** Baked into the sheet's speed at build time on a feature; summed live on an effect, so it ends with it. */
+  /** Baked into the sheet's speed at build time on a feature unless gated (then read with the live loadout);
+   *  summed live on an effect, so it ends with it. */
   z.object({ type: z.literal("speed"), amount: z.number().int().min(-30).max(60), ...riderGate }).strict(),
   /**
    * Flat AC. `whileArmored` (the Defense fighting style) predates `when: [{type: "while-armored"}]` and
@@ -363,7 +374,15 @@ export const ModifierSchema = z.discriminatedUnion("type", [
       ...riderGate
     })
     .strict(),
-  z.object({ type: z.literal("initiative"), amount: z.number().int().min(-5).max(10), ...riderGate }).strict(),
+  /** `proficiencyBonus` adds the creature's Proficiency Bonus on top of `amount` (Alert's Initiative Proficiency). */
+  z
+    .object({
+      type: z.literal("initiative"),
+      amount: z.number().int().min(-5).max(10),
+      proficiencyBonus: z.boolean().optional(),
+      ...riderGate
+    })
+    .strict(),
   z.object({ type: z.literal("extra-attack"), count: z.number().int().min(1).max(3), ...riderGate }).strict(),
   /** AC = 10 + DEX + this ability while wearing no armor (Barbarian, Monk, and any homebrew that wants it). */
   z
@@ -379,6 +398,8 @@ export const ModifierSchema = z.discriminatedUnion("type", [
   z
     .object({ type: z.literal("sense"), sense: RiderSlugSchema, feet: z.number().int().min(0).max(240), ...riderGate })
     .strict(),
+  /** More magic items attuned at once than the SRD's three (Use Magic Device: four). Read when an item is attuned. */
+  z.object({ type: z.literal("attunement-slots"), amount: z.number().int().min(1).max(3), ...riderGate }).strict(),
   /** One more use of a limited resource. `poolId` is the live `actionUses` key, not a `classResources` column. */
   z
     .object({
@@ -426,14 +447,14 @@ export const ModifierSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("damage-bonus"), amount: z.number().int().min(-10).max(10), ...riderGate }).strict(),
   /** Extra typed damage as dice (`formula`), the bearer's ability modifier (`abilityModifier`), or both.
    * `damageType` absent takes the attack's own type (Empowered Evocation follows the spell). `doubleOnCritical`
-   * defaults false: 5e does not double dice added after the attack. */
+   * defaults true: a Critical Hit rolls the attack's other damage dice twice too (SRD "Critical Hits"). */
   z
     .object({
       type: z.literal("extra-damage"),
       formula: DiceFormulaSchema.optional(),
       abilityModifier: AbilitySchema.optional(),
       damageType: DamageTypeSchema.optional(),
-      doubleOnCritical: z.boolean().default(false),
+      doubleOnCritical: z.boolean().default(true),
       ...riderGate
     })
     .strict(),
@@ -441,7 +462,7 @@ export const ModifierSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("critical-range"), threshold: z.number().int().min(15).max(20), ...riderGate }).strict(),
   /** Extra untyped weapon dice on a crit (Savage Attacks). A typed crit-only 1d6 fire is `extra-damage` + `when: [{on-critical-hit}]` instead. */
   z.object({ type: z.literal("critical-bonus-dice"), count: z.number().int().min(1).max(4), ...riderGate }).strict(),
-  /** Flat reduction of incoming damage, after resistance. */
+  /** Flat reduction of incoming damage, taken off before resistance (SRD Order of Application). */
   z.object({ type: z.literal("damage-reduction"), amount: z.number().int().min(1).max(30), ...riderGate }).strict(),
   z
     .object({
@@ -450,7 +471,8 @@ export const ModifierSchema = z.discriminatedUnion("type", [
       ...riderGate
     })
     .strict(),
-  /** The mirror of `damage-resistance`; `adjustDamageParts` applies the SRD rule that both together cancel out. */
+  /** The mirror of `damage-resistance`; with both, `adjustDamageParts` halves first and then doubles (SRD Order of
+   * Application). */
   z
     .object({
       type: z.literal("damage-vulnerability"),
@@ -494,6 +516,7 @@ export type Modifier = z.infer<typeof ModifierSchema>;
  * never give it back.
  */
 export const EFFECT_REFUSED_MODIFIER_TYPES: readonly Modifier["type"][] = Object.freeze([
+  "attunement-slots",
   "ability-score",
   "hit-points-per-level",
   "armor-class",
@@ -519,7 +542,7 @@ export const EffectModifiersSchema = z
     });
   });
 
-/** What happens when an effect ends (Frenzy: one level of Exhaustion when the rage ends). */
+/** What happens when an effect ends (a homebrew curse that leaves a level of Exhaustion behind). */
 export const EffectOnEndSchema = z
   .object({
     type: z.literal("condition"),
@@ -527,6 +550,37 @@ export const EffectOnEndSchema = z
     level: z.number().int().min(1).max(6).optional()
   })
   .strict();
+
+/** "Until the end of its next turn" belongs to a creature: the bearer's own turn, or the source's. `skipsCurrentTurn`
+ * marks one that began during that creature's turn, so the end of that turn doesn't count and the next one does. */
+const TurnEndDurationSchemas = [
+  z.object({ type: z.literal("until-bearer-turn-end"), skipsCurrentTurn: z.boolean().default(false) }).strict(),
+  z.object({ type: z.literal("until-source-turn-end"), skipsCurrentTurn: z.boolean().default(false) }).strict()
+] as const;
+
+/** How long a failed save's conditions last, as the text prints it: "for 1 minute" (10 rounds), "until the start of
+ * the X's next turn", "until the end of its next turn" (the target's) or "until the end of your next turn" (the
+ * source's). Absent: until something ends them (a Concentration spell's with its Concentration). */
+export const SaveFailureDurationSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("rounds"), rounds: z.number().int().min(1).max(100) }).strict(),
+  z.object({ type: z.literal("until-source-next-turn") }).strict(),
+  z.object({ type: z.literal("until-bearer-turn-end") }).strict(),
+  z.object({ type: z.literal("until-source-turn-end") }).strict()
+]);
+export type SaveFailureDuration = z.infer<typeof SaveFailureDurationSchema>;
+
+/** Damage a lasting effect deals at the start of a turn while it lasts: "takes 21 (6d6) Acid damage at the start of
+ * each of the behir's turns" is the source's turn, "... of each of its turns" the bearer's. */
+export const OngoingDamageSchema = z
+  .object({
+    damage: z
+      .array(z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema }).strict())
+      .min(1)
+      .max(2),
+    at: z.enum(["bearer-turn-start", "source-turn-start"])
+  })
+  .strict();
+export type OngoingDamage = z.infer<typeof OngoingDamageSchema>;
 
 /** A live rules-engine effect on an actor (Rage, a grapple), with source links, duration and typed modifiers.
  * Ids derive from the commandId so retries mint the same effect. */
@@ -543,12 +597,13 @@ export const EffectInstanceSchema = z
     duration: z.discriminatedUnion("type", [
       z.object({ type: z.literal("rounds"), remaining: z.number().int().min(0).max(100) }).strict(),
       z.object({ type: z.literal("until-source-next-turn") }).strict(),
+      ...TurnEndDurationSchemas,
       z.object({ type: z.literal("encounter") }).strict(),
       z.object({ type: z.literal("manual") }).strict()
     ]),
     /** Grapples etc.: the effect ends when its source actor drops to 0 HP or leaves the roster. */
     endsWhenSourceDefeated: z.boolean().default(false),
-    /** Dodge: the effect's modifiers stop applying while the bearer is incapacitated (SRD). */
+    /** Dodge: the effect's modifiers stop applying while the bearer is Incapacitated or its Speed is 0 (SRD). */
     voidWhileIncapacitated: z.boolean().default(false),
     /** The source actor concentrates to sustain this (SRD Concentration): one at a time; damage prompts a CON save; incapacitation breaks it. */
     concentration: z.boolean().default(false),
@@ -575,9 +630,34 @@ export const EffectInstanceSchema = z
     modifiers: EffectModifiersSchema.default([]),
     /** Conditions this effect applied to the same actor; removed automatically when the effect ends. */
     linkedConditionIds: z.array(ConditionIdSchema).max(4).default([]),
-    /** Shown as "Escape DC 15"; ending the effect on escape is manual. */
+    /** The DC the Escape a Grapple action rolls against; a success ends the effect. */
     escapeDc: z.number().int().min(1).max(40).nullable().default(null),
-    onEnd: z.array(EffectOnEndSchema).max(2).default([])
+    onEnd: z.array(EffectOnEndSchema).max(2).default([]),
+    /** "Repeats the save at the end of each of its turns": the bearer owes this save as each of its turns ends, and
+     * a success ends the effect (Hold Person, a ghast's claws). */
+    repeatSave: z
+      .object({ ability: AbilitySchema, dc: z.number().int().min(1).max(40) })
+      .strict()
+      .optional(),
+    /** Ends early when the bearer takes any damage (Sleep, Turn Undead, Hypnotic Pattern, a knocked-out creature). */
+    endsOnDamage: z.boolean().optional(),
+    /** The bearer's Speed is 0 while this lasts, beyond what its conditions do (Hypnotic Pattern's charm). */
+    speedZero: z.boolean().optional(),
+    /** One Concentration cast: every effect it made (the caster's marker, each failed target's conditions) shares
+     * this, so they end together, and starting another Concentration ends them all. */
+    castId: z.string().min(1).max(120).optional(),
+    /** A grapple's range: it ends once a move leaves the bearer and its source farther apart than this. */
+    rangeFeet: z.number().int().min(5).max(120).optional(),
+    /** Damage it deals at the start of a turn while it lasts (a swallowed creature's acid), and a save the bearer
+     * makes right after it, a success ending the effect (Searing Smite). */
+    ongoingDamage: OngoingDamageSchema.extend({
+      saveToEnd: z
+        .object({ ability: AbilitySchema, dc: z.number().int().min(1).max(40) })
+        .strict()
+        .optional()
+    })
+      .strict()
+      .optional()
   })
   .strict();
 export type EffectInstance = z.infer<typeof EffectInstanceSchema>;
@@ -613,6 +693,10 @@ const ProficiencyIdSchema = z
   .string()
   .regex(/^[a-z0-9-]+$/)
   .max(60);
+/** What an Ammunition weapon fires (SRD Weapons table: "Ammunition (Range 150/600; Arrow)"). The table's one
+ *  "Bullet" is two items, so a Sling's and a firearm's are told apart. */
+export const AmmunitionKindSchema = z.enum(["arrow", "bolt", "firearm-bullet", "needle", "sling-bullet"]);
+export type AmmunitionKind = z.infer<typeof AmmunitionKindSchema>;
 /** Mechanical stats of an item added from the SRD catalog (weapon → attack action, armor/shield → derived AC).
  * Absent on homebrew or older items, which are then display-only. */
 export const ItemWeaponSchema = z
@@ -622,6 +706,11 @@ export const ItemWeaponSchema = z
     damageType: z.string().min(1).max(40),
     rangeFeet: z.number().int().positive().nullable(),
     longRangeFeet: z.number().int().positive().nullable(),
+    /** The Weapons table's band, copied from the catalog: a thrown Dagger is a melee weapon, a Dart a ranged one.
+     *  Absent = read from the range and Thrown, as before the band was recorded. */
+    melee: z.boolean().optional(),
+    /** A Versatile weapon's two-handed die ("1d10" for a Longsword), copied from the catalog. */
+    versatileDice: z.string().min(1).max(20).optional(),
     /** SRD weapon property slugs ("finesse", "thrown", ...), open for homebrew. Absent = not recorded; an empty array = no properties. */
     properties: z
       .array(
@@ -664,12 +753,20 @@ export const InventoryItemSchema = z
     equipped: z.boolean().default(false),
     attuned: z.boolean().default(false),
     weightEach: z.number().nonnegative().max(1_000_000).optional(),
-    description: z.string().max(4000).optional(),
+    /** The catalog text copied on add; as long as `EquipmentReferenceSchema.description` allows. */
+    description: z.string().max(12000).optional(),
     /** Equipment category slug (weapon/armor/tool/...), open for homebrew. Drives sheet grouping. */
     category: z
       .string()
       .regex(/^[a-z0-9-]+$/)
       .max(40)
+      .optional(),
+    /** The catalog record this row is a copy of, when the row's own id can't be it: a second Weapon, +1 bound to
+     *  another base is its own row (`weapon-1-2`) with `recordId: "weapon-1"`. Absent means the id is the record. */
+    recordId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
       .optional(),
     /** The base a template magic item is bound to ("dwarven-thrower" -> "warhammer"). The server validates it and
      * overwrites `weapon`/`armor` with the base's stats; weapon stats are never trusted from a client. */
@@ -680,11 +777,25 @@ export const InventoryItemSchema = z
       .optional(),
     weapon: ItemWeaponSchema.optional(),
     armor: ItemArmorSchema.optional(),
+    /** The type the GM picked for an item whose record lets the GM choose its resistance (Ring of Resistance). Only
+     *  the GM sets it; the server checks it against the record's `damageTypeChoice`. */
+    chosenDamageType: DamageTypeSchema.optional(),
+    /** Ammunition pieces left in a row sold in bundles ("Arrows (20)"), when some are spent; absent = every bundle
+     *  full. The server keeps it: shots spend it and a quantity change moves it by whole bundles. */
+    ammunitionLeft: z.number().int().min(0).max(1_000_000).optional(),
+    /** Pieces fired from this row in the running fight that can be picked up after it (half come back). The
+     *  server keeps it. */
+    ammunitionFired: z.number().int().min(0).max(10_000).optional(),
     /** Display-only marker so the sheet can offer Attune without the catalog; never the riders. */
     magic: ItemMagicMarkerSchema.optional()
   })
   .strict();
 export type InventoryItem = z.infer<typeof InventoryItemSchema>;
+
+/** The catalog id an inventory row is a copy of: its `recordId`, else its own id. Every catalog lookup reads this. */
+export function catalogIdOf(item: Readonly<{ id: string; recordId?: string | undefined }>): string {
+  return item.recordId ?? item.id;
+}
 export const CurrencySchema = z
   .object({
     cp: z.number().int().min(0).max(1_000_000).default(0),
@@ -792,6 +903,9 @@ export const ActorSchema = z.object({
     temporary: z.number().int().nonnegative().default(0)
   }),
   armorClass: z.number().int().positive().optional(),
+  /** A GM-set Armor Class that `armorClass` takes in place of the one derived from equipment, until cleared (a stat
+   *  the sheet can't derive: Mage Armor, natural armor, a ruling). The sheet shows it as set by the GM. */
+  armorClassOverride: z.number().int().min(1).max(40).optional(),
   initiative: z.number().int().optional(),
   ownerSessionId: z.uuid().nullable().default(null),
   notes: z.string().max(10000).optional(),
@@ -816,7 +930,12 @@ export const ActorSchema = z.object({
             .string()
             .regex(/^[a-z0-9-]+$/)
             .max(60),
-          level: z.number().int().min(1).max(6).optional()
+          level: z.number().int().min(1).max(6).optional(),
+          /** The owning player put it on their own character, so they may take it off again. Anything imposed (by
+           * the GM, a failed save, the engine) ends by its own rules or the GM's say. */
+          selfApplied: z.literal(true).optional(),
+          /** Set on its own as well as linked by an effect, so that effect ending leaves it in place. */
+          standalone: z.literal(true).optional()
         })
         .strict()
     )
@@ -909,6 +1028,8 @@ export const EffectGrantSchema = z
     duration: z.discriminatedUnion("type", [
       z.object({ type: z.literal("rounds"), rounds: z.number().int().min(1).max(100) }).strict(),
       z.object({ type: z.literal("until-source-next-turn") }).strict(),
+      /** Until the end of the granter's next turn (Rage, which the bearer's own attacks keep extending). */
+      z.object({ type: z.literal("until-source-turn-end") }).strict(),
       z.object({ type: z.literal("encounter") }).strict(),
       z.object({ type: z.literal("manual") }).strict()
     ]),
@@ -918,7 +1039,7 @@ export const EffectGrantSchema = z
     endsWithTag: EffectTagSchema.optional(),
     /** Who receives the effect: the acting creature (default) or the action's single chosen target (Help). */
     target: z.enum(["self", "target"]).default("self"),
-    /** Dodge: benefits lapse while the bearer is incapacitated (SRD). */
+    /** Dodge: benefits lapse while the bearer is Incapacitated or its Speed is 0 (SRD). */
     voidWhileIncapacitated: z.boolean().default(false),
     /** The granter concentrates to sustain the effect (SRD Concentration). */
     concentration: z.boolean().default(false)
@@ -993,7 +1114,24 @@ export const SaveOutcomeFields = {
   failureConditions: z.array(SaveConditionSchema).max(4).default([]),
   /** Cover gives no bonus to this save (Sacred Flame: "The target gains no benefit from Half Cover or
    *  Three-Quarters Cover for this save"). */
-  ignoresCover: z.boolean().optional()
+  ignoresCover: z.boolean().optional(),
+  /** How long the failure's conditions last. Absent: until ended (with the caster's Concentration, for a spell). */
+  failureDuration: SaveFailureDurationSchema.optional(),
+  /** The target repeats the save at the end of each of its turns, a success ending the failure's conditions. */
+  repeatSave: z.literal(true).optional(),
+  /** A failure that grapples: the grapple's escape DC. Its other conditions last until the grapple ends. */
+  escapeDc: z.number().int().min(1).max(40).optional(),
+  /** The failure's conditions end early if the target takes any damage (Turn Undead, Hypnotic Pattern). */
+  endsOnDamage: z.literal(true).optional(),
+  /** The failure also makes the target's Speed 0 while its conditions last (Hypnotic Pattern). */
+  speedZero: z.literal(true).optional(),
+  /** The save's reach ("within 10 feet"): a grapple it imposes ends once a move takes the two farther apart. */
+  rangeFeet: z.number().int().min(5).max(120).optional(),
+  /** No save when it lands: a target with this many hit points or fewer has the failure outright, and only the
+   * repeated save can end it (Power Word Stun's 150); one with more is spared. */
+  failsAtHitPoints: z.number().int().min(1).max(1000).optional(),
+  /** Damage the failure's conditions bring at the start of each turn while they last (a swallow's acid). */
+  ongoingDamage: OngoingDamageSchema.optional()
 };
 
 /** An area of effect the GM places as a map template ("60-foot Cone"). `widthFeet` is a line's width, null otherwise. */
@@ -1092,11 +1230,22 @@ export const ActionSchema = z.object({
     })
     .optional(),
   damage: z
-    .array(z.object({ formula: DiceFormulaSchema, type: z.string().min(1).max(40) }))
+    .array(z.object({ formula: DamageFormulaSchema, type: z.string().min(1).max(40) }))
     .max(8)
     .default([]),
   /** Hit points each target regains, rolled once and applied when the action resolves (Cure Wounds). */
-  healing: z.object({ formula: HealingFormulaSchema }).strict().optional(),
+  healing: z
+    .object({
+      formula: HealingFormulaSchema,
+      /** The user heals itself (Second Wind), so there is no target to pick. */
+      self: z.literal(true).optional(),
+      /** The roll is one pool divided among the targets (Preserve Life), not regained by each. */
+      divided: z.literal(true).optional(),
+      /** No target is healed past this fraction of its maximum (Preserve Life: half). */
+      upToFractionOfMaximum: z.number().min(0.1).max(1).optional()
+    })
+    .strict()
+    .optional(),
   /** Missiles that each deal `damage` to a creature of the caster's choice (Magic Missile's darts), rolled one by one.
    *  The resolve's targets assign them in order, a target named twice taking two. */
   darts: z.number().int().min(2).max(20).optional(),
@@ -1120,7 +1269,10 @@ export const ActionSchema = z.object({
             .max(3),
           escapeDc: z.number().int().min(1).max(40).optional(),
           /** The rider only applies to targets of at most this size (crocodile Bite: large). */
-          maxTargetSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional()
+          maxTargetSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
+          /** How long the conditions last (a lich's touch: until the start of its next turn). Absent: until ended,
+           *  or until the grapple ends when the rider grapples. */
+          duration: SaveFailureDurationSchema.optional()
         })
         .strict()
     )
@@ -1163,6 +1315,9 @@ export const ActionSchema = z.object({
     })
     .strict()
     .optional(),
+  /** Taken in place of one attack of the Attack action (Breath Weapon: "replace one of your attacks"): it opens the
+   *  Attack action, or spends one attack the action has left. Pairs with activation "action". */
+  replacesAttack: z.boolean().optional(),
   /** SRD Legendary Action: taken on other creatures' turns, spending `cost` from the per-round pool that refills on the creature's own turn. Pairs with activation "other". */
   legendary: z
     .object({ cost: z.number().int().min(1).max(5) })
@@ -1171,6 +1326,34 @@ export const ActionSchema = z.object({
   /** The area it covers, for the map template. Filled from the description where the action enters the system
    *  (the content build, a homebrew save, an import), so play never reads the prose. */
   area: ActionAreaSchema.optional(),
+  /** Damage a hit adds or swaps in under a printed condition ("plus 2 (1d4) Slashing damage if the attack roll had
+   *  Advantage", "or 2 (1d4) Piercing damage if the swarm is Bloodied"). The engine applies what it can see; a
+   *  charge, which it can't, is offered on the hit for the attacker to confirm. */
+  conditionalDamage: z
+    .array(
+      z
+        .object({
+          when: z.enum(["advantage", "self-bloodied", "target-bloodied", "target-grappled-by-self", "charge"]),
+          /** `instead` replaces the first damage part; `plus` adds to the hit. */
+          mode: z.enum(["instead", "plus"]),
+          damage: z
+            .array(z.object({ formula: DamageFormulaSchema, type: z.string().min(1).max(40) }).strict())
+            .min(1)
+            .max(2),
+          /** A charge's run-up, in feet. */
+          feet: z.number().int().min(5).max(120).optional(),
+          /** Only against a target of at most this size. */
+          maxTargetSize: SizeSchema.optional(),
+          /** Conditions it imposes too (a charge's Prone). */
+          conditions: z.array(ConditionIdSchema).max(2).optional()
+        })
+        .strict()
+    )
+    .max(3)
+    .optional(),
+  /** What the engine leaves to the GM, shown when the action resolves: damage on later turns ("takes 10 (3d6) Acid
+   *  damage at the start of each of the cube's turns") or a branch it can't choose. */
+  reminder: z.string().min(1).max(600).optional(),
   /** A Multiattack whose attacks the build could not read: the engine cannot track them against the action, so
    *  the creature's action-slot checks soften to notes. */
   untrackedMultiattack: z.literal(true).optional()

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { armorClassInPlay, type GameState } from "@vtt/domain";
 import type { ActorAction } from "@vtt/schemas";
 import { resolveDefinitionAction } from "../src/action-resolution.js";
+import { endEffect } from "../src/effects.js";
 import { nextInitiativeTurn } from "../src/encounter.js";
 import { deriveEquipment } from "../src/equipment-derivation.js";
 import { answerSave, createPendingSaves } from "../src/saving-throws.js";
@@ -105,6 +106,7 @@ describe("Bless", () => {
     const { state, resolve, action } = fight(wizard, { ally: true });
     const cast = resolve("spell-bless", { targetIds: [HERO, ALLY] });
     expect(cast.effectsApplied?.map((entry) => [entry.targetId, entry.name])).toEqual([
+      [HERO, "Concentrating on Bless"],
       [HERO, "Bless"],
       [ALLY, "Bless"]
     ]);
@@ -139,9 +141,19 @@ describe("Bless", () => {
   it("counts once on a creature blessed twice", () => {
     const { state, resolve, hero } = fight(wizard);
     resolve("spell-bless", { targetIds: [HERO] });
-    hero.effects = [...hero.effects, { ...hero.effects[0]!, id: "other-cast", sourceActorId: FOE2 }];
+    const bless = hero.effects.find((effect) => effect.name === "Bless")!;
+    hero.effects = [...hero.effects, { ...bless, id: "other-cast", sourceActorId: FOE2 }];
     heroTurnAgain(state);
     expect(resolve("spell-fire-bolt", {}, [10, 2, 5]).attack!.bonusDice).toHaveLength(1);
+  });
+
+  it("ends on every creature when the caster's Concentration ends", () => {
+    const { state, resolve, hero } = fight(wizard, { ally: true });
+    resolve("spell-bless", { targetIds: [HERO, ALLY] });
+    const concentrating = hero.effects.find((effect) => effect.name === "Concentrating on Bless")!;
+    expect(actorOf(state, ALLY).effects[0]!.castId).toBe(concentrating.castId);
+    endEffect(state, HERO, concentrating.id);
+    expect([...hero.effects, ...actorOf(state, ALLY).effects]).toEqual([]);
   });
 
   it("needs a creature to bless", () => {
@@ -266,9 +278,10 @@ describe("Mage Armor", () => {
   });
 
   it("does nothing for a creature wearing armor", () => {
-    const { state, resolve, hero } = fight(wizard);
-    hero.inventory = [
-      ...hero.inventory,
+    const { state, resolve } = fight(wizard);
+    const goblin = actorOf(state, FOE);
+    goblin.inventory = [
+      ...goblin.inventory,
       {
         id: "chain-mail",
         name: "Chain Mail",
@@ -285,9 +298,9 @@ describe("Mage Armor", () => {
         }
       }
     ];
-    const cast = resolve("spell-mage-armor", { targetIds: [HERO] });
-    expect(cast.warnings?.join(" ")).toMatch(/Ansel is wearing armor, so Mage Armor does nothing/);
-    expect(actorOf(state, HERO).effects).toEqual([]);
+    const cast = resolve("spell-mage-armor", { targetIds: [FOE] });
+    expect(cast.warnings?.join(" ")).toMatch(/Goblin is wearing armor, so Mage Armor does nothing/);
+    expect(goblin.effects).toEqual([]);
   });
 });
 

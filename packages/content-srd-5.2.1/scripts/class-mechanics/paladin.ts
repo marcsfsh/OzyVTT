@@ -1,5 +1,13 @@
 // Paladin and Oath of Devotion mechanics, merged over the ETL-generated prose.
-import type { ClassMechanicsModule } from "./overlay.js";
+import type { Condition } from "@vtt/schemas";
+import { spellTableStages, type ClassMechanicsModule } from "./overlay.js";
+
+/** SRD Aura of Protection: the aura "is inactive while you have the Incapacitated condition" (or one including it). */
+const AURA_ACTIVE = {
+  type: "while-condition" as const,
+  conditionIds: ["incapacitated", "paralyzed", "petrified", "stunned", "unconscious"] satisfies Condition[],
+  present: false
+};
 
 export const paladin: ClassMechanicsModule = {
   features: {
@@ -50,8 +58,7 @@ export const paladin: ClassMechanicsModule = {
       ]
     },
 
-    // Applies only to actions the feature declares; a Paladin's swings come from inventory, so this
-    // currently reaches nothing (pinned in `rogue-ranger-paladin-mechanics.test.ts`).
+    // A standing rider `effective-actions` folds onto every weapon swing (attack count 2).
     "extra-attack": {
       modifiers: [{ type: "extra-attack", count: 1 }]
     },
@@ -62,8 +69,9 @@ export const paladin: ClassMechanicsModule = {
     },
 
     /**
-     * Spends the shared Channel Divinity pool against the Paladin's own spell save DC. The
-     * Charisma-scaled target count and "until it takes any damage" stay prose.
+     * Spends the shared Channel Divinity pool against the Paladin's own spell save DC; the Frightened lasts 1
+     * minute or until the target takes damage. The Charisma-scaled target count and the one-thing-per-turn limit
+     * stay prose.
      */
     "abjure-foes": {
       uses: { scaling: { type: "class-resource", id: "channel-divinity" }, per: "long-rest", pool: "channel-divinity" },
@@ -75,14 +83,21 @@ export const paladin: ClassMechanicsModule = {
           description:
             "As a Magic action, you expend one use of this class's Channel Divinity and target a number of creatures equal to your Charisma modifier (minimum of one) that you can see within 60 feet. Each target must succeed on a Wisdom saving throw or have the Frightened condition for 1 minute or until it takes any damage. While Frightened this way, a target can do only one of the following on its turns: move, take an action, or take a Bonus Action.",
           damage: [],
-          save: { ability: "wis", dc: "spellcasting", successDamage: "none", failureConditions: ["frightened"] }
+          save: {
+            ability: "wis",
+            dc: "spellcasting",
+            successDamage: "none",
+            failureConditions: ["frightened"],
+            failureDuration: { type: "rounds", rounds: 10 },
+            endsOnDamage: true
+          }
         }
       ]
     },
 
     // The Paladin is always inside their own aura; immunity for allies is not expressible.
     "aura-of-courage": {
-      grants: { conditionImmunities: ["frightened"] }
+      grants: { conditionImmunities: ["frightened"], when: [AURA_ACTIVE] }
     },
 
     "radiant-strikes": {
@@ -98,16 +113,44 @@ export const paladin: ClassMechanicsModule = {
     },
 
     "epic-boon": {
-      choice: { kind: "feat", choose: 1, fromCatalog: "epic-boon-feats" }
+      choice: { kind: "feat", choose: 1, fromCatalog: "feats" }
     }
+  },
+  subclassStages: {
+    "oath-of-devotion": spellTableStages("oath-of-devotion-spells", "Oath of Devotion Spells", "Paladin", [
+      [
+        5,
+        [
+          ["aid", "Aid", 2],
+          ["zone-of-truth", "Zone of Truth", 2]
+        ]
+      ],
+      [
+        9,
+        [
+          ["beacon-of-hope", "Beacon of Hope", 3],
+          ["dispel-magic", "Dispel Magic", 3]
+        ]
+      ],
+      [
+        13,
+        [
+          ["freedom-of-movement", "Freedom of Movement", 4],
+          ["guardian-of-faith", "Guardian of Faith", 4]
+        ]
+      ],
+      [
+        17,
+        [
+          ["commune", "Commune", 5],
+          ["flame-strike", "Flame Strike", 5]
+        ]
+      ]
+    ])
   },
   subclasses: {
     "oath-of-devotion": {
-      /**
-       * Only the level-3 pair is authored: `grants.spells` has no character-level gate, and the overlay
-       * cannot mint per-tier feature records the way Life Domain's hand-authored ones do. The full table
-       * is in the description.
-       */
+      // The level-3 pair; the table's later rows are staged features (`subclassStages`).
       "oath-of-devotion-spells": {
         grants: {
           spells: [
@@ -139,7 +182,7 @@ export const paladin: ClassMechanicsModule = {
 
       // Same reading as Aura of Courage.
       "aura-of-devotion": {
-        grants: { conditionImmunities: ["charmed"] }
+        grants: { conditionImmunities: ["charmed"], when: [AURA_ACTIVE] }
       },
 
       // The counter only; the save advantage (keyed to the source's creature type), the Radiant aura tick

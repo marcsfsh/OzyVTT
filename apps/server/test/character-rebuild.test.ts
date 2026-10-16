@@ -144,7 +144,7 @@ describe("the app remembers hit-point rolls", () => {
 });
 
 describe("rebuilding a live character", () => {
-  it("keeps what the campaign wrote and resets what the level redefines", () => {
+  it("keeps what the campaign wrote and what has been spent, and recomputes what the level redefines", () => {
     const { state, definition } = tableWith();
     const actor = state.actors[0];
     actor.ownerSessionId = "30000000-0000-4000-8000-000000000001";
@@ -172,8 +172,8 @@ describe("rebuilding a live character", () => {
     expect(actor.notes).toBe("Owes the innkeeper 40gp");
     expect(actor.currency.gp).toBe(77);
     expect(actor.inventory.some((item) => item.id === "trophy")).toBe(true);
-    // Reset: the per-level resources the new sheet redefines.
-    expect(actor.actionUses).toEqual({});
+    // A level is not a rest: the spent Second Wind stays spent, and the new Hit Dice pool keeps none spent.
+    expect(actor.actionUses).toEqual({ "second-wind": 1 });
     expect(actor.hitDice!.entries[0].remaining).toBe(actor.hitDice!.entries[0].maximum);
     // HP: the delta rides along, so a level-down clamps and a level-up arrives as usable hit points.
     expect(actor.hp.maximum).toBe(built.hitPoints.maximum);
@@ -214,5 +214,103 @@ describe("rebuilding a live character", () => {
     state.actors[0].definitionId = "bundled-goblin";
     const built = buildCharacterDefinition(prefillFor(definition, 4, fighter()), library, policy);
     expect(() => rebuildActorDefinition(state, ACTOR_ID, built)).toThrow(/can't be rebuilt/i);
+  });
+});
+
+describe("a level is not a rest", () => {
+  /** A level-2 Wizard (slots 3 at level 1) on the table, to level up to 3 (4 + 2). */
+  const wizard = (level: number): CharacterCreateRequestInput => ({
+    name: "Ilyana",
+    speciesId: "human",
+    backgroundId: "soldier",
+    classId: "wizard",
+    level,
+    ...(level >= 3 ? { subclassId: "evoker" } : {}),
+    abilityMethod: "standard-array",
+    baseScores: { str: 10, dex: 14, con: 13, int: 15, wis: 12, cha: 8 },
+    backgroundBonusAllocation: [
+      { ability: "str", amount: 2 },
+      { ability: "con", amount: 1 }
+    ],
+    hp: { mode: "average" },
+    choices: [
+      { level: 1, kind: "language", id: "dwarvish" },
+      { level: 1, kind: "language", id: "giant" },
+      { level: 1, classId: "wizard", kind: "skill", id: "arcana" },
+      { level: 1, classId: "wizard", kind: "skill", id: "insight" },
+      { level: 1, kind: "skill", id: "perception", payload: { featureId: "human-skillful" } },
+      { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
+      { level: 2, classId: "wizard", kind: "expertise", id: "arcana", payload: { featureId: "scholar" } },
+      ...(level >= 3
+        ? [
+            { level: 3, classId: "wizard", kind: "subclass", id: "evoker" },
+            { level: 3, kind: "spell", id: "shatter", payload: { featureId: "evocation-savant" } },
+            { level: 3, kind: "spell", id: "magic-missile", payload: { featureId: "evocation-savant" } },
+            { level: 3, kind: "spell", id: "misty-step" }
+          ]
+        : []),
+      { level: 1, kind: "cantrip", id: "fire-bolt" },
+      { level: 1, kind: "cantrip", id: "light" },
+      { level: 1, kind: "cantrip", id: "mage-hand" },
+      { level: 1, kind: "spell", id: "mage-armor" },
+      { level: 1, kind: "spell", id: "shield" },
+      { level: 1, kind: "spell", id: "sleep" },
+      { level: 1, kind: "spell", id: "detect-magic" },
+      { level: 1, kind: "spell", id: "burning-hands" },
+      { level: 1, kind: "tool", id: "gaming-set-dice" },
+      { level: 1, kind: "equipment", id: "wizard-a" },
+      { level: 1, kind: "equipment", id: "soldier-a" }
+    ]
+  });
+
+  it("keeps spent uses, Hit Dice and spell slots spent against the new maxima", () => {
+    const state: GameState = GameStateSchema.parse({ schemaVersion: 1 });
+    importActorDefinition(state, buildCharacterDefinition(wizard(2), library, policy), ACTOR_ID, "public");
+    const actor = state.actors[0];
+    expect(actor.spellSlots).toEqual([{ level: 1, remaining: 3 }]);
+    actor.spellSlots = [{ level: 1, remaining: 1 }];
+    actor.hitDice = { ...actor.hitDice!, entries: actor.hitDice!.entries.map((entry) => ({ ...entry, remaining: 0 })) };
+    actor.actionUses = { "arcane-recovery": 1, "no-such-pool": 1 };
+
+    rebuildActorDefinition(state, ACTOR_ID, buildCharacterDefinition(wizard(3), library, policy));
+    // Level 3 slots are 4 + 2: the two spent level-1 slots stay spent, the new level-2 slots arrive whole.
+    expect(actor.spellSlots).toEqual([
+      { level: 1, remaining: 2 },
+      { level: 2, remaining: 2 }
+    ]);
+    // Two Hit Dice were spent and a third arrives with the level.
+    expect(actor.hitDice!.entries).toEqual([expect.objectContaining({ die: "d6", maximum: 3, remaining: 1 })]);
+    // Arcane Recovery stays used; a pool the new sheet has not got is dropped.
+    expect(actor.actionUses).toEqual({ "arcane-recovery": 1 });
+  });
+
+  it("leaves a character at 0 hit points at 0, dying or dead", () => {
+    const { state, definition } = tableWith(4);
+    const actor = state.actors[0];
+    actor.hp = { current: 0, maximum: actor.hp.maximum, temporary: 0 };
+    actor.deathSaves = { successes: 0, failures: 3, stable: false };
+    actor.conditions = [{ id: "unconscious" }];
+
+    rebuildActorDefinition(
+      state,
+      ACTOR_ID,
+      buildCharacterDefinition(prefillFor(definition, 5, fighter()), library, policy)
+    );
+    expect(actor.hp.current).toBe(0);
+    expect(actor.hp.maximum).toBeGreaterThan(0);
+    expect(actor.deathSaves).toEqual({ successes: 0, failures: 3, stable: false });
+  });
+});
+
+describe("a sheet with more classes than the build", () => {
+  it("is refused rather than rebuilt without them", () => {
+    const { state, definition } = tableWith(4);
+    const stored = state.definitions[0].definition;
+    stored.character!.classes = [
+      ...stored.character!.classes,
+      { id: "wizard", name: "Wizard", level: 1, hitDie: "d6" }
+    ];
+    const built = buildCharacterDefinition(prefillFor(definition, 5, fighter()), library, policy);
+    expect(() => rebuildActorDefinition(state, ACTOR_ID, built)).toThrow(/more classes than this build carries/);
   });
 });

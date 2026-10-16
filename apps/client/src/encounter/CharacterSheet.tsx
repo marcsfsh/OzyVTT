@@ -1,7 +1,16 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import type { ActorDefinition, GmActor, GmView, PlayerActor, PlayerView } from "@vtt/domain";
+import type {
+  ActorDefinition,
+  GmActor,
+  GmView,
+  PendingSave,
+  PlayerActor,
+  PlayerPendingSave,
+  PlayerView
+} from "@vtt/domain";
 import { Button, IconButton, Modal, SegmentedControl, IconX, useToast } from "@vtt/ui";
 import { ConditionEditor } from "./conditions";
+import { SavePrompt } from "./SavePrompt";
 import { RichText } from "./RichText";
 import { DicePanel } from "../dice/DicePanel";
 import { useRollPreference } from "../dice/roll-preference";
@@ -93,6 +102,9 @@ export function CharacterSheet({
           };
         })()
       : undefined);
+  const savesOwed: ReadonlyArray<PendingSave | PlayerPendingSave> = (state?.combat.pendingSaves ?? []).filter(
+    (save) => save.targetActorId === actor.id
+  );
   const structuredAttacks =
     liveCombat?.active === true &&
     liveCombat.myTurn === true &&
@@ -241,6 +253,7 @@ export function CharacterSheet({
         <SheetIdentityEditor
           actorId={actor.id}
           definition={definition}
+          role={role}
           busy={busy}
           edit={edit}
           onEdited={showEdited}
@@ -250,8 +263,32 @@ export function CharacterSheet({
       <SheetVitals actor={actor} role={role} definition={definition} extension={extension} onFeedback={setFeedback} />
       <div className="sheet-conditions">
         <span className="sheet-section-label">Conditions</span>
-        <ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setFeedback} />
+        <ConditionEditor
+          actorId={actor.id}
+          conditions={actor.conditions}
+          effects={actor.effects}
+          viewer={role}
+          canAsk={role === "player" && liveCombat?.active === true}
+          onFeedback={setFeedback}
+        />
       </div>
+      {/* A save owed outside a fight (a concentration check after a trap): in a fight it waits on the
+        initiative row instead. */}
+      {state && !state.combat.active && savesOwed.length > 0 && (
+        <div className="sheet-saves-owed">
+          <span className="sheet-section-label">Saves owed</span>
+          {savesOwed.map((save) => (
+            <SavePrompt
+              key={save.id}
+              save={save}
+              targetName={actor.name}
+              canDismiss={role === "gm"}
+              onFeedback={setFeedback}
+              rollMode="auto"
+            />
+          ))}
+        </div>
+      )}
       {actor.kind === "player-character" && (
         <div className="sheet-rest-block">
           <span className="sheet-section-label">Rest</span>
@@ -292,7 +329,27 @@ export function CharacterSheet({
               return structured !== null;
             }}
           />
-          {actor.kind === "player-character" && <SheetInventory actor={actor} busy={busy} edit={edit} />}
+          {actor.kind === "player-character" && (
+            <SheetInventory
+              actor={actor}
+              busy={busy}
+              edit={edit}
+              role={role}
+              attunementSlots={derived?.attunementSlots ?? 3}
+              others={
+                role === "gm" && state
+                  ? state.actors
+                      .filter(
+                        (other) =>
+                          other.kind === "player-character" &&
+                          other.id !== actor.id &&
+                          !("archived" in other && other.archived)
+                      )
+                      .map((other) => ({ id: other.id, name: other.name }))
+                  : []
+              }
+            />
+          )}
           {extension.traits && extension.traits.length > 0 && (
             <section className="sheet-section">
               <h3>Traits</h3>

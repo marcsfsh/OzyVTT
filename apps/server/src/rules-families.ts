@@ -10,18 +10,36 @@ const RULE_FAMILIES = {
   "movement.exceeds-speed": "movement",
   "movement.no-movement-remaining": "movement",
   "movement.stand-up-cost": "movement",
+  // Standing spends movement, which a creature has only on its own turn.
+  "movement.stand-up-off-turn": "movement",
   "economy.action-used": "economy",
   "economy.bonus-action-used": "economy",
   "economy.reaction-used": "economy",
   "economy.not-your-turn": "economy",
+  // Wait mode: no one acts until every player has rolled initiative.
+  "initiative.gathering": "economy",
   // Being incapacitated or down means you have no actions: an economy block, not a targeting one.
   "condition.incapacitated": "economy",
   "condition.down": "economy",
+  // Ending a condition or effect someone else imposed skips the action (Escape) or the save its own rules ask for.
+  "condition.imposed": "economy",
+  // A raging Barbarian can't cast spells (SRD Rage).
+  "condition.raging": "economy",
   // "Legendary actions are taken on other creatures' turns" is a timing/economy rule...
   "legendary.own-turn": "economy",
   // An extra attack (Light, Cleave) is owed only once the swing that opens it has happened this turn.
   "attack.light-needs-attack": "economy",
   "attack.cleave-needs-hit": "economy",
+  // A Loading weapon fires once per action, however many attacks the action allows.
+  "attack.loading": "economy",
+  "attack.no-ammunition": "economy",
+  // A Two-Handed weapon can't swing while a Shield takes one hand.
+  "attack.two-handed": "economy",
+  // No spellcasting in armor the caster isn't trained with: what the character can do at all, not a spent slot
+  // (the slots family is advisory by default, and this rule is not).
+  "spell.untrained-armor": "economy",
+  // Sneak Attack, a smite and the like add to a hit: they're chosen when the hit is confirmed, not taken alone.
+  "attack.rides-a-hit": "economy",
   // ...while "no legendary actions left this round" is a spent resource, like limited uses.
   "legendary.no-actions-remaining": "resources",
   "feature.no-uses-remaining": "resources",
@@ -37,6 +55,8 @@ const RULE_FAMILIES = {
   "attack.cleave-too-far": "targeting",
   // A spell aimed at more creatures than it can target (Hold Person at two Humanoids from a 2nd-level slot).
   "target.too-many": "targeting",
+  // The hit an extra is added to can't carry it (no Advantage or ally for Sneak Attack, a ranged smite).
+  "attack.hit-option-unqualified": "targeting",
   // Being Charmed by your target is a targeting restriction, not an economy one.
   "condition.charmed-charmer": "targeting",
   // Spellcasting is its own family, so "Don't police spell slots or prepared spells" relaxes these and nothing else.

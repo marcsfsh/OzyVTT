@@ -4,6 +4,7 @@
   "name": "Battleaxe",
   "category": "martial",
   "melee": true,
+  "versatileDice": "1d10",
   "improvised": false,
   "mastery": "topple",
   "properties": [
@@ -21,6 +22,7 @@
   "name": "Blowgun",
   "category": "martial",
   "melee": false,
+  "ammunition": "needle",
   "improvised": false,
   "mastery": "vex",
   "properties": [
@@ -199,6 +201,7 @@
   "name": "Hand Crossbow",
   "category": "martial",
   "melee": false,
+  "ammunition": "bolt",
   "improvised": false,
   "mastery": "vex",
   "properties": [
@@ -236,6 +239,7 @@
   "name": "Heavy Crossbow",
   "category": "martial",
   "melee": false,
+  "ammunition": "bolt",
   "improvised": false,
   "mastery": "push",
   "properties": [
@@ -292,6 +296,7 @@
   "name": "Light Crossbow",
   "category": "simple",
   "melee": false,
+  "ammunition": "bolt",
   "improvised": false,
   "mastery": "slow",
   "properties": [
@@ -329,6 +334,7 @@
   "name": "Longbow",
   "category": "martial",
   "melee": false,
+  "ammunition": "arrow",
   "improvised": false,
   "mastery": "slow",
   "properties": [
@@ -348,6 +354,7 @@
   "name": "Longsword",
   "category": "martial",
   "melee": true,
+  "versatileDice": "1d10",
   "improvised": false,
   "mastery": "sap",
   "properties": [
@@ -413,6 +420,7 @@
   "name": "Musket",
   "category": "martial",
   "melee": false,
+  "ammunition": "firearm-bullet",
   "improvised": false,
   "mastery": "slow",
   "properties": [
@@ -451,6 +459,7 @@
   "name": "Pistol",
   "category": "martial",
   "melee": false,
+  "ammunition": "firearm-bullet",
   "improvised": false,
   "mastery": "vex",
   "properties": [
@@ -469,6 +478,7 @@
   "name": "Quarterstaff",
   "category": "simple",
   "melee": true,
+  "versatileDice": "1d8",
   "improvised": false,
   "mastery": "topple",
   "properties": [
@@ -521,6 +531,7 @@
   "name": "Shortbow",
   "category": "simple",
   "melee": false,
+  "ammunition": "arrow",
   "improvised": false,
   "mastery": "vex",
   "properties": [
@@ -574,6 +585,7 @@
   "name": "Sling",
   "category": "simple",
   "melee": false,
+  "ammunition": "sling-bullet",
   "improvised": false,
   "mastery": "slow",
   "properties": [
@@ -591,6 +603,7 @@
   "name": "Spear",
   "category": "simple",
   "melee": true,
+  "versatileDice": "1d8",
   "improvised": false,
   "mastery": "sap",
   "properties": [
@@ -609,6 +622,7 @@
   "name": "Trident",
   "category": "martial",
   "melee": true,
+  "versatileDice": "1d10",
   "improvised": false,
   "mastery": "topple",
   "properties": [
@@ -627,6 +641,7 @@
   "name": "War Pick",
   "category": "martial",
   "melee": true,
+  "versatileDice": "1d10",
   "improvised": false,
   "mastery": "sap",
   "properties": [
@@ -644,6 +659,7 @@
   "name": "Warhammer",
   "category": "martial",
   "melee": true,
+  "versatileDice": "1d10",
   "improvised": false,
   "mastery": "push",
   "properties": [

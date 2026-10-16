@@ -3,11 +3,12 @@ import { spellRangeFeet } from "@vtt/content-srd-5.2.1/spell-effect";
 import {
   abilityModifier,
   formulaPlus,
+  isMeleeWeapon,
   isMonkWeapon,
   weaponAbilityModifierFrom,
   type RiderAbility
 } from "@vtt/rules-5e";
-import type { ActorAction, ActorDefinition, InventoryItem } from "@vtt/schemas";
+import { catalogIdOf, type ActorAction, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
 
 /**
  * Actions synthesised from what a character carries: an equipped weapon's swing, an item's declared actions and
@@ -33,11 +34,28 @@ function bearerLevel(definition: ActorDefinition | undefined): number {
   return total >= 1 ? total : 1;
 }
 
+/** A carried item: its row id, and the catalog record it copies. */
+export type CarriedItem = Readonly<{ id: string; recordId?: string }>;
+
+/**
+ * An item's shared charge pool, counted per carried copy: the row's id stands in for the record's, so two Wands of
+ * Fireballs are two pools and a wand's spent charges are its own ("wand-of-fireballs-charges" on the row
+ * "wand-of-fireballs-2" counts as "wand-of-fireballs-2-charges"). Kept within the pool slug's 60 characters.
+ */
+export function itemPool(item: CarriedItem, pool: string): string {
+  const catalogId = catalogIdOf(item);
+  const suffix = pool.startsWith(`${catalogId}-`) ? pool.slice(catalogId.length + 1) : pool;
+  const key = `${item.id}-${suffix}`;
+  return key.length <= 60 ? key : `${item.id.slice(0, Math.max(1, 59 - suffix.length))}-${suffix}`.slice(0, 60);
+}
+
 /** Authored uses to `ActionUsesSchema`, clamped to 1-20 like `resolvedUseLimit`; below 1 means no charges. An
- *  item action carries the action form (with `recharge`), a cast the feature form (with `scaling`). */
+ *  item action carries the action form (with `recharge`), a cast the feature form (with `scaling`). A shared pool
+ *  is counted per carried copy (`itemPool`); an unpooled use is already, by the action's own id. */
 function usesOf(
   uses: FeatureUses | ActorAction["uses"],
-  definition: ActorDefinition | undefined
+  definition: ActorDefinition | undefined,
+  item: CarriedItem
 ): ActorAction["uses"] | undefined {
   if (!uses) return undefined;
   const limit = uses.limit ?? ("scaling" in uses ? scaledLimit(uses.scaling, definition) : undefined);
@@ -45,7 +63,7 @@ function usesOf(
   return {
     limit: Math.min(20, limit),
     per: uses.per,
-    ...(uses.pool ? { pool: uses.pool } : {}),
+    ...(uses.pool ? { pool: itemPool(item, uses.pool) } : {}),
     ...("recharge" in uses && uses.recharge !== undefined ? { recharge: uses.recharge } : {})
   };
 }
@@ -77,10 +95,11 @@ const scoreModifierOf = (definition: ActorDefinition | undefined, ability: Rider
 
 /** An item action with attack and save resolved: the read-time twin of `interpretAction`. */
 export function itemAction(
-  itemId: string,
+  item: CarriedItem,
   declared: FeatureAction,
   definition: ActorDefinition | undefined
 ): ActorAction {
+  const itemId = item.id;
   const caster = casterNumbers(definition);
   let attack: ActorAction["attack"];
   if (declared.attack) {
@@ -100,7 +119,7 @@ export function itemAction(
         ...(declared.save.dc === "spellcasting" ? { spellcasting: true } : {})
       }
     : undefined;
-  const uses = usesOf(declared.uses, definition);
+  const uses = usesOf(declared.uses, definition, item);
   return {
     id: itemActionId(itemId, declared.id),
     name: declared.name,
@@ -109,6 +128,8 @@ export function itemAction(
     ...(attack ? { attack } : {}),
     ...(save ? { save } : {}),
     damage: declared.damage.map((part) => ({ ...part })),
+    // A Potion of Healing's 2d4 + 2.
+    ...(declared.healing ? { healing: { ...declared.healing } } : {}),
     ...(uses ? { uses } : {})
   };
 }
@@ -128,15 +149,16 @@ const clampDc = (value: number) => Math.max(1, Math.min(40, Math.round(value)));
 /** A synthesised cast action with the spell's mechanics. `atLevel` picks the SRD upcast row; `ability`
  *  and `saveDc` override; an unresolvable spell degrades to a name-only action. */
 export function castAction(
-  itemId: string,
+  item: CarriedItem,
   cast: ItemSpellCast,
   itemName: string,
   definition: ActorDefinition | undefined,
   spell: SpellReference | undefined
 ): ActorAction {
+  const itemId = item.id;
   const spellName = spell?.name ?? cast.spellId.replace(/-/g, " ");
   const level = cast.atLevel ?? spell?.level ?? 0;
-  const uses = usesOf(cast.uses, definition);
+  const uses = usesOf(cast.uses, definition, item);
   const base: ActorAction = {
     id: itemActionId(itemId, `cast-${cast.spellId}`),
     name: `Cast ${spellName} (${itemName})`,
@@ -336,7 +358,7 @@ export function withSpellEffects(action: ActorAction, spell: SpellReference | un
 function martialArtsSwing(item: InventoryItem, definition: ActorDefinition, martialArtsInForce: boolean) {
   const weapon = item.weapon;
   if (!martialArtsInForce || !weapon || !definition.character?.martialArts) return null;
-  return isMonkWeapon(weapon.category, weapon.properties ?? [], weapon.rangeFeet)
+  return isMonkWeapon(weapon.category, weapon.properties ?? [], weapon.rangeFeet, weapon.melee)
     ? definition.character.martialArts
     : null;
 }
@@ -403,33 +425,44 @@ export function weaponAction(
 /** A weapon's attack action, with the dice and ability modifier its damage was built from. */
 export type WeaponSwing = Readonly<{ action: ActorAction; dice: string; modifier: number }>;
 
+/** The id suffix of a Versatile weapon's two-handed attack. */
+export const TWO_HANDED_SUFFIX = "two-handed";
+
+/** `twoHanded` mints a Versatile weapon's two-handed attack (its own action, `item-<id>-two-handed`), rolling the
+ *  Versatile die; null when the weapon has none. */
 export function weaponSwing(
   item: InventoryItem,
   definition: ActorDefinition | undefined,
   grantedWeapons: readonly string[] = [],
-  martialArtsInForce = false
+  martialArtsInForce = false,
+  options: Readonly<{ twoHanded?: boolean }> = {}
 ): WeaponSwing | null {
   const weapon = item.weapon;
   if (!weapon || !definition) return null;
+  if (options.twoHanded && !weapon.versatileDice) return null;
   const properties = weapon.properties ?? [];
   const modifier = weaponAbilityModifier(item, definition, martialArtsInForce);
+  const weaponDice = options.twoHanded ? weapon.versatileDice! : weapon.damageDice;
   // Martial Arts: the Monk may roll its die in place of the weapon's, so the bigger one is rolled.
   const martialArts = martialArtsSwing(item, definition, martialArtsInForce);
-  const dice = martialArts ? biggerDie(weapon.damageDice, martialArts.die) : weapon.damageDice;
+  const dice = martialArts ? biggerDie(weaponDice, martialArts.die) : weaponDice;
   const trained = definition.proficiencies?.weapons;
   // A bound template row also answers to its base weapon's id for proficiency.
-  const ids = item.baseId !== undefined ? [item.id, item.baseId] : [item.id];
+  const ids = item.baseId !== undefined ? [catalogIdOf(item), item.baseId] : [catalogIdOf(item)];
   const proficient =
     trained === undefined || trainingCovers(grantedWeapons, weapon, ids) || trainingCovers(trained, weapon, ids);
   const bonus = modifier + (proficient ? definition.proficiencyBonus : 0);
   const action: ActorAction = {
-    id: itemActionId(item.id),
-    name: item.name,
+    id: itemActionId(item.id, options.twoHanded ? TWO_HANDED_SUFFIX : undefined),
+    name: options.twoHanded ? `${item.name} (two-handed)` : item.name,
     activation: "action",
-    description: `Attack with ${item.name}.`,
+    description: options.twoHanded
+      ? `Attack with ${item.name} in both hands (Versatile).`
+      : `Attack with ${item.name}.`,
     attack: {
       bonus,
-      ...(weapon.rangeFeet === null || properties.includes("thrown")
+      // Only a Melee weapon has a reach: a Dart thrown at an adjacent creature is still a ranged attack.
+      ...(isMeleeWeapon(properties, weapon.rangeFeet, weapon.melee)
         ? { reachFeet: properties.includes("reach") ? 10 : 5 }
         : {}),
       ...(weapon.rangeFeet !== null
@@ -441,9 +474,12 @@ export function weaponSwing(
   return { action, dice, modifier };
 }
 
-/** "1d8 + 3", "1d4 - 1", or the dice alone; a flat die ("1", a blowgun) keeps its own term. */
+/** "1d8 + 3", "1d4 - 1", or the dice alone. A fixed amount ("1", a Blowgun) stays as it is: the SRD adds no ability
+ *  modifier to fixed damage that doesn't use a roll. */
 const withModifier = (dice: string, modifier: number) =>
-  `${dice}${modifier === 0 ? "" : modifier > 0 ? ` + ${modifier}` : ` - ${Math.abs(modifier)}`}`;
+  !/d/i.test(dice)
+    ? dice
+    : `${dice}${modifier === 0 ? "" : modifier > 0 ? ` + ${modifier}` : ` - ${Math.abs(modifier)}`}`;
 
 /**
  * The extra attack a weapon can make beside its own (SRD 5.2.1), minted with it: the Light property's (after an

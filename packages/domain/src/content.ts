@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   AbilitySchema,
+  AmmunitionKindSchema,
   HitDieSchema,
   PickBudgetScalingSchema,
   type ActionReaction,
@@ -21,6 +22,8 @@ export const ContentMonsterSummarySchema = z.strictObject({
   id: z.string(),
   name: z.string(),
   challengeRating: z.number(),
+  /** XP for defeating it, for the encounter budget; null for a homebrew CR the SRD table doesn't list. */
+  experiencePoints: z.number().int().nullable(),
   type: z.string(),
   size: z.string(),
   armorClass: z.number().int(),
@@ -31,6 +34,21 @@ export type ContentMonstersResult = {
   ok: boolean;
   message?: string;
   monsters?: readonly ContentMonsterSummary[];
+  attribution?: string;
+};
+/** One Rules Glossary term for the in-app rules reference; public information for any joined session. */
+export const ContentGlossaryEntrySchema = z.strictObject({
+  id: z.string(),
+  name: z.string(),
+  /** The bracketed family the SRD gives the term ("Condition", "Action", "Hazard"), or null. */
+  tag: z.string().nullable(),
+  description: z.string()
+});
+export type ContentGlossaryEntry = Wire<z.infer<typeof ContentGlossaryEntrySchema>>;
+export type ContentGlossaryResult = {
+  ok: boolean;
+  message?: string;
+  glossary?: readonly ContentGlossaryEntry[];
   attribution?: string;
 };
 /** SRD condition reference (name + rules text) for pickers and tooltips; public information for any joined session. */
@@ -102,6 +120,12 @@ export const ContentEquipmentSummarySchema = z.strictObject({
       damageType: z.string(),
       rangeFeet: z.number().int().nullable(),
       longRangeFeet: z.number().int().nullable(),
+      /** Melee or ranged weapon (the Weapons table's band); absent on homebrew that doesn't say. */
+      melee: z.boolean().optional(),
+      /** A Versatile weapon's two-handed die. */
+      versatileDice: z.string().optional(),
+      /** What an Ammunition weapon fires ("arrow", "bolt"). */
+      ammunition: AmmunitionKindSchema.optional(),
       mastery: z.enum(["cleave", "graze", "nick", "push", "sap", "slow", "topple", "vex"]).optional(),
       properties: z.array(slug(40)).max(12).optional()
     })
@@ -115,7 +139,9 @@ export const ContentEquipmentSummarySchema = z.strictObject({
       strengthRequired: z.number().int().nullable()
     })
     .nullable(),
-  appliesTo: z.strictObject({ label: z.string(), baseIds: z.array(slug(60)).min(1).max(40) }).nullable()
+  appliesTo: z.strictObject({ label: z.string(), baseIds: z.array(slug(60)).min(1).max(40) }).nullable(),
+  /** The damage types the GM may pick for the item's resistance ("The GM chooses the type"). */
+  damageTypeChoice: z.array(slug(20)).max(13).optional()
 });
 export type ContentEquipmentSummary = Wire<z.infer<typeof ContentEquipmentSummarySchema>>;
 export type ContentEquipmentResult = {
@@ -464,7 +490,8 @@ export type ContentActionSummary = Readonly<{
   grants: boolean;
   reaction: Wire<ActionReaction> | null;
   /** SRD generic action rows (Dodge, Dash, Help, ...) appended after the stat block's own. */ builtin?: boolean;
-  /** Builtin targeting: "single" picks one combatant, "none" is a direct tap. */ targeting?: "single" | "none";
+  /** Targeting: "single" picks one combatant, "multi" several (Preserve Life), "none" is a direct tap. */ targeting?:
+    "single" | "multi" | "none";
   /** SRD Legendary Action cost against the creature's per-round pool (taken on other creatures' turns). */ legendaryCost?: number;
   /** Darts the action makes, each assigned to a target (Magic Missile); see `ActorAction.darts`. */ darts?: number;
   /** Damage types the caster picks from (Chromatic Orb); see `ActorAction.damageTypes`. */ damageTypes?: readonly DamageType[];

@@ -31,8 +31,11 @@ export const CharacterDraftSchema = z
     poolAssignment: z.partialRecord(AbilityIdSchema, z.string().max(40).nullable()),
     spendScores: z.partialRecord(AbilityIdSchema, z.number().int().min(1).max(30)),
     backgroundBonus: z.array(DraftIncrease).max(6),
-    hpMode: z.enum(["average", "entries"]),
+    /** "roll" leaves the throws to the server when the character is made. */
+    hpMode: z.enum(["average", "entries", "roll"]),
     hpEntries: z.array(z.number().int().min(1).max(20)).max(19),
+    /** The server ability roll the pool came from (`builder.roll-abilities`). */
+    abilityRollId: z.uuid().optional(),
     /** Offer key to the option ids chosen for it. */
     picks: z.record(DraftOfferKey, z.array(z.string().min(1).max(120)).max(40)).refine(atMostKeys(300), {
       message: "Too many answered offers."

@@ -20,22 +20,52 @@ import {
   healActor,
   isSrdDamageType,
   setCurrentHp,
+  setMaximumHp,
   setTemporaryHp,
   UNTYPED_DAMAGE
 } from "../hit-points.js";
-import { applyRest, spendHitDice } from "../rests.js";
+import { applyRest, hitDieSizesToSpend, spendHitDice } from "../rests.js";
+import { builtinAction } from "../builtin-actions.js";
+import { effectiveActions } from "../effective-actions.js";
+import type { EquipmentCatalog } from "../equipment-derivation.js";
+import type { ActorDefinition } from "@vtt/schemas";
 import { recordRoll } from "../roll-history.js";
 import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
 // Hit points, conditions and rests.
 
+/** SRD Knocking Out a Creature: only "a melee attack" can, so a named source action that isn't one is refused. */
+function requireMeleeKnockOut(
+  state: Parameters<typeof applyDamageDetailed>[0],
+  sourceActorId: string,
+  sourceActionId: string,
+  kit: Readonly<{
+    resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
+    equipmentCatalog: () => EquipmentCatalog;
+  }>
+): void {
+  const source = state.actors.find((candidate) => candidate.id === sourceActorId);
+  if (!source) return;
+  const definition = source.definitionId ? kit.resolveDefinition(source.definitionId) : undefined;
+  const action =
+    effectiveActions(definition, source, kit.equipmentCatalog()).find((candidate) => candidate.id === sourceActionId) ??
+    builtinAction(sourceActionId);
+  if (!action) return;
+  // A ranged attack, or a save or spell with no attack roll; an action that doesn't say stays the GM's call.
+  const ranged =
+    action.attack !== undefined && action.attack.reachFeet === undefined && action.attack.rangeFeet !== undefined;
+  const noAttack = action.attack === undefined && (action.save !== undefined || action.spellId !== undefined);
+  if (ranged || noAttack)
+    throw new CommandRejectedError(`Only a melee attack can knock a creature out - ${action.name} isn't one.`);
+}
+
 export const actorHealthCommands = [
   defineCommand({
     type: "actor.apply-damage",
     operationId: "applyDamage",
     description:
-      "Applies damage (temporary hit points absorb first). Optional typed `parts` run the defense pipeline - immunity, then resistance (half, rounded down), then vulnerability (double) - from the target's definition and active effects, with the per-part breakdown returned in `applied`; the bare `amount` is the manual path (no defense math). Dropping a player character to 0 starts the dying state (Unconscious + Prone + death saves; `critical: true` while dying adds two failures). Player sessions may target only their claimed character.",
+      "Applies damage (temporary hit points absorb first). Optional typed `parts` run the defense pipeline - immunity, then resistance (half, rounded down), then vulnerability (double) - from the target's definition and active effects, with the per-part breakdown returned in `applied`; the bare `amount` is the manual path (no defense math). Dropping a player character to 0 starts the dying state (Unconscious + Prone + death saves; `critical: true` while dying adds two failures). `nonlethal` knocks out instead (SRD): a melee attack that would drop the target to 0 leaves it at 1 HP and Unconscious until it regains hit points; a named `sourceActionId` that is not a melee attack is refused. Any damage ends the target's effects that end on damage (Sleep). Player sessions may target only their claimed character.",
     summary: "Apply damage (GM anyone; a player their claimed character).",
     schema: ApplyDamageSchema,
     malformed: "The damage command is malformed.",
@@ -55,6 +85,8 @@ export const actorHealthCommands = [
       const distance = await kit.creatureDistance();
       let outcome: ReturnType<typeof applyDamageDetailed> | undefined;
       const { duplicate } = await execute((state) => {
+        if (nonlethal && sourceActorId && request.sourceActionId)
+          requireMeleeKnockOut(state, sourceActorId, request.sourceActionId, kit);
         outcome = applyDamageDetailed(
           state,
           actorId,
@@ -146,15 +178,19 @@ export const actorHealthCommands = [
   defineCommand({
     type: "actor.set-hp",
     operationId: "setCurrentHp",
-    description: "Sets current hit points directly (GM-grade only).",
-    summary: "Set current hit points directly (GM).",
+    description: "Sets current hit points directly, and optionally the hit point maximum first (GM-grade only).",
+    summary: "Set current (and maximum) hit points directly (GM).",
     schema: SetHpSchema,
     malformed: "The hit point command is malformed.",
     gmOnly: "Only the GM can set hit points directly.",
     async run({ request, execute }, kit) {
       let events: EffectNarration[] = [];
+      if (request.current === undefined && request.maximum === undefined)
+        throw new CommandRejectedError("Give the current hit points, the maximum, or both.");
       const { duplicate } = await execute((state) => {
-        events = setCurrentHp(state, request.actorId, request.current, { role: "gm" });
+        if (request.maximum !== undefined) setMaximumHp(state, request.actorId, request.maximum, { role: "gm" });
+        if (request.current !== undefined)
+          events = setCurrentHp(state, request.actorId, request.current, { role: "gm" });
       });
       if (!duplicate) kit.publishNarrations(events);
     }
@@ -164,7 +200,7 @@ export const actorHealthCommands = [
     type: "actor.set-condition",
     operationId: "setCondition",
     description:
-      "Applies or clears a bundled SRD condition (exhaustion carries a level). Player sessions may target only their claimed character.",
+      "Applies or clears a bundled SRD condition. Exhaustion is cumulative: without `level` it gains one level, with one it is set to that level. Player sessions may target only their claimed character: they may add any condition and clear one they added, while clearing one imposed by a save, an effect or the GM is a rules block (`condition.imposed`) they can ask the GM about; standing from Prone is allowed only on their own turn in a fight (`movement.stand-up-off-turn`) and costs half their Speed.",
     summary: "Apply or clear an SRD condition, with exhaustion levels.",
     schema: SetConditionSchema,
     malformed: "The condition command is malformed.",
@@ -254,7 +290,7 @@ export const actorHealthCommands = [
     type: "actor.rest",
     operationId: "restActor",
     description:
-      "Applies a rest to a rostered actor outside combat; a player session may rest only their claimed character, the GM anyone. Long: remaining effects end (their on-end grants fire first), hit points restore to maximum, temporary HP clears, the dying state resets, limited-use pools refresh, all spent Hit Point Dice restore, spell slots and prepared spells reset to the sheet defaults, and Exhaustion drops one level. Short: per-short-rest and recharge pools re-arm; healing is the separate spend-hit-dice call.",
+      "Applies a rest to a rostered actor outside combat; a player session may rest only their claimed character, the GM anyone. Long: the actor's Concentration and its effects measured in turns or rounds end (their on-end grants fire first; effects that last until ended stay), hit points restore to maximum, temporary HP clears, the dying state resets, limited-use pools refresh, all spent Hit Point Dice restore, spell slots and prepared spells reset to the sheet defaults, and Exhaustion drops one level. Short: per-short-rest and recharge pools re-arm; healing is the separate spend-hit-dice call.",
     summary:
       "Take a rest on your own character (GM: anyone): short re-arms short-rest uses; long restores HP, hit dice, spell slots, prepared spells, limited uses, clears dying, and drops one Exhaustion level.",
     schema: ActorRestSchema,
@@ -262,11 +298,16 @@ export const actorHealthCommands = [
     async run({ principal, request, execute }, kit) {
       const { actorId, kind } = request;
       let events: EffectNarration[] = [];
+      const chargeLines: string[] = [];
       // Authorized inside the mutation against live state (applyRest still refuses a combatant in a running
-      // encounter).
+      // encounter). A charged item's dawn regain is rolled with the server's dice.
       const { duplicate } = await execute((state) => {
         requireActorAccess(initiatorOf(principal), state, actorId, "resource");
-        events = applyRest(state, actorId, kind, kit.resolveDefinition, kit.equipmentCatalog());
+        chargeLines.length = 0;
+        events = applyRest(state, actorId, kind, kit.resolveDefinition, kit.equipmentCatalog(), {
+          random: (sides) => kit.context.random(sides),
+          lines: chargeLines
+        });
       });
       if (duplicate) return;
       kit.context.appendLog({
@@ -275,6 +316,8 @@ export const actorHealthCommands = [
         actorIds: [actorId],
         gmOnly: kit.actorHidden(actorId)
       });
+      for (const line of chargeLines)
+        kit.context.appendLog({ kind: "heal", text: line, actorIds: [actorId], gmOnly: kit.actorHidden(actorId) });
       kit.publishNarrations(events);
     }
   }),
@@ -293,19 +336,29 @@ export const actorHealthCommands = [
       // Roll before executing: a duplicate retry replays the stored outcome and must not consume fresh
       // randomness. The execute callback re-validates against live state.
       const snapshotActor = kit.read().actors.find((candidate) => candidate.id === actorId);
-      const sides = snapshotActor?.hitDice ? Number.parseInt(snapshotActor.hitDice.die.slice(1), 10) : 8;
-      const faces = Array.from({ length: count }, () => kit.context.random(sides));
+      // Each die at its own size: a multiclass pool spends its biggest dice first.
+      const sizes = snapshotActor?.hitDice ? hitDieSizesToSpend(snapshotActor.hitDice.entries, count) : [];
+      const faces = sizes.map((sides) => kit.context.random(sides));
       const rollId = kit.context.newId();
       let healed = 0;
       let events: EffectNarration[] = [];
       const { state, duplicate } = await execute((draft) => {
-        const outcome = spendHitDice(draft, actorId, faces, initiator, (definitionId) =>
-          kit.resolveDefinitionIn(draft, definitionId)
+        const outcome = spendHitDice(
+          draft,
+          actorId,
+          faces,
+          initiator,
+          (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
+          count
         );
         healed = outcome.healed;
         events = outcome.events;
         const actor = draft.actors.find((candidate) => candidate.id === actorId)!;
         const bonus = Math.abs(outcome.conModifier * count);
+        // "2d10 + 1d6": one term per die size, biggest first.
+        const dicePart = [...new Set(sizes)]
+          .map((sides) => `${sizes.filter((size) => size === sides).length}d${sides}`)
+          .join(" + ");
         // The dice land in shared roll history; hidden actors stay GM-only.
         const record: RollRecord = {
           id: rollId,
@@ -316,9 +369,9 @@ export const actorHealthCommands = [
           actorId,
           purpose: "manual",
           visibility: actor.visibility === "gm-only" ? "gm-only" : "public",
-          formula: `${count}${actor.hitDice!.die}${outcome.conModifier !== 0 ? ` ${outcome.conModifier < 0 ? "-" : "+"} ${bonus}` : ""}`,
-          normalizedFormula: `${count}${actor.hitDice!.die}`,
-          dice: faces.map((face) => ({ group: 0, sides, face, kept: true, sign: 1 as const })),
+          formula: `${dicePart}${outcome.conModifier !== 0 ? ` ${outcome.conModifier < 0 ? "-" : "+"} ${bonus}` : ""}`,
+          normalizedFormula: dicePart,
+          dice: faces.map((face, index) => ({ group: 0, sides: sizes[index], face, kept: true, sign: 1 as const })),
           modifiers: outcome.conModifier !== 0 ? [{ value: bonus, sign: outcome.conModifier < 0 ? -1 : 1 }] : [],
           total: outcome.healed,
           createdAt: new Date().toISOString()

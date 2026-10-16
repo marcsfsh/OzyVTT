@@ -64,7 +64,7 @@ export type BuildEncounterArchiveInput = Readonly<{
   journal: readonly JournalEntry[];
   /** The last live picture of the fight, cloned before `endEncounter` cleared the combat. */
   finalState: GameState;
-  /** The state after `encounter.end`'s own work: combat cleared, end-of-fight effect sweeps (Frenzy's Exhaustion) landed. */
+  /** The state after `encounter.end`'s own work: combat cleared, end-of-fight effect sweeps (and their on-end grants) landed. */
   postEncounterState: GameState;
   endedAt: string;
   /** Resolves a bundled (SRD) stat block by definition id; imported ones come from the states themselves. */

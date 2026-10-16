@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { upcastAction } from "../src/item-actions.js";
-import { settlePlayerDarts } from "../src/player-damage.js";
+import { settlePlayerDamage } from "../src/player-damage.js";
 import {
   build,
   fighterInput,
@@ -87,7 +87,7 @@ describe("Magic Missile's darts", () => {
     const resolution = resolve("spell-magic-missile", { targetIds: [FOE, FOE, FOE2] }, [1, 2, 3]);
     expect(resolution.damage.map((part) => part.total)).toEqual([2, 3, 4]);
     expect(resolution.damageTotal).toBe(9);
-    expect(resolution.damageByTarget).toEqual([
+    expect(resolution.damageTargets).toEqual([
       expect.objectContaining({ targetId: FOE, targetName: "Goblin", total: 5 }),
       expect.objectContaining({ targetId: FOE2, targetName: "Orc", total: 4 })
     ]);
@@ -96,7 +96,7 @@ describe("Magic Missile's darts", () => {
   it("all strike one creature when only one is named", () => {
     const { resolve } = fight(wizard);
     const resolution = resolve("spell-magic-missile", { targetIds: [FOE] }, [1, 1, 1]);
-    expect(resolution.damageByTarget).toEqual([expect.objectContaining({ targetId: FOE, total: 6 })]);
+    expect(resolution.damageTargets).toEqual([expect.objectContaining({ targetId: FOE, total: 6 })]);
   });
 
   it("gain a dart for each slot level above 1, and can't be over-assigned", () => {
@@ -112,14 +112,14 @@ describe("Magic Missile's darts", () => {
     const deps = { resolveDefinition: () => undefined, newId: () => crypto.randomUUID(), now: () => 0 };
     const proposed = fight(wizard);
     const resolution = proposed.resolve("spell-magic-missile", { targetIds: [FOE, FOE2] }, [1, 1, 1]);
-    settlePlayerDarts(proposed.state, resolution, "Ansel", HERO, "proposal", deps);
+    settlePlayerDamage(proposed.state, resolution, "Ansel", HERO, "proposal", deps);
     expect(proposed.state.combat.pendingDamage.map((entry) => [entry.targetActorId, entry.proposedTotal])).toEqual([
       [FOE, 4],
       [FOE2, 2]
     ]);
     const direct = fight(wizard);
     const applied = direct.resolve("spell-magic-missile", { targetIds: [FOE, FOE2] }, [1, 1, 1]);
-    settlePlayerDarts(direct.state, applied, "Ansel", HERO, "direct", deps);
+    settlePlayerDamage(direct.state, applied, "Ansel", HERO, "direct", deps);
     expect(direct.state.actors.find((actor) => actor.id === FOE)!.hp.current).toBe(196);
     expect(direct.state.actors.find((actor) => actor.id === FOE2)!.hp.current).toBe(198);
   });

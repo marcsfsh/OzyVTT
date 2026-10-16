@@ -89,8 +89,9 @@ export function deriveActorSheet(
     // the stat block.
     armorClass: actor.armorClass ?? definition?.armorClass ?? 0,
     // Initiative is not reconciled onto the actor, so the live value is computed here; `actor.initiative`
-    // still holds the instantiation-time number.
-    initiative: (scores ? abilityModifier(scores.dex) : 0) + (definition?.initiativeBonus ?? 0) + derivation.initiative,
+    // still holds the instantiation-time number. `initiativeBonus` already includes Dexterity (a built
+    // character's Dex modifier plus feats, a stat block's printed bonus).
+    initiative: (definition?.initiativeBonus ?? 0) + derivation.initiative,
     abilities,
     skills: derivedSkills,
     defences: standingDefences(
@@ -102,6 +103,8 @@ export function deriveActorSheet(
     spellSaveDcBonus: sumRiders(
       collectRiders(derivation.carriers, { ...derivation.context, moment: null }),
       "spell-save-dc"
-    )
+    ),
+    // The SRD's three, plus what an `attunement-slots` rider adds (Use Magic Device).
+    attunementSlots: 3 + derivation.attunementSlots
   };
 }

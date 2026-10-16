@@ -153,6 +153,7 @@ export const effectsField = (scope: RiderScope): FieldDef => ({
       options: [
         opt("rounds", "A number of rounds"),
         opt("until-source-next-turn", "Until your next turn"),
+        opt("until-source-turn-end", "Until the end of your next turn"),
         opt("encounter", "The whole encounter"),
         opt("manual", "Until removed by hand")
       ]

@@ -301,5 +301,17 @@ describe("the item mechanics overlay", () => {
         "cloak-of-protection": { modifiers: [{ type: "armor-class", amount: 99 }] }
       })
     ).toThrow(/cloak-of-protection - the schema refuses the merged row\. modifiers\.0\.amount:/);
+
+    // A GM-chosen type replaces one printed resistance, so the record must grant exactly one of its choices.
+    expect(() => applyItemMechanics(rows, { "cloak-of-protection": { damageTypeChoice: ["acid", "cold"] } })).toThrow(
+      "cloak-of-protection - the schema refuses the merged row. damageTypeChoice: A chosen damage type replaces one granted resistance: grant exactly one, from the choices."
+    );
+  });
+
+  it("lets the GM choose the resistance of the items whose text says so", () => {
+    const choiceOf = (id: string) => rows.find((row) => row.id === id)!.damageTypeChoice;
+    expect(choiceOf("ring-of-resistance")).toHaveLength(10);
+    expect(choiceOf("armor-of-resistance")).toEqual(choiceOf("ring-of-resistance"));
+    expect(choiceOf("dragon-scale-mail")).toEqual(["acid", "cold", "fire", "lightning", "poison"]);
   });
 });

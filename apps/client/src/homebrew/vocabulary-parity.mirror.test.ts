@@ -1630,19 +1630,32 @@ describe("several picks on one record (`choices`) — through both paths", () =>
       .filter((feat) => feat !== undefined && (feat.feature.choices?.length ?? 0) > 0)
       .map((feat) => feat!.id)
       .sort();
-    // Exactly three at the time of writing, each with two picks and no `choice` key.
+    // Exactly three at the time of writing, each with three picks (two cantrips, a level 1 spell, the
+    // spellcasting ability) and no `choice` key.
     expect(carriers).toEqual(["magic-initiate-cleric", "magic-initiate-druid", "magic-initiate-wizard"]);
 
     const initiate = library.featRecord(SEVERAL.srdFeatId)!.feature;
     expect(initiate.choice).toBeUndefined();
-    expect(initiate.choices).toHaveLength(2);
+    expect(initiate.choices).toHaveLength(3);
     expect(initiate.choices![0]).toMatchObject({ kind: "cantrip", choose: 2, fromCatalog: "cleric-spells" });
     expect(initiate.choices![1]).toMatchObject({ kind: "spell", choose: 1, fromCatalog: "cleric-spells" });
+    expect(initiate.choices![2]).toMatchObject({
+      kind: "spellcasting-ability",
+      choose: 1,
+      from: ["int", "wis", "cha"]
+    });
   });
 
   it("3. one assertion body over both: every pick — the second included — is a spell on the sheet", () => {
     const paths: ReadonlyArray<readonly [string, ActorDefinition, ReadonlyArray<{ kind: string; id: string }>]> = [
-      ["SRD content", initiateSheet(SEVERAL.srdFeatId, SEVERAL.srdFeatId, SEVERAL.srdRows), SEVERAL.srdRows],
+      [
+        "SRD content",
+        initiateSheet(SEVERAL.srdFeatId, SEVERAL.srdFeatId, [
+          ...SEVERAL.srdRows,
+          { kind: "spellcasting-ability", id: "wis" }
+        ]),
+        SEVERAL.srdRows
+      ],
       [
         "the homebrew editor",
         initiateSheet(SEVERAL.hbFeatId, SEVERAL.hbFeatureId, SEVERAL.hbRows, authoredTwinFeat()),
@@ -1652,7 +1665,7 @@ describe("several picks on one record (`choices`) — through both paths", () =>
     for (const [label, definition, rows] of paths) {
       for (const row of rows) {
         const spell = preparedSpell(definition, row.id);
-        // The cantrips arrive always-prepared and the level-1 spell as an ordinary prepared spell.
+        // The cantrips arrive always prepared, and so does the level-1 spell.
         expect(spell, `${label}: ${row.id}`).toMatchObject({ id: row.id, prepared: true });
         expect(spell?.name, `${label}: ${row.id}`).not.toBe(row.id);
       }
@@ -2120,6 +2133,7 @@ const resilientWarlock = (damageType: string): CharacterCreateRequestInput =>
       { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
       { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
       { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+      { level: 1, kind: "spellcasting-ability", id: "wis", payload: { featureId: "magic-initiate-cleric" } },
       { level: 1, classId: "warlock", kind: "skill", id: "arcana" },
       { level: 1, classId: "warlock", kind: "skill", id: "deception" },
       ...[
@@ -2223,7 +2237,7 @@ describe("a settled pick the character may re-make (`replaces`) — through both
     expect(field.validate?.("f1", { id: "f2" }, EMPTY_CONTEXT)).toBeNull();
   });
 
-  it("2. SRD content authors the same shape — 2 replaceable picks and 3 superseding features", () => {
+  it("2. SRD content authors the same shape — 2 replaceable picks and 7 superseding features", () => {
     const library = new ContentLibrary().forAudience("gm");
     const clauses: Array<{ id: string; clause: Record<string, unknown> }> = [];
     const supersedes: Array<{ id: string; replaced: string }> = [];
@@ -2257,11 +2271,16 @@ describe("a settled pick the character may re-make (`replaces`) — through both
       when: "long-rest"
     });
 
-    // Three superseding features: two Fighter attack tiers (read by the builder) and Champion's (not read; see 1b).
+    // Seven superseding features: two Fighter attack tiers and four Unarmored Movement steps (read by the builder),
+    // and Champion's (not read; see 1b).
     expect(supersedes.map((entry) => `${entry.id} → ${entry.replaced}`).sort()).toEqual([
       "superior-critical → improved-critical",
       "three-extra-attacks → two-extra-attacks",
-      "two-extra-attacks → extra-attack"
+      "two-extra-attacks → extra-attack",
+      "unarmored-movement-10 → unarmored-movement-6",
+      "unarmored-movement-14 → unarmored-movement-10",
+      "unarmored-movement-18 → unarmored-movement-14",
+      "unarmored-movement-6 → unarmored-movement"
     ]);
   });
 
@@ -2527,8 +2546,7 @@ const WINDOW = {
   srdBoonId: "boon-of-the-night-spirit",
   raised: "wis",
   ceiling: 30,
-  withCeiling: 21,
-  withoutCeiling: 20
+  withCeiling: 21
 } as const;
 
 /** A feat with one spell pick and the given window. */
@@ -2726,7 +2744,7 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
     expect(upsideDown.why).toContain("minSpellLevel 6 is above maxSpellLevel 2");
   });
 
-  it("2. SRD content authors the same shapes — 17 ceilings, 6 floors, 7 epic boons", () => {
+  it("2. SRD content authors the same shapes — 17 ceilings, 11 floors, 7 epic boons", () => {
     const library = new ContentLibrary().forAudience("gm");
     const found: Array<{
       id: string;
@@ -2767,26 +2785,34 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
     carriers(library.subclassSummaries(), (id) => library.subclassRecord(id));
     carriers(library.featSummaries(), (id) => library.featRecord(id));
 
-    // Every floor has `min === max`: a floor exists to make a pick exact ("a level 6 spell", not
-    // "6 or lower").
+    // Every floor but Evocation Savant's has `min === max`: a floor exists to make a pick exact ("a level 6
+    // spell", not "6 or lower"); the savant's "level 1 or 2" keeps cantrips out of a spellbook.
     const ceilings = found.filter((entry) => entry.max !== undefined);
     const floors = found.filter((entry) => entry.min !== undefined);
     const maxima = found.filter((entry) => entry.maximum !== undefined);
     expect(ceilings).toHaveLength(17);
     expect(floors.map((entry) => entry.id).sort()).toEqual([
+      "evocation-savant",
+      // Magic Initiate's "level 1 spell" is exact too.
+      "magic-initiate-cleric",
+      "magic-initiate-druid",
+      "magic-initiate-wizard",
       "mystic-arcanum-level-6-spell",
       "mystic-arcanum-level-7-spell",
       "mystic-arcanum-level-8-spell",
       "mystic-arcanum-level-9-spell",
+      "signature-spells",
       "spell-mastery",
       "spell-mastery"
     ]);
-    expect(floors.every((entry) => entry.min === entry.max)).toBe(true);
+    expect(floors.filter((entry) => entry.min !== entry.max)).toEqual([
+      expect.objectContaining({ id: "evocation-savant", min: 1, max: 2 })
+    ]);
     expect(maxima).toHaveLength(7);
     expect(maxima.every((entry) => entry.maximum === WINDOW.ceiling && entry.kind === "ability-score")).toBe(true);
 
     // Every window author draws on a spell catalog, and every ceiling author on a typed list of abilities.
-    expect(ceilings.every((entry) => (entry.fromCatalog ?? "").endsWith("-spells"))).toBe(true);
+    expect(ceilings.every((entry) => /-spells(-of-[a-z]+)?$/.test(entry.fromCatalog ?? ""))).toBe(true);
     expect(maxima.every((entry) => entry.fromCatalog === undefined)).toBe(true);
   });
 
@@ -2840,7 +2866,7 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
     expect(arcanum).toMatchObject({ id: WINDOW.inWindow, level: WINDOW.windowLevel });
   });
 
-  it("4. one assertion body over both: the ceiling carries a 20 to 21, and without it the point is thrown away", () => {
+  it("4. one assertion body over both: the ceiling carries a 20 to 21, and without it the pick is refused", () => {
     const srdView = new ContentLibrary().forAudience("gm");
     const paths: ReadonlyArray<readonly [string, ActorDefinition]> = [
       [
@@ -2857,17 +2883,18 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
       ]
     ];
     for (const [label, definition] of paths) {
-      // A score past the ASI clamp: Wisdom was 20 before the boon.
+      // A score past the ASI ceiling: Wisdom was 20 before the boon.
       expect(definition.abilityScores[WINDOW.raised], label).toBe(WINDOW.withCeiling);
     }
 
-    // Negative control: no ceiling, so the clamp falls back to 20 and the point is lost.
-    const uncapped = buildCharacterDefinition(
-      boonMonk(WINDOW.boonFeatId, WINDOW.boonFeatureId),
-      featView(authoredBoon(), WINDOW.boonFeatId),
-      BuilderPolicySchema.parse({})
-    );
-    expect(uncapped.abilityScores[WINDOW.raised]).toBe(WINDOW.withoutCeiling);
+    // Negative control: no ceiling, so 20 holds and the pick past it is refused rather than lost.
+    expect(() =>
+      buildCharacterDefinition(
+        boonMonk(WINDOW.boonFeatId, WINDOW.boonFeatureId),
+        featView(authoredBoon(), WINDOW.boonFeatId),
+        BuilderPolicySchema.parse({})
+      )
+    ).toThrowError(/WIS would be 21; .* cannot raise a score above 20/);
   });
 });
 
@@ -2975,6 +3002,7 @@ const blastWarlock = (featId?: string, cantrips: readonly string[] = LEDGER.cant
       { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
       { level: 1, kind: "cantrip", id: LEDGER.otherSource, payload: { featureId: "magic-initiate-cleric" } },
       { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+      { level: 1, kind: "spellcasting-ability", id: "wis", payload: { featureId: "magic-initiate-cleric" } },
       { level: 1, classId: "warlock", kind: "skill", id: "arcana" },
       { level: 1, classId: "warlock", kind: "skill", id: "deception" },
       ...LEDGER.invocations.map((id) => ({
@@ -3397,6 +3425,7 @@ const landDruid = (land: string): CharacterCreateRequestInput =>
       { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
       { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
       { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+      { level: 1, kind: "spellcasting-ability", id: "wis", payload: { featureId: "magic-initiate-cleric" } },
       { level: 1, classId: "druid", kind: "skill", id: "nature" },
       { level: 1, classId: "druid", kind: "skill", id: "perception" },
       { level: 1, kind: "primal-order", id: "warden", payload: { featureId: "primal-order" } },
@@ -3467,7 +3496,7 @@ describe("an option gated on an earlier answer (`requires`) — through both pat
     expect([...suggested].sort()).toEqual(["ember-ward", "emberborn", "frost-ward", "frostborn"]);
   });
 
-  it("2. SRD content authors the same shape — 8 gated options over 4 features", () => {
+  it("2. SRD content authors the same shape — 26 gated options over 7 features", () => {
     const library = new ContentLibrary().forAudience("gm");
     const gates: Array<{ owner: string; option: string; offer: string; id: string }> = [];
     // Track the owner explicitly: the last non-option object with an id (choice blocks have none).
@@ -3501,9 +3530,14 @@ describe("an option gated on an earlier answer (`requires`) — through both pat
     for (const summary of library.subclassSummaries()) walk(library.subclassRecord(summary.id), "?");
     for (const summary of library.featSummaries()) walk(library.featRecord(summary.id), "?");
 
-    // Eight at the time of writing over four features, each naming a `feature:<id>` pick of its own record.
-    expect(gates).toHaveLength(8);
+    // Twenty-six at the time of writing, each naming a `feature:<id>` pick of its own record: the land's later
+    // spell rows (four lands at 5, 7 and 9) and six invocations needing another, beside the earlier eight.
+    expect(gates).toHaveLength(26);
     expect([...new Set(gates.map((gate) => gate.owner))].sort()).toEqual([
+      "circle-of-the-land-spells-5",
+      "circle-of-the-land-spells-7",
+      "circle-of-the-land-spells-9",
+      "eldritch-invocations",
       "improved-blessed-strikes",
       "improved-elemental-fury",
       "natures-ward"

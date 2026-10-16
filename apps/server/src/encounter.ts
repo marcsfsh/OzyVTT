@@ -12,7 +12,9 @@ import { aggregateRollMode } from "@vtt/rules-5e";
 import { deriveEquipment, rollModeClaims, type EquipmentCatalog } from "./equipment-derivation.js";
 import { effectiveActions } from "./effective-actions.js";
 import { expireEffectsAtTurnStart, type EffectNarration } from "./effects.js";
+import { endOfTurn, startOfTurn } from "./turn-boundaries.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
+import { conditionLabel, exhaustionPenalty, incapacitatingCondition } from "./condition-rules.js";
 
 type StartEncounterInput = Readonly<{
   mapAssetId: string;
@@ -23,6 +25,8 @@ type StartEncounterInput = Readonly<{
   /** When true, each claimed player-character without an explicit score gets a provisional auto-roll and is
    * parked in `pendingInitiative` for its owner to roll (combat.playerInitiativeMode picks immediate/wait). */
   playersRollInitiative?: boolean;
+  /** SRD: one roll for each group of identical monsters (same stat block), so the group acts together. */
+  groupMonsters?: boolean;
 }>;
 
 const EMPTY_TURN = {
@@ -58,20 +62,49 @@ function clearPerEncounterUses(
 
 const validScore = (value: number) => Number.isInteger(value) && value >= -1000 && value <= 1000;
 
-/** `roll-mode {roll: "initiative"}` riders ("advantage on Initiative while attuned", Feral Instinct), standing or
- *  `on-initiative-roll`. 5e cancellation applies via `aggregateRollMode`: any advantage plus any disadvantage is a
- *  normal roll. */
+type RollMode = "advantage" | "disadvantage" | "normal";
+
+/** What an initiative roll looks up about its roller; optional so scene bookkeeping can roll without content. */
+export type InitiativeRollDeps = Readonly<{
+  resolveDefinition?: (definitionId: string) => ActorDefinition | undefined;
+  catalog?: EquipmentCatalog;
+}>;
+
+/**
+ * The roll mode and penalty of one combatant's initiative (a Dexterity check, so a D20 Test). Advantage comes
+ * from `roll-mode {roll: "initiative"}` riders (Feral Instinct, items) and Invisible; Disadvantage from riders,
+ * Surprise and any Incapacitated condition. 2024 cancellation applies via `aggregateRollMode`: any Advantage
+ * plus any Disadvantage is a normal roll. Exhaustion takes 2 per level off the total.
+ */
+export function initiativeRollFor(
+  state: GameState,
+  actorId: string,
+  surprised: boolean,
+  deps: InitiativeRollDeps = {}
+): { mode: RollMode; penalty: number; reasons: string[] } {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) return { mode: "normal", penalty: 0, reasons: [] };
+  const definition = actor.definitionId ? deps.resolveDefinition?.(actor.definitionId) : undefined;
+  const claims = rollModeClaims(deriveEquipment(actor, definition, deps.catalog), ["initiative"], "on-initiative-roll");
+  if (actor.conditions.some((condition) => condition.id === "invisible"))
+    claims.advantage.push({ source: "invisible", label: "Invisible" });
+  if (surprised) claims.disadvantage.push({ source: "surprised", label: "Surprised" });
+  const incapacitated = incapacitatingCondition(actor);
+  if (incapacitated) claims.disadvantage.push({ source: "incapacitated", label: conditionLabel(incapacitated) });
+  const penalty = exhaustionPenalty(actor);
+  const reasons = [...claims.advantage, ...claims.disadvantage].map((claim) => claim.label);
+  if (penalty !== 0) reasons.push(`Exhaustion ${penalty}`);
+  return { mode: aggregateRollMode(claims.advantage, claims.disadvantage).mode, penalty, reasons };
+}
+
+/** The roll mode alone, from riders and conditions, for a combatant who isn't surprised. */
 export function initiativeRollMode(
   state: GameState,
   actorId: string,
   resolveDefinition: ((definitionId: string) => ActorDefinition | undefined) | undefined,
   catalog: EquipmentCatalog | undefined
-): "advantage" | "disadvantage" | "normal" {
-  const actor = state.actors.find((candidate) => candidate.id === actorId);
-  if (!actor) return "normal";
-  const definition = actor.definitionId ? resolveDefinition?.(actor.definitionId) : undefined;
-  const claims = rollModeClaims(deriveEquipment(actor, definition, catalog), ["initiative"], "on-initiative-roll");
-  return aggregateRollMode(claims.advantage, claims.disadvantage).mode;
+): RollMode {
+  return initiativeRollFor(state, actorId, false, { resolveDefinition, catalog }).mode;
 }
 
 /** Told about every initiative die the server rolls, so the caller can put it in the table feed.
@@ -87,10 +120,29 @@ export type InitiativeRollSink = (
 ) => void;
 
 /** Roll one initiative d20 under an aggregated roll mode. */
-function rollUnderMode(rollD20: () => number, mode: "advantage" | "disadvantage" | "normal"): number {
+function rollUnderMode(rollD20: () => number, mode: RollMode): number {
   if (mode === "advantage") return Math.max(rollD20(), rollD20());
   if (mode === "disadvantage") return Math.min(rollD20(), rollD20());
   return rollD20();
+}
+
+/** One combatant's initiative: the d20 (rolled, or a hand-typed `natural`) plus its modifier and the
+ *  Exhaustion penalty. Every path that rolls initiative goes through here, so they all follow the same rules. */
+function rollInitiative(
+  state: GameState,
+  actorId: string,
+  surprised: boolean,
+  rollD20: () => number,
+  deps: InitiativeRollDeps,
+  natural?: number
+): { natural: number; modifier: number; total: number; mode: RollMode } {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  const { mode, penalty } = initiativeRollFor(state, actorId, surprised, deps);
+  const die = natural ?? rollUnderMode(rollD20, mode);
+  const modifier = (actor?.initiative ?? 0) + penalty;
+  const total = die + modifier;
+  if (!validScore(total)) throw new CommandRejectedError("Initiative scores must be whole numbers from -1000 to 1000.");
+  return { natural: die, modifier, total, mode };
 }
 
 function ordered(state: GameState, entries: readonly InitiativeEntry[]) {
@@ -102,6 +154,30 @@ function ordered(state: GameState, entries: readonly InitiativeEntry[]) {
       (names.get(left.actorId) ?? "").localeCompare(names.get(right.actorId) ?? "") ||
       left.actorId.localeCompare(right.actorId)
   );
+}
+
+/**
+ * The order after a score changes mid-round. Re-sorting outright could move a combatant across the current
+ * turn, so one who already acted would act again or one who hadn't would be skipped. Those who have acted stay
+ * ahead of the current turn and the rest stay behind it, each part in score order; the next round sorts fully.
+ */
+function reorderMidRound(state: GameState, entries: readonly InitiativeEntry[]) {
+  const { active, turnActorId, initiative, playerInitiativeMode, pendingInitiative } = state.combat;
+  const gathering = playerInitiativeMode === "wait" && pendingInitiative.length > 0;
+  const current = initiative.findIndex((entry) => entry.actorId === turnActorId);
+  if (!active || gathering || current < 0) return ordered(state, entries);
+  const acted = new Set(initiative.slice(0, current).map((entry) => entry.actorId));
+  return [
+    ...ordered(
+      state,
+      entries.filter((entry) => acted.has(entry.actorId))
+    ),
+    ...entries.filter((entry) => entry.actorId === turnActorId),
+    ...ordered(
+      state,
+      entries.filter((entry) => !acted.has(entry.actorId) && entry.actorId !== turnActorId)
+    )
+  ];
 }
 
 export function startEncounter(
@@ -131,6 +207,8 @@ export function startEncounter(
   // Claimed PCs whose owner will roll their own initiative: the auto-roll below is provisional until the
   // player rolls (immediate mode), or the fallback if the GM rolls the rest (wait mode).
   const pendingInitiative: string[] = [];
+  // Identical monsters share one die when the GM rolls by group; keyed by stat block and Surprise.
+  const groupDice = new Map<string, number>();
   const initiative = input.entries.map((entry) => {
     if (actorIds.has(entry.actorId)) throw new CommandRejectedError("Each actor can appear in Initiative only once.");
     actorIds.add(entry.actorId);
@@ -140,28 +218,25 @@ export function startEncounter(
     assertNotArchived(state, entry.actorId);
     actor.lastUsedAt = now; // recency for the scene-setup "Recent" list (GM-only)
     const tieBreaker = actor.initiative ?? 0;
-    // 2024 Surprise: a surprised combatant rolls with disadvantage. Item initiative riders join the same
-    // aggregation, so advantage and Surprise cancel to a normal roll.
-    const itemMode = initiativeRollMode(state, actor.id, resolveDefinition, catalog);
-    const mode =
-      entry.surprised === true
-        ? aggregateRollMode(itemMode === "advantage" ? [{ source: "item", label: "Item" }] : [], [
-            { source: "surprised", label: "Surprised" }
-          ]).mode
-        : itemMode;
-    const natural = entry.score === undefined ? rollUnderMode(rollD20, mode) : null;
-    const rolled = natural === null ? entry.score! : natural + tieBreaker;
-    if (!validScore(rolled))
-      throw new CommandRejectedError("Initiative scores must be whole numbers from -1000 to 1000.");
-    if (natural !== null) onRoll?.({ actorId: actor.id, natural, modifier: tieBreaker, total: rolled, mode });
-    if (
-      input.playersRollInitiative &&
-      entry.score === undefined &&
-      actor.kind === "player-character" &&
-      actor.ownerSessionId !== null
-    )
+    const surprised = entry.surprised === true;
+    const flags = surprised ? { surprised } : {};
+    if (entry.score !== undefined) {
+      if (!validScore(entry.score))
+        throw new CommandRejectedError("Initiative scores must be whole numbers from -1000 to 1000.");
+      return { actorId: actor.id, score: entry.score, tieBreaker, ...flags };
+    }
+    const groupKey =
+      input.groupMonsters && actor.kind === "monster" && actor.definitionId
+        ? `${actor.definitionId}|${surprised}`
+        : null;
+    const shared = groupKey === null ? undefined : groupDice.get(groupKey);
+    const roll = rollInitiative(state, actor.id, surprised, rollD20, { resolveDefinition, catalog }, shared);
+    // A group's die reaches the feed once, on its first member.
+    if (shared === undefined) onRoll?.({ actorId: actor.id, ...roll });
+    if (groupKey !== null && shared === undefined) groupDice.set(groupKey, roll.natural);
+    if (input.playersRollInitiative && actor.kind === "player-character" && actor.ownerSessionId !== null)
       pendingInitiative.push(actor.id);
-    return { actorId: actor.id, score: rolled, tieBreaker };
+    return { actorId: actor.id, score: roll.total, tieBreaker, ...flags };
   });
   const sorted = ordered(state, initiative);
   // Spread, never a fresh literal, so fields added to CombatState are not dropped. Fog rides the spread:
@@ -200,7 +275,9 @@ export function startEncounter(
   if (resolveDefinition) clearPerEncounterUses(state, actorIds, resolveDefinition, catalog);
 }
 
-/** Drops a new combatant into a running encounter: rolls (or takes) its initiative, re-sorts, and places its token. GM-only at the command layer. */
+/** Drops a new combatant into a running encounter: rolls (or takes) its initiative, re-sorts, and places its
+ *  token. It joins fresh, like everyone at the start: per-encounter and recharge pools are ready. GM-only at the
+ *  command layer. */
 export function addCombatant(
   state: GameState,
   actorId: string,
@@ -208,7 +285,8 @@ export function addCombatant(
   rollD20: () => number,
   tokenGeometry: TokenMapGeometry,
   now: number = Date.now(),
-  onRoll?: InitiativeRollSink
+  onRoll?: InitiativeRollSink,
+  deps: InitiativeRollDeps = {}
 ) {
   if (!state.combat.active) throw new CommandRejectedError("Start the encounter before adding a combatant to it.");
   const actor = state.actors.find((candidate) => candidate.id === actorId);
@@ -219,12 +297,18 @@ export function addCombatant(
   if (state.combat.initiative.length >= 200)
     throw new CommandRejectedError("This encounter already has 200 combatants.");
   const tieBreaker = actor.initiative ?? 0;
-  const natural = score === undefined ? rollD20() : null;
-  const rolled = natural === null ? score! : natural + tieBreaker;
-  if (!validScore(rolled))
-    throw new CommandRejectedError("Initiative scores must be whole numbers from -1000 to 1000.");
-  if (natural !== null) onRoll?.({ actorId, natural, modifier: tieBreaker, total: rolled, mode: "normal" });
+  let rolled: number;
+  if (score === undefined) {
+    const roll = rollInitiative(state, actorId, false, rollD20, deps);
+    onRoll?.({ actorId, ...roll });
+    rolled = roll.total;
+  } else {
+    if (!validScore(score))
+      throw new CommandRejectedError("Initiative scores must be whole numbers from -1000 to 1000.");
+    rolled = score;
+  }
   actor.lastUsedAt = now; // recency for the scene-setup "Recent" list (GM-only)
+  // A joiner takes its place by count: one whose count has passed this round waits for the next.
   state.combat = {
     ...state.combat,
     initiative: ordered(state, [...state.combat.initiative, { actorId, score: rolled, tieBreaker }]),
@@ -233,6 +317,7 @@ export function addCombatant(
       ...createEncounterTokens([{ actorId, sizeCells: actor.sizeCells ?? 1, size: actor.size }], tokenGeometry)
     ]
   };
+  if (deps.resolveDefinition) clearPerEncounterUses(state, new Set([actorId]), deps.resolveDefinition, deps.catalog);
 }
 
 export function endEncounter(state: GameState) {
@@ -262,79 +347,102 @@ export function endEncounter(state: GameState) {
   };
 }
 
-export function setInitiativeScore(state: GameState, actorId: string, score: number) {
+export function setInitiativeScore(state: GameState, actorId: string, score: number, tieBreaker?: number) {
   if (!state.combat.active) throw new CommandRejectedError("Start an encounter before changing Initiative.");
   if (!validScore(score)) throw new CommandRejectedError("Initiative scores must be whole numbers from -1000 to 1000.");
   if (!state.combat.initiative.some((entry) => entry.actorId === actorId))
     throw new CommandRejectedError("That actor is not in this encounter.");
   // A GM-set score clears that actor's pending roll, and in wait mode may complete the gather.
-  const stillPending = state.combat.pendingInitiative.filter((id) => id !== actorId);
+  const initiative = reorderMidRound(
+    state,
+    state.combat.initiative.map((entry) =>
+      entry.actorId === actorId ? { ...entry, score, ...(tieBreaker === undefined ? {} : { tieBreaker }) } : entry
+    )
+  );
   state.combat = {
     ...state.combat,
-    initiative: ordered(
-      state,
-      state.combat.initiative.map((entry) => (entry.actorId === actorId ? { ...entry, score } : entry))
-    ),
-    pendingInitiative: stillPending
+    initiative,
+    pendingInitiative: state.combat.pendingInitiative.filter((id) => id !== actorId)
   };
   settleGatherIfComplete(state);
 }
 
-/** A claimed player rolls their own initiative (or supplies `natural`) and clears their pending flag; in
- *  wait mode the last roll begins turns. Returns the final score. */
+/** SRD Alert, Initiative Swap: right after initiative is rolled, two combatants trade scores. Not while either
+ *  is Incapacitated, and only before the first of them has taken a turn in this fight. */
+export function swapInitiative(state: GameState, actorId: string, withActorId: string) {
+  if (!state.combat.active) throw new CommandRejectedError("Start an encounter before swapping Initiative.");
+  if (actorId === withActorId) throw new CommandRejectedError("Pick another combatant to swap with.");
+  const entries = [actorId, withActorId].map((id) => state.combat.initiative.find((entry) => entry.actorId === id));
+  if (entries.some((entry) => entry === undefined))
+    throw new CommandRejectedError("Both combatants must be in this encounter.");
+  for (const id of [actorId, withActorId]) {
+    const actor = state.actors.find((candidate) => candidate.id === id);
+    const condition = actor ? incapacitatingCondition(actor) : null;
+    if (actor && condition)
+      throw new CommandRejectedError(`${actor.name} can't swap Initiative while ${conditionLabel(condition)}.`);
+  }
+  const current = state.combat.initiative.findIndex((entry) => entry.actorId === state.combat.turnActorId);
+  const actedAlready = (id: string) => {
+    const index = state.combat.initiative.findIndex((entry) => entry.actorId === id);
+    return state.combat.round > 1 || index < current;
+  };
+  if (actedAlready(actorId) || actedAlready(withActorId))
+    throw new CommandRejectedError(
+      "Initiative Swap happens right after initiative is rolled, before either has acted."
+    );
+  const [first, second] = entries as InitiativeEntry[];
+  const swapped = state.combat.initiative.map((entry) =>
+    entry.actorId === actorId
+      ? { ...entry, score: second.score, tieBreaker: second.tieBreaker }
+      : entry.actorId === withActorId
+        ? { ...entry, score: first.score, tieBreaker: first.tieBreaker }
+        : entry
+  );
+  state.combat = { ...state.combat, initiative: reorderMidRound(state, swapped) };
+}
+
+/** A claimed player rolls their own initiative (or supplies `natural`, a physical die) and clears their
+ *  pending flag; in wait mode the last roll begins turns. The rules decide the roll mode: a player can't pick
+ *  Advantage. `rollMode` is a GM-grade override. Returns the final score. */
 export function rollSelfInitiative(
   state: GameState,
   actorId: string,
-  options: Readonly<{ natural?: number; rollMode?: "advantage" | "disadvantage" | "normal" }>,
+  options: Readonly<{ natural?: number; rollMode?: RollMode }>,
   rollD20: () => number,
-  onRoll?: InitiativeRollSink
+  onRoll?: InitiativeRollSink,
+  deps: InitiativeRollDeps = {}
 ): number {
   if (!state.combat.active) throw new CommandRejectedError("Start an encounter before rolling Initiative.");
   const entry = state.combat.initiative.find((candidate) => candidate.actorId === actorId);
   if (!entry) throw new CommandRejectedError("That actor is not in this encounter.");
   if (!state.combat.pendingInitiative.includes(actorId))
     throw new CommandRejectedError("Your initiative is already set.");
-  const actor = state.actors.find((candidate) => candidate.id === actorId);
-  const tieBreaker = actor?.initiative ?? 0;
-  const natural =
-    options.natural !== undefined
-      ? options.natural
-      : options.rollMode === "advantage"
-        ? Math.max(rollD20(), rollD20())
-        : options.rollMode === "disadvantage"
-          ? Math.min(rollD20(), rollD20())
-          : rollD20();
-  const score = natural + tieBreaker;
-  if (!validScore(score)) throw new CommandRejectedError("Initiative scores must be whole numbers from -1000 to 1000.");
+  const override = options.rollMode;
+  const natural = options.natural ?? (override ? rollUnderMode(rollD20, override) : undefined);
+  const roll = rollInitiative(state, actorId, entry.surprised === true, rollD20, deps, natural);
   // A hand-typed `natural` is a die the server never threw, so only server rolls reach the feed.
-  if (options.natural === undefined)
-    onRoll?.({ actorId, natural, modifier: tieBreaker, total: score, mode: options.rollMode ?? "normal" });
+  if (options.natural === undefined) onRoll?.({ actorId, ...roll, mode: override ?? roll.mode });
+  const initiative = reorderMidRound(
+    state,
+    state.combat.initiative.map((candidate) =>
+      candidate.actorId === actorId ? { ...candidate, score: roll.total } : candidate
+    )
+  );
   state.combat = {
     ...state.combat,
-    initiative: ordered(
-      state,
-      state.combat.initiative.map((candidate) => (candidate.actorId === actorId ? { ...candidate, score } : candidate))
-    ),
+    initiative,
     pendingInitiative: state.combat.pendingInitiative.filter((id) => id !== actorId)
   };
   settleGatherIfComplete(state);
-  return score;
+  return roll.total;
 }
 
-/** GM rolls initiative for every combatant still pending (starting the fight in wait mode), clearing the gather. */
-export function rollRemainingInitiative(state: GameState, rollD20: () => number, onRoll?: InitiativeRollSink) {
+/** The GM settles every pending player roll, beginning a wait-mode fight. The provisional rolls made at the
+ *  start already followed the rules and are in the feed, so they stand rather than being rolled again. */
+export function rollRemainingInitiative(state: GameState) {
   if (!state.combat.active) throw new CommandRejectedError("Start an encounter before rolling Initiative.");
   if (state.combat.pendingInitiative.length === 0) return;
-  const pending = new Set(state.combat.pendingInitiative);
-  const rolledEntries = state.combat.initiative.map((entry) => {
-    if (!pending.has(entry.actorId)) return entry;
-    const actor = state.actors.find((candidate) => candidate.id === entry.actorId);
-    const natural = rollD20();
-    const modifier = actor?.initiative ?? 0;
-    onRoll?.({ actorId: entry.actorId, natural, modifier, total: natural + modifier, mode: "normal" });
-    return { ...entry, score: natural + modifier };
-  });
-  state.combat = { ...state.combat, initiative: ordered(state, rolledEntries), pendingInitiative: [] };
+  state.combat = { ...state.combat, pendingInitiative: [] };
   settleGatherIfComplete(state);
 }
 
@@ -352,12 +460,16 @@ function settleGatherIfComplete(state: GameState) {
   state.combat = { ...state.combat, turnActorId: top, round: 1, turn: { ...EMPTY_TURN } };
 }
 
-/** Dependencies for start-of-turn recharge rolls; optional so scene bookkeeping can advance turns without them. */
+/** Dependencies for start-of-turn recharge rolls and ongoing damage and end-of-turn repeat saves; optional so scene
+ *  bookkeeping can advance turns without them. */
 export type TurnAdvanceDeps = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
   /** The item catalog, so an item's recharge pool re-arms like a stat block's. */
   catalog?: EquipmentCatalog;
   rollDie: (sides: number) => number;
+  /** Mint the repeat saves the ending turn opens; absent, effects still expire but no save is opened. */
+  newId?: () => string;
+  now?: () => string;
 }>;
 
 /** SRD Recharge X-Y: at the start of the owner's turn, a d6 at or above the threshold re-arms the spent
@@ -374,19 +486,23 @@ function rollRecharges(state: GameState, actorId: string, deps: TurnAdvanceDeps,
     if (rolledPools.has(key) || (actor.actionUses[key] ?? 0) === 0) continue;
     rolledPools.add(key);
     const die = deps.rollDie(6);
+    // Whether a monster's breath is back is the GM's to know; the table sees it when it is used.
+    const audience = actor.kind === "player-character" ? {} : { gmOnly: true as const };
     if (die >= action.uses.recharge) {
       const { [key]: _spent, ...rest } = actor.actionUses;
       actor.actionUses = rest;
       events?.push({
         kind: "effect",
         text: `${actor.name}'s ${action.name} recharges (rolled ${die}).`,
-        actorId: actor.id
+        actorId: actor.id,
+        ...audience
       });
     } else {
       events?.push({
         kind: "effect",
         text: `${actor.name}'s ${action.name} stays spent (rolled ${die}, needs ${action.uses.recharge}+).`,
-        actorId: actor.id
+        actorId: actor.id,
+        ...audience
       });
     }
   }
@@ -401,9 +517,21 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   const currentIndex = state.combat.initiative.findIndex((entry) => entry.actorId === state.combat.turnActorId);
   if (currentIndex < 0) throw new CommandRejectedError("The current turn is not in Initiative.");
   const wraps = currentIndex === state.combat.initiative.length - 1;
-  const nextActorId = state.combat.initiative[wraps ? 0 : currentIndex + 1].actorId;
+  // The outgoing turn ends first: its "until the end of the turn" effects lapse and repeated saves open.
+  const ending: EffectNarration[] = [];
+  endOfTurn(
+    state,
+    state.combat.turnActorId,
+    ending,
+    deps?.newId ? { newId: deps.newId, now: deps.now ?? (() => new Date().toISOString()) } : undefined
+  );
+  events?.push(...ending);
+  // A new round sorts the whole order again, settling any mid-round score change.
+  const order = wraps ? ordered(state, state.combat.initiative) : state.combat.initiative;
+  const nextActorId = order[wraps ? 0 : currentIndex + 1].actorId;
   state.combat = {
     ...state.combat,
+    initiative: order,
     round: wraps ? state.combat.round + 1 : state.combat.round,
     turnActorId: nextActorId,
     // A new turn: fresh action/bonus/reaction for the incoming actor, and its legendary pool refills (SRD).
@@ -416,7 +544,12 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   // The incoming actor's durations tick: Reckless ends, Rage counts down (ADR-0020).
   const expiry = expireEffectsAtTurnStart(state, nextActorId);
   events?.push(...expiry);
-  if (deps) rollRecharges(state, nextActorId, deps, events);
+  if (!deps) return;
+  // Then what lands at the start of its turn: a swallow's acid, Searing Smite's fire.
+  const starting: EffectNarration[] = [];
+  startOfTurn(state, nextActorId, starting, deps);
+  events?.push(...starting);
+  rollRecharges(state, nextActorId, deps, events);
 }
 
 export function previousInitiativeTurn(state: GameState) {

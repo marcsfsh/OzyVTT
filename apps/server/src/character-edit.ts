@@ -58,7 +58,35 @@ function mergeClassRows(stored: readonly ClassRow[], supplied: readonly ClassRow
   return [...merged, ...stored.filter((row) => !suppliedIds.has(row.id))];
 }
 
-export function setCharacterIdentity(state: GameState, actorId: string, character: ActorDefinition["character"]): void {
+/**
+ * What a character's identity does at the table, with the display names left out: class rows (id, level,
+ * hit die, subclass id), species and background ids, feats, features, the choice ledger and Martial Arts. Feat
+ * and feature riders, Weapon Mastery unlocks and the Hit Dice pool all read these.
+ */
+function mechanicsOf(identity: CharacterIdentity | undefined): string {
+  return JSON.stringify({
+    classes: (identity?.classes ?? []).map((row) => [row.id, row.level, row.hitDie ?? null, row.subclass?.id ?? null]),
+    race: [identity?.race?.id ?? null, identity?.race?.subrace?.id ?? null],
+    background: identity?.background?.id ?? null,
+    feats: (identity?.feats ?? []).map((feat) => feat.id),
+    features: identity?.features ?? null,
+    choices: identity?.choices ?? null,
+    martialArts: identity?.martialArts ?? null
+  });
+}
+
+/**
+ * A light hand-edit of identity. A player may rename (class, subclass, species, background) but changes nothing
+ * the rules read: levels, classes, feats, features and the choice ledger are the GM's, or the builder's. On a
+ * sheet built here (it carries the choice ledger) the builder owns all of those, for the GM too, since a hand
+ * change would not be validated and the next rebuild would drop it.
+ */
+export function setCharacterIdentity(
+  state: GameState,
+  actorId: string,
+  character: ActorDefinition["character"],
+  editor: Readonly<{ gm: boolean }> = { gm: true }
+): void {
   const { definitionId, definition } = editableDefinition(state, actorId);
   // The table's level cap applies here too, or the free-text identity editor bypasses it. Summed across classes.
   const requested = (character?.classes ?? []).reduce((total, row) => total + row.level, 0);
@@ -70,6 +98,13 @@ export function setCharacterIdentity(state: GameState, actorId: string, characte
     merged !== undefined && stored !== undefined
       ? { ...merged, classes: mergeClassRows(stored.classes, merged.classes) }
       : merged;
+  const built = stored?.choices !== undefined;
+  if ((built || !editor.gm) && mechanicsOf(next) !== mechanicsOf(stored))
+    throw new CommandRejectedError(
+      built
+        ? "This character was built here: change classes, levels and feats in the Level flow, which checks them."
+        : "Only the GM can change a character's classes, levels or feats - you can rename them."
+    );
   replaceDefinition(state, definitionId, { ...definition, character: next });
 }
 

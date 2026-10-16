@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { type ActorDefinition, type ContentActionSummary } from "@vtt/domain";
-import { ActionResultHead, HealingOutcome, SplitDamageOutcome } from "./ActionResultHead";
+import { ActionResultHead, HealingOutcome } from "./ActionResultHead";
 import { ActionRow } from "./ActionRow";
 import { ActionTargetPicker } from "./ActionTargetPicker";
 import { actionSummaryParts } from "./action-summary";
 import { AttackOutcome, AttackPreview } from "./AttackPreview";
+import { damageBreakdown } from "./format";
 import { AskTheGmPrompt } from "./RuleAsk";
 import {
   beginTargeting,
@@ -46,7 +47,11 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
     grants: action.grants !== undefined,
     reaction: action.reaction ?? null,
     ...(action.darts !== undefined ? { darts: action.darts } : {}),
-    ...(action.damageTypes !== undefined ? { damageTypes: [...action.damageTypes] } : {})
+    ...(action.damageTypes !== undefined ? { damageTypes: [...action.damageTypes] } : {}),
+    // A heal for others picks its targets: one (Divine Spark's healing), or several for a divided pool.
+    ...(action.healing && !action.healing.self
+      ? { targeting: action.healing.divided ? ("multi" as const) : ("single" as const) }
+      : {})
   };
 }
 
@@ -82,7 +87,15 @@ export function PlayerActionRunner({
   const actions = useMemo(
     () => [
       ...definition.actions
-        .filter((action) => action.attack || action.save || action.damage.length > 0 || action.uses !== undefined)
+        .filter(
+          (action) =>
+            action.attack ||
+            action.save ||
+            action.damage.length > 0 ||
+            action.uses !== undefined ||
+            // A feature's heal (Second Wind); a spell's heal is cast from the spell list.
+            (action.healing !== undefined && action.spellId === undefined)
+        )
         .map(summaryOfOwnAction),
       // Item-derived actions are appended: their `item-<inventory id>` keys cannot collide with
       // stat-block ids.
@@ -96,11 +109,18 @@ export function PlayerActionRunner({
     ],
     [definition, extraActions]
   );
-  const isTargetlessOwn = (action: ContentActionSummary) =>
-    action.attackBonus === null &&
-    action.saveAbility === null &&
-    action.damage.length === 0 &&
-    action.usesLimit !== null;
+  const healingOf = (action: ContentActionSummary) => definition.actions.find((own) => own.id === action.id)?.healing;
+  // A self heal (Second Wind) is a direct tap; a heal for others picks its targets first.
+  const isTargetlessOwn = (action: ContentActionSummary) => {
+    const healing = healingOf(action);
+    if (healing) return healing.self === true;
+    return (
+      action.attackBonus === null &&
+      action.saveAbility === null &&
+      action.damage.length === 0 &&
+      action.usesLimit !== null
+    );
+  };
   const session = useTargeting();
   const result = useTargetingResult();
   const busy = useTargetingBusy();
@@ -171,6 +191,7 @@ export function PlayerActionRunner({
               bonusMode={bonusMode}
               onFeedback={onFeedback}
               push={result.push}
+              {...(result.hitOffers ? { hitOffers: result.hitOffers } : {})}
               resolve={(options) => resolveTargeting(revision, onOutcome, options)}
             />
           )}
@@ -192,10 +213,7 @@ export function PlayerActionRunner({
           {result.damage.length > 0 &&
             !result.preview &&
             (() => {
-              const breakdown = [
-                ...result.damage.map((part) => `${part.formula} ${part.type} = ${part.total}`),
-                ...(result.bonusDamage ?? []).map((part) => `+${part.amount} ${part.source}`)
-              ].join(" + ");
+              const breakdown = damageBreakdown(result);
               return (
                 <p className="action-damage">
                   Damage: <strong>{result.damageTotal}</strong>
@@ -205,12 +223,6 @@ export function PlayerActionRunner({
               );
             })()}
           {result.healing && <HealingOutcome healing={result.healing} />}
-          {!result.preview && result.damageByTarget && (
-            <SplitDamageOutcome
-              split={result.damageByTarget}
-              after={() => (playerDamageMode === "direct" ? "- applied." : "- handed to the GM.")}
-            />
-          )}
           {/* Players never apply damage: a committed hit goes to the GM (proposal) or is auto-applied
           (direct), unless a target's reaction (Uncanny Dodge) parked it on a prompt instead. */}
           {/* A miss owes damage only through Graze, which is already in the total. */}
@@ -236,6 +248,13 @@ export function PlayerActionRunner({
                 </p>
               );
             })()}
+          {/* No attack roll and no save (Magic Missile): each target's damage goes the same way as a hit's. */}
+          {!result.preview && !result.attack && (result.damageTargets?.length ?? 0) > 0 && (
+            <p className="action-save-note">
+              {playerDamageMode === "direct" ? "Applied to " : "Handed to the GM to apply to "}
+              {result.damageTargets!.map((owed) => `${owed.targetName} (${owed.total})`).join(", ")}.
+            </p>
+          )}
           {result.opens &&
             (() => {
               // Cleave: the hit opened a swing at a second creature, picked like any target.

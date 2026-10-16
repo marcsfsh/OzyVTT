@@ -27,6 +27,7 @@ import {
   ConditionReferenceSchema,
   ContentAttributionSchema,
   EquipmentReferenceSchema,
+  GlossaryEntrySchema,
   LanguageReferenceSchema,
   RuleReferenceSchema,
   SkillReferenceSchema,
@@ -38,6 +39,7 @@ import {
   type ConditionReference,
   type ContentAttribution,
   type EquipmentReference,
+  type GlossaryEntry,
   type LanguageReference,
   type RuleReference,
   type SkillReference,
@@ -155,6 +157,9 @@ export function loadEquipment(): readonly EquipmentReference[] {
         damageType: weapon.damage.type,
         rangeFeet: weapon.rangeFeet,
         longRangeFeet: weapon.longRangeFeet,
+        ...(weapon.melee !== undefined ? { melee: weapon.melee } : {}),
+        ...(weapon.versatileDice !== undefined ? { versatileDice: weapon.versatileDice } : {}),
+        ...(weapon.ammunition !== undefined ? { ammunition: weapon.ammunition } : {}),
         mastery: weapon.mastery,
         properties: weapon.properties
       },
@@ -191,6 +196,11 @@ export function loadEquipment(): readonly EquipmentReference[] {
 /** The 13 SRD 5.2.1 damage-type descriptions. */
 export function loadDamageTypes(): readonly ConditionReference[] {
   return loadBundle("damage-types.v1.json", z.array(ConditionReferenceSchema));
+}
+
+/** The SRD 5.2.1 Rules Glossary, one entry per term. */
+export function loadGlossary(): readonly GlossaryEntry[] {
+  return loadBundle("glossary.v1.json", z.array(GlossaryEntrySchema));
 }
 
 /** SRD 5.2.1 core rules text grouped by ruleset (D20 Tests, Combat, Damage and Healing, ...). */

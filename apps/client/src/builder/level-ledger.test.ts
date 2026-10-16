@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { ActorDefinition, CharacterChoice } from "@vtt/schemas";
-import { choicesAbove, hpRollGap, hpRolls, identityOf, ledgerOf, methodFor } from "./level-ledger";
+import type { BuilderPolicy } from "@vtt/domain";
+import type { BuilderCatalogs } from "../content/catalogs";
+import {
+  choicesAbove,
+  draftFromLedger,
+  hpPlan,
+  hpRollGap,
+  hpRolls,
+  identityOf,
+  ledgerOf,
+  methodFor,
+  recordedAbilities
+} from "./level-ledger";
 
 /**
  * The level flow must never let a rebuild silently lose something. Hit points are the sharp case:
@@ -107,8 +119,11 @@ describe("Rolled hit points", () => {
     expect(hpRollGap([{ level: 1, kind: "skill", id: "athletics" }], 5)).toBeNull();
   });
 
-  it("names the level range when a rolled character's rolls are only partly recorded", () => {
-    expect(hpRollGap([roll(2, 6)], 4)).toEqual({ from: 2, to: 4 });
+  it("names the levels the table will roll when a rolled character's rolls stop short", () => {
+    expect(hpRollGap([roll(2, 6)], 4)).toEqual([3, 4]);
+    // A rolled sheet asks the table to roll; it reuses every recorded roll and throws only the missing ones.
+    expect(hpPlan([roll(2, 6)], 4)).toEqual({ mode: "roll" });
+    expect(hpPlan([], 4)).toEqual({ mode: "average" });
   });
 
   it("says nothing when every roll is there", () => {
@@ -145,5 +160,57 @@ describe("Which ability method a rebuild may claim", () => {
   it("falls back to a strict method rather than to one the table has turned off", () => {
     expect(methodFor(policy(["point-buy"]))).toBe("point-buy");
     expect(methodFor(policy(["standard-array"]))).toBe("standard-array");
+  });
+});
+
+describe("The scores a character was made with", () => {
+  const recordedRow: CharacterChoice = {
+    level: 1,
+    kind: "ability-scores",
+    id: "standard-array",
+    payload: {
+      baseScores: { str: 15, dex: 14, con: 13, int: 8, wis: 12, cha: 10 },
+      backgroundBonusAllocation: [
+        { ability: "str", amount: 2 },
+        { ability: "con", amount: 1 }
+      ]
+    }
+  };
+  const tablePolicy = {
+    allowedAbilityMethods: ["standard-array", "point-buy", "roll", "custom"],
+    customFormula: null,
+    maxLevel: 20,
+    playerBuilder: "open",
+    playerRandom: "gm-only",
+    typedRolls: "gm-only",
+    hitPointRollFloor: "none"
+  } as BuilderPolicy;
+
+  it("seeds a rebuild from the recorded method, base scores and background increase, not the sheet's totals", () => {
+    // The sheet's STR 19 includes the background's +2 and an ASI's +2; neither is in the base again.
+    const sheet = withCharacter([recordedRow]);
+    const seeded = draftFromLedger(
+      identityOf(sheet)!,
+      [recordedRow],
+      { ...sheet, abilityScores: { str: 19, dex: 14, con: 14, int: 8, wis: 12, cha: 10 } },
+      {} as BuilderCatalogs,
+      4,
+      tablePolicy,
+      { offers: [], picks: {}, asiIncreases: {}, subclassId: null, choices: [] }
+    );
+    expect(seeded.abilityMethod).toBe("standard-array");
+    expect(seeded.backgroundBonus).toEqual([
+      { ability: "str", amount: 2 },
+      { ability: "con", amount: 1 }
+    ]);
+    expect(seeded.spendScores).toEqual({ str: 15, dex: 14, con: 13, int: 8, wis: 12, cha: 10 });
+    expect(seeded.abilityPool.map((entry) => entry.value).sort((left, right) => right - left)).toEqual([
+      15, 14, 13, 12, 10, 8
+    ]);
+  });
+
+  it("reads nothing from a sheet built before the row was kept", () => {
+    expect(recordedAbilities([])).toBeNull();
+    expect(recordedAbilities([{ ...recordedRow, id: "mystery" }])).toBeNull();
   });
 });

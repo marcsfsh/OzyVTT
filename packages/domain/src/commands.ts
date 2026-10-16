@@ -83,6 +83,8 @@ export const EncounterStartSchema = z
     ruleExceptions: WireRuleExceptionsSchema.optional(),
     /** When true, claimed player-characters roll their own initiative (a provisional auto-roll parks them until they do). */
     playersRollInitiative: z.boolean().optional(),
+    /** SRD: one initiative roll for each group of identical monsters, so they act together. */
+    groupMonsters: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -91,10 +93,13 @@ export const InitiativeScoreSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     score: z.number().int().min(-1000).max(1000),
+    /** Orders combatants tied on `score` (higher acts first); the GM settles ties the dice don't. */
+    tieBreaker: z.number().int().min(-1000).max(1000).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** A player rolls their own initiative (server rolls unless a manual d20 `natural` is given; adv/disadv supported). */
+/** A player rolls their own initiative: the server rolls unless a manual d20 `natural` is given, under the roll mode
+ *  the rules give (Surprise, conditions, features). `rollMode` is a GM override and is ignored from a player. */
 export const InitiativeRollSelfSchema = z
   .object({
     commandId: z.uuid(),
@@ -116,6 +121,15 @@ export const SetPlayerInitiativeModeSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** Alert's Initiative Swap, made by the GM for the table: two combatants trade initiative scores. */
+export const InitiativeSwapSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    withActorId: z.uuid(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const AddCombatantSchema = z
   .object({
     commandId: z.uuid(),
@@ -134,6 +148,8 @@ export const ActorAddFromDefinitionSchema = z
       .max(200),
     visibility: z.enum(["public", "gm-only"]).default("public"),
     joinEncounter: z.boolean().optional(),
+    /** The stat block's average hit points (the default), or its Hit Dice rolled on the server. */
+    hitPoints: z.enum(["average", "roll"]).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -257,7 +273,10 @@ export const SetHpSchema = z
   .object({
     commandId: z.uuid(),
     actorId: z.uuid(),
-    current: z.number().int().min(0).max(10000),
+    /** Omitted with `maximum`: current hit points stay, up to the new maximum. */
+    current: z.number().int().min(0).max(10000).optional(),
+    /** A new hit point maximum, set before `current` (a tougher ogre, a Life Drain). */
+    maximum: z.number().int().min(1).max(10000).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -271,8 +290,8 @@ export const SetConditionSchema = z
       .max(60),
     active: z.boolean(),
     level: z.number().int().min(1).max(6).optional(),
-    /** Bypass a movement-rule rejection (standing from Prone costs half Speed); audited. */ override:
-      RulesOverrideSchema.optional(),
+    /** Bypass a rules rejection (standing from Prone costs half Speed, on your own turn; a condition someone else
+     *  imposed is theirs to end); audited. */ override: RulesOverrideSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -282,6 +301,21 @@ export const TurnUseSchema = z
     slot: z.enum(["action", "bonus-action"]),
     used: z.boolean(),
     expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** One extra chosen for a hit: the offer's id, and a damage type or slot where the offer asks for one. */
+export const HitOptionChoiceSchema = z
+  .object({
+    id: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(120),
+    damageType: z
+      .string()
+      .regex(/^[a-z]+$/)
+      .max(40)
+      .optional(),
+    slotLevel: z.number().int().min(1).max(9).optional()
   })
   .strict();
 export const ActionResolveSchema = z
@@ -327,6 +361,9 @@ export const ActionResolveSchema = z
     slotLevel: z.number().int().min(1).max(9).optional(),
     /** The damage type picked for an action that lets its caster choose (Chromatic Orb); absent, its first. */
     damageType: DamageTypeSchema.optional(),
+    /** Extras to add to this hit, from the preview's `hitOffers` (Sneak Attack, a smite and its slot, Divine Strike's
+     *  type, a charge). Each is checked and spent with the hit; on a miss nothing is spent. */
+    hitOptions: z.array(HitOptionChoiceSchema).max(6).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
@@ -450,6 +487,9 @@ export const EffectAddSchema = z
     modifiers: EffectModifiersSchema.optional(),
     /** The granter concentrates to sustain this effect (SRD Concentration): one at a time; damage prompts a CON save; incapacitation breaks it. */
     concentration: z.boolean().optional(),
+    /** The creature the effect comes from: with `concentration`, the one concentrating on it (the Cleric who cast
+     *  the Bless on the Fighter). Absent, a concentration effect is sustained by its bearer. */
+    sourceActorId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -458,6 +498,8 @@ export const EffectEndSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     effectId: z.string().min(1).max(120),
+    /** Bypass the rules block on ending an effect someone else imposed (an Allow from the GM); audited. */
+    override: RulesOverrideSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -729,6 +771,19 @@ export const CharacterSetInventorySchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** Moves one carried row, whole, from one character to another, with the charges it has spent (GM). */
+export const CharacterGiveItemSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    toActorId: z.uuid(),
+    itemId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const CharacterSetCurrencySchema = z
   .object({
     commandId: z.uuid(),
@@ -790,12 +845,17 @@ export const CharacterCreateSchema = z
     backgroundBonusAllocation: z
       .array(z.object({ ability: AbilitySchema, amount: z.number().int().min(1).max(3) }).strict())
       .max(3),
+    /** "average" takes the fixed value, "entries" carries typed rolls per level (2..level), "roll" has the server
+     *  throw every level that has no recorded roll. */
     hp: z
       .object({
-        mode: z.enum(["average", "entries"]),
+        mode: z.enum(["average", "entries", "roll"]),
         entries: z.array(z.number().int().min(1).max(12)).max(19).optional()
       })
       .strict(),
+    /** The `builder.roll-abilities` roll the "roll"/"custom" scores came from, when the table has players' rolls
+     *  thrown by the server. */
+    abilityRollId: z.uuid().optional(),
     choices: z.array(CharacterChoiceSchema).max(200),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -872,6 +932,10 @@ export const BuilderSetPolicySchema = z
     playerBuilder: z.enum(["open", "gm-only"]).optional(),
     /** Whether players may roll a random character themselves; omitted keeps the stored setting. */
     playerRandom: z.enum(["open", "gm-only"]).optional(),
+    /** Whether players may type their own dice for rolled scores and hit points; omitted keeps the stored setting. */
+    typedRolls: z.enum(["open", "gm-only"]).optional(),
+    /** Whether a rolled hit-point level is raised to the average; omitted keeps the stored setting. */
+    hitPointRollFloor: z.enum(["none", "average"]).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
@@ -912,6 +976,15 @@ export const ActorSetSpeedSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     speedFeet: z.number().int().min(0).max(500).nullable(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** GM-set Armor Class that replaces the one derived from equipment; null clears it back to the derived AC. */
+export const ActorSetArmorClassSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    armorClass: z.number().int().min(1).max(40).nullable(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

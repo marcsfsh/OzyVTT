@@ -282,15 +282,6 @@
   font-size: 1rem;
   color: var(--danger-text);
 }
-/* Magic Missile's darts: one line per creature, each with its own Apply. */
-.action-split-damage {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.action-split-damage .action-apply {
-  margin-left: var(--space-1);
-}
 .action-healing {
   margin: 0.35rem 0 0;
   font-size: var(--fs-sm);

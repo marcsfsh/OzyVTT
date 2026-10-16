@@ -16,10 +16,11 @@ import type { CombatLogStore } from "../combat-log.js";
 import type { TimelineOutcome } from "../combat-history.js";
 import type { ContentLibrary } from "../content-library.js";
 import type { EffectNarration } from "../effects.js";
-import type { InitiativeRollSink } from "../encounter.js";
+import type { InitiativeRollDeps, InitiativeRollSink } from "../encounter.js";
 import { equipmentCatalogOf } from "../equipment-derivation.js";
 import type { GameStore } from "../game-store.js";
 import { tokenCreatureDistance } from "../movement-narration.js";
+import { withoutSourceName } from "../projections.js";
 import { describeRoll, recordRoll, rollFeedIsGmOnly, rollsForCommand } from "../roll-history.js";
 import type { TokenMapGeometry } from "../token-placement.js";
 
@@ -180,6 +181,12 @@ export function createKit(context: CommandContext) {
       return true;
     },
 
+    /** What an initiative roll reads about its roller in `state`: stat blocks and items for its riders. */
+    initiativeRollDeps: (state: GameState): InitiativeRollDeps => ({
+      resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId),
+      catalog: equipmentCatalogOf(contentLibrary.forAudience("gm"))
+    }),
+
     /** Server-thrown initiative dice land in `state.rolls` attributed to the combatant; hidden ones are GM-only. */
     initiativeRollSink:
       (state: GameState, commandId: string, principal: GamePrincipal): InitiativeRollSink =>
@@ -234,11 +241,16 @@ export function createKit(context: CommandContext) {
     /** Shared narration fan-out for engine transitions (effect ends, dying, consciousness). */
     publishNarrations(events: readonly EffectNarration[]) {
       for (const event of events) {
+        // A line naming a hidden cause reaches the table with that name masked, as the projection masks it.
+        const masked =
+          event.source && actorHidden(event.source.actorId) && !actorHidden(event.actorId)
+            ? withoutSourceName(event.text, event.source.name ?? actorName(event.source.actorId))
+            : event.text;
         context.broadcastTableEvent({
           kind: event.kind,
-          text: event.text,
+          text: masked,
           actorIds: [event.actorId],
-          gmOnly: actorHidden(event.actorId)
+          gmOnly: event.gmOnly === true || actorHidden(event.actorId)
         });
       }
     },

@@ -1,4 +1,11 @@
-import { addActorFromDefinition, importActorDefinition, removeActor } from "../actor-roster.js";
+import { rollDice } from "@vtt/rules-5e";
+import {
+  addActorFromDefinition,
+  importActorDefinition,
+  removeActor,
+  storedArmorClass,
+  withDerivedSlots
+} from "../actor-roster.js";
 import { requireActorAccess } from "../authorization.js";
 import { forceReleaseCharacter } from "../character-claims.js";
 import { addCombatant } from "../encounter.js";
@@ -7,6 +14,7 @@ import {
   ActorImportDefinitionSchema,
   ActorRemoveSchema,
   ActorSetSpeedSchema,
+  ActorSetArmorClassSchema,
   SetActorArchivedSchema,
   SetActorHealthDisplaySchema,
   SetActorSheetPreviewSchema,
@@ -27,7 +35,7 @@ export const actorCommands = [
     type: "actor.add-from-definition",
     operationId: "addActorFromDefinition",
     description:
-      "Instantiates a bundled SRD monster onto the roster (GM-grade only). The response's `actorId` equals the commandId.",
+      "Instantiates a bundled SRD monster onto the roster (GM-grade only), with the stat block's average hit points or, with `hitPoints: \"roll\"`, its Hit Dice rolled. The response's `actorId` equals the commandId.",
     summary:
       "Instantiate a bundled SRD monster onto the roster, optionally joining the running fight in the same command (GM).",
     schema: ActorAddFromDefinitionSchema,
@@ -47,12 +55,29 @@ export const actorCommands = [
       await execute(
         (state) => {
           addActorFromDefinition(state, definition, actorId, request.visibility, kit.equipmentCatalog());
+          // Rolled hit points: the stat block's Hit Dice, thrown on the server; never below 1.
+          const formula = definition.hitPoints.formula;
+          if (request.hitPoints === "roll" && formula) {
+            const added = state.actors.find((actor) => actor.id === actorId)!;
+            const rolled = Math.max(1, rollDice(formula, (sides) => kit.context.random(sides)).total);
+            added.hp = { ...added.hp, maximum: rolled, current: rolled };
+          }
           // Ignored out of combat: there is no fight to join, and the roster add is the whole intent.
           if (request.joinEncounter === true && state.combat.active && geometry)
-            addCombatant(state, actorId, undefined, () => kit.context.random(20), geometry);
+            addCombatant(
+              state,
+              actorId,
+              undefined,
+              () => kit.context.random(20),
+              geometry,
+              Date.now(),
+              kit.initiativeRollSink(state, request.commandId, principal),
+              kit.initiativeRollDeps(state)
+            );
         },
         { actorId }
       );
+      kit.publishRolls(kit.read(), request.commandId);
       return { actorId };
     }
   }),
@@ -67,7 +92,10 @@ export const actorCommands = [
     malformed: "The import command is malformed.",
     gmOnly: "Only the GM can import sheets.",
     async run({ request, execute }, kit) {
-      const definition = importedDefinition(request.definition, "actor definition");
+      const definition = withDerivedSlots(
+        importedDefinition(request.definition, "actor definition"),
+        kit.contentLibrary.forAudience("gm").classProgressionTable()
+      );
       const actorId = request.commandId;
       await execute(
         (state) => importActorDefinition(state, definition, actorId, request.visibility, kit.equipmentCatalog()),
@@ -230,6 +258,39 @@ export const actorCommands = [
         if (speedFeet === null) delete actor.speedFeet;
         else actor.speedFeet = speedFeet;
       });
+    }
+  }),
+
+  defineCommand({
+    type: "actor.set-armor-class",
+    operationId: "setActorArmorClass",
+    description:
+      "Sets a combatant's Armor Class by hand (GM-grade only), replacing the one derived from what it wears until cleared with null - for what the sheet can't derive (Mage Armor, natural armor, a ruling). Live effects such as the Shield spell still add to it. Players see that the GM set their character's AC.",
+    summary: "Set or clear a combatant's Armor Class by hand (null returns to the derived AC) (GM).",
+    schema: ActorSetArmorClassSchema,
+    malformed: "The armor class command is malformed.",
+    gmOnly: "Only the GM can set Armor Class by hand.",
+    async run({ request, execute }, kit) {
+      const { actorId, armorClass } = request;
+      const { duplicate } = await execute((state) => {
+        const actor = state.actors.find((candidate) => candidate.id === actorId);
+        if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+        if (armorClass === null) delete actor.armorClassOverride;
+        else actor.armorClassOverride = armorClass;
+        const definition = actor.definitionId ? kit.resolveDefinitionIn(state, actor.definitionId) : undefined;
+        if (definition) actor.armorClass = storedArmorClass(actor, definition, kit.equipmentCatalog());
+        else if (armorClass !== null) actor.armorClass = armorClass;
+      });
+      if (!duplicate)
+        kit.context.appendLog({
+          kind: "encounter",
+          text:
+            armorClass === null
+              ? `${kit.actorName(actorId)}'s Armor Class follows their gear again.`
+              : `The GM set ${kit.actorName(actorId)}'s Armor Class to ${armorClass}.`,
+          actorIds: [actorId],
+          gmOnly: true
+        });
     }
   }),
 

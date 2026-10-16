@@ -1,6 +1,6 @@
 import { abilityModifier } from "@vtt/rules-5e";
 import type { Modifier } from "@vtt/schemas";
-import { addEffect, makeEffect, type EffectNarration } from "../effects.js";
+import { addEffect, makeEffect, turnEndDuration, type EffectNarration } from "../effects.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { currentSpeedFeet } from "../speed.js";
 import type { LiveActor, ResolveContext } from "./context.js";
@@ -10,7 +10,8 @@ const MAGE_ARMOR_TAG = "mage-armor";
 const HASTED_TAG = "hasted";
 
 /** Granted effects (Rage, Reckless Attack on self; Help on an ally; Bless on each creature it targets): replace-on-
- *  refresh, ending when the granter drops to 0 HP. An `onHit` grant (Guiding Bolt) lands only on a hit. */
+ *  refresh, ending when the granter drops to 0 HP, and with the cast's Concentration when it has one (`castId`, so
+ *  `startConcentration` runs first). An `onHit` grant (Guiding Bolt) lands only on a hit. */
 export function applyGrant(ctx: ResolveContext): void {
   const { action, attacker, targets, attack } = ctx;
   const grant = action.grants;
@@ -65,7 +66,11 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       sourceActionId: action.id,
       startedRound: state.combat.round,
       duration:
-        grant.duration.type === "rounds" ? { type: "rounds", remaining: grant.duration.rounds } : grant.duration,
+        grant.duration.type === "rounds"
+          ? { type: "rounds", remaining: grant.duration.rounds }
+          : grant.duration.type === "until-source-turn-end"
+            ? turnEndDuration(state, "until-source-turn-end", attacker.id)
+            : grant.duration,
       endsWhenSourceDefeated: true,
       voidWhileIncapacitated: grant.voidWhileIncapacitated,
       modifiers: [...grant.modifiers, ...hasteSpeed],
@@ -74,6 +79,8 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       concentration: grant.concentration,
       // SRD Combining Game Effects: one spell's effects on a creature don't add up (two Blesses give one d4).
       ...(action.spellId !== undefined ? { stackKey: `spell:${action.spellId}` } : {}),
+      // A Concentration spell's effects end with the caster's Concentration on that cast.
+      ...(ctx.castId !== null ? { castId: ctx.castId } : {}),
       ...(armorClassBonus !== undefined ? { armorClassBonus } : {}),
       ...grantedMovement
     }),

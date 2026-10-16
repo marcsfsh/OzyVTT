@@ -11,6 +11,7 @@ import {
   AbilitySchema,
   ActionAreaSchema,
   ActionGrantSchema,
+  AmmunitionKindSchema,
   ActionReactionSchema,
   ActorDefinitionSchema,
   DamageTypeSchema,
@@ -207,6 +208,10 @@ export const WeaponReferenceSchema = z.object({
   category: z.enum(["simple", "martial"]),
   /** The Weapons table's melee/ranged band (a thrown Dagger is melee, a Dart is not). Absent = not recorded. */
   melee: z.boolean().optional(),
+  /** The die a Versatile weapon deals used with two hands (`Versatile (1d10)`); absent on other weapons. */
+  versatileDice: z.string().min(1).max(20).optional(),
+  /** What an Ammunition weapon fires (`Ammunition (Range 150/600; Arrow)`); absent on other weapons. */
+  ammunition: AmmunitionKindSchema.optional(),
   improvised: z.boolean(),
   damage: z.object({ dice: z.string().min(1).max(20), type: z.string().min(1).max(40) }),
   rangeFeet: z.number().int().positive().nullable(),
@@ -273,6 +278,23 @@ export const ItemSpellCastSchema = z
   .strict();
 export type ItemSpellCast = z.infer<typeof ItemSpellCastSchema>;
 
+/**
+ * How a charged item's charges come back, beside the pools its actions and casts declare: `regain` is rolled on a
+ * long rest ("regains 1d6 + 1 expended charges daily at dawn"; absent = all come back), and `lastChargeRoll` rolls a
+ * d20 when the last charge is spent, whose 1 does what the item's text says (most crumble).
+ */
+export const ItemChargesSchema = z
+  .object({
+    // The SRD's own grammar here includes a d3 ("regains 1d3 expended charges"), which the dice roller lacks.
+    regain: z
+      .string()
+      .regex(/^\d+d(?:3|4|6|8|10|12|20)(?:\s*[+-]\s*\d+)?$/i, "Use a dice formula such as 1d6 + 1.")
+      .optional(),
+    lastChargeRoll: z.boolean().default(false)
+  })
+  .strict();
+export type ItemCharges = z.infer<typeof ItemChargesSchema>;
+
 /** Attunement. `restrictedTo` is advisory: shown on the sheet, never enforced. */
 export const ItemAttunementSchema = z
   .object({
@@ -293,6 +315,12 @@ const EquipmentWeaponStatsSchema = z.object({
   damageType: z.string().max(40),
   rangeFeet: z.number().int().positive().nullable(),
   longRangeFeet: z.number().int().positive().nullable(),
+  /** The Weapons table's band: a thrown Dagger is melee, a Dart is ranged. Absent = read from range and Thrown. */
+  melee: z.boolean().optional(),
+  /** A Versatile weapon's two-handed damage die. */
+  versatileDice: z.string().max(20).optional(),
+  /** What an Ammunition weapon fires. Absent = any ammunition the bearer carries. */
+  ammunition: AmmunitionKindSchema.optional(),
   /** Optional here: gear and homebrew rows map through this shape and have no mastery. */
   mastery: z.enum(["cleave", "graze", "nick", "push", "sap", "slow", "topple", "vex"]).optional(),
   /** Copied onto the inventory row, where `weaponPropertiesOf` reads it. */
@@ -348,8 +376,9 @@ export const EquipmentReferenceSchema = z
       .max(40),
     costGp: z.number().nonnegative().max(1_000_000).nullable(),
     weightLb: z.number().nonnegative().max(1000).nullable(),
-    /** Matches `InventoryItemSchema.description`, which add-from-catalog copies this string onto. */
-    description: z.string().max(4000).nullable(),
+    /** Matches `InventoryItemSchema.description`, which add-from-catalog copies this string onto. Long enough for
+     *  the longest SRD item with its tables (Mysterious Deck). */
+    description: z.string().max(12000).nullable(),
     weapon: EquipmentWeaponStatsSchema.nullable().optional(),
     armor: z
       .object({
@@ -375,6 +404,20 @@ export const EquipmentReferenceSchema = z
     /** Cannot be voluntarily removed once attuned; its magic is hidden from the player until attunement, and only until then. */
     cursed: z.boolean().default(false),
     casts: z.array(ItemSpellCastSchema).max(8).default([]),
+    charges: ItemChargesSchema.optional(),
+    /** Mithral: the armor it is bound to has no Stealth Disadvantage and no Strength requirement. */
+    removesArmorDrawbacks: z.boolean().optional(),
+    /** Each use of one of its actions uses one up (a potion drunk, a flask thrown), and its actions work from the
+     *  pack: drinking or throwing one needs no equipping. */
+    consumedOnUse: z.boolean().optional(),
+    /** This row is ammunition sold in bundles: each one quantity is `count` pieces of `kind` ("Arrows (20)"). */
+    ammunition: z
+      .object({ kind: AmmunitionKindSchema, count: z.number().int().min(1).max(100) })
+      .strict()
+      .optional(),
+    /** "The GM chooses the type": the types the GM may pick for this item's one granted resistance, which then
+     *  replaces the printed default in `grants.damageResistances` for that carried copy. */
+    damageTypeChoice: z.array(DamageTypeSchema).min(2).max(13).optional(),
     /** Feats granted while active, depth 1. Nothing has `grants.items`, so a grant cycle cannot be expressed. */
     grantsFeatIds: z.array(ContentIdSchema).max(4).default([]),
 
@@ -391,6 +434,15 @@ export const EquipmentReferenceSchema = z
         message:
           "A cursed item must require attunement - attunement is both what springs the curse and what reveals it."
       });
+    }
+    if (item.damageTypeChoice) {
+      const printed = item.grants?.damageResistances ?? [];
+      if (printed.length !== 1 || !(item.damageTypeChoice as readonly string[]).includes(printed[0]))
+        context.addIssue({
+          code: "custom",
+          path: ["damageTypeChoice"],
+          message: "A chosen damage type replaces one granted resistance: grant exactly one, from the choices."
+        });
     }
     // Enforced on the item carrier only: the identical rider on a feat is valid.
     item.modifiers.forEach((modifier, index) => {
@@ -414,6 +466,15 @@ export const RuleReferenceSchema = z.object({
   description: z.string().min(1).max(40000)
 });
 export type RuleReference = z.infer<typeof RuleReferenceSchema>;
+
+/** One Rules Glossary term: its name, its tag in brackets ("Condition", "Action", "Hazard"), and its text. */
+export const GlossaryEntrySchema = z.object({
+  id: z.string().regex(/^[a-z0-9-]+$/),
+  name: z.string().min(1).max(80),
+  tag: z.string().min(1).max(40).nullable(),
+  description: z.string().min(1).max(20000)
+});
+export type GlossaryEntry = z.infer<typeof GlossaryEntrySchema>;
 
 export const ContentAttributionSchema = z.object({
   license: z.literal("CC-BY-4.0"),

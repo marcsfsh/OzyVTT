@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { usePrompt } from "../components/feedback";
-import { armorClassInPlay, type ContentActionSummary, type GmActor, type GmView } from "@vtt/domain";
+import { armorClassInPlay, owedDamageParts, type ContentActionSummary, type GmActor, type GmView } from "@vtt/domain";
 import { ActionResultCard } from "./ActionResultCard";
 import { ActionTargetPicker } from "./ActionTargetPicker";
 import { componentLabel } from "./action-summary";
@@ -102,29 +102,27 @@ export function ActionRunner({
     if (!ok && message) onFeedback(message);
   };
 
-  const applyDamage = (targetId: string, targetName: string, key: string, overrideAmount?: number) => {
-    // Damage split between targets (Magic Missile's darts) applies each target's own share.
-    const share = result?.damageByTarget?.find((target) => target.targetId === targetId);
-    const total = share?.total ?? result?.damageTotal ?? 0;
-    if (!result || (overrideAmount ?? total) <= 0) {
+  const applyDamage = (
+    targetId: string,
+    targetName: string,
+    key: string,
+    overrideAmount?: number,
+    owedParts?: ReadonlyArray<{ amount: number; type: string }>
+  ) => {
+    // A target of an action with no attack roll is owed its own parts (Magic Missile's darts); a hit owes the roll's.
+    const parts = owedParts ? owedParts.map((part) => ({ ...part })) : result ? owedDamageParts(result) : [];
+    const owed = parts.reduce((sum, part) => sum + part.amount, 0);
+    if (!result || (overrideAmount ?? owed) <= 0) {
       setApplied((current) => new Set([...current, key]));
       return;
     }
     setBusy(true);
     // The typed parts always travel with the apply, amended or not: an override is sent as
     // `damageOverride` and the server re-weights the same types to it, so resistances still apply.
-    const parts = (
-      share
-        ? share.parts.map((part) => ({ amount: part.total, type: part.type }))
-        : [
-            ...result.damage.map((part) => ({ amount: part.total, type: part.type })),
-            ...(result.bonusDamage ?? []).map((part) => ({ amount: part.amount, type: part.type }))
-          ]
-    ).filter((part) => part.amount > 0);
-    const useOverride = overrideAmount !== undefined && overrideAmount !== total;
+    const useOverride = overrideAmount !== undefined && overrideAmount !== owed;
     void command("actor:apply-damage", {
       actorId: targetId,
-      amount: overrideAmount ?? total,
+      amount: overrideAmount ?? owed,
       parts,
       ...(useOverride ? { damageOverride: overrideAmount } : {}),
       sourceActorId: actor.id,
@@ -143,7 +141,7 @@ export function ActionRunner({
           `${targetName} took ${application.totalApplied} damage - ${damageAdjustments(application.parts, application.flatReduction)}.`
         );
       } else {
-        onFeedback(`${targetName} took ${application?.totalApplied ?? total} damage.`);
+        onFeedback(`${targetName} took ${application?.totalApplied ?? owed} damage.`);
       }
     });
   };

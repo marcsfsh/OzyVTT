@@ -52,7 +52,8 @@ export function useEquipmentReference(): Readonly<{
  * The catalog's weapon block, narrowed to what an inventory row may carry. `ItemWeaponSchema` is
  * `.strict()` and has no `mastery` (masteries resolve by item id once unlocked), so spreading the
  * browse summary's block makes `character.set-inventory` refuse every SRD weapon. `properties` must
- * be carried: `weaponPropertiesOf` reads it off the inventory row (Finesse, Reach).
+ * be carried: `weaponPropertiesOf` reads it off the inventory row (Finesse, Reach), as the swing reads the
+ * melee band and the Versatile die.
  * Exported for `catalog-add.mirror.test.ts`.
  */
 export function inventoryWeaponFrom(weapon: NonNullable<ContentEquipmentSummary["weapon"]>) {
@@ -62,6 +63,8 @@ export function inventoryWeaponFrom(weapon: NonNullable<ContentEquipmentSummary[
     damageType: weapon.damageType,
     rangeFeet: weapon.rangeFeet,
     longRangeFeet: weapon.longRangeFeet,
+    ...(weapon.melee !== undefined ? { melee: weapon.melee } : {}),
+    ...(weapon.versatileDice !== undefined ? { versatileDice: weapon.versatileDice } : {}),
     ...(weapon.properties ? { properties: [...weapon.properties] } : {})
   };
 }
@@ -103,12 +106,16 @@ function metaLine(item: ContentEquipmentSummary): string {
         `range ${item.weapon.rangeFeet}${item.weapon.longRangeFeet ? `/${item.weapon.longRangeFeet}` : ""} ft`
       );
   }
-  if (item.armor)
-    parts.push(
-      item.category === "shield"
-        ? `+${item.armor.acBase} AC`
-        : `AC ${item.armor.acBase}${item.armor.addDexModifier ? " + Dex" : ""}`
-    );
+  if (item.armor) {
+    const dex = !item.armor.addDexModifier
+      ? ""
+      : item.armor.dexModifierCap !== null
+        ? ` + Dex (max ${item.armor.dexModifierCap})`
+        : " + Dex";
+    parts.push(item.category === "shield" ? `+${item.armor.acBase} AC` : `AC ${item.armor.acBase}${dex}`);
+    if (item.armor.strengthRequired) parts.push(`Str ${item.armor.strengthRequired}`);
+    if (item.armor.stealthDisadvantage) parts.push("Stealth Disadvantage");
+  }
   const cost = formatCost(item.costGp);
   if (cost) parts.push(cost);
   if (item.weightLb) parts.push(`${item.weightLb} lb`);
@@ -217,8 +224,8 @@ export function BindItemModal({
  * sheet gates it).
  *
  * A template item with a real choice inserts one step: the same window lists the eligible bases and
- * the add completes with the pick. A single-base template never asks (the server auto-binds), and
- * re-adding an owned template grows the stack, keeping its pick.
+ * the add completes with the pick. A single-base template never asks (the server auto-binds). A copy on
+ * the same base grows the stack; on another base it becomes its own row.
  */
 export function EquipmentPicker({
   ownedCounts,
@@ -246,10 +253,8 @@ export function EquipmentPicker({
   }, [catalog, query, active]);
 
   const startAdd = (item: ContentEquipmentSummary) => {
-    const owned = (ownedCounts.get(item.id) ?? 0) > 0;
-    // Only for a real choice on a new row: an owned template already has its pick (rows are keyed by
-    // item id), and re-adding just grows the stack.
-    if (!owned && item.appliesTo && item.appliesTo.baseIds.length > 1) {
+    // A real choice asks every time: another copy may be another base (a +1 longsword, then a +1 dagger).
+    if (item.appliesTo && item.appliesTo.baseIds.length > 1) {
       setQuery("");
       setChoosing(item);
       return;

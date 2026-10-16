@@ -1,5 +1,12 @@
 import { z } from "zod";
-import { ActorDefinitionSchema, ActorSchema, EffectModifiersSchema, HealthDisplaySchema } from "@vtt/schemas";
+import {
+  ActorDefinitionSchema,
+  ActorSchema,
+  EffectInstanceSchema,
+  EffectModifiersSchema,
+  HealthDisplaySchema,
+  SaveFailureDurationSchema
+} from "@vtt/schemas";
 
 /** An imported stat block persisted with the campaign: the inert definition plus the id actors reference via `definitionId`. */
 export const StoredDefinitionSchema = z
@@ -60,7 +67,9 @@ export type PlayerRollRecord = Omit<RollRecord, "initiatorSessionId">;
 export const InitiativeEntrySchema = z.object({
   actorId: z.uuid(),
   score: z.number().int().min(-1000).max(1000),
-  tieBreaker: z.number().int().min(-1000).max(1000).default(0)
+  tieBreaker: z.number().int().min(-1000).max(1000).default(0),
+  /** Surprised when the fight began (SRD Surprise), kept so a later roll of this entry has Disadvantage too. */
+  surprised: z.boolean().optional()
 });
 export type InitiativeEntry = z.infer<typeof InitiativeEntrySchema>;
 
@@ -222,13 +231,30 @@ export const PendingSaveSchema = z
         escapeDc: z.number().int().min(1).max(40).nullable().default(null),
         sourceActorId: z.uuid().nullable().default(null),
         sourceName: z.string().max(120).nullable().default(null),
-        /** What the effect does while it lasts (Bane's -1d4), and for how many rounds (absent: until ended). */
-        modifiers: EffectModifiersSchema.default([]),
-        duration: z
-          .object({ type: z.literal("rounds"), rounds: z.number().int().min(1).max(100) })
-          .strict()
-          .optional()
+        /** How long it lasts, as the text prints it; absent is until ended. */
+        duration: SaveFailureDurationSchema.optional(),
+        /** The save the target repeats at the end of each of its turns, a success ending the effect. */
+        repeatSave: EffectInstanceSchema.shape.repeatSave,
+        endsOnDamage: z.boolean().optional(),
+        speedZero: z.boolean().optional(),
+        /** A grapple: it ends with its source's defeat, and when a move takes them farther apart than `rangeFeet`. */
+        endsWhenSourceDefeated: z.boolean().optional(),
+        rangeFeet: EffectInstanceSchema.shape.rangeFeet,
+        /** The Concentration cast it belongs to: it is sustained by the caster's Concentration, and is not applied
+         * once that has ended. */
+        castId: z.string().min(1).max(120).optional(),
+        /** The action it came from, so a second hit from the same action refreshes rather than stacks. */
+        sourceActionId: z.string().max(120).optional(),
+        /** Damage the effect deals at the start of a turn while it lasts (a swallow's acid). */
+        ongoingDamage: EffectInstanceSchema.shape.ongoingDamage,
+        /** What the effect does while it lasts (Bane's -1d4 on attack rolls and saves). */
+        modifiers: EffectModifiersSchema.default([])
       })
+      .strict()
+      .optional(),
+    /** A save the bearer repeats at the end of its turn: a success ends this effect. Stripped from player projections. */
+    repeatOf: z
+      .object({ actorId: z.uuid(), effectId: z.string().min(1).max(120) })
       .strict()
       .optional(),
     createdAt: z.number().int().nonnegative()
@@ -276,7 +302,27 @@ export const ParkedAttackSchema = z
     initiatorRole: z.enum(["gm", "player"]),
     initiatorSessionId: z.string().min(1).max(200),
     /** The bonus lasts until the reactor's next turn (Shield) rather than against this attack only (Parry). */
-    untilNextTurn: z.boolean()
+    untilNextTurn: z.boolean(),
+    /** Extras chosen for the hit (Sneak Attack, a smite), checked and spent only if it still hits. */
+    hitOptions: z
+      .array(
+        z
+          .object({
+            id: z
+              .string()
+              .regex(/^[a-z0-9-]+$/)
+              .max(120),
+            damageType: z
+              .string()
+              .regex(/^[a-z]+$/)
+              .max(40)
+              .optional(),
+            slotLevel: z.number().int().min(1).max(9).optional()
+          })
+          .strict()
+      )
+      .max(6)
+      .default([])
   })
   .strict();
 export type ParkedAttack = z.infer<typeof ParkedAttackSchema>;
@@ -432,7 +478,13 @@ export type RuleExceptions = z.infer<typeof RuleExceptionsSchema>;
 export const DEFAULT_RULE_EXCEPTIONS: RuleExceptions = { slots: "assisted" };
 
 /** Closed list: `rules.answer` replays the parked payload under GM authority. */
-export const AskableCommandSchema = z.enum(["action.resolve", "action.use", "token.move", "actor.set-condition"]);
+export const AskableCommandSchema = z.enum([
+  "action.resolve",
+  "action.use",
+  "token.move",
+  "actor.set-condition",
+  "effect.end"
+]);
 export type AskableCommand = z.infer<typeof AskableCommandSchema>;
 
 /** A player's parked "Ask the GM": a blocked command waiting for the GM to allow or deny it. The owner is not
@@ -493,11 +545,19 @@ const sceneCombatShape = {
       /** Who has expended a spell slot to cast a spell this turn (SRD: one per turn). Engine bookkeeping, never
        *  projected. */
       spellSlotCasters: z.array(z.uuid()).max(200).optional(),
+      /** The turn's actor has made its one death save (SRD: at the start of its turn). Never projected. */
+      deathSaveRolled: z.boolean().optional(),
       /** What this turn's attacks opened for an extra attack: the Light weapons its actor swung in the Attack action,
-       *  and the creature a Cleave weapon hit. Engine bookkeeping, never projected. */
+       *  and the creature a Cleave weapon hit; and the Loading weapons already fired in that action, which can't
+       *  fire again in it. Engine bookkeeping, never projected. */
       extraAttacks: z
         .object({
           light: z
+            .object({ actorId: z.uuid(), itemIds: z.array(z.string().max(120)).max(10) })
+            .strict()
+            .nullable()
+            .default(null),
+          loading: z
             .object({ actorId: z.uuid(), itemIds: z.array(z.string().max(120)).max(10) })
             .strict()
             .nullable()
@@ -701,7 +761,12 @@ export const BuilderPolicySchema = z
     /** Whether players may run the character builder themselves; enforced in `character.create`. */
     playerBuilder: z.enum(["open", "gm-only"]).default("open"),
     /** Whether players may roll a random character; "gm-only" by default because it fills a roster slot in one tap. */
-    playerRandom: z.enum(["open", "gm-only"]).default("gm-only")
+    playerRandom: z.enum(["open", "gm-only"]).default("gm-only"),
+    /** Whether players may type what their own dice showed for rolled ability scores and hit points. Closed by
+     *  default: a player's rolls are then thrown by the server (the GM may always type). */
+    typedRolls: z.enum(["open", "gm-only"]).default("gm-only"),
+    /** A table rule raising a rolled hit-point level to the class average; "none" is the SRD (the roll stands). */
+    hitPointRollFloor: z.enum(["none", "average"]).default("none")
   })
   .strict();
 export type BuilderPolicy = z.infer<typeof BuilderPolicySchema>;

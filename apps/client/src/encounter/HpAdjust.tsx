@@ -5,8 +5,9 @@ import { DamageTypeField } from "./DamageTypeField";
 import { manualDamagePayload, manualDamageType } from "./manual-damage";
 import "./hp-adjust.css";
 
-/** The hit point changes a door offers: damage, a nonlethal knock-out, heal, temporary HP, and an exact value. */
-export type HpControl = "damage" | "nonlethal" | "heal" | "temp" | "set";
+/** The hit point changes a door offers: damage, a nonlethal knock-out, heal, temporary HP, an exact value, and
+ *  a new maximum. */
+export type HpControl = "damage" | "nonlethal" | "heal" | "temp" | "set" | "max";
 
 const LABELS: Record<HpControl, { label: string; title?: string }> = {
   damage: { label: "Dmg", title: "Apply as damage (or press Enter)" },
@@ -16,7 +17,8 @@ const LABELS: Record<HpControl, { label: string; title?: string }> = {
   },
   heal: { label: "Heal" },
   temp: { label: "Temp", title: "Set temporary hit points" },
-  set: { label: "Set", title: "Set current hit points" }
+  set: { label: "Set", title: "Set current hit points" },
+  max: { label: "Max", title: "Set the hit point maximum (current hit points stay, up to the new maximum)" }
 };
 
 /**
@@ -64,27 +66,30 @@ export function HpAdjust({
     const sent =
       control === "set"
         ? command("actor:set-hp", { actorId: actor.id, current: value, ...guard })
-        : control === "heal"
-          ? command("actor:heal", { actorId: actor.id, amount: value, ...guard })
-          : control === "temp"
-            ? command("actor:set-temp-hp", { actorId: actor.id, amount: value, ...guard })
-            : command(
-                "actor:apply-damage",
-                manualDamagePayload({
-                  actorId: actor.id,
-                  amount: value,
-                  damageType: typed,
-                  nonlethal: control === "nonlethal",
-                  expectedRevision: revision
-                })
-              );
+        : control === "max"
+          ? command("actor:set-hp", { actorId: actor.id, maximum: value, ...guard })
+          : control === "heal"
+            ? command("actor:heal", { actorId: actor.id, amount: value, ...guard })
+            : control === "temp"
+              ? command("actor:set-temp-hp", { actorId: actor.id, amount: value, ...guard })
+              : command(
+                  "actor:apply-damage",
+                  manualDamagePayload({
+                    actorId: actor.id,
+                    amount: value,
+                    damageType: typed,
+                    nonlethal: control === "nonlethal",
+                    expectedRevision: revision
+                  })
+                );
     const type = typed ? ` ${typed}` : "";
     const done = {
       damage: `${actor.name} took ${value}${type} damage.`,
       nonlethal: `${actor.name} took ${value} nonlethal${type} damage.`,
       heal: `${actor.name} healed ${value}.`,
       temp: `${actor.name} has ${value} temporary HP.`,
-      set: `${actor.name} set to ${value} HP.`
+      set: `${actor.name} set to ${value} HP.`,
+      max: `${actor.name}'s hit point maximum is now ${value}.`
     }[control];
     setBusy(true);
     void sent.then((result) => {

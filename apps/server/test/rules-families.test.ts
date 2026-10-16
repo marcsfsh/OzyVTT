@@ -38,17 +38,34 @@ describe("rule families", () => {
       ["movement.exceeds-speed", "movement"],
       ["movement.no-movement-remaining", "movement"],
       ["movement.stand-up-cost", "movement"],
+      // Standing spends movement, which only your own turn has.
+      ["movement.stand-up-off-turn", "movement"],
       ["economy.action-used", "economy"],
       ["economy.bonus-action-used", "economy"],
       ["economy.reaction-used", "economy"],
       ["economy.not-your-turn", "economy"],
+      // No one acts while a wait-mode fight gathers initiative: the turn economy hasn't begun.
+      ["initiative.gathering", "economy"],
       // Being incapacitated or down is "you have no actions" - economy, not a targeting rule.
       ["condition.incapacitated", "economy"],
       ["condition.down", "economy"],
+      // Ending what someone else imposed skips the action or save its rules ask for; a raging Barbarian can't cast.
+      ["condition.imposed", "economy"],
+      ["condition.raging", "economy"],
       ["legendary.own-turn", "economy"],
       // An extra attack waits on the swing that opens it: a matter of what this turn has done.
       ["attack.light-needs-attack", "economy"],
       ["attack.cleave-needs-hit", "economy"],
+      // A Loading weapon fires once per action: what this action has already done.
+      ["attack.loading", "economy"],
+      // Running out of ammunition: what the character carries, like the hands rule.
+      ["attack.no-ammunition", "economy"],
+      // What the character's hands are holding, like what the action has already done.
+      ["attack.two-handed", "economy"],
+      // Casting in untrained armor: what the character can do at all, like the hands rule.
+      ["spell.untrained-armor", "economy"],
+      // Sneak Attack or a smite taken alone, with no hit to add to.
+      ["attack.rides-a-hit", "economy"],
       ["feature.no-uses-remaining", "resources"],
       ["feature.requires-effect", "resources"],
       ["legendary.no-actions-remaining", "resources"],
@@ -62,6 +79,8 @@ describe("rule families", () => {
       ["target.too-many", "targeting"],
       ["attack.cleave-same-target", "targeting"],
       ["attack.cleave-too-far", "targeting"],
+      // The hit can't carry the extra: no Advantage or ally for Sneak Attack, no melee weapon for a smite.
+      ["attack.hit-option-unqualified", "targeting"],
       // "Don't police spell slots or prepared spells" relaxes exactly these.
       ["slots.none-remaining", "slots"],
       ["slots.below-spell-level", "slots"],

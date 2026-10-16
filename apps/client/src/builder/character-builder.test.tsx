@@ -318,6 +318,7 @@ const fixtureOffer = (
   featureId: null,
   help: null,
   maxSpellLevel: null,
+  maximum: null,
   level: 1,
   classId: null,
   unresolvable: null,

@@ -5,8 +5,10 @@ export const barbarian: ClassMechanicsModule = {
   features: {
     /**
      * Uses read off the printed Rages column. The `raging` tag is what `requiresEffectTag` and Mindless
-     * Rage's gate read. Rage Damage (a second column), the 10-minute cap, extending by attacking and the
-     * heavy-armor restriction stay prose.
+     * Rage's gate read, and what the engine's Rage rules key on: it lasts until the end of the Barbarian's next
+     * turn, each attack roll or forced save extends it (so does re-declaring it as a Bonus Action, for no use),
+     * and Incapacitation or Heavy armor ends it. Rage Damage reads the second column at build (`grantScaling`) onto
+     * the damage bonus of attacks using Strength. The 10-minute cap and Persistent Rage's longer form stay prose.
      */
     rage: {
       uses: { scaling: { type: "class-resource", id: "rage" }, per: "long-rest" },
@@ -18,12 +20,19 @@ export const barbarian: ClassMechanicsModule = {
           description:
             "You enter a Rage: Resistance to Bludgeoning, Piercing and Slashing damage, Advantage on Strength checks and Strength saving throws, and a bonus to Strength-based damage. You can't concentrate or cast spells while raging.",
           damage: [],
+          grantScaling: { resource: "rage-damage" },
           grants: {
             name: "Raging",
             tags: ["raging"],
-            duration: { type: "encounter" },
+            duration: { type: "until-source-turn-end" },
             modifiers: [
               { type: "damage-resistance", damageTypes: ["bludgeoning", "piercing", "slashing"] },
+              // "When you make an attack using Strength - with either a weapon or an Unarmed Strike - and deal damage".
+              {
+                type: "damage-bonus",
+                amount: 2,
+                when: [{ type: "on-damage-roll" }, { type: "ability-is", abilities: ["str"] }]
+              },
               {
                 type: "roll-mode",
                 roll: "check",
@@ -51,14 +60,22 @@ export const barbarian: ClassMechanicsModule = {
         { offer: "feature:weapon-mastery", scaling: { type: "class-resource-growth", id: "weapon-mastery" } }
       ]
     },
-    // Advantage on Dexterity saves; the Incapacitated exception needs negation and stays prose.
+    // Advantage on Dexterity saves "unless you have the Incapacitated condition" (or one that includes it).
     "danger-sense": {
       modifiers: [
         {
           type: "roll-mode",
           roll: "save",
           mode: "advantage",
-          when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["dex"] }]
+          when: [
+            { type: "on-saving-throw" },
+            { type: "ability-is", abilities: ["dex"] },
+            {
+              type: "while-condition",
+              conditionIds: ["incapacitated", "paralyzed", "petrified", "stunned", "unconscious"],
+              present: false
+            }
+          ]
         }
       ]
     },
@@ -81,8 +98,7 @@ export const barbarian: ClassMechanicsModule = {
     "primal-knowledge": {
       extraPicks: [{ offer: "class-skills", amount: 1 }]
     },
-    // Currently reaches nothing: it raises `attack.count` only on feature actions, and martial swings
-    // come from inventory. Kept to match the Fighter's identical rider.
+    // A standing rider `effective-actions` folds onto every weapon swing (attack count 2).
     "extra-attack": {
       modifiers: [{ type: "extra-attack", count: 1 }]
     },
@@ -99,7 +115,7 @@ export const barbarian: ClassMechanicsModule = {
       uses: { limit: 1, per: "long-rest" }
     },
     "epic-boon": {
-      choice: { kind: "feat", choose: 1, fromCatalog: "epic-boon-feats" }
+      choice: { kind: "feat", choose: 1, fromCatalog: "feats" }
     },
     // `maximum: 25` lifts the builder's default clamp at 20.
     "primal-champion": {
@@ -112,8 +128,8 @@ export const barbarian: ClassMechanicsModule = {
   subclasses: {
     "path-of-the-berserker": {
       /**
-       * DC 8 + Strength + Proficiency Bonus; a failed save is Frightened. The Emanation targeting, repeat
-       * save and restoring the use by spending a Rage stay prose.
+       * DC 8 + Strength + Proficiency Bonus; a failed save is Frightened for 1 minute, repeating the save at the
+       * end of each of its turns. Restoring the use by spending a Rage stays prose.
        */
       "intimidating-presence": {
         uses: { limit: 1, per: "long-rest" },
@@ -130,7 +146,9 @@ export const barbarian: ClassMechanicsModule = {
               ability: "wis",
               dc: { base: 8, ability: "str", proficiencyBonus: true },
               successDamage: "none",
-              failureConditions: ["frightened"]
+              failureConditions: ["frightened"],
+              failureDuration: { type: "rounds", rounds: 10 },
+              repeatSave: true
             }
           }
         ]

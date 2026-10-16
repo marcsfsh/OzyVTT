@@ -29,6 +29,7 @@ import type { ReadSpec } from "./pipeline.js";
  *  (ADR-0015): reference text, and the character builder's choices. */
 const PUBLIC_CATALOGS = [
   ["content:conditions", CONTENT_PATHS.conditions, "conditions", (catalog) => catalog.conditionSummaries()],
+  ["content:glossary", CONTENT_PATHS.glossary, "glossary", (catalog) => catalog.glossaryEntries()],
   ["content:skills", CONTENT_PATHS.skills, "skills", (catalog) => catalog.skillSummaries()],
   ["content:languages", CONTENT_PATHS.languages, "languages", (catalog) => catalog.languageSummaries()],
   ["content:spells", CONTENT_PATHS.spells, "spells", (catalog) => catalog.spellSummaries()],
@@ -144,8 +145,8 @@ export const gameReads = [
       return {
         rulesMode: state.combat.rulesMode,
         actions: [
-          ...actionAvailability(state, actor, available, definition, false, available),
-          ...actionAvailability(state, actor, builtins, definition, true, available)
+          ...actionAvailability(state, actor, available, definition, false, available, catalog),
+          ...actionAvailability(state, actor, builtins, definition, true, available, catalog)
         ],
         // Derived numbers are computed only after the authorization gate above, which is why they ride a
         // request rather than the broadcast projection (see `actor-derived.ts`).

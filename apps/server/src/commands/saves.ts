@@ -6,8 +6,15 @@ import { deriveEquipment } from "../equipment-derivation.js";
 import { DeathSaveRollSchema, SaveAnswerSchema, SaveDismissSchema, SaveRollSchema } from "@vtt/domain/commands";
 import { CommandRejectedError } from "../game-store.js";
 import { damageAdjustmentDetail, healActor } from "../hit-points.js";
-import { answerSave, dismissSave, saveRiderDiceTerms, saveTotalFor } from "../saving-throws.js";
-import { initiatorOf, sessionIdOf } from "./kit.js";
+import {
+  answerSave,
+  dismissSave,
+  saveRiderBonusForAnySave,
+  saveRiderDiceTerms,
+  saveTotalFor
+} from "../saving-throws.js";
+import { exhaustionPenalty } from "../condition-rules.js";
+import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
 // Saving throws, owed and loose, and death saves.
@@ -141,7 +148,7 @@ export const saveCommands = [
     type: "death-save.roll",
     operationId: "rollDeathSave",
     description:
-      "Rolls a death saving throw for a dying character (at 0 HP): natural 20 regains 1 HP, natural 1 counts two failures, 10+ succeeds (three stabilize), otherwise a failure (three kill). Default applies in one step; pass `commit: false` to preview the projected pips first (honoring `rollMode` adv/disadv), then confirm with `commit: true` and the shown `naturalRoll`. The roll is recorded in the shared history and the response carries `deathSave`. GM-grade anyone; a player session only their claimed character.",
+      "Rolls a death saving throw for a dying character (at 0 HP): natural 20 regains 1 HP, natural 1 counts two failures, a total of 10+ (after Exhaustion and save bonuses) succeeds (three stabilize), otherwise a failure (three kill). In a fight a player commits one per turn, on the character's own turn. Default applies in one step; pass `commit: false` to preview the projected pips first (honoring `rollMode` adv/disadv), then confirm with `commit: true` and the shown `naturalRoll`. The roll is recorded in the shared history and the response carries `deathSave`. GM-grade anyone; a player session only their claimed character.",
     summary: "Roll a death saving throw for a dying character (GM anyone; a player their claimed character).",
     schema: DeathSaveRollSchema,
     malformed: "The death save is malformed.",
@@ -160,11 +167,27 @@ export const saveCommands = [
         if (actor.deathSaves.stable) throw new CommandRejectedError("A stable character doesn't roll death saves.");
         if (actor.deathSaves.failures >= 3)
           throw new CommandRejectedError("That character is dead - heal or revive them through the GM.");
+        // In a fight a death save comes once, at the start of the dying creature's turn. The GM may roll
+        // one any time, as a correction.
+        const inFight = draft.combat.active && draft.combat.initiative.some((entry) => entry.actorId === actorId);
+        if (inFight && commit && !isGmGrade(principal)) {
+          if (draft.combat.turnActorId !== actorId)
+            throw new CommandRejectedError(`${actor.name} rolls a death save at the start of their own turn.`);
+          if (draft.combat.turn.deathSaveRolled === true)
+            throw new CommandRejectedError(`${actor.name} has already made this turn's death save.`);
+        }
+        const definition = actor.definitionId ? kit.resolveDefinitionIn(draft, actor.definitionId) : undefined;
+        const derivation = deriveEquipment(actor, definition, kit.equipmentCatalog());
         // The die and preview/commit logic live in the shared death-save core.
         roll = rollDeathSave(
           draft,
           actor,
-          { commit, rollMode, naturalRoll },
+          {
+            commit,
+            rollMode,
+            naturalRoll,
+            modifier: exhaustionPenalty(actor) + saveRiderBonusForAnySave(derivation)
+          },
           {
             random: kit.context.random,
             rollId,
@@ -174,6 +197,8 @@ export const saveCommands = [
             now: () => new Date().toISOString()
           }
         );
+        if (commit && inFight && draft.combat.turnActorId === actorId)
+          draft.combat.turn = { ...draft.combat.turn, deathSaveRolled: true };
         if (commit && roll.outcome.regainsOneHitPoint) events = healActor(draft, actorId, 1, { role: "gm" });
       });
       if (duplicate || !roll) return { rollId };

@@ -3,6 +3,7 @@ import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } fr
 import { setCharacterIdentity, setCharacterProficiencies } from "../character-edit.js";
 import {
   ActorRemoveSchema,
+  CharacterGiveItemSchema,
   CharacterSetCurrencySchema,
   CharacterSetIdentitySchema,
   CharacterSetInventorySchema,
@@ -12,9 +13,9 @@ import {
   CharacterSetSlotSchema,
   CommandIdentitySchema
 } from "@vtt/domain/commands";
-import { setCurrency, setInventoryItem } from "../inventory.js";
+import { giveItem, setCurrency, setInventoryItem } from "../inventory.js";
 import { finishPreparing, setPreparedSpell, setSpellSlotRemaining } from "../spellcasting.js";
-import { initiatorOf, sessionIdOf } from "./kit.js";
+import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
 // Claims, and the edits a player may make to their own character's sheet.
@@ -148,6 +149,41 @@ export const characterSheetCommands = [
   }),
 
   defineCommand({
+    type: "character.give-item",
+    operationId: "giveItem",
+    description:
+      "Moves one carried item row, whole, from one character to another (GM-grade only). It arrives unequipped and unattuned, and the charges it has spent go with it: a wand's charges belong to the wand, not to whoever held it.",
+    summary: "Hand one carried item, with its spent charges, to another character (GM).",
+    schema: CharacterGiveItemSchema,
+    malformed: "The give-item command is malformed.",
+    gmOnly: "Only the GM can move an item to another character.",
+    async run({ request, execute }, kit) {
+      const { actorId, toActorId, itemId } = request;
+      let name = "";
+      const { duplicate } = await execute((state) => {
+        name = giveItem(
+          state,
+          actorId,
+          toActorId,
+          itemId,
+          (definitionId) => kit.resolveDefinitionIn(state, definitionId),
+          {
+            catalog: kit.equipmentCatalog(),
+            role: "gm"
+          }
+        ).name;
+      });
+      if (!duplicate)
+        kit.context.appendLog({
+          kind: "encounter",
+          text: `${kit.actorName(actorId)} hands ${name} to ${kit.actorName(toActorId)}.`,
+          actorIds: [actorId, toActorId],
+          gmOnly: kit.actorHidden(actorId) || kit.actorHidden(toActorId)
+        });
+    }
+  }),
+
+  defineCommand({
     type: "character.set-currency",
     operationId: "setCurrency",
     description:
@@ -167,14 +203,15 @@ export const characterSheetCommands = [
     type: "character.set-identity",
     operationId: "setIdentity",
     description:
-      "Sets a character's identity (class/level/race/background/feats) on its editable imported sheet - a light hand-edit, not a guided builder. Player sessions may target only their claimed character.",
-    summary: "Edit a character's identity (class/level/race/background/feats) on its imported sheet.",
+      "Sets a character's identity (class/level/race/background/feats) on its editable imported sheet - a light hand-edit, not a guided builder. Player sessions may target only their claimed character, and may only rename: classes, levels, species and background ids, feats, features, the choice ledger and Martial Arts are the GM's. On a sheet built here (it carries the choice ledger) those belong to the builder for everyone, and the Level flow (`character.rebuild`) changes them.",
+    summary:
+      "Edit a character's identity (class/level/race/background/feats) on its imported sheet; players only rename.",
     schema: CharacterSetIdentitySchema,
     malformed: "The identity command is malformed.",
     async run({ principal, request, execute }) {
       await execute((state) => {
         requireActorAccess(initiatorOf(principal), state, request.actorId, "edit");
-        setCharacterIdentity(state, request.actorId, request.character);
+        setCharacterIdentity(state, request.actorId, request.character, { gm: isGmGrade(principal) });
       });
     }
   }),

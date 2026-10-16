@@ -297,6 +297,28 @@ describe("resolveCatalogChoice", () => {
     expect(resolveCatalogChoice("fighting-style-feats", catalogs).map((option) => option.id)).toEqual(["archery"]);
   });
 
+  it("resolves feats to every category, for a pick that names none", () => {
+    // SRD: "If you're instructed to choose a feat and no category is specified, you can choose from any category."
+    expect(resolveCatalogChoice("feats", catalogs).map((option) => option.id)).toEqual(["alert", "archery", "tough"]);
+  });
+
+  it("narrows a spell list to one school with <listId>-spells-of-<school>", () => {
+    const withSchools: CatalogChoiceCatalogs = {
+      ...catalogs,
+      spells: [
+        spellSummary("magic-missile", 1, ["wizard"]),
+        { ...spellSummary("sleep", 1, ["wizard"]), school: "enchantment" },
+        spellSummary("cure-wounds", 1, ["cleric"])
+      ]
+    };
+    expect(resolveCatalogChoice("wizard-spells-of-evocation", withSchools).map((option) => option.id)).toEqual([
+      "magic-missile"
+    ]);
+    expect(() => resolveCatalogChoice("wizard-spells-of-necromancy", withSchools)).toThrowError(
+      /No necromancy spells are tagged for the "wizard" spell list/
+    );
+  });
+
   it("resolves <speciesId>-lineages against the species record", () => {
     expect(resolveCatalogChoice("elf-lineages", catalogs).map((option) => option.id)).toEqual([
       "drow",

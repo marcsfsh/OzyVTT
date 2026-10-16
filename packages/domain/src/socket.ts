@@ -4,6 +4,7 @@ import type {
   ContentBackgroundsResult,
   ContentClassesResult,
   ContentConditionsResult,
+  ContentGlossaryResult,
   ContentEquipmentResult,
   ContentFeatsResult,
   ContentLanguagesResult,
@@ -47,6 +48,7 @@ import type {
   ActorRemoveSchema,
   ActorRestSchema,
   ActorSetSpeedSchema,
+  ActorSetArmorClassSchema,
   ActorSpendHitDiceSchema,
   AddCombatantSchema,
   AnnotationAddSchema,
@@ -67,6 +69,7 @@ import type {
   CharacterSetCurrencySchema,
   CharacterSetIdentitySchema,
   CharacterSetInventorySchema,
+  CharacterGiveItemSchema,
   CharacterSetPreparedSchema,
   CharacterFinishPreparingSchema,
   CharacterSetProficienciesSchema,
@@ -90,6 +93,7 @@ import type {
   InitiativeRollRemainingSchema,
   InitiativeRollSelfSchema,
   InitiativeScoreSchema,
+  InitiativeSwapSchema,
   ReactionAnswerSchema,
   ReactionDismissSchema,
   ReplayLaunchSchema,
@@ -306,6 +310,10 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof ActorSetSpeedSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  "actor:set-armor-class": (
+    payload: CommandPayload<typeof ActorSetArmorClassSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
   /** `damageType` types a bare manual `amount` (ignored when `parts` is present); `damageOverride` replaces a
    * rolled total while keeping its types. */
   "actor:apply-damage": (
@@ -331,6 +339,10 @@ export interface ClientToServerEvents {
   "content:conditions": (
     payload: Record<string, never>,
     acknowledgement: (result: ContentConditionsResult) => void
+  ) => void;
+  "content:glossary": (
+    payload: Record<string, never>,
+    acknowledgement: (result: ContentGlossaryResult) => void
   ) => void;
   "content:skills": (payload: Record<string, never>, acknowledgement: (result: ContentSkillsResult) => void) => void;
   "content:languages": (
@@ -432,6 +444,10 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof CharacterSetInventorySchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  "character:give-item": (
+    payload: CommandPayload<typeof CharacterGiveItemSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
   "character:set-currency": (
     payload: CommandPayload<typeof CharacterSetCurrencySchema>,
     acknowledgement: (result: MutationResult) => void
@@ -505,6 +521,10 @@ export interface ClientToServerEvents {
   ) => void;
   "initiative:set": (
     payload: CommandPayload<typeof InitiativeScoreSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "initiative:swap": (
+    payload: CommandPayload<typeof InitiativeSwapSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "initiative:roll-self": (

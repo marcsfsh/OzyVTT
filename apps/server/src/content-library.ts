@@ -6,6 +6,7 @@ import type {
   ContentClassLevelRow,
   ContentClassSummary,
   ContentConditionSummary,
+  ContentGlossaryEntry,
   ContentEquipmentSummary,
   ContentFeatSummary,
   ContentFeatureSummary,
@@ -28,6 +29,7 @@ import {
   loadBackgrounds,
   loadClasses,
   loadConditions,
+  loadGlossary,
   loadEquipment,
   loadFeats,
   loadLanguages,
@@ -101,6 +103,8 @@ export interface ContentView {
   readonly audience: ContentAudience;
   readonly attribution: string;
   conditionSummaries(): readonly ContentConditionSummary[];
+  /** The SRD Rules Glossary; bundled text only, the same for every audience. */
+  glossaryEntries(): readonly ContentGlossaryEntry[];
   hasCondition(conditionId: string): boolean;
   skillSummaries(): readonly ContentSkillSummary[];
   languageSummaries(): readonly ContentLanguageSummary[];
@@ -209,7 +213,11 @@ export function actionSummaryOf(action: ActorDefinition["actions"][number]): Con
     reaction: action.reaction ?? null,
     ...(action.legendary ? { legendaryCost: action.legendary.cost } : {}),
     ...(action.darts !== undefined ? { darts: action.darts } : {}),
-    ...(action.damageTypes !== undefined ? { damageTypes: [...action.damageTypes] } : {})
+    ...(action.damageTypes !== undefined ? { damageTypes: [...action.damageTypes] } : {}),
+    // A heal for others picks its targets: one (Divine Spark's healing), or several for a divided pool (Preserve Life).
+    ...(action.healing && !action.healing.self
+      ? { targeting: action.healing.divided ? ("multi" as const) : ("single" as const) }
+      : {})
   };
 }
 
@@ -583,7 +591,9 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
     weapon: item.weapon ?? null,
     armor: item.armor ?? null,
     // The template eligibility list, for the base chooser. Printed SRD text plus resolved ids; nothing GM-secret.
-    appliesTo: item.appliesTo ?? null
+    appliesTo: item.appliesTo ?? null,
+    // The types the GM may pick for its resistance, as printed; the pick itself is the GM's, on the row.
+    ...(item.damageTypeChoice ? { damageTypeChoice: [...item.damageTypeChoice] } : {})
   }));
 
   const monstersById = new Map<string, ActorDefinition>();
@@ -597,6 +607,7 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
         id,
         name: definition.name,
         challengeRating: facts.challengeRating ?? 0,
+        experiencePoints: facts.experiencePoints,
         type: facts.creatureType ?? "unknown",
         size: definition.size,
         armorClass: definition.armorClass,
@@ -670,11 +681,20 @@ type CatalogData = ReturnType<typeof buildCatalogData>;
 const SRD_ONLY_CATALOG: CatalogData = buildCatalogData(EMPTY_HOMEBREW_SLICE);
 
 /** A thin per-audience wrapper over built catalog data; audiences that merge to the same data share it. */
+/** The glossary is bundled SRD text alone (no homebrew), so one copy serves every view. */
+const glossaryEntries: readonly ContentGlossaryEntry[] = loadGlossary().map(({ id, name, tag, description }) => ({
+  id,
+  name,
+  tag,
+  description
+}));
+
 function viewOf(audience: ContentAudience, data: CatalogData, attribution: string): ContentView {
   return {
     audience,
     attribution,
     conditionSummaries: () => data.conditionSummaries,
+    glossaryEntries: () => glossaryEntries,
     hasCondition: (conditionId) => data.conditionIds.has(conditionId),
     skillSummaries: () => data.skillSummaries,
     languageSummaries: () => data.languageSummaries,

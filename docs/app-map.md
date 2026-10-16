@@ -6,7 +6,7 @@ machine-derivable surfaces of the app (state shape, command catalog, HTTP paths)
 file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.
 
 - API version `1` · realtime protocol `1`
-- 11 GameState fields · 93 commands · 210 HTTP paths
+- 11 GameState fields · 96 commands · 214 HTTP paths
 
 ## GameState shape
 
@@ -47,6 +47,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `
 | `actor.remove` | `actor:write` |
 | `actor.rest` | `actor:write` |
 | `actor.set-archived` | `actor:write` |
+| `actor.set-armor-class` | `actor:write` |
 | `actor.set-condition` | `actor:write` |
 | `actor.set-health-display` | `actor:write` |
 | `actor.set-hp` | `actor:write` |
@@ -73,6 +74,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `
 | `character.finish-preparing` | `actor:write` |
 | `character.force-release` | `actor:write` |
 | `character.generate` | `actor:write` |
+| `character.give-item` | `actor:write` |
 | `character.rebuild` | `actor:write` |
 | `character.release` | `actor:write` |
 | `character.resolve-import` | `actor:write` |
@@ -105,6 +107,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `
 | `initiative.roll-remaining` | `combat:write` |
 | `initiative.roll-self` | `combat:write` |
 | `initiative.set` | `combat:write` |
+| `initiative.swap` | `combat:write` |
 | `reaction.answer` | `combat:write` |
 | `reaction.dismiss` | `combat:write` |
 | `replay.launch` | `combat:write` |
@@ -194,6 +197,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `GET /api/v1/content/conditions`
 - `GET /api/v1/content/equipment`
 - `GET /api/v1/content/feats`
+- `GET /api/v1/content/glossary`
 - `GET /api/v1/content/languages`
 - `GET /api/v1/content/monsters`
 - `GET /api/v1/content/monsters/{definitionId}`
@@ -213,6 +217,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/actors`
 - `DELETE /api/v1/game/actors/{actorId}`
 - `POST /api/v1/game/actors/{actorId}/archived`
+- `POST /api/v1/game/actors/{actorId}/armor-class`
 - `GET /api/v1/game/actors/{actorId}/available-actions`
 - `POST /api/v1/game/actors/{actorId}/conditions`
 - `POST /api/v1/game/actors/{actorId}/currency`
@@ -226,6 +231,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/actors/{actorId}/hp`
 - `POST /api/v1/game/actors/{actorId}/identity`
 - `POST /api/v1/game/actors/{actorId}/inventory`
+- `POST /api/v1/game/actors/{actorId}/inventory/give`
 - `GET /api/v1/game/actors/{actorId}/movement`
 - `POST /api/v1/game/actors/{actorId}/prepared-spell`
 - `POST /api/v1/game/actors/{actorId}/proficiencies`
@@ -280,6 +286,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/initiative/roll-remaining`
 - `POST /api/v1/game/initiative/roll-self`
 - `POST /api/v1/game/initiative/set`
+- `POST /api/v1/game/initiative/swap`
 - `GET /api/v1/game/log`
 - `POST /api/v1/game/reactions/{reactionId}/answer`
 - `POST /api/v1/game/reactions/{reactionId}/dismiss`

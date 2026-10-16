@@ -4,20 +4,27 @@ import {
   collectRiders,
   damageWhileDying,
   droppedToZero,
+  halveDamageParts,
   normalizeDamageType,
-  reduceDamageTotal,
+  reduceDamageParts,
   rescaleDamageParts,
-  sumRiders,
-  type DamagePart
+  type DamagePart,
+  type DamageReduction,
+  type ResolvedRider
 } from "@vtt/rules-5e";
 import { DAMAGE_TYPE_IDS } from "@vtt/content-srd-5.2.1/schemas";
 import type { ActorDefinition } from "@vtt/schemas";
 import { requireActorAccess, requireGm, type Initiator } from "./authorization.js";
 import { CommandRejectedError } from "./game-store.js";
 import {
+  addEffect,
   applyCondition,
   endConcentrationSustainedBy,
+  endEffectsOnDamage,
   endEffectsSustainedBy,
+  endKnockOut,
+  KNOCKED_OUT_TAG,
+  makeEffect,
   removeConditionDirect,
   type EffectNarration
 } from "./effects.js";
@@ -51,7 +58,7 @@ export type DamageInput = Readonly<{
   sourceName?: string | null;
   /** The creature that dealt it, when known; its damage can open the target's strike-back reaction. */
   sourceActorId?: string | null;
-  /** Knocking out a creature (SRD): a nonlethal drop to 0 leaves it Unconscious and stable. */
+  /** Knocking out a creature (SRD): a melee attack that would drop it to 0 leaves it at 1 HP and Unconscious. */
   nonlethal?: boolean;
 }>;
 export type DamageDeps = Readonly<{
@@ -88,31 +95,54 @@ export function damagePartsOf(input: DamageInput): readonly DamagePart[] | null 
   return [{ amount: input.damageOverride ?? input.amount, type: named }];
 }
 
+/** How a defence reads on a damage line. */
+export function adjustmentLabel(adjustment: NonNullable<DamageApplication["parts"][number]["adjustment"]>): string {
+  return adjustment === "resistance-and-vulnerability" ? "resistance and vulnerability" : adjustment;
+}
+
 /** The damage-adjustment line ("17 bludgeoning → 8, resistance: Rage"); "" when nothing adjusted the hit. */
 export function damageAdjustmentDetail(
   application: Readonly<{ parts: DamageApplication["parts"]; flatReduction?: number }>
 ): string {
-  const clauses = application.parts
-    .filter((part) => part.adjustment !== null)
-    .map(
-      (part) =>
-        `${part.amount} ${part.type} → ${part.adjusted}, ${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""}`
-    );
-  // The flat step is not per-type: it comes once, after the halving.
-  if ((application.flatReduction ?? 0) > 0) clauses.push(`then -${application.flatReduction}, reduction`);
+  // The flat step comes first (SRD Order of Application), so each part's line starts from what was left.
+  const clauses = (application.flatReduction ?? 0) > 0 ? [`-${application.flatReduction}, reduction`] : [];
+  for (const part of application.parts)
+    if (part.adjustment !== null)
+      clauses.push(
+        `${part.amount} ${part.type} → ${part.adjusted}, ${adjustmentLabel(part.adjustment)}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""}`
+      );
   return clauses.length > 0 ? ` (${clauses.join("; ")})` : "";
 }
 
-/** Flat `damage-reduction` riders on the receiving side: standing ones plus `on-taking-damage` ones whose
- *  `damage-type-is` matches the incoming types. */
-function damageReductionFor(derivation: EquipmentDerivation, damageTypes: readonly string[]): number {
-  const standing = collectRiders(derivation.carriers, { ...derivation.context, moment: null });
-  const onTakingDamage = collectRiders(derivation.carriers, {
-    ...derivation.context,
-    moment: "on-taking-damage",
-    damageTypes
-  });
-  return sumRiders(standing, "damage-reduction") + sumRiders(onTakingDamage, "damage-reduction");
+/** Flat `damage-reduction` riders on the receiving side, each with the types it covers: standing ones cover every
+ *  type, `on-taking-damage` ones the incoming types their `damage-type-is` matches. Riders sharing a `stackKey` are
+ *  one game effect, so only the largest counts. */
+function damageReductionsFor(derivation: EquipmentDerivation, damageTypes: readonly string[]): DamageReduction[] {
+  const isReduction = (rider: ResolvedRider) => rider.modifier.type === "damage-reduction";
+  const covered = new Map<ResolvedRider["modifier"], { rider: ResolvedRider; types: string[] | null }>();
+  for (const rider of collectRiders(derivation.carriers, { ...derivation.context, moment: null }).filter(isReduction))
+    covered.set(rider.modifier, { rider, types: null });
+  for (const type of new Set(damageTypes)) {
+    const riders = collectRiders(derivation.carriers, {
+      ...derivation.context,
+      moment: "on-taking-damage",
+      damageTypes: [type]
+    }).filter(isReduction);
+    for (const rider of riders) {
+      const entry = covered.get(rider.modifier) ?? { rider, types: [] };
+      entry.types?.push(type);
+      covered.set(rider.modifier, entry);
+    }
+  }
+  const strongest = new Map<string, { amount: number; types: string[] | null }>();
+  const reductions: DamageReduction[] = [];
+  for (const { rider, types } of covered.values()) {
+    const amount = rider.modifier.amount ?? 0;
+    if (amount <= 0) continue;
+    if (rider.stackKey === undefined) reductions.push({ amount, types });
+    else if ((strongest.get(rider.stackKey)?.amount ?? 0) < amount) strongest.set(rider.stackKey, { amount, types });
+  }
+  return [...reductions, ...strongest.values()];
 }
 
 /** The stat block's defences minus any a rest-time re-choice superseded (chosen options are baked in). */
@@ -177,25 +207,42 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
     // Effects, items, feats and features are derived whole each time, so removing the ring or ending the Rage
     // removes the resistance on the next hit.
     const derivation = deriveEquipment(actor, definition, deps?.catalog);
-    const derivedSourceOf = (adjustment: "resistance" | "immunity" | "vulnerability", type: string) => {
-      const list =
+    const derivedSourceOf = (
+      adjustment: NonNullable<DamageApplication["parts"][number]["adjustment"]>,
+      type: string
+    ) => {
+      const lists =
         adjustment === "immunity"
-          ? derivation.damageImmunities
+          ? [derivation.damageImmunities]
           : adjustment === "vulnerability"
-            ? derivation.damageVulnerabilities
-            : derivation.damageResistances;
-      return list.find((entry) => entry.id === type)?.source ?? null;
+            ? [derivation.damageVulnerabilities]
+            : adjustment === "resistance"
+              ? [derivation.damageResistances]
+              : [derivation.damageResistances, derivation.damageVulnerabilities];
+      const sources = lists.flatMap((list) => list.filter((entry) => entry.id === type).map((entry) => entry.source));
+      return sources.length > 0 ? [...new Set(sources)].join(", ") : null;
     };
-    // SRD Petrified: resistance to all damage + immunity to poison, on top of innate/effect defenses.
+    const resisted = (adjustment: DamageApplication["parts"][number]["adjustment"]) =>
+      adjustment === "resistance" || adjustment === "resistance-and-vulnerability";
+    // SRD 5.2.1 Petrified: resistance to all damage (its poison immunity is to the condition, not the damage).
     const petrified = actor.conditions.some((condition) => condition.id === "petrified");
     // SRD Underwater Combat: everything fully underwater has resistance to fire damage.
     const underwater = state.combat.active && state.combat.underwater;
     const standing = standingDefences(definition, fromChoices, derivation);
     const types = (rows: readonly DerivedDefence[]) => rows.map((row) => row.type);
-    const adjusted = adjustDamageParts(typed, {
+    // SRD Order of Application: flat reductions first, then Resistance, then Vulnerability.
+    const reduction = reduceDamageParts(
+      typed,
+      damageReductionsFor(
+        derivation,
+        typed.map((part) => normalizeDamageType(part.type))
+      )
+    );
+    flatReduction = reduction.reduced;
+    const adjusted = adjustDamageParts(reduction.parts, {
       resistances: [...types(standing.resistances), ...(underwater ? ["fire"] : [])],
-      immunities: [...types(standing.immunities), ...(petrified ? ["poison"] : [])],
-      // Effects and items can make a target vulnerable as a stat block can; a same-type resistance cancels it.
+      immunities: types(standing.immunities),
+      // Effects and items can make a target vulnerable as a stat block can; with a same-type resistance both apply.
       vulnerabilities: types(standing.vulnerabilities),
       resistAll: petrified
     });
@@ -211,13 +258,13 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
         petrified &&
         choiceSource === null &&
         derivedSource === null &&
-        ((part.adjustment === "resistance" && !innateHas(innate.resistances)) ||
-          (part.adjustment === "immunity" && type === "poison" && !innateHas(innate.immunities)))
+        resisted(part.adjustment) &&
+        !innateHas(innate.resistances)
           ? "Petrified"
           : null;
       const underwaterSource =
         underwater &&
-        part.adjustment === "resistance" &&
+        resisted(part.adjustment) &&
         type === "fire" &&
         !innateHas(innate.resistances) &&
         derivedSource === null &&
@@ -228,17 +275,7 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
       return { ...part, adjustmentSource: derivedSource ?? choiceSource ?? petrifiedSource ?? underwaterSource };
     });
     totalRequested = typed.reduce((sum, part) => sum + part.amount, 0);
-    const afterDefenses = adjusted.reduce((sum, part) => sum + part.adjusted, 0);
-    // Last, on the total: flat reduction subtracts from what the per-type math produced.
-    flatReduction = Math.max(
-      0,
-      damageReductionFor(
-        derivation,
-        adjusted.map((part) => normalizeDamageType(part.type))
-      )
-    );
-    totalAdjusted = reduceDamageTotal(afterDefenses, flatReduction);
-    flatReduction = afterDefenses - totalAdjusted;
+    totalAdjusted = adjusted.reduce((sum, part) => sum + part.adjusted, 0);
   } else {
     // The untyped fast path: a manual correction that names no type is exact by design.
     totalRequested = input.damageOverride ?? input.amount;
@@ -255,9 +292,9 @@ type DamageWeighing = Readonly<{
   parts: DamageApplication["parts"];
 }>;
 
-/** Half of each typed part, floored per part (Uncanny Dodge); parts that halve to nothing drop out. */
+/** Half the hit (Uncanny Dodge), rounded down once on the total and spread back over its types. */
 export function halvedDamageParts(parts: readonly DamagePart[]): DamagePart[] {
-  return parts.map((part) => ({ ...part, amount: Math.floor(part.amount / 2) })).filter((part) => part.amount > 0);
+  return halveDamageParts(parts);
 }
 
 /** A dry run of `applyDamageDetailed`: the typed breakdown and total it would apply, with nothing moved. */
@@ -298,33 +335,52 @@ export function applyDamageDetailed(
   actor.hp.temporary -= absorbed;
   const damageToHp = totalAdjusted - absorbed;
   actor.hp.current = Math.max(0, hpBefore - damageToHp);
+  // SRD Knocking Out a Creature: a melee attack that would drop it to 0 can leave it at 1 HP and Unconscious instead.
+  const knockedOut = input.nonlethal === true && !wasAtZero && actor.hp.current === 0 && damageToHp > 0;
+  if (knockedOut) actor.hp.current = 1;
+  // Sleep, Turn Undead and the like end the moment the bearer takes any damage.
+  if (totalAdjusted > 0) events.push(...endEffectsOnDamage(state, actor));
 
   let deathSaveFailuresAdded = 0;
   let instantDeath = false;
   let defeated = false;
   const isPlayerCharacter = actor.kind === "player-character";
 
-  if (isPlayerCharacter && wasAtZero && damageToHp > 0) {
-    // Damage while dying: automatic failures (two on a crit), instant death at max-HP damage.
+  if (isPlayerCharacter && wasAtZero && totalAdjusted > 0) {
+    // Damage while dying: automatic failures (two on a crit), even when Temporary Hit Points soak it all ("If
+    // you take any damage while you have 0 Hit Points"); instant death when what carries over reaches the maximum.
     const current = actor.deathSaves ?? { successes: 0, failures: 0, stable: false };
-    const outcome = damageWhileDying(current, damageToHp, input.critical === true, actor.hp.maximum);
+    const outcome = damageWhileDying(current, totalAdjusted, input.critical === true, actor.hp.maximum, damageToHp);
     actor.deathSaves = outcome.state;
     deathSaveFailuresAdded = outcome.failuresAdded;
     instantDeath = outcome.dead && damageToHp >= actor.hp.maximum;
     applyCondition(actor, "unconscious", { immunities: deps });
     applyCondition(actor, "prone", { immunities: deps });
+  } else if (knockedOut) {
+    // Unconscious until it regains any hit points (or first aid, which the GM ends by hand). No dying, no defeat.
+    addEffect(
+      state,
+      actor.id,
+      makeEffect({
+        id: `${deps?.commandId ?? deps?.newId?.() ?? `${actor.id}:${hpBefore}`}:knocked-out`,
+        name: "Knocked out",
+        tags: [KNOCKED_OUT_TAG],
+        sourceActorId: input.sourceActorId ?? null,
+        sourceName: input.sourceName ?? null,
+        startedRound: state.combat.round,
+        duration: { type: "manual" },
+        linkedConditionIds: ["unconscious"]
+      }),
+      events,
+      deps
+    );
+    events.push({
+      kind: "condition",
+      text: `${actor.name} was knocked out - Unconscious at 1 HP until it regains hit points.`,
+      actorId
+    });
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0) {
-    if (input.nonlethal === true) {
-      // Knocking out (SRD): the target drops to 0, Unconscious and stable (no death saves, no defeat).
-      if (isPlayerCharacter) actor.deathSaves = { successes: 0, failures: 0, stable: true };
-      applyCondition(actor, "unconscious", { immunities: deps });
-      applyCondition(actor, "prone", { immunities: deps });
-      events.push({
-        kind: "condition",
-        text: `${actor.name} was knocked out - Unconscious and stable at 0 HP.`,
-        actorId
-      });
-    } else if (isPlayerCharacter) {
+    if (isPlayerCharacter) {
       const overflow = damageToHp - hpBefore;
       const outcome = droppedToZero(overflow, actor.hp.maximum);
       actor.deathSaves = outcome.state;
@@ -346,8 +402,9 @@ export function applyDamageDetailed(
   }
 
   // SRD Concentration: damage while concentrating prompts a CON save, DC max(10, half the damage) capped
-  // at 30. The prompt carries the effects a committed failure ends. Skipped without an id-minter.
-  if (totalAdjusted > 0 && actor.hp.current > 0 && deps?.newId && state.combat.active) {
+  // at 30, in a fight or out of one (a trap between fights). The prompt carries the effects a committed failure
+  // ends. Skipped without an id-minter.
+  if (totalAdjusted > 0 && actor.hp.current > 0 && deps?.newId) {
     const sustained: Array<{ actorId: string; effectId: string }> = [];
     for (const bearer of state.actors) {
       for (const effect of bearer.effects) {
@@ -418,6 +475,7 @@ export function applyDamage(state: GameState, actorId: string, amount: number, s
 /** Healing caps at maximum and never restores temp HP; healing from 0 clears dying and Unconscious (not Prone). */
 export function healActor(state: GameState, actorId: string, amount: number, scope: Initiator): EffectNarration[] {
   const actor = adjustableActor(state, actorId, scope);
+  const before = actor.hp.current;
   const wasDying = actor.hp.current <= 0 && actor.deathSaves !== null;
   actor.hp.current = Math.min(actor.hp.maximum, actor.hp.current + amount);
   const events: EffectNarration[] = [];
@@ -425,6 +483,25 @@ export function healActor(state: GameState, actorId: string, amount: number, sco
     actor.deathSaves = null;
     removeConditionDirect(actor, "unconscious");
     events.push({ kind: "condition", text: `${actor.name} regained consciousness.`, actorId });
+  }
+  events.push(...wakeOnHealing(state, actor, before));
+  return events;
+}
+
+/** SRD: an Unconscious creature at 0 HP, or one knocked out at 1, stays so "until it regains any Hit Points". */
+function wakeOnHealing(state: GameState, actor: Actor, before: number): EffectNarration[] {
+  if (actor.hp.current <= before) return [];
+  const events = endKnockOut(state, actor);
+  // A creature knocked out before the 1-HP rule (at 0, with no dying state) wakes the same way.
+  if (
+    before <= 0 &&
+    actor.deathSaves === null &&
+    actor.conditions.some((condition) => condition.id === "unconscious")
+  ) {
+    if (!actor.effects.some((effect) => effect.linkedConditionIds.includes("unconscious"))) {
+      removeConditionDirect(actor, "unconscious");
+      events.push({ kind: "condition", text: `${actor.name} regained consciousness.`, actorId: actor.id });
+    }
   }
   return events;
 }
@@ -450,10 +527,21 @@ export function setCurrentHp(state: GameState, actorId: string, current: number,
     if (actor.kind === "player-character" && actor.deathSaves === null) {
       actor.deathSaves = { successes: 0, failures: 0, stable: false };
       applyCondition(actor, "unconscious");
-      applyCondition(actor, "prone");
       events.push({ kind: "condition", text: `${actor.name} fell Unconscious and is dying.`, actorId });
     }
+    // The same transition as damage to 0: what it sustains ends, and so does its Concentration.
     events.push(...endEffectsSustainedBy(state, actor.id));
+    events.push(...endConcentrationSustainedBy(state, actor.id));
   }
+  events.push(...wakeOnHealing(state, actor, before));
   return events;
+}
+
+/** The GM sets a creature's hit point maximum. Current HP never exceeds it. A character's sheet sets the
+ *  maximum again when it is rebuilt. */
+export function setMaximumHp(state: GameState, actorId: string, maximum: number, scope: Initiator) {
+  requireGm(scope, "Only the GM can set hit points directly.");
+  const actor = adjustableActor(state, actorId, scope);
+  actor.hp.maximum = maximum;
+  actor.hp.current = Math.min(actor.hp.current, maximum);
 }

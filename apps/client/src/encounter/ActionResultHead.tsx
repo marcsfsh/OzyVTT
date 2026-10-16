@@ -36,24 +36,3 @@ export function HealingOutcome({ healing }: Readonly<{ healing: NonNullable<Acti
     </p>
   );
 }
-
-/** Damage split between targets (Magic Missile's darts): each creature's share and the darts behind it, with
- *  whatever the audience can do about it (the GM's Apply, a player's "handed to the GM"). */
-export function SplitDamageOutcome({
-  split,
-  after
-}: Readonly<{
-  split: NonNullable<ActionResolution["damageByTarget"]>;
-  after: (target: NonNullable<ActionResolution["damageByTarget"]>[number]) => ReactNode;
-}>) {
-  return (
-    <ul className="action-split-damage">
-      {split.map((target) => (
-        <li key={target.targetId} className="action-damage">
-          {target.targetName}: <strong>{target.total}</strong> (
-          {target.parts.map((part) => `${part.formula} ${part.type} = ${part.total}`).join(" + ")}) {after(target)}
-        </li>
-      ))}
-    </ul>
-  );
-}

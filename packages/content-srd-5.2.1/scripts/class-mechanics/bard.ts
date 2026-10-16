@@ -25,7 +25,7 @@ export const bard: ClassMechanicsModule = {
     },
 
     "epic-boon": {
-      choice: { kind: "feat", choose: 1, fromCatalog: "epic-boon-feats" }
+      choice: { kind: "feat", choose: 1, fromCatalog: "feats" }
     },
 
     /**
@@ -39,11 +39,16 @@ export const bard: ClassMechanicsModule = {
           { id: "power-word-kill", level: 9, alwaysPrepared: true }
         ]
       }
-    }
+    },
 
-    // Not modeled: Magical Secrets (its generated `choice` is wrong, and nothing widens an existing
-    // budget's spell list), Jack of All Trades (half proficiency), Font of Inspiration, Superior
-    // Inspiration and Countercharm.
+    /**
+     * Not a pick of its own: the Bard's prepared spells and later replacements may come from these lists too,
+     * and count as Bard spells.
+     */
+    "magical-secrets": { extraSpellLists: ["cleric", "druid", "wizard"] }
+
+    // Not modeled: Jack of All Trades (half proficiency), Font of Inspiration, Superior Inspiration and
+    // Countercharm.
   },
 
   subclasses: {

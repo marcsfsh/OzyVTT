@@ -6,7 +6,7 @@ import {
   SpeciesReferenceSchema,
   SubclassReferenceSchema
 } from "@vtt/content-srd-5.2.1";
-import { ActorDefinitionSchema, type ActorAction, type ActorDefinition } from "@vtt/schemas";
+import { ActorDefinitionSchema, InventoryItemSchema, type ActorAction, type ActorDefinition } from "@vtt/schemas";
 import { collectRiders } from "@vtt/rules-5e";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { importActorDefinition } from "../src/actor-roster.js";
@@ -51,14 +51,16 @@ const ROLL_TIME_RIDERS: ReadonlyArray<Record<string, unknown>> = [
   { type: "spell-attack-bonus", amount: 1 },
   { type: "spell-slot", level: 1, amount: 1 },
   { type: "resource-bonus", poolId: "rift-surge", amount: 1 },
-  { type: "sense", sense: "tremorsense", feet: 30 }
+  { type: "sense", sense: "tremorsense", feet: 30 },
+  // Collected live so it follows the armor worn now (Defense applies only while armor is worn).
+  { type: "armor-class", amount: 1 },
+  { type: "attunement-slots", amount: 1 }
 ];
 /** The variants the builder bakes into the definition; none may appear as a carrier, or it applies twice. */
 const BUILD_TIME_RIDERS: ReadonlyArray<Record<string, unknown>> = [
   { type: "ability-score", ability: "wis", amount: 1 },
   { type: "hit-points-per-level", amount: 1 },
   { type: "speed", amount: 10 },
-  { type: "armor-class", amount: 1 },
   { type: "initiative", amount: 2 },
   { type: "unarmored-defense", ability: "con" },
   { type: "darkvision", feet: 60 }
@@ -436,7 +438,7 @@ describe("the builder records every granted feature by id and provenance", () =>
     }
   });
 
-  it("reaches all FOURTEEN roll-time variants from all SIX carriers, and none of the seven baked ones", () => {
+  it("reaches all SIXTEEN roll-time variants from all SIX carriers, and none of the six baked ones", () => {
     // One assertion per (carrier, variant) pair, each way.
     for (const on of CARRIERS) {
       for (const modifier of ROLL_TIME_RIDERS) {
@@ -456,10 +458,17 @@ describe("the builder records every granted feature by id and provenance", () =>
   it("contributes nothing when no feature carries a rider at all", () => {
     const built = build();
     for (const on of CARRIERS) expect(carrierOf(built, LABEL[on])).toBeUndefined();
-    // The equipped gear is still carried, but nothing it holds carries a rider.
+    // The equipped gear is still carried; the only rider it holds is the Chain Mail's Stealth Disadvantage.
     expect(
       deriveEquipment(built.hero, built.definition, built.catalog).carriers.flatMap((carrier) => carrier.modifiers)
-    ).toEqual([]);
+    ).toEqual([
+      {
+        type: "roll-mode",
+        roll: "check",
+        mode: "disadvantage",
+        when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["stealth"] }]
+      }
+    ]);
   });
 });
 
@@ -680,6 +689,11 @@ describe("a feature's moment-gated roll-mode fires only at its moment", () => {
     expect(swung.attack!.naturalRoll).toBe(18); // the higher of the two dice was kept
 
     const ranged = fight(build({ on: "option", modifiers: [RECKLESS] }));
+    // A bow fires only with arrows to fire (SRD Ammunition).
+    ranged.hero.inventory = [
+      ...ranged.hero.inventory,
+      InventoryItemSchema.parse({ id: "arrows-20", name: "Arrows (20)", category: "ammunition" })
+    ];
     const shot = resolveDefinitionAction(
       ranged.state,
       actionOf(ranged, "item-shortbow"),
@@ -742,7 +756,7 @@ describe("a this-item-scoped rider on a feature does not become an 'always' ride
 });
 
 describe("nothing the builder baked is counted a second time as a carrier", () => {
-  it("bakes a feature's speed / initiative / AC exactly once", () => {
+  it("bakes a feature's speed / initiative exactly once, and collects its AC live", () => {
     const built = build({
       on: "species",
       modifiers: [
@@ -754,7 +768,7 @@ describe("nothing the builder baked is counted a second time as a carrier", () =
     const derivation = deriveEquipment(built.hero, built.definition, built.catalog);
     expect(currentSpeedFeet(built.hero, derivation)).toBe(40);
     expect(derivation.initiative).toBe(0);
-    expect(derivation.armorClass).toBe(0);
+    expect(derivation.armorClass).toBe(1); // the rider, read live rather than baked
 
     expect(built.definition.speedFeet).toBe(40); // 30 + 10, once
     expect(built.hero.speedFeet).toBe(40);
@@ -795,8 +809,16 @@ describe("the feature carriers fail open", () => {
     expect(legacy.character?.features).toBeUndefined();
 
     const derivation = deriveEquipment(built.hero, legacy, built.catalog);
-    expect(derivation.carriers.map((carrier) => carrier.label)).toEqual(["Greatsword", "Shortbow", "Chain Mail"]); // gear only
-    expect(derivation.carriers.flatMap((carrier) => carrier.modifiers)).toEqual([]); // no array, no feature riders
+    // Gear only, and the Chain Mail's own Stealth rider.
+    expect(derivation.carriers.map((carrier) => carrier.label)).toEqual([
+      "Greatsword",
+      "Shortbow",
+      "Chain Mail",
+      "Chain Mail (Stealth)"
+    ]);
+    expect(derivation.carriers.flatMap((carrier) => carrier.modifiers).map((modifier) => modifier.type)).toEqual([
+      "roll-mode"
+    ]); // no array, no feature riders
     expect(
       effectiveActions(legacy, built.hero, built.catalog).find((entry) => entry.id === "item-greatsword")!.attack!.bonus
     ).toBe(6);
@@ -998,7 +1020,7 @@ describe("Agonizing Blast: a spell-gated rider adds the caster's own ability mod
 
 // `FeatureChoiceSchema.maximum`. An `ability-score` rider raises a named ability and honours its own
 // `maximum`; a choice lets the player pick the ability, as the epic boons do ("increase one ability
-// score by 1, to a maximum of 30"). Without a choice-level ceiling the offer consumer clamps at 20,
+// score by 1, to a maximum of 30"). Without a choice-level ceiling the build refuses a pick past 20,
 // which would make every boon useless for a character already at 20.
 describe("an ability-score choice raises past 20 when it says so", () => {
   /** STR 18 rolled + the background's +2 = exactly 20 before the boon. */
@@ -1018,16 +1040,15 @@ describe("an ability-score choice raises past 20 when it says so", () => {
     expect(actionOf(built, "item-greatsword").attack!.bonus).toBe(8);
   });
 
-  it("stops at 20 when the choice names no maximum - the SRD default is unchanged", () => {
-    // Negative control: the cap is not lifted for every choice.
-    const built = build({ ...AT_TWENTY, boon: false });
-    expect(built.definition.abilityScores.str).toBe(20);
-    expect(actionOf(built, "item-greatsword").attack!.bonus).toBe(8); // +5 either way; the score is the assertion
+  it("refuses a pick past 20 when the choice names no maximum - the SRD default is unchanged", () => {
+    // Negative control: the cap is not lifted for every choice. The pick is refused, not quietly dropped.
+    expect(() => build({ ...AT_TWENTY, boon: false })).toThrowError(
+      /STR would be 21; Rift Apotheosis cannot raise a score above 20/
+    );
   });
 
   it("honours a maximum BELOW 20 too, because the field is a ceiling and not a boon flag", () => {
-    const built = build({ ...AT_TWENTY, boon: 20 });
-    expect(built.definition.abilityScores.str).toBe(20);
+    expect(() => build({ ...AT_TWENTY, boon: 20 })).toThrowError(/cannot raise a score above 20/);
   });
 
   it("still climbs when the score is nowhere near either ceiling", () => {

@@ -5,10 +5,11 @@ import { pactSlotMaximum, spellSlotMaxima } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
 import { effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
-import { endEffect, removeConditionDirect, type EffectNarration } from "./effects.js";
+import { endEffectsAtLongRest, removeConditionDirect, type EffectNarration } from "./effects.js";
 import { requireActorAccess, type Initiator } from "./authorization.js";
 import { openPreparation } from "./spellcasting.js";
 import { healActor } from "./hit-points.js";
+import { chargesAfterDawn } from "./item-charges.js";
 
 /** Takes `count` dice off a multiclass pool, biggest die first (the order the roll uses). The caller has
  *  already checked the pool holds enough. */
@@ -23,6 +24,15 @@ function spendFromPool(entries: readonly HitDiceEntry[], count: number): HitDice
     });
 }
 
+/** The sizes of the next `count` Hit Dice a pool spends, biggest first, matching `spendFromPool`: a
+ *  Fighter 3 / Wizard 2 rolls d10s, then d6s. Short when the pool holds fewer. */
+export function hitDieSizesToSpend(entries: readonly HitDiceEntry[], count: number): number[] {
+  return [...entries]
+    .sort((a, b) => Number(b.die.slice(1)) - Number(a.die.slice(1)))
+    .flatMap((entry) => Array.from({ length: entry.remaining }, () => Number(entry.die.slice(1))))
+    .slice(0, count);
+}
+
 /** Spends Hit Point Dice to heal (SRD 5.2.1 Short Rest): each die heals `face + Con modifier`, minimum 1.
  *  The caller rolls the faces before the store executes (so retries never reroll) and records them; this
  *  owns validation, healing (via healActor) and the pool decrement. */
@@ -31,7 +41,8 @@ export function spendHitDice(
   actorId: string,
   faces: readonly number[],
   scope: Initiator,
-  resolveDefinition: (definitionId: string) => ActorDefinition | undefined
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
+  count: number = faces.length
 ): { healed: number; events: EffectNarration[]; conModifier: number } {
   requireActorAccess(scope, state, actorId, "resource");
   const actor = state.actors.find((candidate) => candidate.id === actorId);
@@ -40,7 +51,7 @@ export function spendHitDice(
     throw new CommandRejectedError("Hit Dice are spent on a rest - end the encounter first.");
   if (!actor.hitDice)
     throw new CommandRejectedError(`${actor.name} has no Hit Dice pool (its stat block has no hit-point formula).`);
-  if (actor.hitDice.remaining < faces.length)
+  if (actor.hitDice.remaining < count || faces.length < count)
     throw new CommandRejectedError(
       `${actor.name} has ${actor.hitDice.remaining} Hit ${actor.hitDice.remaining === 1 ? "Die" : "Dice"} left.`
     );
@@ -68,15 +79,17 @@ function restorePactSlots(actor: Actor, definition: ActorDefinition | undefined)
 /**
  * Applies a rest to a rostered actor outside combat (SRD Resting, ADR-0020).
  * Short: per-short-rest and recharge pools and Pact Magic slots re-arm; healing is only by spending Hit Point Dice.
- * Long: remaining effects end first (onEnd grants land), then HP to max, temp HP cleared, dying
- * cleared, all pools refreshed, all Hit Point Dice restored, Exhaustion drops one level.
+ * Long: Concentration and turn-measured effects end first (onEnd grants land), then HP to max, temp HP cleared, dying
+ * cleared, all pools refreshed, all Hit Point Dice restored, Exhaustion drops one level. With `charges.random`, a
+ * charged item regains its printed dice rather than every charge, and `charges.lines` hears what each regained.
  */
 export function applyRest(
   state: GameState,
   actorId: string,
   kind: "long" | "short",
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
-  catalog?: EquipmentCatalog
+  catalog?: EquipmentCatalog,
+  charges?: Readonly<{ random: (sides: number) => number; lines: string[] }>
 ): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
@@ -100,7 +113,8 @@ export function applyRest(
     restorePactSlots(actor, definition);
     return events;
   }
-  for (const effect of [...actor.effects]) events.push(...endEffect(state, actorId, effect.id));
+  // Eight hours of sleep: Concentration ends and turn-measured effects lapse; "until ended" ones (a curse) stay.
+  events.push(...endEffectsAtLongRest(state, actorId));
   actor.hp.current = actor.hp.maximum;
   actor.hp.temporary = 0;
   // Every die size in the pool comes back, not just the largest (SRD 5.2.1 "Regain All HP").
@@ -108,7 +122,12 @@ export function applyRest(
     actor.hitDice = makeHitDicePool(actor.hitDice.entries.map((entry) => ({ ...entry, remaining: entry.maximum })));
   actor.deathSaves = null;
   removeConditionDirect(actor, "unconscious");
-  actor.actionUses = {};
+  const longRestDefinition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
+  if (charges) {
+    const dawn = chargesAfterDawn(actor, longRestDefinition, catalog, charges.random);
+    actor.actionUses = dawn.stillSpent;
+    charges.lines.push(...dawn.lines);
+  } else actor.actionUses = {};
   // Both kinds lapse on a long rest.
   actor.choiceOverrides = clearOverrides(actor.choiceOverrides, "long");
   const exhaustion = actor.conditions.find((condition) => condition.id === "exhaustion");
@@ -121,7 +140,6 @@ export function applyRest(
   }
   // SRD long rest: spell slots (and Pact Magic) refill.
   // No spellcasting leaves these untouched.
-  const longRestDefinition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
   if (actor.spellSlots && longRestDefinition?.spellcasting) {
     // `spellSlotMaxima` covers derived multiclass tables and item-added slots, shared with seeding and the
     // spend clamp.

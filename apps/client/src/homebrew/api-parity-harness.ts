@@ -434,6 +434,18 @@ const FEATURE_CARRIERS: readonly HomebrewBodyType[] = [
   "subclass"
 ];
 
+/** The save-block keys that say how a failure's conditions end (`SaveOutcomeFields`). */
+const SAVE_LIFETIME_KEYS = [
+  "failureDuration.**",
+  "repeatSave",
+  "escapeDc",
+  "endsOnDamage",
+  "speedZero",
+  "rangeFeet",
+  "failsAtHitPoints",
+  "ongoingDamage.**"
+] as const;
+
 /** The exemption table. First match wins, so specific rows sit above general ones. */
 export const EXEMPTIONS: readonly ExemptionRow[] = [
   // ---- action rider surface (every carrier that mounts actions) ----
@@ -491,6 +503,19 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
       "the feature save's DERIVED dc object (ability/base/proficiencyBonus) — the rows author the statblock's flat number only",
     status: "gap"
   },
+  ...SAVE_LIFETIME_KEYS.map((key): ExemptionRow => ({
+    at: `actions[].save.${key}`,
+    types: ACTION_CARRIERS,
+    reason:
+      "how a failed save's conditions end (duration, repeated save, grapple escape and range, ending on damage, Speed 0, an HP gate) - read from SRD prose or authored in the class and item overlays; no editor control yet",
+    status: "gap"
+  })),
+  ...SAVE_LIFETIME_KEYS.map((key): ExemptionRow => ({
+    at: `save.${key}`,
+    types: ["spell"],
+    reason: "how a failed save's conditions end, read from the spell's description as the catalog is built",
+    status: "gap"
+  })),
   {
     at: "actions[].grants.**",
     types: ACTION_CARRIERS,
@@ -568,6 +593,39 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "actions[].healing.**",
     types: ACTION_CARRIERS,
     reason: "hit points an action restores - no control on the action row yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].conditionalDamage[].**",
+    types: ACTION_CARRIERS,
+    reason:
+      "a stat block's damage under a printed condition (Bloodied swarms, a charge), read from the hit clause as the catalog is built; no control on the action row yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].reminder",
+    types: ACTION_CARRIERS,
+    reason: "what the engine leaves to the GM, read from a save's later-turn damage as the catalog is built",
+    status: "gap"
+  },
+  {
+    at: "actions[].healingByLevel[].**",
+    types: FEATURE_CARRIERS,
+    reason: "healing that grows with level - feature-carrier actions only, beside damageByLevel",
+    status: "gap"
+  },
+  {
+    at: "actions[].adds.**",
+    types: FEATURE_CARRIERS,
+    reason:
+      "a level multiple or ability modifier added at build (Second Wind, Divine Spark) - feature-carrier actions only",
+    status: "gap"
+  },
+  {
+    at: "actions[].grantScaling.**",
+    types: FEATURE_CARRIERS,
+    reason:
+      "a granted damage bonus read off a printed class column at build (Rage Damage) - feature-carrier actions only",
     status: "gap"
   },
   {
@@ -720,6 +778,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "replacesFeatureId",
     types: ["species"],
     reason: "supersession at species-trait scope — the control exists on class features, not here",
+    status: "gap"
+  },
+  {
+    at: "extraSpellLists",
+    types: "*",
+    reason:
+      "spell lists a feature adds to the class's own picks (Magical Secrets) — no list control at feature scope yet",
     status: "gap"
   },
 

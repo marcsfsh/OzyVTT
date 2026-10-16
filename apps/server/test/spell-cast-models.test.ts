@@ -134,7 +134,7 @@ describe("a spell that takes a minute or more to cast", () => {
 describe("a healing spell with an area", () => {
   it("is cast at the creatures the caster picks, not every creature under a template", () => {
     const massCure = castAction(
-      "ring",
+      { id: "ring" },
       { spellId: "mass-cure-wounds", consumesSpellSlot: false },
       "Ring",
       cleric,
@@ -143,7 +143,7 @@ describe("a healing spell with an area", () => {
     expect(massCure.healing).toBeDefined();
     expect(massCure.area).toBeUndefined();
     const fireball = castAction(
-      "ring",
+      { id: "ring" },
       { spellId: "fireball", consumesSpellSlot: false },
       "Ring",
       cleric,

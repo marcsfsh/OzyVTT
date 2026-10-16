@@ -23,7 +23,15 @@ import {
 } from "@vtt/domain/commands";
 import { CommandRejectedError } from "../game-store.js";
 import { applyMovementRules } from "../movement-rules.js";
-import { creatureDistance, mapDistance, narrateTokenMove, type MovementNarration } from "../movement-narration.js";
+import {
+  creatureDistance,
+  DISTANCE_TOLERANCE_FEET,
+  mapDistance,
+  narrateTokenMove,
+  tokenCreatureDistance,
+  type MovementNarration
+} from "../movement-narration.js";
+import { releaseGrapplesOutOfRange, type EffectNarration } from "../effects.js";
 import { movementCost } from "../terrain.js";
 import { moveEncounterToken, moveSceneToken } from "../token-placement.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf, type GamePrincipal, type Kit } from "./kit.js";
@@ -78,6 +86,7 @@ export const mapCommands = [
       let movementWarning: string | null = null;
       let movementOverridden: string | null = null;
       const opportunityPrompts: Array<{ actorId: string; name: string }> = [];
+      let released: EffectNarration[] = [];
       const { duplicate } = await execute((state) => {
         if (state.combat.mapAssetId !== mapAssetId)
           throw new CommandRejectedError("The active encounter changed. Try moving the token again.");
@@ -121,8 +130,16 @@ export const mapCommands = [
         movementWarning = outcome.warning;
         movementOverridden = outcome.overridden;
         opportunityPrompts.push(...outcome.prompts);
+        // SRD Grappling: a grapple ends once the two are farther apart than its range (dragging is not modeled).
+        released = releaseGrapplesOutOfRange(
+          state,
+          actorId,
+          (a, b) => tokenCreatureDistance(state, geometry, a, b)?.value ?? null,
+          DISTANCE_TOLERANCE_FEET
+        );
       });
       if (duplicate) return;
+      kit.publishNarrations(released);
       if (movement?.publicText)
         kit.context.appendLog({ kind: "movement", text: movement.publicText, actorIds: [actorId] });
       if (movement?.gmText) kit.context.appendLog({ kind: "movement", text: movement.gmText, gmOnly: true });

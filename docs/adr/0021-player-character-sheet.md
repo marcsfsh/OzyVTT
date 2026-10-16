@@ -52,6 +52,13 @@ ability-only`. The builder later _fills the same fields_; no consumer changes. (
    `ActorDefinitionSchema`. Shared bundle content is never editable this way. Guided creation
    stays deferred to the builder.
 
+   **Amendment (2026-10-16):** the identity hand-edit is narrowed. A player may rename (class, subclass,
+   species, background) but not change what the rules read: class rows, levels, species and background ids,
+   feats, features, the choice ledger and Martial Arts are the GM's. On a sheet the builder made (it carries
+   the choice ledger) those belong to the builder for everyone; the Level flow (`character.rebuild`) changes
+   them, re-validated, so a hand-added class or feat can no longer slip past the rules or vanish at the next
+   rebuild.
+
 **Amendment (v6, 2026-07-23): a slice of "rules auto-derivation" ships in the play sheet.**
 Originally this ADR parked all auto-derivation (incl. AC-from-armor) for the builder. In
 response to direct GM feedback, the play sheet now derives two things from equipped gear, using
@@ -63,6 +70,13 @@ is equipped (so imports and monsters are unaffected); **(b) weapon attack action
 weapons render as tap-to-roll to-hit/damage on the sheet (Str melee / Dex ranged; finesse,
 versatile, and per-weapon proficiency remain builder work as that data isn't vendored). The
 guided builder, point-buy, level-up, and full content/derivation are still deferred.
+
+**Amendment (2026-10-16): Armor Class follows what is worn now.** A built character's AC is no longer
+frozen at build: with no armor or Shield it is 10 + Dex (or its Unarmored Defense), and its features'
+`armor-class` riders are read live, so the Defense fighting style follows armor bought or removed later.
+A Shield adds its +2 only with Shield training. A printed total (a stat block, a PDF import) stands
+until body armor is equipped, since it may already count a Shield. The GM can set an AC by hand
+(`actor.set-armor-class`), shown to the party as set by the GM, until cleared.
 
 ## Consequences
 

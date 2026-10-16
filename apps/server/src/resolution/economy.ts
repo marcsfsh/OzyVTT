@@ -2,9 +2,13 @@ import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import { spellRangeFeet } from "@vtt/content-srd-5.2.1/spell-effect";
 import type { GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
+import { effectiveSlot } from "@vtt/rules-5e";
 import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
-import { hasEffectTag } from "../effects.js";
+import { hasEffectTag, RAGING_TAG } from "../effects.js";
+import { ammunitionFor, ammunitionLabel, launcherKind } from "../ammunition.js";
+import { armorTrainingGaps, type EquipmentCatalog } from "../equipment-derivation.js";
 import { RulesBlockedError } from "../game-store.js";
+import { isItemActionId, itemActionRest, TWO_HANDED_SUFFIX } from "../item-actions.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import {
   effectiveModeFor,
@@ -16,6 +20,7 @@ import {
 } from "../rules-families.js";
 import { laterSpellActionId, ritualSpellActionId } from "../item-actions.js";
 import { builtinHandlerFor } from "./builtins.js";
+import { hitRiderOf } from "./hit-riders.js";
 import { sizeRank, type DefinitionAction, type LiveActor, type ResolveContext, type ResolveInput } from "./context.js";
 
 type RuleViolation = Readonly<{ rule: RuleId; message: string }>;
@@ -91,6 +96,10 @@ export function evaluateActionEconomy(
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null,
   siblings: ReadonlyArray<DefinitionAction> = definition?.actions ?? [],
   slotLevel?: number,
+  /** The action rides a hit it was chosen for (Sneak Attack), rather than being taken alone. */
+  asHitRider = false,
+  catalog?: EquipmentCatalog,
+  /** The spell the action casts, for the slot, preparation and targeting checks. */
   spell?: SpellReference
 ): EconomyEvaluation {
   const evaluation: Evaluation = {
@@ -107,7 +116,13 @@ export function evaluateActionEconomy(
     notes: []
   };
   checkAbleToAct(evaluation);
+  checkTurnsBegun(evaluation);
   checkExtraAttackOpened(evaluation);
+  checkLoading(evaluation);
+  checkHands(evaluation);
+  checkArmorTraining(evaluation, definition);
+  checkAmmunition(evaluation, catalog);
+  if (!asHitRider) checkTakenAlone(evaluation);
   const spendUse = checkLimitedUse(evaluation);
   // A later ray of a spell already cast this action spends no further slot; it rolls at the first ray's.
   const continued = continuedSpellSlot(evaluation);
@@ -137,10 +152,38 @@ export function evaluateActionEconomy(
   };
 }
 
-/** Incapacitation and 0 HP forbid all three activation kinds (SRD 2024 "Incapacitated"); a required
- *  effect (Frenzy needs Rage) must be active. */
+/** In wait mode the order is provisional until every player has rolled, and the turn economy resets when
+ *  turns begin, so an action taken before then would come free. */
+function checkTurnsBegun({ state, violations }: Evaluation): void {
+  const { active, playerInitiativeMode, pendingInitiative } = state.combat;
+  if (active && playerInitiativeMode === "wait" && pendingInitiative.length > 0)
+    violations.push({
+      rule: "initiative.gathering",
+      message: "Players are still rolling initiative - turns begin once everyone has rolled."
+    });
+}
+
+/**
+ * Features with no activation of their own that answer a roll or an event rather than act (rerolling a failed save,
+ * Relentless Endurance at 0 HP), which an Incapacitated creature still gets. Every other "other" activation - a
+ * legendary action, Sneak Attack, Reckless Attack, Action Surge, a free cast - is an action by another name.
+ */
+const ANSWERS_A_ROLL: ReadonlySet<string> = new Set([
+  "indomitable",
+  "stroke-of-luck",
+  "uncanny-metabolism",
+  "persistent-rage",
+  "orc-relentless-endurance",
+  "relentless-endurance",
+  "dark-ones-own-luck",
+  "boon-of-fate"
+]);
+
+/** Incapacitation and 0 HP forbid every action, Bonus Action and Reaction (SRD 2024 "Incapacitated"), legendary
+ *  actions and feature activations included; a required effect (Frenzy needs Rage) must be active, and a raging
+ *  Barbarian can't cast spells. */
 function checkAbleToAct({ attacker, action, violations }: Evaluation): void {
-  if (action.activation !== "other") {
+  if (action.activation !== "other" || !ANSWERS_A_ROLL.has(action.id)) {
     const incapacitating = incapacitatingCondition(attacker);
     if (incapacitating !== null)
       violations.push({
@@ -154,6 +197,12 @@ function checkAbleToAct({ attacker, action, violations }: Evaluation): void {
         message: `${attacker.name} is down (0 HP) and can't take actions, bonus actions, or reactions.`
       });
   }
+  // SRD Rage: "you can't cast spells".
+  if ((action.spellId !== undefined || action.spellSlot !== undefined) && hasEffectTag(attacker, RAGING_TAG))
+    violations.push({
+      rule: "condition.raging",
+      message: `${attacker.name} is raging and can't cast spells.`
+    });
   if (action.requiresEffectTag && !hasEffectTag(attacker, action.requiresEffectTag)) {
     violations.push({
       rule: "feature.requires-effect",
@@ -187,6 +236,92 @@ function checkExtraAttackOpened({ state, attacker, action, violations }: Evaluat
     });
 }
 
+/** The inventory row a weapon swing is made with (`item-<id>`, or a Versatile weapon's `item-<id>-two-handed`), or
+ *  null for any other action. */
+function swingItemOf(attacker: LiveActor, action: DefinitionAction) {
+  if (!isItemActionId(action.id)) return null;
+  const rest = itemActionRest(action.id);
+  return (
+    attacker.inventory.find(
+      (item) => item.weapon !== undefined && (item.id === rest || `${item.id}-${TWO_HANDED_SUFFIX}` === rest)
+    ) ?? null
+  );
+}
+
+/** SRD Armor Training: in Light, Medium or Heavy armor you lack training with, "you can't cast spells". Any action
+ *  that casts a spell counts, a wand's included. Read from the sheet's own training; armor training an item grants
+ *  is the GM's to allow. */
+function checkArmorTraining({ attacker, action, violations }: Evaluation, definition: ActorDefinition | undefined) {
+  if (action.spellId === undefined && action.spellSlot === undefined) return;
+  const { untrainedArmor } = armorTrainingGaps(attacker.inventory, definition);
+  if (untrainedArmor)
+    violations.push({
+      rule: "spell.untrained-armor",
+      message: `${attacker.name} can't cast spells while wearing ${untrainedArmor.name} without training in it.`
+    });
+}
+
+/** SRD: a Two-Handed weapon "requires two hands when you attack with it", and a Shield is strapped to one arm. Read
+ *  from the row, since a magic shield's slot travels on its marker. The Lance's "unless mounted" is the GM's call. */
+function checkHands({ attacker, action, violations }: Evaluation): void {
+  const item = swingItemOf(attacker, action);
+  if (!item) return;
+  const twoHands =
+    item.weapon?.properties?.includes("two-handed") === true ||
+    itemActionRest(action.id) === `${item.id}-${TWO_HANDED_SUFFIX}`;
+  if (!twoHands) return;
+  const shield = attacker.inventory.find(
+    (entry) =>
+      entry.equipped &&
+      entry.quantity > 0 &&
+      entry.armor !== undefined &&
+      effectiveSlot({ slot: entry.magic?.slot, category: entry.category }) === "shield"
+  );
+  if (shield)
+    violations.push({
+      rule: "attack.two-handed",
+      message: `${item.name} needs two hands, and ${attacker.name} has ${shield.name} on one arm. Unequip the shield first.`
+    });
+}
+
+/** SRD Ammunition: "You can use a weapon that has the Ammunition property to make a ranged attack only if you have
+ *  ammunition to fire from it." Unchecked without the catalog, which says what each row is. */
+function checkAmmunition({ attacker, action, violations }: Evaluation, catalog: EquipmentCatalog | undefined): void {
+  const item = catalog ? swingItemOf(attacker, action) : null;
+  if (!item) return;
+  const kind = launcherKind(item, catalog);
+  if (kind === null || ammunitionFor(attacker, kind, catalog)) return;
+  violations.push({
+    rule: "attack.no-ammunition",
+    message: `${attacker.name} has no ${ammunitionLabel(kind)} to fire from ${item.name}.`
+  });
+}
+
+/** SRD Loading: "You can fire only one piece of ammunition from a Loading weapon when you use an action ... to fire
+ *  it, regardless of the number of attacks you can normally make." Extra Attack's other swings stay open for
+ *  another weapon. */
+function checkLoading({ state, attacker, action, onOwnTurn, violations }: Evaluation): void {
+  if (!onOwnTurn || action.activation !== "action") return;
+  const item = swingItemOf(attacker, action);
+  if (!item?.weapon?.properties?.includes("loading")) return;
+  const fired = state.combat.turn.extraAttacks?.loading;
+  if (fired?.actorId === attacker.id && fired.itemIds.includes(item.id))
+    violations.push({
+      rule: "attack.loading",
+      message: `${action.name} has the Loading property: it fires once per action. Use another weapon for the remaining attacks.`
+    });
+}
+
+/** Sneak Attack, a smite and the like add their dice to a hit, so they're chosen on the attack's result before it
+ *  is confirmed; taken alone they would deal damage with no hit to ride. */
+function checkTakenAlone({ action, violations }: Evaluation): void {
+  if (hitRiderOf(action))
+    violations.push({
+      rule: "attack.rides-a-hit",
+      message: `${action.name} adds to a hit: choose it on the attack's result before you confirm the hit.`
+    });
+}
+
 const USE_SCOPE_LABELS: Readonly<Record<"turn" | "encounter" | "short-rest" | "long-rest", string>> = {
   turn: "turn",
   encounter: "encounter",
@@ -196,6 +331,8 @@ const USE_SCOPE_LABELS: Readonly<Record<"turn" | "encounter" | "short-rest" | "l
 
 function checkLimitedUse({ state, attacker, action, siblings, violations }: Evaluation): EconomyPlan["spendUse"] {
   if (!action.uses) return null;
+  // SRD Rage: a raging Barbarian extends it with a Bonus Action, which spends no new use.
+  if (action.grants?.tags.includes(RAGING_TAG) && hasEffectTag(attacker, RAGING_TAG)) return null;
   const uses = action.uses;
   const key = uses.pool ?? action.id;
   // The counter is keyed on the pool, so the gate is the pool's size (see `useLimitFor`).
@@ -341,6 +478,9 @@ function checkActionSlot({
       notes.push(`${action.name} belongs to more than one Multiattack - tracking it standalone.`);
     } else if (action.attack && (action.attack.count ?? 1) > 1) {
       components = attackPool(action);
+    } else if (action.replacesAttack && attacksInAttackAction(siblings) > 1) {
+      // Breath Weapon as the first attack of the Attack action: the rest stay open for weapon swings.
+      components = { attack: attacksInAttackAction(siblings) - 1 };
     }
     // The instance stays even when exhausted so a further resolve gets "no attacks remaining".
     return {
@@ -380,7 +520,10 @@ function checkActionSlot({
       });
   } else if ((components[action.id] ?? 0) > 0) {
     components[action.id] -= 1;
-  } else if (action.attack && action.spellId === undefined && (components["attack"] ?? 0) > 0) {
+  } else if (
+    ((action.attack && action.spellId === undefined) || action.replacesAttack) &&
+    (components["attack"] ?? 0) > 0
+  ) {
     components["attack"] -= 1;
   } else {
     const named = leftovers();
@@ -400,6 +543,18 @@ function checkActionSlot({
       ...(active.slotLevel !== undefined ? { slotLevel: active.slotLevel } : {})
     }
   };
+}
+
+/** How many attacks the Attack action makes: the most any one attack action makes, which is where Extra Attack is
+ *  folded (weapon swings and the Unarmed Strike). Spells and Multiattack plans are not the Attack action. */
+function attacksInAttackAction(siblings: ReadonlyArray<DefinitionAction>): number {
+  return siblings.reduce(
+    (most, candidate) =>
+      candidate.attack && candidate.activation === "action" && !candidate.multiattack && !candidate.spellId
+        ? Math.max(most, candidate.attack.count ?? 1)
+        : most,
+    1
+  );
 }
 
 /** SRD Legendary Actions: taken at the end of other creatures' turns from a per-round pool that refills
@@ -692,6 +847,8 @@ export function planEconomy(
   warnings: string[],
   distanceFeet: ((actorIdA: string, actorIdB: string) => number | null) | undefined,
   siblings: ReadonlyArray<DefinitionAction>,
+  asHitRider = false,
+  catalog?: EquipmentCatalog,
   spell?: SpellReference
 ): { plan: EconomyPlan; overridden: { rule: RuleId; reason: string } | null } {
   const { violations, softViolations, plan, proseMultiattack, notes } = evaluateActionEconomy(
@@ -703,6 +860,8 @@ export function planEconomy(
     distanceFeet,
     siblings,
     input.slotLevel,
+    asHitRider,
+    catalog,
     spell
   );
   warnings.push(...notes);

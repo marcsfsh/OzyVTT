@@ -155,7 +155,9 @@ function unarmedSave(failure: "grappled" | "prone" | "pushed") {
               linkedConditionIds: ["grappled"],
               escapeDc: dc,
               sourceActorId: attacker.id,
-              sourceName: attacker.name
+              sourceName: attacker.name,
+              endsWhenSourceDefeated: true,
+              rangeFeet: 5
             }
           }
         : {}),

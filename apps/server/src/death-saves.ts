@@ -29,11 +29,12 @@ export type DeathSaveRollResult = Readonly<{
  *
  * `commit=false` previews: the die is recorded for the table but pips are untouched. `commit` applies
  * the next pip state. A provided `naturalRoll` confirms a previewed or physical die without rolling.
+ * `modifier` is what a saving throw adds to the die (Exhaustion, save bonuses).
  */
 export function rollDeathSave(
   state: GameState,
   actor: Actor,
-  options: Readonly<{ commit: boolean; rollMode?: DeathSaveMode; naturalRoll?: number }>,
+  options: Readonly<{ commit: boolean; rollMode?: DeathSaveMode; naturalRoll?: number; modifier?: number }>,
   deps: DeathSaveRollDependencies
 ): DeathSaveRollResult {
   if (actor.deathSaves === null) throw new Error("rollDeathSave requires a dying actor.");
@@ -64,7 +65,7 @@ export function rollDeathSave(
       createdAt: deps.now()
     });
   }
-  const outcome = resolveDeathSave(actor.deathSaves, face);
+  const outcome = resolveDeathSave(actor.deathSaves, face, face + (options.modifier ?? 0));
   if (options.commit) actor.deathSaves = outcome.state;
   return { face, outcome, mode, committed: options.commit };
 }

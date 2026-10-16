@@ -68,14 +68,19 @@ export const monk: ClassMechanicsModule = {
     "uncanny-metabolism": {
       uses: { limit: 1, per: "long-rest" }
     },
-    // Same caveat as the Barbarian's: it reaches feature actions only, not inventory-derived swings.
+    // "+10 feet while you aren't wearing armor or wielding a Shield", read with the live loadout. The column's
+    // later steps are staged features below.
+    "unarmored-movement": {
+      modifiers: [{ type: "speed", amount: 10, when: [{ type: "while-unarmored" }] }]
+    },
+    // `effective-actions` folds it onto every weapon swing and the Martial Arts strike.
     "extra-attack": {
       modifiers: [{ type: "extra-attack", count: 1 }]
     },
     /**
      * DC is 8 + Wisdom + Proficiency Bonus; the Focus Point comes off the shared pool. A failed save is
-     * Stunned; the success rider (halved Speed, Advantage) stays prose. "Once per turn" is not expressible
-     * alongside the pool, so the scarcer Focus Point is what is tracked.
+     * Stunned until the start of the Monk's next turn; the success rider (halved Speed, Advantage) stays prose.
+     * "Once per turn" is not expressible alongside the pool, so the scarcer Focus Point is what is tracked.
      */
     "stunning-strike": {
       uses: { scaling: { type: "class-resource", id: "focus-points" }, per: "short-rest", pool: "focus-points" },
@@ -91,7 +96,8 @@ export const monk: ClassMechanicsModule = {
             ability: "con",
             dc: { base: 8, ability: "wis", proficiencyBonus: true },
             successDamage: "none",
-            failureConditions: ["stunned"]
+            failureConditions: ["stunned"],
+            failureDuration: { type: "until-source-next-turn" }
           }
         }
       ]
@@ -113,7 +119,7 @@ export const monk: ClassMechanicsModule = {
       ]
     },
     "epic-boon": {
-      choice: { kind: "feat", choose: 1, fromCatalog: "epic-boon-feats" }
+      choice: { kind: "feat", choose: 1, fromCatalog: "feats" }
     },
     /** "Your Dexterity and Wisdom scores increase by 4, to a maximum of 25." */
     "body-and-mind": {
@@ -124,12 +130,22 @@ export const monk: ClassMechanicsModule = {
     }
     // Not modeled here: Martial Arts' Unarmed Strike is minted by the builder (`martialArtsStrike`),
     // but its die and Dexterity do not reach inventory Monk weapons. Martial-Arts-die features (Deflect
-    // Attacks/Energy, heal and temp HP amounts), Unarmored Movement's scaling speed, and Slow Fall,
-    // Acrobatic Movement, Empowered Strikes, Evasion, Self-Restoration and Perfect Focus stay prose.
+    // Attacks/Energy, temp HP amounts), and Slow Fall, Acrobatic Movement, Empowered Strikes, Self-Restoration
+    // and Perfect Focus stay prose. Evasion is read by the save outcome (`hasEvasion` in the server) from the
+    // held feature.
   },
+  // The Unarmored Movement column's steps (+15 at 6, +20 at 10, +25 at 14, +30 at 18), each replacing the last.
+  stages: [6, 10, 14, 18].map((level, index, levels) => ({
+    id: `unarmored-movement-${level}`,
+    name: "Unarmored Movement",
+    level,
+    description: `Your speed increases by ${15 + 5 * index} feet while you aren't wearing armor or wielding a Shield.`,
+    replacesFeatureId: index === 0 ? "unarmored-movement" : `unarmored-movement-${levels[index - 1]}`,
+    modifiers: [{ type: "speed" as const, amount: 15 + 5 * index, when: [{ type: "while-unarmored" as const }] }]
+  })),
   subclasses: {
     "warrior-of-the-open-hand": {
-      // Uses equal the Wisdom modifier (minimum 1); the Martial Arts die heal stays prose.
+      // Uses equal the Wisdom modifier (minimum 1); the heal is the Martial Arts die plus the Wisdom modifier.
       "wholeness-of-body": {
         uses: { scaling: { type: "ability-modifier", ability: "wis", minimum: 1 }, per: "long-rest" },
         actions: [
@@ -139,7 +155,15 @@ export const monk: ClassMechanicsModule = {
             activation: "bonus-action",
             description:
               "Roll your Martial Arts die and regain a number of Hit Points equal to the number rolled plus your Wisdom modifier (minimum of 1 Hit Point regained).",
-            damage: []
+            damage: [],
+            // The Martial Arts die at the Warrior of the Open Hand's levels: d8 from 6, d10 from 11, d12 from 17.
+            healing: { formula: "1d8", self: true },
+            healingByLevel: [
+              { level: 6, formula: "1d8" },
+              { level: 11, formula: "1d10" },
+              { level: 17, formula: "1d12" }
+            ],
+            adds: { abilityModifier: "wis" }
           }
         ]
       },

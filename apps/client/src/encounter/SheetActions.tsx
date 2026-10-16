@@ -75,8 +75,9 @@ export function SheetActions({
               modifierOf(definition.abilityScores.dex)
             );
             const toHit = abilityMod + definition.proficiencyBonus;
+            // A fixed amount (a Blowgun's 1) takes no modifier, as on the server.
             const damageFormula =
-              abilityMod === 0
+              abilityMod === 0 || !/d/i.test(weapon.damageDice)
                 ? weapon.damageDice
                 : `${weapon.damageDice} ${abilityMod > 0 ? "+" : "-"} ${Math.abs(abilityMod)}`;
             // Riders apply only while active: equipped, and attuned when the item requires it. An unattuned

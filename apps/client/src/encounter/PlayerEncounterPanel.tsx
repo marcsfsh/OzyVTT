@@ -270,7 +270,25 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                         <EffectChips
                           actorId={entry.actorId}
                           effects={rowActor.effects}
-                          canEnd
+                          canEnd={false}
+                          canAsk={combat.active}
+                          onFeedback={onFeedback}
+                        />
+                      )}
+                    </OwnFeedback>
+                  )}
+                  {/* What this player's character holds on someone else (a grapple, a Concentration spell's
+                    hold): theirs to let go of from that creature's row. */}
+                  {!isMe && rowActor && (
+                    <OwnFeedback
+                      className="own-effect-row"
+                      empty={!rowActor.effects.some((effect) => effect.yours === true)}
+                    >
+                      {(onFeedback) => (
+                        <EffectChips
+                          actorId={entry.actorId}
+                          effects={rowActor.effects.filter((effect) => effect.yours === true)}
+                          canEnd={false}
                           onFeedback={onFeedback}
                         />
                       )}
@@ -283,7 +301,8 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                           actorId={entry.actorId}
                           name={entry.name}
                           deathSaves={rowActor.deathSaves!}
-                          canRoll
+                          // A death save comes at the start of the character's own turn.
+                          canRoll={myTurn}
                           onFeedback={onFeedback}
                           rollMode={rollMode}
                           isActingTurn={myTurn}

@@ -10,7 +10,8 @@ import {
   rollRemainingInitiative,
   rollSelfInitiative,
   setInitiativeScore,
-  startEncounter
+  startEncounter,
+  swapInitiative
 } from "../encounter.js";
 import {
   AddCombatantSchema,
@@ -21,14 +22,16 @@ import {
   InitiativeRollRemainingSchema,
   InitiativeRollSelfSchema,
   InitiativeScoreSchema,
+  InitiativeSwapSchema,
   TurnLegendarySchema,
   TurnReactionSchema,
   TurnUseSchema
 } from "@vtt/domain/commands";
 import { CommandRejectedError, type JournalEntry } from "../game-store.js";
 import { endTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "../turn-economy.js";
-import { initiatorOf, principalTag } from "./kit.js";
+import { initiatorOf, isGmGrade, principalTag } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
+import { recoverAmmunition } from "../ammunition.js";
 
 // The encounter lifecycle, initiative and the turn economy.
 
@@ -46,7 +49,7 @@ export const encounterCommands = [
       const encounterMap = kit.context.mapCatalog.get(request.mapAssetId);
       if (!encounterMap || encounterMap.kind !== "battlemap")
         throw new CommandRejectedError("Select an uploaded battlemap before starting the encounter.");
-      const { commandId, mapAssetId, rulesMode, ruleExceptions, playersRollInitiative } = request;
+      const { commandId, mapAssetId, rulesMode, ruleExceptions, playersRollInitiative, groupMonsters } = request;
       const tokenGeometry = await kit.context.tokenGeometryFor(mapAssetId);
       // Omitted `entries` means "start the fight staged here", derived from live state rather than the client.
       // No refusal here, so `startEncounter`'s own guards keep their order and wording.
@@ -68,7 +71,8 @@ export const encounterCommands = [
             entries,
             rulesMode: rulesMode ?? draft.rulesPolicy.dial,
             ruleExceptions: ruleExceptions ?? { ...draft.rulesPolicy.exceptions },
-            playersRollInitiative
+            playersRollInitiative,
+            groupMonsters
           },
           () => kit.context.random(20),
           tokenGeometry,
@@ -90,7 +94,7 @@ export const encounterCommands = [
         if (entry.surprised === true)
           kit.context.appendLog({
             kind: "encounter",
-            text: `${kit.actorName(entry.actorId)} is surprised - initiative rolled at disadvantage.`,
+            text: `${kit.actorName(entry.actorId)} is surprised.`,
             actorIds: [entry.actorId],
             gmOnly: kit.actorHidden(entry.actorId)
           });
@@ -115,17 +119,18 @@ export const encounterCommands = [
       let endedSceneId: string | null = null;
       let endedMapAssetId: string | null = null;
       let endedTurnCount = 0;
+      let recovered: ReturnType<typeof recoverAmmunition> = [];
       const { duplicate } = await executeTimeline((state, timeline) => {
         // The last live picture of the fight, captured before endEncounter clears the combat.
         const finalState = structuredClone(state);
         endedSceneId = finalState.combat.activeSceneId;
         endedMapAssetId = finalState.combat.mapAssetId;
         // The fight's effects end with it (onEnd fires), scoped to its combatants so parked scenes' effects survive.
-        effectEvents = endEncounterEffects(
-          state,
-          state.combat.initiative.map((entry) => entry.actorId)
-        );
+        const combatantIds = state.combat.initiative.map((entry) => entry.actorId);
+        effectEvents = endEncounterEffects(state, combatantIds);
         endEncounter(state); // rejects while rewound
+        // SRD Ammunition: after a fight, half the pieces each combatant fired are picked up again.
+        recovered = recoverAmmunition(state, combatantIds, kit.equipmentCatalog());
         // Archive the fight in the same transaction, before wiping live buffers, so it can never be lost.
         // A fight that captured no boundaries is skipped.
         const entries = timeline.entries();
@@ -171,6 +176,13 @@ export const encounterCommands = [
       });
       if (duplicate) return;
       kit.context.appendLog({ kind: "encounter", text: "The encounter ended.", gmOnly: false });
+      for (const line of recovered)
+        kit.context.appendLog({
+          kind: "encounter",
+          text: line.text,
+          actorIds: [line.actorId],
+          gmOnly: kit.actorHidden(line.actorId)
+        });
       kit.publishNarrations(effectEvents);
       kit.context.onEncounterArchived?.({
         mapAssetId: endedMapAssetId,
@@ -202,7 +214,8 @@ export const encounterCommands = [
           () => kit.context.random(20),
           geometry,
           Date.now(),
-          kit.initiativeRollSink(draft, commandId, principal)
+          kit.initiativeRollSink(draft, commandId, principal),
+          kit.initiativeRollDeps(draft)
         )
       );
       if (!duplicate) kit.publishRolls(state, commandId);
@@ -212,13 +225,35 @@ export const encounterCommands = [
   defineCommand({
     type: "initiative.set",
     operationId: "setInitiativeScore",
-    description: "Sets a combatant's initiative score (GM-grade only).",
+    description:
+      "Sets a combatant's initiative score (GM-grade only); `tieBreaker` orders combatants tied on the same score, higher first.",
     summary: "Set a combatant's initiative score (GM).",
     schema: InitiativeScoreSchema,
     malformed: "The Initiative update is malformed.",
     gmOnly: "Only the GM can change Initiative.",
     async run({ request, execute }) {
-      await execute((state) => setInitiativeScore(state, request.actorId, request.score));
+      await execute((state) => setInitiativeScore(state, request.actorId, request.score, request.tieBreaker));
+    }
+  }),
+
+  defineCommand({
+    type: "initiative.swap",
+    operationId: "swapInitiative",
+    description:
+      "Swaps two combatants' initiative (GM-grade only): the Alert feat's Initiative Swap, made right after initiative is rolled and before either has acted. Refused while either is Incapacitated.",
+    summary: "Swap two combatants' initiative, as Alert's Initiative Swap (GM).",
+    schema: InitiativeSwapSchema,
+    malformed: "The Initiative swap is malformed.",
+    gmOnly: "Only the GM can swap Initiative.",
+    async run({ request, execute }, kit) {
+      const { duplicate } = await execute((state) => swapInitiative(state, request.actorId, request.withActorId));
+      if (duplicate) return;
+      kit.context.appendLog({
+        kind: "encounter",
+        text: `${kit.actorName(request.actorId)} and ${kit.actorName(request.withActorId)} swapped initiative.`,
+        actorIds: [request.actorId, request.withActorId],
+        gmOnly: kit.actorHidden(request.actorId) || kit.actorHidden(request.withActorId)
+      });
     }
   }),
 
@@ -226,7 +261,7 @@ export const encounterCommands = [
     type: "initiative.roll-self",
     operationId: "rollOwnInitiative",
     description:
-      "Rolls initiative for a character (server rolls the d20 unless a manual `natural` is supplied; `rollMode` gives advantage/disadvantage), adds its initiative modifier, sets its score, and clears its pending flag. GM-grade for anyone; a player session only for their own claimed character. When the encounter runs in `wait` mode, the last pending roll begins turns.",
+      "Rolls initiative for a character (server rolls the d20 unless a manual `natural` is supplied), adds its initiative modifier, sets its score, and clears its pending flag. The rules set the roll mode (Surprise, conditions, features) and Exhaustion's penalty; `rollMode` is honoured only from a GM-grade session. GM-grade for anyone; a player session only for their own claimed character. When the encounter runs in `wait` mode, the last pending roll begins turns.",
     summary: "Roll your own claimed character's initiative (GM anyone); the server rolls unless a manual d20 is given.",
     schema: InitiativeRollSelfSchema,
     malformed: "The initiative roll is malformed.",
@@ -239,9 +274,10 @@ export const encounterCommands = [
         score = rollSelfInitiative(
           draft,
           actorId,
-          { natural, rollMode },
+          { natural, rollMode: isGmGrade(principal) ? rollMode : undefined },
           () => kit.context.random(20),
-          kit.initiativeRollSink(draft, commandId, principal)
+          kit.initiativeRollSink(draft, commandId, principal),
+          kit.initiativeRollDeps(draft)
         );
       });
       if (duplicate) return;
@@ -261,21 +297,14 @@ export const encounterCommands = [
     type: "initiative.roll-remaining",
     operationId: "rollRemainingInitiative",
     description:
-      "Rolls initiative for every combatant still pending a player roll (GM-grade only), beginning a `wait`-mode fight.",
-    summary: "Roll initiative for every player still pending, beginning a wait-mode fight (GM).",
+      "Settles initiative for every combatant still pending a player roll with the provisional roll made at the start (GM-grade only), beginning a `wait`-mode fight.",
+    summary: "Use the start's rolls for every player still pending, beginning a wait-mode fight (GM).",
     schema: InitiativeRollRemainingSchema,
     malformed: "The initiative command is malformed.",
     gmOnly: "Only the GM can roll initiative for the rest of the table.",
-    async run({ principal, request, execute }, kit) {
-      const { state, duplicate } = await execute((draft) =>
-        rollRemainingInitiative(
-          draft,
-          () => kit.context.random(20),
-          kit.initiativeRollSink(draft, request.commandId, principal)
-        )
-      );
+    async run({ execute }, kit) {
+      const { duplicate } = await execute((draft) => rollRemainingInitiative(draft));
       if (duplicate) return;
-      kit.publishRolls(state, request.commandId);
       kit.context.appendLog({
         kind: "action",
         text: "The GM rolled initiative for the remaining players.",
@@ -303,7 +332,9 @@ export const encounterCommands = [
           nextInitiativeTurn(advancing, effectEvents, {
             resolveDefinition: (definitionId) => kit.resolveDefinitionIn(advancing, definitionId),
             catalog: kit.equipmentCatalog(),
-            rollDie: (sides) => kit.context.random(sides)
+            rollDie: (sides) => kit.context.random(sides),
+            newId: kit.context.newId,
+            now: () => new Date().toISOString()
           })
         );
       });
@@ -354,7 +385,9 @@ export const encounterCommands = [
           endTurn(advancing, initiatorOf(principal), effectEvents, {
             resolveDefinition: (definitionId) => kit.resolveDefinitionIn(advancing, definitionId),
             catalog: kit.equipmentCatalog(),
-            rollDie: (sides) => kit.context.random(sides)
+            rollDie: (sides) => kit.context.random(sides),
+            newId: kit.context.newId,
+            now: () => new Date().toISOString()
           })
         );
       });

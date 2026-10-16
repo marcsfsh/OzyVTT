@@ -5,7 +5,7 @@
  * scoped to "your pact weapon" (the trigger vocabulary cannot name one conjured weapon, and unscoped
  * riders would apply to every weapon); and senses, which are display-only.
  */
-import type { ClassMechanicsModule } from "./overlay.js";
+import { spellTableStages, type ClassMechanicsModule } from "./overlay.js";
 
 /** An invocation's spell: cast at will without a slot, and never with one, since the Warlock does not know it. */
 const atWill = (id: string, level: number) => ({ id, level, withoutSlot: "at-will" as const, withSlot: false });
@@ -135,14 +135,36 @@ export const warlock: ClassMechanicsModule = {
       choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", minSpellLevel: 9, maxSpellLevel: 9 },
       uses: { limit: 1, per: "long-rest" }
     },
-    "epic-boon": { choice: { kind: "feat", choose: 1, fromCatalog: "epic-boon-feats" } }
+    "epic-boon": { choice: { kind: "feat", choose: 1, fromCatalog: "feats" } }
+  },
+  subclassStages: {
+    "fiend-patron": spellTableStages("fiend-spells", "Fiend Spells", "Warlock", [
+      [
+        5,
+        [
+          ["fireball", "Fireball", 3],
+          ["stinking-cloud", "Stinking Cloud", 3]
+        ]
+      ],
+      [
+        7,
+        [
+          ["fire-shield", "Fire Shield", 4],
+          ["wall-of-fire", "Wall of Fire", 4]
+        ]
+      ],
+      [
+        9,
+        [
+          ["geas", "Geas", 5],
+          ["insect-plague", "Insect Plague", 5]
+        ]
+      ]
+    ])
   },
   subclasses: {
     "fiend-patron": {
-      /**
-       * Only the level-3 tier is authored: `grants.spells` has no character-level gate, and the overlay
-       * cannot split the feature into staged records. The full table is in the description.
-       */
+      // The level-3 tier; the table's later rows are staged features (`subclassStages`).
       "fiend-spells": {
         grants: {
           spells: [
@@ -187,7 +209,13 @@ export const warlock: ClassMechanicsModule = {
             activation: "other",
             description:
               "Once per turn when you hit a creature with an attack roll, the target must succeed on a Charisma saving throw or hurtle through the Lower Planes, taking 8d10 Psychic damage if it isn't a Fiend and gaining the Incapacitated condition until the end of your next turn.",
-            save: { ability: "cha", dc: "spellcasting", successDamage: "none", failureConditions: ["incapacitated"] },
+            save: {
+              ability: "cha",
+              dc: "spellcasting",
+              successDamage: "none",
+              failureConditions: ["incapacitated"],
+              failureDuration: { type: "until-source-turn-end" }
+            },
             damage: [{ formula: "8d10", type: "psychic" }]
           }
         ]

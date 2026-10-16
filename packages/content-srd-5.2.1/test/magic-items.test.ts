@@ -123,19 +123,19 @@ describe("the generated magic-item bundle", () => {
         "Cloak of the Bat",
         "Cloak of the Manta Ray",
         "Mantle of Spell Resistance",
+        "Wings of Flying"
+      ],
+      // The SRD's one-of-each list caps cloaks and headwear, not robes or lenses, so they wear apart.
+      body: [
         "Robe of Eyes",
         "Robe of Scintillating Colors",
         "Robe of Stars",
         "Robe of Useful Items",
-        "Robe of the Archmagi",
-        "Wings of Flying"
+        "Robe of the Archmagi"
       ],
+      eyes: ["Eyes of Charming", "Eyes of Minute Seeing", "Eyes of the Eagle", "Goggles of Night"],
       head: [
         "Circlet of Blasting",
-        "Eyes of Charming",
-        "Eyes of Minute Seeing",
-        "Eyes of the Eagle",
-        "Goggles of Night",
         "Hat of Disguise",
         "Headband of Intellect",
         "Helm of Brilliance",
@@ -152,9 +152,9 @@ describe("the generated magic-item bundle", () => {
         "Slippers of Spider Climbing",
         "Winged Boots"
       ],
+      // "One pair of gloves or gauntlets, one pair of bracers": two caps, so two slots.
+      bracers: ["Bracers of Archery", "Bracers of Defense"],
       hands: [
-        "Bracers of Archery",
-        "Bracers of Defense",
         "Gauntlets of Ogre Power",
         "Gloves of Missile Snaring",
         "Gloves of Swimming and Climbing",
@@ -263,16 +263,16 @@ describe("the generated magic-item bundle", () => {
     expect(rows.find((row) => row.name === "Armor of Resistance")!.description).toContain("1d10 1: Damage Type Acid");
   });
 
-  it("cuts only the two long d100 tables at the 4000-char cap, and names them", () => {
+  it("cuts no description, so the long d100 tables keep their last rows", () => {
     // The cap matches `InventoryItemSchema.description` (add-from-catalog copies this string onto it).
-    // Overflow is cut at a sentence boundary and marked; only two long d100 tables are cut.
-    const cut = rows
-      .filter((row) => row.description!.endsWith(" […]"))
-      .map((row) => row.name)
-      .sort();
-    expect(cut).toEqual(["Mysterious Deck", "Wand of Wonder"]);
-    // Spot-checks mechanics that a lower cap would cut.
+    const cut = rows.filter((row) => row.description!.endsWith(" […]")).map((row) => row.name);
+    expect(cut).toEqual([]);
     const textOf = (name: string) => rows.find((row) => row.name === name)!.description!;
+    // The GM rolls on these tables from the text, so the final rows must be there.
+    expect(textOf("Wand of Wonder")).toContain("98–00: The creature closest to the chosen point of origin");
+    expect(textOf("Mysterious Deck")).toContain("You draw no more cards.");
+    expect(textOf("Mysterious Deck")).toContain("Void");
+    // Spot-checks mechanics that a lower cap would cut.
     expect(textOf("Ring of Elemental Command")).toContain("save DC of 18");
     expect(textOf("Rod of Lordly Might")).toContain("Drain Life");
     expect(textOf("Staff of the Magi")).toContain("Retributive Strike");

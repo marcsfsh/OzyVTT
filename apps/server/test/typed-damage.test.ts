@@ -101,26 +101,52 @@ describe("gap 1: flat damage-reduction reaches the hit", () => {
   });
   const worn = () => [item({ id: "plate-of-blunting", name: "Plate of Blunting", category: "armor" })];
 
-  it("subtracts a standing reduction from the total, and names it on the line", () => {
+  it("subtracts a standing reduction from the hit, and names it on the line", () => {
     const catalog = catalogOf([reducer([{ type: "damage-reduction", amount: 3 }])]);
     const result = hit(stateWith(worn()), [{ amount: 10, type: "fire" }], definitionOf(), catalog);
     expect(result.hpLost).toBe(7);
     expect(result.application.flatReduction).toBe(3);
-    expect(result.detail).toContain("then -3, reduction");
+    expect(result.detail).toContain("-3, reduction");
   });
 
-  it("applies AFTER resistance, never before it", () => {
+  it("applies BEFORE resistance (SRD Order of Application)", () => {
     const catalog = catalogOf([reducer([{ type: "damage-reduction", amount: 3 }])]);
-    // 10 fire, resisted to 5, then reduced by 3 = 2. Reduction-first would be (10-3)/2 = 3.
+    // 10 fire, reduced by 3 to 7, then resisted to 3. The old after-resistance order gave 5 - 3 = 2.
     const result = hit(
       stateWith(worn()),
       [{ amount: 10, type: "fire" }],
       definitionOf({ damageResistances: ["fire"] }),
       catalog
     );
-    expect(result.hpLost).toBe(2);
-    expect(result.detail).toContain("10 fire → 5, resistance");
-    expect(result.detail).toContain("then -3, reduction");
+    expect(result.hpLost).toBe(3);
+    expect(result.detail).toBe(" (-3, reduction; 7 fire → 3, resistance)");
+  });
+
+  it("works the SRD's own example: 28 fire, -5, Resistance to all and fire Vulnerability is 22", () => {
+    const catalog = catalogOf([reducer([{ type: "damage-reduction", amount: 5 }])]);
+    const state = stateWith(worn(), { conditions: [{ id: "petrified" }] });
+    const result = hit(
+      state,
+      [{ amount: 28, type: "fire" }],
+      definitionOf({ damageVulnerabilities: ["fire"] }),
+      catalog
+    );
+    expect(result.hpLost).toBe(22);
+    expect(result.detail).toContain("23 fire → 22, resistance and vulnerability");
+  });
+
+  it("takes the reduction once from a hit of several types", () => {
+    const catalog = catalogOf([reducer([{ type: "damage-reduction", amount: 3 }])]);
+    const result = hit(
+      stateWith(worn()),
+      [
+        { amount: 8, type: "slashing" },
+        { amount: 4, type: "fire" }
+      ],
+      definitionOf(),
+      catalog
+    );
+    expect(result.hpLost).toBe(9);
   });
 
   it("honours the on-taking-damage moment and its damage-type filter", () => {
@@ -181,12 +207,12 @@ describe("gap 2: anything can make a target vulnerable, not just a stat block", 
     expect(hit(state, [{ amount: 6, type: "cold" }], definitionOf()).hpLost).toBe(6);
   });
 
-  it("cancels against a same-type resistance instead of compounding (SRD 5.2.1)", () => {
+  it("meets a same-type resistance in order: halved first, then doubled (SRD 5.2.1)", () => {
     const state = stateWith();
     curse(state, ["fire"]);
-    const result = hit(state, [{ amount: 6, type: "fire" }], definitionOf({ damageResistances: ["fire"] }));
+    const result = hit(state, [{ amount: 7, type: "fire" }], definitionOf({ damageResistances: ["fire"] }));
     expect(result.hpLost).toBe(6);
-    expect(result.detail).toBe("");
+    expect(result.detail).toContain("7 fire → 6, resistance and vulnerability: Curse of Embers");
   });
 
   it("loses to immunity outright", () => {
