@@ -775,12 +775,17 @@ export const CharacterCreateSchema = z
     backgroundBonusAllocation: z
       .array(z.object({ ability: AbilitySchema, amount: z.number().int().min(1).max(3) }).strict())
       .max(3),
+    /** "average" takes the fixed value, "entries" carries typed rolls per level (2..level), "roll" has the server
+     *  throw every level that has no recorded roll. */
     hp: z
       .object({
-        mode: z.enum(["average", "entries"]),
+        mode: z.enum(["average", "entries", "roll"]),
         entries: z.array(z.number().int().min(1).max(12)).max(19).optional()
       })
       .strict(),
+    /** The `builder.roll-abilities` roll the "roll"/"custom" scores came from, when the table has players' rolls
+     *  thrown by the server. */
+    abilityRollId: z.uuid().optional(),
     choices: z.array(CharacterChoiceSchema).max(200),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -857,6 +862,10 @@ export const BuilderSetPolicySchema = z
     playerBuilder: z.enum(["open", "gm-only"]).optional(),
     /** Whether players may roll a random character themselves; omitted keeps the stored setting. */
     playerRandom: z.enum(["open", "gm-only"]).optional(),
+    /** Whether players may type their own dice for rolled scores and hit points; omitted keeps the stored setting. */
+    typedRolls: z.enum(["open", "gm-only"]).optional(),
+    /** Whether a rolled hit-point level is raised to the average; omitted keeps the stored setting. */
+    hitPointRollFloor: z.enum(["none", "average"]).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()

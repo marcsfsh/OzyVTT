@@ -343,7 +343,9 @@ export type CharacterCreatePayload = Readonly<{
   abilityMethod: BuilderAbilityMethod;
   baseScores: Record<Ability, number>;
   backgroundBonusAllocation: ReadonlyArray<{ ability: Ability; amount: number }>;
-  hp: { mode: "average" | "entries"; entries?: readonly number[] };
+  hp: { mode: "average" | "entries" | "roll"; entries?: readonly number[] };
+  /** The server roll the "roll"/"custom" scores came from, when the wizard rolled them there. */
+  abilityRollId?: string;
   choices: readonly CharacterChoice[];
 }>;
 
@@ -369,7 +371,13 @@ export function buildCreatePayload(draft: BuilderDraft, choices: readonly Charac
     abilityMethod: draft.abilityMethod,
     baseScores: scores,
     backgroundBonusAllocation: draft.backgroundBonus,
-    hp: draft.hpMode === "average" ? { mode: "average" } : { mode: "entries", entries: draft.hpEntries },
+    hp:
+      draft.hpMode === "entries"
+        ? { mode: "entries", entries: draft.hpEntries }
+        : { mode: draft.hpMode === "roll" ? "roll" : "average" },
+    ...(draft.abilityRollId && (draft.abilityMethod === "roll" || draft.abilityMethod === "custom")
+      ? { abilityRollId: draft.abilityRollId }
+      : {}),
     choices
   };
 }

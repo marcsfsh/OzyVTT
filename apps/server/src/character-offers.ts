@@ -170,7 +170,7 @@ function optionAsFeature(option: FeatureOption): FeatureRecord {
 const spreadKey = (amounts: readonly number[]) => [...amounts].sort((left, right) => right - left).join("/");
 
 function validateBaseScores(input: CharacterCreateRequestInput, policy: BuilderPolicy): void {
-  if (!policy.allowedAbilityMethods.includes(input.abilityMethod)) {
+  if (!policy.allowedAbilityMethods.includes(input.abilityMethod) && !input.keepsRecordedScores) {
     reject(`The table's builder policy does not allow the "${input.abilityMethod}" ability method.`);
   }
   const values = ABILITIES.map((ability) => input.baseScores[ability]);
@@ -188,6 +188,8 @@ function validateBaseScores(input: CharacterCreateRequestInput, policy: BuilderP
   // "roll" and "custom": the server cannot verify dice it did not throw (physical dice are supported),
   // so it bound-checks each score against what the formula can produce.
   if (input.abilityMethod === "custom" && !policy.customFormula) {
+    // Recorded custom scores were checked against the formula of their day.
+    if (input.keepsRecordedScores) return;
     reject("The custom ability method needs the GM to configure a formula first (builder policy).");
   }
   const formula = input.abilityMethod === "custom" ? policy.customFormula! : ABILITY_ROLL_FORMULA;
@@ -939,8 +941,8 @@ function placeChoices(
   }
 
   // Pass B: everything else. Class spells/cantrips (step 9), equipment, size and the subclass row aren't
-  // offers. `hp-roll` rows are build output, so an echoed ledger is accepted.
-  const separateKinds = new Set(["equipment", "size", "hp-roll"]);
+  // offers. `hp-roll` and `ability-scores` rows are build output, so an echoed ledger is accepted.
+  const separateKinds = new Set(["equipment", "size", "hp-roll", "ability-scores"]);
   const preparedSpellRows: CharacterChoice[] = [];
   const classCantripRows: CharacterChoice[] = [];
   for (const row of choices) {

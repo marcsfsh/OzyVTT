@@ -57,7 +57,9 @@ import { CommandRejectedError } from "./game-store.js";
  *   - "cantrip" / "spell" without a featureId fill the class's cantripsKnown / preparedCount budgets;
  *   - "spellcasting-ability" names the ability a species' or a feat's spells are cast with;
  *   - "equipment" names one class and one background starting-equipment option;
- *   - "size" (optional) picks among the species' sizes; defaults to medium.
+ *   - "size" (optional) picks among the species' sizes; defaults to medium;
+ *   - "hp-roll" and "ability-scores" are build output: the rolled hit points per level, and the ability method, base
+ *     scores and background increase, so a rebuild re-sends what the character was made with.
  */
 
 export type CharacterCreateRequestInput = Readonly<{
@@ -72,6 +74,9 @@ export type CharacterCreateRequestInput = Readonly<{
   backgroundBonusAllocation: ReadonlyArray<Readonly<{ ability: Ability; amount: number }>>;
   hp: Readonly<{ mode: "average" | "entries"; entries?: readonly number[] }>;
   choices: readonly CharacterChoice[];
+  /** Set by a rebuild that re-sends the ability scores its sheet recorded: the table's allowed methods govern new
+   *  scores, so a character made under an earlier policy can still level. */
+  keepsRecordedScores?: boolean;
 }>;
 
 function reject(message: string): never {
@@ -557,6 +562,50 @@ export function hitPointRollRows(input: Pick<CharacterCreateRequestInput, "hp" |
   }));
 }
 
+/** The ledger row recording how the ability scores were made: the method, the base scores and the background's
+ *  increase, which a rebuild re-sends rather than recomputing from the sheet's totals. */
+export const ABILITY_SCORES_KIND = "ability-scores";
+
+export function abilityScoresRow(
+  input: Pick<CharacterCreateRequestInput, "abilityMethod" | "baseScores" | "backgroundBonusAllocation">
+): CharacterChoice {
+  return {
+    level: 1,
+    kind: ABILITY_SCORES_KIND,
+    id: input.abilityMethod,
+    payload: {
+      baseScores: { ...input.baseScores },
+      backgroundBonusAllocation: input.backgroundBonusAllocation.map((entry) => ({ ...entry }))
+    }
+  };
+}
+
+/** The stored ability row read back, or null for a sheet built before it was recorded. */
+export function storedAbilityScores(
+  choices: readonly CharacterChoice[]
+): Pick<CharacterCreateRequestInput, "abilityMethod" | "baseScores" | "backgroundBonusAllocation"> | null {
+  const row = choices.find((entry) => entry.kind === ABILITY_SCORES_KIND);
+  const payload = row?.payload as { baseScores?: unknown; backgroundBonusAllocation?: unknown } | undefined;
+  const base = payload?.baseScores as Partial<Record<Ability, unknown>> | undefined;
+  if (!row || !base || !ABILITIES.every((ability) => typeof base[ability] === "number")) return null;
+  if (!["standard-array", "point-buy", "roll", "custom"].includes(row.id)) return null;
+  const allocation = Array.isArray(payload?.backgroundBonusAllocation) ? payload.backgroundBonusAllocation : [];
+  return {
+    abilityMethod: row.id as CharacterCreateRequestInput["abilityMethod"],
+    baseScores: Object.fromEntries(ABILITIES.map((ability) => [ability, base[ability] as number])) as Record<
+      Ability,
+      number
+    >,
+    backgroundBonusAllocation: allocation.filter(
+      (entry): entry is { ability: Ability; amount: number } =>
+        typeof entry === "object" &&
+        entry !== null &&
+        ABILITIES.includes((entry as { ability?: unknown }).ability as Ability) &&
+        typeof (entry as { amount?: unknown }).amount === "number"
+    )
+  };
+}
+
 /** Rolled HP recovered from a stored ledger, or null when any level lacks a roll (the caller uses the average). */
 export function storedHitPointRolls(choices: readonly CharacterChoice[], level: number): number[] | null {
   const rolls: number[] = [];
@@ -731,7 +780,8 @@ export function buildCharacterDefinition(
   // `origin: null` rows are skipped: they are already on `character.feats`.
   const heldFeatures = dedupeFeatureRefs(granted);
 
-  // ---- 7. Hit points: rules-5e pool math; "entries" applies the product default max(roll, average). ----
+  // ---- 7. Hit points: rules-5e pool math. A rolled level counts the roll (SRD); a table may raise it to the
+  // average (`builderPolicy.hitPointRollFloor`). ----
   const conModifier = abilityModifier(finalScores.con);
   const faces = hitDieFaces(classRecord.hitDie);
   const classLevels = [{ classId: classRecord.id, level: input.level, hitDie: classRecord.hitDie }];
@@ -748,8 +798,8 @@ export function buildCharacterDefinition(
       if (!Number.isInteger(entry) || entry < 1 || entry > faces)
         reject(`A ${classRecord.hitDie} hit-point roll must be 1-${faces}; got ${entry}.`);
     }
-    // Product rule: rolling can only help, max(roll, average).
-    hitPointMaximum = hitPointPool(classLevels, conModifier, "max-of-both", entries, progression);
+    const mode = policy.hitPointRollFloor === "average" ? "max-of-both" : "roll";
+    hitPointMaximum = hitPointPool(classLevels, conModifier, mode, entries, progression);
   }
   hitPointMaximum = Math.max(1, hitPointMaximum + interpreted.hitPointsPerLevel * input.level);
 
@@ -1218,7 +1268,11 @@ export function buildCharacterDefinition(
       features: heldFeatures,
       // The provenance ledger verbatim (level-up and respec prefill from it), plus the rolled hit points
       // so a level-down/level-up round trip can restore the character.
-      choices: [...input.choices.filter((row) => row.kind !== "hp-roll"), ...hitPointRollRows(input)]
+      choices: [
+        ...input.choices.filter((row) => row.kind !== "hp-roll" && row.kind !== ABILITY_SCORES_KIND),
+        abilityScoresRow(input),
+        ...hitPointRollRows(input)
+      ]
     },
     proficiencies,
     ...(spellcasting ? { spellcasting } : {}),

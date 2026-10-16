@@ -4,7 +4,7 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { Alert, Button, useToast } from "@vtt/ui";
 import { useBuilderCatalogs } from "../content/catalogs";
 import { CharacterBuilder } from "./CharacterBuilder";
-import { choicesAbove, draftFromLedger, hpRollGap, identityOf, ledgerOf } from "./level-ledger";
+import { choicesAbove, draftFromLedger, hpRollGap, identityOf, ledgerOf, recordedAbilities } from "./level-ledger";
 import { useBuilderOffers } from "./useBuilderOffers";
 import "./character-builder.css";
 
@@ -115,6 +115,7 @@ export function LevelFlow({
   if (target !== null && reading.reply) {
     const seed = draftFromLedger(identity, ledger, definition, catalogs, target, state.builderPolicy, reading.reply);
     const gap = hpRollGap(ledger, target);
+    const recorded = recordedAbilities(ledger);
     return (
       <CharacterBuilder
         state={state}
@@ -128,12 +129,13 @@ export function LevelFlow({
           actorId,
           name: actor.name,
           seed,
+          ...(recorded ? { recordedMethod: recorded.method } : {}),
           ...(gap
             ? {
                 notice: (
                   <Alert tone="info" title="About this character's hit points">
-                    Rolled HP wasn&rsquo;t recorded for levels {gap.from}&ndash;{gap.to} — the average is used for those
-                    levels.
+                    The table rolls hit points for level{gap.length > 1 ? "s" : ""} {gap.join(", ")} when you apply
+                    this. Rolls already recorded are kept.
                   </Alert>
                 )
               }

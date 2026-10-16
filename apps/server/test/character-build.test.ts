@@ -228,9 +228,19 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
     expect(definition.proficiencyBonus).toBe(3);
   });
 
-  it("computes rolled HP as max(roll, average) per level on the class hit die", () => {
-    // Level 1: 10+2. Rolls 1/10/4/6 vs d10 average 6 -> 6/10/6/6, +2 Con each = 48.
-    expect(definition.hitPoints.maximum).toBe(48);
+  it("counts each rolled level as rolled, on the class hit die (SRD)", () => {
+    // Level 1: 10+2. Rolls 1/10/4/6, +2 Con each = 41.
+    expect(definition.hitPoints.maximum).toBe(41);
+  });
+
+  it("raises a roll below the average to it only when the table's policy says so", () => {
+    // Rolls 1/10/4/6 vs the d10 average 6 -> 6/10/6/6, +2 Con each = 48.
+    const floored = buildCharacterDefinition(
+      fighterInput(),
+      library,
+      BuilderPolicySchema.parse({ hitPointRollFloor: "average" })
+    );
+    expect(floored.hitPoints.maximum).toBe(48);
   });
 
   it("derives AC from the equipped starting armor via the shared rules function, plus the Defense rider", () => {
@@ -309,11 +319,22 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
       "defense",
       "savage-attacker"
     ]);
-    // The ledger is the input's rows verbatim, plus the rolled hit points the build consumed, so a
-    // level-down/level-up round trip lands on the same maximum.
-    expect((definition.character?.choices ?? []).filter((row) => row.kind !== "hp-roll")).toEqual(
-      fighterInput().choices
-    );
+    // The ledger is the input's rows verbatim, plus how the scores were made and the rolled hit points the
+    // build consumed, so a level-down/level-up round trip lands on the same sheet.
+    expect(
+      (definition.character?.choices ?? []).filter((row) => row.kind !== "hp-roll" && row.kind !== "ability-scores")
+    ).toEqual(fighterInput().choices);
+    expect((definition.character?.choices ?? []).filter((row) => row.kind === "ability-scores")).toEqual([
+      {
+        level: 1,
+        kind: "ability-scores",
+        id: "standard-array",
+        payload: {
+          baseScores: fighterInput().baseScores,
+          backgroundBonusAllocation: fighterInput().backgroundBonusAllocation
+        }
+      }
+    ]);
     expect((definition.character?.choices ?? []).filter((row) => row.kind === "hp-roll")).toEqual(
       (fighterInput().hp.entries ?? []).map((roll, index) => ({
         level: index + 2,
@@ -373,7 +394,7 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
     expect(actor.kind).toBe("player-character");
     expect(actor.definitionId).toBe(`import-${ACTOR_ID}`);
     expect(state.definitions.map((entry) => entry.id)).toEqual([`import-${ACTOR_ID}`]);
-    expect(actor.hp).toEqual({ current: 48, maximum: 48, temporary: 0 });
+    expect(actor.hp).toEqual({ current: 41, maximum: 41, temporary: 0 });
     // `instantiate` re-derives AC from the loadout, so the builder's flat rider (Defense +1) must survive.
     expect(actor.armorClass).toBe(17);
     expect(actor.armorClass).toBe(definition.armorClass);
