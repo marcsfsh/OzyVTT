@@ -51,6 +51,28 @@ describe("a Potion of Healing", () => {
     expect(row(table, "potion-of-healing")).toBeUndefined();
     expect(() => actionOf(table, IDS.fighter, "item-potion-of-healing-drink")).toThrow();
   });
+
+  it("comes in the stronger strengths of the magic item table, each healing its own dice", () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput(), [IDS.wizard]: wizardInput() });
+    write(table, IDS.fighter, catalogRow("potion-of-healing-superior", { equipped: false }));
+    expect(actionOf(table, IDS.fighter, "item-potion-of-healing-superior-drink")).toMatchObject({
+      activation: "bonus-action",
+      healing: { formula: "8d4 + 8" }
+    });
+    const wizard = table.actor(IDS.wizard);
+    wizard.hp = { ...wizard.hp, current: 1 };
+    table.state.combat.initiative = [];
+    fight(table, IDS.fighter);
+    table.state.combat.initiative.push({ ...table.state.combat.initiative[1], actorId: IDS.wizard, score: 5 });
+    // Administered to the wizard, within 5 feet: 8d4 + 8, all ones.
+    const given = resolveAt(table, IDS.fighter, "item-potion-of-healing-superior-drink", [1, 1, 1, 1, 1, 1, 1, 1], {
+      targetIds: [IDS.wizard]
+    });
+    expect(given.healing).toMatchObject({ total: 16, targets: [{ targetId: IDS.wizard, regained: 16 }] });
+    expect(table.actor(IDS.wizard).hp.current).toBe(17);
+    expect(row(table, "potion-of-healing-superior")).toBeUndefined();
+    expect(table.state.combat.turn.bonusActionUsed).toBe(true);
+  });
 });
 
 describe("thrown flasks and the Net", () => {

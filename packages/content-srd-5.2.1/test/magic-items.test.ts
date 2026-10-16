@@ -38,7 +38,6 @@ const VARIES_ROWS = [
   "Figurine of Wondrous Power",
   "Ioun Stone",
   "Potion of Giant Strength",
-  "Potions of Healing",
   "Spell Scroll"
 ];
 
@@ -46,7 +45,8 @@ describe("the generated magic-item bundle", () => {
   it("expands the five +1/+2/+3 ladders to one row per tier, and keeps each Rarity Varies table whole", () => {
     const ladders = rows.filter((row) => /, \+[123]$/.test(row.name));
     expect(ladders.map((row) => row.name).sort()).toEqual([...LADDER_ROWS].sort());
-    // The seven that deliberately did not expand are each still exactly one row.
+    // The six that deliberately did not expand are each still exactly one row (Potions of Healing expands into
+    // its strengths, below).
     for (const name of VARIES_ROWS) {
       expect(
         rows.filter((row) => row.name === name),
@@ -74,7 +74,7 @@ describe("the generated magic-item bundle", () => {
     expect(histogram(rows.map((row) => row.category))).toEqual({
       "wondrous-item": 127,
       weapon: 33,
-      consumable: 25,
+      consumable: 27,
       ring: 22,
       wand: 15,
       armor: 14,
@@ -185,15 +185,15 @@ describe("the generated magic-item bundle", () => {
 
   it("reads each printed rarity, and a d100 rung as varies", () => {
     expect(histogram(rows.map((row) => row.rarity!))).toEqual({
-      rare: 87,
-      uncommon: 77,
-      "very-rare": 60,
+      rare: 88,
+      uncommon: 78,
+      "very-rare": 61,
       legendary: 33,
-      varies: 8,
+      varies: 7,
       common: 2,
       artifact: 1
     });
-    // `Horn of Valhalla`'s rung is a d100 roll in its description, so it is `varies` (eight, not seven).
+    // `Horn of Valhalla`'s rung is a d100 roll in its description, so it is `varies` (seven, not six).
     expect(rows.find((row) => row.name === "Horn of Valhalla")!.rarity).toBe("varies");
     expect(rows.find((row) => row.name === "Horn of Valhalla")!.description).toContain(
       "Rare (Silver or Brass), Very Rare (Bronze), or Legendary (Iron)"
@@ -296,19 +296,34 @@ describe("the generated magic-item bundle", () => {
     expect(new Set(rows.map((row) => row.id)).size).toBe(rows.length);
   });
 
-  it("keeps the grouped Potions of Healing row and leaves the mundane potion alone", () => {
+  it("mints a row for each stronger Potion of Healing, and leaves the common one to the gear catalog", () => {
     /**
-     * The mundane priced `potion-of-healing` and the magic `Potions of Healing` table are both kept;
-     * replacing the hand-authored row would make this ETL edit its own sibling input.
+     * The table's common strength is the priced gear `potion-of-healing`; minting it again would make this ETL
+     * edit its own sibling input. Each other strength is its own item, with its own rarity and dice.
      */
     const catalog = loadEquipment();
     expect(catalog.find((item) => item.id === "potion-of-healing")).toMatchObject({ isMagic: false, costGp: 50 });
-    expect(catalog.find((item) => item.id === "potions-of-healing")).toMatchObject({
-      isMagic: true,
-      rarity: "varies",
-      costGp: null
-    });
-    expect(rows.filter((row) => /^Potion of Healing/.test(row.name))).toEqual([]);
+    expect(catalog.find((item) => item.id === "potions-of-healing")).toBeUndefined();
+    const strengths = rows
+      .filter((row) => /^Potion of Healing/.test(row.name))
+      .map((row) => ({
+        id: row.id,
+        rarity: row.rarity,
+        heals: row.actions.map((action) => [action.activation, action.healing?.formula]),
+        used: row.consumedOnUse
+      }));
+    expect(strengths).toEqual([
+      { id: "potion-of-healing-greater", rarity: "uncommon", heals: [["bonus-action", "4d4 + 4"]], used: true },
+      { id: "potion-of-healing-superior", rarity: "rare", heals: [["bonus-action", "8d4 + 8"]], used: true },
+      { id: "potion-of-healing-supreme", rarity: "very-rare", heals: [["bonus-action", "10d4 + 20"]], used: true }
+    ]);
+    // Each heals what its own row of the printed table says.
+    for (const row of rows.filter((candidate) => /^Potion of Healing/.test(candidate.name))) {
+      const printed = new RegExp(`${row.name.replace(/[()]/g, "\\$&")}: HP Regained ([0-9d+ ]+),`).exec(
+        row.description ?? ""
+      )?.[1];
+      expect(printed, row.id).toBe(row.actions[0].healing?.formula);
+    }
   });
 
   it("gives every magic shield the plain shield's armor block, so its own bonus stacks on the +2", () => {

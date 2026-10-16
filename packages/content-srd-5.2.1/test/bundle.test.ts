@@ -496,9 +496,9 @@ describe("SRD 5.2.1 reference bundles", () => {
     // Each of the four sources is counted from its own bundle: gear, non-improvised weapons, armor and
     // the generated magic items.
     const nonImprovisedWeapons = loadWeapons().filter((weapon) => !weapon.improvised).length;
-    expect(loadMagicItems().length).toBe(268);
+    expect(loadMagicItems().length).toBe(270);
     // 139 gear rows: the 132 first authored, plus the Chest, Map, Net, String, Firearm Bullets and two gaming sets.
-    expect(equipment.length).toBe(139 + nonImprovisedWeapons + loadArmor().length + 268);
+    expect(equipment.length).toBe(139 + nonImprovisedWeapons + loadArmor().length + 270);
     expect(equipment.length).toBeGreaterThan(150);
 
     // Every category the framework promises is represented (the homebrew update extends these).

@@ -267,13 +267,31 @@ function categoryOfRow(type: TypeLine, slotId: string): string {
 // ---- 4. The expansion rule ----------------------------------------------------------------------
 
 /**
- * The five "+1, +2, or +3" ladders expand to one row per tier (each tier has its own rarity and bonus).
- * The seven "Rarity Varies" tables (Armor of Resistance, Potions of Healing...) stay one row each,
- * with the table in the text. 268 = 258 - 5 + 15.
+ * The five "+1, +2, or +3" ladders expand to one row per tier (each tier has its own rarity and bonus), and
+ * so does Potions of Healing, whose table prints four strengths with their own rarity and dice. Its common
+ * strength is the Adventuring Gear Potion of Healing, which `equipment.v1.json` already sells, so three rows
+ * come from it. The six other "Rarity Varies" tables (Armor of Resistance, Spell Scroll...) stay one row each,
+ * with the table in the text. 270 = 258 - 5 + 15 - 1 + 3.
  */
 const LADDER_SUFFIX = /,\s*\+1,\s*\+2,\s*or\s*\+3$/;
 /** "Uncommon (+1), Rare (+2), or Very Rare (+3)" -> the three printed rungs, in tier order. */
 const LADDER_RARITIES = /^(.+?)\s*\(\+1\),\s*(.+?)\s*\(\+2\),\s*or\s*(.+?)\s*\(\+3\)$/;
+/** Entries whose table's first and last columns name each strength and its rarity. */
+const STRENGTH_TABLES = new Set(["Potions of Healing"]);
+
+/** The rows of a strength table ("Potion of Healing (greater)" ... "Uncommon"), except those another bundle sells. */
+function strengthsOf(entry: Entry): Array<{ name: string; printedRarity: string; rarity: string }> {
+  const sold = new Set(
+    (JSON.parse(readFileSync(join(outDir, "equipment.v1.json"), "utf8")) as Array<{ id: string }>).map((row) => row.id)
+  );
+  const rows = [
+    ...entry.body.matchAll(/<tr>\s*<td>([^<]+)<\/td>(?:\s*<td>[^<]*<\/td>)*?\s*<td>([^<]+)<\/td>\s*<\/tr>/g)
+  ];
+  if (rows.length < 2) die(`${entry.name} (line ${entry.line}): its strength table has ${rows.length} rows.`);
+  return rows
+    .map((row) => ({ name: row[1].trim(), printedRarity: row[2].trim(), rarity: rarityId(row[2].trim()) }))
+    .filter((strength) => !sold.has(slug(strength.name)));
+}
 
 // ---- 5. Description -----------------------------------------------------------------------------
 
@@ -469,14 +487,16 @@ for (const entry of items) {
         printedRarity: rungs[bonus].trim(),
         rarity: rarityId(rungs[bonus].trim())
       }))
-    : // The printed segment stays verbatim in the description even when the slug collapses to `varies`.
-      [
-        {
-          name: entry.name,
-          printedRarity: type.rarity,
-          rarity: /,| or /.test(type.rarity) ? "varies" : rarityId(type.rarity)
-        }
-      ];
+    : STRENGTH_TABLES.has(entry.name)
+      ? strengthsOf(entry)
+      : // The printed segment stays verbatim in the description even when the slug collapses to `varies`.
+        [
+          {
+            name: entry.name,
+            printedRarity: type.rarity,
+            rarity: /,| or /.test(type.rarity) ? "varies" : rarityId(type.rarity)
+          }
+        ];
 
   for (const tier of tiers) {
     const rarity = tier.rarity;
@@ -506,7 +526,10 @@ for (const entry of items) {
 
 // ---- the guards, all fail-closed --------------------------------------------------------------
 
-if (rows.length !== 268) die(`Expected 268 rows (258 entries - 5 ladders + 15 tiers), emitted ${rows.length}.`);
+if (rows.length !== 270)
+  die(
+    `Expected 270 rows (258 entries - 5 ladders + 15 tiers - Potions of Healing + its 3 strengths), emitted ${rows.length}.`
+  );
 
 const badSlots = rows.filter((row) => !ItemSlotSchema.safeParse(row.slot).success);
 if (badSlots.length > 0)
@@ -539,8 +562,8 @@ if (strayAppliesTo.length > 0)
     `${strayAppliesTo.length} row(s) outside weapon/armor carry an appliesTo: ${strayAppliesTo.map((row) => row.id).join(", ")}`
   );
 
-// Expanding `Potions of Healing` would have minted `potion-of-healing`, which `equipment.v1.json`
-// already ships; this guard turns any such collision into a build failure.
+// Expanding `Potions of Healing` mints its strengths but not `potion-of-healing`, which `equipment.v1.json`
+// already ships; this guard turns any collision into a build failure.
 const OTHER_BUNDLES = ["equipment.v1.json", "weapons.v1.json", "armor.v1.json"] as const;
 const elsewhere = new Map<string, string>();
 for (const file of OTHER_BUNDLES) {
