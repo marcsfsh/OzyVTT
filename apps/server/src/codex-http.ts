@@ -872,9 +872,22 @@ export function createCodexRouter(options: CodexRouterOptions) {
       store.getPublishedDate()
     )
   }));
-  // The only thing that moves the players' clock.
+  // Before a calendar save: which revealed dated records it would move. Reads only, so no commandId and no ping.
+  router.post(expressPath(CODEX_PATHS.calendarCheck), requireGmRead, (request, response) => {
+    try {
+      return sendData(response, 200, {
+        moves: store.calendarMoves(withoutCommandId(CalendarSchema.parse(request.body)))
+      });
+    } catch (error) {
+      return malformed(response, error);
+    }
+  });
+  // The only thing that moves the players' clock forward; unpublishing takes it away.
   write("post", CODEX_PATHS.calendarPublish, () => ({
     calendar: projectGmCalendar(store.publishCampaignDate(), store.getPublishedDate())
+  }));
+  write("post", CODEX_PATHS.calendarUnpublish, () => ({
+    calendar: projectGmCalendar(store.unpublishCampaignDate(), store.getPublishedDate())
   }));
 
   // Restore a backup: replace-only and all-or-nothing. The body must be an unedited export file.

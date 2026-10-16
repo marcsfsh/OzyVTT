@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Alert, Button, Field, IconButton, IconPlus, IconX, Input, Modal, Select } from "@vtt/ui";
-import { formatWorldDate, type CodexCalendar, type CodexCalendarEra } from "@vtt/domain";
+import { formatWorldDate, type CodexCalendar, type CodexCalendarEra, type CodexCalendarMove } from "@vtt/domain";
 import { calendarApi } from "./api";
 
 type EraDraft = Readonly<{ name: string; startYear: string }>;
@@ -61,6 +61,11 @@ export function CalendarEditor({
   const [curDay, setCurDay] = useState(seed.currentDate ? String(seed.currentDate.day) : "1");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A save that would move dates players can see waits here until the GM confirms it.
+  const [pending, setPending] = useState<{
+    body: CodexCalendar;
+    moves: readonly CodexCalendarMove[];
+  } | null>(null);
 
   const setMonth = (index: number, patch: Partial<{ name: string; days: string }>) =>
     setMonths((prev) => prev.map((month, idx) => (idx === index ? { ...month, ...patch } : month)));
@@ -71,9 +76,23 @@ export function CalendarEditor({
   const addEra = () => setEras((prev) => [...prev, { name: "", startYear: curYear.trim() || "0" }]);
   const removeEra = (index: number) => setEras((prev) => prev.filter((_, idx) => idx !== index));
 
+  const commit = async (calendarInput: CodexCalendar) => {
+    setBusy(true);
+    setError(null);
+    try {
+      onSaved(await calendarApi.set(gmToken, calendarInput));
+      onClose();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Couldn't save the calendar.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const save = async () => {
     setBusy(true);
     setError(null);
+    setPending(null);
     try {
       const calendarInput = calendarBody({
         yearName: yearName.trim(),
@@ -94,11 +113,17 @@ export function CalendarEditor({
             ? null
             : { year: toYear(curYear), month: curMonth, day: Math.max(1, Math.trunc(Number(curDay) || 1)) }
       });
-      onSaved(await calendarApi.set(gmToken, calendarInput));
-      onClose();
+      // Ask first when the new shape would move a date players can already see.
+      const moves = await calendarApi.check(gmToken, calendarInput);
+      if (moves.length > 0) {
+        setPending({ body: calendarInput, moves });
+        setBusy(false);
+        return;
+      }
+      setBusy(false);
+      await commit(calendarInput);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Couldn't save the calendar.");
-    } finally {
       setBusy(false);
     }
   };
@@ -228,10 +253,36 @@ export function CalendarEditor({
           </div>
         </Field>
         {error && <Alert tone="danger">{error}</Alert>}
+        {pending && (
+          <Alert tone="warning" title="This moves dates players can see">
+            <ul className="codex-cal-moves">
+              {pending.moves.map((move) => (
+                <li key={`${move.kind}:${move.id}`}>
+                  <strong>{move.title}</strong>{" "}
+                  {move.unpasses
+                    ? `reads as approaching again (${move.after})`
+                    : `moves from ${move.before} to ${move.after}`}
+                </li>
+              ))}
+            </ul>
+            The raw dates are kept, so a later calendar can put them back.
+          </Alert>
+        )}
         <div className="codex-cal-foot">
-          <Button variant="primary" size="sm" disabled={busy || months.length === 0} onClick={save}>
-            Save calendar
-          </Button>
+          {pending ? (
+            <>
+              <Button variant="ghost" size="sm" disabled={busy} onClick={() => setPending(null)}>
+                Keep editing
+              </Button>
+              <Button variant="primary" size="sm" disabled={busy} onClick={() => void commit(pending.body)}>
+                Save anyway
+              </Button>
+            </>
+          ) : (
+            <Button variant="primary" size="sm" disabled={busy || months.length === 0} onClick={save}>
+              Save calendar
+            </Button>
+          )}
         </div>
       </div>
     </Modal>

@@ -26,7 +26,7 @@ export type CodexQuestObjective = Readonly<{ text: string; done: boolean }>;
 /** The kinds the suite-wide search indexes. */
 export type CodexRecordKind = "page" | "journal" | "map" | "marker" | "quest" | "session";
 /** Every surface the reveal audit reports on. */
-export type CodexRevealAuditKind = "page" | "map" | "marker" | "journal" | "session" | "quest" | "standing";
+export type CodexRevealAuditKind = "date" | "page" | "map" | "marker" | "journal" | "session" | "quest" | "standing";
 
 // ----- Pages -----
 
@@ -444,9 +444,25 @@ export type CodexSettingsInput = Readonly<{
   autosave: CodexAutosaveSettings;
 }>;
 
+// ----- Calendar check (GM-only): what a calendar change would move in front of players -----
+
+/** A revealed dated record a proposed calendar would move: its date resolves to another day, or a deadline players
+ *  saw pass would read as approaching again. */
+export type CodexCalendarMove = Readonly<{
+  kind: "page" | "journal";
+  id: string;
+  /** The page's title, or the start of the journal entry's player text, else its kind. */
+  title: string;
+  /** The date as players read it now, and as they would. */
+  before: string;
+  after: string;
+  unpasses: boolean;
+}>;
+
 // ----- The reveal audit (GM-only): what the player projections currently emit -----
 
-/** `id` is what the kind's reveal route takes, which for `standing` is the faction page id. */
+/** `id` is what the kind's reveal route takes, which for `standing` is the faction page id. The `date` row's
+ *  routes are the calendar's publish and unpublish, which take none. */
 export type CodexRevealAuditRow = Readonly<{
   kind: CodexRevealAuditKind;
   id: string;

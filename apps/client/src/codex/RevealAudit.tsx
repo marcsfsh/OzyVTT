@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { Alert, Badge, Button, Modal, RevealSwitch, Skeleton } from "@vtt/ui";
 import type { CodexRevealAuditKind, CodexRevealAuditSection } from "@vtt/domain";
-import { atlasApi, codexApi, journalApi, questApi, revealAuditApi, sessionApi, standingApi } from "./api";
+import { atlasApi, calendarApi, codexApi, journalApi, questApi, revealAuditApi, sessionApi, standingApi } from "./api";
 import { CHRONICLE_KIND_META, chronicleKindOfJournal } from "./chronicle";
 import { CodexIcon } from "./icons";
 import { useCodexQuery } from "./useCodexQuery";
@@ -27,6 +27,14 @@ const AUDIT_KINDS: Readonly<
     }>
   >
 > = {
+  date: {
+    heading: "Campaign date",
+    iconId: "calendar",
+    emptyLabel: "No campaign date is shown to players.",
+    // Showing it again publishes the GM's clock, the only way the players' date moves.
+    setRevealed: (token, _id, revealed) => (revealed ? calendarApi.publish(token) : calendarApi.unpublish(token)),
+    hideLabel: (title) => `Show the date ${title} to players`
+  },
   page: {
     heading: "Pages",
     iconId: "scroll",

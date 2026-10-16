@@ -1802,7 +1802,7 @@ export const openApiDocument = {
         notModified: true,
         bad: false,
         description:
-          'One GM view of everything the party can currently see, across every reveal surface in the Codex - pages, maps, markers, journal (all six kinds), sessions, quests and standing. GM-only, and READ-ONLY: it is an AGGREGATION of the existing player projections, not a second opinion about visibility, so it lists exactly what the corresponding player-facing endpoints would return - a marker flagged revealed on a HIDDEN map is absent here, because the party cannot see it either. Every section is always present, empty ones included with `revealed: 0`, so "nothing is revealed here" cannot be mistaken for "this did not load". Each row carries the id its own kind\'s EXISTING reveal route takes, which is how un-revealing works from this surface: there is deliberately no unreveal route and no bulk operation. Table-side exposure (tokens, fog, the shared viewer) is deliberately out of scope - that system has its own visibility rules, and folding it in would make this the second place that decides what a player can see.'
+          'One GM view of everything the party can currently see, across every reveal surface in the Codex - the published campaign date, pages, maps, markers, journal (all six kinds), sessions, quests and standing. GM-only, and READ-ONLY: it is an AGGREGATION of the existing player projections, not a second opinion about visibility, so it lists exactly what the corresponding player-facing endpoints would return - a marker flagged revealed on a HIDDEN map is absent here, because the party cannot see it either. Every section is always present, empty ones included with `revealed: 0`, so "nothing is revealed here" cannot be mistaken for "this did not load". Each row carries the id its own kind\'s EXISTING reveal route takes, which is how un-revealing works from this surface: there is deliberately no unreveal route and no bulk operation. Table-side exposure (tokens, fog, the shared viewer) is deliberately out of scope - that system has its own visibility rules, and folding it in would make this the second place that decides what a player can see.'
       })
     },
     [CODEX_PATHS.calendar]: {
@@ -1822,6 +1822,19 @@ export const openApiDocument = {
       post: codexOp("publishCodexCampaignDate", codexWrite, "CodexCalendarResponse", {
         description:
           "Publishes the GM's clock: the party's `currentDate` becomes the GM's. Takes no body - \"publish\" means exactly \"the table now sees where I am\", and an arbitrary settable published date would be a third clock to keep in step. This is the ONLY thing that moves the players' date; neither editing the calendar nor applying downtime does it. Publishing while the GM has no current date clears the published one. The 400 is not reachable through any input today - the handler routes every failure through the shared codex error mapper, and documenting only the statuses currently reachable would make the document wrong the moment that changes."
+      })
+    },
+    [CODEX_PATHS.calendarCheck]: {
+      post: codexOp("checkCodexCalendar", codexGmRead, "CodexCalendarCheckResponse", {
+        body: "CodexCalendarRequest",
+        description:
+          "Says what saving this calendar (the same body `PUT /codex/calendar` takes) would do to records the players can see, and changes nothing. A dated record keeps its raw date, but a calendar with fewer months or shorter ones resolves a date it lacks to another day, and a deadline measured against the published date can read as approaching again after players saw it pass. The GM's calendar editor calls this before saving and asks first when anything would move. GM-only; a read, so it takes no `commandId` and pings nobody."
+      })
+    },
+    [CODEX_PATHS.calendarUnpublish]: {
+      post: codexOp("unpublishCodexCampaignDate", codexWrite, "CodexCalendarResponse", {
+        description:
+          "Takes the published date away from the players: their `currentDate` reads null until the GM publishes again. Takes no body, and leaves the GM's own clock and the calendar's structure alone. Deadlines a player could see as passed read as not yet fired while no date is published, since `fired` is measured against the published date. The reveal audit's date row hides through this route."
       })
     },
     [CODEX_PATHS.settings]: {
@@ -5062,19 +5075,19 @@ export const openApiDocument = {
         properties: {
           kind: {
             type: "string",
-            enum: ["page", "map", "marker", "journal", "session", "quest", "standing"],
+            enum: ["date", "page", "map", "marker", "journal", "session", "quest", "standing"],
             description:
-              "Which reveal surface this row belongs to - and therefore which existing reveal route un-reveals it."
+              "Which reveal surface this row belongs to - and therefore which existing reveal route un-reveals it. The `date` row is the published campaign date, hidden by `POST /codex/calendar/unpublish` and shown by `POST /codex/calendar/publish`."
           },
           id: {
-            ...codexUuid,
+            anyOf: [codexUuid, { type: "string", const: "published-date" }],
             description:
-              "The record's OWN id, which is exactly the id that kind's existing reveal route takes. For a `standing` row this is the FACTION PAGE id, because `POST /codex/standing/{factionPageId}/reveal` is addressed that way."
+              "The record's OWN id, which is exactly the id that kind's existing reveal route takes. For a `standing` row this is the FACTION PAGE id, because `POST /codex/standing/{factionPageId}/reveal` is addressed that way. The `date` row's is the fixed `published-date`, since the calendar routes take none."
           },
           title: {
             type: "string",
             description:
-              "One line naming the record, taken from the record's own PLAYER projection - a page title, a map name, a marker label, a bounded excerpt of a journal entry's player text, \"Session 4\", a quest title, a faction name. Empty string when the record has no name (an unlabelled pin)."
+              "One line naming the record, taken from the record's own PLAYER projection - the published date as the calendar writes it, a page title, a map name, a marker label, a bounded excerpt of a journal entry's player text, \"Session 4\", a quest title, a faction name. Empty string when the record has no name (an unlabelled pin)."
           },
           journalKind: {
             oneOf: [
@@ -5082,7 +5095,7 @@ export const openApiDocument = {
               { type: "null" }
             ],
             description:
-              'WHICH kind of journal record this is - the same six-value vocabulary `CodexJournalEntry.kind` uses. Set on every `kind: "journal"` row and `null` on all six other kinds, present either way so no consumer branches on key presence. Render it as a badge beside `title`, never by parsing `title`: the title is the record\'s own prose whenever it has any, and only names the kind when the record is silent.'
+              'WHICH kind of journal record this is - the same six-value vocabulary `CodexJournalEntry.kind` uses. Set on every `kind: "journal"` row and `null` on all seven other kinds, present either way so no consumer branches on key presence. Render it as a badge beside `title`, never by parsing `title`: the title is the record\'s own prose whenever it has any, and only names the kind when the record is silent.'
           }
         }
       },
@@ -5093,7 +5106,7 @@ export const openApiDocument = {
           'One reveal surface\'s report. ALWAYS present, empty ones included with `revealed: 0` and `rows: []` - "nothing is revealed here" and "this did not load" must not look the same.',
         required: ["kind", "revealed", "total", "rows"],
         properties: {
-          kind: { type: "string", enum: ["page", "map", "marker", "journal", "session", "quest", "standing"] },
+          kind: { type: "string", enum: ["date", "page", "map", "marker", "journal", "session", "quest", "standing"] },
           revealed: {
             type: "integer",
             minimum: 0,
@@ -5131,6 +5144,28 @@ export const openApiDocument = {
       CodexRevealAuditResponse: envelopeSchema("#/components/schemas/CodexRevealAuditData"),
       CodexCalendarData: codexDataObject("calendar", { $ref: "#/components/schemas/CodexCalendar" }),
       CodexCalendarResponse: envelopeSchema("#/components/schemas/CodexCalendarData"),
+      CodexCalendarMove: {
+        type: "object",
+        additionalProperties: false,
+        description: "A record the party can see that the proposed calendar would move.",
+        required: ["kind", "id", "title", "before", "after", "unpasses"],
+        properties: {
+          kind: { type: "string", enum: ["page", "journal"], description: "A dated page, or a journal entry." },
+          id: { ...codexUuid, description: "The record's id." },
+          title: {
+            type: "string",
+            description: "The page's title, or the start of the journal entry's player text, else its kind."
+          },
+          before: { type: "string", description: "The date as players read it under the current calendar." },
+          after: { type: "string", description: "The date as they would read it under the proposed one." },
+          unpasses: {
+            type: "boolean",
+            description: "A deadline players have seen pass that would read as approaching again."
+          }
+        }
+      },
+      CodexCalendarCheckData: codexDataObject("moves", codexArrayRef("CodexCalendarMove")),
+      CodexCalendarCheckResponse: envelopeSchema("#/components/schemas/CodexCalendarCheckData"),
       // The GET projects per role; calendar writes and the apply-downtime payload keep the GM shape.
       CodexCalendarProjectedData: codexDataObject("calendar", { $ref: "#/components/schemas/CodexCalendarProjected" }),
       CodexCalendarProjectedResponse: envelopeSchema("#/components/schemas/CodexCalendarProjectedData"),

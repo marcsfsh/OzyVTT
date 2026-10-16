@@ -1,9 +1,11 @@
 import {
+  clampToCalendar,
   dateToInstant,
   formatWorldDate,
   instantToDate,
   weekdayOf,
   type CodexCalendar,
+  type CodexCalendarMove,
   type CodexInWorldDate
 } from "@vtt/domain";
 import type { CodexDb } from "./db.js";
@@ -177,4 +179,52 @@ export function resolveDate(
 /** The GM's clock as a resolved date, for records written "now" (fights, quest and standing history). */
 export function resolveNow(db: CodexDb): ResolvedDate {
   return resolveDate(db, getCalendar(db).currentDate ?? null, null);
+}
+
+/**
+ * What saving `input` would do to revealed dated records: a date the new calendar lacks resolves to another day
+ * (the raw date is kept, but players see the clamped one), and a deadline measured against the published date can
+ * un-pass. Read-only; the GM is asked before the save.
+ */
+export function calendarMoves(db: CodexDb, input: CodexCalendar): CodexCalendarMove[] {
+  const before = getCalendar(db);
+  const after = normalizeCalendar(input);
+  const published = getPublishedDate(db);
+  const passed = (calendar: CodexCalendar, date: CodexInWorldDate) =>
+    published !== null && dateToInstant(calendar, date) <= dateToInstant(calendar, published);
+  type Row = { id: string; title: string; kind: string; year: number; month: number; day: number };
+  const rows = [
+    ...(
+      db.database
+        .prepare(
+          "SELECT id, title, 'page' AS kind, in_world_year AS year, in_world_month AS month, in_world_day AS day FROM codex_pages WHERE revealed = 1 AND in_world_year IS NOT NULL"
+        )
+        .all() as Row[]
+    ).map((row) => ({ ...row, source: "page" as const })),
+    ...(
+      db.database
+        .prepare(
+          "SELECT id, player_text AS title, kind, in_world_year AS year, in_world_month AS month, in_world_day AS day FROM codex_journal WHERE revealed = 1 AND in_world_year IS NOT NULL"
+        )
+        .all() as Row[]
+    ).map((row) => ({ ...row, source: "journal" as const }))
+  ];
+  return rows.flatMap((row) => {
+    const date = { year: row.year, month: row.month, day: row.day };
+    const was = clampToCalendar(before, date);
+    const now = clampToCalendar(after, date);
+    const unpasses = row.kind === "deadline" && passed(before, date) && !passed(after, date);
+    if (was.month === now.month && was.day === now.day && !unpasses) return [];
+    return [
+      {
+        kind: row.source,
+        id: row.id,
+        // A journal entry's title is its player text, flattened and cut to a list row's length.
+        title: row.title.replace(/\s+/g, " ").trim().slice(0, 160) || row.kind,
+        before: formatWorldDate(before, date),
+        after: formatWorldDate(after, date),
+        unpasses
+      }
+    ];
+  });
 }

@@ -1,5 +1,6 @@
 import type {
   CodexCalendar,
+  CodexCalendarMove,
   CodexImportCounts,
   CodexInWorldDate,
   CodexJournalEntry,
@@ -273,12 +274,22 @@ export class CodexStore {
   getPublishedDate(): CodexInWorldDate | null {
     return calendar.getPublishedDate(this.#db);
   }
+  /** What saving this calendar would move in front of players; changes nothing. */
+  calendarMoves(input: CodexCalendar): CodexCalendarMove[] {
+    return calendar.calendarMoves(this.#db, input);
+  }
   /** Copies the GM's clock to the players' (clearing it when the GM clock is unset). The only thing that publishes. */
   publishCampaignDate(): CodexCalendar {
     const db = this.#db;
     const current = calendar.getCalendar(db);
     write(db, () => calendar.writePublishedDate(db, current.currentDate ?? null));
     return current;
+  }
+  /** Takes the date away from the players: they see no date until the GM publishes again. */
+  unpublishCampaignDate(): CodexCalendar {
+    const db = this.#db;
+    write(db, () => calendar.writePublishedDate(db, null));
+    return calendar.getCalendar(db);
   }
   campaignInstant(): number | null {
     return calendar.campaignInstant(this.#db);

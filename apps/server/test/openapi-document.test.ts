@@ -160,6 +160,8 @@ describe("the OpenAPI document", () => {
     }
     // The one bearer-less codex operation: it mints a player session token.
     expect(paths[CODEX_PATHS.previewSession].post.security).toEqual([{ gmAuth: [] }]);
+    // A POST that only reads: it carries a draft calendar in its body and changes nothing.
+    expect(paths[CODEX_PATHS.calendarCheck].post.security).toEqual(gmRead);
     for (const path of [...Object.values(CODEX_PATHS), ...Object.values(CODEX_ASSET_PATHS)]) {
       for (const [method, op] of Object.entries(paths[path])) {
         expect(
@@ -171,8 +173,9 @@ describe("the OpenAPI document", () => {
           expect(scopes, "preview-session must stay GM-session-only").toBeUndefined();
           continue;
         }
+        const reads = method === "get" || path === CODEX_PATHS.calendarCheck;
         expect(scopes, `${method} ${path} must name exactly one codex scope`).toEqual([
-          method === "get" ? "codex:read" : "codex:write"
+          reads ? "codex:read" : "codex:write"
         ]);
       }
     }
