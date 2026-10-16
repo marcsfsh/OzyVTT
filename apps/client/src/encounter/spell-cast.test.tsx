@@ -242,3 +242,53 @@ describe("the prepare step after a Long Rest", () => {
     expect((screen.getByRole("button", { name: "Cast" }) as HTMLButtonElement).disabled).toBe(true);
   });
 });
+
+describe("a ritual spell on the sheet", () => {
+  it("can be cast as a Ritual, through its own action with no slot", () => {
+    const cast = vi.fn();
+    const wizardSheet = {
+      ...definition,
+      actions: [
+        {
+          id: "spell-alarm",
+          name: "Alarm",
+          activation: "action",
+          description: "",
+          damage: [],
+          spellSlot: { level: 1 }
+        },
+        { id: "spell-alarm-ritual", name: "Alarm (ritual)", activation: "action", description: "", damage: [] }
+      ],
+      spellcasting: {
+        ability: "int",
+        slots: [{ level: 1, max: 2 }],
+        spells: [
+          {
+            id: "alarm",
+            name: "Alarm",
+            level: 1,
+            prepared: true,
+            alwaysPrepared: false,
+            actionId: "spell-alarm",
+            ritualActionId: "spell-alarm-ritual"
+          }
+        ]
+      }
+    } as unknown as ActorDefinition;
+    render(
+      <SheetSpells
+        actor={{ ...actor, preparedSpellIds: ["alarm"] } as unknown as GmActor}
+        definition={wizardSheet}
+        busy={false}
+        edit={vi.fn() as unknown as SheetEdit}
+        rolls={{ rollFlat: vi.fn() } as unknown as SheetRolls}
+        onFeedback={() => {}}
+        routeSpell={() => false}
+        castSpellAction={cast}
+      />
+    );
+    fireEvent.change(screen.getByRole("combobox", { name: "Cast Alarm at level" }), { target: { value: "ritual" } });
+    fireEvent.click(screen.getByRole("button", { name: "Cast" }));
+    expect(cast).toHaveBeenLastCalledWith("spell-alarm-ritual");
+  });
+});

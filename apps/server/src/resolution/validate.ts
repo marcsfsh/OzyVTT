@@ -4,7 +4,13 @@ import { effectiveActions } from "../effective-actions.js";
 import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
 import { effectiveModeFor, overrideCovers, overrideReason, overrideWaives } from "../rules-families.js";
-import { isLongCastingTime, laterSpellActionId, upcastAction, withSpellAttackReach } from "../item-actions.js";
+import {
+  isLongCastingTime,
+  laterSpellActionId,
+  ritualSpellActionId,
+  upcastAction,
+  withSpellAttackReach
+} from "../item-actions.js";
 import { builtinHandlerFor } from "./builtins.js";
 import type { DefinitionAction, LiveActor, ResolveContext, ResolveDependencies, ResolveInput } from "./context.js";
 import { castLevelOf, planEconomy, type EconomyPlan } from "./economy.js";
@@ -163,12 +169,16 @@ function laterActionReminders(spell: SpellReference | undefined, action: Definit
   const later = spell?.effect?.laterActions ?? [];
   if (!spell || later.some((row) => laterSpellActionId(spell.id, row.name) === action.id)) return [];
   return [
-    // SRD "Longer Casting Times": the Magic action every turn of the cast, keeping Concentration throughout.
-    ...(isLongCastingTime(spell.castingTime)
+    // SRD Rituals: 10 minutes longer than the spell's casting time, and no slot.
+    ...(action.id === ritualSpellActionId(spell.id)
       ? [
-          `${spell.name} takes ${spell.castingTime} to cast: the Magic action on each of the caster's turns until then, keeping Concentration. If that breaks, the spell fails and its slot isn't spent - restore it on the sheet.`
+          `${spell.name} as a Ritual takes 10 minutes longer than its ${spell.castingTime}: the Magic action on each of the caster's turns, keeping Concentration, and no slot.`
         ]
-      : []),
+      : isLongCastingTime(spell.castingTime)
+        ? [
+            `${spell.name} takes ${spell.castingTime} to cast: the Magic action on each of the caster's turns until then, keeping Concentration. If that breaks, the spell fails and its slot isn't spent - restore it on the sheet.`
+          ]
+        : []),
     ...later.map((row) => `${spell.name}: ${row.when} Use "${spell.name}: ${row.name}" for it.`)
   ];
 }

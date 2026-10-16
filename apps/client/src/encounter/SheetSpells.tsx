@@ -19,6 +19,7 @@ type SheetSpell = Readonly<{
   level: number;
   actionId?: string | null;
   freeActionId?: string;
+  ritualActionId?: string;
   withSlot?: boolean;
 }>;
 
@@ -68,9 +69,11 @@ function SpellCastControls({
   policeSlots,
   prepared,
   free,
+  ritual,
   busy,
   onCastSlot,
   onCastFree,
+  onCastRitual,
   onCastCantrip
 }: Readonly<{
   spell: Readonly<{ id: string; name: string; level: number; withSlot?: boolean }>;
@@ -86,17 +89,27 @@ function SpellCastControls({
   prepared: boolean;
   /** A free casting: the uses it has left, or null at will. */
   free: Readonly<{ left: number | null }> | null;
+  /** The spell can be cast as a Ritual: no slot, 10 minutes longer. */
+  ritual: boolean;
   busy: boolean;
   onCastSlot: (level: number) => void;
   onCastFree: () => void;
+  onCastRitual: () => void;
   onCastCantrip: () => void;
 }>) {
   const isCantrip = spell.level === 0;
   const levels = [...new Set([...slotLevels, ...(pact ? [pact.level] : [])])].sort((a, b) => a - b);
   const options = isCantrip || spell.withSlot === false ? [] : levels.filter((level) => level >= spell.level);
-  const [choice, setChoice] = useState<number | "free">(options[0] ?? (free ? "free" : spell.level));
-  const chosen = choice === "free" ? (free ? "free" : (options[0] ?? spell.level)) : choice;
-  const level = chosen === "free" || !options.includes(chosen) ? (options[0] ?? spell.level) : chosen;
+  const [choice, setChoice] = useState<number | "free" | "ritual">(options[0] ?? (free ? "free" : spell.level));
+  const chosen =
+    choice === "free"
+      ? free
+        ? "free"
+        : (options[0] ?? spell.level)
+      : choice === "ritual" && !ritual
+        ? spell.level
+        : choice;
+  const level = typeof chosen !== "number" || !options.includes(chosen) ? (options[0] ?? spell.level) : chosen;
   const atPact = (slot: number) => pact !== null && pact.level === slot;
   const remainingAt = (slot: number) =>
     (slotMaxByLevel.has(slot) ? (liveRemaining.get(slot) ?? slotMaxByLevel.get(slot) ?? 0) : 0) +
@@ -105,12 +118,14 @@ function SpellCastControls({
   const freeLabel = free ? (free.left === null ? "At will" : `No slot · ${free.left} left`) : "";
   // The effect at the selected level, from the same helper the Cast button rolls. Three grid cells
   // (helper · slot · Cast) that align across rows.
-  const { label: effect } = spellEffectAt(content, spell.level, chosen === "free" ? spell.level : level);
+  const { label: effect } = spellEffectAt(content, spell.level, typeof chosen !== "number" ? spell.level : level);
   const canCast =
     isCantrip ||
     (chosen === "free"
       ? free !== null && free.left !== 0
-      : options.length > 0 && (!policeSlots || (prepared && remainingAt(level) > 0)));
+      : chosen === "ritual"
+        ? !policeSlots || prepared
+        : options.length > 0 && (!policeSlots || (prepared && remainingAt(level) > 0)));
   return (
     <>
       <span
@@ -126,9 +141,15 @@ function SpellCastControls({
         <select
           className="sheet-cast-select"
           aria-label={`Cast ${spell.name} at level`}
-          value={chosen === "free" ? "free" : level}
+          value={typeof chosen !== "number" ? chosen : level}
           disabled={busy}
-          onChange={(event) => setChoice(event.target.value === "free" ? "free" : Number(event.target.value))}
+          onChange={(event) =>
+            setChoice(
+              event.target.value === "free" || event.target.value === "ritual"
+                ? event.target.value
+                : Number(event.target.value)
+            )
+          }
         >
           {options.map((slot) => (
             <option key={slot} value={slot} disabled={policeSlots && remainingAt(slot) === 0}>
@@ -142,6 +163,7 @@ function SpellCastControls({
               {freeLabel}
             </option>
           )}
+          {ritual && <option value="ritual">Ritual · no slot, +10 min</option>}
         </select>
       ) : free ? (
         <span className="sheet-cast-slot at-will">{freeLabel}</span>
@@ -152,7 +174,15 @@ function SpellCastControls({
         type="button"
         className="sheet-cast-btn"
         disabled={busy || !canCast}
-        onClick={() => (isCantrip ? onCastCantrip() : chosen === "free" ? onCastFree() : onCastSlot(level))}
+        onClick={() =>
+          isCantrip
+            ? onCastCantrip()
+            : chosen === "free"
+              ? onCastFree()
+              : chosen === "ritual"
+                ? onCastRitual()
+                : onCastSlot(level)
+        }
       >
         Cast
       </button>
@@ -489,9 +519,11 @@ export function SheetSpells({
                               policeSlots={policeSlots}
                               prepared={isPrepared || !keepsPreparedList}
                               free={freeCastOf(spell)}
+                              ritual={spell.ritualActionId !== undefined}
                               busy={busy}
                               onCastSlot={(castLevel) => castSpell(spell, castLevel)}
                               onCastFree={() => spell.freeActionId && castSpellAction(spell.freeActionId)}
+                              onCastRitual={() => spell.ritualActionId && castSpellAction(spell.ritualActionId)}
                               onCastCantrip={() => castCantrip(spell)}
                             />
                           )}

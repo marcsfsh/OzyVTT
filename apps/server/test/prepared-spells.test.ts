@@ -3,6 +3,7 @@ import { ActorDefinitionSchema } from "@vtt/schemas";
 import { endEncounter } from "../src/encounter.js";
 import { applyRest } from "../src/rests.js";
 import { finishPreparing, openPreparation, setPreparedSpell } from "../src/spellcasting.js";
+import { spendLooseUses } from "../src/tap-routing.js";
 import { build, catalog, fight, HERO, wizardInput, WIZARD_SPELLS } from "./spell-casters.js";
 
 // SRD 5.2.1 Spells: a caster casts the level 1+ spells it has prepared, and a Cleric, Druid or Wizard changes that list
@@ -81,5 +82,22 @@ describe("the prepare step a Long Rest opens", () => {
     hero.preparation = null;
     openPreparation(hero, sheet("sorcerer"));
     expect(hero.preparation).toBeNull();
+  });
+});
+
+describe("casting a spell as a Ritual (SRD Rituals)", () => {
+  it("spends no slot, takes the Magic action each turn, and needs the spell prepared", () => {
+    const { hero, state, action } = fight(wizard, { combat: false });
+    const ritual = action("spell-alarm-ritual");
+    expect(ritual).toMatchObject({ name: "Alarm (ritual)", activation: "action", spellId: "alarm" });
+    expect(ritual.spellSlot).toBeUndefined();
+    expect(wizard.spellcasting!.spells.find((spell) => spell.id === "alarm")!.ritualActionId).toBe(
+      "spell-alarm-ritual"
+    );
+    const before = JSON.stringify(hero.spellSlots);
+    expect(spendLooseUses(hero, ritual, [], undefined, "strict", wizard)).toEqual({ usesLeft: null, spent: false });
+    expect(JSON.stringify(hero.spellSlots)).toBe(before);
+    setPreparedSpell(state, HERO, "alarm", false, resolveDefinition);
+    expect(() => spendLooseUses(hero, ritual, [], undefined, "strict", wizard)).toThrowError(/hasn't prepared Alarm/);
   });
 });

@@ -232,6 +232,9 @@ function spellDamage(
   }));
 }
 
+/** The id of the action that casts a spell as a Ritual. */
+export const ritualSpellActionId = (spellId: string): string => `spell-${spellId}-ritual`;
+
 /** A casting time of a minute or more ("10 minutes", "8 hours"). */
 export const isLongCastingTime = (castingTime: string): boolean => /\b\d+\s*(?:minute|hour)s?\b/i.test(castingTime);
 

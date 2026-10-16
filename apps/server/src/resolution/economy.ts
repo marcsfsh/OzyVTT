@@ -14,7 +14,7 @@ import {
   rememberOverride,
   type RuleId
 } from "../rules-families.js";
-import { laterSpellActionId } from "../item-actions.js";
+import { laterSpellActionId, ritualSpellActionId } from "../item-actions.js";
 import { builtinHandlerFor } from "./builtins.js";
 import { sizeRank, type DefinitionAction, type LiveActor, type ResolveContext, type ResolveInput } from "./context.js";
 
@@ -455,10 +455,12 @@ function checkSpellSlot({ state, attacker, action, slotLevel, violations }: Eval
  *  no prepared list (an import with no prepared cap) need nothing. */
 export function unpreparedSpell(
   actor: Pick<LiveActor, "name" | "preparedSpellIds">,
-  action: Pick<DefinitionAction, "spellSlot" | "spellId">,
+  action: Pick<DefinitionAction, "id" | "spellSlot" | "spellId">,
   definition: ActorDefinition | undefined
 ): string | null {
-  if (!action.spellSlot || action.spellId === undefined) return null;
+  if (action.spellId === undefined) return null;
+  // A slot cast, or a Ritual ("To cast a spell as a Ritual, a spellcaster must have it prepared").
+  if (!action.spellSlot && action.id !== ritualSpellActionId(action.spellId)) return null;
   const spell = definition?.spellcasting?.spells.find((entry) => entry.id === action.spellId);
   if (!spell || spell.level === 0 || spell.alwaysPrepared || actor.preparedSpellIds.includes(spell.id)) return null;
   const classes = definition!.spellcasting!.classes ?? [];

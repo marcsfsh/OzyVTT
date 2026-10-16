@@ -34,7 +34,13 @@ import {
 } from "./character-offers.js";
 import type { ContentView } from "./content-library.js";
 import { BUILDER_BAKED_MODIFIER_TYPES, type CharacterFeatureRef } from "./equipment-derivation.js";
-import { isLongCastingTime, laterSpellAction, spellCastMechanics, UNARMED_STRIKE_ACTION_ID } from "./item-actions.js";
+import {
+  isLongCastingTime,
+  laterSpellAction,
+  ritualSpellActionId,
+  spellCastMechanics,
+  UNARMED_STRIKE_ACTION_ID
+} from "./item-actions.js";
 import { bindTemplateItem } from "./inventory.js";
 import { CommandRejectedError } from "./game-store.js";
 
@@ -319,6 +325,17 @@ function leveledSpellActionFor(
   } as ActorAction;
 }
 
+/** A slot cast as a Ritual: the same spell with no slot, 10 minutes longer, so the Magic action on each turn of it. */
+function ritualActionOf(cast: ActorAction, spell: SpellReference): ActorAction {
+  const { spellSlot: _slot, ...rest } = cast;
+  return {
+    ...rest,
+    id: ritualSpellActionId(spell.id),
+    name: `${spell.name} (ritual)`,
+    activation: "action"
+  };
+}
+
 /** `ActorDefinitionSchema`'s cap on a sheet's actions; spells past it keep their sheet entry without an action. */
 const MAX_DEFINITION_ACTIONS = 100;
 
@@ -337,7 +354,7 @@ function linkSpellActions(
   for (const entry of spells) {
     const record = library.spellRecord(String(entry.id));
     if (!record) continue;
-    const mint = (action: ActorAction | null, key: "actionId" | "freeActionId") => {
+    const mint = (action: ActorAction | null, key: "actionId" | "freeActionId" | "ritualActionId") => {
       if (!action || into.length >= MAX_DEFINITION_ACTIONS || into.some((existing) => existing.id === action.id))
         return;
       into.push(action);
@@ -345,7 +362,12 @@ function linkSpellActions(
     };
     if (record.level === 0) mint(cantripActionFor(record, numbers), "actionId");
     else {
-      if (hasSlots && entry.withSlot !== false) mint(leveledSpellActionFor(record, numbers), "actionId");
+      if (hasSlots && entry.withSlot !== false) {
+        const cast = leveledSpellActionFor(record, numbers);
+        mint(cast, "actionId");
+        // SRD Rituals: a prepared ritual spell can be cast without a slot, taking 10 minutes longer.
+        if (cast && record.ritual) mint(ritualActionOf(cast, record), "ritualActionId");
+      }
       const grant = granted.find((candidate) => candidate.id === record.id && candidate.free !== undefined);
       if (grant) mint(leveledSpellActionFor(record, numbers, grant.free), "freeActionId");
     }

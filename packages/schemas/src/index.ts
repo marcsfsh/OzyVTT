@@ -1344,6 +1344,11 @@ const SpellcastingSchema = z
               .string()
               .regex(/^[a-z0-9-]+$/)
               .optional(),
+            /** The action that casts it as a Ritual: no slot, 10 minutes longer (SRD Rituals). */
+            ritualActionId: z
+              .string()
+              .regex(/^[a-z0-9-]+$/)
+              .optional(),
             /** False when it can be cast only without a slot (an invocation's spell). Absent: with a slot. */
             withSlot: z.boolean().optional(),
             /** Which class granted this spell, so `resolveSpellcasting` can pick the right ability. */
