@@ -38,8 +38,9 @@ function OwnFeedback({
   );
 }
 
-/** A player's own economy: Action/Bonus only on their turn; the reaction is markable any time. Pressed = spent. */
-function PlayerTurnEconomy({
+/** A player's own economy: Action/Bonus only on their turn; the reaction is markable any time. Pressed = spent. Only
+ *  the GM gives a spent one back while the table polices the action economy, so a pressed slot is locked then. */
+export function PlayerTurnEconomy({
   combat,
   myId,
   myTurn,
@@ -55,6 +56,8 @@ function PlayerTurnEconomy({
     });
   };
   const reactionUsed = combat.reactionsUsed.includes(myId);
+  const giveBackLocked = (combat.ruleExceptions.economy ?? combat.rulesMode) !== "freeform";
+  const lockedTitle = "Spent - only the GM can give it back";
   return (
     <div className="turn-economy" role="group" aria-label="Your turn resources">
       {myTurn && (
@@ -63,7 +66,8 @@ function PlayerTurnEconomy({
             type="button"
             className="economy-slot"
             aria-pressed={combat.turn.actionUsed}
-            disabled={busy}
+            disabled={busy || (combat.turn.actionUsed && giveBackLocked)}
+            title={combat.turn.actionUsed && giveBackLocked ? lockedTitle : undefined}
             onClick={() =>
               emit(
                 () => command("turn:use", { slot: "action", used: !combat.turn.actionUsed }),
@@ -77,7 +81,8 @@ function PlayerTurnEconomy({
             type="button"
             className="economy-slot"
             aria-pressed={combat.turn.bonusActionUsed}
-            disabled={busy}
+            disabled={busy || (combat.turn.bonusActionUsed && giveBackLocked)}
+            title={combat.turn.bonusActionUsed && giveBackLocked ? lockedTitle : undefined}
             onClick={() =>
               emit(
                 () =>
@@ -97,8 +102,8 @@ function PlayerTurnEconomy({
         type="button"
         className="economy-slot"
         aria-pressed={reactionUsed}
-        disabled={busy}
-        title="Reactions refresh when your turn starts"
+        disabled={busy || (reactionUsed && giveBackLocked)}
+        title={reactionUsed && giveBackLocked ? lockedTitle : "Reactions refresh when your turn starts"}
         onClick={() =>
           emit(
             () => command("turn:use-reaction", { actorId: myId, used: !reactionUsed }),

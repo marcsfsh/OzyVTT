@@ -401,14 +401,18 @@ export const encounterCommands = [
     type: "turn.use",
     operationId: "useTurnSlot",
     description:
-      "Marks the current turn's action or bonus action used/unused. A free manual toggle (never blocks); structured action resolution validates against this state per the encounter's rules mode, and un-marking the action slot also clears any open compound-action instance.",
+      "Marks the current turn's action or bonus action used/unused. A manual toggle: structured action resolution validates against this state per the encounter's rules mode, and un-marking the action slot also clears any open compound-action instance. Only the GM gives back a spent slot: a player's un-marking is the `economy.spent-slot` rules block (a GM note under advise).",
     summary: "Mark the current turn's action or bonus action used/unused.",
     schema: TurnUseSchema,
     malformed: "The turn command is malformed.",
     async run({ principal, request, execute }, kit) {
       const { slot, used } = request;
-      const { state, duplicate } = await execute((draft) => setTurnSlot(draft, slot, used, initiatorOf(principal)));
+      const notes: string[] = [];
+      const { state, duplicate } = await execute((draft) =>
+        setTurnSlot(draft, slot, used, initiatorOf(principal), notes)
+      );
       if (duplicate) return;
+      kit.logRulesNotes(notes, state.combat.turnActorId);
       // Marking a slot spent is narrated like reactions; un-marking (a correction) stays silent.
       const turnActorId = state.combat.turnActorId;
       if (used && turnActorId)
@@ -424,13 +428,18 @@ export const encounterCommands = [
   defineCommand({
     type: "turn.use-reaction",
     operationId: "useReaction",
-    description: "Marks a combatant's reaction used/unused; reactions refresh at the start of their own turn.",
+    description:
+      "Marks a combatant's reaction used/unused; reactions refresh at the start of their own turn. Only the GM gives back a spent reaction: a player's un-marking is the `economy.spent-slot` rules block (a GM note under advise).",
     summary: "Mark a combatant's reaction used/unused.",
     schema: TurnReactionSchema,
     malformed: "The reaction command is malformed.",
     async run({ principal, request, execute }, kit) {
       const { actorId, used } = request;
-      const { duplicate } = await execute((state) => setReactionUsed(state, actorId, used, initiatorOf(principal)));
+      const notes: string[] = [];
+      const { duplicate } = await execute((state) =>
+        setReactionUsed(state, actorId, used, initiatorOf(principal), notes)
+      );
+      if (!duplicate) kit.logRulesNotes(notes, actorId);
       if (!duplicate && used)
         kit.context.broadcastTableEvent({
           kind: "reaction",

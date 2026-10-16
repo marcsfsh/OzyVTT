@@ -238,6 +238,17 @@ export function createKit(context: CommandContext) {
           : null;
     },
 
+    /** A rule the table advises rather than enforces, let through: a note for the GM alone. */
+    logRulesNotes(notes: readonly string[], actorId: string | null) {
+      for (const note of notes)
+        context.appendLog({
+          kind: "action",
+          text: `Rules note: ${note}`,
+          actorIds: actorId === null ? [] : [actorId],
+          gmOnly: true
+        });
+    },
+
     /** Shared narration fan-out for engine transitions (effect ends, dying, consciousness). */
     publishNarrations(events: readonly EffectNarration[]) {
       for (const event of events) {

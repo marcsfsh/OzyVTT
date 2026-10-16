@@ -16,6 +16,8 @@ const RULE_FAMILIES = {
   "economy.bonus-action-used": "economy",
   "economy.reaction-used": "economy",
   "economy.not-your-turn": "economy",
+  // Only the GM gives back a spent action, Bonus Action or Reaction: un-marking it would let a creature act twice.
+  "economy.spent-slot": "economy",
   // Wait mode: no one acts until every player has rolled initiative.
   "initiative.gathering": "economy",
   // Being incapacitated or down means you have no actions: an economy block, not a targeting one.
