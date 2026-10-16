@@ -20,6 +20,7 @@ vi.mock("../socket", () => {
 
 import { socket } from "../socket";
 import { EquipmentPicker } from "./equipment";
+import { ToastProvider } from "@vtt/ui";
 import { CharacterSheet } from "./CharacterSheet";
 
 /**
@@ -128,7 +129,7 @@ describe("the far end of the magic-item ETL", () => {
       ...(chosen!.description ? { description: chosen!.description } : {})
     };
     const holding = { ...ACTOR, inventory: [stored] } as unknown as PlayerActor;
-    render(<CharacterSheet actor={holding} role="player" onClose={() => {}} />);
+    render(<CharacterSheet actor={holding} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
 
     const row = screen.getByText("Wand of the War Mage, +1").closest(".sheet-inv-row") as HTMLElement;
     expect(row).toBeTruthy();
@@ -300,7 +301,7 @@ describe("the wire seam - the real sheet ships the pick", () => {
 
   it("addFromCatalog carries the chooser's pick as baseId, and ships NO stats - the server copies them", async () => {
     const emits = captureEmits();
-    render(<CharacterSheet actor={ACTOR} role="player" onClose={() => {}} />);
+    render(<CharacterSheet actor={ACTOR} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Browse SRD gear" }));
     await user.type(await screen.findByRole("searchbox", { name: "Search equipment" }), "Weapon, +1");
@@ -335,7 +336,7 @@ describe("the wire seam - the real sheet ships the pick", () => {
       }
     };
     const holding = { ...ACTOR, inventory: [bound] } as unknown as PlayerActor;
-    render(<CharacterSheet actor={holding} role="player" onClose={() => {}} />);
+    render(<CharacterSheet actor={holding} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Browse SRD gear" }));
     await user.type(await screen.findByRole("searchbox", { name: "Search equipment" }), "Weapon, +1");
@@ -357,7 +358,7 @@ describe("the wire seam - the real sheet ships the pick", () => {
       category: "weapon"
     };
     const holding = { ...ACTOR, inventory: [legacy] } as unknown as PlayerActor;
-    render(<CharacterSheet actor={holding} role="player" onClose={() => {}} />);
+    render(<CharacterSheet actor={holding} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
     const user = userEvent.setup();
     // The bound-base display is absent and the one sheet-side chooser is offered instead.
     await user.click(await screen.findByRole("button", { name: "Choose what it is" }));

@@ -34,9 +34,28 @@ const SWING = {
 };
 const PARRY = { id: "parry", name: "Parry", activation: "reaction" as const, description: "Adds 2 AC.", damage: [] };
 
-/** A real fixture sheet with the two test actions grafted on, so the definition stays schema-valid. */
-function heroDefinition(id: string, name: string) {
-  return { ...(loadActorFixture("player-character") as Record<string, unknown>), id, name, actions: [SWING, PARRY] };
+/** A charged throw and a charged use with nothing to roll, as an item's actions arrive. */
+const ZAP = {
+  id: "zap",
+  name: "Zap",
+  activation: "action" as const,
+  description: "Ranged Attack Roll: +5.",
+  attack: { bonus: 5, rangeFeet: 60 },
+  damage: [],
+  uses: { limit: 1, per: "long-rest" as const }
+};
+const FLARE = {
+  id: "flare",
+  name: "Flare",
+  activation: "action" as const,
+  description: "A light in the sky.",
+  damage: [],
+  uses: { limit: 2, per: "long-rest" as const }
+};
+
+/** A real fixture sheet with the test actions grafted on, so the definition stays schema-valid. */
+function heroDefinition(id: string, name: string, actions: readonly object[] = [SWING, PARRY]) {
+  return { ...(loadActorFixture("player-character") as Record<string, unknown>), id, name, actions };
 }
 
 /** A live fight: Hero is up, Second Hero and the Goblin are waiting. */
@@ -291,6 +310,44 @@ describe("action.use over the API", () => {
     const feed = await fetch(base + GAME_PATHS.log, { headers: bearer(heroSession) });
     const entries = (await feed.json()).data.entries as ReadonlyArray<{ kind: string; actorId?: string }>;
     expect(entries.filter((entry) => entry.kind === "roll").every((entry) => entry.actorId === HERO)).toBe(true);
+  });
+
+  it("spends a charge on the loose route, refuses past the last, and narrates a use with nothing to roll", async () => {
+    const idle = GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [
+        {
+          id: HERO,
+          name: "Hero",
+          kind: "player-character",
+          visibility: "public",
+          hp: { current: 20, maximum: 20 },
+          definitionId: "hero-def"
+        }
+      ],
+      definitions: [{ id: "hero-def", definition: heroDefinition("hero-def", "Hero", [ZAP, FLARE]) }]
+    });
+    const { base, server } = await boot(idle);
+    const heroSession = server.auth.issuePlayerSession();
+    await post(base, GAME_PATHS.claims, heroSession, { actorId: HERO });
+    const use = (actionId: string) =>
+      post(base, GAME_PATHS.actionUse, heroSession, { commandId: randomUUID(), actorId: HERO, actionId });
+
+    const zapped = await use("zap");
+    expect(zapped.status).toBe(200);
+    expect((await zapped.json()).data.rollIds).toHaveLength(1);
+    expect(server.store.snapshot.actors[0].actionUses).toMatchObject({ zap: 1 });
+    const again = await use("zap");
+    expect(again.status).toBe(409);
+    expect((await again.json()).error.message).toBe("Zap: no uses remaining (1/long rest).");
+    expect(server.store.snapshot.rolls).toHaveLength(1);
+
+    const flared = await use("flare");
+    expect(flared.status).toBe(200);
+    expect((await flared.json()).data).toMatchObject({ route: "loose", rollIds: [] });
+    const feed = await fetch(base + GAME_PATHS.log, { headers: bearer(heroSession) });
+    const texts = ((await feed.json()).data.entries as ReadonlyArray<{ text: string }>).map((entry) => entry.text);
+    expect(texts).toContain("Hero uses Flare (1 use left).");
   });
 
   it("routes a GM's tap on a MONSTER sheet structurally - the old client gate sent it loose", async () => {

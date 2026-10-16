@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { ActorDefinition, GmActor, GmView, PlayerActor, PlayerView } from "@vtt/domain";
-import { Button, IconButton, Modal, SegmentedControl, IconX } from "@vtt/ui";
+import { Button, IconButton, Modal, SegmentedControl, IconX, useToast } from "@vtt/ui";
 import { ConditionEditor } from "./conditions";
 import { RichText } from "./RichText";
 import { DicePanel } from "../dice/DicePanel";
@@ -21,6 +21,7 @@ import { SheetVitals } from "./SheetVitals";
 import { useSheetDefinition } from "./useSheetDefinition";
 import { useSheetEdit } from "./useSheetEdit";
 import { useSheetRolls } from "./useSheetRolls";
+import { command } from "../lib/command";
 import "./character-sheet.css";
 
 /** Per-browser storage for the sheet's dice dock (private-mode safe). */
@@ -71,6 +72,7 @@ export function CharacterSheet({
   onClose: () => void;
 }>) {
   const [feedback, setFeedback] = useState("");
+  const { toast } = useToast();
   const { definitionId, definition, serverActions, derived, showEdited } = useSheetDefinition(actor, role, setFeedback);
   // On the player's own turn, targeted stat-block actions resolve through the shared structured flow
   // (pick target -> roll -> resolve). Combat context is the `combat` prop when embedded in the
@@ -95,6 +97,16 @@ export function CharacterSheet({
     liveCombat.myTurn === true &&
     actor.kind === "player-character" &&
     definition !== null;
+  // Outside the fight an item's action goes to the server's loose route, which rolls it and spends its charges.
+  const inFight = state
+    ? state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actor.id)
+    : liveCombat?.active === true;
+  const onLooseUse = inFight
+    ? null
+    : (actionId: string) =>
+        void command("action:use", { actorId: actor.id, actionId }).then((response) => {
+          if (!response.ok) toast(response.message ?? "That could not be used.", { tone: "error" });
+        });
   const { busy, edit } = useSheetEdit(setFeedback);
   const rolls = useSheetRolls(actor.id, setFeedback);
   const [editMode, setEditMode] = useState<null | "prof" | "identity">(null);
@@ -271,6 +283,7 @@ export function CharacterSheet({
             runnerRef={runnerRef}
             routeAttack={routeAttack}
             structuredActionFor={structuredActionFor}
+            onLooseUse={onLooseUse}
           />
           <p className="sheet-attribution">
             Includes material from the SRD 5.2.1 by Wizards of the Coast LLC, licensed under CC BY 4.0.

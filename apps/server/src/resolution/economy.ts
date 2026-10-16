@@ -149,17 +149,18 @@ function checkLimitedUse({ state, attacker, action, siblings, violations }: Eval
   const limit = useLimitFor(siblings, action);
   const spent =
     uses.per === "turn" ? (state.combat.turn.turnUses[`${attacker.id}:${key}`] ?? 0) : (attacker.actionUses[key] ?? 0);
-  if (spent >= limit) {
-    violations.push({
-      rule: "feature.no-uses-remaining",
-      message: `${action.name}: no uses remaining (${
-        uses.per === "recharge"
-          ? `spent - recharges on ${uses.recharge}+ at the start of its turn`
-          : `${limit}/${USE_SCOPE_LABELS[uses.per]}`
-      }).`
-    });
-  }
+  if (spent >= limit) violations.push({ rule: "feature.no-uses-remaining", message: noUsesRemaining(action, limit) });
   return { key, per: uses.per };
+}
+
+/** Why a limited-use action is refused, in and out of a fight. */
+export function noUsesRemaining(action: DefinitionAction, limit: number): string {
+  const uses = action.uses!;
+  return `${action.name}: no uses remaining (${
+    uses.per === "recharge"
+      ? `spent - recharges on ${uses.recharge}+ at the start of its turn`
+      : `${limit}/${USE_SCOPE_LABELS[uses.per]}`
+  }).`;
 }
 
 /** The action-slot multiattack parents (sibling actions) that list `action` as a component. A bonus-action plan

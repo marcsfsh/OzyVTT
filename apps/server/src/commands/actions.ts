@@ -14,7 +14,7 @@ import { tokenCreatureDistance } from "../movement-narration.js";
 import { settlePlayerHit, type AppliedDamage } from "../player-damage.js";
 import { recordRoll, rolledTerms } from "../roll-history.js";
 import { overrideReason, overrideWaives, rememberOverride } from "../rules-families.js";
-import { looseRollPlan, NOT_YOUR_TURN, offTurnVerdict, routeForTap } from "../tap-routing.js";
+import { looseRollPlan, NOT_YOUR_TURN, offTurnVerdict, routeForTap, spendLooseUses } from "../tap-routing.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, principalTag, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -262,7 +262,7 @@ export const actionCommands = [
     type: "action.use",
     operationId: "useAction",
     description:
-      'Uses an action and lets the SERVER decide what that means. In the fight on this creature\'s turn it delegates to the full structured resolution and acks `route: "resolved"`. Off turn it is refused with the overridable, askable rules block `economy.not-your-turn` (reactions and legendary actions are exempt - taking those off turn is the point); under an `economy` exception of advise/off it resolves, with a GM-only warning line under advise. With no fight running - or with this creature not in the turn order - the server rolls the action\'s own attack die (and, only with `includeDamage`, its damage parts) as attributed rolls, touches no combat state, and acks `route: "loose"` with the roll ids. No hit points ever move on the loose route. GM-grade for any combatant, including a monster\'s sheet; a player session only for their own claimed character.',
+      "Uses an action and lets the SERVER decide what that means. In the fight on this creature's turn it delegates to the full structured resolution and acks `route: \"resolved\"`. Off turn it is refused with the overridable, askable rules block `economy.not-your-turn` (reactions and legendary actions are exempt - taking those off turn is the point); under an `economy` exception of advise/off it resolves, with a GM-only warning line under advise. With no fight running - or with this creature not in the turn order - the server rolls the action's own attack die (and, only with `includeDamage`, its damage parts) as attributed rolls, spends what the action costs (an item's charges or a feature's per-rest uses, and any spell slot an item cast consumes; refused when none remain), touches no combat state, and acks `route: \"loose\"` with the roll ids. An action with nothing to roll is still used, with a feed line. No hit points ever move on the loose route. GM-grade for any combatant, including a monster's sheet; a player session only for their own claimed character.",
     summary:
       "Use an action and let the SERVER route it: resolved in the fight on your turn, refused off turn, loose dice outside a fight (GM anyone; a player their own claimed character).",
     schema: ActionUseSchema,
@@ -291,9 +291,8 @@ export const actionCommands = [
       if (route === "resolved") return { ...(await resolve(false)), route: "resolved" };
 
       const definition = actor.definitionId ? kit.resolveDefinitionIn(snapshot, actor.definitionId) : undefined;
-      const action =
-        effectiveActions(definition, actor, kit.equipmentCatalog()).find((candidate) => candidate.id === actionId) ??
-        builtinAction(actionId);
+      const available = effectiveActions(definition, actor, kit.equipmentCatalog());
+      const action = available.find((candidate) => candidate.id === actionId) ?? builtinAction(actionId);
       if (!action) throw new CommandRejectedError("That action is not on the stat block.");
 
       // Off turn in combat: a real rules block, so the GM can override and the player can ask. Advise
@@ -337,15 +336,16 @@ export const actionCommands = [
         return { ...resolved, route: "resolved", ...(verdict.warning === null ? {} : { warning: verdict.warning }) };
       }
 
-      // Loose: the server rolls the action's dice, attributed to the character, and touches no combat
-      // state. HP only ever moves through the resolver.
+      // Loose: the server rolls the action's dice, attributed to the character, and spends what the action
+      // costs (an item's charges), touching no combat state. HP only ever moves through the resolver.
       const plan = looseRollPlan(action, { includeDamage: includeDamage === true, ...(rollMode ? { rollMode } : {}) });
-      if (plan.length === 0) throw new CommandRejectedError(`${action.name} has nothing to roll outside a fight.`);
       const initiator = initiatorOf(principal);
       const rollIds = plan.map(() => kit.context.newId());
+      let spend: ReturnType<typeof spendLooseUses> = { usesLeft: null, spent: false };
       const { state, duplicate } = await execute((draft) => {
         requireActorAccess(initiator, draft, actorId, "attack");
         const live = draft.actors.find((candidate) => candidate.id === actorId)!;
+        spend = spendLooseUses(live, action, available);
         plan.forEach((entry, index) => {
           const resolution = rollDice(entry.formula, (sides) => kit.context.random(sides));
           recordRoll(draft, {
@@ -366,7 +366,20 @@ export const actionCommands = [
           });
         });
       });
-      if (!duplicate) kit.publishRolls(state, commandId);
+      if (duplicate) return { route: "loose", rollIds };
+      kit.publishRolls(state, commandId);
+      // Rolls narrate themselves; a use with nothing to roll, or one that cost a charge, says so.
+      if (plan.length === 0 || spend.spent) {
+        const left =
+          spend.usesLeft === null ? "" : ` (${spend.usesLeft} ${spend.usesLeft === 1 ? "use" : "uses"} left)`;
+        kit.context.appendLog({
+          kind: "action",
+          text: `${kit.actorName(actorId)} uses ${action.name}${left}.`,
+          actorId,
+          actorIds: [actorId],
+          gmOnly: kit.actorHidden(actorId)
+        });
+      }
       return { route: "loose", rollIds };
     }
   }),
