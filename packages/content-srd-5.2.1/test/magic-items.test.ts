@@ -5,7 +5,7 @@ import { loadArmor, loadEquipment, loadMagicItems, loadWeapons } from "../src/in
 /**
  * What `scripts/build-magic-items.ts` decides, pinned where a reading of the SRD is a choice: the
  * ladder expansion, the worn/carried slot split, the browse categories and the base-item column.
- * Counts the ETL already refuses on (268 rows, slots and rarities in their enums) are not repeated.
+ * Counts the ETL already refuses on (270 rows, slots and rarities in their enums) are not repeated.
  */
 
 const rows = loadMagicItems();
