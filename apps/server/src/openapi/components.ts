@@ -180,6 +180,7 @@ const CONTENT_CATALOGS: ReadonlyArray<readonly [string, z.ZodType]> = [
   ["ContentExtraPick", wire.ContentExtraPickSummarySchema],
   ["ContentMonstersData", catalog("monsters", wire.ContentMonsterSummarySchema)],
   ["ContentConditionsData", catalog("conditions", wire.ContentConditionSummarySchema)],
+  ["ContentGlossaryData", catalog("glossary", wire.ContentGlossaryEntrySchema)],
   ["ContentSkillsData", catalog("skills", wire.ContentSkillSummarySchema)],
   ["ContentLanguagesData", catalog("languages", wire.ContentLanguageSummarySchema)],
   ["ContentSpellsData", catalog("spells", wire.ContentSpellSummarySchema)],

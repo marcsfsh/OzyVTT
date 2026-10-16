@@ -106,6 +106,42 @@ async function issueCredential(base: string, gmToken: string, name: string, scop
   return { token: body.data.token as string, id: body.data.credential.id as string };
 }
 
+describe("death saves over the API", () => {
+  it("lets a player make one death save, on their dying character's own turn", async () => {
+    const { base, server, gmToken, mapAssetId } = await bootWithBattlemap();
+    const playerToken = server.auth.issuePlayerSession();
+    await post(base, GAME_PATHS.claims, playerToken, { commandId: randomUUID(), actorId: HERO_ID });
+    await post(base, GAME_PATHS.encounterStart, gmToken, {
+      commandId: randomUUID(),
+      mapAssetId,
+      entries: [
+        { actorId: SECRET_ID, score: 20 },
+        { actorId: HERO_ID, score: 10 }
+      ]
+    });
+    await post(base, GAME_PATHS.actorHp.replace("{actorId}", HERO_ID), gmToken, {
+      commandId: randomUUID(),
+      actorId: HERO_ID,
+      current: 0
+    });
+    // A typed 12: a plain success, so a random natural 20 can't bring the hero back up mid-test.
+    const roll = (token: string) =>
+      post(base, GAME_PATHS.deathSaveRoll.replace("{actorId}", HERO_ID), token, {
+        commandId: randomUUID(),
+        actorId: HERO_ID,
+        naturalRoll: 12
+      });
+    // The Tyrant's turn: not yet.
+    expect((await roll(playerToken)).status).toBe(409);
+    await post(base, GAME_PATHS.initiativeNext, gmToken, { commandId: randomUUID() });
+    expect((await roll(playerToken)).status).toBe(200);
+    // One per turn.
+    expect((await roll(playerToken)).status).toBe(409);
+    // The GM can still roll one as a correction.
+    expect((await roll(gmToken)).status).toBe(200);
+  });
+});
+
 describe("public game API over /api/v1", () => {
   it("serves GM-full and player-safe snapshots by principal, with ETag polling and no hidden-actor leaks", async () => {
     const { base, server, gmToken } = await boot();
@@ -502,6 +538,13 @@ describe("public game API over /api/v1", () => {
     const conditionsBody = await conditions.json();
     expect(conditionsBody.data.conditions.length).toBeGreaterThan(5);
     expect(conditionsBody.data.attribution).toContain("System Reference Document 5.2.1");
+
+    // The Rules Glossary is reference text any joined player may read.
+    const glossary = await fetch(base + CONTENT_PATHS.glossary, { headers: bearer(playerToken) });
+    expect(glossary.status).toBe(200);
+    const glossaryBody = await glossary.json();
+    expect(glossaryBody.data.glossary.find((entry: { id: string }) => entry.id === "prone")?.tag).toBe("Condition");
+    expect(glossaryBody.data.attribution).toContain("System Reference Document 5.2.1");
 
     const equipment = await fetch(base + CONTENT_PATHS.equipment, { headers: bearer(playerToken) });
     expect(equipment.status).toBe(200);
@@ -1202,6 +1245,18 @@ describe("public game API over /api/v1", () => {
       await (await post(base, GAME_PATHS.actors, gmToken, { commandId, definitionId: "giant-crocodile" })).json()
     );
     const crocId = added.data.actorId as string;
+    // Average hit points by default; rolled on request, from the stat block's Hit Dice.
+    expect(server.store.snapshot.actors.find((actor) => actor.id === crocId)?.hp.maximum).toBe(85);
+    const rolledId = randomUUID();
+    await post(base, GAME_PATHS.actors, gmToken, {
+      commandId: rolledId,
+      definitionId: "giant-crocodile",
+      hitPoints: "roll"
+    });
+    const rolled = server.store.snapshot.actors.find((actor) => actor.id === rolledId)!.hp;
+    expect(rolled.current).toBe(rolled.maximum);
+    expect(rolled.maximum).toBeGreaterThanOrEqual(9 + 27); // 9d12 + 27
+    expect(rolled.maximum).toBeLessThanOrEqual(108 + 27);
 
     const path = GAME_PATHS.actorAvailableActions.replace("{actorId}", crocId);
     expect((await fetch(base + path)).status).toBe(401);

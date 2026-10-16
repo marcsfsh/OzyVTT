@@ -64,10 +64,13 @@ export type MovementRulesOutcome = Readonly<{
  * can't see (Invisible, or the enemy Blinded) unless its Blindsight or Truesight reaches. Sides use the
  * player-character vs monster heuristic; NPCs are GM-adjudicated.
  */
-/** A move spends movement only on the mover's own turn in combat, with movement rules on. */
+/** A move spends movement only on the mover's own turn in combat, with movement rules on. While a wait-mode
+ *  fight gathers initiative no turn has begun, so tokens are still being positioned. */
 function movementCounts(state: GameState, actorId: string): boolean {
+  const gathering = state.combat.playerInitiativeMode === "wait" && state.combat.pendingInitiative.length > 0;
   return (
     state.combat.active &&
+    !gathering &&
     state.combat.turnActorId === actorId &&
     familyModeFor(state.combat, "movement") !== "freeform"
   );

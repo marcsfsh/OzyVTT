@@ -4,6 +4,7 @@ import {
   aggregateRollMode,
   collectRiders,
   d20TestFormula,
+  halveDamageParts,
   parseDiceFormula,
   rescaleDamageParts,
   resolveDice,
@@ -17,7 +18,7 @@ import { recordRoll as recordRollInHistory, rolledTerms } from "./roll-history.j
 import { requireGm, type Initiator } from "./authorization.js";
 import { applyDamageDetailed, previewDamage, adjustableActor } from "./hit-points.js";
 import { setCondition } from "./actor-conditions.js";
-import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty } from "./condition-rules.js";
+import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
 import {
   addEffect,
   CONCENTRATING_TAG,
@@ -95,6 +96,13 @@ export function saveRiderBonus(derivation: EquipmentDerivation, ability: Ability
   return derivation.saveBonus + sumRiders(momentary, "save-bonus");
 }
 
+/** The flat rider bonus to a saving throw that names no ability, such as a death save: riders that apply to
+ *  every save (Ring of Protection, Aura of Protection) and none tied to one ability. */
+export function saveRiderBonusForAnySave(derivation: EquipmentDerivation): number {
+  const momentary = collectRiders(derivation.carriers, { ...derivation.context, moment: "on-saving-throw" });
+  return derivation.saveBonus + sumRiders(momentary, "save-bonus");
+}
+
 const ABILITIES: readonly AbilityId[] = ["str", "dex", "con", "int", "wis", "cha"];
 
 /** Save modifier without situational terms. Precedence: GM-typed `saveOverrides`, the sheet's
@@ -150,6 +158,24 @@ export function saveTotalFor(
     (actor ? exhaustionPenalty(actor) : 0) +
     saveRiderBonus(derivation, ability)
   );
+}
+
+/**
+ * Evasion (Rogue 7, Monk 7, and stat blocks that print it, the Assassin's): a held `evasion` class feature, or a
+ * trait of that name on the sheet.
+ */
+export function hasEvasion(definition: ActorDefinition | undefined): boolean {
+  if (!definition) return false;
+  if ((definition.character?.features ?? []).some((feature) => feature.id === "evasion")) return true;
+  return Object.values(definition.extensions ?? {}).some((bag) => {
+    const traits = bag !== null && typeof bag === "object" ? (bag as { traits?: unknown }).traits : undefined;
+    return (
+      Array.isArray(traits) &&
+      traits.some(
+        (trait) => trait !== null && typeof trait === "object" && (trait as { name?: unknown }).name === "Evasion"
+      )
+    );
+  });
 }
 
 /** Create one pending save per target when a save action resolves. Called inside the action:resolve mutation. */
@@ -401,29 +427,36 @@ export function answerSave(
   // are kept (`rescaleDamageParts`) so resistances still apply. Range is bounded by `SaveAnswerSchema`
   // and ownership by `adjustableActor` above.
   const proposedTotal = damageOverride ?? pending.proposedDamage;
-  // Typed parts (ADR-0020) halve per part on success and run the defense pipeline; older saves fall
-  // back to the untyped total.
+  // Typed parts (ADR-0020) halve on success (the total, rounded down once) and run the defense pipeline; older
+  // saves fall back to the untyped total.
   const proposed = pending.proposedDamageParts;
   const parts =
     proposed && proposed.length > 0 && damageOverride !== undefined
       ? rescaleDamageParts(proposed, damageOverride)
       : proposed;
+  // SRD Evasion: on a Dexterity save for half damage, a success takes none and a failure half.
+  const evasion =
+    pending.ability === "dex" &&
+    pending.halfOnSuccess &&
+    !isIncapacitated(target) &&
+    hasEvasion(target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined);
+  const halved = success !== evasion;
   const outcomeParts =
     parts && parts.length > 0
-      ? !success
-        ? parts
-        : pending.halfOnSuccess
-          ? parts.map((part) => ({ ...part, amount: Math.floor(part.amount / 2) }))
-          : []
+      ? success && (!pending.halfOnSuccess || evasion)
+        ? []
+        : halved
+          ? halveDamageParts(parts)
+          : parts
       : null;
   const outcomeDamage =
     outcomeParts !== null
       ? outcomeParts.reduce((sum, part) => sum + part.amount, 0)
-      : !success
-        ? proposedTotal
-        : pending.halfOnSuccess
+      : success && (!pending.halfOnSuccess || evasion)
+        ? 0
+        : halved
           ? Math.floor(proposedTotal / 2)
-          : 0;
+          : proposedTotal;
   const outcomeCondition =
     !success && (pending.conditionIds.length > 0 || (pending.onFailEffect?.linkedConditionIds.length ?? 0) > 0);
 

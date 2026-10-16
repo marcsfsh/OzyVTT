@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema } from "@vtt/domain";
-import { applyDamage, healActor, healthBandOf, setCurrentHp, setTemporaryHp } from "../src/hit-points.js";
+import { applyDamage, healActor, healthBandOf, setCurrentHp, setMaximumHp, setTemporaryHp } from "../src/hit-points.js";
 import { startEncounter } from "../src/encounter.js";
 import { projectPlayerView, projectPublicInitiative } from "../src/projections.js";
 import { projectViewerInitiative } from "../src/viewer-encounter.js";
@@ -60,6 +60,15 @@ describe("hit point tracking", () => {
     expect(game.actors[0].hp.current).toBe(20);
     setCurrentHp(game, IDS.pc, 0, GM);
     expect(game.actors[0].hp.current).toBe(0);
+  });
+
+  it("lets the GM set a new maximum, keeping current hit points within it", () => {
+    const game = state();
+    setMaximumHp(game, IDS.pc, 30, GM);
+    expect(game.actors[0].hp).toMatchObject({ maximum: 30, current: 20 });
+    setMaximumHp(game, IDS.pc, 12, GM);
+    expect(game.actors[0].hp).toMatchObject({ maximum: 12, current: 12 });
+    expect(() => setMaximumHp(game, IDS.pc, 40, OWNER)).toThrow(/Only the GM/);
   });
 
   it("lets a player adjust only their own claimed character", () => {

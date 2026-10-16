@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { rosterActors, type GmActor } from "@vtt/domain";
 import { Button, IconPlus, useToast } from "@vtt/ui";
+import { EncounterBudgetLine } from "../encounter/EncounterBudget";
 import { MonsterBrowser } from "../encounter/MonsterBrowser";
 import { MapPicker, type PickerMap } from "../maps/MapPicker";
 import type { MapSelection } from "../maps/MapManager";
@@ -178,6 +179,7 @@ export function ScenePrepPanel({
         emptyNote={emptyNote}
         placementHint={placementHint}
       />
+      <EncounterBudgetLine actors={actors} staged={staged} />
 
       <div className="scene-prep-adds">
         <Button

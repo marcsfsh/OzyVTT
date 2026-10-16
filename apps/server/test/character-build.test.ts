@@ -225,6 +225,11 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
     expect(definition.proficiencyBonus).toBe(3);
   });
 
+  it("adds Alert's Proficiency Bonus to initiative on top of Dexterity", () => {
+    // Dex 13 (+1) and Alert at level 5 (PB 3).
+    expect(definition.initiativeBonus).toBe(4);
+  });
+
   it("computes rolled HP as max(roll, average) per level on the class hit die", () => {
     // Level 1: 10+2. Rolls 1/10/4/6 vs d10 average 6 -> 6/10/6/6, +2 Con each = 48.
     expect(definition.hitPoints.maximum).toBe(48);
@@ -1352,6 +1357,65 @@ describe("an action that shares a pool is gated on the POOL's size", () => {
         deps()
       )
     ).toThrowError(/no uses remaining \(2\/long rest\)/);
+  });
+});
+
+describe("a Cleric's Channel Divinity heals and harms by the printed formula", () => {
+  // Wisdom 15 + 2 = 17: +3.
+  const definition = buildCharacterDefinition(clericInput(), library, defaultPolicy);
+  const actionOf = (id: string) => definition.actions.find((action) => action.id === id)!;
+
+  it("adds the Wisdom modifier to Divine Spark, and gives it its healing branch", () => {
+    expect(actionOf("divine-spark").damage).toEqual([{ formula: "1d8 + 3", type: "radiant" }]);
+    expect(actionOf("divine-spark-heal")).toMatchObject({
+      healing: { formula: "1d8 + 3" },
+      uses: { pool: "channel-divinity" }
+    });
+  });
+
+  it("divides Preserve Life's five times the Cleric level among Bloodied targets, none past half its maximum", () => {
+    expect(actionOf("preserve-life").healing).toEqual({ formula: "15", divided: true, upToFractionOfMaximum: 0.5 });
+    const state = emptyState();
+    importActorDefinition(state, definition, ACTOR_ID, "public");
+    const FRIEND = "7a4b1a58-0f6c-4a52-9a51-2f60cf6f9d13";
+    state.actors.push({
+      ...state.actors[0],
+      id: FRIEND,
+      name: "Friend",
+      definitionId: undefined,
+      hp: { current: 2, maximum: 40, temporary: 0 }
+    });
+    state.actors[0].hp = { ...state.actors[0].hp, current: 1 };
+    startEncounter(
+      state,
+      {
+        mapAssetId: "20000000-0000-5000-8000-000000000001",
+        entries: [
+          { actorId: ACTOR_ID, score: 20 },
+          { actorId: FRIEND, score: 5 }
+        ]
+      },
+      () => 1,
+      { width: 900, height: 600, calibration: null }
+    );
+    const cast = resolveDefinitionAction(
+      state,
+      actionOf("preserve-life"),
+      { actorId: ACTOR_ID, targetIds: [ACTOR_ID, FRIEND], commandId: "50000000-0000-4000-8000-00000000003a" },
+      {
+        random: () => 1,
+        newRollId: () => "40000000-0000-4000-8000-00000000003a",
+        gmSessionId: "30000000-0000-4000-8000-00000000000a",
+        now: () => "2026-07-27T00:00:00.000Z",
+        definition
+      }
+    );
+    // 15 split: the Cleric (max 24) can take 11 to reach half, so 7 each, then the rest to whoever has room.
+    const cleric = state.actors[0];
+    const friend = state.actors.find((actor) => actor.id === FRIEND)!;
+    expect(cast.healing?.targets.reduce((sum, target) => sum + target.regained, 0)).toBe(15);
+    expect(cleric.hp.current).toBeLessThanOrEqual(Math.floor(cleric.hp.maximum / 2));
+    expect(friend.hp.current).toBeLessThanOrEqual(20);
   });
 });
 

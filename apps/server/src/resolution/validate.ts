@@ -4,6 +4,7 @@ import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
 import { effectiveModeFor, overrideCovers, overrideReason, overrideWaives } from "../rules-families.js";
 import { upcastAction } from "../item-actions.js";
+import { coverBonusOf, coverFor } from "../cover.js";
 import { builtinHandlerFor } from "./builtins.js";
 import type { DefinitionAction, LiveActor, ResolveContext, ResolveDependencies, ResolveInput } from "./context.js";
 import { planEconomy, type EconomyPlan } from "./economy.js";
@@ -34,6 +35,7 @@ function combatantsOf(
   const spendsALimitedUse = action.uses !== undefined || action.spellSlot !== undefined;
   const structuredWithoutTargets =
     (action.grants !== undefined && action.grants.target !== "target") ||
+    action.healing?.self === true ||
     action.multiattack !== undefined ||
     spendsALimitedUse ||
     input.builtin === true;
@@ -71,10 +73,17 @@ export function openResolve(
     : planEconomy(state, attacker, action, input, deps.definition, warnings, deps.distanceFeet, siblings);
   let overridden = economy.overridden;
 
-  // GM-adjudicated cover (SRD Cover, no line-of-sight engine): total cover can't be targeted;
-  // half/three-quarters add to AC and Dexterity saves.
+  // GM-adjudicated cover (SRD Cover, no line-of-sight engine): the GM's choice for this resolve, else the cover the
+  // GM marked the target with, whoever attacks. Total cover can't be targeted; half/three-quarters add to AC and
+  // Dexterity saves.
   const coverMode = effectiveModeFor(state.combat, "cover.total");
-  if (input.cover === "total" && coverMode !== "freeform") {
+  const attackCover = targets.length === 1 ? coverFor(input.cover, targets[0]) : (input.cover ?? null);
+  // An area's other targets still take it, so a marked creature among several is the GM's to remove.
+  if (targets.length > 1)
+    for (const target of targets)
+      if ((input.cover ?? null) === null && coverFor(null, target) === "total")
+        warnings.push(`${target.name} has Total Cover - leave it out if the effect can't reach it.`);
+  if (attackCover === "total" && coverMode !== "freeform") {
     const waived = overrideWaives(input.override, "cover.total");
     if (coverMode === "strict" && !waived && !overrideCovers(state.combat.turn, "cover.total"))
       throw new RulesBlockedError("cover.total", "The target has Total Cover and can't be targeted directly.");
@@ -96,7 +105,7 @@ export function openResolve(
     riderItemId,
     plan: economy.plan,
     overridden,
-    coverBonus: input.cover === "half" ? 2 : input.cover === "three-quarters" ? 5 : 0,
+    coverBonus: coverBonusOf(attackCover),
     rollBase: {
       commandId: input.commandId,
       initiatorSessionId: deps.initiatorSessionId ?? deps.gmSessionId,
@@ -125,7 +134,8 @@ export function openResolve(
     reactionPrompts: [],
     builtinSave: null,
     opens: null,
-    castId: null
+    castId: null,
+    hitRiders: []
   };
   if (builtin?.prepare) ctx.action = builtin.prepare(ctx);
   // A spell cast with a higher slot rolls that slot's dice; a paid replay names the slot it was cast with.

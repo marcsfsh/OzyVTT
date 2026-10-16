@@ -6,6 +6,7 @@ import { halvedDamageParts, previewDamage } from "../hit-points.js";
 import { offerableReaction } from "../reaction-offers.js";
 import { applyFailureEffect, createPendingSaves } from "../saving-throws.js";
 import type { ResolveContext } from "./context.js";
+import { coverBonusOf, coverFor } from "../cover.js";
 import { damagePartsOf } from "./damage.js";
 
 type HalfDamageReaction = Extract<ActionReaction, { response: "half-damage" }>;
@@ -128,7 +129,9 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
           distanceFeet: deps.distanceFeet?.(attacker.id, target.id) ?? null,
           initiatorRole: deps.initiatorRole ?? "gm",
           initiatorSessionId: deps.initiatorSessionId ?? deps.gmSessionId,
-          untilNextTurn: offer.reaction.untilNextTurn === true
+          untilNextTurn: offer.reaction.untilNextTurn === true,
+          // The extras chosen for the hit ride the replay, spent only if it still hits.
+          hitOptions: (input.hitOptions ?? []).map((choice) => ({ ...choice }))
         },
         createdAt: Date.parse(deps.now())
       }
@@ -184,7 +187,7 @@ export function failureEffectFor(
  * outright (Power Word Stun) lands at once, and only its repeated save can end it.
  */
 export function parkActionSave(ctx: ResolveContext): void {
-  const { state, action, attacker, targets, input, deps, damage, attack } = ctx;
+  const { state, action, attacker, targets, input, deps, attack } = ctx;
   if (!action.save) return;
   const rider = attack !== null;
   if (rider && attack.outcome !== "hit" && attack.outcome !== "crit") return;
@@ -221,23 +224,30 @@ export function parkActionSave(ctx: ResolveContext): void {
     }
   }
   if (saving.length === 0) return;
-  createPendingSaves(state, {
-    sourceActorId: attacker.id,
-    sourceName: attacker.name,
-    actionName: action.name,
-    ability: action.save.ability,
-    dc: action.save.dc,
-    targetIds: saving.map((target) => target.id),
-    proposedDamage: rider ? 0 : damage.reduce((sum, part) => sum + part.total, 0),
-    proposedDamageParts: rider ? [] : damage.map((part) => ({ amount: part.total, type: part.type })),
-    // Cover adds to Dexterity saving throws (SRD Cover) - carried on the prompt.
-    saveBonus: action.save.ability === "dex" ? ctx.coverBonus : 0,
-    halfOnSuccess: action.save.successDamage === "half",
-    conditionIds,
-    ...(onFailEffect ? { onFailEffect } : {}),
-    newSaveId: deps.newRollId,
-    createdAt: Date.parse(deps.now())
-  });
+  const parts = rider ? [] : damagePartsOf(ctx);
+  // Cover adds to Dexterity saving throws (SRD Cover), each target's own: the GM's choice for this resolve, else the
+  // cover the GM marked it with. Carried on the prompt.
+  const saveBonusOf = (target: (typeof targets)[number]) =>
+    action.save!.ability === "dex" ? coverBonusOf(coverFor(input.cover, target)) : 0;
+  const groups = new Map<number, string[]>();
+  for (const target of saving) groups.set(saveBonusOf(target), [...(groups.get(saveBonusOf(target)) ?? []), target.id]);
+  for (const [saveBonus, targetIds] of groups)
+    createPendingSaves(state, {
+      sourceActorId: attacker.id,
+      sourceName: attacker.name,
+      actionName: action.name,
+      ability: action.save.ability,
+      dc: action.save.dc,
+      targetIds,
+      proposedDamage: parts.reduce((sum, part) => sum + part.amount, 0),
+      proposedDamageParts: parts,
+      saveBonus,
+      halfOnSuccess: action.save.successDamage === "half",
+      conditionIds,
+      ...(onFailEffect ? { onFailEffect } : {}),
+      newSaveId: deps.newRollId,
+      createdAt: Date.parse(deps.now())
+    });
 }
 
 const conditionDeps = (deps: ResolveContext["deps"]) => ({

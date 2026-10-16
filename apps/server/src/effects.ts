@@ -17,6 +17,8 @@ export type EffectNarration = Readonly<{
   immune?: true;
   /** Who the line names as the cause (an effect's source), so the table's copy can mask a hidden one. */
   source?: Readonly<{ actorId: string; name: string | null }>;
+  /** For the GM alone even when the actor is visible: a monster's spent resources are GM knowledge. */
+  gmOnly?: true;
 }>;
 
 const MAX_EFFECTS = 20;

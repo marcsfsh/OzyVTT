@@ -30,6 +30,11 @@ export const PickBudgetScalingSchema = z.strictObject({
 export const DiceFormulaSchema = z
   .string()
   .regex(/^\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?$/i, "Use a safe dice formula such as 1d8 + 3.");
+/** Damage an action deals: dice, or a fixed amount that doesn't use a roll ("1 Piercing damage", a Blowgun). A crit
+ * doubles only dice, so a fixed amount stays as it is. */
+export const DamageFormulaSchema = z
+  .string()
+  .regex(/^(?:\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?|\d+)$/i, "Use dice such as 1d8 + 3, or a number.");
 /** Hit points restored: dice, or a flat number (Heal's 70). */
 export const HealingFormulaSchema = z
   .string()
@@ -161,15 +166,15 @@ export const RiderTriggerSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("on-initiative-roll") }).strict(),
   z.object({ type: z.literal("on-taking-damage") }).strict(),
   // ---- filters ----
-  /** `spell` is an attack that casts a spell; `reaction` and `opportunity` match only when the resolver announces
-   * that trigger. */
+  /** `spell` is an attack that casts a spell; `weapon` one made with a weapon (not a spell, an Unarmed Strike or a
+   * monster's natural attack); `reaction` and `opportunity` match only when the resolver announces that trigger. */
   z
     .object({
       type: z.literal("attack-kind-is"),
       kinds: z
-        .array(z.enum(["melee", "ranged", "spell", "unarmed", "thrown", "reaction", "opportunity"]))
+        .array(z.enum(["melee", "ranged", "spell", "unarmed", "thrown", "reaction", "opportunity", "weapon"]))
         .min(1)
-        .max(7)
+        .max(8)
     })
     .strict(),
   z.object({ type: z.literal("weapon-property-is"), properties: z.array(RiderSlugSchema).min(1).max(12) }).strict(),
@@ -343,7 +348,15 @@ export const ModifierSchema = z.discriminatedUnion("type", [
       ...riderGate
     })
     .strict(),
-  z.object({ type: z.literal("initiative"), amount: z.number().int().min(-5).max(10), ...riderGate }).strict(),
+  /** `proficiencyBonus` adds the creature's Proficiency Bonus on top of `amount` (Alert). */
+  z
+    .object({
+      type: z.literal("initiative"),
+      amount: z.number().int().min(-5).max(10),
+      proficiencyBonus: z.boolean().optional(),
+      ...riderGate
+    })
+    .strict(),
   z.object({ type: z.literal("extra-attack"), count: z.number().int().min(1).max(3), ...riderGate }).strict(),
   /** AC = 10 + DEX + this ability while wearing no armor (Barbarian, Monk, and any homebrew that wants it). */
   z
@@ -390,14 +403,14 @@ export const ModifierSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("damage-bonus"), amount: z.number().int().min(-10).max(10), ...riderGate }).strict(),
   /** Extra typed damage as dice (`formula`), the bearer's ability modifier (`abilityModifier`), or both.
    * `damageType` absent takes the attack's own type (Empowered Evocation follows the spell). `doubleOnCritical`
-   * defaults false: 5e does not double dice added after the attack. */
+   * defaults true: a Critical Hit rolls the attack's other damage dice twice too (SRD "Critical Hits"). */
   z
     .object({
       type: z.literal("extra-damage"),
       formula: DiceFormulaSchema.optional(),
       abilityModifier: AbilitySchema.optional(),
       damageType: DamageTypeSchema.optional(),
-      doubleOnCritical: z.boolean().default(false),
+      doubleOnCritical: z.boolean().default(true),
       ...riderGate
     })
     .strict(),
@@ -405,7 +418,7 @@ export const ModifierSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("critical-range"), threshold: z.number().int().min(15).max(20), ...riderGate }).strict(),
   /** Extra untyped weapon dice on a crit (Savage Attacks). A typed crit-only 1d6 fire is `extra-damage` + `when: [{on-critical-hit}]` instead. */
   z.object({ type: z.literal("critical-bonus-dice"), count: z.number().int().min(1).max(4), ...riderGate }).strict(),
-  /** Flat reduction of incoming damage, after resistance. */
+  /** Flat reduction of incoming damage, taken off before resistance (SRD Order of Application). */
   z.object({ type: z.literal("damage-reduction"), amount: z.number().int().min(1).max(30), ...riderGate }).strict(),
   z
     .object({
@@ -414,7 +427,8 @@ export const ModifierSchema = z.discriminatedUnion("type", [
       ...riderGate
     })
     .strict(),
-  /** The mirror of `damage-resistance`; `adjustDamageParts` applies the SRD rule that both together cancel out. */
+  /** The mirror of `damage-resistance`; with both, `adjustDamageParts` halves first and then doubles (SRD Order of
+   * Application). */
   z
     .object({
       type: z.literal("damage-vulnerability"),
@@ -1077,11 +1091,22 @@ export const ActionSchema = z.object({
     })
     .optional(),
   damage: z
-    .array(z.object({ formula: DiceFormulaSchema, type: z.string().min(1).max(40) }))
+    .array(z.object({ formula: DamageFormulaSchema, type: z.string().min(1).max(40) }))
     .max(8)
     .default([]),
   /** Hit points each target regains, rolled once and applied when the action resolves (Cure Wounds). */
-  healing: z.object({ formula: HealingFormulaSchema }).strict().optional(),
+  healing: z
+    .object({
+      formula: HealingFormulaSchema,
+      /** The user heals itself (Second Wind), so there is no target to pick. */
+      self: z.literal(true).optional(),
+      /** The roll is one pool divided among the targets (Preserve Life), not regained by each. */
+      divided: z.literal(true).optional(),
+      /** No target is healed past this fraction of its maximum (Preserve Life: half). */
+      upToFractionOfMaximum: z.number().min(0.1).max(1).optional()
+    })
+    .strict()
+    .optional(),
   /** Compound action: one shared action slot, components tracked (crocodile Multiattack = one Bite + one Tail). */
   multiattack: z
     .array(z.object({ actionId: z.string().regex(/^[a-z0-9-]+$/), count: z.number().int().min(1).max(4) }).strict())
@@ -1153,6 +1178,34 @@ export const ActionSchema = z.object({
   /** The area it covers, for the map template. Filled from the description where the action enters the system
    *  (the content build, a homebrew save, an import), so play never reads the prose. */
   area: ActionAreaSchema.optional(),
+  /** Damage a hit adds or swaps in under a printed condition ("plus 2 (1d4) Slashing damage if the attack roll had
+   *  Advantage", "or 2 (1d4) Piercing damage if the swarm is Bloodied"). The engine applies what it can see; a
+   *  charge, which it can't, is offered on the hit for the attacker to confirm. */
+  conditionalDamage: z
+    .array(
+      z
+        .object({
+          when: z.enum(["advantage", "self-bloodied", "target-bloodied", "target-grappled-by-self", "charge"]),
+          /** `instead` replaces the first damage part; `plus` adds to the hit. */
+          mode: z.enum(["instead", "plus"]),
+          damage: z
+            .array(z.object({ formula: DamageFormulaSchema, type: z.string().min(1).max(40) }).strict())
+            .min(1)
+            .max(2),
+          /** A charge's run-up, in feet. */
+          feet: z.number().int().min(5).max(120).optional(),
+          /** Only against a target of at most this size. */
+          maxTargetSize: SizeSchema.optional(),
+          /** Conditions it imposes too (a charge's Prone). */
+          conditions: z.array(ConditionIdSchema).max(2).optional()
+        })
+        .strict()
+    )
+    .max(3)
+    .optional(),
+  /** What the engine leaves to the GM, shown when the action resolves: damage on later turns ("takes 10 (3d6) Acid
+   *  damage at the start of each of the cube's turns") or a branch it can't choose. */
+  reminder: z.string().min(1).max(600).optional(),
   /** A Multiattack whose attacks the build could not read: the engine cannot track them against the action, so
    *  the creature's action-slot checks soften to notes. */
   untrackedMultiattack: z.literal(true).optional()

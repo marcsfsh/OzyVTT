@@ -4,6 +4,7 @@ import type {
   ActionRollMode,
   ActionTableNarration,
   GameState,
+  HitOptionChoice,
   RollRecord
 } from "@vtt/domain";
 import {
@@ -62,6 +63,8 @@ export type ResolveInput = Readonly<{
   economyPaid?: boolean;
   /** A reaction's AC bonus against this attack only (Parry), added to the target's AC. */
   reactionAcBonus?: Readonly<{ amount: number; source: string }>;
+  /** Extras to add to the hit, chosen from the preview's offers (Sneak Attack, a smite and its slot, a charge). */
+  hitOptions?: readonly HitOptionChoice[];
 }>;
 
 export type ResolveDependencies = Readonly<{
@@ -133,7 +136,7 @@ export type ResolveContext = {
   crit: boolean;
   /** The roll-specific facts riders filter on (attack kind, target size, damage types...). */
   riderFilters: Omit<Partial<RiderContext>, "moment">;
-  readonly damage: Array<{ formula: string; type: string; total: number }>;
+  readonly damage: Array<{ formula: string; type: string; total: number; source?: string }>;
   readonly bonusDamage: Array<{ amount: number; type: string; source: string }>;
   /** The weapon mastery in force on this swing; null unless a mastery applies to an attack that rolled. */
   masterySwing: MasterySwing | null;
@@ -153,6 +156,8 @@ export type ResolveContext = {
   opens: ActionResolution["opens"] | null;
   /** The Concentration this cast started (a Concentration spell): what its failed saves impose is sustained by it. */
   castId: string | null;
+  /** The extras this hit carries whose costs are spent after the hit's own (`spendHitOptions`). */
+  readonly hitRiders: Array<{ action: DefinitionAction; slotLevel?: number }>;
 };
 
 /** Records one rolled formula in the shared history, attributed like every roll of this resolve. */

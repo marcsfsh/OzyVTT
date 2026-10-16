@@ -11,7 +11,7 @@ import { ActionResolveSchema, ActionUseSchema, DiceRollSchema } from "@vtt/domai
 import { CommandRejectedError } from "../game-store.js";
 import { damageAdjustmentDetail } from "../hit-points.js";
 import { tokenCreatureDistance } from "../movement-narration.js";
-import { settlePlayerHit, type AppliedDamage } from "../player-damage.js";
+import { settlePlayerDamage, type AppliedDamage } from "../player-damage.js";
 import { recordRoll, rolledTerms } from "../roll-history.js";
 import { overrideReason, overrideWaives, rememberOverride } from "../rules-families.js";
 import { looseRollPlan, NOT_YOUR_TURN, offTurnVerdict, routeForTap, spendLooseUses } from "../tap-routing.js";
@@ -68,7 +68,7 @@ export const actionCommands = [
       const gmSessionId = sessionIdOf(principal);
       let resolution: ReturnType<typeof resolveDefinitionAction> | undefined;
       // A player's confirmed hit in "direct" mode applies server-side inside the mutation; captured for narration.
-      let playerDamageApplied: AppliedDamage | undefined;
+      let playerDamageApplied: readonly AppliedDamage[] = [];
       const { state, duplicate } = await execute((draft) => {
         const attacker = draft.actors.find((item) => item.id === actorId);
         if (!attacker) throw new CommandRejectedError("That combatant no longer exists.");
@@ -135,7 +135,8 @@ export const actionCommands = [
             attackTotal,
             critical,
             ...(request.pushFeet !== undefined ? { pushFeet: request.pushFeet } : {}),
-            ...(request.slotLevel !== undefined ? { slotLevel: request.slotLevel } : {})
+            ...(request.slotLevel !== undefined ? { slotLevel: request.slotLevel } : {}),
+            ...(request.hitOptions ? { hitOptions: request.hitOptions } : {})
           },
           {
             random: (sides) => kit.context.random(sides),
@@ -154,14 +155,20 @@ export const actionCommands = [
         // A player's confirmed hit is settled server-side per the player-damage policy (GM-confirmed proposal
         // by default, or applied directly), so the player never mutates a creature they don't own.
         if (isPlayer)
-          playerDamageApplied =
-            settlePlayerHit(draft, resolution, attacker.name, actorId, draft.combat.playerDamageMode, {
+          playerDamageApplied = settlePlayerDamage(
+            draft,
+            resolution,
+            attacker.name,
+            actorId,
+            draft.combat.playerDamageMode,
+            {
               resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
               newId: kit.context.newId,
               now: () => Date.now(),
               catalog: kit.equipmentCatalog(),
               distanceFeet
-            }) ?? undefined;
+            }
+          );
         // Record the blast as a public shape; id=commandId keeps re-delivery idempotent.
         if (template)
           addAnnotation(
@@ -209,9 +216,8 @@ export const actionCommands = [
           });
         }
         kit.narrateResolution(resolution, actorId);
-        if (playerDamageApplied) {
+        for (const { outcome, targetId, sourceActorId, label } of playerDamageApplied) {
           // Narrated like actor:apply-damage. Both actors ride actorIds so the line is gm-only if either is hidden.
-          const { outcome, targetId, sourceActorId, label } = playerDamageApplied;
           const detail = damageAdjustmentDetail(outcome.application);
           const text = `${label} hit ${kit.actorName(targetId)} for ${outcome.application.totalApplied} damage${detail}.`;
           kit.context.broadcastTableEvent({ kind: "damage", text, actorIds: [targetId, sourceActorId] });

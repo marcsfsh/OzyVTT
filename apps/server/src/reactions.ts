@@ -382,6 +382,7 @@ function answerParkedAttack(answer: Answer): ReactionOutcome {
       attackKinds: parked.attackKinds,
       ...(parked.pushFeet !== null ? { pushFeet: parked.pushFeet } : {}),
       ...(parked.slotLevel !== null ? { slotLevel: parked.slotLevel } : {}),
+      ...(parked.hitOptions.length > 0 ? { hitOptions: parked.hitOptions } : {}),
       economyPaid: true,
       ...(use && effectName === null && pending.acBonus !== null
         ? { reactionAcBonus: { amount: pending.acBonus, source: pending.actionName } }

@@ -983,6 +983,22 @@ export const openApiDocument = {
         }
       }
     },
+    [CONTENT_PATHS.glossary]: {
+      get: {
+        operationId: "listContentGlossary",
+        security: gameSecurityWithPlayer("game:read"),
+        description:
+          "The SRD 5.2.1 Rules Glossary, one entry per term with its bracketed tag (public information - any GM, player, or integration session). Includes the CC BY 4.0 attribution line.",
+        responses: {
+          "200": {
+            description: "Rules Glossary entries",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ContentGlossaryResponse" } } }
+          },
+          "401": apiError,
+          "403": apiError
+        }
+      }
+    },
     [CONTENT_PATHS.conditions]: {
       get: {
         operationId: "listContentConditions",
@@ -2130,6 +2146,7 @@ export const openApiDocument = {
       },
       ContentMonsterActionsResponse: envelopeSchema("#/components/schemas/ContentMonsterActionsData"),
       ContentConditionsResponse: envelopeSchema("#/components/schemas/ContentConditionsData"),
+      ContentGlossaryResponse: envelopeSchema("#/components/schemas/ContentGlossaryData"),
       ContentSkillsResponse: envelopeSchema("#/components/schemas/ContentSkillsData"),
       ContentLanguagesResponse: envelopeSchema("#/components/schemas/ContentLanguagesData"),
       ContentSpellsResponse: envelopeSchema("#/components/schemas/ContentSpellsData"),

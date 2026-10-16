@@ -600,6 +600,36 @@ describe("report test 9 - zero HP, dying, and healing", () => {
       expect(game.rolls.length).toBe(recorded); // a confirmed/typed roll records nothing new
     });
 
+    it("adds what a saving throw adds (Exhaustion, save bonuses), while the die alone decides a 1 or a 20", () => {
+      const { game, pip } = dying();
+      // A 12 is a success on its own, but Exhaustion 3 takes 6 off the total.
+      const tired = rollDeathSave(
+        game,
+        pip,
+        { commit: false, modifier: -6 },
+        deps(() => 12)
+      );
+      expect(tired.outcome.outcome).toBe("failure");
+      // A 9 with a +1 Ring of Protection reaches 10.
+      expect(
+        rollDeathSave(
+          game,
+          pip,
+          { commit: false, modifier: 1 },
+          deps(() => 9)
+        ).outcome.outcome
+      ).toBe("success");
+      // A natural 20 is still a 20, whatever the penalty.
+      expect(
+        rollDeathSave(
+          game,
+          pip,
+          { commit: false, modifier: -6 },
+          deps(() => 20)
+        ).outcome.regainsOneHitPoint
+      ).toBe(true);
+    });
+
     it("a natural 20 signals the regain-1-HP heal and resets the pips", () => {
       const { game, pip } = dying();
       pip.deathSaves = { successes: 1, failures: 2, stable: false };
@@ -2405,6 +2435,45 @@ describe("range and reach validation (SRD Making an Attack / Range)", () => {
     expect(JSON.stringify(unseen)).not.toContain("Giant Crocodile 2");
     expect(unseen.rollMode?.disadvantage ?? []).toEqual([]);
   });
+
+  it("an adjacent creature spoils the shot only while it is an able, living enemy", () => {
+    const shoot = (game: GameState) =>
+      resolveDefinitionAction(
+        game,
+        actionOf(pipDefinition, "shortbow"),
+        { actorId: IDS.pip, targetIds: [IDS.croc1], commandId: nextCommandId() },
+        {
+          ...deps([18, 3], pipDefinition, (_a, b) => (b === IDS.croc2 ? 5 : 40)),
+          resolveDefinition: (id) => game.definitions.find((entry) => entry.id === id)?.definition
+        }
+      );
+    const crowded = () =>
+      buildGame([
+        { actorId: IDS.pip, score: 20 },
+        { actorId: IDS.croc1, score: 12 },
+        { actorId: IDS.croc2, score: 8 }
+      ]);
+    const neighbour = (game: GameState) => game.actors.find((actor) => actor.id === IDS.croc2)!;
+
+    // A monster at 0 HP is dead (SRD Monster Death), even with its token still on the map.
+    const dead = crowded();
+    neighbour(dead).hp.current = 0;
+    expect(shoot(dead).rollMode?.disadvantage ?? []).toEqual([]);
+
+    // A hostile NPC is an enemy like a monster.
+    const bandit = crowded();
+    neighbour(bandit).kind = "npc";
+    expect(shoot(bandit).rollMode?.disadvantage).toContain("Enemy within 5 feet (Giant Crocodile 2)");
+
+    // A creature whose stat block is friendly stands with the party (a summoned ally), whatever its kind.
+    const ally = crowded();
+    ally.definitions.push({
+      id: "friendly-croc",
+      definition: { ...crocodileDefinition, token: { ...crocodileDefinition.token, disposition: "friendly" } }
+    });
+    neighbour(ally).definitionId = "friendly-croc";
+    expect(shoot(ally).rollMode?.disadvantage ?? []).toEqual([]);
+  });
 });
 
 describe("cover - GM-adjudicated, server math (SRD Cover)", () => {
@@ -2761,6 +2830,38 @@ describe("underwater combat (SRD Underwater Combat) - GM environment toggle", ()
     expect(rapier.rollMode?.disadvantage ?? []).not.toContain("Underwater (non-piercing melee)");
   });
 
+  it("a creature with a Swim Speed is not impeded, and ranged weapons have Disadvantage within normal range", () => {
+    // The Giant Crocodile swims 50 ft, so its bludgeoning Tail is not impeded.
+    const game = buildGame([
+      { actorId: IDS.croc1, score: 20 },
+      { actorId: IDS.torva, score: 8 }
+    ]);
+    game.combat = { ...game.combat, underwater: true };
+    const tail = resolve(
+      game,
+      crocodileDefinition,
+      "tail",
+      { actorId: IDS.croc1, targetIds: [IDS.torva] },
+      [15, 3, 3, 3]
+    );
+    expect(tail.rollMode?.disadvantage ?? []).not.toContain("Underwater (non-piercing melee)");
+
+    const archer = buildGame([
+      { actorId: IDS.pip, score: 20 },
+      { actorId: IDS.croc1, score: 8 }
+    ]);
+    archer.combat = { ...archer.combat, underwater: true };
+    const shot = resolve(
+      archer,
+      pipDefinition,
+      "shortbow",
+      { actorId: IDS.pip, targetIds: [IDS.croc1] },
+      [18, 3, 3],
+      () => 30
+    );
+    expect(shot.rollMode?.disadvantage).toContain("Underwater (ranged weapon)");
+  });
+
   it("ranged attacks automatically miss beyond normal range (strict violation range.underwater)", () => {
     const game = buildGame([
       { actorId: IDS.pip, score: 20 },
@@ -2775,15 +2876,17 @@ describe("underwater combat (SRD Underwater Combat) - GM environment toggle", ()
       expect(error).toBeInstanceOf(RulesBlockedError);
       expect((error as RulesBlockedError).rule).toBe("range.underwater");
     }
+    // Within normal range it can hit, at Disadvantage (two d20s, the lower kept).
     const close = resolve(
       game,
       pipDefinition,
       "shortbow",
       { actorId: IDS.pip, targetIds: [IDS.croc1] },
-      [18, 3],
+      [18, 17, 3],
       () => 60
     );
     expect(close.attack?.outcome).toBe("hit");
+    expect(close.rollMode?.disadvantage).toContain("Underwater (ranged weapon)");
   });
 
   it("everyone underwater resists fire damage, attributed to the environment", () => {
@@ -3182,14 +3285,16 @@ describe("recharge abilities (SRD Recharge X-Y; Foundry-parity adoption)", () =>
     nextInitiativeTurn(game); // the dragon's turn
     resolve(game, wyrmlingDefinition, "cold-breath", { actorId: DRAGON, targetIds: [IDS.torva] }, Array(5).fill(1)); // 5d8 cold
     expect(game.actors.find((actor) => actor.id === DRAGON)!.actionUses["cold-breath"]).toBe(1);
-    // Round 2, low roll (2 < 5): the pool stays spent and the table sees why.
-    const lowEvents: { text: string; actorId: string }[] = [];
+    // Round 2, low roll (2 < 5): the pool stays spent, narrated to the GM alone (a monster's resources are
+    // GM knowledge; the table sees the breath when it is used).
+    const lowEvents: { text: string; actorId: string; gmOnly?: true }[] = [];
     nextInitiativeTurn(game, lowEvents as never, dragonDeps(game, 2)); // Torva (no dragon pools roll)
     nextInitiativeTurn(game, lowEvents as never, dragonDeps(game, 2)); // dragon's turn start: d6 = 2
     expect(game.actors.find((actor) => actor.id === DRAGON)!.actionUses["cold-breath"]).toBe(1);
-    expect(
-      lowEvents.some((event) => event.actorId === DRAGON && /stays spent \(rolled 2, needs 5\+\)/.test(event.text))
-    ).toBe(true);
+    const stillSpent = lowEvents.find(
+      (event) => event.actorId === DRAGON && /stays spent \(rolled 2, needs 5\+\)/.test(event.text)
+    );
+    expect(stillSpent?.gmOnly).toBe(true);
     expect(() =>
       resolve(game, wyrmlingDefinition, "cold-breath", { actorId: DRAGON, targetIds: [IDS.torva] }, [])
     ).toThrowError(/recharges on 5\+ at the start of its turn/);

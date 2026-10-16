@@ -1,3 +1,4 @@
+import { rollDice } from "@vtt/rules-5e";
 import { addActorFromDefinition, importActorDefinition, removeActor } from "../actor-roster.js";
 import { requireActorAccess } from "../authorization.js";
 import { forceReleaseCharacter } from "../character-claims.js";
@@ -27,7 +28,7 @@ export const actorCommands = [
     type: "actor.add-from-definition",
     operationId: "addActorFromDefinition",
     description:
-      "Instantiates a bundled SRD monster onto the roster (GM-grade only). The response's `actorId` equals the commandId.",
+      "Instantiates a bundled SRD monster onto the roster (GM-grade only), with the stat block's average hit points or, with `hitPoints: \"roll\"`, its Hit Dice rolled. The response's `actorId` equals the commandId.",
     summary:
       "Instantiate a bundled SRD monster onto the roster, optionally joining the running fight in the same command (GM).",
     schema: ActorAddFromDefinitionSchema,
@@ -47,12 +48,29 @@ export const actorCommands = [
       await execute(
         (state) => {
           addActorFromDefinition(state, definition, actorId, request.visibility, kit.equipmentCatalog());
+          // Rolled hit points: the stat block's Hit Dice, thrown on the server; never below 1.
+          const formula = definition.hitPoints.formula;
+          if (request.hitPoints === "roll" && formula) {
+            const added = state.actors.find((actor) => actor.id === actorId)!;
+            const rolled = Math.max(1, rollDice(formula, (sides) => kit.context.random(sides)).total);
+            added.hp = { ...added.hp, maximum: rolled, current: rolled };
+          }
           // Ignored out of combat: there is no fight to join, and the roster add is the whole intent.
           if (request.joinEncounter === true && state.combat.active && geometry)
-            addCombatant(state, actorId, undefined, () => kit.context.random(20), geometry);
+            addCombatant(
+              state,
+              actorId,
+              undefined,
+              () => kit.context.random(20),
+              geometry,
+              Date.now(),
+              kit.initiativeRollSink(state, request.commandId, principal),
+              kit.initiativeRollDeps(state)
+            );
         },
         { actorId }
       );
+      kit.publishRolls(kit.read(), request.commandId);
       return { actorId };
     }
   }),

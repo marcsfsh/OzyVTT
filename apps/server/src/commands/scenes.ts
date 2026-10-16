@@ -13,6 +13,7 @@ import {
   TerrainPaintSchema,
   TerrainResetSchema
 } from "@vtt/domain/commands";
+import { restartTimeline } from "../combat-history.js";
 import { CommandRejectedError } from "../game-store.js";
 import { launchReplay } from "../replay-launch.js";
 import { paintTerrain, resetTerrain } from "../terrain.js";
@@ -54,7 +55,7 @@ export const sceneCommands = [
         if (activate === true) {
           // The implicit-scene id must not be the commandId: the new scene already owns it.
           activateScene(draft, commandId, implicitSceneId);
-          timeline.truncateAll();
+          restartTimeline(draft, timeline);
         }
       });
       // Going live also presents the map on the shared screen.
@@ -104,7 +105,7 @@ export const sceneCommands = [
       const { state, duplicate } = await executeTimeline((draft, timeline) => {
         activateScene(draft, sceneId, commandId); // rejects while rewound
         // Snapshots belong to the scene that was live; the swap invalidates them.
-        timeline.truncateAll();
+        restartTimeline(draft, timeline);
       });
       if (duplicate) return;
       const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId);
@@ -209,7 +210,7 @@ export const sceneCommands = [
           newActorId: kit.context.newId
         });
         // The snapshots belonged to the fight that just parked; the swap invalidates them.
-        timeline.truncateAll();
+        restartTimeline(draft, timeline);
       });
       if (!outcome) return;
       if (!duplicate) {

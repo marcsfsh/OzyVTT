@@ -1,6 +1,6 @@
 import type { Actor } from "@vtt/domain";
 import type { ActorAction, ActorDefinition } from "@vtt/schemas";
-import { collectRiders, sumRiders } from "@vtt/rules-5e";
+import { collectRiders, sumRiders, type RiderContext } from "@vtt/rules-5e";
 import {
   deriveEquipment,
   sourceItemOf,
@@ -120,10 +120,20 @@ function usesBonus(action: ActorAction, riders: ReturnType<typeof collectRiders>
   );
 }
 
-/** The natural-d20 threshold at or above which an attack crits (SRD 20; a rider can widen it). */
-export function criticalThreshold(derivation: EquipmentDerivation, actor: Actor, action: ActorAction): number {
+/** The natural-d20 threshold at or above which an attack crits (SRD 20; a rider can widen it). Standing riders (a
+ *  keen weapon) and ones gated on the attack roll, which can name the kinds of attack they widen (Improved
+ *  Critical: weapons and Unarmed Strikes) when the roll's filters are passed. */
+export function criticalThreshold(
+  derivation: EquipmentDerivation,
+  actor: Actor,
+  action: ActorAction,
+  filters: Omit<Partial<RiderContext>, "moment"> = {}
+): number {
   const sourceItemId = sourceItemOf(action, derivation, actor.inventory);
-  const riders = collectRiders(derivation.carriers, { ...derivation.context, moment: null, sourceItemId });
+  const riders = [
+    ...collectRiders(derivation.carriers, { ...derivation.context, moment: null, sourceItemId }),
+    ...collectRiders(derivation.carriers, { ...derivation.context, ...filters, moment: "on-attack-roll", sourceItemId })
+  ];
   return riders.reduce(
     (lowest, rider) =>
       rider.modifier.type === "critical-range" && rider.modifier.threshold !== undefined

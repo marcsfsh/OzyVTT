@@ -40,9 +40,9 @@ const SAVE: PendingSave = {
 };
 
 /**
- * The same 17 split across two damage types. The server floors the success halving per part, so an
- * amended 12 lands as 3 + 2 = 5 rather than `floor(12 / 2)` = 6, which proves the prompt prints the
- * server's number. The mirror test runs this save through the real `answerSave`.
+ * The same 17 split across two damage types, against a fire-resistant target. An amended 12 is halved once to 6
+ * (4 fire + 2 cold), then the fire is resisted, landing 2 + 2 = 4: neither 12 nor its half, which proves the
+ * prompt prints the server's number. The mirror test runs this save through the real `answerSave`.
  */
 const TWO_TYPE: PendingSave = {
   ...SAVE,
@@ -181,10 +181,10 @@ describe("the save prompt's damage field", () => {
       damageOverride: 12
     });
 
-    // 5 is the server's answer for this save (see the mirror test). Neither 12 nor any halving of it
-    // is 5, so the line must be showing the server's number.
-    ack({ total: 18, success: true, appliedDamage: 5 });
-    expect(await screen.findByText("5 dmg (amended - rolled 17)")).toBeTruthy();
+    // 4 is the server's answer for this save (see the mirror test). Neither 12 nor its half is 4, so the
+    // line must be showing the server's number.
+    ack({ total: 18, success: true, appliedDamage: 4 });
+    expect(await screen.findByText("4 dmg (amended - rolled 17)")).toBeTruthy();
     expect(screen.queryByText(/^12 dmg/)).toBeNull();
     expect(screen.queryByText(/^6 dmg/)).toBeNull();
 

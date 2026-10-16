@@ -419,6 +419,25 @@ describe("Barbarian: Reckless Attack is an effect the table can see and swing un
   });
 });
 
+describe("Barbarian: Rage Damage on attacks using Strength", () => {
+  it("prints the column's number on the Rage action and grants it as the damage bonus", () => {
+    const rageOf = (level: number) => build(barbarianInput(level)).actions.find((action) => action.id === "rage")!;
+    expect(rageOf(1).description).toContain("Rage Damage: +2.");
+    expect(rageOf(9).description).toContain("Rage Damage: +3.");
+    expect(rageOf(16).grants?.modifiers).toContainEqual(expect.objectContaining({ type: "damage-bonus", amount: 4 }));
+  });
+
+  it("adds it to a raging Greataxe hit, and not before the Rage", () => {
+    const built = onTheTable(build(barbarianInput(5)));
+    const before = use(built, "item-greataxe", [IDS.foe], [15, 6]);
+    expect(before.bonusDamage).toBeUndefined();
+    use(built, "rage");
+    const raging = use(built, "item-greataxe", [IDS.foe], [15, 6]);
+    expect(raging.bonusDamage).toEqual([expect.objectContaining({ amount: 2, type: "slashing" })]);
+    expect(raging.damageTotal).toBe(6 + 4 + 2);
+  });
+});
+
 describe("Barbarian: Persistent Rage is a counter the engine spends", () => {
   it("spends its one long-rest use and refuses the second attempt", () => {
     const built = onTheTable(build(barbarianInput()));
@@ -630,18 +649,75 @@ describe("Barbarian: Intimidating Presence holds the target to the Barbarian's o
 
 // Fighter / Champion
 
+describe("healing features heal what they print", () => {
+  it("Second Wind heals its user 1d10 plus the Fighter level, and spends a use", () => {
+    const built = onTheTable(build(fighterInput(5)));
+    expect(built.definition.actions.find((action) => action.id === "second-wind")?.healing).toEqual({
+      formula: "1d10 + 5",
+      self: true
+    });
+    built.hero.hp.current = 5;
+    const healed = use(built, "second-wind", [], [7]);
+    expect(healed.healing?.targets).toEqual([{ targetId: IDS.hero, targetName: built.hero.name, regained: 12 }]);
+    expect(built.hero.hp.current).toBe(17);
+    expect(built.hero.actionUses["second-wind"]).toBe(1);
+  });
+
+  it("Wholeness of Body heals the Monk its Martial Arts die plus the Wisdom modifier", () => {
+    // Monk 11: Wisdom 14 + 2 (level 8) = 16, +3; the Martial Arts die is a d10 from level 11.
+    const built = onTheTable(build(monkInput(11)));
+    expect(built.definition.actions.find((action) => action.id === "wholeness-of-body")?.healing).toEqual({
+      formula: "1d10 + 3",
+      self: true
+    });
+    built.hero.hp.current = 10;
+    use(built, "wholeness-of-body", [], [4]);
+    expect(built.hero.hp.current).toBe(17);
+  });
+});
+
 describe("Champion: the crit range the resolver reads", () => {
   it("is 19 at level 3, 18 at level 15, and 20 for a Fighter with no subclass yet", () => {
+    // The riders name the kinds of attack they widen, so the roll's filters are passed.
+    const swing = { attackKinds: ["melee" as const, "weapon" as const] };
     const five = onTheTable(build(fighterInput(5)), { fight: false });
-    expect(criticalThreshold(derivationOf(five), five.hero, actionOf(five, "item-greatsword"))).toBe(19);
+    expect(criticalThreshold(derivationOf(five), five.hero, actionOf(five, "item-greatsword"), swing)).toBe(19);
 
     // Superior Critical does not replace Improved Critical: `criticalThreshold` takes the lowest any
     // carrier names, so the two compose without an ordering rule.
     const fifteen = onTheTable(build(fighterInput(15)), { fight: false });
-    expect(criticalThreshold(derivationOf(fifteen), fifteen.hero, actionOf(fifteen, "item-greatsword"))).toBe(18);
+    expect(criticalThreshold(derivationOf(fifteen), fifteen.hero, actionOf(fifteen, "item-greatsword"), swing)).toBe(
+      18
+    );
 
     const bare = onTheTable(build(fighterInput(2)), { fight: false });
-    expect(criticalThreshold(derivationOf(bare), bare.hero, actionOf(bare, "item-greatsword"))).toBe(20);
+    expect(criticalThreshold(derivationOf(bare), bare.hero, actionOf(bare, "item-greatsword"), swing)).toBe(20);
+  });
+
+  it("widens weapon and Unarmed Strike attacks only, never a spell attack", () => {
+    // "Your attack rolls with weapons and Unarmed Strikes can score a Critical Hit on a roll of 19 or 20."
+    const built = onTheTable(build(fighterInput(5)));
+    const fireBolt = {
+      id: "fire-bolt",
+      name: "Fire Bolt",
+      activation: "action" as const,
+      description: "Make a ranged spell attack.",
+      spellId: "fire-bolt",
+      attack: { bonus: 5, rangeFeet: 120 },
+      damage: [{ formula: "1d10", type: "fire" }]
+    };
+    const cast = resolveDefinitionAction(
+      built.state,
+      fireBolt,
+      {
+        actorId: IDS.hero,
+        targetIds: [IDS.foe],
+        commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`
+      },
+      deps(built, [19, 6])
+    );
+    expect(cast.attack).toMatchObject({ naturalRoll: 19, outcome: "hit" });
+    expect(cast.damageTotal).toBe(6);
   });
 
   it("turns a natural 19 into a critical hit, and doubles the dice it rolls", () => {
@@ -1082,7 +1158,8 @@ describe("Monk: Wholeness of Body counts uses off an ability modifier", () => {
     // Wis 16 (+3) -> three uses. `minimum: 1` is the printed "(minimum of once)".
     const built = onTheTable(build(monkInput(11)));
     expect(actionOf(built, "wholeness-of-body").uses).toEqual({ limit: 3, per: "long-rest" });
-    use(built, "wholeness-of-body");
+    // It heals now, so its Martial Arts die is rolled.
+    use(built, "wholeness-of-body", [], [4]);
     expect(built.hero.actionUses["wholeness-of-body"]).toBe(1);
   });
 });
