@@ -103,6 +103,12 @@ export const SpellEffectSchema = z
     laterActions: z.array(SpellLaterActionSchema).min(1).max(2).optional(),
     /** Missiles one cast makes, each at a creature of the caster's choice (Magic Missile's three darts). */
     darts: z.number().int().min(2).max(20).optional(),
+    /** How many creatures one cast targets (Bless: up to three), plus `perSlot` more for each slot level above the
+     *  spell's own. Absent: the text sets no number the engine checks (an area, or the GM's call). */
+    targets: z
+      .object({ count: z.number().int().min(1).max(20), perSlot: z.number().int().min(1).max(2).optional() })
+      .strict()
+      .optional(),
     /** Hit points each target regains; `addsModifier` adds the caster's spellcasting ability modifier. */
     healing: z.object({ formula: HealingFormulaSchema, addsModifier: z.boolean() }).strict().nullable(),
     /** A reaction spell's trigger and response (Shield, Hellish Rebuke), so the table offers it as a prompt. */

@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { castAction } from "../src/item-actions.js";
-import { ALLY, build, clericInput, druidInput, fight, FOE, view, wizardInput } from "./spell-casters.js";
+import { ALLY, build, clericInput, druidInput, fight, FOE, FOE2, view, wizardInput } from "./spell-casters.js";
 
 // What each cast does, per SRD 5.2.1: damage dealt when a spell appears, saves made later rather than on the cast,
-// a damage type the caster picks, a flame hurled on later turns, and a save that ignores cover.
+// a damage type the caster picks, a flame hurled on later turns, a save that ignores cover, and the range and number of
+// a spell's targets.
 
 const cleric = build(
   clericInput(["bless", "healing-word", "guiding-bolt", "shield-of-faith", "spiritual-weapon", "spirit-guardians"])
@@ -17,7 +18,8 @@ const wizard = build(
     "magic-missile",
     "shield",
     "fireball",
-    "misty-step"
+    "misty-step",
+    "hold-person"
   ])
 );
 const druid = build(druidInput(["entangle", "moonbeam", "heat-metal"]));
@@ -148,5 +150,27 @@ describe("a healing spell with an area", () => {
       view.spellRecord("fireball")
     );
     expect(fireball.area).toMatchObject({ shape: "sphere", sizeFeet: 20 });
+  });
+});
+
+describe("a save or healing spell's targets", () => {
+  it("are no more than the spell targets at the slot it is cast with", () => {
+    const { resolve } = fight(wizard);
+    expect(() => resolve("spell-hold-person", { targetIds: [FOE, FOE2] })).toThrowError(
+      /Hold Person targets one creature; 2 were chosen/
+    );
+    const upcast = fight(wizard);
+    expect(() => upcast.resolve("spell-hold-person", { targetIds: [FOE, FOE2], slotLevel: 3 })).not.toThrow();
+  });
+
+  it("are within the spell's range, a Touch spell's within 5 feet", () => {
+    const far = fight(cleric, { distance: 65 });
+    expect(() => far.resolve("spell-healing-word", { targetIds: [FOE] })).toThrowError(
+      /65 ft away, beyond Healing Word's 60 ft range/
+    );
+    const near = fight(cleric, { distance: 10 });
+    expect(() => near.resolve("spell-cure-wounds", { targetIds: [FOE] })).toThrowError(/beyond Cure Wounds's touch/);
+    const touching = fight(cleric, { distance: 5 });
+    expect(() => touching.resolve("spell-cure-wounds", { targetIds: [FOE] })).not.toThrow();
   });
 });

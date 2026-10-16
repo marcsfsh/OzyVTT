@@ -10,6 +10,7 @@ describe("what one cast of an SRD spell does", () => {
     expect(effectOf("cure-wounds")).toEqual({
       attacks: 0,
       damage: [],
+      targets: { count: 1 },
       healing: { formula: "2d8", addsModifier: true }
     });
     expect(effectOf("heal")!.healing).toEqual({ formula: "70", addsModifier: false });
@@ -103,6 +104,12 @@ describe("what one cast of an SRD spell does", () => {
       })
     ]);
     expect(effectOf("fireball")!.noCastSave).toBeUndefined();
+  });
+
+  it("says how many creatures a cast targets, and how many more a higher slot adds", () => {
+    expect(effectOf("bless")!.targets).toEqual({ count: 3, perSlot: 1 });
+    expect(effectOf("mass-cure-wounds")!.targets).toEqual({ count: 6 });
+    expect(effectOf("fireball")!.targets).toBeUndefined();
   });
 
   it("lets the caster pick the damage type where the spell does", () => {

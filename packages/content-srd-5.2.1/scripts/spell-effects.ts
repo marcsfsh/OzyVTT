@@ -102,6 +102,51 @@ const CAST_ATTACKS: Readonly<Record<string, number>> = {
   "produce-flame": 0
 };
 
+/** How many creatures a cast targets (SRD "up to three creatures", "one additional creature for each spell slot level
+ *  above 1"), for the spells a table casts in a fight. */
+const CAST_TARGETS: Readonly<Record<string, NonNullable<SpellEffect["targets"]>>> = {
+  aid: { count: 3 },
+  "animal-friendship": { count: 1, perSlot: 1 },
+  bane: { count: 3, perSlot: 1 },
+  banishment: { count: 1, perSlot: 1 },
+  bless: { count: 3, perSlot: 1 },
+  blindnessdeafness: { count: 1, perSlot: 1 },
+  "charm-monster": { count: 1, perSlot: 1 },
+  "charm-person": { count: 1, perSlot: 1 },
+  command: { count: 1, perSlot: 1 },
+  "cure-wounds": { count: 1 },
+  "dissonant-whispers": { count: 1 },
+  "dominate-beast": { count: 1 },
+  "dominate-monster": { count: 1 },
+  "dominate-person": { count: 1 },
+  "enhance-ability": { count: 1, perSlot: 1 },
+  fly: { count: 1, perSlot: 1 },
+  "freedom-of-movement": { count: 1, perSlot: 1 },
+  "gaseous-form": { count: 1, perSlot: 1 },
+  haste: { count: 1 },
+  "healing-word": { count: 1 },
+  heroism: { count: 1, perSlot: 1 },
+  "hideous-laughter": { count: 1, perSlot: 1 },
+  "hold-monster": { count: 1, perSlot: 1 },
+  "hold-person": { count: 1, perSlot: 1 },
+  "inflict-wounds": { count: 1 },
+  invisibility: { count: 1, perSlot: 1 },
+  jump: { count: 1, perSlot: 1 },
+  longstrider: { count: 1, perSlot: 1 },
+  "mage-armor": { count: 1 },
+  "mass-cure-wounds": { count: 6 },
+  "mass-healing-word": { count: 6 },
+  "phantasmal-killer": { count: 1 },
+  polymorph: { count: 1 },
+  "power-word-stun": { count: 1 },
+  "prayer-of-healing": { count: 5 },
+  "sacred-flame": { count: 1 },
+  "shield-of-faith": { count: 1 },
+  "spider-climb": { count: 1, perSlot: 1 },
+  suggestion: { count: 1 },
+  "vicious-mockery": { count: 1 }
+};
+
 /** Missiles one cast makes, each striking a creature of the caster's choice. */
 const CAST_DARTS: Readonly<Record<string, number>> = { "magic-missile": 3 };
 
@@ -400,6 +445,7 @@ export function spellEffectFor(
   const darts = CAST_DARTS[id];
   const choices = DAMAGE_CHOICES[id];
   const later = LATER_ACTIONS[id];
+  const targets = CAST_TARGETS[id];
   return {
     attacks,
     ...(attackRange ? { attackRange } : {}),
@@ -408,6 +454,7 @@ export function spellEffectFor(
     ...(NO_CAST_SAVE.has(id) ? { noCastSave: true as const } : {}),
     ...(later ? { laterActions: later.map((row) => ({ ...row, damage: [...row.damage] })) } : {}),
     ...(darts ? { darts } : {}),
+    ...(targets ? { targets: { ...targets } } : {}),
     healing,
     ...(reaction ? { reaction } : {})
   };
@@ -465,6 +512,7 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...NO_CAST_SAVE,
   ...Object.keys(LATER_ACTIONS),
   ...Object.keys(CAST_DARTS),
+  ...Object.keys(CAST_TARGETS),
   ...Object.keys(UPCAST_CORRECTIONS),
   ...Object.keys(CAST_REACTIONS)
 ];

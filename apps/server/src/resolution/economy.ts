@@ -1,3 +1,5 @@
+import type { SpellReference } from "@vtt/content-srd-5.2.1";
+import { spellRangeFeet } from "@vtt/content-srd-5.2.1/spell-effect";
 import type { GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
@@ -12,6 +14,7 @@ import {
   rememberOverride,
   type RuleId
 } from "../rules-families.js";
+import { laterSpellActionId } from "../item-actions.js";
 import { builtinHandlerFor } from "./builtins.js";
 import { sizeRank, type DefinitionAction, type LiveActor, type ResolveContext, type ResolveInput } from "./context.js";
 
@@ -87,7 +90,8 @@ export function evaluateActionEconomy(
   definition: ActorDefinition | undefined,
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null,
   siblings: ReadonlyArray<DefinitionAction> = definition?.actions ?? [],
-  slotLevel?: number
+  slotLevel?: number,
+  spell?: SpellReference
 ): EconomyEvaluation {
   const evaluation: Evaluation = {
     state,
@@ -115,6 +119,7 @@ export function evaluateActionEconomy(
     if (unprepared) evaluation.violations.push({ rule: "slots.not-prepared", message: unprepared });
   }
   checkTargeting(evaluation, distanceFeet);
+  if (spell) checkSpellTargets(evaluation, spell, spendSpellSlot?.level ?? continued ?? spell.level, distanceFeet);
   const opensSpell = spendSpellSlot !== null && slots.markAction && slots.instance?.components[action.id] !== undefined;
   return {
     violations: evaluation.violations,
@@ -591,6 +596,48 @@ function checkTargeting(
   }
 }
 
+/**
+ * A spell's own targeting (SRD Spells, "Range" and "Targets"): a save or healing spell reaches the creatures it names
+ * only within its range (a Touch spell within 5 feet), and no more of them than it targets at this slot. An attack's
+ * range is the attack's; an area's targets are whoever the template covers; a later action's trigger is wherever the
+ * creature is.
+ */
+function checkSpellTargets(
+  { state, attacker, action, targetIds, violations }: Evaluation,
+  spell: SpellReference,
+  castLevel: number,
+  distanceFeet: ((actorIdA: string, actorIdB: string) => number | null) | undefined
+): void {
+  if (
+    action.area ||
+    (spell.effect?.laterActions ?? []).some((row) => laterSpellActionId(spell.id, row.name) === action.id)
+  )
+    return;
+  const targets = spell.effect?.targets;
+  const unique = [...new Set(targetIds)];
+  if (targets && action.darts === undefined) {
+    const limit = targets.count + (targets.perSlot ?? 0) * Math.max(0, castLevel - spell.level);
+    if (unique.length > limit)
+      violations.push({
+        rule: "target.too-many",
+        message: `${spell.name} targets ${limit === 1 ? "one creature" : `up to ${limit} creatures`}${castLevel > spell.level ? ` with a level-${castLevel} slot` : ""}; ${unique.length} were chosen.`
+      });
+  }
+  if (action.attack !== undefined || !distanceFeet) return;
+  const range = spellRangeFeet(spell.range) ?? (/^touch\b/i.test(spell.range.text ?? "") ? 5 : null);
+  if (range === null) return;
+  for (const targetId of unique) {
+    if (targetId === attacker.id) continue;
+    const distance = distanceFeet(attacker.id, targetId);
+    if (distance === null || distance <= range + DISTANCE_TOLERANCE_FEET) continue;
+    const targetName = state.actors.find((candidate) => candidate.id === targetId)?.name ?? "The target";
+    violations.push({
+      rule: "range.out-of-range",
+      message: `${targetName} is ${Math.round(distance * 10) / 10} ft away, beyond ${spell.name}'s ${range === 5 ? "touch" : `${range} ft range`}.`
+    });
+  }
+}
+
 /** Range/reach (SRD): checked only when distance is measurable. A thrown weapon is legal in either
  *  envelope; long-range disadvantage lives in the attack roll's sources. */
 function checkRange(
@@ -642,7 +689,8 @@ export function planEconomy(
   definition: ActorDefinition | undefined,
   warnings: string[],
   distanceFeet: ((actorIdA: string, actorIdB: string) => number | null) | undefined,
-  siblings: ReadonlyArray<DefinitionAction>
+  siblings: ReadonlyArray<DefinitionAction>,
+  spell?: SpellReference
 ): { plan: EconomyPlan; overridden: { rule: RuleId; reason: string } | null } {
   const { violations, softViolations, plan, proseMultiattack, notes } = evaluateActionEconomy(
     state,
@@ -652,7 +700,8 @@ export function planEconomy(
     definition,
     distanceFeet,
     siblings,
-    input.slotLevel
+    input.slotLevel,
+    spell
   );
   warnings.push(...notes);
 

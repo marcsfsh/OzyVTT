@@ -85,7 +85,7 @@ export function openResolve(
     );
   const economy = input.economyPaid
     ? { plan: paidPlan(state), overridden: null }
-    : planEconomy(state, attacker, action, input, deps.definition, warnings, deps.distanceFeet, siblings);
+    : planEconomy(state, attacker, action, input, deps.definition, warnings, deps.distanceFeet, siblings, spell);
   let overridden = economy.overridden;
 
   // GM-adjudicated cover (SRD Cover, no line-of-sight engine): total cover can't be targeted;

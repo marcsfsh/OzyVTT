@@ -59,6 +59,7 @@ describe("rule families", () => {
       ["target.too-large-to-grapple", "targeting"],
       ["cover.total", "targeting"],
       ["condition.charmed-charmer", "targeting"],
+      ["target.too-many", "targeting"],
       ["attack.cleave-same-target", "targeting"],
       ["attack.cleave-too-far", "targeting"],
       // "Don't police spell slots or prepared spells" relaxes exactly these.

@@ -35,6 +35,8 @@ const RULE_FAMILIES = {
   // Cleave's second creature: another one, within 5 feet of the first.
   "attack.cleave-same-target": "targeting",
   "attack.cleave-too-far": "targeting",
+  // A spell aimed at more creatures than it can target (Hold Person at two Humanoids from a 2nd-level slot).
+  "target.too-many": "targeting",
   // Being Charmed by your target is a targeting restriction, not an economy one.
   "condition.charmed-charmer": "targeting",
   // Spellcasting is its own family, so "Don't police spell slots or prepared spells" relaxes these and nothing else.
