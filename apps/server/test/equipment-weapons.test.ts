@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { ActorDefinitionSchema } from "@vtt/schemas";
+import { resolveDefinitionAction } from "../src/action-resolution.js";
 import { RulesBlockedError } from "../src/game-store.js";
 import {
   actionOf,
+  catalog,
   catalogRow,
   fight,
   fighterInput,
@@ -110,5 +113,91 @@ describe("Heavy", () => {
     const table = tableOf({ [IDS.fighter]: fighterInput() });
     fight(table, IDS.fighter);
     expect(resolveAt(table, IDS.fighter, "item-greatsword", [15, 4, 4]).rollMode).toBeUndefined();
+  });
+});
+
+describe("Slow, Vex and Sap", () => {
+  /** Gives the foe a stat block: immune to `immune`, with one claw attack. */
+  function foeWithStatBlock(table: ReturnType<typeof tableOf>, immune: string[]) {
+    const definitionId = `import-${IDS.foe}`;
+    table.state.definitions = [
+      ...table.state.definitions,
+      {
+        id: definitionId,
+        definition: ActorDefinitionSchema.parse({
+          schemaId: "vtt.actor-monster",
+          schemaVersion: 1,
+          source: { name: "Test", version: "1" },
+          name: "Foe",
+          size: "medium",
+          abilityScores: { str: 14, dex: 12, con: 12, int: 6, wis: 10, cha: 6 },
+          proficiencyBonus: 2,
+          armorClass: 10,
+          hitPoints: { maximum: 60 },
+          initiativeBonus: 1,
+          speedFeet: 30,
+          damageImmunities: immune,
+          actions: [
+            {
+              id: "claw",
+              name: "Claw",
+              activation: "action",
+              description: "Melee attack.",
+              attack: { bonus: 4, reachFeet: 5 },
+              damage: [{ formula: "1d6 + 2", type: "slashing" }]
+            }
+          ],
+          token: { disposition: "hostile", footprint: { width: 1, height: 1 } }
+        })
+      }
+    ];
+    table.actor(IDS.foe).definitionId = definitionId;
+  }
+  const tags = (table: ReturnType<typeof tableOf>) => table.actor(IDS.foe).effects.flatMap((effect) => effect.tags);
+
+  it("lays Slow only on a hit that deals damage", () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput() });
+    write(table, IDS.fighter, catalogRow("longbow"));
+    foeWithStatBlock(table, ["piercing"]);
+    fight(table, IDS.fighter);
+    expect(resolveAt(table, IDS.fighter, "item-longbow", [18, 5]).attack?.outcome).toBe("hit");
+    expect(tags(table)).not.toContain("slow");
+
+    const harmed = tableOf({ [IDS.fighter]: fighterInput() });
+    write(harmed, IDS.fighter, catalogRow("longbow"));
+    foeWithStatBlock(harmed, []);
+    fight(harmed, IDS.fighter);
+    resolveAt(harmed, IDS.fighter, "item-longbow", [18, 5]);
+    expect(tags(harmed)).toContain("slow");
+  });
+
+  it("lets Sap give Disadvantage to the sapped creature's next attack roll only", () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput() });
+    foeWithStatBlock(table, []);
+    fight(table, IDS.fighter);
+    expect(resolveAt(table, IDS.fighter, "item-flail", [18, 5]).attack?.outcome).toBe("hit");
+    expect(tags(table)).toContain("sap");
+    const claw = (faces: number[]) =>
+      resolveDefinitionAction(
+        table.state,
+        table.resolve(`import-${IDS.foe}`)!.actions[0],
+        { actorId: IDS.foe, targetIds: [IDS.fighter], commandId: `50000000-0000-4000-8000-0000000009${faces[0]}0` },
+        {
+          random: () => faces.shift()!,
+          newRollId: (() => {
+            let n = 0;
+            return () => `40000000-0000-4000-8000-0000000009${String(n++).padStart(2, "0")}`;
+          })(),
+          gmSessionId: IDS.gmSession,
+          now: () => "2026-10-16T00:00:00.000Z",
+          definition: table.resolve(`import-${IDS.foe}`),
+          catalog,
+          resolveDefinition: table.resolve
+        }
+      );
+    // Off the foe's turn, so no action economy: two claws in a row.
+    expect(claw([15, 3, 4]).rollMode?.disadvantage).toEqual(["Sapped by Borin"]);
+    expect(tags(table)).not.toContain("sap");
+    expect(claw([16, 4]).rollMode).toBeUndefined();
   });
 });
