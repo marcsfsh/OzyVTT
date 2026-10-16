@@ -143,7 +143,7 @@ export function LevelFlow({
 
   if (target !== null && reading.reply) {
     const seed = draftFromLedger(identity, ledger, definition, catalogs, target, state.builderPolicy, reading.reply);
-    const gap = hpRollGap(ledger, target.level);
+    const gap = hpRollGap(ledger, target, identity.classLevels);
     const recordedMethod = reading.reply.abilities?.abilityMethod ?? recordedAbilities(ledger)?.method;
     return (
       <CharacterBuilder

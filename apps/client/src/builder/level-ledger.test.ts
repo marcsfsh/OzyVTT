@@ -145,21 +145,37 @@ describe("Rolled hit points", () => {
     expect(hpRolls([{ level: 2, kind: "hp-roll", id: "hp" }], 2)).toBeNull();
   });
 
+  /** A Fighter rebuilt at `level`, from a sheet whose levels so far were all Fighter. */
+  const fighterTo = (level: number) => ({ level, classLevels: Array<string>(level).fill("fighter") });
+  const FIGHTER_3 = ["fighter", "fighter", "fighter"];
+
   it("says nothing to a character that took the average", () => {
     // No hp-roll rows at all is not a gap: nothing was rolled, so nothing was lost.
-    expect(hpRollGap([], 5)).toBeNull();
-    expect(hpRollGap([{ level: 1, kind: "skill", id: "athletics" }], 5)).toBeNull();
+    expect(hpRollGap([], fighterTo(5), FIGHTER_3)).toBeNull();
+    expect(hpRollGap([{ level: 1, kind: "skill", id: "athletics" }], fighterTo(5), FIGHTER_3)).toBeNull();
   });
 
   it("names the levels the table will roll when a rolled character's rolls stop short", () => {
-    expect(hpRollGap([roll(2, 6)], 4)).toEqual([3, 4]);
+    expect(hpRollGap([roll(2, 6)], fighterTo(4), FIGHTER_3)).toEqual([3, 4]);
     // A rolled sheet asks the table to roll; it reuses every recorded roll and throws only the missing ones.
     expect(hpPlan([roll(2, 6)], 4)).toEqual({ mode: "roll" });
     expect(hpPlan([], 4)).toEqual({ mode: "average" });
   });
 
   it("says nothing when every roll is there", () => {
-    expect(hpRollGap([roll(2, 6), roll(3, 4)], 3)).toBeNull();
+    expect(hpRollGap([roll(2, 6), roll(3, 4)], fighterTo(3), FIGHTER_3)).toBeNull();
+  });
+
+  it("names a level whose recorded roll was for another class, which the table rolls afresh", () => {
+    // A Fighter 3 / Wizard 1 levelled down to Fighter 3 keeps its level 4 Wizard roll (a d6) for the way back up.
+    const ledger = [roll(2, 7), roll(3, 9), { ...roll(4, 5), classId: "wizard" }];
+    expect(hpRollGap(ledger, { level: 4, classLevels: [...FIGHTER_3, "wizard"] }, FIGHTER_3)).toBeNull();
+    // Level 4 as a Fighter instead: that roll was a Wizard's, so the table throws a d10.
+    expect(hpRollGap(ledger, fighterTo(4), FIGHTER_3)).toEqual([4]);
+    // A row with no class was rolled for the class the sheet had at that level.
+    expect(
+      hpRollGap([roll(2, 7), roll(3, 9)], { level: 3, classLevels: ["fighter", "wizard", "wizard"] }, FIGHTER_3)
+    ).toEqual([2, 3]);
   });
 });
 

@@ -191,13 +191,28 @@ export function hpRolls(choices: readonly CharacterChoice[], level: number): num
   return rolls;
 }
 
-/** The levels the table will roll hit points for on a rebuild: those with no recorded roll, when the sheet was
- *  rolled. Null when nothing is rolled (all recorded, or the average was taken). */
-export function hpRollGap(choices: readonly CharacterChoice[], targetLevel: number): readonly number[] | null {
-  if (hpPlan(choices, targetLevel).mode !== "roll") return null;
+/**
+ * The levels the table will roll hit points for on a rebuild, when the sheet was rolled: those with no roll recorded
+ * for the class the level now goes to, since a roll belongs to its class's die. A multiclass sheet's rows name their
+ * class; an older row was rolled for the class the sheet had at that level (`recordedLevels`), or its starting class
+ * past them. Null when nothing is rolled (all recorded, or the average was taken). Mirrors the server's reuse rule.
+ */
+export function hpRollGap(
+  choices: readonly CharacterChoice[],
+  target: Readonly<{ level: number; classLevels: readonly string[] }>,
+  recordedLevels: readonly string[]
+): readonly number[] | null {
+  if (hpPlan(choices, target.level).mode !== "roll") return null;
   const missing: number[] = [];
-  for (let level = 2; level <= targetLevel; level += 1)
-    if (!choices.some((row) => row.kind === "hp-roll" && row.level === level)) missing.push(level);
+  for (let level = 2; level <= target.level; level += 1) {
+    const kept = choices.some((row) => {
+      const roll = row.payload?.roll;
+      if (row.kind !== "hp-roll" || row.level !== level) return false;
+      if (typeof roll !== "number" || !Number.isInteger(roll) || roll < 1) return false;
+      return (row.classId ?? recordedLevels[level - 1] ?? recordedLevels[0]) === target.classLevels[level - 1];
+    });
+    if (!kept) missing.push(level);
+  }
   return missing.length > 0 ? missing : null;
 }
 
