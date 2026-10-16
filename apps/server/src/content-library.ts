@@ -6,6 +6,7 @@ import type {
   ContentClassLevelRow,
   ContentClassSummary,
   ContentConditionSummary,
+  ContentGlossaryEntry,
   ContentEquipmentSummary,
   ContentFeatSummary,
   ContentFeatureSummary,
@@ -28,6 +29,7 @@ import {
   loadBackgrounds,
   loadClasses,
   loadConditions,
+  loadGlossary,
   loadEquipment,
   loadFeats,
   loadLanguages,
@@ -101,6 +103,8 @@ export interface ContentView {
   readonly audience: ContentAudience;
   readonly attribution: string;
   conditionSummaries(): readonly ContentConditionSummary[];
+  /** The SRD Rules Glossary; bundled text only, the same for every audience. */
+  glossaryEntries(): readonly ContentGlossaryEntry[];
   hasCondition(conditionId: string): boolean;
   skillSummaries(): readonly ContentSkillSummary[];
   languageSummaries(): readonly ContentLanguageSummary[];
@@ -669,11 +673,20 @@ type CatalogData = ReturnType<typeof buildCatalogData>;
 const SRD_ONLY_CATALOG: CatalogData = buildCatalogData(EMPTY_HOMEBREW_SLICE);
 
 /** A thin per-audience wrapper over built catalog data; audiences that merge to the same data share it. */
+/** The glossary is bundled SRD text alone (no homebrew), so one copy serves every view. */
+const glossaryEntries: readonly ContentGlossaryEntry[] = loadGlossary().map(({ id, name, tag, description }) => ({
+  id,
+  name,
+  tag,
+  description
+}));
+
 function viewOf(audience: ContentAudience, data: CatalogData, attribution: string): ContentView {
   return {
     audience,
     attribution,
     conditionSummaries: () => data.conditionSummaries,
+    glossaryEntries: () => glossaryEntries,
     hasCondition: (conditionId) => data.conditionIds.has(conditionId),
     skillSummaries: () => data.skillSummaries,
     languageSummaries: () => data.languageSummaries,

@@ -4,6 +4,7 @@ import type {
   ContentBackgroundsResult,
   ContentClassesResult,
   ContentConditionsResult,
+  ContentGlossaryResult,
   ContentEquipmentResult,
   ContentFeatsResult,
   ContentLanguagesResult,
@@ -331,6 +332,10 @@ export interface ClientToServerEvents {
   "content:conditions": (
     payload: Record<string, never>,
     acknowledgement: (result: ContentConditionsResult) => void
+  ) => void;
+  "content:glossary": (
+    payload: Record<string, never>,
+    acknowledgement: (result: ContentGlossaryResult) => void
   ) => void;
   "content:skills": (payload: Record<string, never>, acknowledgement: (result: ContentSkillsResult) => void) => void;
   "content:languages": (

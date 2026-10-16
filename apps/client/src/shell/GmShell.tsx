@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { RulesButton } from "../reference/RulesReference";
 import type { GmView } from "@vtt/domain";
 import { Modal, Tabs, useToast, Wordmark } from "@vtt/ui";
 import { PartyRosterTab } from "../actors/PartyRosterTab";
@@ -79,6 +80,7 @@ export function GmTabBar() {
           );
         }}
       />
+      <RulesButton />
     </div>
   );
 }

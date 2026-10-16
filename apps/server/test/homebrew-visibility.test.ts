@@ -245,6 +245,7 @@ function readsWith(contentLibrary: ContentLibrary): GameCommands {
 // table itself, so a new content read cannot be added without a decision here.
 const PLAYER_READABLE_CONTENT_READS = [
   "content:conditions",
+  "content:glossary",
   "content:skills",
   "content:languages",
   "content:spells",
