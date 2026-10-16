@@ -5,8 +5,8 @@ export const barbarian: ClassMechanicsModule = {
   features: {
     /**
      * Uses read off the printed Rages column. The `raging` tag is what `requiresEffectTag` and Mindless
-     * Rage's gate read. Rage Damage (a second column), the 10-minute cap, extending by attacking and the
-     * heavy-armor restriction stay prose.
+     * Rage's gate read. Rage Damage reads the second column at build (`grantScaling`) onto the damage bonus of
+     * attacks using Strength. The 10-minute cap, extending by attacking and the heavy-armor restriction stay prose.
      */
     rage: {
       uses: { scaling: { type: "class-resource", id: "rage" }, per: "long-rest" },
@@ -18,12 +18,19 @@ export const barbarian: ClassMechanicsModule = {
           description:
             "You enter a Rage: Resistance to Bludgeoning, Piercing and Slashing damage, Advantage on Strength checks and Strength saving throws, and a bonus to Strength-based damage. You can't concentrate or cast spells while raging.",
           damage: [],
+          grantScaling: { resource: "rage-damage" },
           grants: {
             name: "Raging",
             tags: ["raging"],
             duration: { type: "encounter" },
             modifiers: [
               { type: "damage-resistance", damageTypes: ["bludgeoning", "piercing", "slashing"] },
+              // "When you make an attack using Strength - with either a weapon or an Unarmed Strike - and deal damage".
+              {
+                type: "damage-bonus",
+                amount: 2,
+                when: [{ type: "on-damage-roll" }, { type: "ability-is", abilities: ["str"] }]
+              },
               {
                 type: "roll-mode",
                 roll: "check",

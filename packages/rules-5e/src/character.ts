@@ -24,8 +24,19 @@ export function weaponAbilityModifierFrom(
   str: number,
   dex: number
 ): number {
+  return weaponAbilityFrom(properties, rangeFeet, str, dex) === "dex" ? dex : str;
+}
+
+/** Which ability that is: Strength or Dexterity (a Finesse weapon takes the better, Strength on a tie). Rage Damage
+ *  reads it ("an attack using Strength"). */
+export function weaponAbilityFrom(
+  properties: readonly string[],
+  rangeFeet: number | null | undefined,
+  str: number,
+  dex: number
+): "str" | "dex" {
   const ranged = rangeFeet !== null && rangeFeet !== undefined && !properties.includes("thrown");
-  return properties.includes("finesse") ? Math.max(str, dex) : ranged ? dex : str;
+  return properties.includes("finesse") ? (dex > str ? "dex" : "str") : ranged ? "dex" : "str";
 }
 
 /** SRD Monk weapon: a Simple melee weapon, or a Martial melee weapon with the Light property. A thrown weapon

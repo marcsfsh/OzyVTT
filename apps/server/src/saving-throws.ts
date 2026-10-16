@@ -18,7 +18,7 @@ import { recordRoll as recordRollInHistory, rolledTerms } from "./roll-history.j
 import { requireGm, type Initiator } from "./authorization.js";
 import { applyDamageDetailed, previewDamage, adjustableActor } from "./hit-points.js";
 import { setCondition } from "./actor-conditions.js";
-import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty } from "./condition-rules.js";
+import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
 import { addEffect, endEffectIfPresent, makeEffect, type EffectNarration } from "./effects.js";
 import {
   deriveEquipment,
@@ -142,6 +142,24 @@ export function saveTotalFor(
     (actor ? exhaustionPenalty(actor) : 0) +
     saveRiderBonus(derivation, ability)
   );
+}
+
+/**
+ * Evasion (Rogue 7, Monk 7, and stat blocks that print it, the Assassin's): a held `evasion` class feature, or a
+ * trait of that name on the sheet.
+ */
+export function hasEvasion(definition: ActorDefinition | undefined): boolean {
+  if (!definition) return false;
+  if ((definition.character?.features ?? []).some((feature) => feature.id === "evasion")) return true;
+  return Object.values(definition.extensions ?? {}).some((bag) => {
+    const traits = bag !== null && typeof bag === "object" ? (bag as { traits?: unknown }).traits : undefined;
+    return (
+      Array.isArray(traits) &&
+      traits.some(
+        (trait) => trait !== null && typeof trait === "object" && (trait as { name?: unknown }).name === "Evasion"
+      )
+    );
+  });
 }
 
 /** Create one pending save per target when a save action resolves. Called inside the action:resolve mutation. */
@@ -337,16 +355,29 @@ export function answerSave(
     proposed && proposed.length > 0 && damageOverride !== undefined
       ? rescaleDamageParts(proposed, damageOverride)
       : proposed;
+  // SRD Evasion: on a Dexterity save for half damage, a success takes none and a failure half.
+  const evasion =
+    pending.ability === "dex" &&
+    pending.halfOnSuccess &&
+    !isIncapacitated(target) &&
+    hasEvasion(target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined);
+  const halved = success !== evasion;
   const outcomeParts =
-    parts && parts.length > 0 ? (!success ? parts : pending.halfOnSuccess ? halveDamageParts(parts) : []) : null;
+    parts && parts.length > 0
+      ? success && (!pending.halfOnSuccess || evasion)
+        ? []
+        : halved
+          ? halveDamageParts(parts)
+          : parts
+      : null;
   const outcomeDamage =
     outcomeParts !== null
       ? outcomeParts.reduce((sum, part) => sum + part.amount, 0)
-      : !success
-        ? proposedTotal
-        : pending.halfOnSuccess
+      : success && (!pending.halfOnSuccess || evasion)
+        ? 0
+        : halved
           ? Math.floor(proposedTotal / 2)
-          : 0;
+          : proposedTotal;
   const outcomeCondition = !success && pending.conditionIds.length > 0;
 
   // Preview (commit=false): the roll is recorded so everyone sees it, but nothing is applied and the

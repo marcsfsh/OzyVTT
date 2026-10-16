@@ -8,7 +8,7 @@ import { applyDamageDetailed, halvedDamageParts } from "../src/hit-points.js";
 import { weaponAction } from "../src/item-actions.js";
 import { settlePlayerDamage, settlePlayerHit } from "../src/player-damage.js";
 import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
-import { answerSave, createPendingSaves } from "../src/saving-throws.js";
+import { answerSave, createPendingSaves, hasEvasion } from "../src/saving-throws.js";
 
 // How rolled damage becomes hit points lost: the card's total, halving, and damage at 0 HP (SRD "Damage and
 // Healing").
@@ -425,6 +425,14 @@ describe("a stat block's conditional damage", () => {
     const { strike } = monsterFight("gelatinous-cube");
     const engulf = strike("engulf", [3, 3, 3]);
     expect(engulf.warnings).toContainEqual(expect.stringMatching(/at the start of each of the cube's turns/));
+  });
+});
+
+describe("Evasion on a stat block", () => {
+  it("is read from the Assassin's printed trait, and not from a goblin", () => {
+    const monster = (id: string) => loadMonsterDefinitions().find((entry) => entry.source.externalId === id)!;
+    expect(hasEvasion(monster("assassin"))).toBe(true);
+    expect(hasEvasion(monster("goblin-warrior"))).toBe(false);
   });
 });
 

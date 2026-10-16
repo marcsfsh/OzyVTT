@@ -7,6 +7,7 @@ import { effectiveActions } from "../src/effective-actions.js";
 import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { answerReaction } from "../src/reactions.js";
+import { answerSave, createPendingSaves } from "../src/saving-throws.js";
 import { setCondition } from "../src/actor-conditions.js";
 import { startEncounter } from "../src/encounter.js";
 import type { ActorDefinition } from "@vtt/schemas";
@@ -335,6 +336,59 @@ describe("Rogue - Sneak Attack from an ally beside the target", () => {
     const offer = swing(built, "item-shortsword", [15], { commit: false }).hitOffers?.[0];
     expect(offer).toMatchObject({ id: "sneak-attack" });
     expect(offer?.unverified).toMatch(/ally is within 5 feet/);
+  });
+});
+
+describe("Rogue - Evasion on a Dexterity save for half damage", () => {
+  const fireball = (built: Table, total: number, dc = 15) => {
+    createPendingSaves(built.state, {
+      sourceActorId: IDS.foe,
+      sourceName: "Foe",
+      actionName: "Fireball",
+      ability: "dex",
+      dc,
+      targetIds: [IDS.hero],
+      proposedDamage: 28,
+      proposedDamageParts: [{ amount: 28, type: "fire" }],
+      halfOnSuccess: true,
+      conditionIds: [],
+      newSaveId: () => "60000000-0000-4000-8000-000000000077",
+      createdAt: 0
+    });
+    return answerSave(
+      built.state,
+      nextCommandId(),
+      "60000000-0000-4000-8000-000000000077",
+      "manual",
+      total,
+      true,
+      GM_SCOPE,
+      {
+        random: () => 1,
+        newRollId: () => "40000000-0000-4000-8000-0000000000aa",
+        sessionId: IDS.gm,
+        role: "gm",
+        now: () => "2026-08-07T00:00:00.000Z",
+        resolveDefinition: (id) => resolveIn(built.state, id),
+        catalog: built.catalog
+      }
+    ).outcome.appliedDamage;
+  };
+
+  it("takes none on a success and half on a failure from level 7", () => {
+    const seven = table(rogueInput(7));
+    expect(fireball(seven, 20)).toBe(0);
+    expect(fireball(seven, 5)).toBe(14);
+    // A level-6 Rogue has no Evasion yet.
+    const six = table(rogueInput(6));
+    expect(fireball(six, 20)).toBe(14);
+    expect(fireball(six, 5)).toBe(28);
+  });
+
+  it("is lost while Incapacitated", () => {
+    const built = table(rogueInput(7));
+    built.hero.conditions = [{ id: "incapacitated" }];
+    expect(fireball(built, 20)).toBe(14);
   });
 });
 

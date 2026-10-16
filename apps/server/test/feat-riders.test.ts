@@ -368,7 +368,8 @@ describe("a feat's resource-bonus raises a pool the engine actually spends from"
       built.state,
       action,
       { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000020" },
-      deps(built, [])
+      // Second Wind heals, so its d10 is rolled.
+      deps(built, [5])
     );
     expect(built.hero.actionUses["second-wind"]).toBe(4);
   });

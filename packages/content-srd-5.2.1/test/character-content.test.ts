@@ -241,8 +241,9 @@ describe("character-builder content records", () => {
         ]
       }
     });
-    expect(channel.actions.map((action) => action.id)).toEqual(["divine-spark", "turn-undead"]);
-    expect(channel.actions[1].save).toEqual({
+    // Divine Spark's healing branch is its own action, so the table can heal with it.
+    expect(channel.actions.map((action) => action.id)).toEqual(["divine-spark", "divine-spark-heal", "turn-undead"]);
+    expect(channel.actions[2].save).toEqual({
       ability: "wis",
       dc: "spellcasting",
       successDamage: "none",

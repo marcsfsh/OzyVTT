@@ -11,6 +11,7 @@ import {
   ABILITIES,
   abilityModifier,
   armorClassFromEquipment,
+  formulaPlus,
   hitDieFaces,
   hitPointPool,
   spellAttackBonus,
@@ -176,7 +177,7 @@ function interpretAction(
   action: FeatureRecord["actions"][number],
   context: BuildContext
 ): ActorAction {
-  const { attack, save, damageByLevel, multiattackByLevel, ...carried } = action;
+  const { attack, save, damageByLevel, multiattackByLevel, healingByLevel, adds, grantScaling, ...carried } = action;
   const assembled: Record<string, unknown> = { ...carried };
   if (attack) {
     const ability = attack.ability === "spellcasting" ? context.spellcastingAbility : attack.ability;
@@ -212,6 +213,35 @@ function interpretAction(
   }
   const plan = (multiattackByLevel ?? []).filter((row) => row.level <= context.level).sort((a, b) => a.level - b.level);
   if (plan.length > 0) assembled.multiattack = plan[plan.length - 1].multiattack;
+  const healingRows = (healingByLevel ?? [])
+    .filter((row) => row.level <= context.level)
+    .sort((left, right) => left.level - right.level);
+  if (healingRows.length > 0)
+    assembled.healing = { ...(action.healing ?? {}), formula: healingRows[healingRows.length - 1].formula };
+  // "1d10 plus your Fighter level", "add your Wisdom modifier": read off the character as it is built.
+  if (adds) {
+    const bonus =
+      (adds.classLevel ?? 0) * context.level +
+      (adds.abilityModifier ? abilityModifier(context.finalScores[adds.abilityModifier]) : 0);
+    const damage = assembled.damage as ActorAction["damage"] | undefined;
+    if (damage && damage.length > 0)
+      assembled.damage = [{ ...damage[0], formula: formulaPlus(damage[0].formula, bonus) }, ...damage.slice(1)];
+    const healing = assembled.healing as ActorAction["healing"];
+    if (healing) assembled.healing = { ...healing, formula: formulaPlus(healing.formula, bonus) };
+  }
+  // The grant's damage bonus is the printed column at this level (Rage Damage), and the sheet says the number.
+  if (grantScaling && action.grants) {
+    const amount = context.classResources.find((resource) => resource.id === grantScaling.resource);
+    if (typeof amount?.amount === "number") {
+      assembled.grants = {
+        ...action.grants,
+        modifiers: action.grants.modifiers.map((modifier) =>
+          modifier.type === "damage-bonus" ? { ...modifier, amount: amount.amount as number } : modifier
+        )
+      };
+      assembled.description = `${action.description} ${amount.name}: +${amount.amount}.`.slice(0, 12000);
+    }
+  }
   // The feature's limited uses ride the action when the action declares none of its own.
   if (feature.uses && assembled.uses === undefined) {
     const limit = resolvedUseLimit(feature.uses, context);

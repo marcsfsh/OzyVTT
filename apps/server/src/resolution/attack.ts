@@ -1,11 +1,13 @@
 import { armorClassInPlay } from "@vtt/domain";
 import {
+  abilityModifier as scoreModifier,
   aggregateRollMode,
   collectRiders,
   d20TestFormula,
   parseDiceFormula,
   resolveDice,
   sumRiders,
+  weaponAbilityFrom,
   type AttackKind
 } from "@vtt/rules-5e";
 import { conditionLabel, exhaustionLevel, exhaustionPenalty, isIncapacitated } from "../condition-rules.js";
@@ -63,6 +65,20 @@ function attackKindsOf(ctx: ResolveContext, distance: number | null): AttackKind
   if (unarmed) kinds.add("unarmed");
   if (action.activation === "reaction") kinds.add("reaction");
   return [...kinds];
+}
+
+/** The ability a weapon or Unarmed Strike attack uses, for riders gated on it (Rage Damage: "an attack using
+ *  Strength"). Unknown for a stat block's own attacks, so such riders don't fire there. */
+function attackAbilityOf(ctx: ResolveContext): "str" | "dex" | undefined {
+  const scores = ctx.deps.definition?.abilityScores;
+  if (!scores) return undefined;
+  const str = scoreModifier(scores.str);
+  const dex = scoreModifier(scores.dex);
+  // Martial Arts lets a Monk's strike use Dexterity; the builtin strike is Strength.
+  if (ctx.action.id === UNARMED_STRIKE_ACTION_ID)
+    return ctx.deps.definition?.character?.martialArts && dex > str ? "dex" : "str";
+  const weapon = ctx.attacker.inventory.find((item) => item.id === ctx.riderItemId)?.weapon;
+  return weapon ? weaponAbilityFrom(weapon.properties ?? [], weapon.rangeFeet, str, dex) : undefined;
 }
 
 /** Conditions that by themselves give an attack advantage or disadvantage (SRD conditions appendix), in
@@ -245,8 +261,10 @@ export function rollAttack(ctx: ResolveContext): void {
   const targetDefinition = target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined;
   const targetDerivation = deriveEquipment(target, targetDefinition, deps.catalog);
   const creatureType = targetDefinition ? statblockFacts(targetDefinition).creatureType : null;
+  const ability = attackAbilityOf(ctx);
   ctx.riderFilters = {
     attackKinds: attackKindsOf(ctx, distance),
+    ...(ability ? { ability } : {}),
     weaponProperties: weaponPropertiesOf(ctx.riderItemId, attacker.inventory),
     damageTypes,
     targetSize: target.size ?? "medium",

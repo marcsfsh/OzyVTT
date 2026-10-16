@@ -1031,7 +1031,18 @@ export const ActionSchema = z.object({
     .max(8)
     .default([]),
   /** Hit points each target regains, rolled once and applied when the action resolves (Cure Wounds). */
-  healing: z.object({ formula: HealingFormulaSchema }).strict().optional(),
+  healing: z
+    .object({
+      formula: HealingFormulaSchema,
+      /** The user heals itself (Second Wind), so there is no target to pick. */
+      self: z.literal(true).optional(),
+      /** The roll is one pool divided among the targets (Preserve Life), not regained by each. */
+      divided: z.literal(true).optional(),
+      /** No target is healed past this fraction of its maximum (Preserve Life: half). */
+      upToFractionOfMaximum: z.number().min(0.1).max(1).optional()
+    })
+    .strict()
+    .optional(),
   /** Compound action: one shared action slot, components tracked (crocodile Multiattack = one Bite + one Tail). */
   multiattack: z
     .array(z.object({ actionId: z.string().regex(/^[a-z0-9-]+$/), count: z.number().int().min(1).max(4) }).strict())

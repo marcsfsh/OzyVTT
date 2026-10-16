@@ -406,6 +406,11 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       'WHICH spell this action is a casting of. Identity only - every number the action rolls is already on the action itself - so it changes no arithmetic. It exists because the `spell-id-is` rider filter needs something to match: "when you cast Eldritch Blast" cannot be said with `spell-school-is` or `spell-level-is`, which name categories. Absent = not a spell, and every `spell-id-is` gate fails closed',
     damageByLevel:
       "Damage that grows with level, replacing `damage` at the highest matching level (Sneak Attack, Divine Smite)",
+    healingByLevel:
+      "Healing that grows with level, replacing `healing.formula` at the highest matching level (Divine Spark's heal, Wholeness of Body's Martial Arts die)",
+    adds: 'Read off the character when it is built and added to the first damage part and to the healing: `classLevel` times its level ("1d10 plus your Fighter level", "five times your Cleric level") and `abilityModifier` ("add your Wisdom modifier")',
+    grantScaling:
+      "The granted effect's `damage-bonus` amounts become the named printed class column at the character's level (Rage Damage), and the action's text says the number",
     "damageByLevel[].formula":
       'One die term plus at most one flat modifier ("1d8 + 3"). Anything richer stays prose (ADR-0008)'
   },

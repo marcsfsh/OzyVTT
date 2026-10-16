@@ -35,6 +35,7 @@ function combatantsOf(
   const spendsALimitedUse = action.uses !== undefined || action.spellSlot !== undefined;
   const structuredWithoutTargets =
     (action.grants !== undefined && action.grants.target !== "target") ||
+    action.healing?.self === true ||
     action.multiattack !== undefined ||
     spendsALimitedUse ||
     input.builtin === true;
