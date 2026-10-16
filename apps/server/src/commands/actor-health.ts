@@ -24,7 +24,7 @@ import {
   setTemporaryHp,
   UNTYPED_DAMAGE
 } from "../hit-points.js";
-import { applyRest, spendHitDice } from "../rests.js";
+import { applyRest, hitDieSizesToSpend, spendHitDice } from "../rests.js";
 import { recordRoll } from "../roll-history.js";
 import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
@@ -298,19 +298,29 @@ export const actorHealthCommands = [
       // Roll before executing: a duplicate retry replays the stored outcome and must not consume fresh
       // randomness. The execute callback re-validates against live state.
       const snapshotActor = kit.read().actors.find((candidate) => candidate.id === actorId);
-      const sides = snapshotActor?.hitDice ? Number.parseInt(snapshotActor.hitDice.die.slice(1), 10) : 8;
-      const faces = Array.from({ length: count }, () => kit.context.random(sides));
+      // Each die at its own size: a multiclass pool spends its biggest dice first.
+      const sizes = snapshotActor?.hitDice ? hitDieSizesToSpend(snapshotActor.hitDice.entries, count) : [];
+      const faces = sizes.map((sides) => kit.context.random(sides));
       const rollId = kit.context.newId();
       let healed = 0;
       let events: EffectNarration[] = [];
       const { state, duplicate } = await execute((draft) => {
-        const outcome = spendHitDice(draft, actorId, faces, initiator, (definitionId) =>
-          kit.resolveDefinitionIn(draft, definitionId)
+        const outcome = spendHitDice(
+          draft,
+          actorId,
+          faces,
+          initiator,
+          (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
+          count
         );
         healed = outcome.healed;
         events = outcome.events;
         const actor = draft.actors.find((candidate) => candidate.id === actorId)!;
         const bonus = Math.abs(outcome.conModifier * count);
+        // "2d10 + 1d6": one term per die size, biggest first.
+        const dicePart = [...new Set(sizes)]
+          .map((sides) => `${sizes.filter((size) => size === sides).length}d${sides}`)
+          .join(" + ");
         // The dice land in shared roll history; hidden actors stay GM-only.
         const record: RollRecord = {
           id: rollId,
@@ -321,9 +331,9 @@ export const actorHealthCommands = [
           actorId,
           purpose: "manual",
           visibility: actor.visibility === "gm-only" ? "gm-only" : "public",
-          formula: `${count}${actor.hitDice!.die}${outcome.conModifier !== 0 ? ` ${outcome.conModifier < 0 ? "-" : "+"} ${bonus}` : ""}`,
-          normalizedFormula: `${count}${actor.hitDice!.die}`,
-          dice: faces.map((face) => ({ group: 0, sides, face, kept: true, sign: 1 as const })),
+          formula: `${dicePart}${outcome.conModifier !== 0 ? ` ${outcome.conModifier < 0 ? "-" : "+"} ${bonus}` : ""}`,
+          normalizedFormula: dicePart,
+          dice: faces.map((face, index) => ({ group: 0, sides: sizes[index], face, kept: true, sign: 1 as const })),
           modifiers: outcome.conModifier !== 0 ? [{ value: bonus, sign: outcome.conModifier < 0 ? -1 : 1 }] : [],
           total: outcome.healed,
           createdAt: new Date().toISOString()
