@@ -383,7 +383,11 @@ describe("Boots of Elvenkind make a Stealth check keep the higher die", () => {
 
 describe("an AC bonus the SRD gates on wearing nothing", () => {
   it("gives Bracers of Defense +2 bare, and takes it away the moment a Shield is equipped", () => {
-    const definition = definitionOf();
+    // A built character trained with Shields, so the Shield's own +2 lands (SRD Armor Training) and derives.
+    const definition = definitionOf({
+      source: { name: "OzyVTT Character Builder", version: "1" },
+      proficiencies: { saves: [], skills: [], weapons: [], armor: ["shields"], tools: [] }
+    });
     const state = stateWith([]);
     setInventoryItem(state, IDS.hero, worn("bracers-of-defense", "Bracers of Defense"), () => definition, { catalog });
     expect(state.actors[0].armorClass).toBe(14); // 12 + 2

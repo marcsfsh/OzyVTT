@@ -1,26 +1,78 @@
-import { requireActorAccess } from "../authorization.js";
+import { policeConditionRule } from "../actor-conditions.js";
+import { canInitiateForActor, GameAccessDeniedError, requireActorAccess, type Initiator } from "../authorization.js";
 import { addEffect, endEffect, makeEffect, type EffectNarration } from "../effects.js";
+import { CommandRejectedError } from "../game-store.js";
 import { EffectAddSchema, EffectEndSchema } from "@vtt/domain/commands";
-import { initiatorOf } from "./kit.js";
+import type { GameState } from "@vtt/domain";
+import type { RulesOverride } from "../rules-families.js";
+import { initiatorOf, isGmGrade } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
 // Rules-engine effects added and ended by hand (ADR-0020).
+
+/**
+ * Who may end an effect by hand (SRD: a grappler may release, a creator end its Concentration, at any time). The GM
+ * may end any. A player may end what their own character is the source of, on whoever bears it (their grapple on a
+ * goblin, their Concentration on an ally). An effect on their character that someone else imposed ends by its own
+ * rules (Escape, its duration, a repeated save) or the GM's say, so ending it is a rules block they can ask about.
+ */
+function authorizeEnd(
+  state: GameState,
+  initiator: Initiator,
+  actorId: string,
+  effectId: string,
+  override: RulesOverride | null,
+  events: EffectNarration[]
+): void {
+  if (initiator.role === "gm") return;
+  const bearer = state.actors.find((candidate) => candidate.id === actorId);
+  const effect = bearer?.effects.find((candidate) => candidate.id === effectId);
+  const sourceId = effect?.sourceActorId ?? null;
+  if (sourceId !== null && canInitiateForActor(initiator, state, sourceId, "track").ok) return;
+  requireActorAccess(initiator, state, actorId, "track", "You can only track your own character.");
+  if (!bearer || !effect) return;
+  const how =
+    effect.escapeDc !== null
+      ? `escape it (DC ${effect.escapeDc}) or ask the GM`
+      : "it ends by its own rules, or ask the GM";
+  policeConditionRule(
+    state,
+    bearer,
+    "condition.imposed",
+    `${effect.name} wasn't ${bearer.name}'s own doing - ${how}.`,
+    { override },
+    events
+  );
+}
 
 export const effectCommands = [
   defineCommand({
     type: "effect.add",
     operationId: "addEffect",
     description:
-      "Adds a rules-engine effect to a combatant (GM-grade only): a named, tagged state with an optional duration and typed modifiers (damage bonus, damage resistance, advantage). Structured actions create richer effects via their own declarations; this is the house-rule/manual path. The response's `effectId` equals the commandId.",
+      "Adds a rules-engine effect to a combatant (GM-grade only): a named, tagged state with an optional duration and typed modifiers (damage bonus, damage resistance, advantage). Structured actions create richer effects via their own declarations; this is the house-rule/manual path. With `concentration`, `sourceActorId` names the creature concentrating on it (the caster of a Bless on an ally); without one, the bearer sustains it. The response's `effectId` equals the commandId.",
     summary: "Add a rules-engine effect to a combatant (GM).",
     schema: EffectAddSchema,
     malformed: "The effect command is malformed.",
     gmOnly: "Only the GM can add effects.",
     async run({ request, execute }, kit) {
-      const { commandId, actorId, name, tags, duration, modifiers, concentration } = request;
+      const { commandId, actorId, name, tags, duration, modifiers, concentration, sourceActorId } = request;
       let events: EffectNarration[] = [];
       const { duplicate } = await execute((state) => {
         events = [];
+        const source = sourceActorId ? state.actors.find((candidate) => candidate.id === sourceActorId) : undefined;
+        if (sourceActorId && !source) throw new CommandRejectedError("The effect's source is no longer on the table.");
+        // A concentration effect is sustained by its caster when named, else by its bearer: the one whose damage
+        // prompts the CON save. A named caster already concentrating holds this as part of that same Concentration
+        // (a Bless the GM puts on three allies), rather than ending it.
+        const sustainer = source?.id ?? (concentration ? actorId : null);
+        const ongoing =
+          concentration && source
+            ? state.actors
+                .flatMap((candidate) => candidate.effects)
+                .find((candidate) => candidate.concentration && candidate.sourceActorId === source.id)
+            : undefined;
+        const castId = concentration && source ? (ongoing?.castId ?? commandId) : undefined;
         addEffect(
           state,
           actorId,
@@ -28,8 +80,8 @@ export const effectCommands = [
             id: commandId,
             name,
             tags: tags ? [...tags] : [],
-            // A GM-added concentration effect is sustained by its bearer (damage to them prompts the CON save).
-            sourceActorId: concentration ? actorId : null,
+            sourceActorId: sustainer,
+            sourceName: source?.name ?? null,
             startedRound: state.combat.round,
             duration:
               duration === undefined
@@ -38,7 +90,8 @@ export const effectCommands = [
                   ? { type: "rounds", remaining: duration.rounds }
                   : duration,
             concentration: concentration ?? false,
-            modifiers: modifiers ? [...modifiers] : []
+            modifiers: modifiers ? [...modifiers] : [],
+            ...(castId !== undefined ? { castId } : {})
           }),
           events
         );
@@ -60,18 +113,21 @@ export const effectCommands = [
     type: "effect.end",
     operationId: "endEffect",
     description:
-      "Ends an effect: linked conditions clear (a released grapple removes Grappled/Restrained) and its on-end grants fire (a Frenzied Rage ending adds Exhaustion). GM-grade anyone; a player session only their claimed character.",
+      "Ends an effect: linked conditions clear (a released grapple removes Grappled/Restrained) and its on-end grants fire. GM-grade anyone. A player session may end an effect its claimed character is the source of, on any creature (releasing its grapple, dropping its Concentration), or one on its claimed character it gave itself; an effect someone else imposed on it is a rules block (`condition.imposed`) the player can ask the GM about.",
     summary:
-      "End an effect (GM anyone; a player their claimed character), clearing linked conditions and firing its on-end grants.",
+      "End an effect (GM anyone; a player one their character is the source of, or one on it that it gave itself), clearing linked conditions and firing its on-end grants.",
     schema: EffectEndSchema,
     malformed: "The effect command is malformed.",
     async run({ principal, request, execute }, kit) {
       const { actorId, effectId } = request;
+      if (request.override && !isGmGrade(principal))
+        throw new GameAccessDeniedError("Only the GM can override a rules block.");
       let events: EffectNarration[] = [];
       const { duplicate } = await execute((state) => {
+        events = [];
+        authorizeEnd(state, initiatorOf(principal), actorId, effectId, request.override ?? null, events);
         // Ending fires onEnd and clears linked conditions.
-        requireActorAccess(initiatorOf(principal), state, actorId, "track", "You can only track your own character.");
-        events = endEffect(state, actorId, effectId);
+        events.push(...endEffect(state, actorId, effectId));
       });
       if (!duplicate) kit.publishNarrations(events);
     }

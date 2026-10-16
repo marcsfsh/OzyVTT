@@ -288,6 +288,19 @@ describe("SRD 5.2.1 reference bundles", () => {
     ]);
   });
 
+  it("prints every condition's rules as clean bullets, with the upstream extraction glitches fixed", () => {
+    const text = (id: string) => loadConditions().find((condition) => condition.id === id)!.description;
+    for (const condition of loadConditions()) {
+      // Every bullet has a space after its star, and no word is split across a line ("move- ment").
+      expect(condition.description, condition.id).not.toMatch(/\n\*\S/);
+      expect(condition.description, condition.id).not.toMatch(/[a-z]- [a-z]/);
+    }
+    expect(text("prone")).toContain("amount of movement equal to half your Speed");
+    // Unaware is its own bullet, not the tail of Automatic Critical Hits.
+    expect(text("unconscious")).toMatch(/within 5 feet of you\. \n\* Unaware\. You’re unaware/);
+    expect(text("invisible")).toContain("\n* Attacks Affected.");
+  });
+
   it("carries all 339 spells with faithful structured fields (fireball spot-check)", () => {
     const spells = loadSpells();
     expect(spells.length).toBe(339);
@@ -484,7 +497,8 @@ describe("SRD 5.2.1 reference bundles", () => {
     // the generated magic items.
     const nonImprovisedWeapons = loadWeapons().filter((weapon) => !weapon.improvised).length;
     expect(loadMagicItems().length).toBe(268);
-    expect(equipment.length).toBe(134 + nonImprovisedWeapons + loadArmor().length + 268);
+    // 139 gear rows: the 132 first authored, plus the Chest, Map, Net, String, Firearm Bullets and two gaming sets.
+    expect(equipment.length).toBe(139 + nonImprovisedWeapons + loadArmor().length + 268);
     expect(equipment.length).toBeGreaterThan(150);
 
     // Every category the framework promises is represented (the homebrew update extends these).
@@ -555,6 +569,44 @@ describe("SRD 5.2.1 reference bundles", () => {
  * Homebrew seam on the reference records. A plain `z.object` strips undeclared keys silently, so
  * `source` must be declared on every record or `source: "homebrew"` is lost.
  */
+describe("the gear text is the SRD 5.2.1's", () => {
+  const text = (id: string) => loadEquipment().find((item) => item.id === id)?.description ?? "";
+  it("throws Acid, Alchemist's Fire and Holy Water as a Dexterity save in the Attack action, not an attack roll", () => {
+    for (const id of ["acid", "alchemists-fire", "holy-water", "oil", "net"]) {
+      expect(text(id), id).toContain("replace one of your attacks");
+      expect(text(id), id).toContain(
+        "Dexterity saving throw (DC 8 plus your Dexterity modifier and Proficiency Bonus)"
+      );
+      expect(text(id), id).not.toMatch(/ranged attack|on a hit/i);
+    }
+    expect(text("holy-water")).toContain("2d8 Radiant damage");
+  });
+
+  it("prints the 2024 numbers for rope, manacles, chain and the tinderbox", () => {
+    expect(text("rope")).toContain("DC 20 Strength (Athletics)");
+    expect(text("manacles")).toContain("DC 25 Strength (Athletics)");
+    expect(text("chain")).toContain("DC 20 Strength (Athletics)");
+    expect(text("chain")).not.toContain("Hit Points");
+    expect(text("tinderbox")).toContain("takes a Bonus Action");
+    expect(text("hunting-trap")).toContain("DC 13 Dexterity saving throw");
+  });
+
+  it("packs the 2024 contents, with the pack's weight", () => {
+    const explorers = loadEquipment().find((item) => item.id === "explorers-pack")!;
+    expect(explorers.description).toBe(
+      "An Explorer's Pack contains the following items: Backpack, Bedroll, 2 flasks of Oil, 10 days of Rations, Rope, Tinderbox, 10 Torches, and Waterskin."
+    );
+    expect(explorers.weightLb).toBe(55);
+    expect(text("priests-pack")).not.toContain("Alms Box");
+  });
+
+  it("gives every tool its Ability and Utilize entries, and stocks the gear the catalog lacked", () => {
+    expect(text("thieves-tools")).toBe("Ability: Dexterity. Utilize: Pick a lock (DC 15), or disarm a trap (DC 15).");
+    for (const id of ["chest", "map", "net", "string", "firearm-bullets-10", "gaming-set-dragonchess"])
+      expect(text(id), id).not.toBe("");
+  });
+});
+
 describe("homebrew source discriminator and open item categories", () => {
   const spellBody = {
     id: "hb-grave-touch",

@@ -89,16 +89,18 @@ describe("SRD monster attack damage matches the stat block", () => {
 });
 
 describe("SRD monster save damage is what the failure deals at once", () => {
-  it("leaves damage on later turns to a GM reminder instead of dealing it at once", () => {
+  it("deals damage on later turns as the failure's ongoing damage instead of at once", () => {
     const action = (monster: string, id: string) =>
       monsters.find((entry) => entry.source.externalId === monster)!.actions.find((entry) => entry.id === id)!;
     const engulf = action("gelatinous-cube", "engulf");
     expect(engulf.damage).toEqual([{ formula: "3d6", type: "acid" }]);
-    expect(engulf.reminder).toMatch(/takes 10 \(3d6\) Acid damage at the start of each of the cube's turns/);
-    // Swallowed: nothing at once, the acid comes at the start of the creature's turns.
+    expect(engulf.save?.ongoingDamage).toEqual({ damage: [{ formula: "3d6", type: "acid" }], at: "source-turn-start" });
+    // The engine deals it, so the GM's reminder keeps only the rest.
+    expect(engulf.reminder).not.toMatch(/Acid damage/);
+    // Swallowed: nothing at once, the acid comes at the start of the swallower's turns.
     for (const monster of ["behir", "purple-worm", "remorhaz", "tarrasque"]) {
       expect(action(monster, "swallow").damage).toEqual([]);
-      expect(action(monster, "swallow").reminder).toMatch(/at the start of each/);
+      expect(action(monster, "swallow").save?.ongoingDamage?.at).toBe("source-turn-start");
     }
     expect(action("kraken", "swallow").damage).toEqual([{ formula: "3d8 + 10", type: "piercing" }]);
     // A failure that depends on the target's hit points deals and imposes nothing on its own.

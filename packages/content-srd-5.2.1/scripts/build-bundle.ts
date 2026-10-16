@@ -10,7 +10,15 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import { ActorDefinitionSchema, type ActorAction, type ActorDefinition } from "@vtt/schemas";
+import {
+  ActorDefinitionSchema,
+  AmmunitionKindSchema,
+  SaveConditionSchema,
+  type ActorAction,
+  type ActorDefinition,
+  type AmmunitionKind,
+  type SaveFailureDuration
+} from "@vtt/schemas";
 import { experienceForChallenge } from "@vtt/rules-5e";
 import {
   ArmorReferenceSchema,
@@ -22,9 +30,16 @@ import {
   WeaponReferenceSchema
 } from "../src/index.js";
 import { outDir, sourcePath } from "./paths.js";
-import { SPELL_SAVE_OVERRIDE_IDS, spellSaveOutcomeFor, statBlockSaveOutcome } from "./save-outcomes.js";
+import {
+  failureDurationOf,
+  SPELL_SAVE_OVERRIDE_IDS,
+  spellSaveOutcomeFor,
+  statBlockSaveOutcome,
+  withoutOngoingDamage
+} from "./save-outcomes.js";
 import { areaOfProse, withProseFacts } from "../src/action-prose.js";
-import { spellEffectFor } from "./spell-effects.js";
+import { castingOptionsFor, makesSpellAttack, spellEffectFor } from "./spell-effects.js";
+import { castingTimeText, SPELL_FIELD_CORRECTIONS } from "./spell-corrections.js";
 import { printedHitDamage, printedSaveDamage } from "./monster-damage.js";
 
 const sourceDir = sourcePath("open5e-srd-2024");
@@ -323,26 +338,56 @@ const parseMultiattack = (
 /**
  * On-hit condition riders from the stock phrasing: "If the target is a Large or smaller creature,
  * it has the Grappled condition (escape DC 15). While Grappled, the target has the Restrained
- * condition." and "…it has the Prone condition." Only attack actions get riders (a save action's
- * conditions flow through the pending-save pipeline instead).
+ * condition." (or "...and it has the Restrained condition until the grapple ends"), "…it has the Prone
+ * condition.", and an unconditional timed one: "...and the target has the Poisoned condition until the start of
+ * the assassin's next turn." Only attack actions get riders (a save action's conditions flow through the
+ * pending-save pipeline instead); a rider that depends on a charge or a drop to 0 HP stays prose.
  */
 type OnHitRider = {
   conditions: Array<{ id: string }>;
   escapeDc?: number;
   maxTargetSize?: "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan";
+  duration?: SaveFailureDuration;
 };
+const RIDER_CONDITIONS: ReadonlySet<string> = new Set(SaveConditionSchema.options);
+const riderConditionIds = (names: string): string[] =>
+  names
+    .split(/ and /)
+    .map((name) => name.toLowerCase())
+    .filter((id) => RIDER_CONDITIONS.has(id) && id !== "grappled");
 const parseOnHitRiders = (desc: string): OnHitRider[] | null => {
   const size = desc.match(/If the target is a (Tiny|Small|Medium|Large|Huge) or smaller creature/i);
   const maxTargetSize = size ? (size[1].toLowerCase() as NonNullable<OnHitRider["maxTargetSize"]>) : undefined;
   const riders: OnHitRider[] = [];
   const grapple = desc.match(/has the Grappled condition \(escape DC (\d+)\)/i);
   if (grapple) {
-    const conditions = [{ id: "grappled" }];
-    if (/While Grappled, the target (?:also )?has the Restrained condition/i.test(desc))
-      conditions.push({ id: "restrained" });
+    // What lasts exactly as long as the grapple rides the same effect, so escaping ends it too.
+    const held = new Set<string>();
+    if (/While Grappled, the target (?:also )?has the Restrained condition/i.test(desc)) held.add("restrained");
+    for (const match of desc.matchAll(
+      /\b(?:it|the target) has the ([A-Z][a-z]+(?: and [A-Z][a-z]+)?) conditions? until the grapple ends|\bUntil the grapple ends, the target has the ([A-Z][a-z]+(?: and [A-Z][a-z]+)?) conditions?/g
+    ))
+      for (const id of riderConditionIds(match[1] ?? match[2]!)) held.add(id);
+    const conditions = [{ id: "grappled" }, ...[...held].slice(0, 2).map((id) => ({ id }))];
     riders.push({ conditions, escapeDc: Number.parseInt(grapple[1], 10), ...(maxTargetSize ? { maxTargetSize } : {}) });
   } else if (/it has the Prone condition/i.test(desc)) {
     riders.push({ conditions: [{ id: "prone" }], ...(maxTargetSize ? { maxTargetSize } : {}) });
+  }
+  // An unconditional rider in the hit's own sentence (not one opening with "If"): timed, or with no end printed there
+  // (an otyugh's Poisoned, which a later save ends), which lasts until ended.
+  const hit = desc.slice(Math.max(0, desc.search(/\bHit:|Attack Roll:/)));
+  for (const sentence of hit.split(/(?<=\.)\s+/)) {
+    if (/^If\b/.test(sentence) || /Grappled/.test(sentence)) continue;
+    const timed = sentence.match(
+      /\bthe target has the ([A-Z][a-z]+(?: and [A-Z][a-z]+)?) conditions? (until the (?:start|end) of (?:its|the [A-Za-z' -]+?(?:'s|s')) next turn)/
+    );
+    const untimed = timed
+      ? null
+      : sentence.match(/\bdamage, and the target has the ([A-Z][a-z]+(?: and [A-Z][a-z]+)?) conditions?\.$/);
+    const ids = riderConditionIds((timed ?? untimed)?.[1] ?? "");
+    const duration = timed ? failureDurationOf(timed[2]) : undefined;
+    if (ids.length > 0 && (duration || untimed) && riders.length < 2)
+      riders.push({ conditions: ids.map((id) => ({ id })), ...(duration ? { duration } : {}) });
   }
   return riders.length > 0 ? riders : null;
 };
@@ -621,13 +666,8 @@ const CORRECTIONS: Record<string, Partial<CreatureFields>> = {
   ...Object.fromEntries(MEDIUM_OR_SMALL_PER_SRD.map((slug) => [`srd-2024_${slug}`, { size: "medium" }]))
 };
 
-/**
- * Same idea for spells. greater-invisibility ships with an empty `desc` upstream; the text is
- * the printed SRD 5.2.1 sentence.
- */
-const SPELL_CORRECTIONS: Record<string, Partial<SpellFields>> = {
-  "srd-2024_greater-invisibility": { desc: "A creature you touch has the Invisible condition until the spell ends." }
-};
+/** Same idea for spells: reviewed against the SRD 5.2.1 spells chapter (`spell-corrections.ts`). */
+const SPELL_CORRECTIONS: Readonly<Record<string, Partial<SpellFields>>> = SPELL_FIELD_CORRECTIONS;
 
 for (const pk of [...Object.keys(CORRECTIONS), ...EXCLUSIONS]) {
   if (!creatures.some((creature) => creature.pk === pk))
@@ -712,7 +752,20 @@ const monsters: ActorDefinition[] = creatures
       if (printed) report.printedAttackDamage += 1;
       // A save rider on an attack deals its damage through the hit, but may still deal more on later turns.
       const saveDamage = save ? printedSaveDamage(action.fields.desc) : null;
-      const reminder = fix?.reminder ?? saveDamage?.laterDamage ?? undefined;
+      // A reviewed failure the engine can't apply keeps only what a success does.
+      const saveOutcome = save
+        ? fix?.drop === "outcome"
+          ? { successDamage: statBlockSaveOutcome(action.fields.desc).successDamage, failureConditions: [] }
+          : statBlockSaveOutcome(action.fields.desc)
+        : null;
+      // Later-turn damage the engine deals itself (`ongoingDamage`) leaves the GM's reminder.
+      const laterDamage = saveDamage?.laterDamage ?? null;
+      const reminder =
+        fix?.reminder ??
+        (laterDamage !== null && saveOutcome && "ongoingDamage" in saveOutcome
+          ? withoutOngoingDamage(laterDamage)
+          : laterDamage) ??
+        undefined;
       const fromRows = row
         ? [
             ...(row.damage_die_count && row.damage_die_type
@@ -791,8 +844,7 @@ const monsters: ActorDefinition[] = creatures
               save: {
                 ability: ABILITY_BY_NAME[save[1] as keyof typeof ABILITY_BY_NAME],
                 dc: Number.parseInt(save[2], 10),
-                ...statBlockSaveOutcome(action.fields.desc),
-                ...(fix?.drop === "outcome" ? { failureConditions: [] } : {})
+                ...saveOutcome!
               }
             }
           : {}),
@@ -928,6 +980,27 @@ if (report.skipped.length > 0) {
   process.exit(1);
 }
 
+/**
+ * The upstream condition texts carry PDF-extraction glitches, fixed here so the vendored source stays
+ * byte-identical: a bullet with no space after its star, a word hyphenated across a line ("move- ment"), and
+ * Unconscious's last bullet run into the one before it.
+ */
+const CONDITION_TEXT_FIXES: Readonly<Record<string, ReadonlyArray<readonly [string, string]>>> = {
+  unconscious: [[" of you. Unaware. ", " of you. \n* Unaware. "]]
+};
+for (const id of Object.keys(CONDITION_TEXT_FIXES)) {
+  if (!conditions.some((condition) => condition.fields.document === "srd-2024" && condition.fields.describes === id))
+    throw new Error(`Condition text fix targets unknown condition ${id} - check for a typo or an upstream rename.`);
+}
+const conditionText = (id: string, text: string): string => {
+  let fixed = text.replace(/\n\*(?=\S)/g, "\n* ").replace(/([a-z])- ([a-z])/g, "$1$2");
+  for (const [from, to] of CONDITION_TEXT_FIXES[id] ?? []) {
+    if (!fixed.includes(from)) throw new Error(`Condition text fix for ${id} no longer matches - review it.`);
+    fixed = fixed.replace(from, to);
+  }
+  return fixed;
+};
+
 const conditionRecords = conditions
   .filter((condition) => condition.fields.document === "srd-2024")
   .sort((left, right) => left.pk.localeCompare(right.pk))
@@ -937,7 +1010,7 @@ const conditionRecords = conditions
       .split("-")
       .map((part) => `${part[0].toUpperCase()}${part.slice(1)}`)
       .join(" "),
-    description: condition.fields.desc
+    description: conditionText(condition.fields.describes, condition.fields.desc)
   }));
 
 /** Printed English title case: interior particles stay lowercase ("sleight-of-hand" -> "Sleight of Hand"). */
@@ -973,12 +1046,17 @@ const spellRecords = onlySrd(spells).map((spell) => {
   const fields = { ...spell.fields, ...correction };
   if (fields.saving_throw_ability && !abilityShort[fields.saving_throw_ability])
     throw new Error(`${spell.pk}: unexpected save ability ${fields.saving_throw_ability}`);
+  const effect = spellEffectFor(slugOf(spell.pk), fields.desc, fields.damage_roll || null, fields.damage_types, {
+    distance: fields.range,
+    unit: fields.range_unit,
+    text: fields.range_text || null
+  });
   return {
     id: slugOf(spell.pk),
     name: fields.name,
     level: fields.level,
     school: fields.school,
-    castingTime: fields.casting_time,
+    castingTime: castingTimeText(fields.casting_time),
     reactionCondition: fields.reaction_condition || null,
     range: { distance: fields.range, unit: fields.range_unit, text: fields.range_text || null },
     components: {
@@ -991,7 +1069,7 @@ const spellRecords = onlySrd(spells).map((spell) => {
     duration: fields.duration,
     concentration: fields.concentration,
     ritual: fields.ritual,
-    attackRoll: fields.attack_roll,
+    attackRoll: makesSpellAttack(fields.desc, effect),
     damage: { roll: fields.damage_roll || null, types: [...fields.damage_types] },
     save: fields.saving_throw_ability
       ? { ability: abilityShort[fields.saving_throw_ability], ...spellSaveOutcomeFor(slugOf(spell.pk), fields.desc) }
@@ -1001,18 +1079,19 @@ const spellRecords = onlySrd(spells).map((spell) => {
       ? { type: fields.shape_type, size: fields.shape_size, unit: fields.shape_size_unit }
       : null,
     area: areaOfProse(fields.desc),
-    effect: spellEffectFor(slugOf(spell.pk), fields.desc, fields.damage_roll || null, fields.damage_types),
+    effect,
     classes: fields.classes.map(slugOf).sort(),
     description: fields.desc,
     higherLevel: fields.higher_level || null,
-    castingOptions: (spellOptionsBySpell.get(spell.pk) ?? [])
-      .sort((left, right) => left.fields.type.localeCompare(right.fields.type))
-      .map((option) => ({
+    castingOptions: castingOptionsFor(
+      slugOf(spell.pk),
+      (spellOptionsBySpell.get(spell.pk) ?? []).map((option) => ({
         type: option.fields.type,
         damageRoll: option.fields.damage_roll || null,
         targetCount: option.fields.target_count,
         description: option.fields.desc || null
       }))
+    )
   };
 });
 
@@ -1028,8 +1107,8 @@ const weaponPropertyRecords = onlySrd(weaponProperties).map((property) => ({
  * fixtures do not link weapons to properties. Both are optional on the schema, so the join fails
  * the build rather than dropping them silently.
  *
- * A property cell's parenthetical is dropped (`Versatile (1d10)` -> `versatile`): riders match the
- * bare slug, and `EquipmentWeaponStatsSchema` has nowhere to put a second damage die.
+ * A property cell's parenthetical is dropped from the slug (`Versatile (1d10)` -> `versatile`), since riders
+ * match the bare word; the Versatile die is kept as `versatileDice`.
  */
 const weaponTableSource = readFileSync(sourcePath("dnd-5e-srd-markdown", "equipment.md"), "utf8");
 const stripTags = (value: string) =>
@@ -1045,10 +1124,30 @@ const tableSlug = (value: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
+/** `Ammunition (Range 150/600; Arrow)` -> "arrow". The table prints "Bullet" for both a Sling's and a firearm's,
+ *  which the Ammunition table sells as two items, so the Sling's is told apart by name. */
+function ammunitionKindOf(weaponId: string, properties: string): AmmunitionKind | null {
+  const printed = /Ammunition \([^;)]*;\s*([A-Za-z]+)\)/.exec(properties)?.[1]?.toLowerCase();
+  if (printed === undefined) return null;
+  if (printed === "bullet") return weaponId === "sling" ? "sling-bullet" : "firearm-bullet";
+  const kind = AmmunitionKindSchema.safeParse(printed);
+  if (!kind.success) throw new Error(`Weapons table: "${weaponId}" fires "${printed}", which no ammunition sells.`);
+  return kind.data;
+}
+
 const weaponTable = (() => {
   const table = weaponTableSource.match(/\*\*Weapons\*\*\s*(<table>[\s\S]*?<\/table>)/);
   if (!table) throw new Error("No **Weapons** table in sources/dnd-5e-srd-markdown/equipment.md.");
-  const rows = new Map<string, { properties: readonly string[]; mastery: string; melee: boolean }>();
+  const rows = new Map<
+    string,
+    {
+      properties: readonly string[];
+      mastery: string;
+      melee: boolean;
+      versatileDice: string | null;
+      ammunition: AmmunitionKind | null;
+    }
+  >();
   // The `<th colspan="6">` band rows ("Simple Melee Weapons", ...) are the only source of melee vs
   // ranged: a thrown Dagger has a range and is melee, a Dart is not. Unknown bands, or data rows before
   // any band, fail the build.
@@ -1077,7 +1176,9 @@ const weaponTable = (() => {
               .map((entry) => tableSlug(entry.replace(/\(.*/, "")))
               .filter((entry) => entry !== ""),
       mastery: tableSlug(cells[3]),
-      melee: band.melee
+      melee: band.melee,
+      versatileDice: /Versatile \((\d+d\d+)\)/.exec(properties)?.[1] ?? null,
+      ammunition: ammunitionKindOf(tableSlug(cells[0]), properties)
     });
   }
   // Both vocabularies come from the fixtures' `WeaponProperty` rows, as bare ids (riders match the bare word).
@@ -1116,8 +1217,10 @@ const weaponRecords = onlySrd(weapons).map((weapon) => {
     id,
     name: weapon.fields.name,
     category: weapon.fields.is_simple ? ("simple" as const) : ("martial" as const),
-    // Needed to resolve "Weapon (Any Melee Weapon)" eligibility.
+    // Needed to resolve "Weapon (Any Melee Weapon)" eligibility, and whether a thrown weapon has a melee reach.
     melee: row.melee,
+    ...(row.versatileDice !== null ? { versatileDice: row.versatileDice } : {}),
+    ...(row.ammunition !== null ? { ammunition: row.ammunition } : {}),
     improvised: weapon.fields.is_improvised,
     mastery: row.mastery,
     // `[]` when the table prints "—": a Mace has no properties, which differs from "not recorded".

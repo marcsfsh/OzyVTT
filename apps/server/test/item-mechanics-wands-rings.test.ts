@@ -178,13 +178,15 @@ describe("a Wand of Fireballs spends a charge, rolls real damage, and refuses at
 
     actor.actionUses = { [CHARGES]: 6 };
     newTurn(state);
-    resolveDefinitionAction(
+    const last = resolveDefinitionAction(
       state,
       cast,
       { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(2) },
-      deps([1, 1, 1, 1, 1, 1, 1, 1], definition)
+      deps([1, 1, 1, 1, 1, 1, 1, 1, 12], definition)
     );
     expect(actor.actionUses[CHARGES]).toBe(7); // the seventh charge, still legal
+    // The SRD's d20 for the last charge, rolled by the server after the damage dice.
+    expect(last.warnings).toContain("Wand of Fireballs's last charge is spent; the d20 shows 12, so it keeps working.");
 
     newTurn(state);
     // The message names the wand and the pool it exhausted.
@@ -378,13 +380,15 @@ describe("a staff's resistance and its shared charge pool", () => {
     ]);
 
     actor.actionUses = { "staff-of-charming-charges": 9 };
-    resolveDefinitionAction(
+    const last = resolveDefinitionAction(
       state,
       actions.find((entry) => entry.id === "item-staff-of-charming-cast-command")!,
       { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(8) },
-      deps([], definition)
+      deps([1], definition)
     );
     expect(actor.actionUses["staff-of-charming-charges"]).toBe(10);
+    // The last charge rolls a d20; on a 1 the staff's own text decides, so the GM is told.
+    expect(last.warnings?.[0]).toMatch(/^Staff of Charming's last charge is spent and the d20 shows 1/);
 
     newTurn(state);
     // A different cast on the same pool is refused too: one pool.

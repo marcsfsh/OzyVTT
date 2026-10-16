@@ -19,6 +19,7 @@ import { fillMissingSpeeds, fillStoredProseFacts, reconcileArmorClasses, storedD
 import { createApiV1Router } from "./api-v1.js";
 import { ContentLibrary } from "./content-library.js";
 import { equipmentCatalogOf } from "./equipment-derivation.js";
+import { reconcileMagicMarkers } from "./inventory.js";
 import { AuthService } from "./auth.js";
 import { developmentClientUrl } from "./client-hosting.js";
 import { CombatLogStore, projectFeedRow } from "./combat-log.js";
@@ -61,6 +62,7 @@ import { createViewerRouter } from "./viewer-http.js";
 import { projectViewerEncounter } from "./viewer-encounter.js";
 import { ViewerPresentationStore } from "./viewer-presentation-store.js";
 import { CharacterDraftStore } from "./character-drafts.js";
+import { turnReminder } from "./turn-reminder.js";
 
 export type CreateServerOptions = {
   authPath: string;
@@ -198,7 +200,8 @@ export function createServer(options: CreateServerOptions) {
     const reconcile = (state: GameState) => {
       const filled = fillStoredProseFacts(state);
       const sped = fillMissingSpeeds(state, definitionsIn(state));
-      return reconcileArmorClasses(state, definitionsIn(state), catalog) || filled || sped;
+      const marked = reconcileMagicMarkers(state, catalog);
+      return reconcileArmorClasses(state, definitionsIn(state), catalog) || filled || sped || marked;
     };
     // A dry run first, so an unchanged campaign takes no revision.
     if (!reconcile(structuredClone(current))) return;
@@ -283,7 +286,8 @@ export function createServer(options: CreateServerOptions) {
       if (projected) socket.emit("log:entry", projected);
     }
   }
-  /** "Round 3 - Borin's turn." A hidden combatant's turn stays GM-only (its name would otherwise leak). */
+  /** "Round 3 - Borin's turn.", then what Borin carries into it (`turnReminder`). A hidden combatant's turn stays
+   *  GM-only (its name would otherwise leak). */
   function logTurnBegin(state: GameState) {
     if (state.combat.turnActorId === null) return;
     const name = state.actors.find((actor) => actor.id === state.combat.turnActorId)?.name ?? "A combatant";
@@ -292,6 +296,8 @@ export function createServer(options: CreateServerOptions) {
       text: `Round ${state.combat.round} - ${name}'s turn.`,
       actorIds: [state.combat.turnActorId]
     });
+    const reminder = turnReminder(state, state.combat.turnActorId);
+    if (reminder !== null) appendLog({ kind: "turn", text: reminder, actorIds: [state.combat.turnActorId] });
   }
   /** Turns a timeline navigation outcome into log lines: plain turns for forward play, GM-only notes for rewinds. */
   function logTimelineOutcome(outcome: TimelineOutcome, state: GameState) {

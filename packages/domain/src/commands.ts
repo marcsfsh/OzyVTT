@@ -19,6 +19,7 @@ import {
   CharacterChoiceSchema,
   CharacterIdentitySchema,
   CurrencySchema,
+  DamageTypeSchema,
   EffectModifiersSchema,
   InventoryItemSchema,
   ProficienciesSchema
@@ -289,8 +290,8 @@ export const SetConditionSchema = z
       .max(60),
     active: z.boolean(),
     level: z.number().int().min(1).max(6).optional(),
-    /** Bypass a movement-rule rejection (standing from Prone costs half Speed); audited. */ override:
-      RulesOverrideSchema.optional(),
+    /** Bypass a rules rejection (standing from Prone costs half Speed, on your own turn; a condition someone else
+     *  imposed is theirs to end); audited. */ override: RulesOverrideSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -358,6 +359,8 @@ export const ActionResolveSchema = z
     /** The spell slot to cast with (upcasting rolls that slot's dice); absent, the spell's own level, else the lowest
      *  above it with a slot left. */
     slotLevel: z.number().int().min(1).max(9).optional(),
+    /** The damage type picked for an action that lets its caster choose (Chromatic Orb); absent, its first. */
+    damageType: DamageTypeSchema.optional(),
     /** Extras to add to this hit, from the preview's `hitOffers` (Sneak Attack, a smite and its slot, Divine Strike's
      *  type, a charge). Each is checked and spent with the hit; on a miss nothing is spent. */
     hitOptions: z.array(HitOptionChoiceSchema).max(6).optional(),
@@ -484,6 +487,9 @@ export const EffectAddSchema = z
     modifiers: EffectModifiersSchema.optional(),
     /** The granter concentrates to sustain this effect (SRD Concentration): one at a time; damage prompts a CON save; incapacitation breaks it. */
     concentration: z.boolean().optional(),
+    /** The creature the effect comes from: with `concentration`, the one concentrating on it (the Cleric who cast
+     *  the Bless on the Fighter). Absent, a concentration effect is sustained by its bearer. */
+    sourceActorId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -492,6 +498,8 @@ export const EffectEndSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     effectId: z.string().min(1).max(120),
+    /** Bypass the rules block on ending an effect someone else imposed (an Allow from the GM); audited. */
+    override: RulesOverrideSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -534,6 +542,8 @@ export const ActionUseSchema = z
     override: RulesOverrideSchema.optional(),
     /** The spell slot to cast with; see `action.resolve`. */
     slotLevel: z.number().int().min(1).max(9).optional(),
+    /** The damage type picked; see `action.resolve`. */
+    damageType: DamageTypeSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -731,6 +741,8 @@ export const CharacterSetSlotSchema = z
     actorId: z.uuid(),
     level: z.number().int().min(1).max(9),
     remaining: z.number().int().min(0).max(9),
+    /** The Warlock's Pact Magic pool at `level`, not the spell slots. */
+    pact: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -743,11 +755,32 @@ export const CharacterSetPreparedSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** Closes the prepare step a Long Rest opened: the prepared list stands until the next one. */
+export const CharacterFinishPreparingSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const CharacterSetInventorySchema = z
   .object({
     commandId: z.uuid(),
     actorId: z.uuid(),
     item: InventoryItemSchema,
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Moves one carried row, whole, from one character to another, with the charges it has spent (GM). */
+export const CharacterGiveItemSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    toActorId: z.uuid(),
+    itemId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -990,6 +1023,15 @@ export const ActorSetSpeedSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     speedFeet: z.number().int().min(0).max(500).nullable(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** GM-set Armor Class that replaces the one derived from equipment; null clears it back to the derived AC. */
+export const ActorSetArmorClassSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    armorClass: z.number().int().min(1).max(40).nullable(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

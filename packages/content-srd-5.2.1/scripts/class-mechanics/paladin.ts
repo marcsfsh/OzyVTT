@@ -1,5 +1,13 @@
 // Paladin and Oath of Devotion mechanics, merged over the ETL-generated prose.
+import type { Condition } from "@vtt/schemas";
 import { spellTableStages, type ClassMechanicsModule } from "./overlay.js";
+
+/** SRD Aura of Protection: the aura "is inactive while you have the Incapacitated condition" (or one including it). */
+const AURA_ACTIVE = {
+  type: "while-condition" as const,
+  conditionIds: ["incapacitated", "paralyzed", "petrified", "stunned", "unconscious"] satisfies Condition[],
+  present: false
+};
 
 export const paladin: ClassMechanicsModule = {
   features: {
@@ -61,8 +69,9 @@ export const paladin: ClassMechanicsModule = {
     },
 
     /**
-     * Spends the shared Channel Divinity pool against the Paladin's own spell save DC. The
-     * Charisma-scaled target count and "until it takes any damage" stay prose.
+     * Spends the shared Channel Divinity pool against the Paladin's own spell save DC; the Frightened lasts 1
+     * minute or until the target takes damage. The Charisma-scaled target count and the one-thing-per-turn limit
+     * stay prose.
      */
     "abjure-foes": {
       uses: { scaling: { type: "class-resource", id: "channel-divinity" }, per: "long-rest", pool: "channel-divinity" },
@@ -74,14 +83,21 @@ export const paladin: ClassMechanicsModule = {
           description:
             "As a Magic action, you expend one use of this class's Channel Divinity and target a number of creatures equal to your Charisma modifier (minimum of one) that you can see within 60 feet. Each target must succeed on a Wisdom saving throw or have the Frightened condition for 1 minute or until it takes any damage. While Frightened this way, a target can do only one of the following on its turns: move, take an action, or take a Bonus Action.",
           damage: [],
-          save: { ability: "wis", dc: "spellcasting", successDamage: "none", failureConditions: ["frightened"] }
+          save: {
+            ability: "wis",
+            dc: "spellcasting",
+            successDamage: "none",
+            failureConditions: ["frightened"],
+            failureDuration: { type: "rounds", rounds: 10 },
+            endsOnDamage: true
+          }
         }
       ]
     },
 
     // The Paladin is always inside their own aura; immunity for allies is not expressible.
     "aura-of-courage": {
-      grants: { conditionImmunities: ["frightened"] }
+      grants: { conditionImmunities: ["frightened"], when: [AURA_ACTIVE] }
     },
 
     "radiant-strikes": {
@@ -90,7 +106,8 @@ export const paladin: ClassMechanicsModule = {
           type: "extra-damage",
           formula: "1d8",
           damageType: "radiant",
-          when: [{ type: "on-hit" }, { type: "attack-kind-is", kinds: ["melee", "unarmed"] }]
+          // A melee weapon or an Unarmed Strike: a melee spell attack is melee but no weapon.
+          when: [{ type: "on-hit" }, { type: "attack-kind-is", kinds: ["melee-weapon", "unarmed"] }]
         }
       ]
     },
@@ -165,7 +182,7 @@ export const paladin: ClassMechanicsModule = {
 
       // Same reading as Aura of Courage.
       "aura-of-devotion": {
-        grants: { conditionImmunities: ["charmed"] }
+        grants: { conditionImmunities: ["charmed"], when: [AURA_ACTIVE] }
       },
 
       // The counter only; the save advantage (keyed to the source's creature type), the Radiant aura tick

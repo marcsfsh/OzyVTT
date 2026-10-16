@@ -141,7 +141,7 @@ type SlotMaximum = { level: number; max: number };
  * The build's spell slots (SRD Multiclassing, Spell Slots). One class with the Spellcasting feature reads its own
  * table. Two or more add their levels (Bard, Cleric, Druid, Sorcerer and Wizard all of them, Paladin and Ranger half
  * rounded up, a homebrew class by its own progression) and read the Multiclass Spellcaster table. Pact Magic is a
- * pool of its own; a Warlock with no Spellcasting class beside it keeps its pact row as its slots.
+ * pool of its own, never spell slots, whatever classes stand beside it.
  */
 export function spellSlotsOf(classes: readonly BuildClass[]): { slots: SlotMaximum[]; pact: SlotMaximum | null } {
   const casters = castersOf(classes);
@@ -161,7 +161,6 @@ export function spellSlotsOf(classes: readonly BuildClass[]): { slots: SlotMaxim
         )
       : (spellcasters[0]?.entry.row.spellSlots ?? []);
   const slots = counts.map((count, index) => ({ level: index + 1, max: count })).filter((slot) => slot.max > 0);
-  if (spellcasters.length === 0 && pact) return { slots: [pact], pact: null };
   return { slots, pact };
 }
 

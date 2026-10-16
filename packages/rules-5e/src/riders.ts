@@ -10,8 +10,19 @@
 export type RiderAbility = "str" | "dex" | "con" | "int" | "wis" | "cha";
 export type ArmorWeight = "light" | "medium" | "heavy";
 /** How an attack is being made. `reaction`/`opportunity` are only knowable from the resolve's caller. `weapon` is an
- *  attack with a weapon, as opposed to a spell, an Unarmed Strike or a monster's natural attack. */
-export type AttackKind = "melee" | "ranged" | "spell" | "unarmed" | "thrown" | "reaction" | "opportunity" | "weapon";
+ *  attack with a weapon, as opposed to a spell, an Unarmed Strike or a monster's natural attack, and `melee-weapon`/
+ *  `ranged-weapon` such an attack made in melee or at range. */
+export type AttackKind =
+  | "melee"
+  | "ranged"
+  | "spell"
+  | "unarmed"
+  | "thrown"
+  | "reaction"
+  | "opportunity"
+  | "weapon"
+  | "melee-weapon"
+  | "ranged-weapon";
 
 /** The named roll or event a rider fires at; at most one per rider. */
 export type RiderMoment =
@@ -45,7 +56,8 @@ const FILTERS: ReadonlySet<string> = new Set([
   "spell-id-is",
   "versus-creature-type",
   "versus-size",
-  "versus-condition"
+  "versus-condition",
+  "by-effect-source"
 ]);
 const DYNAMIC_GATES: ReadonlySet<string> = new Set(["while-effect-tag", "while-hp-at-or-below", "while-condition"]);
 
@@ -110,6 +122,8 @@ export type RiderModifier = Readonly<{
   poolId?: string;
   threshold?: number;
   sense?: string;
+  /** `attack-bonus` / `save-bonus`: dice rolled on top of `amount` ("1d4"), or taken off ("-1d4"). */
+  dice?: string;
   when?: readonly RiderTrigger[];
   scope?: "bearer" | "this-item";
 }>;
@@ -173,6 +187,9 @@ export type RiderContext = Readonly<{
   targetCreatureType?: string;
   /** Which item this roll is made with; `scope: "this-item"` matches against it. */
   sourceItemId?: string | null;
+  /** The riders being read sit on an effect the roller put on its bearer (Hunter's Mark on the creature it hits);
+   *  `by-effect-source` passes only then. */
+  fromEffectSource?: boolean;
 }>;
 
 const overlaps = (allowed: readonly string[] | undefined, have: readonly string[] | undefined): boolean =>
@@ -265,6 +282,8 @@ function passes(trigger: RiderTrigger, context: RiderContext): boolean {
       );
     case "versus-condition":
       return overlaps(trigger.conditionIds, context.targetConditionIds);
+    case "by-effect-source":
+      return context.fromEffectSource === true;
     default:
       return false;
   }
@@ -376,6 +395,29 @@ export function sumRiders(riders: readonly ResolvedRider[], type: string): numbe
   }
   for (const amount of stacked.values()) total += amount;
   return total;
+}
+
+/** The dice riders of one type add to a roll (Bless's "+1d4", Bane's "-1d4"), each with its label, in collection
+ *  order. Read beside `sumRiders`, which sums the flat `amount`s. Riders sharing a `stackKey` count once (two
+ *  Blesses add one d4). */
+export function diceRiders(
+  riders: readonly ResolvedRider[],
+  type: string
+): Array<Readonly<{ label: string; dice: string }>> {
+  const counted = new Set<string>();
+  return riders.flatMap((rider) => {
+    if (rider.modifier.type !== type || rider.modifier.dice === undefined) return [];
+    if (rider.stackKey !== undefined) {
+      if (counted.has(rider.stackKey)) return [];
+      counted.add(rider.stackKey);
+    }
+    return [{ label: rider.label, dice: rider.modifier.dice }];
+  });
+}
+
+/** Dice riders as terms to append to a d20 test's formula (" + 1d4 - 1d4"). */
+export function diceRiderTerms(dice: ReadonlyArray<Readonly<{ dice: string }>>): string {
+  return dice.map((entry) => (entry.dice.startsWith("-") ? ` - ${entry.dice.slice(1)}` : ` + ${entry.dice}`)).join("");
 }
 
 /** SRD armor weight from the item's AC fields: heavy adds no Dex, medium caps it at +2, light adds it uncapped. */

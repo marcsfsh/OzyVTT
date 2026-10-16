@@ -9,6 +9,7 @@ import { resolveDefinitionAction, type ResolveDependencies } from "../src/action
 import { answerReaction } from "../src/reactions.js";
 import { answerSave, createPendingSaves } from "../src/saving-throws.js";
 import { setCondition } from "../src/actor-conditions.js";
+import { addEffect, endEffect, makeEffect } from "../src/effects.js";
 import { startEncounter } from "../src/encounter.js";
 import type { ActorDefinition } from "@vtt/schemas";
 import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
@@ -622,21 +623,22 @@ describe("Ranger - Favored Enemy, audit row 32", () => {
   it("gives exactly as many free casts as the printed Favored Enemy column, at two levels", () => {
     // The column reads 2 at level 1 and 6 at level 17, via `scaling: {type: "class-resource"}`. The free casts
     // are Hunter's Mark cast without a slot, counted on the feature's pool.
-    // A bonus action each, so each cast is its own turn.
+    // A bonus action each, so each cast is its own turn, and each marks the foe.
+    const mark = (built: Table) => {
+      newTurn(built);
+      return resolve(built, "spell-hunters-mark-free", []);
+    };
     const first = table(rangerInput(1));
-    spend(first, "spell-hunters-mark-free");
-    spend(first, "spell-hunters-mark-free");
+    mark(first);
+    mark(first);
     expect(first.hero.actionUses["favored-enemy"]).toBe(2);
-    expect(() => spend(first, "spell-hunters-mark-free")).toThrowError(
-      /Hunter's Mark \(no slot\): no uses remaining \(2\/long rest\)/
-    );
+    expect(first.foe.effects.map((effect) => effect.name)).toEqual(["Hunter's Mark"]);
+    expect(() => mark(first)).toThrowError(/Hunter's Mark \(no slot\): no uses remaining \(2\/long rest\)/);
 
     const late = table(rangerInput(17));
-    for (let cast = 0; cast < 6; cast += 1) spend(late, "spell-hunters-mark-free");
+    for (let cast = 0; cast < 6; cast += 1) mark(late);
     expect(late.hero.actionUses["favored-enemy"]).toBe(6);
-    expect(() => spend(late, "spell-hunters-mark-free")).toThrowError(
-      /Hunter's Mark \(no slot\): no uses remaining \(6\/long rest\)/
-    );
+    expect(() => mark(late)).toThrowError(/Hunter's Mark \(no slot\): no uses remaining \(6\/long rest\)/);
   });
 });
 
@@ -900,7 +902,10 @@ describe("Paladin - Channel Divinity is ONE counter that three features spend", 
       dc: 14,
       spellcasting: true,
       successDamage: "none",
-      failureConditions: ["frightened"]
+      failureConditions: ["frightened"],
+      // "for 1 minute or until it takes any damage".
+      failureDuration: { type: "rounds", rounds: 10 },
+      endsOnDamage: true
     });
     const resolution = resolve(built, "abjure-foes", [], [IDS.foe]);
     expect(resolution.save).toMatchObject({ ability: "wis", dc: 14 });
@@ -908,29 +913,40 @@ describe("Paladin - Channel Divinity is ONE counter that three features spend", 
 });
 
 describe("Paladin - the auras that are really immunities", () => {
+  // The auras are gated grants (inactive while the Paladin is Incapacitated), read live through the catalog as
+  // every command path passes it.
+  const immunitiesOf = (built: Table) => ({ resolveDefinition: () => built.definition, catalog: built.catalog });
+
   it("REFUSES the Frightened condition on a level-10 Paladin, and says so at the table", () => {
     // `grants.conditionImmunities` is enforced with narration in the fight log. The level-9 build is the
     // negative control.
     const brave = table(paladinInput(10));
-    const events = setCondition(brave.state, IDS.hero, "frightened", true, undefined, GM_SCOPE);
+    const events = setCondition(brave.state, IDS.hero, "frightened", true, undefined, GM_SCOPE, immunitiesOf(brave));
     expect(events).toEqual([
       { kind: "condition", text: "Bree is immune to Frightened - not applied.", actorId: IDS.hero, immune: true }
     ]);
     expect(brave.hero.conditions).toEqual([]);
 
     const earlier = table(paladinInput(9));
-    setCondition(earlier.state, IDS.hero, "frightened", true, undefined, GM_SCOPE);
+    setCondition(earlier.state, IDS.hero, "frightened", true, undefined, GM_SCOPE, immunitiesOf(earlier));
     expect(earlier.hero.conditions).toEqual([{ id: "frightened" }]);
   });
 
   it("REFUSES Charmed from Oath of Devotion's level-7 aura", () => {
     const devoted = table(paladinInput(7));
-    expect(setCondition(devoted.state, IDS.hero, "charmed", true, undefined, GM_SCOPE)[0].text).toBe(
-      "Bree is immune to Charmed - not applied."
-    );
+    expect(
+      setCondition(devoted.state, IDS.hero, "charmed", true, undefined, GM_SCOPE, immunitiesOf(devoted))[0].text
+    ).toBe("Bree is immune to Charmed - not applied.");
     // Frightened is not immune yet: the class aura is level 10.
-    setCondition(devoted.state, IDS.hero, "frightened", true, undefined, GM_SCOPE);
+    setCondition(devoted.state, IDS.hero, "frightened", true, undefined, GM_SCOPE, immunitiesOf(devoted));
     expect(devoted.hero.conditions).toEqual([{ id: "frightened" }]);
+  });
+
+  it("goes quiet while the Paladin is Incapacitated (SRD: the aura is inactive)", () => {
+    const brave = table(paladinInput(10));
+    setCondition(brave.state, IDS.hero, "stunned", true, undefined, GM_SCOPE, immunitiesOf(brave));
+    setCondition(brave.state, IDS.hero, "frightened", true, undefined, GM_SCOPE, immunitiesOf(brave));
+    expect(brave.hero.conditions.map((condition) => condition.id)).toEqual(["frightened", "stunned"]);
   });
 });
 
@@ -972,6 +988,65 @@ describe("Paladin - Divine Smite rides a melee hit", () => {
     );
     expect((thrown.hitOffers ?? []).some((offer) => offer.id === "spell-divine-smite")).toBe(true);
     expect(swing(built, "item-longsword", [2], { commit: false }).hitOffers).toBeUndefined();
+  });
+});
+
+/** A Paladin input with `spellId` prepared in place of its first pick. */
+const preparing = (input: MutableInput, spellId: string): MutableInput => {
+  const first = input.choices.findIndex((row) => row.kind === "spell");
+  input.choices[first] = { ...input.choices[first], id: spellId } as MutableInput["choices"][number];
+  return input;
+};
+
+describe("Paladin - smites that outlast the hit", () => {
+  it("Shining Smite gives the Paladin its Concentration, ends the one held before, and its mark ends with it", () => {
+    const built = table(preparing(paladinInput(5), "shining-smite"));
+    addEffect(
+      built.state,
+      IDS.hero,
+      makeEffect({
+        id: "bless",
+        name: "Concentrating on Bless",
+        tags: ["concentrating"],
+        sourceActorId: IDS.hero,
+        concentration: true,
+        castId: "bless",
+        duration: { type: "rounds", remaining: 10 }
+      })
+    );
+    const result = swing(built, "item-longsword", [19, 4, 3, 3, 3, 3], {
+      hitOptions: [{ id: "spell-shining-smite", slotLevel: 2 }]
+    });
+    expect(built.hero.effects.map((effect) => effect.name)).toEqual(["Concentrating on Shining Smite"]);
+    expect(result.effectsApplied?.map((applied) => applied.name)).toEqual(
+      expect.arrayContaining(["Concentrating on Shining Smite", "Shining Smite"])
+    );
+    const mark = built.foe.effects.find((effect) => effect.name === "Shining Smite")!;
+    expect(mark.castId).toBe(built.hero.effects[0].castId);
+    // Dropping the Concentration ends the mark.
+    endEffect(built.state, IDS.hero, built.hero.effects[0].id);
+    expect(built.foe.effects.map((effect) => effect.name)).toEqual(["Sapped by Bree"]);
+  });
+
+  it("Searing Smite keeps burning: its slot's dice at the start of each of the target's turns, then the spell's save", () => {
+    const built = table(preparing(paladinInput(5), "searing-smite"));
+    const result = swing(built, "item-longsword", [19, 4, 2, 2, 2, 2], {
+      hitOptions: [{ id: "spell-searing-smite", slotLevel: 2 }]
+    });
+    // The cast itself asks for no save: the save is the spell's own, at the Paladin's spell save DC.
+    expect(actionOf(built, "spell-searing-smite")!.save).toBeUndefined();
+    const dc = built.definition.spellcasting!.saveDc;
+    expect(built.foe.effects.find((effect) => effect.name === "Searing Smite")).toMatchObject({
+      sourceActorId: IDS.hero,
+      duration: { type: "rounds", remaining: 10 },
+      ongoingDamage: {
+        damage: [{ formula: "2d6", type: "fire" }],
+        at: "bearer-turn-start",
+        saveToEnd: { ability: "con", dc }
+      }
+    });
+    // The engine runs it, so it is no longer a note for the table.
+    expect(result.warnings ?? []).not.toContainEqual(expect.stringMatching(/^Searing Smite:/));
   });
 });
 

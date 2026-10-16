@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 // ajv is CJS: under `module: NodeNext` the default import is the module namespace, so use the named export.
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
@@ -21,6 +22,9 @@ import {
   resolveSpellcasting,
   riderLayer
 } from "../src/index.js";
+import { renderActorDefinitionJsonSchema } from "../src/json-schema.js";
+
+const readText = (relative: string) => readFileSync(new URL(relative, import.meta.url), "utf8");
 
 describe("actor definition v1", () => {
   const jsonValidate = new Ajv2020({ strict: false }).compile(jsonSchema);
@@ -29,6 +33,14 @@ describe("actor definition v1", () => {
     const parsed = ActorDefinitionSchema.safeParse(fixture);
     expect(parsed.success, parsed.success ? undefined : JSON.stringify(parsed.error.issues)).toBe(true);
     expect(jsonValidate(fixture), JSON.stringify(jsonValidate.errors)).toBe(true);
+  });
+  it("is the committed JSON Schema, regenerated from the Zod schema (`npm run map`)", () => {
+    expect(readText("../json/actor-definition.v1.schema.json")).toBe(renderActorDefinitionJsonSchema());
+  });
+  it("accepts every monster in the SRD bundle", () => {
+    const monsters = JSON.parse(readText("../../content-srd-5.2.1/bundles/monsters.v1.json")) as { name: string }[];
+    for (const definition of monsters)
+      expect(jsonValidate(definition), `${definition.name}: ${JSON.stringify(jsonValidate.errors)}`).toBe(true);
   });
   it("rejects unsafe or malformed dice input", () => {
     const invalid = structuredClone(monster);
@@ -349,12 +361,12 @@ describe("actor definition v1", () => {
     expect(parsed.success ? [] : parsed.error.issues.map((issue) => issue.path.join("."))).toContain(
       "spellcasting.slots"
     );
-    expect(jsonValidate(inconsistent)).toBe(false);
+    // A cross-field rule: the generated JSON Schema can't state it, so only the app refuses it.
+    expect(jsonValidate(inconsistent)).toBe(true);
     // Omitting `slots` is the same violation (it defaults to empty).
     const omitted = structuredClone(inconsistent);
     delete omitted.spellcasting.slots;
     expect(ActorDefinitionSchema.safeParse(omitted).success).toBe(false);
-    expect(jsonValidate(omitted)).toBe(false);
     const consistent = structuredClone(inconsistent);
     consistent.spellcasting.slots = [
       { level: 1, max: 4 },
@@ -452,14 +464,7 @@ describe("actor definition v1", () => {
     const parsed = ActorDefinitionSchema.safeParse(withRiders);
     expect(parsed.success, parsed.success ? undefined : JSON.stringify(parsed.error.issues)).toBe(true);
     expect(jsonValidate(withRiders), JSON.stringify(jsonValidate.errors)).toBe(true);
-    // The JSON twin declares every branch an effect may carry: the shared union minus the refused ones.
-    const effectTypes = ModifierSchema.options
-      .map((option) => option.shape.type.value)
-      .filter((type) => !EFFECT_REFUSED_MODIFIER_TYPES.includes(type));
-    expect(
-      (jsonSchema as any).$defs.effectModifier.oneOf.map((branch: any) => branch.properties.type.const).sort()
-    ).toEqual([...effectTypes].sort());
-    // A branch only Zod knows about is a stored effect the JSON validator would reject on load.
+    // A branch the JSON Schema lacked would be a stored effect its validator rejects on load.
     expect(EffectModifiersSchema.safeParse([{ type: "speed", amount: -10 }]).success).toBe(true);
     expect(EffectModifiersSchema.safeParse([{ type: "speed", amount: 61 }]).success).toBe(false);
     const striding = structuredClone(withRiders) as Record<string, any>;
@@ -482,7 +487,7 @@ describe("actor definition v1", () => {
     expect(RiderWhenSchema.safeParse([{ type: "while-condition", conditionIds: ["poisonned"] }]).success).toBe(false);
   });
 
-  it("declares twenty-eight named triggers, every one classified and accepted by the JSON twin", () => {
+  it("declares twenty-nine named triggers, every one classified and accepted by the JSON twin", () => {
     // One sample per trigger: the JSON twin folds parameterless moments into one enum branch, so a branch count would
     // not prove agreement.
     const samples: Record<string, Record<string, unknown>> = {
@@ -513,10 +518,11 @@ describe("actor definition v1", () => {
       "spell-id-is": { spellIds: ["eldritch-blast"] },
       "versus-creature-type": { creatureTypes: ["undead"] },
       "versus-size": { sizes: ["large"] },
-      "versus-condition": { conditionIds: ["prone"] }
+      "versus-condition": { conditionIds: ["prone"] },
+      "by-effect-source": {}
     };
     const declared = RiderTriggerSchema.options.map((option) => option.shape.type.value as string);
-    expect(declared).toHaveLength(28);
+    expect(declared).toHaveLength(29);
     expect(Object.keys(samples).sort()).toEqual([...declared].sort());
     // Every trigger must be classified, or it would evaluate in the wrong layer.
     const kinds = declared.map((type) => RIDER_TRIGGER_KINDS[type as keyof typeof RIDER_TRIGGER_KINDS]);
@@ -524,7 +530,7 @@ describe("actor definition v1", () => {
     expect(kinds.filter((kind) => kind === "static-gate")).toHaveLength(6);
     expect(kinds.filter((kind) => kind === "dynamic-gate")).toHaveLength(3);
     expect(kinds.filter((kind) => kind === "moment")).toHaveLength(8);
-    expect(kinds.filter((kind) => kind === "filter")).toHaveLength(11);
+    expect(kinds.filter((kind) => kind === "filter")).toHaveLength(12);
 
     for (const type of declared) {
       const trigger = { type, ...samples[type] };

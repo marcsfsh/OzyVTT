@@ -26,6 +26,9 @@ export default defineConfig({
           setupFiles: ["./test/setup.ts"],
           include: ["src/**/*.test.{ts,tsx}"],
           exclude: ["src/**/*.mirror.test.ts"],
+          // Rendering the full content bundles takes a few seconds in jsdom; the 5s default fails them on a
+          // busy machine while they pass in under two seconds alone.
+          testTimeout: 15_000,
           restoreMocks: true,
           clearMocks: true
         }

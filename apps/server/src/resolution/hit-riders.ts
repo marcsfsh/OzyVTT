@@ -23,6 +23,9 @@ export type HitRider = Readonly<{
   ownTurn?: true;
   /** A lasting effect on the target (Shining Smite), held by the attacker's concentration. */
   marks?: Readonly<{ name: string; tag: string; rounds: number }>;
+  /** A lasting effect on the target that deals the rider's dice again at the start of each of its turns and then
+   *  asks for the spell's save, a success ending it (Searing Smite). */
+  lingers?: Readonly<{ name: string; rounds: number }>;
   /** What the table finishes by hand. */
   reminder?: string;
 }>;
@@ -43,8 +46,7 @@ const BY_SPELL_ID: Readonly<Record<string, HitRider>> = {
   "searing-smite": {
     rides: "melee-weapon-or-unarmed",
     ownTurn: true,
-    reminder:
-      "Searing Smite: at the start of each of its turns until the spell ends, the target takes 1d6 Fire damage (1d6 more per slot level above 1) and then makes a Constitution save; on a success the spell ends."
+    lingers: { name: "Searing Smite", rounds: 10 }
   },
   "shining-smite": {
     rides: "melee-weapon-or-unarmed",

@@ -210,7 +210,7 @@ describe("Warlock: Mystic Arcanum is a real pick and a real once-per-day casting
     // Pact Magic tops out at level 5, so the class budget refuses a level-6 spell; as a feature pick it
     // lands on a sheet whose highest slot is level 5.
     const built = level11();
-    expect(built.spellcasting!.slots.map((slot) => slot.level)).toEqual([5]);
+    expect(built.spellcasting!.pact?.level).toBe(5);
     expect(spellOf(built, "true-seeing")).toMatchObject({ id: "true-seeing", level: 6, prepared: true });
   });
 
@@ -558,7 +558,9 @@ describe("Fiend Patron: Hurl Through Hell rolls its 8d10 and holds the target to
       dc: 18,
       spellcasting: true,
       successDamage: "none",
-      failureConditions: ["incapacitated"]
+      failureConditions: ["incapacitated"],
+      // "until the end of your next turn": the Warlock's.
+      failureDuration: { type: "until-source-turn-end" }
     });
     expect(built.definition.spellcasting!.saveDc).toBe(18);
 

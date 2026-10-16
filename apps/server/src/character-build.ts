@@ -43,8 +43,15 @@ import {
 } from "./character-offers.js";
 import type { ContentView } from "./content-library.js";
 import { BUILDER_BAKED_MODIFIER_TYPES, type CharacterFeatureRef } from "./equipment-derivation.js";
-import { spellCastMechanics, UNARMED_STRIKE_ACTION_ID } from "./item-actions.js";
+import {
+  isLongCastingTime,
+  laterSpellAction,
+  ritualSpellActionId,
+  spellCastMechanics,
+  UNARMED_STRIKE_ACTION_ID
+} from "./item-actions.js";
 import { bindTemplateItem } from "./inventory.js";
+import { BUILDER_SOURCE_NAME } from "./actor-roster.js";
 import { featHoldings, featPrerequisiteFailure } from "./feat-prerequisites.js";
 import { CommandRejectedError } from "./game-store.js";
 
@@ -178,6 +185,8 @@ const CARRIER_RIDER_DISPOSITION: Readonly<
   "critical-range": "standing", // effective-actions criticalThreshold
   "critical-bonus-dice": "standing", // effective-actions folds it into attack.criticalBonusDice
   "extra-attack": "standing", // effective-actions extraAttacksFor raises attack.count on a weapon swing
+  "armor-class": "standing", // storedArmorClass, via derivation.armorClass, so Defense follows the armor worn now
+  "attunement-slots": "standing", // inventory.ts, the attunement limit
   "roll-mode": "at-its-moment", // rollModeClaims: attacks, saves, checks, initiative
   "extra-damage": "at-its-moment", // resolution/damage.ts rolls it as its own typed damage entry
   "damage-bonus": "standing", // effective-actions folds it into the first damage part's formula; a moment-gated one lands as a bonusDamage line in resolution/damage.ts
@@ -331,18 +340,22 @@ function cantripActionFor(
     activation: activationOf(spell.castingTime),
     description: spell.description.slice(0, 12000),
     ...mechanics,
-    ...(spell.area ? { area: spell.area } : {}),
+    // A healing area heals up to a number of creatures the caster picks (Mass Cure Wounds' six), so it is picked.
+    ...(spell.area && !mechanics.healing ? { area: spell.area } : {}),
     ...(spell.effect?.reaction ? { reaction: spell.effect.reaction } : {}),
     // `spell-id-is` riders (Agonizing Blast) match on this field alone.
     spellId: spell.id
   } as ActorAction;
 }
 
-/** The action economy a casting time names ("1 action", "1 bonus action", "1 reaction, which you take when..."). */
+/** The action economy a casting time names ("Action", "Bonus Action", "Reaction, which you take when..."). A casting
+ *  time of a minute or more takes the Magic action on each turn of it (SRD "Longer Casting Times"), so it is an action
+ *  too, refused while Incapacitated. */
 function activationOf(castingTime: string): ActorAction["activation"] {
   if (/bonus/i.test(castingTime)) return "bonus-action";
   if (/reaction/i.test(castingTime)) return "reaction";
-  return /^(?:1 )?action$/i.test(castingTime.trim()) ? "action" : "other";
+  if (/^(?:1 )?action\b/i.test(castingTime.trim()) || isLongCastingTime(castingTime)) return "action";
+  return "other";
 }
 
 type CasterNumbers = Readonly<{ attackBonus: number; saveDc: number; characterLevel: number; modifier: number }>;
@@ -368,6 +381,7 @@ function leveledSpellActionFor(
     mechanics.save !== undefined ||
     mechanics.healing !== undefined ||
     mechanics.attack ||
+    mechanics.grants !== undefined ||
     spell.effect?.reaction !== undefined;
   if (free === null && !resolvable) return null;
   const freeCast = free !== undefined;
@@ -377,12 +391,24 @@ function leveledSpellActionFor(
     activation: activationOf(spell.castingTime),
     description: spell.description.slice(0, 12000),
     ...mechanics,
-    ...(spell.area ? { area: spell.area } : {}),
+    // A healing area heals up to a number of creatures the caster picks (Mass Cure Wounds' six), so it is picked.
+    ...(spell.area && !mechanics.healing ? { area: spell.area } : {}),
     // A reaction spell's trigger rides its action, so the table offers it (Shield when an attack would hit).
     ...(spell.effect?.reaction ? { reaction: spell.effect.reaction } : {}),
     ...(freeCast ? (free ? { uses: free } : {}) : { spellSlot: { level: spell.level } }),
     spellId: spell.id
   } as ActorAction;
+}
+
+/** A slot cast as a Ritual: the same spell with no slot, 10 minutes longer, so the Magic action on each turn of it. */
+function ritualActionOf(cast: ActorAction, spell: SpellReference): ActorAction {
+  const { spellSlot: _slot, ...rest } = cast;
+  return {
+    ...rest,
+    id: ritualSpellActionId(spell.id),
+    name: `${spell.name} (ritual)`,
+    activation: "action"
+  };
 }
 
 /** The tag of a feature whose spell picks go to the spellbook to be prepared, not straight onto the prepared list
@@ -404,14 +430,16 @@ type SpellEntry = {
   classId?: string;
   actionId?: string;
   freeActionId?: string;
+  ritualActionId?: string;
   source: SpellSource;
   free?: ActorAction["uses"] | null;
 };
 
 /**
  * Mints and links each spell's actions: a cantrip's (`actionId`), a leveled spell's slot cast (`actionId`, when the
- * sheet has slots and the spell may use one) and a free cast (`freeActionId`), each with the numbers of the ability
- * its source casts with. Mutates the list in place.
+ * sheet has slots and the spell may use one), its Ritual cast (`ritualActionId`), a free cast (`freeActionId`) and
+ * what it lets its caster do later, each with the numbers of the ability its source casts with. Mutates the list in
+ * place.
  */
 function linkSpellActions(
   spells: SpellEntry[],
@@ -424,18 +452,35 @@ function linkSpellActions(
     const record = library.spellRecord(entry.id);
     if (!record) continue;
     const numbers = numbersOf(entry.source);
-    const mint = (action: ActorAction | null, key: "actionId" | "freeActionId") => {
+    const mint = (action: ActorAction | null, key: "actionId" | "freeActionId" | "ritualActionId") => {
       if (!action || into.length >= MAX_DEFINITION_ACTIONS || into.some((existing) => existing.id === action.id))
         return;
       into.push(action);
       entry[key] = action.id;
     };
-    if (record.level === 0) {
-      mint(cantripActionFor(record, numbers), "actionId");
-      continue;
+    if (record.level === 0) mint(cantripActionFor(record, numbers), "actionId");
+    else {
+      if (hasSlots && entry.withSlot !== false) {
+        const cast = leveledSpellActionFor(record, numbers);
+        mint(cast, "actionId");
+        // SRD Rituals: a prepared ritual spell can be cast without a slot, taking 10 minutes longer.
+        if (cast && record.ritual) mint(ritualActionOf(cast, record), "ritualActionId");
+      }
+      if (entry.free !== undefined) mint(leveledSpellActionFor(record, numbers, entry.free), "freeActionId");
     }
-    if (hasSlots && entry.withSlot !== false) mint(leveledSpellActionFor(record, numbers), "actionId");
-    if (entry.free !== undefined) mint(leveledSpellActionFor(record, numbers, entry.free), "freeActionId");
+    // What the spell lets its caster do once it is up (Produce Flame's hurl, Spirit Guardians' save), with no slot.
+    const tier =
+      record.level === 0 ? cantripTierAt(cantripScalingOf(record.castingOptions), numbers.characterLevel) : null;
+    for (const later of record.effect?.laterActions ?? []) {
+      const action = laterSpellAction(
+        record,
+        later,
+        { attackBonus: numbers.attackBonus, saveDc: numbers.saveDc, bearersDc: true, modifier: numbers.modifier },
+        { roll: tier?.damageRoll ?? null }
+      );
+      if (into.length < MAX_DEFINITION_ACTIONS && !into.some((existing) => existing.id === action.id))
+        into.push(action);
+    }
   }
 }
 
@@ -583,8 +628,8 @@ function interpretFeature(
       case "speed":
         if ((modifier.when?.length ?? 0) === 0) into.speedBonus += modifier.amount;
         break;
-      // Defense is "+1 AC while wearing armor": a `whileArmored` rider waits for step 11, which knows the
-      // final loadout. An unconditional rider applies either way.
+      // Only the starting AC printed on the definition. The live AC collects these riders from the feature
+      // itself (`storedArmorClass`), so Defense follows whatever armor is worn later.
       case "armor-class":
         if (modifier.whileArmored) into.armorClassBonusWhileArmored += modifier.amount;
         else into.armorClassBonus += modifier.amount;
@@ -1196,7 +1241,7 @@ export function buildCharacterDefinition(
     const lead = classSpells[0];
     const { saveDc, attackBonus } = numbersOf(`class:${lead.classId}`);
     // Spells become actions with the numbers of the ability their source casts with; the sheet sends only an id.
-    linkSpellActions(spells, interpreted.actions, numbersOf, library, slots.length > 0);
+    linkSpellActions(spells, interpreted.actions, numbersOf, library, slots.length > 0 || pact !== null);
     // Top-level fields stay populated (the schema demands the combined pool when per-class slots exist); a lone
     // caster also records the pool as its own.
     spellcasting = {
@@ -1287,7 +1332,7 @@ export function buildCharacterDefinition(
               : false,
             attuned: false,
             ...(record?.weightLb !== null && record?.weightLb !== undefined ? { weightEach: record.weightLb } : {}),
-            ...(record?.description ? { description: record.description.slice(0, 4000) } : {}),
+            ...(record?.description ? { description: record.description.slice(0, 12000) } : {}),
             ...(record ? { category: record.category } : {}),
             // `mastery` is not copied: it resolves against the catalog and is gated on the bearer having unlocked
             // this weapon. Omit `properties` when the catalog records none (absent means "not recorded").
@@ -1299,6 +1344,8 @@ export function buildCharacterDefinition(
                     damageType: record.weapon.damageType,
                     rangeFeet: record.weapon.rangeFeet,
                     longRangeFeet: record.weapon.longRangeFeet,
+                    ...(record.weapon.melee !== undefined ? { melee: record.weapon.melee } : {}),
+                    ...(record.weapon.versatileDice ? { versatileDice: record.weapon.versatileDice } : {}),
                     ...(record.weapon.properties ? { properties: [...record.weapon.properties] } : {})
                   }
                 }
@@ -1355,13 +1402,11 @@ export function buildCharacterDefinition(
     allowShield: entry.allowShield
   }));
   const equipmentAc = bestArmorClass(dexModifier, inventory, unarmoredDefenses);
-  const unarmoredAc =
-    unarmoredDefenses.length > 0 ? Math.max(...unarmoredDefenses.map((entry) => 10 + dexModifier + entry.bonus)) : null;
+  const unarmoredAc = 10 + dexModifier + Math.max(0, ...unarmoredDefenses.map((entry) => entry.bonus));
   const wearingArmor = inventory.some((item) => item.equipped && item.category === "armor" && item.armor);
-  // The flat non-equipment part of AC travels in the definition's extension bag so `instantiate` can
-  // re-derive AC from the live loadout without dropping it (`armorClassRiderOf` in actor-roster.ts).
+  // The starting AC the definition prints; the live AC is re-derived from what is worn (`storedArmorClass`).
   const armorClassRider = interpreted.armorClassBonus + (wearingArmor ? interpreted.armorClassBonusWhileArmored : 0);
-  const armorClass = (equipmentAc ?? unarmoredAc ?? 10 + dexModifier) + armorClassRider;
+  const armorClass = (equipmentAc ?? unarmoredAc) + armorClassRider;
   const initiativeBonus = dexModifier + interpreted.initiativeBonus;
 
   // ---- 12. Assemble, validate through the canonical schema, done. ----
@@ -1381,7 +1426,7 @@ export function buildCharacterDefinition(
   return ActorDefinitionSchema.parse({
     schemaId: "vtt.actor-character",
     schemaVersion: 1,
-    source: { name: "OzyVTT Character Builder", version: "1" },
+    source: { name: BUILDER_SOURCE_NAME, version: "1" },
     name: input.name,
     summary,
     size,
@@ -1401,7 +1446,6 @@ export function buildCharacterDefinition(
     extensions: {
       "open5e.srd-2024": {
         traits: interpreted.traits,
-        ...(armorClassRider !== 0 ? { armorClassBonus: armorClassRider } : {}),
         ...(interpreted.unarmoredDefenses.length > 0 ? { unarmoredDefense: interpreted.unarmoredDefenses[0] } : {}),
         ...(interpreted.unarmoredDefenses.length > 1 ? { unarmoredDefenses: interpreted.unarmoredDefenses } : {})
       }

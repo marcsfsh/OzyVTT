@@ -5,9 +5,11 @@ import { pactSlotMaximum, spellSlotMaxima } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
 import { effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
-import { endEffect, removeConditionDirect, type EffectNarration } from "./effects.js";
+import { endEffectsAtLongRest, removeConditionDirect, type EffectNarration } from "./effects.js";
 import { requireActorAccess, type Initiator } from "./authorization.js";
+import { openPreparation } from "./spellcasting.js";
 import { healActor } from "./hit-points.js";
+import { chargesAfterDawn } from "./item-charges.js";
 
 /** Takes `count` dice off a multiclass pool, biggest die first (the order the roll uses). The caller has
  *  already checked the pool holds enough. */
@@ -68,18 +70,26 @@ function clearOverrides(overrides: Actor["choiceOverrides"], kind: "long" | "sho
   return Object.fromEntries(Object.entries(overrides).filter(([, override]) => override.per !== "short-rest"));
 }
 
+/** SRD Pact Magic: every expended pact slot comes back on a Short or Long Rest. */
+function restorePactSlots(actor: Actor, definition: ActorDefinition | undefined): void {
+  const maximum = actor.pactSlots ? pactSlotMaximum(definition) : null;
+  if (actor.pactSlots && maximum) actor.pactSlots = { ...actor.pactSlots, remaining: maximum.max };
+}
+
 /**
  * Applies a rest to a rostered actor outside combat (SRD Resting, ADR-0020).
- * Short: per-short-rest and recharge pools re-arm; healing is only by spending Hit Point Dice.
- * Long: remaining effects end first (onEnd grants land), then HP to max, temp HP cleared, dying
- * cleared, all pools refreshed, all Hit Point Dice restored, Exhaustion drops one level.
+ * Short: per-short-rest and recharge pools and Pact Magic slots re-arm; healing is only by spending Hit Point Dice.
+ * Long: Concentration and turn-measured effects end first (onEnd grants land), then HP to max, temp HP cleared, dying
+ * cleared, all pools refreshed, all Hit Point Dice restored, Exhaustion drops one level. With `charges.random`, a
+ * charged item regains its printed dice rather than every charge, and `charges.lines` hears what each regained.
  */
 export function applyRest(
   state: GameState,
   actorId: string,
   kind: "long" | "short",
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
-  catalog?: EquipmentCatalog
+  catalog?: EquipmentCatalog,
+  charges?: Readonly<{ random: (sides: number) => number; lines: string[] }>
 ): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
@@ -100,9 +110,11 @@ export function applyRest(
     // A pick re-made "whenever you finish a Short or Long Rest" lapses here; the build's own answer stands
     // until the character chooses again.
     actor.choiceOverrides = clearOverrides(actor.choiceOverrides, "short");
+    restorePactSlots(actor, definition);
     return events;
   }
-  for (const effect of [...actor.effects]) events.push(...endEffect(state, actorId, effect.id));
+  // Eight hours of sleep: Concentration ends and turn-measured effects lapse; "until ended" ones (a curse) stay.
+  events.push(...endEffectsAtLongRest(state, actorId));
   actor.hp.current = actor.hp.maximum;
   actor.hp.temporary = 0;
   // Every die size in the pool comes back, not just the largest (SRD 5.2.1 "Regain All HP").
@@ -110,7 +122,12 @@ export function applyRest(
     actor.hitDice = makeHitDicePool(actor.hitDice.entries.map((entry) => ({ ...entry, remaining: entry.maximum })));
   actor.deathSaves = null;
   removeConditionDirect(actor, "unconscious");
-  actor.actionUses = {};
+  const longRestDefinition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
+  if (charges) {
+    const dawn = chargesAfterDawn(actor, longRestDefinition, catalog, charges.random);
+    actor.actionUses = dawn.stillSpent;
+    charges.lines.push(...dawn.lines);
+  } else actor.actionUses = {};
   // Both kinds lapse on a long rest.
   actor.choiceOverrides = clearOverrides(actor.choiceOverrides, "long");
   const exhaustion = actor.conditions.find((condition) => condition.id === "exhaustion");
@@ -121,9 +138,8 @@ export function applyRest(
         condition.id === "exhaustion" ? { ...condition, level: (condition.level ?? 1) - 1 } : condition
       );
   }
-  // SRD long rest: spell slots (and Pact Magic) refill and prepared spells reset to the sheet's defaults.
+  // SRD long rest: spell slots (and Pact Magic) refill.
   // No spellcasting leaves these untouched.
-  const longRestDefinition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
   if (actor.spellSlots && longRestDefinition?.spellcasting) {
     // `spellSlotMaxima` covers derived multiclass tables and item-added slots, shared with seeding and the
     // spend clamp.
@@ -132,16 +148,13 @@ export function applyRest(
         (entry) => [entry.level, entry.max] as const
       )
     );
-    actor.spellSlots = actor.spellSlots.map((slot) => ({
-      ...slot,
-      remaining: maxByLevel.get(slot.level) ?? slot.remaining
-    }));
+    // A level the sheet no longer has (an older Warlock's pact row) goes; Pact Magic is its own pool.
+    actor.spellSlots = actor.spellSlots
+      .filter((slot) => maxByLevel.has(slot.level))
+      .map((slot) => ({ ...slot, remaining: maxByLevel.get(slot.level)! }));
   }
-  const pactMaximum = actor.pactSlots ? pactSlotMaximum(longRestDefinition) : null;
-  if (actor.pactSlots && pactMaximum) actor.pactSlots = { ...actor.pactSlots, remaining: pactMaximum.max };
-  if (longRestDefinition?.spellcasting)
-    actor.preparedSpellIds = longRestDefinition.spellcasting.spells
-      .filter((spell) => spell.prepared || spell.alwaysPrepared)
-      .map((spell) => spell.id);
+  restorePactSlots(actor, longRestDefinition);
+  // The prepared list stands; a caster that prepares after a Long Rest gets the step to change it.
+  openPreparation(actor, longRestDefinition);
   return events;
 }

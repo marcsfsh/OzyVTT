@@ -2,8 +2,85 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://vtt.local/schemas/actor-definition.v1.schema.json",
   "title": "VTT actor definition v1",
-  "description": "Mirror of the authoritative Zod ActorDefinitionSchema (packages/schemas/src/index.ts). Kept in lockstep by packages/schemas/test/actor-definition.test.ts; the Zod schema strips unknown keys where this document rejects them, so treat this file as the stricter authoring guide.",
+  "description": "Generated from the Zod ActorDefinitionSchema (packages/schemas/src/index.ts) by `npm run map`; do not edit by hand. Stricter than the app on one point: unknown keys are errors here, where the app drops them.",
   "type": "object",
+  "properties": {
+    "schemaId": {
+      "$ref": "#/$defs/__schema0"
+    },
+    "schemaVersion": {
+      "$ref": "#/$defs/__schema1"
+    },
+    "source": {
+      "$ref": "#/$defs/__schema2"
+    },
+    "name": {
+      "$ref": "#/$defs/__schema3"
+    },
+    "summary": {
+      "$ref": "#/$defs/__schema4"
+    },
+    "size": {
+      "$ref": "#/$defs/__schema5"
+    },
+    "abilityScores": {
+      "$ref": "#/$defs/__schema6"
+    },
+    "proficiencyBonus": {
+      "$ref": "#/$defs/__schema7"
+    },
+    "armorClass": {
+      "$ref": "#/$defs/__schema8"
+    },
+    "hitPoints": {
+      "$ref": "#/$defs/__schema9"
+    },
+    "initiativeBonus": {
+      "$ref": "#/$defs/__schema11"
+    },
+    "speedFeet": {
+      "$ref": "#/$defs/__schema12"
+    },
+    "actions": {
+      "$ref": "#/$defs/__schema13"
+    },
+    "token": {
+      "$ref": "#/$defs/__schema48"
+    },
+    "extensions": {
+      "$ref": "#/$defs/__schema49"
+    },
+    "damageResistances": {
+      "$ref": "#/$defs/__schema50"
+    },
+    "damageImmunities": {
+      "$ref": "#/$defs/__schema52"
+    },
+    "damageVulnerabilities": {
+      "$ref": "#/$defs/__schema53"
+    },
+    "conditionImmunities": {
+      "$ref": "#/$defs/__schema54"
+    },
+    "legendary": {
+      "$ref": "#/$defs/__schema55"
+    },
+    "character": {
+      "$ref": "#/$defs/__schema56"
+    },
+    "proficiencies": {
+      "$ref": "#/$defs/__schema61"
+    },
+    "spellcasting": {
+      "$ref": "#/$defs/__schema65"
+    },
+    "startingInventory": {
+      "$ref": "#/$defs/__schema75"
+    },
+    "startingCurrency": {
+      "$ref": "#/$defs/__schema78"
+    }
+  },
   "required": [
     "schemaId",
     "schemaVersion",
@@ -16,340 +93,917 @@
     "hitPoints",
     "speedFeet"
   ],
-  "properties": {
-    "schemaId": { "enum": ["vtt.actor-character", "vtt.actor-monster"] },
-    "schemaVersion": { "const": 1 },
-    "source": {
+  "$defs": {
+    "__schema0": {
+      "type": "string",
+      "enum": [
+        "vtt.actor-character",
+        "vtt.actor-monster"
+      ]
+    },
+    "__schema1": {
+      "type": "number",
+      "const": 1
+    },
+    "__schema2": {
       "type": "object",
-      "required": ["name", "version"],
       "properties": {
-        "name": { "type": "string", "minLength": 1 },
-        "version": { "type": "string", "minLength": 1 },
-        "externalId": { "type": "string" }
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "externalId": {
+          "type": "string",
+          "maxLength": 200
+        }
       },
+      "required": [
+        "name",
+        "version"
+      ],
       "additionalProperties": false
     },
-    "name": { "type": "string", "minLength": 1, "maxLength": 120 },
-    "summary": { "type": "string", "maxLength": 280 },
-    "size": { "$ref": "#/$defs/size" },
-    "abilityScores": {
+    "__schema3": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "__schema4": {
+      "type": "string",
+      "maxLength": 280
+    },
+    "__schema5": {
+      "type": "string",
+      "enum": [
+        "tiny",
+        "small",
+        "medium",
+        "large",
+        "huge",
+        "gargantuan"
+      ]
+    },
+    "__schema6": {
       "type": "object",
-      "required": ["str", "dex", "con", "int", "wis", "cha"],
-      "additionalProperties": false,
       "properties": {
-        "str": { "$ref": "#/$defs/ability" },
-        "dex": { "$ref": "#/$defs/ability" },
-        "con": { "$ref": "#/$defs/ability" },
-        "int": { "$ref": "#/$defs/ability" },
-        "wis": { "$ref": "#/$defs/ability" },
-        "cha": { "$ref": "#/$defs/ability" }
+        "str": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        },
+        "dex": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        },
+        "con": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        },
+        "int": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        },
+        "wis": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        },
+        "cha": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        }
+      },
+      "required": [
+        "str",
+        "dex",
+        "con",
+        "int",
+        "wis",
+        "cha"
+      ],
+      "additionalProperties": false
+    },
+    "__schema7": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 12
+    },
+    "__schema8": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 40
+    },
+    "__schema9": {
+      "type": "object",
+      "properties": {
+        "maximum": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "formula": {
+          "$ref": "#/$defs/__schema10"
+        }
+      },
+      "required": [
+        "maximum"
+      ],
+      "additionalProperties": false
+    },
+    "__schema10": {
+      "type": "string",
+      "pattern": "^\\d+d(?:4|6|8|10|12|20|100)(?:\\s*[+-]\\s*\\d+)?$"
+    },
+    "__schema11": {
+      "default": 0,
+      "type": "integer",
+      "minimum": -20,
+      "maximum": 30
+    },
+    "__schema12": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "__schema13": {
+      "default": [],
+      "maxItems": 100,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema14"
       }
     },
-    "proficiencyBonus": { "type": "integer", "minimum": 0, "maximum": 12 },
-    "armorClass": { "type": "integer", "minimum": 1, "maximum": 40 },
-    "hitPoints": {
-      "type": "object",
-      "required": ["maximum"],
-      "properties": { "maximum": { "type": "integer", "minimum": 1 }, "formula": { "$ref": "#/$defs/dice" } },
-      "additionalProperties": false
-    },
-    "initiativeBonus": { "type": "integer", "minimum": -20, "maximum": 30 },
-    "speedFeet": { "type": "integer", "minimum": 0 },
-    "actions": { "type": "array", "items": { "$ref": "#/$defs/action" }, "maxItems": 100 },
-    "token": {
+    "__schema14": {
       "type": "object",
       "properties": {
-        "disposition": { "enum": ["friendly", "hostile", "neutral"] },
-        "footprint": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "activation": {
+          "type": "string",
+          "enum": [
+            "action",
+            "bonus-action",
+            "reaction",
+            "other"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 12000
+        },
+        "attack": {
           "type": "object",
-          "required": ["width", "height"],
           "properties": {
-            "width": { "type": "integer", "minimum": 1, "maximum": 4 },
-            "height": { "type": "integer", "minimum": 1, "maximum": 4 }
+            "bonus": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "reachFeet": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "rangeFeet": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "rangeNormalFeet": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            },
+            "criticalBonusDice": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4
+            }
           },
+          "required": [
+            "bonus"
+          ],
+          "additionalProperties": false
+        },
+        "save": {
+          "type": "object",
+          "properties": {
+            "ability": {
+              "$ref": "#/$defs/__schema15"
+            },
+            "dc": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 40
+            },
+            "spellcasting": {
+              "type": "boolean"
+            },
+            "successDamage": {
+              "default": "half",
+              "type": "string",
+              "enum": [
+                "half",
+                "none"
+              ]
+            },
+            "failureConditions": {
+              "default": [],
+              "maxItems": 4,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema16"
+              }
+            },
+            "ignoresCover": {
+              "type": "boolean"
+            },
+            "failureDuration": {
+              "$ref": "#/$defs/__schema17"
+            },
+            "repeatSave": {
+              "type": "boolean",
+              "const": true
+            },
+            "escapeDc": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 40
+            },
+            "endsOnDamage": {
+              "type": "boolean",
+              "const": true
+            },
+            "speedZero": {
+              "type": "boolean",
+              "const": true
+            },
+            "rangeFeet": {
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 120
+            },
+            "failsAtHitPoints": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "ongoingDamage": {
+              "type": "object",
+              "properties": {
+                "damage": {
+                  "minItems": 1,
+                  "maxItems": 2,
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/__schema18"
+                  }
+                },
+                "at": {
+                  "type": "string",
+                  "enum": [
+                    "bearer-turn-start",
+                    "source-turn-start"
+                  ]
+                }
+              },
+              "required": [
+                "damage",
+                "at"
+              ],
+              "additionalProperties": false
+            },
+            "failureEffect": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "tags": {
+                  "default": [],
+                  "maxItems": 8,
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/__schema20"
+                  }
+                },
+                "duration": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "rounds"
+                    },
+                    "rounds": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 100
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "rounds"
+                  ],
+                  "additionalProperties": false
+                },
+                "modifiers": {
+                  "default": [],
+                  "$ref": "#/$defs/__schema21"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "ability",
+            "dc"
+          ],
+          "additionalProperties": false
+        },
+        "damage": {
+          "default": [],
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema33"
+          }
+        },
+        "healing": {
+          "type": "object",
+          "properties": {
+            "formula": {
+              "type": "string",
+              "pattern": "^(?:\\d+d(?:4|6|8|10|12|20|100)(?:\\s*[+-]\\s*\\d+)?|\\d+)$"
+            },
+            "self": {
+              "type": "boolean",
+              "const": true
+            },
+            "divided": {
+              "type": "boolean",
+              "const": true
+            },
+            "upToFractionOfMaximum": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 1
+            }
+          },
+          "required": [
+            "formula"
+          ],
+          "additionalProperties": false
+        },
+        "darts": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 20
+        },
+        "damageTypes": {
+          "minItems": 2,
+          "maxItems": 10,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema19"
+          }
+        },
+        "multiattack": {
+          "minItems": 1,
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema35"
+          }
+        },
+        "onHit": {
+          "maxItems": 2,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema36"
+          }
+        },
+        "targetRules": {
+          "maxItems": 2,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema39"
+          }
+        },
+        "grants": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "tags": {
+              "minItems": 1,
+              "maxItems": 8,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema20"
+              }
+            },
+            "duration": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "rounds"
+                    },
+                    "rounds": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 100
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "rounds"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "until-source-next-turn"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "until-source-turn-end"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "encounter"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "manual"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "modifiers": {
+              "default": [],
+              "$ref": "#/$defs/__schema21"
+            },
+            "onEnd": {
+              "default": [],
+              "maxItems": 2,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema40"
+              }
+            },
+            "endsWithTag": {
+              "$ref": "#/$defs/__schema20"
+            },
+            "target": {
+              "default": "self",
+              "type": "string",
+              "enum": [
+                "self",
+                "target",
+                "targets"
+              ]
+            },
+            "voidWhileIncapacitated": {
+              "default": false,
+              "type": "boolean"
+            },
+            "concentration": {
+              "default": false,
+              "type": "boolean"
+            },
+            "onHit": {
+              "type": "boolean"
+            },
+            "armorClassBonus": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "tags",
+            "duration"
+          ],
+          "additionalProperties": false
+        },
+        "requiresEffectTag": {
+          "$ref": "#/$defs/__schema20"
+        },
+        "uses": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "$ref": "#/$defs/__schema41"
+            },
+            "per": {
+              "$ref": "#/$defs/__schema42"
+            },
+            "pool": {
+              "$ref": "#/$defs/__schema43"
+            },
+            "recharge": {
+              "$ref": "#/$defs/__schema44"
+            }
+          },
+          "required": [
+            "limit",
+            "per"
+          ],
+          "additionalProperties": false
+        },
+        "spellSlot": {
+          "type": "object",
+          "properties": {
+            "level": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9
+            }
+          },
+          "required": [
+            "level"
+          ],
+          "additionalProperties": false
+        },
+        "spellId": {
+          "type": "string",
+          "maxLength": 80,
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "reaction": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "trigger": {
+                  "type": "string",
+                  "const": "hit-by-attack"
+                },
+                "response": {
+                  "type": "string",
+                  "const": "half-damage"
+                }
+              },
+              "required": [
+                "trigger",
+                "response"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "trigger": {
+                  "type": "string",
+                  "const": "hit-by-attack"
+                },
+                "response": {
+                  "type": "string",
+                  "const": "ac-bonus"
+                },
+                "amount": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10
+                },
+                "melee": {
+                  "type": "boolean"
+                },
+                "untilNextTurn": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "trigger",
+                "response",
+                "amount"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "trigger": {
+                  "type": "string",
+                  "const": "damaged-by-creature"
+                },
+                "response": {
+                  "type": "string",
+                  "const": "strike-back"
+                },
+                "rangeFeet": {
+                  "$ref": "#/$defs/__schema45"
+                }
+              },
+              "required": [
+                "trigger",
+                "response"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "trigger": {
+                  "type": "string",
+                  "const": "damaged-by-creature"
+                },
+                "response": {
+                  "type": "string",
+                  "const": "melee-attack"
+                },
+                "rangeFeet": {
+                  "$ref": "#/$defs/__schema45"
+                }
+              },
+              "required": [
+                "trigger",
+                "response"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "extraAttack": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "light",
+                "cleave"
+              ]
+            },
+            "itemId": {
+              "type": "string",
+              "maxLength": 120,
+              "pattern": "^[a-z0-9-]+$"
+            }
+          },
+          "required": [
+            "kind",
+            "itemId"
+          ],
+          "additionalProperties": false
+        },
+        "replacesAttack": {
+          "type": "boolean"
+        },
+        "legendary": {
+          "type": "object",
+          "properties": {
+            "cost": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "cost"
+          ],
+          "additionalProperties": false
+        },
+        "area": {
+          "type": "object",
+          "properties": {
+            "shape": {
+              "type": "string",
+              "enum": [
+                "cone",
+                "line",
+                "sphere",
+                "cube",
+                "emanation"
+              ]
+            },
+            "sizeFeet": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "widthFeet": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "shape",
+            "sizeFeet",
+            "widthFeet"
+          ],
+          "additionalProperties": false
+        },
+        "conditionalDamage": {
+          "maxItems": 3,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema46"
+          }
+        },
+        "reminder": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 600
+        },
+        "untrackedMultiattack": {
+          "type": "boolean",
+          "const": true
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "activation",
+        "description"
+      ],
+      "additionalProperties": false
+    },
+    "__schema15": {
+      "type": "string",
+      "enum": [
+        "str",
+        "dex",
+        "con",
+        "int",
+        "wis",
+        "cha"
+      ]
+    },
+    "__schema16": {
+      "type": "string",
+      "enum": [
+        "blinded",
+        "charmed",
+        "deafened",
+        "frightened",
+        "grappled",
+        "incapacitated",
+        "paralyzed",
+        "petrified",
+        "poisoned",
+        "prone",
+        "restrained",
+        "stunned",
+        "unconscious"
+      ]
+    },
+    "__schema17": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "rounds"
+            },
+            "rounds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "type",
+            "rounds"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "until-source-next-turn"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "until-bearer-turn-end"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "until-source-turn-end"
+            }
+          },
+          "required": [
+            "type"
+          ],
           "additionalProperties": false
         }
-      },
-      "additionalProperties": false
+      ]
     },
-    "extensions": { "type": "object", "additionalProperties": true },
-    "damageResistances": { "$ref": "#/$defs/damageTypeList" },
-    "damageImmunities": { "$ref": "#/$defs/damageTypeList" },
-    "damageVulnerabilities": { "$ref": "#/$defs/damageTypeList" },
-    "conditionImmunities": { "type": "array", "items": { "$ref": "#/$defs/conditionId" }, "maxItems": 20 },
-    "legendary": {
+    "__schema18": {
       "type": "object",
       "properties": {
-        "actionsPerRound": { "type": "integer", "minimum": 1, "maximum": 5 },
-        "resistancesPerDay": { "type": "integer", "minimum": 1, "maximum": 6 }
-      },
-      "additionalProperties": false
-    },
-    "character": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "classes": {
-          "type": "array",
-          "maxItems": 4,
-          "items": {
-            "type": "object",
-            "required": ["id", "name", "level"],
-            "additionalProperties": false,
-            "properties": {
-              "id": { "$ref": "#/$defs/slug" },
-              "name": { "type": "string", "minLength": 1, "maxLength": 60 },
-              "subclass": { "$ref": "#/$defs/namedSlug" },
-              "level": { "type": "integer", "minimum": 1, "maximum": 20 },
-              "hitDie": { "$ref": "#/$defs/hitDie" }
-            }
-          }
+        "formula": {
+          "$ref": "#/$defs/__schema10"
         },
-        "race": {
-          "type": "object",
-          "required": ["id", "name"],
-          "additionalProperties": false,
-          "properties": {
-            "id": { "$ref": "#/$defs/slug" },
-            "name": { "type": "string", "minLength": 1, "maxLength": 60 },
-            "subrace": { "$ref": "#/$defs/namedSlug" }
-          }
-        },
-        "background": { "$ref": "#/$defs/namedSlug" },
-        "feats": {
-          "type": "array",
-          "maxItems": 40,
-          "items": {
-            "type": "object",
-            "required": ["id", "name"],
-            "additionalProperties": false,
-            "properties": {
-              "id": { "$ref": "#/$defs/slug" },
-              "name": { "type": "string", "minLength": 1, "maxLength": 80 },
-              "description": { "type": "string", "maxLength": 4000 }
-            }
-          }
-        },
-        "choices": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/characterChoice" } }
-      }
-    },
-    "proficiencies": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "saves": { "type": "array", "maxItems": 6, "items": { "$ref": "#/$defs/abilityId" } },
-        "skills": {
-          "type": "array",
-          "maxItems": 40,
-          "items": {
-            "type": "object",
-            "required": ["id", "proficiency"],
-            "additionalProperties": false,
-            "properties": { "id": { "$ref": "#/$defs/slug" }, "proficiency": { "enum": ["proficient", "expertise"] } }
-          }
-        },
-        "saveOverrides": {
-          "type": "object",
-          "additionalProperties": { "type": "integer", "minimum": -20, "maximum": 30 }
-        },
-        "skillOverrides": {
-          "type": "object",
-          "additionalProperties": { "type": "integer", "minimum": -20, "maximum": 30 }
-        },
-        "armor": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/proficiencyId" } },
-        "weapons": { "type": "array", "maxItems": 60, "items": { "$ref": "#/$defs/proficiencyId" } },
-        "tools": { "type": "array", "maxItems": 40, "items": { "$ref": "#/$defs/proficiencyId" } },
-        "languages": { "type": "array", "maxItems": 30, "items": { "$ref": "#/$defs/proficiencyId" } }
-      }
-    },
-    "spellcasting": {
-      "type": "object",
-      "required": ["ability"],
-      "additionalProperties": false,
-      "allOf": [
-        {
-          "$comment": "Mirrors the Zod superRefine: per-class slots without the combined top-level pool would seed a caster with zero live slots.",
-          "if": {
-            "type": "object",
-            "required": ["classes"],
-            "properties": {
-              "classes": {
-                "contains": { "type": "object", "required": ["slots"], "properties": { "slots": { "minItems": 1 } } }
-              }
-            }
-          },
-          "then": { "required": ["slots"], "properties": { "slots": { "minItems": 1 } } }
+        "type": {
+          "$ref": "#/$defs/__schema19"
         }
+      },
+      "required": [
+        "formula",
+        "type"
       ],
-      "properties": {
-        "ability": { "$ref": "#/$defs/abilityId" },
-        "saveDc": { "type": "integer", "minimum": 1, "maximum": 40 },
-        "attackBonus": { "type": "integer", "minimum": -5, "maximum": 30 },
-        "slots": { "type": "array", "maxItems": 9, "items": { "$ref": "#/$defs/spellSlotMax" } },
-        "pact": {
-          "type": "object",
-          "required": ["level", "max"],
-          "additionalProperties": false,
-          "properties": {
-            "level": { "type": "integer", "minimum": 1, "maximum": 5 },
-            "max": { "type": "integer", "minimum": 0, "maximum": 4 }
-          }
-        },
-        "classes": {
-          "type": "array",
-          "maxItems": 4,
-          "items": {
-            "type": "object",
-            "required": ["classId", "ability"],
-            "additionalProperties": false,
-            "properties": {
-              "classId": { "$ref": "#/$defs/slug" },
-              "ability": { "$ref": "#/$defs/abilityId" },
-              "saveDc": { "type": "integer", "minimum": 1, "maximum": 40 },
-              "attackBonus": { "type": "integer", "minimum": -5, "maximum": 30 },
-              "slots": { "type": "array", "maxItems": 9, "items": { "$ref": "#/$defs/spellSlotMax" } },
-              "prepared": { "type": "integer", "minimum": 0, "maximum": 60 }
-            }
-          }
-        },
-        "spells": {
-          "type": "array",
-          "maxItems": 400,
-          "items": {
-            "type": "object",
-            "required": ["id", "name", "level"],
-            "additionalProperties": false,
-            "properties": {
-              "id": { "type": "string", "maxLength": 80 },
-              "name": { "type": "string", "minLength": 1, "maxLength": 120 },
-              "level": { "type": "integer", "minimum": 0, "maximum": 9 },
-              "prepared": { "type": "boolean" },
-              "alwaysPrepared": { "type": "boolean" },
-              "actionId": { "$ref": "#/$defs/slug" },
-              "classId": { "$ref": "#/$defs/slug" }
-            }
-          }
-        }
-      }
+      "additionalProperties": false
     },
-    "startingInventory": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/inventoryItem" } },
-    "startingCurrency": { "$ref": "#/$defs/currency" }
-  },
-  "additionalProperties": false,
-  "$defs": {
-    "slug": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 80 },
-    "abilityId": { "enum": ["str", "dex", "con", "int", "wis", "cha"] },
-    "hitDie": { "enum": ["d4", "d6", "d8", "d10", "d12"] },
-    "proficiencyId": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 60 },
-    "spellSlotMax": {
-      "type": "object",
-      "required": ["level", "max"],
-      "additionalProperties": false,
-      "properties": {
-        "level": { "type": "integer", "minimum": 1, "maximum": 9 },
-        "max": { "type": "integer", "minimum": 0, "maximum": 9 }
-      }
-    },
-    "characterChoice": {
-      "type": "object",
-      "required": ["level", "kind", "id"],
-      "additionalProperties": false,
-      "properties": {
-        "level": { "type": "integer", "minimum": 1, "maximum": 20 },
-        "classId": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 60 },
-        "kind": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 60 },
-        "id": { "$ref": "#/$defs/slug" },
-        "payload": { "type": "object", "additionalProperties": true }
-      }
-    },
-    "namedSlug": {
-      "type": "object",
-      "required": ["id", "name"],
-      "additionalProperties": false,
-      "properties": { "id": { "$ref": "#/$defs/slug" }, "name": { "type": "string", "minLength": 1, "maxLength": 60 } }
-    },
-    "coin": { "type": "integer", "minimum": 0, "maximum": 1000000 },
-    "currency": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "cp": { "$ref": "#/$defs/coin" },
-        "sp": { "$ref": "#/$defs/coin" },
-        "ep": { "$ref": "#/$defs/coin" },
-        "gp": { "$ref": "#/$defs/coin" },
-        "pp": { "$ref": "#/$defs/coin" }
-      }
-    },
-    "inventoryItem": {
-      "type": "object",
-      "required": ["id", "name"],
-      "additionalProperties": false,
-      "properties": {
-        "id": { "$ref": "#/$defs/slug" },
-        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
-        "quantity": { "type": "integer", "minimum": 0, "maximum": 9999 },
-        "equipped": { "type": "boolean" },
-        "attuned": { "type": "boolean" },
-        "weightEach": { "type": "number", "minimum": 0 },
-        "description": { "type": "string", "maxLength": 4000 },
-        "category": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 40 },
-        "weapon": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["category", "damageDice", "damageType", "rangeFeet", "longRangeFeet"],
-          "properties": {
-            "category": { "enum": ["simple", "martial"] },
-            "damageDice": { "type": "string", "minLength": 1, "maxLength": 20 },
-            "damageType": { "type": "string", "minLength": 1, "maxLength": 40 },
-            "rangeFeet": { "type": ["integer", "null"], "minimum": 1 },
-            "longRangeFeet": { "type": ["integer", "null"], "minimum": 1 },
-            "properties": {
-              "type": "array",
-              "maxItems": 12,
-              "items": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 40 }
-            }
-          }
-        },
-        "armor": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["acBase", "addDexModifier", "dexModifierCap", "stealthDisadvantage", "strengthRequired"],
-          "properties": {
-            "acBase": { "type": "integer", "minimum": 2, "maximum": 25 },
-            "addDexModifier": { "type": "boolean" },
-            "dexModifierCap": { "type": ["integer", "null"] },
-            "stealthDisadvantage": { "type": "boolean" },
-            "strengthRequired": { "type": ["integer", "null"] }
-          }
-        },
-        "magic": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "isMagic": { "type": "boolean" },
-            "attunementRequired": { "type": "boolean" },
-            "slot": { "$ref": "#/$defs/itemSlot" }
-          }
-        }
-      }
-    },
-    "ability": { "type": "integer", "minimum": 1, "maximum": 30 },
-    "dice": { "type": "string", "pattern": "^\\d+d(?:4|6|8|10|12|20|100)(?:\\s*[+-]\\s*\\d+)?$" },
-    "damageFormula": {
+    "__schema19": {
       "type": "string",
-      "pattern": "^(?:\\d+d(?:4|6|8|10|12|20|100)(?:\\s*[+-]\\s*\\d+)?|\\d+)$"
-    },
-    "size": { "enum": ["tiny", "small", "medium", "large", "huge", "gargantuan"] },
-    "conditionId": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 60 },
-    "effectTag": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 40 },
-    "damageTypeList": {
-      "type": "array",
-      "items": { "type": "string", "minLength": 1, "maxLength": 40 },
-      "maxItems": 20
-    },
-    "damageTypeId": { "type": "string", "minLength": 1, "maxLength": 40 },
-    "damageType": {
-      "$comment": "The SRD's 13 damage types: the closed set a rider may name.",
       "enum": [
         "acid",
         "bludgeoning",
@@ -366,8 +1020,1299 @@
         "thunder"
       ]
     },
-    "condition": {
-      "$comment": "The SRD's 15 conditions: the closed set a rider may name.",
+    "__schema20": {
+      "type": "string",
+      "maxLength": 40,
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "__schema21": {
+      "maxItems": 8,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema22"
+      }
+    },
+    "__schema22": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "ability-score"
+            },
+            "ability": {
+              "$ref": "#/$defs/__schema15"
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": -5,
+              "maximum": 5
+            },
+            "maximum": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "ability",
+            "amount"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "hit-points-per-level"
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": -5,
+              "maximum": 5
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "amount"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "speed"
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": -30,
+              "maximum": 60
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "amount"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "armor-class"
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": -5,
+              "maximum": 5
+            },
+            "whileArmored": {
+              "default": false,
+              "type": "boolean"
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "amount"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "initiative"
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": -5,
+              "maximum": 10
+            },
+            "proficiencyBonus": {
+              "type": "boolean"
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "amount"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "extra-attack"
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "count"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "unarmored-defense"
+            },
+            "ability": {
+              "$ref": "#/$defs/__schema15"
+            },
+            "allowShield": {
+              "default": false,
+              "type": "boolean"
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "ability"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "darkvision"
+            },
+            "feet": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 240
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "feet"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "sense"
+            },
+            "sense": {
+              "$ref": "#/$defs/__schema26"
+            },
+            "feet": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 240
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "sense",
+            "feet"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "attunement-slots"
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "amount"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "resource-bonus"
+            },
+            "poolId": {
+              "$ref": "#/$defs/__schema26"
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": -20,
+              "maximum": 20
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "poolId",
+            "amount"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "attack-bonus"
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": -10,
+              "maximum": 10
+            },
+            "dice": {
+              "$ref": "#/$defs/__schema32"
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "amount"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "save-bonus"
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": -10,
+              "maximum": 10
+            },
+            "dice": {
+              "$ref": "#/$defs/__schema32"
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "amount"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "check-bonus"
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": -10,
+              "maximum": 10
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "amount"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "roll-mode"
+            },
+            "roll": {
+              "type": "string",
+              "enum": [
+                "attack",
+                "incoming-attack",
+                "save",
+                "check",
+                "initiative",
+                "concentration"
+              ]
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "advantage",
+                "disadvantage"
+              ]
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "roll",
+            "mode"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "damage-bonus"
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": -10,
+              "maximum": 10
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "amount"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "extra-damage"
+            },
+            "formula": {
+              "$ref": "#/$defs/__schema10"
+            },
+            "abilityModifier": {
+              "$ref": "#/$defs/__schema15"
+            },
+            "damageType": {
+              "$ref": "#/$defs/__schema19"
+            },
+            "doubleOnCritical": {
+              "default": true,
+              "type": "boolean"
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "critical-range"
+            },
+            "threshold": {
+              "type": "integer",
+              "minimum": 15,
+              "maximum": 20
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "threshold"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "critical-bonus-dice"
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "count"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "damage-reduction"
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "amount"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "damage-resistance"
+            },
+            "damageTypes": {
+              "minItems": 1,
+              "maxItems": 13,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema19"
+              }
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "damageTypes"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "damage-vulnerability"
+            },
+            "damageTypes": {
+              "minItems": 1,
+              "maxItems": 13,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema19"
+              }
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "damageTypes"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "spell-save-dc"
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": -5,
+              "maximum": 5
+            },
+            "classId": {
+              "$ref": "#/$defs/__schema26"
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "amount"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "spell-attack-bonus"
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": -5,
+              "maximum": 5
+            },
+            "classId": {
+              "$ref": "#/$defs/__schema26"
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "amount"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "spell-slot"
+            },
+            "level": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": -4,
+              "maximum": 4
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "level",
+            "amount"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "__schema23": {
+      "maxItems": 4,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema24"
+      }
+    },
+    "__schema24": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "attuned"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "while-armored"
+            },
+            "weights": {
+              "minItems": 1,
+              "maxItems": 3,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema25"
+              }
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "while-unarmored"
+            },
+            "allowShield": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "while-shield"
+            },
+            "wielding": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "while-character-is"
+            },
+            "classIds": {
+              "default": [],
+              "maxItems": 8,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema26"
+              }
+            },
+            "speciesIds": {
+              "default": [],
+              "maxItems": 8,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema26"
+              }
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "while-proficient-with"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "weapon",
+                "armor",
+                "tool",
+                "skill"
+              ]
+            },
+            "ids": {
+              "minItems": 1,
+              "maxItems": 12,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema26"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "kind",
+            "ids"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "while-effect-tag"
+            },
+            "tags": {
+              "minItems": 1,
+              "maxItems": 4,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema20"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "tags"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "while-hp-at-or-below"
+            },
+            "percent": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 99
+            }
+          },
+          "required": [
+            "type",
+            "percent"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "while-condition"
+            },
+            "conditionIds": {
+              "minItems": 1,
+              "maxItems": 6,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema27"
+              }
+            },
+            "present": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "type",
+            "conditionIds"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "on-attack-roll"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "on-hit"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "on-critical-hit"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "on-damage-roll"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "on-saving-throw"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "on-ability-check"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "on-initiative-roll"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "on-taking-damage"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "attack-kind-is"
+            },
+            "kinds": {
+              "minItems": 1,
+              "maxItems": 10,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema28"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "kinds"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "weapon-property-is"
+            },
+            "properties": {
+              "minItems": 1,
+              "maxItems": 12,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema26"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "properties"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "damage-type-is"
+            },
+            "damageTypes": {
+              "minItems": 1,
+              "maxItems": 12,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema19"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "damageTypes"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "ability-is"
+            },
+            "abilities": {
+              "minItems": 1,
+              "maxItems": 6,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema15"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "abilities"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "skill-is"
+            },
+            "skills": {
+              "minItems": 1,
+              "maxItems": 12,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema26"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "skills"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "spell-school-is"
+            },
+            "schools": {
+              "minItems": 1,
+              "maxItems": 8,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema26"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "schools"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "spell-level-is"
+            },
+            "levels": {
+              "minItems": 1,
+              "maxItems": 10,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema29"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "levels"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "spell-id-is"
+            },
+            "spellIds": {
+              "minItems": 1,
+              "maxItems": 12,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema26"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "spellIds"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "versus-creature-type"
+            },
+            "creatureTypes": {
+              "minItems": 1,
+              "maxItems": 12,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema26"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "creatureTypes"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "versus-size"
+            },
+            "sizes": {
+              "minItems": 1,
+              "maxItems": 6,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema30"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "sizes"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "versus-condition"
+            },
+            "conditionIds": {
+              "minItems": 1,
+              "maxItems": 6,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema27"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "conditionIds"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "by-effect-source"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "__schema25": {
+      "type": "string",
+      "enum": [
+        "light",
+        "medium",
+        "heavy"
+      ]
+    },
+    "__schema26": {
+      "type": "string",
+      "maxLength": 80,
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "__schema27": {
+      "type": "string",
       "enum": [
         "blinded",
         "charmed",
@@ -386,701 +2331,1207 @@
         "unconscious"
       ]
     },
-    "itemSlot": {
+    "__schema28": {
+      "type": "string",
       "enum": [
+        "melee",
+        "ranged",
+        "spell",
         "weapon",
-        "shield",
-        "armor",
-        "head",
-        "neck",
-        "shoulders",
-        "hands",
-        "ring",
-        "belt",
-        "feet",
-        "held",
-        "wondrous",
-        "consumable",
-        "ammunition",
-        "none"
+        "melee-weapon",
+        "ranged-weapon",
+        "unarmed",
+        "thrown",
+        "reaction",
+        "opportunity"
       ]
     },
-    "slugList": { "type": "array", "minItems": 1, "maxItems": 12, "items": { "$ref": "#/$defs/slug" } },
-    "riderTrigger": {
-      "$comment": "Twenty-eight named triggers in four kinds (static gate, dynamic gate, moment, filter). The AND-list rules Zod enforces in RiderWhenSchema - at most one moment, a filter needs a moment, no repeated type - are structural refinements this document deliberately does not restate.",
-      "oneOf": [
-        {
-          "type": "object",
-          "required": ["type"],
-          "properties": { "type": { "const": "attuned" } },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type"],
-          "properties": {
-            "type": { "const": "while-armored" },
-            "weights": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 3,
-              "items": { "enum": ["light", "medium", "heavy"] }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type"],
-          "properties": { "type": { "const": "while-unarmored" }, "allowShield": { "type": "boolean" } },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type"],
-          "properties": { "type": { "const": "while-shield" }, "wielding": { "type": "boolean" } },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type"],
-          "properties": {
-            "type": { "const": "while-character-is" },
-            "classIds": { "type": "array", "maxItems": 8, "items": { "$ref": "#/$defs/slug" } },
-            "speciesIds": { "type": "array", "maxItems": 8, "items": { "$ref": "#/$defs/slug" } }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "kind", "ids"],
-          "properties": {
-            "type": { "const": "while-proficient-with" },
-            "kind": { "enum": ["weapon", "armor", "tool", "skill"] },
-            "ids": { "$ref": "#/$defs/slugList" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "tags"],
-          "properties": {
-            "type": { "const": "while-effect-tag" },
-            "tags": { "type": "array", "minItems": 1, "maxItems": 4, "items": { "$ref": "#/$defs/effectTag" } }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "percent"],
-          "properties": {
-            "type": { "const": "while-hp-at-or-below" },
-            "percent": { "type": "integer", "minimum": 1, "maximum": 99 }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "conditionIds"],
-          "properties": {
-            "type": { "const": "while-condition" },
-            "conditionIds": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 6,
-              "items": { "$ref": "#/$defs/condition" }
-            },
-            "present": { "type": "boolean" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type"],
-          "properties": {
-            "type": {
-              "enum": [
-                "on-attack-roll",
-                "on-hit",
-                "on-critical-hit",
-                "on-damage-roll",
-                "on-saving-throw",
-                "on-ability-check",
-                "on-initiative-roll",
-                "on-taking-damage"
-              ]
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "kinds"],
-          "properties": {
-            "type": { "const": "attack-kind-is" },
-            "kinds": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 7,
-              "items": {
-                "enum": ["melee", "ranged", "spell", "unarmed", "thrown", "reaction", "opportunity", "weapon"]
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "properties"],
-          "properties": { "type": { "const": "weapon-property-is" }, "properties": { "$ref": "#/$defs/slugList" } },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "damageTypes"],
-          "properties": {
-            "type": { "const": "damage-type-is" },
-            "damageTypes": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 12,
-              "items": { "$ref": "#/$defs/damageType" }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "abilities"],
-          "properties": {
-            "type": { "const": "ability-is" },
-            "abilities": { "type": "array", "minItems": 1, "maxItems": 6, "items": { "$ref": "#/$defs/abilityId" } }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "skills"],
-          "properties": { "type": { "const": "skill-is" }, "skills": { "$ref": "#/$defs/slugList" } },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "schools"],
-          "properties": {
-            "type": { "const": "spell-school-is" },
-            "schools": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "$ref": "#/$defs/slug" } }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "levels"],
-          "properties": {
-            "type": { "const": "spell-level-is" },
-            "levels": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 10,
-              "items": { "type": "integer", "minimum": 0, "maximum": 9 }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "spellIds"],
-          "properties": { "type": { "const": "spell-id-is" }, "spellIds": { "$ref": "#/$defs/slugList" } },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "creatureTypes"],
-          "properties": {
-            "type": { "const": "versus-creature-type" },
-            "creatureTypes": { "$ref": "#/$defs/slugList" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "sizes"],
-          "properties": {
-            "type": { "const": "versus-size" },
-            "sizes": { "type": "array", "minItems": 1, "maxItems": 6, "items": { "$ref": "#/$defs/size" } }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "conditionIds"],
-          "properties": {
-            "type": { "const": "versus-condition" },
-            "conditionIds": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 6,
-              "items": { "$ref": "#/$defs/condition" }
-            }
-          },
-          "additionalProperties": false
-        }
+    "__schema29": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9
+    },
+    "__schema30": {
+      "type": "string",
+      "enum": [
+        "tiny",
+        "small",
+        "medium",
+        "large",
+        "huge",
+        "gargantuan"
       ]
     },
-    "riderWhen": { "type": "array", "maxItems": 4, "items": { "$ref": "#/$defs/riderTrigger" } },
-    "riderScope": { "enum": ["bearer", "this-item"] },
-    "effectModifier": {
-      "$comment": "The shared modifier vocabulary (Zod ModifierSchema) minus EFFECT_REFUSED_MODIFIER_TYPES, which an effect could not give back when it ends.",
-      "oneOf": [
-        {
-          "type": "object",
-          "required": ["type", "amount"],
-          "properties": {
-            "type": { "const": "speed" },
-            "amount": { "type": "integer", "minimum": -30, "maximum": 60 },
-            "when": { "$ref": "#/$defs/riderWhen" },
-            "scope": { "$ref": "#/$defs/riderScope" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "count"],
-          "properties": {
-            "type": { "const": "extra-attack" },
-            "count": { "type": "integer", "minimum": 1, "maximum": 3 },
-            "when": { "$ref": "#/$defs/riderWhen" },
-            "scope": { "$ref": "#/$defs/riderScope" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "poolId", "amount"],
-          "properties": {
-            "type": { "const": "resource-bonus" },
-            "poolId": { "$ref": "#/$defs/slug" },
-            "amount": { "type": "integer", "minimum": -20, "maximum": 20 },
-            "when": { "$ref": "#/$defs/riderWhen" },
-            "scope": { "$ref": "#/$defs/riderScope" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "amount"],
-          "properties": {
-            "type": { "const": "attack-bonus" },
-            "amount": { "type": "integer", "minimum": -10, "maximum": 10 },
-            "when": { "$ref": "#/$defs/riderWhen" },
-            "scope": { "$ref": "#/$defs/riderScope" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "amount"],
-          "properties": {
-            "type": { "const": "save-bonus" },
-            "amount": { "type": "integer", "minimum": -10, "maximum": 10 },
-            "when": { "$ref": "#/$defs/riderWhen" },
-            "scope": { "$ref": "#/$defs/riderScope" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "amount"],
-          "properties": {
-            "type": { "const": "check-bonus" },
-            "amount": { "type": "integer", "minimum": -10, "maximum": 10 },
-            "when": { "$ref": "#/$defs/riderWhen" },
-            "scope": { "$ref": "#/$defs/riderScope" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "roll", "mode"],
-          "properties": {
-            "type": { "const": "roll-mode" },
-            "roll": { "enum": ["attack", "incoming-attack", "save", "check", "initiative", "concentration"] },
-            "mode": { "enum": ["advantage", "disadvantage"] },
-            "when": { "$ref": "#/$defs/riderWhen" },
-            "scope": { "$ref": "#/$defs/riderScope" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "amount"],
-          "properties": {
-            "type": { "const": "damage-bonus" },
-            "amount": { "type": "integer", "minimum": -10, "maximum": 10 },
-            "when": { "$ref": "#/$defs/riderWhen" },
-            "scope": { "$ref": "#/$defs/riderScope" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "damageType"],
-          "properties": {
-            "type": { "const": "extra-damage" },
-            "formula": { "$ref": "#/$defs/dice" },
-            "abilityModifier": { "$ref": "#/$defs/abilityId" },
-            "damageType": { "$ref": "#/$defs/damageType" },
-            "doubleOnCritical": { "type": "boolean" },
-            "when": { "$ref": "#/$defs/riderWhen" },
-            "scope": { "$ref": "#/$defs/riderScope" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "threshold"],
-          "properties": {
-            "type": { "const": "critical-range" },
-            "threshold": { "type": "integer", "minimum": 15, "maximum": 20 },
-            "when": { "$ref": "#/$defs/riderWhen" },
-            "scope": { "$ref": "#/$defs/riderScope" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "count"],
-          "properties": {
-            "type": { "const": "critical-bonus-dice" },
-            "count": { "type": "integer", "minimum": 1, "maximum": 4 },
-            "when": { "$ref": "#/$defs/riderWhen" },
-            "scope": { "$ref": "#/$defs/riderScope" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "amount"],
-          "properties": {
-            "type": { "const": "damage-reduction" },
-            "amount": { "type": "integer", "minimum": 1, "maximum": 30 },
-            "when": { "$ref": "#/$defs/riderWhen" },
-            "scope": { "$ref": "#/$defs/riderScope" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "damageTypes"],
-          "properties": {
-            "type": { "const": "damage-resistance" },
-            "damageTypes": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 13,
-              "items": { "$ref": "#/$defs/damageType" }
-            },
-            "when": { "$ref": "#/$defs/riderWhen" },
-            "scope": { "$ref": "#/$defs/riderScope" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "damageTypes"],
-          "properties": {
-            "type": { "const": "damage-vulnerability" },
-            "damageTypes": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 13,
-              "items": { "$ref": "#/$defs/damageType" }
-            },
-            "when": { "$ref": "#/$defs/riderWhen" },
-            "scope": { "$ref": "#/$defs/riderScope" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "amount"],
-          "properties": {
-            "type": { "const": "spell-save-dc" },
-            "amount": { "type": "integer", "minimum": -5, "maximum": 5 },
-            "classId": { "$ref": "#/$defs/slug" },
-            "when": { "$ref": "#/$defs/riderWhen" },
-            "scope": { "$ref": "#/$defs/riderScope" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["type", "amount"],
-          "properties": {
-            "type": { "const": "spell-attack-bonus" },
-            "amount": { "type": "integer", "minimum": -5, "maximum": 5 },
-            "classId": { "$ref": "#/$defs/slug" },
-            "when": { "$ref": "#/$defs/riderWhen" },
-            "scope": { "$ref": "#/$defs/riderScope" }
-          },
-          "additionalProperties": false
-        }
+    "__schema31": {
+      "type": "string",
+      "enum": [
+        "bearer",
+        "this-item"
       ]
     },
-    "action": {
+    "__schema32": {
+      "type": "string",
+      "pattern": "^-?[1-4]d(?:4|6|8|10|12)$"
+    },
+    "__schema33": {
       "type": "object",
-      "required": ["id", "name", "activation", "description"],
       "properties": {
-        "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
-        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
-        "activation": { "enum": ["action", "bonus-action", "reaction", "other"] },
-        "description": { "type": "string", "minLength": 1, "maxLength": 12000 },
-        "attack": {
-          "type": "object",
-          "required": ["bonus"],
-          "properties": {
-            "bonus": { "type": "integer" },
-            "reachFeet": { "type": "integer", "minimum": 1 },
-            "rangeFeet": { "type": "integer", "minimum": 1 },
-            "rangeNormalFeet": { "type": "integer", "minimum": 1 },
-            "count": { "type": "integer", "minimum": 1, "maximum": 10 },
-            "criticalBonusDice": { "type": "integer", "minimum": 1, "maximum": 4 }
-          },
-          "additionalProperties": false
+        "formula": {
+          "$ref": "#/$defs/__schema34"
         },
-        "save": {
-          "type": "object",
-          "required": ["ability", "dc"],
-          "properties": {
-            "ability": { "enum": ["str", "dex", "con", "int", "wis", "cha"] },
-            "dc": { "type": "integer", "minimum": 1, "maximum": 40 },
-            "successDamage": { "enum": ["half", "none"], "default": "half" },
-            "failureCondition": {
-              "enum": [
-                "blinded",
-                "charmed",
-                "deafened",
-                "frightened",
-                "grappled",
-                "incapacitated",
-                "paralyzed",
-                "petrified",
-                "poisoned",
-                "prone",
-                "restrained",
-                "stunned",
-                "unconscious",
-                null
-              ],
-              "default": null
-            }
-          },
-          "additionalProperties": false
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        }
+      },
+      "required": [
+        "formula",
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "__schema34": {
+      "type": "string",
+      "pattern": "^(?:\\d+d(?:4|6|8|10|12|20|100)(?:\\s*[+-]\\s*\\d+)?|\\d+)$"
+    },
+    "__schema35": {
+      "type": "object",
+      "properties": {
+        "actionId": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
         },
-        "damage": {
-          "type": "array",
-          "maxItems": 8,
-          "items": {
-            "type": "object",
-            "required": ["formula", "type"],
-            "properties": {
-              "formula": { "$ref": "#/$defs/damageFormula" },
-              "type": { "type": "string", "minLength": 1, "maxLength": 40 }
-            },
-            "additionalProperties": false
-          }
-        },
-        "multiattack": {
-          "type": "array",
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        }
+      },
+      "required": [
+        "actionId",
+        "count"
+      ],
+      "additionalProperties": false
+    },
+    "__schema36": {
+      "type": "object",
+      "properties": {
+        "conditions": {
           "minItems": 1,
-          "maxItems": 4,
-          "items": {
-            "type": "object",
-            "required": ["actionId", "count"],
-            "properties": {
-              "actionId": { "type": "string", "pattern": "^[a-z0-9-]+$" },
-              "count": { "type": "integer", "minimum": 1, "maximum": 4 }
-            },
-            "additionalProperties": false
-          }
-        },
-        "onHit": {
+          "maxItems": 3,
           "type": "array",
-          "maxItems": 2,
           "items": {
-            "type": "object",
-            "required": ["conditions"],
-            "properties": {
-              "conditions": {
-                "type": "array",
-                "minItems": 1,
-                "maxItems": 3,
-                "items": {
-                  "type": "object",
-                  "required": ["id"],
-                  "properties": {
-                    "id": { "$ref": "#/$defs/conditionId" },
-                    "level": { "type": "integer", "minimum": 1, "maximum": 6 }
-                  },
-                  "additionalProperties": false
-                }
-              },
-              "escapeDc": { "type": "integer", "minimum": 1, "maximum": 40 },
-              "maxTargetSize": { "$ref": "#/$defs/size" }
-            },
-            "additionalProperties": false
+            "$ref": "#/$defs/__schema37"
           }
         },
-        "targetRules": { "type": "array", "maxItems": 2, "items": { "enum": ["not-grappled-by-source"] } },
-        "grants": {
-          "type": "object",
-          "required": ["tags", "duration"],
-          "properties": {
-            "name": { "type": "string", "minLength": 1, "maxLength": 120 },
-            "tags": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "$ref": "#/$defs/effectTag" } },
-            "duration": {
-              "oneOf": [
-                {
-                  "type": "object",
-                  "required": ["type", "rounds"],
-                  "properties": {
-                    "type": { "const": "rounds" },
-                    "rounds": { "type": "integer", "minimum": 1, "maximum": 100 }
-                  },
-                  "additionalProperties": false
-                },
-                {
-                  "type": "object",
-                  "required": ["type"],
-                  "properties": { "type": { "enum": ["until-source-next-turn", "encounter", "manual"] } },
-                  "additionalProperties": false
-                }
-              ]
-            },
-            "modifiers": { "type": "array", "maxItems": 8, "items": { "$ref": "#/$defs/effectModifier" } },
-            "onEnd": {
-              "type": "array",
-              "maxItems": 2,
-              "items": {
-                "type": "object",
-                "required": ["type", "conditionId"],
-                "properties": {
-                  "type": { "const": "condition" },
-                  "conditionId": { "$ref": "#/$defs/conditionId" },
-                  "level": { "type": "integer", "minimum": 1, "maximum": 6 }
-                },
-                "additionalProperties": false
-              }
-            },
-            "endsWithTag": { "$ref": "#/$defs/effectTag" },
-            "target": { "enum": ["self", "target"] },
-            "voidWhileIncapacitated": { "type": "boolean" },
-            "concentration": { "type": "boolean" }
-          },
-          "additionalProperties": false
+        "escapeDc": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 40
         },
-        "requiresEffectTag": { "$ref": "#/$defs/effectTag" },
-        "uses": {
-          "type": "object",
-          "required": ["limit", "per"],
-          "properties": {
-            "limit": { "type": "integer", "minimum": 1, "maximum": 20 },
-            "per": { "enum": ["turn", "encounter", "long-rest", "short-rest", "recharge"] },
-            "pool": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 60 },
-            "recharge": { "type": "integer", "minimum": 2, "maximum": 6 }
-          },
-          "additionalProperties": false
-        },
-        "spellSlot": {
-          "type": "object",
-          "required": ["level"],
-          "properties": { "level": { "type": "integer", "minimum": 1, "maximum": 9 } },
-          "additionalProperties": false
-        },
-        "spellId": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 80 },
-        "reaction": {
-          "oneOf": [
-            {
-              "type": "object",
-              "required": ["trigger", "response"],
-              "properties": { "trigger": { "const": "hit-by-attack" }, "response": { "const": "half-damage" } },
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "required": ["trigger", "response", "amount"],
-              "properties": {
-                "trigger": { "const": "hit-by-attack" },
-                "response": { "const": "ac-bonus" },
-                "amount": { "type": "integer", "minimum": 1, "maximum": 10 },
-                "melee": { "type": "boolean" },
-                "untilNextTurn": { "type": "boolean" }
-              },
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "required": ["trigger", "response"],
-              "properties": {
-                "trigger": { "const": "damaged-by-creature" },
-                "response": { "enum": ["strike-back", "melee-attack"] },
-                "rangeFeet": { "type": "integer", "minimum": 5, "maximum": 1000 }
-              },
-              "additionalProperties": false
-            }
+        "maxTargetSize": {
+          "type": "string",
+          "enum": [
+            "tiny",
+            "small",
+            "medium",
+            "large",
+            "huge",
+            "gargantuan"
           ]
         },
-        "extraAttack": {
-          "type": "object",
-          "required": ["kind", "itemId"],
-          "properties": {
-            "kind": { "enum": ["light", "cleave"] },
-            "itemId": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 120 }
-          },
-          "additionalProperties": false
+        "duration": {
+          "$ref": "#/$defs/__schema17"
+        }
+      },
+      "required": [
+        "conditions"
+      ],
+      "additionalProperties": false
+    },
+    "__schema37": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/__schema38"
         },
-        "replacesAttack": { "type": "boolean" },
-        "legendary": {
-          "type": "object",
-          "required": ["cost"],
-          "properties": { "cost": { "type": "integer", "minimum": 1, "maximum": 5 } },
-          "additionalProperties": false
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "__schema38": {
+      "type": "string",
+      "maxLength": 60,
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "__schema39": {
+      "type": "string",
+      "enum": [
+        "not-grappled-by-source"
+      ]
+    },
+    "__schema40": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "condition"
         },
-        "conditionalDamage": {
+        "conditionId": {
+          "$ref": "#/$defs/__schema38"
+        },
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        }
+      },
+      "required": [
+        "type",
+        "conditionId"
+      ],
+      "additionalProperties": false
+    },
+    "__schema41": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20
+    },
+    "__schema42": {
+      "type": "string",
+      "enum": [
+        "turn",
+        "encounter",
+        "long-rest",
+        "short-rest",
+        "recharge"
+      ]
+    },
+    "__schema43": {
+      "type": "string",
+      "maxLength": 60,
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "__schema44": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 6
+    },
+    "__schema45": {
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 1000
+    },
+    "__schema46": {
+      "type": "object",
+      "properties": {
+        "when": {
+          "type": "string",
+          "enum": [
+            "advantage",
+            "self-bloodied",
+            "target-bloodied",
+            "target-grappled-by-self",
+            "charge"
+          ]
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "instead",
+            "plus"
+          ]
+        },
+        "damage": {
+          "minItems": 1,
+          "maxItems": 2,
           "type": "array",
-          "maxItems": 3,
           "items": {
-            "type": "object",
-            "required": ["when", "mode", "damage"],
-            "properties": {
-              "when": {
-                "enum": ["advantage", "self-bloodied", "target-bloodied", "target-grappled-by-self", "charge"]
-              },
-              "mode": { "enum": ["instead", "plus"] },
-              "damage": {
-                "type": "array",
-                "minItems": 1,
-                "maxItems": 2,
-                "items": {
-                  "type": "object",
-                  "required": ["formula", "type"],
-                  "properties": {
-                    "formula": { "$ref": "#/$defs/damageFormula" },
-                    "type": { "type": "string", "minLength": 1, "maxLength": 40 }
-                  },
-                  "additionalProperties": false
-                }
-              },
-              "feet": { "type": "integer", "minimum": 5, "maximum": 120 },
-              "maxTargetSize": { "$ref": "#/$defs/size" },
-              "conditions": { "type": "array", "maxItems": 2, "items": { "$ref": "#/$defs/conditionId" } }
-            },
-            "additionalProperties": false
+            "$ref": "#/$defs/__schema47"
           }
         },
-        "reminder": { "type": "string", "minLength": 1, "maxLength": 600 }
+        "feet": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 120
+        },
+        "maxTargetSize": {
+          "$ref": "#/$defs/__schema30"
+        },
+        "conditions": {
+          "maxItems": 2,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema38"
+          }
+        }
+      },
+      "required": [
+        "when",
+        "mode",
+        "damage"
+      ],
+      "additionalProperties": false
+    },
+    "__schema47": {
+      "type": "object",
+      "properties": {
+        "formula": {
+          "$ref": "#/$defs/__schema34"
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        }
+      },
+      "required": [
+        "formula",
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "__schema48": {
+      "default": {
+        "disposition": "neutral",
+        "footprint": {
+          "width": 1,
+          "height": 1
+        }
+      },
+      "type": "object",
+      "properties": {
+        "disposition": {
+          "default": "neutral",
+          "type": "string",
+          "enum": [
+            "friendly",
+            "hostile",
+            "neutral"
+          ]
+        },
+        "footprint": {
+          "default": {
+            "width": 1,
+            "height": 1
+          },
+          "type": "object",
+          "properties": {
+            "width": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 4
+            },
+            "height": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 4
+            }
+          },
+          "required": [
+            "width",
+            "height"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "__schema49": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "__schema50": {
+      "maxItems": 20,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema51"
+      }
+    },
+    "__schema51": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40
+    },
+    "__schema52": {
+      "maxItems": 20,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema51"
+      }
+    },
+    "__schema53": {
+      "maxItems": 20,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema51"
+      }
+    },
+    "__schema54": {
+      "maxItems": 20,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema38"
+      }
+    },
+    "__schema55": {
+      "type": "object",
+      "properties": {
+        "actionsPerRound": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "resistancesPerDay": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        }
+      },
+      "additionalProperties": false
+    },
+    "__schema56": {
+      "type": "object",
+      "properties": {
+        "classes": {
+          "default": [],
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema57"
+          }
+        },
+        "race": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "maxLength": 60,
+              "pattern": "^[a-z0-9-]+$"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            },
+            "subrace": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "maxLength": 60,
+                  "pattern": "^[a-z0-9-]+$"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        "background": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "maxLength": 60,
+              "pattern": "^[a-z0-9-]+$"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        "feats": {
+          "default": [],
+          "maxItems": 40,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema58"
+          }
+        },
+        "martialArts": {
+          "type": "object",
+          "properties": {
+            "die": {
+              "type": "string",
+              "pattern": "^1d(?:4|6|8|10|12)$"
+            }
+          },
+          "required": [
+            "die"
+          ],
+          "additionalProperties": false
+        },
+        "features": {
+          "maxItems": 80,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema59"
+          }
+        },
+        "choices": {
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema60"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "__schema57": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 60,
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "subclass": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "maxLength": 60,
+              "pattern": "^[a-z0-9-]+$"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "hitDie": {
+          "type": "string",
+          "enum": [
+            "d4",
+            "d6",
+            "d8",
+            "d10",
+            "d12"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "level"
+      ],
+      "additionalProperties": false
+    },
+    "__schema58": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 60,
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 4000
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "__schema59": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 80,
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "class",
+            "subclass",
+            "species",
+            "lineage",
+            "background",
+            "option"
+          ]
+        },
+        "sourceId": {
+          "type": "string",
+          "maxLength": 80,
+          "pattern": "^[a-z0-9-]+$"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "sourceId"
+      ],
+      "additionalProperties": false
+    },
+    "__schema60": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "classId": {
+          "type": "string",
+          "maxLength": 60,
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "kind": {
+          "type": "string",
+          "maxLength": 60,
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "id": {
+          "type": "string",
+          "maxLength": 80,
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "payload": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "level",
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "__schema61": {
+      "type": "object",
+      "properties": {
+        "saves": {
+          "default": [],
+          "maxItems": 6,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema15"
+          }
+        },
+        "skills": {
+          "default": [],
+          "maxItems": 40,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema62"
+          }
+        },
+        "saveOverrides": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/__schema15"
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": -20,
+            "maximum": 30
+          }
+        },
+        "skillOverrides": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/__schema63"
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": -20,
+            "maximum": 30
+          }
+        },
+        "armor": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema64"
+          }
+        },
+        "weapons": {
+          "maxItems": 60,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema64"
+          }
+        },
+        "tools": {
+          "maxItems": 40,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema64"
+          }
+        },
+        "languages": {
+          "maxItems": 30,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema64"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "__schema62": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/__schema63"
+        },
+        "proficiency": {
+          "type": "string",
+          "enum": [
+            "proficient",
+            "expertise"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "proficiency"
+      ],
+      "additionalProperties": false
+    },
+    "__schema63": {
+      "type": "string",
+      "maxLength": 60,
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "__schema64": {
+      "type": "string",
+      "maxLength": 60,
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "__schema65": {
+      "type": "object",
+      "properties": {
+        "ability": {
+          "$ref": "#/$defs/__schema15"
+        },
+        "saveDc": {
+          "$ref": "#/$defs/__schema66"
+        },
+        "attackBonus": {
+          "$ref": "#/$defs/__schema67"
+        },
+        "slots": {
+          "$ref": "#/$defs/__schema68"
+        },
+        "pact": {
+          "$ref": "#/$defs/__schema70"
+        },
+        "classes": {
+          "$ref": "#/$defs/__schema71"
+        },
+        "spells": {
+          "$ref": "#/$defs/__schema73"
+        }
+      },
+      "required": [
+        "ability"
+      ],
+      "additionalProperties": false
+    },
+    "__schema66": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 40
+    },
+    "__schema67": {
+      "type": "integer",
+      "minimum": -5,
+      "maximum": 30
+    },
+    "__schema68": {
+      "default": [],
+      "maxItems": 9,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema69"
+      }
+    },
+    "__schema69": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9
+        },
+        "max": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9
+        }
+      },
+      "required": [
+        "level",
+        "max"
+      ],
+      "additionalProperties": false
+    },
+    "__schema70": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "max": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        }
+      },
+      "required": [
+        "level",
+        "max"
+      ],
+      "additionalProperties": false
+    },
+    "__schema71": {
+      "maxItems": 4,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema72"
+      }
+    },
+    "__schema72": {
+      "type": "object",
+      "properties": {
+        "classId": {
+          "type": "string",
+          "maxLength": 60,
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "ability": {
+          "$ref": "#/$defs/__schema15"
+        },
+        "saveDc": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 40
+        },
+        "attackBonus": {
+          "type": "integer",
+          "minimum": -5,
+          "maximum": 30
+        },
+        "slots": {
+          "maxItems": 9,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema69"
+          }
+        },
+        "prepared": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60
+        }
+      },
+      "required": [
+        "classId",
+        "ability"
+      ],
+      "additionalProperties": false
+    },
+    "__schema73": {
+      "default": [],
+      "maxItems": 400,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema74"
+      }
+    },
+    "__schema74": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "level": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9
+        },
+        "prepared": {
+          "default": true,
+          "type": "boolean"
+        },
+        "alwaysPrepared": {
+          "default": false,
+          "type": "boolean"
+        },
+        "actionId": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "freeActionId": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "ritualActionId": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "withSlot": {
+          "type": "boolean"
+        },
+        "classId": {
+          "type": "string",
+          "maxLength": 60,
+          "pattern": "^[a-z0-9-]+$"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "level"
+      ],
+      "additionalProperties": false
+    },
+    "__schema75": {
+      "maxItems": 200,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema76"
+      }
+    },
+    "__schema76": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 80,
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "quantity": {
+          "default": 1,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9999
+        },
+        "equipped": {
+          "default": false,
+          "type": "boolean"
+        },
+        "attuned": {
+          "default": false,
+          "type": "boolean"
+        },
+        "weightEach": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 12000
+        },
+        "category": {
+          "type": "string",
+          "maxLength": 40,
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "recordId": {
+          "type": "string",
+          "maxLength": 80,
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "baseId": {
+          "type": "string",
+          "maxLength": 80,
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "weapon": {
+          "type": "object",
+          "properties": {
+            "category": {
+              "type": "string",
+              "enum": [
+                "simple",
+                "martial"
+              ]
+            },
+            "damageDice": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 20
+            },
+            "damageType": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "rangeFeet": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "longRangeFeet": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "melee": {
+              "type": "boolean"
+            },
+            "versatileDice": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 20
+            },
+            "properties": {
+              "maxItems": 12,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema77"
+              }
+            }
+          },
+          "required": [
+            "category",
+            "damageDice",
+            "damageType",
+            "rangeFeet",
+            "longRangeFeet"
+          ],
+          "additionalProperties": false
+        },
+        "armor": {
+          "type": "object",
+          "properties": {
+            "acBase": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 25
+            },
+            "addDexModifier": {
+              "type": "boolean"
+            },
+            "dexModifierCap": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "stealthDisadvantage": {
+              "type": "boolean"
+            },
+            "strengthRequired": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "acBase",
+            "addDexModifier",
+            "dexModifierCap",
+            "stealthDisadvantage",
+            "strengthRequired"
+          ],
+          "additionalProperties": false
+        },
+        "chosenDamageType": {
+          "$ref": "#/$defs/__schema19"
+        },
+        "ammunitionLeft": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "ammunitionFired": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "magic": {
+          "type": "object",
+          "properties": {
+            "isMagic": {
+              "default": false,
+              "type": "boolean"
+            },
+            "attunementRequired": {
+              "default": false,
+              "type": "boolean"
+            },
+            "slot": {
+              "type": "string",
+              "enum": [
+                "weapon",
+                "shield",
+                "armor",
+                "head",
+                "eyes",
+                "neck",
+                "shoulders",
+                "body",
+                "hands",
+                "bracers",
+                "ring",
+                "belt",
+                "feet",
+                "held",
+                "wondrous",
+                "consumable",
+                "ammunition",
+                "none"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "__schema77": {
+      "type": "string",
+      "maxLength": 40,
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "__schema78": {
+      "type": "object",
+      "properties": {
+        "cp": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "sp": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "ep": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "gp": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "pp": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        }
       },
       "additionalProperties": false
     }
-  }
+  },
+  "additionalProperties": false
 }

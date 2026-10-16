@@ -117,6 +117,7 @@ describe("the bind: one shipped row, two picked bases, two different numbers", (
       damageType: "slashing",
       rangeFeet: null,
       longRangeFeet: null,
+      melee: true,
       properties: ["heavy", "two-handed"]
     });
 
@@ -349,8 +350,10 @@ describe("the headline far end: the +N ladder lands whole through the real bind"
       state,
       action,
       { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000210" },
-      deps([10, 3, 4])
+      deps([10, 18, 3, 4])
     );
+    // A greatsword is Heavy and this wielder has Strength 12, so the d20 is rolled twice and the lower kept.
+    expect(resolution.rollMode?.disadvantage).toEqual(["Weapon, +1 is Heavy (Strength under 13)"]);
     expect(resolution.attack).toMatchObject({ total: 14, outcome: "hit" });
     expect(resolution.damage).toEqual([{ formula: "2d6 + 2", type: "slashing", total: 9 }]);
     expect(resolution.damageTotal).toBe(9);

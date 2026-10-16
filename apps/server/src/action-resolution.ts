@@ -6,18 +6,24 @@ import {
   type GameState
 } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
+import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { masteryMissDamage } from "./weapon-mastery.js";
-import { rollAttack } from "./resolution/attack.js";
+import { spendAmmunition } from "./resolution/ammunition.js";
+import { useUpConsumable } from "./resolution/consumables.js";
+import { rollAttack, spendUntilAttacked } from "./resolution/attack.js";
+import { rollLastCharge } from "./resolution/charges.js";
 import type { DefinitionAction, ResolveContext, ResolveDependencies, ResolveInput } from "./resolution/context.js";
-import { rollRiderDamage, rollWeaponDamage } from "./resolution/damage.js";
+import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
 import { applyHealing } from "./resolution/heal.js";
-import { recordCleaveOpening, recordLightAttack } from "./resolution/extra-attacks.js";
-import { applyMasteryForces, masterySwingOf, offeredPush, spendVex } from "./resolution/masteries.js";
+import { recordCleaveOpening, recordLightAttack, recordLoadingShot } from "./resolution/extra-attacks.js";
+import { applyMasteryForces, masterySwingOf, offeredPush, spendSap, spendVex } from "./resolution/masteries.js";
 import { hitOffersOf, rollHitOptions, spendHitOptions } from "./resolution/hit-options.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
 import { parkActionSave, parkForAcReaction, parkReaction } from "./resolution/pending.js";
+import { startConcentration } from "./resolution/concentration.js";
+import { applyRageRules } from "./resolution/rage.js";
 import { releaseHideAndReady } from "./resolution/release.js";
 import { openResolve } from "./resolution/validate.js";
 
@@ -42,12 +48,21 @@ export function resolveDefinitionAction(
   // Preview: the d20 is rolled and shown, nothing else applies. The economy was validated already, so an
   // illegal attack is blocked before the preview roll.
   if (ctx.attack !== null && input.commit === false) return previewOf(ctx);
-  // The roll is made, so a Vex marker it read is spent; a finishing replay already spent it.
-  if (input.economyPaid !== true) spendVex(ctx);
+  // The roll is made, so a Vex marker, a Sap or Guiding Bolt's light it read is spent; a finishing replay already
+  // spent them.
+  if (input.economyPaid !== true) {
+    spendVex(ctx);
+    spendSap(ctx);
+    spendUntilAttacked(ctx);
+  }
   // A hit the target's Parry or Shield may still turn into a miss: the attack is spent, and the answer finishes it.
   if (parkForAcReaction(ctx)) {
     commitEconomy(ctx);
+    rollLastCharge(ctx);
+    spendAmmunition(ctx);
+    useUpConsumable(ctx);
     recordLightAttack(ctx);
+    recordLoadingShot(ctx);
     releaseHideAndReady(ctx);
     return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
   }
@@ -64,16 +79,22 @@ export function resolveDefinitionAction(
 
   applyOnHitEffects(ctx);
   applyMasteryForces(ctx);
+  startConcentration(ctx);
   applyGrant(ctx);
   applyHealing(ctx);
 
   parkReaction(ctx);
   ctx.builtin?.forcedSave?.(ctx);
   parkActionSave(ctx);
+  applyRageRules(ctx);
 
   commitEconomy(ctx);
   spendHitOptions(ctx);
+  rollLastCharge(ctx);
+  spendAmmunition(ctx);
+  useUpConsumable(ctx);
   recordLightAttack(ctx);
+  recordLoadingShot(ctx);
   recordCleaveOpening(ctx);
   releaseHideAndReady(ctx);
   return resolutionOf(ctx);
@@ -105,10 +126,13 @@ function previewOf(ctx: ResolveContext): ActionResolution {
 
 const withOffers = (offers: ReturnType<typeof hitOffersOf>) => (offers.length > 0 ? { hitOffers: offers } : {});
 
-/** With no attack roll and no save, every target takes the damage (SRD Magic Missile: "A dart deals 1d4 + 1 Force
- *  damage to its target"), owed like a hit's: the GM's Apply, or a player's proposal or direct damage. */
+/** With no attack roll and no save, every target takes the damage, owed like a hit's: the GM's Apply, or a player's
+ *  proposal or direct damage. A darts action owes each creature what its own darts dealt (SRD Magic Missile: "A dart
+ *  deals 1d4 + 1 Force damage to its target"). */
 function damageTargetsOf(ctx: ResolveContext): ActionResolution["damageTargets"] {
   if (ctx.attack !== null || ctx.action.save || ctx.builtinSave) return undefined;
+  const darts = dartDamageTargetsOf(ctx);
+  if (darts) return darts;
   const parts = owedDamageParts(ctx);
   const total = parts.reduce((sum, part) => sum + part.amount, 0);
   if (total <= 0 || ctx.targets.length === 0) return undefined;
@@ -161,10 +185,22 @@ export function actionAvailability(
   actions: ReadonlyArray<DefinitionAction>,
   definition: ActorDefinition | undefined,
   builtin = false,
-  siblings: ReadonlyArray<DefinitionAction> = definition?.actions ?? []
+  siblings: ReadonlyArray<DefinitionAction> = definition?.actions ?? [],
+  catalog?: EquipmentCatalog
 ): ReadonlyArray<ActionAvailability> {
   return actions.map((action): ActionAvailability => {
-    const evaluation = evaluateActionEconomy(state, attacker, action, [], definition, undefined, siblings);
+    const evaluation = evaluateActionEconomy(
+      state,
+      attacker,
+      action,
+      [],
+      definition,
+      undefined,
+      siblings,
+      undefined,
+      false,
+      catalog
+    );
     let usesRemaining: number | null = null;
     if (action.uses) {
       const key = action.uses.pool ?? action.id;

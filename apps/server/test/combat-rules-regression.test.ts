@@ -1382,7 +1382,9 @@ describe("SRD condition modifiers - Tier A completeness (Playing the Game / cond
     expect(game.actors.find((actor) => actor.id === IDS.croc1)!.hp.current).toBe(0);
   });
 
-  it("petrified grants resistance to all damage and poison immunity (SRD Petrified)", () => {
+  // SRD 5.2.1 Petrified: resistance to all damage, poison included; its immunity is to the Poisoned condition
+  // (the 2014 poison damage immunity is gone).
+  it("petrified resists all damage and is immune to the Poisoned condition, not poison damage (SRD Petrified)", () => {
     const game = buildGame();
     game.actors.find((actor) => actor.id === IDS.torva)!.conditions = [{ id: "petrified" }];
     const outcome = applyDamageDetailed(
@@ -1400,9 +1402,13 @@ describe("SRD condition modifiers - Tier A completeness (Playing the Game / cond
     );
     expect(outcome.application.parts).toEqual([
       { type: "bludgeoning", amount: 17, adjusted: 8, adjustment: "resistance", adjustmentSource: "Petrified" },
-      { type: "poison", amount: 10, adjusted: 0, adjustment: "immunity", adjustmentSource: "Petrified" }
+      { type: "poison", amount: 10, adjusted: 5, adjustment: "resistance", adjustmentSource: "Petrified" }
     ]);
-    expect(outcome.application.totalApplied).toBe(8);
+    expect(outcome.application.totalApplied).toBe(13);
+    const torva = game.actors.find((actor) => actor.id === IDS.torva)!;
+    const events = setCondition(game, IDS.torva, "poisoned", true, undefined, { role: "gm" });
+    expect(torva.conditions.map((condition) => condition.id)).toEqual(["petrified"]);
+    expect(events.some((event) => /immune to Poisoned/.test(event.text))).toBe(true);
   });
 
   it("condition immunity skips with narration instead of applying (SRD Immunity)", () => {
@@ -1880,6 +1886,31 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     place(stunned, IDS.croc1, 0, 0);
     stunned.actors.find((actor) => actor.id === IDS.croc1)!.conditions = [{ id: "stunned" }];
     expect(moveRules(stunned, IDS.torva, { x: 5, y: 0 }, { x: 30, y: 0 }).prompts).toHaveLength(0);
+  });
+
+  // SRD Opportunity Attacks: "a creature that you can see leaves your reach".
+  it("no prompt when the enemy can't see the mover: an Invisible mover, or a Blinded enemy without Blindsight", () => {
+    const unseen = buildGame();
+    place(unseen, IDS.croc1, 0, 0);
+    unseen.actors.find((actor) => actor.id === IDS.torva)!.conditions = [{ id: "invisible" }];
+    expect(moveRules(unseen, IDS.torva, { x: 5, y: 0 }, { x: 30, y: 0 }).prompts).toHaveLength(0);
+
+    const blinded = buildGame();
+    place(blinded, IDS.croc1, 0, 0);
+    blinded.actors.find((actor) => actor.id === IDS.croc1)!.conditions = [{ id: "blinded" }];
+    expect(moveRules(blinded, IDS.torva, { x: 5, y: 0 }, { x: 30, y: 0 }).prompts).toHaveLength(0);
+
+    // Blindsight reaching the mover's starting space sees it either way.
+    const sensing = buildGame();
+    place(sensing, IDS.croc1, 0, 0);
+    const croc = sensing.actors.find((actor) => actor.id === IDS.croc1)!;
+    croc.conditions = [{ id: "blinded" }];
+    const stored = sensing.definitions.find((entry) => entry.id === croc.definitionId)!;
+    stored.definition = {
+      ...stored.definition,
+      extensions: { ...stored.definition.extensions, "open5e.srd-2024": { senses: ["blindsight 10 ft."] } }
+    };
+    expect(moveRules(sensing, IDS.torva, { x: 5, y: 0 }, { x: 30, y: 0 }).prompts).toHaveLength(1);
   });
 
   it("answering the opportunity prompt swings a real melee attack and auto-applies the damage", () => {
@@ -2879,8 +2910,10 @@ describe("underwater combat (SRD Underwater Combat) - GM environment toggle", ()
   });
 });
 
+// SRD 5.2.1 Knocking Out a Creature: the drop to 0 becomes 1 HP and Unconscious (and so Prone) until it regains
+// any hit points; no dying, no defeat. The 2014-style "0 HP and stable" is gone.
 describe("knocking out a creature (SRD) - nonlethal damage", () => {
-  it("a nonlethal drop to 0 leaves a character Unconscious and stable instead of dying", () => {
+  it("a nonlethal drop to 0 leaves a character at 1 HP and Unconscious instead of dying", () => {
     const game = buildGame();
     const outcome = applyDamageDetailed(
       game,
@@ -2890,14 +2923,19 @@ describe("knocking out a creature (SRD) - nonlethal damage", () => {
       { resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition }
     );
     const pip = game.actors.find((actor) => actor.id === IDS.pip)!;
-    expect(pip.hp.current).toBe(0);
-    expect(pip.deathSaves).toEqual({ successes: 0, failures: 0, stable: true });
-    expect(pip.conditions.some((condition) => condition.id === "unconscious")).toBe(true);
+    expect(pip.hp.current).toBe(1);
+    expect(pip.deathSaves).toBeNull();
+    expect(pip.conditions.map((condition) => condition.id)).toEqual(["prone", "unconscious"]);
     expect(outcome.application.instantDeath).toBe(false);
+    expect(outcome.application.droppedToZero).toBe(false);
     expect(outcome.events.some((event) => /knocked out/.test(event.text))).toBe(true);
+    // Regaining any hit point wakes it; it stays Prone (SRD Unconscious).
+    healActor(game, IDS.pip, 1, { role: "gm" });
+    expect(pip.conditions.map((condition) => condition.id)).toEqual(["prone"]);
+    expect(pip.effects).toEqual([]);
   });
 
-  it("a nonlethal drop to 0 leaves a monster Unconscious, not defeated", () => {
+  it("a nonlethal drop to 0 leaves a monster at 1 HP and Unconscious, not defeated, and healing wakes it", () => {
     const game = buildGame();
     const outcome = applyDamageDetailed(
       game,
@@ -2907,11 +2945,11 @@ describe("knocking out a creature (SRD) - nonlethal damage", () => {
       { resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition }
     );
     expect(outcome.application.defeated).toBe(false);
-    expect(
-      game.actors
-        .find((actor) => actor.id === IDS.croc1)!
-        .conditions.some((condition) => condition.id === "unconscious")
-    ).toBe(true);
+    const croc = game.actors.find((actor) => actor.id === IDS.croc1)!;
+    expect(croc.hp.current).toBe(1);
+    expect(croc.conditions.some((condition) => condition.id === "unconscious")).toBe(true);
+    healActor(game, IDS.croc1, 4, { role: "gm" });
+    expect(croc.conditions.some((condition) => condition.id === "unconscious")).toBe(false);
   });
 });
 

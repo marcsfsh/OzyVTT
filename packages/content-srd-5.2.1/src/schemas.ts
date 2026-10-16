@@ -10,12 +10,15 @@ import { z } from "zod";
 import {
   AbilitySchema,
   ActionAreaSchema,
+  ActionGrantSchema,
+  AmmunitionKindSchema,
   ActionReactionSchema,
   ActorDefinitionSchema,
   DamageTypeSchema,
   DiceFormulaSchema,
   HealingFormulaSchema,
   ItemSlotSchema,
+  SaveFailureEffectSchema,
   SaveOutcomeFields
 } from "@vtt/schemas";
 import {
@@ -52,15 +55,70 @@ export type ConditionReference = z.infer<typeof ConditionReferenceSchema>;
 
 const AbilityShortSchema = z.enum(["str", "dex", "con", "int", "wis", "cha"]);
 
+/** How a spell attack is made: a melee spell attack within `feet` of the caster (Touch is 5; a summoned blade
+ *  strikes 5 feet past the spell's range), or a ranged one out to `feet`. */
+const SpellAttackRangeSchema = z
+  .object({ kind: z.enum(["melee", "ranged"]), feet: z.number().int().min(5).max(5280) })
+  .strict();
+
+/** Typed damage; `addsModifier` adds the caster's spellcasting ability modifier (Spiritual Weapon's 1d8 + it). */
+const SpellDamageSchema = z
+  .array(
+    z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema, addsModifier: z.boolean().optional() }).strict()
+  )
+  .max(4);
+
+/** Something a spell lets its caster do after the cast, as an action of its own: Produce Flame's hurl, Spiritual
+ *  Weapon's later attacks, or the save a creature makes when it enters Spirit Guardians (`activation` "other": no
+ *  action, the trigger is the GM's to spot). It rolls at the spell's own level. */
+export const SpellLaterActionSchema = z
+  .object({
+    /** Its name on the sheet, after the spell's ("Spirit Guardians: save"). */
+    name: z.string().min(1).max(60),
+    activation: z.enum(["action", "bonus-action", "other"]),
+    /** When it happens, for the reminder on casting ("a creature enters the Emanation or ends its turn there"). */
+    when: z.string().min(1).max(300),
+    attackRange: SpellAttackRangeSchema.optional(),
+    save: z
+      .object({ ability: AbilityShortSchema, ...SaveOutcomeFields })
+      .strict()
+      .optional(),
+    damage: SpellDamageSchema,
+    area: ActionAreaSchema.optional()
+  })
+  .strict();
+export type SpellLaterAction = z.infer<typeof SpellLaterActionSchema>;
+
 /** One cast's mechanical effect; see `SpellReference.effect`. */
 export const SpellEffectSchema = z
   .object({
     /** Spell attack rolls one cast makes (Scorching Ray's three rays); 0 for none. */
     attacks: z.number().int().min(0).max(10),
-    /** Damage to each target, every part rolled (all three of Magic Missile's darts). */
-    damage: z.array(z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema }).strict()).max(4),
+    /** How those attacks are made. Absent, the spell's range decides. */
+    attackRange: SpellAttackRangeSchema.optional(),
+    /** Damage to each target, every part rolled; with `darts`, what each dart deals. */
+    damage: SpellDamageSchema,
+    /** The damage types the caster picks from on each cast (Chromatic Orb); the damage carries the first. */
+    damageTypes: z.array(DamageTypeSchema).min(2).max(10).optional(),
+    /** The spell's save is not made when it is cast but later (Spirit Guardians, Web) or never by its target
+     *  (Haste, Sanctuary): the cast prompts none. `laterActions` carries one the engine can roll. */
+    noCastSave: z.literal(true).optional(),
+    laterActions: z.array(SpellLaterActionSchema).min(1).max(2).optional(),
+    /** Missiles one cast makes, each at a creature of the caster's choice (Magic Missile's three darts). */
+    darts: z.number().int().min(2).max(20).optional(),
+    /** How many creatures one cast targets (Bless: up to three), plus `perSlot` more for each slot level above the
+     *  spell's own. Absent: the text sets no number the engine checks (an area, or the GM's call). */
+    targets: z
+      .object({ count: z.number().int().min(1).max(20), perSlot: z.number().int().min(1).max(2).optional() })
+      .strict()
+      .optional(),
     /** Hit points each target regains; `addsModifier` adds the caster's spellcasting ability modifier. */
     healing: z.object({ formula: HealingFormulaSchema, addsModifier: z.boolean() }).strict().nullable(),
+    /** What the cast leaves on the creatures it targets, or the one its attack hits, while it lasts (Bless's d4,
+     *  Hunter's Mark's extra damage). */
+    grant: ActionGrantSchema.optional(),
+    /** What a failed save against the cast leaves on the creature (Bane's -1d4, Faerie Fire's outline). */
+    failureEffect: SaveFailureEffectSchema.optional(),
     /** A reaction spell's trigger and response (Shield, Hellish Rebuke), so the table offers it as a prompt. */
     reaction: ActionReactionSchema.optional()
   })
@@ -88,6 +146,8 @@ export const SpellReferenceSchema = z.object({
   duration: z.string().min(1).max(120),
   concentration: z.boolean(),
   ritual: z.boolean(),
+  /** The caster makes a spell attack roll, when it casts or on a later turn: read from the cast model for the SRD,
+   *  since the source marks every spell whose text mentions an attack roll (Bless, Shining Smite). */
   attackRoll: z.boolean(),
   damage: z.object({ roll: z.string().nullable(), types: z.array(z.string()) }),
   /** The save the spell forces: the ability the target rolls and what the save does. The caster supplies the DC. */
@@ -101,7 +161,7 @@ export const SpellReferenceSchema = z.object({
    *  own field, which records a line's width as its size and has no emanations. */
   area: ActionAreaSchema.nullable().default(null),
   /** What one cast does to its targets: the spell attacks it makes, the damage it deals, the hit points it restores.
-   *  Read from the text at build time with a reviewed table, because the source's `damage` and `attackRoll` columns
+   *  Read from the text at build time with a reviewed table, because the source's `damage` and `attack_roll` columns
    *  describe the prose (Hex's later 1d6, Faerie Fire's "attack rolls against"), not a cast. A zone, a summons or a
    *  rider on later hits casts with none of these, and stays for the GM. Actions built from a spell read this. */
   effect: SpellEffectSchema.nullable().default(null),
@@ -148,6 +208,10 @@ export const WeaponReferenceSchema = z.object({
   category: z.enum(["simple", "martial"]),
   /** The Weapons table's melee/ranged band (a thrown Dagger is melee, a Dart is not). Absent = not recorded. */
   melee: z.boolean().optional(),
+  /** The die a Versatile weapon deals used with two hands (`Versatile (1d10)`); absent on other weapons. */
+  versatileDice: z.string().min(1).max(20).optional(),
+  /** What an Ammunition weapon fires (`Ammunition (Range 150/600; Arrow)`); absent on other weapons. */
+  ammunition: AmmunitionKindSchema.optional(),
   improvised: z.boolean(),
   damage: z.object({ dice: z.string().min(1).max(20), type: z.string().min(1).max(40) }),
   rangeFeet: z.number().int().positive().nullable(),
@@ -214,6 +278,23 @@ export const ItemSpellCastSchema = z
   .strict();
 export type ItemSpellCast = z.infer<typeof ItemSpellCastSchema>;
 
+/**
+ * How a charged item's charges come back, beside the pools its actions and casts declare: `regain` is rolled on a
+ * long rest ("regains 1d6 + 1 expended charges daily at dawn"; absent = all come back), and `lastChargeRoll` rolls a
+ * d20 when the last charge is spent, whose 1 does what the item's text says (most crumble).
+ */
+export const ItemChargesSchema = z
+  .object({
+    // The SRD's own grammar here includes a d3 ("regains 1d3 expended charges"), which the dice roller lacks.
+    regain: z
+      .string()
+      .regex(/^\d+d(?:3|4|6|8|10|12|20)(?:\s*[+-]\s*\d+)?$/i, "Use a dice formula such as 1d6 + 1.")
+      .optional(),
+    lastChargeRoll: z.boolean().default(false)
+  })
+  .strict();
+export type ItemCharges = z.infer<typeof ItemChargesSchema>;
+
 /** Attunement. `restrictedTo` is advisory: shown on the sheet, never enforced. */
 export const ItemAttunementSchema = z
   .object({
@@ -234,6 +315,12 @@ const EquipmentWeaponStatsSchema = z.object({
   damageType: z.string().max(40),
   rangeFeet: z.number().int().positive().nullable(),
   longRangeFeet: z.number().int().positive().nullable(),
+  /** The Weapons table's band: a thrown Dagger is melee, a Dart is ranged. Absent = read from range and Thrown. */
+  melee: z.boolean().optional(),
+  /** A Versatile weapon's two-handed damage die. */
+  versatileDice: z.string().max(20).optional(),
+  /** What an Ammunition weapon fires. Absent = any ammunition the bearer carries. */
+  ammunition: AmmunitionKindSchema.optional(),
   /** Optional here: gear and homebrew rows map through this shape and have no mastery. */
   mastery: z.enum(["cleave", "graze", "nick", "push", "sap", "slow", "topple", "vex"]).optional(),
   /** Copied onto the inventory row, where `weaponPropertiesOf` reads it. */
@@ -289,8 +376,9 @@ export const EquipmentReferenceSchema = z
       .max(40),
     costGp: z.number().nonnegative().max(1_000_000).nullable(),
     weightLb: z.number().nonnegative().max(1000).nullable(),
-    /** Matches `InventoryItemSchema.description`, which add-from-catalog copies this string onto. */
-    description: z.string().max(4000).nullable(),
+    /** Matches `InventoryItemSchema.description`, which add-from-catalog copies this string onto. Long enough for
+     *  the longest SRD item with its tables (Mysterious Deck). */
+    description: z.string().max(12000).nullable(),
     weapon: EquipmentWeaponStatsSchema.nullable().optional(),
     armor: z
       .object({
@@ -316,6 +404,20 @@ export const EquipmentReferenceSchema = z
     /** Cannot be voluntarily removed once attuned; its magic is hidden from the player until attunement, and only until then. */
     cursed: z.boolean().default(false),
     casts: z.array(ItemSpellCastSchema).max(8).default([]),
+    charges: ItemChargesSchema.optional(),
+    /** Mithral: the armor it is bound to has no Stealth Disadvantage and no Strength requirement. */
+    removesArmorDrawbacks: z.boolean().optional(),
+    /** Each use of one of its actions uses one up (a potion drunk, a flask thrown), and its actions work from the
+     *  pack: drinking or throwing one needs no equipping. */
+    consumedOnUse: z.boolean().optional(),
+    /** This row is ammunition sold in bundles: each one quantity is `count` pieces of `kind` ("Arrows (20)"). */
+    ammunition: z
+      .object({ kind: AmmunitionKindSchema, count: z.number().int().min(1).max(100) })
+      .strict()
+      .optional(),
+    /** "The GM chooses the type": the types the GM may pick for this item's one granted resistance, which then
+     *  replaces the printed default in `grants.damageResistances` for that carried copy. */
+    damageTypeChoice: z.array(DamageTypeSchema).min(2).max(13).optional(),
     /** Feats granted while active, depth 1. Nothing has `grants.items`, so a grant cycle cannot be expressed. */
     grantsFeatIds: z.array(ContentIdSchema).max(4).default([]),
 
@@ -332,6 +434,15 @@ export const EquipmentReferenceSchema = z
         message:
           "A cursed item must require attunement - attunement is both what springs the curse and what reveals it."
       });
+    }
+    if (item.damageTypeChoice) {
+      const printed = item.grants?.damageResistances ?? [];
+      if (printed.length !== 1 || !(item.damageTypeChoice as readonly string[]).includes(printed[0]))
+        context.addIssue({
+          code: "custom",
+          path: ["damageTypeChoice"],
+          message: "A chosen damage type replaces one granted resistance: grant exactly one, from the choices."
+        });
     }
     // Enforced on the item carrier only: the identical rider on a feat is valid.
     item.modifiers.forEach((modifier, index) => {

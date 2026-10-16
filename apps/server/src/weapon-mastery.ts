@@ -55,6 +55,8 @@ type MasteryHandler = Readonly<{
   onMiss?: (swing: MasterySwing) => readonly MasteryBonusDamage[];
   /** The swing landed. Returns the effects this mastery puts on the target. */
   onHit?: (swing: MasterySwing) => readonly MasteryAppliedEffect[];
+  /** `onHit` fires only when the hit also deals damage ("If you hit a creature with this weapon and deal damage"). */
+  onHitNeedsDamage?: boolean;
   /** The swing landed. Returns the saving throws this mastery forces on the target. */
   onHitSave?: (swing: MasterySwing) => readonly MasteryPendingSave[];
   /** The swing landed. Returns the forced movement this mastery applies to the target. */
@@ -67,6 +69,8 @@ type MasteryHandler = Readonly<{
 
 /** The tag on Vex's marker, which the attack roll looks for. */
 export const VEXED_TAG = "vexed";
+/** The tag on Sap's effect, which the sapped creature's next attack roll spends. */
+export const SAPPED_TAG = "sap";
 
 // Moment gates shared by every mastery: a fumble is a miss, a crit is a hit, and `unknown` (target has
 // no AC) is neither, so no mastery fires on a swing the engine could not adjudicate.
@@ -107,8 +111,8 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
   },
 
   /** Sap (SRD): on a hit, Disadvantage on the target's next attack roll before the start of your next
-   *  turn. Approximation: effects don't expire on use, so every attack in that window has Disadvantage
-   *  (same as Help). Persists if the attacker drops to 0 HP (they still have a next turn). */
+   *  turn. The target's first attack roll spends it (`spendSap`). Persists if the attacker drops to 0 HP (they
+   *  still have a next turn). */
   sap: {
     onHit: (swing) => [
       {
@@ -117,7 +121,7 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
         effect: {
           id: `${swing.commandId}:mastery:sap:${swing.attack.targetId}`,
           name: `Sapped by ${swing.attacker.name}`,
-          tags: ["sap"],
+          tags: [SAPPED_TAG],
           sourceActorId: swing.attacker.id,
           sourceName: swing.attacker.name,
           sourceActionId: `${swing.actionId}:sap`,
@@ -131,12 +135,13 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
   },
 
   /**
-   * Slow (SRD): on a hit, the target's Speed drops by 10 feet until the start of your next turn, as a
+   * Slow (SRD): on a hit that deals damage, the target's Speed drops by 10 feet until the start of your next turn, as a
    * `speed` effect (never by writing `actor.speedFeet`). SRD "Combining Game Effects": Slows don't stack,
    * so `stackKey` groups them and the most potent applies. A second hit from the same weapon refreshes
    * via `sourceActionId`. Persists if the attacker drops to 0 HP (they still have a next turn).
    */
   slow: {
+    onHitNeedsDamage: true,
     onHit: (swing) => [
       {
         targetId: swing.attack.targetId,
@@ -161,12 +166,13 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
   },
 
   /**
-   * Vex (SRD): a hit gives the attacker Advantage on their next attack roll against that creature before the end of
+   * Vex (SRD): a hit that deals damage gives the attacker Advantage on their next attack roll against that creature before the end of
    * their next turn. A marker on the target, linked to the attacker, which the attack roll reads and spends
    * (`resolution/attack.ts`). It lasts until the start of the attacker's turn after next, a turn's opportunity
    * attacks longer than the SRD's end of their next turn.
    */
   vex: {
+    onHitNeedsDamage: true,
     onHit: (swing) => [
       {
         targetId: swing.attack.targetId,
@@ -220,10 +226,13 @@ export function masteryMissDamage(swing: MasterySwing | null): readonly MasteryB
   return MASTERY_HANDLERS[swing.mastery.id]?.onMiss?.(swing) ?? [];
 }
 
-/** On-hit hook: effects the swing's mastery puts on the target; the caller adds them. */
-export function masteryHitEffects(swing: MasterySwing | null): readonly MasteryAppliedEffect[] {
+/** On-hit hook: effects the swing's mastery puts on the target; the caller adds them. `dealsDamage` says whether the
+ *  hit deals the target any damage after its defences, which Slow and Vex need. */
+export function masteryHitEffects(swing: MasterySwing | null, dealsDamage = true): readonly MasteryAppliedEffect[] {
   if (swing === null || !landed(swing.attack)) return [];
-  return MASTERY_HANDLERS[swing.mastery.id]?.onHit?.(swing) ?? [];
+  const handler = MASTERY_HANDLERS[swing.mastery.id];
+  if (handler?.onHitNeedsDamage && !dealsDamage) return [];
+  return handler?.onHit?.(swing) ?? [];
 }
 
 /** On-hit save hook (Topple): saves the swing's mastery forces; the caller parks them. */

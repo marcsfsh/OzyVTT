@@ -4,6 +4,8 @@ import {
   aggregateRollMode,
   collectRiders,
   d20TestFormula,
+  diceRiders,
+  diceRiderTerms,
   halveDamageParts,
   parseDiceFormula,
   rescaleDamageParts,
@@ -19,7 +21,16 @@ import { requireGm, type Initiator } from "./authorization.js";
 import { applyDamageDetailed, previewDamage, adjustableActor } from "./hit-points.js";
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
-import { addEffect, endEffectIfPresent, makeEffect, type EffectNarration } from "./effects.js";
+import {
+  addEffect,
+  CONCENTRATING_TAG,
+  effectDurationOf,
+  endEffectIfPresent,
+  makeEffect,
+  sourceOf,
+  type ConditionImmunitySource,
+  type EffectNarration
+} from "./effects.js";
 import {
   deriveEquipment,
   rollModeClaims,
@@ -85,6 +96,13 @@ export function saveRiderBonus(derivation: EquipmentDerivation, ability: Ability
   const momentary = collectRiders(derivation.carriers, { ...derivation.context, ability, moment: "on-saving-throw" });
   // `derivation.saveBonus` is the summed standing half; only momentary riders are added here.
   return derivation.saveBonus + sumRiders(momentary, "save-bonus");
+}
+
+/** The dice riders add to one saving throw (Bless +1d4, Bane -1d4), standing or at the save, as formula terms. */
+export function saveRiderDiceTerms(derivation: EquipmentDerivation, ability: AbilityId): string {
+  const standing = collectRiders(derivation.carriers, { ...derivation.context, moment: null });
+  const atSave = collectRiders(derivation.carriers, { ...derivation.context, ability, moment: "on-saving-throw" });
+  return diceRiderTerms(diceRiders([...standing, ...atSave], "save-bonus"));
 }
 
 /** The flat rider bonus to a saving throw that names no ability, such as a death save: riders that apply to
@@ -173,7 +191,7 @@ export function hasEvasion(definition: ActorDefinition | undefined): boolean {
 export function createPendingSaves(
   state: GameState,
   input: Readonly<{
-    sourceActorId: string;
+    sourceActorId: string | null;
     sourceName: string;
     actionName: string;
     ability: AbilityId;
@@ -184,7 +202,10 @@ export function createPendingSaves(
     halfOnSuccess: boolean;
     conditionIds: readonly string[];
     saveBonus?: number;
-    onFailEffect?: PendingSave["onFailEffect"];
+    onFailEffect?: Omit<NonNullable<PendingSave["onFailEffect"]>, "modifiers"> &
+      Partial<Pick<NonNullable<PendingSave["onFailEffect"]>, "modifiers">>;
+    /** A save repeated at the end of the bearer's turn: a success ends this effect. */
+    repeatOf?: PendingSave["repeatOf"];
     /** Replace an older prompt with the same (target, actionName, source) key. Default true; per-hit riders
      *  pass false since Extra Attack can owe two saves. */
     replaceExisting?: boolean;
@@ -207,7 +228,10 @@ export function createPendingSaves(
     halfOnSuccess: input.halfOnSuccess,
     conditionIds: [...input.conditionIds],
     saveBonus: input.saveBonus ?? 0,
-    ...(input.onFailEffect ? { onFailEffect: input.onFailEffect } : {}),
+    ...(input.onFailEffect
+      ? { onFailEffect: { ...input.onFailEffect, modifiers: [...(input.onFailEffect.modifiers ?? [])] } }
+      : {}),
+    ...(input.repeatOf ? { repeatOf: input.repeatOf } : {}),
     createdAt: input.createdAt
   }));
   // A re-cast against the same target replaces its older prompt.
@@ -227,6 +251,69 @@ export function createPendingSaves(
   if (pendingSaves.length > 100)
     throw new CommandRejectedError("Too many unanswered saving throws. Resolve or dismiss some first.");
   state.combat = { ...state.combat, pendingSaves };
+}
+
+/**
+ * Puts a failed save's effect on its target (see `failureEffectFor`). A Concentration cast's effect lands only while
+ * the caster still holds that Concentration: one broken before the target answered imposes nothing.
+ */
+export function applyFailureEffect(
+  state: GameState,
+  targetId: string,
+  onFail: NonNullable<PendingSave["onFailEffect"]>,
+  id: string,
+  immunities?: ConditionImmunitySource
+): EffectNarration[] {
+  const target = state.actors.find((candidate) => candidate.id === targetId);
+  if (!target) return [];
+  if (onFail.castId !== undefined) {
+    const holding = state.actors.some((actor) =>
+      actor.effects.some((effect) => effect.castId === onFail.castId && effect.tags.includes(CONCENTRATING_TAG))
+    );
+    if (!holding)
+      return [
+        {
+          kind: "effect",
+          text: `${onFail.sourceName ?? "The caster"} is no longer concentrating, so ${target.name} is spared.`,
+          actorId: target.id,
+          ...sourceOf(onFail)
+        }
+      ];
+  }
+  const events: EffectNarration[] = [];
+  const applied = addEffect(
+    state,
+    target.id,
+    makeEffect({
+      id,
+      name: onFail.name,
+      tags: [...onFail.tags],
+      sourceActorId: onFail.sourceActorId,
+      sourceName: onFail.sourceName,
+      sourceActionId: onFail.sourceActionId ?? null,
+      startedRound: state.combat.round,
+      duration: effectDurationOf(state, onFail.duration, target.id, onFail.sourceActorId),
+      // Saves parked before failures carried their own lifetime were all grapples.
+      endsWhenSourceDefeated: onFail.endsWhenSourceDefeated ?? onFail.tags.includes("grapple"),
+      concentration: onFail.castId !== undefined,
+      linkedConditionIds: [...onFail.linkedConditionIds],
+      escapeDc: onFail.escapeDc,
+      ...(onFail.repeatSave ? { repeatSave: { ...onFail.repeatSave } } : {}),
+      ...(onFail.endsOnDamage ? { endsOnDamage: true } : {}),
+      ...(onFail.speedZero ? { speedZero: true } : {}),
+      ...(onFail.castId !== undefined ? { castId: onFail.castId } : {}),
+      ...(onFail.rangeFeet !== undefined ? { rangeFeet: onFail.rangeFeet } : {}),
+      ...(onFail.ongoingDamage ? { ongoingDamage: onFail.ongoingDamage } : {}),
+      // What it does while it lasts (Bane's -1d4).
+      modifiers: [...onFail.modifiers]
+    }),
+    events,
+    immunities
+  );
+  return [
+    { kind: "effect", text: `${target.name} is ${applied.name}.`, actorId: target.id, ...sourceOf(applied) },
+    ...events
+  ];
 }
 
 function recordSaveRoll(
@@ -278,7 +365,7 @@ export function answerSave(
   explicitRollMode?: "advantage" | "disadvantage" | "normal",
   damageOverride?: number
 ): { outcome: SaveOutcome; events: EffectNarration[] } {
-  if (!state.combat.active) throw new CommandRejectedError("There is no active encounter.");
+  // A save owed outside a fight (a concentration check after a trap) is answered the same way.
   const pending = state.combat.pendingSaves.find((entry) => entry.id === saveId);
   if (!pending) throw new CommandRejectedError("That saving throw was already answered or dismissed.");
   const target = adjustableActor(state, pending.targetActorId, scope);
@@ -307,7 +394,9 @@ export function answerSave(
     const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
     // An explicit choice (the answerer's button, or a forced "normal") wins over detected sources.
     const mode = explicitRollMode ?? aggregated.mode;
-    const resolution = resolveDice(parseDiceFormula(d20TestFormula(mode, modifier)), deps.random);
+    // Bless's d4 rolls into the save itself, so a preview's total is the one Confirm sends.
+    const formula = d20TestFormula(mode, modifier) + saveRiderDiceTerms(derivation, pending.ability);
+    const resolution = resolveDice(parseDiceFormula(formula), deps.random);
     if (mode !== "normal")
       rollMode = {
         mode,
@@ -385,7 +474,8 @@ export function answerSave(
         : halved
           ? Math.floor(proposedTotal / 2)
           : proposedTotal;
-  const outcomeCondition = !success && pending.conditionIds.length > 0;
+  const outcomeCondition =
+    !success && (pending.conditionIds.length > 0 || (pending.onFailEffect?.linkedConditionIds.length ?? 0) > 0);
 
   // Preview (commit=false): the roll is recorded so everyone sees it, but nothing is applied and the
   // save stays open until the answerer confirms. The damage is weighed through the target's defences, so the
@@ -455,9 +545,15 @@ export function answerSave(
     application = outcome.application;
     events.push(...outcome.events);
   }
+  const immunities = {
+    resolveDefinition: (definitionId: string) => deps.resolveDefinition(definitionId),
+    ...(deps.catalog ? { catalog: deps.catalog } : {})
+  };
   if (outcomeCondition) {
+    // What the failure's effect links lands with the effect below; the rest (Prone, Exhaustion) stands alone.
     // setCondition narrates immunity skips; whether any condition landed is read back.
-    for (const conditionId of pending.conditionIds)
+    const linked = new Set(pending.onFailEffect?.linkedConditionIds ?? []);
+    for (const conditionId of pending.conditionIds.filter((id) => !linked.has(id)))
       events.push(
         ...setCondition(
           state,
@@ -472,7 +568,6 @@ export function answerSave(
           }
         )
       );
-    conditionApplied = target.conditions.some((condition) => pending.conditionIds.includes(condition.id));
   }
   // A committed failed concentration check ends the sustained effects (SRD Concentration); tolerant of
   // effects already gone.
@@ -480,28 +575,19 @@ export function answerSave(
     for (const reference of pending.endsEffects)
       events.push(...endEffectIfPresent(state, reference.actorId, reference.effectId));
   }
-  // A committed failure applies the declared source-linked effect (Unarmed Strike Grapple, ADR-0020).
-  if (!success && pending.onFailEffect) {
-    const applied = addEffect(
-      state,
-      target.id,
-      makeEffect({
-        id: `${commandId}:${saveId}:fail`,
-        name: pending.onFailEffect.name,
-        tags: [...pending.onFailEffect.tags],
-        sourceActorId: pending.onFailEffect.sourceActorId,
-        sourceName: pending.onFailEffect.sourceName,
-        startedRound: state.combat.round,
-        duration: { type: "manual" },
-        endsWhenSourceDefeated: true,
-        linkedConditionIds: [...pending.onFailEffect.linkedConditionIds],
-        escapeDc: pending.onFailEffect.escapeDc
-      }),
-      undefined,
-      deps
+  // A committed failure applies the declared source-linked effect (a grapple, a timed or Concentration condition).
+  if (!success && pending.onFailEffect)
+    events.push(
+      ...applyFailureEffect(state, target.id, pending.onFailEffect, `${commandId}:${saveId}:fail`, immunities)
     );
-    events.push({ kind: "effect", text: `${target.name} is ${applied.name}.`, actorId: target.id });
-  }
+  if (outcomeCondition)
+    conditionApplied = target.conditions.some(
+      (condition) =>
+        pending.conditionIds.includes(condition.id) || pending.onFailEffect?.linkedConditionIds.includes(condition.id)
+    );
+  // A repeated save that succeeds ends the effect it was repeated for (Hold Person ends on that target).
+  if (success && pending.repeatOf)
+    events.push(...endEffectIfPresent(state, pending.repeatOf.actorId, pending.repeatOf.effectId));
   state.combat = { ...state.combat, pendingSaves: state.combat.pendingSaves.filter((entry) => entry.id !== saveId) };
   return {
     outcome: {

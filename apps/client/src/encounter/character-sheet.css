@@ -65,7 +65,8 @@
 .sheet-conditions .condition-editor {
   margin-top: 0;
 }
-.sheet-rest-block {
+.sheet-rest-block,
+.sheet-saves-owed {
   margin-top: 0.85rem;
 }
 .sheet-rest {
@@ -795,6 +796,25 @@
   padding-top: 0.8rem;
   border-top: 1px dashed color-mix(in srgb, var(--line-strong) 55%, transparent);
 }
+/* The prepare step a Long Rest opens: what may change, and Done. */
+.sheet-prepare-step {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0.4rem 0;
+  padding: var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+.sheet-prepare-step p {
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.sheet-prepare-step button {
+  min-height: 44px;
+}
 .sheet-spell-group-head {
   display: flex;
   align-items: center;
@@ -1461,4 +1481,46 @@
   .sheet-meta dt {
     min-width: 6rem;
   }
+}
+/* The GM's AC chip opens the hand-set editor, so it is a full tap target. */
+.sheet-vital-button {
+  min-height: var(--tap-min);
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.sheet-vital-button:hover {
+  border-color: color-mix(in srgb, var(--cyan) 45%, transparent);
+}
+.sheet-vital-note {
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+  line-height: 1;
+}
+.sheet-ac-edit {
+  display: flex;
+  flex: 1 0 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.sheet-ac-edit > input {
+  width: 4.2rem;
+  margin: 0;
+  text-align: center;
+}
+.sheet-item-choice {
+  margin-top: var(--space-1);
+  max-width: 14rem;
+}
+.sheet-give {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.sheet-give > select {
+  flex: 1 1 9rem;
+  min-width: 0;
 }

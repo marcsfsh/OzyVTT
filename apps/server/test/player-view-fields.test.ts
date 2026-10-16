@@ -77,6 +77,7 @@ const OWNER = [
   "spellSlots",
   "pactSlots",
   "preparedSpellIds",
+  "preparation",
   "inventory",
   "currency"
 ];

@@ -145,8 +145,8 @@ export const gameReads = [
       return {
         rulesMode: state.combat.rulesMode,
         actions: [
-          ...actionAvailability(state, actor, available, definition, false, available),
-          ...actionAvailability(state, actor, builtins, definition, true, available)
+          ...actionAvailability(state, actor, available, definition, false, available, catalog),
+          ...actionAvailability(state, actor, builtins, definition, true, available, catalog)
         ],
         // Derived numbers are computed only after the authorization gate above, which is why they ride a
         // request rather than the broadcast projection (see `actor-derived.ts`).

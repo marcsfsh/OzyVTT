@@ -1,5 +1,12 @@
 import { z } from "zod";
-import { ActorDefinitionSchema, ActorSchema, HealthDisplaySchema } from "@vtt/schemas";
+import {
+  ActorDefinitionSchema,
+  ActorSchema,
+  EffectInstanceSchema,
+  EffectModifiersSchema,
+  HealthDisplaySchema,
+  SaveFailureDurationSchema
+} from "@vtt/schemas";
 
 /** An imported stat block persisted with the campaign: the inert definition plus the id actors reference via `definitionId`. */
 export const StoredDefinitionSchema = z
@@ -223,8 +230,31 @@ export const PendingSaveSchema = z
           .default([]),
         escapeDc: z.number().int().min(1).max(40).nullable().default(null),
         sourceActorId: z.uuid().nullable().default(null),
-        sourceName: z.string().max(120).nullable().default(null)
+        sourceName: z.string().max(120).nullable().default(null),
+        /** How long it lasts, as the text prints it; absent is until ended. */
+        duration: SaveFailureDurationSchema.optional(),
+        /** The save the target repeats at the end of each of its turns, a success ending the effect. */
+        repeatSave: EffectInstanceSchema.shape.repeatSave,
+        endsOnDamage: z.boolean().optional(),
+        speedZero: z.boolean().optional(),
+        /** A grapple: it ends with its source's defeat, and when a move takes them farther apart than `rangeFeet`. */
+        endsWhenSourceDefeated: z.boolean().optional(),
+        rangeFeet: EffectInstanceSchema.shape.rangeFeet,
+        /** The Concentration cast it belongs to: it is sustained by the caster's Concentration, and is not applied
+         * once that has ended. */
+        castId: z.string().min(1).max(120).optional(),
+        /** The action it came from, so a second hit from the same action refreshes rather than stacks. */
+        sourceActionId: z.string().max(120).optional(),
+        /** Damage the effect deals at the start of a turn while it lasts (a swallow's acid). */
+        ongoingDamage: EffectInstanceSchema.shape.ongoingDamage,
+        /** What the effect does while it lasts (Bane's -1d4 on attack rolls and saves). */
+        modifiers: EffectModifiersSchema.default([])
       })
+      .strict()
+      .optional(),
+    /** A save the bearer repeats at the end of its turn: a success ends this effect. Stripped from player projections. */
+    repeatOf: z
+      .object({ actorId: z.uuid(), effectId: z.string().min(1).max(120) })
       .strict()
       .optional(),
     createdAt: z.number().int().nonnegative()
@@ -252,6 +282,21 @@ export const ParkedAttackSchema = z
     pushFeet: z.number().int().min(0).max(100).nullable(),
     /** The slot the spell was cast with, so the replay rolls the same dice. */
     slotLevel: z.number().int().min(1).max(9).nullable(),
+    /** The damage type the caster picked (Chromatic Orb), so the replay deals it. */
+    damageType: z.string().max(40).nullable().default(null),
+    /** Dice an effect added to the roll (Bless's d4) as they rolled, so the replay totals the same. */
+    bonusDice: z
+      .array(
+        z
+          .object({
+            label: z.string().min(1).max(120),
+            dice: z.string().max(8),
+            total: z.number().int().min(-48).max(48)
+          })
+          .strict()
+      )
+      .max(8)
+      .default([]),
     /** Attacker to target when it rolled, so the replay classifies the swing (melee or thrown) the same way. */
     distanceFeet: z.number().min(0).max(100000).nullable(),
     initiatorRole: z.enum(["gm", "player"]),
@@ -433,7 +478,13 @@ export type RuleExceptions = z.infer<typeof RuleExceptionsSchema>;
 export const DEFAULT_RULE_EXCEPTIONS: RuleExceptions = { slots: "assisted" };
 
 /** Closed list: `rules.answer` replays the parked payload under GM authority. */
-export const AskableCommandSchema = z.enum(["action.resolve", "action.use", "token.move", "actor.set-condition"]);
+export const AskableCommandSchema = z.enum([
+  "action.resolve",
+  "action.use",
+  "token.move",
+  "actor.set-condition",
+  "effect.end"
+]);
 export type AskableCommand = z.infer<typeof AskableCommandSchema>;
 
 /** A player's parked "Ask the GM": a blocked command waiting for the GM to allow or deny it. The owner is not
@@ -471,8 +522,13 @@ const sceneCombatShape = {
     .object({
       actionUsed: z.boolean().default(false),
       bonusActionUsed: z.boolean().default(false),
+      /** `slotLevel`: the slot a multi-attack spell (Scorching Ray) was cast with, which its later rays roll at. */
       actionInstance: z
-        .object({ actorId: z.uuid(), components: z.record(z.string(), z.number().int().nonnegative()) })
+        .object({
+          actorId: z.uuid(),
+          components: z.record(z.string(), z.number().int().nonnegative()),
+          slotLevel: z.number().int().min(1).max(9).optional()
+        })
         .strict()
         .nullable()
         .default(null),
@@ -486,13 +542,22 @@ const sceneCombatShape = {
       movementUsedFeet: z.number().nonnegative().max(100000).default(0),
       /** Rule families the GM already waved through this turn. Stripped from player projections. */
       rulesOverriddenFamilies: z.array(RuleFamilySchema).max(5).optional(),
+      /** Who has expended a spell slot to cast a spell this turn (SRD: one per turn). Engine bookkeeping, never
+       *  projected. */
+      spellSlotCasters: z.array(z.uuid()).max(200).optional(),
       /** The turn's actor has made its one death save (SRD: at the start of its turn). Never projected. */
       deathSaveRolled: z.boolean().optional(),
       /** What this turn's attacks opened for an extra attack: the Light weapons its actor swung in the Attack action,
-       *  and the creature a Cleave weapon hit. Engine bookkeeping, never projected. */
+       *  and the creature a Cleave weapon hit; and the Loading weapons already fired in that action, which can't
+       *  fire again in it. Engine bookkeeping, never projected. */
       extraAttacks: z
         .object({
           light: z
+            .object({ actorId: z.uuid(), itemIds: z.array(z.string().max(120)).max(10) })
+            .strict()
+            .nullable()
+            .default(null),
+          loading: z
             .object({ actorId: z.uuid(), itemIds: z.array(z.string().max(120)).max(10) })
             .strict()
             .nullable()
