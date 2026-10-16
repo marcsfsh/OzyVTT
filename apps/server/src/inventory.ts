@@ -201,6 +201,8 @@ function weaponStatsFrom(stats: CatalogRecord["weapon"]): InventoryItem["weapon"
     damageType: stats.damageType,
     rangeFeet: stats.rangeFeet ?? null,
     longRangeFeet: stats.longRangeFeet ?? null,
+    ...(stats.melee !== undefined ? { melee: stats.melee } : {}),
+    ...(stats.versatileDice !== undefined ? { versatileDice: stats.versatileDice } : {}),
     ...(stats.properties !== undefined ? { properties: [...stats.properties] } : {})
   };
 }

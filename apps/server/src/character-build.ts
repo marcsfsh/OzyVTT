@@ -957,6 +957,8 @@ export function buildCharacterDefinition(
                     damageType: record.weapon.damageType,
                     rangeFeet: record.weapon.rangeFeet,
                     longRangeFeet: record.weapon.longRangeFeet,
+                    ...(record.weapon.melee !== undefined ? { melee: record.weapon.melee } : {}),
+                    ...(record.weapon.versatileDice ? { versatileDice: record.weapon.versatileDice } : {}),
                     ...(record.weapon.properties ? { properties: [...record.weapon.properties] } : {})
                   }
                 }

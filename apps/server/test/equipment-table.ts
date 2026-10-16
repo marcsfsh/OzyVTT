@@ -209,13 +209,14 @@ export function actionOf(table: Table, actorId: string, actionId: string) {
 }
 
 let command = 0;
-/** Resolves one action at the foe with queued dice faces. */
+/** Resolves one action at the foe with queued dice faces; `distanceFeet` puts every pair of combatants that far apart. */
 export function resolveAt(
   table: Table,
   actorId: string,
   actionId: string,
   faces: number[],
-  input: Partial<ResolveInput> = {}
+  input: Partial<ResolveInput> = {},
+  distanceFeet?: number
 ) {
   let roll = 0;
   command += 1;
@@ -230,7 +231,8 @@ export function resolveAt(
     now: () => "2026-10-16T00:00:00.000Z",
     definition: table.definition(actorId),
     catalog,
-    resolveDefinition: table.resolve
+    resolveDefinition: table.resolve,
+    ...(distanceFeet !== undefined ? { distanceFeet: () => distanceFeet } : {})
   };
   return resolveDefinitionAction(
     table.state,

@@ -303,6 +303,8 @@
             "damageType": { "type": "string", "minLength": 1, "maxLength": 40 },
             "rangeFeet": { "type": ["integer", "null"], "minimum": 1 },
             "longRangeFeet": { "type": ["integer", "null"], "minimum": 1 },
+            "melee": { "type": "boolean" },
+            "versatileDice": { "type": "string", "minLength": 1, "maxLength": 20 },
             "properties": {
               "type": "array",
               "maxItems": 12,

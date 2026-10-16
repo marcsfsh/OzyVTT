@@ -96,6 +96,10 @@ export const ContentEquipmentSummarySchema = z.strictObject({
       damageType: z.string(),
       rangeFeet: z.number().int().nullable(),
       longRangeFeet: z.number().int().nullable(),
+      /** Melee or ranged weapon (the Weapons table's band); absent on homebrew that doesn't say. */
+      melee: z.boolean().optional(),
+      /** A Versatile weapon's two-handed die. */
+      versatileDice: z.string().optional(),
       mastery: z.enum(["cleave", "graze", "nick", "push", "sap", "slow", "topple", "vex"]).optional(),
       properties: z.array(slug(40)).max(12).optional()
     })

@@ -586,6 +586,11 @@ export const ItemWeaponSchema = z
     damageType: z.string().min(1).max(40),
     rangeFeet: z.number().int().positive().nullable(),
     longRangeFeet: z.number().int().positive().nullable(),
+    /** The Weapons table's band, copied from the catalog: a thrown Dagger is a melee weapon, a Dart a ranged one.
+     *  Absent = read from the range and Thrown, as before the band was recorded. */
+    melee: z.boolean().optional(),
+    /** A Versatile weapon's two-handed die ("1d10" for a Longsword), copied from the catalog. */
+    versatileDice: z.string().min(1).max(20).optional(),
     /** SRD weapon property slugs ("finesse", "thrown", ...), open for homebrew. Absent = not recorded; an empty array = no properties. */
     properties: z
       .array(

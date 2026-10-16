@@ -51,6 +51,8 @@ describe("rule families", () => {
       ["attack.cleave-needs-hit", "economy"],
       // A Loading weapon fires once per action: what this action has already done.
       ["attack.loading", "economy"],
+      // What the character's hands are holding, like what the action has already done.
+      ["attack.two-handed", "economy"],
       ["feature.no-uses-remaining", "resources"],
       ["feature.requires-effect", "resources"],
       ["feature.no-spell-slot", "resources"],

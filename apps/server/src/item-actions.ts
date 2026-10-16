@@ -2,6 +2,7 @@ import type { FeatureAction, FeatureSaveDc, FeatureUses, ItemSpellCast, SpellRef
 import {
   abilityModifier,
   formulaPlus,
+  isMeleeWeapon,
   isMonkWeapon,
   weaponAbilityModifierFrom,
   type RiderAbility
@@ -210,7 +211,7 @@ export function spellCastMechanics(
 function martialArtsSwing(item: InventoryItem, definition: ActorDefinition, martialArtsInForce: boolean) {
   const weapon = item.weapon;
   if (!martialArtsInForce || !weapon || !definition.character?.martialArts) return null;
-  return isMonkWeapon(weapon.category, weapon.properties ?? [], weapon.rangeFeet)
+  return isMonkWeapon(weapon.category, weapon.properties ?? [], weapon.rangeFeet, weapon.melee)
     ? definition.character.martialArts
     : null;
 }
@@ -277,19 +278,27 @@ export function weaponAction(
 /** A weapon's attack action, with the dice and ability modifier its damage was built from. */
 export type WeaponSwing = Readonly<{ action: ActorAction; dice: string; modifier: number }>;
 
+/** The id suffix of a Versatile weapon's two-handed attack. */
+export const TWO_HANDED_SUFFIX = "two-handed";
+
+/** `twoHanded` mints a Versatile weapon's two-handed attack (its own action, `item-<id>-two-handed`), rolling the
+ *  Versatile die; null when the weapon has none. */
 export function weaponSwing(
   item: InventoryItem,
   definition: ActorDefinition | undefined,
   grantedWeapons: readonly string[] = [],
-  martialArtsInForce = false
+  martialArtsInForce = false,
+  options: Readonly<{ twoHanded?: boolean }> = {}
 ): WeaponSwing | null {
   const weapon = item.weapon;
   if (!weapon || !definition) return null;
+  if (options.twoHanded && !weapon.versatileDice) return null;
   const properties = weapon.properties ?? [];
   const modifier = weaponAbilityModifier(item, definition, martialArtsInForce);
+  const weaponDice = options.twoHanded ? weapon.versatileDice! : weapon.damageDice;
   // Martial Arts: the Monk may roll its die in place of the weapon's, so the bigger one is rolled.
   const martialArts = martialArtsSwing(item, definition, martialArtsInForce);
-  const dice = martialArts ? biggerDie(weapon.damageDice, martialArts.die) : weapon.damageDice;
+  const dice = martialArts ? biggerDie(weaponDice, martialArts.die) : weaponDice;
   const trained = definition.proficiencies?.weapons;
   // A bound template row also answers to its base weapon's id for proficiency.
   const ids = item.baseId !== undefined ? [item.id, item.baseId] : [item.id];
@@ -297,13 +306,16 @@ export function weaponSwing(
     trained === undefined || trainingCovers(grantedWeapons, weapon, ids) || trainingCovers(trained, weapon, ids);
   const bonus = modifier + (proficient ? definition.proficiencyBonus : 0);
   const action: ActorAction = {
-    id: itemActionId(item.id),
-    name: item.name,
+    id: itemActionId(item.id, options.twoHanded ? TWO_HANDED_SUFFIX : undefined),
+    name: options.twoHanded ? `${item.name} (two-handed)` : item.name,
     activation: "action",
-    description: `Attack with ${item.name}.`,
+    description: options.twoHanded
+      ? `Attack with ${item.name} in both hands (Versatile).`
+      : `Attack with ${item.name}.`,
     attack: {
       bonus,
-      ...(weapon.rangeFeet === null || properties.includes("thrown")
+      // Only a Melee weapon has a reach: a Dart thrown at an adjacent creature is still a ranged attack.
+      ...(isMeleeWeapon(properties, weapon.rangeFeet, weapon.melee)
         ? { reachFeet: properties.includes("reach") ? 10 : 5 }
         : {}),
       ...(weapon.rangeFeet !== null

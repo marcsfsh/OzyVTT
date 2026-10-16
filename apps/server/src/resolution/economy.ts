@@ -1,9 +1,10 @@
 import type { GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
+import { effectiveSlot } from "@vtt/rules-5e";
 import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
 import { hasEffectTag } from "../effects.js";
 import { RulesBlockedError } from "../game-store.js";
-import { isItemActionId, itemActionRest } from "../item-actions.js";
+import { isItemActionId, itemActionRest, TWO_HANDED_SUFFIX } from "../item-actions.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import {
   effectiveModeFor,
@@ -102,6 +103,7 @@ export function evaluateActionEconomy(
   checkAbleToAct(evaluation);
   checkExtraAttackOpened(evaluation);
   checkLoading(evaluation);
+  checkHands(evaluation);
   const spendUse = checkLimitedUse(evaluation);
   const slots = checkActionSlots(evaluation);
   const spendLegendary = checkLegendary(evaluation, definition);
@@ -166,11 +168,39 @@ function checkExtraAttackOpened({ state, attacker, action, violations }: Evaluat
     });
 }
 
-/** The inventory row a weapon swing is made with (`item-<id>`), or null for any other action. */
+/** The inventory row a weapon swing is made with (`item-<id>`, or a Versatile weapon's `item-<id>-two-handed`), or
+ *  null for any other action. */
 function swingItemOf(attacker: LiveActor, action: DefinitionAction) {
   if (!isItemActionId(action.id)) return null;
   const rest = itemActionRest(action.id);
-  return attacker.inventory.find((item) => item.id === rest && item.weapon !== undefined) ?? null;
+  return (
+    attacker.inventory.find(
+      (item) => item.weapon !== undefined && (item.id === rest || `${item.id}-${TWO_HANDED_SUFFIX}` === rest)
+    ) ?? null
+  );
+}
+
+/** SRD: a Two-Handed weapon "requires two hands when you attack with it", and a Shield is strapped to one arm. Read
+ *  from the row, since a magic shield's slot travels on its marker. The Lance's "unless mounted" is the GM's call. */
+function checkHands({ attacker, action, violations }: Evaluation): void {
+  const item = swingItemOf(attacker, action);
+  if (!item) return;
+  const twoHands =
+    item.weapon?.properties?.includes("two-handed") === true ||
+    itemActionRest(action.id) === `${item.id}-${TWO_HANDED_SUFFIX}`;
+  if (!twoHands) return;
+  const shield = attacker.inventory.find(
+    (entry) =>
+      entry.equipped &&
+      entry.quantity > 0 &&
+      entry.armor !== undefined &&
+      effectiveSlot({ slot: entry.magic?.slot, category: entry.category }) === "shield"
+  );
+  if (shield)
+    violations.push({
+      rule: "attack.two-handed",
+      message: `${item.name} needs two hands, and ${attacker.name} has ${shield.name} on one arm. Unequip the shield first.`
+    });
 }
 
 /** SRD Loading: "You can fire only one piece of ammunition from a Loading weapon when you use an action ... to fire

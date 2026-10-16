@@ -4,6 +4,7 @@
   "name": "Battleaxe",
   "category": "martial",
   "melee": true,
+  "versatileDice": "1d10",
   "improvised": false,
   "mastery": "topple",
   "properties": [
@@ -348,6 +349,7 @@
   "name": "Longsword",
   "category": "martial",
   "melee": true,
+  "versatileDice": "1d10",
   "improvised": false,
   "mastery": "sap",
   "properties": [
@@ -469,6 +471,7 @@
   "name": "Quarterstaff",
   "category": "simple",
   "melee": true,
+  "versatileDice": "1d8",
   "improvised": false,
   "mastery": "topple",
   "properties": [
@@ -591,6 +594,7 @@
   "name": "Spear",
   "category": "simple",
   "melee": true,
+  "versatileDice": "1d8",
   "improvised": false,
   "mastery": "sap",
   "properties": [
@@ -609,6 +613,7 @@
   "name": "Trident",
   "category": "martial",
   "melee": true,
+  "versatileDice": "1d10",
   "improvised": false,
   "mastery": "topple",
   "properties": [
@@ -627,6 +632,7 @@
   "name": "War Pick",
   "category": "martial",
   "melee": true,
+  "versatileDice": "1d10",
   "improvised": false,
   "mastery": "sap",
   "properties": [
@@ -644,6 +650,7 @@
   "name": "Warhammer",
   "category": "martial",
   "melee": true,
+  "versatileDice": "1d10",
   "improvised": false,
   "mastery": "push",
   "properties": [

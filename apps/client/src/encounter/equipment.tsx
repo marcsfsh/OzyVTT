@@ -52,7 +52,8 @@ export function useEquipmentReference(): Readonly<{
  * The catalog's weapon block, narrowed to what an inventory row may carry. `ItemWeaponSchema` is
  * `.strict()` and has no `mastery` (masteries resolve by item id once unlocked), so spreading the
  * browse summary's block makes `character.set-inventory` refuse every SRD weapon. `properties` must
- * be carried: `weaponPropertiesOf` reads it off the inventory row (Finesse, Reach).
+ * be carried: `weaponPropertiesOf` reads it off the inventory row (Finesse, Reach), as the swing reads the
+ * melee band and the Versatile die.
  * Exported for `catalog-add.mirror.test.ts`.
  */
 export function inventoryWeaponFrom(weapon: NonNullable<ContentEquipmentSummary["weapon"]>) {
@@ -62,6 +63,8 @@ export function inventoryWeaponFrom(weapon: NonNullable<ContentEquipmentSummary[
     damageType: weapon.damageType,
     rangeFeet: weapon.rangeFeet,
     longRangeFeet: weapon.longRangeFeet,
+    ...(weapon.melee !== undefined ? { melee: weapon.melee } : {}),
+    ...(weapon.versatileDice !== undefined ? { versatileDice: weapon.versatileDice } : {}),
     ...(weapon.properties ? { properties: [...weapon.properties] } : {})
   };
 }

@@ -28,15 +28,28 @@ export function weaponAbilityModifierFrom(
   return properties.includes("finesse") ? Math.max(str, dex) : ranged ? dex : str;
 }
 
+/** Whether a weapon is a Melee weapon (SRD Weapons table): the recorded band when there is one, else no range or
+ *  the Thrown property. A thrown Dagger is melee; a Dart, a ranged weapon with Thrown, is not. */
+export function isMeleeWeapon(
+  properties: readonly string[],
+  rangeFeet: number | null | undefined,
+  melee?: boolean
+): boolean {
+  return melee ?? (rangeFeet === null || rangeFeet === undefined || properties.includes("thrown"));
+}
+
 /** SRD Monk weapon: a Simple melee weapon, or a Martial melee weapon with the Light property. A thrown weapon
  *  (Dagger, Handaxe) is still a melee weapon. */
 export function isMonkWeapon(
   category: string,
   properties: readonly string[],
-  rangeFeet: number | null | undefined
+  rangeFeet: number | null | undefined,
+  melee?: boolean
 ): boolean {
-  const melee = rangeFeet === null || rangeFeet === undefined || properties.includes("thrown");
-  return melee && (category === "simple" || (category === "martial" && properties.includes("light")));
+  return (
+    isMeleeWeapon(properties, rangeFeet, melee) &&
+    (category === "simple" || (category === "martial" && properties.includes("light")))
+  );
 }
 
 /** SRD proficiency bonus by total level: +2 at 1-4, +1 every 4 levels to +6 at 17-20. Clamps level to 1-20. */

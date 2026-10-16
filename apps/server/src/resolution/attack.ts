@@ -44,7 +44,9 @@ function attackKindsOf(ctx: ResolveContext, distance: number | null): AttackKind
     const ranged = attack.rangeFeet !== undefined;
     if (attackUsedAsRanged(attack, distance)) kinds.add("ranged");
     else if (melee) kinds.add("melee");
-    if (melee && ranged) kinds.add("thrown");
+    // A Dart is a ranged weapon with Thrown: it has no reach, and is still thrown.
+    const thrownWeapon = weaponPropertiesOf(ctx.riderItemId, ctx.attacker.inventory).includes("thrown");
+    if ((melee && ranged) || (ranged && thrownWeapon)) kinds.add("thrown");
     if (action.spellId !== undefined) kinds.add("spell");
   }
   // Matched by id so a Monk's own strike (which shadows the builtin) still counts as unarmed.

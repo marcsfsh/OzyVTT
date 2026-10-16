@@ -12,6 +12,7 @@ import {
   collectRiders,
   effectiveSlot,
   gatePasses,
+  isMeleeWeapon,
   sumRiders,
   type RiderAbility,
   type RiderCarrier,
@@ -383,12 +384,26 @@ export function deriveEquipment(
     .filter((entry) => entry.item.weapon?.properties?.includes("light"))
     .reduce((count, entry) => count + Math.max(1, entry.item.quantity), 0);
   const twoWeaponFighting = (definition?.character?.feats ?? []).some((feat) => feat.id === "two-weapon-fighting");
-  for (const entry of equipped) {
+  // A Shield is strapped to one arm, so a Versatile weapon can't take its two-handed grip beside it.
+  const shieldInHand = equipped.some(
+    (entry) => entry.item.armor !== undefined && effectiveSlot(slotView(entry)) === "shield"
+  );
+  for (const equippedEntry of equipped) {
+    const entry = { ...equippedEntry, item: withCatalogWeaponFacts(equippedEntry, catalog!) };
     const swing = weaponSwing(entry.item, definition, weaponProficiencies, martialArtsInForce);
     if (!swing) continue;
     const weaponAttack = swing.action;
     actions.push(weaponAttack);
     weaponActionIds.push(weaponAttack.id);
+    const twoHanded = shieldInHand
+      ? null
+      : weaponSwing(entry.item, definition, weaponProficiencies, martialArtsInForce, { twoHanded: true });
+    if (twoHanded) {
+      actions.push(twoHanded.action);
+      weaponActionIds.push(twoHanded.action.id);
+    }
+    const heavy = heavyWeaponCarrier(entry.item, definition);
+    if (heavy) carriers.push(heavy);
     // A template row bound via `baseId` is that base weapon, so it carries the base's mastery and a pick
     // on that weapon kind covers it (SRD picks are per weapon kind).
     const baseRecord = entry.item.baseId !== undefined ? catalog!.equipmentRecord(entry.item.baseId) : undefined;
@@ -401,6 +416,7 @@ export function deriveEquipment(
         ? { id: mastery, abilityModifier: weaponAbilityModifier(entry.item, definition, martialArtsInForce) }
         : null;
     if (inForce) masteryByActionId[weaponAttack.id] = inForce;
+    if (inForce && twoHanded) masteryByActionId[twoHanded.action.id] = inForce;
     // The extra attacks the weapon can make beside its own (not Extra Attack's to multiply, so not weapon swings
     // for `weaponActionIds`). The Light one carries the weapon's mastery; Cleave's is the mastery itself.
     if (entry.item.weapon?.properties?.includes("light") && lightWeaponsInHand >= 2) {
@@ -449,6 +465,52 @@ export function deriveEquipment(
     weaponActionIds,
     masteryByActionId,
     sources
+  };
+}
+
+/** A weapon row with the catalog's melee band and Versatile die filled in, for rows stored before the row carried
+ *  them (a bound template reads its base's). The row's own values win. */
+function withCatalogWeaponFacts(entry: ActiveItem, catalog: EquipmentCatalog): InventoryItem {
+  const weapon = entry.item.weapon;
+  if (!weapon) return entry.item;
+  const versatile = weapon.properties?.includes("versatile") === true;
+  if (weapon.melee !== undefined && (weapon.versatileDice !== undefined || !versatile)) return entry.item;
+  const stats =
+    entry.record?.weapon ??
+    (entry.item.baseId !== undefined ? catalog.equipmentRecord(entry.item.baseId)?.weapon : undefined);
+  if (!stats) return entry.item;
+  return {
+    ...entry.item,
+    weapon: {
+      ...weapon,
+      ...(weapon.melee === undefined && stats.melee !== undefined ? { melee: stats.melee } : {}),
+      ...(weapon.versatileDice === undefined && versatile && stats.versatileDice
+        ? { versatileDice: stats.versatileDice }
+        : {})
+    }
+  };
+}
+
+/** SRD Heavy: Disadvantage on attack rolls with a Heavy Melee weapon below Strength 13, or a Heavy Ranged weapon
+ *  below Dexterity 13. A carrier scoped to this weapon, so it rides the attack roll's roll-mode claims. */
+function heavyWeaponCarrier(item: InventoryItem, definition: ActorDefinition | undefined): RiderCarrier | null {
+  const weapon = item.weapon;
+  if (!weapon?.properties?.includes("heavy") || !definition) return null;
+  const melee = isMeleeWeapon(weapon.properties, weapon.rangeFeet, weapon.melee);
+  if (definition.abilityScores[melee ? "str" : "dex"] >= 13) return null;
+  return {
+    label: `${item.name} is Heavy (${melee ? "Strength" : "Dexterity"} under 13)`,
+    sourceItemId: item.id,
+    isWeapon: true,
+    modifiers: [
+      {
+        type: "roll-mode",
+        roll: "attack",
+        mode: "disadvantage",
+        scope: "this-item",
+        when: [{ type: "on-attack-roll" }]
+      }
+    ]
   };
 }
 

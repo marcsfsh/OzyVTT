@@ -148,6 +148,8 @@ export const WeaponReferenceSchema = z.object({
   category: z.enum(["simple", "martial"]),
   /** The Weapons table's melee/ranged band (a thrown Dagger is melee, a Dart is not). Absent = not recorded. */
   melee: z.boolean().optional(),
+  /** The die a Versatile weapon deals used with two hands (`Versatile (1d10)`); absent on other weapons. */
+  versatileDice: z.string().min(1).max(20).optional(),
   improvised: z.boolean(),
   damage: z.object({ dice: z.string().min(1).max(20), type: z.string().min(1).max(40) }),
   rangeFeet: z.number().int().positive().nullable(),
@@ -234,6 +236,10 @@ const EquipmentWeaponStatsSchema = z.object({
   damageType: z.string().max(40),
   rangeFeet: z.number().int().positive().nullable(),
   longRangeFeet: z.number().int().positive().nullable(),
+  /** The Weapons table's band: a thrown Dagger is melee, a Dart is ranged. Absent = read from range and Thrown. */
+  melee: z.boolean().optional(),
+  /** A Versatile weapon's two-handed damage die. */
+  versatileDice: z.string().max(20).optional(),
   /** Optional here: gear and homebrew rows map through this shape and have no mastery. */
   mastery: z.enum(["cleave", "graze", "nick", "push", "sap", "slow", "topple", "vex"]).optional(),
   /** Copied onto the inventory row, where `weaponPropertiesOf` reads it. */

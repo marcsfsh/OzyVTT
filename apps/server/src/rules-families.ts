@@ -24,6 +24,8 @@ const RULE_FAMILIES = {
   "attack.cleave-needs-hit": "economy",
   // A Loading weapon fires once per action, however many attacks the action allows.
   "attack.loading": "economy",
+  // A Two-Handed weapon can't swing while a Shield takes one hand.
+  "attack.two-handed": "economy",
   // ...while "no legendary actions left this round" is a spent resource, like limited uses.
   "legendary.no-actions-remaining": "resources",
   "feature.no-uses-remaining": "resources",

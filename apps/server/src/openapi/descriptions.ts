@@ -293,10 +293,14 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   },
   EquipmentWeapon: {
     longRangeFeet: "Attacks past `rangeFeet` up to this roll at disadvantage",
+    melee:
+      "The SRD Weapons table's band: true for a melee weapon (a thrown Dagger), false for a ranged one (a Dart). Only a melee weapon gets a melee reach. Absent reads the band from the range and the Thrown property",
+    versatileDice:
+      'A Versatile weapon\'s damage die with two hands ("1d10" for a Longsword). The sheet offers the two-handed attack while no Shield is equipped',
     mastery:
       "The SRD weapon-mastery property, if this weapon has one. Optional: a homebrew weapon may have none, and a mastery does nothing until a character unlocks THIS weapon through Weapon Mastery.",
     properties:
-      "The weapon's property slugs. The engine reads three of them off the character's inventory row: `finesse` makes the swing take the better of Strength and Dexterity, `thrown` keeps a ranged weapon on a melee reach, and `reach` makes it 10 feet instead of 5; the rest narrow a `weapon-property-is` rider. Open slugs, unlike `mastery`, so a homebrew property is expressible - but only the nine SRD ones have readers, and an unknown slug is inert rather than an error. Omit to record nothing; an empty array says the weapon has none."
+      "The weapon's property slugs. The engine reads three of them off the character's inventory row: `finesse` makes the swing take the better of Strength and Dexterity, `thrown` lets a melee weapon be thrown at range, and `reach` makes its reach 10 feet instead of 5; the rest narrow a `weapon-property-is` rider. Open slugs, unlike `mastery`, so a homebrew property is expressible - but only the nine SRD ones have readers, and an unknown slug is inert rather than an error. Omit to record nothing; an empty array says the weapon has none."
   },
   EquipmentArmor: {
     "": "Body armor carries its full base AC (11-18); a shield carries its +2 bonus."
