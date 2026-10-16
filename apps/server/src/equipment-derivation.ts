@@ -6,7 +6,7 @@ import type {
   FeatureRecord,
   SpellReference
 } from "@vtt/content-srd-5.2.1";
-import type { ActorAction, ActorDefinition, InventoryItem, Modifier } from "@vtt/schemas";
+import { catalogIdOf, type ActorAction, type ActorDefinition, type InventoryItem, type Modifier } from "@vtt/schemas";
 import {
   armorWeightOf,
   collectRiders,
@@ -375,7 +375,7 @@ export function deriveEquipment(
   const active: ActiveItem[] = [];
   for (const item of catalog ? actor.inventory : []) {
     if (item.quantity <= 0 || !item.equipped) continue;
-    const record = catalog!.equipmentRecord(item.id);
+    const record = catalog!.equipmentRecord(catalogIdOf(item));
     const entry = { item, record };
     equipped.push(entry);
     if (itemIsActive(item, record)) active.push(entry);
@@ -510,7 +510,7 @@ export function deriveEquipment(
     const baseRecord = entry.item.baseId !== undefined ? catalog!.equipmentRecord(entry.item.baseId) : undefined;
     const mastery = entry.record?.weapon?.mastery ?? baseRecord?.weapon?.mastery;
     const unlockedHere =
-      unlocked.has(entry.item.id) || (entry.item.baseId !== undefined && unlocked.has(entry.item.baseId));
+      unlocked.has(catalogIdOf(entry.item)) || (entry.item.baseId !== undefined && unlocked.has(entry.item.baseId));
     // The weapon has a mastery, the bearer unlocked this weapon, and the engine implements it.
     const inForce: MasteryInForce | null =
       mastery && unlockedHere && masteryReaches(mastery)
@@ -711,7 +711,7 @@ export function withResolvedSlots(
 ): readonly (InventoryItem & { slot?: string })[] {
   if (!catalog) return inventory;
   return inventory.map((item) => {
-    const slot = catalog.equipmentRecord(item.id)?.slot ?? item.magic?.slot;
+    const slot = catalog.equipmentRecord(catalogIdOf(item))?.slot ?? item.magic?.slot;
     return slot === undefined ? item : { ...item, slot };
   });
 }

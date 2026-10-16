@@ -220,8 +220,8 @@ export function BindItemModal({
  * sheet gates it).
  *
  * A template item with a real choice inserts one step: the same window lists the eligible bases and
- * the add completes with the pick. A single-base template never asks (the server auto-binds), and
- * re-adding an owned template grows the stack, keeping its pick.
+ * the add completes with the pick. A single-base template never asks (the server auto-binds). A copy on
+ * the same base grows the stack; on another base it becomes its own row.
  */
 export function EquipmentPicker({
   ownedCounts,
@@ -249,10 +249,8 @@ export function EquipmentPicker({
   }, [catalog, query, active]);
 
   const startAdd = (item: ContentEquipmentSummary) => {
-    const owned = (ownedCounts.get(item.id) ?? 0) > 0;
-    // Only for a real choice on a new row: an owned template already has its pick (rows are keyed by
-    // item id), and re-adding just grows the stack.
-    if (!owned && item.appliesTo && item.appliesTo.baseIds.length > 1) {
+    // A real choice asks every time: another copy may be another base (a +1 longsword, then a +1 dagger).
+    if (item.appliesTo && item.appliesTo.baseIds.length > 1) {
       setQuery("");
       setChoosing(item);
       return;

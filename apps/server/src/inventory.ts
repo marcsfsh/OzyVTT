@@ -1,5 +1,5 @@
 import type { Actor, GameState } from "@vtt/domain";
-import type { ActorDefinition, Currency, InventoryItem } from "@vtt/schemas";
+import { catalogIdOf, type ActorDefinition, type Currency, type InventoryItem } from "@vtt/schemas";
 import { effectiveSlot } from "@vtt/rules-5e";
 import { spellSlotMaxima, storedArmorClass } from "./actor-roster.js";
 import { deriveEquipment, itemIsActive, type EquipmentCatalog } from "./equipment-derivation.js";
@@ -69,7 +69,7 @@ const maxOf = (definition: ActorDefinition, level: number) =>
 /** Whether an attuned row takes one of the bearer's attunement slots: a catalog item only when it needs attunement (a
  *  mundane dagger marked attuned takes none); a row the catalog doesn't know always does. */
 function needsAttunement(item: InventoryItem, deps: InventoryDeps): boolean {
-  const record = deps.catalog?.equipmentRecord(item.id);
+  const record = deps.catalog?.equipmentRecord(catalogIdOf(item));
   return record ? record.attunement?.required === true : true;
 }
 
@@ -102,7 +102,7 @@ function enforceEquipRules(
   }
   if (!incoming.equipped || incoming.quantity <= 0 || !deps.catalog) return;
   const slot = effectiveSlot({
-    slot: deps.catalog.equipmentRecord(incoming.id)?.slot ?? incoming.magic?.slot,
+    slot: deps.catalog.equipmentRecord(catalogIdOf(incoming))?.slot ?? incoming.magic?.slot,
     category: incoming.category
   });
   const capacity = SLOT_CAPACITY[slot];
@@ -112,7 +112,7 @@ function enforceEquipRules(
       entry.equipped &&
       entry.quantity > 0 &&
       effectiveSlot({
-        slot: deps.catalog!.equipmentRecord(entry.id)?.slot ?? entry.magic?.slot,
+        slot: deps.catalog!.equipmentRecord(catalogIdOf(entry))?.slot ?? entry.magic?.slot,
         category: entry.category
       }) === slot
   );
@@ -129,7 +129,7 @@ function enforceEquipRules(
 function enforceCurse(actor: Actor, incoming: InventoryItem, deps: InventoryDeps): void {
   if (deps.role === "gm" || !deps.catalog) return;
   const existing = actor.inventory.find((entry) => entry.id === incoming.id);
-  if (!existing?.attuned || deps.catalog.equipmentRecord(incoming.id)?.cursed !== true) return;
+  if (!existing?.attuned || deps.catalog.equipmentRecord(catalogIdOf(incoming))?.cursed !== true) return;
   const releasing = incoming.quantity <= 0 || !incoming.attuned || !incoming.equipped;
   if (releasing) throw new CommandRejectedError(`${existing.name} will not come off. Ask the GM.`);
 }
@@ -152,7 +152,7 @@ export function bindTemplateItem(item: InventoryItem, deps: InventoryDeps, store
  *  record clears any marker. Only what the item's printed type line already says (magic, needs attunement, where it
  *  is worn), never a rider. A row the catalog doesn't know keeps what it was sent. */
 function withMagicMarker(item: InventoryItem, deps: InventoryDeps): InventoryItem {
-  const record = deps.catalog?.equipmentRecord(item.id);
+  const record = deps.catalog?.equipmentRecord(catalogIdOf(item));
   if (!record) return item;
   const { magic: _sent, ...rest } = item;
   const attunementRequired = record.attunement?.required === true;
@@ -164,7 +164,7 @@ function withMagicMarker(item: InventoryItem, deps: InventoryDeps): InventoryIte
 }
 
 function bindTemplateStats(item: InventoryItem, deps: InventoryDeps, stored?: InventoryItem): InventoryItem {
-  const record = deps.catalog?.equipmentRecord(item.id);
+  const record = deps.catalog?.equipmentRecord(catalogIdOf(item));
   const appliesTo = record?.appliesTo;
   if (!record || !appliesTo) {
     // A non-template row never carries a baseId (it would self-grant proficiency and mastery). Its stats
@@ -267,6 +267,11 @@ export function setInventoryItem(
 ): void {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+  // A row naming itself as its own record is the plain form.
+  if (item.recordId === item.id) {
+    const { recordId: _same, ...plain } = item;
+    item = plain;
+  }
   // A removal never binds, so a row whose base left the catalog can still be removed.
   if (item.quantity > 0)
     item = bindTemplateItem(

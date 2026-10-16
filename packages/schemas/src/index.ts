@@ -647,6 +647,13 @@ export const InventoryItemSchema = z
       .regex(/^[a-z0-9-]+$/)
       .max(40)
       .optional(),
+    /** The catalog record this row is a copy of, when the row's own id can't be it: a second Weapon, +1 bound to
+     *  another base is its own row (`weapon-1-2`) with `recordId: "weapon-1"`. Absent means the id is the record. */
+    recordId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional(),
     /** The base a template magic item is bound to ("dwarven-thrower" -> "warhammer"). The server validates it and
      * overwrites `weapon`/`armor` with the base's stats; weapon stats are never trusted from a client. */
     baseId: z
@@ -661,6 +668,11 @@ export const InventoryItemSchema = z
   })
   .strict();
 export type InventoryItem = z.infer<typeof InventoryItemSchema>;
+
+/** The catalog id an inventory row is a copy of: its `recordId`, else its own id. Every catalog lookup reads this. */
+export function catalogIdOf(item: Readonly<{ id: string; recordId?: string | undefined }>): string {
+  return item.recordId ?? item.id;
+}
 export const CurrencySchema = z
   .object({
     cp: z.number().int().min(0).max(1_000_000).default(0),

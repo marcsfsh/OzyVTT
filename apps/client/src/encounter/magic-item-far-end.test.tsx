@@ -245,7 +245,7 @@ describe("the base chooser", () => {
     expect(added).toEqual([{ id: "weapon-1", baseId: "dagger" }]);
   });
 
-  it("a single-base template never asks, and an owned template re-adds without re-asking", async () => {
+  it("a single-base template never asks, and an owned choice template asks again for the new copy", async () => {
     serveCatalog();
     const added: Array<{ id: string; baseId?: string }> = [];
     const picker = render(
@@ -263,7 +263,7 @@ describe("the base chooser", () => {
     expect(added).toEqual([{ id: "dwarven-thrower" }]);
     picker.unmount();
 
-    // An owned template grows its stack, keeping its pick; the chooser must not reopen.
+    // Another copy may be another base (a +1 longsword beside a +1 dagger), so the chooser opens again.
     render(
       <EquipmentPicker
         ownedCounts={new Map([["weapon-1", 1]])}
@@ -274,7 +274,9 @@ describe("the base chooser", () => {
     );
     await user.type(await screen.findByRole("searchbox", { name: "Search equipment" }), "Weapon, +1");
     await user.click(screen.getByRole("button", { name: "Add Weapon, +1" }));
-    expect(added).toEqual([{ id: "dwarven-thrower" }, { id: "weapon-1" }]);
+    expect(added).toEqual([{ id: "dwarven-thrower" }]);
+    await user.click(screen.getByRole("button", { name: "Make it a Longsword" }));
+    expect(added).toEqual([{ id: "dwarven-thrower" }, { id: "weapon-1", baseId: "longsword" }]);
   });
 });
 
@@ -316,7 +318,7 @@ describe("the wire seam - the real sheet ships the pick", () => {
     expect((emit!.payload.item as Record<string, unknown>).weapon).toBeUndefined();
   });
 
-  it("a re-add of a bound row keeps its stored pick on the wire, chooser skipped", async () => {
+  it("a copy on the same base grows the stack; on another base it is its own row of the same record", async () => {
     const emits = captureEmits();
     const bound = {
       id: "weapon-1",
@@ -341,10 +343,17 @@ describe("the wire seam - the real sheet ships the pick", () => {
     await user.click(await screen.findByRole("button", { name: "Browse SRD gear" }));
     await user.type(await screen.findByRole("searchbox", { name: "Search equipment" }), "Weapon, +1");
     await user.click(screen.getByRole("button", { name: "Add Weapon, +1" }));
+    await user.click(await screen.findByRole("button", { name: "Make it a Dagger" }));
+    const sent = () =>
+      emits.filter((entry) => entry.event === "character:set-inventory").map((entry) => entry.payload.item);
+    expect(sent()[0]).toMatchObject({ id: "weapon-1", baseId: "dagger", quantity: 2 });
+    expect((sent()[0] as Record<string, unknown>).recordId).toBeUndefined();
 
-    // No chooser: the emit went straight out, quantity 2, with the stored pick.
-    const emit = emits.find((entry) => entry.event === "character:set-inventory");
-    expect(emit!.payload.item).toMatchObject({ id: "weapon-1", baseId: "dagger", quantity: 2 });
+    await user.click(await screen.findByRole("button", { name: "Browse SRD gear" }));
+    await user.type(await screen.findByRole("searchbox", { name: "Search equipment" }), "Weapon, +1");
+    await user.click(screen.getByRole("button", { name: "Add Weapon, +1" }));
+    await user.click(await screen.findByRole("button", { name: "Make it a Longsword" }));
+    expect(sent()[1]).toMatchObject({ id: "weapon-1-2", recordId: "weapon-1", baseId: "longsword", quantity: 1 });
   });
 
   it("an unbound legacy row shows its base chooser, and the bind rides the row it already is", async () => {

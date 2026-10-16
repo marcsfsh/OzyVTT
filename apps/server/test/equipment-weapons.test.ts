@@ -6,6 +6,7 @@ import {
   actionOf,
   catalog,
   catalogRow,
+  edit,
   fight,
   fighterInput,
   IDS,
@@ -199,5 +200,27 @@ describe("Slow, Vex and Sap", () => {
     expect(claw([15, 3, 4]).rollMode?.disadvantage).toEqual(["Sapped by Borin"]);
     expect(tags(table)).not.toContain("sap");
     expect(claw([16, 4]).rollMode).toBeUndefined();
+  });
+});
+
+describe("two copies of one magic item", () => {
+  it("holds a +1 longsword and a +1 dagger as two rows of the same record", () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput() });
+    write(table, IDS.fighter, catalogRow("weapon-1", { baseId: "longsword" }));
+    write(table, IDS.fighter, catalogRow("weapon-1", { id: "weapon-1-2", recordId: "weapon-1", baseId: "dagger" }));
+    const fighter = table.actor(IDS.fighter);
+    expect(fighter.inventory.filter((item) => item.name === "Weapon, +1").map((item) => item.baseId)).toEqual([
+      "longsword",
+      "dagger"
+    ]);
+    // Str 19 (+4), PB 3 and the +1 on each; each its own base's die.
+    const longsword = actionOf(table, IDS.fighter, "item-weapon-1");
+    const dagger = actionOf(table, IDS.fighter, "item-weapon-1-2");
+    expect([longsword.attack?.bonus, longsword.damage[0].formula]).toEqual([8, "1d8 + 5"]);
+    expect([dagger.attack?.bonus, dagger.damage[0].formula]).toEqual([8, "1d4 + 5"]);
+    // The copy is still that record: unbinding it to another base is a GM call, as for the first.
+    expect(() => write(table, IDS.fighter, edit(table, IDS.fighter, "weapon-1-2", { baseId: "shortsword" }))).toThrow(
+      /already bound/
+    );
   });
 });

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { ContentEquipmentSummary, GmActor, PlayerActor } from "@vtt/domain";
+import { catalogIdOf, type ContentEquipmentSummary, type GmActor, type PlayerActor } from "@vtt/domain";
 import { Badge, Button, IconButton, Stepper, IconX } from "@vtt/ui";
 import { BindItemModal, EquipmentPicker, inventoryWeaponFrom, useEquipmentReference } from "./equipment";
 import { slugify, titleCase } from "./format";
@@ -35,13 +35,24 @@ export function SheetInventory({
   const attunedCount = inventory.filter((item) => item.attuned).length;
   // The server upserts by id, so adding to an existing stack resends the whole item with quantity+1
   // (keeping equipped/attuned); a new pick starts at 1 with the catalog's category, weight and text.
-  const ownedCounts = new Map(inventory.map((item) => [item.id, item.quantity]));
+  const ownedCounts = new Map<string, number>();
+  for (const item of inventory)
+    ownedCounts.set(catalogIdOf(item), (ownedCounts.get(catalogIdOf(item)) ?? 0) + item.quantity);
   const addFromCatalog = (item: ContentEquipmentSummary, baseId?: string) => {
-    const existing = inventory.find((entry) => entry.id === item.id);
+    const copies = inventory.filter((entry) => catalogIdOf(entry) === item.id);
+    // A template copy bound to another base is its own row (a +1 longsword beside a +1 dagger); the same base, or a
+    // row still waiting for its pick, grows the stack.
+    const existing = copies.find(
+      (entry) => !item.appliesTo || baseId === undefined || entry.baseId === undefined || entry.baseId === baseId
+    );
+    const taken = new Set(inventory.map((entry) => entry.id));
+    let rowId = existing?.id ?? item.id;
+    for (let copy = 2; !existing && taken.has(rowId); copy += 1) rowId = `${item.id.slice(0, 76)}-${copy}`;
     void edit("character:set-inventory", {
       actorId: actor.id,
       item: {
-        id: item.id,
+        id: rowId,
+        ...(rowId !== item.id ? { recordId: item.id } : {}),
         name: item.name,
         quantity: (existing?.quantity ?? 0) + 1,
         category: item.category,
@@ -113,7 +124,7 @@ export function SheetInventory({
                   <span className="sheet-item-cat">{item.category.split("-").map(titleCase).join(" ")}</span>
                 ) : null}
                 {(() => {
-                  const summary = equipmentCatalog.find((entry) => entry.id === item.id);
+                  const summary = equipmentCatalog.find((entry) => entry.id === catalogIdOf(item));
                   return !item.baseId && summary?.appliesTo && summary.appliesTo.baseIds.length > 0 ? (
                     <button
                       type="button"
@@ -202,7 +213,7 @@ export function SheetInventory({
       {(() => {
         if (!bindingRowId) return null;
         const rowItem = inventory.find((entry) => entry.id === bindingRowId);
-        const summary = equipmentCatalog.find((entry) => entry.id === bindingRowId);
+        const summary = rowItem ? equipmentCatalog.find((entry) => entry.id === catalogIdOf(rowItem)) : undefined;
         if (!rowItem || !summary) return null;
         // Binding resends the existing row plus the pick; the server validates and copies the base's stats.
         return (

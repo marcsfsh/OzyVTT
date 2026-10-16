@@ -7,7 +7,7 @@ import {
   weaponAbilityModifierFrom,
   type RiderAbility
 } from "@vtt/rules-5e";
-import type { ActorAction, ActorDefinition, InventoryItem } from "@vtt/schemas";
+import { catalogIdOf, type ActorAction, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
 
 /**
  * Actions synthesised from what a character carries: an equipped weapon's swing, an item's declared actions and
@@ -301,7 +301,7 @@ export function weaponSwing(
   const dice = martialArts ? biggerDie(weaponDice, martialArts.die) : weaponDice;
   const trained = definition.proficiencies?.weapons;
   // A bound template row also answers to its base weapon's id for proficiency.
-  const ids = item.baseId !== undefined ? [item.id, item.baseId] : [item.id];
+  const ids = item.baseId !== undefined ? [catalogIdOf(item), item.baseId] : [catalogIdOf(item)];
   const proficient =
     trained === undefined || trainingCovers(grantedWeapons, weapon, ids) || trainingCovers(trained, weapon, ids);
   const bonus = modifier + (proficient ? definition.proficiencyBonus : 0);
