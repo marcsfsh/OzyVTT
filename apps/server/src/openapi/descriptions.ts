@@ -30,6 +30,11 @@ const SPELL_LIST = "The spell list this class draws from - an open slug matched 
 const STARTING_EQUIPMENT =
   "Starting-equipment bundles with their items and the \"or take N gp\" alternative; the chosen option's id is recorded in the character's choice ledger";
 
+// Prose the table reads share.
+const DEFENCE_TYPE = 'A damage type, e.g. "fire"';
+const DEFENCE_SOURCE = "The feature, item or effect that grants it; null for the stat block itself";
+const MAP_FOLDER = "The map library folder this map is filed under; null when it is unfiled.";
+
 /** Prose for the generated components, keyed by component and then by path: "" is the component itself, "a.b" a
  *  nested property and "a[]" an array's items. A path that no longer exists fails the document build. */
 export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
@@ -1423,5 +1428,57 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   ContentNamesData: {
     "names[].pools": "Ordered by the data, never by a hardcoded client list",
     "names[].pools[].label": 'What this pool is ("Masculine", "Family", "Clan")'
+  },
+  ActorAvailableActionsData: {
+    derived:
+      "DISPLAY ONLY, and the sheet's single source for every number beside a roll button. Derived from the actor's LIVE loadout with the same functions the resolver uses, so a chip cannot disagree with the roll it starts - a circlet's granted expertise and an amulet's save bonus are already inside these numbers. Present on every response; a client should still tolerate its absence so it can talk to an older server. It rides this REQUEST rather than the broadcast game-state projection on purpose: this endpoint already authorizes its caller for one named actor, so the block is never even computed for an actor the caller may not see.",
+    "derived.armorClass": "Live AC, already reconciled against worn armour and item riders",
+    "derived.initiative": "Live initiative bonus including item riders",
+    "derived.abilities[].check": "Ability-check bonus INCLUDING item check-bonus riders",
+    "derived.abilities[].checkWithProficiency":
+      "The same check plus proficiency, for a GM-called check against no named skill",
+    "derived.abilities[].save": "The save the server will actually roll, minus only per-save cover",
+    "derived.abilities[].saveFromItems": "The equipment share of `save`, so a sheet can say where the bonus came from",
+    "derived.skills[].tier": "The EFFECTIVE tier: the sheet's base tier raised by any item grant",
+    "derived.skills[].bonus": "Null only when the skill names no ability, the one case a sheet cannot roll it",
+    "derived.skills[].sources": 'Item names that raised the tier, e.g. ["Circlet of Shadows"]',
+    "derived.defences":
+      "The damage defences in force outside any one hit, as the damage pipeline applies them: the stat block's, chosen features', items' and effects'. Petrified and underwater resistance are added per hit and are not listed.",
+    "derived.defences.resistances[].type": DEFENCE_TYPE,
+    "derived.defences.resistances[].source": DEFENCE_SOURCE,
+    "derived.defences.immunities[].type": DEFENCE_TYPE,
+    "derived.defences.immunities[].source": DEFENCE_SOURCE,
+    "derived.defences.vulnerabilities[].type": DEFENCE_TYPE,
+    "derived.defences.vulnerabilities[].source": DEFENCE_SOURCE,
+    "derived.spellSaveDcBonus":
+      "What standing spell-save-dc riders (an item, a feat) add to the bearer's spell save DC, and so to every action that uses it. A printed DC is not raised.",
+    "actions[].available": "Whether strict mode would allow resolving this action right now",
+    "actions[].violations[].rule":
+      "Machine-readable rule id, e.g. economy.action-used, feature.requires-effect, condition.incapacitated",
+    "actions[].usesRemaining": "Limited-use spending left; null when the action has no use limit",
+    "actions[].componentsRemaining": "Rolls left in the open compound-action instance; null when no instance applies",
+    "actions[].builtin":
+      "True for the SRD generic actions (Dodge, Dash, Help, Unarmed Strike, ...) every combatant can take",
+    "actions[].description":
+      "DISPLAY ONLY. Every field from here down is read off the actor's EFFECTIVE action list, so it already carries the standing riders of what is equipped and attuned - which is what lets a client render an item-derived action (an amulet's cast, a +1 sword's swing) that is absent from the stat block entirely. None of it is what gets rolled: resolution takes `id` and recomputes through the same function, so a preview cannot disagree with the roll.",
+    "actions[].attackBonus": "To-hit including item riders; null when the action has no attack roll",
+    "actions[].rangeNormalFeet": "Normal range band; shots beyond it up to rangeFeet roll at disadvantage",
+    "actions[].saveDc": "Save DC including item riders",
+    "actions[].usesLimit": "Total limited uses including any item that raised the pool; null when unlimited",
+    "actions[].usesPool": "Shared pool key; actions naming one pool spend one counter"
+  },
+  BuilderOffersData: {
+    "offers[].key": "Stable key the draft's answers are filed under",
+    "offers[].unresolvable": "Why nothing can be picked here yet; such an offer may be left open",
+    "offers[].unavailable": "Option id -> why this build cannot usefully take it (already held, or no proficiency)",
+    picks: "The answers the build still accepts, by offer key",
+    subclassId: "The subclass offer's answer",
+    choices: "The ledger rows these answers make: a create's `choices`"
+  },
+  MapAssetMetadata: {
+    folder: MAP_FOLDER
+  },
+  MapCatalogEntry: {
+    folder: MAP_FOLDER
   }
 };

@@ -27,7 +27,7 @@ import {
 import { InvalidRequestError } from "./invalid-request.js";
 import type { MapAssetMetadata, MapAssetStore } from "./map-assets.js";
 import { deriveMapDistanceScale } from "./map-measurement.js";
-import type { MapCatalogEntry, MapCatalogStore, MapKind } from "./map-catalog.js";
+import type { MapCatalogEntry, MapCatalogStore, MapKind, PublicMapAsset } from "./map-catalog.js";
 
 const MAP_COLLECTION = "/api/v1/map-assets";
 const MAP_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -103,7 +103,7 @@ function mapId(request: Request) {
   return MAP_ID.test(id) ? id : null;
 }
 
-function publicAsset(metadata: MapAssetMetadata, entry: MapCatalogEntry) {
+function publicAsset(metadata: MapAssetMetadata, entry: MapCatalogEntry): PublicMapAsset {
   return {
     id: metadata.id,
     name: entry.name,

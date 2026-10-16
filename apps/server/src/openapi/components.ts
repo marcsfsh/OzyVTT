@@ -3,6 +3,7 @@ import * as contract from "@vtt/api-contract";
 import {
   ActionSchema,
   ActionUsesSchema,
+  CharacterChoiceSchema,
   EffectGrantSchema,
   EffectOnEndSchema,
   ModifierSchema,
@@ -10,6 +11,9 @@ import {
 } from "@vtt/schemas";
 import * as content from "@vtt/content-srd-5.2.1";
 import * as wire from "@vtt/domain";
+import { MapCatalogEntrySchema, PublicMapAssetSchema } from "../map-catalog.js";
+import { ViewerAccessMetadataSchema, ViewerPairingSchema } from "../viewer-access.js";
+import { ViewerConnectionMetadataSchema } from "../viewer-coordinator.js";
 import * as codex from "../codex-requests.js";
 import { DESCRIPTIONS } from "./descriptions.js";
 import { commandBodySchemas, gameCommandDocs, type JsonSchema } from "./game-commands.js";
@@ -188,6 +192,25 @@ const CONTENT_CATALOGS: ReadonlyArray<readonly [string, z.ZodType]> = [
   ["ContentNamesData", catalog("names", wire.ContentNameBundleSchema)]
 ];
 
+/** The viewer, map and builder responses, and the game reads whose rows the domain defines. */
+const TABLE_RESPONSES: ReadonlyArray<readonly [string, z.ZodType]> = [
+  ["ViewerAccess", ViewerAccessMetadataSchema],
+  ["ViewerPairingData", z.strictObject({ pairing: ViewerPairingSchema })],
+  [
+    "ViewerAccessListData",
+    z.strictObject({
+      viewers: z.array(ViewerAccessMetadataSchema),
+      connections: z.array(ViewerConnectionMetadataSchema)
+    })
+  ],
+  ["MapAssetMetadata", PublicMapAssetSchema],
+  ["MapCatalogEntry", MapCatalogEntrySchema],
+  ["ActorAvailableActionsData", wire.AvailableActionsReplySchema],
+  ["BuilderOffersData", wire.BuilderOffersReplySchema],
+  ["BuilderAbilityIncreases", wire.BuilderAbilityIncreasesSchema],
+  ["BuilderChoiceRow", CharacterChoiceSchema]
+];
+
 /** The record body a homebrew type is authored as; a monster's is an ActorDefinition. */
 const recordName = (type: contract.HomebrewContentType) => `Homebrew${pascal(type)}Record`;
 const RECORD_TYPES = contract.HomebrewContentTypeSchema.options;
@@ -261,8 +284,8 @@ function describe(schemas: Record<string, JsonSchema>) {
 
 /**
  * The components generated from Zod schemas: the HTTP contract's shapes, the homebrew authoring vocabulary and
- * record bodies, the Codex write bodies and records, the content catalogs, and each game command's request body, plus
- * the game command operations.
+ * record bodies, the Codex write bodies and records, the content catalogs, the viewer, map and builder responses, and
+ * each game command's request body, plus the game command operations.
  * One registry, so a schema that appears in several places is one `$ref`'d component. Prose comes from
  * `descriptions.ts`.
  */
@@ -279,6 +302,7 @@ export function generatedDocs() {
   for (const [id, schema] of CODEX_BODIES) register(id, schema);
   for (const [id, schema] of CODEX_RESPONSES) register(id, schema);
   for (const [id, schema] of CONTENT_CATALOGS) register(id, schema);
+  for (const [id, schema] of TABLE_RESPONSES) register(id, schema);
   for (const type of RECORD_TYPES) register(recordName(type), content.HOMEBREW_BODY_SCHEMAS[type] as z.ZodType);
   // Commands that share a payload schema (several take only the optional revision) share its generated body.
   const aliases: Array<readonly [string, string]> = [];
@@ -295,6 +319,11 @@ export function generatedDocs() {
     // The contract keeps `HomebrewRecord` an open record so it needn't depend on the content bundle; the
     // document names the nine bodies it can be.
     override: ({ zodSchema, jsonSchema }) => {
+      // A `z.custom` value is typed in TypeScript but documented only as an object.
+      if (zodSchema instanceof z.ZodCustom) {
+        Object.assign(jsonSchema, { type: "object", additionalProperties: true });
+        return;
+      }
       if (zodSchema !== (contract.HomebrewRecordSchema as unknown)) return;
       for (const key of Object.keys(jsonSchema)) delete (jsonSchema as Record<string, unknown>)[key];
       Object.assign(jsonSchema, homebrewRecordUnion());

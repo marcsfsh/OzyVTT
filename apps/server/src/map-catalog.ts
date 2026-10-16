@@ -1,10 +1,12 @@
 import type { DatabaseSync } from "node:sqlite";
+import { z } from "zod";
 import { migrate, openDatabase, type Migration } from "./database.js";
 import { validateSquareGridCalibration, type ImagePoint, type SquareGridCalibration } from "./grid-calibration.js";
 import { validateMapDistanceScale, type MapDistanceScale } from "./map-measurement.js";
 import { InvalidRequestError } from "./invalid-request.js";
 
-export type MapKind = "battlemap" | "regional" | "world";
+const MapKindSchema = z.enum(["battlemap", "regional", "world"]);
+export type MapKind = z.infer<typeof MapKindSchema>;
 
 export type StoredGridCalibration = Readonly<{
   calibration: SquareGridCalibration;
@@ -13,16 +15,37 @@ export type StoredGridCalibration = Readonly<{
   verificationErrorPx: number | null;
 }>;
 
-export type MapCatalogEntry = Readonly<{
-  assetId: string;
-  name: string;
-  kind: MapKind;
-  folder: string | null;
-  calibration: StoredGridCalibration | null;
-  scale: MapDistanceScale | null;
-  createdAt: string;
-  updatedAt: string;
-}>;
+/** A value the document shows only as an object: calibration and scale are versioned with the grid tools. */
+const opaque = <T>() => z.custom<T>((value) => typeof value === "object" && value !== null);
+export const MapCatalogEntrySchema = z.strictObject({
+  assetId: z.uuid(),
+  name: z.string(),
+  kind: MapKindSchema,
+  folder: z.string().nullable(),
+  calibration: opaque<StoredGridCalibration>().nullable(),
+  scale: opaque<MapDistanceScale>().nullable(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime()
+});
+export type MapCatalogEntry = Readonly<z.infer<typeof MapCatalogEntrySchema>>;
+/** A map image as the map routes report it: the stored file's facts, with its catalog entry's name, filing and grid. */
+export const PublicMapAssetSchema = z.strictObject({
+  id: z.uuid(),
+  name: z.string(),
+  kind: MapCatalogEntrySchema.shape.kind,
+  folder: z.string().nullable(),
+  originalName: z.string(),
+  format: z.string(),
+  mediaType: z.string(),
+  width: z.number().int().min(1),
+  height: z.number().int().min(1),
+  byteLength: z.number().int().min(1),
+  importedAt: z.iso.datetime(),
+  calibration: MapCatalogEntrySchema.shape.calibration,
+  scale: MapCatalogEntrySchema.shape.scale,
+  updatedAt: z.iso.datetime()
+});
+export type PublicMapAsset = Readonly<z.infer<typeof PublicMapAssetSchema>>;
 
 type CatalogRow = Readonly<{
   asset_id: string;

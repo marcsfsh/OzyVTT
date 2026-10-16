@@ -1,6 +1,7 @@
-import type { CharacterChoice } from "@vtt/schemas";
-import type { CatalogChoiceOption } from "./catalog-choice.js";
-import type { AbilityId, AnnotationPoint } from "./state.js";
+import { z } from "zod";
+import { CharacterChoiceSchema, type CharacterChoice } from "@vtt/schemas";
+import { AbilityIdSchema, type AnnotationPoint } from "./state.js";
+import type { Wire } from "./wire.js";
 
 /**
  * Why a command or read was refused, stable across rewording: branch on this, show the message. A
@@ -186,93 +187,122 @@ export type ReactionAnswerResult = MutationResult & {
     flatReduction?: number;
   };
 };
-/** One action's strict-mode availability for an actor, with every violated rule named (server-computed; ADR-0020 explainability). */
-export type ActionAvailability = Readonly<{
-  id: string;
-  name: string;
-  activation: "action" | "bonus-action" | "reaction" | "other";
+/** One action's strict-mode availability for an actor, with every violated rule named (server-computed; ADR-0020
+ *  explainability), plus the action's display values. */
+export const ActionAvailabilitySchema = z.strictObject({
+  id: z.string(),
+  name: z.string(),
+  activation: z.enum(["action", "bonus-action", "reaction", "other"]),
   /** Whether strict mode would allow resolving this action right now (target-specific rules can't be pre-checked). */
-  available: boolean;
-  violations: ReadonlyArray<{ rule: string; message: string }>;
+  available: z.boolean(),
+  violations: z.array(z.strictObject({ rule: z.string(), message: z.string() })),
   /** Limited-use spending left in the current scope; null when the action has no use limit. */
-  usesRemaining: number | null;
+  usesRemaining: z.number().int().min(0).nullable(),
   /** Rolls left in the open compound-action instance for this action; null when no instance applies. */
-  componentsRemaining: number | null;
+  componentsRemaining: z.number().int().min(0).nullable(),
   /** True for the SRD generic actions every combatant can take (Dodge, Dash, Help, ...) - not on the stat block. */
-  builtin?: boolean;
-}>;
+  builtin: z.boolean().optional(),
+  // Display values only (ADR-0007); resolution recomputes from the id.
+  description: z.string(),
+  attackBonus: z.number().int().nullable(),
+  reachFeet: z.number().int().nullable(),
+  rangeFeet: z.number().int().nullable(),
+  rangeNormalFeet: z.number().int().nullable(),
+  attackCount: z.number().int().nullable(),
+  saveAbility: z.string().nullable(),
+  saveDc: z.number().int().nullable(),
+  damage: z.array(z.strictObject({ formula: z.string(), type: z.string() })),
+  usesLimit: z.number().int().nullable(),
+  usesPer: z.enum(["turn", "encounter", "long-rest", "short-rest", "recharge"]).nullable(),
+  usesPool: z.string().nullable(),
+  requiresEffectTag: z.string().nullable(),
+  multiattack: z.array(z.strictObject({ actionId: z.string(), count: z.number().int() })).nullable(),
+  reaction: z.strictObject({ trigger: z.enum(["hit-by-attack"]), response: z.enum(["half-damage"]) }).nullable()
+});
+export type ActionAvailability = Wire<z.infer<typeof ActionAvailabilitySchema>>;
 /** The sheet's derived numbers. Sent only via `actor:available-actions` (authorized per actor), not `PlayerView`. */
-export type DerivedAbilityRow = Readonly<{
-  ability: AbilityId;
-  check: number;
-  checkWithProficiency: number;
-  save: number;
-  saveProficient: boolean;
-  saveFromItems: number;
-}>;
+const DerivedAbilityRowSchema = z.strictObject({
+  ability: AbilityIdSchema,
+  check: z.number().int(),
+  checkWithProficiency: z.number().int(),
+  save: z.number().int(),
+  saveProficient: z.boolean(),
+  saveFromItems: z.number().int()
+});
+export type DerivedAbilityRow = Wire<z.infer<typeof DerivedAbilityRowSchema>>;
 /** `tier` is the effective tier: the sheet's base raised by any item grant. `sources` names the items that raised it. */
-export type DerivedSkillRow = Readonly<{
-  id: string;
-  name: string;
-  ability: AbilityId | null;
-  tier: "none" | "proficient" | "expertise";
-  bonus: number | null;
-  sources: readonly string[];
-}>;
+const DerivedSkillRowSchema = z.strictObject({
+  id: z.string(),
+  name: z.string(),
+  ability: AbilityIdSchema.nullable(),
+  tier: z.enum(["none", "proficient", "expertise"]),
+  bonus: z.number().int().nullable(),
+  sources: z.array(z.string())
+});
+export type DerivedSkillRow = Wire<z.infer<typeof DerivedSkillRowSchema>>;
 /** One damage type a defence covers, and what grants it (null for the stat block itself). */
-export type DerivedDefence = Readonly<{ type: string; source: string | null }>;
-export type ActorDerivedSheet = Readonly<{
-  proficiencyBonus: number;
-  armorClass: number;
-  initiative: number;
-  abilities: readonly DerivedAbilityRow[];
-  skills: readonly DerivedSkillRow[];
+const DerivedDefenceSchema = z.strictObject({ type: z.string(), source: z.string().nullable() });
+export type DerivedDefence = Wire<z.infer<typeof DerivedDefenceSchema>>;
+const ActorDerivedSheetSchema = z.strictObject({
+  proficiencyBonus: z.number().int(),
+  armorClass: z.number().int(),
+  initiative: z.number().int(),
+  abilities: z.array(DerivedAbilityRowSchema),
+  skills: z.array(DerivedSkillRowSchema),
   /** The damage defences in force outside any one hit: the stat block's, chosen features', items' and
    *  effects', as the damage pipeline reads them. */
-  defences: Readonly<{
-    resistances: readonly DerivedDefence[];
-    immunities: readonly DerivedDefence[];
-    vulnerabilities: readonly DerivedDefence[];
-  }>;
+  defences: z.strictObject({
+    resistances: z.array(DerivedDefenceSchema),
+    immunities: z.array(DerivedDefenceSchema),
+    vulnerabilities: z.array(DerivedDefenceSchema)
+  }),
   /** What standing `spell-save-dc` riders add to the bearer's spell save DC, and so to every action that uses it. */
-  spellSaveDcBonus: number;
-}>;
-export type ActorActionsAvailabilityResult = {
-  ok: boolean;
-  message?: string;
-  rulesMode?: "strict" | "assisted" | "freeform";
-  actions?: readonly ActionAvailability[];
-  derived?: ActorDerivedSheet;
-};
+  spellSaveDcBonus: z.number().int()
+});
+export type ActorDerivedSheet = Wire<z.infer<typeof ActorDerivedSheetSchema>>;
+/** What `actor:available-actions` answers: the table's rules mode, each action's availability, and the sheet. */
+export const AvailableActionsReplySchema = z.strictObject({
+  rulesMode: z.enum(["strict", "assisted", "freeform"]),
+  actions: z.array(ActionAvailabilitySchema),
+  derived: ActorDerivedSheetSchema
+});
+export type AvailableActionsReply = Wire<z.infer<typeof AvailableActionsReplySchema>>;
+export type ActorActionsAvailabilityResult = { ok: boolean; message?: string } & Partial<AvailableActionsReply>;
 
 /** Which builder step shows an offer: the step that chose its source. */
-export type BuilderOfferStep = "species" | "background" | "class" | "features" | "equipment";
+const BuilderOfferStepSchema = z.enum(["species", "background", "class", "features", "equipment"]);
+export type BuilderOfferStep = z.infer<typeof BuilderOfferStepSchema>;
 
 /** One pick the content asks a build for, as the server works it out for a draft (`builder:offers`). */
-export type BuilderOffer = Readonly<{
+const BuilderOfferSchema = z.strictObject({
   /** Stable key into the draft's picks. */
-  key: string;
-  step: BuilderOfferStep;
+  key: z.string(),
+  step: BuilderOfferStepSchema,
   /** The feature that offers the pick; a choose-N list (class skills, background languages) has none. */
-  featureId: string | null;
-  kind: string;
-  label: string;
-  help: string | null;
-  capacity: number;
-  options: readonly CatalogChoiceOption[];
-  maxSpellLevel: number | null;
+  featureId: z.string().nullable(),
+  kind: z.string(),
+  label: z.string(),
+  help: z.string().nullable(),
+  capacity: z.number().int().min(0),
+  options: z.array(z.strictObject({ id: z.string(), name: z.string(), level: z.number().int().optional() })),
+  maxSpellLevel: z.number().int().nullable(),
   /** Character level stamped on this offer's ledger rows. */
-  level: number;
-  classId: string | null;
+  level: z.number().int().min(1).max(20),
+  classId: z.string().nullable(),
   /** Set when the content offers nothing to pick here yet (a catalog gap, or no eligible earlier answer):
    *  the pick may be left open. */
-  unresolvable: string | null;
+  unresolvable: z.string().nullable(),
   /** Option id -> why this build cannot usefully take it (already held, or no proficiency to build on).
    *  Shown disabled rather than hidden, so an earlier answer never vanishes. Null for kinds without the rule. */
-  unavailable: Readonly<Record<string, string>> | null;
-}>;
+  unavailable: z.record(z.string(), z.string()).nullable()
+});
+export type BuilderOffer = Wire<z.infer<typeof BuilderOfferSchema>>;
 
-export type BuilderAbilityIncrease = Readonly<{ ability: AbilityId; amount: number }>;
+/** One ASI's split: at most two abilities, +1 or +2 each. Shared by the offers read's request and reply. */
+export const BuilderAbilityIncreasesSchema = z
+  .array(z.strictObject({ ability: AbilityIdSchema, amount: z.number().int().min(1).max(2) }))
+  .max(2);
+export type BuilderAbilityIncrease = Wire<z.infer<typeof BuilderAbilityIncreasesSchema>>[number];
 
 /** A builder draft as the offers read takes it: the identity chosen so far plus either the answers by offer
  *  key (the wizard) or a stored ledger (a rebuild reading a character back). */
@@ -288,11 +318,12 @@ export type BuilderOffersRequest = Readonly<{
 
 /** What the build offers, the answers it still accepts (picks it no longer offers are dropped), and the
  *  ledger rows those answers make, which `character.create` carries. */
-export type BuilderOffersReply = Readonly<{
-  offers: readonly BuilderOffer[];
-  picks: Readonly<Record<string, readonly string[]>>;
-  asiIncreases: Readonly<Record<string, readonly BuilderAbilityIncrease[]>>;
-  subclassId: string | null;
-  choices: readonly CharacterChoice[];
-}>;
+export const BuilderOffersReplySchema = z.strictObject({
+  offers: z.array(BuilderOfferSchema),
+  picks: z.record(z.string(), z.array(z.string())),
+  asiIncreases: z.record(z.string(), BuilderAbilityIncreasesSchema),
+  subclassId: z.string().nullable(),
+  choices: z.array(CharacterChoiceSchema)
+});
+export type BuilderOffersReply = Wire<z.infer<typeof BuilderOffersReplySchema>>;
 export type BuilderOffersResult = MutationResult & Partial<BuilderOffersReply>;

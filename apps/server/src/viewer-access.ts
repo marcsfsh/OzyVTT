@@ -1,16 +1,21 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
+import { z } from "zod";
 import { migrate, openDatabase, type Migration } from "./database.js";
 import { InvalidRequestError } from "./invalid-request.js";
 
-export type ViewerAccessMetadata = Readonly<{
-  id: string;
-  name: string;
-  createdAt: string;
-  expiresAt: string | null;
-  lastUsedAt: string | null;
-  revokedAt: string | null;
-}>;
+export const ViewerAccessMetadataSchema = z.strictObject({
+  id: z.uuid(),
+  name: z.string(),
+  createdAt: z.iso.datetime(),
+  expiresAt: z.iso.datetime().nullable(),
+  lastUsedAt: z.iso.datetime().nullable(),
+  revokedAt: z.iso.datetime().nullable()
+});
+export type ViewerAccessMetadata = Readonly<z.infer<typeof ViewerAccessMetadataSchema>>;
+/** A one-time code a table screen exchanges for its viewer credential. */
+export const ViewerPairingSchema = z.strictObject({ code: z.string(), expiresAt: z.iso.datetime() });
+export type ViewerPairing = Readonly<z.infer<typeof ViewerPairingSchema>>;
 
 type ViewerAccessRow = Readonly<{
   id: string;
@@ -111,7 +116,7 @@ export class ViewerAccessStore {
     this.database = database;
   }
 
-  createPairingCode(ttlMs = PAIRING_TTL_MS) {
+  createPairingCode(ttlMs = PAIRING_TTL_MS): ViewerPairing {
     this.requireDatabase();
     const now = this.now();
     this.prunePairings(now);
