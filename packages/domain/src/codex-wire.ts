@@ -26,7 +26,7 @@ export type CodexQuestObjective = Readonly<{ text: string; done: boolean }>;
 /** The kinds the suite-wide search indexes. */
 export type CodexRecordKind = "page" | "journal" | "map" | "marker" | "quest" | "session";
 /** Every surface the reveal audit reports on. */
-export type CodexRevealAuditKind = "page" | "map" | "marker" | "journal" | "session" | "quest" | "standing";
+export type CodexRevealAuditKind = "date" | "page" | "map" | "marker" | "journal" | "session" | "quest" | "standing";
 
 // ----- Pages -----
 
@@ -446,7 +446,8 @@ export type CodexSettingsInput = Readonly<{
 
 // ----- The reveal audit (GM-only): what the player projections currently emit -----
 
-/** `id` is what the kind's reveal route takes, which for `standing` is the faction page id. */
+/** `id` is what the kind's reveal route takes, which for `standing` is the faction page id. The `date` row's
+ *  routes are the calendar's publish and unpublish, which take none. */
 export type CodexRevealAuditRow = Readonly<{
   kind: CodexRevealAuditKind;
   id: string;

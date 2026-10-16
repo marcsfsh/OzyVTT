@@ -365,7 +365,14 @@ export const calendarApi = {
     ),
   /** Copy the GM's clock onto the players' clock. Nothing else publishes it. */
   publish: (token: string) =>
-    request<{ calendar: GmCodexCalendar }>(token, "/calendar/publish", { method: "POST" }).then((data) => data.calendar)
+    request<{ calendar: GmCodexCalendar }>(token, "/calendar/publish", { method: "POST" }).then(
+      (data) => data.calendar
+    ),
+  /** Take the date away from the players until the next publish. */
+  unpublish: (token: string) =>
+    request<{ calendar: GmCodexCalendar }>(token, "/calendar/unpublish", { method: "POST" }).then(
+      (data) => data.calendar
+    )
 };
 
 export const journalApi = {

@@ -1775,6 +1775,29 @@ describe("codex deadlines, downtime and the prep clock, HTTP boundary", () => {
     expect((await calendar(base, PLAYER)).currentDate).toEqual({ year: 1492, month: 1, day: 20 });
   });
 
+  it("lists the published date in the reveal audit, under the label players see, until it is unpublished", async () => {
+    const { base } = await fixture();
+    const dateSection = async () =>
+      ((await body(await get(base, "/api/v1/codex/reveal-audit", GM))).data.audit.sections as Json[]).find(
+        (section) => section.kind === "date"
+      )!;
+    // An empty Codex's first date publishes itself.
+    await put(base, "/api/v1/codex/calendar", GM, { ...WORLD, currentDate: { year: 1492, month: 0, day: 10 } });
+    // The GM's clock moves on; the audit names the date players hold, not the GM's.
+    await put(base, "/api/v1/codex/calendar", GM, { ...WORLD, currentDate: { year: 1492, month: 1, day: 20 } });
+    const shown = await dateSection();
+    expect(shown).toMatchObject({ revealed: 1, total: 1 });
+    expect(shown.rows).toEqual([
+      { kind: "date", id: "published-date", title: expect.stringContaining("Hammer"), journalKind: null }
+    ]);
+
+    await post(base, "/api/v1/codex/calendar/unpublish", GM, {});
+    expect((await calendar(base, PLAYER)).currentDate).toBeNull();
+    expect((await calendar(base, GM)).currentDate).toEqual({ year: 1492, month: 1, day: 20 });
+    expect(await dateSection()).toMatchObject({ revealed: 0, rows: [] });
+    expect((await post(base, "/api/v1/codex/calendar/unpublish", PLAYER, {})).status).toBe(403);
+  });
+
   /** Neither deadline nor downtime reaches a player's chronicle until the ordinary reveal is set. */
   it("never puts an unrevealed deadline or downtime on a player's chronicle, and puts a revealed one there", async () => {
     const { base } = await fixture();

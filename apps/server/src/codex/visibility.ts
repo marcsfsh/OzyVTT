@@ -206,6 +206,7 @@ export function revealAuditRecords(store: CodexStore): CodexRevealAuditRecord[] 
   const maps = store.listMaps();
   const sessionContext = journalContext(store);
   return [
+    { kind: "date", calendar: store.getCalendar(), publishedDate: store.getPublishedDate() } as const,
     ...store.listPages().map((page) => ({ kind: "page", page }) as const),
     ...maps.map((map) => ({ kind: "map", map, ...mapContext(store, map) }) as const),
     ...maps.flatMap((map) =>

@@ -35,6 +35,7 @@ import type {
   PlayerCodexSession,
   PlayerCodexStanding
 } from "@vtt/domain";
+import { inWorldLabel } from "./codex/calendar.js";
 import { deadlineFired } from "./codex/journal-kinds.js";
 import type { CodexChronicleSource } from "./codex/journal.js";
 
@@ -743,6 +744,7 @@ export function projectGmSearchHit(record: CodexSearchRecord): CodexSearchHit {
 
 /** Report order. Every row comes from that kind's player projection; never add a raw `revealed` test here. A new reveal route must be added here; the HTTP test checks the audit against real player reads. */
 export const CODEX_REVEAL_AUDIT_KINDS: readonly CodexRevealAuditKind[] = [
+  "date",
   "page",
   "map",
   "marker",
@@ -754,6 +756,7 @@ export const CODEX_REVEAL_AUDIT_KINDS: readonly CodexRevealAuditKind[] = [
 
 /** One record the audit considers, with exactly the context its player projection needs. */
 export type CodexRevealAuditRecord =
+  | Readonly<{ kind: "date"; calendar: CodexCalendar; publishedDate: CodexInWorldDate | null }>
   | Readonly<{ kind: "page"; page: CodexPageSummary }>
   | Readonly<{ kind: "map"; map: CodexMap; parentRevealed: boolean }>
   | (Readonly<{ kind: "marker" }> & CodexPageMarkerRecord)
@@ -776,6 +779,13 @@ const AUDIT_JOURNAL_FALLBACK: Readonly<Record<CodexJournalKind, string>> = {
 /** null when the party cannot see the record. Titles come from the player projection's output. */
 function auditRow(record: CodexRevealAuditRecord): CodexRevealAuditRow | null {
   switch (record.kind) {
+    case "date": {
+      // The players' clock, as their calendar read carries it.
+      const shown = projectPlayerCalendar(record.calendar, record.publishedDate).currentDate;
+      return shown === null
+        ? null
+        : { kind: "date", id: "published-date", title: inWorldLabel(record.calendar, shown), journalKind: null };
+    }
     case "page": {
       const projected = projectPlayerPageSummary(record.page);
       return projected === null ? null : { kind: "page", id: projected.id, title: projected.title, journalKind: null };

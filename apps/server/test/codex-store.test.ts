@@ -4230,6 +4230,9 @@ describe("every codex write bumps the coarse revision (the ETag's invariant)", (
     bumps("publishCampaignDate", () => {
       store.publishCampaignDate();
     });
+    bumps("unpublishCampaignDate", () => {
+      store.unpublishCampaignDate();
+    });
 
     // Journal, in every flavour it is written
     let entry = store.createEntry({ playerText: "we arrived" });
@@ -5403,6 +5406,9 @@ describe("every codex write bumps the coarse revision (the ETag's one premise)",
     },
     publishCampaignDate: (s) => {
       s.publishCampaignDate();
+    },
+    unpublishCampaignDate: (s) => {
+      s.unpublishCampaignDate();
     },
     createEntry: (s) => {
       s.createEntry({ playerText: "We arrived." });

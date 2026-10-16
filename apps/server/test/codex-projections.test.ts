@@ -402,6 +402,7 @@ describe("reveal audit projection - an aggregation and not a second opinion", ()
 
     // Every surface is reported, empty ones included, so "nothing revealed" and "did not load" differ.
     expect(audit.sections.map((entry) => entry.kind)).toEqual([
+      "date",
       "page",
       "map",
       "marker",

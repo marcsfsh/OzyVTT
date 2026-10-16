@@ -12,6 +12,8 @@ const revealEntry = vi.fn();
 const revealSession = vi.fn();
 const revealQuest = vi.fn();
 const revealStanding = vi.fn();
+const unpublishDate = vi.fn();
+const publishDate = vi.fn();
 
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
@@ -27,14 +29,28 @@ vi.mock("./api", async (importOriginal) => {
     journalApi: { ...actual.journalApi, reveal: (...a: unknown[]) => revealEntry(...a) },
     sessionApi: { ...actual.sessionApi, reveal: (...a: unknown[]) => revealSession(...a) },
     questApi: { ...actual.questApi, reveal: (...a: unknown[]) => revealQuest(...a) },
-    standingApi: { ...actual.standingApi, reveal: (...a: unknown[]) => revealStanding(...a) }
+    standingApi: { ...actual.standingApi, reveal: (...a: unknown[]) => revealStanding(...a) },
+    calendarApi: {
+      ...actual.calendarApi,
+      publish: (...a: unknown[]) => publishDate(...a),
+      unpublish: (...a: unknown[]) => unpublishDate(...a)
+    }
   };
 });
 
 import { RevealAudit } from "./RevealAudit";
 import type { CodexJournalKind, CodexRevealAudit, CodexRevealAuditKind, CodexRevealAuditSection } from "@vtt/domain";
 
-const KINDS: readonly CodexRevealAuditKind[] = ["page", "map", "marker", "journal", "session", "quest", "standing"];
+const KINDS: readonly CodexRevealAuditKind[] = [
+  "date",
+  "page",
+  "map",
+  "marker",
+  "journal",
+  "session",
+  "quest",
+  "standing"
+];
 
 /** `journalKind` is present-and-null on non-journal rows. */
 const section = (
@@ -59,6 +75,7 @@ const answer = (sections: readonly CodexRevealAuditSection[]): CodexRevealAudit 
 const EMPTY: CodexRevealAudit = answer(KINDS.map((kind) => section(kind, [])));
 
 const AUDIT: CodexRevealAudit = answer([
+  section("date", [{ id: "published-date", title: "Hammer 10, 1492 DR" }], 1),
   section("page", [{ id: "p1", title: "Strahd" }], 12),
   section("map", [{ id: "m1", title: "Barovia" }], 3),
   section("marker", [{ id: "k1", title: "Vallaki" }], 8),
@@ -115,7 +132,7 @@ describe("The audit lists every Codex record type", () => {
     // Both numbers are the server's: what a player would receive, not a flag count.
     expect(within(sectionOf("Pages")).getByText("1 of 12 shared")).toBeInTheDocument();
     expect(within(sectionOf("Journal entries")).getByText("1 of 40 shared")).toBeInTheDocument();
-    expect(screen.getByText("7 records are shown to players across the Codex.")).toBeInTheDocument();
+    expect(screen.getByText("8 records are shown to players across the Codex.")).toBeInTheDocument();
   });
 
   it("says out loud that it covers Codex records only", async () => {
@@ -239,11 +256,21 @@ describe("It aggregates; it does not decide", () => {
     expect(screen.getByText("1 record is shown to players across the Codex.")).toBeInTheDocument();
   });
 
+  it("hides the published date through the calendar, and shows it again by publishing", async () => {
+    await renderAudit();
+    const user = userEvent.setup();
+    const date = within(sectionOf("Campaign date"));
+    await user.click(date.getByRole("switch", { name: "Show the date Hammer 10, 1492 DR to players" }));
+    await waitFor(() => expect(unpublishDate).toHaveBeenCalledWith("gm"));
+    await user.click(date.getByRole("switch", { name: "Show the date Hammer 10, 1492 DR to players" }));
+    await waitFor(() => expect(publishDate).toHaveBeenCalledWith("gm"));
+  });
+
   it("offers no bulk operation — hiding is one record at a time", async () => {
     await renderAudit();
     expect(screen.queryByRole("button", { name: /hide all/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /hide everything/i })).toBeNull();
-    expect(screen.getAllByRole("switch")).toHaveLength(7);
+    expect(screen.getAllByRole("switch")).toHaveLength(8);
   });
 });
 

@@ -280,6 +280,12 @@ export class CodexStore {
     write(db, () => calendar.writePublishedDate(db, current.currentDate ?? null));
     return current;
   }
+  /** Takes the date away from the players: they see no date until the GM publishes again. */
+  unpublishCampaignDate(): CodexCalendar {
+    const db = this.#db;
+    write(db, () => calendar.writePublishedDate(db, null));
+    return calendar.getCalendar(db);
+  }
   campaignInstant(): number | null {
     return calendar.campaignInstant(this.#db);
   }
