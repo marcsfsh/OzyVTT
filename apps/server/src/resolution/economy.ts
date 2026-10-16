@@ -1,7 +1,7 @@
 import type { GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
-import { hasEffectTag } from "../effects.js";
+import { hasEffectTag, RAGING_TAG } from "../effects.js";
 import { RulesBlockedError } from "../game-store.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import {
@@ -114,10 +114,27 @@ export function evaluateActionEconomy(
   };
 }
 
-/** Incapacitation and 0 HP forbid all three activation kinds (SRD 2024 "Incapacitated"); a required
- *  effect (Frenzy needs Rage) must be active. */
+/**
+ * Features with no activation of their own that answer a roll or an event rather than act (rerolling a failed save,
+ * Relentless Endurance at 0 HP), which an Incapacitated creature still gets. Every other "other" activation - a
+ * legendary action, Sneak Attack, Reckless Attack, Action Surge, a free cast - is an action by another name.
+ */
+const ANSWERS_A_ROLL: ReadonlySet<string> = new Set([
+  "indomitable",
+  "stroke-of-luck",
+  "uncanny-metabolism",
+  "persistent-rage",
+  "orc-relentless-endurance",
+  "relentless-endurance",
+  "dark-ones-own-luck",
+  "boon-of-fate"
+]);
+
+/** Incapacitation and 0 HP forbid every action, Bonus Action and Reaction (SRD 2024 "Incapacitated"), legendary
+ *  actions and feature activations included; a required effect (Frenzy needs Rage) must be active, and a raging
+ *  Barbarian can't cast spells. */
 function checkAbleToAct({ attacker, action, violations }: Evaluation): void {
-  if (action.activation !== "other") {
+  if (action.activation !== "other" || !ANSWERS_A_ROLL.has(action.id)) {
     const incapacitating = incapacitatingCondition(attacker);
     if (incapacitating !== null)
       violations.push({
@@ -131,6 +148,12 @@ function checkAbleToAct({ attacker, action, violations }: Evaluation): void {
         message: `${attacker.name} is down (0 HP) and can't take actions, bonus actions, or reactions.`
       });
   }
+  // SRD Rage: "you can't cast spells".
+  if ((action.spellId !== undefined || action.spellSlot !== undefined) && hasEffectTag(attacker, RAGING_TAG))
+    violations.push({
+      rule: "condition.raging",
+      message: `${attacker.name} is raging and can't cast spells.`
+    });
   if (action.requiresEffectTag && !hasEffectTag(attacker, action.requiresEffectTag)) {
     violations.push({
       rule: "feature.requires-effect",
@@ -173,6 +196,8 @@ const USE_SCOPE_LABELS: Readonly<Record<"turn" | "encounter" | "short-rest" | "l
 
 function checkLimitedUse({ state, attacker, action, siblings, violations }: Evaluation): EconomyPlan["spendUse"] {
   if (!action.uses) return null;
+  // SRD Rage: a raging Barbarian extends it with a Bonus Action, which spends no new use.
+  if (action.grants?.tags.includes(RAGING_TAG) && hasEffectTag(attacker, RAGING_TAG)) return null;
   const uses = action.uses;
   const key = uses.pool ?? action.id;
   // The counter is keyed on the pool, so the gate is the pool's size (see `useLimitFor`).

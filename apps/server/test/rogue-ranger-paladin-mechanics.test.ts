@@ -756,29 +756,40 @@ describe("Paladin - Channel Divinity is ONE counter that three features spend", 
 });
 
 describe("Paladin - the auras that are really immunities", () => {
+  // The auras are gated grants (inactive while the Paladin is Incapacitated), read live through the catalog as
+  // every command path passes it.
+  const immunitiesOf = (built: Table) => ({ resolveDefinition: () => built.definition, catalog: built.catalog });
+
   it("REFUSES the Frightened condition on a level-10 Paladin, and says so at the table", () => {
     // `grants.conditionImmunities` is enforced with narration in the fight log. The level-9 build is the
     // negative control.
     const brave = table(paladinInput(10));
-    const events = setCondition(brave.state, IDS.hero, "frightened", true, undefined, GM_SCOPE);
+    const events = setCondition(brave.state, IDS.hero, "frightened", true, undefined, GM_SCOPE, immunitiesOf(brave));
     expect(events).toEqual([
       { kind: "condition", text: "Bree is immune to Frightened - not applied.", actorId: IDS.hero, immune: true }
     ]);
     expect(brave.hero.conditions).toEqual([]);
 
     const earlier = table(paladinInput(9));
-    setCondition(earlier.state, IDS.hero, "frightened", true, undefined, GM_SCOPE);
+    setCondition(earlier.state, IDS.hero, "frightened", true, undefined, GM_SCOPE, immunitiesOf(earlier));
     expect(earlier.hero.conditions).toEqual([{ id: "frightened" }]);
   });
 
   it("REFUSES Charmed from Oath of Devotion's level-7 aura", () => {
     const devoted = table(paladinInput(7));
-    expect(setCondition(devoted.state, IDS.hero, "charmed", true, undefined, GM_SCOPE)[0].text).toBe(
-      "Bree is immune to Charmed - not applied."
-    );
+    expect(
+      setCondition(devoted.state, IDS.hero, "charmed", true, undefined, GM_SCOPE, immunitiesOf(devoted))[0].text
+    ).toBe("Bree is immune to Charmed - not applied.");
     // Frightened is not immune yet: the class aura is level 10.
-    setCondition(devoted.state, IDS.hero, "frightened", true, undefined, GM_SCOPE);
+    setCondition(devoted.state, IDS.hero, "frightened", true, undefined, GM_SCOPE, immunitiesOf(devoted));
     expect(devoted.hero.conditions).toEqual([{ id: "frightened" }]);
+  });
+
+  it("goes quiet while the Paladin is Incapacitated (SRD: the aura is inactive)", () => {
+    const brave = table(paladinInput(10));
+    setCondition(brave.state, IDS.hero, "stunned", true, undefined, GM_SCOPE, immunitiesOf(brave));
+    setCondition(brave.state, IDS.hero, "frightened", true, undefined, GM_SCOPE, immunitiesOf(brave));
+    expect(brave.hero.conditions.map((condition) => condition.id)).toEqual(["frightened", "stunned"]);
   });
 });
 

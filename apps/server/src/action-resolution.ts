@@ -12,6 +12,7 @@ import { applyMasteryForces, masterySwingOf, offeredPush, spendVex } from "./res
 import { applyOnHitEffects } from "./resolution/on-hit.js";
 import { parkActionSave, parkForAcReaction, parkReaction } from "./resolution/pending.js";
 import { startConcentration } from "./resolution/concentration.js";
+import { applyRageRules } from "./resolution/rage.js";
 import { releaseHideAndReady } from "./resolution/release.js";
 import { openResolve } from "./resolution/validate.js";
 
@@ -62,6 +63,7 @@ export function resolveDefinitionAction(
   parkReaction(ctx);
   ctx.builtin?.forcedSave?.(ctx);
   parkActionSave(ctx);
+  applyRageRules(ctx);
 
   commitEconomy(ctx);
   recordLightAttack(ctx);

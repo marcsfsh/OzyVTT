@@ -45,6 +45,8 @@ describe("rule families", () => {
       // Being incapacitated or down is "you have no actions" - economy, not a targeting rule.
       ["condition.incapacitated", "economy"],
       ["condition.down", "economy"],
+      // A raging Barbarian can't cast spells: what it can do, not what it targets.
+      ["condition.raging", "economy"],
       ["legendary.own-turn", "economy"],
       // An extra attack waits on the swing that opens it: a matter of what this turn has done.
       ["attack.light-needs-attack", "economy"],

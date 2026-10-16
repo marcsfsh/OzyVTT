@@ -17,6 +17,8 @@ const RULE_FAMILIES = {
   // Being incapacitated or down means you have no actions: an economy block, not a targeting one.
   "condition.incapacitated": "economy",
   "condition.down": "economy",
+  // A raging Barbarian can't cast spells (SRD Rage).
+  "condition.raging": "economy",
   // "Legendary actions are taken on other creatures' turns" is a timing/economy rule...
   "legendary.own-turn": "economy",
   // An extra attack (Light, Cleave) is owed only once the swing that opens it has happened this turn.

@@ -5,8 +5,10 @@ export const barbarian: ClassMechanicsModule = {
   features: {
     /**
      * Uses read off the printed Rages column. The `raging` tag is what `requiresEffectTag` and Mindless
-     * Rage's gate read. Rage Damage (a second column), the 10-minute cap, extending by attacking and the
-     * heavy-armor restriction stay prose.
+     * Rage's gate read, and what the engine's Rage rules key on: it lasts until the end of the Barbarian's next
+     * turn, each attack roll or forced save extends it (so does re-declaring it as a Bonus Action, for no use),
+     * and Incapacitation or Heavy armor ends it. Rage Damage (a second column), the 10-minute cap and Persistent
+     * Rage's longer form stay prose.
      */
     rage: {
       uses: { scaling: { type: "class-resource", id: "rage" }, per: "long-rest" },
@@ -21,7 +23,7 @@ export const barbarian: ClassMechanicsModule = {
           grants: {
             name: "Raging",
             tags: ["raging"],
-            duration: { type: "encounter" },
+            duration: { type: "until-source-turn-end" },
             modifiers: [
               { type: "damage-resistance", damageTypes: ["bludgeoning", "piercing", "slashing"] },
               {
@@ -51,14 +53,22 @@ export const barbarian: ClassMechanicsModule = {
         { offer: "feature:weapon-mastery", scaling: { type: "class-resource-growth", id: "weapon-mastery" } }
       ]
     },
-    // Advantage on Dexterity saves; the Incapacitated exception needs negation and stays prose.
+    // Advantage on Dexterity saves "unless you have the Incapacitated condition" (or one that includes it).
     "danger-sense": {
       modifiers: [
         {
           type: "roll-mode",
           roll: "save",
           mode: "advantage",
-          when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["dex"] }]
+          when: [
+            { type: "on-saving-throw" },
+            { type: "ability-is", abilities: ["dex"] },
+            {
+              type: "while-condition",
+              conditionIds: ["incapacitated", "paralyzed", "petrified", "stunned", "unconscious"],
+              present: false
+            }
+          ]
         }
       ]
     },

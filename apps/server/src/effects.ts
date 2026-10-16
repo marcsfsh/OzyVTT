@@ -23,6 +23,8 @@ const MAX_EFFECTS = 20;
 
 /** The tag on a caster's own "Concentrating on X" effect; ending it ends everything its cast made. */
 export const CONCENTRATING_TAG = "concentrating";
+/** The Barbarian's Rage: it ends early on Incapacitated or in Heavy armor, and blocks spells and Concentration. */
+export const RAGING_TAG = "raging";
 /** A creature knocked out at 1 HP; it wakes when it regains any hit points. */
 export const KNOCKED_OUT_TAG = "knocked-out";
 
@@ -151,7 +153,7 @@ export function hasEffectTag(actor: Actor, tag: string): boolean {
 /**
  * What gaining a condition does beyond itself, shared by every path that can impose one (a GM chip, a failed save,
  * an on-hit rider, an effect's linked conditions): an Incapacitated creature's grapples release and its
- * Concentration breaks (SRD Incapacitated, Grappling); Exhaustion 6 is death. 0 HP is handled
+ * Concentration breaks (SRD Incapacitated, Grappling), and its Rage ends; Exhaustion 6 is death. 0 HP is handled
  * by the damage path, which ends everything the creature sustains.
  */
 export function conditionGained(
@@ -164,6 +166,8 @@ export function conditionGained(
   if ((INCAPACITATING_CONDITIONS as readonly string[]).includes(conditionId)) {
     events.push(...releaseGrapplesHeldBy(state, actor.id));
     events.push(...endConcentrationSustainedBy(state, actor.id));
+    for (const rage of actor.effects.filter((effect) => effect.tags.includes(RAGING_TAG)))
+      endEffectInternal(state, actor, rage.id, events);
   }
   if (conditionId === "exhaustion" && previousExhaustion < 6 && exhaustionLevel(actor) >= 6)
     events.push(...applyExhaustionDeath(state, actor));
@@ -190,6 +194,8 @@ export function addEffect(
     const ended = endConcentrationSustainedBy(state, effect.sourceActorId, effect.castId);
     events?.push(...ended);
   }
+  // SRD Rage: "You can't maintain Concentration".
+  if (effect.tags.includes(RAGING_TAG)) events?.push(...endConcentrationSustainedBy(state, actor.id));
   // What some effect already held (the one a refresh replaces included), so only a condition set on its own is
   // marked as outliving this effect.
   const heldBefore = new Set(actor.effects.flatMap((candidate) => candidate.linkedConditionIds));

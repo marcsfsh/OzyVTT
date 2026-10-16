@@ -637,7 +637,7 @@
         "raging"
        ],
        "duration": {
-        "type": "encounter"
+        "type": "until-source-turn-end"
        },
        "modifiers": [
         {
@@ -737,6 +737,17 @@
         "abilities": [
          "dex"
         ]
+       },
+       {
+        "type": "while-condition",
+        "conditionIds": [
+         "incapacitated",
+         "paralyzed",
+         "petrified",
+         "stunned",
+         "unconscious"
+        ],
+        "present": false
        }
       ]
      }
@@ -6261,6 +6272,19 @@
     "grants": {
      "conditionImmunities": [
       "frightened"
+     ],
+     "when": [
+      {
+       "type": "while-condition",
+       "conditionIds": [
+        "incapacitated",
+        "paralyzed",
+        "petrified",
+        "stunned",
+        "unconscious"
+       ],
+       "present": false
+      }
      ]
     }
    },

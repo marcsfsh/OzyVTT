@@ -1196,6 +1196,19 @@
     "grants": {
      "conditionImmunities": [
       "charmed"
+     ],
+     "when": [
+      {
+       "type": "while-condition",
+       "conditionIds": [
+        "incapacitated",
+        "paralyzed",
+        "petrified",
+        "stunned",
+        "unconscious"
+       ],
+       "present": false
+      }
      ]
     }
    },

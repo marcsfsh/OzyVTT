@@ -1,5 +1,13 @@
 // Paladin and Oath of Devotion mechanics, merged over the ETL-generated prose.
+import type { Condition } from "@vtt/schemas";
 import type { ClassMechanicsModule } from "./overlay.js";
+
+/** SRD Aura of Protection: the aura "is inactive while you have the Incapacitated condition" (or one including it). */
+const AURA_ACTIVE = {
+  type: "while-condition" as const,
+  conditionIds: ["incapacitated", "paralyzed", "petrified", "stunned", "unconscious"] satisfies Condition[],
+  present: false
+};
 
 export const paladin: ClassMechanicsModule = {
   features: {
@@ -90,7 +98,7 @@ export const paladin: ClassMechanicsModule = {
 
     // The Paladin is always inside their own aura; immunity for allies is not expressible.
     "aura-of-courage": {
-      grants: { conditionImmunities: ["frightened"] }
+      grants: { conditionImmunities: ["frightened"], when: [AURA_ACTIVE] }
     },
 
     "radiant-strikes": {
@@ -146,7 +154,7 @@ export const paladin: ClassMechanicsModule = {
 
       // Same reading as Aura of Courage.
       "aura-of-devotion": {
-        grants: { conditionImmunities: ["charmed"] }
+        grants: { conditionImmunities: ["charmed"], when: [AURA_ACTIVE] }
       },
 
       // The counter only; the save advantage (keyed to the source's creature type), the Radiant aura tick
