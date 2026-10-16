@@ -9,11 +9,14 @@ import {
 } from "../actor-roster.js";
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { buildCharacterDefinition } from "../character-build.js";
+import { draftOwnerOf } from "../character-drafts.js";
 import { generateCharacterRequest } from "../character-generate.js";
 import {
   BuilderRollAbilitiesSchema,
   BuilderSetPolicySchema,
   CharacterCreateSchema,
+  CharacterDraftDiscardSchema,
+  CharacterDraftSaveSchema,
   CharacterGenerateSchema,
   CharacterRebuildSchema,
   CharacterResolveImportSchema,
@@ -73,6 +76,35 @@ export function importedDefinition(definition: unknown, kind: "actor definition"
 }
 
 export const characterCommands = [
+  defineCommand({
+    type: "character.save-draft",
+    operationId: "saveCharacterDraft",
+    description:
+      "Parks the caller's in-progress character build - the wizard's choices so far, not a sheet - replacing the one it parked before. Each player session keeps one, and the GM keeps one that follows the GM across sign-ins and devices. Kept beside the game state and never broadcast; only its owner reads it back (`GET /game/characters/draft`). A player may park one only while the table's builderPolicy.playerBuilder is open. The response carries `updatedAt`.",
+    summary: "Park the caller's in-progress character build (one per player session, one for the GM).",
+    schema: CharacterDraftSaveSchema,
+    malformed: "The character draft is malformed.",
+    issueMessage: true,
+    async run({ principal, request }, kit) {
+      if (!isGmGrade(principal) && kit.read().builderPolicy.playerBuilder !== "open")
+        throw new GameAccessDeniedError("Your GM builds the characters at this table.");
+      return { updatedAt: kit.context.characterDrafts.save(draftOwnerOf(principal), request.draft) };
+    }
+  }),
+
+  defineCommand({
+    type: "character.discard-draft",
+    operationId: "discardCharacterDraft",
+    description:
+      "Drops the caller's parked character build, if there is one. Only ever the caller's own: a player session's, or the GM's.",
+    summary: "Drop the caller's parked character build.",
+    schema: CharacterDraftDiscardSchema,
+    malformed: "The draft discard is malformed.",
+    async run({ principal }, kit) {
+      kit.context.characterDrafts.discard(draftOwnerOf(principal));
+    }
+  }),
+
   defineCommand({
     type: "character.create",
     operationId: "createCharacter",

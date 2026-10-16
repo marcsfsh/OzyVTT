@@ -38,9 +38,15 @@ carried the only correct record of the reversal, and its wording is the model: s
 boundary, name what changed it, and date it by naming the decision rather than deleting the
 history.
 
-## What is still open
+## What was open, and has since shipped
 
-Server-held drafts (builder "Phase 3"). The wizard parks drafts in `localStorage` behind
-`loadDraft`/`saveDraft`/`clearDraft`, and `apps/client/src/builder/draft.ts` says so in its own
-words: the `GameState.characterDrafts[]` store "is Phase 3 and does not exist yet." The
-builder is also GM-gated; a player-initiated path is not shipped.
+Both items this record left open are done:
+
+- **Server-held drafts** (builder "Phase 3"), 2026-10-16. The wizard parked drafts in
+  `localStorage`; they now live on the server in their own store (`character-drafts.ts`), one
+  per player session and one for the GM, read back only by their owner
+  (`character:draft`, `character.save-draft`, `character.discard-draft`). They were planned as
+  `GameState.characterDrafts[]` and kept out of the game state instead, because the state goes to
+  the whole table on every change and a draft changes on every pick. A level-up keeps no draft.
+- **Players build their own characters** while `builderPolicy.playerBuilder` is open (the
+  default), each new character auto-claimed by its creator.

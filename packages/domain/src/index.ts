@@ -1,5 +1,7 @@
 export * from "./catalog-choice.js";
 export * from "./pick-budget.js";
+/** The character builder's parked build, shared so the wizard and the server's draft store read one shape. */
+export * from "./character-draft.js";
 /** The AC an attack meets, shared so the server's roll and the sheets agree. */
 export * from "./armor-class.js";
 

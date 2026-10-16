@@ -42,7 +42,6 @@ export function LayerView({
       return role === "gm" || state.builderPolicy.playerBuilder === "open" ? (
         <CharacterBuilder
           state={state}
-          sessionKey={role}
           /* The wizard gates its last step on this prop: a disabled Create beats a banner to notice. */
           connection={connection}
           onClose={() => navigate(home)}
@@ -69,7 +68,6 @@ export function LayerView({
           state={state}
           role={role}
           actorId={layer.actorId}
-          sessionKey={`${role}-level`}
           connection={connection}
           onClose={() => navigate(`/characters/${layer.actorId}`)}
           onDone={() => navigate(`/characters/${layer.actorId}`)}

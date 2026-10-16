@@ -23,6 +23,7 @@ import type {
   ActorAddResult,
   ActorMovementResult,
   AnnotationAddResult,
+  CharacterDraftResult,
   DamageApplyResult,
   DeathSaveResult,
   DiceRollResult,
@@ -38,6 +39,8 @@ import type { ClientRole, CombatLogEntry, GmView, PlayerView } from "./views.js"
 import type {
   ActionResolveSchema,
   ActionUseSchema,
+  CharacterDraftDiscardSchema,
+  CharacterDraftSaveSchema,
   ActorAddFromDefinitionSchema,
   ActorImportDefinitionSchema,
   ActorRechooseSchema,
@@ -211,6 +214,18 @@ export interface ClientToServerEvents {
   ) => void;
   "builder:set-policy": (
     payload: CommandPayload<typeof BuilderSetPolicySchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** The caller's parked character build (one per player session, one for the GM), or null. */
+  "character:draft": (payload: Record<string, never>, acknowledgement: (result: CharacterDraftResult) => void) => void;
+  /** Park the caller's in-progress build on the server, replacing any it parked before. */
+  "character:save-draft": (
+    payload: CommandPayload<typeof CharacterDraftSaveSchema>,
+    acknowledgement: (result: MutationResult & { updatedAt?: string }) => void
+  ) => void;
+  /** Drop the caller's parked build. */
+  "character:discard-draft": (
+    payload: CommandPayload<typeof CharacterDraftDiscardSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** Rebuild or respec a character. The GM may rebuild anyone; a player only their own while the builder is open. */

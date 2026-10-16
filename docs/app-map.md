@@ -6,7 +6,7 @@ machine-derivable surfaces of the app (state shape, command catalog, HTTP paths)
 file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.
 
 - API version `1` · realtime protocol `1`
-- 11 GameState fields · 90 commands · 206 HTTP paths
+- 11 GameState fields · 92 commands · 209 HTTP paths
 
 ## GameState shape
 
@@ -69,11 +69,13 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `
 | `builder.set-policy` | `actor:write` |
 | `character.claim` | `actor:write` |
 | `character.create` | `actor:write` |
+| `character.discard-draft` | `actor:write` |
 | `character.force-release` | `actor:write` |
 | `character.generate` | `actor:write` |
 | `character.rebuild` | `actor:write` |
 | `character.release` | `actor:write` |
 | `character.resolve-import` | `actor:write` |
+| `character.save-draft` | `actor:write` |
 | `character.set-currency` | `actor:write` |
 | `character.set-identity` | `actor:write` |
 | `character.set-inventory` | `actor:write` |
@@ -250,6 +252,9 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/character-imports`
 - `POST /api/v1/game/character-imports/{importId}/resolve`
 - `POST /api/v1/game/characters`
+- `GET /api/v1/game/characters/draft`
+- `POST /api/v1/game/characters/draft/discard`
+- `POST /api/v1/game/characters/draft/save`
 - `POST /api/v1/game/characters/random`
 - `POST /api/v1/game/claims`
 - `POST /api/v1/game/claims/{actorId}/force-release`

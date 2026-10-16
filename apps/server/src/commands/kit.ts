@@ -10,6 +10,7 @@ import type {
 } from "@vtt/domain";
 import { d20Die } from "@vtt/rules-5e";
 import { storedDefinition } from "../actor-roster.js";
+import type { CharacterDraftStore } from "../character-drafts.js";
 import type { Initiator } from "../authorization.js";
 import type { CombatLogStore } from "../combat-log.js";
 import type { TimelineOutcome } from "../combat-history.js";
@@ -75,6 +76,8 @@ export type CommandContext = Readonly<{
     touchLastUsed: (assetId: string) => void;
     rememberForDefinition: (definitionId: string, assetId: string) => void;
   }>;
+  /** The builder's parked drafts, kept outside the game state (see `character-drafts.ts`). */
+  characterDrafts: Pick<CharacterDraftStore, "get" | "save" | "discard">;
   tokenGeometryFor: (mapAssetId: string) => Promise<TokenMapGeometry>;
   publishGameState: (state: GameState) => Promise<void>;
   /** Presents a newly-live scene's map on the shared screen; best-effort, a viewer failure must not undo the switch. */

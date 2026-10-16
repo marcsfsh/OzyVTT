@@ -6,6 +6,7 @@ import { deriveActorSheet } from "../actor-derived.js";
 import { storedDefinition } from "../actor-roster.js";
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { builderOffers } from "../builder-offers.js";
+import { draftOwnerOf } from "../character-drafts.js";
 import { BUILTIN_ACTIONS, BUILTIN_TARGETING } from "../builtin-actions.js";
 import { actionSummaryOf, type ContentView } from "../content-library.js";
 import { effectiveActions } from "../effective-actions.js";
@@ -157,6 +158,14 @@ export const gameReads = [
         )
       };
     }
+  },
+
+  {
+    event: "character:draft",
+    path: GAME_PATHS.characterDraft,
+    scope: "game:read",
+    // Only ever the caller's own: the owner comes from the signed principal, never from the request.
+    run: (principal, _input, kit) => ({ draft: kit.context.characterDrafts.get(draftOwnerOf(principal)) })
   },
 
   {

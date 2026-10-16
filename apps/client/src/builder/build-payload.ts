@@ -1,5 +1,6 @@
 import type {
   BuilderAbilityMethod,
+  CharacterDraft,
   BuilderOffer,
   BuilderOffersReply,
   BuilderOffersRequest,
@@ -43,32 +44,8 @@ export const BUILDER_DRAFT_VERSION = 1;
 
 export type PickMap = Readonly<Record<string, readonly string[]>>;
 
-/** The in-progress build; `draft.ts` persists exactly this shape. */
-export type BuilderDraft = {
-  version: number;
-  speciesId: string | null;
-  backgroundId: string | null;
-  classId: string | null;
-  level: number;
-  /** Mirrors the `subclass` offer's pick; sent as the payload's top-level `subclassId`. */
-  subclassId: string | null;
-  abilityMethod: BuilderAbilityMethod;
-  /** assign-mode: the six generated values, in draw order. */
-  abilityPool: ReadonlyArray<{ id: string; value: number }>;
-  /** assign-mode: ability -> pool entry id. */
-  poolAssignment: Readonly<Record<string, string | null>>;
-  /** spend-mode (point buy): the base score per ability. */
-  spendScores: Readonly<Record<string, number>>;
-  backgroundBonus: ReadonlyArray<{ ability: Ability; amount: number }>;
-  hpMode: "average" | "entries";
-  /** One roll per level 2..level, in level order. */
-  hpEntries: readonly number[];
-  /** offer key -> chosen option ids (order preserved; one entry per pick). */
-  picks: PickMap;
-  /** offer key -> the ASI shorthand's +2 split, when that offer took the ability route. */
-  asiIncreases: Readonly<Record<string, ReadonlyArray<{ ability: Ability; amount: number }>>>;
-  name: string;
-};
+/** The in-progress build: the shape the server parks (`CharacterDraftSchema`), so `draft.ts` stores exactly this. */
+export type BuilderDraft = CharacterDraft;
 
 export function emptyDraft(): BuilderDraft {
   return {
