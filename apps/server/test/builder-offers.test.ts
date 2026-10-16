@@ -287,6 +287,24 @@ describe("answers follow the build", () => {
     expect(lower.choices.every((row) => row.level <= 2)).toBe(true);
     expect(lower.subclassId).toBeNull();
   });
+
+  it("offers Magical Discoveries a cantrip as well as a spell, and reads a cantrip taken there back", () => {
+    // SRD College of Lore: "A spell you choose must be a cantrip or a spell for which you have spell slots."
+    const lore = { speciesId: "human", backgroundId: "soldier", classId: "bard", level: 6 };
+    const card = offerNamed(
+      offers({ ...lore, picks: { "feature:bard-subclass": ["college-of-lore"] } }),
+      "feature:magical-discoveries"
+    );
+    expect(ids(card)).toEqual(expect.arrayContaining(["mage-hand", "spiritual-weapon"]));
+    const reread = offers({
+      ...lore,
+      choices: [
+        { level: 3, classId: "bard", kind: "subclass", id: "college-of-lore", payload: { featureId: "bard-subclass" } },
+        { level: 6, classId: "bard", kind: "spell", id: "mage-hand", payload: { featureId: "magical-discoveries" } }
+      ]
+    });
+    expect(reread.picks["feature:magical-discoveries"]).toEqual(["mage-hand"]);
+  });
 });
 
 describe("the builder:offers read", () => {

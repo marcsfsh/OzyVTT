@@ -314,15 +314,14 @@ function cardsOf(offer: ChoiceOffer, survey: DraftSurvey): Card[] {
   }));
 }
 
-/** An offer's options as cards: inside its spell window, a cantrip pick offering only cantrips and a spell
- *  pick only levelled spells, each named. */
+/** An offer's options as cards: inside its spell window, a cantrip pick offering only cantrips, each named. A spell
+ *  pick's window is its own floor: Magical Discoveries may take a cantrip, as the build accepts. */
 function optionsOf(offer: ChoiceOffer, survey: DraftSurvey): CatalogChoiceOption[] {
   const options: CatalogChoiceOption[] = [];
   for (const id of offer.options) {
     const level = offer.optionLevels?.get(id);
     if (!withinOfferSpellWindow(offer, id)) continue;
     if (level !== undefined && offer.kind === "cantrip" && level !== 0) continue;
-    if (level !== undefined && offer.kind === "spell" && level < 1) continue;
     options.push({
       id,
       name: offer.names.get(id) ?? nameOf(offer.kind, id, survey),
