@@ -395,12 +395,19 @@ export function submitPendingImport(state: GameState, definition: ActorDefinitio
   ];
 }
 
-/** GM decision on a queued import: approving instantiates a claimable actor; either way it leaves the queue. */
-export function resolvePendingImport(state: GameState, importId: string, approve: boolean, newActorId: string) {
+/** GM decision on a queued import: approving instantiates a claimable actor; either way it leaves the queue. The
+ *  catalog gives its carried magic items their riders from the start, as the GM's own import does. */
+export function resolvePendingImport(
+  state: GameState,
+  importId: string,
+  approve: boolean,
+  newActorId: string,
+  catalog?: EquipmentCatalog
+) {
   const pending = state.pendingImports.find((entry) => entry.id === importId);
   if (!pending) throw new CommandRejectedError("That pending import is no longer in the queue.");
   state.pendingImports = state.pendingImports.filter((entry) => entry.id !== importId);
-  if (approve) importActorDefinition(state, pending.definition, newActorId, "public");
+  if (approve) importActorDefinition(state, pending.definition, newActorId, "public", catalog);
 }
 
 /** Archived characters are out of play; rejected (not filtered) so the GM's selection never silently changes. */

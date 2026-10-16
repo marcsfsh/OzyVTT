@@ -416,9 +416,12 @@ export const characterCommands = [
     schema: CharacterResolveImportSchema,
     malformed: "The import decision is malformed.",
     gmOnly: "Only the GM can approve imported sheets.",
-    async run({ request, execute }) {
+    async run({ request, execute }, kit) {
       const actorId = request.commandId;
-      await execute((state) => resolvePendingImport(state, request.importId, request.approve, actorId), { actorId });
+      await execute(
+        (state) => resolvePendingImport(state, request.importId, request.approve, actorId, kit.equipmentCatalog()),
+        { actorId }
+      );
       return { actorId };
     }
   })

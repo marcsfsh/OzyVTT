@@ -185,10 +185,16 @@ export const characterSheetCommands = [
       "Edit a character's identity (class/level/race/background/feats) on its imported sheet; players only rename.",
     schema: CharacterSetIdentitySchema,
     malformed: "The identity command is malformed.",
-    async run({ principal, request, execute }) {
+    async run({ principal, request, execute }, kit) {
       await execute((state) => {
         requireActorAccess(initiatorOf(principal), state, request.actorId, "edit");
-        setCharacterIdentity(state, request.actorId, request.character, { gm: isGmGrade(principal) });
+        setCharacterIdentity(
+          state,
+          request.actorId,
+          request.character,
+          { gm: isGmGrade(principal) },
+          kit.equipmentCatalog()
+        );
       });
     }
   }),
@@ -201,10 +207,10 @@ export const characterSheetCommands = [
     summary: "Edit a character's save and skill proficiency selections on its imported sheet.",
     schema: CharacterSetProficienciesSchema,
     malformed: "The proficiencies command is malformed.",
-    async run({ principal, request, execute }) {
+    async run({ principal, request, execute }, kit) {
       await execute((state) => {
         requireActorAccess(initiatorOf(principal), state, request.actorId, "edit");
-        setCharacterProficiencies(state, request.actorId, request.proficiencies);
+        setCharacterProficiencies(state, request.actorId, request.proficiencies, kit.equipmentCatalog());
       });
     }
   })
