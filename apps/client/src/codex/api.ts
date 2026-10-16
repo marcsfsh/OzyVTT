@@ -6,6 +6,7 @@
 import type {
   CodexAutosaveSettings,
   CodexCalendar,
+  CodexCalendarMove,
   CodexChronicleRecord,
   CodexConnection,
   CodexConnectionLayer,
@@ -358,6 +359,11 @@ export type CodexMilestoneInput = Readonly<{ level: number; reason: string }>;
 export const calendarApi = {
   /** The GM's clock plus `publishedDate`. Players read the same route via `playerCodexApi.calendar`. */
   get: (token: string) => request<{ calendar: GmCodexCalendar }>(token, "/calendar").then((data) => data.calendar),
+  /** The revealed dated records saving this calendar would move in front of players; changes nothing. */
+  check: (token: string, calendar: CodexCalendar) =>
+    request<{ moves: readonly CodexCalendarMove[] }>(token, "/calendar/check", { method: "POST", body: calendar }).then(
+      (data) => data.moves
+    ),
   /** Replaces the structure and the GM's clock; it never publishes. */
   set: (token: string, calendar: CodexCalendar) =>
     request<{ calendar: GmCodexCalendar }>(token, "/calendar", { method: "PUT", body: calendar }).then(

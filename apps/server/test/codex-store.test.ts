@@ -5289,6 +5289,8 @@ describe("every codex write bumps the coarse revision (the ETag's one premise)",
     "partyMarker",
     "getCalendar",
     "getPublishedDate",
+    // Previews a calendar save; it writes nothing.
+    "calendarMoves",
     "campaignInstant",
     "publishedInstant",
     "dateForInstant",

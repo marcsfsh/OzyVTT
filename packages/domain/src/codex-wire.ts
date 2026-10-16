@@ -444,6 +444,21 @@ export type CodexSettingsInput = Readonly<{
   autosave: CodexAutosaveSettings;
 }>;
 
+// ----- Calendar check (GM-only): what a calendar change would move in front of players -----
+
+/** A revealed dated record a proposed calendar would move: its date resolves to another day, or a deadline players
+ *  saw pass would read as approaching again. */
+export type CodexCalendarMove = Readonly<{
+  kind: "page" | "journal";
+  id: string;
+  /** The page's title, or the start of the journal entry's player text, else its kind. */
+  title: string;
+  /** The date as players read it now, and as they would. */
+  before: string;
+  after: string;
+  unpasses: boolean;
+}>;
+
 // ----- The reveal audit (GM-only): what the player projections currently emit -----
 
 /** `id` is what the kind's reveal route takes, which for `standing` is the faction page id. The `date` row's

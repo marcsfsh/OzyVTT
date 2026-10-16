@@ -1824,6 +1824,13 @@ export const openApiDocument = {
           "Publishes the GM's clock: the party's `currentDate` becomes the GM's. Takes no body - \"publish\" means exactly \"the table now sees where I am\", and an arbitrary settable published date would be a third clock to keep in step. This is the ONLY thing that moves the players' date; neither editing the calendar nor applying downtime does it. Publishing while the GM has no current date clears the published one. The 400 is not reachable through any input today - the handler routes every failure through the shared codex error mapper, and documenting only the statuses currently reachable would make the document wrong the moment that changes."
       })
     },
+    [CODEX_PATHS.calendarCheck]: {
+      post: codexOp("checkCodexCalendar", codexGmRead, "CodexCalendarCheckResponse", {
+        body: "CodexCalendarRequest",
+        description:
+          "Says what saving this calendar (the same body `PUT /codex/calendar` takes) would do to records the players can see, and changes nothing. A dated record keeps its raw date, but a calendar with fewer months or shorter ones resolves a date it lacks to another day, and a deadline measured against the published date can read as approaching again after players saw it pass. The GM's calendar editor calls this before saving and asks first when anything would move. GM-only; a read, so it takes no `commandId` and pings nobody."
+      })
+    },
     [CODEX_PATHS.calendarUnpublish]: {
       post: codexOp("unpublishCodexCampaignDate", codexWrite, "CodexCalendarResponse", {
         description:
@@ -5137,6 +5144,28 @@ export const openApiDocument = {
       CodexRevealAuditResponse: envelopeSchema("#/components/schemas/CodexRevealAuditData"),
       CodexCalendarData: codexDataObject("calendar", { $ref: "#/components/schemas/CodexCalendar" }),
       CodexCalendarResponse: envelopeSchema("#/components/schemas/CodexCalendarData"),
+      CodexCalendarMove: {
+        type: "object",
+        additionalProperties: false,
+        description: "A record the party can see that the proposed calendar would move.",
+        required: ["kind", "id", "title", "before", "after", "unpasses"],
+        properties: {
+          kind: { type: "string", enum: ["page", "journal"], description: "A dated page, or a journal entry." },
+          id: { ...codexUuid, description: "The record's id." },
+          title: {
+            type: "string",
+            description: "The page's title, or the start of the journal entry's player text, else its kind."
+          },
+          before: { type: "string", description: "The date as players read it under the current calendar." },
+          after: { type: "string", description: "The date as they would read it under the proposed one." },
+          unpasses: {
+            type: "boolean",
+            description: "A deadline players have seen pass that would read as approaching again."
+          }
+        }
+      },
+      CodexCalendarCheckData: codexDataObject("moves", codexArrayRef("CodexCalendarMove")),
+      CodexCalendarCheckResponse: envelopeSchema("#/components/schemas/CodexCalendarCheckData"),
       // The GET projects per role; calendar writes and the apply-downtime payload keep the GM shape.
       CodexCalendarProjectedData: codexDataObject("calendar", { $ref: "#/components/schemas/CodexCalendarProjected" }),
       CodexCalendarProjectedResponse: envelopeSchema("#/components/schemas/CodexCalendarProjectedData"),

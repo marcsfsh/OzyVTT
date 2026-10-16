@@ -1798,6 +1798,62 @@ describe("codex deadlines, downtime and the prep clock, HTTP boundary", () => {
     expect((await post(base, "/api/v1/codex/calendar/unpublish", PLAYER, {})).status).toBe(403);
   });
 
+  it("says before a save which revealed dates a smaller calendar would move, and changes nothing", async () => {
+    const { base, store } = await fixture();
+    await put(base, "/api/v1/codex/calendar", GM, { ...WORLD, currentDate: { year: 1492, month: 1, day: 2 } });
+    await post(base, "/api/v1/codex/calendar/publish", GM, {});
+    // Players saw Hammer 25 pass: the published date is Alturiak 2.
+    const deadline = (
+      await body(
+        await post(base, "/api/v1/codex/journal/deadline", GM, {
+          playerText: "The duke's tax falls due.",
+          inWorldDate: { year: 1492, month: 0, day: 25 }
+        })
+      )
+    ).data.entry as Json;
+    await post(base, `/api/v1/codex/journal/${deadline.id}/reveal`, GM, { revealed: true });
+    const feast = store.createPage({
+      title: "The Feast of the Moon",
+      entityType: "event",
+      revealedToPlayers: true,
+      inWorldDate: { year: 1492, month: 1, day: 20 }
+    });
+    store.createPage({ title: "A secret", entityType: "event", inWorldDate: { year: 1492, month: 1, day: 21 } });
+
+    const oneMonth = {
+      ...WORLD,
+      months: [{ name: "Hammer", days: 30 }],
+      currentDate: { year: 1492, month: 1, day: 2 }
+    };
+    const checked = await post(base, "/api/v1/codex/calendar/check", GM, oneMonth);
+    expect(checked.status).toBe(200);
+    const moves = (await body(checked)).data.moves as Json[];
+    expect(moves).toEqual(
+      expect.arrayContaining([
+        {
+          kind: "journal",
+          id: deadline.id,
+          title: "The duke's tax falls due.",
+          before: "Hammer 25, 1492 DR",
+          after: "Hammer 25, 1492 DR",
+          unpasses: true
+        },
+        {
+          kind: "page",
+          id: feast.id,
+          title: "The Feast of the Moon",
+          before: "Alturiak 20, 1492 DR",
+          after: "Hammer 20, 1492 DR",
+          unpasses: false
+        }
+      ])
+    );
+    // The unrevealed page is the GM's business, not a warning about what players see.
+    expect(moves).toHaveLength(2);
+    expect((await calendar(base, GM)).months).toHaveLength(2);
+    expect((await post(base, "/api/v1/codex/calendar/check", PLAYER, oneMonth)).status).toBe(403);
+  });
+
   /** Neither deadline nor downtime reaches a player's chronicle until the ordinary reveal is set. */
   it("never puts an unrevealed deadline or downtime on a player's chronicle, and puts a revealed one there", async () => {
     const { base } = await fixture();

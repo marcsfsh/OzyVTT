@@ -117,6 +117,7 @@ export const CODEX_PATHS = {
   calendar: `${API_NAMESPACE}/codex/calendar`,
   calendarPublish: `${API_NAMESPACE}/codex/calendar/publish`,
   calendarUnpublish: `${API_NAMESPACE}/codex/calendar/unpublish`,
+  calendarCheck: `${API_NAMESPACE}/codex/calendar/check`,
   // Codex-wide settings, a singleton (`codex_meta` is one row). GM-only for reads and writes.
   settings: `${API_NAMESPACE}/codex/settings`,
   // Deletes the whole `codex_page_revisions` table to reclaim space, hence a top-level collection;
