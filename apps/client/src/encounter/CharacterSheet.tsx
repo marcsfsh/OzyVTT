@@ -13,7 +13,9 @@ import { ConditionEditor } from "./conditions";
 import { SavePrompt } from "./SavePrompt";
 import { RichText } from "./RichText";
 import { DicePanel } from "../dice/DicePanel";
-import { useRollPreference } from "../dice/roll-preference";
+import { rollModeOf, useRollPreference } from "../dice/roll-preference";
+import { DyingTracker } from "./DyingTracker";
+import { isKnockedOut, partyHelpers, StabilizeControl } from "./StabilizeControl";
 import { summaryOfOwnAction } from "./PlayerActionRunner";
 import { beginTargeting, setTargetingResult, useTargeting } from "./targeting";
 import { formatChallenge, titleCase } from "./format";
@@ -278,6 +280,46 @@ export function CharacterSheet({
               rollMode="auto"
             />
           ))}
+        </div>
+      )}
+      {/* Dying or knocked out outside a fight: the death saves, and for the GM the aid that ends it. In a fight
+        both live on the turn order. */}
+      {!inFight && (actor.deathSaves || isKnockedOut(actor)) && (
+        <div className="sheet-dying-block">
+          {actor.deathSaves ? (
+            <DyingTracker
+              actorId={actor.id}
+              name={actor.name}
+              deathSaves={actor.deathSaves}
+              canRoll
+              onFeedback={setFeedback}
+              rollMode={rollModeOf(rollInput)}
+              isActingTurn={false}
+              aid={
+                role === "gm" && state ? (
+                  <StabilizeControl
+                    targetId={actor.id}
+                    targetName={actor.name}
+                    helpers={partyHelpers(state as GmView, actor.id)}
+                    gm
+                    onFeedback={setFeedback}
+                  />
+                ) : undefined
+              }
+            />
+          ) : (
+            role === "gm" &&
+            state && (
+              <StabilizeControl
+                targetId={actor.id}
+                targetName={actor.name}
+                helpers={partyHelpers(state as GmView, actor.id)}
+                gm
+                knockedOut
+                onFeedback={setFeedback}
+              />
+            )
+          )}
         </div>
       )}
       {actor.kind === "player-character" && (

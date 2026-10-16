@@ -32,7 +32,8 @@ import type {
   ReactionAnswerResult,
   RulesBlocked,
   SaveAnswerResult,
-  SceneCreateResult
+  SceneCreateResult,
+  StabilizeResult
 } from "./results.js";
 import type { ClientRole, CombatLogEntry, GmView, PlayerView } from "./views.js";
 
@@ -49,6 +50,7 @@ import type {
   ActorRestSchema,
   ActorReviveSchema,
   ActorSetSpeedSchema,
+  ActorStabilizeSchema,
   ActorSpendHitDiceSchema,
   AddCombatantSchema,
   AnnotationAddSchema,
@@ -383,6 +385,11 @@ export interface ClientToServerEvents {
   "death-save:roll": (
     payload: CommandPayload<typeof DeathSaveRollSchema>,
     acknowledgement: (result: DeathSaveResult) => void
+  ) => void;
+  /** Stabilize a creature at 0 HP (first aid, a Healer's Kit, Spare the Dying, or the GM's ruling). */
+  "actor:stabilize": (
+    payload: CommandPayload<typeof ActorStabilizeSchema>,
+    acknowledgement: (result: StabilizeResult) => void
   ) => void;
   "encounter:set-rules-mode": (
     payload: CommandPayload<typeof SetRulesModeSchema>,

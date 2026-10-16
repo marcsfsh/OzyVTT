@@ -512,6 +512,22 @@ export const DeathSaveRollSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** Stabilize a creature at 0 hit points (`actorId`), or wake one knocked out, by the aid `helperId` gives: first aid
+ *  (a DC 10 Wisdom (Medicine) check), a Healer's Kit use, Spare the Dying, or the GM's own ruling (no helper). */
+export const ActorStabilizeSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    method: z.enum(["medicine", "healers-kit", "spare-the-dying", "gm"]),
+    helperId: z.uuid().optional(),
+    override: RulesOverrideSchema.optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.method !== "gm" && value.helperId === undefined)
+      context.addIssue({ code: "custom", path: ["helperId"], message: "Choose who gives the aid." });
+  });
 /** Change the live fight's rules mode and optionally its per-family exceptions. Omitted `exceptions` leaves the stored ones. */
 export const SetRulesModeSchema = z
   .object({

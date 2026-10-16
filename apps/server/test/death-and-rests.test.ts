@@ -1,7 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { GAME_PATHS } from "@vtt/api-contract";
 import { GameStateSchema, type GameState } from "@vtt/domain";
@@ -10,7 +7,7 @@ import { loadActorFixture } from "@vtt/test-fixtures";
 import { setCondition } from "../src/actor-conditions.js";
 import { healActor, reviveActor, setCurrentHp } from "../src/hit-points.js";
 import { applyRest, spendHitDice } from "../src/rests.js";
-import { createServer } from "../src/server.js";
+import { bootServer } from "./boot-server.js";
 
 // SRD 5.2.1 "Dead": "A dead creature has no Hit Points and can't regain them unless it is first revived by magic".
 // Short and Long Rest: "To start a [Short/Long] Rest, you must have at least 1 Hit Point."
@@ -146,59 +143,28 @@ describe("over the API", () => {
     for (const cleanup of cleanups.splice(0)) await cleanup();
   });
 
-  async function boot(initial: GameState) {
-    const directory = await mkdtemp(join(tmpdir(), "vtt-death-rests-"));
-    const server = createServer({
-      authPath: join(directory, "auth.json"),
-      databasePath: join(directory, "vtt.sqlite"),
-      integrationCredentialsPath: join(directory, "integrations.sqlite"),
-      mapAssetsPath: join(directory, "map-assets"),
-      webDist: join(directory, "dist"),
-      useDevelopmentClient: true,
-      developmentClientPort: 5173,
-      initialGameState: initial
-    });
-    await server.initialize();
-    await server.auth.bootstrap("a sufficiently long GM password");
-    const gmToken = (await server.auth.login("a sufficiently long GM password"))!;
-    await new Promise<void>((done) => server.httpServer.listen(0, "127.0.0.1", done));
-    const address = server.httpServer.address();
-    if (!address || typeof address === "string") throw new Error("Server did not bind.");
-    cleanups.push(async () => {
-      server.close();
-      await rm(directory, { recursive: true, force: true });
-    });
-    return { base: `http://127.0.0.1:${address.port}`, server, gmToken };
-  }
-  const post = (base: string, path: string, token: string, body: unknown) =>
-    fetch(base + path, {
-      method: "POST",
-      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: JSON.stringify(body)
-    });
-
   it("a player can't Long Rest or heal their dead character back, and the GM revives them", async () => {
-    const initial = game({ ...dead, ownerSessionId: null });
-    const { base, server, gmToken } = await boot(initial);
+    const { server, gmToken, post, close } = await bootServer(game({ ...dead, ownerSessionId: null }));
+    cleanups.push(close);
     const player = server.auth.issuePlayerSession();
-    expect((await post(base, GAME_PATHS.claims, player, { commandId: randomUUID(), actorId: HERO })).status).toBe(200);
-    const rest = await post(base, GAME_PATHS.actorRest.replace("{actorId}", HERO), player, {
+    expect((await post(GAME_PATHS.claims, player, { commandId: randomUUID(), actorId: HERO })).status).toBe(200);
+    const rest = await post(GAME_PATHS.actorRest.replace("{actorId}", HERO), player, {
       commandId: randomUUID(),
       kind: "long"
     });
     expect(rest.status).toBe(409);
-    const heal = await post(base, GAME_PATHS.actorHeal.replace("{actorId}", HERO), gmToken, {
+    const heal = await post(GAME_PATHS.actorHeal.replace("{actorId}", HERO), gmToken, {
       commandId: randomUUID(),
       amount: 10
     });
     expect(heal.status).toBe(409);
     expect((await heal.json()).error.message).toMatch(/dead and can't regain hit points/);
-    const playerRevive = await post(base, GAME_PATHS.actorRevive.replace("{actorId}", HERO), player, {
+    const playerRevive = await post(GAME_PATHS.actorRevive.replace("{actorId}", HERO), player, {
       commandId: randomUUID(),
       hitPoints: 1
     });
     expect(playerRevive.status).toBe(403);
-    const revive = await post(base, GAME_PATHS.actorRevive.replace("{actorId}", HERO), gmToken, {
+    const revive = await post(GAME_PATHS.actorRevive.replace("{actorId}", HERO), gmToken, {
       commandId: randomUUID(),
       hitPoints: 1
     });

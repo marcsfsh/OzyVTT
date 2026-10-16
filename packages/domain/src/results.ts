@@ -204,6 +204,15 @@ export type DeathSaveResult = MutationResult & {
       "advantage" | "disadvantage" | "normal";
   }>;
 };
+/** Outcome of giving aid to a creature at 0 hit points: stabilized, woken from a knock-out, or neither (a failed
+ *  check). `check` is the Wisdom (Medicine) roll when first aid was the method. */
+export type StabilizeResult = MutationResult & {
+  stabilize?: Readonly<{
+    stabilized: boolean;
+    woke: boolean;
+    check: Readonly<{ natural: number; total: number; dc: number }> | null;
+  }>;
+};
 /** Outcome of answering a pending save; applied damage/condition already happened server-side when present. */
 export type SaveAnswerResult = MutationResult & {
   outcome?: {
