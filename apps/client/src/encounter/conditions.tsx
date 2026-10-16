@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import type { Actor, ContentConditionSummary } from "@vtt/domain";
-import { Chip, Stepper, type ChipTone } from "@vtt/ui";
+import { Button, Chip, Stepper, type ChipTone } from "@vtt/ui";
 import { command, read } from "../lib/command";
+import { newId } from "../lib/ids";
 import { CONDITION_GLYPHS } from "../scene/tokenGlyph";
 import "./conditions.css";
 
@@ -86,30 +87,89 @@ export function useConditionLabels(conditions: readonly ConditionInstance[]): st
   return conditions.map((instance) => labelFor(instance, reference));
 }
 
+/** A condition's rules text as the bundle prints it: an opening line, then "* Name. Rule." bullets. */
+export function ConditionText({ text }: Readonly<{ text: string }>) {
+  const [lead, ...rest] = text.split(/\n\s*\*\s*/);
+  return (
+    <div className="condition-text">
+      {lead.trim() && <p>{lead.trim()}</p>}
+      {rest.length > 0 && (
+        <ul>
+          {rest.map((line) => {
+            const split = line.trim().match(/^([^.]{1,40}\.)\s*(.*)$/s);
+            return (
+              <li key={line}>
+                {split ? (
+                  <>
+                    <strong>{split[1]}</strong> {split[2]}
+                  </>
+                ) : (
+                  line.trim()
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** What links a condition: the effect holding it, when one does (its name says where it came from). */
+type LinkingEffect = Readonly<{ name: string; linkedConditionIds: readonly string[]; escapeDc: number | null }>;
+
 /**
- * Chips plus a toggleable picker for whoever may edit this actor (the server still enforces
- * scope). Exhaustion exposes a 1-6 level stepper while active.
+ * Chips plus a toggleable picker for whoever may edit this actor (the server still enforces scope).
+ * Tapping a chip opens its rules text, where it came from and an explicit way to end it, so a tap on a
+ * phone never removes anything by itself. A player may take off what they put on; anything imposed is the
+ * GM's to end (or an Escape, or its own duration), so it offers "Ask the GM" instead. Standing from Prone is
+ * the server's call (your own turn, half your Speed). Exhaustion exposes a 1-6 level stepper while active.
  */
 export function ConditionEditor({
   actorId,
   conditions,
+  effects = [],
+  viewer,
+  canAsk = false,
   onFeedback
-}: Readonly<{ actorId: string; conditions: readonly ConditionInstance[]; onFeedback: (text: string) => void }>) {
+}: Readonly<{
+  actorId: string;
+  conditions: readonly ConditionInstance[];
+  /** The actor's effects, so a linked condition can say what holds it. */
+  effects?: readonly LinkingEffect[];
+  viewer: "gm" | "player";
+  /** A player can ask the GM in a live fight, where the GM's question queue is. */
+  canAsk?: boolean;
+  onFeedback: (text: string) => void;
+}>) {
   const reference = useConditionReference();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [shown, setShown] = useState<string | null>(null);
   const activeById = new Map(conditions.map((instance) => [instance.id, instance]));
+  const shownInstance = shown === null ? undefined : activeById.get(shown);
 
   const send = (conditionId: string, active: boolean, level?: number) => {
     setBusy(true);
-    void command("actor:set-condition", {
-      actorId,
-      conditionId,
-      active,
-      ...(level !== undefined ? { level } : {})
+    const payload = { actorId, conditionId, active, ...(level !== undefined ? { level } : {}) };
+    void command("actor:set-condition", payload).then((result) => {
+      setBusy(false);
+      if (!result.ok) {
+        onFeedback(result.message ?? "The condition could not be updated.");
+        return;
+      }
+      if (!active && conditionId === shown) setShown(null);
+    });
+  };
+  const ask = (conditionId: string) => {
+    setBusy(true);
+    void command("rules:ask", {
+      type: "actor.set-condition",
+      payload: { commandId: newId(), actorId, conditionId, active: false }
     }).then((result) => {
       setBusy(false);
-      if (!result.ok) onFeedback(result.message ?? "The condition could not be updated.");
+      if (!result.ok) onFeedback(result.message ?? "That question could not be sent.");
+      else onFeedback(result.ran ? "Done - no question needed." : "Asked the GM. Waiting for their call.");
     });
   };
 
@@ -121,10 +181,14 @@ export function ConditionEditor({
             key={instance.id}
             tone={conditionTone(instance.id)}
             icon={conditionIcon(instance.id)}
-            pressed
+            pressed={shown === instance.id}
+            aria-expanded={shown === instance.id}
             disabled={busy}
-            title={`${descriptionFor(instance.id, reference)}\n\nClick to remove.`}
-            onClick={() => send(instance.id, false)}
+            title={descriptionFor(instance.id, reference)}
+            onClick={() => {
+              requestConditionReference();
+              setShown((current) => (current === instance.id ? null : instance.id));
+            }}
           >
             {labelFor(instance, reference)}
           </Chip>
@@ -144,6 +208,20 @@ export function ConditionEditor({
           {open ? "Done" : "+ Add"}
         </Chip>
       </span>
+      {shownInstance && (
+        <ConditionDetail
+          instance={shownInstance}
+          label={labelFor(shownInstance, reference)}
+          text={descriptionFor(shownInstance.id, reference)}
+          holder={effects.find((effect) => effect.linkedConditionIds.includes(shownInstance.id))}
+          viewer={viewer}
+          canAsk={canAsk}
+          busy={busy}
+          onRemove={() => send(shownInstance.id, false)}
+          onAsk={() => ask(shownInstance.id)}
+          onClose={() => setShown(null)}
+        />
+      )}
       {open && (
         <div className="condition-picker" role="group" aria-label="Conditions">
           {reference.map((entry) => {
@@ -175,6 +253,63 @@ export function ConditionEditor({
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+/** One condition opened from its chip: what it does, what holds it, and the way to end it this viewer has. */
+function ConditionDetail({
+  instance,
+  label,
+  text,
+  holder,
+  viewer,
+  canAsk,
+  busy,
+  onRemove,
+  onAsk,
+  onClose
+}: Readonly<{
+  instance: ConditionInstance;
+  label: string;
+  text: string;
+  holder: LinkingEffect | undefined;
+  viewer: "gm" | "player";
+  canAsk: boolean;
+  busy: boolean;
+  onRemove: () => void;
+  onAsk: () => void;
+  onClose: () => void;
+}>) {
+  const prone = instance.id === "prone";
+  const own = instance.selfApplied === true && holder === undefined;
+  const removable = viewer === "gm" || own || prone;
+  const origin = holder
+    ? `From ${holder.name}${holder.escapeDc !== null ? ` · escape DC ${holder.escapeDc}` : ""}.`
+    : own && viewer === "player"
+      ? "You marked this yourself."
+      : null;
+  return (
+    <div className="condition-detail" role="region" aria-label={`${label} rules`}>
+      <p className="condition-detail-name">{label}</p>
+      {text ? <ConditionText text={text} /> : <p className="condition-detail-muted">Loading the rules text.</p>}
+      {origin && <p className="condition-detail-origin">{origin}</p>}
+      <div className="condition-detail-actions">
+        {removable ? (
+          <Button size="sm" variant="secondary" disabled={busy} onClick={onRemove}>
+            {prone && viewer === "player" ? "Stand up" : `Remove ${label}`}
+          </Button>
+        ) : canAsk ? (
+          <Button size="sm" variant="secondary" disabled={busy} onClick={onAsk}>
+            Ask the GM to end it
+          </Button>
+        ) : (
+          <p className="condition-detail-muted">It ends by its own rules or when the GM ends it.</p>
+        )}
+        <Button size="sm" variant="ghost" onClick={onClose}>
+          Close
+        </Button>
+      </div>
     </div>
   );
 }

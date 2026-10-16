@@ -46,7 +46,13 @@ export function RowTools({
           onEscape={onClose}
           onFeedback={onFeedback}
         />
-        <ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={onFeedback} />
+        <ConditionEditor
+          actorId={actor.id}
+          conditions={actor.conditions}
+          effects={actor.effects}
+          viewer="gm"
+          onFeedback={onFeedback}
+        />
         <EffectChips actorId={actor.id} effects={actor.effects} canEnd onFeedback={onFeedback} />
         <div className="initiative-row-tools">
           <Button
