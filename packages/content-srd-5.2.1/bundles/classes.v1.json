@@ -9642,7 +9642,7 @@
         "choose": 1,
         "fromPicks": {
          "offer": "class-cantrips",
-         "where": "ranged"
+         "where": "ranged-damage"
         }
        }
       },

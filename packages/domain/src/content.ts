@@ -180,7 +180,10 @@ export const ContentFeatureChoiceSummarySchema = z.strictObject({
   minSpellLevel: z.number().int().min(0).max(9).nullable(),
   /** Options drawn from the character's own earlier picks; `offer` names the budget, `where` a predicate slug. */
   fromPicks: z
-    .strictObject({ offer: z.string(), where: z.enum(["deals-damage", "attack-roll", "ranged"]).nullable() })
+    .strictObject({
+      offer: z.string(),
+      where: z.enum(["deals-damage", "attack-roll", "ranged", "ranged-damage"]).nullable()
+    })
     .nullable(),
   /** Inline options with their names and any nested pick. Empty when the options come from `fromCatalog` or are plain ids in `from`. */
   get options(): z.ZodArray<typeof ContentFeatureOptionSummarySchema> {

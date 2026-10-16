@@ -62,7 +62,7 @@ export const warlock: ClassMechanicsModule = {
           ]
         },
         "eldritch-spear": {
-          choice: { kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips", where: "ranged" } }
+          choice: { kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips", where: "ranged-damage" } }
         },
         "repelling-blast": {
           choice: { kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips", where: "attack-roll" } }

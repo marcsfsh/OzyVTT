@@ -363,7 +363,7 @@ const featureChoiceBase = {
   fromPicks: z
     .object({
       offer: PickBudgetKeySchema,
-      where: z.enum(["deals-damage", "attack-roll", "ranged"]).optional()
+      where: z.enum(["deals-damage", "attack-roll", "ranged", "ranged-damage"]).optional()
     })
     .strict()
     .optional(),
