@@ -158,6 +158,8 @@ export type ResolveContext = {
   castId: string | null;
   /** The extras this hit carries whose costs are spent after the hit's own (`spendHitOptions`). */
   readonly hitRiders: Array<{ action: DefinitionAction; slotLevel?: number }>;
+  /** The live effects whose damage riders this hit rolled, so a coat of poison is spent (`spendDamageUses`). */
+  readonly damageEffectIds: string[];
 };
 
 /** Records one rolled formula in the shared history, attributed like every roll of this resolve. */

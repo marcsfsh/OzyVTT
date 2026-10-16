@@ -1,7 +1,8 @@
+import type { GameState } from "@vtt/domain";
 import { addEffect, makeEffect, turnEndDuration, type EffectNarration } from "../effects.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { currentSpeedFeet } from "../speed.js";
-import type { ResolveContext } from "./context.js";
+import type { DefinitionAction, LiveActor, ResolveContext } from "./context.js";
 
 /** Granted effects (Rage, Reckless Attack on self; Help on an ally): replace-on-refresh, ending when the
  *  granter drops to 0 HP. */
@@ -49,6 +50,7 @@ export function applyGrant(ctx: ResolveContext): void {
       onEnd: grant.onEnd,
       endsWithTag: grant.endsWithTag ?? null,
       concentration: grant.concentration,
+      ...(grant.damageUses !== undefined ? { damageUses: grant.damageUses } : {}),
       ...grantedMovement
     }),
     replaced,
@@ -63,4 +65,45 @@ export function applyGrant(ctx: ResolveContext): void {
       conditionIds: []
     });
   else ctx.effectGranted = { name: effect.name, tags: effect.tags };
+}
+
+/** An item's self grant used outside a fight (Antitoxin drunk before the dungeon, a blade coated on the road): the
+ *  same effect on its user, counted once a fight's turns start. Nothing for a grant aimed at a target. */
+export function grantOutsideFight(
+  state: GameState,
+  actor: LiveActor,
+  action: DefinitionAction,
+  commandId: string
+): EffectNarration[] {
+  const grant = action.grants;
+  if (!grant || grant.target === "target") return [];
+  const events: EffectNarration[] = [];
+  const effect = addEffect(
+    state,
+    actor.id,
+    makeEffect({
+      id: `${commandId}:grant`,
+      name: grant.name ?? action.name,
+      tags: grant.tags,
+      sourceActorId: actor.id,
+      sourceName: actor.name,
+      sourceActionId: action.id,
+      startedRound: state.combat.round,
+      duration:
+        grant.duration.type === "rounds"
+          ? { type: "rounds", remaining: grant.duration.rounds }
+          : grant.duration.type === "until-source-turn-end"
+            ? turnEndDuration(state, "until-source-turn-end", actor.id)
+            : grant.duration,
+      endsWhenSourceDefeated: true,
+      voidWhileIncapacitated: grant.voidWhileIncapacitated,
+      modifiers: grant.modifiers,
+      onEnd: grant.onEnd,
+      endsWithTag: grant.endsWithTag ?? null,
+      concentration: grant.concentration,
+      ...(grant.damageUses !== undefined ? { damageUses: grant.damageUses } : {})
+    }),
+    events
+  );
+  return [{ kind: "effect", text: `${actor.name} gains ${effect.name}.`, actorId: actor.id }, ...events];
 }

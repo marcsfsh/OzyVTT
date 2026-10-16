@@ -146,7 +146,8 @@ export function openResolve(
     builtinSave: null,
     opens: null,
     castId: null,
-    hitRiders: []
+    hitRiders: [],
+    damageEffectIds: []
   };
   if (builtin?.prepare) ctx.action = builtin.prepare(ctx);
   // A spell cast with a higher slot rolls that slot's dice; a paid replay names the slot it was cast with.

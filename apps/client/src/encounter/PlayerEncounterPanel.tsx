@@ -272,6 +272,7 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                           effects={rowActor.effects}
                           canEnd={false}
                           canAsk={combat.active}
+                          canAct
                           onFeedback={onFeedback}
                         />
                       )}

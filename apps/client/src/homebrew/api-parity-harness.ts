@@ -443,7 +443,8 @@ const SAVE_LIFETIME_KEYS = [
   "speedZero",
   "rangeFeet",
   "failsAtHitPoints",
-  "ongoingDamage.**"
+  "ongoingDamage.**",
+  "failureHazard"
 ] as const;
 
 /** The exemption table. First match wins, so specific rows sit above general ones. */
@@ -652,6 +653,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "effects[].voidWhileIncapacitated",
     types: FEATURE_CARRIERS,
     reason: "effect linkage vocabulary with no control — no program unit authors it",
+    status: "gap"
+  },
+  {
+    at: "effects[].damageUses",
+    types: FEATURE_CARRIERS,
+    reason:
+      "how many hits an effect's damage riders last (a coat of poison); authored in the item overlay, no control yet",
     status: "gap"
   },
   {

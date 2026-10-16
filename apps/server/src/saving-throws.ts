@@ -14,6 +14,7 @@ import {
 } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
+import { withoutSameHazard } from "./hazards.js";
 import { recordRoll as recordRollInHistory, rolledTerms } from "./roll-history.js";
 import { requireGm, type Initiator } from "./authorization.js";
 import { applyDamageDetailed, previewDamage, adjustableActor } from "./hit-points.js";
@@ -66,13 +67,15 @@ export type SaveOutcome = Readonly<{
 }>;
 
 /** Advantage/disadvantage sources for a save: Restrained gives disadvantage on DEX saves (SRD), and every
- *  carrier's `roll-mode` riders (Dodge, Rage, items), narrowed by `ability-is`. A concentration check also
+ *  carrier's `roll-mode` riders (Dodge, Rage, items), narrowed by `ability-is`, and by `versus-condition` against
+ *  the conditions the save would impose or end (`stakes`: Antitoxin's Poisoned). A concentration check also
  *  collects `roll: "concentration"`. Mirrors attackRollSources. */
 export function saveRollSources(
   target: Actor,
   ability: AbilityId,
   derivation: EquipmentDerivation,
-  concentration = false
+  concentration = false,
+  stakes: readonly string[] = []
 ): RollModeClaims {
   const claims: RollModeClaims = { advantage: [], disadvantage: [] };
   if (ability === "dex" && target.conditions.some((condition) => condition.id === "restrained")) {
@@ -82,11 +85,19 @@ export function saveRollSources(
     derivation,
     concentration ? ["save", "concentration"] : ["save"],
     "on-saving-throw",
-    {
-      ability
-    },
+    { ability, ...(stakes.length > 0 ? { targetConditionIds: stakes } : {}) },
     claims
   );
+}
+
+/** The conditions a pending save is about: what its failure imposes, or what the effect it would end holds. */
+function conditionsAtStake(state: GameState, pending: PendingSave): string[] {
+  const ending = pending.repeatOf
+    ? (state.actors
+        .find((actor) => actor.id === pending.repeatOf!.actorId)
+        ?.effects.find((effect) => effect.id === pending.repeatOf!.effectId)?.linkedConditionIds ?? [])
+    : [];
+  return [...new Set([...pending.conditionIds, ...(pending.onFailEffect?.linkedConditionIds ?? []), ...ending])];
 }
 
 /** The flat rider bonus to one saving throw: standing plus momentary. */
@@ -269,6 +280,7 @@ export function applyFailureEffect(
       ];
   }
   const events: EffectNarration[] = [];
+  withoutSameHazard(target, onFail);
   const applied = addEffect(
     state,
     target.id,
@@ -376,7 +388,13 @@ export function answerSave(
     // the sheet's chip; cover's per-save bonus is added on top.
     const modifier = saveTotalFor(definition, target, pending.ability, derivation) + pending.saveBonus;
     // A save that ends effects when failed is a concentration check.
-    const sources = saveRollSources(target, pending.ability, derivation, pending.endsEffects !== undefined);
+    const sources = saveRollSources(
+      target,
+      pending.ability,
+      derivation,
+      pending.endsEffects !== undefined,
+      conditionsAtStake(state, pending)
+    );
     const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
     // An explicit choice (the answerer's button, or a forced "normal") wins over detected sources.
     const mode = explicitRollMode ?? aggregated.mode;

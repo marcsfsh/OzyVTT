@@ -184,6 +184,11 @@ every charge, and spending the last one rolls the SRD's d20 for the GM (`item-ch
 counted on its row too (`ammunition.ts`): a shot from an Ammunition weapon needs a piece of the kind it fires
 and spends one, and half of the pieces fired come back when the encounter ends. A potion or a flask whose
 record is `consumedOnUse` acts from the pack and leaves the stack one smaller each time (`consumables.ts`).
+A thrown flask takes one attack of the Attack action (`replacesAttack`). Alchemist's Fire sets its target
+burning and Oil covers it (`save.failureHazard`, `hazards.ts`): a burning creature takes 1d4 Fire at the start
+of each of its turns until it uses the Put Out the Fire action, which leaves it Prone, and Fire damage on an
+oiled creature within the minute deals 5 more. Antitoxin and a coat of Basic Poison are effects the item
+grants its user; a coat's damage lasts a set number of hits (`damageUses`), in a fight or out of one.
 
 What a save does is data on the action's save block, not read from its description: `successDamage`
 (half or none) and the `failureCondition` a failed save imposes. They are written where the content

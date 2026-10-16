@@ -13,7 +13,7 @@ import { useUpConsumable } from "./resolution/consumables.js";
 import { rollAttack } from "./resolution/attack.js";
 import { rollLastCharge } from "./resolution/charges.js";
 import type { DefinitionAction, ResolveContext, ResolveDependencies, ResolveInput } from "./resolution/context.js";
-import { rollRiderDamage, rollWeaponDamage } from "./resolution/damage.js";
+import { rollRiderDamage, rollWeaponDamage, spendDamageUses } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
 import { applyHealing } from "./resolution/heal.js";
@@ -44,6 +44,7 @@ export function resolveDefinitionAction(
 ): ActionResolution {
   const ctx = openResolve(state, action, input, deps);
   ctx.builtin?.check?.(ctx);
+  ctx.builtin?.apply?.(ctx);
   rollAttack(ctx);
   // Preview: the d20 is rolled and shown, nothing else applies. The economy was validated already, so an
   // illegal attack is blocked before the preview roll.
@@ -88,6 +89,7 @@ export function resolveDefinitionAction(
 
   commitEconomy(ctx);
   spendHitOptions(ctx);
+  spendDamageUses(ctx);
   rollLastCharge(ctx);
   spendAmmunition(ctx);
   useUpConsumable(ctx);

@@ -15,7 +15,10 @@ import { settlePlayerDamage, type AppliedDamage } from "../player-damage.js";
 import { recordRoll, rolledTerms } from "../roll-history.js";
 import { overrideReason, overrideWaives, rememberOverride } from "../rules-families.js";
 import { looseRollPlan, NOT_YOUR_TURN, offTurnVerdict, routeForTap, spendLooseUses } from "../tap-routing.js";
-import { upcastAction } from "../item-actions.js";
+import { isItemActionId, upcastAction } from "../item-actions.js";
+import { BURNING_TAG, PUT_OUT_FIRE_ACTION_ID, putOutFire } from "../hazards.js";
+import type { EffectNarration } from "../effects.js";
+import { grantOutsideFight } from "../resolution/grant.js";
 import { lastChargeLine, lastChargeRollFor } from "../item-charges.js";
 import { consumableRowFor, withOneUsedUp } from "../consumables.js";
 import { castSlotLevel } from "../resolution/economy.js";
@@ -335,14 +338,30 @@ export const actionCommands = [
       let spend: ReturnType<typeof spendLooseUses> = { usesLeft: null, spent: false };
       let lastCharge: string | null = null;
       let usedUp = false;
+      let narrations: EffectNarration[] = [];
       const { state, duplicate } = await execute((draft) => {
         requireActorAccess(initiator, draft, actorId, "attack");
         const live = draft.actors.find((candidate) => candidate.id === actorId)!;
+        // Rolling on the ground outside a fight puts the fire out all the same.
+        if (action.id === PUT_OUT_FIRE_ACTION_ID) {
+          if (!live.effects.some((effect) => effect.tags.includes(BURNING_TAG)))
+            throw new CommandRejectedError(`${live.name} is not burning.`);
+          narrations = putOutFire(draft, live, {
+            selfApplied: initiator.role === "player",
+            immunities: {
+              resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
+              catalog: kit.equipmentCatalog()
+            }
+          }).events;
+        }
         spend = spendLooseUses(live, action, available, castLevel);
         // A potion drunk or a flask thrown outside a fight is used up all the same.
         const consumable = consumableRowFor(action, live.inventory, kit.equipmentCatalog());
         if (consumable) live.inventory = withOneUsedUp(live.inventory, consumable.id);
         usedUp = consumable !== null;
+        // What an item puts on its user lasts beyond the moment: Antitoxin drunk, a blade coated before a fight.
+        if (isItemActionId(action.id))
+          narrations = [...narrations, ...grantOutsideFight(draft, live, action, commandId)];
         // SRD charged items: spending the last charge rolls a d20, whose 1 is the item's own text.
         const due = spend.usesLeft === 0 ? lastChargeRollFor(action, live.inventory, kit.equipmentCatalog()) : null;
         lastCharge = null;
@@ -389,6 +408,7 @@ export const actionCommands = [
       });
       if (duplicate) return { route: "loose", rollIds };
       kit.publishRolls(state, commandId);
+      kit.publishNarrations(narrations);
       if (lastCharge !== null)
         kit.context.appendLog({
           kind: "action",

@@ -2,6 +2,7 @@ import type { PendingSave } from "@vtt/domain";
 import type { ActionReaction } from "@vtt/schemas";
 import { setCondition } from "../actor-conditions.js";
 import { conditionLabel } from "../condition-rules.js";
+import { HAZARDS } from "../hazards.js";
 import { halvedDamageParts, previewDamage } from "../hit-points.js";
 import { offerableReaction } from "../reaction-offers.js";
 import { applyFailureEffect, createPendingSaves } from "../saving-throws.js";
@@ -160,22 +161,29 @@ export function failureEffectFor(
   const save = action.save;
   if (!save) return undefined;
   const linked = conditionIds.filter((id) => !BARE_FAILURE_CONDITIONS.has(id));
-  if (linked.length === 0) return undefined;
+  // Alchemist's Fire sets its target burning, Oil covers it: an effect of its own, or riding the conditions.
+  const hazard = save.failureHazard ? HAZARDS[save.failureHazard] : undefined;
+  if (linked.length === 0 && !hazard) return undefined;
   const grapple = linked.includes("grappled");
+  const duration = save.failureDuration ?? hazard?.duration;
+  const ongoingDamage = save.ongoingDamage ?? hazard?.ongoingDamage;
   return {
-    name: `${conditionLabel(linked[0])} by ${attacker.name} (${action.name})`.slice(0, 120),
-    tags: grapple ? ["grapple"] : [],
+    name: (linked.length > 0
+      ? `${conditionLabel(linked[0])} by ${attacker.name} (${action.name})`
+      : hazard!.name
+    ).slice(0, 120),
+    tags: [...(grapple ? ["grapple"] : []), ...(hazard ? [hazard.tag] : [])],
     linkedConditionIds: linked,
     // An escape DC the text doesn't print is the grapple's own DC, as the 2024 rules set it.
     escapeDc: grapple ? (save.escapeDc ?? save.dc) : null,
     sourceActorId: attacker.id,
     sourceName: attacker.name,
-    ...(save.failureDuration ? { duration: save.failureDuration } : {}),
+    ...(duration ? { duration } : {}),
     ...(save.repeatSave ? { repeatSave: { ability: save.ability, dc: save.dc } } : {}),
     ...(save.endsOnDamage ? { endsOnDamage: true } : {}),
     ...(save.speedZero ? { speedZero: true } : {}),
     ...(grapple ? { endsWhenSourceDefeated: true, rangeFeet: save.rangeFeet ?? action.attack?.reachFeet ?? 5 } : {}),
-    ...(save.ongoingDamage ? { ongoingDamage: save.ongoingDamage } : {}),
+    ...(ongoingDamage ? { ongoingDamage } : {}),
     ...(castId !== null ? { castId } : {}),
     sourceActionId: action.id
   };

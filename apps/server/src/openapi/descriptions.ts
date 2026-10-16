@@ -486,7 +486,9 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "save.failsAtHitPoints":
       "No save when it lands: a target with this many hit points or fewer has the failure outright and only the repeated save ends it (Power Word Stun)",
     "save.ongoingDamage":
-      "Damage the failure's conditions bring at the start of each turn while they last, rolled and applied by the engine: on the target's own turns (bearer-turn-start) or the source's (source-turn-start, a swallow's acid)"
+      "Damage the failure's conditions bring at the start of each turn while they last, rolled and applied by the engine: on the target's own turns (bearer-turn-start) or the source's (source-turn-start, a swallow's acid)",
+    "save.failureHazard":
+      'A hazard a failure starts, by the SRD\'s own rules: "burning" (1d4 Fire at the start of each of its turns until the burning creature uses an action to put it out, Alchemist\'s Fire) or "oil" (Fire damage it takes in the next minute deals 5 more Fire damage, Oil)'
   },
   FeatureAttack: {
     "": 'An attack a FEATURE grants. Same vocabulary as a stat block\'s attack except the to-hit bonus is DERIVED: the feature names the ability (or "spellcasting") and the builder resolves the number.'
@@ -702,7 +704,9 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     endsWithTag:
       "The granted effect ends when the actor loses every other effect with this tag (Frenzy's marker ends with the Rage)",
     target: "Who receives it: the acting creature, or the action's single chosen target (Help)",
-    voidWhileIncapacitated: "Benefits lapse while the bearer is incapacitated or its Speed is 0 (Dodge)"
+    voidWhileIncapacitated: "Benefits lapse while the bearer is incapacitated or its Speed is 0 (Dodge)",
+    damageUses:
+      "The effect ends once its damage riders have landed this many times (a coat of Basic Poison: one weapon hit, or three pieces of ammunition)"
   },
   EffectDurationRounds: {
     "": "A fixed number of rounds."
