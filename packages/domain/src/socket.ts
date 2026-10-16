@@ -4,6 +4,7 @@ import type {
   ContentBackgroundsResult,
   ContentClassesResult,
   ContentConditionsResult,
+  ContentGlossaryResult,
   ContentEquipmentResult,
   ContentFeatsResult,
   ContentLanguagesResult,
@@ -89,6 +90,7 @@ import type {
   InitiativeRollRemainingSchema,
   InitiativeRollSelfSchema,
   InitiativeScoreSchema,
+  InitiativeSwapSchema,
   ReactionAnswerSchema,
   ReactionDismissSchema,
   ReplayLaunchSchema,
@@ -331,6 +333,10 @@ export interface ClientToServerEvents {
     payload: Record<string, never>,
     acknowledgement: (result: ContentConditionsResult) => void
   ) => void;
+  "content:glossary": (
+    payload: Record<string, never>,
+    acknowledgement: (result: ContentGlossaryResult) => void
+  ) => void;
   "content:skills": (payload: Record<string, never>, acknowledgement: (result: ContentSkillsResult) => void) => void;
   "content:languages": (
     payload: Record<string, never>,
@@ -500,6 +506,10 @@ export interface ClientToServerEvents {
   ) => void;
   "initiative:set": (
     payload: CommandPayload<typeof InitiativeScoreSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "initiative:swap": (
+    payload: CommandPayload<typeof InitiativeSwapSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "initiative:roll-self": (

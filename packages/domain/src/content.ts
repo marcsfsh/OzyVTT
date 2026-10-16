@@ -15,6 +15,8 @@ export const ContentMonsterSummarySchema = z.strictObject({
   id: z.string(),
   name: z.string(),
   challengeRating: z.number(),
+  /** XP for defeating it, for the encounter budget; null for a homebrew CR the SRD table doesn't list. */
+  experiencePoints: z.number().int().nullable(),
   type: z.string(),
   size: z.string(),
   armorClass: z.number().int(),
@@ -25,6 +27,21 @@ export type ContentMonstersResult = {
   ok: boolean;
   message?: string;
   monsters?: readonly ContentMonsterSummary[];
+  attribution?: string;
+};
+/** One Rules Glossary term for the in-app rules reference; public information for any joined session. */
+export const ContentGlossaryEntrySchema = z.strictObject({
+  id: z.string(),
+  name: z.string(),
+  /** The bracketed family the SRD gives the term ("Condition", "Action", "Hazard"), or null. */
+  tag: z.string().nullable(),
+  description: z.string()
+});
+export type ContentGlossaryEntry = Wire<z.infer<typeof ContentGlossaryEntrySchema>>;
+export type ContentGlossaryResult = {
+  ok: boolean;
+  message?: string;
+  glossary?: readonly ContentGlossaryEntry[];
   attribution?: string;
 };
 /** SRD condition reference (name + rules text) for pickers and tooltips; public information for any joined session. */
@@ -458,7 +475,8 @@ export type ContentActionSummary = Readonly<{
   grants: boolean;
   reaction: Wire<ActionReaction> | null;
   /** SRD generic action rows (Dodge, Dash, Help, ...) appended after the stat block's own. */ builtin?: boolean;
-  /** Builtin targeting: "single" picks one combatant, "none" is a direct tap. */ targeting?: "single" | "none";
+  /** Targeting: "single" picks one combatant, "multi" several (Preserve Life), "none" is a direct tap. */ targeting?:
+    "single" | "multi" | "none";
   /** SRD Legendary Action cost against the creature's per-round pool (taken on other creatures' turns). */ legendaryCost?: number;
 }>;
 export type ContentActionsResult = {

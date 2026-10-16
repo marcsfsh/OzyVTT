@@ -11,6 +11,7 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { ActorDefinitionSchema, type ActorAction, type ActorDefinition } from "@vtt/schemas";
+import { experienceForChallenge } from "@vtt/rules-5e";
 import {
   ArmorReferenceSchema,
   ConditionReferenceSchema,
@@ -24,6 +25,7 @@ import { outDir, sourcePath } from "./paths.js";
 import { SPELL_SAVE_OVERRIDE_IDS, spellSaveOutcomeFor, statBlockSaveOutcome } from "./save-outcomes.js";
 import { areaOfProse, withProseFacts } from "../src/action-prose.js";
 import { spellEffectFor } from "./spell-effects.js";
+import { printedHitDamage, printedSaveDamage } from "./monster-damage.js";
 
 const sourceDir = sourcePath("open5e-srd-2024");
 
@@ -398,7 +400,7 @@ const usesOf = (
 /**
  * Fallback for attack actions with no CreatureActionAttack row upstream (mostly animals): parses the
  * 2024 statblock prose ("Melee Attack Roll: +2, reach 5 ft. 10 (2d6 + 3) Slashing damage..."). A flat
- * primary ("1 Piercing damage") keeps an empty damage list; "or ... Bloodied" variants stay prose.
+ * primary ("1 Piercing damage") keeps an empty list here; `printedHitDamage` reads the damage, fixed amounts and conditional variants included.
  */
 type ProseAttack = {
   bonus: number;
@@ -439,20 +441,45 @@ const parseProseAttack = (desc: string): ProseAttack | null => {
 };
 
 /**
- * Damage a save action deals on a failed save, from the "Failure:" clause ("Failure: 45 (10d8) Fire
- * damage."). What a success does and the condition a failure imposes come from `statBlockSaveOutcome`; a
- * flat-only failure with no dice stays prose (ADR-0008).
+ * Reviewed save actions the "Failure:" reader gets wrong, keyed `<creature>/<action>`; each says why. The engine
+ * runs what is left of them and the GM the rest, from the reminder.
  */
-const parseSaveDamage = (desc: string): { formula: string; type: string }[] => {
-  const failure = desc.match(/Failure:\s*(.+?)(?:\s*Success:|$)/s);
-  const segment = failure ? failure[1] : desc;
-  const damage: { formula: string; type: string }[] = [];
-  for (const match of segment.matchAll(/\d+\s*\((\d+d\d+(?:\s*[+-]\s*\d+)?)\)\s+([A-Za-z]+) damage/g)) {
-    const type = match[2].toLowerCase();
-    if ((DAMAGE_TYPES as readonly string[]).includes(type))
-      damage.push({ formula: match[1].replace(/\s*([+-])\s*/, " $1 "), type });
+const SAVE_ACTION_FIXES: Readonly<
+  Record<string, Readonly<{ why: string; drop: "save" | "damage" | "outcome"; reminder: string }>>
+> = {
+  // Three roars in one action: only the first one's save is structured.
+  "sphinx-of-valor/roar": {
+    why: "the Second and Third Roars are later uses with their own saves",
+    drop: "damage",
+    reminder:
+      "Roar runs its First Roar (Frightened for 1 minute). The Second Roar (Paralyzed) and Third Roar (Con save, 44 (8d10) Thunder damage and Prone, half on a success) are applied by hand."
+  },
+  // The save happens when the target finishes a Long Rest, not on the hit.
+  "otyugh/bite": {
+    why: "the Constitution save is made after a Long Rest",
+    drop: "save",
+    reminder:
+      "The hit gives the target the Poisoned condition. Whenever the Poisoned target finishes a Long Rest, it makes a DC 15 Constitution save: on a failure its Hit Point maximum decreases by 5 (1d10); on a success the Poisoned condition ends."
+  },
+  // "If the target has 20 Hit Points or fewer..." is a branch the save prompt cannot take per target.
+  "incubus/nightmare-recharge-6": {
+    why: "the failure depends on the target's Hit Points",
+    drop: "outcome",
+    reminder:
+      "On a failed save: a target with 20 Hit Points or fewer has the Unconscious condition for 1 hour (until it takes damage or is woken); any other target takes 18 (4d8) Psychic damage."
+  },
+  "sea-hag/death-glare": {
+    why: "the failure depends on the target's Hit Points",
+    drop: "outcome",
+    reminder:
+      "On a failed save: a target with 20 Hit Points or fewer drops to 0 Hit Points; any other target takes 13 (3d8) Psychic damage."
+  },
+  "solar/slaying-bow": {
+    why: "the failure depends on the target's Hit Points",
+    drop: "outcome",
+    reminder:
+      "On a failed save: a creature with 100 Hit Points or fewer dies; any other takes 24 (4d8 + 6) Piercing damage plus 36 (8d8) Radiant damage."
   }
-  return damage;
 };
 
 /**
@@ -495,9 +522,93 @@ const TINY_PER_SRD = [
 ];
 
 /**
+ * Stat blocks the SRD prints as "Medium or Small" (the NPCs, vampires, mummies, lycanthropes, the wraith).
+ * open5e keeps only "small", which made a Knight too small to grapple an Ogre; Medium is the printed
+ * default, and the GM can still set Small per creature.
+ */
+const MEDIUM_OR_SMALL_PER_SRD = [
+  "archmage",
+  "assassin",
+  "bandit",
+  "bandit-captain",
+  "berserker",
+  "commoner",
+  "cultist",
+  "cultist-fanatic",
+  "druid",
+  "gladiator",
+  "guard",
+  "guard-captain",
+  "knight",
+  "mage",
+  "mummy",
+  "mummy-lord",
+  "noble",
+  "pirate",
+  "pirate-captain",
+  "priest",
+  "priest-acolyte",
+  "scout",
+  "spy",
+  "tough",
+  "tough-boss",
+  "vampire",
+  "vampire-familiar",
+  "vampire-spawn",
+  "warrior-infantry",
+  "warrior-veteran",
+  "werebear",
+  "wereboar",
+  "wererat",
+  "weretiger",
+  "werewolf",
+  "wraith"
+];
+
+/** Action names open5e got wrong. The Black Pudding's Split reaction is stored as "Parry". */
+const ACTION_NAME_CORRECTIONS: Record<string, string> = { "srd-2024_black-pudding-split": "Split" };
+
+/** The 18 skills as the app names them, keyed by open5e's `skill_bonus_*` suffix. */
+const SKILL_FIELDS = [
+  "acrobatics",
+  "animal_handling",
+  "arcana",
+  "athletics",
+  "deception",
+  "history",
+  "insight",
+  "intimidation",
+  "investigation",
+  "medicine",
+  "nature",
+  "perception",
+  "performance",
+  "persuasion",
+  "religion",
+  "sleight_of_hand",
+  "stealth",
+  "survival"
+] as const;
+
+/** A creature's printed skill bonuses, keyed by the app's skill ids ("sleight-of-hand"). */
+function skillBonuses(fields: CreatureFields): Record<string, number> {
+  const skills: Record<string, number> = {};
+  for (const skill of SKILL_FIELDS) {
+    const bonus = (fields as unknown as Record<string, unknown>)[`skill_bonus_${skill}`];
+    if (typeof bonus === "number") skills[skill.replace(/_/g, "-")] = bonus;
+  }
+  return skills;
+}
+
+/** 5etools cross-reference tags that leaked into open5e's text ("[Area of Effect]|XPHB|Sphere",
+ *  "Cover|XPHB|Total Cover"): the readable word is the last part. */
+function withoutSourceTags(text: string): string {
+  return text.replace(/\[[^\]]*\]\|XPHB\|/g, "").replace(/[\w ]+\|XPHB\|/g, "");
+}
+
+/**
  * Corrections for upstream fixture bugs, applied before adaptation so the vendored sources stay
- * byte-identical to open5e. Values are the printed SRD 5.2.1 ones. The SRD's "Medium or Small" NPC
- * statblocks keep open5e's "small".
+ * byte-identical to open5e. Values are the printed SRD 5.2.1 ones.
  */
 const CORRECTIONS: Record<string, Partial<CreatureFields>> = {
   // octopus: CON/CHA modifiers stored as scores; a garbage 30 in the CON save column
@@ -506,7 +617,8 @@ const CORRECTIONS: Record<string, Partial<CreatureFields>> = {
   // mastiff / swarm-of-rats: the save *modifier* stored where the SRD-printed save bonus belongs.
   "srd-2024_mastiff": { saving_throw_wisdom: 3 },
   "srd-2024_swarm-of-rats": { saving_throw_dexterity: 2 },
-  ...Object.fromEntries(TINY_PER_SRD.map((slug) => [`srd-2024_${slug}`, { size: "tiny" }]))
+  ...Object.fromEntries(TINY_PER_SRD.map((slug) => [`srd-2024_${slug}`, { size: "tiny" }])),
+  ...Object.fromEntries(MEDIUM_OR_SMALL_PER_SRD.map((slug) => [`srd-2024_${slug}`, { size: "medium" }]))
 };
 
 /**
@@ -539,6 +651,8 @@ const report = {
   proseAttacks: 0,
   structuredSaves: 0,
   saveDamage: 0,
+  printedAttackDamage: 0,
+  saveActionFixes: [] as string[],
   structuredMultiattacks: 0,
   proseMultiattacks: 0,
   onHitRiders: 0,
@@ -571,8 +685,9 @@ const monsters: ActorDefinition[] = creatures
     const footprint = FOOTPRINT_BY_SIZE[fields.size];
     const sortedActions = (actionsByCreature.get(creature.pk) ?? []).sort(
       (left, right) =>
-        (left.fields.order_in_statblock ?? 0) - (right.fields.order_in_statblock ?? 0) ||
-        left.pk.localeCompare(right.pk)
+        // An unnumbered action (some legendary ones) goes after the numbered stat block, not before Multiattack.
+        (left.fields.order_in_statblock ?? Number.MAX_SAFE_INTEGER) -
+          (right.fields.order_in_statblock ?? Number.MAX_SAFE_INTEGER) || left.pk.localeCompare(right.pk)
     );
     // Sibling action names -> ids (raw upstream names, before any uses suffix) for Multiattack composition.
     const siblingIdByName = new Map(
@@ -584,14 +699,21 @@ const monsters: ActorDefinition[] = creatures
     const creatureActions = sortedActions.map((action) => {
       const row = attackByAction.get(action.pk)?.fields;
       const prose = row ? null : parseProseAttack(action.fields.desc);
-      const save = action.fields.desc.match(SAVE_PATTERN);
+      const fix = SAVE_ACTION_FIXES[`${slug}/${idSafe(slugOf(action.pk).replace(`${slug}_`, ""))}`];
+      if (fix) report.saveActionFixes.push(`${slug}: ${fix.why}`);
+      const save = fix?.drop === "save" ? null : action.fields.desc.match(SAVE_PATTERN);
       const legendary = action.fields.action_type === "LEGENDARY_ACTION";
       const legendaryPrefix = legendary
         ? `Legendary Action${(action.fields.legendary_action_cost ?? 1) > 1 ? ` (costs ${action.fields.legendary_action_cost} actions)` : ""}. `
         : "";
-      // Flat damage (e.g. the octopus's "1 Bludgeoning") has no dice; it stays in the
-      // description text per ADR-0008 rather than forcing a fake formula.
-      const damage = row
+      // The printed hit clause is the authority for an attack's damage, a fixed "1 Piercing damage" included; the
+      // upstream row and the prose reader are the fallback when the text prints nothing typed.
+      const printed = row || prose ? printedHitDamage(action.fields.desc) : null;
+      if (printed) report.printedAttackDamage += 1;
+      // A save rider on an attack deals its damage through the hit, but may still deal more on later turns.
+      const saveDamage = save ? printedSaveDamage(action.fields.desc) : null;
+      const reminder = fix?.reminder ?? saveDamage?.laterDamage ?? undefined;
+      const fromRows = row
         ? [
             ...(row.damage_die_count && row.damage_die_type
               ? [
@@ -612,7 +734,8 @@ const monsters: ActorDefinition[] = creatures
           ]
         : // A save-for-damage action (Fire Breath) has no attack row; pull its damage from the
           // "Failure:" clause so answering a failed save actually applies it.
-          (prose?.damage ?? (save ? parseSaveDamage(action.fields.desc) : []));
+          (prose?.damage ?? (save ? (saveDamage?.damage ?? []) : []));
+      const damage = fix?.drop === "outcome" || fix?.drop === "damage" ? [] : (printed?.damage ?? fromRows);
       // rangeFeet is the maximum attackable range; rangeNormalFeet the normal band when the
       // weapon has two ranges (disadvantage between them - SRD Range).
       const attack = row
@@ -652,7 +775,7 @@ const monsters: ActorDefinition[] = creatures
       for (const part of damage) if (part.type === "untyped") report.untypedDamage.push(action.pk);
       return withProseFacts({
         id: actionId,
-        name: `${action.fields.name}${usesSuffix(action.fields)}`.slice(0, 120),
+        name: `${ACTION_NAME_CORRECTIONS[action.pk] ?? action.fields.name}${usesSuffix(action.fields)}`.slice(0, 120),
         activation:
           action.fields.action_type === "ACTION"
             ? ("action" as const)
@@ -661,18 +784,21 @@ const monsters: ActorDefinition[] = creatures
               : action.fields.action_type === "REACTION"
                 ? ("reaction" as const)
                 : ("other" as const),
-        description: `${legendaryPrefix}${action.fields.desc}`.slice(0, 12000),
+        description: withoutSourceTags(`${legendaryPrefix}${action.fields.desc}`).slice(0, 12000),
         ...(attack ? { attack } : {}),
         ...(save
           ? {
               save: {
                 ability: ABILITY_BY_NAME[save[1] as keyof typeof ABILITY_BY_NAME],
                 dc: Number.parseInt(save[2], 10),
-                ...statBlockSaveOutcome(action.fields.desc)
+                ...statBlockSaveOutcome(action.fields.desc),
+                ...(fix?.drop === "outcome" ? { failureConditions: [] } : {})
               }
             }
           : {}),
         damage,
+        ...(printed && printed.conditionalDamage.length > 0 ? { conditionalDamage: printed.conditionalDamage } : {}),
+        ...(reminder ? { reminder: reminder.slice(0, 600) } : {}),
         ...(multiattack ? { multiattack } : {}),
         ...(onHit ? { onHit } : {}),
         ...(uses ? { uses } : {}),
@@ -747,7 +873,9 @@ const monsters: ActorDefinition[] = creatures
       extensions: {
         "open5e.srd-2024": {
           challengeRating: challenge,
-          experiencePoints: fields.experience_points_integer,
+          // Upstream carries XP for one creature only; the rest follow from the challenge rating.
+          experiencePoints: fields.experience_points_integer ?? experienceForChallenge(challenge),
+          skills: skillBonuses(fields),
           type: fields.type,
           alignment: fields.alignment,
           armorDetail: fields.armor_detail || null,
@@ -776,9 +904,11 @@ const monsters: ActorDefinition[] = creatures
           conditionImmunities: fields.condition_immunities_display || null,
           nonmagicalAttackImmunity: fields.nonmagical_attack_immunity,
           nonmagicalAttackResistance: fields.nonmagical_attack_resistance,
-          traits: (traitsByCreature.get(creature.pk) ?? [])
-            .sort((left, right) => left.fields.name.localeCompare(right.fields.name))
-            .map((trait) => ({ name: trait.fields.name, description: trait.fields.desc }))
+          // Upstream order is the stat block's own.
+          traits: (traitsByCreature.get(creature.pk) ?? []).map((trait) => ({
+            name: trait.fields.name,
+            description: withoutSourceTags(trait.fields.desc)
+          }))
         }
       }
     };
@@ -1088,12 +1218,15 @@ const skillRecords = describesRecords(skills).map(({ id, name, description }) =>
 const damageTypeRecords = describesRecords(damageTypes);
 
 const ruleSetNames = new Map(onlySrd(ruleSets).map((set) => [set.pk, set.fields.name]));
+// Ids count within each ruleset: upstream repeats an index ("exploration-3" was both Hiding and
+// Interacting with Objects).
+const ruleCounts = new Map<string, number>();
 const ruleRecords = onlySrd(rules)
   .sort(
     (left, right) => left.fields.ruleset.localeCompare(right.fields.ruleset) || left.fields.index - right.fields.index
   )
   .map((rule) => ({
-    id: `${slugOf(rule.fields.ruleset)}-${rule.fields.index}`,
+    id: `${slugOf(rule.fields.ruleset)}-${ruleCounts.set(rule.fields.ruleset, (ruleCounts.get(rule.fields.ruleset) ?? 0) + 1).get(rule.fields.ruleset)}`,
     name: rule.fields.name,
     ruleset: ruleSetNames.get(rule.fields.ruleset) ?? slugOf(rule.fields.ruleset),
     order: rule.fields.index,
@@ -1177,5 +1310,8 @@ if (report.corrections.length > 0)
   console.log(
     `upstream corrections applied (${report.corrections.length}): ${report.corrections.map(slugOf).join(", ")}`
   );
+console.log(`attack damage read from the printed hit clause: ${report.printedAttackDamage}`);
+if (report.saveActionFixes.length > 0)
+  console.log(`reviewed save actions (${report.saveActionFixes.length}): ${report.saveActionFixes.join("; ")}`);
 if (report.untypedDamage.length > 0)
   console.log(`untyped damage fallbacks (${report.untypedDamage.length}): ${report.untypedDamage.join(", ")}`);

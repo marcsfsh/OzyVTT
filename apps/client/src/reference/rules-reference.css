@@ -1,0 +1,41 @@
+/* The rules drawer: the search pinned at the top, the terms scrolling under it. */
+.rules-reference .nh-drawer-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+}
+.rules-reference-list {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.rules-reference-entry {
+  border-bottom: 1px solid var(--line);
+}
+.rules-reference-entry summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  cursor: pointer;
+  font-weight: 700;
+}
+.rules-reference-text {
+  padding-bottom: var(--space-3);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  white-space: pre-line;
+}
+.rules-reference-status,
+.rules-reference-attribution {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.rules-reference-attribution {
+  padding-top: var(--space-3);
+}
+/* Beside the tabs, never squeezed by them. */
+.rules-button {
+  flex: none;
+}

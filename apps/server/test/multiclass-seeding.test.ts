@@ -9,7 +9,7 @@ import {
   spellSlotMaxima,
   withDerivedSlots
 } from "../src/actor-roster.js";
-import { applyRest, spendHitDice } from "../src/rests.js";
+import { applyRest, hitDieSizesToSpend, spendHitDice } from "../src/rests.js";
 import { setSpellSlotRemaining } from "../src/spellcasting.js";
 import { projectPlayerView } from "../src/projections.js";
 
@@ -123,6 +123,13 @@ describe("multiclass seeding", () => {
     });
     const unmodeled = ActorDefinitionSchema.parse({ ...BASE, hitPoints: { maximum: 30 } });
     expect(seedHitDice(unmodeled)).toBeNull();
+  });
+
+  it("rolls each spent die at its own size, biggest first", () => {
+    const game = gameWith(fighterWizard());
+    // Three d10s and two d6s: spending four rolls d10, d10, d10, d6, never a d10 for a d6.
+    expect(hitDieSizesToSpend(actorOf(game).hitDice!.entries, 4)).toEqual([10, 10, 10, 6]);
+    expect(hitDieSizesToSpend(actorOf(game).hitDice!.entries, 9)).toEqual([10, 10, 10, 6, 6]);
   });
 
   it("spends the pool largest die first and a long rest restores every die size", () => {

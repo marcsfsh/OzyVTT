@@ -185,3 +185,19 @@
 .scene-prep-recent > summary {
   --material-fill: var(--material-plate);
 }
+
+/* The staged fight's XP against the SRD budget: a quiet aid line under the tray. */
+.encounter-budget {
+  margin: var(--space-2) 0 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.encounter-budget strong {
+  color: var(--text);
+  font-family: var(--font-numeric);
+}
+.encounter-budget small {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}

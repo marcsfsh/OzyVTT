@@ -209,11 +209,12 @@ describe("the save prompt's damage field", () => {
     expect(40 - table.hp()).toBe(3);
   });
 
-  it("answers a TWO-TYPE save with 5 for an amended 12, which no halving of the total can produce", () => {
-    // 9 fire + 8 cold: `rescaleDamageParts` re-weights 12 as 7 + 5 and the success halving floors each
-    // part (3 + 2 = 5), while `floor(12 / 2)` is 6. `save-damage.test.tsx` renders this fixture.
+  it("answers a TWO-TYPE save with 4 for an amended 12 against fire resistance: halved once, then resisted", () => {
+    // 9 fire + 8 cold: `rescaleDamageParts` re-weights 12 as 7 + 5, the success halves the total once to 6
+    // (4 fire + 2 cold, SRD Half Damage), and the fire is resisted: 2 + 2 = 4. `save-damage.test.tsx` renders
+    // this fixture.
     const table = tableWith({
-      resistant: false,
+      resistant: true,
       halfOnSuccess: true,
       parts: [
         { amount: 9, type: "fire" },
@@ -221,15 +222,15 @@ describe("the save prompt's damage field", () => {
       ]
     });
     const { outcome } = answerFromThePrompt(table, "12", 18, { role: "gm", sessionId: IDS.gm }, false);
-    expect(outcome.appliedDamage).toBe(5);
-    expect(Math.floor(12 / 2), "the fixture stopped distinguishing the server's halving").not.toBe(5);
-    // And the commit lands the same 5, per type.
+    expect(outcome.appliedDamage).toBe(4);
+    expect(Math.floor(12 / 2), "the fixture stopped distinguishing the server's number").not.toBe(4);
+    // And the commit lands the same 4, per type.
     const committed = answerFromThePrompt(table, "12", 18);
     expect(committed.outcome.parts).toEqual([
-      { amount: 3, type: "fire", adjusted: 3, adjustment: null, adjustmentSource: null },
+      { amount: 4, type: "fire", adjusted: 2, adjustment: "resistance", adjustmentSource: null },
       { amount: 2, type: "cold", adjusted: 2, adjustment: null, adjustmentSource: null }
     ]);
-    expect(40 - table.hp()).toBe(5);
+    expect(40 - table.hp()).toBe(4);
   });
 
   it("answers the recheck with ZERO on a success that does not halve - the case the old line got most wrong", () => {

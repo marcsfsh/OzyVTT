@@ -5,6 +5,7 @@ import type {
   AnnotationShapeKind,
   AskableCommand,
   ContentActionSummary,
+  HitOptionChoice,
   RulesBlocked
 } from "@vtt/domain";
 import { command } from "../lib/command";
@@ -139,6 +140,8 @@ export type ResolveOptions = Readonly<{
   critical?: boolean;
   /** How far Push mastery shoves on the confirmed hit (0 declines); absent pushes the full distance. */
   pushFeet?: number;
+  /** Extras the confirmed hit carries (Sneak Attack, a smite), from the preview's offers. */
+  hitOptions?: readonly HitOptionChoice[];
 }>;
 
 export function resolveTargeting(
@@ -160,6 +163,7 @@ export function resolveTargeting(
     ...(opts.attackTotal !== undefined ? { attackTotal: opts.attackTotal } : {}),
     ...(opts.critical !== undefined ? { critical: opts.critical } : {}),
     ...(opts.pushFeet !== undefined ? { pushFeet: opts.pushFeet } : {}),
+    ...(opts.hitOptions && opts.hitOptions.length > 0 ? { hitOptions: [...opts.hitOptions] } : {}),
     ...(slotLevel !== undefined ? { slotLevel } : {}),
     commit,
     ...(revision !== undefined ? { expectedRevision: revision } : {})

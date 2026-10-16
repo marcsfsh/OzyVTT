@@ -1,4 +1,5 @@
 import type { PlayerView } from "@vtt/domain";
+import { RulesButton } from "../reference/RulesReference";
 import { Badge, Tabs, Wordmark } from "@vtt/ui";
 import { MyCharacter } from "../actors/MyCharacter";
 import { useRecapBadge } from "../codex/useRecapBadge";
@@ -76,6 +77,7 @@ export function PlayerTabBar({ token }: Readonly<{ token: string }>) {
           navigate(id === "codex" ? (lastLocationForTab("player", "codex") ?? "/codex") : home);
         }}
       />
+      <RulesButton />
     </div>
   );
 }

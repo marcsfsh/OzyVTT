@@ -12,6 +12,7 @@ import {
   loadConditions,
   loadDamageTypes,
   loadEquipment,
+  loadGlossary,
   loadMagicItems,
   loadMonsterDefinitions,
   loadRules,
@@ -88,6 +89,30 @@ describe("SRD 5.2.1 monster bundle", () => {
           expect(() => parseDiceFormula(part.formula), `${monster.name}/${action.id}`).not.toThrow();
         }
     }
+  });
+
+  it("carries what the bestiary and checks need: XP, skills, the printed size, clean text", () => {
+    const extension = (id: string) =>
+      monsters.find((monster) => monster.source.externalId === id)!.extensions["open5e.srd-2024"] as {
+        experiencePoints: number | null;
+        skills: Record<string, number>;
+        traits: Array<{ name: string; description: string }>;
+      };
+    // XP from the challenge rating; the SRD's own examples: CR 1/2 is 100, CR 9 is 5,000, CR 17 is 18,000.
+    expect(
+      monsters.every((monster) => typeof extension(monster.source.externalId!).experiencePoints === "number")
+    ).toBe(true);
+    expect(extension("goblin-warrior").experiencePoints).toBe(50);
+    expect(extension("adult-red-dragon").experiencePoints).toBe(18000);
+    expect(extension("goblin-warrior").skills).toEqual({ stealth: 6 });
+    // "Medium or Small" stat blocks take the first printed size; genuinely Small creatures stay Small.
+    const size = (id: string) => monsters.find((monster) => monster.source.externalId === id)!.size;
+    expect([size("knight"), size("vampire"), size("werewolf")]).toEqual(["medium", "medium", "medium"]);
+    expect(size("goblin-warrior")).toBe("small");
+    expect(JSON.stringify(monsters)).not.toContain("|XPHB|");
+    const pudding = monsters.find((monster) => monster.source.externalId === "black-pudding")!;
+    expect(pudding.actions.map((action) => action.name)).toContain("Split");
+    expect(extension("octopus").traits.map((trait) => trait.name)).toEqual(["Compression", "Water Breathing"]);
   });
 
   it("adapts the aboleth stat block faithfully", () => {
@@ -191,10 +216,10 @@ describe("SRD 5.2.1 monster bundle", () => {
 
   it("recovers structured attacks from statblock prose when upstream has no attack row", () => {
     const byId = (id: string) => monsters.find((monster) => monster.source.externalId === id)!;
-    // rat: flat "1 Piercing damage" - attack is structured, damage stays prose-only.
+    // rat: flat "1 Piercing damage" - a fixed amount, dealt as printed (no dice, so a crit leaves it at 1).
     const ratBite = byId("rat").actions.find((action) => action.id === "bite");
     expect(ratBite?.attack).toEqual({ bonus: 2, reachFeet: 5 });
-    expect(ratBite?.damage).toEqual([]);
+    expect(ratBite?.damage).toEqual([{ formula: "1", type: "piercing" }]);
     // ankheg: dice primary plus acid rider, parenthetical advantage clause skipped.
     const ankhegBite = byId("ankheg").actions.find((action) => action.id === "bite");
     expect(ankhegBite?.attack).toEqual({ bonus: 5, reachFeet: 5 });
@@ -732,5 +757,25 @@ describe("attribution", () => {
     expect(attribution.license).toBe("CC-BY-4.0");
     expect(attribution.attribution).toContain("This work includes material from the System Reference Document 5.2.1");
     expect(attribution.attribution).toContain("https://creativecommons.org/licenses/by/4.0/legalcode");
+  });
+});
+
+describe("SRD 5.2.1 Rules Glossary bundle", () => {
+  const glossary = loadGlossary();
+
+  it("holds every term once, with its bracketed tag", () => {
+    expect(glossary.length).toBe(155);
+    expect(new Set(glossary.map((entry) => entry.id)).size).toBe(glossary.length);
+    const prone = glossary.find((entry) => entry.id === "prone");
+    expect(prone).toMatchObject({ name: "Prone", tag: "Condition" });
+    expect(prone!.description).toContain("Restricted Movement.");
+    expect(glossary.find((entry) => entry.id === "attack")?.tag).toBe("Action");
+    // No markdown left for a reader to see.
+    expect(glossary.some((entry) => /\*\*|<\/?t[dr]>/.test(entry.description))).toBe(false);
+  });
+
+  it("gives every rules section a distinct id", () => {
+    const rules = loadRules();
+    expect(new Set(rules.map((rule) => rule.id)).size).toBe(rules.length);
   });
 });

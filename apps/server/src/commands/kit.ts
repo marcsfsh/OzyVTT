@@ -16,7 +16,7 @@ import type { CombatLogStore } from "../combat-log.js";
 import type { TimelineOutcome } from "../combat-history.js";
 import type { ContentLibrary } from "../content-library.js";
 import type { EffectNarration } from "../effects.js";
-import type { InitiativeRollSink } from "../encounter.js";
+import type { InitiativeRollDeps, InitiativeRollSink } from "../encounter.js";
 import { equipmentCatalogOf } from "../equipment-derivation.js";
 import type { GameStore } from "../game-store.js";
 import { tokenCreatureDistance } from "../movement-narration.js";
@@ -180,6 +180,12 @@ export function createKit(context: CommandContext) {
       return true;
     },
 
+    /** What an initiative roll reads about its roller in `state`: stat blocks and items for its riders. */
+    initiativeRollDeps: (state: GameState): InitiativeRollDeps => ({
+      resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId),
+      catalog: equipmentCatalogOf(contentLibrary.forAudience("gm"))
+    }),
+
     /** Server-thrown initiative dice land in `state.rolls` attributed to the combatant; hidden ones are GM-only. */
     initiativeRollSink:
       (state: GameState, commandId: string, principal: GamePrincipal): InitiativeRollSink =>
@@ -238,7 +244,7 @@ export function createKit(context: CommandContext) {
           kind: event.kind,
           text: event.text,
           actorIds: [event.actorId],
-          gmOnly: actorHidden(event.actorId)
+          gmOnly: event.gmOnly === true || actorHidden(event.actorId)
         });
       }
     },

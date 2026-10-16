@@ -368,7 +368,8 @@ describe("a feat's resource-bonus raises a pool the engine actually spends from"
       built.state,
       action,
       { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000020" },
-      deps(built, [])
+      // Second Wind heals, so its d10 is rolled.
+      deps(built, [5])
     );
     expect(built.hero.actionUses["second-wind"]).toBe(4);
   });
@@ -452,12 +453,14 @@ describe("a feat's moment-gated roll-mode fires only at its moment", () => {
     const sword = actionOf(built, "item-greatsword");
     expect(criticalThreshold(derivation, built.hero, sword)).toBe(18);
 
+    // Improved Critical names the attacks it widens (weapons and Unarmed Strikes), so the swing's kinds are passed.
     const bare = build();
     expect(
       criticalThreshold(
         deriveEquipment(bare.hero, bare.definition, bare.catalog),
         bare.hero,
-        actionOf(bare, "item-greatsword")
+        actionOf(bare, "item-greatsword"),
+        { attackKinds: ["melee", "weapon"] }
       )
     ).toBe(19);
   });

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { ActionResolution } from "@vtt/domain";
+import type { ActionResolution, HitOffer, HitOptionChoice } from "@vtt/domain";
 import { Button } from "@vtt/ui";
 import { DieModeButtons, type DieMode } from "./RollControls";
 import type { ResolveOptions } from "./targeting";
@@ -63,11 +63,108 @@ export function PushChoice({
   );
 }
 
+const ORDINALS = ["", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th"];
+const titled = (type: string) => (type.length > 0 ? `${type[0].toUpperCase()}${type.slice(1)}` : type);
+
+/**
+ * The extras a hit can carry (Sneak Attack, a smite, Divine Strike, a charge): each a toggle, with its type or slot
+ * picked once it is on. What it costs and what the engine couldn't check are said under it.
+ */
+export function HitOfferChoices({
+  offers,
+  chosen,
+  busy,
+  onChange
+}: Readonly<{
+  offers: readonly HitOffer[];
+  chosen: readonly HitOptionChoice[];
+  busy: boolean;
+  onChange: (next: HitOptionChoice[]) => void;
+}>) {
+  const pickOf = (id: string) => chosen.find((choice) => choice.id === id);
+  const update = (id: string, change: Partial<HitOptionChoice> | null) =>
+    onChange(
+      change === null
+        ? chosen.filter((choice) => choice.id !== id)
+        : chosen.some((choice) => choice.id === id)
+          ? chosen.map((choice) => (choice.id === id ? { ...choice, ...change } : choice))
+          : [...chosen, { id, ...change }]
+    );
+  return (
+    <div className="hit-offers" role="group" aria-label="Add to the hit">
+      {offers.map((offer) => {
+        const pick = pickOf(offer.id);
+        return (
+          <div key={offer.id} className="hit-offer">
+            <button
+              type="button"
+              className={`save-die-mode${pick ? " active" : ""}`}
+              aria-pressed={pick !== undefined}
+              disabled={busy}
+              onClick={() =>
+                update(
+                  offer.id,
+                  pick
+                    ? null
+                    : {
+                        ...(offer.damageTypes ? { damageType: offer.damageTypes[0] } : {}),
+                        ...(offer.slotLevels ? { slotLevel: offer.slotLevels[0] } : {})
+                      }
+                )
+              }
+            >
+              {offer.name} +{offer.dice}
+            </button>
+            {pick && offer.damageTypes && (
+              <span className="hit-offer-picks" role="group" aria-label={`${offer.name} damage type`}>
+                {offer.damageTypes.map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    className={`save-die-mode${pick.damageType === type ? " active" : ""}`}
+                    aria-pressed={pick.damageType === type}
+                    disabled={busy}
+                    onClick={() => update(offer.id, { damageType: type })}
+                  >
+                    {titled(type)}
+                  </button>
+                ))}
+              </span>
+            )}
+            {pick && offer.slotLevels && offer.slotLevels.length > 1 && (
+              <span className="hit-offer-picks" role="group" aria-label={`${offer.name} spell slot`}>
+                {offer.slotLevels.map((level) => (
+                  <button
+                    key={level}
+                    type="button"
+                    className={`save-die-mode${pick.slotLevel === level ? " active" : ""}`}
+                    aria-pressed={pick.slotLevel === level}
+                    disabled={busy}
+                    onClick={() => update(offer.id, { slotLevel: level })}
+                  >
+                    {ORDINALS[level] ?? level} slot
+                  </button>
+                ))}
+              </span>
+            )}
+            {(offer.cost || offer.unverified) && (
+              <small className="hit-offer-note">
+                {[offer.cost ? `Costs ${offer.cost}.` : null, offer.unverified].filter(Boolean).join(" ")}
+              </small>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /**
  * An attack previewed but not yet applied: Adv/Disadv and Re-roll roll the d20 again, Confirm resolves
  * the hit for real (damage, riders, economy). In manual roll mode a second zone takes a typed d20, or
  * the final total with a Natural 20 box when typed bonuses are not added for you. A hit that offers a
- * Push asks how far first; Confirm sends that choice.
+ * Push asks how far first, and a hit that can carry extras (Sneak Attack, a smite) offers them; Confirm sends
+ * those choices.
  */
 export function AttackPreview({
   attack,
@@ -77,6 +174,7 @@ export function AttackPreview({
   bonusMode,
   onFeedback,
   push,
+  hitOffers = [],
   resolve: resolveWith
 }: Readonly<{
   attack: Attack;
@@ -89,14 +187,27 @@ export function AttackPreview({
   onFeedback: (text: string) => void;
   /** The push this hit's weapon mastery offers; Push is "up to", so the attacker picks the distance. */
   push?: ActionResolution["push"];
+  /** The extras this hit can carry; chosen ones ride the Confirm. */
+  hitOffers?: readonly HitOffer[];
   resolve: (options: ResolveOptions) => void;
 }>) {
   // null means the full distance, so a re-roll that changes the offer never carries a stale pick.
   const [pushPick, setPushPick] = useState<number | null>(null);
   const pushFeet = push ? Math.min(pushPick ?? push.maxFeet, push.maxFeet) : undefined;
-  // Only a confirming call carries the push choice; previews ignore it.
+  const [extras, setExtras] = useState<HitOptionChoice[]>([]);
+  // A re-roll can change what is offered (a miss offers nothing), so only choices still offered are sent.
+  const hitOptions = extras.filter((choice) => hitOffers.some((offer) => offer.id === choice.id));
+  // Only a confirming call carries the push and extras; previews ignore them.
   const resolve = (options: ResolveOptions) =>
-    resolveWith(options.commit && pushFeet !== undefined ? { ...options, pushFeet } : options);
+    resolveWith(
+      options.commit
+        ? {
+            ...options,
+            ...(pushFeet !== undefined ? { pushFeet } : {}),
+            ...(hitOptions.length > 0 ? { hitOptions } : {})
+          }
+        : options
+    );
   const [entry, setEntry] = useState("");
   // Whether the typed roll has been submitted: drives "Use roll" → Confirm/Re-roll.
   const [submitted, setSubmitted] = useState(false);
@@ -142,6 +253,9 @@ export function AttackPreview({
   return (
     <div className="action-preview">
       {push && pushFeet !== undefined && <PushChoice push={push} value={pushFeet} busy={busy} onPick={setPushPick} />}
+      {hitOffers.length > 0 && (
+        <HitOfferChoices offers={hitOffers} chosen={hitOptions} busy={busy} onChange={setExtras} />
+      )}
       <div className="roll-zone">
         <span className="save-prompt-confirm">
           <DieModeButtons

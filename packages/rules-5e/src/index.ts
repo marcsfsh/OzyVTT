@@ -6,3 +6,4 @@ export * from "./class-data.js";
 export * from "./progression.js";
 export * from "./riders.js";
 export * from "./movement.js";
+export * from "./encounters.js";

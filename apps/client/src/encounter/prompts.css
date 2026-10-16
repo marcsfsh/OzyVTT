@@ -212,3 +212,29 @@
   color: var(--text-dim);
   font-size: var(--fs-xs);
 }
+/* A hit's extras: each a toggle, with its type or slot picked once it is on. */
+.hit-offers {
+  display: grid;
+  gap: var(--space-2);
+}
+.hit-offer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.hit-offer .save-die-mode {
+  min-height: var(--tap-min);
+  padding: 0.4rem 0.8rem;
+  font-size: var(--fs-sm);
+}
+.hit-offer-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.hit-offer-note {
+  flex-basis: 100%;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}

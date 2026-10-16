@@ -64,4 +64,32 @@ describe("the GM's result card", () => {
     fireEvent.click(screen.getByRole("button", { name: "Apply to Goblin" }));
     expect(applyDamage).toHaveBeenCalledWith(FOE, "Goblin", FOE, 3);
   });
+
+  it("gives each target of an action with no attack roll and no save its own Apply", () => {
+    const parts = [{ amount: 12, type: "force" }];
+    const { applyDamage } = card({
+      actionName: "Magic Missile",
+      activation: "action",
+      attack: null,
+      save: null,
+      damage: [{ formula: "3d4 + 3", type: "force", total: 12 }],
+      damageTotal: 12,
+      crit: false,
+      damageTargets: [{ targetId: FOE, targetName: "Goblin", parts, total: 12 }]
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Apply 12 to Goblin" }));
+    expect(applyDamage).toHaveBeenCalledWith(FOE, "Goblin", FOE, undefined, parts);
+  });
+
+  it("names the extras that rode the hit in its damage line", () => {
+    card(
+      swing("hit", 17, {
+        damage: [
+          { formula: "1d6 + 3", type: "piercing", total: 6 },
+          { formula: "3d6", type: "piercing", total: 11, source: "Sneak Attack" }
+        ]
+      })
+    );
+    expect(screen.getByText(/3d6 piercing \(Sneak Attack\) = 11/)).toBeTruthy();
+  });
 });

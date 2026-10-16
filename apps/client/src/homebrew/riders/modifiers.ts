@@ -76,7 +76,7 @@ function blankModifier(type: string): Draft {
     case "check-bonus":
       return { type, amount: 1 };
     case "extra-damage":
-      return { type, formula: "1d6", doubleOnCritical: false };
+      return { type, formula: "1d6", doubleOnCritical: true };
     case "roll-mode":
       return { type, roll: "attack", mode: "advantage" };
     case "spell-save-dc":
@@ -271,10 +271,10 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
     { key: "whileArmored", label: "Only while wearing armour", kind: "switch", visibleWhen: hasType("armor-class") },
     {
       key: "proficiencyBonus",
-      label: "Add Proficiency Bonus",
+      label: "Also add the Proficiency Bonus",
       kind: "switch",
       visibleWhen: hasType("initiative"),
-      help: "Alert's rule: the character's Proficiency Bonus on top of the amount."
+      help: "Alert's rule. A feature's or feat's is built into the character when it is built or levelled; an item's counts while the item is in use."
     },
     /* On an item nothing reads `unarmored-defense` (it is builder-baked from features and feats
        only), so items get a note; features and feats need none. */
@@ -320,7 +320,7 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       label: "Doubled on a critical hit",
       kind: "switch",
       visibleWhen: hasType("extra-damage"),
-      help: "Off is the 5e rule — dice added after the attack aren't doubled."
+      help: "On is the rule: a critical hit rolls the attack's extra dice twice too."
     },
     {
       key: "roll",
