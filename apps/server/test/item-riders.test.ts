@@ -199,7 +199,7 @@ describe("criterion 1: a magic weapon's +1 to hit and extra damage die", () => {
 });
 
 describe("criterion 2: `slot` makes an open category mechanically real", () => {
-  it("derives AC from a homebrew category that declares an armor slot, and caps rings at two", () => {
+  it("derives AC from a homebrew category that declares an armor slot, and caps footwear at one", () => {
     const definition = definitionOf();
     const relic = {
       id: "scale-relic",
@@ -232,44 +232,40 @@ describe("criterion 2: `slot` makes an open category mechanically real", () => {
     );
     expect(state.actors[0].armorClass).toBe(16); // 14 + min(dex +2, cap 2)
 
-    const rings = [1, 2, 3].map((n) => ({
-      id: `ring-${n}`,
-      name: `Ring ${n}`,
-      category: "ring",
-      slot: "ring"
-    }));
-    const ringCatalog = catalogOf(rings);
-    const ringState = stateWith([]);
-    for (const n of [1, 2])
-      setInventoryItem(
-        ringState,
-        IDS.hero,
-        item({ id: `ring-${n}`, name: `Ring ${n}`, equipped: true, category: "ring" }),
-        () => definition,
-        { catalog: ringCatalog, role: "player" }
-      );
+    // A homebrew "anklet" category worn on the feet takes the one footwear place (SRD: one pair of footwear).
+    const anklets = [1, 2].map((n) => ({ id: `anklet-${n}`, name: `Anklet ${n}`, category: "anklet", slot: "feet" }));
+    const ankletCatalog = catalogOf(anklets);
+    const ankletState = stateWith([]);
+    setInventoryItem(
+      ankletState,
+      IDS.hero,
+      item({ id: "anklet-1", name: "Anklet 1", equipped: true, category: "anklet" }),
+      () => definition,
+      { catalog: ankletCatalog, role: "player" }
+    );
     expect(() =>
       setInventoryItem(
-        ringState,
+        ankletState,
         IDS.hero,
-        item({ id: "ring-3", name: "Ring 3", equipped: true, category: "ring" }),
+        item({ id: "anklet-2", name: "Anklet 2", equipped: true, category: "anklet" }),
         () => definition,
-        { catalog: ringCatalog, role: "player" }
+        { catalog: ankletCatalog, role: "player" }
       )
-    ).toThrow(/Only 2 ring items/);
+    ).toThrow(/Anklet 1 already occupies the feet slot/);
     // The GM override is the audited escape hatch.
     setInventoryItem(
-      ringState,
+      ankletState,
       IDS.hero,
-      item({ id: "ring-3", name: "Ring 3", equipped: true, category: "ring" }),
+      item({ id: "anklet-2", name: "Anklet 2", equipped: true, category: "anklet" }),
       () => definition,
-      { catalog: ringCatalog, role: "gm" }
+      { catalog: ankletCatalog, role: "gm" }
     );
-    expect(ringState.actors[0].inventory).toHaveLength(3);
+    expect(ankletState.actors[0].inventory).toHaveLength(2);
   });
 
   it("counts only ONE shield - three equipped shields used to read +6 AC", () => {
-    const definition = definitionOf();
+    // A built character: a printed AC would stand under a Shield alone, since it may already count one.
+    const definition = definitionOf({ source: { name: "OzyVTT Character Builder", version: "1" } });
     const state = stateWith([]);
     const shield = (n: number) =>
       item({

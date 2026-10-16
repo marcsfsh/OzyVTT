@@ -38,7 +38,7 @@ export type PlayerEffect = Omit<EffectInstance, "sourceActorId" | "sourceActionI
 export type PlayerActorTableField =
   "id" | "name" | "kind" | "visibility" | "size" | "sizeCells" | "tokenAssetId" | "conditions" | "deathSaves";
 /** Actor fields players receive only on player characters; a monster's stats are GM knowledge. */
-export type PlayerActorPartyField = "armorClass" | "initiative" | "speedFeet" | "definitionId";
+export type PlayerActorPartyField = "armorClass" | "armorClassOverride" | "initiative" | "speedFeet" | "definitionId";
 export type PlayerActor = Pick<Actor, PlayerActorTableField> &
   Partial<Pick<Actor, PlayerActorPartyField>> & {
     replaySceneId?: string;
@@ -68,6 +68,7 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
     /** Sheet resources (spell slots, prepared spells, inventory, currency). Your own claimed character always; another player's only at `partyVisibility` `sheet-and-resources`. */ spellSlots?: Actor["spellSlots"];
     pactSlots?: Actor["pactSlots"];
     preparedSpellIds?: Actor["preparedSpellIds"];
+    preparation?: Actor["preparation"];
     inventory?: Actor["inventory"];
     currency?: Actor["currency"];
     /** The resolved token health indicator, present only when the table shows a bar/ring/aura to everyone (audience "all"); the client derives the fill from `hp` (exact for the owner, coarse band otherwise). */ healthDisplay?: Readonly<{

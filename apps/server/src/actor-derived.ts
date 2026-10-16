@@ -103,6 +103,8 @@ export function deriveActorSheet(
     spellSaveDcBonus: sumRiders(
       collectRiders(derivation.carriers, { ...derivation.context, moment: null }),
       "spell-save-dc"
-    )
+    ),
+    // The SRD's three, plus what an `attunement-slots` rider adds (Use Magic Device).
+    attunementSlots: 3 + derivation.attunementSlots
   };
 }

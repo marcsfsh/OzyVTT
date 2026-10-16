@@ -7,7 +7,9 @@ import { effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 import { endEffectsAtLongRest, reduceExhaustion, removeConditionDirect, type EffectNarration } from "./effects.js";
 import { requireActorAccess, requireGm, type Initiator } from "./authorization.js";
+import { openPreparation } from "./spellcasting.js";
 import { healActor } from "./hit-points.js";
+import { chargesAfterDawn } from "./item-charges.js";
 
 /** SRD Resting: a Short Rest is 1 hour and a Long Rest at least 8. */
 export const SHORT_REST_HOURS = 1;
@@ -148,21 +150,29 @@ function clearOverrides(overrides: Actor["choiceOverrides"], kind: "long" | "sho
   return Object.fromEntries(Object.entries(overrides).filter(([, override]) => override.per !== "short-rest"));
 }
 
+/** SRD Pact Magic: every expended pact slot comes back on a Short or Long Rest. */
+function restorePactSlots(actor: Actor, definition: ActorDefinition | undefined): void {
+  const maximum = actor.pactSlots ? pactSlotMaximum(definition) : null;
+  if (actor.pactSlots && maximum) actor.pactSlots = { ...actor.pactSlots, remaining: maximum.max };
+}
+
 /**
  * Applies a rest to a rostered actor outside combat (SRD Resting, ADR-0020). Either needs at least 1 Hit Point, so
  * the dying and the dead get nothing from it, and a Long Rest waits 16 hours of game time after the last one.
- * Short: per-short-rest, recharge and per-encounter pools re-arm, and long-rest pools a feature partly refills
- * (Rage's one use) get those uses back; healing is only by spending Hit Point Dice.
+ * Short: per-short-rest, recharge and per-encounter pools and Pact Magic slots re-arm, and long-rest pools a feature
+ * partly refills (Rage's one use) get those uses back; healing is only by spending Hit Point Dice.
  * Long: Concentration and turn-measured effects end first (onEnd grants land), then HP to max, temp HP cleared, all
  * pools refreshed, all Hit Point Dice restored, Exhaustion drops one level. It counts as ending at the current game
- * hour; a party rest moves the clock past it.
+ * hour; a party rest moves the clock past it. With `charges.random`, a charged item regains its printed dice rather
+ * than every charge, and `charges.lines` hears what each regained.
  */
 export function applyRest(
   state: GameState,
   actorId: string,
   kind: "long" | "short",
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
-  catalog?: EquipmentCatalog
+  catalog?: EquipmentCatalog,
+  charges?: Readonly<{ random: (sides: number) => number; lines: string[] }>
 ): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
@@ -180,6 +190,7 @@ export function applyRest(
     // A pick re-made "whenever you finish a Short or Long Rest" lapses here; the build's own answer stands
     // until the character chooses again.
     actor.choiceOverrides = clearOverrides(actor.choiceOverrides, "short");
+    restorePactSlots(actor, definition);
     return events;
   }
   // Eight hours of sleep: Concentration ends and turn-measured effects lapse; "until ended" ones (a curse) stay.
@@ -191,16 +202,20 @@ export function applyRest(
     actor.hitDice = makeHitDicePool(actor.hitDice.entries.map((entry) => ({ ...entry, remaining: entry.maximum })));
   actor.deathSaves = null;
   removeConditionDirect(actor, "unconscious");
-  actor.actionUses = {};
+  const longRestDefinition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
+  if (charges) {
+    const dawn = chargesAfterDawn(actor, longRestDefinition, catalog, charges.random);
+    actor.actionUses = dawn.stillSpent;
+    charges.lines.push(...dawn.lines);
+  } else actor.actionUses = {};
   // Both kinds lapse on a long rest.
   actor.choiceOverrides = clearOverrides(actor.choiceOverrides, "long");
   reduceExhaustion(actor);
   actor.lastLongRestAt = state.rest.clockHours;
   // Rested, by whatever path: nothing left to ask the GM for.
   state.rest = { ...state.rest, requests: state.rest.requests.filter((id) => id !== actorId) };
-  // SRD long rest: spell slots (and Pact Magic) refill and prepared spells reset to the sheet's defaults.
+  // SRD long rest: spell slots (and Pact Magic) refill.
   // No spellcasting leaves these untouched.
-  const longRestDefinition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
   if (actor.spellSlots && longRestDefinition?.spellcasting) {
     // `spellSlotMaxima` covers derived multiclass tables and item-added slots, shared with seeding and the
     // spend clamp.
@@ -209,17 +224,14 @@ export function applyRest(
         (entry) => [entry.level, entry.max] as const
       )
     );
-    actor.spellSlots = actor.spellSlots.map((slot) => ({
-      ...slot,
-      remaining: maxByLevel.get(slot.level) ?? slot.remaining
-    }));
+    // A level the sheet no longer has (an older Warlock's pact row) goes; Pact Magic is its own pool.
+    actor.spellSlots = actor.spellSlots
+      .filter((slot) => maxByLevel.has(slot.level))
+      .map((slot) => ({ ...slot, remaining: maxByLevel.get(slot.level)! }));
   }
-  const pactMaximum = actor.pactSlots ? pactSlotMaximum(longRestDefinition) : null;
-  if (actor.pactSlots && pactMaximum) actor.pactSlots = { ...actor.pactSlots, remaining: pactMaximum.max };
-  if (longRestDefinition?.spellcasting)
-    actor.preparedSpellIds = longRestDefinition.spellcasting.spells
-      .filter((spell) => spell.prepared || spell.alwaysPrepared)
-      .map((spell) => spell.id);
+  restorePactSlots(actor, longRestDefinition);
+  // The prepared list stands; a caster that prepares after a Long Rest gets the step to change it.
+  openPreparation(actor, longRestDefinition);
   return events;
 }
 
@@ -249,7 +261,8 @@ export function answerLongRest(
   approve: boolean,
   scope: Initiator,
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
-  catalog?: EquipmentCatalog
+  catalog?: EquipmentCatalog,
+  random?: (sides: number) => number
 ): EffectNarration[] {
   requireGm(scope, "Only the GM answers a Long Rest request.");
   const actor = state.actors.find((candidate) => candidate.id === actorId);
@@ -257,9 +270,22 @@ export function answerLongRest(
   if (!state.rest.requests.includes(actorId))
     throw new CommandRejectedError(`${actor.name} isn't waiting for a Long Rest.`);
   // The rest clears the request itself, so a refused one leaves it waiting.
-  if (approve) return applyRest(state, actorId, "long", resolveDefinition, catalog);
+  if (approve) return longRest(state, actorId, resolveDefinition, catalog, random);
   state.rest = { ...state.rest, requests: state.rest.requests.filter((id) => id !== actorId) };
   return [];
+}
+
+/** A Long Rest, with each charged item's dawn regain rolled on `random` and told as a line about the rester. */
+function longRest(
+  state: GameState,
+  actorId: string,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
+  catalog: EquipmentCatalog | undefined,
+  random: ((sides: number) => number) | undefined
+): EffectNarration[] {
+  const lines: string[] = [];
+  const events = applyRest(state, actorId, "long", resolveDefinition, catalog, random ? { random, lines } : undefined);
+  return [...events, ...lines.map((text) => ({ kind: "effect" as const, text, actorId }))];
 }
 
 /**
@@ -272,7 +298,8 @@ export function startPartyRest(
   actorIds: readonly string[],
   kind: "long" | "short",
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
-  catalog?: EquipmentCatalog
+  catalog?: EquipmentCatalog,
+  random?: (sides: number) => number
 ): EffectNarration[] {
   if (kind === "short" && state.rest.shortRest)
     throw new CommandRejectedError("A Short Rest is already under way - finish it first.");
@@ -289,7 +316,7 @@ export function startPartyRest(
     state.rest = { ...state.rest, shortRest: { actorIds: [...actorIds], done: [] } };
     return [];
   }
-  const events = members.flatMap((actor) => applyRest(state, actor.id, "long", resolveDefinition, catalog));
+  const events = members.flatMap((actor) => longRest(state, actor.id, resolveDefinition, catalog, random));
   const clockHours = Math.min(CLOCK_LIMIT_HOURS, state.rest.clockHours + LONG_REST_HOURS);
   state.rest = { ...state.rest, clockHours };
   for (const actor of members) actor.lastLongRestAt = clockHours;

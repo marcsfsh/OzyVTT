@@ -20,7 +20,7 @@ import {
   type SectionDef
 } from "./schema";
 import type { HomebrewType } from "./types";
-import { ABILITIES, SIZES } from "./vocabulary";
+import { ABILITIES, DAMAGE_TYPES, SIZES } from "./vocabulary";
 
 const LEVEL_CHIPS = Array.from({ length: 20 }, (_, index) => opt(String(index + 1), String(index + 1)));
 
@@ -740,20 +740,32 @@ const SPELL_LIST_SCHEMA: HomebrewSchema = {
 const SLOTS = [
   opt("weapon", "A weapon", "Held"),
   opt("shield", "A shield", "Held"),
-  opt("held", "Held — a wand, orb, rod or staff", "Held"),
+  opt("held", "Held - a wand, orb, rod or staff", "Held"),
   opt("armor", "Body armour", "Worn"),
-  opt("head", "On the head — a circlet or helm", "Worn"),
-  opt("neck", "Around the neck — an amulet", "Worn"),
-  opt("shoulders", "Over the shoulders — a cloak", "Worn"),
-  opt("hands", "On the hands — gloves", "Worn"),
+  opt("head", "On the head - a circlet or helm", "Worn"),
+  opt("eyes", "Over the eyes - lenses or goggles", "Worn"),
+  opt("neck", "Around the neck - an amulet", "Worn"),
+  opt("shoulders", "Over the shoulders - a cloak", "Worn"),
+  opt("body", "Over the clothes - a robe", "Worn"),
+  opt("hands", "On the hands - gloves or gauntlets", "Worn"),
+  opt("bracers", "On the forearms - bracers", "Worn"),
   opt("ring", "A ring", "Worn"),
   opt("belt", "At the belt", "Worn"),
-  opt("feet", "On the feet — boots", "Worn"),
-  opt("wondrous", "Wondrous — attunable, worn nowhere", "Everything else"),
-  opt("consumable", "Used up — a potion or scroll", "Everything else"),
+  opt("feet", "On the feet - boots", "Worn"),
+  opt("wondrous", "Wondrous - attunable, worn nowhere", "Everything else"),
+  opt("consumable", "Used up - a potion or scroll", "Everything else"),
   opt("ammunition", "Ammunition", "Everything else"),
   opt("none", "Just carried", "Everything else")
 ];
+
+const AMMUNITION_KINDS = [
+  opt("arrow", "Arrows"),
+  opt("bolt", "Crossbow bolts"),
+  opt("firearm-bullet", "Firearm bullets"),
+  opt("needle", "Blowgun needles"),
+  opt("sling-bullet", "Sling bullets")
+];
+const isAmmunition = (draft: Draft) => draft.category === "ammunition" || draft.slot === "ammunition";
 
 /** Turning magic off removes all of these; a leftover `isMagic: false` or orphan rider would fail
     `.strict()` invisibly. */
@@ -762,6 +774,9 @@ const MAGIC_KEYS = [
   "rarity",
   "attunement",
   "cursed",
+  "charges",
+  "damageTypeChoice",
+  "removesArmorDrawbacks",
   "casts",
   "grantsFeatIds",
   "modifiers",
@@ -814,6 +829,36 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           unit: "lb",
           allowDecimal: true,
           emptyValue: "null"
+        },
+        {
+          key: "consumedOnUse",
+          label: "Used up when used",
+          kind: "switch",
+          help: "A potion or a flask: each use of its actions takes one from the stack, and it works from the pack."
+        },
+        // Ammunition sold in bundles counts its pieces: each shot spends one, and half come back after the fight.
+        {
+          key: "ammunition.kind",
+          label: "Ammunition for",
+          kind: "select",
+          options: AMMUNITION_KINDS,
+          placeholder: "Counted one per item",
+          help: "Sold in bundles, like Arrows (20): what one piece is.",
+          visibleWhen: isAmmunition,
+          read: (draft) => String(getAt(draft, "ammunition.kind") ?? ""),
+          write: (next, draft) => {
+            const { ammunition: _old, ...rest } = draft;
+            const count = Number(getAt(draft, "ammunition.count")) || 20;
+            return next ? { ...rest, ammunition: { kind: next, count } } : rest;
+          }
+        },
+        {
+          key: "ammunition.count",
+          label: "Pieces per bundle",
+          kind: "number",
+          min: 1,
+          max: 100,
+          visibleWhen: (draft) => isAmmunition(draft) && getAt(draft, "ammunition.kind") !== undefined
         }
       ]
     },
@@ -865,6 +910,46 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           kind: "switch",
           help: "Players can't unattune, unequip or drop it — only you can. Its magic stays hidden from them until they attune.",
           visibleWhen: (draft) => draft.isMagic === true && getAt(draft, "attunement.required") === true
+        },
+        // The charges themselves are the `uses` on its spells and actions; these say how they come back.
+        {
+          key: "charges.regain",
+          label: "Charges regained at dawn",
+          placeholder: "1d6 + 1",
+          emptyValue: "omit",
+          help: "Dice, as printed. Leave empty and a long rest gives every charge back.",
+          visibleWhen: (draft) => draft.isMagic === true
+        },
+        {
+          key: "charges.lastChargeRoll",
+          label: "Roll a d20 when the last charge is spent",
+          kind: "switch",
+          help: "On a 1 the item's own text says what happens. You are told the roll.",
+          visibleWhen: (draft) => draft.isMagic === true
+        },
+        {
+          key: "removesArmorDrawbacks",
+          label: "No Stealth or Strength drawback",
+          kind: "switch",
+          help: "Like mithral: the armor it is made from keeps neither its Stealth Disadvantage nor its Strength minimum.",
+          visibleWhen: (draft) => draft.isMagic === true
+        },
+        // Like a Ring of Resistance: the record grants one resistance, and the GM picks its type per copy.
+        {
+          key: "damageTypeChoice",
+          label: "The GM picks its resistance from",
+          kind: "multiselect",
+          wide: true,
+          options: DAMAGE_TYPES,
+          help: "Pick two or more, one of them its granted resistance. The GM chooses the type for each copy on the sheet.",
+          // Shown once the item grants a resistance, the one this choice replaces.
+          visibleWhen: (draft) =>
+            draft.isMagic === true &&
+            ((getAt(draft, "grants.damageResistances") as unknown[] | undefined)?.length ?? 0) > 0,
+          write: (next, draft) => {
+            const { damageTypeChoice: _old, ...rest } = draft;
+            return Array.isArray(next) && next.length > 0 ? { ...rest, damageTypeChoice: next } : rest;
+          }
         },
         // Template pair, like the SRD's "Weapon, +1 (Any Simple or Martial)": with both set, the
         // player picks the base when the item lands on a sheet and the server copies its stats.
@@ -996,68 +1081,110 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
       id: "weapon",
       title: "Weapon",
       blurb: "Fill these in only for a weapon. The category has to be “weapon” too, or nothing here is read.",
-      fields: inContainer("weapon", SUB_OBJECT_DEFAULTS.equipment!.weapon, [
+      fields: [
+        ...inContainer("weapon", SUB_OBJECT_DEFAULTS.equipment!.weapon, [
+          {
+            key: "weapon.category",
+            label: "Weapon kind",
+            kind: "select",
+            options: [opt("simple", "Simple"), opt("martial", "Martial")]
+          },
+          { key: "weapon.damageDice", label: "Damage", placeholder: "1d8", validate: diceValidate },
+          {
+            key: "weapon.damageType",
+            label: "Damage type",
+            pick: true,
+            placeholder: "slashing",
+            suggestions: (ctx) => ctx.damageTypes
+          },
+          {
+            key: "weapon.rangeFeet",
+            label: "Range",
+            kind: "number",
+            min: 1,
+            max: 1000,
+            unit: "ft",
+            emptyValue: "null",
+            help: "Leave both empty for a melee weapon."
+          },
+          {
+            key: "weapon.longRangeFeet",
+            label: "Long range",
+            kind: "number",
+            min: 1,
+            max: 5000,
+            unit: "ft",
+            emptyValue: "null"
+          },
+          /**
+           * Weapon properties are mechanics, not labels: `finesse` (better of Str/Dex), `reach`,
+           * `thrown`, and `weapon-property-is` riders all read this column. Uses
+           * `WEAPON_PROPERTY_IDS`, not `ctx.weaponProperties` (which also includes masteries). Open
+           * like other SRD vocabularies, so homebrew properties stay typeable.
+           */
+          {
+            key: "weapon.properties",
+            label: "Properties",
+            kind: "tags",
+            pick: true,
+            max: 12,
+            maxRowsReason: "Twelve properties is as many as the column stores.",
+            suggestions: WEAPON_PROPERTY_IDS,
+            placeholder: "finesse",
+            help: "Finesse lets it swing off Dexterity; reach threatens at 10 feet."
+          },
+          // Closed: each mastery is engine behaviour, so the select offers exactly the eight the engine runs.
+          {
+            key: "weapon.mastery",
+            label: "Mastery",
+            kind: "select",
+            options: WEAPON_MASTERY_IDS.map((id) => opt(id, humanise(id))),
+            placeholder: "None",
+            emptyValue: "omit",
+            help: "What a wielder with Weapon Mastery gets from it: Graze, Cleave, Topple and the rest."
+          },
+          {
+            key: "weapon.versatileDice",
+            label: "Two-handed damage",
+            placeholder: "1d10",
+            validate: diceValidate,
+            emptyValue: "omit",
+            help: "For a Versatile weapon: the die it deals held in both hands."
+          },
+          {
+            key: "weapon.ammunition",
+            label: "Fires",
+            kind: "select",
+            options: AMMUNITION_KINDS,
+            placeholder: "Any ammunition",
+            emptyValue: "omit",
+            help: "For an Ammunition weapon: what it needs to fire."
+          }
+        ]),
+        // Outside `inContainer`, whose plain path write can't turn the choice into a boolean.
         {
-          key: "weapon.category",
-          label: "Weapon kind",
+          key: "weapon.melee",
+          label: "Melee or ranged",
           kind: "select",
-          options: [opt("simple", "Simple"), opt("martial", "Martial")]
-        },
-        { key: "weapon.damageDice", label: "Damage", placeholder: "1d8", validate: diceValidate },
-        {
-          key: "weapon.damageType",
-          label: "Damage type",
-          pick: true,
-          placeholder: "slashing",
-          suggestions: (ctx) => ctx.damageTypes
-        },
-        {
-          key: "weapon.rangeFeet",
-          label: "Range",
-          kind: "number",
-          min: 1,
-          max: 1000,
-          unit: "ft",
-          emptyValue: "null",
-          help: "Leave both empty for a melee weapon."
-        },
-        {
-          key: "weapon.longRangeFeet",
-          label: "Long range",
-          kind: "number",
-          min: 1,
-          max: 5000,
-          unit: "ft",
-          emptyValue: "null"
-        },
-        /**
-         * Weapon properties are mechanics, not labels: `finesse` (better of Str/Dex), `reach`,
-         * `thrown`, and `weapon-property-is` riders all read this column. Uses
-         * `WEAPON_PROPERTY_IDS`, not `ctx.weaponProperties` (which also includes masteries). Open
-         * like other SRD vocabularies, so homebrew properties stay typeable.
-         */
-        {
-          key: "weapon.properties",
-          label: "Properties",
-          kind: "tags",
-          pick: true,
-          max: 12,
-          maxRowsReason: "Twelve properties is as many as the column stores.",
-          suggestions: WEAPON_PROPERTY_IDS,
-          placeholder: "finesse",
-          help: "Finesse lets it swing off Dexterity; reach threatens at 10 feet."
-        },
-        // Closed: each mastery is engine behaviour, so the select offers exactly the eight the engine runs.
-        {
-          key: "weapon.mastery",
-          label: "Mastery",
-          kind: "select",
-          options: WEAPON_MASTERY_IDS.map((id) => opt(id, humanise(id))),
-          placeholder: "None",
-          emptyValue: "omit",
-          help: "What a wielder with Weapon Mastery gets from it: Graze, Cleave, Topple and the rest."
+          options: [opt("melee", "Melee weapon"), opt("ranged", "Ranged weapon")],
+          placeholder: "From its range",
+          help: "A Dagger is a melee weapon you can throw; a Dart is a ranged one. Only a melee weapon has a reach.",
+          read: (scope) => {
+            const melee = (scope.weapon as Draft | undefined)?.melee;
+            return melee === true ? "melee" : melee === false ? "ranged" : "";
+          },
+          write: (next, scope) => {
+            const { melee: _melee, ...held } = {
+              ...SUB_OBJECT_DEFAULTS.equipment!.weapon,
+              ...((scope.weapon as Draft | undefined) ?? {})
+            };
+            return {
+              ...scope,
+              weapon: next === "melee" ? { ...held, melee: true } : next === "ranged" ? { ...held, melee: false } : held
+            };
+          }
         }
-      ])
+      ]
     },
     {
       id: "armor",

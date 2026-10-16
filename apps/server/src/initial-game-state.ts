@@ -493,6 +493,7 @@ function actorFor(member: (typeof PARTY)[number]) {
     spellSlots: seedSpellSlots(definition),
     pactSlots: seedPactSlots(definition),
     preparedSpellIds: seedPreparedSpellIds(definition),
+    preparation: null,
     inventory: (definition.startingInventory ?? []).map((item) => ({ ...item })),
     currency: definition.startingCurrency ? { ...definition.startingCurrency } : { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
     ...(definition.summary ? { notes: definition.summary } : {}),

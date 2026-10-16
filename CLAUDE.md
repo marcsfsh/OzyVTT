@@ -9,17 +9,17 @@ HTTP paths.
 
 Node 24+. Run from the repo root.
 
-| Command           | What it does                                                |
-| ----------------- | ----------------------------------------------------------- |
-| `npm run dev`     | Client on `:5173`, server on `:3001`.                       |
-| `npm run check`   | Typecheck every workspace and the smoke suite.              |
-| `npm test`        | All tests.                                                  |
-| `npm run build`   | Build the client.                                           |
-| `npm run smoke`   | Browser smoke tests against the built client (build first). |
-| `npm run map`     | Regenerate `docs/app-map.md`; a test fails if it is stale.  |
-| `npm run content` | Rebuild the SRD content bundles from their sources.         |
-| `npm run lint`    | ESLint.                                                     |
-| `npm run format`  | Prettier; CI runs `npm run format:check`.                   |
+| Command           | What it does                                                                             |
+| ----------------- | ---------------------------------------------------------------------------------------- |
+| `npm run dev`     | Client on `:5173`, server on `:3001`.                                                    |
+| `npm run check`   | Typecheck every workspace and the smoke suite.                                           |
+| `npm test`        | All tests.                                                                               |
+| `npm run build`   | Build the client.                                                                        |
+| `npm run smoke`   | Browser smoke tests against the built client (build first).                              |
+| `npm run map`     | Regenerate `docs/app-map.md` and the actor JSON Schema; a test fails if either is stale. |
+| `npm run content` | Rebuild the SRD content bundles from their sources.                                      |
+| `npm run lint`    | ESLint.                                                                                  |
+| `npm run format`  | Prettier; CI runs `npm run format:check`.                                                |
 
 ## Invariants
 

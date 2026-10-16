@@ -56,11 +56,18 @@ describe("rule families", () => {
       // An extra attack waits on the swing that opens it: a matter of what this turn has done.
       ["attack.light-needs-attack", "economy"],
       ["attack.cleave-needs-hit", "economy"],
+      // A Loading weapon fires once per action: what this action has already done.
+      ["attack.loading", "economy"],
+      // Running out of ammunition: what the character carries, like the hands rule.
+      ["attack.no-ammunition", "economy"],
+      // What the character's hands are holding, like what the action has already done.
+      ["attack.two-handed", "economy"],
+      // Casting in untrained armor: what the character can do at all, like the hands rule.
+      ["spell.untrained-armor", "economy"],
       // Sneak Attack or a smite taken alone, with no hit to add to.
       ["attack.rides-a-hit", "economy"],
       ["feature.no-uses-remaining", "resources"],
       ["feature.requires-effect", "resources"],
-      ["feature.no-spell-slot", "resources"],
       ["legendary.no-actions-remaining", "resources"],
       ["range.out-of-range", "targeting"],
       ["range.out-of-reach", "targeting"],
@@ -69,12 +76,16 @@ describe("rule families", () => {
       ["target.too-large-to-grapple", "targeting"],
       ["cover.total", "targeting"],
       ["condition.charmed-charmer", "targeting"],
+      ["target.too-many", "targeting"],
       ["attack.cleave-same-target", "targeting"],
       ["attack.cleave-too-far", "targeting"],
       // The hit can't carry the extra: no Advantage or ally for Sneak Attack, no melee weapon for a smite.
       ["attack.hit-option-unqualified", "targeting"],
-      // Not thrown yet, but the family is already part of the wire vocabulary.
-      ["slots.none-remaining", "slots"]
+      // "Don't police spell slots or prepared spells" relaxes exactly these.
+      ["slots.none-remaining", "slots"],
+      ["slots.below-spell-level", "slots"],
+      ["slots.one-per-turn", "slots"],
+      ["slots.not-prepared", "slots"]
     ];
     for (const [rule, family] of expected) expect(familyOf(rule), rule).toBe(family);
     expect(expected.map(([rule]) => rule).sort()).toEqual([...RULE_IDS].sort());

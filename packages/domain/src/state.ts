@@ -3,6 +3,7 @@ import {
   ActorDefinitionSchema,
   ActorSchema,
   EffectInstanceSchema,
+  EffectModifiersSchema,
   HealthDisplaySchema,
   SaveFailureDurationSchema
 } from "@vtt/schemas";
@@ -245,7 +246,9 @@ export const PendingSaveSchema = z
         /** The action it came from, so a second hit from the same action refreshes rather than stacks. */
         sourceActionId: z.string().max(120).optional(),
         /** Damage the effect deals at the start of a turn while it lasts (a swallow's acid). */
-        ongoingDamage: EffectInstanceSchema.shape.ongoingDamage
+        ongoingDamage: EffectInstanceSchema.shape.ongoingDamage,
+        /** What the effect does while it lasts (Bane's -1d4 on attack rolls and saves). */
+        modifiers: EffectModifiersSchema.default([])
       })
       .strict()
       .optional(),
@@ -279,6 +282,21 @@ export const ParkedAttackSchema = z
     pushFeet: z.number().int().min(0).max(100).nullable(),
     /** The slot the spell was cast with, so the replay rolls the same dice. */
     slotLevel: z.number().int().min(1).max(9).nullable(),
+    /** The damage type the caster picked (Chromatic Orb), so the replay deals it. */
+    damageType: z.string().max(40).nullable().default(null),
+    /** Dice an effect added to the roll (Bless's d4) as they rolled, so the replay totals the same. */
+    bonusDice: z
+      .array(
+        z
+          .object({
+            label: z.string().min(1).max(120),
+            dice: z.string().max(8),
+            total: z.number().int().min(-48).max(48)
+          })
+          .strict()
+      )
+      .max(8)
+      .default([]),
     /** Attacker to target when it rolled, so the replay classifies the swing (melee or thrown) the same way. */
     distanceFeet: z.number().min(0).max(100000).nullable(),
     initiatorRole: z.enum(["gm", "player"]),
@@ -504,8 +522,13 @@ const sceneCombatShape = {
     .object({
       actionUsed: z.boolean().default(false),
       bonusActionUsed: z.boolean().default(false),
+      /** `slotLevel`: the slot a multi-attack spell (Scorching Ray) was cast with, which its later rays roll at. */
       actionInstance: z
-        .object({ actorId: z.uuid(), components: z.record(z.string(), z.number().int().nonnegative()) })
+        .object({
+          actorId: z.uuid(),
+          components: z.record(z.string(), z.number().int().nonnegative()),
+          slotLevel: z.number().int().min(1).max(9).optional()
+        })
         .strict()
         .nullable()
         .default(null),
@@ -519,13 +542,22 @@ const sceneCombatShape = {
       movementUsedFeet: z.number().nonnegative().max(100000).default(0),
       /** Rule families the GM already waved through this turn. Stripped from player projections. */
       rulesOverriddenFamilies: z.array(RuleFamilySchema).max(5).optional(),
+      /** Who has expended a spell slot to cast a spell this turn (SRD: one per turn). Engine bookkeeping, never
+       *  projected. */
+      spellSlotCasters: z.array(z.uuid()).max(200).optional(),
       /** The turn's actor has made its one death save (SRD: at the start of its turn). Never projected. */
       deathSaveRolled: z.boolean().optional(),
       /** What this turn's attacks opened for an extra attack: the Light weapons its actor swung in the Attack action,
-       *  and the creature a Cleave weapon hit. Engine bookkeeping, never projected. */
+       *  and the creature a Cleave weapon hit; and the Loading weapons already fired in that action, which can't
+       *  fire again in it. Engine bookkeeping, never projected. */
       extraAttacks: z
         .object({
           light: z
+            .object({ actorId: z.uuid(), itemIds: z.array(z.string().max(120)).max(10) })
+            .strict()
+            .nullable()
+            .default(null),
+          loading: z
             .object({ actorId: z.uuid(), itemIds: z.array(z.string().max(120)).max(10) })
             .strict()
             .nullable()

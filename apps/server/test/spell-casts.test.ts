@@ -125,8 +125,11 @@ describe("an item's spell cast, from the spell's cast model", () => {
     });
   });
 
-  it("fires all three of Magic Missile's darts", () => {
-    expect(castOf(table(), "magic-missile").damage).toEqual([{ formula: "3d4 + 3", type: "force" }]);
+  it("fires all three of Magic Missile's darts, each its own 1d4 + 1 to assign", () => {
+    expect(castOf(table(), "magic-missile")).toMatchObject({
+      damage: [{ formula: "1d4 + 1", type: "force" }],
+      darts: 3
+    });
   });
 
   it("makes no attack for a spell that only mentions attack rolls, and no damage the text only threatens", () => {

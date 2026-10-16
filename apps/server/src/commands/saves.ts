@@ -13,7 +13,13 @@ import {
 } from "@vtt/domain/commands";
 import { CommandRejectedError } from "../game-store.js";
 import { damageAdjustmentDetail, healActor } from "../hit-points.js";
-import { answerSave, dismissSave, saveRiderBonusForAnySave, saveTotalFor } from "../saving-throws.js";
+import {
+  answerSave,
+  dismissSave,
+  saveRiderBonusForAnySave,
+  saveRiderDiceTerms,
+  saveTotalFor
+} from "../saving-throws.js";
 import { exhaustionPenalty } from "../condition-rules.js";
 import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
@@ -54,19 +60,15 @@ export const saveCommands = [
       }
       // Loose save at the same modifier the resolver would use.
       const definition = actor.definitionId ? kit.resolveDefinitionIn(snapshot, actor.definitionId) : undefined;
-      const modifier = saveTotalFor(
-        definition,
-        actor,
-        ability,
-        deriveEquipment(actor, definition, kit.equipmentCatalog())
-      );
+      const derivation = deriveEquipment(actor, definition, kit.equipmentCatalog());
+      const modifier = saveTotalFor(definition, actor, ability, derivation);
       const die = d20Die(rollMode);
       const loose = await dispatch("dice.roll", {
         commandId,
         actorId,
         formula:
           total === undefined
-            ? `${die}${modifier === 0 ? "" : modifier < 0 ? ` - ${Math.abs(modifier)}` : ` + ${modifier}`}`
+            ? `${die}${modifier === 0 ? "" : modifier < 0 ? ` - ${Math.abs(modifier)}` : ` + ${modifier}`}${saveRiderDiceTerms(derivation, ability)}`
             : `${total}`,
         purpose: "save",
         visibility: actor.visibility === "gm-only" ? "gm-only" : "public",

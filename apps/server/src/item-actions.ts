@@ -1,12 +1,14 @@
 import type { FeatureAction, FeatureSaveDc, FeatureUses, ItemSpellCast, SpellReference } from "@vtt/content-srd-5.2.1";
+import { spellRangeFeet } from "@vtt/content-srd-5.2.1/spell-effect";
 import {
   abilityModifier,
   formulaPlus,
+  isMeleeWeapon,
   isMonkWeapon,
   weaponAbilityModifierFrom,
   type RiderAbility
 } from "@vtt/rules-5e";
-import { MAX_ACTION_USES, type ActorAction, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
+import { catalogIdOf, MAX_ACTION_USES, type ActorAction, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
 
 /**
  * Actions synthesised from what a character carries: an equipped weapon's swing, an item's declared actions and
@@ -32,11 +34,28 @@ function bearerLevel(definition: ActorDefinition | undefined): number {
   return total >= 1 ? total : 1;
 }
 
+/** A carried item: its row id, and the catalog record it copies. */
+export type CarriedItem = Readonly<{ id: string; recordId?: string }>;
+
+/**
+ * An item's shared charge pool, counted per carried copy: the row's id stands in for the record's, so two Wands of
+ * Fireballs are two pools and a wand's spent charges are its own ("wand-of-fireballs-charges" on the row
+ * "wand-of-fireballs-2" counts as "wand-of-fireballs-2-charges"). Kept within the pool slug's 60 characters.
+ */
+export function itemPool(item: CarriedItem, pool: string): string {
+  const catalogId = catalogIdOf(item);
+  const suffix = pool.startsWith(`${catalogId}-`) ? pool.slice(catalogId.length + 1) : pool;
+  const key = `${item.id}-${suffix}`;
+  return key.length <= 60 ? key : `${item.id.slice(0, Math.max(1, 59 - suffix.length))}-${suffix}`.slice(0, 60);
+}
+
 /** Authored uses to `ActionUsesSchema`, clamped to its range like `resolvedUseLimit`; below 1 means no charges. An
- *  item action carries the action form (with `recharge`), a cast the feature form (with `scaling`). */
+ *  item action carries the action form (with `recharge`), a cast the feature form (with `scaling`). A shared pool
+ *  is counted per carried copy (`itemPool`); an unpooled use is already, by the action's own id. */
 function usesOf(
   uses: FeatureUses | ActorAction["uses"],
-  definition: ActorDefinition | undefined
+  definition: ActorDefinition | undefined,
+  item: CarriedItem
 ): ActorAction["uses"] | undefined {
   if (!uses) return undefined;
   const limit = uses.limit ?? ("scaling" in uses ? scaledLimit(uses.scaling, definition) : undefined);
@@ -44,7 +63,7 @@ function usesOf(
   return {
     limit: Math.min(MAX_ACTION_USES, limit),
     per: uses.per,
-    ...(uses.pool ? { pool: uses.pool } : {}),
+    ...(uses.pool ? { pool: itemPool(item, uses.pool) } : {}),
     ...("recharge" in uses && uses.recharge !== undefined ? { recharge: uses.recharge } : {})
   };
 }
@@ -76,10 +95,11 @@ const scoreModifierOf = (definition: ActorDefinition | undefined, ability: Rider
 
 /** An item action with attack and save resolved: the read-time twin of `interpretAction`. */
 export function itemAction(
-  itemId: string,
+  item: CarriedItem,
   declared: FeatureAction,
   definition: ActorDefinition | undefined
 ): ActorAction {
+  const itemId = item.id;
   const caster = casterNumbers(definition);
   let attack: ActorAction["attack"];
   if (declared.attack) {
@@ -99,7 +119,7 @@ export function itemAction(
         ...(declared.save.dc === "spellcasting" ? { spellcasting: true } : {})
       }
     : undefined;
-  const uses = usesOf(declared.uses, definition);
+  const uses = usesOf(declared.uses, definition, item);
   return {
     id: itemActionId(itemId, declared.id),
     name: declared.name,
@@ -108,6 +128,8 @@ export function itemAction(
     ...(attack ? { attack } : {}),
     ...(save ? { save } : {}),
     damage: declared.damage.map((part) => ({ ...part })),
+    // A Potion of Healing's 2d4 + 2.
+    ...(declared.healing ? { healing: { ...declared.healing } } : {}),
     ...(uses ? { uses } : {})
   };
 }
@@ -127,15 +149,16 @@ const clampDc = (value: number) => Math.max(1, Math.min(40, Math.round(value)));
 /** A synthesised cast action with the spell's mechanics. `atLevel` picks the SRD upcast row; `ability`
  *  and `saveDc` override; an unresolvable spell degrades to a name-only action. */
 export function castAction(
-  itemId: string,
+  item: CarriedItem,
   cast: ItemSpellCast,
   itemName: string,
   definition: ActorDefinition | undefined,
   spell: SpellReference | undefined
 ): ActorAction {
+  const itemId = item.id;
   const spellName = spell?.name ?? cast.spellId.replace(/-/g, " ");
   const level = cast.atLevel ?? spell?.level ?? 0;
-  const uses = usesOf(cast.uses, definition);
+  const uses = usesOf(cast.uses, definition, item);
   const base: ActorAction = {
     id: itemActionId(itemId, `cast-${cast.spellId}`),
     name: `Cast ${spellName} (${itemName})`,
@@ -173,7 +196,8 @@ export function castAction(
     { attackBonus, saveDc: clampDc(saveDc), bearersDc, modifier: scoreModifierOf(definition, ability) },
     { roll: upcast }
   );
-  return { ...base, ...(spell.area ? { area: spell.area } : {}), ...mechanics };
+  // A healing area heals the creatures the caster picks (up to its count), so it is picked rather than templated.
+  return { ...base, ...(spell.area && !mechanics.healing ? { area: spell.area } : {}), ...mechanics };
 }
 
 /** What an action casting this spell does, from the spell's cast model (`SpellReference.effect`): its spell
@@ -184,18 +208,39 @@ export function spellCastMechanics(
   spell: SpellReference,
   numbers: Readonly<{ attackBonus: number; saveDc: number; bearersDc: boolean; modifier: number }>,
   scaled: Readonly<{ roll?: string | null; attacks?: number }> = {}
-): Pick<ActorAction, "damage"> & Partial<Pick<ActorAction, "attack" | "save" | "healing">> {
+): Pick<ActorAction, "damage"> &
+  Partial<Pick<ActorAction, "attack" | "save" | "healing" | "darts" | "damageTypes" | "grants">> {
   // No cast model: the save still applies, and the rest is the GM's.
   const effect = spell.effect ?? { attacks: 0, damage: [], healing: null };
   const scale = (formula: string) => (scaled.roll && formula === spell.damage.roll ? scaled.roll : formula);
   const attacks = scaled.attacks ?? effect.attacks;
+  // A save made later or by someone else (Spirit Guardians, Haste) is not the cast's.
+  const castSave = effect.noCastSave ? null : spell.save;
+  const damage = spellDamage(effect.damage, scale, numbers.modifier);
   return {
-    damage: effect.damage.map((part) => ({ formula: scale(part.formula), type: part.type })),
+    damage,
+    ...(effect.darts ? { darts: effect.darts } : {}),
+    ...(effect.damageTypes && damage.length > 0 ? { damageTypes: [...effect.damageTypes] } : {}),
     ...(attacks > 0
-      ? { attack: { bonus: numbers.attackBonus, ...(attacks > 1 ? { count: Math.min(10, attacks) } : {}) } }
-      : spell.save
-        ? { save: { ...spell.save, dc: numbers.saveDc, ...(numbers.bearersDc ? { spellcasting: true } : {}) } }
+      ? {
+          attack: {
+            bonus: numbers.attackBonus,
+            ...(attacks > 1 ? { count: Math.min(10, attacks) } : {}),
+            ...spellAttackReach(spell)
+          }
+        }
+      : castSave
+        ? {
+            save: {
+              ...castSave,
+              dc: numbers.saveDc,
+              ...(numbers.bearersDc ? { spellcasting: true } : {}),
+              ...(effect.failureEffect ? { failureEffect: structuredClone(effect.failureEffect) } : {})
+            }
+          }
         : {}),
+    // What the cast leaves on its targets (Bless, Hunter's Mark), sourced by the caster.
+    ...(effect.grant ? { grants: structuredClone(effect.grant) } : {}),
     ...(effect.healing
       ? {
           healing: {
@@ -206,11 +251,114 @@ export function spellCastMechanics(
   };
 }
 
+/** A cast model's damage parts as an action's: scaled (an upcast row, a cantrip tier), and with the caster's
+ *  spellcasting modifier where the spell adds it (Spiritual Weapon's 1d8 + it). */
+function spellDamage(
+  parts: NonNullable<SpellReference["effect"]>["damage"],
+  scale: (formula: string) => string,
+  modifier: number
+): ActorAction["damage"] {
+  return parts.map((part) => ({
+    formula: part.addsModifier ? formulaPlus(scale(part.formula), modifier) : scale(part.formula),
+    type: part.type
+  }));
+}
+
+/** The id of the action that casts a spell as a Ritual. */
+export const ritualSpellActionId = (spellId: string): string => `spell-${spellId}-ritual`;
+
+/** A casting time of a minute or more ("10 minutes", "8 hours"). */
+export const isLongCastingTime = (castingTime: string): boolean => /\b\d+\s*(?:minute|hour)s?\b/i.test(castingTime);
+
+/** The id of the action a spell's later action is minted as ("spell-spirit-guardians-then-save"). */
+export const laterSpellActionId = (spellId: string, name: string): string =>
+  `spell-${spellId}-then-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+
+/** One of the things a spell lets its caster do after the cast (`SpellReference.effect.laterActions`), as an action
+ *  with the caster's numbers: no slot, the spell's own level (a cantrip's tier through `scaled.roll`). */
+export function laterSpellAction(
+  spell: SpellReference,
+  later: NonNullable<NonNullable<SpellReference["effect"]>["laterActions"]>[number],
+  numbers: Readonly<{ attackBonus: number; saveDc: number; bearersDc: boolean; modifier: number }>,
+  scaled: Readonly<{ roll?: string | null }> = {}
+): ActorAction {
+  const scale = (formula: string) => (scaled.roll && formula === spell.damage.roll ? scaled.roll : formula);
+  const damage = spellDamage(later.damage, scale, numbers.modifier);
+  return {
+    id: laterSpellActionId(spell.id, later.name),
+    name: `${spell.name}: ${later.name}`,
+    activation: later.activation,
+    description: `${later.when}\n\n${spell.description}`.slice(0, 12000),
+    damage,
+    ...(later.attackRange
+      ? {
+          attack: {
+            bonus: numbers.attackBonus,
+            ...(later.attackRange.kind === "melee"
+              ? { reachFeet: later.attackRange.feet }
+              : { rangeFeet: later.attackRange.feet })
+          }
+        }
+      : later.save
+        ? { save: { ...later.save, dc: numbers.saveDc, ...(numbers.bearersDc ? { spellcasting: true } : {}) } }
+        : {}),
+    ...(spell.effect?.damageTypes && damage.length > 0 ? { damageTypes: [...spell.effect.damageTypes] } : {}),
+    ...(later.area ? { area: later.area } : {}),
+    spellId: spell.id
+  };
+}
+
+/** Where a spell's attack reaches, as the attack block carries it: a melee spell attack's `reachFeet` or a ranged
+ *  one's `rangeFeet` (no long range: a spell has one range). A cast model from before the build recorded it falls
+ *  back to the spell's range, Touch and Self being melee. */
+export function spellAttackReach(
+  spell: Pick<SpellReference, "effect" | "range">
+): Pick<NonNullable<ActorAction["attack"]>, "reachFeet" | "rangeFeet"> {
+  const feet = spellRangeFeet(spell.range);
+  const reach =
+    spell.effect?.attackRange ??
+    (feet !== null
+      ? { kind: "ranged" as const, feet }
+      : spell.range.text !== null && !/^(?:touch|self)/i.test(spell.range.text)
+        ? null
+        : { kind: "melee" as const, feet: 5 });
+  // A range the map can't measure (Sight) is left unchecked rather than read as a 5-foot reach.
+  if (reach === null) return { rangeFeet: 5280 };
+  return reach.kind === "melee" ? { reachFeet: reach.feet } : { rangeFeet: reach.feet };
+}
+
+/** A spell action made before its attack carried a range (an older sheet), given the spell's: otherwise the economy
+ *  reads it as a 5-foot melee swing. Unchanged when it has one, or casts no attack. */
+export function withSpellAttackReach(action: ActorAction, spell: SpellReference | undefined): ActorAction {
+  const attack = action.attack;
+  if (!attack || !spell || attack.reachFeet !== undefined || attack.rangeFeet !== undefined) return action;
+  return { ...action, attack: { ...attack, ...spellAttackReach(spell) } };
+}
+
+/** A spell action made before the cast model carried effects (an older sheet), given the spell's: Bless's d4 and
+ *  Bane's penalty land without a rebuild. A later action (Spiritual Weapon's attack) leaves none. */
+export function withSpellEffects(action: ActorAction, spell: SpellReference | undefined): ActorAction {
+  const effect = spell?.effect;
+  if (!spell || !effect || action.spellId !== spell.id) return action;
+  if ((effect.laterActions ?? []).some((row) => laterSpellActionId(spell.id, row.name) === action.id)) return action;
+  const grants = action.grants === undefined && effect.grant ? structuredClone(effect.grant) : undefined;
+  const failureEffect =
+    action.save && !action.save.failureEffect && effect.failureEffect
+      ? structuredClone(effect.failureEffect)
+      : undefined;
+  if (!grants && !failureEffect) return action;
+  return {
+    ...action,
+    ...(grants ? { grants } : {}),
+    ...(failureEffect && action.save ? { save: { ...action.save, failureEffect } } : {})
+  };
+}
+
 /** Martial Arts reaches this swing: the bearer has it, it is in force (no armour, no shield) and this is a Monk weapon. */
 function martialArtsSwing(item: InventoryItem, definition: ActorDefinition, martialArtsInForce: boolean) {
   const weapon = item.weapon;
   if (!martialArtsInForce || !weapon || !definition.character?.martialArts) return null;
-  return isMonkWeapon(weapon.category, weapon.properties ?? [], weapon.rangeFeet)
+  return isMonkWeapon(weapon.category, weapon.properties ?? [], weapon.rangeFeet, weapon.melee)
     ? definition.character.martialArts
     : null;
 }
@@ -277,33 +425,44 @@ export function weaponAction(
 /** A weapon's attack action, with the dice and ability modifier its damage was built from. */
 export type WeaponSwing = Readonly<{ action: ActorAction; dice: string; modifier: number }>;
 
+/** The id suffix of a Versatile weapon's two-handed attack. */
+export const TWO_HANDED_SUFFIX = "two-handed";
+
+/** `twoHanded` mints a Versatile weapon's two-handed attack (its own action, `item-<id>-two-handed`), rolling the
+ *  Versatile die; null when the weapon has none. */
 export function weaponSwing(
   item: InventoryItem,
   definition: ActorDefinition | undefined,
   grantedWeapons: readonly string[] = [],
-  martialArtsInForce = false
+  martialArtsInForce = false,
+  options: Readonly<{ twoHanded?: boolean }> = {}
 ): WeaponSwing | null {
   const weapon = item.weapon;
   if (!weapon || !definition) return null;
+  if (options.twoHanded && !weapon.versatileDice) return null;
   const properties = weapon.properties ?? [];
   const modifier = weaponAbilityModifier(item, definition, martialArtsInForce);
+  const weaponDice = options.twoHanded ? weapon.versatileDice! : weapon.damageDice;
   // Martial Arts: the Monk may roll its die in place of the weapon's, so the bigger one is rolled.
   const martialArts = martialArtsSwing(item, definition, martialArtsInForce);
-  const dice = martialArts ? biggerDie(weapon.damageDice, martialArts.die) : weapon.damageDice;
+  const dice = martialArts ? biggerDie(weaponDice, martialArts.die) : weaponDice;
   const trained = definition.proficiencies?.weapons;
   // A bound template row also answers to its base weapon's id for proficiency.
-  const ids = item.baseId !== undefined ? [item.id, item.baseId] : [item.id];
+  const ids = item.baseId !== undefined ? [catalogIdOf(item), item.baseId] : [catalogIdOf(item)];
   const proficient =
     trained === undefined || trainingCovers(grantedWeapons, weapon, ids) || trainingCovers(trained, weapon, ids);
   const bonus = modifier + (proficient ? definition.proficiencyBonus : 0);
   const action: ActorAction = {
-    id: itemActionId(item.id),
-    name: item.name,
+    id: itemActionId(item.id, options.twoHanded ? TWO_HANDED_SUFFIX : undefined),
+    name: options.twoHanded ? `${item.name} (two-handed)` : item.name,
     activation: "action",
-    description: `Attack with ${item.name}.`,
+    description: options.twoHanded
+      ? `Attack with ${item.name} in both hands (Versatile).`
+      : `Attack with ${item.name}.`,
     attack: {
       bonus,
-      ...(weapon.rangeFeet === null || properties.includes("thrown")
+      // Only a Melee weapon has a reach: a Dart thrown at an adjacent creature is still a ranged attack.
+      ...(isMeleeWeapon(properties, weapon.rangeFeet, weapon.melee)
         ? { reachFeet: properties.includes("reach") ? 10 : 5 }
         : {}),
       ...(weapon.rangeFeet !== null
@@ -357,22 +516,34 @@ export function extraAttackAction(
   };
 }
 
-/** The action cast with a higher slot: the spell's printed row for that slot replaces the dice its own roll gave, in
- *  the damage and the healing. Unchanged where the spell prints no dice for the slot (Magic Missile adds darts). */
+/** The action cast with a higher slot, from the spell's printed row for that slot: its roll replaces the one the
+ *  cast's own roll gave, in the damage and the healing (Cure Wounds' 4d8, Heal's 80), and its count is the rays or
+ *  darts the cast makes (Scorching Ray's fourth ray, Magic Missile's fourth dart). A count of targets (Bless, Hold
+ *  Person) is a targeting limit, not read here. */
 export function upcastAction(action: ActorAction, spell: SpellReference, level: number): ActorAction {
-  const roll = spell.castingOptions.find((option) => option.type === `slot_level_${level}`)?.damageRoll;
-  const base = spell.damage.roll;
-  if (!roll || !base) return action;
-  const swap = (formula: string): string => {
-    if (formula === base) return roll;
-    const match = /^(\d+d\d+)(?:\s*([+-])\s*(\d+))?$/i.exec(formula.trim());
-    return match && match[1] === base
-      ? formulaPlus(roll, (match[2] === "-" ? -1 : 1) * Number(match[3] ?? 0))
-      : formula;
-  };
+  const row = spell.castingOptions.find((option) => option.type === `slot_level_${level}`);
+  if (!row) return action;
+  const roll = row.damageRoll;
+  const swapFrom =
+    (base: string | null | undefined) =>
+    (formula: string): string => {
+      if (!roll || !base) return formula;
+      if (formula === base) return roll;
+      const match = /^(\d+d\d+)(?:\s*([+-])\s*(\d+))?$/i.exec(formula.trim());
+      return match && match[1] === base
+        ? formulaPlus(roll, (match[2] === "-" ? -1 : 1) * Number(match[3] ?? 0))
+        : formula;
+    };
+  const damage = swapFrom(spell.damage.roll);
+  const healing = swapFrom(spell.effect?.healing?.formula ?? spell.damage.roll);
+  const count = row.targetCount;
+  const rays = count !== null && action.attack !== undefined && (spell.effect?.attacks ?? 0) > 1;
+  const darts = count !== null && action.darts !== undefined;
   return {
     ...action,
-    damage: action.damage.map((part) => ({ ...part, formula: swap(part.formula) })),
-    ...(action.healing ? { healing: { formula: swap(action.healing.formula) } } : {})
+    damage: action.damage.map((part) => ({ ...part, formula: damage(part.formula) })),
+    ...(action.healing ? { healing: { formula: healing(action.healing.formula) } } : {}),
+    ...(rays ? { attack: { ...action.attack!, count: Math.min(10, count) } } : {}),
+    ...(darts ? { darts: Math.min(20, count) } : {})
   };
 }

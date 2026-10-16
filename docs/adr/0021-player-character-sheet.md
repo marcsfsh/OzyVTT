@@ -36,7 +36,10 @@ ability-only`. The builder later _fills the same fields_; no consumer changes. (
 3. **Immutable definition vs. live actor split**, mirroring `hitDice`/`actionUses`:
    identity, proficiency selections, and spell _capability_ live on `ActorDefinition`; live
    `spellSlots`/`pactSlots`/`preparedSpellIds`/`inventory`/`currency` live on `Actor`, seeded
-   in `instantiate()` and projected **owner-only**.
+   in `instantiate()` and projected **owner-only**. (Since 2026-10-16 a Long Rest keeps the
+   prepared list and opens a prepare step, `Actor.preparation`, in which a Cleric, Druid or
+   Wizard player changes it within the cap, a Paladin or Ranger one spell; the GM may change it
+   any time, and `character.finish-preparing` closes the step.)
 
 4. **Players initiate their own rolls; the server still resolves and authorizes.** Damage to
    monsters stays a GM-applied step — players never reduce another creature's HP. All
@@ -67,6 +70,13 @@ is equipped (so imports and monsters are unaffected); **(b) weapon attack action
 weapons render as tap-to-roll to-hit/damage on the sheet (Str melee / Dex ranged; finesse,
 versatile, and per-weapon proficiency remain builder work as that data isn't vendored). The
 guided builder, point-buy, level-up, and full content/derivation are still deferred.
+
+**Amendment (2026-10-16): Armor Class follows what is worn now.** A built character's AC is no longer
+frozen at build: with no armor or Shield it is 10 + Dex (or its Unarmored Defense), and its features'
+`armor-class` riders are read live, so the Defense fighting style follows armor bought or removed later.
+A Shield adds its +2 only with Shield training. A printed total (a stat block, a PDF import) stands
+until body armor is equipped, since it may already count a Shield. The GM can set an AC by hand
+(`actor.set-armor-class`), shown to the party as set by the GM, until cleared.
 
 ## Consequences
 

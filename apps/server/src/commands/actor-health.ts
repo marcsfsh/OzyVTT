@@ -322,9 +322,9 @@ export const actorHealthCommands = [
     type: "actor.rest",
     operationId: "restActor",
     description:
-      "Applies a rest to a rostered actor outside combat; a player session may take a Short Rest on their claimed character and asks the GM for a Long Rest (rest.ask), the GM rests anyone. Either rest needs at least 1 hit point (SRD) and is refused for a creature at 0 or dead, and a Long Rest is refused within 16 hours of game time after the actor's last one (the refusal says how long is left; time.pass moves the clock). Long: the actor's Concentration and its effects measured in turns or rounds end (their on-end grants fire first; effects that last until ended stay), hit points restore to maximum, temporary HP clears, limited-use pools refresh, all spent Hit Point Dice restore, spell slots and prepared spells reset to the sheet defaults, and Exhaustion drops one level. Short: per-short-rest, recharge and per-encounter pools re-arm, and features that say so give back uses of a long-rest pool (Rage, Second Wind, Channel Divinity, Wild Shape: one; Bardic Inspiration from Bard 5: all); healing is the separate spend-hit-dice call.",
+      "Applies a rest to a rostered actor outside combat; a player session may take a Short Rest on their claimed character and asks the GM for a Long Rest (rest.ask), the GM rests anyone. Either rest needs at least 1 hit point (SRD) and is refused for a creature at 0 or dead, and a Long Rest is refused within 16 hours of game time after the actor's last one (the refusal says how long is left; time.pass moves the clock). Long: the actor's Concentration and its effects measured in turns or rounds end (their on-end grants fire first; effects that last until ended stay), hit points restore to maximum, temporary HP clears, limited-use pools refresh (a charged item regains its printed dice), all spent Hit Point Dice restore, spell slots and Pact Magic refill, a caster that prepares its spells after a Long Rest gets the step to change them, and Exhaustion drops one level. Short: per-short-rest, recharge and per-encounter pools and Pact Magic slots re-arm, and features that say so give back uses of a long-rest pool (Rage, Second Wind, Channel Divinity, Wild Shape: one; Bardic Inspiration from Bard 5: all); healing is the separate spend-hit-dice call.",
     summary:
-      "Take a Short Rest on your own character (GM: either rest on anyone, at 1 HP or more): short re-arms short-rest uses and gives back what features say; long restores HP, hit dice, spell slots, prepared spells and limited uses, and drops one Exhaustion level.",
+      "Take a Short Rest on your own character (GM: either rest on anyone, at 1 HP or more): short re-arms short-rest uses and Pact Magic and gives back what features say; long restores HP, hit dice, spell slots and limited uses, opens the prepare step, and drops one Exhaustion level.",
     schema: ActorRestSchema,
     malformed: "The rest command is malformed.",
     async run({ principal, request, execute }, kit) {
@@ -334,11 +334,16 @@ export const actorHealthCommands = [
       if (kind === "long" && initiator.role !== "gm")
         throw new GameAccessDeniedError("Ask the GM for a Long Rest - they approve it.");
       let events: EffectNarration[] = [];
+      const chargeLines: string[] = [];
       // Authorized inside the mutation against live state (applyRest still refuses a combatant in a running
-      // encounter).
+      // encounter). A charged item's dawn regain is rolled with the server's dice.
       const { duplicate } = await execute((state) => {
         requireActorAccess(initiator, state, actorId, "resource");
-        events = applyRest(state, actorId, kind, kit.resolveDefinition, kit.equipmentCatalog());
+        chargeLines.length = 0;
+        events = applyRest(state, actorId, kind, kit.resolveDefinition, kit.equipmentCatalog(), {
+          random: (sides) => kit.context.random(sides),
+          lines: chargeLines
+        });
       });
       if (duplicate) return;
       kit.context.appendLog({
@@ -347,6 +352,8 @@ export const actorHealthCommands = [
         actorIds: [actorId],
         gmOnly: kit.actorHidden(actorId)
       });
+      for (const line of chargeLines)
+        kit.context.appendLog({ kind: "heal", text: line, actorIds: [actorId], gmOnly: kit.actorHidden(actorId) });
       kit.publishNarrations(events);
     }
   }),

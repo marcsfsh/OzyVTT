@@ -1,6 +1,13 @@
 import { useId } from "react";
-import { Button, Stepper } from "@vtt/ui";
-import { clearTargeting, setTargetingSpend, toggleTarget, type TargetingSession } from "./targeting";
+import { Button, Select, Stepper } from "@vtt/ui";
+import {
+  clearTargeting,
+  setDamageType,
+  setTargetDarts,
+  setTargetingSpend,
+  toggleTarget,
+  type TargetingSession
+} from "./targeting";
 
 /**
  * Choosing who an action targets: one (radio) or several (checkboxes), or, for an area, where to drag
@@ -22,6 +29,8 @@ export function ActionTargetPicker({
 }>) {
   const group = useId();
   const ready = picking.mode === "template" ? Boolean(picking.template?.placed) : picking.selected.length > 0;
+  const darts = picking.darts;
+  const assigned = darts ? Object.values(darts.counts).reduce((sum, count) => sum + count, 0) : 0;
   return (
     <div className="action-targeting" role="group" aria-label={`Targets for ${picking.action.name}`}>
       {picking.mode === "template" ? (
@@ -37,6 +46,9 @@ export function ActionTargetPicker({
             <strong>{picking.action.name}</strong> -{" "}
             {picking.mode === "single" ? "choose one target" : "choose targets"}
             {onMap ? (picking.mode === "single" ? " (or click a token)" : " (or click tokens)") : ""}
+            {darts
+              ? `. ${darts.total} darts: ${assigned >= darts.total ? "all assigned" : `${darts.total - Math.min(assigned, darts.total)} left, which go round the chosen targets in order`}.`
+              : ""}
           </p>
           <ul className="action-target-list scroll-y">
             {targets.map((target) => (
@@ -50,6 +62,15 @@ export function ActionTargetPicker({
                   />
                   <span>{target.label}</span>
                 </label>
+                {darts && picking.selected.includes(target.id) && (
+                  <Stepper
+                    value={darts.counts[target.id] ?? 1}
+                    min={1}
+                    max={darts.total}
+                    aria-label={`Darts at ${target.label}`}
+                    onChange={(count) => setTargetDarts(target.id, count)}
+                  />
+                )}
               </li>
             ))}
           </ul>
@@ -68,6 +89,21 @@ export function ActionTargetPicker({
           aria-label={`How much of ${picking.action.name} to spend`}
           className="action-targeting-spend"
         />
+      )}
+      {picking.action.damageTypes && (
+        <label className="action-damage-type">
+          <span>Damage type</span>
+          <Select
+            value={picking.damageType ?? picking.action.damageTypes[0]}
+            onChange={(event) => setDamageType(event.target.value)}
+          >
+            {picking.action.damageTypes.map((type) => (
+              <option key={type} value={type}>
+                {type.charAt(0).toUpperCase() + type.slice(1)}
+              </option>
+            ))}
+          </Select>
+        </label>
       )}
       <div className="action-targeting-buttons">
         <Button type="button" variant="secondary" disabled={busy} onClick={() => clearTargeting()}>

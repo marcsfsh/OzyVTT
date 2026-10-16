@@ -19,6 +19,7 @@ type SheetSpell = Readonly<{
   level: number;
   actionId?: string | null;
   freeActionId?: string;
+  ritualActionId?: string;
   withSlot?: boolean;
 }>;
 
@@ -55,16 +56,24 @@ function spellEffectAt(
  * disabled), a "No slot" choice for a grant's free casting, and a Cast button. The parent owns the
  * emits. A spell cast only without a slot (an invocation's) shows "No slot" or "At will" instead.
  */
+/** A Pact Magic pool: its one slot level, what is left and its size. */
+type PactPool = Readonly<{ level: number; remaining: number; max: number }>;
+
 function SpellCastControls({
   spell,
   content,
   slotLevels,
   slotMaxByLevel,
   liveRemaining,
+  pact,
+  policeSlots,
+  prepared,
   free,
+  ritual,
   busy,
   onCastSlot,
   onCastFree,
+  onCastRitual,
   onCastCantrip
 }: Readonly<{
   spell: Readonly<{ id: string; name: string; level: number; withSlot?: boolean }>;
@@ -72,25 +81,51 @@ function SpellCastControls({
   slotLevels: readonly number[];
   slotMaxByLevel: ReadonlyMap<number, number>;
   liveRemaining: ReadonlyMap<number, number>;
+  /** Pact Magic slots, which cast any of the character's spells at their level; the server spends them first. */
+  pact: PactPool | null;
+  /** Whether an empty slot level, or an unprepared spell, blocks the cast here. */
+  policeSlots: boolean;
+  /** Prepared (or always prepared): the spells a caster casts with a slot. */
+  prepared: boolean;
   /** A free casting: the uses it has left, or null at will. */
   free: Readonly<{ left: number | null }> | null;
+  /** The spell can be cast as a Ritual: no slot, 10 minutes longer. */
+  ritual: boolean;
   busy: boolean;
   onCastSlot: (level: number) => void;
   onCastFree: () => void;
+  onCastRitual: () => void;
   onCastCantrip: () => void;
 }>) {
   const isCantrip = spell.level === 0;
-  const options = isCantrip || spell.withSlot === false ? [] : slotLevels.filter((level) => level >= spell.level);
-  const [choice, setChoice] = useState<number | "free">(options[0] ?? (free ? "free" : spell.level));
-  const chosen = choice === "free" ? (free ? "free" : (options[0] ?? spell.level)) : choice;
-  const level = chosen === "free" || !options.includes(chosen) ? (options[0] ?? spell.level) : chosen;
-  const remainingAt = (slot: number) => liveRemaining.get(slot) ?? slotMaxByLevel.get(slot) ?? 0;
+  const levels = [...new Set([...slotLevels, ...(pact ? [pact.level] : [])])].sort((a, b) => a - b);
+  const options = isCantrip || spell.withSlot === false ? [] : levels.filter((level) => level >= spell.level);
+  const [choice, setChoice] = useState<number | "free" | "ritual">(options[0] ?? (free ? "free" : spell.level));
+  const chosen =
+    choice === "free"
+      ? free
+        ? "free"
+        : (options[0] ?? spell.level)
+      : choice === "ritual" && !ritual
+        ? spell.level
+        : choice;
+  const level = typeof chosen !== "number" || !options.includes(chosen) ? (options[0] ?? spell.level) : chosen;
+  const atPact = (slot: number) => pact !== null && pact.level === slot;
+  const remainingAt = (slot: number) =>
+    (slotMaxByLevel.has(slot) ? (liveRemaining.get(slot) ?? slotMaxByLevel.get(slot) ?? 0) : 0) +
+    (atPact(slot) ? pact!.remaining : 0);
+  const maxAt = (slot: number) => (slotMaxByLevel.get(slot) ?? 0) + (atPact(slot) ? pact!.max : 0);
   const freeLabel = free ? (free.left === null ? "At will" : `No slot · ${free.left} left`) : "";
   // The effect at the selected level, from the same helper the Cast button rolls. Three grid cells
   // (helper · slot · Cast) that align across rows.
-  const { label: effect } = spellEffectAt(content, spell.level, chosen === "free" ? spell.level : level);
+  const { label: effect } = spellEffectAt(content, spell.level, typeof chosen !== "number" ? spell.level : level);
   const canCast =
-    isCantrip || (chosen === "free" ? free !== null && free.left !== 0 : options.length > 0 && remainingAt(level) > 0);
+    isCantrip ||
+    (chosen === "free"
+      ? free !== null && free.left !== 0
+      : chosen === "ritual"
+        ? !policeSlots || prepared
+        : options.length > 0 && (!policeSlots || (prepared && remainingAt(level) > 0)));
   return (
     <>
       <span
@@ -106,13 +141,20 @@ function SpellCastControls({
         <select
           className="sheet-cast-select"
           aria-label={`Cast ${spell.name} at level`}
-          value={chosen === "free" ? "free" : level}
+          value={typeof chosen !== "number" ? chosen : level}
           disabled={busy}
-          onChange={(event) => setChoice(event.target.value === "free" ? "free" : Number(event.target.value))}
+          onChange={(event) =>
+            setChoice(
+              event.target.value === "free" || event.target.value === "ritual"
+                ? event.target.value
+                : Number(event.target.value)
+            )
+          }
         >
           {options.map((slot) => (
-            <option key={slot} value={slot} disabled={remainingAt(slot) === 0}>
-              {ordinal(slot)} · {remainingAt(slot)}/{slotMaxByLevel.get(slot) ?? 0}
+            <option key={slot} value={slot} disabled={policeSlots && remainingAt(slot) === 0}>
+              {ordinal(slot)} · {remainingAt(slot)}/{maxAt(slot)}
+              {atPact(slot) ? " · pact" : ""}
               {slot > spell.level ? " · upcast" : ""}
             </option>
           ))}
@@ -121,6 +163,7 @@ function SpellCastControls({
               {freeLabel}
             </option>
           )}
+          {ritual && <option value="ritual">Ritual · no slot, +10 min</option>}
         </select>
       ) : free ? (
         <span className="sheet-cast-slot at-will">{freeLabel}</span>
@@ -131,11 +174,54 @@ function SpellCastControls({
         type="button"
         className="sheet-cast-btn"
         disabled={busy || !canCast}
-        onClick={() => (isCantrip ? onCastCantrip() : chosen === "free" ? onCastFree() : onCastSlot(level))}
+        onClick={() =>
+          isCantrip
+            ? onCastCantrip()
+            : chosen === "free"
+              ? onCastFree()
+              : chosen === "ritual"
+                ? onCastRitual()
+                : onCastSlot(level)
+        }
       >
         Cast
       </button>
     </>
+  );
+}
+
+/** One pool's slots as tappable pips: tap a filled pip to spend down to it, an empty one to restore up to it. */
+function SlotPips({
+  label,
+  pipLabel,
+  remaining,
+  max,
+  busy,
+  onSet
+}: Readonly<{
+  label: string;
+  pipLabel: string;
+  remaining: number;
+  max: number;
+  busy: boolean;
+  onSet: (remaining: number) => void;
+}>) {
+  return (
+    <div className="sheet-slot-pips" role="group" aria-label={`${label} (${remaining} of ${max} left)`}>
+      {Array.from({ length: max }, (_, index) => (
+        <button
+          key={index}
+          type="button"
+          className={`sheet-pip${index < remaining ? " filled" : ""}`}
+          disabled={busy}
+          aria-label={`${index < remaining ? "Spend" : "Restore"} ${pipLabel}`}
+          onClick={() => onSet(index < remaining ? index : index + 1)}
+        />
+      ))}
+      <span className="sheet-slot-count">
+        {remaining}/{max}
+      </span>
+    </div>
   );
 }
 
@@ -153,7 +239,9 @@ export function SheetSpells({
   onFeedback,
   routeSpell,
   castSpellAction,
-  spellSaveDcBonus = 0
+  spellSaveDcBonus = 0,
+  policeSlots = true,
+  canPrepare = true
 }: Readonly<{
   actor: GmActor | PlayerActor;
   definition: ActorDefinition;
@@ -167,6 +255,11 @@ export function SheetSpells({
   castSpellAction: (actionId: string, slotLevel?: number) => void;
   /** The server's sum of standing spell-save-DC riders (an item, a feat), which the cast DC includes. */
   spellSaveDcBonus?: number;
+  /** Whether a cast with no slot left, or of a spell not prepared, is refused here; otherwise the server warns or
+   *  lets it pass ("Don't police spell slots or prepared spells"). */
+  policeSlots?: boolean;
+  /** Whether the prepared toggles work now: the GM's always do, a player's in the step a Long Rest opens. */
+  canPrepare?: boolean;
 }>) {
   const { rollFlat } = rolls;
   const spellcasting = definition.spellcasting;
@@ -184,10 +277,15 @@ export function SheetSpells({
   const liveSlotRemaining = new Map<number, number>(
     (actor.spellSlots ?? []).map((slot) => [slot.level, slot.remaining])
   );
-  const pact = actor.pactSlots ?? null;
+  // Pact Magic is its own pool; a sheet that doesn't state its size shows what is left as the size.
+  const pact: PactPool | null = actor.pactSlots
+    ? { ...actor.pactSlots, max: Math.max(spellcasting.pact?.max ?? 0, actor.pactSlots.remaining) }
+    : null;
   // `resolveSpellcasting` applies the resolution order (per-class entry by classId, the lone-entry
   // shortcut, then top-level fields), so a multiclass caster gets one row per casting class.
   const casterEntries = spellcasting.classes ?? [];
+  // A sheet with a prepared cap keeps a prepared list; an import without one casts whatever it lists.
+  const keepsPreparedList = casterEntries.some((entry) => entry.prepared !== undefined);
   const casterRows = (casterEntries.length > 0 ? casterEntries.map((entry) => entry.classId) : [undefined]).flatMap(
     (classId) => {
       const resolved = resolveSpellcasting(spellcasting, classId);
@@ -219,9 +317,12 @@ export function SheetSpells({
       castSpellAction(spell.actionId, level);
       return;
     }
+    // A Pact Magic slot goes first at its level, as the server spends them.
+    const fromPact = pact !== null && pact.level === level && pact.remaining > 0;
     const max = slotMaxByLevel.get(level) ?? 0;
-    const rem = liveSlotRemaining.get(level) ?? max;
-    if (max <= 0 || rem <= 0) {
+    const rem = fromPact ? pact.remaining : (liveSlotRemaining.get(level) ?? max);
+    const none = !fromPact && (max <= 0 || rem <= 0);
+    if (none && policeSlots) {
       onFeedback(`No ${ordinal(level)}-level slots remain.`);
       return;
     }
@@ -229,7 +330,16 @@ export function SheetSpells({
     // Same helper as the displayed effect, so the roll matches what is shown.
     const { formula } = spellEffectAt(content, spell.level, level);
     const types = content && content.damageTypes.length ? ` ${content.damageTypes.join("/")}` : "";
-    void edit("character:set-slot", { actorId: actor.id, level, remaining: rem - 1 }).then((result) => {
+    // With slots not policed and none left, the cast goes ahead with nothing to spend.
+    const spend = none
+      ? Promise.resolve({ ok: true })
+      : edit("character:set-slot", {
+          actorId: actor.id,
+          level,
+          remaining: rem - 1,
+          ...(fromPact ? { pact: true } : {})
+        });
+    void spend.then((result) => {
       if (!result.ok) return;
       // The slot is spent; on your turn a spell that targets a creature goes through the structured flow.
       // A utility spell stays a plain note. Known limitation: an upcast spell resolves at its base dice
@@ -286,6 +396,39 @@ export function SheetSpells({
             </Fragment>
           ))}
         </div>
+        {actor.preparation && (
+          <div className="sheet-prepare-step" role="group" aria-label="Change prepared spells">
+            <p>
+              Long Rest: change your prepared spells
+              {actor.preparation.changesLeft === null
+                ? "."
+                : ` - ${actor.preparation.changesLeft} ${actor.preparation.changesLeft === 1 ? "swap" : "swaps"} left.`}
+            </p>
+            <button
+              type="button"
+              className="secondary"
+              disabled={busy}
+              onClick={() => void edit("character:finish-preparing", { actorId: actor.id })}
+            >
+              Done
+            </button>
+          </div>
+        )}
+        {pact && pact.max > 0 && (
+          <div className="sheet-spell-group-head">
+            <h4>Pact Magic · {ordinal(pact.level)} level</h4>
+            <SlotPips
+              label="Pact Magic slots"
+              pipLabel="a Pact Magic slot"
+              remaining={pact.remaining}
+              max={pact.max}
+              busy={busy}
+              onSet={(next) =>
+                void edit("character:set-slot", { actorId: actor.id, level: pact.level, remaining: next, pact: true })
+              }
+            />
+          </div>
+        )}
         {(() => {
           type Spell = (typeof spellcasting.spells)[number];
           const groups = new Map<number, Spell[]>();
@@ -305,31 +448,14 @@ export function SheetSpells({
                   <div className="sheet-spell-group-head">
                     <h4>{level === 0 ? "Cantrips" : `${ordinal(level)} Level`}</h4>
                     {level > 0 && max > 0 && (
-                      <div
-                        className="sheet-slot-pips"
-                        role="group"
-                        aria-label={`Level ${level} spell slots (${remaining} of ${max} left)`}
-                      >
-                        {Array.from({ length: max }, (_, index) => (
-                          <button
-                            key={index}
-                            type="button"
-                            className={`sheet-pip${index < remaining ? " filled" : ""}`}
-                            disabled={busy}
-                            aria-label={`${index < remaining ? "Spend" : "Restore"} a level ${level} slot`}
-                            onClick={() => {
-                              void edit("character:set-slot", {
-                                actorId: actor.id,
-                                level,
-                                remaining: index < remaining ? index : index + 1
-                              });
-                            }}
-                          />
-                        ))}
-                        <span className="sheet-slot-count">
-                          {remaining}/{max}
-                        </span>
-                      </div>
+                      <SlotPips
+                        label={`Level ${level} spell slots`}
+                        pipLabel={`a level ${level} slot`}
+                        remaining={remaining}
+                        max={max}
+                        busy={busy}
+                        onSet={(next) => void edit("character:set-slot", { actorId: actor.id, level, remaining: next })}
+                      />
                     )}
                   </div>
                   <ul className={`sheet-spell-list${actor.kind === "player-character" ? " castable" : ""}`}>
@@ -344,8 +470,14 @@ export function SheetSpells({
                             <button
                               type="button"
                               className={`sheet-prep-tag toggle${isPrepared ? " on" : ""}`}
-                              disabled={busy}
-                              title={isPrepared ? "Prepared - tap to unprepare" : "Not prepared - tap to prepare"}
+                              disabled={busy || !canPrepare}
+                              title={
+                                !canPrepare
+                                  ? `${isPrepared ? "Prepared" : "Not prepared"} - change it after a Long Rest`
+                                  : isPrepared
+                                    ? "Prepared - tap to unprepare"
+                                    : "Not prepared - tap to prepare"
+                              }
                               onClick={() => {
                                 void edit("character:set-prepared", {
                                   actorId: actor.id,
@@ -383,10 +515,15 @@ export function SheetSpells({
                               slotLevels={slotLevels}
                               slotMaxByLevel={slotMaxByLevel}
                               liveRemaining={liveSlotRemaining}
+                              pact={pact}
+                              policeSlots={policeSlots}
+                              prepared={isPrepared || !keepsPreparedList}
                               free={freeCastOf(spell)}
+                              ritual={spell.ritualActionId !== undefined}
                               busy={busy}
                               onCastSlot={(castLevel) => castSpell(spell, castLevel)}
                               onCastFree={() => spell.freeActionId && castSpellAction(spell.freeActionId)}
+                              onCastRitual={() => spell.ritualActionId && castSpellAction(spell.ritualActionId)}
                               onCastCantrip={() => castCantrip(spell)}
                             />
                           )}
@@ -398,11 +535,6 @@ export function SheetSpells({
               );
             });
         })()}
-        {pact ? (
-          <p className="sheet-entry">
-            Pact Magic: {ordinal(pact.level)}-level slots, {pact.remaining} remaining.
-          </p>
-        ) : null}
       </section>
       {openSpell && <SpellCard spell={openSpell} onClose={() => setOpenSpell(null)} />}
     </>

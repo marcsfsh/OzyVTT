@@ -4,7 +4,7 @@
   "name": "Acid Arrow",
   "level": 2,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 90,
@@ -37,6 +37,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 90
+   },
    "damage": [
     {
      "formula": "4d4",
@@ -100,7 +104,7 @@
   "name": "Acid Splash",
   "level": 0,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -185,7 +189,7 @@
   "name": "Aid",
   "level": 2,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -217,6 +221,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 3
+   },
    "healing": null
   },
   "classes": [
@@ -278,7 +285,7 @@
   "name": "Alarm",
   "level": 1,
   "school": "abjuration",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -333,7 +340,7 @@
   "name": "Alter Self",
   "level": 2,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -380,7 +387,7 @@
   "name": "Animal Friendship",
   "level": 1,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -418,6 +425,10 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1,
+    "perSlot": 1
+   },
    "healing": null
   },
   "classes": [
@@ -483,7 +494,7 @@
   "name": "Animal Messenger",
   "level": 2,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -578,7 +589,7 @@
   "name": "Animal Shapes",
   "level": 8,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -624,7 +635,7 @@
   "name": "Animate Dead",
   "level": 3,
   "school": "necromancy",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 10,
@@ -708,7 +719,7 @@
   "name": "Animate Objects",
   "level": 5,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -781,7 +792,7 @@
   "name": "Antilife Shell",
   "level": 5,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -831,7 +842,7 @@
   "name": "Antimagic Field",
   "level": 8,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -873,7 +884,7 @@
    "cleric",
    "wizard"
   ],
-  "description": "An aura of antimagic surrounds you in 10-foot Emanation. No one can cast spells, take Magic actions, or create other magical effects inside the aura, and those things can't target or otherwise affect anything inside it. Magical properties of magic items don't work inside the aura or on anything inside it. Areas of effect created by spells or other magic can't extend into the aura, and no one can teleport into or out of it or use planar travel there. Portals close temporarily while in the aura. Ongoing spells, except those cast by an Artifact or a deity, are suppressed in the area. While an effect is suppressed, it doesn't function, but the time it spends suppressed counts against its duration.",
+  "description": "An aura of antimagic surrounds you in 10-foot Emanation. No one can cast spells, take Magic actions, or create other magical effects inside the aura, and those things can't target or otherwise affect anything inside it. Magical properties of magic items don't work inside the aura or on anything inside it.\n\nAreas of effect created by spells or other magic can't extend into the aura, and no one can teleport into or out of it or use planar travel there. Portals close temporarily while in the aura.\n\nOngoing spells, except those cast by an Artifact or a deity, are suppressed in the area. While an effect is suppressed, it doesn't function, but the time it spends suppressed counts against its duration.\n\nDispel Magic has no effect on the aura, and the auras created by different Antimagic Field spells don't nullify each other.",
   "higherLevel": null,
   "castingOptions": []
  },
@@ -882,7 +893,7 @@
   "name": "Antipathy/Sympathy",
   "level": 8,
   "school": "enchantment",
-  "castingTime": "1hour",
+  "castingTime": "1 hour",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -918,6 +929,7 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
    "healing": null
   },
   "classes": [
@@ -934,7 +946,7 @@
   "name": "Arcane Eye",
   "level": 4,
   "school": "divination",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -980,7 +992,7 @@
   "name": "Arcane Hand",
   "level": 5,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -997,7 +1009,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": false,
+  "attackRoll": true,
   "damage": {
    "roll": null,
    "types": []
@@ -1052,7 +1064,7 @@
   "name": "Arcane Lock",
   "level": 2,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -1098,7 +1110,7 @@
   "name": "Arcane Sword",
   "level": 7,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 90,
@@ -1110,7 +1122,7 @@
    "somatic": true,
    "material": true,
    "materialText": "a miniature sword worth 250+ GP",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "1 minute",
   "concentration": true,
@@ -1130,8 +1142,36 @@
   "shape": null,
   "area": null,
   "effect": {
-   "attacks": 0,
-   "damage": [],
+   "attacks": 1,
+   "attackRange": {
+    "kind": "melee",
+    "feet": 95
+   },
+   "damage": [
+    {
+     "formula": "4d12",
+     "type": "force",
+     "addsModifier": true
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "attack",
+     "activation": "bonus-action",
+     "when": "On your later turns, a Bonus Action moves the sword up to 30 feet and repeats the attack.",
+     "attackRange": {
+      "kind": "melee",
+      "feet": 95
+     },
+     "damage": [
+      {
+       "formula": "4d12",
+       "type": "force",
+       "addsModifier": true
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -1147,7 +1187,7 @@
   "name": "Arcanist's Magic Aura",
   "level": 2,
   "school": "illusion",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -1193,7 +1233,7 @@
   "name": "Astral Projection",
   "level": 9,
   "school": "necromancy",
-  "castingTime": "1hour",
+  "castingTime": "1 hour",
   "reactionCondition": null,
   "range": {
    "distance": 10,
@@ -1241,7 +1281,7 @@
   "name": "Augury",
   "level": 2,
   "school": "divination",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -1253,7 +1293,7 @@
    "somatic": true,
    "material": true,
    "materialText": "specially marked sticks, bones, cards, or other divinatory tokens worth 25+ GP",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "instantaneous",
   "concentration": false,
@@ -1289,7 +1329,7 @@
   "name": "Aura of Life",
   "level": 4,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -1342,7 +1382,7 @@
   "name": "Awaken",
   "level": 5,
   "school": "transmutation",
-  "castingTime": "1hour",
+  "castingTime": "8 hours",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -1389,7 +1429,7 @@
   "name": "Bane",
   "level": 1,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -1406,7 +1446,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": "1d4",
    "types": []
@@ -1425,7 +1465,43 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 3,
+    "perSlot": 1
+   },
+   "healing": null,
+   "failureEffect": {
+    "name": "Bane",
+    "tags": [
+     "baned"
+    ],
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    },
+    "modifiers": [
+     {
+      "type": "attack-bonus",
+      "amount": 0,
+      "dice": "-1d4",
+      "when": [
+       {
+        "type": "on-attack-roll"
+       }
+      ]
+     },
+     {
+      "type": "save-bonus",
+      "amount": 0,
+      "dice": "-1d4",
+      "when": [
+       {
+        "type": "on-saving-throw"
+       }
+      ]
+     }
+    ]
+   }
   },
   "classes": [
    "bard",
@@ -1490,7 +1566,7 @@
   "name": "Banishment",
   "level": 4,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -1528,6 +1604,10 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1,
+    "perSlot": 1
+   },
    "healing": null
   },
   "classes": [
@@ -1577,7 +1657,7 @@
   "name": "Barkskin",
   "level": 2,
   "school": "transmutation",
-  "castingTime": "bonus-action",
+  "castingTime": "Bonus Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -1624,7 +1704,7 @@
   "name": "Beacon of Hope",
   "level": 3,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -1660,6 +1740,7 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
    "healing": null
   },
   "classes": [
@@ -1674,7 +1755,7 @@
   "name": "Befuddlement",
   "level": 8,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 150,
@@ -1734,7 +1815,7 @@
   "name": "Bestow Curse",
   "level": 3,
   "school": "necromancy",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -1751,7 +1832,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": "1d8",
    "types": [
@@ -1825,7 +1906,7 @@
   "name": "Black Tentacles",
   "level": 4,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 90,
@@ -1861,10 +1942,39 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 20,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "3d6",
+     "type": "bludgeoning"
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "A creature that enters the area or ends its turn there makes the save. A creature makes this save only once per turn.",
+     "save": {
+      "ability": "str",
+      "successDamage": "none",
+      "failureConditions": [
+       "restrained"
+      ]
+     },
+     "damage": [
+      {
+       "formula": "3d6",
+       "type": "bludgeoning"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -1879,7 +1989,7 @@
   "name": "Blade Barrier",
   "level": 6,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 90,
@@ -1916,7 +2026,30 @@
   "area": null,
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "6d10",
+     "type": "force"
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "A creature that enters the wall's space or ends its turn there makes the save. A creature makes this save only once per turn.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "6d10",
+       "type": "force"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -1931,7 +2064,7 @@
   "name": "Bless",
   "level": 1,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -1943,12 +2076,12 @@
    "somatic": true,
    "material": true,
    "materialText": "a Holy Symbol worth 5+ GP",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": "1d4",
    "types": []
@@ -1963,7 +2096,47 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 3,
+    "perSlot": 1
+   },
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "attack-bonus",
+      "amount": 0,
+      "dice": "1d4",
+      "when": [
+       {
+        "type": "on-attack-roll"
+       }
+      ]
+     },
+     {
+      "type": "save-bonus",
+      "amount": 0,
+      "dice": "1d4",
+      "when": [
+       {
+        "type": "on-saving-throw"
+       }
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Bless",
+    "tags": [
+     "blessed"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    }
+   }
   },
   "classes": [
    "cleric",
@@ -2027,7 +2200,7 @@
   "name": "Blight",
   "level": 4,
   "school": "necromancy",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -2118,7 +2291,7 @@
   "name": "Blindness/Deafness",
   "level": 2,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -2157,6 +2330,10 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1,
+    "perSlot": 1
+   },
    "healing": null
   },
   "classes": [
@@ -2217,7 +2394,7 @@
   "name": "Blink",
   "level": 3,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -2264,7 +2441,7 @@
   "name": "Blur",
   "level": 2,
   "school": "illusion",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -2281,7 +2458,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -2311,7 +2488,7 @@
   "name": "Burning Hands",
   "level": 1,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -2426,7 +2603,7 @@
   "name": "Call Lightning",
   "level": 3,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -2520,7 +2697,7 @@
   "name": "Calm Emotions",
   "level": 2,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -2579,7 +2756,7 @@
   "name": "Chain Lightning",
   "level": 6,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 150,
@@ -2629,7 +2806,7 @@
    "wizard"
   ],
   "description": "You launch a lightning bolt toward a target you can see within range. Three bolts then leap from that target to as many as three other targets of your choice, each of which must be within 30 feet of the first target. A target can be a creature or an object and can be targeted by only one of the bolts. Each target makes a Dexterity saving throw, taking 10d8 Lightning damage on a failed save or half as much damage on a successful one.",
-  "higherLevel": null,
+  "higherLevel": "One additional bolt leaps from the first target to another target for each spell slot level above 6.",
   "castingOptions": []
  },
  {
@@ -2637,7 +2814,7 @@
   "name": "Charm Monster",
   "level": 4,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -2675,6 +2852,10 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1,
+    "perSlot": 1
+   },
    "healing": null
   },
   "classes": [
@@ -2724,7 +2905,7 @@
   "name": "Charm Person",
   "level": 1,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -2762,6 +2943,10 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1,
+    "perSlot": 1
+   },
    "healing": null
   },
   "classes": [
@@ -2829,7 +3014,7 @@
   "name": "Chill Touch",
   "level": 0,
   "school": "necromancy",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -2862,6 +3047,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "melee",
+    "feet": 5
+   },
    "damage": [
     {
      "formula": "1d10",
@@ -2903,7 +3092,7 @@
   "name": "Chromatic Orb",
   "level": 1,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 90,
@@ -2915,7 +3104,7 @@
    "somatic": true,
    "material": true,
    "materialText": "a diamond worth 50+ GP",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "instantaneous",
   "concentration": false,
@@ -2934,7 +3123,24 @@
   "area": null,
   "effect": {
    "attacks": 1,
-   "damage": [],
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 90
+   },
+   "damage": [
+    {
+     "formula": "3d8",
+     "type": "acid"
+    }
+   ],
+   "damageTypes": [
+    "acid",
+    "cold",
+    "fire",
+    "lightning",
+    "poison",
+    "thunder"
+   ],
    "healing": null
   },
   "classes": [
@@ -2999,7 +3205,7 @@
   "name": "Circle of Death",
   "level": 6,
   "school": "necromancy",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 150,
@@ -3011,7 +3217,7 @@
    "somatic": true,
    "material": true,
    "materialText": "the powder of a crushed black pearl worth 500+ GP",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "instantaneous",
   "concentration": false,
@@ -3085,7 +3291,7 @@
   "name": "Clairvoyance",
   "level": 3,
   "school": "divination",
-  "castingTime": "1minute",
+  "castingTime": "10 minutes",
   "reactionCondition": null,
   "range": {
    "distance": 5280,
@@ -3097,7 +3303,7 @@
    "somatic": true,
    "material": true,
    "materialText": "a focus worth 100+ GP, either a jeweled horn for hearing or a glass eye for seeing",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "10 minutes",
   "concentration": true,
@@ -3134,7 +3340,7 @@
   "name": "Clone",
   "level": 8,
   "school": "necromancy",
-  "castingTime": "1hour",
+  "castingTime": "1 hour",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -3180,7 +3386,7 @@
   "name": "Cloudkill",
   "level": 5,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -3225,7 +3431,30 @@
   },
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "5d8",
+     "type": "poison"
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. A creature makes this save only once per turn.",
+     "save": {
+      "ability": "con",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "5d8",
+       "type": "poison"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -3266,7 +3495,7 @@
   "name": "Color Spray",
   "level": 1,
   "school": "illusion",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -3331,7 +3560,7 @@
   "name": "Command",
   "level": 1,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -3367,6 +3596,10 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1,
+    "perSlot": 1
+   },
    "healing": null
   },
   "classes": [
@@ -3374,7 +3607,7 @@
    "cleric",
    "paladin"
   ],
-  "description": "You speak a one-word command to a creature you can see within range. The target must succeed on a Wisdom saving throw or follow the command on its next turn. Choose the command from these options:\n\n- **Drop.** The target drops whatever it is holding and then ends its turn.\n- **Flee.** The target spends its turn moving away from you by the fastest available means.\n- **Grovel.** The target has the Prone condition and then ends its turn.\n- **Halt.** On its turn, the target doesn't move and takes no action or Bonus Action.",
+  "description": "You speak a one-word command to a creature you can see within range. The target must succeed on a Wisdom saving throw or follow the command on its next turn. Choose the command from these options:\n\n**Approach.** The target moves toward you by the shortest and most direct route, ending its turn if it moves within 5 feet of you.\n\n**Drop.** The target drops whatever it is holding and then ends its turn.\n\n**Flee.** The target spends its turn moving away from you by the fastest available means.\n\n**Grovel.** The target has the Prone condition and then ends its turn.\n\n**Halt.** On its turn, the target doesn't move and takes no action or Bonus Action.",
   "higherLevel": "You can affect one additional creature for each spell slot level above 1.",
   "castingOptions": [
    {
@@ -3432,7 +3665,7 @@
   "name": "Commune",
   "level": 5,
   "school": "divination",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -3478,7 +3711,7 @@
   "name": "Commune with Nature",
   "level": 5,
   "school": "divination",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -3525,7 +3758,7 @@
   "name": "Comprehend Languages",
   "level": 1,
   "school": "divination",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -3574,7 +3807,7 @@
   "name": "Compulsion",
   "level": 4,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -3626,7 +3859,7 @@
   "name": "Cone of Cold",
   "level": 5,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -3718,7 +3951,7 @@
   "name": "Confusion",
   "level": 4,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 90,
@@ -3810,7 +4043,7 @@
   "name": "Conjure Animals",
   "level": 3,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -3848,6 +4081,25 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "When the pack moves within 10 feet of a creature, or a creature enters a space within 10 feet of it or ends its turn there, you can force the save. A creature makes this save only once per turn.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "none",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "3d10",
+       "type": "slashing"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -3900,7 +4152,7 @@
   "name": "Conjure Celestial",
   "level": 7,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 90,
@@ -3928,16 +4180,23 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 10,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": {
+    "formula": "4d12",
+    "addsModifier": true
+   }
   },
   "classes": [
    "cleric"
   ],
-  "description": "You conjure a spirit from the Upper Planes, which manifests as a pillar of light in a 10-foot-radius, 40-foot-high Cylinder centered on a point within range. For each creature you can see in the Cylinder, choose which of these lights shines on it: Until the spell ends, Bright Light fills the Cylinder, and when you move on your turn, you can also move the Cylinder up to 30 feet. Whenever the Cylinder moves into the space of a creature you can see and whenever a creature you can see enters the Cylinder or ends its turn there, you can bathe it in one of the lights. A creature can be affected by this spell only once per turn.",
+  "description": "You conjure a spirit from the Upper Planes, which manifests as a pillar of light in a 10-foot-radius, 40-foot-high Cylinder centered on a point within range. For each creature you can see in the Cylinder, choose which of these lights shines on it:\n\n**Healing Light.** The target regains Hit Points equal to 4d12 plus your spellcasting ability modifier.\n\n**Searing Light.** The target makes a Dexterity saving throw, taking 6d12 Radiant damage on a failed save or half as much damage on a successful one.\n\nUntil the spell ends, Bright Light fills the Cylinder, and when you move on your turn, you can also move the Cylinder up to 30 feet.\n\nWhenever the Cylinder moves into the space of a creature you can see and whenever a creature you can see enters the Cylinder or ends its turn there, you can bathe it in one of the lights. A creature can be affected by this spell only once per turn.",
   "higherLevel": "The healing and damage increase by 1d12 for each spell slot level above 7.",
   "castingOptions": [
    {
@@ -3959,7 +4218,7 @@
   "name": "Conjure Elemental",
   "level": 5,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -3997,6 +4256,33 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "damageTypes": [
+    "lightning",
+    "thunder",
+    "fire",
+    "cold"
+   ],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "A creature that enters the spirit's space or starts its turn within 5 feet of it makes the save, if the spirit has no creature Restrained; the Restrained target repeats it at the start of each of its turns, taking 4d8 on a failure.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "none",
+      "failureConditions": [
+       "restrained"
+      ]
+     },
+     "damage": [
+      {
+       "formula": "8d8",
+       "type": "lightning"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -4037,7 +4323,7 @@
   "name": "Conjure Fey",
   "level": 6,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -4054,7 +4340,7 @@
   "duration": "10 minutes",
   "concentration": true,
   "ritual": false,
-  "attackRoll": false,
+  "attackRoll": true,
   "damage": {
    "roll": "3d12",
    "types": [
@@ -4069,8 +4355,36 @@
   "shape": null,
   "area": null,
   "effect": {
-   "attacks": 0,
-   "damage": [],
+   "attacks": 1,
+   "attackRange": {
+    "kind": "melee",
+    "feet": 65
+   },
+   "damage": [
+    {
+     "formula": "3d12",
+     "type": "psychic",
+     "addsModifier": true
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "attack",
+     "activation": "bonus-action",
+     "when": "On your later turns, a Bonus Action teleports the spirit up to 30 feet and makes the attack (a hit also Frightens the target until the start of your next turn).",
+     "attackRange": {
+      "kind": "melee",
+      "feet": 65
+     },
+     "damage": [
+      {
+       "formula": "3d12",
+       "type": "psychic",
+       "addsModifier": true
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -4104,7 +4418,7 @@
   "name": "Conjure Minor Elementals",
   "level": 4,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -4186,7 +4500,7 @@
   "name": "Conjure Woodland Beings",
   "level": 4,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -4228,6 +4542,25 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "When the Emanation enters a creature's space, or a creature enters it or ends its turn there, you can force the save. A creature makes this save only once per turn.",
+     "save": {
+      "ability": "wis",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "5d8",
+       "type": "force"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -4274,7 +4607,7 @@
   "name": "Contact Other Plane",
   "level": 5,
   "school": "divination",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -4329,7 +4662,7 @@
   "name": "Contagion",
   "level": 5,
   "school": "necromancy",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -4389,7 +4722,7 @@
   "name": "Contingency",
   "level": 6,
   "school": "abjuration",
-  "castingTime": "1minute",
+  "castingTime": "10 minutes",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -4401,7 +4734,7 @@
    "somatic": true,
    "material": true,
    "materialText": "a gem-encrusted statuette of yourself worth 1,500+ GP",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "10 days",
   "concentration": false,
@@ -4435,7 +4768,7 @@
   "name": "Continual Flame",
   "level": 2,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -4483,7 +4816,7 @@
   "name": "Control Water",
   "level": 4,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 300,
@@ -4531,7 +4864,7 @@
   "name": "Control Weather",
   "level": 8,
   "school": "transmutation",
-  "castingTime": "1minute",
+  "castingTime": "10 minutes",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -4579,7 +4912,7 @@
   "name": "Counterspell",
   "level": 3,
   "school": "abjuration",
-  "castingTime": "reaction",
+  "castingTime": "Reaction",
   "reactionCondition": "which you take when you see a creature within 60 feet of yourself casting a spell with Verbal, Somatic, or Material components",
   "range": {
    "distance": 60,
@@ -4631,7 +4964,7 @@
   "name": "Create Food and Water",
   "level": 3,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -4678,7 +5011,7 @@
   "name": "Create or Destroy Water",
   "level": 1,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -4778,7 +5111,7 @@
   "name": "Create Undead",
   "level": 6,
   "school": "necromancy",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 10,
@@ -4845,7 +5178,7 @@
   "name": "Creation",
   "level": 5,
   "school": "illusion",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -4925,7 +5258,7 @@
   "name": "Cure Wounds",
   "level": 1,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -4957,6 +5290,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": {
     "formula": "2d8",
     "addsModifier": true
@@ -5027,7 +5363,7 @@
   "name": "Dancing Lights",
   "level": 0,
   "school": "illusion",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -5075,7 +5411,7 @@
   "name": "Darkness",
   "level": 2,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -5131,7 +5467,7 @@
   "name": "Darkvision",
   "level": 2,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -5180,7 +5516,7 @@
   "name": "Daylight",
   "level": 3,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -5238,7 +5574,7 @@
   "name": "Death Ward",
   "level": 4,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -5285,7 +5621,7 @@
   "name": "Delayed Blast Fireball",
   "level": 7,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 150,
@@ -5331,6 +5667,30 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "explosion",
+     "activation": "other",
+     "when": "The bead explodes when the spell ends: 12d6, plus 1d6 for each of your turns that ended while it lasted.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "12d6",
+       "type": "fire"
+      }
+     ],
+     "area": {
+      "shape": "sphere",
+      "sizeFeet": 20,
+      "widthFeet": null
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -5359,7 +5719,7 @@
   "name": "Demiplane",
   "level": 8,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -5407,7 +5767,7 @@
   "name": "Detect Evil and Good",
   "level": 1,
   "school": "divination",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -5454,7 +5814,7 @@
   "name": "Detect Magic",
   "level": 1,
   "school": "divination",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -5507,7 +5867,7 @@
   "name": "Detect Poison and Disease",
   "level": 1,
   "school": "divination",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -5556,7 +5916,7 @@
   "name": "Detect Thoughts",
   "level": 2,
   "school": "divination",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -5608,7 +5968,7 @@
   "name": "Dimension Door",
   "level": 4,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 500,
@@ -5659,7 +6019,7 @@
   "name": "Disguise Self",
   "level": 1,
   "school": "illusion",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -5707,7 +6067,7 @@
   "name": "Disintegrate",
   "level": 6,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -5761,19 +6121,19 @@
   "castingOptions": [
    {
     "type": "slot_level_7",
-    "damageRoll": "13d6",
+    "damageRoll": "13d6 + 40",
     "targetCount": null,
     "description": null
    },
    {
     "type": "slot_level_8",
-    "damageRoll": "16d6",
+    "damageRoll": "16d6 + 40",
     "targetCount": null,
     "description": null
    },
    {
     "type": "slot_level_9",
-    "damageRoll": "19d6",
+    "damageRoll": "19d6 + 40",
     "targetCount": null,
     "description": null
    }
@@ -5784,7 +6144,7 @@
   "name": "Dispel Evil and Good",
   "level": 5,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -5801,7 +6161,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -5822,7 +6182,7 @@
    "cleric",
    "paladin"
   ],
-  "description": "For the duration, Celestials, Elementals, Fey, Fiends, and Undead have Disadvantage on attack rolls against you. You can end the spell early by using either of the following special functions.",
+  "description": "For the duration, Celestials, Elementals, Fey, Fiends, and Undead have Disadvantage on attack rolls against you. You can end the spell early by using either of the following special functions.\n\n**Break Enchantment.** As a Magic action, you touch a creature that is possessed by or has the Charmed or Frightened condition from one or more creatures of the types above. The target is no longer possessed, Charmed, or Frightened by such creatures.\n\n**Dismissal.** As a Magic action, you target one creature you can see within 5 feet of you that has one of the creature types above. The target must succeed on a Charisma saving throw or be sent back to its home plane if it isn't there already. If they aren't on their home plane, Undead are sent to the Shadowfell, and Fey are sent to the Feywild.",
   "higherLevel": null,
   "castingOptions": []
  },
@@ -5831,7 +6191,7 @@
   "name": "Dispel Magic",
   "level": 3,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -5927,7 +6287,7 @@
   "name": "Dissonant Whispers",
   "level": 1,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -5970,21 +6330,73 @@
      "type": "psychic"
     }
    ],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
    "bard"
   ],
   "description": "One creature of your choice that you can see within range hears a discordant melody in its mind. The target makes a Wisdom saving throw. On a failed save, it takes 3d6 Psychic damage and must immediately use its Reaction, if available, to move as far away from you as it can, using the safest route. On a successful save, the target takes half as much damage only.",
-  "higherLevel": null,
-  "castingOptions": []
+  "higherLevel": "The damage increases by 1d6 for each spell slot level above 1.",
+  "castingOptions": [
+   {
+    "type": "slot_level_2",
+    "damageRoll": "4d6",
+    "targetCount": null,
+    "description": null
+   },
+   {
+    "type": "slot_level_3",
+    "damageRoll": "5d6",
+    "targetCount": null,
+    "description": null
+   },
+   {
+    "type": "slot_level_4",
+    "damageRoll": "6d6",
+    "targetCount": null,
+    "description": null
+   },
+   {
+    "type": "slot_level_5",
+    "damageRoll": "7d6",
+    "targetCount": null,
+    "description": null
+   },
+   {
+    "type": "slot_level_6",
+    "damageRoll": "8d6",
+    "targetCount": null,
+    "description": null
+   },
+   {
+    "type": "slot_level_7",
+    "damageRoll": "9d6",
+    "targetCount": null,
+    "description": null
+   },
+   {
+    "type": "slot_level_8",
+    "damageRoll": "10d6",
+    "targetCount": null,
+    "description": null
+   },
+   {
+    "type": "slot_level_9",
+    "damageRoll": "11d6",
+    "targetCount": null,
+    "description": null
+   }
+  ]
  },
  {
   "id": "divination",
   "name": "Divination",
   "level": 4,
   "school": "divination",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -6032,7 +6444,7 @@
   "name": "Divine Favor",
   "level": 1,
   "school": "transmutation",
-  "castingTime": "bonus-action",
+  "castingTime": "Bonus Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -6080,7 +6492,7 @@
   "name": "Divine Smite",
   "level": 1,
   "school": "evocation",
-  "castingTime": "bonus-action",
+  "castingTime": "Bonus Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -6182,7 +6594,7 @@
   "name": "Divine Word",
   "level": 7,
   "school": "evocation",
-  "castingTime": "bonus-action",
+  "castingTime": "Bonus Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -6232,7 +6644,7 @@
   "name": "Dominate Beast",
   "level": 4,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -6270,6 +6682,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -6317,7 +6732,7 @@
   "name": "Dominate Monster",
   "level": 8,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -6355,6 +6770,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -6379,7 +6797,7 @@
   "name": "Dominate Person",
   "level": 5,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -6417,6 +6835,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -6458,7 +6879,7 @@
   "name": "Dragon's Breath",
   "level": 2,
   "school": "transmutation",
-  "castingTime": "bonus-action",
+  "castingTime": "Bonus Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -6502,6 +6923,37 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "damageTypes": [
+    "acid",
+    "cold",
+    "fire",
+    "lightning",
+    "poison"
+   ],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "exhale",
+     "activation": "action",
+     "when": "Until the spell ends, the creature you touched can take a Magic action to exhale.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "3d6",
+       "type": "acid"
+      }
+     ],
+     "area": {
+      "shape": "cone",
+      "sizeFeet": 15,
+      "widthFeet": null
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -6560,7 +7012,7 @@
   "name": "Dream",
   "level": 5,
   "school": "illusion",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -6598,6 +7050,7 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
    "healing": null
   },
   "classes": [
@@ -6614,7 +7067,7 @@
   "name": "Druidcraft",
   "level": 0,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -6664,7 +7117,7 @@
   "name": "Earthquake",
   "level": 8,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 500,
@@ -6724,7 +7177,7 @@
   "name": "Eldritch Blast",
   "level": 0,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -6757,6 +7210,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 120
+   },
    "damage": [
     {
      "formula": "1d10",
@@ -6796,7 +7253,7 @@
   "name": "Elementalism",
   "level": 0,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -6848,7 +7305,7 @@
   "name": "Enhance Ability",
   "level": 2,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -6880,6 +7337,10 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1,
+    "perSlot": 1
+   },
    "healing": null
   },
   "classes": [
@@ -6942,7 +7403,7 @@
   "name": "Enlarge/Reduce",
   "level": 2,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -6995,7 +7456,7 @@
   "name": "Ensnaring Strike",
   "level": 1,
   "school": "conjuration",
-  "castingTime": "bonus-action",
+  "castingTime": "Bonus Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -7098,7 +7559,7 @@
   "name": "Entangle",
   "level": 1,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 90,
@@ -7132,7 +7593,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 20,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
@@ -7151,7 +7616,7 @@
   "name": "Enthrall",
   "level": 2,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -7202,7 +7667,7 @@
   "name": "Etherealness",
   "level": 7,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -7267,7 +7732,7 @@
   "name": "Expeditious Retreat",
   "level": 1,
   "school": "transmutation",
-  "castingTime": "bonus-action",
+  "castingTime": "Bonus Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -7315,7 +7780,7 @@
   "name": "Eyebite",
   "level": 6,
   "school": "necromancy",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -7368,7 +7833,7 @@
   "name": "Fabricate",
   "level": 4,
   "school": "transmutation",
-  "castingTime": "1minute",
+  "castingTime": "10 minutes",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -7422,7 +7887,7 @@
   "name": "Faerie Fire",
   "level": 1,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -7439,7 +7904,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -7466,7 +7931,29 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "failureEffect": {
+    "name": "Faerie Fire",
+    "tags": [
+     "outlined"
+    ],
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    },
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "incoming-attack",
+      "mode": "advantage",
+      "when": [
+       {
+        "type": "on-attack-roll"
+       }
+      ]
+     }
+    ]
+   }
   },
   "classes": [
    "bard",
@@ -7481,7 +7968,7 @@
   "name": "Faithful Hound",
   "level": 4,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -7519,6 +8006,25 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "bite",
+     "activation": "other",
+     "when": "At the start of each of your turns, the hound bites one enemy within 5 feet of it.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "none",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "4d8",
+       "type": "force"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -7533,7 +8039,7 @@
   "name": "False Life",
   "level": 1,
   "school": "necromancy",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -7629,7 +8135,7 @@
   "name": "Fear",
   "level": 3,
   "school": "illusion",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -7692,7 +8198,7 @@
   "name": "Feather Fall",
   "level": 1,
   "school": "transmutation",
-  "castingTime": "reaction",
+  "castingTime": "Reaction",
   "reactionCondition": "which you take when you or a creature you can see within 60 feet of you falls",
   "range": {
    "distance": 60,
@@ -7740,7 +8246,7 @@
   "name": "Find Familiar",
   "level": 1,
   "school": "conjuration",
-  "castingTime": "1hour",
+  "castingTime": "1 hour",
   "reactionCondition": null,
   "range": {
    "distance": 10,
@@ -7786,7 +8292,7 @@
   "name": "Find Steed",
   "level": 2,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -7875,7 +8381,7 @@
   "name": "Find the Path",
   "level": 6,
   "school": "divination",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -7887,7 +8393,7 @@
    "somatic": true,
    "material": true,
    "materialText": "a set of divination tools—such as cards or runes—worth 100+ GP",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "1 day",
   "concentration": true,
@@ -7923,7 +8429,7 @@
   "name": "Find Traps",
   "level": 2,
   "school": "divination",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -7971,7 +8477,7 @@
   "name": "Finger of Death",
   "level": 7,
   "school": "necromancy",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -8030,7 +8536,7 @@
   "name": "Fire Bolt",
   "level": 0,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -8063,6 +8569,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 120
+   },
    "damage": [
     {
      "formula": "1d10",
@@ -8103,7 +8613,7 @@
   "name": "Fire Shield",
   "level": 4,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -8120,7 +8630,7 @@
   "duration": "10 minutes",
   "concentration": false,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": "2d8",
    "types": [
@@ -8154,7 +8664,7 @@
   "name": "Fire Storm",
   "level": 7,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 150,
@@ -8221,7 +8731,7 @@
   "name": "Fireball",
   "level": 3,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 150,
@@ -8324,7 +8834,7 @@
   "name": "Flame Blade",
   "level": 2,
   "school": "evocation",
-  "castingTime": "bonus-action",
+  "castingTime": "Bonus Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -8358,6 +8868,24 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "attack",
+     "activation": "action",
+     "when": "As a Magic action, you can make a melee spell attack with the fiery blade.",
+     "attackRange": {
+      "kind": "melee",
+      "feet": 5
+     },
+     "damage": [
+      {
+       "formula": "3d6",
+       "type": "fire",
+       "addsModifier": true
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -8416,7 +8944,7 @@
   "name": "Flame Strike",
   "level": 5,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -8451,7 +8979,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 10,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [
@@ -8469,7 +9001,7 @@
   "classes": [
    "cleric"
   ],
-  "description": "A vertical column of brilliant fire roars down from above. Each creature in a 10-foot-radius, 40-foothigh Cylinder centered on a point within range makes a Dexterity saving throw, taking 5d6 Fire damage and 5d6 Radiant damage on a failed save or half as much damage on a successful one.",
+  "description": "A vertical column of brilliant fire roars down from above. Each creature in a 10-foot-radius, 40-foot-high Cylinder centered on a point within range makes a Dexterity saving throw, taking 5d6 Fire damage and 5d6 Radiant damage on a failed save or half as much damage on a successful one.",
   "higherLevel": "The Fire damage and the Radiant damage increase by 1d6 for each spell slot level above 5.",
   "castingOptions": [
    {
@@ -8503,7 +9035,7 @@
   "name": "Flaming Sphere",
   "level": 2,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -8541,6 +9073,25 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "A creature that ends its turn within 5 feet of the sphere, or whose space you ram it into as a Bonus Action, makes the save.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "2d6",
+       "type": "fire"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -8600,7 +9151,7 @@
   "name": "Flesh to Stone",
   "level": 6,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -8654,7 +9205,7 @@
   "name": "Floating Disk",
   "level": 1,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -8700,7 +9251,7 @@
   "name": "Fly",
   "level": 3,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -8732,6 +9283,10 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1,
+    "perSlot": 1
+   },
    "healing": null
   },
   "classes": [
@@ -8785,7 +9340,7 @@
   "name": "Fog Cloud",
   "level": 1,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -8891,7 +9446,7 @@
   "name": "Forbiddance",
   "level": 6,
   "school": "abjuration",
-  "castingTime": "10minutes",
+  "castingTime": "10 minutes",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -8903,7 +9458,7 @@
    "somatic": true,
    "material": true,
    "materialText": "ruby dust worth 1,000+ GP",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "1 day",
   "concentration": false,
@@ -8939,7 +9494,7 @@
   "name": "Forcecage",
   "level": 7,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 100,
@@ -8975,6 +9530,7 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
    "healing": null
   },
   "classes": [
@@ -8991,7 +9547,7 @@
   "name": "Foresight",
   "level": 9,
   "school": "divination",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -9008,7 +9564,7 @@
   "duration": "8 hours",
   "concentration": false,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -9040,7 +9596,7 @@
   "name": "Freedom of Movement",
   "level": 4,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -9082,6 +9638,11 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
+   "targets": {
+    "count": 1,
+    "perSlot": 1
+   },
    "healing": null
   },
   "classes": [
@@ -9130,7 +9691,7 @@
   "name": "Freezing Sphere",
   "level": 6,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 300,
@@ -9215,7 +9776,7 @@
   "name": "Gaseous Form",
   "level": 3,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -9253,6 +9814,11 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
+   "targets": {
+    "count": 1,
+    "perSlot": 1
+   },
    "healing": null
   },
   "classes": [
@@ -9306,7 +9872,7 @@
   "name": "Gate",
   "level": 9,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -9318,7 +9884,7 @@
    "somatic": true,
    "material": true,
    "materialText": "a diamond worth 5,000+ GP",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "1 minute",
   "concentration": true,
@@ -9355,7 +9921,7 @@
   "name": "Geas",
   "level": 5,
   "school": "enchantment",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -9426,7 +9992,7 @@
   "name": "Gentle Repose",
   "level": 2,
   "school": "necromancy",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -9474,7 +10040,7 @@
   "name": "Giant Insect",
   "level": 4,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -9551,7 +10117,7 @@
   "name": "Glibness",
   "level": 8,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -9598,7 +10164,7 @@
   "name": "Globe of Invulnerability",
   "level": 6,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -9664,7 +10230,7 @@
   "name": "Glyph of Warding",
   "level": 3,
   "school": "abjuration",
-  "castingTime": "1hour",
+  "castingTime": "1 hour",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -9753,7 +10319,7 @@
   "name": "Goodberry",
   "level": 1,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -9800,7 +10366,7 @@
   "name": "Grease",
   "level": 1,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -9834,7 +10400,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 10,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
@@ -9844,7 +10414,7 @@
    "sorcerer",
    "wizard"
   ],
-  "description": "Nonflammable grease covers the ground in a 10 foot square centered on a point within range and turns it into Difficult Terrain for the duration. When the grease appears, each creature standing in its area must succeed on a Dexterity saving throw or have the Prone condition. A creature that enters the area or ends its turn there must also succeed on that save or fall Prone.",
+  "description": "Nonflammable grease covers the ground in a 10-foot square centered on a point within range and turns it into Difficult Terrain for the duration.\n\nWhen the grease appears, each creature standing in its area must succeed on a Dexterity saving throw or have the Prone condition. A creature that enters the area or ends its turn there must also succeed on that save or fall Prone.",
   "higherLevel": null,
   "castingOptions": []
  },
@@ -9853,7 +10423,7 @@
   "name": "Greater Invisibility",
   "level": 4,
   "school": "illusion",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -9901,7 +10471,7 @@
   "name": "Greater Restoration",
   "level": 5,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -9951,7 +10521,7 @@
   "name": "Guardian of Faith",
   "level": 4,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -9989,6 +10559,7 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
    "healing": null
   },
   "classes": [
@@ -10003,7 +10574,7 @@
   "name": "Guards and Wards",
   "level": 6,
   "school": "abjuration",
-  "castingTime": "1hour",
+  "castingTime": "1 hour",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -10015,7 +10586,7 @@
    "somatic": true,
    "material": true,
    "materialText": "a silver rod worth 10+ GP",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "24 hours",
   "concentration": false,
@@ -10031,7 +10602,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 50,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
@@ -10050,7 +10625,7 @@
   "name": "Guidance",
   "level": 0,
   "school": "divination",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -10097,7 +10672,7 @@
   "name": "Guiding Bolt",
   "level": 1,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -10130,13 +10705,44 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 120
+   },
    "damage": [
     {
      "formula": "4d6",
      "type": "radiant"
     }
    ],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "incoming-attack",
+      "mode": "advantage",
+      "when": [
+       {
+        "type": "on-attack-roll"
+       }
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Guiding Bolt's light",
+    "tags": [
+     "until-attacked"
+    ],
+    "target": "target",
+    "onHit": true,
+    "duration": {
+     "type": "rounds",
+     "rounds": 2
+    }
+   }
   },
   "classes": [
    "cleric"
@@ -10199,7 +10805,7 @@
   "name": "Gust of Wind",
   "level": 2,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -10252,7 +10858,7 @@
   "name": "Hallow",
   "level": 5,
   "school": "abjuration",
-  "castingTime": "1hour",
+  "castingTime": "24 hours",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -10289,7 +10895,7 @@
   "classes": [
    "cleric"
   ],
-  "description": "You touch a point and infuse an area around it with holy or unholy power. The area can have a radius up to 60 feet, and the spell fails if the radius includes an area already under the effect of Hallow. The affected area has the following effects.\n\n**_Hallowed Ward._** Choose any of these creature types: Aberration, Celestial, Elemental, Fey, Fiend, or Undead. Creatures of the chosen types can't willingly enter the area, and any creature that is possessed by or that has the Charmed or Frightened condition from such creatures isn't possessed, Charmed, or Frightened by them while in the area.\n\n**_Extra Effect._** You bind an extra effect to the area from the list below:\n\n- **_Courage._** Creatures of any types you choose can't gain the Frightened condition while in the area.\n- **_Darkness._** Darkness fills the area. Normal light, as well as magical light created by spells of a level lower than this spell, can't illuminate the area.\n - **_Daylight._** Bright light fills the area. Magical Darkness created by spells of a level lower than this spell can't extinguish the light.\n- **_Peaceful Rest._** Dead bodies interred in the area can't be turned into Undead.\n- **_Extradimensional Interference._** Creatures of any types you choose can't enter or exit the area using teleportation or interplanar travel.\n- **_Fear._** Creatures of any types you choose have the Frightened condition while in the area.\n- **_Silence._** No sound can emanate from within the area, and no sound can reach into it.\n- **_Tongues._** Creatures of any types you choose can communicate with any other creature in the area even if they don't share a common language.\n- **_Vulnerability._** Creatures of any types you choose have Vulnerability to one damage type of your choice while in the area.",
+  "description": "You touch a point and infuse an area around it with holy or unholy power. The area can have a radius up to 60 feet, and the spell fails if the radius includes an area already under the effect of Hallow. The affected area has the following effects.\n\n**Hallowed Ward.** Choose any of these creature types: Aberration, Celestial, Elemental, Fey, Fiend, or Undead. Creatures of the chosen types can't willingly enter the area, and any creature that is possessed by or that has the Charmed or Frightened condition from such creatures isn't possessed, Charmed, or Frightened by them while in the area.\n\n**Extra Effect.** You bind an extra effect to the area from the list below:\n\n**Courage.** Creatures of any types you choose can't gain the Frightened condition while in the area.\n\n**Darkness.** Darkness fills the area. Normal light, as well as magical light created by spells of a level lower than this spell, can't illuminate the area.\n\n**Daylight.** Bright light fills the area. Magical Darkness created by spells of a level lower than this spell can't extinguish the light.\n\n**Peaceful Rest.** Dead bodies interred in the area can't be turned into Undead.\n\n**Extradimensional Interference.** Creatures of any types you choose can't enter or exit the area using teleportation or interplanar travel.\n\n**Fear.** Creatures of any types you choose have the Frightened condition while in the area.\n\n**Resistance.** Creatures of any types you choose have Resistance to one damage type of your choice while in the area.\n\n**Silence.** No sound can emanate from within the area, and no sound can reach into it.\n\n**Tongues.** Creatures of any types you choose can communicate with any other creature in the area even if they don't share a common language.\n\n**Vulnerability.** Creatures of any types you choose have Vulnerability to one damage type of your choice while in the area.",
   "higherLevel": null,
   "castingOptions": []
  },
@@ -10298,7 +10904,7 @@
   "name": "Hallucinatory Terrain",
   "level": 4,
   "school": "illusion",
-  "castingTime": "1minute",
+  "castingTime": "10 minutes",
   "reactionCondition": null,
   "range": {
    "distance": 300,
@@ -10355,7 +10961,7 @@
   "name": "Harm",
   "level": 6,
   "school": "necromancy",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -10412,7 +11018,7 @@
   "name": "Haste",
   "level": 3,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -10448,7 +11054,44 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "noCastSave": true,
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "save",
+      "mode": "advantage",
+      "when": [
+       {
+        "type": "on-saving-throw"
+       },
+       {
+        "type": "ability-is",
+        "abilities": [
+         "dex"
+        ]
+       }
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Haste",
+    "tags": [
+     "hasted"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    },
+    "armorClassBonus": 2
+   }
   },
   "classes": [
    "sorcerer",
@@ -10463,7 +11106,7 @@
   "name": "Heal",
   "level": 6,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -10509,19 +11152,19 @@
   "castingOptions": [
    {
     "type": "slot_level_7",
-    "damageRoll": null,
+    "damageRoll": "80",
     "targetCount": null,
     "description": "The target regains 80 Hit Points."
    },
    {
     "type": "slot_level_8",
-    "damageRoll": null,
+    "damageRoll": "90",
     "targetCount": null,
     "description": "The target regains 90 Hit Points."
    },
    {
     "type": "slot_level_9",
-    "damageRoll": null,
+    "damageRoll": "100",
     "targetCount": null,
     "description": "The target regains 100 Hit Points."
    }
@@ -10532,7 +11175,7 @@
   "name": "Healing Word",
   "level": 1,
   "school": "abjuration",
-  "castingTime": "bonus-action",
+  "castingTime": "Bonus Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -10564,6 +11207,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": {
     "formula": "2d4",
     "addsModifier": true
@@ -10632,7 +11278,7 @@
   "name": "Heat Metal",
   "level": 2,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -10649,7 +11295,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": "2d8",
    "types": [
@@ -10669,7 +11315,26 @@
   "area": null,
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "2d8",
+     "type": "fire"
+    }
+   ],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "heat again",
+     "activation": "bonus-action",
+     "when": "On your later turns, a Bonus Action deals the damage again if the object is within range; a creature holding or wearing it makes a Constitution save or drops it.",
+     "damage": [
+      {
+       "formula": "2d8",
+       "type": "fire"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -10728,7 +11393,7 @@
   "name": "Hellish Rebuke",
   "level": 1,
   "school": "evocation",
-  "castingTime": "reaction",
+  "castingTime": "Reaction",
   "reactionCondition": "which you take in response to taking damage from a creature that you can see within 60 feet of yourself",
   "range": {
    "distance": 60,
@@ -10839,7 +11504,7 @@
   "name": "Heroes' Feast",
   "level": 6,
   "school": "conjuration",
-  "castingTime": "1minute",
+  "castingTime": "10 minutes",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -10897,7 +11562,7 @@
   "name": "Heroism",
   "level": 1,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -10929,6 +11594,10 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1,
+    "perSlot": 1
+   },
    "healing": null
   },
   "classes": [
@@ -10993,7 +11662,7 @@
   "name": "Hex",
   "level": 1,
   "school": "enchantment",
-  "castingTime": "bonus-action",
+  "castingTime": "Bonus Action",
   "reactionCondition": null,
   "range": {
    "distance": 90,
@@ -11010,7 +11679,7 @@
   "duration": "1 hour",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": "1d6",
    "types": [
@@ -11027,7 +11696,36 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "extra-damage",
+      "formula": "1d6",
+      "damageType": "necrotic",
+      "doubleOnCritical": true,
+      "when": [
+       {
+        "type": "on-hit"
+       },
+       {
+        "type": "by-effect-source"
+       }
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Hex",
+    "tags": [
+     "hexed"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "warlock"
@@ -11090,7 +11788,7 @@
   "name": "Hideous Laughter",
   "level": 1,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -11130,6 +11828,10 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1,
+    "perSlot": 1
+   },
    "healing": null
   },
   "classes": [
@@ -11195,7 +11897,7 @@
   "name": "Hold Monster",
   "level": 5,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 90,
@@ -11234,6 +11936,10 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1,
+    "perSlot": 1
+   },
    "healing": null
   },
   "classes": [
@@ -11276,7 +11982,7 @@
   "name": "Hold Person",
   "level": 2,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -11315,6 +12021,10 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1,
+    "perSlot": 1
+   },
    "healing": null
   },
   "classes": [
@@ -11377,7 +12087,7 @@
   "name": "Holy Aura",
   "level": 8,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -11389,12 +12099,12 @@
    "somatic": true,
    "material": true,
    "materialText": "a reliquary worth 1,000+ GP",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -11427,7 +12137,7 @@
   "name": "Hunter's Mark",
   "level": 1,
   "school": "divination",
-  "castingTime": "bonus-action",
+  "castingTime": "Bonus Action",
   "reactionCondition": null,
   "range": {
    "distance": 90,
@@ -11444,7 +12154,7 @@
   "duration": "1 hour",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": "1d6",
    "types": [
@@ -11461,7 +12171,36 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "extra-damage",
+      "formula": "1d6",
+      "damageType": "force",
+      "doubleOnCritical": true,
+      "when": [
+       {
+        "type": "on-hit"
+       },
+       {
+        "type": "by-effect-source"
+       }
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Hunter's Mark",
+    "tags": [
+     "hunters-mark"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "ranger"
@@ -11518,7 +12257,7 @@
   "name": "Hypnotic Pattern",
   "level": 3,
   "school": "illusion",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -11584,7 +12323,7 @@
   "name": "Ice Knife",
   "level": 1,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -11622,6 +12361,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 60
+   },
    "damage": [
     {
      "formula": "1d10",
@@ -11640,49 +12383,49 @@
   "castingOptions": [
    {
     "type": "slot_level_2",
-    "damageRoll": "2d10",
+    "damageRoll": null,
     "targetCount": null,
     "description": null
    },
    {
     "type": "slot_level_3",
-    "damageRoll": "3d10",
+    "damageRoll": null,
     "targetCount": null,
     "description": null
    },
    {
     "type": "slot_level_4",
-    "damageRoll": "4d10",
+    "damageRoll": null,
     "targetCount": null,
     "description": null
    },
    {
     "type": "slot_level_5",
-    "damageRoll": "5d10",
+    "damageRoll": null,
     "targetCount": null,
     "description": null
    },
    {
     "type": "slot_level_6",
-    "damageRoll": "6d10",
+    "damageRoll": null,
     "targetCount": null,
     "description": null
    },
    {
     "type": "slot_level_7",
-    "damageRoll": "7d10",
+    "damageRoll": null,
     "targetCount": null,
     "description": null
    },
    {
     "type": "slot_level_8",
-    "damageRoll": "8d10",
+    "damageRoll": null,
     "targetCount": null,
     "description": null
    },
    {
     "type": "slot_level_9",
-    "damageRoll": "9d10",
+    "damageRoll": null,
     "targetCount": null,
     "description": null
    }
@@ -11693,7 +12436,7 @@
   "name": "Ice Storm",
   "level": 4,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 300,
@@ -11728,7 +12471,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 20,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [
@@ -11788,7 +12535,7 @@
   "name": "Identify",
   "level": 1,
   "school": "divination",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -11800,7 +12547,7 @@
    "somatic": true,
    "material": true,
    "materialText": "a pearl worth 100+ GP",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "instantaneous",
   "concentration": false,
@@ -11835,7 +12582,7 @@
   "name": "Illusory Script",
   "level": 1,
   "school": "illusion",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -11883,7 +12630,7 @@
   "name": "Imprisonment",
   "level": 9,
   "school": "abjuration",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -11895,7 +12642,7 @@
    "somatic": true,
    "material": true,
    "materialText": "a statuette of the target worth 5,000+ GP",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "until dispelled",
   "concentration": false,
@@ -11934,7 +12681,7 @@
   "name": "Incendiary Cloud",
   "level": 8,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 150,
@@ -11979,7 +12726,30 @@
   },
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "10d8",
+     "type": "fire"
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. A creature makes this save only once per turn.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "10d8",
+       "type": "fire"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -11996,7 +12766,7 @@
   "name": "Inflict Wounds",
   "level": 1,
   "school": "necromancy",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -12039,6 +12809,9 @@
      "type": "necrotic"
     }
    ],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -12102,7 +12875,7 @@
   "name": "Insect Plague",
   "level": 5,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 300,
@@ -12147,7 +12920,30 @@
   },
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "4d10",
+     "type": "piercing"
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "A creature that enters the area for the first time on a turn or ends its turn there makes the save. A creature makes this save only once per turn.",
+     "save": {
+      "ability": "con",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "4d10",
+       "type": "piercing"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -12189,7 +12985,7 @@
   "name": "Instant Summons",
   "level": 6,
   "school": "conjuration",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -12201,7 +12997,7 @@
    "somatic": true,
    "material": true,
    "materialText": "a sapphire worth 1,000+ GP",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "until dispelled",
   "concentration": false,
@@ -12235,7 +13031,7 @@
   "name": "Invisibility",
   "level": 2,
   "school": "illusion",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -12252,7 +13048,7 @@
   "duration": "1 hour",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -12267,6 +13063,10 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1,
+    "perSlot": 1
+   },
    "healing": null
   },
   "classes": [
@@ -12327,7 +13127,7 @@
   "name": "Irresistible Dance",
   "level": 6,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -12344,7 +13144,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -12380,7 +13180,7 @@
   "name": "Jump",
   "level": 1,
   "school": "transmutation",
-  "castingTime": "bonus-action",
+  "castingTime": "Bonus Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -12391,7 +13191,7 @@
    "verbal": true,
    "somatic": true,
    "material": true,
-   "materialText": null,
+   "materialText": "a grasshopper's hind leg",
    "materialConsumed": false
   },
   "duration": "1 minute",
@@ -12412,6 +13212,10 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1,
+    "perSlot": 1
+   },
    "healing": null
   },
   "classes": [
@@ -12478,7 +13282,7 @@
   "name": "Knock",
   "level": 2,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -12517,7 +13321,7 @@
    "sorcerer",
    "wizard"
   ],
-  "description": "A target that is held shut by a mundane lock or that is stuck or barred becomes unlocked, unstuck, or unbarred. If the object has multiple locks, only one of them is unlocked. If the target is held shut by Arcane Lock, that spell is suppressed for 10 minutes, during which time the target can be opened and closed. When you cast the spell, a loud knock, audible up to 300 feet away, emanates from the target.",
+  "description": "Choose an object that you can see within range. The object can be a door, a box, a chest, a set of manacles, a padlock, or another object that contains a mundane or magical means that prevents access.\n\nA target that is held shut by a mundane lock or that is stuck or barred becomes unlocked, unstuck, or unbarred. If the object has multiple locks, only one of them is unlocked.\n\nIf the target is held shut by Arcane Lock, that spell is suppressed for 10 minutes, during which time the target can be opened and closed.\n\nWhen you cast the spell, a loud knock, audible up to 300 feet away, emanates from the target.",
   "higherLevel": null,
   "castingOptions": []
  },
@@ -12526,7 +13330,7 @@
   "name": "Legend Lore",
   "level": 5,
   "school": "divination",
-  "castingTime": "1minute",
+  "castingTime": "10 minutes",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -12574,7 +13378,7 @@
   "name": "Lesser Restoration",
   "level": 2,
   "school": "abjuration",
-  "castingTime": "bonus-action",
+  "castingTime": "Bonus Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -12624,7 +13428,7 @@
   "name": "Levitate",
   "level": 2,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -12675,7 +13479,7 @@
   "name": "Light",
   "level": 0,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -12724,7 +13528,7 @@
   "name": "Lightning Bolt",
   "level": 3,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -12827,7 +13631,7 @@
   "name": "Locate Animals or Plants",
   "level": 2,
   "school": "divination",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -12875,7 +13679,7 @@
   "name": "Locate Creature",
   "level": 4,
   "school": "divination",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -12926,7 +13730,7 @@
   "name": "Locate Object",
   "level": 2,
   "school": "divination",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -12977,7 +13781,7 @@
   "name": "Longstrider",
   "level": 1,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -13009,6 +13813,10 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1,
+    "perSlot": 1
+   },
    "healing": null
   },
   "classes": [
@@ -13075,7 +13883,7 @@
   "name": "Mage Armor",
   "level": 1,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -13107,7 +13915,24 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Mage Armor",
+    "tags": [
+     "mage-armor"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "sorcerer",
@@ -13122,7 +13947,7 @@
   "name": "Mage Hand",
   "level": 0,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -13171,7 +13996,7 @@
   "name": "Magic Circle",
   "level": 3,
   "school": "abjuration",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 10,
@@ -13188,7 +14013,7 @@
   "duration": "1 hour",
   "concentration": false,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -13203,10 +14028,15 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 10,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
    "healing": null
   },
   "classes": [
@@ -13261,7 +14091,7 @@
   "name": "Magic Jar",
   "level": 6,
   "school": "necromancy",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -13273,7 +14103,7 @@
    "somatic": true,
    "material": true,
    "materialText": "a gem, crystal, or reliquary worth 500+ GP",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "until dispelled",
   "concentration": false,
@@ -13311,7 +14141,7 @@
   "name": "Magic Missile",
   "level": 1,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -13346,10 +14176,11 @@
    "attacks": 0,
    "damage": [
     {
-     "formula": "3d4 + 3",
+     "formula": "1d4 + 1",
      "type": "force"
     }
    ],
+   "darts": 3,
    "healing": null
   },
   "classes": [
@@ -13414,7 +14245,7 @@
   "name": "Magic Mouth",
   "level": 2,
   "school": "illusion",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -13461,7 +14292,7 @@
   "name": "Magic Weapon",
   "level": 2,
   "school": "transmutation",
-  "castingTime": "bonus-action",
+  "castingTime": "Bonus Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -13478,7 +14309,7 @@
   "duration": "1 hour",
   "concentration": false,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -13553,7 +14384,7 @@
   "name": "Magnificent Mansion",
   "level": 7,
   "school": "conjuration",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 300,
@@ -13565,7 +14396,7 @@
    "somatic": true,
    "material": true,
    "materialText": "a miniature door worth 15+ GP",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "24 hours",
   "concentration": false,
@@ -13608,7 +14439,7 @@
   "name": "Major Image",
   "level": 3,
   "school": "illusion",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -13702,7 +14533,7 @@
   "name": "Mass Cure Wounds",
   "level": 5,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -13742,6 +14573,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 6
+   },
    "healing": {
     "formula": "5d8",
     "addsModifier": true
@@ -13786,7 +14620,7 @@
   "name": "Mass Heal",
   "level": 9,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -13832,7 +14666,7 @@
   "name": "Mass Healing Word",
   "level": 3,
   "school": "abjuration",
-  "castingTime": "bonus-action",
+  "castingTime": "Bonus Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -13864,6 +14698,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 6
+   },
    "healing": {
     "formula": "2d4",
     "addsModifier": true
@@ -13919,7 +14756,7 @@
   "name": "Mass Suggestion",
   "level": 6,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -13992,7 +14829,7 @@
   "name": "Maze",
   "level": 8,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -14038,7 +14875,7 @@
   "name": "Meld into Stone",
   "level": 3,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -14088,7 +14925,7 @@
   "name": "Mending",
   "level": 0,
   "school": "transmutation",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -14138,7 +14975,7 @@
   "name": "Message",
   "level": 0,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -14187,7 +15024,7 @@
   "name": "Meteor Swarm",
   "level": 9,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 5280,
@@ -14258,7 +15095,7 @@
   "name": "Mind Blank",
   "level": 8,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -14307,7 +15144,7 @@
   "name": "Mind Spike",
   "level": 2,
   "school": "divination",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -14409,7 +15246,7 @@
   "name": "Minor Illusion",
   "level": 0,
   "school": "illusion",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -14462,7 +15299,7 @@
   "name": "Mirage Arcane",
   "level": 7,
   "school": "illusion",
-  "castingTime": "1minute",
+  "castingTime": "10 minutes",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -14510,7 +15347,7 @@
   "name": "Mirror Image",
   "level": 2,
   "school": "illusion",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -14527,7 +15364,7 @@
   "duration": "1 minute",
   "concentration": false,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -14559,7 +15396,7 @@
   "name": "Mislead",
   "level": 5,
   "school": "illusion",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -14576,7 +15413,7 @@
   "duration": "1 hour",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -14607,7 +15444,7 @@
   "name": "Misty Step",
   "level": 2,
   "school": "conjuration",
-  "castingTime": "bonus-action",
+  "castingTime": "Bonus Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -14655,7 +15492,7 @@
   "name": "Modify Memory",
   "level": 5,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -14735,7 +15572,7 @@
   "name": "Moonbeam",
   "level": 2,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -14769,7 +15606,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 5,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [
@@ -14778,12 +15619,30 @@
      "type": "radiant"
     }
    ],
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "A creature the Cylinder moves into, or that enters it or ends its turn there, makes the save. A creature makes this save only once per turn.",
+     "save": {
+      "ability": "con",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "2d10",
+       "type": "radiant"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
    "druid"
   ],
-  "description": "When the Cylinder appears, each creature in it makes a Constitution saving throw. On a failed save, a creature takes 2d10 Radiant damage, and if the creature is shape-shifted (as a result of the Polymorph spell, for example), it reverts to its true form and can't shape-shift until it leaves the Cylinder. On a successful save, a creature takes half as much damage only. A creature also makes this save when the spell's area moves into its space and when it enters the spell's area or ends its turn there. A creature makes this save only once per turn.",
+  "description": "A silvery beam of pale light shines down in a 5-foot-radius, 40-foot-high Cylinder centered on a point within range. Until the spell ends, Dim Light fills the Cylinder, and you can take a Magic action on later turns to move the Cylinder up to 60 feet.\n\nWhen the Cylinder appears, each creature in it makes a Constitution saving throw. On a failed save, a creature takes 2d10 Radiant damage, and if the creature is shape-shifted (as a result of the Polymorph spell, for example), it reverts to its true form and can't shape-shift until it leaves the Cylinder. On a successful save, a creature takes half as much damage only. A creature also makes this save when the spell's area moves into its space and when it enters the spell's area or ends its turn there. A creature makes this save only once per turn.",
   "higherLevel": "The damage increases by 1d10 for each spell slot level above 2.",
   "castingOptions": [
    {
@@ -14835,7 +15694,7 @@
   "name": "Move Earth",
   "level": 6,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -14863,7 +15722,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 40,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
@@ -14883,7 +15746,7 @@
   "name": "Nondetection",
   "level": 3,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -14931,7 +15794,7 @@
   "name": "Pass without Trace",
   "level": 2,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -14982,7 +15845,7 @@
   "name": "Passwall",
   "level": 5,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -15028,7 +15891,7 @@
   "name": "Phantasmal Force",
   "level": 2,
   "school": "illusion",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -15090,7 +15953,7 @@
   "name": "Phantasmal Killer",
   "level": 4,
   "school": "illusion",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -15107,7 +15970,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": "4d10",
    "types": [
@@ -15133,6 +15996,9 @@
      "type": "psychic"
     }
    ],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -15179,7 +16045,7 @@
   "name": "Phantom Steed",
   "level": 3,
   "school": "illusion",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -15225,7 +16091,7 @@
   "name": "Planar Ally",
   "level": 6,
   "school": "conjuration",
-  "castingTime": "1minute",
+  "castingTime": "10 minutes",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -15271,7 +16137,7 @@
   "name": "Planar Binding",
   "level": 5,
   "school": "abjuration",
-  "castingTime": "1hour",
+  "castingTime": "1 hour",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -15350,7 +16216,7 @@
   "name": "Plane Shift",
   "level": 7,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -15362,7 +16228,7 @@
    "somatic": true,
    "material": true,
    "materialText": "a forked, metal rod worth 250+ GP and attuned to a plane of existence",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "instantaneous",
   "concentration": false,
@@ -15400,7 +16266,7 @@
   "name": "Plant Growth",
   "level": 3,
   "school": "transmutation",
-  "castingTime": "1hour",
+  "castingTime": "Action or 8 hours",
   "reactionCondition": null,
   "range": {
    "distance": 150,
@@ -15452,7 +16318,7 @@
   "name": "Poison Spray",
   "level": 0,
   "school": "necromancy",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -15485,6 +16351,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 30
+   },
    "damage": [
     {
      "formula": "1d12",
@@ -15527,7 +16397,7 @@
   "name": "Polymorph",
   "level": 4,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -15563,6 +16433,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -15580,7 +16453,7 @@
   "name": "Power Word Heal",
   "level": 9,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -15627,7 +16500,7 @@
   "name": "Power Word Kill",
   "level": 9,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -15678,7 +16551,7 @@
   "name": "Power Word Stun",
   "level": 8,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -15718,6 +16591,10 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -15735,7 +16612,7 @@
   "name": "Prayer of Healing",
   "level": 2,
   "school": "abjuration",
-  "castingTime": "1minute",
+  "castingTime": "10 minutes",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -15767,6 +16644,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 5
+   },
    "healing": {
     "formula": "2d8",
     "addsModifier": false
@@ -15828,7 +16708,7 @@
   "name": "Prestidigitation",
   "level": 0,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 10,
@@ -15877,7 +16757,7 @@
   "name": "Prismatic Spray",
   "level": 7,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -15943,7 +16823,7 @@
   "name": "Prismatic Wall",
   "level": 9,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -15992,6 +16872,7 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
    "healing": null
   },
   "classes": [
@@ -16007,7 +16888,7 @@
   "name": "Private Sanctum",
   "level": 4,
   "school": "abjuration",
-  "castingTime": "1minute",
+  "castingTime": "10 minutes",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -16084,7 +16965,7 @@
   "name": "Produce Flame",
   "level": 0,
   "school": "conjuration",
-  "castingTime": "bonus-action",
+  "castingTime": "Bonus Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -16116,11 +16997,23 @@
   "shape": null,
   "area": null,
   "effect": {
-   "attacks": 1,
-   "damage": [
+   "attacks": 0,
+   "damage": [],
+   "laterActions": [
     {
-     "formula": "1d8",
-     "type": "fire"
+     "name": "hurl",
+     "activation": "action",
+     "when": "Until the spell ends, a Magic action hurls fire at a creature or object within 60 feet.",
+     "attackRange": {
+      "kind": "ranged",
+      "feet": 60
+     },
+     "damage": [
+      {
+       "formula": "1d8",
+       "type": "fire"
+      }
+     ]
     }
    ],
    "healing": null
@@ -16156,7 +17049,7 @@
   "name": "Programmed Illusion",
   "level": 6,
   "school": "illusion",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -16168,7 +17061,7 @@
    "somatic": true,
    "material": true,
    "materialText": "jade dust worth 25+ GP",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "until dispelled",
   "concentration": false,
@@ -16211,7 +17104,7 @@
   "name": "Project Image",
   "level": 7,
   "school": "illusion",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 2640000,
@@ -16223,7 +17116,7 @@
    "somatic": true,
    "material": true,
    "materialText": "a statuette of yourself worth 5+ GP",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "1 day",
   "concentration": true,
@@ -16258,7 +17151,7 @@
   "name": "Protection from Energy",
   "level": 3,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -16308,7 +17201,7 @@
   "name": "Protection from Evil and Good",
   "level": 1,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -16325,7 +17218,7 @@
   "duration": "10 minutes",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -16358,7 +17251,7 @@
   "name": "Protection from Poison",
   "level": 2,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -16409,7 +17302,7 @@
   "name": "Purify Food and Drink",
   "level": 1,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 10,
@@ -16465,7 +17358,7 @@
   "name": "Raise Dead",
   "level": 5,
   "school": "necromancy",
-  "castingTime": "1hour",
+  "castingTime": "1 hour",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -16513,7 +17406,7 @@
   "name": "Ray of Enfeeblement",
   "level": 2,
   "school": "necromancy",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -16530,7 +17423,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": "1d8",
    "types": []
@@ -16564,7 +17457,7 @@
   "name": "Ray of Frost",
   "level": 0,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -16597,6 +17490,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 60
+   },
    "damage": [
     {
      "formula": "1d8",
@@ -16637,7 +17534,7 @@
   "name": "Ray of Sickness",
   "level": 1,
   "school": "necromancy",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -16670,6 +17567,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 60
+   },
    "damage": [
     {
      "formula": "2d8",
@@ -16740,7 +17641,7 @@
   "name": "Regenerate",
   "level": 7,
   "school": "transmutation",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -16791,7 +17692,7 @@
   "name": "Reincarnate",
   "level": 5,
   "school": "necromancy",
-  "castingTime": "1hour",
+  "castingTime": "1 hour",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -16837,7 +17738,7 @@
   "name": "Remove Curse",
   "level": 3,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -16886,7 +17787,7 @@
   "name": "Resilient Sphere",
   "level": 4,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -16936,7 +17837,7 @@
   "name": "Resistance",
   "level": 0,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -16983,7 +17884,7 @@
   "name": "Resurrection",
   "level": 7,
   "school": "necromancy",
-  "castingTime": "1hour",
+  "castingTime": "1 hour",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -17030,7 +17931,7 @@
   "name": "Reverse Gravity",
   "level": 7,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 100,
@@ -17082,7 +17983,7 @@
   "name": "Revivify",
   "level": 3,
   "school": "necromancy",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -17131,7 +18032,7 @@
   "name": "Rope Trick",
   "level": 2,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -17177,7 +18078,7 @@
   "name": "Sacred Flame",
   "level": 0,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -17204,7 +18105,8 @@
   "save": {
    "ability": "dex",
    "successDamage": "none",
-   "failureConditions": []
+   "failureConditions": [],
+   "ignoresCover": true
   },
   "target": {
    "type": "creature",
@@ -17220,6 +18122,9 @@
      "type": "radiant"
     }
    ],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -17253,7 +18158,7 @@
   "name": "Sanctuary",
   "level": 1,
   "school": "abjuration",
-  "castingTime": "bonus-action",
+  "castingTime": "Bonus Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -17270,7 +18175,7 @@
   "duration": "1 minute",
   "concentration": false,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": null,
    "types": []
@@ -17289,6 +18194,7 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
    "healing": null
   },
   "classes": [
@@ -17303,7 +18209,7 @@
   "name": "Scorching Ray",
   "level": 2,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -17336,6 +18242,10 @@
   "area": null,
   "effect": {
    "attacks": 3,
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 120
+   },
    "damage": [
     {
      "formula": "2d6",
@@ -17400,7 +18310,7 @@
   "name": "Scrying",
   "level": 5,
   "school": "divination",
-  "castingTime": "1minute",
+  "castingTime": "10 minutes",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -17412,7 +18322,7 @@
    "somatic": true,
    "material": true,
    "materialText": "a focus worth 1,000+ GP, such as a crystal ball, mirror, or water-filled font",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "10 minutes",
   "concentration": true,
@@ -17454,7 +18364,7 @@
   "name": "Searing Smite",
   "level": 1,
   "school": "evocation",
-  "castingTime": "bonus-action",
+  "castingTime": "Bonus Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -17497,6 +18407,7 @@
      "type": "fire"
     }
    ],
+   "noCastSave": true,
    "healing": null
   },
   "classes": [
@@ -17560,7 +18471,7 @@
   "name": "Secret Chest",
   "level": 4,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -17572,7 +18483,7 @@
    "somatic": true,
    "material": true,
    "materialText": "a chest, 3 feet by 2 feet by 2 feet, constructed from rare materials worth 5,000+ GP, and a Tiny replica of the chest made from the same materials worth 50+ GP",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "until dispelled",
   "concentration": false,
@@ -17606,7 +18517,7 @@
   "name": "See Invisibility",
   "level": 2,
   "school": "divination",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -17654,7 +18565,7 @@
   "name": "Seeming",
   "level": 5,
   "school": "illusion",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -17706,7 +18617,7 @@
   "name": "Sending",
   "level": 3,
   "school": "divination",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -17754,7 +18665,7 @@
   "name": "Sequester",
   "level": 7,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -17800,7 +18711,7 @@
   "name": "Shapechange",
   "level": 9,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -17812,7 +18723,7 @@
    "somatic": true,
    "material": true,
    "materialText": "a jade circlet worth 1,500+ GP",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "1 hour",
   "concentration": true,
@@ -17847,7 +18758,7 @@
   "name": "Shatter",
   "level": 2,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -17957,7 +18868,7 @@
   "name": "Shield",
   "level": 1,
   "school": "abjuration",
-  "castingTime": "reaction",
+  "castingTime": "Reaction",
   "reactionCondition": "which you take when you are hit by an attack roll or targeted by the Magic Missile spell",
   "range": {
    "distance": 0,
@@ -18010,7 +18921,7 @@
   "name": "Shield of Faith",
   "level": 1,
   "school": "abjuration",
-  "castingTime": "bonus-action",
+  "castingTime": "Bonus Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -18042,7 +18953,26 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Shield of Faith",
+    "tags": [
+     "shield-of-faith"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "rounds",
+     "rounds": 100
+    },
+    "armorClassBonus": 2
+   }
   },
   "classes": [
    "cleric",
@@ -18057,7 +18987,7 @@
   "name": "Shillelagh",
   "level": 0,
   "school": "transmutation",
-  "castingTime": "bonus-action",
+  "castingTime": "Bonus Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -18124,7 +19054,7 @@
   "name": "Shining Smite",
   "level": 2,
   "school": "transmutation",
-  "castingTime": "bonus-action",
+  "castingTime": "Bonus Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -18141,7 +19071,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": "2d6",
    "types": [
@@ -18220,7 +19150,7 @@
   "name": "Shocking Grasp",
   "level": 0,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -18253,6 +19183,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "melee",
+    "feet": 5
+   },
    "damage": [
     {
      "formula": "1d8",
@@ -18293,7 +19227,7 @@
   "name": "Silence",
   "level": 2,
   "school": "illusion",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -18351,7 +19285,7 @@
   "name": "Silent Image",
   "level": 1,
   "school": "illusion",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -18407,7 +19341,7 @@
   "name": "Simulacrum",
   "level": 7,
   "school": "illusion",
-  "castingTime": "1hour",
+  "castingTime": "12 hours",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -18453,7 +19387,7 @@
   "name": "Sleep",
   "level": 1,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -18519,7 +19453,7 @@
   "name": "Sleet Storm",
   "level": 3,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 150,
@@ -18553,10 +19487,30 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 20,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "A creature that enters the Cylinder for the first time on a turn or starts its turn there makes the save; a failure also breaks its Concentration.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "none",
+      "failureConditions": [
+       "prone"
+      ]
+     },
+     "damage": []
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -18573,7 +19527,7 @@
   "name": "Slow",
   "level": 3,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -18633,7 +19587,7 @@
   "name": "Sorcerous Burst",
   "level": 0,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -18664,7 +19618,25 @@
   "area": null,
   "effect": {
    "attacks": 1,
-   "damage": [],
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 120
+   },
+   "damage": [
+    {
+     "formula": "1d8",
+     "type": "acid"
+    }
+   ],
+   "damageTypes": [
+    "acid",
+    "cold",
+    "fire",
+    "lightning",
+    "poison",
+    "psychic",
+    "thunder"
+   ],
    "healing": null
   },
   "classes": [
@@ -18698,7 +19670,7 @@
   "name": "Spare the Dying",
   "level": 0,
   "school": "necromancy",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 15,
@@ -18764,7 +19736,7 @@
   "name": "Speak with Animals",
   "level": 1,
   "school": "divination",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -18813,7 +19785,7 @@
   "name": "Speak with Dead",
   "level": 3,
   "school": "necromancy",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 10,
@@ -18861,7 +19833,7 @@
   "name": "Speak with Plants",
   "level": 3,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -18913,7 +19885,7 @@
   "name": "Spider Climb",
   "level": 2,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -18945,6 +19917,10 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1,
+    "perSlot": 1
+   },
    "healing": null
   },
   "classes": [
@@ -19004,7 +19980,7 @@
   "name": "Spike Growth",
   "level": 2,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 150,
@@ -19061,7 +20037,7 @@
   "name": "Spirit Guardians",
   "level": 3,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -19104,6 +20080,29 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "damageTypes": [
+    "radiant",
+    "necrotic"
+   ],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "When the Emanation enters a creature's space, or a creature enters it or ends its turn there, it makes the save. A creature makes this save only once per turn.",
+     "save": {
+      "ability": "wis",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "3d8",
+       "type": "radiant"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -19155,7 +20154,7 @@
   "name": "Spiritual Weapon",
   "level": 2,
   "school": "evocation",
-  "castingTime": "bonus-action",
+  "castingTime": "Bonus Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -19172,7 +20171,7 @@
   "duration": "1 minute",
   "concentration": true,
   "ritual": false,
-  "attackRoll": false,
+  "attackRoll": true,
   "damage": {
    "roll": "1d8",
    "types": [
@@ -19187,8 +20186,36 @@
   "shape": null,
   "area": null,
   "effect": {
-   "attacks": 0,
-   "damage": [],
+   "attacks": 1,
+   "attackRange": {
+    "kind": "melee",
+    "feet": 65
+   },
+   "damage": [
+    {
+     "formula": "1d8",
+     "type": "force",
+     "addsModifier": true
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "attack",
+     "activation": "bonus-action",
+     "when": "On your later turns, a Bonus Action moves the force up to 20 feet and repeats the attack.",
+     "attackRange": {
+      "kind": "melee",
+      "feet": 65
+     },
+     "damage": [
+      {
+       "formula": "1d8",
+       "type": "force",
+       "addsModifier": true
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -19246,7 +20273,7 @@
   "name": "Starry Wisp",
   "level": 0,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -19279,6 +20306,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "ranged",
+    "feet": 60
+   },
    "damage": [
     {
      "formula": "1d8",
@@ -19319,7 +20350,7 @@
   "name": "Stinking Cloud",
   "level": 3,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 90,
@@ -19365,6 +20396,22 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "A creature that starts its turn in the Sphere makes the save; it is Poisoned until the end of that turn and can't take an action or a Bonus Action.",
+     "save": {
+      "ability": "con",
+      "successDamage": "none",
+      "failureConditions": [
+       "poisoned"
+      ]
+     },
+     "damage": []
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -19381,7 +20428,7 @@
   "name": "Stone Shape",
   "level": 4,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -19429,7 +20476,7 @@
   "name": "Stoneskin",
   "level": 4,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -19480,7 +20527,7 @@
   "name": "Storm of Vengeance",
   "level": 9,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 5280,
@@ -19519,7 +20566,12 @@
   "area": null,
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "2d6",
+     "type": "thunder"
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -19534,7 +20586,7 @@
   "name": "Suggestion",
   "level": 2,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -19572,6 +20624,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -19589,7 +20644,7 @@
   "name": "Summon Dragon",
   "level": 5,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -19601,7 +20656,7 @@
    "somatic": true,
    "material": true,
    "materialText": "an object with the image of a dragon engraved on it worth 500+ GP",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "1 hour",
   "concentration": true,
@@ -19660,7 +20715,7 @@
   "name": "Sunbeam",
   "level": 6,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -19729,7 +20784,7 @@
   "name": "Sunburst",
   "level": 8,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 150,
@@ -19804,7 +20859,7 @@
   "name": "Symbol",
   "level": 7,
   "school": "abjuration",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -19861,7 +20916,7 @@
   "name": "Telekinesis",
   "level": 5,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -19903,7 +20958,7 @@
    "sorcerer",
    "wizard"
   ],
-  "description": "You gain the ability to move or manipulate creatures or objects by thought. When you cast the spell and as a Magic action on your later turns before the spell ends, you can exert your will on one creature or object that you can see within range, causing the appropriate effect below. You can affect the same target round after round or choose a new one at any time. If you switch targets, the prior target is no longer affected by the spell.\n\n**_Creature._** You can try to move a Huge or smaller creature. The target must succeed on a Strength saving throw, or you move it up to 30 feet in any direction within the spell's range. Until the end of your next turn, the creature has the Restrained condition, and if you lift it into the air, it is suspended there. It falls at the end of your next turn unless you use this option on it again and it fails the save.\n\n**_Object._** You can try to move a Huge or smaller object. If the object isn't being worn or carried, you automatically move it up to 30 feet in any direction within the spell's range.\n\nIf the object is worn or carried by a creature, that creature must succeed on a Strength saving throw, or you pull the object away and move it up to 30 feet in any direction within the spell's range.\n\nYou can exert fine control on objects with your telekinetic grip, such as manipulating a simple tool,",
+  "description": "You gain the ability to move or manipulate creatures or objects by thought. When you cast the spell and as a Magic action on your later turns before the spell ends, you can exert your will on one creature or object that you can see within range, causing the appropriate effect below. You can affect the same target round after round or choose a new one at any time. If you switch targets, the prior target is no longer affected by the spell.\n\n**Creature.** You can try to move a Huge or smaller creature. The target must succeed on a Strength saving throw, or you move it up to 30 feet in any direction within the spell's range. Until the end of your next turn, the creature has the Restrained condition, and if you lift it into the air, it is suspended there. It falls at the end of your next turn unless you use this option on it again and it fails the save.\n\n**Object.** You can try to move a Huge or smaller object. If the object isn't being worn or carried, you automatically move it up to 30 feet in any direction within the spell's range. If the object is worn or carried by a creature, that creature must succeed on a Strength saving throw, or you pull the object away and move it up to 30 feet in any direction within the spell's range.\n\nYou can exert fine control on objects with your telekinetic grip, such as manipulating a simple tool, opening a door or a container, stowing or retrieving an item from an open container, or pouring the contents from a vial.",
   "higherLevel": null,
   "castingOptions": []
  },
@@ -19912,7 +20967,7 @@
   "name": "Telepathic Bond",
   "level": 5,
   "school": "divination",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -19959,7 +21014,7 @@
   "name": "Teleport",
   "level": 7,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 10,
@@ -19998,7 +21053,7 @@
    "sorcerer",
    "wizard"
   ],
-  "description": "This spell instantly transports you and up to eight willing creatures that you can see within range, or a single object that you can see within range, to a destination you select. If you target an object, it must be Large or smaller, and it can't be held or carried by an unwilling creature. The destination you choose must be known to you, and it must be on the same plane of existence as you. Your familiarity with the destination determines whether you arrive there successfully. The GM rolls 1d100 and consults the Teleportation Outcome table and the explanations after it.\n\n| Familiarity | Mishap | Similar Area | Off Target | On Target |\n|---|---|---|---|---|\n| Permanent circle | — | — | — | 01–00 |\n| Linked object | — | — | — | 01–00 |\n| Very familiar | 01–05 | 06–13 | 14–24 | 25–00 |\n| Seen casually | 01–33 | 34–43 | 44–53 | 54–00 |\n| Viewed once or described | 01–43 | 44–53 | 54–73 | 74–00 |\n| False destination | 01–50 | 51–00 | — | — |\n\n- \"Permanent circle\" means a permanent teleportation circle whose sigil sequence you know.\n- \"Linked object\" means you possess an object taken from the desired destination within the last six months, such as a book from a wizard's library.\n- \"Very familiar\" is a place you have visited often, a place you have carefully studied, or a place you can see when you cast the spell.\n- \"Seen casually\" is a place you have seen more than once but with which you aren't very familiar.\n- \"Viewed once or described\" is a place you have seen once, possibly using magic, or a place you know through someone else's description, perhaps from a map.\n- \"False destination\" is a place that doesn't exist. Perhaps you tried to scry an enemy's sanctum but instead viewed an illusion, or you are attempting to teleport to a location that no longer exists.\n\n**Mishap.** The spell's unpredictable magic results in a difficult journey. Each teleporting creature (or the target object) takes 3d10 Force damage, and the GM rerolls on the table to see where you wind up (multiple mishaps can occur, dealing damage each time).\n\n**Similar Area.** You and your group (or the target object) appear in a different area that's visually or thematically similar to the target area. You appear in the closest similar place. If you are heading for your home laboratory, for example, you might appear in another person's laboratory in the same city.\n\n**Off Target.** You and your group (or the target object) appear 2d12 miles away from the destination in a random direction. Roll 1d8 for the direction: 1, east; 2, southeast; 3, south; 4, southwest; 5, west; 6, northwest; 7, north; or 8, northeast.\n\n**On Target.** You and your group (or the target object) appear where you intended.",
+  "description": "This spell instantly transports you and up to eight willing creatures that you can see within range, or a single object that you can see within range, to a destination you select. If you target an object, it must be Large or smaller, and it can't be held or carried by an unwilling creature.\n\nThe destination you choose must be known to you, and it must be on the same plane of existence as you. Your familiarity with the destination determines whether you arrive there successfully. The GM rolls 1d100 and consults the Teleportation Outcome table and the explanations after it.\n\n**Teleportation Outcome**\n\n| Familiarity | Mishap | Similar Area | Off Target | On Target |\n|---|---|---|---|---|\n| Permanent circle | — | — | — | 01–00 |\n| Linked object | — | — | — | 01–00 |\n| Very familiar | 01–05 | 06–13 | 14–24 | 25–00 |\n| Seen casually | 01–33 | 34–43 | 44–53 | 54–00 |\n| Viewed once or described | 01–43 | 44–53 | 54–73 | 74–00 |\n| False destination | 01–50 | 51–00 | — | — |\n\n**Familiarity.** Here are the meanings of the terms in the table's Familiarity column:\n\n- \"Permanent circle\" means a permanent teleportation circle whose sigil sequence you know.\n- \"Linked object\" means you possess an object taken from the desired destination within the last six months, such as a book from a wizard's library.\n- \"Very familiar\" is a place you have visited often, a place you have carefully studied, or a place you can see when you cast the spell.\n- \"Seen casually\" is a place you have seen more than once but with which you aren't very familiar.\n- \"Viewed once or described\" is a place you have seen once, possibly using magic, or a place you know through someone else's description, perhaps from a map.\n- \"False destination\" is a place that doesn't exist. Perhaps you tried to scry an enemy's sanctum but instead viewed an illusion, or you are attempting to teleport to a location that no longer exists.\n\n**Mishap.** The spell's unpredictable magic results in a difficult journey. Each teleporting creature (or the target object) takes 3d10 Force damage, and the GM rerolls on the table to see where you wind up (multiple mishaps can occur, dealing damage each time).\n\n**Similar Area.** You and your group (or the target object) appear in a different area that's visually or thematically similar to the target area. You appear in the closest similar place. If you are heading for your home laboratory, for example, you might appear in another person's laboratory in the same city.\n\n**Off Target.** You and your group (or the target object) appear 2d12 miles away from the destination in a random direction. Roll 1d8 for the direction: 1, east; 2, southeast; 3, south; 4, southwest; 5, west; 6, northwest; 7, north; or 8, northeast.\n\n**On Target.** You and your group (or the target object) appear where you intended.",
   "higherLevel": null,
   "castingOptions": []
  },
@@ -20007,7 +21062,7 @@
   "name": "Teleportation Circle",
   "level": 5,
   "school": "conjuration",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 10,
@@ -20060,7 +21115,7 @@
   "name": "Thaumaturgy",
   "level": 0,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -20106,7 +21161,7 @@
   "name": "Thunderwave",
   "level": 1,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -20223,7 +21278,7 @@
   "name": "Time Stop",
   "level": 9,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -20270,7 +21325,7 @@
   "name": "Tiny Hut",
   "level": 3,
   "school": "evocation",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -20321,7 +21376,7 @@
   "name": "Tongues",
   "level": 3,
   "school": "divination",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -20371,7 +21426,7 @@
   "name": "Transport via Plants",
   "level": 6,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 10,
@@ -20417,7 +21472,7 @@
   "name": "Tree Stride",
   "level": 5,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -20464,7 +21519,7 @@
   "name": "True Polymorph",
   "level": 9,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -20516,7 +21571,7 @@
   "name": "True Resurrection",
   "level": 9,
   "school": "necromancy",
-  "castingTime": "1hour",
+  "castingTime": "1 hour",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -20563,7 +21618,7 @@
   "name": "True Seeing",
   "level": 6,
   "school": "divination",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -20613,7 +21668,7 @@
   "name": "True Strike",
   "level": 0,
   "school": "divination",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -20625,7 +21680,7 @@
    "somatic": true,
    "material": true,
    "materialText": "a weapon with which you have proficiency and that is worth 1+ CP",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "instantaneous",
   "concentration": false,
@@ -20683,7 +21738,7 @@
   "name": "Tsunami",
   "level": 8,
   "school": "conjuration",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 5280,
@@ -20720,7 +21775,12 @@
   "area": null,
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "6d10",
+     "type": "bludgeoning"
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -20735,7 +21795,7 @@
   "name": "Unseen Servant",
   "level": 1,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -20783,7 +21843,7 @@
   "name": "Vampiric Touch",
   "level": 3,
   "school": "necromancy",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -20816,6 +21876,10 @@
   "area": null,
   "effect": {
    "attacks": 1,
+   "attackRange": {
+    "kind": "melee",
+    "feet": 5
+   },
    "damage": [
     {
      "formula": "3d6",
@@ -20875,7 +21939,7 @@
   "name": "Vicious Mockery",
   "level": 0,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -20892,7 +21956,7 @@
   "duration": "instantaneous",
   "concentration": false,
   "ritual": false,
-  "attackRoll": true,
+  "attackRoll": false,
   "damage": {
    "roll": "1d6",
    "types": [
@@ -20918,6 +21982,9 @@
      "type": "psychic"
     }
    ],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -20951,7 +22018,7 @@
   "name": "Vitriolic Sphere",
   "level": 4,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 150,
@@ -21048,7 +22115,7 @@
   "name": "Wall of Fire",
   "level": 4,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -21085,7 +22152,25 @@
   "area": null,
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "5d8",
+     "type": "fire"
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "burn",
+     "activation": "other",
+     "when": "A creature that ends its turn within 10 feet of the burning side or inside the wall, or enters the wall for the first time on a turn, takes the damage.",
+     "damage": [
+      {
+       "formula": "5d8",
+       "type": "fire"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -21133,7 +22218,7 @@
   "name": "Wall of Force",
   "level": 5,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -21179,7 +22264,7 @@
   "name": "Wall of Ice",
   "level": 6,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -21215,10 +22300,19 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 10,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "10d6",
+     "type": "cold"
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -21229,19 +22323,19 @@
   "castingOptions": [
    {
     "type": "slot_level_7",
-    "damageRoll": "11d6",
-    "targetCount": null,
-    "description": null
-   },
-   {
-    "type": "slot_level_8",
     "damageRoll": "12d6",
     "targetCount": null,
     "description": null
    },
    {
+    "type": "slot_level_8",
+    "damageRoll": "14d6",
+    "targetCount": null,
+    "description": null
+   },
+   {
     "type": "slot_level_9",
-    "damageRoll": "13d6",
+    "damageRoll": "16d6",
     "targetCount": null,
     "description": null
    }
@@ -21252,7 +22346,7 @@
   "name": "Wall of Stone",
   "level": 5,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -21306,7 +22400,7 @@
   "name": "Wall of Thorns",
   "level": 6,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -21344,7 +22438,30 @@
   "area": null,
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "7d8",
+     "type": "piercing"
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "A creature that enters a space in the wall for the first time on a turn or ends its turn there makes the save. A creature makes this save only once per turn.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "7d8",
+       "type": "slashing"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -21378,7 +22495,7 @@
   "name": "Warding Bond",
   "level": 2,
   "school": "abjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -21390,7 +22507,7 @@
    "somatic": true,
    "material": true,
    "materialText": "a pair of platinum rings worth 50+ GP each, which you and the target must wear for the duration",
-   "materialConsumed": true
+   "materialConsumed": false
   },
   "duration": "1 hour",
   "concentration": false,
@@ -21425,7 +22542,7 @@
   "name": "Water Breathing",
   "level": 3,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -21474,7 +22591,7 @@
   "name": "Water Walk",
   "level": 3,
   "school": "transmutation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -21523,7 +22640,7 @@
   "name": "Web",
   "level": 2,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,
@@ -21571,6 +22688,22 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "The first time a creature enters the webs on a turn or starts its turn there, it makes the save; Restrained, it can try a Strength (Athletics) check against your spell save DC as an action.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "none",
+      "failureConditions": [
+       "restrained"
+      ]
+     },
+     "damage": []
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -21586,7 +22719,7 @@
   "name": "Weird",
   "level": 9,
   "school": "illusion",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -21655,7 +22788,7 @@
   "name": "Wind Walk",
   "level": 6,
   "school": "transmutation",
-  "castingTime": "1minute",
+  "castingTime": "1 minute",
   "reactionCondition": null,
   "range": {
    "distance": 30,
@@ -21703,7 +22836,7 @@
   "name": "Wind Wall",
   "level": 3,
   "school": "evocation",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 120,
@@ -21740,7 +22873,12 @@
   "area": null,
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "4d8",
+     "type": "bludgeoning"
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -21756,7 +22894,7 @@
   "name": "Wish",
   "level": 9,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 0,
@@ -21805,7 +22943,7 @@
   "name": "Word of Recall",
   "level": 6,
   "school": "conjuration",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 5,
@@ -21851,7 +22989,7 @@
   "name": "Zone of Truth",
   "level": 2,
   "school": "enchantment",
-  "castingTime": "action",
+  "castingTime": "Action",
   "reactionCondition": null,
   "range": {
    "distance": 60,

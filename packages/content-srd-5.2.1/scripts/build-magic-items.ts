@@ -178,10 +178,14 @@ function rarityId(printed: string): string {
  */
 const WORN_BY_NOUN: ReadonlyArray<readonly [string, string]> = [
   ["neck", "amulets?|necklaces?|periapts?|medallions?|scarabs?|talismans?|brooches|brooch"],
-  ["shoulders", "cloaks?|capes?|mantles?|robes?"],
-  ["head", "helms?|helmets?|hats?|circlets?|headbands?|masks?|goggles|lenses"],
+  ["shoulders", "cloaks?|capes?|mantles?"],
+  // A robe is worn under a cloak, and lenses under a helm: the SRD's one-of-each list names neither.
+  ["body", "robes?"],
+  ["eyes", "goggles|lenses"],
+  ["head", "helms?|helmets?|hats?|circlets?|headbands?|masks?"],
   ["feet", "boots|slippers"],
-  ["hands", "gloves|gauntlets|bracers"],
+  ["hands", "gloves|gauntlets"],
+  ["bracers", "bracers"],
   ["belt", "belts?|girdles?"]
 ];
 
@@ -195,7 +199,7 @@ const HELD_NOT_WORN = (body: string): boolean =>
 function wondrousSlot(entry: Entry): string {
   // Pass 1: the name names the body location. `Eyes of ...` names the body part itself.
   const byName = /^eyes of\b/i.test(entry.name)
-    ? "head"
+    ? "eyes"
     : WORN_BY_NOUN.find(([, nouns]) => new RegExp(`\\b(${nouns})\\b`, "i").test(entry.name))?.[0];
   if (byName) {
     // Pass 3: demote. `Hat of Many Spells` reads "While holding the hat" and is never worn; at `head` the
@@ -277,7 +281,7 @@ const LADDER_RARITIES = /^(.+?)\s*\(\+1\),\s*(.+?)\s*\(\+2\),\s*or\s*(.+?)\s*\(\
  * Matches `InventoryItemSchema.description`, which add-from-catalog copies this string onto. Overflow
  * is cut at the last sentence boundary and marked; the bundle test names every row that is cut.
  */
-const DESCRIPTION_LIMIT = 4000;
+const DESCRIPTION_LIMIT = 12000;
 const TRUNCATION_MARK = " […]";
 
 function renderDescription(entry: Entry, printedTypeLine: string): { text: string; truncated: boolean } {

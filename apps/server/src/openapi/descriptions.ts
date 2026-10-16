@@ -188,7 +188,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     category:
       'Open slug, never a closed enum - "relic", "vehicle", "trinket" need no schema change. Display and grouping; `slot` is what the engine switches on',
     description:
-      "Raised from 2000 to 4000 on 2026-08-11 to match both `EquipmentReferenceSchema` and `InventoryItemSchema.description`, the row this string is copied onto by add-from-catalog. Widening a maxLength accepts everything the old bound did, so no caller that validated before stops validating",
+      "Matches both `EquipmentReferenceSchema` and `InventoryItemSchema.description`, the row this string is copied onto by add-from-catalog. Long enough for the longest SRD item with its tables (Mysterious Deck, Wand of Wonder)",
     weapon: "Populated for weapons only",
     armor: "Populated for armor and shields only",
     slot: "WHERE it is worn or held - the mechanical hook, and the one closed enum here. Absent = fall back to `category` for the three the engine already knows (weapon, armor, shield)",
@@ -200,6 +200,16 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     cursed:
       "A cursed item cannot be voluntarily removed once attuned, and its magic half is withheld from the player until attunement. It MUST require attunement - a curse you can drop by taking the hat off is not a curse, and requiring attunement gives the hiding rule one well-defined boundary: hidden until attuned, fully visible after, because by then the player has learned it and hiding further would only make their own sheet lie to them",
     casts: "Spells the item can cast (Amulet of Message, Wand of Fireballs)",
+    charges:
+      "How a charged item's charges come back. `regain` is the dice a long rest rolls (absent: every charge returns); `lastChargeRoll` rolls a d20 when the last charge is spent and tells the GM, since a 1 does what the item's text says. The charges themselves are the `uses` on its casts and actions, counted per carried copy",
+    removesArmorDrawbacks:
+      "Mithral: the armor this template is bound to keeps neither its Stealth Disadvantage nor its Strength requirement, on the bound row and in the derivation",
+    consumedOnUse:
+      "Each use of one of its actions takes one from the carried stack (a potion drunk, a flask thrown), on the fight's resolve and on the loose route alike, and its actions work from the pack without equipping it",
+    ammunition:
+      'This row is ammunition sold in bundles: each one of its quantity is `count` pieces of `kind` ("Arrows (20)" is 20 arrows). A shot from a weapon that fires that kind spends a piece, and half the pieces fired come back when the encounter ends. Absent on magic ammunition, counted one piece per quantity',
+    damageTypeChoice:
+      '"The GM chooses the type" (Ring of Resistance, Dragon Scale Mail): the types the GM may pick for the ONE resistance in `grants.damageResistances`, which is the printed default until the GM picks. The pick is stored per carried copy as the row\'s `chosenDamageType`, which only the GM can set',
     grantsFeatIds:
       "Feats the item grants while active. Depth 1, no transitive expansion, and the grant edge is one-directional - nothing ever grants an item back - so a cycle cannot be drawn rather than merely being checked for",
     tags: "Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity)",
@@ -296,10 +306,14 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   },
   EquipmentWeapon: {
     longRangeFeet: "Attacks past `rangeFeet` up to this roll at disadvantage",
+    melee:
+      "The SRD Weapons table's band: true for a melee weapon (a thrown Dagger), false for a ranged one (a Dart). Only a melee weapon gets a melee reach. Absent reads the band from the range and the Thrown property",
+    versatileDice:
+      'A Versatile weapon\'s damage die with two hands ("1d10" for a Longsword). The sheet offers the two-handed attack while no Shield is equipped',
     mastery:
       "The SRD weapon-mastery property, if this weapon has one. Optional: a homebrew weapon may have none, and a mastery does nothing until a character unlocks THIS weapon through Weapon Mastery.",
     properties:
-      "The weapon's property slugs. The engine reads three of them off the character's inventory row: `finesse` makes the swing take the better of Strength and Dexterity, `thrown` keeps a ranged weapon on a melee reach, and `reach` makes it 10 feet instead of 5; the rest narrow a `weapon-property-is` rider. Open slugs, unlike `mastery`, so a homebrew property is expressible - but only the nine SRD ones have readers, and an unknown slug is inert rather than an error. Omit to record nothing; an empty array says the weapon has none."
+      "The weapon's property slugs. The engine reads three of them off the character's inventory row: `finesse` makes the swing take the better of Strength and Dexterity, `thrown` lets a melee weapon be thrown at range, and `reach` makes its reach 10 feet instead of 5; the rest narrow a `weapon-property-is` rider. Open slugs, unlike `mastery`, so a homebrew property is expressible - but only the nine SRD ones have readers, and an unknown slug is inert rather than an error. Omit to record nothing; an empty array says the weapon has none."
   },
   EquipmentArmor: {
     "": "Body armor carries its full base AC (11-18); a shield carries its +2 bonus."
@@ -512,7 +526,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     when: 'The condition the TEN LIST FIELDS above apply under - every one except `spells`, which cannot be gated: a granted spell is baked into the sheet\'s spell list, its prepared count and its cantrip action when the character is BUILT, so nothing would re-read the gate. A block carrying both `when` and `spells` is refused, naming the spells that would have been lost. Omitted = unconditional, which is what every record written before this field meant. Only the two trigger kinds a derivation can answer are allowed - static gates (attuned, while-armored, while-unarmored, while-shield, while-character-is, while-proficient-with) and dynamic gates (while-effect-tag, while-hp-at-or-below, while-condition). A moment or a filter is refused: a grant is collected before any roll starts, so a gate it cannot evaluate would silently mean "always"'
   },
   Modifier: {
-    "": "THE rider vocabulary: what a feature, a feat, a chosen option, a magic ITEM and a live EFFECT contribute to the rules engine, one union for every carrier and read by one evaluator against one context, so a bonus means the same thing wherever it is authored. Bounded and grown additively; anything not modeled stays prose (ADR-0008). Every amount is a SIGNED integer, so a curse is this vocabulary with a negative number rather than a second one, and every branch carries the `when`/`scope` gate. Carriers refuse what they cannot honour: an ITEM refuses `hit-points-per-level` and `ability-score` (both bake into the sheet and cannot be un-granted when the item comes off), and an EFFECT refuses every number stored on the sheet or the actor (`ability-score`, `hit-points-per-level`, `armor-class`, `initiative`, `unarmored-defense`, `darkvision`, `sense`, `spell-slot`), which an effect that ends could never give back."
+    "": "THE rider vocabulary: what a feature, a feat, a chosen option, a magic ITEM and a live EFFECT contribute to the rules engine, one union for every carrier and read by one evaluator against one context, so a bonus means the same thing wherever it is authored. Bounded and grown additively; anything not modeled stays prose (ADR-0008). Every amount is a SIGNED integer, so a curse is this vocabulary with a negative number rather than a second one, and every branch carries the `when`/`scope` gate. Carriers refuse what they cannot honour: an ITEM refuses `hit-points-per-level`, `ability-score` (both bake into the sheet and cannot be un-granted when the item comes off) and `attunement-slots` (it would decide its own attunement), and an EFFECT refuses every number stored on the sheet or the actor (`attunement-slots`, `ability-score`, `hit-points-per-level`, `armor-class`, `initiative`, `unarmored-defense`, `darkvision`, `sense`, `spell-slot`), which an effect that ends could never give back."
   },
   ModifierAbilityScore: {
     "": "Raise (or lower) one ability score, optionally past the usual cap. REFUSED on an item: an ability score cascades into AC, saves, skills, spell DC, hit points and initiative, and every one of those reads the baked `abilityScores`, so layering one score means layering the whole sheet.",
@@ -533,7 +547,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       'What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer"'
   },
   ModifierArmorClass: {
-    "": 'A flat AC rider. `whileArmored` is the ONE bounded condition the SRD\'s printed bonuses need (the Defense fighting style reads "While you\'re wearing Light, Medium, or Heavy armor"); it is a boolean, not a condition language, and defaults to the unconditional bonus every earlier record meant. `when: [{"type": "while-armored"}]` now says the same thing in the general vocabulary - the boolean STAYS because shipped bundles author it, and a collector normalises it into that trigger.',
+    "": 'A flat AC rider, read live from every carrier (a feature or feat as much as an item), so it follows the armor worn now. `whileArmored` is the ONE bounded condition the SRD\'s printed bonuses need (the Defense fighting style reads "While you\'re wearing Light, Medium, or Heavy armor"); it is a boolean, not a condition language, and defaults to the unconditional bonus every earlier record meant. `when: [{"type": "while-armored"}]` now says the same thing in the general vocabulary - the boolean STAYS because shipped bundles author it, and a collector normalises it into that trigger.',
     when: "AND-list of at most four triggers gating this rider, with at most ONE moment. Absent or empty = always. A filter with no moment is rejected: it has nothing to narrow",
     scope:
       'What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer"'
@@ -596,6 +610,12 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   },
   ModifierSpellSlot: {
     "": "An extra spell slot of one level, layered over the single-sourced slot maxima so the seed, the long rest and the spend-clamp cannot disagree.",
+    when: "AND-list of at most four triggers gating this rider, with at most ONE moment. Absent or empty = always. A filter with no moment is rejected: it has nothing to narrow",
+    scope:
+      'What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer"'
+  },
+  ModifierAttunementSlots: {
+    "": "More magic items attuned at once than the SRD's three (the Thief's Use Magic Device: one more, for four). Read when a player attunes an item. REFUSED on an item, whose own attunement it would decide, and on an effect, which could end with too many items attuned.",
     when: "AND-list of at most four triggers gating this rider, with at most ONE moment. Absent or empty = always. A filter with no moment is rejected: it has nothing to narrow",
     scope:
       'What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer"'
@@ -1348,6 +1368,10 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "equipment[].weapon.properties":
       "The SRD weapon table's Properties column (finesse, light, thrown, versatile, reach, heavy, two-handed, loading, ammunition). Unlike `mastery` these ARE copied onto an inventory row and the engine reads them there - finesse decides whether the swing uses Dexterity, reach decides 10 feet versus 5. An empty array means the weapon genuinely has none.",
     "equipment[].armor": "Populated for armor and shields only",
+    "equipment[].weapon.ammunition":
+      "What an Ammunition weapon fires (the Weapons table's \"Ammunition (Range 150/600; Arrow)\"); a Sling's bullets and a firearm's are different items",
+    "equipment[].damageTypeChoice":
+      "The damage types the GM may pick for the item's resistance, as the SRD prints them (absent when the item has no such choice)",
     "equipment[].appliesTo":
       'The eligibility column for a TEMPLATE magic item - the printed type-line qualifier ("Any Simple or Martial") plus the base ids it RESOLVED to at build/authoring time. Null everywhere except weapon/armor templates. A template row derives nothing until the player\'s pick binds it to one of `baseIds`, validated and copied server-side at set-inventory.'
   },
@@ -1498,6 +1522,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "derived.defences.vulnerabilities[].source": DEFENCE_SOURCE,
     "derived.spellSaveDcBonus":
       "What standing spell-save-dc riders (an item, a feat) add to the bearer's spell save DC, and so to every action that uses it. A printed DC is not raised.",
+    "derived.attunementSlots": "How many items the character can attune to at once: 3, or 4 with Use Magic Device",
     "actions[].available": "Whether strict mode would allow resolving this action right now",
     "actions[].violations[].rule":
       "Machine-readable rule id, e.g. economy.action-used, feature.requires-effect, condition.incapacitated",

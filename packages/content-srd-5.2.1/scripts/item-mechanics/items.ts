@@ -5,7 +5,22 @@
  * A rider is authored only where a consumer reads it and produces the printed effect. Where an item
  * stays prose for a reason worth keeping, a comment in its section says why.
  */
+import type { DamageType } from "@vtt/schemas";
 import type { ItemMechanicsModule } from "./overlay.js";
+
+/** The d10 table Armor of Resistance and Ring of Resistance roll on for their type. */
+const RESISTANCE_TABLE = [
+  "acid",
+  "cold",
+  "fire",
+  "force",
+  "lightning",
+  "necrotic",
+  "poison",
+  "psychic",
+  "radiant",
+  "thunder"
+] satisfies DamageType[];
 
 export const ITEM_MECHANICS: ItemMechanicsModule = {
   // ==== Weapons, armor, shields and ammunition ====================================================
@@ -65,16 +80,26 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // Not modeled: Advantage on saves against dragon breath (no trigger names a save's source) and the dragon sense.
+  // The dragon's kind sets the type; fire (a red dragon) until the GM picks.
   "dragon-scale-mail": {
     grants: { damageResistances: ["fire"] },
+    damageTypeChoice: ["acid", "cold", "fire", "lightning", "poison"],
     modifiers: [{ type: "armor-class", amount: 1 }]
   },
 
-  // "The GM chooses the type": lightning, the d10 table's row 5.
-  "armor-of-resistance": { grants: { damageResistances: ["lightning"] } },
+  // "If the armor normally imposes Disadvantage on Dexterity (Stealth) checks or has a Strength requirement, the
+  // mithral version of the armor doesn't."
+  "mithral-armor": { removesArmorDrawbacks: true },
+
+  // "The GM chooses the type or determines it randomly": lightning (the d10 table's row 5) until the GM picks.
+  "armor-of-resistance": { grants: { damageResistances: ["lightning"] }, damageTypeChoice: RESISTANCE_TABLE },
 
   // Metal Shell (timed immunity, once per dawn) is not authored: a standing immunity grant would be permanent.
   "armor-of-invulnerability": { grants: { damageResistances: ["bludgeoning", "piercing", "slashing"] } },
+
+  // The curse alone: attuning locks the armor on (SRD: attunement to a cursed item can't be ended voluntarily).
+  // The resistance and the two vulnerabilities depend on a type the GM picks per copy, so they stay prose.
+  "armor-of-vulnerability": { cursed: true },
 
   // Kept as the curse alone: the SRD item is a trap, and the attunement lock is what springs it. The GM
   // applies the rest from the description, since neither half is expressible: resistance to ranged-weapon
@@ -106,16 +131,21 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // ---- Ammunition ------------------------------------------------------------------------------
 
   /**
-   * Ammunition has no weapon block, so `attack-bonus` is bearer-scoped; the `when` pair limits it to
-   * ranged attacks so melee swings are unaffected. It applies to all of the bearer's ranged attacks,
-   * not only those using this ammunition. The damage half is not authored.
+   * Ammunition has no weapon block, so its riders are bearer-scoped; `weapon-property-is: ammunition`
+   * limits them to shots from a launcher, so a thrown dagger or a spell gets nothing. Not modeled: which
+   * launcher fires which kind of ammunition, and the piece losing its magic once it hits.
    */
   "ammunition-1": {
     modifiers: [
       {
         type: "attack-bonus",
         amount: 1,
-        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["ranged"] }]
+        when: [{ type: "on-attack-roll" }, { type: "weapon-property-is", properties: ["ammunition"] }]
+      },
+      {
+        type: "damage-bonus",
+        amount: 1,
+        when: [{ type: "on-damage-roll" }, { type: "weapon-property-is", properties: ["ammunition"] }]
       }
     ]
   },
@@ -124,7 +154,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       {
         type: "attack-bonus",
         amount: 2,
-        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["ranged"] }]
+        when: [{ type: "on-attack-roll" }, { type: "weapon-property-is", properties: ["ammunition"] }]
+      },
+      {
+        type: "damage-bonus",
+        amount: 2,
+        when: [{ type: "on-damage-roll" }, { type: "weapon-property-is", properties: ["ammunition"] }]
       }
     ]
   },
@@ -133,7 +168,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       {
         type: "attack-bonus",
         amount: 3,
-        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["ranged"] }]
+        when: [{ type: "on-attack-roll" }, { type: "weapon-property-is", properties: ["ammunition"] }]
+      },
+      {
+        type: "damage-bonus",
+        amount: 3,
+        when: [{ type: "on-damage-roll" }, { type: "weapon-property-is", properties: ["ammunition"] }]
       }
     ]
   },
@@ -163,6 +203,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
    * "Beast with a Swim Speed" target restriction stays prose.
    */
   "trident-of-fish-command": {
+    charges: { regain: "1d3" },
     casts: [{ spellId: "dominate-beast", saveDc: 15, uses: { limit: 3, per: "long-rest" } }]
   },
 
@@ -285,8 +326,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // Not modeled: +1 HP per level (`hit-points-per-level` is refused on items) and the curse.
+  // The curse's attunement lock is authored (SRD: attunement to a cursed item can't be ended voluntarily). Not
+  // modeled: +1 HP per level (`hit-points-per-level` is refused on items) and the curse's berserk save.
   "berserker-axe": {
+    cursed: true,
     modifiers: [
       { type: "attack-bonus", amount: 1 },
       { type: "damage-bonus", amount: 1 }
@@ -318,14 +361,13 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //   `ammunition-of-slaying` - entirely gated on creature type.
   //   `oathbow` - everything is gated on a player-declared sworn enemy.
   //   `sword-of-life-stealing`, `sword-of-sharpness` - crit damage of 15 and 14 exceeds the range.
-  //   `armor-of-vulnerability` - no `grants.damageVulnerabilities`; authoring only the resistance
-  //       would make the cursed item strictly better than plain armor.
 
   // ==== Wands, staffs, rods, rings and the spell scroll ===========================================
   //
   // Recurring limits:
   //   - One use spends exactly one charge, so only one-charge properties are authored.
-  //   - "Regains 1d6 + 1 expended charges daily at dawn" becomes a full recharge on a long rest.
+  //   - "Regains 1d6 + 1 expended charges daily at dawn" is `charges.regain`, rolled on a long rest, and "if you
+  //     expend the last charge, roll 1d20" is `charges.lastChargeRoll`. Charges count per carried copy.
   //   - Use pools are capped at 20.
   //   - Staffs and rods have no weapon block, so "+N to attack and damage rolls made with it" would be
   //     bearer-scoped (every weapon) or inert; it is not authored.
@@ -345,6 +387,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
    * carries no `saveDc`. "Fear (affects Beasts only)" stays prose.
    */
   "ring-of-animal-influence": {
+    charges: { regain: "1d3" },
     casts: [
       {
         spellId: "animal-friendship",
@@ -362,6 +405,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Auto-succeeding a save is not expressible; the reaction and its 3-charge pool are, and the GM rules the success.
   "ring-of-evasion": {
+    charges: { regain: "1d3" },
     actions: [
       {
         id: "evade",
@@ -396,7 +440,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `ring-of-regeneration` - no out-of-combat healing timer.
 
   // "The GM chooses the type": fire (the d10's Garnet row). Copy the item to choose another.
-  "ring-of-resistance": { grants: { damageResistances: ["fire"] } },
+  // As Armor of Resistance: fire until the GM picks from the same d10 table.
+  "ring-of-resistance": { grants: { damageResistances: ["fire"] }, damageTypeChoice: RESISTANCE_TABLE },
 
   /**
    * The two cantrips are at will; Shooting Stars is the ring's own effect, at its one-charge size.
@@ -404,6 +449,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
    * 2-3 charge Shooting Stars (multi-charge).
    */
   "ring-of-shooting-stars": {
+    charges: { regain: "1d6" },
     casts: [{ spellId: "dancing-lights" }, { spellId: "light" }],
     actions: [
       {
@@ -505,6 +551,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // All three one-charge casts on one pool. No `saveDc`: the cast uses the wielder's own DC, as
   // printed. Reflect and Resist Enchantment (save outcomes) are not expressible.
   "staff-of-charming": {
+    charges: { regain: "1d8 + 2", lastChargeRoll: true },
     casts: [
       { spellId: "charm-person", uses: { limit: 10, per: "long-rest", pool: "staff-of-charming-charges" } },
       { spellId: "command", uses: { limit: 10, per: "long-rest", pool: "staff-of-charming-charges" } },
@@ -514,12 +561,14 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Fireball (3) and Wall of Fire (4) are multi-charge.
   "staff-of-fire": {
+    charges: { regain: "1d6 + 4", lastChargeRoll: true },
     grants: { damageResistances: ["fire"] },
     casts: [{ spellId: "burning-hands", uses: { limit: 10, per: "long-rest", pool: "staff-of-fire-charges" } }]
   },
 
   // Wall of Ice, Ice Storm and Cone of Cold are multi-charge.
   "staff-of-frost": {
+    charges: { regain: "1d6 + 4", lastChargeRoll: true },
     grants: { damageResistances: ["cold"] },
     casts: [{ spellId: "fog-cloud", uses: { limit: 10, per: "long-rest", pool: "staff-of-frost-charges" } }]
   },
@@ -543,6 +592,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Insect Cloud's counter; the Heavily Obscured area is a GM ruling. Giant Insect and Insect Plague are multi-charge.
   "staff-of-swarming-insects": {
+    charges: { regain: "1d6 + 4", lastChargeRoll: true },
     actions: [
       {
         id: "insect-cloud",
@@ -570,6 +620,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // The three one-charge properties on the 6-charge pool. Not authored: the spell attack bonus, the
   // +2 Quarterstaff, the multi-charge spells.
   "staff-of-the-woodlands": {
+    charges: { regain: "1d6", lastChargeRoll: true },
     casts: [
       { spellId: "animal-friendship", uses: { limit: 6, per: "long-rest", pool: "staff-of-the-woodlands-charges" } },
       { spellId: "speak-with-animals", uses: { limit: 6, per: "long-rest", pool: "staff-of-the-woodlands-charges" } }
@@ -630,6 +681,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // The detection is GM information; the charge is real.
   "wand-of-enemy-detection": {
+    charges: { regain: "1d6 + 1", lastChargeRoll: true },
     actions: [
       {
         id: "detect-enemies",
@@ -644,6 +696,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Command at the wand's printed DC. Fear (3 charges) is multi-charge.
   "wand-of-fear": {
+    charges: { regain: "1d6 + 1", lastChargeRoll: true },
     casts: [{ spellId: "command", saveDc: 15, uses: { limit: 7, per: "long-rest", pool: "wand-of-fear-charges" } }]
   },
 
@@ -652,6 +705,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
    * level. The 2-3 charge upcasts are multi-charge.
    */
   "wand-of-fireballs": {
+    charges: { regain: "1d6 + 1", lastChargeRoll: true },
     casts: [
       {
         spellId: "fireball",
@@ -663,6 +717,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   /** The Fireball wand's twin: Lightning Bolt (save DC 15), 1 charge, 7 charges. Upcasts are multi-charge. */
   "wand-of-lightning-bolts": {
+    charges: { regain: "1d6 + 1", lastChargeRoll: true },
     casts: [
       {
         spellId: "lightning-bolt",
@@ -674,6 +729,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   /** "This wand has 3 charges. While holding it, you can expend 1 charge to cast Detect Magic from it." Complete. */
   "wand-of-magic-detection": {
+    charges: { regain: "1d3" },
     casts: [{ spellId: "detect-magic", uses: { limit: 3, per: "long-rest", pool: "wand-of-magic-detection-charges" } }]
   },
 
@@ -681,6 +737,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // The wand's own effect.
   "wand-of-paralysis": {
+    charges: { regain: "1d6 + 1", lastChargeRoll: true },
     actions: [
       {
         id: "paralyzing-ray",
@@ -703,12 +760,14 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   /** "expend 1 charge to cast Polymorph (save DC 15) from it." One charge, one spell, printed DC. Complete. */
   "wand-of-polymorph": {
+    charges: { regain: "1d6 + 1", lastChargeRoll: true },
     casts: [
       { spellId: "polymorph", saveDc: 15, uses: { limit: 7, per: "long-rest", pool: "wand-of-polymorph-charges" } }
     ]
   },
 
   "wand-of-secrets": {
+    charges: { regain: "1d3" },
     actions: [
       {
         id: "find-secrets",
@@ -728,6 +787,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // The d100 effect table is GM-rolled; the charge is real.
   "wand-of-wonder": {
+    charges: { regain: "1d6 + 1", lastChargeRoll: true },
     actions: [
       {
         id: "wild-surge",
@@ -797,6 +857,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Charge-alone: 4 charges exact; the Fly Speed is GM-adjudicated.
   "winged-boots": {
+    charges: { regain: "1d4" },
     actions: [
       {
         id: "fly",
@@ -890,6 +951,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   "brooch-of-shielding": { grants: { damageResistances: ["force"] } },
 
   "medallion-of-thoughts": {
+    charges: { regain: "1d4" },
     casts: [
       {
         spellId: "detect-thoughts",
@@ -946,6 +1008,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Charge-alone: 3 charges exact; the GM applies the Invisible condition.
   "cloak-of-invisibility": {
+    charges: { regain: "1d3" },
     actions: [
       {
         id: "vanish",
@@ -990,6 +1053,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
    * for the duration, and the stun ending with the effect (the GM clears it).
    */
   "robe-of-scintillating-colors": {
+    charges: { regain: "1d3" },
     actions: [
       {
         id: "dazzle",
@@ -1024,13 +1088,13 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //     is no healing or temporary-HP rider.
   //   - One use spends one charge, and pools are capped at 20.
   //   - `ability-score` is refused on items.
-  //   - Item actions only resolve inside an encounter. Outside one, `iron-bands` (the only one with an
-  //     attack) can still be rolled through the loose route, which spends no charge.
+  //   - Item actions only resolve inside an encounter. Outside one, the loose route rolls them and spends the
+  //     charge, as `action.use` says.
   //
   // A charged item may be authored for its charge alone (count and recharge exact) when the GM can
   // already produce what the charge buys: the elemental summons, `bag-of-tricks`, `gem-of-seeing`,
   // `pipes-of-the-sewers`, `cubic-gate` and `iron-bands`. Not when the sheet would then be wrong
-  // (`pearl-of-power`). "Regains 1dN at dawn" becomes a full refill on a long rest.
+  // (`pearl-of-power`). "Regains 1dN at dawn" is `charges.regain`, rolled on a long rest.
   //
   // Trap items (`bag-of-devouring`, `potion-of-poison`, `dust-of-sneezing-and-choking`) are not
   // authored: a button naming the real effect would spoil the trap.
@@ -1141,6 +1205,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Gate and Plane Shift on one shared 3-charge pool. Which plane each side opens is the GM's.
   "cubic-gate": {
+    charges: { regain: "1d3" },
     casts: [
       { spellId: "gate", uses: { limit: 3, per: "long-rest", pool: "cubic-gate-charges" } },
       { spellId: "plane-shift", uses: { limit: 3, per: "long-rest", pool: "cubic-gate-charges" } }
@@ -1180,6 +1245,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Charge-alone. Not cast as True Seeing (that spell targets someone you touch); the Truesight is narrated.
   "gem-of-seeing": {
+    charges: { regain: "1d3" },
     actions: [
       {
         id: "peer",
@@ -1253,6 +1319,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
    * repeating the save at the end of each of its turns. Not modeled: the 24-hour immunity after a success.
    */
   "pipes-of-haunting": {
+    charges: { regain: "1d3" },
     actions: [
       {
         id: "play",
@@ -1279,6 +1346,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
    * made by the swarm, so it is not this action's `save`.
    */
   "pipes-of-the-sewers": {
+    charges: { regain: "1d3" },
     actions: [
       {
         id: "call",

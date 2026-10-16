@@ -303,7 +303,8 @@ describe("generated OpenAPI components", () => {
       "spell-id-is": { spellIds: ["eldritch-blast"] },
       "versus-creature-type": { creatureTypes: ["undead"] },
       "versus-size": { sizes: ["large", "huge"] },
-      "versus-condition": { conditionIds: ["prone"] }
+      "versus-condition": { conditionIds: ["prone"] },
+      "by-effect-source": {}
     };
 
     /** One payload per modifier. */
@@ -335,6 +336,7 @@ describe("generated OpenAPI components", () => {
       "spell-slot": { level: 3, amount: 1 },
       "resource-bonus": { poolId: "channel-divinity", amount: 1 },
       "short-rest-regain": { poolId: "rage", amount: 1 },
+      "attunement-slots": { amount: 1 },
       "critical-range": { threshold: 19 },
       "critical-bonus-dice": { count: 1 },
       "damage-reduction": {

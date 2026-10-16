@@ -9,7 +9,7 @@ import { deriveActorSheet } from "../src/actor-derived.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
 import { setCondition } from "../src/actor-conditions.js";
 import { answerSave, createPendingSaves, saveTotalFor } from "../src/saving-throws.js";
-import { startEncounter } from "../src/encounter.js";
+import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
 
 // Every field the homebrew editor offers must change play. One describe per field group; each test
 // proves the effect at the far end (a rolled number, an applied condition, halved damage), not merely
@@ -756,8 +756,11 @@ describe("row 6: an item that casts a spell, with its cast details", () => {
     );
     expect(state.actors[0].spellSlots).toEqual([{ level: 3, remaining: 0 }]);
 
-    // A fresh turn: the action slot is not under test here, the empty pool is.
-    state.combat = { ...state.combat, turn: { ...state.combat.turn, actionUsed: false, actionInstance: null } };
+    // A fresh turn: the action slot is not under test here, the empty pool is. Slots are policed only once the GM
+    // makes them strict (they advise by default).
+    nextInitiativeTurn(state);
+    nextInitiativeTurn(state);
+    state.combat = { ...state.combat, ruleExceptions: { slots: "strict" } };
 
     expect(() =>
       resolveDefinitionAction(

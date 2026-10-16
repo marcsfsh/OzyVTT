@@ -19,6 +19,7 @@ import {
   CharacterChoiceSchema,
   CharacterIdentitySchema,
   CurrencySchema,
+  DamageTypeSchema,
   EffectModifiersSchema,
   InventoryItemSchema,
   ProficienciesSchema
@@ -358,6 +359,8 @@ export const ActionResolveSchema = z
     /** The spell slot to cast with (upcasting rolls that slot's dice); absent, the spell's own level, else the lowest
      *  above it with a slot left. */
     slotLevel: z.number().int().min(1).max(9).optional(),
+    /** The damage type picked for an action that lets its caster choose (Chromatic Orb); absent, its first. */
+    damageType: DamageTypeSchema.optional(),
     /** Extras to add to this hit, from the preview's `hitOffers` (Sneak Attack, a smite and its slot, Divine Strike's
      *  type, a charge). Each is checked and spent with the hit; on a miss nothing is spent. */
     hitOptions: z.array(HitOptionChoiceSchema).max(6).optional(),
@@ -559,6 +562,8 @@ export const ActionUseSchema = z
     slotLevel: z.number().int().min(1).max(9).optional(),
     /** How much of its pool an action that lets its user choose spends; see `action.resolve`. */
     spend: z.number().int().min(1).max(100).optional(),
+    /** The damage type picked; see `action.resolve`. */
+    damageType: DamageTypeSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -837,6 +842,8 @@ export const CharacterSetSlotSchema = z
     actorId: z.uuid(),
     level: z.number().int().min(1).max(9),
     remaining: z.number().int().min(0).max(9),
+    /** The Warlock's Pact Magic pool at `level`, not the spell slots. */
+    pact: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -849,11 +856,32 @@ export const CharacterSetPreparedSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** Closes the prepare step a Long Rest opened: the prepared list stands until the next one. */
+export const CharacterFinishPreparingSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const CharacterSetInventorySchema = z
   .object({
     commandId: z.uuid(),
     actorId: z.uuid(),
     item: InventoryItemSchema,
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Moves one carried row, whole, from one character to another, with the charges it has spent (GM). */
+export const CharacterGiveItemSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    toActorId: z.uuid(),
+    itemId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1049,6 +1077,15 @@ export const ActorSetSpeedSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     speedFeet: z.number().int().min(0).max(500).nullable(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** GM-set Armor Class that replaces the one derived from equipment; null clears it back to the derived AC. */
+export const ActorSetArmorClassSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    armorClass: z.number().int().min(1).max(40).nullable(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

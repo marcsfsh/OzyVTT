@@ -12,9 +12,11 @@ import { join } from "node:path";
 import { z } from "zod";
 import {
   ActorDefinitionSchema,
+  AmmunitionKindSchema,
   SaveConditionSchema,
   type ActorAction,
   type ActorDefinition,
+  type AmmunitionKind,
   type SaveFailureDuration
 } from "@vtt/schemas";
 import { experienceForChallenge } from "@vtt/rules-5e";
@@ -36,7 +38,8 @@ import {
   withoutOngoingDamage
 } from "./save-outcomes.js";
 import { areaOfProse, withProseFacts } from "../src/action-prose.js";
-import { spellEffectFor } from "./spell-effects.js";
+import { castingOptionsFor, makesSpellAttack, spellEffectFor } from "./spell-effects.js";
+import { castingTimeText, SPELL_FIELD_CORRECTIONS } from "./spell-corrections.js";
 import { printedHitDamage, printedSaveDamage } from "./monster-damage.js";
 
 const sourceDir = sourcePath("open5e-srd-2024");
@@ -663,13 +666,8 @@ const CORRECTIONS: Record<string, Partial<CreatureFields>> = {
   ...Object.fromEntries(MEDIUM_OR_SMALL_PER_SRD.map((slug) => [`srd-2024_${slug}`, { size: "medium" }]))
 };
 
-/**
- * Same idea for spells. greater-invisibility ships with an empty `desc` upstream; the text is
- * the printed SRD 5.2.1 sentence.
- */
-const SPELL_CORRECTIONS: Record<string, Partial<SpellFields>> = {
-  "srd-2024_greater-invisibility": { desc: "A creature you touch has the Invisible condition until the spell ends." }
-};
+/** Same idea for spells: reviewed against the SRD 5.2.1 spells chapter (`spell-corrections.ts`). */
+const SPELL_CORRECTIONS: Readonly<Record<string, Partial<SpellFields>>> = SPELL_FIELD_CORRECTIONS;
 
 for (const pk of [...Object.keys(CORRECTIONS), ...EXCLUSIONS]) {
   if (!creatures.some((creature) => creature.pk === pk))
@@ -1048,12 +1046,17 @@ const spellRecords = onlySrd(spells).map((spell) => {
   const fields = { ...spell.fields, ...correction };
   if (fields.saving_throw_ability && !abilityShort[fields.saving_throw_ability])
     throw new Error(`${spell.pk}: unexpected save ability ${fields.saving_throw_ability}`);
+  const effect = spellEffectFor(slugOf(spell.pk), fields.desc, fields.damage_roll || null, fields.damage_types, {
+    distance: fields.range,
+    unit: fields.range_unit,
+    text: fields.range_text || null
+  });
   return {
     id: slugOf(spell.pk),
     name: fields.name,
     level: fields.level,
     school: fields.school,
-    castingTime: fields.casting_time,
+    castingTime: castingTimeText(fields.casting_time),
     reactionCondition: fields.reaction_condition || null,
     range: { distance: fields.range, unit: fields.range_unit, text: fields.range_text || null },
     components: {
@@ -1066,7 +1069,7 @@ const spellRecords = onlySrd(spells).map((spell) => {
     duration: fields.duration,
     concentration: fields.concentration,
     ritual: fields.ritual,
-    attackRoll: fields.attack_roll,
+    attackRoll: makesSpellAttack(fields.desc, effect),
     damage: { roll: fields.damage_roll || null, types: [...fields.damage_types] },
     save: fields.saving_throw_ability
       ? { ability: abilityShort[fields.saving_throw_ability], ...spellSaveOutcomeFor(slugOf(spell.pk), fields.desc) }
@@ -1076,18 +1079,19 @@ const spellRecords = onlySrd(spells).map((spell) => {
       ? { type: fields.shape_type, size: fields.shape_size, unit: fields.shape_size_unit }
       : null,
     area: areaOfProse(fields.desc),
-    effect: spellEffectFor(slugOf(spell.pk), fields.desc, fields.damage_roll || null, fields.damage_types),
+    effect,
     classes: fields.classes.map(slugOf).sort(),
     description: fields.desc,
     higherLevel: fields.higher_level || null,
-    castingOptions: (spellOptionsBySpell.get(spell.pk) ?? [])
-      .sort((left, right) => left.fields.type.localeCompare(right.fields.type))
-      .map((option) => ({
+    castingOptions: castingOptionsFor(
+      slugOf(spell.pk),
+      (spellOptionsBySpell.get(spell.pk) ?? []).map((option) => ({
         type: option.fields.type,
         damageRoll: option.fields.damage_roll || null,
         targetCount: option.fields.target_count,
         description: option.fields.desc || null
       }))
+    )
   };
 });
 
@@ -1103,8 +1107,8 @@ const weaponPropertyRecords = onlySrd(weaponProperties).map((property) => ({
  * fixtures do not link weapons to properties. Both are optional on the schema, so the join fails
  * the build rather than dropping them silently.
  *
- * A property cell's parenthetical is dropped (`Versatile (1d10)` -> `versatile`): riders match the
- * bare slug, and `EquipmentWeaponStatsSchema` has nowhere to put a second damage die.
+ * A property cell's parenthetical is dropped from the slug (`Versatile (1d10)` -> `versatile`), since riders
+ * match the bare word; the Versatile die is kept as `versatileDice`.
  */
 const weaponTableSource = readFileSync(sourcePath("dnd-5e-srd-markdown", "equipment.md"), "utf8");
 const stripTags = (value: string) =>
@@ -1120,10 +1124,30 @@ const tableSlug = (value: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
+/** `Ammunition (Range 150/600; Arrow)` -> "arrow". The table prints "Bullet" for both a Sling's and a firearm's,
+ *  which the Ammunition table sells as two items, so the Sling's is told apart by name. */
+function ammunitionKindOf(weaponId: string, properties: string): AmmunitionKind | null {
+  const printed = /Ammunition \([^;)]*;\s*([A-Za-z]+)\)/.exec(properties)?.[1]?.toLowerCase();
+  if (printed === undefined) return null;
+  if (printed === "bullet") return weaponId === "sling" ? "sling-bullet" : "firearm-bullet";
+  const kind = AmmunitionKindSchema.safeParse(printed);
+  if (!kind.success) throw new Error(`Weapons table: "${weaponId}" fires "${printed}", which no ammunition sells.`);
+  return kind.data;
+}
+
 const weaponTable = (() => {
   const table = weaponTableSource.match(/\*\*Weapons\*\*\s*(<table>[\s\S]*?<\/table>)/);
   if (!table) throw new Error("No **Weapons** table in sources/dnd-5e-srd-markdown/equipment.md.");
-  const rows = new Map<string, { properties: readonly string[]; mastery: string; melee: boolean }>();
+  const rows = new Map<
+    string,
+    {
+      properties: readonly string[];
+      mastery: string;
+      melee: boolean;
+      versatileDice: string | null;
+      ammunition: AmmunitionKind | null;
+    }
+  >();
   // The `<th colspan="6">` band rows ("Simple Melee Weapons", ...) are the only source of melee vs
   // ranged: a thrown Dagger has a range and is melee, a Dart is not. Unknown bands, or data rows before
   // any band, fail the build.
@@ -1152,7 +1176,9 @@ const weaponTable = (() => {
               .map((entry) => tableSlug(entry.replace(/\(.*/, "")))
               .filter((entry) => entry !== ""),
       mastery: tableSlug(cells[3]),
-      melee: band.melee
+      melee: band.melee,
+      versatileDice: /Versatile \((\d+d\d+)\)/.exec(properties)?.[1] ?? null,
+      ammunition: ammunitionKindOf(tableSlug(cells[0]), properties)
     });
   }
   // Both vocabularies come from the fixtures' `WeaponProperty` rows, as bare ids (riders match the bare word).
@@ -1191,8 +1217,10 @@ const weaponRecords = onlySrd(weapons).map((weapon) => {
     id,
     name: weapon.fields.name,
     category: weapon.fields.is_simple ? ("simple" as const) : ("martial" as const),
-    // Needed to resolve "Weapon (Any Melee Weapon)" eligibility.
+    // Needed to resolve "Weapon (Any Melee Weapon)" eligibility, and whether a thrown weapon has a melee reach.
     melee: row.melee,
+    ...(row.versatileDice !== null ? { versatileDice: row.versatileDice } : {}),
+    ...(row.ammunition !== null ? { ammunition: row.ammunition } : {}),
     improvised: weapon.fields.is_improvised,
     mastery: row.mastery,
     // `[]` when the table prints "—": a Mace has no properties, which differs from "not recorded".

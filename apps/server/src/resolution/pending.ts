@@ -125,7 +125,11 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
             (kind): kind is "reaction" | "opportunity" => kind === "reaction" || kind === "opportunity"
           ),
           pushFeet: input.pushFeet ?? null,
-          slotLevel: ctx.plan.spendSpellSlot?.level ?? null,
+          slotLevel: ctx.plan.castLevel,
+          damageType: input.damageType ?? null,
+          bonusDice: (attack.bonusDice ?? []).flatMap((entry) =>
+            entry.total === null ? [] : [{ label: entry.label, dice: entry.dice, total: entry.total }]
+          ),
           distanceFeet: deps.distanceFeet?.(attacker.id, target.id) ?? null,
           initiatorRole: deps.initiatorRole ?? "gm",
           initiatorSessionId: deps.initiatorSessionId ?? deps.gmSessionId,
@@ -149,8 +153,9 @@ const BARE_FAILURE_CONDITIONS: ReadonlySet<string> = new Set(["prone", "exhausti
  * What a failed save puts on its target, as one source-linked effect (SRD: each condition ends by its own rules):
  * the conditions with their printed duration, the save repeated at the end of each of the target's turns, a
  * grapple's escape DC and range, ending on damage, the damage it deals at the start of each turn, and the
- * Concentration the cast is sustained by. Charmed's "can't attack the charmer" and Grappled's "except the grappler"
- * read the source from it. Undefined when every condition stays bare.
+ * Concentration the cast is sustained by, and what the action declares a failure leaves besides (Bane's -1d4).
+ * Charmed's "can't attack the charmer" and Grappled's "except the grappler" read the source from it. Undefined when
+ * every condition stays bare and the action declares nothing more.
  */
 export function failureEffectFor(
   ctx: Pick<ResolveContext, "action" | "attacker" | "castId">,
@@ -160,17 +165,21 @@ export function failureEffectFor(
   const save = action.save;
   if (!save) return undefined;
   const linked = conditionIds.filter((id) => !BARE_FAILURE_CONDITIONS.has(id));
-  if (linked.length === 0) return undefined;
+  // What the failure leaves besides conditions (Bane's -1d4, Faerie Fire's outline), declared by the action.
+  const declared = save.failureEffect;
+  if (linked.length === 0 && !declared) return undefined;
   const grapple = linked.includes("grappled");
+  const duration = save.failureDuration ?? declared?.duration;
   return {
-    name: `${conditionLabel(linked[0])} by ${attacker.name} (${action.name})`.slice(0, 120),
-    tags: grapple ? ["grapple"] : [],
+    name: declared?.name ?? `${conditionLabel(linked[0]!)} by ${attacker.name} (${action.name})`.slice(0, 120),
+    tags: [...(grapple ? ["grapple"] : []), ...(declared?.tags ?? [])].slice(0, 8),
+    modifiers: [...(declared?.modifiers ?? [])],
     linkedConditionIds: linked,
     // An escape DC the text doesn't print is the grapple's own DC, as the 2024 rules set it.
     escapeDc: grapple ? (save.escapeDc ?? save.dc) : null,
     sourceActorId: attacker.id,
     sourceName: attacker.name,
-    ...(save.failureDuration ? { duration: save.failureDuration } : {}),
+    ...(duration ? { duration } : {}),
     ...(save.repeatSave ? { repeatSave: { ability: save.ability, dc: save.dc } } : {}),
     ...(save.endsOnDamage ? { endsOnDamage: true } : {}),
     ...(save.speedZero ? { speedZero: true } : {}),
@@ -227,9 +236,9 @@ export function parkActionSave(ctx: ResolveContext): void {
   if (saving.length === 0) return;
   const parts = rider ? [] : damagePartsOf(ctx);
   // Cover adds to Dexterity saving throws (SRD Cover), each target's own: the GM's choice for this resolve, else the
-  // cover the GM marked it with. Carried on the prompt.
+  // cover the GM marked it with, unless the save ignores it (Sacred Flame). Carried on the prompt.
   const saveBonusOf = (target: (typeof targets)[number]) =>
-    action.save!.ability === "dex" ? coverBonusOf(coverFor(input.cover, target)) : 0;
+    action.save!.ability === "dex" && !action.save!.ignoresCover ? coverBonusOf(coverFor(input.cover, target)) : 0;
   const groups = new Map<number, string[]>();
   for (const target of saving) groups.set(saveBonusOf(target), [...(groups.get(saveBonusOf(target)) ?? []), target.id]);
   for (const [saveBonus, targetIds] of groups)

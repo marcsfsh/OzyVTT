@@ -96,9 +96,24 @@
       "type": "on-attack-roll"
      },
      {
-      "type": "attack-kind-is",
-      "kinds": [
-       "ranged"
+      "type": "weapon-property-is",
+      "properties": [
+       "ammunition"
+      ]
+     }
+    ]
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 1,
+    "when": [
+     {
+      "type": "on-damage-roll"
+     },
+     {
+      "type": "weapon-property-is",
+      "properties": [
+       "ammunition"
       ]
      }
     ]
@@ -138,9 +153,24 @@
       "type": "on-attack-roll"
      },
      {
-      "type": "attack-kind-is",
-      "kinds": [
-       "ranged"
+      "type": "weapon-property-is",
+      "properties": [
+       "ammunition"
+      ]
+     }
+    ]
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 2,
+    "when": [
+     {
+      "type": "on-damage-roll"
+     },
+     {
+      "type": "weapon-property-is",
+      "properties": [
+       "ammunition"
       ]
      }
     ]
@@ -180,9 +210,24 @@
       "type": "on-attack-roll"
      },
      {
-      "type": "attack-kind-is",
-      "kinds": [
-       "ranged"
+      "type": "weapon-property-is",
+      "properties": [
+       "ammunition"
+      ]
+     }
+    ]
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 3,
+    "when": [
+     {
+      "type": "on-damage-roll"
+     },
+     {
+      "type": "weapon-property-is",
+      "properties": [
+       "ammunition"
       ]
      }
     ]
@@ -409,6 +454,18 @@
   },
   "cursed": false,
   "casts": [],
+  "damageTypeChoice": [
+   "acid",
+   "cold",
+   "fire",
+   "force",
+   "lightning",
+   "necrotic",
+   "poison",
+   "psychic",
+   "radiant",
+   "thunder"
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -464,7 +521,7 @@
    "required": true,
    "restrictedTo": []
   },
-  "cursed": false,
+  "cursed": true,
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
@@ -894,7 +951,7 @@
    "required": true,
    "restrictedTo": []
   },
-  "cursed": false,
+  "cursed": true,
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
@@ -1128,7 +1185,7 @@
   "description": "Wondrous Item, Uncommon (Requires Attunement). While wearing these bracers, you have proficiency with the Longbow and Shortbow, and you gain a +2 bonus to damage rolls made with such weapons.",
   "weapon": null,
   "armor": null,
-  "slot": "hands",
+  "slot": "bracers",
   "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
@@ -1170,7 +1227,7 @@
   "description": "Wondrous Item, Rare (Requires Attunement). While wearing these bracers, you gain a +2 bonus to Armor Class if you are wearing no armor and using no Shield.",
   "weapon": null,
   "armor": null,
-  "slot": "hands",
+  "slot": "bracers",
   "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
@@ -1609,6 +1666,10 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "regain": "1d3",
+   "lastChargeRoll": false
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [
@@ -1932,6 +1993,10 @@
     "consumesSpellSlot": false
    }
   ],
+  "charges": {
+   "regain": "1d3",
+   "lastChargeRoll": false
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -2278,6 +2343,13 @@
   },
   "cursed": false,
   "casts": [],
+  "damageTypeChoice": [
+   "acid",
+   "cold",
+   "fire",
+   "lightning",
+   "poison"
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -2745,7 +2817,7 @@
   "description": "Wondrous Item, Uncommon (Requires Attunement). These crystal lenses fit over the eyes. They have 3 charges. While wearing them, you can expend 1 or more charges to cast Charm Person (save DC 13). For 1 charge, you cast the level 1 version of the spell. You increase the spell's level by one for each additional charge you expend. The lenses regain all expended charges daily at dawn.",
   "weapon": null,
   "armor": null,
-  "slot": "head",
+  "slot": "eyes",
   "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
@@ -2782,7 +2854,7 @@
   "description": "Wondrous Item, Uncommon. These crystal lenses fit over the eyes. While wearing them, your vision improves significantly out to a range of 1 foot, granting you Darkvision within that range and Advantage on Intelligence (Investigation) checks made to examine something within that range.",
   "weapon": null,
   "armor": null,
-  "slot": "head",
+  "slot": "eyes",
   "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
@@ -2808,7 +2880,7 @@
   "description": "Wondrous Item, Uncommon. These crystal lenses fit over the eyes. While wearing them, you have Advantage on Wisdom (Perception) checks that rely on sight. In conditions of clear visibility, you can make out details of even extremely distant creatures and objects as small as 2 feet across.",
   "weapon": null,
   "armor": null,
-  "slot": "head",
+  "slot": "eyes",
   "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
@@ -3097,6 +3169,10 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "regain": "1d3",
+   "lastChargeRoll": false
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [
@@ -3334,7 +3410,7 @@
   "description": "Wondrous Item, Uncommon. While wearing these dark lenses, you have Darkvision out to 60 feet. If you already have Darkvision, wearing the goggles increases its range by 60 feet.",
   "weapon": null,
   "armor": null,
-  "slot": "head",
+  "slot": "eyes",
   "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
@@ -4373,6 +4449,10 @@
     "consumesSpellSlot": false
    }
   ],
+  "charges": {
+   "regain": "1d4",
+   "lastChargeRoll": false
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -4437,6 +4517,7 @@
   },
   "cursed": false,
   "casts": [],
+  "removesArmorDrawbacks": true,
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -4450,7 +4531,7 @@
   "category": "wondrous-item",
   "costGp": null,
   "weightLb": null,
-  "description": "Wondrous Item, Legendary. Usually found in a box or pouch, this deck contains a number of cards made of ivory or vellum. Most (75 percent) of these decks have thirteen cards, but some have twenty-two. Use the appropriate column of the Mysterious Deck table when randomly determining cards drawn from the deck. Before you draw a card, you must declare how many cards you intend to draw and then draw them randomly. Any cards drawn in excess of this number have no effect. Otherwise, as soon as you draw a card from the deck, its magic takes effect. You must draw each card no more than 1 hour after the previous draw. If you fail to draw the chosen number, the remaining number of cards fly from the deck on their own and take effect all at once. Once a card is drawn, it disappears. Unless the card is the Fool or Jester, the card reappears in the deck, making it possible to draw the same card twice. (Once the Fool or Jester has left the deck, reroll on the table if that card comes up again.) Mysterious Deck 1d100 (13-Card Deck) —: 1d100 (22-Card Deck) 01–05, Card Balance; 1d100 (13-Card Deck) —: 1d100 (22-Card Deck) 06–10, Card Comet; 1d100 (13-Card Deck) —: 1d100 (22-Card Deck) 11–14, Card Donjon; 1d100 (13-Card Deck) 01–08: 1d100 (22-Card Deck) 15–18, Card Euryale; 1d100 (13-Card Deck) —: 1d100 (22-Card Deck) 19–23, Card Fates; 1d100 (13-Card Deck) 09–16: 1d100 (22-Card Deck) 24–27, Card Flames; 1d100 (13-Card Deck) —: 1d100 (22-Card Deck) 28–31, Card Fool; 1d100 (13-Card Deck) —: 1d100 (22-Card Deck) 32–36, Card Gem; 1d100 (13-Card Deck) 17–24: 1d100 (22-Card Deck) 37–41, Card Jester; 1d100 (13-Card Deck) 25–32: 1d100 (22-Card Deck) 42–46, Card Key; 1d100 (13-Card Deck) 33–40: 1d100 (22-Card Deck) 47–51, Card Knight; 1d100 (13-Card Deck) 41–48: 1d100 (22-Card Deck) 52–56, Card Moon; 1d100 (13-Card Deck) —: 1d100 (22-Card Deck) 57–60, Card Puzzle; 1d100 (13-Card Deck) 49–56: 1d100 (22-Card Deck) 61–64, Card Rogue; 1d100 (13-Card Deck) 57–64: 1d100 (22-Card Deck) 65–68, Card Ruin; 1d100 (13-Card Deck) —: 1d100 (22-Card Deck) 69–73, Card Sage. 1d100 (13-Card Deck) 65–72: 1d100 (22-Card Deck) 74–77, Card Skull; 1d100 (13-Card Deck) 73–80: 1d100 (22-Card Deck) 78–82, Card Star; 1d100 (13-Card Deck) 81–88: 1d100 (22-Card Deck) 83–87, Card Sun; 1d100 (13-Card Deck) —: 1d100 (22-Card Deck) 88–91, Card Talons; 1d100 (13-Card Deck) 89–96: 1d100 (22-Card Deck) 92–96, Card Throne; 1d100 (13-Card Deck) 97–00: 1d100 (22-Card Deck) 97–00, Card Void. Each card's effect is described below. Balance. You can increase one of your ability scores by 2, to a maximum of 22, provided you also decrease another one of your ability scores by 2. You can't decrease an ability that has a score of 5 or lower. Alternatively, you can choose not to adjust your ability scores, in which case this card has no effect. Comet. The next time you enter combat against one or more Hostile creatures, you can select one of them as your foe when you roll Initiative. If you reduce your foe to 0 Hit Points during that combat, you have Advantage on Death Saving Throws for 1 year. If someone else reduces your chosen foe to 0 Hit Points or you don't choose a foe, this card has no effect. Donjon. You disappear and become entombed in a state of suspended animation in an extradimensional sphere. Everything you're wearing and carrying disappears with you except for Artifacts, which stay behind in the space you occupied when you disappeared. You remain imprisoned until you are found and removed from the sphere. You can't be located by any Divination magic, but a Wish spell can reveal the location of your prison. You draw no more cards. Euryale. The card's medusa-like visage curses you. You take a −2 penalty to saving throws while cursed in this way. Only a god or the magic of the Fates card can end this curse. Fates. Reality's fabric unravels and spins anew, allowing you to avoid or erase one event as if it never happened. […]",
+  "description": "Wondrous Item, Legendary. Usually found in a box or pouch, this deck contains a number of cards made of ivory or vellum. Most (75 percent) of these decks have thirteen cards, but some have twenty-two. Use the appropriate column of the Mysterious Deck table when randomly determining cards drawn from the deck. Before you draw a card, you must declare how many cards you intend to draw and then draw them randomly. Any cards drawn in excess of this number have no effect. Otherwise, as soon as you draw a card from the deck, its magic takes effect. You must draw each card no more than 1 hour after the previous draw. If you fail to draw the chosen number, the remaining number of cards fly from the deck on their own and take effect all at once. Once a card is drawn, it disappears. Unless the card is the Fool or Jester, the card reappears in the deck, making it possible to draw the same card twice. (Once the Fool or Jester has left the deck, reroll on the table if that card comes up again.) Mysterious Deck 1d100 (13-Card Deck) —: 1d100 (22-Card Deck) 01–05, Card Balance; 1d100 (13-Card Deck) —: 1d100 (22-Card Deck) 06–10, Card Comet; 1d100 (13-Card Deck) —: 1d100 (22-Card Deck) 11–14, Card Donjon; 1d100 (13-Card Deck) 01–08: 1d100 (22-Card Deck) 15–18, Card Euryale; 1d100 (13-Card Deck) —: 1d100 (22-Card Deck) 19–23, Card Fates; 1d100 (13-Card Deck) 09–16: 1d100 (22-Card Deck) 24–27, Card Flames; 1d100 (13-Card Deck) —: 1d100 (22-Card Deck) 28–31, Card Fool; 1d100 (13-Card Deck) —: 1d100 (22-Card Deck) 32–36, Card Gem; 1d100 (13-Card Deck) 17–24: 1d100 (22-Card Deck) 37–41, Card Jester; 1d100 (13-Card Deck) 25–32: 1d100 (22-Card Deck) 42–46, Card Key; 1d100 (13-Card Deck) 33–40: 1d100 (22-Card Deck) 47–51, Card Knight; 1d100 (13-Card Deck) 41–48: 1d100 (22-Card Deck) 52–56, Card Moon; 1d100 (13-Card Deck) —: 1d100 (22-Card Deck) 57–60, Card Puzzle; 1d100 (13-Card Deck) 49–56: 1d100 (22-Card Deck) 61–64, Card Rogue; 1d100 (13-Card Deck) 57–64: 1d100 (22-Card Deck) 65–68, Card Ruin; 1d100 (13-Card Deck) —: 1d100 (22-Card Deck) 69–73, Card Sage. 1d100 (13-Card Deck) 65–72: 1d100 (22-Card Deck) 74–77, Card Skull; 1d100 (13-Card Deck) 73–80: 1d100 (22-Card Deck) 78–82, Card Star; 1d100 (13-Card Deck) 81–88: 1d100 (22-Card Deck) 83–87, Card Sun; 1d100 (13-Card Deck) —: 1d100 (22-Card Deck) 88–91, Card Talons; 1d100 (13-Card Deck) 89–96: 1d100 (22-Card Deck) 92–96, Card Throne; 1d100 (13-Card Deck) 97–00: 1d100 (22-Card Deck) 97–00, Card Void. Each card's effect is described below. Balance. You can increase one of your ability scores by 2, to a maximum of 22, provided you also decrease another one of your ability scores by 2. You can't decrease an ability that has a score of 5 or lower. Alternatively, you can choose not to adjust your ability scores, in which case this card has no effect. Comet. The next time you enter combat against one or more Hostile creatures, you can select one of them as your foe when you roll Initiative. If you reduce your foe to 0 Hit Points during that combat, you have Advantage on Death Saving Throws for 1 year. If someone else reduces your chosen foe to 0 Hit Points or you don't choose a foe, this card has no effect. Donjon. You disappear and become entombed in a state of suspended animation in an extradimensional sphere. Everything you're wearing and carrying disappears with you except for Artifacts, which stay behind in the space you occupied when you disappeared. You remain imprisoned until you are found and removed from the sphere. You can't be located by any Divination magic, but a Wish spell can reveal the location of your prison. You draw no more cards. Euryale. The card's medusa-like visage curses you. You take a −2 penalty to saving throws while cursed in this way. Only a god or the magic of the Fates card can end this curse. Fates. Reality's fabric unravels and spins anew, allowing you to avoid or erase one event as if it never happened. You can use the card's magic as soon as you draw the card or at any other time before you die. Flames. A powerful devil becomes your enemy. The devil seeks your ruin and torments you, savoring your suffering before attempting to slay you. This enmity lasts until either you or the devil dies. Fool. You have Disadvantage on D20 Tests for the next 72 hours. Draw another card; this draw doesn't count as one of your declared draws. Gem. Twenty-five pieces of jewelry worth 2,000 GP each or fifty gems worth 1,000 GP each appear at your feet. Jester. You have Advantage on D20 Tests for the next 72 hours, or you can draw two additional cards beyond your declared draws. Key. A Rare or rarer magic weapon with which you are proficient appears on your person. The GM chooses the weapon. Knight. You gain the service of a Knight, who magically appears in an unoccupied space you choose within 30 feet of yourself. The knight has the same alignment as you and serves you loyally until death, believing the two of you have been drawn together by fate. Work with your GM to create a name and backstory for this NPC. The GM can use a different stat block to represent the knight, as desired. Moon. You gain the ability to cast Wish 1d3 times. Puzzle. Permanently reduce your Intelligence or Wisdom by 1d4 + 1 (to a minimum score of 1). You can draw one additional card beyond your declared draws. Rogue. An NPC of the GM's choice becomes Hostile toward you. You don't know the identity of this NPC until they or someone else reveals it. Nothing less than a Wish spell or divine intervention can end the NPC's hostility toward you. Ruin. All forms of wealth that you carry or own, other than magic items, are lost to you. Portable property vanishes. Businesses, buildings, and land you own are lost in a way that alters reality the least. Any documentation that proves you should own something lost to this card also disappears. Sage. At any time you choose within one year of drawing this card, you can ask a question in meditation and mentally receive a truthful answer to that question. Skull. An Avatar of Death (see the accompanying stat block) appears in an unoccupied space as close to you as possible. The avatar targets only you with its attacks, appearing as a ghostly skeleton clad in a tattered black robe and carrying a spectral scythe. The avatar disappears when it drops to 0 Hit Points or you die. If an ally of yours deals damage to the avatar, that ally summons another Avatar of Death. The new avatar appears in an unoccupied space as close to that ally as possible and targets only that ally with its attacks. You and your allies can each summon only one avatar as a consequence of this draw. A creature slain by an avatar can't be restored to life. Star. Increase one of your ability scores by 2, to a maximum of 24. Sun. A magic item (chosen by the GM) appears on your person. In addition, you gain 10 Temporary Hit Points daily at dawn until you die. Talons. Every magic item you wear or carry disintegrates. Artifacts in your possession vanish instead. Throne. You gain proficiency and Expertise in your choice of History, Insight, Intimidation, or Persuasion. In addition, you gain rightful ownership of a small keep somewhere in the world. However, the keep is currently home to one or more monsters, which must be cleared out before you can claim the keep as yours. Void. Your soul is drawn from your body and contained in an object in a place of the GM's choice. One or more powerful beings guard the place. While your soul is trapped in this way, your body is inert, ceases aging, and requires no food, air, or water. A Wish spell can't return your soul to your body, but the spell reveals the location of the object that holds your soul. You draw no more cards.",
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
@@ -4907,6 +4988,10 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "regain": "1d3",
+   "lastChargeRoll": false
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [
@@ -4959,6 +5044,10 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "regain": "1d3",
+   "lastChargeRoll": false
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [
@@ -5629,6 +5718,10 @@
     "consumesSpellSlot": false
    }
   ],
+  "charges": {
+   "regain": "1d3",
+   "lastChargeRoll": false
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -5707,6 +5800,10 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "regain": "1d3",
+   "lastChargeRoll": false
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [
@@ -5943,6 +6040,18 @@
   },
   "cursed": false,
   "casts": [],
+  "damageTypeChoice": [
+   "acid",
+   "cold",
+   "fire",
+   "force",
+   "lightning",
+   "necrotic",
+   "poison",
+   "psychic",
+   "radiant",
+   "thunder"
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -5993,6 +6102,10 @@
     "consumesSpellSlot": false
    }
   ],
+  "charges": {
+   "regain": "1d6",
+   "lastChargeRoll": false
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [
@@ -6282,7 +6395,7 @@
   "description": "Wondrous Item, Rare (Requires Attunement). This robe is adorned with eyelike patterns. While you wear the robe, you gain the following benefits: All-Around Vision. The robe gives you Advantage on Wisdom (Perception) checks that rely on sight. Special Senses. You have Darkvision and Truesight, both with a range of 120 feet. Drawbacks. A Light spell cast on the robe or a Daylight spell cast within 5 feet of the robe gives you the Blinded condition for 1 minute. At the end of each of your turns, you make a Constitution saving throw (DC 11 for Light or DC 15 for Daylight), ending the condition on yourself on a success.",
   "weapon": null,
   "armor": null,
-  "slot": "shoulders",
+  "slot": "body",
   "appliesTo": null,
   "rarity": "rare",
   "isMagic": true,
@@ -6308,7 +6421,7 @@
   "description": "Wondrous Item, Very Rare (Requires Attunement). This robe has 3 charges, and it regains 1d3 expended charges daily at dawn. While you wear it, you can take a Magic action and expend 1 charge to cause the garment to display a shifting pattern of dazzling hues until the end of your next turn. During this time, the robe sheds Bright Light in a 30-foot radius and Dim Light for an additional 30 feet, and creatures that can see you have Disadvantage on attack rolls against you. Any creature in the Bright Light that can see you when the robe's power is activated must succeed on a DC 15 Wisdom saving throw or have the Stunned condition until the effect ends.",
   "weapon": null,
   "armor": null,
-  "slot": "shoulders",
+  "slot": "body",
   "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
@@ -6318,6 +6431,10 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "regain": "1d3",
+   "lastChargeRoll": false
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [
@@ -6355,7 +6472,7 @@
   "description": "Wondrous Item, Very Rare (Requires Attunement). This black or dark-blue robe is embroidered with small white or silver stars. You gain a +1 bonus to saving throws while you wear it. Six stars, located on the robe's upper-front portion, are particularly large. While wearing this robe, you can take a Magic action to remove one of the stars and expend it to cast the level 5 version of Magic Missile. Daily at dusk, 1d6 removed stars reappear on the robe. While you wear the robe, you can take a Magic action to enter the Astral Plane along with everything you are wearing and carrying. You remain there until you take a Magic action to return to the plane you were on. You reappear in the last space you occupied or, if that space is occupied, the nearest unoccupied space.",
   "weapon": null,
   "armor": null,
-  "slot": "shoulders",
+  "slot": "body",
   "appliesTo": null,
   "rarity": "very-rare",
   "isMagic": true,
@@ -6386,7 +6503,7 @@
   "description": "Wondrous Item, Legendary (Requires Attunement by a Sorcerer, Warlock, or Wizard). This elegant garment is made from exquisite cloth and adorned with runes. You gain these benefits while wearing the robe. Armor. If you aren't wearing armor, your base Armor Class is 15 plus your Dexterity modifier. Magic Resistance. You have Advantage on saving throws against spells and other magical effects. War Mage. Your spell save DC and spell attack bonus each increase by 2.",
   "weapon": null,
   "armor": null,
-  "slot": "shoulders",
+  "slot": "body",
   "appliesTo": null,
   "rarity": "legendary",
   "isMagic": true,
@@ -6416,7 +6533,7 @@
   "description": "Wondrous Item, Uncommon. This robe has cloth patches of various shapes and colors covering it. While wearing the robe, you can take a Magic action to detach one of the patches, causing it to become the object or creature it represents. Once the last patch is removed, the robe becomes an ordinary garment. The robe has two of each of the following patches: • Bullseye Lantern (filled and lit) • Dagger • Mirror • Pole • Rope (coiled) • Sack In addition, the robe has 4d4 other patches. The GM chooses the patches or determines them randomly by rolling on the following table. 1d100 01–08: Bag of 100 GP; 1d100 09–15: Silver coffer (1 foot long, 6 inches wide and deep) worth 500 GP; 1d100 16–22: Iron door (up to 10 feet wide and 10 feet high, barred on one side of your choice), which you can place in an opening you can reach; it conforms to fit the opening, attaching and hinging itself; 1d100 23–30: 10 gems worth 100 GP each; 1d100 31–44: Wooden ladder (24 feet long); 1d100 45–51: Riding Horse with a Riding Saddle; 1d100 52–59: Open pit (a 10-foot Cube), which you can place on the ground within 10 feet of yourself; 1d100 60–68: 4 Potions of Healing; 1d100 69–75: Rowboat (12 feet long); 1d100 76–83: Spell Scroll containing one spell of level 1, 2, or 3 (your choice); 1d100 84–90: 2 Mastiffs; 1d100 91–96: Window (2 feet by 4 feet, up to 2 feet deep), which you can place on a vertical surface you can reach; 1d100 97–00: Portable Ram.",
   "weapon": null,
   "armor": null,
-  "slot": "shoulders",
+  "slot": "body",
   "appliesTo": null,
   "rarity": "uncommon",
   "isMagic": true,
@@ -7264,6 +7381,10 @@
     "consumesSpellSlot": false
    }
   ],
+  "charges": {
+   "regain": "1d8 + 2",
+   "lastChargeRoll": true
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -7305,6 +7426,10 @@
     "consumesSpellSlot": false
    }
   ],
+  "charges": {
+   "regain": "1d6 + 4",
+   "lastChargeRoll": true
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -7361,6 +7486,10 @@
     "consumesSpellSlot": false
    }
   ],
+  "charges": {
+   "regain": "1d6 + 4",
+   "lastChargeRoll": true
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -7505,6 +7634,10 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "regain": "1d6 + 4",
+   "lastChargeRoll": true
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [
@@ -7643,6 +7776,10 @@
     "consumesSpellSlot": false
    }
   ],
+  "charges": {
+   "regain": "1d6",
+   "lastChargeRoll": true
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [
@@ -8208,6 +8345,10 @@
     "consumesSpellSlot": false
    }
   ],
+  "charges": {
+   "regain": "1d3",
+   "lastChargeRoll": false
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -8397,6 +8538,10 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "regain": "1d6 + 1",
+   "lastChargeRoll": true
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [
@@ -8447,6 +8592,10 @@
     "consumesSpellSlot": false
    }
   ],
+  "charges": {
+   "regain": "1d6 + 1",
+   "lastChargeRoll": true
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -8486,6 +8635,10 @@
     "consumesSpellSlot": false
    }
   ],
+  "charges": {
+   "regain": "1d6 + 1",
+   "lastChargeRoll": true
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -8525,6 +8678,10 @@
     "consumesSpellSlot": false
    }
   ],
+  "charges": {
+   "regain": "1d6 + 1",
+   "lastChargeRoll": true
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -8561,6 +8718,10 @@
     "consumesSpellSlot": false
    }
   ],
+  "charges": {
+   "regain": "1d3",
+   "lastChargeRoll": false
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -8615,6 +8776,10 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "regain": "1d6 + 1",
+   "lastChargeRoll": true
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [
@@ -8680,6 +8845,10 @@
     "consumesSpellSlot": false
    }
   ],
+  "charges": {
+   "regain": "1d6 + 1",
+   "lastChargeRoll": true
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -8706,6 +8875,10 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "regain": "1d3",
+   "lastChargeRoll": false
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [
@@ -8844,7 +9017,7 @@
   "category": "wand",
   "costGp": null,
   "weightLb": null,
-  "description": "Wand, Rare (Requires Attunement). This wand has 7 charges. While holding it, you can take a Magic action to expend 1 charge while choosing a point within 120 feet of yourself. That location becomes the point of origin of a spell or other magical effect determined by rolling on the Wand of Wonder Effects table. Spells cast from the wand have a save DC of 15. If a spell's maximum range is normally less than 120 feet, it becomes 120 feet when cast from the wand. If an effect has multiple possible subjects, the GM determines randomly which among them are affected. Regaining Charges. The wand regains 1d6 + 1 expended charges daily at dawn. If you expend the wand's last charge, roll 1d20. On a 1, the wand crumbles into dust and is destroyed. Wand of Wonder Effects 1d100 01–20: You cast a spell originating from the chosen point. Roll 1d10 to determine the spell: on a 1–2, Darkness; on a 3–4, Faerie Fire; on a 5–6, Fireball; on a 7–8, Slow; on a 9–10, Stinking Cloud.; 1d100 21–25: Nothing happens at the chosen point of origin. Instead, you have the Stunned condition until the start of your next turn, believing something awesome just happened.; 1d100 26–30: You cast Gust of Wind. The Line created by the spell extends from you to the chosen point of origin.; 1d100 31–35: Nothing happens at the chosen point of origin. Instead, you take 1d6 Psychic damage.; 1d100 36–40: Heavy rain falls for 1 minute in a 120-foot-high, 60-foot-radius Cylinder centered on the chosen point of origin. During that time, the area of effect is Lightly Obscured.; 1d100 41–45: A cloud of 600 oversized butterflies fills a 60-foot-high, 30-foot-radius Cylinder centered on the chosen point of origin. The butterflies remain for 10 minutes, during which time the area of effect is Heavily Obscured.; 1d100 46–50: You cast Lightning Bolt. The Line created by the spell extends from you to the chosen point of origin.; 1d100 51–55: The creature closest to the chosen point of origin is enlarged as if you had cast Enlarge/ Reduce on it. If the target isn't you and can't be affected by that spell, you become the target instead.; 1d100 56–60: A magically formed creature appears in an unoccupied space as close to the chosen point of origin as possible. The creature isn't under your control, acts as it normally would, and disappears after 1 hour or when it drops to 0 Hit Points. Roll 1d4 to determine which creature appears. On a 1, a Rhinoceros appears; on a 2, an Elephant appears; and on a 3–4, a Rat appears.; 1d100 61–64: Grass covers a 60-foot-radius circle of ground, with the center of that circle as close to the chosen point of origin as possible. Grass that's already there grows to ten times its normal size and remains overgrown for 1 minute.. 1d100 65–68: An object of the GM's choice disappears into the Ethereal Plane. The object must be neither worn nor carried, within 120 feet of the chosen point of origin, and no larger than 10 feet in any dimension. If there are no such objects in range, nothing happens.; 1d100 69–72: Nothing happens at the chosen point of origin. Instead, you shrink as if you had cast Enlarge/ Reduce on yourself and remain in that state for 1 minute.; 1d100 73–77: Leaves grow from the creature nearest to the chosen point of origin. Unless they are picked off, the leaves turn brown and fall off after 24 hours.; 1d100 78–82: Nothing happens at the chosen point of origin. Instead, a burst of colorful, shimmering light extends from you in a 30-foot Emanation. Each creature in the area must succeed on a DC 15 Constitution saving throw or have the Blinded condition for 1 minute. A creature repeats the save at the end of each of its turns, ending the effect on itself on a success.; 1d100 83–87: Nothing happens at the chosen point of origin. Instead, you cast Invisibility on yourself.; 1d100 88–92: Nothing happens at the chosen point of origin. […]",
+  "description": "Wand, Rare (Requires Attunement). This wand has 7 charges. While holding it, you can take a Magic action to expend 1 charge while choosing a point within 120 feet of yourself. That location becomes the point of origin of a spell or other magical effect determined by rolling on the Wand of Wonder Effects table. Spells cast from the wand have a save DC of 15. If a spell's maximum range is normally less than 120 feet, it becomes 120 feet when cast from the wand. If an effect has multiple possible subjects, the GM determines randomly which among them are affected. Regaining Charges. The wand regains 1d6 + 1 expended charges daily at dawn. If you expend the wand's last charge, roll 1d20. On a 1, the wand crumbles into dust and is destroyed. Wand of Wonder Effects 1d100 01–20: You cast a spell originating from the chosen point. Roll 1d10 to determine the spell: on a 1–2, Darkness; on a 3–4, Faerie Fire; on a 5–6, Fireball; on a 7–8, Slow; on a 9–10, Stinking Cloud.; 1d100 21–25: Nothing happens at the chosen point of origin. Instead, you have the Stunned condition until the start of your next turn, believing something awesome just happened.; 1d100 26–30: You cast Gust of Wind. The Line created by the spell extends from you to the chosen point of origin.; 1d100 31–35: Nothing happens at the chosen point of origin. Instead, you take 1d6 Psychic damage.; 1d100 36–40: Heavy rain falls for 1 minute in a 120-foot-high, 60-foot-radius Cylinder centered on the chosen point of origin. During that time, the area of effect is Lightly Obscured.; 1d100 41–45: A cloud of 600 oversized butterflies fills a 60-foot-high, 30-foot-radius Cylinder centered on the chosen point of origin. The butterflies remain for 10 minutes, during which time the area of effect is Heavily Obscured.; 1d100 46–50: You cast Lightning Bolt. The Line created by the spell extends from you to the chosen point of origin.; 1d100 51–55: The creature closest to the chosen point of origin is enlarged as if you had cast Enlarge/ Reduce on it. If the target isn't you and can't be affected by that spell, you become the target instead.; 1d100 56–60: A magically formed creature appears in an unoccupied space as close to the chosen point of origin as possible. The creature isn't under your control, acts as it normally would, and disappears after 1 hour or when it drops to 0 Hit Points. Roll 1d4 to determine which creature appears. On a 1, a Rhinoceros appears; on a 2, an Elephant appears; and on a 3–4, a Rat appears.; 1d100 61–64: Grass covers a 60-foot-radius circle of ground, with the center of that circle as close to the chosen point of origin as possible. Grass that's already there grows to ten times its normal size and remains overgrown for 1 minute.. 1d100 65–68: An object of the GM's choice disappears into the Ethereal Plane. The object must be neither worn nor carried, within 120 feet of the chosen point of origin, and no larger than 10 feet in any dimension. If there are no such objects in range, nothing happens.; 1d100 69–72: Nothing happens at the chosen point of origin. Instead, you shrink as if you had cast Enlarge/ Reduce on yourself and remain in that state for 1 minute.; 1d100 73–77: Leaves grow from the creature nearest to the chosen point of origin. Unless they are picked off, the leaves turn brown and fall off after 24 hours.; 1d100 78–82: Nothing happens at the chosen point of origin. Instead, a burst of colorful, shimmering light extends from you in a 30-foot Emanation. Each creature in the area must succeed on a DC 15 Constitution saving throw or have the Blinded condition for 1 minute. A creature repeats the save at the end of each of its turns, ending the effect on itself on a success.; 1d100 83–87: Nothing happens at the chosen point of origin. Instead, you cast Invisibility on yourself.; 1d100 88–92: Nothing happens at the chosen point of origin. Instead, a stream of 1d4 × 10 gems, each worth 1 GP, shoots from the wand's tip in a Line 30 feet long and 5 feet wide toward the chosen point of origin. Each gem deals 1 Bludgeoning damage, and the total damage of the gems is divided equally among all creatures in the Line.; 1d100 93–97: You cast Polymorph, targeting the creature closest to the chosen point of origin. Roll 1d4 to determine the target's new form. On a 1, the new form is a Black Bear; on a 2, the new form is a Giant Wasp; on a 3–4, the new form is a Frog.; 1d100 98–00: The creature closest to the chosen point of origin makes a DC 15 Constitution saving throw. On a failed save, the creature has the Restrained condition and begins to turn to stone. While Restrained in this way, the creature repeats the save at the end of its next turn. On a successful save, the effect ends. On a failed save, the creature has the Petrified condition instead of the Restrained condition. The petrification lasts until the creature is freed by the Greater Restoration spell or similar magic..",
   "weapon": null,
   "armor": null,
   "slot": "held",
@@ -8857,6 +9030,10 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "regain": "1d6 + 1",
+   "lastChargeRoll": true
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [
@@ -9253,6 +9430,10 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "regain": "1d4",
+   "lastChargeRoll": false
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [

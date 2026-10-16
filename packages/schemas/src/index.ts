@@ -88,9 +88,12 @@ export const ItemSlotSchema = z.enum([
   "shield",
   "armor",
   "head",
+  "eyes", // lenses and goggles, apart from headwear
   "neck",
-  "shoulders",
-  "hands",
+  "shoulders", // a cloak or cape
+  "body", // a robe, worn over clothes and under a cloak
+  "hands", // gloves or gauntlets
+  "bracers",
   "ring",
   "belt",
   "feet", // worn
@@ -167,14 +170,29 @@ export const RiderTriggerSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("on-taking-damage") }).strict(),
   // ---- filters ----
   /** `spell` is an attack that casts a spell; `weapon` one made with a weapon (not a spell, an Unarmed Strike or a
-   * monster's natural attack); `reaction` and `opportunity` match only when the resolver announces that trigger. */
+   * monster's natural attack), and `melee-weapon` and `ranged-weapon` such an attack made in melee or at range (a
+   * melee spell attack is melee, but no weapon's); `reaction` and `opportunity` match only when the resolver announces
+   * that trigger. */
   z
     .object({
       type: z.literal("attack-kind-is"),
       kinds: z
-        .array(z.enum(["melee", "ranged", "spell", "unarmed", "thrown", "reaction", "opportunity", "weapon"]))
+        .array(
+          z.enum([
+            "melee",
+            "ranged",
+            "spell",
+            "weapon",
+            "melee-weapon",
+            "ranged-weapon",
+            "unarmed",
+            "thrown",
+            "reaction",
+            "opportunity"
+          ])
+        )
         .min(1)
-        .max(8)
+        .max(10)
     })
     .strict(),
   z.object({ type: z.literal("weapon-property-is"), properties: z.array(RiderSlugSchema).min(1).max(12) }).strict(),
@@ -195,7 +213,10 @@ export const RiderTriggerSchema = z.discriminatedUnion("type", [
     .object({ type: z.literal("versus-creature-type"), creatureTypes: z.array(RiderSlugSchema).min(1).max(12) })
     .strict(),
   z.object({ type: z.literal("versus-size"), sizes: z.array(SizeSchema).min(1).max(6) }).strict(),
-  z.object({ type: z.literal("versus-condition"), conditionIds: z.array(ConditionSchema).min(1).max(6) }).strict()
+  z.object({ type: z.literal("versus-condition"), conditionIds: z.array(ConditionSchema).min(1).max(6) }).strict(),
+  /** On an effect, its riders fire only for the creature that put the effect on its bearer, never for the bearer:
+   * Hunter's Mark's extra damage when its caster hits the marked creature. */
+  z.object({ type: z.literal("by-effect-source") }).strict()
 ]);
 export type RiderTrigger = z.infer<typeof RiderTriggerSchema>;
 export type RiderTriggerKind = "static-gate" | "dynamic-gate" | "moment" | "filter";
@@ -229,7 +250,8 @@ export const RIDER_TRIGGER_KINDS: Readonly<Record<RiderTrigger["type"], RiderTri
   "spell-id-is": "filter",
   "versus-creature-type": "filter",
   "versus-size": "filter",
-  "versus-condition": "filter"
+  "versus-condition": "filter",
+  "by-effect-source": "filter"
 });
 
 /** The moments the damage roll collects (`rollRiderDamage`). A damage rider gated on any other moment would never
@@ -308,6 +330,9 @@ export const GrantWhenSchema = z
 
 /** The gate fields every modifier carries. No `when` means always. `scope` defaults by carrier: on an item with a
  * weapon block the attack/damage/crit riders mean "with this weapon", otherwise "the bearer". */
+/** Dice a rider adds to a d20 test ("1d4"), or with a minus takes from it ("-1d4"). */
+const SignedDiceSchema = z.string().regex(/^-?[1-4]d(?:4|6|8|10|12)$/, "Use dice such as 1d4, or -1d4 to subtract.");
+
 const riderGate = {
   when: RiderWhenSchema.optional(),
   scope: z.enum(["bearer", "this-item"]).optional()
@@ -373,6 +398,8 @@ export const ModifierSchema = z.discriminatedUnion("type", [
   z
     .object({ type: z.literal("sense"), sense: RiderSlugSchema, feet: z.number().int().min(0).max(240), ...riderGate })
     .strict(),
+  /** More magic items attuned at once than the SRD's three (Use Magic Device: four). Read when an item is attuned. */
+  z.object({ type: z.literal("attunement-slots"), amount: z.number().int().min(1).max(3), ...riderGate }).strict(),
   /** One more use of a limited resource. `poolId` is the live `actionUses` key, not a `classResources` column. */
   z
     .object({
@@ -393,9 +420,25 @@ export const ModifierSchema = z.discriminatedUnion("type", [
     })
     .strict(),
   // ---- rolls ----
-  z.object({ type: z.literal("attack-bonus"), amount: z.number().int().min(-10).max(10), ...riderGate }).strict(),
-  /** A flat bonus to saving throws. Narrow it with `when: [{type: "on-saving-throw"}, {type: "ability-is", ...}]`. */
-  z.object({ type: z.literal("save-bonus"), amount: z.number().int().min(-10).max(10), ...riderGate }).strict(),
+  /** `dice` rolls with the attack on top of `amount` (Bless's 1d4); a leading minus takes them off (Bane). */
+  z
+    .object({
+      type: z.literal("attack-bonus"),
+      amount: z.number().int().min(-10).max(10),
+      dice: SignedDiceSchema.optional(),
+      ...riderGate
+    })
+    .strict(),
+  /** A flat bonus to saving throws, with `dice` as on `attack-bonus`. Narrow it with `when: [{type:
+   * "on-saving-throw"}, {type: "ability-is", ...}]`. */
+  z
+    .object({
+      type: z.literal("save-bonus"),
+      amount: z.number().int().min(-10).max(10),
+      dice: SignedDiceSchema.optional(),
+      ...riderGate
+    })
+    .strict(),
   /** A flat bonus to ability and skill checks. Gloves of Thievery (+5 Sleight of Hand) is literally this. */
   z.object({ type: z.literal("check-bonus"), amount: z.number().int().min(-10).max(10), ...riderGate }).strict(),
   /** Advantage or disadvantage on a named roll; `aggregateRollMode` applies 5e cancellation. `concentration` is the
@@ -483,6 +526,7 @@ export type Modifier = z.infer<typeof ModifierSchema>;
  * never give it back.
  */
 export const EFFECT_REFUSED_MODIFIER_TYPES: readonly Modifier["type"][] = Object.freeze([
+  "attunement-slots",
   "ability-score",
   "hit-points-per-level",
   "armor-class",
@@ -659,6 +703,10 @@ const ProficiencyIdSchema = z
   .string()
   .regex(/^[a-z0-9-]+$/)
   .max(60);
+/** What an Ammunition weapon fires (SRD Weapons table: "Ammunition (Range 150/600; Arrow)"). The table's one
+ *  "Bullet" is two items, so a Sling's and a firearm's are told apart. */
+export const AmmunitionKindSchema = z.enum(["arrow", "bolt", "firearm-bullet", "needle", "sling-bullet"]);
+export type AmmunitionKind = z.infer<typeof AmmunitionKindSchema>;
 /** Mechanical stats of an item added from the SRD catalog (weapon → attack action, armor/shield → derived AC).
  * Absent on homebrew or older items, which are then display-only. */
 export const ItemWeaponSchema = z
@@ -668,6 +716,11 @@ export const ItemWeaponSchema = z
     damageType: z.string().min(1).max(40),
     rangeFeet: z.number().int().positive().nullable(),
     longRangeFeet: z.number().int().positive().nullable(),
+    /** The Weapons table's band, copied from the catalog: a thrown Dagger is a melee weapon, a Dart a ranged one.
+     *  Absent = read from the range and Thrown, as before the band was recorded. */
+    melee: z.boolean().optional(),
+    /** A Versatile weapon's two-handed die ("1d10" for a Longsword), copied from the catalog. */
+    versatileDice: z.string().min(1).max(20).optional(),
     /** SRD weapon property slugs ("finesse", "thrown", ...), open for homebrew. Absent = not recorded; an empty array = no properties. */
     properties: z
       .array(
@@ -710,12 +763,20 @@ export const InventoryItemSchema = z
     equipped: z.boolean().default(false),
     attuned: z.boolean().default(false),
     weightEach: z.number().nonnegative().max(1_000_000).optional(),
-    description: z.string().max(4000).optional(),
+    /** The catalog text copied on add; as long as `EquipmentReferenceSchema.description` allows. */
+    description: z.string().max(12000).optional(),
     /** Equipment category slug (weapon/armor/tool/...), open for homebrew. Drives sheet grouping. */
     category: z
       .string()
       .regex(/^[a-z0-9-]+$/)
       .max(40)
+      .optional(),
+    /** The catalog record this row is a copy of, when the row's own id can't be it: a second Weapon, +1 bound to
+     *  another base is its own row (`weapon-1-2`) with `recordId: "weapon-1"`. Absent means the id is the record. */
+    recordId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
       .optional(),
     /** The base a template magic item is bound to ("dwarven-thrower" -> "warhammer"). The server validates it and
      * overwrites `weapon`/`armor` with the base's stats; weapon stats are never trusted from a client. */
@@ -726,11 +787,25 @@ export const InventoryItemSchema = z
       .optional(),
     weapon: ItemWeaponSchema.optional(),
     armor: ItemArmorSchema.optional(),
+    /** The type the GM picked for an item whose record lets the GM choose its resistance (Ring of Resistance). Only
+     *  the GM sets it; the server checks it against the record's `damageTypeChoice`. */
+    chosenDamageType: DamageTypeSchema.optional(),
+    /** Ammunition pieces left in a row sold in bundles ("Arrows (20)"), when some are spent; absent = every bundle
+     *  full. The server keeps it: shots spend it and a quantity change moves it by whole bundles. */
+    ammunitionLeft: z.number().int().min(0).max(1_000_000).optional(),
+    /** Pieces fired from this row in the running fight that can be picked up after it (half come back). The
+     *  server keeps it. */
+    ammunitionFired: z.number().int().min(0).max(10_000).optional(),
     /** Display-only marker so the sheet can offer Attune without the catalog; never the riders. */
     magic: ItemMagicMarkerSchema.optional()
   })
   .strict();
 export type InventoryItem = z.infer<typeof InventoryItemSchema>;
+
+/** The catalog id an inventory row is a copy of: its `recordId`, else its own id. Every catalog lookup reads this. */
+export function catalogIdOf(item: Readonly<{ id: string; recordId?: string | undefined }>): string {
+  return item.recordId ?? item.id;
+}
 export const CurrencySchema = z
   .object({
     cp: z.number().int().min(0).max(1_000_000).default(0),
@@ -838,6 +913,9 @@ export const ActorSchema = z.object({
     temporary: z.number().int().nonnegative().default(0)
   }),
   armorClass: z.number().int().positive().optional(),
+  /** A GM-set Armor Class that `armorClass` takes in place of the one derived from equipment, until cleared (a stat
+   *  the sheet can't derive: Mage Armor, natural armor, a ruling). The sheet shows it as set by the GM. */
+  armorClassOverride: z.number().int().min(1).max(40).optional(),
   initiative: z.number().int().optional(),
   ownerSessionId: z.uuid().nullable().default(null),
   notes: z.string().max(10000).optional(),
@@ -926,6 +1004,13 @@ export const ActorSchema = z.object({
     .default(null),
   /** Spell ids prepared right now, re-chosen on a long rest. Owner-only. */
   preparedSpellIds: z.array(z.string().max(80)).max(400).default([]),
+  /** Open after a Long Rest for a caster that changes its prepared spells then (SRD Spell Preparation by Class): the
+   *  spells it may still swap in (null: any number). Null when closed. Owner-only. */
+  preparation: z
+    .object({ changesLeft: z.number().int().min(0).max(60).nullable() })
+    .strict()
+    .nullable()
+    .default(null),
   /** Carried inventory, seeded from the definition's starting loadout. Owner-only. */
   inventory: z.array(InventoryItemSchema).max(200).default([]),
   /** Coin purse, seeded from the definition's starting currency. Owner-only. */
@@ -973,6 +1058,15 @@ export const EffectGrantSchema = z
     concentration: z.boolean().default(false)
   })
   .strict();
+
+/** An action's grant: the effect shape, which may also go to every creature the action targets (Bless), land only
+ *  when its attack hits (Guiding Bolt's light), and add to AC while it lasts (Shield of Faith). */
+export const ActionGrantSchema = EffectGrantSchema.extend({
+  target: z.enum(["self", "target", "targets"]).default("self"),
+  onHit: z.boolean().optional(),
+  /** Kept apart from `modifiers`, whose `armor-class` is written onto the sheet, like a reaction's lasting bonus. */
+  armorClassBonus: z.number().int().min(1).max(10).optional()
+}).strict();
 
 /** The most a limited-use pool can hold: Lay on Hands at Paladin 20 is 100 points. */
 export const MAX_ACTION_USES = 100;
@@ -1034,6 +1128,9 @@ export const SaveOutcomeFields = {
   successDamage: z.enum(["half", "none"]).default("half"),
   /** Every condition a failed save imposes (Turn Undead: Frightened and Incapacitated). */
   failureConditions: z.array(SaveConditionSchema).max(4).default([]),
+  /** Cover gives no bonus to this save (Sacred Flame: "The target gains no benefit from Half Cover or
+   *  Three-Quarters Cover for this save"). */
+  ignoresCover: z.boolean().optional(),
   /** How long the failure's conditions last. Absent: until ended (with the caster's Concentration, for a spell). */
   failureDuration: SaveFailureDurationSchema.optional(),
   /** The target repeats the save at the end of each of its turns, a success ending the failure's conditions. */
@@ -1103,6 +1200,20 @@ export const ActionReactionSchema = z.discriminatedUnion("response", [
 ]);
 export type ActionReaction = z.infer<typeof ActionReactionSchema>;
 
+/** What a failed save leaves on the creature: a named effect with typed modifiers, for a number of rounds (absent:
+ *  until ended). */
+export const SaveFailureEffectSchema = z
+  .object({
+    name: z.string().min(1).max(120),
+    tags: z.array(EffectTagSchema).max(8).default([]),
+    duration: z
+      .object({ type: z.literal("rounds"), rounds: z.number().int().min(1).max(100) })
+      .strict()
+      .optional(),
+    modifiers: EffectModifiersSchema.default([])
+  })
+  .strict();
+
 /** Mechanics fields are optional (ADR-0020): absent means prose only. Descriptions stay the display source of truth. */
 export const ActionSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
@@ -1129,7 +1240,9 @@ export const ActionSchema = z.object({
       /** The DC is the bearer's spell save DC (a spell, or a feature that uses it), so a `spell-save-dc` rider
        *  raises it. Absent: a printed DC that no rider touches (a breath weapon, a wand's DC 15). */
       spellcasting: z.boolean().optional(),
-      ...SaveOutcomeFields
+      ...SaveOutcomeFields,
+      /** An effect a failed save puts on the creature, sourced by the actor (Bane's -1d4, Faerie Fire's outline). */
+      failureEffect: SaveFailureEffectSchema.optional()
     })
     .optional(),
   damage: z
@@ -1156,6 +1269,12 @@ export const ActionSchema = z.object({
   useCost: z.union([z.number().int().min(2).max(MAX_ACTION_USES), z.literal("chosen")]).optional(),
   /** Conditions this action ends on each target (Lay on Hands: Poisoned). */
   endsConditions: z.array(ConditionIdSchema).min(1).max(4).optional(),
+  /** Missiles that each deal `damage` to a creature of the caster's choice (Magic Missile's darts), rolled one by one.
+   *  The resolve's targets assign them in order, a target named twice taking two. */
+  darts: z.number().int().min(2).max(20).optional(),
+  /** The damage types the caster picks from on each use (Chromatic Orb); the resolve names one, and every damage
+   *  part takes it. Absent: the damage's own types. */
+  damageTypes: z.array(DamageTypeSchema).min(2).max(10).optional(),
   /** Compound action: one shared action slot, components tracked (crocodile Multiattack = one Bite + one Tail). */
   multiattack: z
     .array(z.object({ actionId: z.string().regex(/^[a-z0-9-]+$/), count: z.number().int().min(1).max(4) }).strict())
@@ -1188,7 +1307,7 @@ export const ActionSchema = z.object({
     .max(2)
     .optional(),
   /** Resolving this action grants an effect to the actor itself (Rage, Reckless Attack). */
-  grants: EffectGrantSchema.optional(),
+  grants: ActionGrantSchema.optional(),
   /** The action requires an active self effect carrying this tag (Frenzy requires "raging"). */
   requiresEffectTag: EffectTagSchema.optional(),
   uses: ActionUsesSchema.optional(),
@@ -1476,6 +1595,11 @@ const SpellcastingSchema = z
             /** The action that casts it without a slot: a grant's free casting (spending the feature's uses) or an
              *  at-will one. */
             freeActionId: z
+              .string()
+              .regex(/^[a-z0-9-]+$/)
+              .optional(),
+            /** The action that casts it as a Ritual: no slot, 10 minutes longer (SRD Rituals). */
+            ritualActionId: z
               .string()
               .regex(/^[a-z0-9-]+$/)
               .optional(),

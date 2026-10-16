@@ -31,6 +31,7 @@ import { CommandRejectedError, type JournalEntry } from "../game-store.js";
 import { endTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "../turn-economy.js";
 import { initiatorOf, isGmGrade, principalTag } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
+import { recoverAmmunition } from "../ammunition.js";
 
 // The encounter lifecycle, initiative and the turn economy.
 
@@ -118,17 +119,18 @@ export const encounterCommands = [
       let endedSceneId: string | null = null;
       let endedMapAssetId: string | null = null;
       let endedTurnCount = 0;
+      let recovered: ReturnType<typeof recoverAmmunition> = [];
       const { duplicate } = await executeTimeline((state, timeline) => {
         // The last live picture of the fight, captured before endEncounter clears the combat.
         const finalState = structuredClone(state);
         endedSceneId = finalState.combat.activeSceneId;
         endedMapAssetId = finalState.combat.mapAssetId;
         // The fight's effects end with it (onEnd fires), scoped to its combatants so parked scenes' effects survive.
-        effectEvents = endEncounterEffects(
-          state,
-          state.combat.initiative.map((entry) => entry.actorId)
-        );
+        const combatantIds = state.combat.initiative.map((entry) => entry.actorId);
+        effectEvents = endEncounterEffects(state, combatantIds);
         endEncounter(state); // rejects while rewound
+        // SRD Ammunition: after a fight, half the pieces each combatant fired are picked up again.
+        recovered = recoverAmmunition(state, combatantIds, kit.equipmentCatalog());
         // Archive the fight in the same transaction, before wiping live buffers, so it can never be lost.
         // A fight that captured no boundaries is skipped.
         const entries = timeline.entries();
@@ -174,6 +176,13 @@ export const encounterCommands = [
       });
       if (duplicate) return;
       kit.context.appendLog({ kind: "encounter", text: "The encounter ended.", gmOnly: false });
+      for (const line of recovered)
+        kit.context.appendLog({
+          kind: "encounter",
+          text: line.text,
+          actorIds: [line.actorId],
+          gmOnly: kit.actorHidden(line.actorId)
+        });
       kit.publishNarrations(effectEvents);
       kit.context.onEncounterArchived?.({
         mapAssetId: endedMapAssetId,

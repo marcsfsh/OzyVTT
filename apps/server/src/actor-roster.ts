@@ -4,10 +4,12 @@ import {
   ABILITIES,
   abilityModifier,
   armorClassFromEquipment,
+  casterProgressionFor,
   hitDicePool,
   multiclassCasterLevel,
   multiclassPactSlots,
   multiclassSpellSlots,
+  wornBodyArmor,
   type Ability,
   type ClassLevelEntry,
   type ClassProgressionTable,
@@ -84,8 +86,15 @@ export function spellSlotMaxima(
 function baseSpellSlotMaxima(definition: ActorDefinition | undefined): ReadonlyArray<{ level: number; max: number }> {
   const spellcasting = definition?.spellcasting;
   if (!spellcasting) return [];
-  if (spellcasting.slots.length > 0) return spellcasting.slots;
   const casterIds = new Set((spellcasting.classes ?? []).map((entry) => entry.classId));
+  // A Warlock built before Pact Magic had a pool of its own carried the pact row as its `slots`; those are its pact
+  // slots, which `pactSlotMaximum` derives, so counting them here would seed them twice.
+  const pactOnly =
+    !spellcasting.pact &&
+    casterIds.size > 0 &&
+    [...casterIds].every((classId) => casterProgressionFor(classId) === "pact");
+  if (pactOnly) return [];
+  if (spellcasting.slots.length > 0) return spellcasting.slots;
   if (casterIds.size === 0) return [];
   const casterLevels = classLevelsOf(definition!).filter((entry) => casterIds.has(entry.classId));
   return multiclassSpellSlots(multiclassCasterLevel(casterLevels))
@@ -154,8 +163,18 @@ export function seedPreparedSpellIds(definition: ActorDefinition): string[] {
     : [];
 }
 
-/** Flat non-equipment AC (Defense, a ring of protection), kept in the `open5e.srd-2024` extension bag so
- *  re-deriving AC from the loadout doesn't drop it. Absent reads 0. */
+/** The `source.name` the character builder stamps on what it builds. */
+export const BUILDER_SOURCE_NAME = "OzyVTT Character Builder";
+
+/** Whether a sheet's Armor Class is worked out from what the character wears (a built character), rather than a
+ *  printed total that already counts its armor (a stat block, an imported sheet). */
+export function armorClassFromLoadout(definition: ActorDefinition): boolean {
+  // `source` is required by the schema, but hand-built definitions (tests, old fixtures) can lack it.
+  return definition.source?.name === BUILDER_SOURCE_NAME;
+}
+
+/** Flat non-equipment AC an older build kept in the `open5e.srd-2024` extension bag. Read only for a printed
+ *  total; a built character's riders are collected live from its features. Absent reads 0. */
 export function armorClassRiderOf(definition: ActorDefinition): number {
   // `extensions` is schema-defaulted, but hand-built definitions can lack it; missing means no rider.
   const extension = definition.extensions?.["open5e.srd-2024"];
@@ -191,19 +210,25 @@ export function unarmoredDefenseOf(definition: ActorDefinition, catalog?: Equipm
   return null;
 }
 
-/** The AC an actor stores, which attacks read: equipped armor and shields when there are any, else the sheet's
- *  own (natural armor, monsters); plus the flat rider, so a built definition and its actor agree, and standing
- *  item riders. */
+/**
+ * The AC an actor stores, which attacks read. A GM-set AC wins outright. A built character's AC is what it wears now
+ * (SRD: with no armor or Shield, 10 + Dex, or its Unarmored Defense), plus the standing `armor-class` riders of its
+ * items and features (Defense applies only while armor is worn). A printed total (a stat block, an imported sheet)
+ * already counts the armor it was printed with, so it stands until body armor is equipped; a Shield alone can't be
+ * told apart from one it already counts.
+ */
 export function storedArmorClass(actor: Actor, definition: ActorDefinition, catalog?: EquipmentCatalog): number {
-  const equipmentAc = armorClassFromEquipment(
-    abilityModifier(definition.abilityScores.dex),
-    withResolvedSlots(actor.inventory, catalog),
-    unarmoredDefenseOf(definition, catalog)
-  );
-  return (
-    (equipmentAc === null ? definition.armorClass : equipmentAc + armorClassRiderOf(definition)) +
-    deriveEquipment(actor, definition, catalog).armorClass
-  );
+  if (actor.armorClassOverride !== undefined) return actor.armorClassOverride;
+  const derivation = deriveEquipment(actor, definition, catalog);
+  const dex = abilityModifier(definition.abilityScores.dex);
+  const items = withResolvedSlots(actor.inventory, catalog);
+  const unarmored = unarmoredDefenseOf(definition, catalog);
+  const equipmentAc = armorClassFromEquipment(dex, items, unarmored, { shield: derivation.untrainedShield === null });
+  if (armorClassFromLoadout(definition))
+    return (equipmentAc ?? 10 + dex + (unarmored?.bonus ?? 0)) + derivation.armorClass;
+  const base =
+    equipmentAc !== null && wornBodyArmor(items) ? equipmentAc + armorClassRiderOf(definition) : definition.armorClass;
+  return base + derivation.armorClass;
 }
 
 /** Re-derives every stored AC from current content. Inventory writes reconcile AC, but a homebrew publish or a
@@ -307,6 +332,7 @@ function instantiate(
     spellSlots: seedSpellSlots(definition, derivation.spellSlots),
     pactSlots: seedPactSlots(definition),
     preparedSpellIds: seedPreparedSpellIds(definition),
+    preparation: null,
     inventory,
     currency: definition.startingCurrency ? { ...definition.startingCurrency } : { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
     archived: false,

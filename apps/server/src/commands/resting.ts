@@ -62,13 +62,15 @@ export const restingCommands = [
       const { actorId, approve } = request;
       let events: EffectNarration[] = [];
       const { duplicate } = await execute((state) => {
+        // A charged item's dawn regain is rolled with the server's dice, as on any Long Rest.
         events = answerLongRest(
           state,
           actorId,
           approve,
           initiatorOf(principal),
           kit.resolveDefinition,
-          kit.equipmentCatalog()
+          kit.equipmentCatalog(),
+          (sides) => kit.context.random(sides)
         );
       });
       if (duplicate) return;
@@ -98,7 +100,9 @@ export const restingCommands = [
       const { kind, actorIds } = request;
       let events: EffectNarration[] = [];
       const { duplicate } = await execute((state) => {
-        events = startPartyRest(state, actorIds, kind, kit.resolveDefinition, kit.equipmentCatalog());
+        events = startPartyRest(state, actorIds, kind, kit.resolveDefinition, kit.equipmentCatalog(), (sides) =>
+          kit.context.random(sides)
+        );
       });
       if (duplicate) return;
       const who = names(actorIds.map((actorId) => kit.actorName(actorId)));

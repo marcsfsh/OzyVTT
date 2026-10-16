@@ -47,6 +47,8 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
       : null,
     grants: action.grants !== undefined,
     reaction: action.reaction ?? null,
+    ...(action.darts !== undefined ? { darts: action.darts } : {}),
+    ...(action.damageTypes !== undefined ? { damageTypes: [...action.damageTypes] } : {}),
     // A heal for others picks its targets: one (Divine Spark's healing), or several for a divided pool.
     ...(action.healing && !action.healing.self
       ? { targeting: action.healing.divided ? ("multi" as const) : ("single" as const) }

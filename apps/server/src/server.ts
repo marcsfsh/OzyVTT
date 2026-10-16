@@ -19,6 +19,7 @@ import { fillMissingSpeeds, fillStoredProseFacts, reconcileArmorClasses, storedD
 import { createApiV1Router } from "./api-v1.js";
 import { ContentLibrary } from "./content-library.js";
 import { equipmentCatalogOf } from "./equipment-derivation.js";
+import { reconcileMagicMarkers } from "./inventory.js";
 import { AuthService } from "./auth.js";
 import { developmentClientUrl } from "./client-hosting.js";
 import { CombatLogStore, projectFeedRow } from "./combat-log.js";
@@ -199,7 +200,8 @@ export function createServer(options: CreateServerOptions) {
     const reconcile = (state: GameState) => {
       const filled = fillStoredProseFacts(state);
       const sped = fillMissingSpeeds(state, definitionsIn(state));
-      return reconcileArmorClasses(state, definitionsIn(state), catalog) || filled || sped;
+      const marked = reconcileMagicMarkers(state, catalog);
+      return reconcileArmorClasses(state, definitionsIn(state), catalog) || filled || sped || marked;
     };
     // A dry run first, so an unchanged campaign takes no revision.
     if (!reconcile(structuredClone(current))) return;

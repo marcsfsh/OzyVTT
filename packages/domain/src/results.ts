@@ -54,6 +54,9 @@ export type ActionResolutionAttack = Readonly<{
     amount: number;
     source: string;
   }>;
+  /** Dice an effect adds to the roll, in `total` (Bless +1d4, Bane -1d4). A preview leaves `total` null: they roll
+   *  when the attack is confirmed. */
+  bonusDice?: ReadonlyArray<Readonly<{ label: string; dice: string; total: number | null }>>;
 }>;
 /** Every source behind an attack's advantage/disadvantage, so the table can see the math (ADR-0020). */
 export type ActionRollMode = Readonly<{
@@ -158,7 +161,8 @@ export type ActionResolution = Readonly<{
   preview?: boolean;
   /** On a previewed hit, the extras the attacker may add when confirming (`hitOptions`). */
   hitOffers?: readonly HitOffer[];
-  /** No attack roll and no save, but damage (Magic Missile): what each target is owed, applied or proposed like a hit. */
+  /** No attack roll and no save, but damage: what each target is owed, applied or proposed like a hit. A darts action
+   *  (Magic Missile) owes each creature only what its own darts dealt. */
   damageTargets?: readonly DamageTarget[];
 }>;
 /** A strict-mode rules rejection: what rule blocked the command and whether an override may bypass it. */
@@ -312,7 +316,9 @@ const ActorDerivedSheetSchema = z.strictObject({
     vulnerabilities: z.array(DerivedDefenceSchema)
   }),
   /** What standing `spell-save-dc` riders add to the bearer's spell save DC, and so to every action that uses it. */
-  spellSaveDcBonus: z.number().int()
+  spellSaveDcBonus: z.number().int(),
+  /** How many items the bearer can attune to at once: 3, or 4 with Use Magic Device. */
+  attunementSlots: z.number().int().min(1).max(10)
 });
 export type ActorDerivedSheet = Wire<z.infer<typeof ActorDerivedSheetSchema>>;
 /** What `actor:available-actions` answers: the table's rules mode, each action's availability, and the sheet. */

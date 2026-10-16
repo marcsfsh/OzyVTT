@@ -6,12 +6,13 @@ import type {
   FeatureRecord,
   SpellReference
 } from "@vtt/content-srd-5.2.1";
-import type { ActorAction, ActorDefinition, InventoryItem, Modifier } from "@vtt/schemas";
+import { catalogIdOf, type ActorAction, type ActorDefinition, type InventoryItem, type Modifier } from "@vtt/schemas";
 import {
   armorWeightOf,
   collectRiders,
   effectiveSlot,
   gatePasses,
+  isMeleeWeapon,
   sumRiders,
   type RiderAbility,
   type RiderCarrier,
@@ -61,7 +62,6 @@ export const BUILDER_BAKED_MODIFIER_TYPES = [
   "ability-score",
   "hit-points-per-level",
   "speed",
-  "armor-class",
   "initiative",
   "unarmored-defense",
   "darkvision"
@@ -128,7 +128,17 @@ export type EquipmentDerivation = Readonly<{
   masteryByActionId: Readonly<Record<string, MasteryInForce>>;
   /** Provenance for the sheet ("Stealth (Circlet of Shadows)"). */
   sources: readonly Readonly<{ itemId: string; itemName: string; summary: string }>[];
+  /** Magic items the bearer may attune beyond the SRD's three (Use Magic Device). */
+  attunementSlots: number;
+  /** Equipped body armor the bearer has no training with (SRD Armor Training: Disadvantage on Strength and
+   *  Dexterity D20 Tests, and no spellcasting), or null. */
+  untrainedArmor: WornItem | null;
+  /** An equipped Shield the bearer has no training with: it gives no AC. */
+  untrainedShield: WornItem | null;
 }>;
+
+/** An equipped item the rules name in a refusal or a roll card. */
+export type WornItem = Readonly<{ itemId: string; name: string }>;
 
 export const EMPTY_DERIVATION: EquipmentDerivation = Object.freeze({
   skills: [],
@@ -147,7 +157,10 @@ export const EMPTY_DERIVATION: EquipmentDerivation = Object.freeze({
   actions: [],
   weaponActionIds: [],
   masteryByActionId: {},
-  sources: []
+  sources: [],
+  attunementSlots: 0,
+  untrainedArmor: null,
+  untrainedShield: null
 });
 
 /** Whether an item's riders apply: equipped, present and (if required) attuned. A cursed item contributes
@@ -164,6 +177,98 @@ const slotView = (entry: ActiveItem) => ({
   slot: entry.record?.slot ?? entry.item.magic?.slot,
   category: entry.item.category
 });
+
+/** Whether recorded armor training covers one weight, or Shields. A sheet that records no armor training at all (an
+ *  import, a monster: "a monster has training with any armor in its stat block") counts as trained. Slugs are
+ *  matched as content and imports spell them ("heavy", "heavy-armor", "shields", "all-armor"). */
+export function armorTrainingCovers(
+  recorded: readonly string[] | undefined,
+  granted: readonly string[],
+  kind: "light" | "medium" | "heavy" | "shields"
+): boolean {
+  if (recorded === undefined) return true;
+  return [...recorded, ...granted].some((raw) => {
+    const slug = raw.replace(/-armor$/, "");
+    return slug === kind || slug === "all" || (kind === "shields" && slug === "shield");
+  });
+}
+
+/** The worn body armor and Shield the bearer lacks training with. `granted` is item-granted armor training. */
+export function armorTrainingGaps(
+  inventory: readonly (InventoryItem & { slot?: string })[],
+  definition: ActorDefinition | undefined,
+  granted: readonly string[] = []
+): Readonly<{ untrainedArmor: WornItem | null; untrainedShield: WornItem | null }> {
+  const recorded = definition?.proficiencies?.armor;
+  const worn = inventory.filter((item) => item.equipped && item.quantity > 0 && item.armor !== undefined);
+  const view = (item: InventoryItem & { slot?: string }) => ({
+    slot: item.slot ?? item.magic?.slot,
+    category: item.category
+  });
+  const body = worn.find((item) => effectiveSlot(view(item)) === "armor");
+  const shield = worn.find((item) => effectiveSlot(view(item)) === "shield");
+  const untrained = (item: InventoryItem | undefined, kind: "light" | "medium" | "heavy" | "shields") =>
+    item && !armorTrainingCovers(recorded, granted, kind) ? { itemId: item.id, name: item.name } : null;
+  return {
+    untrainedArmor: untrained(body, body ? armorWeightOf(body.armor!) : "light"),
+    untrainedShield: untrained(shield, "shields")
+  };
+}
+
+/** What wearing body armor costs (SRD Armor), as carriers every roll reads like any other rider: the Strength
+ *  requirement's -10 feet, Disadvantage on Dexterity (Stealth) checks, and, without training, Disadvantage on
+ *  Strength and Dexterity D20 Tests (attack rolls, saves, checks and Initiative, a Dexterity check). */
+function bodyArmorCarriers(
+  worn: ActiveItem | undefined,
+  definition: ActorDefinition | undefined,
+  untrained: boolean
+): RiderCarrier[] {
+  const body = worn?.item;
+  const armor = body?.armor;
+  if (!body || !armor) return [];
+  const carriers: RiderCarrier[] = [];
+  // Mithral keeps neither drawback, whatever a row bound before the rule copied from its base.
+  const drawbacks = worn?.record?.removesArmorDrawbacks !== true;
+  const strength = definition?.abilityScores.str;
+  if (drawbacks && armor.strengthRequired !== null && strength !== undefined && strength < armor.strengthRequired)
+    carriers.push({
+      label: `${body.name} (needs Strength ${armor.strengthRequired})`,
+      sourceItemId: body.id,
+      modifiers: [{ type: "speed", amount: -10 }]
+    });
+  if (drawbacks && armor.stealthDisadvantage)
+    carriers.push({
+      label: `${body.name} (Stealth)`,
+      sourceItemId: body.id,
+      modifiers: [
+        {
+          type: "roll-mode",
+          roll: "check",
+          mode: "disadvantage",
+          when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["stealth"] }]
+        }
+      ]
+    });
+  if (untrained) {
+    const strOrDex = { type: "ability-is", abilities: ["str", "dex"] } as const;
+    carriers.push({
+      label: `${body.name} (no armor training)`,
+      sourceItemId: body.id,
+      modifiers: [
+        {
+          type: "roll-mode",
+          roll: "attack",
+          mode: "disadvantage",
+          when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["melee", "ranged"] }]
+        },
+        { type: "roll-mode", roll: "save", mode: "disadvantage", when: [{ type: "on-saving-throw" }, strOrDex] },
+        { type: "roll-mode", roll: "check", mode: "disadvantage", when: [{ type: "on-ability-check" }, strOrDex] },
+        { type: "roll-mode", roll: "initiative", mode: "disadvantage" }
+      ]
+    });
+  }
+  return carriers;
+}
 
 /** The bearer's facts flattened once; `granted` adds item-granted training and effect tags to the sheet's own. */
 function bearerContext(
@@ -274,19 +379,23 @@ export function deriveEquipment(
   // An unattuned cursed blade is indistinguishable from a mundane one.
   const equipped: ActiveItem[] = [];
   const active: ActiveItem[] = [];
+  /** Potions and flasks in the pack: only their actions, which use one up. */
+  const packed: ActiveItem[] = [];
   for (const item of catalog ? actor.inventory : []) {
-    if (item.quantity <= 0 || !item.equipped) continue;
-    const record = catalog!.equipmentRecord(item.id);
+    if (item.quantity <= 0) continue;
+    const record = catalog!.equipmentRecord(catalogIdOf(item));
     const entry = { item, record };
-    equipped.push(entry);
-    if (itemIsActive(item, record)) active.push(entry);
+    if (item.equipped) equipped.push(entry);
+    if (item.equipped && itemIsActive(item, record)) active.push(entry);
+    else if (record?.consumedOnUse) packed.push(entry);
   }
   const carriers: RiderCarrier[] = [
     ...(catalog ? characterCarriers(definition, catalog) : []),
     ...effectCarriers(actor)
   ];
   const gatedGrants = catalog ? characterGatedGrants(definition, catalog) : [];
-  if (equipped.length === 0 && carriers.length === 0 && gatedGrants.length === 0) return EMPTY_DERIVATION;
+  if (equipped.length === 0 && packed.length === 0 && carriers.length === 0 && gatedGrants.length === 0)
+    return EMPTY_DERIVATION;
   /** Feats the character already holds, so an item granting one adds nothing twice. */
   const heldFeatIds = new Set((definition?.character?.feats ?? []).map((feat) => feat.id));
 
@@ -340,11 +449,11 @@ export function deriveEquipment(
     const label = record.name;
     const isWeapon = effectiveSlot(slotView(entry)) === "weapon" || item.weapon !== undefined;
     carriers.push({ label, modifiers: record.modifiers, sourceItemId: item.id, isWeapon });
-    takeGrants(record, item.id, label);
+    takeGrants(withChosenResistance(record, item), item.id, label);
     takeEffects(record, item.id, label);
-    for (const declared of record.actions) actions.push(itemAction(item.id, declared, definition));
+    for (const declared of record.actions) actions.push(itemAction(item, declared, definition));
     for (const cast of record.casts)
-      actions.push(castAction(item.id, cast, label, definition, catalog!.spellRecord?.(cast.spellId)));
+      actions.push(castAction(item, cast, label, definition, catalog!.spellRecord?.(cast.spellId)));
     // Depth 1: the feat's riders join this block, so unequipping removes them in one recomputation.
     for (const featId of record.grantsFeatIds) {
       // Already a builder carrier (with its baked half in the definition); granting again would double it.
@@ -359,6 +468,8 @@ export function deriveEquipment(
     if (record.modifiers.length > 0 || record.grants || record.effects.length > 0 || record.grantsFeatIds.length > 0)
       sources.push({ itemId: item.id, itemName: label, summary: summarise(record) });
   }
+  for (const { item, record } of packed)
+    for (const declared of record?.actions ?? []) actions.push(itemAction(item, declared, definition));
   // Gated grants on own feats/features (the builder baked only ungated ones). The `feature:<id>` source
   // is never in `attunedItemIds`, so an `attuned` gate on a feature fails closed.
   for (const { id, name, block } of gatedGrants) {
@@ -386,24 +497,39 @@ export function deriveEquipment(
     .filter((entry) => entry.item.weapon?.properties?.includes("light"))
     .reduce((count, entry) => count + Math.max(1, entry.item.quantity), 0);
   const twoWeaponFighting = (definition?.character?.feats ?? []).some((feat) => feat.id === "two-weapon-fighting");
-  for (const entry of equipped) {
+  // A Shield is strapped to one arm, so a Versatile weapon can't take its two-handed grip beside it.
+  const shieldInHand = equipped.some(
+    (entry) => entry.item.armor !== undefined && effectiveSlot(slotView(entry)) === "shield"
+  );
+  for (const equippedEntry of equipped) {
+    const entry = { ...equippedEntry, item: withCatalogWeaponFacts(equippedEntry, catalog!) };
     const swing = weaponSwing(entry.item, definition, weaponProficiencies, martialArtsInForce);
     if (!swing) continue;
     const weaponAttack = swing.action;
     actions.push(weaponAttack);
     weaponActionIds.push(weaponAttack.id);
+    const twoHanded = shieldInHand
+      ? null
+      : weaponSwing(entry.item, definition, weaponProficiencies, martialArtsInForce, { twoHanded: true });
+    if (twoHanded) {
+      actions.push(twoHanded.action);
+      weaponActionIds.push(twoHanded.action.id);
+    }
+    const heavy = heavyWeaponCarrier(entry.item, definition);
+    if (heavy) carriers.push(heavy);
     // A template row bound via `baseId` is that base weapon, so it carries the base's mastery and a pick
     // on that weapon kind covers it (SRD picks are per weapon kind).
     const baseRecord = entry.item.baseId !== undefined ? catalog!.equipmentRecord(entry.item.baseId) : undefined;
     const mastery = entry.record?.weapon?.mastery ?? baseRecord?.weapon?.mastery;
     const unlockedHere =
-      unlocked.has(entry.item.id) || (entry.item.baseId !== undefined && unlocked.has(entry.item.baseId));
+      unlocked.has(catalogIdOf(entry.item)) || (entry.item.baseId !== undefined && unlocked.has(entry.item.baseId));
     // The weapon has a mastery, the bearer unlocked this weapon, and the engine implements it.
     const inForce: MasteryInForce | null =
       mastery && unlockedHere && masteryReaches(mastery)
         ? { id: mastery, abilityModifier: weaponAbilityModifier(entry.item, definition, martialArtsInForce) }
         : null;
     if (inForce) masteryByActionId[weaponAttack.id] = inForce;
+    if (inForce && twoHanded) masteryByActionId[twoHanded.action.id] = inForce;
     // The extra attacks the weapon can make beside its own (not Extra Attack's to multiply, so not weapon swings
     // for `weaponActionIds`). The Light one carries the weapon's mastery; Cleave's is the mastery itself.
     if (entry.item.weapon?.properties?.includes("light") && lightWeaponsInHand >= 2) {
@@ -421,6 +547,11 @@ export function deriveEquipment(
   if (definition?.actions.some((action) => action.id === UNARMED_STRIKE_ACTION_ID && action.attack !== undefined)) {
     weaponActionIds.push(UNARMED_STRIKE_ACTION_ID);
   }
+
+  // Armor training counts what items grant in this same recomputation (Elven Chain-style training).
+  const training = armorTrainingGaps(withResolvedSlots(actor.inventory, catalog), definition, armorProficiencies);
+  const body = equipped.find((entry) => entry.item.armor !== undefined && effectiveSlot(slotView(entry)) === "armor");
+  carriers.push(...bodyArmorCarriers(body, definition, training.untrainedArmor !== null));
 
   // The standing + conditional pass: riders naming no moment whose static and dynamic gates pass.
   const context = bearerContext(actor, definition, equipped, {
@@ -456,7 +587,55 @@ export function deriveEquipment(
     actions,
     weaponActionIds,
     masteryByActionId,
-    sources
+    sources,
+    attunementSlots: sumRiders(standing, "attunement-slots"),
+    ...training
+  };
+}
+
+/** A weapon row with the catalog's melee band and Versatile die filled in, for rows stored before the row carried
+ *  them (a bound template reads its base's). The row's own values win. */
+function withCatalogWeaponFacts(entry: ActiveItem, catalog: EquipmentCatalog): InventoryItem {
+  const weapon = entry.item.weapon;
+  if (!weapon) return entry.item;
+  const versatile = weapon.properties?.includes("versatile") === true;
+  if (weapon.melee !== undefined && (weapon.versatileDice !== undefined || !versatile)) return entry.item;
+  const stats =
+    entry.record?.weapon ??
+    (entry.item.baseId !== undefined ? catalog.equipmentRecord(entry.item.baseId)?.weapon : undefined);
+  if (!stats) return entry.item;
+  return {
+    ...entry.item,
+    weapon: {
+      ...weapon,
+      ...(weapon.melee === undefined && stats.melee !== undefined ? { melee: stats.melee } : {}),
+      ...(weapon.versatileDice === undefined && versatile && stats.versatileDice
+        ? { versatileDice: stats.versatileDice }
+        : {})
+    }
+  };
+}
+
+/** SRD Heavy: Disadvantage on attack rolls with a Heavy Melee weapon below Strength 13, or a Heavy Ranged weapon
+ *  below Dexterity 13. A carrier scoped to this weapon, so it rides the attack roll's roll-mode claims. */
+function heavyWeaponCarrier(item: InventoryItem, definition: ActorDefinition | undefined): RiderCarrier | null {
+  const weapon = item.weapon;
+  if (!weapon?.properties?.includes("heavy") || !definition) return null;
+  const melee = isMeleeWeapon(weapon.properties, weapon.rangeFeet, weapon.melee);
+  if (definition.abilityScores[melee ? "str" : "dex"] >= 13) return null;
+  return {
+    label: `${item.name} is Heavy (${melee ? "Strength" : "Dexterity"} under 13)`,
+    sourceItemId: item.id,
+    isWeapon: true,
+    modifiers: [
+      {
+        type: "roll-mode",
+        roll: "attack",
+        mode: "disadvantage",
+        scope: "this-item",
+        when: [{ type: "on-attack-roll" }]
+      }
+    ]
   };
 }
 
@@ -465,6 +644,14 @@ function defencesOf(riders: readonly ResolvedRider[], type: "damage-resistance" 
   return riders.flatMap((rider) =>
     rider.modifier.type === type ? (rider.modifier.damageTypes ?? []).map((id) => ({ id, source: rider.label })) : []
   );
+}
+
+/** "The GM chooses the type": the row's pick replaces the record's printed resistance, when it is one of the
+ *  record's choices. */
+function withChosenResistance(record: EquipmentReference, item: InventoryItem): EquipmentReference {
+  const chosen = item.chosenDamageType;
+  if (!chosen || !record.grants || !record.damageTypeChoice?.includes(chosen)) return record;
+  return { ...record, grants: { ...record.grants, damageResistances: [chosen] } };
 }
 
 function summarise(record: RiderBlock | EquipmentReference): string {
@@ -547,7 +734,7 @@ export function withResolvedSlots(
 ): readonly (InventoryItem & { slot?: string })[] {
   if (!catalog) return inventory;
   return inventory.map((item) => {
-    const slot = catalog.equipmentRecord(item.id)?.slot ?? item.magic?.slot;
+    const slot = catalog.equipmentRecord(catalogIdOf(item))?.slot ?? item.magic?.slot;
     return slot === undefined ? item : { ...item, slot };
   });
 }

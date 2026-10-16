@@ -173,6 +173,7 @@ const ON_FAIL_EFFECT_FIELDS = {
   tags: "player",
   linkedConditionIds: "player",
   escapeDc: "player",
+  modifiers: "player",
   duration: "player",
   repeatSave: "player",
   endsOnDamage: "player",
@@ -388,6 +389,8 @@ const PLAYER_ACTOR_FIELDS = {
   conditions: "table",
   deathSaves: "table",
   armorClass: "party",
+  // Only says the GM set the character's AC by hand; the number is `armorClass`, which the party already sees.
+  armorClassOverride: "party",
   initiative: "party",
   speedFeet: "party",
   definitionId: "party",
@@ -403,6 +406,7 @@ const PLAYER_ACTOR_FIELDS = {
   spellSlots: "derived",
   pactSlots: "derived",
   preparedSpellIds: "derived",
+  preparation: "derived",
   inventory: "derived",
   currency: "derived",
   notes: "never",
@@ -424,6 +428,13 @@ const PARTY_FIELDS = (Object.keys(PLAYER_ACTOR_FIELDS) as (keyof Actor)[]).filte
 ) as FieldsFor<"table" | "party">[];
 
 /** Copies the listed fields, leaving out optional ones that are unset. */
+/** A carried row for a player. The GM's pick of a resistance type stays the GM's until the bearer attunes, when
+ *  the item's properties are learned (and the resistance starts to apply). */
+function playerInventoryRow(item: Actor["inventory"][number]): Actor["inventory"][number] {
+  const { chosenDamageType, ...row } = item;
+  return chosenDamageType !== undefined && item.attuned ? { ...row, chosenDamageType } : row;
+}
+
 function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): Pick<Actor, K> {
   const picked: Partial<Pick<Actor, K>> = {};
   for (const key of keys) if (source[key] !== undefined) picked[key] = structuredClone(source[key]);
@@ -439,7 +450,7 @@ function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): P
  * | --------------------------------------- | ---- | --- | -------------- | ---------- | ------------------- |
  * | (the actor entry exists at all)         |  Y   |  Y  |       Y        |     Y      |          Y          |
  * | id, name, kind, visibility              |  Y   |  Y  |       Y        |     Y      |          Y          |
- * | armorClass, initiative, speedFeet       |  Y   |  Y  |       Y        |     Y      |          Y          |
+ * | armorClass(Override), initiative, speed |  Y   |  Y  |       Y        |     Y      |          Y          |
  * | size, sizeCells, tokenAssetId           |  Y   |  Y  |       Y        |     Y      |          Y          |
  * | definitionId, conditions, deathSaves    |  Y   |  Y  |       Y        |     Y      |          Y          |
  * | hp (exact for a PC), effects (masked)   |  Y   |  Y  |       Y        |     Y      |          Y          |
@@ -448,6 +459,7 @@ function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): P
  * | definition (the imported sheet)         |  Y   |  -  |       -        |     Y      |          Y          |
  * | actionUses, hitDice                     |  Y   |  -  |       -        |     -      |          Y          |
  * | spellSlots, pactSlots, preparedSpellIds |  Y   |  -  |       -        |     -      |          Y          |
+ * | preparation (Long Rest prepare step)    |  Y   |  -  |       -        |     -      |          Y          |
  * | inventory, currency                     |  Y   |  -  |       -        |     -      |          Y          |
  * | notes, ownerSessionId, conditionImmunities, legendary, lastUsedAt, archived, sheetPreview, lastLongRestAt:   |
  * | never, at any tier.                                                                                            |
@@ -508,6 +520,7 @@ export function projectPlayerView(
           spellSlots,
           pactSlots,
           preparedSpellIds,
+          preparation,
           inventory,
           currency,
           replaySceneId
@@ -564,7 +577,8 @@ export function projectPlayerView(
                 spellSlots: spellSlots === null ? null : spellSlots.map((slot) => ({ ...slot })),
                 pactSlots: pactSlots === null ? null : { ...pactSlots },
                 preparedSpellIds: [...preparedSpellIds],
-                inventory: inventory.map((item) => ({ ...item })),
+                preparation: preparation === null ? null : { ...preparation },
+                inventory: inventory.map(playerInventoryRow),
                 currency: { ...currency }
               }
             : {}),
