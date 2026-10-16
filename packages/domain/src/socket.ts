@@ -47,6 +47,7 @@ import type {
   ActorRechooseSchema,
   ActorRemoveSchema,
   ActorRestSchema,
+  ActorReviveSchema,
   ActorSetSpeedSchema,
   ActorSpendHitDiceSchema,
   AddCombatantSchema,
@@ -409,6 +410,11 @@ export interface ClientToServerEvents {
   ) => void;
   "actor:rest": (
     payload: CommandPayload<typeof ActorRestSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: bring a dead creature back with the hit points the revival gives. */
+  "actor:revive": (
+    payload: CommandPayload<typeof ActorReviveSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** Re-make a pick a feature says may be re-made on a rest (Circle of the Land's land type, Fiendish Resilience's damage type). `offer` is the offer key the build already uses. */

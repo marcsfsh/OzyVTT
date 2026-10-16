@@ -1,5 +1,6 @@
+import { isDead } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
-import { healActor } from "../hit-points.js";
+import { deadCantHealLine, healActor } from "../hit-points.js";
 import { recordRoll, type LiveActor, type ResolveContext } from "./context.js";
 
 /** Healing (Cure Wounds): rolled once, and every target regains it on the resolve. A willing creature's healing has
@@ -14,6 +15,11 @@ export function applyHealing(ctx: ResolveContext): void {
   recordRoll(ctx, rolled, "healing");
   const shares = sharesOf(targets, Math.max(0, rolled.total), healing);
   const healed = targets.map((target, index) => {
+    // SRD "Dead": the cast reaches the others, and a dead target regains nothing until it is revived.
+    if (isDead(target)) {
+      tableNarration.push({ kind: "heal", text: deadCantHealLine(target.name), actorIds: [target.id] });
+      return { targetId: target.id, targetName: target.name, regained: 0 };
+    }
     const before = target.hp.current;
     // The cast is already authorized; the caster heals whoever it targeted.
     const events = healActor(state, target.id, shares[index], { role: "gm" });

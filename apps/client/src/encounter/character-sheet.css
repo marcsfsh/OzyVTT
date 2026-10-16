@@ -45,6 +45,11 @@
 .sheet-hp-meter {
   margin: 0.3rem 0 0.1rem;
 }
+.sheet-vital-note {
+  margin: 0.3rem 0 0;
+  color: var(--danger-text);
+  font-size: var(--fs-sm);
+}
 /* `.sheet-vital` is `isolation: isolate` (it keeps its `z-index: -1` backing layer inside), which
    traps the open combobox list's z-index inside the chip, so later positioned elements cover it and
    steal taps. The chip is lifted while a list is open instead; 3 clears `.sheet-float-resize` (2). */

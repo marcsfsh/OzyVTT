@@ -99,6 +99,10 @@ A design study of Foundry's dnd5e system (MIT code; studied, never copied) ident
 
 Still open after this amendment: Rage's 10-minute cap and Persistent Rage's longer form, the second stage of two-stage saves (a basilisk's Petrified, Sleep's Unconscious), escape checks for spell restraints (Entangle, Web), Fast Movement and Roving in Heavy armor (their Speed is baked into the sheet), and ending a swallowed creature's conditions when the swallower dies.
 
+## Amendment — 2026-10-16 (death, stabilizing and rests)
+
+39. **One "dead" rule.** `isDead` (`packages/domain`) decides it for every path: a character on a third failed death save (massive damage counts as three), anyone at Exhaustion 6, and a monster or NPC at 0 HP (SRD Monster Death) unless it lies Unconscious there. A dead creature regains nothing: healing (an `actor.heal`, a spell's or feature's heal, which narrates the skip for that target) and a GM `actor.set-hp` above 0 are refused, and no rest or Hit Die applies. The only way back is the GM-only `actor.revive` with the hit points the revival gives: the dying state and its Unconscious end, Exhaustion drops a level, attunement ends, other conditions stay. A rest and spending Hit Dice need at least 1 HP (SRD Resting), so item 8's "dying reset" no longer happens on a long rest. A rebuild leaves a character at 0 HP at 0, so a level up never revives one either.
+
 ## Mobile, security, and visibility impact
 
 All validation, rolls, and effect lifecycle run server-side; phones and desktops see identical outcomes. Blocked rows stay tappable in the GM UI — the server rejection opens the one-tap override dialog, so the client never gates (server authority, CLAUDE.md rule 2). New projection fields are explicit allowlists: effects reach players without source actor/action ids (hidden sources masked as "A hidden threat"), a hidden combatant's turn instance and per-turn uses project as idle, limited-use spending travels only to the owning player, and the public viewer projection is unchanged.

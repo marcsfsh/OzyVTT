@@ -705,6 +705,15 @@ export const ActorRestSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** Bring a dead creature back (GM): the hit points the revival gives, clamped to 1 and the maximum. */
+export const ActorReviveSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    hitPoints: z.number().int().min(1).max(10000),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 /** Re-make a pick a feature allows on a rest (`replaces`); `id` must be one the original pick allowed. */
 export const ActorRechooseSchema = z
   .object({

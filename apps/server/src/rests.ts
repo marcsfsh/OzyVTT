@@ -1,11 +1,11 @@
-import { makeHitDicePool, type GameState, type HitDiceEntry } from "@vtt/domain";
+import { isDead, makeHitDicePool, type GameState, type HitDiceEntry } from "@vtt/domain";
 import type { Actor, ActorDefinition } from "@vtt/schemas";
 import { abilityModifier as scoreModifier } from "@vtt/rules-5e";
 import { pactSlotMaximum, spellSlotMaxima } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
 import { effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
-import { endEffectsAtLongRest, removeConditionDirect, type EffectNarration } from "./effects.js";
+import { endEffectsAtLongRest, reduceExhaustion, removeConditionDirect, type EffectNarration } from "./effects.js";
 import { requireActorAccess, type Initiator } from "./authorization.js";
 import { healActor } from "./hit-points.js";
 
@@ -47,6 +47,7 @@ export function spendHitDice(
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
     throw new CommandRejectedError("Hit Dice are spent on a rest - end the encounter first.");
+  refuseRestAtZero(actor, "Hit Dice are spent on a Short Rest, which needs");
   if (!actor.hitDice)
     throw new CommandRejectedError(`${actor.name} has no Hit Dice pool (its stat block has no hit-point formula).`);
   if (actor.hitDice.remaining < count || faces.length < count)
@@ -62,6 +63,14 @@ export function spendHitDice(
   return { healed, events, conModifier };
 }
 
+/** SRD Resting: "To start a Short Rest [or a Long Rest], you must have at least 1 Hit Point", and nothing brings
+ *  the dead back but a revival. `needs` finishes the refusal: what asks for that 1 Hit Point. */
+function refuseRestAtZero(actor: Actor, needs: string): void {
+  if (isDead(actor)) throw new CommandRejectedError(`${actor.name} is dead - a rest can't bring them back.`);
+  if (actor.hp.current < 1)
+    throw new CommandRejectedError(`${actor.name} has 0 Hit Points - ${needs} at least 1. Heal them first.`);
+}
+
 /** Which re-choices a rest ends: a short rest clears those naming it; a long rest clears everything. */
 function clearOverrides(overrides: Actor["choiceOverrides"], kind: "long" | "short"): Actor["choiceOverrides"] {
   if (kind === "long") return {};
@@ -69,10 +78,11 @@ function clearOverrides(overrides: Actor["choiceOverrides"], kind: "long" | "sho
 }
 
 /**
- * Applies a rest to a rostered actor outside combat (SRD Resting, ADR-0020).
+ * Applies a rest to a rostered actor outside combat (SRD Resting, ADR-0020). Either needs at least 1 Hit Point, so
+ * the dying and the dead get nothing from it.
  * Short: per-short-rest and recharge pools re-arm; healing is only by spending Hit Point Dice.
- * Long: Concentration and turn-measured effects end first (onEnd grants land), then HP to max, temp HP cleared, dying
- * cleared, all pools refreshed, all Hit Point Dice restored, Exhaustion drops one level.
+ * Long: Concentration and turn-measured effects end first (onEnd grants land), then HP to max, temp HP cleared, all
+ * pools refreshed, all Hit Point Dice restored, Exhaustion drops one level.
  */
 export function applyRest(
   state: GameState,
@@ -85,6 +95,7 @@ export function applyRest(
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
     throw new CommandRejectedError("End the encounter before resting a combatant who is in it.");
+  refuseRestAtZero(actor, `a ${kind === "long" ? "Long" : "Short"} Rest needs`);
   const events: EffectNarration[] = [];
   if (kind === "short") {
     const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
@@ -114,14 +125,7 @@ export function applyRest(
   actor.actionUses = {};
   // Both kinds lapse on a long rest.
   actor.choiceOverrides = clearOverrides(actor.choiceOverrides, "long");
-  const exhaustion = actor.conditions.find((condition) => condition.id === "exhaustion");
-  if (exhaustion) {
-    if ((exhaustion.level ?? 1) <= 1) removeConditionDirect(actor, "exhaustion");
-    else
-      actor.conditions = actor.conditions.map((condition) =>
-        condition.id === "exhaustion" ? { ...condition, level: (condition.level ?? 1) - 1 } : condition
-      );
-  }
+  reduceExhaustion(actor);
   // SRD long rest: spell slots (and Pact Magic) refill and prepared spells reset to the sheet's defaults.
   // No spellcasting leaves these untouched.
   const longRestDefinition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;

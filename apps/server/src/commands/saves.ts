@@ -164,7 +164,7 @@ export const saveCommands = [
           throw new CommandRejectedError("That character isn't dying.");
         if (actor.deathSaves.stable) throw new CommandRejectedError("A stable character doesn't roll death saves.");
         if (actor.deathSaves.failures >= 3)
-          throw new CommandRejectedError("That character is dead - heal or revive them through the GM.");
+          throw new CommandRejectedError("That character is dead - only a revival brings them back.");
         // In a fight a death save comes once, at the start of the dying creature's turn. The GM may roll
         // one any time, as a correction.
         const inFight = draft.combat.active && draft.combat.initiative.some((entry) => entry.actorId === actorId);

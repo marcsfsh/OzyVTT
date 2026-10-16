@@ -1,4 +1,4 @@
-import type { RollRecord } from "@vtt/domain";
+import { isDead, type RollRecord } from "@vtt/domain";
 import { setCondition } from "../actor-conditions.js";
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { replaceableOffers } from "../choice-overrides.js";
@@ -6,6 +6,7 @@ import type { EffectNarration } from "../effects.js";
 import {
   ActorRechooseSchema,
   ActorRestSchema,
+  ActorReviveSchema,
   ActorSpendHitDiceSchema,
   ApplyDamageSchema,
   HpAmountSchema,
@@ -15,10 +16,13 @@ import {
 } from "@vtt/domain/commands";
 import { CommandRejectedError } from "../game-store.js";
 import {
+  adjustableActor,
   applyDamageDetailed,
   damageAdjustmentDetail,
+  deadCantHealLine,
   healActor,
   isSrdDamageType,
+  reviveActor,
   setCurrentHp,
   setMaximumHp,
   setTemporaryHp,
@@ -142,7 +146,8 @@ export const actorHealthCommands = [
   defineCommand({
     type: "actor.heal",
     operationId: "healActor",
-    description: "Heals hit points up to the maximum. Player sessions may target only their claimed character.",
+    description:
+      "Heals hit points up to the maximum. A dead creature can't regain hit points (refused; `actor.revive` brings it back first). Player sessions may target only their claimed character.",
     summary: "Heal hit points (GM anyone; a player their claimed character).",
     schema: HpAmountSchema,
     malformed: "The healing command is malformed.",
@@ -150,6 +155,8 @@ export const actorHealthCommands = [
       const { actorId, amount } = request;
       let events: EffectNarration[] = [];
       const { duplicate } = await execute((state) => {
+        const target = adjustableActor(state, actorId, initiatorOf(principal));
+        if (isDead(target)) throw new CommandRejectedError(deadCantHealLine(target.name));
         events = healActor(state, actorId, amount, initiatorOf(principal));
       });
       if (duplicate) return;
@@ -176,9 +183,31 @@ export const actorHealthCommands = [
   }),
 
   defineCommand({
+    type: "actor.revive",
+    operationId: "reviveActor",
+    description:
+      "Brings a dead creature back to life with the given hit points (SRD Dead: only magic such as Revivify or Raise Dead revives one; the GM applies it). The dying state and its Unconscious end, a creature that died with Exhaustion returns one level lower, and its magic items are no longer attuned. Refused for a creature that isn't dead. GM-grade only.",
+    summary: "Revive a dead creature with the given hit points (GM).",
+    schema: ActorReviveSchema,
+    malformed: "The revive command is malformed.",
+    gmOnly: "Only the GM can revive a creature.",
+    async run({ principal, request, execute }, kit) {
+      let events: EffectNarration[] = [];
+      const { duplicate } = await execute((state) => {
+        events = reviveActor(state, request.actorId, request.hitPoints, initiatorOf(principal), {
+          resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
+          catalog: kit.equipmentCatalog()
+        });
+      });
+      if (!duplicate) kit.publishNarrations(events);
+    }
+  }),
+
+  defineCommand({
     type: "actor.set-hp",
     operationId: "setCurrentHp",
-    description: "Sets current hit points directly, and optionally the hit point maximum first (GM-grade only).",
+    description:
+      "Sets current hit points directly, and optionally the hit point maximum first (GM-grade only). Raising a dead creature's hit points is refused: `actor.revive` brings it back.",
     summary: "Set current (and maximum) hit points directly (GM).",
     schema: SetHpSchema,
     malformed: "The hit point command is malformed.",
@@ -290,7 +319,7 @@ export const actorHealthCommands = [
     type: "actor.rest",
     operationId: "restActor",
     description:
-      "Applies a rest to a rostered actor outside combat; a player session may rest only their claimed character, the GM anyone. Long: the actor's Concentration and its effects measured in turns or rounds end (their on-end grants fire first; effects that last until ended stay), hit points restore to maximum, temporary HP clears, the dying state resets, limited-use pools refresh, all spent Hit Point Dice restore, spell slots and prepared spells reset to the sheet defaults, and Exhaustion drops one level. Short: per-short-rest and recharge pools re-arm; healing is the separate spend-hit-dice call.",
+      "Applies a rest to a rostered actor outside combat; a player session may rest only their claimed character, the GM anyone. Either rest needs at least 1 hit point (SRD) and is refused for a creature at 0 or dead. Long: the actor's Concentration and its effects measured in turns or rounds end (their on-end grants fire first; effects that last until ended stay), hit points restore to maximum, temporary HP clears, limited-use pools refresh, all spent Hit Point Dice restore, spell slots and prepared spells reset to the sheet defaults, and Exhaustion drops one level. Short: per-short-rest and recharge pools re-arm; healing is the separate spend-hit-dice call.",
     summary:
       "Take a rest on your own character (GM: anyone): short re-arms short-rest uses; long restores HP, hit dice, spell slots, prepared spells, limited uses, clears dying, and drops one Exhaustion level.",
     schema: ActorRestSchema,
@@ -319,7 +348,7 @@ export const actorHealthCommands = [
     type: "actor.spend-hit-dice",
     operationId: "spendHitDice",
     description:
-      "Spends Hit Point Dice to heal (SRD Short Rest: each die heals its roll + Con modifier, minimum 1). Rejected while the actor is in an active encounter. Player sessions may target only their claimed character; the dice land in the shared roll history.",
+      "Spends Hit Point Dice to heal (SRD Short Rest: each die heals its roll + Con modifier, minimum 1). Rejected while the actor is in an active encounter, and at 0 hit points or dead (a Short Rest needs at least 1). Player sessions may target only their claimed character; the dice land in the shared roll history.",
     summary: "Spend Hit Point Dice to heal on a short rest (roll + Con modifier each, minimum 1).",
     schema: ActorSpendHitDiceSchema,
     malformed: "The hit-dice command is malformed.",
