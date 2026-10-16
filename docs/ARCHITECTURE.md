@@ -185,13 +185,17 @@ counted on its row too (`ammunition.ts`): a shot from an Ammunition weapon needs
 and spends one, and half of the pieces fired come back when the encounter ends. Magic ammunition is bound to a
 kind when it is added, like a magic weapon to its base, so +1 bolts fit only a crossbow, and its bonus rides only
 the shot that draws it. A shot outside a fight spends a piece too, and `character.recover-ammunition` picks up
-half of them. A potion or a flask whose
-record is `consumedOnUse` acts from the pack and leaves the stack one smaller each time (`consumables.ts`).
-A thrown flask takes one attack of the Attack action (`replacesAttack`). Alchemist's Fire sets its target
-burning and Oil covers it (`save.failureHazard`, `hazards.ts`): a burning creature takes 1d4 Fire at the start
-of each of its turns until it uses the Put Out the Fire action, which leaves it Prone, and Fire damage on an
-oiled creature within the minute deals 5 more. Antitoxin and a coat of Basic Poison are effects the item
-grants its user; a coat's damage lasts a set number of hits (`damageUses`), in a fight or out of one.
+half of them. A potion, a flask or a Spell Scroll whose record is `consumedOnUse` acts from the pack and leaves
+the stack one smaller each time (`consumables.ts`). A Spell Scroll's row bears the one spell picked when it was
+added (`spellId`). Reading it casts that spell like an item's cast, at the spell's own level with the scroll
+table's save DC and attack bonus and no slot, for a reader whose class spell lists have it; a spell above the
+levels the reader can cast takes a spellcasting ability check (DC 10 + its level) first, and a failure loses the
+scroll with nothing cast (`scrolls.ts`). A thrown flask takes one attack of the Attack action (`replacesAttack`).
+Alchemist's Fire sets its target burning and Oil covers it (`save.failureHazard`, `hazards.ts`): a burning
+creature takes 1d4 Fire at the start of each of its turns until it uses the Put Out the Fire action, which leaves
+it Prone, and Fire damage on an oiled creature within the minute deals 5 more. Antitoxin and a coat of Basic
+Poison are effects the item grants its user; a coat's damage lasts a set number of hits (`damageUses`), in a fight
+or out of one.
 
 What a save does is data on the action's save block, not read from its description: `successDamage`
 (half or none) and the `failureCondition` a failed save imposes. They are written where the content

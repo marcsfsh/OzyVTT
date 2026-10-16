@@ -16,6 +16,7 @@ import type { DefinitionAction, ResolveContext, ResolveDependencies, ResolveInpu
 import { rollRiderDamage, rollWeaponDamage, spendDamageUses } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
+import { readScroll } from "./resolution/scroll.js";
 import { applyHealing } from "./resolution/heal.js";
 import { recordCleaveOpening, recordLightAttack, recordLoadingShot } from "./resolution/extra-attacks.js";
 import { applyMasteryForces, masterySwingOf, offeredPush, spendSap, spendVex } from "./resolution/masteries.js";
@@ -45,6 +46,12 @@ export function resolveDefinitionAction(
   const ctx = openResolve(state, action, input, deps);
   ctx.builtin?.check?.(ctx);
   ctx.builtin?.apply?.(ctx);
+  // A failed check to read a scroll spends the cast and the scroll, and nothing else happens.
+  if (readScroll(ctx)) {
+    commitEconomy(ctx);
+    useUpConsumable(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
   rollAttack(ctx);
   // Preview: the d20 is rolled and shown, nothing else applies. The economy was validated already, so an
   // illegal attack is blocked before the preview roll.

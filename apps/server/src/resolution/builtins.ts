@@ -45,7 +45,7 @@ function skillBonusFromExtension(definition: ActorDefinition | undefined, skill:
 /** One d20 plus `modifier`, Exhaustion and the check-bonus riders, with `roll-mode {roll: "check"}` riders, both
  *  narrowed to the check's ability and skill (Boots of Elvenkind on Hide) as the sheet's rows are, recorded like
  *  any roll. Null success: no DC, the GM adjudicates. */
-function rollCheck(
+export function rollCheck(
   ctx: ResolveContext,
   label: string,
   narrow: CheckNarrowing,

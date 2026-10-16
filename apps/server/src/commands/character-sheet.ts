@@ -122,7 +122,8 @@ export const characterSheetCommands = [
         requireActorAccess(initiatorOf(principal), state, actorId, "inventory");
         setInventoryItem(state, actorId, item, (definitionId) => kit.resolveDefinitionIn(state, definitionId), {
           catalog: kit.equipmentCatalog(),
-          role: initiatorOf(principal).role
+          role: initiatorOf(principal).role,
+          pickableSpell: (spellId) => kit.catalogFor(principal).spellRecord(spellId)
         });
       });
     }

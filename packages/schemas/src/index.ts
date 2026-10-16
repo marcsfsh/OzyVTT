@@ -746,6 +746,13 @@ export const InventoryItemSchema = z
     /** The type the GM picked for an item whose record lets the GM choose its resistance (Ring of Resistance). Only
      *  the GM sets it; the server checks it against the record's `damageTypeChoice`. */
     chosenDamageType: DamageTypeSchema.optional(),
+    /** The spell a Spell Scroll bears, picked when it is added. The server checks it against the scroll's levels;
+     *  every copy in the row bears it. */
+    spellId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional(),
     /** Ammunition pieces left in a row sold in bundles ("Arrows (20)"), when some are spent; absent = every bundle
      *  full. The server keeps it: shots spend it and a quantity change moves it by whole bundles. */
     ammunitionLeft: z.number().int().min(0).max(1_000_000).optional(),

@@ -212,6 +212,8 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       '"The GM chooses the type" (Ring of Resistance, Dragon Scale Mail): the types the GM may pick for the ONE resistance in `grants.damageResistances`, which is the printed default until the GM picks. The pick is stored per carried copy as the row\'s `chosenDamageType`, which only the GM can set',
     vulnerableToOtherChoices:
       "Armor of Vulnerability's curse: while the bearer is attuned, worn or not, Vulnerability to every `damageTypeChoice` type except the one it resists. Needs `cursed` and `damageTypeChoice`",
+    spellScroll:
+      "A Spell Scroll: each carried copy bears one spell of these levels (0 is a cantrip), stored as the row's `spellId` and checked by the server when it is added. Reading it casts the spell at its level with the Spell Scroll table's save DC and attack bonus, no spell slot and no Material components, and uses it up; a reader whose spell list lacks the spell can't read it, and one above the reader's levels needs a check first. Needs `consumedOnUse`",
     grantsFeatIds:
       "Feats the item grants while active. Depth 1, no transitive expansion, and the grant edge is one-directional - nothing ever grants an item back - so a cycle cannot be drawn rather than merely being checked for",
     tags: "Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity)",
@@ -1378,6 +1380,8 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       "What an Ammunition weapon fires (the Weapons table's \"Ammunition (Range 150/600; Arrow)\"); a Sling's bullets and a firearm's are different items",
     "equipment[].damageTypeChoice":
       "The damage types the GM may pick for the item's resistance, as the SRD prints them (absent when the item has no such choice)",
+    "equipment[].spellScroll":
+      "The spell levels one copy of a Spell Scroll can bear (0 is a cantrip), for the picker's spell step; absent on anything else",
     "equipment[].appliesTo":
       'The eligibility column for a TEMPLATE magic item - the printed type-line qualifier ("Any Simple or Martial") plus the base ids it RESOLVED to at build/authoring time. Null everywhere except weapon, armor and ammunition templates (the bases of magic ammunition are the kinds of ammunition, which decide the launchers that fire it). A template row derives nothing until the player\'s pick binds it to one of `baseIds`, validated and copied server-side at set-inventory.'
   },

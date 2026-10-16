@@ -4,6 +4,7 @@ import { effectiveSlot } from "@vtt/rules-5e";
 import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
 import { hasEffectTag, RAGING_TAG } from "../effects.js";
 import { ammunitionFor, ammunitionLabel, launcherKind } from "../ammunition.js";
+import { SCROLL_UNREADABLE, scrollOfAction, scrollReading } from "../scrolls.js";
 import { armorTrainingGaps, type EquipmentCatalog } from "../equipment-derivation.js";
 import { RulesBlockedError } from "../game-store.js";
 import { isItemActionId, itemActionRest, TWO_HANDED_SUFFIX } from "../item-actions.js";
@@ -113,6 +114,7 @@ export function evaluateActionEconomy(
   checkHands(evaluation);
   checkArmorTraining(evaluation, definition);
   checkAmmunition(evaluation, catalog);
+  checkScrollLegible(evaluation, definition, catalog);
   if (!asHitRider) checkTakenAlone(evaluation);
   const spendUse = checkLimitedUse(evaluation);
   const slots = checkActionSlots(evaluation);
@@ -271,6 +273,19 @@ function checkAmmunition({ attacker, action, violations }: Evaluation, catalog: 
     rule: "attack.no-ammunition",
     message: `${attacker.name} has no ${ammunitionLabel(kind)} to fire from ${item.name}.`
   });
+}
+
+/** SRD Spell Scroll: "If the spell is on your spell list, you can read the scroll ... Otherwise, the scroll is
+ *  unintelligible." */
+function checkScrollLegible(
+  { attacker, action, violations }: Evaluation,
+  definition: ActorDefinition | undefined,
+  catalog: EquipmentCatalog | undefined
+): void {
+  const scroll = scrollOfAction(action, attacker.inventory, catalog);
+  if (!scroll) return;
+  const reading = scrollReading(definition, scroll.spell, catalog);
+  if (!reading.readable) violations.push({ rule: SCROLL_UNREADABLE, message: reading.message });
 }
 
 /** SRD Loading: "You can fire only one piece of ammunition from a Loading weapon when you use an action ... to fire

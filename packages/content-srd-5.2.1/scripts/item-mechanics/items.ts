@@ -548,8 +548,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // ---- The scroll ------------------------------------------------------------------------------
 
-  // `spell-scroll` - a per-copy template (spell, DC, attack bonus by level); one `spellId` would fix
-  // every scroll to one spell. Mint concrete scrolls in the homebrew editor.
+  // One spell per carried copy, of any level, picked when it is added; the DC and attack bonus come from
+  // the scroll table by the spell's level (the server's `scrolls.ts`).
+  "spell-scroll": { spellScroll: { minLevel: 0, maxLevel: 9 }, consumedOnUse: true },
 
   // ---- Staffs ----------------------------------------------------------------------------------
 

@@ -1,6 +1,7 @@
 import type { GameState } from "@vtt/domain";
 import { effectiveActions } from "../effective-actions.js";
 import { withShotAmmunitionOnly } from "../ammunition.js";
+import { consumableRowFor } from "../consumables.js";
 import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
 import { effectiveModeFor, overrideCovers, overrideReason, overrideWaives } from "../rules-families.js";
@@ -14,7 +15,8 @@ import { planEconomy, type EconomyPlan } from "./economy.js";
 function combatantsOf(
   state: GameState,
   action: DefinitionAction,
-  input: ResolveInput
+  input: ResolveInput,
+  catalog: ResolveDependencies["catalog"]
 ): { attacker: LiveActor; targets: LiveActor[] } {
   if (!state.combat.active) throw new CommandRejectedError("Start an encounter before resolving actions.");
   const inFight = (actorId: string) => state.combat.initiative.some((entry) => entry.actorId === actorId);
@@ -32,8 +34,12 @@ function combatantsOf(
   if (action.grants?.target === "target" && targets.length !== 1)
     throw new CommandRejectedError("Choose exactly one target for this action.");
   // A limited use or spell slot is itself the mechanic (Action Surge, Arcane Recovery, ...), so an
-  // action that only spends one resolves without a roll or a target.
-  const spendsALimitedUse = action.uses !== undefined || action.spellSlot !== undefined;
+  // action that only spends one resolves without a roll or a target; so does one that uses up an item (a scroll of
+  // Detect Magic read in the fight).
+  const spendsALimitedUse =
+    action.uses !== undefined ||
+    action.spellSlot !== undefined ||
+    consumableRowFor(action, attacker.inventory, catalog) !== null;
   const structuredWithoutTargets =
     (action.grants !== undefined && action.grants.target !== "target") ||
     action.healing?.self === true ||
@@ -64,7 +70,7 @@ export function openResolve(
   input: ResolveInput,
   deps: ResolveDependencies
 ): ResolveContext {
-  const { attacker, targets } = combatantsOf(state, action, input);
+  const { attacker, targets } = combatantsOf(state, action, input, deps.catalog);
   const warnings: string[] = [];
   const derived = deriveEquipment(attacker, deps.definition, deps.catalog);
   const siblings = effectiveActions(deps.definition, attacker, deps.catalog);

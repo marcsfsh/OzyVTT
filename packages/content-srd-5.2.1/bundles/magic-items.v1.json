@@ -7407,6 +7407,11 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
+  "spellScroll": {
+   "minLevel": 0,
+   "maxLevel": 9
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],

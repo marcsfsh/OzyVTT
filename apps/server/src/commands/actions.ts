@@ -1,5 +1,5 @@
 import type { RollRecord } from "@vtt/domain";
-import { rollDice } from "@vtt/rules-5e";
+import { d20TestFormula, rollDice } from "@vtt/rules-5e";
 import { resolveDefinitionAction } from "../action-resolution.js";
 import { addAnnotation, shapeGeometry } from "../annotations.js";
 import { tokensInTemplate } from "../area-targeting.js";
@@ -22,7 +22,10 @@ import { grantOutsideFight } from "../resolution/grant.js";
 import { lastChargeLine, lastChargeRollFor } from "../item-charges.js";
 import { consumableRowFor, withOneUsedUp } from "../consumables.js";
 import { ammunitionLabel, shotFrom, spendPiece } from "../ammunition.js";
-import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
+import { checkRollMode } from "../ability-checks.js";
+import { exhaustionPenalty } from "../condition-rules.js";
+import { checkRiderBonus, deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
+import { SCROLL_UNREADABLE, scrollCheckRoll, scrollLostLine, scrollOfAction, scrollReading } from "../scrolls.js";
 import { castSlotLevel } from "../resolution/economy.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, principalTag, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
@@ -243,7 +246,7 @@ export const actionCommands = [
     type: "action.use",
     operationId: "useAction",
     description:
-      "Uses an action and lets the SERVER decide what that means. In the fight on this creature's turn it delegates to the full structured resolution and acks `route: \"resolved\"`. Off turn it is refused with the overridable, askable rules block `economy.not-your-turn` (reactions and legendary actions are exempt - taking those off turn is the point); under an `economy` exception of advise/off it resolves, with a GM-only warning line under advise. With no fight running - or with this creature not in the turn order - the server rolls the action's own attack die (and, only with `includeDamage`, its damage parts) as attributed rolls, spends what the action costs (an item's charges or a feature's per-rest uses, and any spell slot an item cast consumes; refused when none remain; an item's last charge rolls its d20 for the GM), touches no combat state, and acks `route: \"loose\"` with the roll ids. An action with nothing to roll is still used, with a feed line. No hit points ever move on the loose route. GM-grade for any combatant, including a monster's sheet; a player session only for their own claimed character.",
+      "Uses an action and lets the SERVER decide what that means. In the fight on this creature's turn it delegates to the full structured resolution and acks `route: \"resolved\"`. Off turn it is refused with the overridable, askable rules block `economy.not-your-turn` (reactions and legendary actions are exempt - taking those off turn is the point); under an `economy` exception of advise/off it resolves, with a GM-only warning line under advise. With no fight running - or with this creature not in the turn order - the server rolls the action's own attack die (and, only with `includeDamage`, its damage parts) as attributed rolls, spends what the action costs (an item's charges or a feature's per-rest uses, and any spell slot an item cast consumes; refused when none remain; an item's last charge rolls its d20 for the GM), uses up a potion, flask or Spell Scroll and the shot's ammunition, reads a scroll only if the reader can (a spell above the reader's levels rolls its check first, and a failure loses the scroll with nothing else rolled), touches no combat state, and acks `route: \"loose\"` with the roll ids. An action with nothing to roll is still used, with a feed line. No hit points ever move on the loose route. GM-grade for any combatant, including a monster's sheet; a player session only for their own claimed character.",
     summary:
       "Use an action and let the SERVER route it: resolved in the fight on your turn, refused off turn, loose dice outside a fight (GM anyone; a player their own claimed character).",
     schema: ActionUseSchema,
@@ -340,14 +343,60 @@ export const actionCommands = [
       const plan = looseRollPlan(action, { includeDamage: includeDamage === true, ...(rollMode ? { rollMode } : {}) });
       const initiator = initiatorOf(principal);
       const rollIds = plan.map(() => kit.context.newId());
+      const scrollCheckId = kit.context.newId();
+      let scrollChecked = false;
+      let scrollLost: string | null = null;
       let spend: ReturnType<typeof spendLooseUses> = { usesLeft: null, spent: false };
       let lastCharge: string | null = null;
       let usedUp = false;
       let narrations: EffectNarration[] = [];
-      let ammunitionNote: string | null = null;
+      let rulesNote: string | null = null;
       const { state, duplicate } = await execute((draft) => {
         requireActorAccess(initiator, draft, actorId, "attack");
         const live = draft.actors.find((candidate) => candidate.id === actorId)!;
+        // A scroll outside a fight: one the reader can't read is refused, and a spell above their levels needs its
+        // check first. A failure loses the scroll, and nothing else is rolled.
+        const scroll = scrollOfAction(action, live.inventory, kit.equipmentCatalog());
+        scrollChecked = false;
+        scrollLost = null;
+        if (scroll) {
+          const catalog = kit.equipmentCatalog();
+          const reading = scrollReading(definition, scroll.spell, catalog);
+          if (!reading.readable) {
+            const mode = effectiveModeFor(draft.combat, SCROLL_UNREADABLE);
+            if (mode === "strict" && !overrideWaives(override, SCROLL_UNREADABLE))
+              throw new RulesBlockedError(SCROLL_UNREADABLE, reading.message);
+            if (mode !== "freeform") rulesNote = reading.message;
+          } else if (reading.check) {
+            const derivation = deriveEquipment(live, definition, catalog);
+            const check = scrollCheckRoll(definition, derivation, reading.check, scroll.spell.name);
+            const total = check.modifier + exhaustionPenalty(live) + checkRiderBonus(derivation, check.narrow);
+            const formula = d20TestFormula(checkRollMode(derivation, check.narrow).mode, total);
+            const resolution = rollDice(formula, (sides) => kit.context.random(sides));
+            recordRoll(draft, {
+              id: scrollCheckId,
+              commandId,
+              initiatorSessionId: sessionIdOf(principal),
+              initiatorRole: initiator.role,
+              initiatorLabel: live.name,
+              label: check.label,
+              actorId,
+              purpose: "check",
+              visibility: live.visibility === "gm-only" ? "gm-only" : "public",
+              formula,
+              normalizedFormula: resolution.expression.normalized,
+              ...rolledTerms(resolution),
+              total: resolution.total,
+              createdAt: new Date().toISOString()
+            });
+            scrollChecked = true;
+            if (resolution.total < reading.check.dc) {
+              scrollLost = scrollLostLine(live.name, scroll.spell.name);
+              live.inventory = withOneUsedUp(live.inventory, scroll.row.id);
+              return;
+            }
+          }
+        }
         // A shot outside a fight needs a piece to fire and spends it as in one; half come back when it is picked up.
         if (action.attack) {
           const catalog = kit.equipmentCatalog();
@@ -359,7 +408,7 @@ export const actionCommands = [
             const mode = effectiveModeFor(draft.combat, NO_AMMUNITION);
             if (mode === "strict" && !overrideWaives(override, NO_AMMUNITION))
               throw new RulesBlockedError(NO_AMMUNITION, message);
-            if (mode !== "freeform") ammunitionNote = message;
+            if (mode !== "freeform") rulesNote = message;
           }
         }
         // Rolling on the ground outside a fight puts the fire out all the same.
@@ -426,13 +475,24 @@ export const actionCommands = [
           });
         });
       });
-      if (duplicate) return { route: "loose", rollIds };
+      const usedRollIds = scrollLost !== null ? [scrollCheckId] : scrollChecked ? [scrollCheckId, ...rollIds] : rollIds;
+      if (duplicate) return { route: "loose", rollIds: usedRollIds };
       kit.publishRolls(state, commandId);
       kit.publishNarrations(narrations);
-      if (ammunitionNote !== null)
+      if (scrollLost !== null) {
         kit.context.appendLog({
           kind: "action",
-          text: `Rules note: ${ammunitionNote}`,
+          text: scrollLost,
+          actorId,
+          actorIds: [actorId],
+          gmOnly: kit.actorHidden(actorId)
+        });
+        return { route: "loose", rollIds: usedRollIds };
+      }
+      if (rulesNote !== null)
+        kit.context.appendLog({
+          kind: "action",
+          text: `Rules note: ${rulesNote}`,
           actorId,
           actorIds: [actorId],
           gmOnly: true
@@ -457,7 +517,7 @@ export const actionCommands = [
           gmOnly: kit.actorHidden(actorId)
         });
       }
-      return { route: "loose", rollIds };
+      return { route: "loose", rollIds: usedRollIds };
     }
   }),
 
