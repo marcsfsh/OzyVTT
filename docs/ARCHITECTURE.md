@@ -176,7 +176,9 @@ refuses a rider gated on a moment its reader never collects.
 A magic item's charges are an `actionUses` pool keyed by the carried row (`itemPool` in
 `item-actions.ts`), so two copies count separately and the count moves with the row when the GM hands
 it over (`character.give-item`). A long rest gives back the item's printed dice (`charges.regain`), not
-every charge, and spending the last one rolls the SRD's d20 for the GM (`item-charges.ts`).
+every charge, and spending the last one rolls the SRD's d20 for the GM (`item-charges.ts`). Ammunition is
+counted on its row too (`ammunition.ts`): a shot from an Ammunition weapon needs a piece of the kind it fires
+and spends one, and half of the pieces fired come back when the encounter ends.
 
 What a save does is data on the action's save block, not read from its description: `successDamage`
 (half or none) and the `failureCondition` a failed save imposes. They are written where the content

@@ -295,6 +295,8 @@
         "category": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 40 },
         "recordId": { "$ref": "#/$defs/slug" },
         "chosenDamageType": { "$ref": "#/$defs/damageType" },
+        "ammunitionLeft": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+        "ammunitionFired": { "type": "integer", "minimum": 0, "maximum": 10000 },
         "weapon": {
           "type": "object",
           "additionalProperties": false,

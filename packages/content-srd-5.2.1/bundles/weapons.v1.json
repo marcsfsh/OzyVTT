@@ -22,6 +22,7 @@
   "name": "Blowgun",
   "category": "martial",
   "melee": false,
+  "ammunition": "needle",
   "improvised": false,
   "mastery": "vex",
   "properties": [
@@ -200,6 +201,7 @@
   "name": "Hand Crossbow",
   "category": "martial",
   "melee": false,
+  "ammunition": "bolt",
   "improvised": false,
   "mastery": "vex",
   "properties": [
@@ -237,6 +239,7 @@
   "name": "Heavy Crossbow",
   "category": "martial",
   "melee": false,
+  "ammunition": "bolt",
   "improvised": false,
   "mastery": "push",
   "properties": [
@@ -293,6 +296,7 @@
   "name": "Light Crossbow",
   "category": "simple",
   "melee": false,
+  "ammunition": "bolt",
   "improvised": false,
   "mastery": "slow",
   "properties": [
@@ -330,6 +334,7 @@
   "name": "Longbow",
   "category": "martial",
   "melee": false,
+  "ammunition": "arrow",
   "improvised": false,
   "mastery": "slow",
   "properties": [
@@ -415,6 +420,7 @@
   "name": "Musket",
   "category": "martial",
   "melee": false,
+  "ammunition": "firearm-bullet",
   "improvised": false,
   "mastery": "slow",
   "properties": [
@@ -453,6 +459,7 @@
   "name": "Pistol",
   "category": "martial",
   "melee": false,
+  "ammunition": "firearm-bullet",
   "improvised": false,
   "mastery": "vex",
   "properties": [
@@ -524,6 +531,7 @@
   "name": "Shortbow",
   "category": "simple",
   "melee": false,
+  "ammunition": "arrow",
   "improvised": false,
   "mastery": "vex",
   "properties": [
@@ -577,6 +585,7 @@
   "name": "Sling",
   "category": "simple",
   "melee": false,
+  "ammunition": "sling-bullet",
   "improvised": false,
   "mastery": "slow",
   "properties": [

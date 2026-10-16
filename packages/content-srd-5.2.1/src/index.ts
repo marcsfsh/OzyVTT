@@ -157,6 +157,7 @@ export function loadEquipment(): readonly EquipmentReference[] {
         longRangeFeet: weapon.longRangeFeet,
         ...(weapon.melee !== undefined ? { melee: weapon.melee } : {}),
         ...(weapon.versatileDice !== undefined ? { versatileDice: weapon.versatileDice } : {}),
+        ...(weapon.ammunition !== undefined ? { ammunition: weapon.ammunition } : {}),
         mastery: weapon.mastery,
         properties: weapon.properties
       },

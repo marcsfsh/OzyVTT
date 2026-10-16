@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { GAME_PATHS } from "@vtt/api-contract";
 import { ActorDefinitionSchema } from "@vtt/schemas";
+import { recoverAmmunition } from "../src/ammunition.js";
 import { resolveDefinitionAction } from "../src/action-resolution.js";
 import { RulesBlockedError } from "../src/game-store.js";
 import {
@@ -11,6 +13,7 @@ import {
   fighterInput,
   IDS,
   resolveAt,
+  serve,
   tableOf,
   wizardInput,
   write
@@ -32,6 +35,7 @@ describe("Loading", () => {
   it("fires once per action whatever Extra Attack allows, and leaves the other attack to another weapon", () => {
     const table = tableOf({ [IDS.fighter]: fighterInput() });
     write(table, IDS.fighter, catalogRow("heavy-crossbow"));
+    write(table, IDS.fighter, catalogRow("crossbow-bolts-20", { equipped: false }));
     fight(table, IDS.fighter);
     resolveAt(table, IDS.fighter, "item-heavy-crossbow", [15, 4]);
     expect(blockedRule(() => resolveAt(table, IDS.fighter, "item-heavy-crossbow", [15, 4]))).toBe("attack.loading");
@@ -42,6 +46,7 @@ describe("Loading", () => {
   it("can follow another weapon's attack in the same action", () => {
     const table = tableOf({ [IDS.fighter]: fighterInput() });
     write(table, IDS.fighter, catalogRow("heavy-crossbow"));
+    write(table, IDS.fighter, catalogRow("crossbow-bolts-20", { equipped: false }));
     fight(table, IDS.fighter);
     resolveAt(table, IDS.fighter, "item-greatsword", [15, 4, 4]);
     expect(blockedRule(() => resolveAt(table, IDS.fighter, "item-heavy-crossbow", [15, 4]))).toBeNull();
@@ -102,6 +107,7 @@ describe("Heavy", () => {
     const table = tableOf({ [IDS.fighter]: fighterInput(), [IDS.wizard]: wizardInput() });
     write(table, IDS.wizard, catalogRow("greatsword"));
     write(table, IDS.wizard, catalogRow("longbow"));
+    write(table, IDS.wizard, catalogRow("arrows-20", { equipped: false }));
     fight(table, IDS.wizard);
     const swing = resolveAt(table, IDS.wizard, "item-greatsword", [15, 3, 4, 4]);
     expect(swing.rollMode?.disadvantage).toEqual(["Greatsword is Heavy (Strength under 13)"]);
@@ -222,5 +228,89 @@ describe("two copies of one magic item", () => {
     expect(() => write(table, IDS.fighter, edit(table, IDS.fighter, "weapon-1-2", { baseId: "shortsword" }))).toThrow(
       /already bound/
     );
+  });
+});
+
+describe("Ammunition", () => {
+  const cleanups: Array<() => Promise<void>> = [];
+  afterEach(async () => {
+    for (const cleanup of cleanups.splice(0)) await cleanup();
+  });
+  const row = (table: ReturnType<typeof tableOf>, id: string) =>
+    table.actor(IDS.fighter).inventory.find((entry) => entry.id === id);
+
+  it("spends one arrow a shot, hit or miss, from the bundles the fighter carries", () => {
+    // Fighter B and the Soldier kit: a Longbow and two Arrows (20).
+    const table = tableOf({ [IDS.fighter]: fighterInput("fighter-b") });
+    fight(table, IDS.fighter);
+    resolveAt(table, IDS.fighter, "item-longbow", [15, 4], {}, 30);
+    expect(row(table, "arrows-20")).toMatchObject({ quantity: 2, ammunitionLeft: 39, ammunitionFired: 1 });
+    // Extra Attack's second shot misses (3 + 4 against AC 10), and still spends an arrow.
+    resolveAt(table, IDS.fighter, "item-longbow", [3], {}, 30);
+    expect(row(table, "arrows-20")).toMatchObject({ quantity: 2, ammunitionLeft: 38, ammunitionFired: 2 });
+  });
+
+  it("refuses a bow with nothing to fire, and a crossbow with only arrows", () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput("fighter-b") });
+    write(table, IDS.fighter, edit(table, IDS.fighter, "arrows-20", { quantity: 0 }));
+    write(table, IDS.fighter, catalogRow("light-crossbow"));
+    fight(table, IDS.fighter);
+    expect(blockedRule(() => resolveAt(table, IDS.fighter, "item-longbow", [15, 4], {}, 30))).toBe(
+      "attack.no-ammunition"
+    );
+    write(table, IDS.fighter, catalogRow("arrows-20", { equipped: false }));
+    expect(blockedRule(() => resolveAt(table, IDS.fighter, "item-light-crossbow", [15, 4], {}, 30))).toBe(
+      "attack.no-ammunition"
+    );
+    expect(() => resolveAt(table, IDS.fighter, "item-light-crossbow", [15, 4], {}, 30)).toThrow(
+      "Borin has no bolts to fire from Light Crossbow."
+    );
+  });
+
+  it("draws +1 ammunition first while it is equipped, and a piece that hits is not recovered", () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput("fighter-b") });
+    write(table, IDS.fighter, catalogRow("ammunition-1", { quantity: 10 }));
+    fight(table, IDS.fighter);
+    // d20 15 + Dex 1 + PB 3 + the arrow's 1.
+    expect(resolveAt(table, IDS.fighter, "item-longbow", [15, 4], {}, 30).attack?.total).toBe(20);
+    expect(row(table, "ammunition-1")).toMatchObject({ quantity: 9 });
+    expect(row(table, "ammunition-1")?.ammunitionFired).toBeUndefined();
+    expect(row(table, "arrows-20")?.ammunitionLeft).toBeUndefined();
+  });
+
+  it("keeps the count when the sheet writes the row, and a bought bundle adds its pieces", () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput("fighter-b") });
+    fight(table, IDS.fighter);
+    resolveAt(table, IDS.fighter, "item-longbow", [15, 4], {}, 30);
+    // A stale or forged count is the server's to keep.
+    write(table, IDS.fighter, edit(table, IDS.fighter, "arrows-20", { ammunitionLeft: 999, equipped: true }));
+    expect(row(table, "arrows-20")).toMatchObject({ quantity: 2, ammunitionLeft: 39, equipped: true });
+    write(table, IDS.fighter, edit(table, IDS.fighter, "arrows-20", { quantity: 3 }));
+    expect(row(table, "arrows-20")).toMatchObject({ quantity: 3, ammunitionLeft: 59 });
+  });
+
+  it("recovers half the arrows fired, rounded down, when the fight ends", async () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput("fighter-b") });
+    fight(table, IDS.fighter);
+    resolveAt(table, IDS.fighter, "item-longbow", [15, 4], {}, 30);
+    resolveAt(table, IDS.fighter, "item-longbow", [3], {}, 30);
+    const { server, gmToken, post, log, close } = await serve(table);
+    cleanups.push(close);
+    expect((await post(GAME_PATHS.encounterEnd, gmToken, {})).status).toBeLessThan(300);
+    const arrows = server.store.snapshot.actors
+      .find((actor) => actor.id === IDS.fighter)!
+      .inventory.find((entry) => entry.id === "arrows-20");
+    expect(arrows).toMatchObject({ quantity: 2, ammunitionLeft: 39 });
+    expect(arrows?.ammunitionFired).toBeUndefined();
+    expect(await log()).toContain("Borin recovers 1 of the 2 pieces fired from Arrows (20).");
+  });
+
+  it("recovers nothing from a single piece, and clears the count", () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput("fighter-b") });
+    fight(table, IDS.fighter);
+    resolveAt(table, IDS.fighter, "item-longbow", [15, 4], {}, 30);
+    expect(recoverAmmunition(table.state, [IDS.fighter], catalog)).toEqual([]);
+    expect(row(table, "arrows-20")).toMatchObject({ quantity: 2, ammunitionLeft: 39 });
+    expect(row(table, "arrows-20")?.ammunitionFired).toBeUndefined();
   });
 });

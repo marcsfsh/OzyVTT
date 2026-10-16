@@ -6,7 +6,7 @@ import {
   SpeciesReferenceSchema,
   SubclassReferenceSchema
 } from "@vtt/content-srd-5.2.1";
-import { ActorDefinitionSchema, type ActorAction, type ActorDefinition } from "@vtt/schemas";
+import { ActorDefinitionSchema, InventoryItemSchema, type ActorAction, type ActorDefinition } from "@vtt/schemas";
 import { collectRiders } from "@vtt/rules-5e";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { importActorDefinition } from "../src/actor-roster.js";
@@ -689,6 +689,11 @@ describe("a feature's moment-gated roll-mode fires only at its moment", () => {
     expect(swung.attack!.naturalRoll).toBe(18); // the higher of the two dice was kept
 
     const ranged = fight(build({ on: "option", modifiers: [RECKLESS] }));
+    // A bow fires only with arrows to fire (SRD Ammunition).
+    ranged.hero.inventory = [
+      ...ranged.hero.inventory,
+      InventoryItemSchema.parse({ id: "arrows-20", name: "Arrows (20)", category: "ammunition" })
+    ];
     const shot = resolveDefinitionAction(
       ranged.state,
       actionOf(ranged, "item-shortbow"),

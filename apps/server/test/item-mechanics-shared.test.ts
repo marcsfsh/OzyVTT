@@ -222,7 +222,7 @@ describe("the rider families held only by a bundle assertion, driven", () => {
       shot([fromCatalog("longbow"), picked("ammunition-3")], "item-longbow"),
       "the +3 did not reach the shot"
     ).toBe(14);
-    expect(shot([fromCatalog("longbow")], "item-longbow"), "the control: Dex +2 alone").toBe(11);
+    expect(shot([fromCatalog("longbow"), picked("arrows-20")], "item-longbow"), "the control: Dex +2 alone").toBe(11);
     // `weapon-property-is: ["ammunition"]` keeps this from being a blanket +3.
     expect(shot([fromCatalog("mace"), picked("ammunition-3")], "item-mace"), "the arrow reached a melee swing").toBe(9);
     // A thrown dagger is a ranged attack that fires no ammunition: d20 9 + Dex 2 + PB 3.

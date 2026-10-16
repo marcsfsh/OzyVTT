@@ -176,6 +176,10 @@ export function SheetInventory({
                     </Select>
                   );
                 })()}
+                {/* A partly spent bundle of ammunition: the quantity counts bundles, this the pieces. */}
+                {item.ammunitionLeft !== undefined ? (
+                  <span className="sheet-item-cat">{item.ammunitionLeft} left</span>
+                ) : null}
                 {role === "player" && item.chosenDamageType ? (
                   <span className="sheet-item-cat">Resists {titleCase(item.chosenDamageType)}</span>
                 ) : null}

@@ -10,7 +10,13 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import { ActorDefinitionSchema, type ActorAction, type ActorDefinition } from "@vtt/schemas";
+import {
+  ActorDefinitionSchema,
+  AmmunitionKindSchema,
+  type ActorAction,
+  type ActorDefinition,
+  type AmmunitionKind
+} from "@vtt/schemas";
 import {
   ArmorReferenceSchema,
   ConditionReferenceSchema,
@@ -915,12 +921,29 @@ const tableSlug = (value: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
+/** `Ammunition (Range 150/600; Arrow)` -> "arrow". The table prints "Bullet" for both a Sling's and a firearm's,
+ *  which the Ammunition table sells as two items, so the Sling's is told apart by name. */
+function ammunitionKindOf(weaponId: string, properties: string): AmmunitionKind | null {
+  const printed = /Ammunition \([^;)]*;\s*([A-Za-z]+)\)/.exec(properties)?.[1]?.toLowerCase();
+  if (printed === undefined) return null;
+  if (printed === "bullet") return weaponId === "sling" ? "sling-bullet" : "firearm-bullet";
+  const kind = AmmunitionKindSchema.safeParse(printed);
+  if (!kind.success) throw new Error(`Weapons table: "${weaponId}" fires "${printed}", which no ammunition sells.`);
+  return kind.data;
+}
+
 const weaponTable = (() => {
   const table = weaponTableSource.match(/\*\*Weapons\*\*\s*(<table>[\s\S]*?<\/table>)/);
   if (!table) throw new Error("No **Weapons** table in sources/dnd-5e-srd-markdown/equipment.md.");
   const rows = new Map<
     string,
-    { properties: readonly string[]; mastery: string; melee: boolean; versatileDice: string | null }
+    {
+      properties: readonly string[];
+      mastery: string;
+      melee: boolean;
+      versatileDice: string | null;
+      ammunition: AmmunitionKind | null;
+    }
   >();
   // The `<th colspan="6">` band rows ("Simple Melee Weapons", ...) are the only source of melee vs
   // ranged: a thrown Dagger has a range and is melee, a Dart is not. Unknown bands, or data rows before
@@ -951,7 +974,8 @@ const weaponTable = (() => {
               .filter((entry) => entry !== ""),
       mastery: tableSlug(cells[3]),
       melee: band.melee,
-      versatileDice: /Versatile \((\d+d\d+)\)/.exec(properties)?.[1] ?? null
+      versatileDice: /Versatile \((\d+d\d+)\)/.exec(properties)?.[1] ?? null,
+      ammunition: ammunitionKindOf(tableSlug(cells[0]), properties)
     });
   }
   // Both vocabularies come from the fixtures' `WeaponProperty` rows, as bare ids (riders match the bare word).
@@ -993,6 +1017,7 @@ const weaponRecords = onlySrd(weapons).map((weapon) => {
     // Needed to resolve "Weapon (Any Melee Weapon)" eligibility, and whether a thrown weapon has a melee reach.
     melee: row.melee,
     ...(row.versatileDice !== null ? { versatileDice: row.versatileDice } : {}),
+    ...(row.ammunition !== null ? { ammunition: row.ammunition } : {}),
     improvised: weapon.fields.is_improvised,
     mastery: row.mastery,
     // `[]` when the table prints "—": a Mace has no properties, which differs from "not recorded".

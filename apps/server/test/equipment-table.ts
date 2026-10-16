@@ -1,3 +1,7 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { GAME_PATHS } from "@vtt/api-contract";
 import { BuilderPolicySchema, GameStateSchema, type GameState } from "@vtt/domain";
 import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
 import { resolveDefinitionAction, type ResolveDependencies, type ResolveInput } from "../src/action-resolution.js";
@@ -8,6 +12,7 @@ import { effectiveActions } from "../src/effective-actions.js";
 import { startEncounter } from "../src/encounter.js";
 import { equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { setInventoryItem } from "../src/inventory.js";
+import { createServer } from "../src/server.js";
 
 /**
  * Characters built through the real builder against the shipped catalog, at a table with one foe, for the
@@ -245,4 +250,42 @@ export function resolveAt(
     },
     deps
   );
+}
+
+/** A real server holding the table's state, for commands only the HTTP route runs; `close` cleans it up. */
+export async function serve(table: Table) {
+  const directory = await mkdtemp(join(tmpdir(), "vtt-equipment-"));
+  const server = createServer({
+    authPath: join(directory, "auth.json"),
+    databasePath: join(directory, "vtt.sqlite"),
+    integrationCredentialsPath: join(directory, "integrations.sqlite"),
+    mapAssetsPath: join(directory, "map-assets"),
+    webDist: join(directory, "dist"),
+    useDevelopmentClient: true,
+    developmentClientPort: 5173,
+    initialGameState: table.state
+  });
+  await server.initialize();
+  await server.auth.bootstrap("a sufficiently long GM password");
+  const gmToken = (await server.auth.login("a sufficiently long GM password"))!;
+  await new Promise<void>((resolve) => server.httpServer.listen(0, "127.0.0.1", resolve));
+  const close = async () => {
+    server.close();
+    await rm(directory, { recursive: true, force: true });
+  };
+  const address = server.httpServer.address();
+  if (!address || typeof address === "string") throw new Error("The server did not bind.");
+  const post = (path: string, token: string, body: object) =>
+    fetch(`http://127.0.0.1:${address.port}${path}`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify(body)
+    });
+  const log = async () => {
+    const response = await fetch(`http://127.0.0.1:${address.port}${GAME_PATHS.log}`, {
+      headers: { authorization: `Bearer ${gmToken}` }
+    });
+    return ((await response.json()).data.entries as ReadonlyArray<{ text: string }>).map((entry) => entry.text);
+  };
+  return { server, gmToken, post, log, close };
 }

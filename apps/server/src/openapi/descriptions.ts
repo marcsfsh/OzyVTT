@@ -199,6 +199,8 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     casts: "Spells the item can cast (Amulet of Message, Wand of Fireballs)",
     charges:
       "How a charged item's charges come back. `regain` is the dice a long rest rolls (absent: every charge returns); `lastChargeRoll` rolls a d20 when the last charge is spent and tells the GM, since a 1 does what the item's text says. The charges themselves are the `uses` on its casts and actions, counted per carried copy",
+    ammunition:
+      'This row is ammunition sold in bundles: each one of its quantity is `count` pieces of `kind` ("Arrows (20)" is 20 arrows). A shot from a weapon that fires that kind spends a piece, and half the pieces fired come back when the encounter ends. Absent on magic ammunition, counted one piece per quantity',
     damageTypeChoice:
       '"The GM chooses the type" (Ring of Resistance, Dragon Scale Mail): the types the GM may pick for the ONE resistance in `grants.damageResistances`, which is the printed default until the GM picks. The pick is stored per carried copy as the row\'s `chosenDamageType`, which only the GM can set',
     grantsFeatIds:
@@ -1316,6 +1318,8 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "equipment[].weapon.properties":
       "The SRD weapon table's Properties column (finesse, light, thrown, versatile, reach, heavy, two-handed, loading, ammunition). Unlike `mastery` these ARE copied onto an inventory row and the engine reads them there - finesse decides whether the swing uses Dexterity, reach decides 10 feet versus 5. An empty array means the weapon genuinely has none.",
     "equipment[].armor": "Populated for armor and shields only",
+    "equipment[].weapon.ammunition":
+      "What an Ammunition weapon fires (the Weapons table's \"Ammunition (Range 150/600; Arrow)\"); a Sling's bullets and a firearm's are different items",
     "equipment[].damageTypeChoice":
       "The damage types the GM may pick for the item's resistance, as the SRD prints them (absent when the item has no such choice)",
     "equipment[].appliesTo":

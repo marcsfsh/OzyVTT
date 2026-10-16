@@ -62,6 +62,7 @@ function hero(over: Record<string, unknown> = {}): GmActor {
     effects: [],
     inventory: [
       { id: "rope", name: "Rope", quantity: 1, equipped: false, attuned: false },
+      { id: "arrows-20", name: "Arrows (20)", quantity: 2, equipped: false, attuned: false, ammunitionLeft: 39 },
       {
         id: "ring-of-resistance",
         name: "Ring of Resistance",
@@ -110,6 +111,8 @@ describe("the sheet's inventory", () => {
     const rope = screen.getByText("Rope").closest(".sheet-inv-row") as HTMLElement;
     const ring = screen.getByText("Ring of Resistance").closest(".sheet-inv-row") as HTMLElement;
     expect(within(rope).queryByRole("button", { name: "Attune" })).toBeNull();
+    // A partly spent bundle shows the pieces left.
+    expect((screen.getByText("Arrows (20)").closest(".sheet-inv-row") as HTMLElement).textContent).toContain("39 left");
     expect(within(ring).getByRole("button", { name: "Attune" })).toBeTruthy();
     // A player never sees the GM's resistance pick control.
     expect(screen.queryByRole("combobox", { name: "Resistance type of Ring of Resistance" })).toBeNull();

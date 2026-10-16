@@ -1,12 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { GAME_PATHS } from "@vtt/api-contract";
 import { giveItem } from "../src/inventory.js";
 import { applyRest } from "../src/rests.js";
-import { createServer } from "../src/server.js";
 import {
   actionOf,
   catalog,
@@ -16,6 +12,7 @@ import {
   fighterInput,
   IDS,
   resolveAt,
+  serve,
   tableOf,
   wizardInput,
   write,
@@ -108,42 +105,11 @@ describe("the charge commands over HTTP", () => {
     for (const cleanup of cleanups.splice(0)) await cleanup();
   });
 
-  async function boot(table: Table) {
-    const directory = await mkdtemp(join(tmpdir(), "vtt-charges-"));
-    const server = createServer({
-      authPath: join(directory, "auth.json"),
-      databasePath: join(directory, "vtt.sqlite"),
-      integrationCredentialsPath: join(directory, "integrations.sqlite"),
-      mapAssetsPath: join(directory, "map-assets"),
-      webDist: join(directory, "dist"),
-      useDevelopmentClient: true,
-      developmentClientPort: 5173,
-      initialGameState: table.state
-    });
-    await server.initialize();
-    await server.auth.bootstrap("a sufficiently long GM password");
-    const gmToken = (await server.auth.login("a sufficiently long GM password"))!;
-    await new Promise<void>((resolve) => server.httpServer.listen(0, "127.0.0.1", resolve));
-    cleanups.push(async () => {
-      server.close();
-      await rm(directory, { recursive: true, force: true });
-    });
-    const address = server.httpServer.address();
-    if (!address || typeof address === "string") throw new Error("The server did not bind.");
-    const post = (path: string, token: string, body: object) =>
-      fetch(`http://127.0.0.1:${address.port}${path}`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-        body: JSON.stringify(body)
-      });
-    const log = async () => {
-      const response = await fetch(`http://127.0.0.1:${address.port}${GAME_PATHS.log}`, {
-        headers: { authorization: `Bearer ${gmToken}` }
-      });
-      return ((await response.json()).data.entries as ReadonlyArray<{ text: string }>).map((entry) => entry.text);
-    };
-    return { server, gmToken, post, log };
-  }
+  const boot = async (table: Table) => {
+    const served = await serve(table);
+    cleanups.push(served.close);
+    return served;
+  };
 
   it("rolls the d20 when a loose use spends a wand's last charge, and not for a wand that has none to roll", async () => {
     const table = tableOf({ [IDS.wizard]: wizardInput() }, false);

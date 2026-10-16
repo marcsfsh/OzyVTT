@@ -3,7 +3,8 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { effectiveSlot } from "@vtt/rules-5e";
 import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
 import { hasEffectTag } from "../effects.js";
-import { armorTrainingGaps } from "../equipment-derivation.js";
+import { ammunitionFor, ammunitionLabel, launcherKind } from "../ammunition.js";
+import { armorTrainingGaps, type EquipmentCatalog } from "../equipment-derivation.js";
 import { RulesBlockedError } from "../game-store.js";
 import { isItemActionId, itemActionRest, TWO_HANDED_SUFFIX } from "../item-actions.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
@@ -86,7 +87,8 @@ export function evaluateActionEconomy(
   definition: ActorDefinition | undefined,
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null,
   siblings: ReadonlyArray<DefinitionAction> = definition?.actions ?? [],
-  slotLevel?: number
+  slotLevel?: number,
+  catalog?: EquipmentCatalog
 ): EconomyEvaluation {
   const evaluation: Evaluation = {
     state,
@@ -106,6 +108,7 @@ export function evaluateActionEconomy(
   checkLoading(evaluation);
   checkHands(evaluation);
   checkArmorTraining(evaluation, definition);
+  checkAmmunition(evaluation, catalog);
   const spendUse = checkLimitedUse(evaluation);
   const slots = checkActionSlots(evaluation);
   const spendLegendary = checkLegendary(evaluation, definition);
@@ -216,6 +219,19 @@ function checkHands({ attacker, action, violations }: Evaluation): void {
       rule: "attack.two-handed",
       message: `${item.name} needs two hands, and ${attacker.name} has ${shield.name} on one arm. Unequip the shield first.`
     });
+}
+
+/** SRD Ammunition: "You can use a weapon that has the Ammunition property to make a ranged attack only if you have
+ *  ammunition to fire from it." Unchecked without the catalog, which says what each row is. */
+function checkAmmunition({ attacker, action, violations }: Evaluation, catalog: EquipmentCatalog | undefined): void {
+  const item = catalog ? swingItemOf(attacker, action) : null;
+  if (!item) return;
+  const kind = launcherKind(item, catalog);
+  if (kind === null || ammunitionFor(attacker, kind, catalog)) return;
+  violations.push({
+    rule: "attack.no-ammunition",
+    message: `${attacker.name} has no ${ammunitionLabel(kind)} to fire from ${item.name}.`
+  });
 }
 
 /** SRD Loading: "You can fire only one piece of ammunition from a Loading weapon when you use an action ... to fire
@@ -595,7 +611,8 @@ export function planEconomy(
   definition: ActorDefinition | undefined,
   warnings: string[],
   distanceFeet: ((actorIdA: string, actorIdB: string) => number | null) | undefined,
-  siblings: ReadonlyArray<DefinitionAction>
+  siblings: ReadonlyArray<DefinitionAction>,
+  catalog?: EquipmentCatalog
 ): { plan: EconomyPlan; overridden: { rule: RuleId; reason: string } | null } {
   const { violations, softViolations, plan, proseMultiattack, notes } = evaluateActionEconomy(
     state,
@@ -605,7 +622,8 @@ export function planEconomy(
     definition,
     distanceFeet,
     siblings,
-    input.slotLevel
+    input.slotLevel,
+    catalog
   );
   warnings.push(...notes);
 

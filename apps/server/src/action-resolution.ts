@@ -1,6 +1,8 @@
 import type { ActionAvailability, ActionResolution, GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
+import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { masteryMissDamage } from "./weapon-mastery.js";
+import { spendAmmunition } from "./resolution/ammunition.js";
 import { rollAttack } from "./resolution/attack.js";
 import { rollLastCharge } from "./resolution/charges.js";
 import type { DefinitionAction, ResolveContext, ResolveDependencies, ResolveInput } from "./resolution/context.js";
@@ -45,6 +47,7 @@ export function resolveDefinitionAction(
   if (parkForAcReaction(ctx)) {
     commitEconomy(ctx);
     rollLastCharge(ctx);
+    spendAmmunition(ctx);
     recordLightAttack(ctx);
     recordLoadingShot(ctx);
     releaseHideAndReady(ctx);
@@ -69,6 +72,7 @@ export function resolveDefinitionAction(
 
   commitEconomy(ctx);
   rollLastCharge(ctx);
+  spendAmmunition(ctx);
   recordLightAttack(ctx);
   recordLoadingShot(ctx);
   recordCleaveOpening(ctx);
@@ -143,10 +147,21 @@ export function actionAvailability(
   actions: ReadonlyArray<DefinitionAction>,
   definition: ActorDefinition | undefined,
   builtin = false,
-  siblings: ReadonlyArray<DefinitionAction> = definition?.actions ?? []
+  siblings: ReadonlyArray<DefinitionAction> = definition?.actions ?? [],
+  catalog?: EquipmentCatalog
 ): ReadonlyArray<ActionAvailability> {
   return actions.map((action): ActionAvailability => {
-    const evaluation = evaluateActionEconomy(state, attacker, action, [], definition, undefined, siblings);
+    const evaluation = evaluateActionEconomy(
+      state,
+      attacker,
+      action,
+      [],
+      definition,
+      undefined,
+      siblings,
+      undefined,
+      catalog
+    );
     let usesRemaining: number | null = null;
     if (action.uses) {
       const key = action.uses.pool ?? action.id;

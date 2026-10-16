@@ -24,6 +24,7 @@ const RULE_FAMILIES = {
   "attack.cleave-needs-hit": "economy",
   // A Loading weapon fires once per action, however many attacks the action allows.
   "attack.loading": "economy",
+  "attack.no-ammunition": "economy",
   // A Two-Handed weapon can't swing while a Shield takes one hand.
   "attack.two-handed": "economy",
   // No spellcasting in armor the caster isn't trained with: what the character can do at all, not a spent slot

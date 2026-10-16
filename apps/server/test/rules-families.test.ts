@@ -51,6 +51,8 @@ describe("rule families", () => {
       ["attack.cleave-needs-hit", "economy"],
       // A Loading weapon fires once per action: what this action has already done.
       ["attack.loading", "economy"],
+      // Running out of ammunition: what the character carries, like the hands rule.
+      ["attack.no-ammunition", "economy"],
       // What the character's hands are holding, like what the action has already done.
       ["attack.two-handed", "economy"],
       // Casting in untrained armor: what the character can do at all, like the hands rule.

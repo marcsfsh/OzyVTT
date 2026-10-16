@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { AbilitySchema, HitDieSchema, PickBudgetScalingSchema, type ActionReaction } from "@vtt/schemas";
+import {
+  AbilitySchema,
+  AmmunitionKindSchema,
+  HitDieSchema,
+  PickBudgetScalingSchema,
+  type ActionReaction
+} from "@vtt/schemas";
 import type { Wire } from "./wire.js";
 
 /** An open identity slug; ids are never closed enums, so homebrew stays additive. */
@@ -100,6 +106,8 @@ export const ContentEquipmentSummarySchema = z.strictObject({
       melee: z.boolean().optional(),
       /** A Versatile weapon's two-handed die. */
       versatileDice: z.string().optional(),
+      /** What an Ammunition weapon fires ("arrow", "bolt"). */
+      ammunition: AmmunitionKindSchema.optional(),
       mastery: z.enum(["cleave", "graze", "nick", "push", "sap", "slow", "topple", "vex"]).optional(),
       properties: z.array(slug(40)).max(12).optional()
     })

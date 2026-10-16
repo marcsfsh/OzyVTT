@@ -10,6 +10,7 @@ import { z } from "zod";
 import {
   AbilitySchema,
   ActionAreaSchema,
+  AmmunitionKindSchema,
   ActionReactionSchema,
   ActorDefinitionSchema,
   DamageTypeSchema,
@@ -150,6 +151,8 @@ export const WeaponReferenceSchema = z.object({
   melee: z.boolean().optional(),
   /** The die a Versatile weapon deals used with two hands (`Versatile (1d10)`); absent on other weapons. */
   versatileDice: z.string().min(1).max(20).optional(),
+  /** What an Ammunition weapon fires (`Ammunition (Range 150/600; Arrow)`); absent on other weapons. */
+  ammunition: AmmunitionKindSchema.optional(),
   improvised: z.boolean(),
   damage: z.object({ dice: z.string().min(1).max(20), type: z.string().min(1).max(40) }),
   rangeFeet: z.number().int().positive().nullable(),
@@ -257,6 +260,8 @@ const EquipmentWeaponStatsSchema = z.object({
   melee: z.boolean().optional(),
   /** A Versatile weapon's two-handed damage die. */
   versatileDice: z.string().max(20).optional(),
+  /** What an Ammunition weapon fires. Absent = any ammunition the bearer carries. */
+  ammunition: AmmunitionKindSchema.optional(),
   /** Optional here: gear and homebrew rows map through this shape and have no mastery. */
   mastery: z.enum(["cleave", "graze", "nick", "push", "sap", "slow", "topple", "vex"]).optional(),
   /** Copied onto the inventory row, where `weaponPropertiesOf` reads it. */
@@ -341,6 +346,11 @@ export const EquipmentReferenceSchema = z
     cursed: z.boolean().default(false),
     casts: z.array(ItemSpellCastSchema).max(8).default([]),
     charges: ItemChargesSchema.optional(),
+    /** This row is ammunition sold in bundles: each one quantity is `count` pieces of `kind` ("Arrows (20)"). */
+    ammunition: z
+      .object({ kind: AmmunitionKindSchema, count: z.number().int().min(1).max(100) })
+      .strict()
+      .optional(),
     /** "The GM chooses the type": the types the GM may pick for this item's one granted resistance, which then
      *  replaces the printed default in `grants.damageResistances` for that carried copy. */
     damageTypeChoice: z.array(DamageTypeSchema).min(2).max(13).optional(),

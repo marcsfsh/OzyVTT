@@ -758,6 +758,15 @@ const SLOTS = [
   opt("none", "Just carried", "Everything else")
 ];
 
+const AMMUNITION_KINDS = [
+  opt("arrow", "Arrows"),
+  opt("bolt", "Crossbow bolts"),
+  opt("firearm-bullet", "Firearm bullets"),
+  opt("needle", "Blowgun needles"),
+  opt("sling-bullet", "Sling bullets")
+];
+const isAmmunition = (draft: Draft) => draft.category === "ammunition" || draft.slot === "ammunition";
+
 /** Turning magic off removes all of these; a leftover `isMagic: false` or orphan rider would fail
     `.strict()` invisibly. */
 const MAGIC_KEYS = [
@@ -819,6 +828,30 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           unit: "lb",
           allowDecimal: true,
           emptyValue: "null"
+        },
+        // Ammunition sold in bundles counts its pieces: each shot spends one, and half come back after the fight.
+        {
+          key: "ammunition.kind",
+          label: "Ammunition for",
+          kind: "select",
+          options: AMMUNITION_KINDS,
+          placeholder: "Counted one per item",
+          help: "Sold in bundles, like Arrows (20): what one piece is.",
+          visibleWhen: isAmmunition,
+          read: (draft) => String(getAt(draft, "ammunition.kind") ?? ""),
+          write: (next, draft) => {
+            const { ammunition: _old, ...rest } = draft;
+            const count = Number(getAt(draft, "ammunition.count")) || 20;
+            return next ? { ...rest, ammunition: { kind: next, count } } : rest;
+          }
+        },
+        {
+          key: "ammunition.count",
+          label: "Pieces per bundle",
+          kind: "number",
+          min: 1,
+          max: 100,
+          visibleWhen: (draft) => isAmmunition(draft) && getAt(draft, "ammunition.kind") !== undefined
         }
       ]
     },
@@ -1103,6 +1136,15 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
             validate: diceValidate,
             emptyValue: "omit",
             help: "For a Versatile weapon: the die it deals held in both hands."
+          },
+          {
+            key: "weapon.ammunition",
+            label: "Fires",
+            kind: "select",
+            options: AMMUNITION_KINDS,
+            placeholder: "Any ammunition",
+            emptyValue: "omit",
+            help: "For an Ammunition weapon: what it needs to fire."
           }
         ]),
         // Outside `inContainer`, whose plain path write can't turn the choice into a boolean.

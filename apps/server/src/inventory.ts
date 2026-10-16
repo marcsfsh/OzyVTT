@@ -4,6 +4,7 @@ import { effectiveSlot } from "@vtt/rules-5e";
 import { spellSlotMaxima, storedArmorClass } from "./actor-roster.js";
 import { deriveEquipment, itemIsActive, type EquipmentCatalog } from "./equipment-derivation.js";
 import { castAction, itemAction } from "./item-actions.js";
+import { keepAmmunitionCount } from "./ammunition.js";
 import { CommandRejectedError } from "./game-store.js";
 
 const MAX_ITEMS = 200;
@@ -320,6 +321,11 @@ export function setInventoryItem(
       actor.inventory.find((entry) => entry.id === item.id)
     );
   item = withDamageTypeChoice(actor, item, deps);
+  item = keepAmmunitionCount(
+    actor.inventory.find((entry) => entry.id === item.id),
+    item,
+    deps.catalog
+  );
   const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
   enforceCurse(actor, item, deps);
   enforceEquipRules(actor, item, definition, deps);
