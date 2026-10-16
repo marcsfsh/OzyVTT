@@ -4,7 +4,15 @@ import type { DockPosition } from "../encounter/DockPicker";
 /** The map's tools and the toolbar's contract, shared by the toolbar, its groups and the map. */
 
 /** The map's pointer mode; defined here because the toolbar sets it. */
-export type MapTool = "select" | "measure" | "ping" | "fog-reveal" | "fog-hide" | AnnotationShapeKind;
+export type MapTool =
+  | "select"
+  | "measure"
+  | "ping"
+  | "fog-reveal"
+  | "fog-hide"
+  | "terrain-difficult"
+  | "terrain-clear"
+  | AnnotationShapeKind;
 
 export type ClearScope = "mine" | "players" | "all";
 
@@ -61,6 +69,12 @@ export interface MapToolbarProps {
   onRevealAll: () => void;
   onHideAll: () => void;
 
+  /* Terrain (GM only) */
+  terrainBusy: boolean;
+  /** Whether this map has any difficult terrain to clear. */
+  hasTerrain: boolean;
+  onClearTerrain: () => void;
+
   /**
    * The "Preview what players see" tool. No panel behind it: the preview is already a fixed,
    * draggable panel. Absent: not offered (players have nothing to preview).
@@ -75,10 +89,6 @@ export interface MapToolbarProps {
   fullscreen: boolean;
   onToggleFullscreen: () => void;
   dock?: Readonly<{ position: DockPosition; onChange: (position: DockPosition) => void }>;
-  rulerWhileMoving: boolean;
-  onRulerWhileMovingChange: (on: boolean) => void;
-  occupiedCost: boolean;
-  onOccupiedCostChange: (on: boolean) => void;
   notificationsMuted: boolean;
   onNotificationsMutedChange: (muted: boolean) => void;
 }

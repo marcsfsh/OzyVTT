@@ -17,6 +17,7 @@ import type {
 } from "@vtt/domain";
 import { actionPools } from "./effective-actions.js";
 import { healthBandOf } from "./hit-points.js";
+import { visibleTerrain } from "./terrain.js";
 
 type PresenceLookup = (sessionId: string) => PresenceStatus | null;
 
@@ -264,6 +265,8 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => publicActorIds.has(actorId)),
     // Fog carries geometry only and is never the security boundary; hidden actors are stripped regardless.
     fog: { enabled: state.combat.fog.enabled, shapes: state.combat.fog.shapes.map((shape) => ({ ...shape })) },
+    // Only the revealed part: terrain under the fog would show the layout of ground players haven't seen.
+    terrain: visibleTerrain(state.combat),
     // legendaryUsed is omitted: a monster's remaining legendary actions are GM knowledge.
     // While the GM reviews an earlier turn players get only the flag; turn labels can name hidden combatants.
     rewound: state.combat.historyCursor !== null,

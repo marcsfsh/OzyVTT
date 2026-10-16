@@ -4,7 +4,7 @@ import { command } from "../lib/command";
 import type { Point } from "./useMapView";
 
 /**
- * Everything the map sends: token moves, annotations and fog. Each family has its own busy flag, and
+ * Everything the map sends: token moves, annotations, fog and terrain. Each family has its own busy flag, and
  * a refusal lands on the map's feedback line. Moves and fog target the privately staged scene while
  * the GM arranges one (`sceneId`), else the live table.
  */
@@ -29,6 +29,7 @@ export function useMapCommands({
   const [busyActorId, setBusyActorId] = useState<string | null>(null);
   const [annotationBusy, setAnnotationBusy] = useState<string | null>(null);
   const [fogBusy, setFogBusy] = useState(false);
+  const [terrainBusy, setTerrainBusy] = useState(false);
   const scene = sceneId !== undefined ? { sceneId } : {};
 
   const submitMove = async (actorId: string, position: EncounterTokenPosition | null) => {
@@ -167,6 +168,35 @@ export function useMapCommands({
   const hideAllFog = () =>
     runFog(() => command("fog:reset", { ...scene, expectedRevision: revision }), "The fog could not be reset.");
 
+  const runTerrain = (run: () => Promise<MutationResult>, failure: string) => {
+    setTerrainBusy(true);
+    void run().then((result) => {
+      setTerrainBusy(false);
+      if (!result.ok) setMessage(result.message ?? failure);
+    });
+  };
+  const paintTerrain = (op: "difficult" | "clear", a: Point, b: Point) => {
+    const rect = {
+      x: Math.min(a.x, b.x),
+      y: Math.min(a.y, b.y),
+      width: Math.abs(a.x - b.x),
+      height: Math.abs(a.y - b.y)
+    };
+    if (rect.width < 2 || rect.height < 2) {
+      setMessage(op === "difficult" ? "Drag an area to mark it difficult." : "Drag an area to clear it.");
+      return;
+    }
+    runTerrain(
+      () => command("terrain:paint", { op, rect, ...scene, expectedRevision: revision }),
+      "The terrain could not be marked."
+    );
+  };
+  const clearAllTerrain = () =>
+    runTerrain(
+      () => command("terrain:reset", { ...scene, expectedRevision: revision }),
+      "The terrain could not be cleared."
+    );
+
   return {
     message,
     setMessage,
@@ -186,7 +216,10 @@ export function useMapCommands({
     paintFog,
     setFogEnabled,
     revealAllFog,
-    hideAllFog
+    hideAllFog,
+    terrainBusy,
+    paintTerrain,
+    clearAllTerrain
   };
 }
 

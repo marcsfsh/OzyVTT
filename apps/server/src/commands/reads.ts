@@ -10,7 +10,13 @@ import { BUILTIN_ACTIONS, BUILTIN_TARGETING } from "../builtin-actions.js";
 import { actionSummaryOf, type ContentView } from "../content-library.js";
 import { effectiveActions } from "../effective-actions.js";
 import { deriveEquipment } from "../equipment-derivation.js";
-import { ActorAvailableActionsSchema, BuilderOffersSchema, ContentActionsSchema } from "@vtt/domain/commands";
+import {
+  ActorAvailableActionsSchema,
+  ActorMovementSchema,
+  BuilderOffersSchema,
+  ContentActionsSchema
+} from "@vtt/domain/commands";
+import { movementStatus } from "../movement-rules.js";
 import { GameNotFoundError } from "./failures.js";
 import { initiatorOf, isGmGrade, type GamePrincipal, type Kit } from "./kit.js";
 import type { ReadSpec } from "./pipeline.js";
@@ -150,6 +156,32 @@ export const gameReads = [
           catalog
         )
       };
+    }
+  },
+
+  {
+    event: "actor:movement",
+    path: GAME_PATHS.actorMovement,
+    scope: "combat:read",
+    schema: ActorMovementSchema,
+    malformed: "The movement lookup is malformed.",
+    // The budget a move is charged against, for the map's drag preview. GM-grade any combatant; a player their own.
+    run: (principal, input, kit) => {
+      const state = kit.read();
+      const actorId = (input as z.output<typeof ActorMovementSchema>).actorId;
+      if (!state.actors.some((candidate) => candidate.id === actorId))
+        throw new GameNotFoundError("That combatant no longer exists.");
+      requireActorAccess(
+        initiatorOf(principal),
+        state,
+        actorId,
+        "check",
+        "You can only check your own character's movement."
+      );
+      return movementStatus(state, actorId, {
+        resolveDefinition: (definitionId) => kit.resolveDefinition(definitionId),
+        catalog: kit.equipmentCatalog()
+      });
     }
   },
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { CharacterChoiceSchema, type CharacterChoice } from "@vtt/schemas";
-import { AbilityIdSchema, type AnnotationPoint } from "./state.js";
+import { AbilityIdSchema, RuleModeSchema, type AnnotationPoint } from "./state.js";
 import type { Wire } from "./wire.js";
 
 /**
@@ -268,6 +268,19 @@ export const AvailableActionsReplySchema = z.strictObject({
 });
 export type AvailableActionsReply = Wire<z.infer<typeof AvailableActionsReplySchema>>;
 export type ActorActionsAvailabilityResult = { ok: boolean; message?: string } & Partial<AvailableActionsReply>;
+
+/** What `actor:movement` answers: whether a move spends this creature's movement right now, and how much is left. */
+export const ActorMovementReplySchema = z.strictObject({
+  /** True while combat runs, it is this creature's turn and movement rules are on. Otherwise moves are free. */
+  counted: z.boolean(),
+  /** This turn's movement budget (Speed after exhaustion, Slow and the like, plus Dash); null when unknown. */
+  speedFeet: z.number().min(0).nullable(),
+  usedFeet: z.number().min(0),
+  /** What going over does: `strict` refuses the move, `assisted` lets it through with a warning. */
+  enforcement: RuleModeSchema
+});
+export type ActorMovementReply = Wire<z.infer<typeof ActorMovementReplySchema>>;
+export type ActorMovementResult = { ok: boolean; message?: string } & Partial<ActorMovementReply>;
 
 /** Which builder step shows an offer: the step that chose its source. */
 const BuilderOfferStepSchema = z.enum(["species", "background", "class", "features", "equipment"]);

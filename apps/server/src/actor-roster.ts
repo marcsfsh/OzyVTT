@@ -195,6 +195,24 @@ export function reconcileArmorClasses(
   return changed;
 }
 
+/** Gives a speed to an actor whose sheet has one but who never got it, as the example party once didn't. An
+ *  unknown speed skips the movement budget, so this is what lets those moves be counted. A speed the GM set is
+ *  kept. True when any changed. */
+export function fillMissingSpeeds(
+  state: GameState,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined
+): boolean {
+  let changed = false;
+  for (const actor of state.actors) {
+    if (actor.speedFeet !== undefined || !actor.definitionId) continue;
+    const speed = resolveDefinition(actor.definitionId)?.speedFeet;
+    if (speed === undefined) continue;
+    actor.speedFeet = speed;
+    changed = true;
+  }
+  return changed;
+}
+
 /** Unarmored Defense from the sheet's features then feats (last wins, like `interpretFeature`); fails open to null. */
 function unarmoredDefenseFromContent(definition: ActorDefinition, catalog?: EquipmentCatalog): UnarmoredDefense | null {
   if (!catalog) return null;

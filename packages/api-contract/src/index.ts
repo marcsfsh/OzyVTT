@@ -190,6 +190,7 @@ export const GAME_PATHS = {
   reactionDismiss: `${API_NAMESPACE}/game/reactions/{reactionId}/dismiss`,
   damageResolve: `${API_NAMESPACE}/game/damage/resolve`,
   actorAvailableActions: `${API_NAMESPACE}/game/actors/{actorId}/available-actions`,
+  actorMovement: `${API_NAMESPACE}/game/actors/{actorId}/movement`,
   effects: `${API_NAMESPACE}/game/actors/{actorId}/effects`,
   effectEnd: `${API_NAMESPACE}/game/actors/{actorId}/effects/{effectId}/end`,
   deathSaveRoll: `${API_NAMESPACE}/game/actors/{actorId}/death-save`,
@@ -247,7 +248,9 @@ export const GAME_PATHS = {
   sceneReorder: `${API_NAMESPACE}/game/scenes/reorder`,
   fogEnabled: `${API_NAMESPACE}/game/fog/enabled`,
   fogPaint: `${API_NAMESPACE}/game/fog/paint`,
-  fogReset: `${API_NAMESPACE}/game/fog/reset`
+  fogReset: `${API_NAMESPACE}/game/fog/reset`,
+  terrainPaint: `${API_NAMESPACE}/game/terrain/paint`,
+  terrainReset: `${API_NAMESPACE}/game/terrain/reset`
 } as const;
 
 /** Session issuance for headless/alternate player clients: the HTTP mirror of the socket's open join. */
@@ -569,7 +572,9 @@ export const GAME_COMMANDS = {
   "builder.roll-abilities": { scope: "actor:write", method: "post", path: GAME_PATHS.builderRollAbilities },
   "fog.set-enabled": { scope: "scene:write", method: "post", path: GAME_PATHS.fogEnabled },
   "fog.paint": { scope: "scene:write", method: "post", path: GAME_PATHS.fogPaint },
-  "fog.reset": { scope: "scene:write", method: "post", path: GAME_PATHS.fogReset }
+  "fog.reset": { scope: "scene:write", method: "post", path: GAME_PATHS.fogReset },
+  "terrain.paint": { scope: "scene:write", method: "post", path: GAME_PATHS.terrainPaint },
+  "terrain.reset": { scope: "scene:write", method: "post", path: GAME_PATHS.terrainReset }
 } as const satisfies Record<
   string,
   Readonly<{ scope: z.infer<typeof IntegrationScopeSchema>; method: "post" | "delete"; path: string }>

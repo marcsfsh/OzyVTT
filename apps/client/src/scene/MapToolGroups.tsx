@@ -1,5 +1,17 @@
 import type { AnnotationShapeKind, AnnotationVisibility } from "@vtt/domain";
-import { Button, Field, Select, SegmentedControl, Switch, IconCleanup, IconColor, IconEye, IconEyeOff } from "@vtt/ui";
+import {
+  Button,
+  Field,
+  Select,
+  SegmentedControl,
+  Switch,
+  IconCleanup,
+  IconColor,
+  IconEye,
+  IconEyeOff,
+  IconTerrain,
+  IconX
+} from "@vtt/ui";
 import type { DockPosition } from "../encounter/DockPicker";
 import { drawingAudienceOptions, NEEDS_GRID, type ClearScope, type MapTool, type MapToolbarProps } from "./mapTools";
 
@@ -198,9 +210,58 @@ export function FogGroup({
   );
 }
 
-export function ViewGroup({
-  role,
+export function TerrainGroup({
+  tool,
   calibrated,
+  terrainBusy,
+  hasTerrain,
+  onClearTerrain,
+  onPickTool
+}: MapToolbarProps & { onPickTool: (tool: MapTool) => void }) {
+  return (
+    <>
+      <p className="map-toolbar-note">
+        Entering difficult terrain costs double movement. Moves are charged and previewed along the cheapest path.
+      </p>
+      <div className="map-toolbar-choices" role="group" aria-label="Terrain tools">
+        <button
+          type="button"
+          className="map-toolbar-choice tap-target interactive"
+          aria-pressed={tool === "terrain-difficult"}
+          disabled={terrainBusy || !calibrated}
+          title={calibrated ? "Drag an area to mark it difficult" : NEEDS_GRID}
+          onClick={() => onPickTool(tool === "terrain-difficult" ? "select" : "terrain-difficult")}
+        >
+          <span className="map-toolbar-row-icon" aria-hidden="true">
+            <IconTerrain />
+          </span>
+          Difficult
+        </button>
+        <button
+          type="button"
+          className="map-toolbar-choice tap-target interactive"
+          aria-pressed={tool === "terrain-clear"}
+          disabled={terrainBusy || !calibrated || !hasTerrain}
+          title={calibrated ? "Drag an area to make it normal ground again" : NEEDS_GRID}
+          onClick={() => onPickTool(tool === "terrain-clear" ? "select" : "terrain-clear")}
+        >
+          <span className="map-toolbar-row-icon" aria-hidden="true">
+            <IconX />
+          </span>
+          Clear
+        </button>
+      </div>
+      {!calibrated && <p className="map-toolbar-note">{NEEDS_GRID}</p>}
+      <div className="map-toolbar-actions">
+        <Button variant="secondary" block disabled={terrainBusy || !hasTerrain} onClick={onClearTerrain}>
+          Clear all terrain
+        </Button>
+      </div>
+    </>
+  );
+}
+
+export function ViewGroup({
   onZoom,
   onResetView,
   enlarged,
@@ -208,10 +269,6 @@ export function ViewGroup({
   fullscreen,
   onToggleFullscreen,
   dock,
-  rulerWhileMoving,
-  onRulerWhileMovingChange,
-  occupiedCost,
-  onOccupiedCostChange,
   notificationsMuted,
   onNotificationsMutedChange
 }: MapToolbarProps & { id: string }) {
@@ -251,22 +308,6 @@ export function ViewGroup({
             ]}
           />
         </Field>
-      )}
-      <Switch
-        className="map-toolbar-switch"
-        checked={rulerWhileMoving}
-        disabled={!calibrated}
-        onChange={onRulerWhileMovingChange}
-        label="Show distance while moving"
-      />
-      {role === "gm" && (
-        <Switch
-          className="map-toolbar-switch"
-          checked={occupiedCost}
-          disabled={!calibrated}
-          onChange={onOccupiedCostChange}
-          label="Add 5 ft per occupied square"
-        />
       )}
       <Switch
         className="map-toolbar-switch"

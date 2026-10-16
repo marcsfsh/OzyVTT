@@ -24,6 +24,7 @@ import {
 import { CommandRejectedError } from "../game-store.js";
 import { applyMovementRules } from "../movement-rules.js";
 import { creatureDistance, mapDistance, narrateTokenMove, type MovementNarration } from "../movement-narration.js";
+import { movementCost } from "../terrain.js";
 import { moveEncounterToken, moveSceneToken } from "../token-placement.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf, type GamePrincipal, type Kit } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
@@ -98,6 +99,7 @@ export const mapCommands = [
           from,
           to: moverToken?.position ?? null,
           distance: (a, b) => mapDistance(geometry, a, b)?.value ?? null,
+          cost: (a, b) => movementCost(state, geometry, actorId, a, b),
           creatureDistance: (enemy, moverPoint) => {
             const enemyToken = state.combat.tokens.find((token) => token.actorId === enemy.actorId);
             if (!enemyToken || !moverToken) return null;

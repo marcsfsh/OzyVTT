@@ -75,6 +75,7 @@ function sceneCombatFrom(combat: GameState["combat"]): SceneCombat {
     reactionsUsed: combat.reactionsUsed,
     legendaryUsed: combat.legendaryUsed,
     fog: combat.fog,
+    terrain: combat.terrain,
     pendingSaves: combat.pendingSaves,
     pendingReactions: combat.pendingReactions,
     pendingDamage: combat.pendingDamage,

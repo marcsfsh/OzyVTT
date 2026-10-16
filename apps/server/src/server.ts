@@ -15,7 +15,7 @@ import type {
 } from "@vtt/domain";
 import { ACTOR_DEFINITION_SCHEMA_VERSION } from "@vtt/schemas";
 import { nextAnnotationExpiry } from "./annotations.js";
-import { fillStoredProseFacts, reconcileArmorClasses, storedDefinition } from "./actor-roster.js";
+import { fillMissingSpeeds, fillStoredProseFacts, reconcileArmorClasses, storedDefinition } from "./actor-roster.js";
 import { createApiV1Router } from "./api-v1.js";
 import { ContentLibrary } from "./content-library.js";
 import { equipmentCatalogOf } from "./equipment-derivation.js";
@@ -195,7 +195,8 @@ export function createServer(options: CreateServerOptions) {
       storedDefinition(state, definitionId) ?? contentLibrary.monsterForInstance(definitionId);
     const reconcile = (state: GameState) => {
       const filled = fillStoredProseFacts(state);
-      return reconcileArmorClasses(state, definitionsIn(state), catalog) || filled;
+      const sped = fillMissingSpeeds(state, definitionsIn(state));
+      return reconcileArmorClasses(state, definitionsIn(state), catalog) || filled || sped;
     };
     // A dry run first, so an unchanged campaign takes no revision.
     if (!reconcile(structuredClone(current))) return;

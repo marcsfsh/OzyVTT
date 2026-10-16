@@ -206,6 +206,7 @@ const TABLE_RESPONSES: ReadonlyArray<readonly [string, z.ZodType]> = [
   ["MapAssetMetadata", PublicMapAssetSchema],
   ["MapCatalogEntry", MapCatalogEntrySchema],
   ["ActorAvailableActionsData", wire.AvailableActionsReplySchema],
+  ["ActorMovementData", wire.ActorMovementReplySchema],
   ["BuilderOffersData", wire.BuilderOffersReplySchema],
   ["BuilderAbilityIncreases", wire.BuilderAbilityIncreasesSchema],
   ["BuilderChoiceRow", CharacterChoiceSchema]

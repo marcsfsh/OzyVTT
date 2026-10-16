@@ -8,16 +8,17 @@ import {
   IconMeasure,
   IconPing,
   IconSearch,
-  IconSelect
+  IconSelect,
+  IconTerrain
 } from "@vtt/ui";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { NEEDS_GRID, type MapTool, type MapToolbarProps } from "./mapTools";
-import { DrawGroup, FogGroup, ViewGroup } from "./MapToolGroups";
+import { DrawGroup, FogGroup, TerrainGroup, ViewGroup } from "./MapToolGroups";
 import "./map-toolbar.css";
 
 /**
- * The map toolbar. Always visible: the constant tools (Select · Ping · Measure) and three labelled
- * group buttons (Draw · Fog · View), on one row that never wraps; everything else is one tap deeper
+ * The map toolbar. Always visible: the constant tools (Select · Ping · Measure) and the labelled group
+ * buttons (Draw · View, and for the GM Fog · Terrain), on one row that never wraps; everything else is one tap deeper
  * in the group's panel. At 560px and below it collapses to one `Tools` button at the bottom-left
  * (thumb reach) that opens a vertical rail of the same content.
  *
@@ -26,9 +27,9 @@ import "./map-toolbar.css";
  * go through the map's commands (`useMapCommands`). The group panels are in `MapToolGroups.tsx`.
  */
 
-type GroupId = "draw" | "fog" | "view";
+type GroupId = "draw" | "fog" | "terrain" | "view";
 
-const GROUP_LABEL: Record<GroupId, string> = { draw: "Draw", fog: "Fog", view: "View" };
+const GROUP_LABEL: Record<GroupId, string> = { draw: "Draw", fog: "Fog", terrain: "Terrain", view: "View" };
 
 const CONSTANT_TOOLS: ReadonlyArray<{ id: MapTool; label: string; icon: React.ReactNode; needsGrid?: boolean }> = [
   { id: "select", label: "Select and move", icon: <IconSelect /> },
@@ -48,7 +49,7 @@ export function MapToolbar(props: MapToolbarProps) {
   const railRef = useRef<HTMLDivElement | null>(null);
   const baseId = useId();
 
-  const groups: GroupId[] = role === "gm" ? ["draw", "fog", "view"] : ["draw", "view"];
+  const groups: GroupId[] = role === "gm" ? ["draw", "fog", "terrain", "view"] : ["draw", "view"];
 
   // Leaving the compact band with the rail open would strand the state; reset both on the swap.
   useEffect(() => {
@@ -109,11 +110,20 @@ export function MapToolbar(props: MapToolbarProps) {
   const groupBody = (group: GroupId) => {
     if (group === "draw") return <DrawGroup {...props} id={`${baseId}-draw`} onPickTool={pickTool} />;
     if (group === "fog") return <FogGroup {...props} onPickTool={pickTool} />;
+    if (group === "terrain") return <TerrainGroup {...props} onPickTool={pickTool} />;
     return <ViewGroup {...props} id={`${baseId}-view`} />;
   };
 
   const groupIcon = (group: GroupId) =>
-    group === "draw" ? <IconDraw /> : group === "fog" ? <IconFog /> : <IconSearch />;
+    group === "draw" ? (
+      <IconDraw />
+    ) : group === "fog" ? (
+      <IconFog />
+    ) : group === "terrain" ? (
+      <IconTerrain />
+    ) : (
+      <IconSearch />
+    );
 
   /**
    * The preview toggle, in both trees. No caret (no panel), and `aria-pressed` rather than

@@ -162,6 +162,7 @@ export function TableView(props: TableViewProps) {
               revision={state.revision}
               activeActorId={null}
               fog={staged.combat.fog}
+              terrain={staged.combat.terrain}
               moveSceneId={staged.id}
               onScenePrep={gm?.onPrepareScene}
               staging={{
@@ -203,6 +204,7 @@ export function TableView(props: TableViewProps) {
                 activeActorId={state.combat.turnActorId}
                 reactionsUsed={state.combat.reactionsUsed}
                 fog={state.combat.fog}
+                terrain={state.combat.terrain}
                 dock={mapDock}
                 onScenePrep={gm?.onPrepareScene}
                 {...(props.role === "gm" && Array.isArray(props.state.combat.scenes)

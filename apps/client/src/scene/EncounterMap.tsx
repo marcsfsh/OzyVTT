@@ -16,16 +16,19 @@ import type { DockPosition } from "../encounter/DockPicker";
 import { useTargeting } from "../encounter/targeting";
 import { FogOverlay } from "./FogOverlay";
 import { gesturePreview } from "./gesturePreview";
-import { footprintCells, occupiedPathCost, snapCellCenterPreview, useMapCalibration } from "./gridPreview";
+import { snapCellCenterPreview, useMapCalibration } from "./gridPreview";
 import { MarkLayer, ShapeLayer } from "./MapAnnotationLayers";
 import { useAuthorizedMapImage } from "./mapImage";
 import { MapToken } from "./MapToken";
 import { MapTokenTray } from "./MapTokenTray";
 import { MapToolbar } from "./MapToolbar";
 import type { MapTool } from "./mapTools";
+import { moveLabel, previewMove } from "./movePreview";
+import { useMovementBudget } from "./useMovementBudget";
 import { SceneControls } from "./SceneControls";
 import { ShapeEditor } from "./ShapeEditor";
 import { TargetBar } from "./TargetBar";
+import { TerrainOverlay } from "./TerrainOverlay";
 import { TokenContextMenu } from "./TokenContextMenu";
 import { useMapCommands } from "./useMapCommands";
 import { useMapGestures } from "./useMapGestures";
@@ -48,6 +51,10 @@ type FogState = Readonly<{
   }>[];
 }>;
 
+type TerrainState = Readonly<{
+  difficult: readonly Readonly<{ x: number; y: number; width: number; height: number }>[];
+}>;
+
 // On-brand annotation swatches. Concrete hexes, not theme vars: the colour travels over the wire and
 // must read the same on every screen.
 const PLAYER_COLORS = ["#2de2ff", "#5b6ef5", "#a45cff", "#ff2e9a", "#ff2d5e", "#ff8cc6", "#7cefff", "#ffffff"];
@@ -68,6 +75,7 @@ export function EncounterMap({
   activeActorId,
   reactionsUsed = [],
   fog,
+  terrain,
   dock,
   moveSceneId,
   onScenePrep,
@@ -90,6 +98,8 @@ export function EncounterMap({
   reactionsUsed?: readonly string[];
   /** Manual fog-of-war mask for this map (live table or staged scene). Absent = no fog. */
   fog?: FogState;
+  /** Difficult terrain on this map; a player's is already clipped to what the fog reveals. */
+  terrain?: TerrainState;
   dock?: Readonly<{
     node: React.ReactNode;
     position: DockPosition;
@@ -122,12 +132,6 @@ export function EncounterMap({
   const [tool, setTool] = useState<MapTool>("select");
   const [defaultVisibility, setDefaultVisibility] = useState<AnnotationVisibility>("public");
   const [defaultActorId, setDefaultActorId] = useState<string | null>(null);
-  const [rulerWhileMoving, setRulerWhileMoving] = useState(false);
-  // GM-controlled: whether measure-while-moving adds the +5 ft per occupied cell penalty. Persisted.
-  const [showOccupied, setShowOccupied] = useState(() => localStorage.getItem("vtt.show-occupied") !== "0");
-  useEffect(() => {
-    localStorage.setItem("vtt.show-occupied", showOccupied ? "1" : "0");
-  }, [showOccupied]);
   const [contextMenu, setContextMenu] = useState<{ actorId: string; x: number; y: number } | null>(null);
   // Click-to-target: only the GM resolves actions here, so the targeting session is inert for players.
   const targetingSession = useTargeting();
@@ -262,24 +266,47 @@ export function EncounterMap({
     const position = dragging?.actorId === encounterToken.actorId ? dragSnappedPoint : encounterToken.position;
     return position ? [{ ...encounterToken, position }] : [];
   });
-  // Cells occupied by every other visible token (players never receive hidden tokens, so no leak).
-  const occupiedByOthers =
-    rulerWhileMoving && showOccupied && calibration && dragging
-      ? new Set<string>(
-          tokens.flatMap((encounterToken) =>
-            encounterToken.actorId !== dragging.actorId && encounterToken.position
-              ? [...footprintCells(calibration, encounterToken.position, encounterToken.sizeCells)]
-              : []
-          )
-        )
-      : null;
+  // The drag's path and cost, as the server will charge it, and what that leaves of the mover's turn. Only the
+  // combatant whose turn it is spends movement, so only that drag asks for the budget.
+  const difficult = terrain?.difficult ?? [];
   const liveMove =
-    rulerWhileMoving && calibration && dragSnappedPoint && dragging?.origin && occupiedByOthers
-      ? occupiedPathCost(calibration, dragging.origin, dragSnappedPoint, occupiedByOthers)
+    calibration && size && dragSnappedPoint && dragging?.origin && !dragging.fromTray
+      ? previewMove({
+          calibration,
+          size,
+          terrain: difficult,
+          tokens,
+          actorsById,
+          moverId: dragging.actorId,
+          from: dragging.origin,
+          to: dragSnappedPoint
+        })
       : null;
+  const budget = useMovementBudget(
+    dragging && dragging.actorId === activeActorId && !moveSceneId ? dragging.actorId : null,
+    revision
+  );
+  const liveLabel = liveMove && liveMove.feet > 0 ? moveLabel(liveMove, budget) : null;
+  const labelSize = sizes.labelSize;
+  // The label must stay readable on a phone, where the whole map is drawn small: at least 14 screen pixels, and
+  // kept inside the map so a drag near an edge doesn't cut it off.
+  const moveLabelPlacement = (() => {
+    if (!liveLabel || !dragSnappedPoint || !size) return null;
+    const [, , viewWidth = 0, viewHeight = 0] = view.viewBox.split(/\s+/).map(Number);
+    const svg = svgRef.current;
+    const scale = svg && viewWidth > 0 ? Math.min(svg.clientWidth / viewWidth, svg.clientHeight / viewHeight) : 0;
+    const fontSize = scale > 0 ? Math.max(labelSize, 14 / scale) : labelSize;
+    // Space Mono's glyphs are about 0.6em wide.
+    const halfWidth = Math.min(size.width / 2, (liveLabel.text.length * fontSize * 0.6) / 2 + fontSize * 0.5);
+    const above = dragSnappedPoint.y - fontSize * 1.3;
+    return {
+      fontSize,
+      x: Math.min(size.width - halfWidth, Math.max(halfWidth, dragSnappedPoint.x)),
+      y: above - fontSize > 0 ? above : dragSnappedPoint.y + fontSize * 2
+    };
+  })();
   const preview = gesturePreview(calibration, gesture, annotationAt);
   const selected = selectedId ? annotationAt(selectedId) : null;
-  const labelSize = sizes.labelSize;
 
   return (
     <div className={`encounter-map-interaction ${view.enlarged ? "enlarged" : ""}`} {...handlers}>
@@ -327,6 +354,9 @@ export function EncounterMap({
               onFogEnabledChange={commands.setFogEnabled}
               onRevealAll={commands.revealAllFog}
               onHideAll={commands.hideAllFog}
+              terrainBusy={commands.terrainBusy}
+              hasTerrain={difficult.length > 0}
+              onClearTerrain={commands.clearAllTerrain}
               {...(viewerPreview ? { viewerPreview } : {})}
               onZoom={view.zoomCenter}
               onResetView={view.resetView}
@@ -335,10 +365,6 @@ export function EncounterMap({
               fullscreen={view.fullscreen}
               onToggleFullscreen={view.toggleFullscreen}
               dock={dock ? { position: dock.position, onChange: dock.onChange } : undefined}
-              rulerWhileMoving={rulerWhileMoving}
-              onRulerWhileMovingChange={setRulerWhileMoving}
-              occupiedCost={showOccupied}
-              onOccupiedCostChange={setShowOccupied}
               notificationsMuted={notificationsMuted}
               onNotificationsMutedChange={setNotificationsMuted}
             />
@@ -351,6 +377,7 @@ export function EncounterMap({
               aria-label={`${altText}. Interactive tokens are layered above this map.`}
             >
               <image href={image.url} width={size.width} height={size.height} role="img" aria-label={altText} />
+              <TerrainOverlay difficult={difficult} cellSizePx={calibration?.cellSizePx ?? 50} />
 
               {/* Shapes render below tokens; measurements render above them. */}
               <ShapeLayer
@@ -393,24 +420,22 @@ export function EncounterMap({
                 );
               })}
               <MarkLayer annotations={annotations} preview={preview} sizes={sizes} color={sessionColor} />
-              {liveMove !== null && dragSnappedPoint && dragging?.origin && (
-                <g className="encounter-move-guide">
-                  <line
+              {liveMove && liveLabel && moveLabelPlacement && (
+                <g className={`encounter-move-guide${liveLabel.over ? " over" : ""}`}>
+                  <polyline
                     className="encounter-move-line"
-                    x1={dragging.origin.x}
-                    y1={dragging.origin.y}
-                    x2={dragSnappedPoint.x}
-                    y2={dragSnappedPoint.y}
+                    points={liveMove.path.map((point) => `${point.x},${point.y}`).join(" ")}
                   />
                   <text
                     className="encounter-live-distance"
-                    style={{ fontSize: labelSize, strokeWidth: Math.max(3, labelSize * 0.22) }}
-                    x={dragSnappedPoint.x}
-                    y={dragSnappedPoint.y - labelSize * 1.3}
+                    style={{
+                      fontSize: moveLabelPlacement.fontSize,
+                      strokeWidth: Math.max(3, moveLabelPlacement.fontSize * 0.22)
+                    }}
+                    x={moveLabelPlacement.x}
+                    y={moveLabelPlacement.y}
                   >
-                    {liveMove.penaltyFeet > 0
-                      ? `${liveMove.baseFeet} ft + ${liveMove.penaltyFeet} ft (occupied)`
-                      : `${liveMove.baseFeet} ft`}
+                    {liveLabel.text}
                   </text>
                 </g>
               )}
@@ -418,6 +443,16 @@ export function EncounterMap({
               {gesture?.kind === "fog" && (
                 <rect
                   className={`fog-stroke-preview fog-stroke-${gesture.op}`}
+                  x={Math.min(gesture.origin.x, gesture.current.x)}
+                  y={Math.min(gesture.origin.y, gesture.current.y)}
+                  width={Math.abs(gesture.origin.x - gesture.current.x)}
+                  height={Math.abs(gesture.origin.y - gesture.current.y)}
+                />
+              )}
+              {/* Live outline of the terrain stroke being dragged (snapped to whole cells on commit). */}
+              {gesture?.kind === "terrain" && (
+                <rect
+                  className={`terrain-stroke-preview terrain-stroke-${gesture.op}`}
                   x={Math.min(gesture.origin.x, gesture.current.x)}
                   y={Math.min(gesture.origin.y, gesture.current.y)}
                   width={Math.abs(gesture.origin.x - gesture.current.x)}

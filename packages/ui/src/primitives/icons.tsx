@@ -286,6 +286,18 @@ export function IconFog({ className }: Readonly<{ className?: string }>) {
   );
 }
 
+/** Terrain: a square of ground crossed by hatching, as the map draws difficult terrain. */
+export function IconTerrain({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path
+        fillRule="evenodd"
+        d="M3 3h18v18H3zM4.6 4.6v14.8h14.8V4.6zM4.6 10.4 10.4 4.6H13L4.6 13zM4.6 17.4 17.4 4.6h2v2L6.6 19.4h-2zM11 19.4 19.4 11v2.6l-5.8 5.8z"
+      />
+    </Glyph>
+  );
+}
+
 /** Colour: labels a choice of colour only, never what a mark means. */
 export function IconColor({ className }: Readonly<{ className?: string }>) {
   return (

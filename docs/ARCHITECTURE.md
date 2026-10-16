@@ -143,6 +143,11 @@ hidden things are stripped by the projections regardless of what fog covers.
   preview that mirrors the server.
 - Drawings, measurements and pings live in `annotations.ts`. Fog is an ordered list of
   reveal/hide rectangles per scene (`fog.ts`). Scenes park and resume a fight (`scenes.ts`).
+- Difficult terrain is a GM-painted set of cell-snapped rectangles per scene (`terrain.ts`).
+  A move is charged along the cheapest grid path, where terrain and enemies' spaces cost double
+  (`movementPath` in `@vtt/rules-5e`). The map's drag preview runs the same function, and a
+  mirror test checks the two agree. Players and the table screen get only the terrain the fog
+  reveals.
 
 ## Rules engine
 

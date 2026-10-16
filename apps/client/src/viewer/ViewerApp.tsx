@@ -3,6 +3,7 @@ import { Button, Input } from "@vtt/ui";
 import { ApiError, apiRequest } from "../lib/api";
 import { probeImageDimensions } from "../scene/mapImage";
 import { FogOverlay } from "../scene/FogOverlay";
+import { TerrainOverlay } from "../scene/TerrainOverlay";
 import { bandFraction, TokenGlyph, TokenHealthAura, TokenStatusBadges } from "../scene/tokenGlyph";
 import { AnnotationGlyph, PingGlyph } from "../scene/annotationGlyph";
 import { InitiativeRow } from "../encounter/InitiativeList";
@@ -69,6 +70,8 @@ export type Presentation = Readonly<{
         height: number;
       }>[];
     }>;
+    /** Difficult terrain the fog reveals. */
+    terrain?: Readonly<{ difficult: readonly Readonly<{ x: number; y: number; width: number; height: number }>[] }>;
   }>;
 }>;
 
@@ -336,6 +339,12 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
               .catch(() => {});
           }}
         />
+        {onActiveMap && presentation.encounter.terrain && (
+          <TerrainOverlay
+            difficult={presentation.encounter.terrain.difficult}
+            cellSizePx={Math.min(size.width, size.height) / 20}
+          />
+        )}
         {annotations.map((annotation) => {
           if (annotation.kind === "ping")
             return (

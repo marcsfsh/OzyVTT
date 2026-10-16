@@ -61,6 +61,7 @@ export {
   IconMeasure,
   IconDraw,
   IconFog,
+  IconTerrain,
   IconColor,
   IconCleanup,
   IconScene,
