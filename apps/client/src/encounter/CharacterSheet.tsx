@@ -322,13 +322,15 @@ export function CharacterSheet({
           )}
         </div>
       )}
-      {actor.kind === "player-character" && (
+      {/* The GM rests monsters and NPCs too (a Long Rest re-arms Legendary Resistance and per-day uses), without
+          Hit Dice to spend. */}
+      {(actor.kind === "player-character" || role === "gm") && (
         <div className="sheet-rest-block">
           <span className="sheet-section-label">Rest</span>
           <SheetRest
             actorId={actor.id}
             role={role}
-            hitDice={"hitDice" in actor ? actor.hitDice : null}
+            hitDice={actor.kind === "player-character" && "hitDice" in actor ? actor.hitDice : null}
             asked={state?.rest?.requests.includes(actor.id) ?? false}
             onFeedback={setFeedback}
           />
