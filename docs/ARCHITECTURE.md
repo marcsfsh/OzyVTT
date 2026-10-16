@@ -182,7 +182,10 @@ A magic item's charges are an `actionUses` pool keyed by the carried row (`itemP
 it over (`character.give-item`). A long rest gives back the item's printed dice (`charges.regain`), not
 every charge, and spending the last one rolls the SRD's d20 for the GM (`item-charges.ts`). Ammunition is
 counted on its row too (`ammunition.ts`): a shot from an Ammunition weapon needs a piece of the kind it fires
-and spends one, and half of the pieces fired come back when the encounter ends. A potion or a flask whose
+and spends one, and half of the pieces fired come back when the encounter ends. Magic ammunition is bound to a
+kind when it is added, like a magic weapon to its base, so +1 bolts fit only a crossbow, and its bonus rides only
+the shot that draws it. A shot outside a fight spends a piece too, and `character.recover-ammunition` picks up
+half of them. A potion or a flask whose
 record is `consumedOnUse` acts from the pack and leaves the stack one smaller each time (`consumables.ts`).
 A thrown flask takes one attack of the Attack action (`replacesAttack`). Alchemist's Fire sets its target
 burning and Oil covers it (`save.failureHazard`, `hazards.ts`): a burning creature takes 1d4 Fire at the start

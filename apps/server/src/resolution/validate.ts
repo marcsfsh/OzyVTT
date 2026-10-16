@@ -1,5 +1,6 @@
 import type { GameState } from "@vtt/domain";
 import { effectiveActions } from "../effective-actions.js";
+import { withShotAmmunitionOnly } from "../ammunition.js";
 import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
 import { effectiveModeFor, overrideCovers, overrideReason, overrideWaives } from "../rules-families.js";
@@ -65,9 +66,10 @@ export function openResolve(
 ): ResolveContext {
   const { attacker, targets } = combatantsOf(state, action, input);
   const warnings: string[] = [];
-  const derivation = deriveEquipment(attacker, deps.definition, deps.catalog);
+  const derived = deriveEquipment(attacker, deps.definition, deps.catalog);
   const siblings = effectiveActions(deps.definition, attacker, deps.catalog);
-  const riderItemId = sourceItemOf(action, derivation, attacker.inventory);
+  const riderItemId = sourceItemOf(action, derived, attacker.inventory);
+  const derivation = withShotAmmunitionOnly(derived, attacker, riderItemId, deps.catalog);
   const economy = input.economyPaid
     ? { plan: paidPlan(state), overridden: null }
     : planEconomy(

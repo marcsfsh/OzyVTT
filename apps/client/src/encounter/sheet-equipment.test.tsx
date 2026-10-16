@@ -166,6 +166,52 @@ describe("the sheet's inventory", () => {
       expect.objectContaining({ actorId: HERO, toActorId: FRIEND, itemId: "rope" })
     ]);
   });
+
+  it("names a magic arrow's kind, and picks up fired arrows only outside a fight", async () => {
+    serve();
+    const archer = hero();
+    archer.inventory = [
+      ...archer.inventory.map((item) => (item.id === "arrows-20" ? { ...item, ammunitionFired: 4 } : item)),
+      {
+        id: "ammunition-1",
+        name: "Ammunition, +1",
+        quantity: 5,
+        equipped: true,
+        attuned: false,
+        category: "ammunition",
+        baseId: "arrows-20"
+      }
+    ];
+    const { unmount } = render(<CharacterSheet actor={archer} role="player" onClose={() => {}} />, {
+      wrapper: ToastProvider
+    });
+    const magic = (await screen.findByText("Ammunition, +1")).closest(".sheet-inv-row") as HTMLElement;
+    expect(await within(magic).findByText("(Arrows)")).toBeTruthy();
+    expect((screen.getByText("Arrows (20)").closest(".sheet-inv-row") as HTMLElement).textContent).toContain("4 fired");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Pick up fired ammunition" }));
+    expect(sent("character:recover-ammunition")).toEqual([expect.objectContaining({ actorId: HERO })]);
+    unmount();
+    // In the fight they come back when it ends, so the sheet offers nothing yet.
+    const fighting = { ...stateWith(archer), combat: { active: true, initiative: [{ actorId: HERO }] } } as GmView;
+    render(<CharacterSheet actor={archer} role="gm" state={fighting} onClose={() => {}} />, {
+      wrapper: ToastProvider
+    });
+    expect(screen.queryByRole("button", { name: "Pick up fired ammunition" })).toBeNull();
+  });
+
+  it("asks which kind a piece of magic ammunition is, naming the weapons each kind fits", async () => {
+    serve();
+    const added = vi.fn();
+    render(<EquipmentPicker ownedCounts={new Map()} busy={false} onAdd={added} onClose={() => {}} />);
+    const user = userEvent.setup();
+    await user.type(await screen.findByRole("searchbox", { name: "Search equipment" }), "ammunition, +1");
+    await user.click(screen.getByRole("button", { name: "Add Ammunition, +1" }));
+    expect(screen.getByText(/only a weapon that fires that kind can shoot it/)).toBeTruthy();
+    const bolts = screen.getByRole("button", { name: "Make it Crossbow Bolts" }).closest("li") as HTMLElement;
+    expect(bolts.textContent).toContain("Bolts for a Hand Crossbow, Light Crossbow or Heavy Crossbow");
+    await user.click(screen.getByRole("button", { name: "Make it Crossbow Bolts" }));
+    expect(added).toHaveBeenCalledWith(expect.objectContaining({ id: "ammunition-1" }), "crossbow-bolts-20");
+  });
 });
 
 describe("the hand-set Armor Class", () => {

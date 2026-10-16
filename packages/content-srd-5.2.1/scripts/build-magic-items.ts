@@ -340,6 +340,13 @@ const BASE_WEAPONS = z
   .parse(JSON.parse(readFileSync(join(outDir, "weapons.v1.json"), "utf8")))
   .filter((weapon) => !weapon.improvised);
 const BASE_ARMOR = z.array(ArmorReferenceSchema).parse(JSON.parse(readFileSync(join(outDir, "armor.v1.json"), "utf8")));
+/** "Weapon (Any Ammunition)": a piece of magic ammunition is one of the kinds the gear table sells (Arrows,
+ *  Bolts...), so it fits only the launchers that fire that kind. */
+const AMMUNITION_BASE_IDS = (
+  JSON.parse(readFileSync(join(outDir, "equipment.v1.json"), "utf8")) as Array<{ id: string; ammunition?: unknown }>
+)
+  .filter((row) => row.ammunition !== undefined)
+  .map((row) => row.id);
 
 /**
  * A magic shield is a shield: its rarity bonus (an authored `armor-class` rider) stacks on the plain
@@ -440,12 +447,16 @@ function armorBaseIds(entry: Entry, qualifier: string): readonly string[] {
 const RESERVED_UNBINDABLE = new Set(["sun-blade", "energy-bow"]);
 
 /**
- * Weapon and body-armor rows get the column; everything else gets null. A magic shield already
- * carries the shield's block (`SHIELD_ARMOR`), so it binds to nothing. Magic ammunition is unbound:
- * there is no ammunition model.
+ * Weapon, body-armor and ammunition rows get the column; everything else gets null. A magic shield
+ * already carries the shield's block (`SHIELD_ARMOR`), so it binds to nothing.
  */
 function appliesToOf(entry: Entry, type: TypeLine, slotId: string): ItemAppliesTo | null {
   if (RESERVED_UNBINDABLE.has(slug(entry.name))) return null;
+  if (slotId === "ammunition") {
+    if (AMMUNITION_BASE_IDS.length === 0)
+      return die(`${entry.name} (line ${entry.line}): equipment.v1.json sells no ammunition to bind it to.`);
+    return { label: type.qualifier ?? "Any Ammunition", baseIds: [...AMMUNITION_BASE_IDS] };
+  }
   if (type.category === "Weapon" && slotId === "weapon") {
     if (!type.qualifier)
       return die(`${entry.name} (line ${entry.line}): a weapon row whose type line names no base weapon.`);
@@ -543,23 +554,24 @@ if (badRarities.length > 0)
     `${badRarities.length} row(s) carry a rarity outside RARITY_IDS: ${badRarities.map((row) => `${row.name} -> ${row.rarity}`).join(", ")}`
   );
 
-// The eligibility column is total on weapons and body armor and absent everywhere else.
+// The eligibility column is total on weapons, body armor and ammunition, and absent everywhere else.
+const TEMPLATE_CATEGORIES: ReadonlySet<string> = new Set(["weapon", "armor", "ammunition"]);
 const missingAppliesTo = rows.filter(
-  (row) => (row.category === "weapon" || row.category === "armor") && !row.appliesTo && !RESERVED_UNBINDABLE.has(row.id)
+  (row) => TEMPLATE_CATEGORIES.has(row.category) && !row.appliesTo && !RESERVED_UNBINDABLE.has(row.id)
 );
 if (missingAppliesTo.length > 0)
   die(
-    `${missingAppliesTo.length} weapon/armor row(s) carry no appliesTo: ${missingAppliesTo.map((row) => row.id).join(", ")}`
+    `${missingAppliesTo.length} weapon/armor/ammunition row(s) carry no appliesTo: ${missingAppliesTo.map((row) => row.id).join(", ")}`
   );
 const boundReserved = rows.filter((row) => RESERVED_UNBINDABLE.has(row.id) && row.appliesTo);
 if (boundReserved.length > 0)
   die(
     `${boundReserved.length} reserved unbindable row(s) carry an appliesTo they must not: ${boundReserved.map((row) => row.id).join(", ")}`
   );
-const strayAppliesTo = rows.filter((row) => row.category !== "weapon" && row.category !== "armor" && row.appliesTo);
+const strayAppliesTo = rows.filter((row) => !TEMPLATE_CATEGORIES.has(row.category) && row.appliesTo);
 if (strayAppliesTo.length > 0)
   die(
-    `${strayAppliesTo.length} row(s) outside weapon/armor carry an appliesTo: ${strayAppliesTo.map((row) => row.id).join(", ")}`
+    `${strayAppliesTo.length} row(s) outside weapon/armor/ammunition carry an appliesTo: ${strayAppliesTo.map((row) => row.id).join(", ")}`
   );
 
 // Expanding `Potions of Healing` mints its strengths but not `potion-of-healing`, which `equipment.v1.json`

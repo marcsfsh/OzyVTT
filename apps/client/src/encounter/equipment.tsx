@@ -122,10 +122,20 @@ function metaLine(item: ContentEquipmentSummary): string {
   return parts.join(" · ");
 }
 
+/** A piece of magic ammunition is one kind of the gear table's ammunition: "Arrows", not "Arrows (20)". */
+export const ammunitionKindName = (base: Pick<ContentEquipmentSummary, "name">) => base.name.replace(/\s*\(\d+\)$/, "");
+
+/** What picking a base decides, for the chooser's lead line. */
+const pickConsequence = (template: ContentEquipmentSummary) =>
+  template.category === "ammunition"
+    ? "only a weapon that fires that kind can shoot it."
+    : "its numbers come from that choice.";
+
 /**
  * The eligible-base list for a template magic item ("Weapon (Any Simple or Martial)"), shared by the
- * picker's chooser step and the sheet's bind prompt. Each row shows the base's own numbers. Bases the
- * catalog cannot resolve (e.g. a deleted homebrew base) are omitted; the server would refuse them.
+ * picker's chooser step and the sheet's bind prompt. Each row shows the base's own numbers, or for magic
+ * ammunition the weapons its kind fits. Bases the catalog cannot resolve (e.g. a deleted homebrew base) are
+ * omitted; the server would refuse them.
  */
 export function BaseOptionList({
   template,
@@ -151,19 +161,22 @@ export function BaseOptionList({
         {needle ? "No base matches that search." : "None of this item's bases are in the catalog."}
       </p>
     );
+  const kinds = template.category === "ammunition";
   return (
     <ul className="sheet-picker-list scroll-y">
       {bases.map((base) => (
         <li key={base.id}>
           <div className="sheet-picker-item">
-            <span className="sheet-picker-name">{base.name}</span>
-            <span className="sheet-picker-meta">{metaLine(base)}</span>
+            <span className="sheet-picker-name">{kinds ? ammunitionKindName(base) : base.name}</span>
+            <span className="sheet-picker-meta">
+              {kinds ? (base.description?.split(/(?<=\.)\s/)[0] ?? "") : metaLine(base)}
+            </span>
           </div>
           <button
             type="button"
             className="sheet-picker-add tap-target"
             disabled={busy}
-            aria-label={`Make it a ${base.name}`}
+            aria-label={kinds ? `Make it ${ammunitionKindName(base)}` : `Make it a ${base.name}`}
             onClick={() => onPick(base.id)}
           >
             Pick
@@ -198,8 +211,8 @@ export function BindItemModal({
       ariaLabel={`Choose which ${template.category} ${template.name} is`}
     >
       <p className="sheet-picker-empty">
-        {template.name} applies to {template.appliesTo?.label ?? "a base"}. Pick which one it is - its numbers come from
-        that choice.
+        {template.name} applies to {template.appliesTo?.label ?? "a base"}. Pick which one it is -{" "}
+        {pickConsequence(template)}
       </p>
       <div className="sheet-picker-controls">
         <Input
@@ -273,8 +286,10 @@ export function EquipmentPicker({
         ariaLabel={`Choose which ${choosing.category} ${choosing.name} is`}
       >
         <p className="sheet-picker-empty">
-          {choosing.name} applies to {choosing.appliesTo?.label}. Pick which one it is - its dice, reach and properties
-          come from that choice.
+          {choosing.name} applies to {choosing.appliesTo?.label}. Pick which one it is -{" "}
+          {choosing.category === "ammunition"
+            ? pickConsequence(choosing)
+            : "its dice, reach and properties come from that choice."}
         </p>
         <div className="sheet-picker-controls">
           <Input

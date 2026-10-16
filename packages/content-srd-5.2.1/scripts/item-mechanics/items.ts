@@ -137,8 +137,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   /**
    * Ammunition has no weapon block, so its riders are bearer-scoped; `weapon-property-is: ammunition`
-   * limits them to shots from a launcher, so a thrown dagger or a spell gets nothing. Not modeled: which
-   * launcher fires which kind of ammunition, and the piece losing its magic once it hits.
+   * limits them to shots from a launcher, so a thrown dagger or a spell gets nothing. The server applies them
+   * only to a shot drawn from this row, which the piece's kind (its bound base) ties to its launchers.
    */
   "ammunition-1": {
     modifiers: [

@@ -8,12 +8,12 @@ import { builtinAction } from "../builtin-actions.js";
 import { effectiveActions } from "../effective-actions.js";
 import { pushTokenAway } from "../forced-movement.js";
 import { ActionResolveSchema, ActionUseSchema, DiceRollSchema } from "@vtt/domain/commands";
-import { CommandRejectedError } from "../game-store.js";
+import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
 import { damageAdjustmentDetail } from "../hit-points.js";
 import { tokenCreatureDistance } from "../movement-narration.js";
 import { settlePlayerDamage, type AppliedDamage } from "../player-damage.js";
 import { recordRoll, rolledTerms } from "../roll-history.js";
-import { overrideReason, overrideWaives, rememberOverride } from "../rules-families.js";
+import { effectiveModeFor, overrideReason, overrideWaives, rememberOverride } from "../rules-families.js";
 import { looseRollPlan, NOT_YOUR_TURN, offTurnVerdict, routeForTap, spendLooseUses } from "../tap-routing.js";
 import { isItemActionId, upcastAction } from "../item-actions.js";
 import { BURNING_TAG, PUT_OUT_FIRE_ACTION_ID, putOutFire } from "../hazards.js";
@@ -21,11 +21,16 @@ import type { EffectNarration } from "../effects.js";
 import { grantOutsideFight } from "../resolution/grant.js";
 import { lastChargeLine, lastChargeRollFor } from "../item-charges.js";
 import { consumableRowFor, withOneUsedUp } from "../consumables.js";
+import { ammunitionLabel, shotFrom, spendPiece } from "../ammunition.js";
+import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
 import { castSlotLevel } from "../resolution/economy.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, principalTag, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
 // Stat-block actions, the server-routed "use this action" tap, and free dice rolls.
+
+/** The fight's own ammunition rule, also held to outside one. */
+const NO_AMMUNITION = "attack.no-ammunition";
 
 export const actionCommands = [
   defineCommand({
@@ -339,9 +344,24 @@ export const actionCommands = [
       let lastCharge: string | null = null;
       let usedUp = false;
       let narrations: EffectNarration[] = [];
+      let ammunitionNote: string | null = null;
       const { state, duplicate } = await execute((draft) => {
         requireActorAccess(initiator, draft, actorId, "attack");
         const live = draft.actors.find((candidate) => candidate.id === actorId)!;
+        // A shot outside a fight needs a piece to fire and spends it as in one; half come back when it is picked up.
+        if (action.attack) {
+          const catalog = kit.equipmentCatalog();
+          const launcherId = sourceItemOf(action, deriveEquipment(live, definition, catalog), live.inventory);
+          const shot = shotFrom(live, launcherId, catalog);
+          if (shot?.ammo) spendPiece(live, shot.ammo, true);
+          else if (shot) {
+            const message = `${live.name} has no ${ammunitionLabel(shot.kind)} to fire from ${shot.launcher.name}.`;
+            const mode = effectiveModeFor(draft.combat, NO_AMMUNITION);
+            if (mode === "strict" && !overrideWaives(override, NO_AMMUNITION))
+              throw new RulesBlockedError(NO_AMMUNITION, message);
+            if (mode !== "freeform") ammunitionNote = message;
+          }
+        }
         // Rolling on the ground outside a fight puts the fire out all the same.
         if (action.id === PUT_OUT_FIRE_ACTION_ID) {
           if (!live.effects.some((effect) => effect.tags.includes(BURNING_TAG)))
@@ -409,6 +429,14 @@ export const actionCommands = [
       if (duplicate) return { route: "loose", rollIds };
       kit.publishRolls(state, commandId);
       kit.publishNarrations(narrations);
+      if (ammunitionNote !== null)
+        kit.context.appendLog({
+          kind: "action",
+          text: `Rules note: ${ammunitionNote}`,
+          actorId,
+          actorIds: [actorId],
+          gmOnly: true
+        });
       if (lastCharge !== null)
         kit.context.appendLog({
           kind: "action",

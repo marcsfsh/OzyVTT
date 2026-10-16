@@ -4,6 +4,7 @@ import { setCharacterIdentity, setCharacterProficiencies } from "../character-ed
 import {
   ActorRemoveSchema,
   CharacterGiveItemSchema,
+  CharacterRecoverAmmunitionSchema,
   CharacterSetCurrencySchema,
   CharacterSetIdentitySchema,
   CharacterSetInventorySchema,
@@ -12,6 +13,8 @@ import {
   CharacterSetSlotSchema,
   CommandIdentitySchema
 } from "@vtt/domain/commands";
+import { recoverAmmunition } from "../ammunition.js";
+import { CommandRejectedError } from "../game-store.js";
 import { giveItem, setCurrency, setInventoryItem } from "../inventory.js";
 import { setPreparedSpell, setSpellSlotRemaining } from "../spellcasting.js";
 import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
@@ -156,6 +159,39 @@ export const characterSheetCommands = [
           text: `${kit.actorName(actorId)} hands ${name} to ${kit.actorName(toActorId)}.`,
           actorIds: [actorId, toActorId],
           gmOnly: kit.actorHidden(actorId) || kit.actorHidden(toActorId)
+        });
+    }
+  }),
+
+  defineCommand({
+    type: "character.recover-ammunition",
+    operationId: "recoverAmmunition",
+    description:
+      "Picks up the ammunition a character fired outside a fight: half the pieces fired from each row come back, rounded down, and the rest are lost (SRD Ammunition). A fight's pieces come back when the encounter ends, so this is refused while the character is in a running fight. Player sessions may target only their claimed character.",
+    summary: "Pick up half the ammunition a character fired outside a fight.",
+    schema: CharacterRecoverAmmunitionSchema,
+    malformed: "The recover-ammunition command is malformed.",
+    async run({ principal, request, execute }, kit) {
+      const { actorId } = request;
+      let lines: ReturnType<typeof recoverAmmunition> = [];
+      const { duplicate } = await execute((state) => {
+        requireActorAccess(initiatorOf(principal), state, actorId, "inventory");
+        if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
+          throw new CommandRejectedError("Ammunition is picked up after the fight.");
+        const actor = state.actors.find((candidate) => candidate.id === actorId);
+        if (!actor) throw new CommandRejectedError("That character no longer exists.");
+        if (!actor.inventory.some((row) => row.ammunitionFired !== undefined))
+          throw new CommandRejectedError(`${actor.name} has no fired ammunition to pick up.`);
+        lines = recoverAmmunition(state, [actorId], kit.equipmentCatalog());
+      });
+      if (duplicate) return;
+      const said = lines.length > 0 ? lines : [{ actorId, text: `${kit.actorName(actorId)} finds none of it.` }];
+      for (const line of said)
+        kit.context.appendLog({
+          kind: "encounter",
+          text: line.text,
+          actorIds: [line.actorId],
+          gmOnly: kit.actorHidden(line.actorId)
         });
     }
   }),

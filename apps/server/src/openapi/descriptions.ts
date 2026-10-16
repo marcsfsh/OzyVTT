@@ -193,7 +193,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     armor: "Populated for armor and shields only",
     slot: "WHERE it is worn or held - the mechanical hook, and the one closed enum here. Absent = fall back to `category` for the three the engine already knows (weapon, armor, shield)",
     appliesTo:
-      "Makes the item a TEMPLATE (the SRD's \"Weapon, +1 (Any Simple or Martial)\"). `label` is the printed wording the chooser shows; `baseIds` the RESOLVED weapon/armor ids the player may pick from - publish refuses an id the merged catalog cannot resolve, a non-weapon/armor category, and fixed stats alongside a template. The picked base's stats are copied onto the inventory row by the SERVER at set-inventory; the row records the pick as `baseId`.",
+      'Makes the item a TEMPLATE (the SRD\'s "Weapon, +1 (Any Simple or Martial)"). `label` is the printed wording the chooser shows; `baseIds` the RESOLVED weapon/armor ids the player may pick from - publish refuses an id the merged catalog cannot resolve, a category other than weapon, armor or ammunition, and fixed stats alongside a template. The picked base\'s stats are copied onto the inventory row by the SERVER at set-inventory; the row records the pick as `baseId`. Magic AMMUNITION names the gear table\'s ammunition ("Any Ammunition": Arrows, Crossbow Bolts...): its pick copies no stats and says which launchers fire it.',
     rarity:
       'Display and filtering only ("uncommon", "legendary"). An OPEN slug: rarity is identity, not a mechanical hook',
     attunement: "Attunement requirement and its advisory class/species restriction",
@@ -1379,7 +1379,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "equipment[].damageTypeChoice":
       "The damage types the GM may pick for the item's resistance, as the SRD prints them (absent when the item has no such choice)",
     "equipment[].appliesTo":
-      'The eligibility column for a TEMPLATE magic item - the printed type-line qualifier ("Any Simple or Martial") plus the base ids it RESOLVED to at build/authoring time. Null everywhere except weapon/armor templates. A template row derives nothing until the player\'s pick binds it to one of `baseIds`, validated and copied server-side at set-inventory.'
+      'The eligibility column for a TEMPLATE magic item - the printed type-line qualifier ("Any Simple or Martial") plus the base ids it RESOLVED to at build/authoring time. Null everywhere except weapon, armor and ammunition templates (the bases of magic ammunition are the kinds of ammunition, which decide the launchers that fire it). A template row derives nothing until the player\'s pick binds it to one of `baseIds`, validated and copied server-side at set-inventory.'
   },
   ContentFeature: {
     "": "The browse-and-pick projection of a bundle FeatureRecord. Prose is the display source of truth; a feature's structured riders (granted actions, effects, modifiers, limited uses) stay server-side - the server applies them when it builds the character, so the wizard never becomes a second rules engine.",

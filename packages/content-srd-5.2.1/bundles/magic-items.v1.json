@@ -48,7 +48,16 @@
   "weapon": null,
   "armor": null,
   "slot": "ammunition",
-  "appliesTo": null,
+  "appliesTo": {
+   "label": "Any Ammunition",
+   "baseIds": [
+    "arrows-20",
+    "crossbow-bolts-20",
+    "sling-bullets-20",
+    "blowgun-needles-50",
+    "firearm-bullets-10"
+   ]
+  },
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -74,7 +83,16 @@
   "weapon": null,
   "armor": null,
   "slot": "ammunition",
-  "appliesTo": null,
+  "appliesTo": {
+   "label": "Any Ammunition",
+   "baseIds": [
+    "arrows-20",
+    "crossbow-bolts-20",
+    "sling-bullets-20",
+    "blowgun-needles-50",
+    "firearm-bullets-10"
+   ]
+  },
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -131,7 +149,16 @@
   "weapon": null,
   "armor": null,
   "slot": "ammunition",
-  "appliesTo": null,
+  "appliesTo": {
+   "label": "Any Ammunition",
+   "baseIds": [
+    "arrows-20",
+    "crossbow-bolts-20",
+    "sling-bullets-20",
+    "blowgun-needles-50",
+    "firearm-bullets-10"
+   ]
+  },
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -188,7 +215,16 @@
   "weapon": null,
   "armor": null,
   "slot": "ammunition",
-  "appliesTo": null,
+  "appliesTo": {
+   "label": "Any Ammunition",
+   "baseIds": [
+    "arrows-20",
+    "crossbow-bolts-20",
+    "sling-bullets-20",
+    "blowgun-needles-50",
+    "firearm-bullets-10"
+   ]
+  },
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {

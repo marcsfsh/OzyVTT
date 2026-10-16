@@ -207,6 +207,7 @@ export const GAME_PATHS = {
   characterSetPrepared: `${API_NAMESPACE}/game/actors/{actorId}/prepared-spell`,
   characterSetInventory: `${API_NAMESPACE}/game/actors/{actorId}/inventory`,
   characterGiveItem: `${API_NAMESPACE}/game/actors/{actorId}/inventory/give`,
+  characterRecoverAmmunition: `${API_NAMESPACE}/game/actors/{actorId}/inventory/recover-ammunition`,
   characterSetCurrency: `${API_NAMESPACE}/game/actors/{actorId}/currency`,
   characterSetIdentity: `${API_NAMESPACE}/game/actors/{actorId}/identity`,
   characterSetProficiencies: `${API_NAMESPACE}/game/actors/{actorId}/proficiencies`,
@@ -545,6 +546,11 @@ export const GAME_COMMANDS = {
   "character.set-prepared": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetPrepared },
   "character.set-inventory": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetInventory },
   "character.give-item": { scope: "actor:write", method: "post", path: GAME_PATHS.characterGiveItem },
+  "character.recover-ammunition": {
+    scope: "actor:write",
+    method: "post",
+    path: GAME_PATHS.characterRecoverAmmunition
+  },
   "character.set-currency": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetCurrency },
   "character.set-identity": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetIdentity },
   "character.set-proficiencies": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetProficiencies },

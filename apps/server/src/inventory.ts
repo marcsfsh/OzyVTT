@@ -232,6 +232,16 @@ function bindTemplateStats(item: InventoryItem, deps: InventoryDeps, stored?: In
     throw new CommandRejectedError(`${item.name} is already bound - remove it and add it again to change what it is.`);
   }
   const base = deps.catalog?.equipmentRecord(baseId);
+  // Magic ammunition is a piece of one kind (an arrow, a bolt): the pick says which launchers fire it, and it has no
+  // weapon stats to copy.
+  if (record.category === "ammunition") {
+    const { weapon: _weapon, armor: _armor, ...bare } = item;
+    if (appliesTo.baseIds.includes(baseId) && base?.ammunition !== undefined) return { ...bare, baseId };
+    if (stored?.baseId === baseId) return { ...bare, baseId };
+    throw new CommandRejectedError(
+      `${item.name} applies to ${appliesTo.label} - "${baseId}" is not one of the kinds it can be.`
+    );
+  }
   const stats = record.category === "weapon" ? base?.weapon : base?.armor;
   const shieldBase = record.category !== "weapon" && base?.category === "shield";
   const invalid =
