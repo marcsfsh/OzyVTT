@@ -416,7 +416,12 @@ export const actionCommands = [
           ...(label ? { label } : {}),
           actorId: attributedActorId,
           purpose,
-          visibility,
+          // A roll made for a creature the players can't see stays the GM's, or it would reveal the creature.
+          visibility:
+            visibility === "public" &&
+            draft.actors.some((candidate) => candidate.id === attributedActorId && candidate.visibility !== "public")
+              ? "gm-only"
+              : visibility,
           formula,
           normalizedFormula: resolution.expression.normalized,
           ...rolledTerms(resolution),

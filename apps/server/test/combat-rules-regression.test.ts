@@ -2355,6 +2355,24 @@ describe("range and reach validation (SRD Making an Attack / Range)", () => {
       (_a, b) => distances[b] ?? null
     );
     expect(jostled.rollMode?.disadvantage).toContain("Enemy within 5 feet (Giant Crocodile 2)");
+
+    // A crocodile the players can't see neither spoils the shot nor gets named in the reply.
+    const lurking = buildGame([
+      { actorId: IDS.pip, score: 20 },
+      { actorId: IDS.croc1, score: 12 },
+      { actorId: IDS.croc2, score: 8 }
+    ]);
+    lurking.actors.find((actor) => actor.id === IDS.croc2)!.visibility = "gm-only";
+    const unseen = resolve(
+      lurking,
+      pipDefinition,
+      "shortbow",
+      { actorId: IDS.pip, targetIds: [IDS.croc1] },
+      [18, 3],
+      (_a, b) => distances[b] ?? null
+    );
+    expect(JSON.stringify(unseen)).not.toContain("Giant Crocodile 2");
+    expect(unseen.rollMode?.disadvantage ?? []).toEqual([]);
   });
 });
 

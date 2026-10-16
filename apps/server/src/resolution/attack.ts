@@ -143,6 +143,9 @@ function positionClaims(ctx: ResolveContext, distance: number | null, sources: R
     if (entry.actorId === attacker.id) continue;
     const enemy = state.actors.find((candidate) => candidate.id === entry.actorId);
     if (!enemy || enemy.kind !== enemyKind || isIncapacitated(enemy)) continue;
+    // A creature the players can't see never spoils a visible attacker's shot on its own: the Disadvantage
+    // would reveal it. The GM can still impose it.
+    if (enemy.visibility !== "public" && attacker.visibility === "public") continue;
     const enemyDistance = deps.distanceFeet(attacker.id, enemy.id);
     if (enemyDistance !== null && enemyDistance <= 5 + 1e-6) {
       sources.disadvantage.push({ source: "ranged-in-close-combat", label: `Enemy within 5 feet (${enemy.name})` });

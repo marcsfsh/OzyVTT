@@ -29,7 +29,10 @@ export function playerHp(actor: GameState["actors"][number]): PlayerHp {
     : { kind: "band", band: healthBandOf(actor.hp) };
 }
 
-function visibleToPlayer(roll: RollRecord, playerSessionId?: string) {
+/** A roll a player may see: public or their own, and never one attributed to an actor hidden from them. */
+function visibleToPlayer(state: GameState, roll: RollRecord, playerSessionId?: string) {
+  if (roll.actorId && state.actors.some((actor) => actor.id === roll.actorId && actor.visibility !== "public"))
+    return false;
   return (
     roll.visibility === "public" || (roll.visibility === "self-only" && roll.initiatorSessionId === playerSessionId)
   );
@@ -516,7 +519,7 @@ export function projectPlayerView(
           ...(sharedDisplayStyle ? { healthDisplay: { style: sharedDisplayStyle } } : {})
         };
       }),
-    rolls: state.rolls.filter((roll) => visibleToPlayer(roll, playerSessionId)).map(playerRoll)
+    rolls: state.rolls.filter((roll) => visibleToPlayer(state, roll, playerSessionId)).map(playerRoll)
   };
 }
 
