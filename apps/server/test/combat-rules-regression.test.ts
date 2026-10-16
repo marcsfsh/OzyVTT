@@ -975,6 +975,15 @@ describe("report test 2/3 supplement - Eldritch Blast beams", () => {
 });
 
 describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
+  // The crocodile bites on its own turn: an action off it is a rules block of its own.
+  const crocTurn = () =>
+    buildGame([
+      { actorId: IDS.croc1, score: 20 },
+      { actorId: IDS.torva, score: 16 },
+      { actorId: IDS.pip, score: 12 },
+      { actorId: IDS.croc2, score: 12 },
+      { actorId: IDS.sable, score: 5 }
+    ]);
   // Prompt creation needs the target's definition, so these resolves carry the game's own resolver.
   const gameResolver = (game: GameState) => (definitionId: string) =>
     game.definitions.find((entry) => entry.id === definitionId)?.definition;
@@ -1004,7 +1013,7 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
     );
 
   it("parks a hit's damage on a pending prompt instead of the apply button", () => {
-    const game = buildGame();
+    const game = crocTurn();
     // Croc 1 bites Pip: 15 + 8 = 23 vs AC 16 hits; 6+6+6+5 = 23 piercing.
     const bite = resolveLive(
       game,
@@ -1034,7 +1043,7 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
   });
 
   it("answering use spends the reaction and applies half; the prompt clears", () => {
-    const game = buildGame();
+    const game = crocTurn();
     resolveLive(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6]);
     const outcome = answerReaction(
       game,
@@ -1058,7 +1067,7 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
   });
 
   it("declining applies the full parked damage and keeps the reaction", () => {
-    const game = buildGame();
+    const game = crocTurn();
     resolveLive(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6]);
     const outcome = answerReaction(
       game,
@@ -1143,7 +1152,7 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
   });
 
   it("offers no prompt when the reaction is already spent, the reactor is incapacitated, or the mode is freeform", () => {
-    const spent = buildGame();
+    const spent = crocTurn();
     spent.combat = { ...spent.combat, reactionsUsed: [IDS.pip] };
     expect(
       resolveLive(spent, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6])
@@ -1151,7 +1160,7 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
     ).toBeUndefined();
     expect(spent.combat.pendingReactions).toHaveLength(0);
 
-    const stunned = buildGame();
+    const stunned = crocTurn();
     stunned.actors.find((actor) => actor.id === IDS.pip)!.conditions = [{ id: "stunned" }];
     // A stunned target gives the attack advantage, so the roll consumes two d20 faces.
     expect(
@@ -1159,7 +1168,7 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
         .reactionPrompts
     ).toBeUndefined();
 
-    const freeform = buildGame();
+    const freeform = crocTurn();
     freeform.combat = { ...freeform.combat, rulesMode: "freeform" };
     expect(
       resolveLive(freeform, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6])
@@ -1168,7 +1177,7 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
   });
 
   it("a spent reaction rejects use (decline stays open) and the GM dismiss drops the prompt without damage", () => {
-    const game = buildGame();
+    const game = crocTurn();
     resolveLive(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6]);
     game.combat = { ...game.combat, reactionsUsed: [IDS.pip] }; // spent between the hit and the answer
     const promptId = game.combat.pendingReactions[0].id;
@@ -1183,7 +1192,7 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
   });
 
   it("a player may answer only their own claimed character's prompt", () => {
-    const game = buildGame();
+    const game = crocTurn();
     resolveLive(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6]);
     const promptId = game.combat.pendingReactions[0].id;
     expect(() =>
@@ -1211,7 +1220,7 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
   });
 
   it("prompts persist across a turn advance so parked damage is never silently lost", () => {
-    const game = buildGame();
+    const game = crocTurn();
     resolveLive(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6]);
     nextInitiativeTurn(game);
     expect(game.combat.pendingReactions).toHaveLength(1);
@@ -1232,6 +1241,92 @@ describe("incapacitation gates the action economy (SRD 2024 Incapacitated)", () 
     expect(() => resolve(game, torvaDefinition, "rage", { actorId: IDS.torva }, [])).toThrow(
       /Unconscious and can't take actions, bonus actions, or reactions/
     );
+  });
+});
+
+describe("actions and Bonus Actions belong to your own turn (SRD Actions, Ready)", () => {
+  const builtin = (
+    game: GameState,
+    actionId: string,
+    input: { actorId: string; note?: string },
+    definition: ActorDefinition
+  ) =>
+    resolveDefinitionAction(
+      game,
+      builtinAction(actionId)!,
+      { actorId: input.actorId, targetIds: [], commandId: nextCommandId(), builtin: true, note: input.note ?? null },
+      deps([], definition)
+    );
+  const blockedRule = (attempt: () => unknown) => {
+    try {
+      attempt();
+    } catch (error) {
+      expect(error).toBeInstanceOf(RulesBlockedError);
+      return (error as RulesBlockedError).rule;
+    }
+    return null;
+  };
+
+  it("refuses an action or a Bonus Action off the creature's turn, whoever sends it, until the GM overrides", () => {
+    const game = buildGame(); // Torva is up.
+    expect(blockedRule(() => builtin(game, "dodge", { actorId: IDS.sable }, sableDefinition))).toBe(
+      "economy.not-your-turn"
+    );
+    expect(
+      blockedRule(() =>
+        resolve(game, sableDefinition, "eldritch-blast", { actorId: IDS.sable, targetIds: [IDS.croc1] }, [15, 7])
+      )
+    ).toBe("economy.not-your-turn");
+    // A Bonus Action too: Torva's Rage while Sable is up.
+    const sableUp = buildGame([
+      { actorId: IDS.sable, score: 20 },
+      { actorId: IDS.torva, score: 10 },
+      { actorId: IDS.croc1, score: 5 }
+    ]);
+    expect(blockedRule(() => resolve(sableUp, torvaDefinition, "rage", { actorId: IDS.torva }, []))).toBe(
+      "economy.not-your-turn"
+    );
+    // Nothing happened: no effect, no roll, and no reaction spent in its place.
+    const sable = game.actors.find((actor) => actor.id === IDS.sable)!;
+    expect(sable.effects).toEqual([]);
+    expect(game.rolls).toEqual([]);
+    expect(game.combat.reactionsUsed).toEqual([]);
+    // The GM's ruling lets it through, reported for the audit line.
+    const forced = resolve(
+      game,
+      sableDefinition,
+      "eldritch-blast",
+      { actorId: IDS.sable, targetIds: [IDS.croc1], override: { reason: "Haste" } },
+      [15, 7]
+    );
+    expect(forced.overridden).toEqual({ rule: "economy.not-your-turn", reason: "Haste" });
+  });
+
+  it("lets the creature whose turn it is act", () => {
+    const game = buildGame();
+    expect(blockedRule(() => resolve(game, torvaDefinition, "rage", { actorId: IDS.torva }, []))).toBeNull();
+  });
+
+  it("takes a readied response with the Reaction, and refuses it with no Reaction left (SRD Ready)", () => {
+    const game = buildGame([
+      { actorId: IDS.pip, score: 20 },
+      { actorId: IDS.croc1, score: 8 }
+    ]);
+    builtin(game, "ready", { actorId: IDS.pip, note: "shoot the crocodile" }, pipDefinition);
+    nextInitiativeTurn(game);
+    // Spent before the trigger came: the ready can't be taken, rather than releasing for free.
+    game.combat = { ...game.combat, reactionsUsed: [IDS.pip] };
+    try {
+      resolve(game, pipDefinition, "shortbow", { actorId: IDS.pip, targetIds: [IDS.croc1] }, [15, 4]);
+      expect.unreachable();
+    } catch (error) {
+      expect((error as RulesBlockedError).rule).toBe("economy.reaction-used");
+      expect((error as RulesBlockedError).message).toBe(
+        "Pip Underbough has no reaction left to take the readied action with."
+      );
+    }
+    const pip = game.actors.find((actor) => actor.id === IDS.pip)!;
+    expect(pip.effects.map((effect) => effect.name)).toEqual(["Readied: shoot the crocodile"]);
   });
 });
 
@@ -1494,7 +1589,8 @@ describe("SRD generic actions - builtin catalog (rules glossary [Action] entries
     expect(game.combat.turn.actionUsed).toBe(true);
     const pip = game.actors.find((actor) => actor.id === IDS.pip)!;
 
-    // Incoming attack rolls at disadvantage, labeled.
+    // Incoming attack rolls at disadvantage, labeled. The crocodile bites on its own turn.
+    nextInitiativeTurn(game);
     const bite = resolve(
       game,
       crocodileDefinition,
@@ -1605,7 +1701,11 @@ describe("SRD generic actions - builtin catalog (rules glossary [Action] entries
   });
 
   it("Unarmed grapple: target saves vs 8 + Str + PB; failure applies the escapable Grappled effect; escape frees; a stunned grappler releases", () => {
-    const game = buildGame();
+    const game = buildGame([
+      { actorId: IDS.torva, score: 16 },
+      { actorId: IDS.pip, score: 12 },
+      { actorId: IDS.croc1, score: 8 }
+    ]);
     // Torva grapples Pip (small - within one size): DC 8 + 4 + 3 = 15; Pip's better save is Dex (+7).
     const grapple = resolveBuiltin(
       game,
@@ -1656,8 +1756,12 @@ describe("SRD generic actions - builtin catalog (rules glossary [Action] entries
     expect(escape.check).toMatchObject({ dc: 15, success: true });
     expect(pip.conditions.some((condition) => condition.id === "grappled")).toBe(false);
 
-    // Re-grapple, then stun the grappler: SRD Grappling - an incapacitated grappler releases.
-    game.combat = { ...game.combat, turn: { ...game.combat.turn, actionUsed: false, actionInstance: null } };
+    // Re-grapple on Torva's turn, then stun the grappler: SRD Grappling - an incapacitated grappler releases.
+    game.combat = {
+      ...game.combat,
+      turnActorId: IDS.torva,
+      turn: { ...game.combat.turn, actionUsed: false, actionInstance: null }
+    };
     resolveBuiltin(game, "unarmed-grapple", { actorId: IDS.torva, targetIds: [IDS.pip] }, [], torvaDefinition);
     answerSave(
       game,
@@ -1735,7 +1839,8 @@ describe("SRD generic actions - builtin catalog (rules glossary [Action] entries
     );
     game.combat = {
       ...game.combat,
-      initiative: [...game.combat.initiative, { actorId: extraId, score: 1, tieBreaker: 0 }]
+      initiative: [...game.combat.initiative, { actorId: extraId, score: 1, tieBreaker: 0 }],
+      turnActorId: extraId
     };
     const dodge = resolveBuiltin(game, "dodge", { actorId: extraId }, []);
     expect(dodge.effectGranted?.name).toBe("Dodging");

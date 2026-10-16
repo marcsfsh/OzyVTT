@@ -1,21 +1,21 @@
 import type { Actor, CombatState, GameState, RuleMode } from "@vtt/domain";
 import { d20Die } from "@vtt/rules-5e";
 import type { ActorAction, ActorDefinition } from "@vtt/schemas";
-import { effectiveModeFor, familyModeFor, overrideCovers, type RuleId } from "./rules-families.js";
-import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
+import { familyModeFor, type RuleId } from "./rules-families.js";
+import { CommandRejectedError } from "./game-store.js";
 import { castSlot, noUsesRemaining, slotsLeft, spendSlot, unpreparedSpell, useLimitFor } from "./resolution/economy.js";
 
 /**
  * Where an action tap goes, decided by the server. The sheet sends intent; the server answers:
  * - `resolved`: in the fight, on this creature's turn; the full structured resolution (`action.resolve`).
- * - `blocked`: in the fight, off turn; a machine-readable rules block the GM can override and the
- *   player can ask about.
+ * - `blocked`: in the fight, off turn; still resolved, where the action economy refuses it with the overridable,
+ *   askable `economy.not-your-turn` block (a reaction or a legendary action is the point of acting off turn).
  * - `loose`: no fight, or this creature isn't in it; the server rolls the action's dice and attributes
  *   them, touching no combat state.
  */
 export type TapRoute = "resolved" | "loose" | "blocked";
 
-/** The rule id this file can throw, in the `economy` family (see rules-families.ts). */
+/** The block an off-turn action or Bonus Action meets (`evaluateActionEconomy`), in the `economy` family. */
 export const NOT_YOUR_TURN: RuleId = "economy.not-your-turn";
 
 /** Which route a tap takes, before anything is rolled. `loose` covers "no fight" and "not in the fight":
@@ -27,22 +27,6 @@ export function routeForTap(
   if (!combat.active) return "loose";
   if (!combat.initiative.some((entry) => entry.actorId === actorId)) return "loose";
   return combat.turnActorId === actorId ? "resolved" : "blocked";
-}
-
-/** Off-turn: refuse, warn or allow per the `economy` family's mode. Reactions and legendary actions are
- *  exempt (taken on others' turns by design; `evaluateActionEconomy` owns their rules). A GM Allow earlier
- *  this turn covers the family. */
-export function offTurnVerdict(
-  state: GameState,
-  action: Pick<ActorAction, "activation" | "legendary">,
-  currentName: string
-): Readonly<{ blocked: false; warning: string | null }> {
-  if (action.activation === "reaction" || action.legendary !== undefined) return { blocked: false, warning: null };
-  const mode = effectiveModeFor(state.combat, NOT_YOUR_TURN);
-  if (mode === "freeform" || overrideCovers(state.combat.turn, NOT_YOUR_TURN)) return { blocked: false, warning: null };
-  const message = `Not your turn yet - ${currentName} is up.`;
-  if (mode === "strict") throw new RulesBlockedError(NOT_YOUR_TURN, message);
-  return { blocked: false, warning: message };
 }
 
 /** The dice a loose tap rolls: the attack roll (honouring an explicit roll mode), the healing, and, only if asked,

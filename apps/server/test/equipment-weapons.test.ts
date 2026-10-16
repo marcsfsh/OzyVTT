@@ -202,7 +202,8 @@ describe("Slow, Vex and Sap", () => {
           resolveDefinition: table.resolve
         }
       );
-    // Off the foe's turn, so no action economy: two claws in a row.
+    // On the foe's own turn, the action economy off so its one Claw can be made twice in a row.
+    table.state.combat = { ...table.state.combat, turnActorId: IDS.foe, ruleExceptions: { economy: "freeform" } };
     expect(claw([15, 3, 4]).rollMode?.disadvantage).toEqual(["Sapped by Borin"]);
     expect(tags(table)).not.toContain("sap");
     expect(claw([16, 4]).rollMode).toBeUndefined();

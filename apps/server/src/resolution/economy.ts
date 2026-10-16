@@ -4,7 +4,7 @@ import type { GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { effectiveSlot } from "@vtt/rules-5e";
 import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
-import { hasEffectTag, RAGING_TAG } from "../effects.js";
+import { hasEffectTag, RAGING_TAG, READIED_TAG } from "../effects.js";
 import { ammunitionFor, ammunitionLabel, launcherKind } from "../ammunition.js";
 import { armorTrainingGaps, type EquipmentCatalog } from "../equipment-derivation.js";
 import { RulesBlockedError } from "../game-store.js";
@@ -117,6 +117,7 @@ export function evaluateActionEconomy(
   };
   checkAbleToAct(evaluation);
   checkTurnsBegun(evaluation);
+  checkOwnTurn(evaluation);
   checkExtraAttackOpened(evaluation);
   checkLoading(evaluation);
   checkHands(evaluation);
@@ -161,6 +162,39 @@ function checkTurnsBegun({ state, violations }: Evaluation): void {
       rule: "initiative.gathering",
       message: "Players are still rolling initiative - turns begin once everyone has rolled."
     });
+}
+
+/** A Readied creature's response to its trigger: an action it takes off its own turn, which the SRD makes a Reaction
+ *  ("you can either take your Reaction right after the trigger finishes"). */
+export function isReadiedResponse(
+  state: GameState,
+  attacker: LiveActor,
+  action: Pick<DefinitionAction, "id" | "activation">
+): boolean {
+  return (
+    state.combat.active &&
+    state.combat.turnActorId !== attacker.id &&
+    action.activation === "action" &&
+    action.id !== "ready" &&
+    hasEffectTag(attacker, READIED_TAG)
+  );
+}
+
+/** SRD: an action and a Bonus Action are taken on your own turn. Off it a creature acts only with a Reaction (a
+ *  readied action is one), a legendary action, or a feature that answers an event. The current creature is named
+ *  only when the table can see it. */
+function checkOwnTurn({ state, attacker, action, onOwnTurn, violations }: Evaluation): void {
+  if (onOwnTurn || !state.combat.active || action.legendary !== undefined) return;
+  if (action.activation !== "action" && action.activation !== "bonus-action") return;
+  if (isReadiedResponse(state, attacker, action)) return;
+  const current = state.actors.find((candidate) => candidate.id === state.combat.turnActorId);
+  violations.push({
+    rule: "economy.not-your-turn",
+    message:
+      current && current.visibility === "public"
+        ? `Not your turn yet - ${current.name} is up.`
+        : "Not your turn yet - wait for your turn."
+  });
 }
 
 /**
@@ -440,11 +474,14 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
     };
   }
   if (onOwnTurn && action.activation === "action") return checkActionSlot(evaluation);
-  if (action.activation === "reaction") {
+  const readied = isReadiedResponse(state, attacker, action);
+  if (action.activation === "reaction" || readied) {
     if (state.combat.reactionsUsed.includes(attacker.id))
       violations.push({
         rule: "economy.reaction-used",
-        message: `${attacker.name} has already used a reaction this round.`
+        message: readied
+          ? `${attacker.name} has no reaction left to take the readied action with.`
+          : `${attacker.name} has already used a reaction this round.`
       });
     return { ...unchanged, markReaction: true };
   }

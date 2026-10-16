@@ -1331,7 +1331,7 @@ describe("an action that shares a pool is gated on the POOL's size", () => {
       definitionId: undefined,
       actionUses: {}
     });
-    // The foe holds the turn, so the action-economy slot never masks the limited-use gate.
+    // The action economy is off, so neither the turn nor the action slot masks the limited-use gate.
     startEncounter(
       state,
       {
@@ -1344,6 +1344,7 @@ describe("an action that shares a pool is gated on the POOL's size", () => {
       () => 1,
       { width: 900, height: 600, calibration: null }
     );
+    state.combat = { ...state.combat, ruleExceptions: { economy: "freeform" } };
     return state;
   }
   const deps = (): ResolveDependencies => ({

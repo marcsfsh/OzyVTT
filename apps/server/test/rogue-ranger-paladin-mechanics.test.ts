@@ -404,6 +404,8 @@ describe("Rogue - Uncanny Dodge halves the damage that hit", () => {
       attack: { bonus: 20 }
     };
     const before = built.hero.hp.current;
+    // The foe bites on its own turn.
+    built.state.combat = { ...built.state.combat, turnActorId: IDS.foe };
     const hit = resolveDefinitionAction(
       built.state,
       bite,
@@ -438,6 +440,7 @@ describe("Rogue - Uncanny Dodge halves the damage that hit", () => {
       damage: [{ formula: "2d6", type: "piercing" }],
       attack: { bonus: 20 }
     };
+    built.state.combat = { ...built.state.combat, turnActorId: IDS.foe };
     resolveDefinitionAction(
       built.state,
       bite,

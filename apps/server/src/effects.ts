@@ -29,6 +29,8 @@ export const CONCENTRATING_TAG = "concentrating";
 export const RAGING_TAG = "raging";
 /** A creature knocked out at 1 HP; it wakes when it regains any hit points. */
 export const KNOCKED_OUT_TAG = "knocked-out";
+/** The Ready action's held response, taken with the Reaction when its trigger comes. */
+export const READIED_TAG = "readied";
 
 /** What an effect must name; every other field takes `EffectInstanceSchema`'s default. */
 export type EffectSpec = Pick<EffectInstance, "id" | "name" | "duration"> & Partial<EffectInstance>;
