@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema } from "@vtt/domain";
+import { projectReply } from "../src/commands/pipeline.js";
 import { projectPlayerView } from "../src/projections.js";
 
 const me = "b539ef5e-16e6-46ce-bf33-3ed4b02997c1";
@@ -233,5 +234,28 @@ describe("player view pending prompts", () => {
     expect(serialized).not.toContain("Vashkar");
     expect(serialized).not.toContain(hidden);
     expect(combat.pendingSaves[0].onFailEffect?.name).toBe("Grappled by A hidden threat");
+  });
+});
+
+describe("a player's command reply", () => {
+  const resolution = {
+    attack: { targetId: other, targetName: "Goblin Warrior", total: 5, naturalRoll: 3, targetAc: 15, outcome: "miss" },
+    tableNarration: [
+      { text: "The goblin staggers.", gmOnly: false },
+      { text: "The goblin's AC is 15.", gmOnly: true }
+    ]
+  };
+
+  it("never carries a target's Armor Class or a GM-only narration line", () => {
+    const reply = projectReply({ kind: "player", sessionId: me }, { resolution } as never) as typeof resolution & {
+      resolution: typeof resolution;
+    };
+    expect(reply.resolution.attack.targetAc).toBeNull();
+    expect(reply.resolution.attack.outcome).toBe("miss");
+    expect(reply.resolution.tableNarration.map((line) => line.text)).toEqual(["The goblin staggers."]);
+  });
+
+  it("leaves the GM's reply whole", () => {
+    expect(projectReply({ kind: "gm", sessionId: me }, { resolution } as never)).toEqual({ resolution });
   });
 });
