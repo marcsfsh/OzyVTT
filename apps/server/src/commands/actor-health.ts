@@ -20,6 +20,7 @@ import {
   healActor,
   isSrdDamageType,
   setCurrentHp,
+  setMaximumHp,
   setTemporaryHp,
   UNTYPED_DAMAGE
 } from "../hit-points.js";
@@ -146,15 +147,19 @@ export const actorHealthCommands = [
   defineCommand({
     type: "actor.set-hp",
     operationId: "setCurrentHp",
-    description: "Sets current hit points directly (GM-grade only).",
-    summary: "Set current hit points directly (GM).",
+    description: "Sets current hit points directly, and optionally the hit point maximum first (GM-grade only).",
+    summary: "Set current (and maximum) hit points directly (GM).",
     schema: SetHpSchema,
     malformed: "The hit point command is malformed.",
     gmOnly: "Only the GM can set hit points directly.",
     async run({ request, execute }, kit) {
       let events: EffectNarration[] = [];
+      if (request.current === undefined && request.maximum === undefined)
+        throw new CommandRejectedError("Give the current hit points, the maximum, or both.");
       const { duplicate } = await execute((state) => {
-        events = setCurrentHp(state, request.actorId, request.current, { role: "gm" });
+        if (request.maximum !== undefined) setMaximumHp(state, request.actorId, request.maximum, { role: "gm" });
+        if (request.current !== undefined)
+          events = setCurrentHp(state, request.actorId, request.current, { role: "gm" });
       });
       if (!duplicate) kit.publishNarrations(events);
     }

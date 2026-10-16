@@ -90,6 +90,30 @@ describe("SRD 5.2.1 monster bundle", () => {
     }
   });
 
+  it("carries what the bestiary and checks need: XP, skills, the printed size, clean text", () => {
+    const extension = (id: string) =>
+      monsters.find((monster) => monster.source.externalId === id)!.extensions["open5e.srd-2024"] as {
+        experiencePoints: number | null;
+        skills: Record<string, number>;
+        traits: Array<{ name: string; description: string }>;
+      };
+    // XP from the challenge rating; the SRD's own examples: CR 1/2 is 100, CR 9 is 5,000, CR 17 is 18,000.
+    expect(
+      monsters.every((monster) => typeof extension(monster.source.externalId!).experiencePoints === "number")
+    ).toBe(true);
+    expect(extension("goblin-warrior").experiencePoints).toBe(50);
+    expect(extension("adult-red-dragon").experiencePoints).toBe(18000);
+    expect(extension("goblin-warrior").skills).toEqual({ stealth: 6 });
+    // "Medium or Small" stat blocks take the first printed size; genuinely Small creatures stay Small.
+    const size = (id: string) => monsters.find((monster) => monster.source.externalId === id)!.size;
+    expect([size("knight"), size("vampire"), size("werewolf")]).toEqual(["medium", "medium", "medium"]);
+    expect(size("goblin-warrior")).toBe("small");
+    expect(JSON.stringify(monsters)).not.toContain("|XPHB|");
+    const pudding = monsters.find((monster) => monster.source.externalId === "black-pudding")!;
+    expect(pudding.actions.map((action) => action.name)).toContain("Split");
+    expect(extension("octopus").traits.map((trait) => trait.name)).toEqual(["Compression", "Water Breathing"]);
+  });
+
   it("adapts the aboleth stat block faithfully", () => {
     const aboleth = monsters.find((monster) => monster.source.externalId === "aboleth");
     expect(aboleth).toBeDefined();

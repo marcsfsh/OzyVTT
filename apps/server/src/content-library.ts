@@ -595,6 +595,7 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
         id,
         name: definition.name,
         challengeRating: facts.challengeRating ?? 0,
+        experiencePoints: facts.experiencePoints,
         type: facts.creatureType ?? "unknown",
         size: definition.size,
         armorClass: definition.armorClass,

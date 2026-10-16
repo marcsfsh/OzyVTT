@@ -3144,14 +3144,16 @@ describe("recharge abilities (SRD Recharge X-Y; Foundry-parity adoption)", () =>
     nextInitiativeTurn(game); // the dragon's turn
     resolve(game, wyrmlingDefinition, "cold-breath", { actorId: DRAGON, targetIds: [IDS.torva] }, Array(5).fill(1)); // 5d8 cold
     expect(game.actors.find((actor) => actor.id === DRAGON)!.actionUses["cold-breath"]).toBe(1);
-    // Round 2, low roll (2 < 5): the pool stays spent and the table sees why.
-    const lowEvents: { text: string; actorId: string }[] = [];
+    // Round 2, low roll (2 < 5): the pool stays spent, narrated to the GM alone (a monster's resources are
+    // GM knowledge; the table sees the breath when it is used).
+    const lowEvents: { text: string; actorId: string; gmOnly?: true }[] = [];
     nextInitiativeTurn(game, lowEvents as never, dragonDeps(game, 2)); // Torva (no dragon pools roll)
     nextInitiativeTurn(game, lowEvents as never, dragonDeps(game, 2)); // dragon's turn start: d6 = 2
     expect(game.actors.find((actor) => actor.id === DRAGON)!.actionUses["cold-breath"]).toBe(1);
-    expect(
-      lowEvents.some((event) => event.actorId === DRAGON && /stays spent \(rolled 2, needs 5\+\)/.test(event.text))
-    ).toBe(true);
+    const stillSpent = lowEvents.find(
+      (event) => event.actorId === DRAGON && /stays spent \(rolled 2, needs 5\+\)/.test(event.text)
+    );
+    expect(stillSpent?.gmOnly).toBe(true);
     expect(() =>
       resolve(game, wyrmlingDefinition, "cold-breath", { actorId: DRAGON, targetIds: [IDS.torva] }, [])
     ).toThrowError(/recharges on 5\+ at the start of its turn/);

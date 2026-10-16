@@ -15,6 +15,12 @@
   margin-top: 0;
   padding: 0.6rem 0.8rem;
 }
+/* Four compact selects: two per row on a phone, one row on a laptop. */
+.monster-browser-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: var(--space-2);
+}
 .monster-browser-target {
   margin: 0;
   color: var(--text-dim);

@@ -139,7 +139,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 10,
-    "experiencePoints": null,
+    "experiencePoints": 5900,
+    "skills": {
+     "history": 12,
+     "perception": 10
+    },
     "type": "aberration",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -350,7 +354,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 14,
-    "experiencePoints": null,
+    "experiencePoints": 11500,
+    "skills": {
+     "perception": 11,
+     "stealth": 7
+    },
     "type": "dragon",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -539,7 +547,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 16,
-    "experiencePoints": null,
+    "experiencePoints": 15000,
+    "skills": {
+     "perception": 12,
+     "stealth": 5
+    },
     "type": "dragon",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -755,7 +767,13 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 13,
-    "experiencePoints": null,
+    "experiencePoints": 10000,
+    "skills": {
+     "history": 7,
+     "perception": 11,
+     "persuasion": 8,
+     "stealth": 5
+    },
     "type": "dragon",
     "alignment": "chaotic good",
     "armorDetail": "natural armor",
@@ -909,7 +927,7 @@
     "id": "thunderclap",
     "name": "Thunderclap",
     "activation": "other",
-    "description": "Legendary Action. Constitution Saving Throw: DC 17, each creature in a 20-foot-radius Sphere [Area of Effect]|XPHB|Sphere centered on a point the dragon can see within 90 feet. Failure: 10 (3d6) Thunder damage, and the target has the Deafened condition until the end of its next turn.",
+    "description": "Legendary Action. Constitution Saving Throw: DC 17, each creature in a 20-foot-radius Sphere Sphere centered on a point the dragon can see within 90 feet. Failure: 10 (3d6) Thunder damage, and the target has the Deafened condition until the end of its next turn.",
     "save": {
      "ability": "con",
      "dc": 17,
@@ -978,7 +996,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 15,
-    "experiencePoints": null,
+    "experiencePoints": 13000,
+    "skills": {
+     "insight": 7,
+     "perception": 12,
+     "stealth": 5
+    },
     "type": "dragon",
     "alignment": "lawful good",
     "armorDetail": "natural armor",
@@ -1196,7 +1219,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 14,
-    "experiencePoints": null,
+    "experiencePoints": 11500,
+    "skills": {
+     "deception": 9,
+     "perception": 12,
+     "stealth": 6
+    },
     "type": "dragon",
     "alignment": "chaotic good",
     "armorDetail": "natural armor",
@@ -1412,7 +1440,13 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 17,
-    "experiencePoints": null,
+    "experiencePoints": 18000,
+    "skills": {
+     "insight": 8,
+     "perception": 14,
+     "persuasion": 13,
+     "stealth": 8
+    },
     "type": "dragon",
     "alignment": "lawful good",
     "armorDetail": "natural armor",
@@ -1512,7 +1546,7 @@
     "id": "noxious-miasma",
     "name": "Noxious Miasma",
     "activation": "other",
-    "description": "Legendary Action. Constitution Saving Throw: DC 17, each creature in a 20-foot-radius Sphere [Area of Effect]|XPHB|Sphere centered on a point the dragon can see within 90 feet. Failure: 7 (2d6) Poison damage, and the target takes a -2 penalty to AC until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
+    "description": "Legendary Action. Constitution Saving Throw: DC 17, each creature in a 20-foot-radius Sphere Sphere centered on a point the dragon can see within 90 feet. Failure: 7 (2d6) Poison damage, and the target takes a -2 penalty to AC until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
     "save": {
      "ability": "con",
      "dc": 17,
@@ -1620,7 +1654,13 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 15,
-    "experiencePoints": null,
+    "experiencePoints": 13000,
+    "skills": {
+     "deception": 9,
+     "perception": 12,
+     "persuasion": 9,
+     "stealth": 6
+    },
     "type": "dragon",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -1809,7 +1849,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 17,
-    "experiencePoints": null,
+    "experiencePoints": 18000,
+    "skills": {
+     "perception": 13,
+     "stealth": 6
+    },
     "type": "dragon",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -2030,7 +2074,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 16,
-    "experiencePoints": null,
+    "experiencePoints": 15000,
+    "skills": {
+     "history": 8,
+     "perception": 11,
+     "stealth": 5
+    },
     "type": "dragon",
     "alignment": "lawful good",
     "armorDetail": "natural armor",
@@ -2103,7 +2152,7 @@
     "id": "freezing-burst",
     "name": "Freezing Burst",
     "activation": "other",
-    "description": "Legendary Action. Constitution Saving Throw: DC 14, each creature in a 30-foot-radius Sphere [Area of Effect]|XPHB|Sphere centered on a point the dragon can see within 120 feet. Failure: 7 (2d6) Cold damage, and the target's Speed is 0 until the end of the target's next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
+    "description": "Legendary Action. Constitution Saving Throw: DC 14, each creature in a 30-foot-radius Sphere Sphere centered on a point the dragon can see within 120 feet. Failure: 7 (2d6) Cold damage, and the target's Speed is 0 until the end of the target's next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
     "save": {
      "ability": "con",
      "dc": 14,
@@ -2224,7 +2273,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 13,
-    "experiencePoints": null,
+    "experiencePoints": 10000,
+    "skills": {
+     "perception": 11,
+     "stealth": 5
+    },
     "type": "dragon",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -2379,7 +2432,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {},
     "type": "elemental",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -2490,7 +2544,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {
+     "perception": 5
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -2678,7 +2735,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 21,
-    "experiencePoints": null,
+    "experiencePoints": 33000,
+    "skills": {
+     "perception": 16,
+     "stealth": 9
+    },
     "type": "dragon",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -2867,7 +2928,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 23,
-    "experiencePoints": null,
+    "experiencePoints": 50000,
+    "skills": {
+     "perception": 17,
+     "stealth": 7
+    },
     "type": "dragon",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -3083,7 +3148,13 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 20,
-    "experiencePoints": null,
+    "experiencePoints": 25000,
+    "skills": {
+     "history": 9,
+     "perception": 14,
+     "persuasion": 12,
+     "stealth": 6
+    },
     "type": "dragon",
     "alignment": "chaotic good",
     "armorDetail": "natural armor",
@@ -3237,7 +3308,7 @@
     "id": "thunderclap",
     "name": "Thunderclap",
     "activation": "other",
-    "description": "Legendary Action. Constitution Saving Throw: DC 22, each creature in a 20-foot-radius Sphere [Area of Effect]|XPHB|Sphere centered on a point the dragon can see within 120 feet. Failure: 13 (3d8) Thunder damage, and the target has the Deafened condition until the end of its next turn.",
+    "description": "Legendary Action. Constitution Saving Throw: DC 22, each creature in a 20-foot-radius Sphere Sphere centered on a point the dragon can see within 120 feet. Failure: 13 (3d8) Thunder damage, and the target has the Deafened condition until the end of its next turn.",
     "save": {
      "ability": "con",
      "dc": 22,
@@ -3306,7 +3377,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 22,
-    "experiencePoints": null,
+    "experiencePoints": 41000,
+    "skills": {
+     "insight": 10,
+     "perception": 17,
+     "stealth": 7
+    },
     "type": "dragon",
     "alignment": "lawful good",
     "armorDetail": "natural armor",
@@ -3524,7 +3600,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 21,
-    "experiencePoints": null,
+    "experiencePoints": 33000,
+    "skills": {
+     "deception": 13,
+     "perception": 17,
+     "stealth": 8
+    },
     "type": "dragon",
     "alignment": "chaotic good",
     "armorDetail": "natural armor",
@@ -3740,7 +3821,13 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 24,
-    "experiencePoints": null,
+    "experiencePoints": 62000,
+    "skills": {
+     "insight": 10,
+     "perception": 17,
+     "persuasion": 16,
+     "stealth": 9
+    },
     "type": "dragon",
     "alignment": "lawful good",
     "armorDetail": "natural armor",
@@ -3840,7 +3927,7 @@
     "id": "noxious-miasma",
     "name": "Noxious Miasma",
     "activation": "other",
-    "description": "Legendary Action. Constitution Saving Throw: DC 21, each creature in a 30-foot-radius Sphere [Area of Effect]|XPHB|Sphere centered on a point the dragon can see within 90 feet. Failure: 17 (5d6) Poison damage, and the target takes a -2 penalty to AC until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
+    "description": "Legendary Action. Constitution Saving Throw: DC 21, each creature in a 30-foot-radius Sphere Sphere centered on a point the dragon can see within 90 feet. Failure: 17 (5d6) Poison damage, and the target takes a -2 penalty to AC until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
     "save": {
      "ability": "con",
      "dc": 21,
@@ -3948,7 +4035,13 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 22,
-    "experiencePoints": null,
+    "experiencePoints": 41000,
+    "skills": {
+     "deception": 13,
+     "perception": 17,
+     "persuasion": 13,
+     "stealth": 8
+    },
     "type": "dragon",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -4137,7 +4230,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 24,
-    "experiencePoints": null,
+    "experiencePoints": 62000,
+    "skills": {
+     "perception": 16,
+     "stealth": 7
+    },
     "type": "dragon",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -4358,7 +4455,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 23,
-    "experiencePoints": null,
+    "experiencePoints": 50000,
+    "skills": {
+     "history": 11,
+     "perception": 16,
+     "stealth": 7
+    },
     "type": "dragon",
     "alignment": "lawful good",
     "armorDetail": "natural armor",
@@ -4431,7 +4533,7 @@
     "id": "freezing-burst",
     "name": "Freezing Burst",
     "activation": "other",
-    "description": "Legendary Action. Constitution Saving Throw: DC 20, each creature in a 30-foot-radius Sphere [Area of Effect]|XPHB|Sphere centered on a point the dragon can see within 120 feet. Failure: 14 (4d6) Cold damage, and the target's Speed is 0 until the end of the target's next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
+    "description": "Legendary Action. Constitution Saving Throw: DC 20, each creature in a 30-foot-radius Sphere Sphere centered on a point the dragon can see within 120 feet. Failure: 14 (4d6) Cold damage, and the target's Speed is 0 until the end of the target's next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
     "save": {
      "ability": "con",
      "dc": 20,
@@ -4552,7 +4654,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 20,
-    "experiencePoints": null,
+    "experiencePoints": 25000,
+    "skills": {
+     "perception": 13,
+     "stealth": 6
+    },
     "type": "dragon",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -4678,7 +4784,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {},
     "type": "construct",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -4781,7 +4888,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {},
     "type": "construct",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -4884,7 +4992,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {},
     "type": "construct",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -5017,7 +5126,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {},
     "type": "monstrosity",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -5136,7 +5246,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -5259,7 +5370,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {
+     "athletics": 5,
+     "perception": 3
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -5360,7 +5475,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
-    "experiencePoints": null,
+    "experiencePoints": 1100,
+    "skills": {
+     "stealth": 5
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -5407,8 +5525,8 @@
    "externalId": "archmage"
   },
   "name": "Archmage",
-  "summary": "Small humanoid, neutral - CR 12",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 12",
+  "size": "medium",
   "abilityScores": {
    "str": 10,
    "dex": 14,
@@ -5508,7 +5626,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 12,
-    "experiencePoints": null,
+    "experiencePoints": 8400,
+    "skills": {
+     "arcana": 13,
+     "history": 9,
+     "perception": 6
+    },
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -5555,8 +5678,8 @@
    "externalId": "assassin"
   },
   "name": "Assassin",
-  "summary": "Small humanoid, neutral - CR 8",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 8",
+  "size": "medium",
   "abilityScores": {
    "str": 11,
    "dex": 18,
@@ -5636,7 +5759,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
-    "experiencePoints": null,
+    "experiencePoints": 3900,
+    "skills": {
+     "acrobatics": 7,
+     "perception": 6,
+     "stealth": 10
+    },
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -5724,7 +5852,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {},
     "type": "plant",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -5812,7 +5941,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {},
     "type": "plant",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -5900,7 +6030,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {},
     "type": "monstrosity",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -5995,7 +6126,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {},
     "type": "elemental",
     "alignment": "lawful neutral",
     "armorDetail": "natural armor",
@@ -6092,7 +6224,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -6183,7 +6316,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {
+     "perception": 3
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -6329,7 +6465,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 19,
-    "experiencePoints": null,
+    "experiencePoints": 22000,
+    "skills": {
+     "perception": 9
+    },
     "type": "fiend",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -6390,8 +6529,8 @@
    "externalId": "bandit"
   },
   "name": "Bandit",
-  "summary": "Small humanoid, neutral - CR 0.125",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 0.125",
+  "size": "medium",
   "abilityScores": {
    "str": 11,
    "dex": 12,
@@ -6453,7 +6592,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.125,
-    "experiencePoints": null,
+    "experiencePoints": 25,
+    "skills": {},
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -6495,8 +6635,8 @@
    "externalId": "bandit-captain"
   },
   "name": "Bandit Captain",
-  "summary": "Small humanoid, neutral - CR 2",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 2",
+  "size": "medium",
   "abilityScores": {
    "str": 15,
    "dex": 16,
@@ -6579,7 +6719,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {
+     "athletics": 4,
+     "deception": 4
+    },
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -6737,7 +6881,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {
+     "deception": 5,
+     "insight": 5,
+     "perception": 8
+    },
     "type": "fiend",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -6865,7 +7014,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {},
     "type": "monstrosity",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -6950,7 +7100,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -7090,7 +7241,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {},
     "type": "fiend",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -7170,7 +7322,7 @@
     "id": "swallow",
     "name": "Swallow",
     "activation": "bonus-action",
-    "description": "Dexterity Saving Throw: DC 18, one Large or smaller creature Grappled by the behir (the behir can have only one creature swallowed at a time). Failure: The behir swallows the target, which is no longer Grappled. While swallowed, a creature has the Blinded and Restrained conditions, has Cover|XPHB|Total Cover against attacks and other effects outside the behir, and takes 21 (6d6) Acid damage at the start of each of the behir's turns. If the behir takes 30 damage or more on a single turn from the swallowed creature, the behir must succeed on a DC 14 Constitution saving throw at the end of that turn or regurgitate the creature, which falls in a space within 10 feet of the behir and has the Prone condition. If the behir dies, a swallowed creature is no longer Restrained and can escape from the corpse by using 15 feet of movement, exiting Prone.",
+    "description": "Dexterity Saving Throw: DC 18, one Large or smaller creature Grappled by the behir (the behir can have only one creature swallowed at a time). Failure: The behir swallows the target, which is no longer Grappled. While swallowed, a creature has the Blinded and Restrained conditions,Total Cover against attacks and other effects outside the behir, and takes 21 (6d6) Acid damage at the start of each of the behir's turns. If the behir takes 30 damage or more on a single turn from the swallowed creature, the behir must succeed on a DC 14 Constitution saving throw at the end of that turn or regurgitate the creature, which falls in a space within 10 feet of the behir and has the Prone condition. If the behir dies, a swallowed creature is no longer Restrained and can escape from the corpse by using 15 feet of movement, exiting Prone.",
     "save": {
      "ability": "dex",
      "dc": 18,
@@ -7265,7 +7417,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 11,
-    "experiencePoints": null,
+    "experiencePoints": 7200,
+    "skills": {
+     "perception": 6,
+     "stealth": 7
+    },
     "type": "monstrosity",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -7309,8 +7465,8 @@
    "externalId": "berserker"
   },
   "name": "Berserker",
-  "summary": "Small humanoid, neutral - CR 2",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 2",
+  "size": "medium",
   "abilityScores": {
    "str": 16,
    "dex": 12,
@@ -7355,7 +7511,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {},
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -7461,7 +7618,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {
+     "perception": 5
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -7599,7 +7759,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {
+     "perception": 4,
+     "stealth": 4
+    },
     "type": "dragon",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -7686,7 +7850,7 @@
    },
    {
     "id": "black-pudding-split",
-    "name": "Parry",
+    "name": "Split",
     "activation": "reaction",
     "description": "_Trigger:_ While the pudding is Large or Medium and has 10+ Hit Points, it becomes Bloodied or is subjected to Lightning or Slashing damage. _Response:_ The pudding splits into two new Black Puddings. Each new pudding is one size smaller than the original pudding and acts on its Initiative. The original pudding’s Hit Points are divided evenly between the new puddings (round down).",
     "damage": []
@@ -7716,7 +7880,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
-    "experiencePoints": null,
+    "experiencePoints": 1100,
+    "skills": {},
     "type": "ooze",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -7831,7 +7996,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {
+     "perception": 5,
+     "stealth": 5
+    },
     "type": "fey",
     "alignment": "lawful good",
     "armorDetail": "natural armor",
@@ -7921,7 +8090,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.125,
-    "experiencePoints": null,
+    "experiencePoints": 25,
+    "skills": {
+     "perception": 6
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -8062,7 +8234,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {
+     "perception": 4,
+     "stealth": 2
+    },
     "type": "dragon",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -8153,7 +8329,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -8285,7 +8462,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 9,
-    "experiencePoints": null,
+    "experiencePoints": 5000,
+    "skills": {
+     "deception": 7,
+     "insight": 6
+    },
     "type": "fiend",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -8435,7 +8616,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {
+     "perception": 4,
+     "stealth": 2
+    },
     "type": "dragon",
     "alignment": "chaotic good",
     "armorDetail": "natural armor",
@@ -8590,7 +8775,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {
+     "perception": 4,
+     "stealth": 2
+    },
     "type": "dragon",
     "alignment": "lawful good",
     "armorDetail": "natural armor",
@@ -8729,7 +8918,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {
+     "perception": 3
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -8860,7 +9052,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {
+     "stealth": 6,
+     "survival": 3
+    },
     "type": "fey",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -8984,7 +9180,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {
+     "stealth": 6,
+     "survival": 2
+    },
     "type": "fey",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -9119,7 +9319,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {
+     "perception": 6
+    },
     "type": "monstrosity",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -9210,7 +9413,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.125,
-    "experiencePoints": null,
+    "experiencePoints": 25,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -9295,7 +9499,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {
+     "perception": 3,
+     "stealth": 4
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -9440,7 +9648,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {
+     "athletics": 6,
+     "perception": 3
+    },
     "type": "fey",
     "alignment": "neutral good",
     "armorDetail": "natural armor",
@@ -9589,7 +9801,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
-    "experiencePoints": null,
+    "experiencePoints": 3900,
+    "skills": {},
     "type": "fiend",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -9766,7 +9979,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 6,
-    "experiencePoints": null,
+    "experiencePoints": 2300,
+    "skills": {
+     "perception": 8
+    },
     "type": "monstrosity",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -9901,7 +10117,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
-    "experiencePoints": null,
+    "experiencePoints": 1100,
+    "skills": {
+     "perception": 4
+    },
     "type": "aberration",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -10038,7 +10257,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 9,
-    "experiencePoints": null,
+    "experiencePoints": 5000,
+    "skills": {},
     "type": "construct",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -10200,7 +10420,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
-    "experiencePoints": null,
+    "experiencePoints": 3900,
+    "skills": {
+     "stealth": 5
+    },
     "type": "aberration",
     "alignment": "chaotic neutral",
     "armorDetail": "natural armor",
@@ -10333,7 +10556,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 9,
-    "experiencePoints": null,
+    "experiencePoints": 5000,
+    "skills": {
+     "insight": 7,
+     "perception": 11
+    },
     "type": "giant",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -10429,7 +10656,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {},
     "type": "monstrosity",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -10473,8 +10701,8 @@
    "externalId": "commoner"
   },
   "name": "Commoner",
-  "summary": "Small humanoid, neutral - CR 0",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 0",
+  "size": "medium",
   "abilityScores": {
    "str": 10,
    "dex": 10,
@@ -10519,7 +10747,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {},
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -10632,7 +10861,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {
+     "perception": 2,
+     "stealth": 4
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -10771,7 +11004,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {
+     "perception": 4,
+     "stealth": 3
+    },
     "type": "dragon",
     "alignment": "chaotic good",
     "armorDetail": "natural armor",
@@ -10904,7 +11141,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
-    "experiencePoints": null,
+    "experiencePoints": 1100,
+    "skills": {},
     "type": "celestial",
     "alignment": "lawful good",
     "armorDetail": "natural armor",
@@ -10994,7 +11232,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {
+     "stealth": 2
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -11103,7 +11344,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {
+     "stealth": 2
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -11150,8 +11394,8 @@
    "externalId": "cultist"
   },
   "name": "Cultist",
-  "summary": "Small humanoid, neutral - CR 0.125",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 0.125",
+  "size": "medium",
   "abilityScores": {
    "str": 11,
    "dex": 12,
@@ -11196,7 +11440,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.125,
-    "experiencePoints": null,
+    "experiencePoints": 25,
+    "skills": {
+     "deception": 2,
+     "religion": 2
+    },
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -11238,8 +11486,8 @@
    "externalId": "cultist-fanatic"
   },
   "name": "Cultist Fanatic",
-  "summary": "Small humanoid, neutral - CR 2",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 2",
+  "size": "medium",
   "abilityScores": {
    "str": 11,
    "dex": 14,
@@ -11302,7 +11550,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {
+     "deception": 3,
+     "persuasion": 3,
+     "religion": 2
+    },
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -11406,7 +11659,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {
+     "stealth": 3
+    },
     "type": "aberration",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -11517,7 +11773,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {
+     "perception": 5,
+     "stealth": 4
+    },
     "type": "monstrosity",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -11607,7 +11867,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {
+     "perception": 4
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -11736,7 +11999,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 10,
-    "experiencePoints": null,
+    "experiencePoints": 5900,
+    "skills": {
+     "insight": 9,
+     "perception": 9
+    },
     "type": "celestial",
     "alignment": "lawful good",
     "armorDetail": "natural armor",
@@ -11845,7 +12112,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {
+     "perception": 5,
+     "stealth": 4
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -11971,7 +12242,7 @@
     "id": "create-whirlwind",
     "name": "Create Whirlwind",
     "activation": "action",
-    "description": "The djinni conjures a whirlwind at a point it can see within 120 feet. The whirlwind fills a 20-foot-radius, 60-foot-high Cylinder [Area of Effect]|XPHB|Cylinder centered on that point. The whirlwind lasts until the djinni's Concentration on it ends. The djinni can move the whirlwind up to 20 feet at the start of each of its turns. Whenever the whirlwind enters a creature's space or a creature enters the whirlwind, that creature is subjected to the following effect. Strength Saving Throw: DC 17 (a creature makes this save only once per turn, and the djinni is unaffected). Failure: While in the whirlwind, the target has the Restrained condition and moves with the whirlwind. At the start of each of its turns, the Restrained target takes 21 (6d6) Thunder damage. At the end of each of its turns, the target repeats the save, ending the effect on itself on a success.",
+    "description": "The djinni conjures a whirlwind at a point it can see within 120 feet. The whirlwind fills a 20-foot-radius, 60-foot-high Cylinder Cylinder centered on that point. The whirlwind lasts until the djinni's Concentration on it ends. The djinni can move the whirlwind up to 20 feet at the start of each of its turns. Whenever the whirlwind enters a creature's space or a creature enters the whirlwind, that creature is subjected to the following effect. Strength Saving Throw: DC 17 (a creature makes this save only once per turn, and the djinni is unaffected). Failure: While in the whirlwind, the target has the Restrained condition and moves with the whirlwind. At the start of each of its turns, the Restrained target takes 21 (6d6) Thunder damage. At the end of each of its turns, the target repeats the save, ending the effect on itself on a success.",
     "save": {
      "ability": "str",
      "dc": 17,
@@ -12009,7 +12280,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 11,
-    "experiencePoints": null,
+    "experiencePoints": 7200,
+    "skills": {},
     "type": "elemental",
     "alignment": "chaotic good",
     "armorDetail": "natural armor",
@@ -12164,7 +12436,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {
+     "deception": 6,
+     "insight": 3
+    },
     "type": "monstrosity",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -12254,7 +12530,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -12412,7 +12689,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 17,
-    "experiencePoints": null,
+    "experiencePoints": 18000,
+    "skills": {},
     "type": "dragon",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -12542,7 +12820,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {},
     "type": "fiend",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -12668,7 +12947,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 6,
-    "experiencePoints": null,
+    "experiencePoints": 2300,
+    "skills": {
+     "perception": 6,
+     "stealth": 10
+    },
     "type": "monstrosity",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -12725,8 +13008,8 @@
    "externalId": "druid"
   },
   "name": "Druid",
-  "summary": "Small humanoid, neutral - CR 2",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 2",
+  "size": "medium",
   "abilityScores": {
    "str": 10,
    "dex": 12,
@@ -12802,7 +13085,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {
+     "medicine": 5,
+     "nature": 3,
+     "perception": 5
+    },
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -12928,7 +13216,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {
+     "perception": 4,
+     "stealth": 5
+    },
     "type": "fey",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -13070,7 +13362,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {
+     "perception": 2,
+     "stealth": 4
+    },
     "type": "elemental",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -13165,7 +13461,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {
+     "perception": 6
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -13297,7 +13596,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {},
     "type": "elemental",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -13431,7 +13731,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 11,
-    "experiencePoints": null,
+    "experiencePoints": 7200,
+    "skills": {},
     "type": "elemental",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -13565,7 +13866,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
-    "experiencePoints": null,
+    "experiencePoints": 1100,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -13653,7 +13955,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {
+     "perception": 2
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -13799,7 +14104,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 12,
-    "experiencePoints": null,
+    "experiencePoints": 8400,
+    "skills": {
+     "perception": 6,
+     "persuasion": 8
+    },
     "type": "fiend",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -13841,7 +14150,7 @@
      },
      {
       "name": "Magic Rope",
-      "description": "The erinyes has a magic rope. While bearing it, the erinyes can use the Entangling Rope action. The rope has AC 20, HP 90, and Immunity to Poison and Psychic damage. The rope turns to dust if reduced to 0 Hit Points, if it is 5+ feet away from the erinyes for 1 hour or more, or if the erinyes dies. If the rope is damaged or destroyed, the erinyes can fully restore it when finishing a Short Rest|XPHB|Short or Long Rest."
+      "description": "The erinyes has a magic rope. While bearing it, the erinyes can use the Entangling Rope action. The rope has AC 20, HP 90, and Immunity to Poison and Psychic damage. The rope turns to dust if reduced to 0 Hit Points, if it is 5+ feet away from the erinyes for 1 hour or more, or if the erinyes dies. If the rope is damaged or destroyed,Short or Long Rest."
      }
     ]
    }
@@ -13962,7 +14271,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {
+     "perception": 3,
+     "stealth": 4,
+     "survival": 3
+    },
     "type": "monstrosity",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -14104,7 +14418,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
-    "experiencePoints": null,
+    "experiencePoints": 1100,
+    "skills": {
+     "perception": 4
+    },
     "type": "giant",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -14221,7 +14538,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {},
     "type": "elemental",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -14356,7 +14674,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 9,
-    "experiencePoints": null,
+    "experiencePoints": 5000,
+    "skills": {
+     "athletics": 11,
+     "perception": 6
+    },
     "type": "giant",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -14469,7 +14791,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {},
     "type": "construct",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -14575,7 +14898,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.125,
-    "experiencePoints": null,
+    "experiencePoints": 25,
+    "skills": {},
     "type": "monstrosity",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -14665,7 +14989,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {
+     "perception": 1,
+     "stealth": 3
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -14804,7 +15132,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
-    "experiencePoints": null,
+    "experiencePoints": 3900,
+    "skills": {
+     "athletics": 9,
+     "perception": 3
+    },
     "type": "giant",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -14913,7 +15245,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {
+     "stealth": 4
+    },
     "type": "elemental",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -15001,7 +15336,7 @@
     "id": "engulf",
     "name": "Engulf",
     "activation": "action",
-    "description": "The cube moves up to its Speed without provoking Opportunity Attacks. The cube can move through the spaces of Large or smaller creatures if it has room inside itself to contain them (see the Ooze Cube [Area of Effect]|XPHB|Cube trait). Dexterity Saving Throw: DC 12, each creature whose space the cube enters for the first time during this move. Failure: 10 (3d6) Acid damage, and the target is engulfed. An engulfed target is suffocating, can't cast spells with a Verbal component, has the Restrained condition, and takes 10 (3d6) Acid damage at the start of each of the cube's turns. When the cube moves, the engulfed target moves with it. An engulfed target can try to escape by taking an action to make a DC 12 Strength (Athletics) check. On a successful check, the target escapes and enters the nearest unoccupied space. Success: Half damage, and the target moves to an unoccupied space within 5 feet of the cube. If there is no unoccupied space, the target fails the save instead.",
+    "description": "The cube moves up to its Speed without provoking Opportunity Attacks. The cube can move through the spaces of Large or smaller creatures if it has room inside itself to contain them (see the Ooze Cube Cube trait). Dexterity Saving Throw: DC 12, each creature whose space the cube enters for the first time during this move. Failure: 10 (3d6) Acid damage, and the target is engulfed. An engulfed target is suffocating, can't cast spells with a Verbal component, has the Restrained condition, and takes 10 (3d6) Acid damage at the start of each of the cube's turns. When the cube moves, the engulfed target moves with it. An engulfed target can try to escape by taking an action to make a DC 12 Strength (Athletics) check. On a successful check, the target escapes and enters the nearest unoccupied space. Success: Half damage, and the target moves to an unoccupied space within 5 feet of the cube. If there is no unoccupied space, the target fails the save instead.",
     "save": {
      "ability": "dex",
      "dc": 12,
@@ -15043,7 +15378,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {},
     "type": "ooze",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -15077,7 +15413,7 @@
     "traits": [
      {
       "name": "Ooze Cube",
-      "description": "The cube fills its entire space and is transparent. Other creatures can enter that space, but a creature that does so is subjected to the cube's Engulf and has Disadvantage on the saving throw. Creatures inside the cube have Cover|XPHB|Total Cover, and the cube can hold one Large creature or up to four Medium or Small creatures inside itself at a time. As an action, a creature within 5 feet of the cube can pull a creature or an object out of the cube by succeeding on a DC 12 Strength (Athletics) check, and the puller takes 10 (3d6) Acid damage."
+      "description": "The cube fills its entire space and is transparent. Other creatures can enter that space, but a creature that does so is subjected to the cube's Engulf and has Disadvantage on the saving throw.Total Cover, and the cube can hold one Large creature or up to four Medium or Small creatures inside itself at a time. As an action, a creature within 5 feet of the cube can pull a creature or an object out of the cube by succeeding on a DC 12 Strength (Athletics) check, and the puller takes 10 (3d6) Acid damage."
      },
      {
       "name": "Transparent",
@@ -15177,7 +15513,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {},
     "type": "undead",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -15359,7 +15696,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
-    "experiencePoints": null,
+    "experiencePoints": 1100,
+    "skills": {},
     "type": "undead",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -15503,7 +15841,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {},
     "type": "undead",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -15606,7 +15945,7 @@
     "id": "boulder-toss",
     "name": "Boulder Toss (Recharge 6)",
     "activation": "action",
-    "description": "The ape hurls a boulder at a point it can see within 90 feet. Dexterity Saving Throw: DC 17, each creature in a 5-foot-radius Sphere [Area of Effect]|XPHB|Sphere centered on that point. Failure: 24 (7d6) Bludgeoning damage. If the target is a Large or smaller creature, it has the Prone condition. Success: Half damage only.",
+    "description": "The ape hurls a boulder at a point it can see within 90 feet. Dexterity Saving Throw: DC 17, each creature in a 5-foot-radius Sphere Sphere centered on that point. Failure: 24 (7d6) Bludgeoning damage. If the target is a Large or smaller creature, it has the Prone condition. Success: Half damage only.",
     "save": {
      "ability": "dex",
      "dc": 17,
@@ -15643,7 +15982,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 7,
-    "experiencePoints": null,
+    "experiencePoints": 2900,
+    "skills": {
+     "athletics": 9,
+     "perception": 4,
+     "survival": 4
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -15734,7 +16078,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {
+     "perception": 3
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -15824,7 +16171,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -15914,7 +16262,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -16007,7 +16356,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -16125,7 +16475,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {
+     "perception": 2
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -16226,7 +16579,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.125,
-    "experiencePoints": null,
+    "experiencePoints": 25,
+    "skills": {
+     "stealth": 3
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -16381,7 +16737,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {
+     "stealth": 5
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -16491,7 +16850,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {
+     "perception": 6
+    },
     "type": "celestial",
     "alignment": "neutral good",
     "armorDetail": "natural armor",
@@ -16583,7 +16945,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {
+     "perception": 4
+    },
     "type": "celestial",
     "alignment": "neutral good",
     "armorDetail": "natural armor",
@@ -16671,7 +17036,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -16770,7 +17136,7 @@
     "id": "swallow",
     "name": "Swallow",
     "activation": "action",
-    "description": "The frog swallows a Small or smaller target it is grappling. While swallowed, the target isn't Grappled but has the Blinded and Restrained conditions, and it has Cover|XPHB|Total Cover against attacks and other effects outside the frog. While swallowing the target, the frog can't use Bite, and if the frog dies, the swallowed target is no longer Restrained and can escape from the corpse using 5 feet of movement, exiting with the Prone condition. At the end of the frog's next turn, the swallowed target takes 5 (2d4) Acid damage. If that damage doesn't kill it, the frog disgorges it, causing it to exit Prone.",
+    "description": "The frog swallows a Small or smaller target it is grappling. While swallowed, the target isn't Grappled but has the Blinded and Restrained conditions,Total Cover against attacks and other effects outside the frog. While swallowing the target, the frog can't use Bite, and if the frog dies, the swallowed target is no longer Restrained and can escape from the corpse using 5 feet of movement, exiting with the Prone condition. At the end of the frog's next turn, the swallowed target takes 5 (2d4) Acid damage. If that damage doesn't kill it, the frog disgorges it, causing it to exit Prone.",
     "damage": []
    }
   ],
@@ -16784,7 +17150,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {
+     "perception": 2,
+     "stealth": 4
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -16883,7 +17253,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {
+     "perception": 3
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -16984,7 +17357,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {
+     "perception": 3
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -17074,7 +17450,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -17199,7 +17576,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {
+     "perception": 4,
+     "stealth": 5
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -17305,7 +17686,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {
+     "perception": 6,
+     "stealth": 6
+    },
     "type": "celestial",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -17400,7 +17785,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.125,
-    "experiencePoints": null,
+    "experiencePoints": 25,
+    "skills": {
+     "perception": 2
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -17535,7 +17923,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -17632,7 +18021,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -17738,7 +18128,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {
+     "perception": 3
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -17853,7 +18246,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {
+     "perception": 4,
+     "stealth": 7
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -17956,7 +18353,7 @@
     "id": "swallow",
     "name": "Swallow",
     "activation": "action",
-    "description": "The toad swallows a Medium or smaller target it is grappling. While swallowed, the target isn't Grappled but has the Blinded and Restrained conditions, and it has Cover|XPHB|Total Cover against attacks and other effects outside the toad. In addition, the target takes 10 (3d6) Acid damage at the end of each of the toad's turns. The toad can have only one target swallowed at a time, and it can't use Bite while it has a swallowed target. If the toad dies, a swallowed creature is no longer Restrained and can escape from the corpse using 5 feet of movement, exiting with the Prone condition.",
+    "description": "The toad swallows a Medium or smaller target it is grappling. While swallowed, the target isn't Grappled but has the Blinded and Restrained conditions,Total Cover against attacks and other effects outside the toad. In addition, the target takes 10 (3d6) Acid damage at the end of each of the toad's turns. The toad can have only one target swallowed at a time, and it can't use Bite while it has a swallowed target. If the toad dies, a swallowed creature is no longer Restrained and can escape from the corpse using 5 feet of movement, exiting with the Prone condition.",
     "damage": []
    }
   ],
@@ -17970,7 +18367,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -18069,7 +18467,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {
+     "perception": 2
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -18162,7 +18563,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {
+     "perception": 3
+    },
     "type": "monstrosity",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -18257,7 +18661,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -18350,7 +18755,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.125,
-    "experiencePoints": null,
+    "experiencePoints": 25,
+    "skills": {
+     "acrobatics": 5,
+     "perception": 3,
+     "stealth": 5
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -18440,7 +18850,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {
+     "perception": 3,
+     "stealth": 7
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -18539,7 +18953,7 @@
     "id": "blinding-spittle",
     "name": "Blinding Spittle (Recharge 5-6)",
     "activation": "action",
-    "description": "Dexterity Saving Throw: DC 10, each creature in a 10-foot-radius Sphere [Area of Effect]|XPHB|Sphere centered on a point within 30 feet. Failure: 7 (2d6) Radiant damage, and the target has the Blinded condition until the end of the mouther's next turn.",
+    "description": "Dexterity Saving Throw: DC 10, each creature in a 10-foot-radius Sphere Sphere centered on a point within 30 feet. Failure: 7 (2d6) Radiant damage, and the target has the Blinded condition until the end of the mouther's next turn.",
     "save": {
      "ability": "dex",
      "dc": 10,
@@ -18576,7 +18990,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {},
     "type": "aberration",
     "alignment": "chaotic neutral",
     "armorDetail": "natural armor",
@@ -18735,7 +19150,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 9,
-    "experiencePoints": null,
+    "experiencePoints": 5000,
+    "skills": {
+     "deception": 7,
+     "perception": 7
+    },
     "type": "fiend",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -18788,8 +19207,8 @@
    "externalId": "gladiator"
   },
   "name": "Gladiator",
-  "summary": "Small humanoid, neutral - CR 5",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 5",
+  "size": "medium",
   "abilityScores": {
    "str": 18,
    "dex": 15,
@@ -18882,7 +19301,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {
+     "athletics": 10,
+     "performance": 5
+    },
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -18998,7 +19421,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {},
     "type": "fiend",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -19083,7 +19507,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {
+     "perception": 2
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -19212,7 +19639,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {
+     "stealth": 6
+    },
     "type": "fey",
     "alignment": "chaotic neutral",
     "armorDetail": "natural armor",
@@ -19311,7 +19741,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.125,
-    "experiencePoints": null,
+    "experiencePoints": 25,
+    "skills": {
+     "stealth": 6
+    },
     "type": "fey",
     "alignment": "chaotic neutral",
     "armorDetail": "natural armor",
@@ -19425,7 +19858,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {
+     "stealth": 6
+    },
     "type": "fey",
     "alignment": "chaotic neutral",
     "armorDetail": "natural armor",
@@ -19577,7 +20013,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {
+     "perception": 4,
+     "stealth": 4
+    },
     "type": "dragon",
     "alignment": "lawful good",
     "armorDetail": "natural armor",
@@ -19716,7 +20156,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {
+     "perception": 7
+    },
     "type": "construct",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -19811,7 +20254,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {
+     "stealth": 2
+    },
     "type": "ooze",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -19961,7 +20407,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {
+     "perception": 4,
+     "stealth": 3
+    },
     "type": "dragon",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -20077,7 +20527,13 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {
+     "arcana": 5,
+     "deception": 4,
+     "perception": 4,
+     "stealth": 3
+    },
     "type": "fey",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -20220,7 +20676,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {
+     "stealth": 4
+    },
     "type": "aberration",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -20334,7 +20793,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {
+     "perception": 5
+    },
     "type": "monstrosity",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -20424,7 +20886,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {
+     "athletics": 5,
+     "perception": 3,
+     "stealth": 5
+    },
     "type": "aberration",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -20468,8 +20935,8 @@
    "externalId": "guard"
   },
   "name": "Guard",
-  "summary": "Small humanoid, neutral - CR 0.125",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 0.125",
+  "size": "medium",
   "abilityScores": {
    "str": 13,
    "dex": 12,
@@ -20516,7 +20983,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.125,
-    "experiencePoints": null,
+    "experiencePoints": 25,
+    "skills": {
+     "perception": 2
+    },
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -20558,8 +21028,8 @@
    "externalId": "guard-captain"
   },
   "name": "Guard Captain",
-  "summary": "Small humanoid, neutral - CR 4",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 4",
+  "size": "medium",
   "abilityScores": {
    "str": 18,
    "dex": 14,
@@ -20630,7 +21100,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
-    "experiencePoints": null,
+    "experiencePoints": 1100,
+    "skills": {
+     "athletics": 6,
+     "perception": 4
+    },
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -20767,7 +21241,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 10,
-    "experiencePoints": null,
+    "experiencePoints": 5900,
+    "skills": {
+     "arcana": 11,
+     "history": 11,
+     "religion": 11
+    },
     "type": "celestial",
     "alignment": "lawful good",
     "armorDetail": "natural armor",
@@ -20905,7 +21384,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {
+     "athletics": 7,
+     "perception": 5,
+     "stealth": 5
+    },
     "type": "dragon",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -21021,7 +21505,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {},
     "type": "monstrosity",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -21104,7 +21589,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {
+     "perception": 6
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -21236,7 +21724,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {
+     "perception": 5
+    },
     "type": "fiend",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -21362,7 +21853,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
-    "experiencePoints": null,
+    "experiencePoints": 3900,
+    "skills": {},
     "type": "fiend",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -21500,7 +21992,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {
+     "perception": 2
+    },
     "type": "giant",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -21601,7 +22096,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {
+     "perception": 5
+    },
     "type": "monstrosity",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -21707,7 +22205,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
-    "experiencePoints": null,
+    "experiencePoints": 1100,
+    "skills": {
+     "perception": 3
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -21825,7 +22326,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {},
     "type": "fey",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -21937,7 +22439,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {},
     "type": "fey",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -22042,7 +22545,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {},
     "type": "construct",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -22186,7 +22690,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 11,
-    "experiencePoints": null,
+    "experiencePoints": 7200,
+    "skills": {},
     "type": "fiend",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -22285,7 +22790,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {
+     "perception": 2
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -22388,7 +22896,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
-    "experiencePoints": null,
+    "experiencePoints": 3900,
+    "skills": {
+     "perception": 6
+    },
     "type": "monstrosity",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -22491,7 +23002,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {
+     "perception": 3
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -22637,7 +23151,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 14,
-    "experiencePoints": null,
+    "experiencePoints": 11500,
+    "skills": {
+     "insight": 7,
+     "perception": 7,
+     "persuasion": 9
+    },
     "type": "fiend",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -22783,7 +23302,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {
+     "perception": 2,
+     "stealth": 3
+    },
     "type": "elemental",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -22902,7 +23425,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {
+     "deception": 4,
+     "insight": 3,
+     "stealth": 5
+    },
     "type": "fiend",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -23048,7 +23576,14 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
-    "experiencePoints": null,
+    "experiencePoints": 1100,
+    "skills": {
+     "deception": 9,
+     "insight": 5,
+     "perception": 5,
+     "persuasion": 9,
+     "stealth": 7
+    },
     "type": "fiend",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -23193,7 +23728,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 6,
-    "experiencePoints": null,
+    "experiencePoints": 2300,
+    "skills": {
+     "perception": 8,
+     "stealth": 10
+    },
     "type": "elemental",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -23357,7 +23896,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 16,
-    "experiencePoints": null,
+    "experiencePoints": 15000,
+    "skills": {},
     "type": "construct",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -23460,7 +24000,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {
+     "perception": 5,
+     "stealth": 4
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -23550,7 +24094,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {
+     "perception": 3,
+     "stealth": 4
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -23599,8 +24147,8 @@
    "externalId": "knight"
   },
   "name": "Knight",
-  "summary": "Small humanoid, neutral - CR 3",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 3",
+  "size": "medium",
   "abilityScores": {
    "str": 16,
    "dex": 11,
@@ -23683,7 +24231,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {},
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -23773,7 +24322,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.125,
-    "experiencePoints": null,
+    "experiencePoints": 25,
+    "skills": {},
     "type": "dragon",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -23960,7 +24510,7 @@
     "id": "swallow",
     "name": "Swallow",
     "activation": "action",
-    "description": "Dexterity Saving Throw: DC 25, one creature Grappled by the kraken (it can have up to four creatures swallowed at a time). Failure: 23 (3d8 + 10) Piercing damage. If the target is Large or smaller, it is swallowed and no longer Grappled. A swallowed creature has the Restrained condition, has Cover|XPHB|Total Cover against attacks and other effects outside the kraken, and takes 24 (7d6) Acid damage at the start of each of its turns. If the kraken takes 50 damage or more on a single turn from a creature inside it, the kraken must succeed on a DC 25 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, each of which falls in a space within 10 feet of the kraken with the Prone condition. If the kraken dies, any swallowed creature no longer has the Restrained condition and can escape from the corpse using 15 feet of movement, exiting Prone.",
+    "description": "Dexterity Saving Throw: DC 25, one creature Grappled by the kraken (it can have up to four creatures swallowed at a time). Failure: 23 (3d8 + 10) Piercing damage. If the target is Large or smaller, it is swallowed and no longer Grappled. A swallowed creature has the Restrained condition,Total Cover against attacks and other effects outside the kraken, and takes 24 (7d6) Acid damage at the start of each of its turns. If the kraken takes 50 damage or more on a single turn from a creature inside it, the kraken must succeed on a DC 25 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, each of which falls in a space within 10 feet of the kraken with the Prone condition. If the kraken dies, any swallowed creature no longer has the Restrained condition and can escape from the corpse using 15 feet of movement, exiting Prone.",
     "save": {
      "ability": "dex",
      "dc": 25,
@@ -24005,7 +24555,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 23,
-    "experiencePoints": null,
+    "experiencePoints": 50000,
+    "skills": {
+     "history": 13,
+     "perception": 11
+    },
     "type": "monstrosity",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -24156,7 +24710,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
-    "experiencePoints": null,
+    "experiencePoints": 1100,
+    "skills": {
+     "deception": 7,
+     "insight": 4,
+     "stealth": 5
+    },
     "type": "fiend",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -24258,7 +24817,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {},
     "type": "fiend",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -24463,7 +25023,13 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 21,
-    "experiencePoints": null,
+    "experiencePoints": 33000,
+    "skills": {
+     "arcana": 19,
+     "history": 12,
+     "insight": 9,
+     "perception": 9
+    },
     "type": "undead",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -24590,7 +25156,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {
+     "perception": 3,
+     "stealth": 4
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -24684,7 +25254,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -24733,8 +25304,8 @@
    "externalId": "mage"
   },
   "name": "Mage",
-  "summary": "Small humanoid, neutral - CR 6",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 6",
+  "size": "medium",
   "abilityScores": {
    "str": 9,
    "dex": 14,
@@ -24828,7 +25399,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 6,
-    "experiencePoints": null,
+    "experiencePoints": 2300,
+    "skills": {
+     "arcana": 6,
+     "history": 6,
+     "perception": 4
+    },
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -24952,7 +25528,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {
+     "stealth": 3
+    },
     "type": "elemental",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -25057,7 +25636,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {},
     "type": "elemental",
     "alignment": "chaotic neutral",
     "armorDetail": "natural armor",
@@ -25183,7 +25763,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 6,
-    "experiencePoints": null,
+    "experiencePoints": 2300,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -25296,7 +25877,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {},
     "type": "monstrosity",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -25450,7 +26032,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 16,
-    "experiencePoints": null,
+    "experiencePoints": 15000,
+    "skills": {
+     "perception": 8
+    },
     "type": "fiend",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -25563,7 +26148,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.125,
-    "experiencePoints": null,
+    "experiencePoints": 25,
+    "skills": {
+     "perception": 5
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -25723,7 +26311,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 6,
-    "experiencePoints": null,
+    "experiencePoints": 2300,
+    "skills": {
+     "deception": 5,
+     "perception": 4,
+     "stealth": 6
+    },
     "type": "monstrosity",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -25815,7 +26408,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.125,
-    "experiencePoints": null,
+    "experiencePoints": 25,
+    "skills": {},
     "type": "elemental",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -25950,7 +26544,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {},
     "type": "monstrosity",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -26089,7 +26684,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {
+     "stealth": 5
+    },
     "type": "monstrosity",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -26205,7 +26803,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {
+     "perception": 7,
+     "survival": 7
+    },
     "type": "monstrosity",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -26318,7 +26920,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {},
     "type": "undead",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -26408,7 +27011,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.125,
-    "experiencePoints": null,
+    "experiencePoints": 25,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -26455,8 +27059,8 @@
    "externalId": "mummy"
   },
   "name": "Mummy",
-  "summary": "Small undead, lawful evil - CR 3",
-  "size": "small",
+  "summary": "Medium undead, lawful evil - CR 3",
+  "size": "medium",
   "abilityScores": {
    "str": 16,
    "dex": 8,
@@ -26540,7 +27144,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {},
     "type": "undead",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -26584,8 +27189,8 @@
    "externalId": "mummy-lord"
   },
   "name": "Mummy Lord",
-  "summary": "Small undead, lawful evil - CR 15",
-  "size": "small",
+  "summary": "Medium undead, lawful evil - CR 15",
+  "size": "medium",
   "abilityScores": {
    "str": 18,
    "dex": 10,
@@ -26738,7 +27343,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 15,
-    "experiencePoints": null,
+    "experiencePoints": 13000,
+    "skills": {
+     "history": 5,
+     "perception": 9,
+     "religion": 5
+    },
     "type": "undead",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -26910,7 +27520,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 13,
-    "experiencePoints": null,
+    "experiencePoints": 10000,
+    "skills": {},
     "type": "fiend",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -27051,7 +27662,13 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {
+     "deception": 6,
+     "insight": 5,
+     "perception": 5,
+     "stealth": 5
+    },
     "type": "fiend",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -27160,7 +27777,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {},
     "type": "fiend",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -27211,8 +27829,8 @@
    "externalId": "noble"
   },
   "name": "Noble",
-  "summary": "Small humanoid, neutral - CR 0.125",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 0.125",
+  "size": "medium",
   "abilityScores": {
    "str": 11,
    "dex": 12,
@@ -27270,7 +27888,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.125,
-    "experiencePoints": null,
+    "experiencePoints": 25,
+    "skills": {
+     "deception": 5,
+     "insight": 4,
+     "persuasion": 5
+    },
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -27380,7 +28003,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {},
     "type": "ooze",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -27491,6 +28115,10 @@
    "open5e.srd-2024": {
     "challengeRating": 0,
     "experiencePoints": 10,
+    "skills": {
+     "perception": 2,
+     "stealth": 6
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": null,
@@ -27607,7 +28235,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {},
     "type": "giant",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -27704,7 +28333,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {},
     "type": "undead",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -27847,7 +28477,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 7,
-    "experiencePoints": null,
+    "experiencePoints": 2900,
+    "skills": {
+     "arcana": 5,
+     "deception": 8,
+     "perception": 4
+    },
     "type": "fiend",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -28003,7 +28638,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {},
     "type": "aberration",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -28088,7 +28724,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {
+     "perception": 5,
+     "stealth": 5
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -28196,7 +28836,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {
+     "perception": 5
+    },
     "type": "monstrosity",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -28293,7 +28936,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {
+     "perception": 4,
+     "stealth": 6
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -28383,7 +29030,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {
+     "perception": 6
+    },
     "type": "celestial",
     "alignment": "chaotic good",
     "armorDetail": "natural armor",
@@ -28491,7 +29141,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {
+     "stealth": 7
+    },
     "type": "monstrosity",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -28589,7 +29242,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -28638,8 +29292,8 @@
    "externalId": "pirate"
   },
   "name": "Pirate",
-  "summary": "Small humanoid, neutral - CR 1",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 1",
+  "size": "medium",
   "abilityScores": {
    "str": 10,
    "dex": 16,
@@ -28714,7 +29368,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {},
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -28756,8 +29411,8 @@
    "externalId": "pirate-captain"
   },
   "name": "Pirate Captain",
-  "summary": "Small humanoid, neutral - CR 6",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 6",
+  "size": "medium",
   "abilityScores": {
    "str": 10,
    "dex": 18,
@@ -28855,7 +29510,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 6,
-    "experiencePoints": null,
+    "experiencePoints": 2300,
+    "skills": {
+     "acrobatics": 7,
+     "perception": 5
+    },
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -29016,7 +29675,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 20,
-    "experiencePoints": null,
+    "experiencePoints": 25000,
+    "skills": {
+     "perception": 10,
+     "persuasion": 19
+    },
     "type": "fiend",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -29140,7 +29803,7 @@
     "id": "holy-burst",
     "name": "Holy Burst",
     "activation": "action",
-    "description": "Dexterity Saving Throw: DC 20, each enemy in a 20-foot-radius Sphere [Area of Effect]|XPHB|Sphere centered on a point the planetar can see within 120 feet. Failure: 24 (7d6) Radiant damage. Success: Half damage.",
+    "description": "Dexterity Saving Throw: DC 20, each enemy in a 20-foot-radius Sphere Sphere centered on a point the planetar can see within 120 feet. Failure: 24 (7d6) Radiant damage. Success: Half damage.",
     "save": {
      "ability": "dex",
      "dc": 20,
@@ -29180,7 +29843,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 16,
-    "experiencePoints": null,
+    "experiencePoints": 15000,
+    "skills": {
+     "perception": 11
+    },
     "type": "celestial",
     "alignment": "lawful good",
     "armorDetail": "natural armor",
@@ -29283,7 +29949,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {
+     "perception": 3,
+     "stealth": 4
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -29392,7 +30062,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {
+     "perception": 5,
+     "stealth": 4
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -29482,7 +30156,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.125,
-    "experiencePoints": null,
+    "experiencePoints": 25,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -29524,8 +30199,8 @@
    "externalId": "priest"
   },
   "name": "Priest",
-  "summary": "Small humanoid, neutral - CR 2",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 2",
+  "size": "medium",
   "abilityScores": {
    "str": 16,
    "dex": 10,
@@ -29612,7 +30287,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {
+     "medicine": 7,
+     "perception": 5,
+     "religion": 5
+    },
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -29654,8 +30334,8 @@
    "externalId": "priest-acolyte"
   },
   "name": "Priest Acolyte",
-  "summary": "Small humanoid, neutral - CR 0.25",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 0.25",
+  "size": "medium",
   "abilityScores": {
    "str": 14,
    "dex": 10,
@@ -29734,7 +30414,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {
+     "medicine": 4,
+     "religion": 2
+    },
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -29855,7 +30539,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {
+     "perception": 5,
+     "stealth": 4
+    },
     "type": "dragon",
     "alignment": "neutral good",
     "armorDetail": "natural armor",
@@ -29951,7 +30639,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {
+     "perception": 1
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -30038,7 +30729,7 @@
     "id": "swallow",
     "name": "Swallow",
     "activation": "bonus-action",
-    "description": "Strength Saving Throw: DC 19, one Large or smaller creature Grappled by the worm (it can have up to three creatures swallowed at a time). Failure: The target is swallowed by the worm, and the Grappled condition ends. A swallowed creature has the Blinded and Restrained conditions, has Cover|XPHB|Total Cover against attacks and other effects outside the worm, and takes 17 (5d6) Acid damage at the start of each of the worm's turns. If the worm takes 30 damage or more on a single turn from a creature inside it, the worm must succeed on a DC 21 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, each of which falls in a space within 5 feet of the worm and has the Prone condition. If the worm dies, any swallowed creature no longer has the Restrained condition and can escape from the corpse using 20 feet of movement, exiting Prone.",
+    "description": "Strength Saving Throw: DC 19, one Large or smaller creature Grappled by the worm (it can have up to three creatures swallowed at a time). Failure: The target is swallowed by the worm, and the Grappled condition ends. A swallowed creature has the Blinded and Restrained conditions,Total Cover against attacks and other effects outside the worm, and takes 17 (5d6) Acid damage at the start of each of the worm's turns. If the worm takes 30 damage or more on a single turn from a creature inside it, the worm must succeed on a DC 21 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, each of which falls in a space within 5 feet of the worm and has the Prone condition. If the worm dies, any swallowed creature no longer has the Restrained condition and can escape from the corpse using 20 feet of movement, exiting Prone.",
     "save": {
      "ability": "str",
      "dc": 19,
@@ -30109,7 +30800,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 15,
-    "experiencePoints": null,
+    "experiencePoints": 13000,
+    "skills": {},
     "type": "monstrosity",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -30249,7 +30941,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {
+     "stealth": 5
+    },
     "type": "fiend",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -30334,7 +31029,7 @@
     "id": "cursed-touch",
     "name": "Cursed Touch",
     "activation": "action",
-    "description": "Melee Attack Roll: +10, reach 5 ft. 12 (2d6 + 5) Slashing damage plus 19 (3d12) Necrotic damage. If the target is a creature, it is cursed. While cursed, the target gains no benefit from finishing a Short Rest|XPHB|Short or Long Rest.",
+    "description": "Melee Attack Roll: +10, reach 5 ft. 12 (2d6 + 5) Slashing damage plus 19 (3d12) Necrotic damage. If the target is a creature, it is cursed. While cursed,Short or Long Rest.",
     "attack": {
      "bonus": 10,
      "reachFeet": 5
@@ -30395,7 +31090,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 13,
-    "experiencePoints": null,
+    "experiencePoints": 10000,
+    "skills": {
+     "deception": 10,
+     "insight": 8,
+     "perception": 8
+    },
     "type": "fiend",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -30489,7 +31189,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {
+     "perception": 2
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -30579,7 +31282,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {
+     "perception": 3
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -30720,7 +31426,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
-    "experiencePoints": null,
+    "experiencePoints": 1100,
+    "skills": {
+     "perception": 4,
+     "stealth": 2
+    },
     "type": "dragon",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -30811,7 +31521,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {
+     "perception": 2
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -30914,7 +31627,7 @@
     "id": "swallow",
     "name": "Swallow",
     "activation": "bonus-action",
-    "description": "Strength Saving Throw: DC 19, one Large or smaller creature Grappled by the remorhaz (it can have up to two creatures swallowed at a time). Failure: The target is swallowed by the remorhaz, and the Grappled condition ends. A swallowed creature has the Blinded and Restrained conditions, it has Cover|XPHB|Total Cover against attacks and other effects outside the remorhaz, and it takes 10 (3d6) Acid damage plus 10 (3d6) Fire damage at the start of each of the remorhaz's turns. If the remorhaz takes 30 damage or more on a single turn from a creature inside it, the remorhaz must succeed on a DC 15 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, each of which falls in a space within 5 feet of the remorhaz and has the Prone condition. If the remorhaz dies, any swallowed creature no longer has the Restrained condition and can escape from the corpse by using 15 feet of movement, exiting Prone.",
+    "description": "Strength Saving Throw: DC 19, one Large or smaller creature Grappled by the remorhaz (it can have up to two creatures swallowed at a time). Failure: The target is swallowed by the remorhaz, and the Grappled condition ends. A swallowed creature has the Blinded and Restrained conditions,Total Cover against attacks and other effects outside the remorhaz, and it takes 10 (3d6) Acid damage plus 10 (3d6) Fire damage at the start of each of the remorhaz's turns. If the remorhaz takes 30 damage or more on a single turn from a creature inside it, the remorhaz must succeed on a DC 15 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, each of which falls in a space within 5 feet of the remorhaz and has the Prone condition. If the remorhaz dies, any swallowed creature no longer has the Restrained condition and can escape from the corpse by using 15 feet of movement, exiting Prone.",
     "save": {
      "ability": "str",
      "dc": 19,
@@ -30950,7 +31663,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 11,
-    "experiencePoints": null,
+    "experiencePoints": 7200,
+    "skills": {},
     "type": "monstrosity",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -31046,7 +31760,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -31134,7 +31849,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -31274,7 +31990,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 11,
-    "experiencePoints": null,
+    "experiencePoints": 7200,
+    "skills": {
+     "perception": 8
+    },
     "type": "monstrosity",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -31403,7 +32122,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {
+     "perception": 6,
+     "stealth": 5
+    },
     "type": "aberration",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -31519,7 +32242,7 @@
     "id": "destroy-metal",
     "name": "Destroy Metal",
     "activation": "action",
-    "description": "The rust monster touches a nonmagical metal object within 5 feet of itself that isn't being worn or carried. The touch destroys a 1-foot Cube [Area of Effect]|XPHB|Cube of the object.",
+    "description": "The rust monster touches a nonmagical metal object within 5 feet of itself that isn't being worn or carried. The touch destroys a 1-foot Cube Cube of the object.",
     "damage": [],
     "area": {
      "shape": "cube",
@@ -31538,7 +32261,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {},
     "type": "monstrosity",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -31653,7 +32377,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {
+     "perception": 5,
+     "stealth": 7
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -31772,7 +32500,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {
+     "perception": 5
+    },
     "type": "fiend",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -31917,7 +32648,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {},
     "type": "elemental",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -32030,7 +32762,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {
+     "perception": 2,
+     "performance": 6,
+     "stealth": 5
+    },
     "type": "fey",
     "alignment": "chaotic neutral",
     "armorDetail": "natural armor",
@@ -32118,7 +32855,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -32162,8 +32900,8 @@
    "externalId": "scout"
   },
   "name": "Scout",
-  "summary": "Small humanoid, neutral - CR 0.5",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 0.5",
+  "size": "medium",
   "abilityScores": {
    "str": 11,
    "dex": 14,
@@ -32233,7 +32971,13 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {
+     "nature": 4,
+     "perception": 5,
+     "stealth": 6,
+     "survival": 5
+    },
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -32351,7 +33095,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {},
     "type": "fey",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -32441,7 +33186,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {
+     "perception": 2,
+     "stealth": 5
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -32563,7 +33312,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {
+     "stealth": 6
+    },
     "type": "undead",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -32706,7 +33458,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {
+     "stealth": 3
+    },
     "type": "plant",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -32832,7 +33587,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 7,
-    "experiencePoints": null,
+    "experiencePoints": 2900,
+    "skills": {},
     "type": "construct",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -32927,7 +33683,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {},
     "type": "plant",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -33081,7 +33838,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {
+     "perception": 4,
+     "stealth": 2
+    },
     "type": "dragon",
     "alignment": "lawful good",
     "armorDetail": "natural armor",
@@ -33196,7 +33957,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {},
     "type": "undead",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -33398,7 +34160,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 21,
-    "experiencePoints": null,
+    "experiencePoints": 33000,
+    "skills": {
+     "perception": 14
+    },
     "type": "celestial",
     "alignment": "lawful good",
     "armorDetail": "natural armor",
@@ -33527,7 +34292,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {},
     "type": "undead",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -33717,7 +34483,13 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 11,
-    "experiencePoints": null,
+    "experiencePoints": 7200,
+    "skills": {
+     "arcana": 12,
+     "history": 12,
+     "perception": 8,
+     "religion": 12
+    },
     "type": "celestial",
     "alignment": "lawful neutral",
     "armorDetail": "natural armor",
@@ -33906,7 +34678,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 17,
-    "experiencePoints": null,
+    "experiencePoints": 18000,
+    "skills": {
+     "arcana": 9,
+     "perception": 12,
+     "religion": 15
+    },
     "type": "celestial",
     "alignment": "lawful neutral",
     "armorDetail": "natural armor",
@@ -34021,7 +34798,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {
+     "arcana": 4,
+     "religion": 4,
+     "stealth": 5
+    },
     "type": "celestial",
     "alignment": "lawful good",
     "armorDetail": "natural armor",
@@ -34111,7 +34893,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {
+     "stealth": 4
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -34248,7 +35033,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
-    "experiencePoints": null,
+    "experiencePoints": 3900,
+    "skills": {},
     "type": "fiend",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -34375,7 +35161,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {
+     "perception": 3,
+     "stealth": 8
+    },
     "type": "fey",
     "alignment": "neutral good",
     "armorDetail": "natural armor",
@@ -34417,8 +35207,8 @@
    "externalId": "spy"
   },
   "name": "Spy",
-  "summary": "Small humanoid, neutral - CR 1",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 1",
+  "size": "medium",
   "abilityScores": {
    "str": 10,
    "dex": 15,
@@ -34487,7 +35277,15 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {
+     "deception": 5,
+     "insight": 4,
+     "investigation": 5,
+     "perception": 6,
+     "sleight-of-hand": 4,
+     "stealth": 6
+    },
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -34611,7 +35409,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {
+     "stealth": 2
+    },
     "type": "elemental",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -34710,7 +35511,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.125,
-    "experiencePoints": null,
+    "experiencePoints": 25,
+    "skills": {},
     "type": "monstrosity",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -34847,7 +35649,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 7,
-    "experiencePoints": null,
+    "experiencePoints": 2900,
+    "skills": {
+     "athletics": 12,
+     "perception": 4,
+     "stealth": 5
+    },
     "type": "giant",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -34985,7 +35792,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 10,
-    "experiencePoints": null,
+    "experiencePoints": 5900,
+    "skills": {},
     "type": "construct",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -35101,7 +35909,7 @@
     "id": "lightning-storm",
     "name": "Lightning Storm (Recharge 5-6)",
     "activation": "action",
-    "description": "Dexterity Saving Throw: DC 18, each creature in a 10-foot-radius, 40-foot-high Cylinder [Area of Effect]|XPHB|Cylinder originating from a point the giant can see within 500 feet. Failure: 55 (10d10) Lightning damage. Success: Half damage.",
+    "description": "Dexterity Saving Throw: DC 18, each creature in a 10-foot-radius, 40-foot-high Cylinder Cylinder originating from a point the giant can see within 500 feet. Failure: 55 (10d10) Lightning damage. Success: Half damage.",
     "save": {
      "ability": "dex",
      "dc": 18,
@@ -35145,7 +35953,13 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 13,
-    "experiencePoints": null,
+    "experiencePoints": 10000,
+    "skills": {
+     "arcana": 8,
+     "athletics": 14,
+     "history": 8,
+     "perception": 10
+    },
     "type": "giant",
     "alignment": "chaotic good",
     "armorDetail": "natural armor",
@@ -35287,7 +36101,14 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
-    "experiencePoints": null,
+    "experiencePoints": 1100,
+    "skills": {
+     "deception": 9,
+     "insight": 5,
+     "perception": 5,
+     "persuasion": 9,
+     "stealth": 7
+    },
     "type": "fiend",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -35382,7 +36203,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -35504,7 +36326,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {},
     "type": "undead",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -35599,7 +36422,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -35698,7 +36522,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -35797,7 +36622,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -35912,7 +36738,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {
+     "perception": 5
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -36005,7 +36834,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -36095,7 +36925,7 @@
     "id": "swallow",
     "name": "Swallow",
     "activation": "bonus-action",
-    "description": "Strength Saving Throw: DC 27, one Large or smaller creature Grappled by the tarrasque (it can have up to six creatures swallowed at a time). Failure: The target is swallowed, and the Grappled condition ends. A swallowed creature has the Blinded and Restrained conditions and can't teleport, it has Cover|XPHB|Total Cover against attacks and other effects outside the tarrasque, and it takes 56 (16d6) Acid damage at the start of each of the tarrasque's turns. If the tarrasque takes 60 damage or more on a single turn from a creature inside it, the tarrasque must succeed on a DC 20 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, each of which falls in a space within 10 feet of the tarrasque and has the Prone condition. If the tarrasque dies, any swallowed creature no longer has the Restrained condition and can escape from the corpse using 20 feet of movement, exiting Prone.",
+    "description": "Strength Saving Throw: DC 27, one Large or smaller creature Grappled by the tarrasque (it can have up to six creatures swallowed at a time). Failure: The target is swallowed, and the Grappled condition ends. A swallowed creature has the Blinded and Restrained conditions and can't teleport,Total Cover against attacks and other effects outside the tarrasque, and it takes 56 (16d6) Acid damage at the start of each of the tarrasque's turns. If the tarrasque takes 60 damage or more on a single turn from a creature inside it, the tarrasque must succeed on a DC 20 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, each of which falls in a space within 10 feet of the tarrasque and has the Prone condition. If the tarrasque dies, any swallowed creature no longer has the Restrained condition and can escape from the corpse using 20 feet of movement, exiting Prone.",
     "save": {
      "ability": "str",
      "dc": 27,
@@ -36252,7 +37082,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 30,
-    "experiencePoints": null,
+    "experiencePoints": 155000,
+    "skills": {
+     "perception": 9
+    },
     "type": "monstrosity",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -36376,7 +37209,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
-    "experiencePoints": null,
+    "experiencePoints": 200,
+    "skills": {
+     "perception": 3,
+     "stealth": 7
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -36420,8 +37257,8 @@
    "externalId": "tough"
   },
   "name": "Tough",
-  "summary": "Small humanoid, neutral - CR 0.5",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 0.5",
+  "size": "medium",
   "abilityScores": {
    "str": 15,
    "dex": 12,
@@ -36483,7 +37320,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {},
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -36530,8 +37368,8 @@
    "externalId": "tough-boss"
   },
   "name": "Tough Boss",
-  "summary": "Small humanoid, neutral - CR 4",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 4",
+  "size": "medium",
   "abilityScores": {
    "str": 17,
    "dex": 14,
@@ -36601,7 +37439,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
-    "experiencePoints": null,
+    "experiencePoints": 1100,
+    "skills": {},
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -36734,7 +37573,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 9,
-    "experiencePoints": null,
+    "experiencePoints": 5000,
+    "skills": {},
     "type": "plant",
     "alignment": "chaotic good",
     "armorDetail": "natural armor",
@@ -36840,7 +37680,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -36948,7 +37789,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {
+     "perception": 5
+    },
     "type": "giant",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -37047,7 +37891,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {},
     "type": "giant",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -37203,7 +38048,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
-    "experiencePoints": null,
+    "experiencePoints": 3900,
+    "skills": {
+     "perception": 4
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -37374,7 +38222,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {},
     "type": "celestial",
     "alignment": "lawful good",
     "armorDetail": "natural armor",
@@ -37427,8 +38276,8 @@
    "externalId": "vampire"
   },
   "name": "Vampire",
-  "summary": "Small undead, lawful evil - CR 13",
-  "size": "small",
+  "summary": "Medium undead, lawful evil - CR 13",
+  "size": "medium",
   "abilityScores": {
    "str": 18,
    "dex": 18,
@@ -37565,7 +38414,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 13,
-    "experiencePoints": null,
+    "experiencePoints": 10000,
+    "skills": {
+     "perception": 7,
+     "stealth": 9
+    },
     "type": "undead",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -37626,8 +38479,8 @@
    "externalId": "vampire-familiar"
   },
   "name": "Vampire Familiar",
-  "summary": "Small humanoid, neutral evil - CR 3",
-  "size": "small",
+  "summary": "Medium humanoid, neutral evil - CR 3",
+  "size": "medium",
   "abilityScores": {
    "str": 17,
    "dex": 16,
@@ -37697,7 +38550,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {
+     "perception": 4,
+     "persuasion": 4,
+     "stealth": 7
+    },
     "type": "humanoid",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -37746,8 +38604,8 @@
    "externalId": "vampire-spawn"
   },
   "name": "Vampire Spawn",
-  "summary": "Small undead, neutral evil - CR 5",
-  "size": "small",
+  "summary": "Medium undead, neutral evil - CR 5",
+  "size": "medium",
   "abilityScores": {
    "str": 16,
    "dex": 16,
@@ -37848,7 +38706,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {
+     "perception": 3,
+     "stealth": 6
+    },
     "type": "undead",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -37947,7 +38809,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.125,
-    "experiencePoints": null,
+    "experiencePoints": 25,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -38050,7 +38913,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {},
     "type": "plant",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -38223,7 +39087,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 6,
-    "experiencePoints": null,
+    "experiencePoints": 2300,
+    "skills": {},
     "type": "fiend",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -38322,7 +39187,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {
+     "perception": 3
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -38415,7 +39283,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {},
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -38510,7 +39379,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {},
     "type": "undead",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -38554,8 +39424,8 @@
    "externalId": "warrior-infantry"
   },
   "name": "Warrior Infantry",
-  "summary": "Small humanoid, neutral - CR 0.125",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 0.125",
+  "size": "medium",
   "abilityScores": {
    "str": 13,
    "dex": 11,
@@ -38602,7 +39472,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.125,
-    "experiencePoints": null,
+    "experiencePoints": 25,
+    "skills": {},
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -38649,8 +39520,8 @@
    "externalId": "warrior-veteran"
   },
   "name": "Warrior Veteran",
-  "summary": "Small humanoid, neutral - CR 3",
-  "size": "small",
+  "summary": "Medium humanoid, neutral - CR 3",
+  "size": "medium",
   "abilityScores": {
    "str": 16,
    "dex": 13,
@@ -38733,7 +39604,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {
+     "athletics": 5,
+     "perception": 2
+    },
     "type": "humanoid",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -38890,7 +39765,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {},
     "type": "elemental",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -38984,7 +39860,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
-    "experiencePoints": null,
+    "experiencePoints": 10,
+    "skills": {
+     "acrobatics": 5,
+     "perception": 3,
+     "stealth": 5
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -39028,8 +39909,8 @@
    "externalId": "werebear"
   },
   "name": "Werebear",
-  "summary": "Small monstrosity, neutral good - CR 5",
-  "size": "small",
+  "summary": "Medium monstrosity, neutral good - CR 5",
+  "size": "medium",
   "abilityScores": {
    "str": 19,
    "dex": 10,
@@ -39129,7 +40010,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {
+     "perception": 7
+    },
     "type": "monstrosity",
     "alignment": "neutral good",
     "armorDetail": "natural armor",
@@ -39173,8 +40057,8 @@
    "externalId": "wereboar"
   },
   "name": "Wereboar",
-  "summary": "Small monstrosity, neutral evil - CR 4",
-  "size": "small",
+  "summary": "Medium monstrosity, neutral evil - CR 4",
+  "size": "medium",
   "abilityScores": {
    "str": 17,
    "dex": 10,
@@ -39274,7 +40158,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
-    "experiencePoints": null,
+    "experiencePoints": 1100,
+    "skills": {
+     "perception": 2
+    },
     "type": "monstrosity",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -39316,8 +40203,8 @@
    "externalId": "wererat"
   },
   "name": "Wererat",
-  "summary": "Small monstrosity, lawful evil - CR 2",
-  "size": "small",
+  "summary": "Medium monstrosity, lawful evil - CR 2",
+  "size": "medium",
   "abilityScores": {
    "str": 10,
    "dex": 16,
@@ -39416,7 +40303,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {
+     "perception": 4,
+     "stealth": 5
+    },
     "type": "monstrosity",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -39460,8 +40351,8 @@
    "externalId": "weretiger"
   },
   "name": "Weretiger",
-  "summary": "Small monstrosity, neutral - CR 4",
-  "size": "small",
+  "summary": "Medium monstrosity, neutral - CR 4",
+  "size": "medium",
   "abilityScores": {
    "str": 17,
    "dex": 15,
@@ -39567,7 +40458,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
-    "experiencePoints": null,
+    "experiencePoints": 1100,
+    "skills": {
+     "perception": 5,
+     "stealth": 4
+    },
     "type": "monstrosity",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -39611,8 +40506,8 @@
    "externalId": "werewolf"
   },
   "name": "Werewolf",
-  "summary": "Small monstrosity, chaotic evil - CR 3",
-  "size": "small",
+  "summary": "Medium monstrosity, chaotic evil - CR 3",
+  "size": "medium",
   "abilityScores": {
    "str": 16,
    "dex": 14,
@@ -39711,7 +40606,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {
+     "perception": 4,
+     "stealth": 4
+    },
     "type": "monstrosity",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -39854,7 +40753,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {
+     "perception": 4,
+     "stealth": 2
+    },
     "type": "dragon",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -40003,7 +40906,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {
+     "perception": 3,
+     "stealth": 4
+    },
     "type": "undead",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -40138,7 +41045,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
-    "experiencePoints": null,
+    "experiencePoints": 450,
+    "skills": {},
     "type": "undead",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -40282,7 +41190,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
-    "experiencePoints": null,
+    "experiencePoints": 700,
+    "skills": {
+     "perception": 5,
+     "stealth": 5
+    },
     "type": "monstrosity",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -40385,7 +41297,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {
+     "perception": 5,
+     "stealth": 4
+    },
     "type": "beast",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -40480,7 +41396,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
-    "experiencePoints": null,
+    "experiencePoints": 100,
+    "skills": {
+     "perception": 4
+    },
     "type": "fey",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -40524,8 +41443,8 @@
    "externalId": "wraith"
   },
   "name": "Wraith",
-  "summary": "Small undead, neutral evil - CR 5",
-  "size": "small",
+  "summary": "Medium undead, neutral evil - CR 5",
+  "size": "medium",
   "abilityScores": {
    "str": 6,
    "dex": 16,
@@ -40597,7 +41516,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {},
     "type": "undead",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
@@ -40729,7 +41649,10 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 6,
-    "experiencePoints": null,
+    "experiencePoints": 2300,
+    "skills": {
+     "perception": 4
+    },
     "type": "dragon",
     "alignment": "unaligned",
     "armorDetail": "natural armor",
@@ -40858,7 +41781,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
-    "experiencePoints": null,
+    "experiencePoints": 1800,
+    "skills": {
+     "perception": 6,
+     "stealth": 6
+    },
     "type": "elemental",
     "alignment": "neutral",
     "armorDetail": "natural armor",
@@ -41006,7 +41933,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 7,
-    "experiencePoints": null,
+    "experiencePoints": 2900,
+    "skills": {
+     "perception": 6,
+     "stealth": 5
+    },
     "type": "dragon",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -41150,7 +42081,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 9,
-    "experiencePoints": null,
+    "experiencePoints": 5000,
+    "skills": {
+     "perception": 9,
+     "stealth": 4
+    },
     "type": "dragon",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -41305,7 +42240,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 6,
-    "experiencePoints": null,
+    "experiencePoints": 2300,
+    "skills": {
+     "perception": 6,
+     "persuasion": 5,
+     "stealth": 3
+    },
     "type": "dragon",
     "alignment": "chaotic good",
     "armorDetail": "natural armor",
@@ -41460,7 +42400,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
-    "experiencePoints": null,
+    "experiencePoints": 3900,
+    "skills": {
+     "insight": 4,
+     "perception": 7,
+     "stealth": 3
+    },
     "type": "dragon",
     "alignment": "lawful good",
     "armorDetail": "natural armor",
@@ -41618,7 +42563,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 7,
-    "experiencePoints": null,
+    "experiencePoints": 2900,
+    "skills": {
+     "deception": 5,
+     "perception": 7,
+     "stealth": 4
+    },
     "type": "dragon",
     "alignment": "chaotic good",
     "armorDetail": "natural armor",
@@ -41771,7 +42721,13 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 10,
-    "experiencePoints": null,
+    "experiencePoints": 5900,
+    "skills": {
+     "insight": 5,
+     "perception": 9,
+     "persuasion": 9,
+     "stealth": 6
+    },
     "type": "dragon",
     "alignment": "lawful good",
     "armorDetail": "natural armor",
@@ -41918,7 +42874,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
-    "experiencePoints": null,
+    "experiencePoints": 3900,
+    "skills": {
+     "deception": 5,
+     "perception": 7,
+     "stealth": 4
+    },
     "type": "dragon",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
@@ -42062,7 +43023,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 10,
-    "experiencePoints": null,
+    "experiencePoints": 5900,
+    "skills": {
+     "perception": 8,
+     "stealth": 4
+    },
     "type": "dragon",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -42217,7 +43182,12 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 9,
-    "experiencePoints": null,
+    "experiencePoints": 5000,
+    "skills": {
+     "history": 6,
+     "perception": 8,
+     "stealth": 4
+    },
     "type": "dragon",
     "alignment": "lawful good",
     "armorDetail": "natural armor",
@@ -42356,7 +43326,11 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 6,
-    "experiencePoints": null,
+    "experiencePoints": 2300,
+    "skills": {
+     "perception": 6,
+     "stealth": 3
+    },
     "type": "dragon",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
@@ -42459,7 +43433,8 @@
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
-    "experiencePoints": null,
+    "experiencePoints": 50,
+    "skills": {},
     "type": "undead",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",

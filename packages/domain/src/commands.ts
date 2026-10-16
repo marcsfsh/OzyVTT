@@ -147,6 +147,8 @@ export const ActorAddFromDefinitionSchema = z
       .max(200),
     visibility: z.enum(["public", "gm-only"]).default("public"),
     joinEncounter: z.boolean().optional(),
+    /** The stat block's average hit points (the default), or its Hit Dice rolled on the server. */
+    hitPoints: z.enum(["average", "roll"]).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -270,7 +272,10 @@ export const SetHpSchema = z
   .object({
     commandId: z.uuid(),
     actorId: z.uuid(),
-    current: z.number().int().min(0).max(10000),
+    /** Omitted with `maximum`: current hit points stay, up to the new maximum. */
+    current: z.number().int().min(0).max(10000).optional(),
+    /** A new hit point maximum, set before `current` (a tougher ogre, a Life Drain). */
+    maximum: z.number().int().min(1).max(10000).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

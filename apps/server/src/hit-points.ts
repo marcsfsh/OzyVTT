@@ -457,3 +457,12 @@ export function setCurrentHp(state: GameState, actorId: string, current: number,
   }
   return events;
 }
+
+/** The GM sets a creature's hit point maximum. Current HP never exceeds it. A character's sheet sets the
+ *  maximum again when it is rebuilt. */
+export function setMaximumHp(state: GameState, actorId: string, maximum: number, scope: Initiator) {
+  requireGm(scope, "Only the GM can set hit points directly.");
+  const actor = adjustableActor(state, actorId, scope);
+  actor.hp.maximum = maximum;
+  actor.hp.current = Math.min(actor.hp.current, maximum);
+}

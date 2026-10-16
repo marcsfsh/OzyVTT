@@ -1,4 +1,5 @@
 import type { ActorDefinition } from "@vtt/schemas";
+import { experienceForChallenge } from "@vtt/rules-5e";
 
 /** The extension key challenge rating and creature type actually live under. */
 export const STATBLOCK_EXTENSION = "open5e.srd-2024";
@@ -6,15 +7,25 @@ export const STATBLOCK_EXTENSION = "open5e.srd-2024";
 export function statblockFacts(definition: ActorDefinition): {
   challengeRating: number | null;
   creatureType: string | null;
+  experiencePoints: number | null;
 } {
   const extension = (definition.extensions ?? {})[STATBLOCK_EXTENSION];
   const bag = (extension && typeof extension === "object" ? extension : {}) as {
     challengeRating?: unknown;
     type?: unknown;
+    experiencePoints?: unknown;
   };
   // Narrowed, not cast: the bag is untyped. Null means "nothing to show", which the publish gate refuses.
+  const challengeRating = typeof bag.challengeRating === "number" ? bag.challengeRating : null;
   return {
-    challengeRating: typeof bag.challengeRating === "number" ? bag.challengeRating : null,
-    creatureType: typeof bag.type === "string" && bag.type.length > 0 ? bag.type : null
+    challengeRating,
+    creatureType: typeof bag.type === "string" && bag.type.length > 0 ? bag.type : null,
+    // A homebrew creature may give only its CR; the SRD's table fills in the XP.
+    experiencePoints:
+      typeof bag.experiencePoints === "number"
+        ? bag.experiencePoints
+        : challengeRating === null
+          ? null
+          : experienceForChallenge(challengeRating)
   };
 }

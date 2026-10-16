@@ -481,19 +481,23 @@ function rollRecharges(state: GameState, actorId: string, deps: TurnAdvanceDeps,
     if (rolledPools.has(key) || (actor.actionUses[key] ?? 0) === 0) continue;
     rolledPools.add(key);
     const die = deps.rollDie(6);
+    // Whether a monster's breath is back is the GM's to know; the table sees it when it is used.
+    const audience = actor.kind === "player-character" ? {} : { gmOnly: true as const };
     if (die >= action.uses.recharge) {
       const { [key]: _spent, ...rest } = actor.actionUses;
       actor.actionUses = rest;
       events?.push({
         kind: "effect",
         text: `${actor.name}'s ${action.name} recharges (rolled ${die}).`,
-        actorId: actor.id
+        actorId: actor.id,
+        ...audience
       });
     } else {
       events?.push({
         kind: "effect",
         text: `${actor.name}'s ${action.name} stays spent (rolled ${die}, needs ${action.uses.recharge}+).`,
-        actorId: actor.id
+        actorId: actor.id,
+        ...audience
       });
     }
   }

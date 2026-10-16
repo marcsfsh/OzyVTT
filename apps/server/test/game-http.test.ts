@@ -1202,6 +1202,18 @@ describe("public game API over /api/v1", () => {
       await (await post(base, GAME_PATHS.actors, gmToken, { commandId, definitionId: "giant-crocodile" })).json()
     );
     const crocId = added.data.actorId as string;
+    // Average hit points by default; rolled on request, from the stat block's Hit Dice.
+    expect(server.store.snapshot.actors.find((actor) => actor.id === crocId)?.hp.maximum).toBe(85);
+    const rolledId = randomUUID();
+    await post(base, GAME_PATHS.actors, gmToken, {
+      commandId: rolledId,
+      definitionId: "giant-crocodile",
+      hitPoints: "roll"
+    });
+    const rolled = server.store.snapshot.actors.find((actor) => actor.id === rolledId)!.hp;
+    expect(rolled.current).toBe(rolled.maximum);
+    expect(rolled.maximum).toBeGreaterThanOrEqual(9 + 27); // 9d12 + 27
+    expect(rolled.maximum).toBeLessThanOrEqual(108 + 27);
 
     const path = GAME_PATHS.actorAvailableActions.replace("{actorId}", crocId);
     expect((await fetch(base + path)).status).toBe(401);
