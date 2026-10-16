@@ -38,7 +38,7 @@ export function RowTools({
       <div className="row-tools-popover" role="dialog" aria-label={`Tools for ${actor.name}`}>
         <HpAdjust
           actor={actor}
-          controls={["damage", "nonlethal", "heal", "temp", "set"]}
+          controls={["damage", "nonlethal", "heal", "temp", "set", "max"]}
           revision={state.revision}
           damageType={hpDamageType}
           onDamageTypeChange={onHpDamageTypeChange}

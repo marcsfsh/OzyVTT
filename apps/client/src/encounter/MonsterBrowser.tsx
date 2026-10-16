@@ -1,9 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ContentMonsterSummary } from "@vtt/domain";
-import { Modal, Input } from "@vtt/ui";
-import { command, read } from "../lib/command";
+import { Modal, Input, Select, Switch } from "@vtt/ui";
+import { command } from "../lib/command";
 import { formatChallenge, titleCase } from "./format";
+import { loadMonsterCatalog } from "./monster-catalog";
 import "./monster-browser.css";
+
+/** Challenge-rating bands for the filter: wide enough to browse by, matching the SRD's tiers of play. */
+const CR_BANDS = [
+  { id: "any", label: "Any CR", min: 0, max: 30 },
+  { id: "0-1", label: "CR 0 to 1", min: 0, max: 1 },
+  { id: "2-4", label: "CR 2 to 4", min: 2, max: 4 },
+  { id: "5-10", label: "CR 5 to 10", min: 5, max: 10 },
+  { id: "11-16", label: "CR 11 to 16", min: 11, max: 16 },
+  { id: "17-30", label: "CR 17 and up", min: 17, max: 30 }
+] as const;
+const SIZES = ["tiny", "small", "medium", "large", "huge", "gargantuan"] as const;
+type Sort = "name" | "cr-up" | "cr-down";
 
 /**
  * The bestiary browser. It adds monsters; visibility comes from the staging tray (`visibility`),
@@ -27,6 +40,11 @@ export function MonsterBrowser({
   const [attribution, setAttribution] = useState("");
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [band, setBand] = useState<(typeof CR_BANDS)[number]["id"]>("any");
+  const [type, setType] = useState("any");
+  const [size, setSize] = useState("any");
+  const [sort, setSort] = useState<Sort>("name");
+  const [rollHitPoints, setRollHitPoints] = useState(false);
   const [feedback, setFeedback] = useState("");
   /**
    * In-flight rows, as a set so several adds can run at once. Safe: each `actor:add-from-definition`
@@ -41,30 +59,41 @@ export function MonsterBrowser({
   const [addedIds, setAddedIds] = useState<ReadonlySet<string>>(() => new Set());
 
   useEffect(() => {
-    void read("content:monsters", {}).then((result) => {
-      if (!result.ok || !result.monsters) {
-        setError(result.message ?? "The bundled bestiary could not be loaded.");
-        return;
-      }
-      setMonsters(result.monsters);
-      setAttribution(result.attribution ?? "");
-    });
+    void loadMonsterCatalog().then(
+      (catalog) => {
+        setMonsters(catalog.monsters);
+        setAttribution(catalog.attribution);
+      },
+      (failure: Error) => setError(failure.message)
+    );
   }, []);
 
+  const types = useMemo(() => [...new Set((monsters ?? []).map((monster) => monster.type))].sort(), [monsters]);
   const shown = useMemo(() => {
     if (!monsters) return [];
     const query = search.trim().toLowerCase();
-    if (!query) return monsters;
-    return monsters.filter(
-      (monster) => monster.name.toLowerCase().includes(query) || monster.type.toLowerCase().includes(query)
+    const { min, max } = CR_BANDS.find((candidate) => candidate.id === band)!;
+    const matching = monsters.filter(
+      (monster) =>
+        (!query || monster.name.toLowerCase().includes(query) || monster.type.toLowerCase().includes(query)) &&
+        monster.challengeRating >= min &&
+        monster.challengeRating <= max &&
+        (type === "any" || monster.type === type) &&
+        (size === "any" || monster.size === size)
     );
-  }, [monsters, search]);
+    if (sort === "name") return matching;
+    const direction = sort === "cr-up" ? 1 : -1;
+    return [...matching].sort(
+      (left, right) => direction * (left.challengeRating - right.challengeRating) || left.name.localeCompare(right.name)
+    );
+  }, [monsters, search, band, type, size, sort]);
 
   const add = (monster: ContentMonsterSummary) => {
     setBusyIds((current) => new Set(current).add(monster.id));
     void command("actor:add-from-definition", {
       definitionId: monster.id,
       visibility,
+      ...(rollHitPoints ? { hitPoints: "roll" as const } : {}),
       ...(joinEncounter ? { joinEncounter: true } : {})
     }).then((result) => {
       setBusyIds((current) => {
@@ -102,6 +131,45 @@ export function MonsterBrowser({
           onChange={(event) => setSearch(event.target.value)}
           autoFocus
         />
+        <div className="monster-browser-filters">
+          <Select
+            aria-label="Challenge rating"
+            value={band}
+            onChange={(event) => setBand(event.target.value as typeof band)}
+          >
+            {CR_BANDS.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+          <Select aria-label="Monster type" value={type} onChange={(event) => setType(event.target.value)}>
+            <option value="any">Any type</option>
+            {types.map((option) => (
+              <option key={option} value={option}>
+                {titleCase(option)}
+              </option>
+            ))}
+          </Select>
+          <Select aria-label="Size" value={size} onChange={(event) => setSize(event.target.value)}>
+            <option value="any">Any size</option>
+            {SIZES.map((option) => (
+              <option key={option} value={option}>
+                {titleCase(option)}
+              </option>
+            ))}
+          </Select>
+          <Select aria-label="Sort" value={sort} onChange={(event) => setSort(event.target.value as Sort)}>
+            <option value="name">By name</option>
+            <option value="cr-up">Lowest CR first</option>
+            <option value="cr-down">Highest CR first</option>
+          </Select>
+        </div>
+        <Switch
+          label="Roll hit points instead of using the average"
+          checked={rollHitPoints}
+          onChange={setRollHitPoints}
+        />
         <p className="monster-browser-target">
           Adds land in the staging tray · <strong>{visibility === "gm-only" ? "GM only" : "Shown to players"}</strong>
         </p>
@@ -122,8 +190,9 @@ export function MonsterBrowser({
                   {addedIds.has(monster.id) && <span className="monster-browser-added">Added</span>}
                 </strong>
                 <small>
-                  CR {formatChallenge(monster.challengeRating)} · {titleCase(monster.size)} {monster.type} · AC{" "}
-                  {monster.armorClass} · HP {monster.hitPoints}
+                  CR {formatChallenge(monster.challengeRating)}
+                  {monster.experiencePoints !== null && ` (${monster.experiencePoints.toLocaleString()} XP)`} ·{" "}
+                  {titleCase(monster.size)} {monster.type} · AC {monster.armorClass} · HP {monster.hitPoints}
                 </small>
               </div>
               <button
@@ -136,7 +205,11 @@ export function MonsterBrowser({
               </button>
             </li>
           ))}
-          {shown.length === 0 && <li className="monster-browser-none">No monsters match "{search}".</li>}
+          {shown.length === 0 && (
+            <li className="monster-browser-none">
+              {search.trim() ? `No monsters match "${search}" with these filters.` : "No monsters match these filters."}
+            </li>
+          )}
         </ol>
       )}
       <p className="monster-browser-feedback" role="status">

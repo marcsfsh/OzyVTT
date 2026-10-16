@@ -244,7 +244,7 @@ export function createKit(context: CommandContext) {
           kind: event.kind,
           text: event.text,
           actorIds: [event.actorId],
-          gmOnly: actorHidden(event.actorId)
+          gmOnly: event.gmOnly === true || actorHidden(event.actorId)
         });
       }
     },

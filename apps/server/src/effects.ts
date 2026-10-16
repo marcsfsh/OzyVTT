@@ -15,6 +15,8 @@ export type EffectNarration = Readonly<{
   text: string;
   actorId: string;
   immune?: true;
+  /** For the GM alone even when the actor is visible: a monster's spent resources are GM knowledge. */
+  gmOnly?: true;
 }>;
 
 const MAX_EFFECTS = 20;

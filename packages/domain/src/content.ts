@@ -15,6 +15,8 @@ export const ContentMonsterSummarySchema = z.strictObject({
   id: z.string(),
   name: z.string(),
   challengeRating: z.number(),
+  /** XP for defeating it, for the encounter budget; null for a homebrew CR the SRD table doesn't list. */
+  experiencePoints: z.number().int().nullable(),
   type: z.string(),
   size: z.string(),
   armorClass: z.number().int(),
