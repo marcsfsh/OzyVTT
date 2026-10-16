@@ -344,7 +344,15 @@ export const ModifierSchema = z.discriminatedUnion("type", [
       ...riderGate
     })
     .strict(),
-  z.object({ type: z.literal("initiative"), amount: z.number().int().min(-5).max(10), ...riderGate }).strict(),
+  /** `proficiencyBonus` adds the bearer's Proficiency Bonus on top of `amount` (Alert's Initiative Proficiency). */
+  z
+    .object({
+      type: z.literal("initiative"),
+      amount: z.number().int().min(-5).max(10),
+      proficiencyBonus: z.boolean().optional(),
+      ...riderGate
+    })
+    .strict(),
   z.object({ type: z.literal("extra-attack"), count: z.number().int().min(1).max(3), ...riderGate }).strict(),
   /** AC = 10 + DEX + this ability while wearing no armor (Barbarian, Monk, and any homebrew that wants it). */
   z

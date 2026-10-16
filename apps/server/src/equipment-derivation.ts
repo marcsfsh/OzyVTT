@@ -438,7 +438,12 @@ export function deriveEquipment(
     damageImmunities,
     conditionImmunities,
     armorClass: sumRiders(standing, "armor-class"),
-    initiative: sumRiders(standing, "initiative"),
+    // "Add your Proficiency Bonus" is proficiency, so it counts once however many carriers grant it.
+    initiative:
+      sumRiders(standing, "initiative") +
+      (standing.some((rider) => rider.modifier.type === "initiative" && rider.modifier.proficiencyBonus)
+        ? (definition?.proficiencyBonus ?? 0)
+        : 0),
     saveBonus: sumRiders(standing, "save-bonus"),
     checkBonus: sumRiders(standing, "check-bonus"),
     spellSlots: standing.flatMap((rider) =>

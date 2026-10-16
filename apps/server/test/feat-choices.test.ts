@@ -133,6 +133,15 @@ describe("an Ability Score Improvement may take a feat of any category", () => {
   });
 });
 
+describe("Alert adds the Proficiency Bonus to Initiative", () => {
+  it("raises a Fighter 4's Initiative from DEX +1 to +3, and follows the bonus as it grows", () => {
+    expect(build(fighter(4, [asi(4, "con")])).initiativeBonus).toBe(1);
+    expect(build(fighter(4, [feat(4, "alert")])).initiativeBonus).toBe(1 + 2);
+    expect(build(fighter(6, [feat(4, "alert"), asi(6, "con")])).initiativeBonus).toBe(1 + 3);
+    expect(build(fighter(9, [feat(4, "alert"), asi(6, "con"), asi(8, "wis")])).initiativeBonus).toBe(1 + 4);
+  });
+});
+
 describe("the Epic Boon slot takes an Epic Boon or any other feat the character qualifies for", () => {
   const level19 = (boon: readonly Row[]) => fighter(19, [...otherAsis(), ...boon]);
 
