@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ActionReactionSchema, CharacterChoiceSchema, type CharacterChoice } from "@vtt/schemas";
+import { CharacterDraftSchema } from "./character-draft.js";
 import { AbilityIdSchema, RuleModeSchema, type AnnotationPoint } from "./state.js";
 import type { Wire } from "./wire.js";
 
@@ -289,6 +290,13 @@ export const ActorMovementReplySchema = z.strictObject({
 });
 export type ActorMovementReply = Wire<z.infer<typeof ActorMovementReplySchema>>;
 export type ActorMovementResult = { ok: boolean; message?: string } & Partial<ActorMovementReply>;
+
+/** What `character:draft` answers: the caller's parked build and when it was last saved, or null for none. */
+export const CharacterDraftReplySchema = z.strictObject({
+  draft: z.strictObject({ draft: CharacterDraftSchema, updatedAt: z.iso.datetime() }).nullable()
+});
+export type CharacterDraftReply = Wire<z.infer<typeof CharacterDraftReplySchema>>;
+export type CharacterDraftResult = { ok: boolean; message?: string } & Partial<CharacterDraftReply>;
 
 /** Which builder step shows an offer: the step that chose its source. */
 const BuilderOfferStepSchema = z.enum(["species", "background", "class", "features", "equipment"]);

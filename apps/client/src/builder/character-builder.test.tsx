@@ -436,7 +436,7 @@ function mount() {
   // `Save & close` toasts, so the wizard needs the provider its host page gives it.
   return render(
     <ToastProvider>
-      <CharacterBuilder state={gmView} sessionKey={`test-${Math.random()}`} onClose={() => {}} onCreated={() => {}} />
+      <CharacterBuilder state={gmView} onClose={() => {}} onCreated={() => {}} />
     </ToastProvider>
   );
 }

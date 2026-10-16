@@ -60,6 +60,7 @@ import { ViewerCoordinator } from "./viewer-coordinator.js";
 import { createViewerRouter } from "./viewer-http.js";
 import { projectViewerEncounter } from "./viewer-encounter.js";
 import { ViewerPresentationStore } from "./viewer-presentation-store.js";
+import { CharacterDraftStore } from "./character-drafts.js";
 
 export type CreateServerOptions = {
   authPath: string;
@@ -107,6 +108,7 @@ export function createServer(options: CreateServerOptions) {
   const tokenCatalog = new TokenCatalogStore(options.databasePath);
   const viewerAccess = new ViewerAccessStore(options.databasePath);
   const viewerPresentation = new ViewerPresentationStore(options.databasePath);
+  const characterDrafts = new CharacterDraftStore(options.databasePath);
   const codexStore = new CodexStore(options.databasePath);
   const codexAssets = new MapAssetStore(join(dirname(options.databasePath), "codex-assets"), {
     maxBytes: 10 * 1024 * 1024,
@@ -372,6 +374,7 @@ export function createServer(options: CreateServerOptions) {
     contentLibrary,
     mapCatalog,
     tokenCatalog,
+    characterDrafts,
     tokenGeometryFor,
     publishGameState,
     presentSceneMap,
@@ -717,6 +720,7 @@ export function createServer(options: CreateServerOptions) {
       tokenCatalog.initialize(),
       viewerAccess.initialize(),
       viewerPresentation.initialize(),
+      characterDrafts.initialize(),
       codexStore.initialize(),
       codexAssets.initialize(),
       homebrewStore.initialize()
@@ -739,6 +743,7 @@ export function createServer(options: CreateServerOptions) {
     tokenCatalog.close();
     viewerAccess.close();
     viewerPresentation.close();
+    characterDrafts.close();
     homebrewStore.close();
   }
 

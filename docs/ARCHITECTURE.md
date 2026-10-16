@@ -193,8 +193,10 @@ names no family is the GM's own ruling on the whole command.
 - Characters are built server-side (`character-build.ts`) from content and the choices made in
   the guided builder. What a build may pick is one survey (`character-offers.ts`): a create
   validates against it, the random generator answers it, and the builder is served it for each
-  draft (`builder-offers.ts`), so the client holds no copy of the build rules. A D&D Beyond PDF can
-  be imported as an actor definition.
+  draft (`builder-offers.ts`), so the client holds no copy of the build rules. An unfinished build
+  is parked on the server (`character-drafts.ts`), one per player session and one for the GM, beside
+  the game state rather than in it, and read back only by its owner. A D&D Beyond PDF can be
+  imported as an actor definition.
 
 ## Codex
 

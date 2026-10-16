@@ -1,62 +1,32 @@
+import { command, read } from "../lib/command";
 import { BUILDER_DRAFT_VERSION, type BuilderDraft } from "./build-payload";
 
 /**
- * Draft persistence for the character builder: the in-progress build parks in `localStorage`,
- * keyed per session, so a reload or "Save & close" never loses work on this device. Every caller
- * goes through `loadDraft` / `saveDraft` / `clearDraft`, so the store can move server-side later.
+ * The character builder's parked draft, kept on the server: one per player session and one for the GM, which
+ * follows the GM to any device. A reload, another tab or "Save & close" picks the build up where it was left.
  */
 
 export type StoredDraft = Readonly<{
-  id: string;
-  /** ISO timestamp of the last write, shown on the resume banner. */
+  /** ISO timestamp of the last save, shown on the resume banner. */
   updatedAt: string;
   draft: BuilderDraft;
 }>;
 
-const KEY_PREFIX = "vtt.character-draft.";
-const storageKey = (sessionKey: string) => `${KEY_PREFIX}${sessionKey}`;
-
-/** Private-mode / quota-safe: a browser that refuses storage loses resume, not the wizard. */
-function readRaw(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-function writeRaw(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    /* storage unavailable; the draft stays in memory */
-  }
+/** The caller's parked draft, or null. One from another draft format is dropped rather than half-restored, which
+ *  would produce a payload the server rejects; so is one the table could not be asked for. */
+export async function loadDraft(): Promise<StoredDraft | null> {
+  const reply = await read("character:draft", {});
+  const stored = reply.ok ? (reply.draft ?? null) : null;
+  return stored && stored.draft.version === BUILDER_DRAFT_VERSION ? stored : null;
 }
 
-export function loadDraft(sessionKey: string): StoredDraft | null {
-  const raw = readRaw(storageKey(sessionKey));
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Partial<StoredDraft>;
-    // A draft from an older shape is dropped rather than half-restored, which would produce a payload
-    // the server rejects.
-    if (!parsed?.draft || parsed.draft.version !== BUILDER_DRAFT_VERSION) return null;
-    return { id: parsed.id ?? sessionKey, updatedAt: parsed.updatedAt ?? "", draft: parsed.draft };
-  } catch {
-    return null;
-  }
+/** Parks the draft, replacing the one parked before. */
+export function saveDraft(draft: BuilderDraft): void {
+  void command("character:save-draft", { draft });
 }
 
-export function saveDraft(sessionKey: string, draft: BuilderDraft): void {
-  const record: StoredDraft = { id: sessionKey, updatedAt: new Date().toISOString(), draft };
-  writeRaw(storageKey(sessionKey), JSON.stringify(record));
-}
-
-export function clearDraft(sessionKey: string): void {
-  try {
-    localStorage.removeItem(storageKey(sessionKey));
-  } catch {
-    /* nothing to clear */
-  }
+export function discardDraft(): void {
+  void command("character:discard-draft", {});
 }
 
 /** "3 minutes ago" / "yesterday" for the resume banner. */

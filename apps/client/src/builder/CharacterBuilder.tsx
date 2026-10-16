@@ -27,7 +27,7 @@ import {
   type BuilderDraft,
   type StepId
 } from "./build-payload";
-import { clearDraft, describeWhen, draftHasProgress, loadDraft, saveDraft, type StoredDraft } from "./draft";
+import { describeWhen, discardDraft, draftHasProgress, loadDraft, saveDraft, type StoredDraft } from "./draft";
 import {
   AsiOffer,
   backgroundOptionsOf,
@@ -54,8 +54,6 @@ type BuilderState = GmView | PlayerView;
 
 export type CharacterBuilderProps = Readonly<{
   state: BuilderState;
-  /** Scopes the draft saved in localStorage. */
-  sessionKey: string;
   /** The table connection. An offline table blocks the last step with a reason instead of letting
       Create be pressed into a socket that cannot answer. */
   connection?: "online" | "reconnecting" | "offline";
@@ -88,14 +86,7 @@ function nameSuggestions(names: BuilderCatalogs["names"], speciesId: string | nu
   return [...batch];
 }
 
-export function CharacterBuilder({
-  state,
-  sessionKey,
-  connection = "online",
-  onClose,
-  onCreated,
-  rebuild
-}: CharacterBuilderProps) {
+export function CharacterBuilder({ state, connection = "online", onClose, onCreated, rebuild }: CharacterBuilderProps) {
   const catalogs = useBuilderCatalogs();
   const { toast } = useToast();
   const policy = state.builderPolicy;
@@ -110,12 +101,22 @@ export function CharacterBuilder({
   const [submitting, setSubmitting] = useState(false);
   /** The single submit-error surface, for both rejections and a silent server. */
   const [rejection, setRejection] = useState<{ title: string; text: string } | null>(null);
-  const [resumable, setResumable] = useState<StoredDraft | null>(() => {
-    // A rebuild starts from an existing character, so a parked create draft is never offered here.
-    if (rebuild) return null;
-    const stored = loadDraft(sessionKey);
-    return stored && draftHasProgress(stored.draft) ? stored : null;
-  });
+  const [resumable, setResumable] = useState<StoredDraft | null>(null);
+  /** Whether the table has said if a draft is parked. Nothing is saved before then, so a build begun in the first
+   *  moment never overwrites the one the banner is about to offer. A rebuild never offers one. */
+  const [draftChecked, setDraftChecked] = useState(Boolean(rebuild));
+  useEffect(() => {
+    if (rebuild) return;
+    let live = true;
+    void loadDraft().then((stored) => {
+      if (!live) return;
+      if (stored && draftHasProgress(stored.draft)) setResumable(stored);
+      setDraftChecked(true);
+    });
+    return () => {
+      live = false;
+    };
+  }, [rebuild]);
   const [abilityEntry, setAbilityEntry] = useState<DiceEntryMode>("auto");
   const [hpEntry, setHpEntry] = useState<DiceEntryMode>("auto");
 
@@ -150,12 +151,25 @@ export function CharacterBuilder({
     setDraft((current) => withAnswersFrom(current, offersReply));
   }, [offersReply, offersCurrent]);
 
-  // Park the draft on every change, except while an unanswered resume offer is on screen: saving then
-  // would overwrite the draft the banner offers. Only Resume, Discard or Save & close answer it.
+  // Park the draft as it changes, once a burst of picks settles, except while an unanswered resume offer is on
+  // screen: saving then would overwrite the draft the banner offers. Only Resume, Discard or Save & close answer it.
+  // Leaving the page sends what the pause was still holding.
+  const unsaved = useRef<BuilderDraft | null>(null);
   useEffect(() => {
-    if (resumable || rebuild) return;
-    if (draftHasProgress(draft)) saveDraft(sessionKey, draft);
-  }, [draft, sessionKey, resumable, rebuild]);
+    if (!draftChecked || resumable || rebuild || !draftHasProgress(draft)) return;
+    unsaved.current = draft;
+    const timer = window.setTimeout(() => {
+      unsaved.current = null;
+      saveDraft(draft);
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [draft, draftChecked, resumable, rebuild]);
+  useEffect(
+    () => () => {
+      if (unsaved.current) saveDraft(unsaved.current);
+    },
+    []
+  );
 
   const rolls = useServerRolls(state.rolls, (text) => setRejection({ title: "That roll was rejected", text }));
 
@@ -231,7 +245,8 @@ export function CharacterBuilder({
   const finishCreate = useEffectEvent((name: string) => {
     attemptId.current = null;
     setPendingCreate(null);
-    clearDraft(sessionKey);
+    unsaved.current = null;
+    discardDraft();
     onCreated(name);
     onClose();
   });
@@ -323,10 +338,11 @@ export function CharacterBuilder({
   }, [rejection]);
 
   // Leaving answers a pending resume offer: this build takes the draft slot. The toast says where
-  // the work went.
+  // the work went. A level-up keeps no draft: the character it started from is still there to level.
   const saveAndClose = () => {
-    const saved = draftHasProgress(draft);
-    if (saved) saveDraft(sessionKey, draft);
+    const saved = !rebuild && draftHasProgress(draft);
+    unsaved.current = null;
+    if (saved) saveDraft(draft);
     onClose();
     if (saved) toast("Draft saved — resume it from Create a character.", { tone: "success" });
   };
@@ -654,17 +670,17 @@ export function CharacterBuilder({
         /* The one way out: the draft is already parked, so no "leave without saving" exit. Discarding
          lives on the resume banner. */
         onSaveAndClose={saveAndClose}
+        {...(rebuild ? { saveLabel: "Close" } : {})}
         resume={
           resumable ? (
             <Alert tone="info" title="Unfinished character found">
               {/* The stored record has identity fields and a timestamp but no step, so none is promised. */}
               {resumedNames.length > 0 ? (
                 <>
-                  You started <strong>{resumedNames.join(" · ")}</strong> on this device{" "}
-                  {describeWhen(resumable.updatedAt)}.
+                  You started <strong>{resumedNames.join(" · ")}</strong> {describeWhen(resumable.updatedAt)}.
                 </>
               ) : (
-                <>You started a character on this device {describeWhen(resumable.updatedAt)}.</>
+                <>You started a character {describeWhen(resumable.updatedAt)}.</>
               )}{" "}
               It stays exactly as you left it until you answer — resume it, or discard it to save the one you build now.{" "}
               <Button
@@ -683,7 +699,7 @@ export function CharacterBuilder({
                 variant="destructive"
                 size="sm"
                 onClick={() => {
-                  clearDraft(sessionKey);
+                  discardDraft();
                   setResumable(null);
                   attemptId.current = null;
                 }}

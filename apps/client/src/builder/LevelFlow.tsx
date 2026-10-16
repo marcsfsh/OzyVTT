@@ -26,7 +26,6 @@ export function LevelFlow({
   state,
   role,
   actorId,
-  sessionKey,
   connection = "online",
   onClose,
   onDone
@@ -34,7 +33,6 @@ export function LevelFlow({
   state: LevelState;
   role: "gm" | "player";
   actorId: string;
-  sessionKey: string;
   connection?: "online" | "reconnecting" | "offline";
   onClose: () => void;
   onDone: (name: string) => void;
@@ -120,7 +118,6 @@ export function LevelFlow({
     return (
       <CharacterBuilder
         state={state}
-        sessionKey={sessionKey}
         connection={connection}
         onClose={() => setTarget(null)}
         onCreated={(name) => {

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CharacterDraftSchema } from "./character-draft.js";
 import {
   AnnotationPointSchema,
   AnnotationShapeKindSchema,
@@ -814,6 +815,11 @@ export const BuilderOffersSchema = z
 
 /** Level up/down or respec: `CharacterCreateSchema` minus the name, plus the actor. Fully re-validated. */
 export const CharacterRebuildSchema = CharacterCreateSchema.omit({ name: true }).extend({ actorId: z.uuid() }).strict();
+
+/** Parks the caller's in-progress build: one per player session, and one for the GM. */
+export const CharacterDraftSaveSchema = z.object({ commandId: z.uuid(), draft: CharacterDraftSchema }).strict();
+/** Drops the caller's parked build. */
+export const CharacterDraftDiscardSchema = z.object({ commandId: z.uuid() }).strict();
 
 /** Roll a whole character: only class (or none) and level cross the wire; everything else is drawn server-side. */
 export const CharacterGenerateSchema = z

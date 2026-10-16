@@ -869,6 +869,22 @@ export const openApiDocument = {
         }
       }
     },
+    [GAME_PATHS.characterDraft]: {
+      get: {
+        operationId: "getCharacterDraft",
+        security: gameSecurityWithPlayer("game:read"),
+        description:
+          "The caller's parked character build, or null: the wizard's choices so far, as `POST /game/characters/draft/save` left it, and when. A player session reads its own; the GM reads the GM's, whichever device signed in. Nobody reads anyone else's.",
+        responses: {
+          "200": {
+            description: "The caller's parked build",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/CharacterDraftResponse" } } }
+          },
+          "401": apiError,
+          "403": apiError
+        }
+      }
+    },
     [GAME_PATHS.actorMovement]: {
       get: {
         operationId: "getActorMovement",
@@ -2049,6 +2065,7 @@ export const openApiDocument = {
       },
       ActorAvailableActionsResponse: envelopeSchema("#/components/schemas/ActorAvailableActionsData"),
       ActorMovementResponse: envelopeSchema("#/components/schemas/ActorMovementData"),
+      CharacterDraftResponse: envelopeSchema("#/components/schemas/CharacterDraftData"),
       BuilderOffersDraft: {
         type: "object",
         additionalProperties: false,
