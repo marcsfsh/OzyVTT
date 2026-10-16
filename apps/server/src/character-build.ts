@@ -105,6 +105,9 @@ type InterpretedFeatures = {
     level: number | undefined;
     alwaysPrepared: boolean;
     ability: Ability | undefined;
+    /** A free casting's uses (the granting feature's own); null for at will; absent when only a slot casts it. */
+    free?: ActorAction["uses"] | null;
+    withSlot: boolean;
   }>;
   hitPointsPerLevel: number;
   speedBonus: number;
@@ -251,17 +254,10 @@ function cantripActionFor(
     }
   );
   if (mechanics.damage.length === 0 && !mechanics.save) return null;
-  const activation: ActorAction["activation"] = /bonus/i.test(spell.castingTime)
-    ? "bonus-action"
-    : /reaction/i.test(spell.castingTime)
-      ? "reaction"
-      : /^action$/i.test(spell.castingTime.trim())
-        ? "action"
-        : "other";
   return {
     id: spellActionId(spell.id),
     name: spell.name,
-    activation,
+    activation: activationOf(spell.castingTime),
     description: spell.description.slice(0, 12000),
     ...mechanics,
     ...(spell.area ? { area: spell.area } : {}),
@@ -270,19 +266,77 @@ function cantripActionFor(
   } as ActorAction;
 }
 
-/** Mints and links (`spells[].actionId`) an action for each cantrip that has one; mutates the list in place. */
-function linkCantripActions(
+/** The action economy a casting time names ("1 action", "1 bonus action", "1 reaction, which you take when..."). */
+function activationOf(castingTime: string): ActorAction["activation"] {
+  if (/bonus/i.test(castingTime)) return "bonus-action";
+  if (/reaction/i.test(castingTime)) return "reaction";
+  return /^(?:1 )?action$/i.test(castingTime.trim()) ? "action" : "other";
+}
+
+type CasterNumbers = Readonly<{ attackBonus: number; saveDc: number; characterLevel: number; modifier: number }>;
+
+/**
+ * A leveled spell as an action. Cast with a slot, it carries `spellSlot` at the spell's level, which the economy
+ * spends (a higher slot on request, upcasting the dice). Cast without one (`free`), it spends the granting
+ * feature's uses, or nothing at will. Null for an at-will cast with nothing to resolve.
+ */
+function leveledSpellActionFor(
+  spell: SpellReference,
+  numbers: CasterNumbers,
+  free?: ActorAction["uses"] | null
+): ActorAction | null {
+  const mechanics = spellCastMechanics(
+    spell,
+    { attackBonus: numbers.attackBonus, saveDc: numbers.saveDc, bearersDc: true, modifier: numbers.modifier },
+    {}
+  );
+  const resolvable =
+    mechanics.damage.length > 0 || mechanics.save !== undefined || mechanics.healing !== undefined || mechanics.attack;
+  if (free === null && !resolvable) return null;
+  const freeCast = free !== undefined;
+  return {
+    id: freeCast ? `${spellActionId(spell.id)}-free` : spellActionId(spell.id),
+    name: freeCast ? `${spell.name} (no slot)` : spell.name,
+    activation: activationOf(spell.castingTime),
+    description: spell.description.slice(0, 12000),
+    ...mechanics,
+    ...(spell.area ? { area: spell.area } : {}),
+    ...(freeCast ? (free ? { uses: free } : {}) : { spellSlot: { level: spell.level } }),
+    spellId: spell.id
+  } as ActorAction;
+}
+
+/** `ActorDefinitionSchema`'s cap on a sheet's actions; spells past it keep their sheet entry without an action. */
+const MAX_DEFINITION_ACTIONS = 100;
+
+/**
+ * Mints and links each spell's actions: a cantrip's (`actionId`), a leveled spell's slot cast (`actionId`, when the
+ * sheet has slots and the spell may use one) and a grant's free cast (`freeActionId`). Mutates the list in place.
+ */
+function linkSpellActions(
   spells: Array<Record<string, unknown>>,
   into: ActorAction[],
-  numbers: Readonly<{ attackBonus: number; saveDc: number; characterLevel: number }>,
-  library: ContentView
+  numbers: CasterNumbers,
+  library: ContentView,
+  granted: InterpretedFeatures["grantedSpells"],
+  hasSlots: boolean
 ): void {
   for (const entry of spells) {
     const record = library.spellRecord(String(entry.id));
-    const action = record ? cantripActionFor(record, numbers) : null;
-    if (!action || into.some((existing) => existing.id === action.id)) continue;
-    into.push(action);
-    entry.actionId = action.id;
+    if (!record) continue;
+    const mint = (action: ActorAction | null, key: "actionId" | "freeActionId") => {
+      if (!action || into.length >= MAX_DEFINITION_ACTIONS || into.some((existing) => existing.id === action.id))
+        return;
+      into.push(action);
+      entry[key] = action.id;
+    };
+    if (record.level === 0) {
+      mint(cantripActionFor(record, numbers), "actionId");
+      continue;
+    }
+    if (hasSlots && entry.withSlot !== false) mint(leveledSpellActionFor(record, numbers), "actionId");
+    const grant = granted.find((candidate) => candidate.id === record.id && candidate.free !== undefined);
+    if (grant) mint(leveledSpellActionFor(record, numbers, grant.free), "freeActionId");
   }
 }
 
@@ -325,9 +379,14 @@ function interpretFeature(feature: FeatureRecord, into: InterpretedFeatures, con
   // or it has limited uses (so the pool is trackable and rests can reset it by action id).
   const synthesizedUses = feature.uses ? Math.min(20, resolvedUseLimit(feature.uses, context)) : 0;
   const carriesUses = feature.uses !== undefined && synthesizedUses >= 1;
+  // The counter of a free-cast grant (Divine Smite once per Long Rest) rides its spell's free-cast action instead.
+  const freeUses: ActorAction["uses"] | undefined = carriesUses
+    ? { limit: synthesizedUses, per: feature.uses!.per, pool: feature.uses!.pool ?? feature.id }
+    : undefined;
+  const freeCastGrant = feature.grants?.spells.some((spell) => spell.withoutSlot === "free") === true;
   if (
     feature.actions.length === 0 &&
-    (feature.effects.length > 0 || carriesUses) &&
+    (feature.effects.length > 0 || (carriesUses && !freeCastGrant)) &&
     !into.actions.some((existing) => existing.id === feature.id)
   ) {
     into.actions.push({
@@ -366,7 +425,13 @@ function interpretFeature(feature: FeatureRecord, into: InterpretedFeatures, con
         id: spell.id,
         level: spell.level,
         alwaysPrepared: spell.alwaysPrepared,
-        ability: spell.ability
+        ability: spell.ability,
+        withSlot: spell.withSlot,
+        ...(spell.withoutSlot === "at-will" ? { free: null } : {}),
+        // A free casting with no counter to spend is refused at build rather than cast without limit.
+        ...(spell.withoutSlot === "free"
+          ? { free: freeUses ?? reject(`"${feature.name}" casts ${spell.id} without a slot but has no uses to spend.`) }
+          : {})
       }))
     );
   }
@@ -676,7 +741,8 @@ export function buildCharacterDefinition(
       name: record?.name ?? grantedSpell.id,
       level: grantedSpell.level ?? record?.level ?? 0,
       prepared: true,
-      alwaysPrepared: grantedSpell.alwaysPrepared
+      alwaysPrepared: grantedSpell.alwaysPrepared,
+      ...(grantedSpell.withSlot ? {} : { withSlot: false })
     };
   };
   let spellcasting: Record<string, unknown> | undefined;
@@ -772,8 +838,15 @@ export function buildCharacterDefinition(
     }
     const saveDc = spellSaveDc(finalScores[casting.ability], proficiencyBonus);
     const attackBonus = spellAttackBonus(finalScores[casting.ability], proficiencyBonus);
-    // Cantrips become actions with this caster's numbers; the sheet sends only an id.
-    linkCantripActions(spells, interpreted.actions, { attackBonus, saveDc, characterLevel: input.level }, library);
+    // Spells become actions with this caster's numbers; the sheet sends only an id.
+    linkSpellActions(
+      spells,
+      interpreted.actions,
+      { attackBonus, saveDc, characterLevel: input.level, modifier: abilityModifier(finalScores[casting.ability]) },
+      library,
+      interpreted.grantedSpells,
+      slots.length > 0
+    );
     // Top-level fields stay populated (the schema demands the combined pool when per-class slots exist).
     spellcasting = {
       ability: casting.ability,
@@ -812,12 +885,14 @@ export function buildCharacterDefinition(
       const ability = interpreted.grantedSpells.find((spell) => spell.ability)?.ability ?? "int";
       const saveDc = spellSaveDc(finalScores[ability], proficiencyBonus);
       const attackBonus = spellAttackBonus(finalScores[ability], proficiencyBonus);
-      // A non-caster's cantrip gets an action too, using the fallback ability above.
-      linkCantripActions(
+      // A non-caster's spells get actions too, using the fallback ability above; with no slots, only free casts.
+      linkSpellActions(
         extraSpells,
         interpreted.actions,
-        { attackBonus, saveDc, characterLevel: input.level },
-        library
+        { attackBonus, saveDc, characterLevel: input.level, modifier: abilityModifier(finalScores[ability]) },
+        library,
+        interpreted.grantedSpells,
+        false
       );
       spellcasting = {
         ability,

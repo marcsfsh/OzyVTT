@@ -27,7 +27,7 @@ export const paladin: ClassMechanicsModule = {
     // Divine Smite always prepared, plus one free casting per Long Rest.
     "paladins-smite": {
       uses: { limit: 1, per: "long-rest" },
-      grants: { spells: [{ id: "divine-smite", level: 1, alwaysPrepared: true }] }
+      grants: { spells: [{ id: "divine-smite", level: 1, alwaysPrepared: true, withoutSlot: "free" }] }
     },
 
     /**
@@ -58,7 +58,7 @@ export const paladin: ClassMechanicsModule = {
 
     "faithful-steed": {
       uses: { limit: 1, per: "long-rest" },
-      grants: { spells: [{ id: "find-steed", level: 2, alwaysPrepared: true }] }
+      grants: { spells: [{ id: "find-steed", level: 2, alwaysPrepared: true, withoutSlot: "free" }] }
     },
 
     /**

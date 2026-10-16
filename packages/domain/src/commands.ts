@@ -320,6 +320,9 @@ export const ActionResolveSchema = z
     critical: z.boolean().optional(),
     /** Push mastery (SRD "up to 10 feet"): how far to push on this hit, 0 to decline; absent pushes the full 10. */
     pushFeet: z.number().int().min(0).max(10).multipleOf(5).optional(),
+    /** The spell slot to cast with (upcasting rolls that slot's dice); absent, the spell's own level, else the lowest
+     *  above it with a slot left. */
+    slotLevel: z.number().int().min(1).max(9).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
@@ -489,6 +492,8 @@ export const ActionUseSchema = z
     includeDamage: z.boolean().optional(),
     /** GM bypass of a rules block (including the off-turn refusal); reason optional. Refused for players. */
     override: RulesOverrideSchema.optional(),
+    /** The spell slot to cast with; see `action.resolve`. */
+    slotLevel: z.number().int().min(1).max(9).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

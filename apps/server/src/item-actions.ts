@@ -302,3 +302,23 @@ export function weaponAction(
     damage: [{ formula: damageFormula, type: weapon.damageType }]
   };
 }
+
+/** The action cast with a higher slot: the spell's printed row for that slot replaces the dice its own roll gave, in
+ *  the damage and the healing. Unchanged where the spell prints no dice for the slot (Magic Missile adds darts). */
+export function upcastAction(action: ActorAction, spell: SpellReference, level: number): ActorAction {
+  const roll = spell.castingOptions.find((option) => option.type === `slot_level_${level}`)?.damageRoll;
+  const base = spell.damage.roll;
+  if (!roll || !base) return action;
+  const swap = (formula: string): string => {
+    if (formula === base) return roll;
+    const match = /^(\d+d\d+)(?:\s*([+-])\s*(\d+))?$/i.exec(formula.trim());
+    return match && match[1] === base
+      ? formulaPlus(roll, (match[2] === "-" ? -1 : 1) * Number(match[3] ?? 0))
+      : formula;
+  };
+  return {
+    ...action,
+    damage: action.damage.map((part) => ({ ...part, formula: swap(part.formula) })),
+    ...(action.healing ? { healing: { formula: swap(action.healing.formula) } } : {})
+  };
+}

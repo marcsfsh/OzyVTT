@@ -15,6 +15,8 @@ import { settlePlayerHit, type AppliedDamage } from "../player-damage.js";
 import { recordRoll, rolledTerms } from "../roll-history.js";
 import { overrideReason, overrideWaives, rememberOverride } from "../rules-families.js";
 import { looseRollPlan, NOT_YOUR_TURN, offTurnVerdict, routeForTap, spendLooseUses } from "../tap-routing.js";
+import { upcastAction } from "../item-actions.js";
+import { castSlotLevel } from "../resolution/economy.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, principalTag, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -132,7 +134,8 @@ export const actionCommands = [
             attackNatural,
             attackTotal,
             critical,
-            ...(request.pushFeet !== undefined ? { pushFeet: request.pushFeet } : {})
+            ...(request.pushFeet !== undefined ? { pushFeet: request.pushFeet } : {}),
+            ...(request.slotLevel !== undefined ? { slotLevel: request.slotLevel } : {})
           },
           {
             random: (sides) => kit.context.random(sides),
@@ -269,7 +272,17 @@ export const actionCommands = [
     malformed: "The action command is malformed.",
     // The server picks structured resolve, blocked or loose roll and says so in the reply.
     async run({ principal, request, execute, dispatch }, kit) {
-      const { commandId, actorId, actionId, targetIds, rollMode, includeDamage, override, expectedRevision } = request;
+      const {
+        commandId,
+        actorId,
+        actionId,
+        targetIds,
+        rollMode,
+        includeDamage,
+        override,
+        slotLevel,
+        expectedRevision
+      } = request;
       if (override && !isGmGrade(principal)) throw new GameAccessDeniedError("Your GM adjudicates rules overrides.");
       const snapshot = kit.read();
       requireActorAccess(initiatorOf(principal), snapshot, actorId, "attack");
@@ -284,6 +297,7 @@ export const actionCommands = [
           ...(targetIds ? { targetIds } : {}),
           ...(rollMode ? { rollMode } : {}),
           ...(withOverride && override ? { override } : {}),
+          ...(slotLevel === undefined ? {} : { slotLevel }),
           ...(expectedRevision === undefined ? {} : { expectedRevision })
         });
 
@@ -292,8 +306,15 @@ export const actionCommands = [
 
       const definition = actor.definitionId ? kit.resolveDefinitionIn(snapshot, actor.definitionId) : undefined;
       const available = effectiveActions(definition, actor, kit.equipmentCatalog());
-      const action = available.find((candidate) => candidate.id === actionId) ?? builtinAction(actionId);
-      if (!action) throw new CommandRejectedError("That action is not on the stat block.");
+      const listed = available.find((candidate) => candidate.id === actionId) ?? builtinAction(actionId);
+      if (!listed) throw new CommandRejectedError("That action is not on the stat block.");
+      // A spell cast with a higher slot rolls that slot's dice, on the loose route as in the fight.
+      const castLevel = listed.spellSlot ? castSlotLevel(actor, listed.spellSlot.level, slotLevel) : undefined;
+      const spell = listed.spellId ? kit.equipmentCatalog().spellRecord?.(listed.spellId) : undefined;
+      const action =
+        castLevel !== undefined && spell && castLevel > listed.spellSlot!.level
+          ? upcastAction(listed, spell, castLevel)
+          : listed;
 
       // Off turn in combat: a real rules block, so the GM can override and the player can ask. Advise
       // resolves with a warning; Off just resolves.
@@ -345,7 +366,7 @@ export const actionCommands = [
       const { state, duplicate } = await execute((draft) => {
         requireActorAccess(initiator, draft, actorId, "attack");
         const live = draft.actors.find((candidate) => candidate.id === actorId)!;
-        spend = spendLooseUses(live, action, available);
+        spend = spendLooseUses(live, action, available, castLevel);
         plan.forEach((entry, index) => {
           const resolution = rollDice(entry.formula, (sides) => kit.context.random(sides));
           recordRoll(draft, {

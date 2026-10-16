@@ -3,6 +3,7 @@ import { effectiveActions } from "../effective-actions.js";
 import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
 import { effectiveModeFor, overrideCovers, overrideReason, overrideWaives } from "../rules-families.js";
+import { upcastAction } from "../item-actions.js";
 import { builtinHandlerFor } from "./builtins.js";
 import type { DefinitionAction, LiveActor, ResolveContext, ResolveDependencies, ResolveInput } from "./context.js";
 import { planEconomy } from "./economy.js";
@@ -123,5 +124,10 @@ export function openResolve(
     builtinSave: null
   };
   if (builtin?.prepare) ctx.action = builtin.prepare(ctx);
+  // A spell cast with a higher slot rolls that slot's dice.
+  const slot = economy.plan.spendSpellSlot;
+  const spell = action.spellId ? deps.catalog?.spellRecord?.(action.spellId) : undefined;
+  if (slot && spell && action.spellSlot && slot.level > action.spellSlot.level)
+    ctx.action = upcastAction(ctx.action, spell, slot.level);
   return ctx;
 }

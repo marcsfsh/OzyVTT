@@ -13,7 +13,14 @@ import { ordinal, signed, titleCase } from "./format";
 import type { SheetEdit } from "./useSheetEdit";
 import type { SheetRolls } from "./useSheetRolls";
 
-type SheetSpell = Readonly<{ id: string; name: string; level: number; actionId?: string | null }>;
+type SheetSpell = Readonly<{
+  id: string;
+  name: string;
+  level: number;
+  actionId?: string | null;
+  freeActionId?: string;
+  withSlot?: boolean;
+}>;
 
 /**
  * The damage a spell deals when cast at `level`: the single source for both the displayed effect
@@ -45,8 +52,8 @@ function spellEffectAt(
 
 /**
  * Per-spell "Cast at" control: a slot-level dropdown (remaining/total per level; empty levels
- * disabled) and a Cast button. The parent owns the slot-spend and roll emits. Leveled spells only;
- * returns null when no slot at or above the spell's level exists.
+ * disabled), a "No slot" choice for a grant's free casting, and a Cast button. The parent owns the
+ * emits. A spell cast only without a slot (an invocation's) shows "No slot" or "At will" instead.
  */
 function SpellCastControls({
   spell,
@@ -54,28 +61,36 @@ function SpellCastControls({
   slotLevels,
   slotMaxByLevel,
   liveRemaining,
+  free,
   busy,
   onCastSlot,
+  onCastFree,
   onCastCantrip
 }: Readonly<{
-  spell: Readonly<{ id: string; name: string; level: number }>;
+  spell: Readonly<{ id: string; name: string; level: number; withSlot?: boolean }>;
   content: ContentSpellSummary | undefined;
   slotLevels: readonly number[];
   slotMaxByLevel: ReadonlyMap<number, number>;
   liveRemaining: ReadonlyMap<number, number>;
+  /** A free casting: the uses it has left, or null at will. */
+  free: Readonly<{ left: number | null }> | null;
   busy: boolean;
   onCastSlot: (level: number) => void;
+  onCastFree: () => void;
   onCastCantrip: () => void;
 }>) {
   const isCantrip = spell.level === 0;
-  const options = isCantrip ? [] : slotLevels.filter((level) => level >= spell.level);
-  const [castLevel, setCastLevel] = useState(options[0] ?? spell.level);
-  const level = options.includes(castLevel) ? castLevel : (options[0] ?? spell.level);
+  const options = isCantrip || spell.withSlot === false ? [] : slotLevels.filter((level) => level >= spell.level);
+  const [choice, setChoice] = useState<number | "free">(options[0] ?? (free ? "free" : spell.level));
+  const chosen = choice === "free" ? (free ? "free" : (options[0] ?? spell.level)) : choice;
+  const level = chosen === "free" || !options.includes(chosen) ? (options[0] ?? spell.level) : chosen;
   const remainingAt = (slot: number) => liveRemaining.get(slot) ?? slotMaxByLevel.get(slot) ?? 0;
+  const freeLabel = free ? (free.left === null ? "At will" : `No slot · ${free.left} left`) : "";
   // The effect at the selected level, from the same helper the Cast button rolls. Three grid cells
   // (helper · slot · Cast) that align across rows.
-  const { label: effect } = spellEffectAt(content, spell.level, level);
-  const canCast = isCantrip || (options.length > 0 && remainingAt(level) > 0);
+  const { label: effect } = spellEffectAt(content, spell.level, chosen === "free" ? spell.level : level);
+  const canCast =
+    isCantrip || (chosen === "free" ? free !== null && free.left !== 0 : options.length > 0 && remainingAt(level) > 0);
   return (
     <>
       <span
@@ -91,9 +106,9 @@ function SpellCastControls({
         <select
           className="sheet-cast-select"
           aria-label={`Cast ${spell.name} at level`}
-          value={level}
+          value={chosen === "free" ? "free" : level}
           disabled={busy}
-          onChange={(event) => setCastLevel(Number(event.target.value))}
+          onChange={(event) => setChoice(event.target.value === "free" ? "free" : Number(event.target.value))}
         >
           {options.map((slot) => (
             <option key={slot} value={slot} disabled={remainingAt(slot) === 0}>
@@ -101,7 +116,14 @@ function SpellCastControls({
               {slot > spell.level ? " · upcast" : ""}
             </option>
           ))}
+          {free && (
+            <option value="free" disabled={free.left === 0}>
+              {freeLabel}
+            </option>
+          )}
         </select>
+      ) : free ? (
+        <span className="sheet-cast-slot at-will">{freeLabel}</span>
       ) : (
         <span className="sheet-cast-slot">no slots</span>
       )}
@@ -109,7 +131,7 @@ function SpellCastControls({
         type="button"
         className="sheet-cast-btn"
         disabled={busy || !canCast}
-        onClick={() => (isCantrip ? onCastCantrip() : onCastSlot(level))}
+        onClick={() => (isCantrip ? onCastCantrip() : chosen === "free" ? onCastFree() : onCastSlot(level))}
       >
         Cast
       </button>
@@ -119,8 +141,8 @@ function SpellCastControls({
 
 /**
  * The spells section: casting stats per casting class, slot pips, prepared toggles and, for a
- * player character, a "Cast at" control per spell. Casting spends the slot, then routes a spell that
- * targets a creature through the structured flow on the caster's turn, or rolls its SRD damage.
+ * player character, a "Cast at" control per spell. A leveled spell casts through the action the builder
+ * minted for it, so the server spends the slot (or the grant's free use) and resolves or rolls it.
  */
 export function SheetSpells({
   actor,
@@ -130,6 +152,7 @@ export function SheetSpells({
   rolls,
   onFeedback,
   routeSpell,
+  castSpellAction,
   spellSaveDcBonus = 0
 }: Readonly<{
   actor: GmActor | PlayerActor;
@@ -140,6 +163,8 @@ export function SheetSpells({
   onFeedback: (text: string) => void;
   /** Hands a spell to the structured flow; false when it has no server-resolvable action now. */
   routeSpell: (spell: SheetSpell) => boolean;
+  /** Casts a leveled spell through its action (with a slot, or a grant's free casting); the server spends it. */
+  castSpellAction: (actionId: string, slotLevel?: number) => void;
   /** The server's sum of standing spell-save-DC riders (an item, a feat), which the cast DC includes. */
   spellSaveDcBonus?: number;
 }>) {
@@ -186,9 +211,14 @@ export function SheetSpells({
     .filter(([, max]) => max > 0)
     .map(([level]) => level)
     .sort((a, b) => a - b);
-  // Cast a leveled spell at a chosen level: spend the slot, then roll the SRD upcast damage for a
-  // damaging spell. Both are server-checked.
+  // Cast a leveled spell at a chosen level. A sheet built before spells had actions spends the slot here and
+  // rolls the SRD upcast damage instead.
   const castSpell = (spell: SheetSpell, level: number) => {
+    // A spell the builder minted an action for resolves on the server, which spends the slot and rolls its dice.
+    if (spell.actionId && definition.actions.some((action) => action.id === spell.actionId && action.spellSlot)) {
+      castSpellAction(spell.actionId, level);
+      return;
+    }
     const max = slotMaxByLevel.get(level) ?? 0;
     const rem = liveSlotRemaining.get(level) ?? max;
     if (max <= 0 || rem <= 0) {
@@ -209,6 +239,16 @@ export function SheetSpells({
       if (formula) void rollFlat(formula, "damage", `${spell.name} at ${ordinal(level)}${types}`);
       else onFeedback(`Cast ${spell.name} at ${ordinal(level)} - spent a ${ordinal(level)}-level slot.`);
     });
+  };
+  // A grant's free casting: the uses its feature has left (shared with that feature's counter), or at will.
+  const freeCastOf = (spell: SheetSpell): { left: number | null } | null => {
+    const action = spell.freeActionId
+      ? definition.actions.find((candidate) => candidate.id === spell.freeActionId)
+      : undefined;
+    if (!action) return null;
+    if (!action.uses) return { left: null };
+    const spent = actor.actionUses?.[action.uses.pool ?? action.id] ?? 0;
+    return { left: Math.max(0, action.uses.limit - spent) };
   };
   // Cantrips cost no slot: roll a damaging cantrip's die, or note a utility cast.
   const castCantrip = (spell: SheetSpell) => {
@@ -343,8 +383,10 @@ export function SheetSpells({
                               slotLevels={slotLevels}
                               slotMaxByLevel={slotMaxByLevel}
                               liveRemaining={liveSlotRemaining}
+                              free={freeCastOf(spell)}
                               busy={busy}
                               onCastSlot={(castLevel) => castSpell(spell, castLevel)}
+                              onCastFree={() => spell.freeActionId && castSpellAction(spell.freeActionId)}
                               onCastCantrip={() => castCantrip(spell)}
                             />
                           )}

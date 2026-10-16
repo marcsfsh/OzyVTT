@@ -153,15 +153,18 @@ export function SheetActions({
             </div>
           );
         };
-        // Weapon/other actions first, then spell actions grouped by the linked spell's level.
+        // Weapon/other actions first, then cantrip actions. A leveled spell's actions are cast from the Spells
+        // section, which chooses the slot, so they are not offered here as well.
         const spellLevelByActionId = new Map<string, number>(
-          (spellcasting?.spells ?? []).filter((spell) => spell.actionId).map((spell) => [spell.actionId!, spell.level])
+          (spellcasting?.spells ?? []).flatMap((spell) =>
+            [spell.actionId, spell.freeActionId].flatMap((id) => (id ? [[id, spell.level] as const] : []))
+          )
         );
         const weaponActions = definition.actions.filter((action) => !spellLevelByActionId.has(action.id));
         const spellGroups = new Map<number, ActionT[]>();
         for (const action of definition.actions) {
           const level = spellLevelByActionId.get(action.id);
-          if (level !== undefined) {
+          if (level === 0) {
             const list = spellGroups.get(level) ?? [];
             list.push(action);
             spellGroups.set(level, list);

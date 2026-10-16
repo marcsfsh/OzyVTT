@@ -197,7 +197,12 @@ export const FeatureGrantsFieldsSchema = z
             id: ContentIdSchema,
             level: z.number().int().min(0).max(9).optional(),
             alwaysPrepared: z.boolean().default(true),
-            ability: AbilitySchema.optional()
+            ability: AbilitySchema.optional(),
+            /** How it is cast besides with a spell slot: "free" spends this feature's own `uses` (Divine Smite, once
+             *  per Long Rest), "at-will" costs nothing (Armor of Shadows). Absent: only with a slot. */
+            withoutSlot: z.enum(["free", "at-will"]).optional(),
+            /** False when it can be cast only without a slot (an invocation's spell the Warlock does not know). */
+            withSlot: z.boolean().default(true)
           })
           .strict()
       )

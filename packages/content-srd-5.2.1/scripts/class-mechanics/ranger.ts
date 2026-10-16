@@ -9,7 +9,7 @@ export const ranger: ClassMechanicsModule = {
      */
     "favored-enemy": {
       uses: { scaling: { type: "class-resource", id: "favored-enemy" }, per: "long-rest" },
-      grants: { spells: [{ id: "hunters-mark", level: 1, alwaysPrepared: true }] }
+      grants: { spells: [{ id: "hunters-mark", level: 1, alwaysPrepared: true, withoutSlot: "free" }] }
     },
 
     // Expertise in one skill plus two languages (raising the `species-languages` budget).

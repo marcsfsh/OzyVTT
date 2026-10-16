@@ -55,6 +55,8 @@ export type ResolveInput = Readonly<{
   attackKinds?: readonly AttackKind[];
   /** Push mastery's chosen distance (0 declines); absent pushes the most the mastery allows. */
   pushFeet?: number;
+  /** The slot a spell is cast with; absent, its own level, else the lowest above it with a slot left. */
+  slotLevel?: number;
 }>;
 
 export type ResolveDependencies = Readonly<{

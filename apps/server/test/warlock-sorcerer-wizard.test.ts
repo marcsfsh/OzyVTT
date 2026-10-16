@@ -327,10 +327,10 @@ describe("Warlock: Contact Patron hands over the spell and the free casting (aud
 
   it("gives it a once-per-Long-Rest counter the engine really spends", () => {
     const built = table(level9());
-    expect(actionOf(built, "contact-patron").uses).toMatchObject({ limit: 1, per: "long-rest" });
+    expect(actionOf(built, "spell-contact-other-plane-free").uses).toMatchObject({ limit: 1, per: "long-rest" });
     resolveDefinitionAction(
       built.state,
-      actionOf(built, "contact-patron"),
+      actionOf(built, "spell-contact-other-plane-free"),
       { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000010" },
       deps(built, [])
     );
@@ -338,7 +338,7 @@ describe("Warlock: Contact Patron hands over the spell and the free casting (aud
     expect(() =>
       resolveDefinitionAction(
         built.state,
-        actionOf(built, "contact-patron"),
+        actionOf(built, "spell-contact-other-plane-free"),
         { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000011" },
         deps(built, [])
       )
@@ -643,10 +643,10 @@ describe("Warlock invocations: the eleven free castings are handed over (audit r
     // The one spell-granting invocation the text limits; the others are at will and carry no pool.
     const built = table(withInvocation("gift-of-the-depths"));
     expect(spellOf(built.definition, "water-breathing")).toMatchObject({ level: 3, alwaysPrepared: true });
-    expect(actionOf(built, "gift-of-the-depths").uses).toMatchObject({ limit: 1, per: "long-rest" });
+    expect(actionOf(built, "spell-water-breathing-free").uses).toMatchObject({ limit: 1, per: "long-rest" });
     resolveDefinitionAction(
       built.state,
-      actionOf(built, "gift-of-the-depths"),
+      actionOf(built, "spell-water-breathing-free"),
       { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000040" },
       deps(built, [])
     );
@@ -654,7 +654,7 @@ describe("Warlock invocations: the eleven free castings are handed over (audit r
     expect(() =>
       resolveDefinitionAction(
         built.state,
-        actionOf(built, "gift-of-the-depths"),
+        actionOf(built, "spell-water-breathing-free"),
         { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000041" },
         deps(built, [])
       )
@@ -707,11 +707,13 @@ describe("Warlock invocations: Agonizing Blast adds the caster's Charisma to the
       attack: { bonus: 6, count: 2 },
       damage: [{ formula: "1d10", type: "force" }]
     });
-    // Cantrips only. A leveled spell mints nothing because no field on the sheet can say which slot it
-    // spends (a Warlock 5's only slots are level 3), and a granted free casting looks like a prepared one.
-    // `bane` is on this Warlock's list through Magic Initiate and stays a Cast-control cast.
-    expect(built.actions.find((action) => action.id === "spell-bless")).toBeUndefined();
-    expect(built.spellcasting!.spells.find((spell) => spell.id === "bless")!.actionId).toBeUndefined();
+    // A leveled spell mints its slot cast: the economy spends a slot of its level or higher (a Warlock 5's only
+    // slots are level 3, so it takes one of those).
+    expect(built.actions.find((action) => action.id === "spell-bless")).toMatchObject({
+      spellId: "bless",
+      spellSlot: { level: 1 }
+    });
+    expect(built.spellcasting!.spells.find((spell) => spell.id === "bless")!.actionId).toBe("spell-bless");
   });
 
   it("rolls 1d10 force PLUS the Warlock's +3, and 1d10 alone without the invocation", () => {
@@ -1229,7 +1231,7 @@ describe("Draconic Sorcery: Dragon Wings and Dragon Companion carry their daily 
       level: 5,
       alwaysPrepared: true
     });
-    expect(actionOf(built, "dragon-companion").uses).toMatchObject({ limit: 1, per: "long-rest" });
+    expect(actionOf(built, "spell-summon-dragon-free").uses).toMatchObject({ limit: 1, per: "long-rest" });
     // ...and a level-17 Sorcerer, one level short, has neither.
     expect(spellOf(sorcerer(17), "summon-dragon")).toBeUndefined();
   });

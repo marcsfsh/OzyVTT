@@ -166,10 +166,27 @@ export function CharacterSheet({
   // Hands a stat-block action to the structured flow (pick target -> roll -> resolve). Every attack
   // from the sheet routes through here. "jump" goes to the initiative view and back on commit;
   // "inline" drives the runner in the Actions section.
-  const routeAttack = (action: ActorDefinition["actions"][number]) => {
+  const routeAttack = (action: ActorDefinition["actions"][number], slotLevel?: number) => {
     setTargetingResult(null);
-    beginTargeting(summaryOfOwnAction(action), actor.id);
+    beginTargeting(summaryOfOwnAction(action), actor.id, slotLevel);
     if (effectiveAttackMode === "jump") onJumpToInitiative?.();
+  };
+  // A leveled spell's cast: on your turn it goes through targeting with its slot; otherwise the server routes it,
+  // spending the slot and rolling its dice outside a fight, or refusing off turn.
+  const castSpellAction = (actionId: string, slotLevel?: number) => {
+    const structured = structuredAttacks ? definition?.actions.find((action) => action.id === actionId) : undefined;
+    if (structured) {
+      routeAttack(structured, slotLevel);
+      return;
+    }
+    void command("action:use", {
+      actorId: actor.id,
+      actionId,
+      includeDamage: true,
+      ...(slotLevel !== undefined ? { slotLevel } : {})
+    }).then((response) => {
+      if (!response.ok) toast(response.message ?? "The spell could not be cast.", { tone: "error" });
+    });
   };
   // The player's own server-resolvable action (has an attack, a save or damage) for an equipped
   // weapon (by name) or a spell (by linked actionId); null falls back to the quick roll.
@@ -254,6 +271,7 @@ export function CharacterSheet({
             rolls={rolls}
             onFeedback={setFeedback}
             spellSaveDcBonus={derived?.spellSaveDcBonus ?? 0}
+            castSpellAction={castSpellAction}
             routeSpell={(spell) => {
               const structured = structuredAttacks
                 ? structuredActionFor({ actionId: spell.actionId ?? undefined, name: spell.name })

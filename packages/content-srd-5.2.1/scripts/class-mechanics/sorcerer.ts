@@ -150,7 +150,7 @@ export const sorcerer: ClassMechanicsModule = {
       // The only route to Summon Dragon, with one free casting per Long Rest. The no-Material,
       // no-Concentration modifications stay prose.
       "dragon-companion": {
-        grants: { spells: [{ id: "summon-dragon", level: 5 }] },
+        grants: { spells: [{ id: "summon-dragon", level: 5, withoutSlot: "free" }] },
         uses: { limit: 1, per: "long-rest" }
       }
     }

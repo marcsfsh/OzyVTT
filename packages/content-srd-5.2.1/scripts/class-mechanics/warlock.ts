@@ -7,6 +7,9 @@
  */
 import type { ClassMechanicsModule } from "./overlay.js";
 
+/** An invocation's spell: cast at will without a slot, and never with one, since the Warlock does not know it. */
+const atWill = (id: string, level: number) => ({ id, level, withoutSlot: "at-will" as const, withSlot: false });
+
 /** Every SRD damage type Fiendish Resilience may name: the printed twelve, less Force. */
 const RESILIENCE_TYPES: ReadonlyArray<readonly [id: string, name: string]> = [
   ["acid", "Acid"],
@@ -65,25 +68,25 @@ export const warlock: ClassMechanicsModule = {
           choice: { kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips", where: "attack-roll" } }
         },
         // ---- castings without a spell slot ---------------------------------------------------------
-        "armor-of-shadows": { grants: { spells: [{ id: "mage-armor", level: 1 }] } },
-        "ascendant-step": { grants: { spells: [{ id: "levitate", level: 2 }] } },
-        "fiendish-vigor": { grants: { spells: [{ id: "false-life", level: 1 }] } },
+        "armor-of-shadows": { grants: { spells: [atWill("mage-armor", 1)] } },
+        "ascendant-step": { grants: { spells: [atWill("levitate", 2)] } },
+        "fiendish-vigor": { grants: { spells: [atWill("false-life", 1)] } },
         /**
          * The only one limited to once per Long Rest, so it also takes a counter. The Swim Speed stays
          * prose (no per-movement-mode speed).
          */
         "gift-of-the-depths": {
-          grants: { spells: [{ id: "water-breathing", level: 3 }] },
+          grants: { spells: [{ id: "water-breathing", level: 3, withoutSlot: "free", withSlot: false }] },
           uses: { limit: 1, per: "long-rest" }
         },
-        "mask-of-many-faces": { grants: { spells: [{ id: "disguise-self", level: 1 }] } },
-        "master-of-myriad-forms": { grants: { spells: [{ id: "alter-self", level: 2 }] } },
-        "misty-visions": { grants: { spells: [{ id: "silent-image", level: 1 }] } },
+        "mask-of-many-faces": { grants: { spells: [atWill("disguise-self", 1)] } },
+        "master-of-myriad-forms": { grants: { spells: [atWill("alter-self", 2)] } },
+        "misty-visions": { grants: { spells: [atWill("silent-image", 1)] } },
         /** The "while you're in Dim Light or Darkness" gate stays prose - there is no light-level trigger. */
-        "one-with-shadows": { grants: { spells: [{ id: "invisibility", level: 2 }] } },
-        "otherworldly-leap": { grants: { spells: [{ id: "jump", level: 1 }] } },
-        "visions-of-distant-realms": { grants: { spells: [{ id: "arcane-eye", level: 4 }] } },
-        "whispers-of-the-grave": { grants: { spells: [{ id: "speak-with-dead", level: 3 }] } },
+        "one-with-shadows": { grants: { spells: [atWill("invisibility", 2)] } },
+        "otherworldly-leap": { grants: { spells: [atWill("jump", 1)] } },
+        "visions-of-distant-realms": { grants: { spells: [atWill("arcane-eye", 4)] } },
+        "whispers-of-the-grave": { grants: { spells: [atWill("speak-with-dead", 3)] } },
         // ---- picks an invocation makes on top of itself --------------------------------------------
         /**
          * `fromCatalog: "weapons"` is wider than "a Simple or Martial Melee weapon" (catalog slugs cannot be
@@ -91,7 +94,7 @@ export const warlock: ClassMechanicsModule = {
          */
         "pact-of-the-blade": { choice: { kind: "weapon", choose: 1, fromCatalog: "weapons" } },
         /** "You learn Find Familiar and can cast it ... without a slot." */
-        "pact-of-the-chain": { grants: { spells: [{ id: "find-familiar", level: 1 }] } },
+        "pact-of-the-chain": { grants: { spells: [{ id: "find-familiar", level: 1, withoutSlot: "at-will" }] } },
         /**
          * The three cantrips only. The two level-1 Ritual spells from any class list are not expressible
          * (no all-classes list, no Ritual filter).
@@ -109,7 +112,7 @@ export const warlock: ClassMechanicsModule = {
     "magical-cunning": { uses: { limit: 1, per: "long-rest" } },
     // Contact Other Plane always prepared, plus one free casting per Long Rest.
     "contact-patron": {
-      grants: { spells: [{ id: "contact-other-plane", level: 5 }] },
+      grants: { spells: [{ id: "contact-other-plane", level: 5, withoutSlot: "free" }] },
       uses: { limit: 1, per: "long-rest" }
     },
     /**

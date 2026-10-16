@@ -1245,10 +1245,19 @@ const SpellcastingSchema = z
             level: z.number().int().min(0).max(9),
             prepared: z.boolean().default(true),
             alwaysPrepared: z.boolean().default(false),
+            /** The action that casts it: with a spell slot for a leveled spell, which the cast spends. */
             actionId: z
               .string()
               .regex(/^[a-z0-9-]+$/)
               .optional(),
+            /** The action that casts it without a slot: a grant's free casting (spending the feature's uses) or an
+             *  at-will one. */
+            freeActionId: z
+              .string()
+              .regex(/^[a-z0-9-]+$/)
+              .optional(),
+            /** False when it can be cast only without a slot (an invocation's spell). Absent: with a slot. */
+            withSlot: z.boolean().optional(),
             /** Which class granted this spell, so `resolveSpellcasting` can pick the right ability. */
             classId: z
               .string()
