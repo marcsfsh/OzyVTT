@@ -904,7 +904,7 @@
                   "id": "divine-strike",
                   "name": "Divine Strike",
                   "activation": "other",
-                  "description": "Once on each of your turns, when you hit a creature with an attack roll using a weapon, add this damage to that hit. The printed damage is Necrotic or Radiant, your choice each time; the rollable below is recorded as Radiant.",
+                  "description": "Once on each of your turns, when you hit a creature with an attack roll using a weapon, add this damage to that hit: Necrotic or Radiant, your choice each time. Add it when you confirm the hit.",
                   "damage": [
                     {
                       "formula": "1d8",

@@ -2647,7 +2647,7 @@
          "id": "divine-strike",
          "name": "Divine Strike",
          "activation": "other",
-         "description": "Once on each of your turns, when you hit a creature with an attack roll using a weapon, add this damage to that hit. The printed damage is Necrotic or Radiant, your choice each time; the rollable below is recorded as Radiant.",
+         "description": "Once on each of your turns, when you hit a creature with an attack roll using a weapon, add this damage to that hit: Necrotic or Radiant, your choice each time. Add it when you confirm the hit.",
          "damage": [
           {
            "formula": "1d8",
@@ -3552,7 +3552,7 @@
          "id": "primal-strike",
          "name": "Primal Strike",
          "activation": "other",
-         "description": "Once on each of your turns, when you hit a creature with an attack roll using a weapon or a Beast form's attack, add this damage to that hit. The printed damage is Cold, Fire, Lightning or Thunder, your choice each time; the rollable below is recorded as Lightning.",
+         "description": "Once on each of your turns, when you hit a creature with an attack roll using a weapon or a Beast form's attack, add this damage to that hit: Cold, Fire, Lightning or Thunder, your choice each time. Add it when you confirm the hit.",
          "damage": [
           {
            "formula": "1d8",
@@ -7688,7 +7688,7 @@
       "id": "sneak-attack",
       "name": "Sneak Attack",
       "activation": "other",
-      "description": "Once per turn, deal this extra damage to one creature you hit with an attack roll, if you have Advantage on the roll (or an ally is within 5 feet of the target, that ally isn't Incapacitated, and you don't have Disadvantage) and the attack uses a Finesse or a Ranged weapon. The extra damage's type is the same as the weapon's, which is why the part below is labelled \"weapon\" rather than a fixed type.",
+      "description": "Once per turn, deal this extra damage to one creature you hit with an attack roll, if you have Advantage on the roll (or an ally is within 5 feet of the target, that ally isn't Incapacitated, and you don't have Disadvantage) and the attack uses a Finesse or a Ranged weapon. The extra damage's type is the same as the weapon's. Add it when you confirm a qualifying hit.",
       "damage": [],
       "damageByLevel": [
        {
