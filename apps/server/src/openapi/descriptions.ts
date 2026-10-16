@@ -583,7 +583,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       'What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer"'
   },
   ModifierDamageReduction: {
-    "": "Flat reduction of incoming damage, applied after resistance.",
+    "": "Flat reduction of incoming damage, taken off the hit once before resistance and vulnerability (SRD Order of Application), from the largest part it covers first.",
     when: "AND-list of at most four triggers gating this rider, with at most ONE moment. Absent or empty = always. A filter with no moment is rejected: it has nothing to narrow",
     scope:
       'What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer"'
@@ -620,7 +620,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       'What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer"'
   },
   ModifierDamageVulnerability: {
-    "": "Vulnerability to the listed damage types - double damage, and the mirror of `damage-resistance`. Resistance and vulnerability to the SAME type cancel to normal damage rather than compounding (SRD 5.2.1).",
+    "": "Vulnerability to the listed damage types - double damage, and the mirror of `damage-resistance`. Resistance and vulnerability to the SAME type both apply in order: halved (round down), then doubled (SRD 5.2.1 Order of Application), so 15 becomes 14.",
     when: "AND-list of at most four triggers gating this rider, with at most ONE moment. Absent or empty = always. A filter with no moment is rejected: it has nothing to narrow",
     scope:
       'What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer"'

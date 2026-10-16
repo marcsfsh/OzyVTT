@@ -405,7 +405,7 @@ export const ModifierSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("critical-range"), threshold: z.number().int().min(15).max(20), ...riderGate }).strict(),
   /** Extra untyped weapon dice on a crit (Savage Attacks). A typed crit-only 1d6 fire is `extra-damage` + `when: [{on-critical-hit}]` instead. */
   z.object({ type: z.literal("critical-bonus-dice"), count: z.number().int().min(1).max(4), ...riderGate }).strict(),
-  /** Flat reduction of incoming damage, after resistance. */
+  /** Flat reduction of incoming damage, taken off before resistance (SRD Order of Application). */
   z.object({ type: z.literal("damage-reduction"), amount: z.number().int().min(1).max(30), ...riderGate }).strict(),
   z
     .object({
@@ -414,7 +414,8 @@ export const ModifierSchema = z.discriminatedUnion("type", [
       ...riderGate
     })
     .strict(),
-  /** The mirror of `damage-resistance`; `adjustDamageParts` applies the SRD rule that both together cancel out. */
+  /** The mirror of `damage-resistance`; with both, `adjustDamageParts` halves first and then doubles (SRD Order of
+   * Application). */
   z
     .object({
       type: z.literal("damage-vulnerability"),

@@ -1,4 +1,4 @@
-import type { ActionResolution, ActionResolutionAttack } from "@vtt/domain";
+import { owedDamageParts, type ActionResolution, type ActionResolutionAttack } from "@vtt/domain";
 import { collectRiders, parseDiceFormula, resolveDice, type DiceExpression, type RiderMoment } from "@vtt/rules-5e";
 import { abilityModifier, recordRoll, type ResolveContext } from "./context.js";
 
@@ -25,14 +25,12 @@ function rollsDamage(attack: ActionResolutionAttack | null): boolean {
   return attack === null || attack.outcome === "crit" || attack.outcome === "hit" || attack.outcome === "unknown";
 }
 
-/** Typed damage parts (rolled dice and flat bonus lines) of a resolution, for parking or applying. */
+/** Typed damage parts (rolled dice and flat bonus lines) of a resolution, for parking or applying: the shared
+ *  `owedDamageParts`, so what lands is what the card shows. */
 export function damagePartsOf(
   resolution: Pick<ActionResolution, "damage" | "bonusDamage">
 ): Array<{ amount: number; type: string }> {
-  return [
-    ...resolution.damage.map((part) => ({ amount: part.total, type: part.type })),
-    ...(resolution.bonusDamage ?? []).map((part) => ({ amount: part.amount, type: part.type }))
-  ].filter((part) => part.amount > 0);
+  return owedDamageParts(resolution);
 }
 
 /** The action's own damage dice: crit-doubled, Savage Attacks on the first part. */

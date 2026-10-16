@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { usePrompt } from "../components/feedback";
-import { armorClassInPlay, type ContentActionSummary, type GmActor, type GmView } from "@vtt/domain";
+import { armorClassInPlay, owedDamageParts, type ContentActionSummary, type GmActor, type GmView } from "@vtt/domain";
 import { ActionResultCard } from "./ActionResultCard";
 import { ActionTargetPicker } from "./ActionTargetPicker";
 import { componentLabel } from "./action-summary";
@@ -110,10 +110,7 @@ export function ActionRunner({
     setBusy(true);
     // The typed parts always travel with the apply, amended or not: an override is sent as
     // `damageOverride` and the server re-weights the same types to it, so resistances still apply.
-    const parts = [
-      ...result.damage.map((part) => ({ amount: part.total, type: part.type })),
-      ...(result.bonusDamage ?? []).map((part) => ({ amount: part.amount, type: part.type }))
-    ].filter((part) => part.amount > 0);
+    const parts = owedDamageParts(result);
     const useOverride = overrideAmount !== undefined && overrideAmount !== result.damageTotal;
     void command("actor:apply-damage", {
       actorId: targetId,

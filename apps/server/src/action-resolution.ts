@@ -1,4 +1,4 @@
-import type { ActionAvailability, ActionResolution, GameState } from "@vtt/domain";
+import { owedDamageTotal, type ActionAvailability, type ActionResolution, type GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { masteryMissDamage } from "./weapon-mastery.js";
 import { rollAttack } from "./resolution/attack.js";
@@ -106,8 +106,8 @@ function resolutionOf(ctx: ResolveContext): ActionResolution {
         }
       : ctx.builtinSave,
     damage,
-    damageTotal:
-      damage.reduce((sum, part) => sum + part.total, 0) + bonusDamage.reduce((sum, part) => sum + part.amount, 0),
+    // What every apply path lands: a negative part deals 0 of its type rather than eating another's.
+    damageTotal: owedDamageTotal({ damage, bonusDamage }),
     crit: ctx.crit,
     ...rollModeOf(ctx),
     ...(bonusDamage.length > 0 ? { bonusDamage } : {}),

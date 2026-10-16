@@ -141,7 +141,8 @@ export type DamageApplication = Readonly<{
     type: string;
     amount: number;
     adjusted: number;
-    adjustment: "resistance" | "immunity" | "vulnerability" | null;
+    /** Both Resistance and Vulnerability: halved, then doubled (SRD Order of Application). */
+    adjustment: "resistance" | "immunity" | "vulnerability" | "resistance-and-vulnerability" | null;
     adjustmentSource: string | null;
   }>;
   temporaryAbsorbed: number;
@@ -153,7 +154,8 @@ export type DamageApplication = Readonly<{
   instantDeath: boolean;
   /** A non-PC hit 0 HP: effects it sustained were ended (grapples released). */
   defeated: boolean;
-  /** Flat `damage-reduction` taken once off the post-resistance total, floored at 0. */
+  /** Flat `damage-reduction` taken off the hit before Resistance (SRD Order of Application); each part's `amount`
+   *  is what was left of it. */
   flatReduction?: number;
 }>;
 export type DamageApplyResult = MutationResult & { applied?: DamageApplication };
@@ -184,7 +186,7 @@ export type SaveAnswerResult = MutationResult & {
       string | null;
     /** Advantage/disadvantage sources that shaped the save roll (Restrained, Dodge). */ rollMode?: ActionRollMode;
     /** The typed breakdown behind `appliedDamage`; absent when the save applied no damage. */ parts?: DamageApplication["parts"];
-    /** Flat reduction taken off the post-resistance total. */ flatReduction?: number;
+    /** Flat reduction taken off before Resistance. */ flatReduction?: number;
   };
 };
 /** Outcome of answering a reaction prompt; any damage it settles is already applied server-side. A strike (an

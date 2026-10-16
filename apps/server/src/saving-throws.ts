@@ -4,6 +4,7 @@ import {
   aggregateRollMode,
   collectRiders,
   d20TestFormula,
+  halveDamageParts,
   parseDiceFormula,
   rescaleDamageParts,
   resolveDice,
@@ -329,21 +330,15 @@ export function answerSave(
   // are kept (`rescaleDamageParts`) so resistances still apply. Range is bounded by `SaveAnswerSchema`
   // and ownership by `adjustableActor` above.
   const proposedTotal = damageOverride ?? pending.proposedDamage;
-  // Typed parts (ADR-0020) halve per part on success and run the defense pipeline; older saves fall
-  // back to the untyped total.
+  // Typed parts (ADR-0020) halve on success (the total, rounded down once) and run the defense pipeline; older
+  // saves fall back to the untyped total.
   const proposed = pending.proposedDamageParts;
   const parts =
     proposed && proposed.length > 0 && damageOverride !== undefined
       ? rescaleDamageParts(proposed, damageOverride)
       : proposed;
   const outcomeParts =
-    parts && parts.length > 0
-      ? !success
-        ? parts
-        : pending.halfOnSuccess
-          ? parts.map((part) => ({ ...part, amount: Math.floor(part.amount / 2) }))
-          : []
-      : null;
+    parts && parts.length > 0 ? (!success ? parts : pending.halfOnSuccess ? halveDamageParts(parts) : []) : null;
   const outcomeDamage =
     outcomeParts !== null
       ? outcomeParts.reduce((sum, part) => sum + part.amount, 0)

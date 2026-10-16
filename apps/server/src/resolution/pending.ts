@@ -141,10 +141,11 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
  * the damage already rode the hit, so the save proposes none of its own.
  */
 export function parkActionSave(ctx: ResolveContext): void {
-  const { state, action, attacker, targets, input, deps, damage, attack } = ctx;
+  const { state, action, attacker, targets, input, deps, attack } = ctx;
   if (!action.save) return;
   const rider = attack !== null;
   if (rider && attack.outcome !== "hit" && attack.outcome !== "crit") return;
+  const parts = rider ? [] : damagePartsOf(ctx);
   createPendingSaves(state, {
     sourceActorId: attacker.id,
     sourceName: attacker.name,
@@ -152,8 +153,8 @@ export function parkActionSave(ctx: ResolveContext): void {
     ability: action.save.ability,
     dc: action.save.dc,
     targetIds: targets.map((target) => target.id),
-    proposedDamage: rider ? 0 : damage.reduce((sum, part) => sum + part.total, 0),
-    proposedDamageParts: rider ? [] : damage.map((part) => ({ amount: part.total, type: part.type })),
+    proposedDamage: parts.reduce((sum, part) => sum + part.amount, 0),
+    proposedDamageParts: parts,
     // Cover adds to Dexterity saving throws (SRD Cover) - carried on the prompt.
     saveBonus: action.save.ability === "dex" ? ctx.coverBonus : 0,
     halfOnSuccess: action.save.successDamage === "half",

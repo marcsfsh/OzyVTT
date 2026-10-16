@@ -2,17 +2,17 @@
 import type { DamageApplication } from "@vtt/domain";
 
 /**
- * What the target's defences did to a hit, as the server weighed it: "12 fire became 6 (resistance:
- * Ring of Fire Resistance); 3 less from damage reduction". Empty when nothing changed the numbers.
+ * What the target's defences did to a hit, as the server weighed it: "3 less from damage reduction; 9 fire
+ * became 4 (resistance: Ring of Fire Resistance)". The reduction comes first, as the server applies it. Empty when
+ * nothing changed the numbers.
  */
 export function damageAdjustments(parts: DamageApplication["parts"] | undefined, flatReduction = 0): string {
-  const adjusted = (parts ?? [])
-    .filter((part) => part.adjustment !== null)
-    .map(
-      (part) =>
-        `${part.amount} ${part.type} became ${part.adjusted} (${part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""})`
-    );
-  if (flatReduction > 0) adjusted.push(`${flatReduction} less from damage reduction`);
+  const adjusted = flatReduction > 0 ? [`${flatReduction} less from damage reduction`] : [];
+  for (const part of parts ?? [])
+    if (part.adjustment !== null)
+      adjusted.push(
+        `${part.amount} ${part.type} became ${part.adjusted} (${part.adjustment === "resistance-and-vulnerability" ? "resistance and vulnerability" : part.adjustment}${part.adjustmentSource ? `: ${part.adjustmentSource}` : ""})`
+      );
   return adjusted.join("; ");
 }
 

@@ -6,14 +6,15 @@ export type DamageDefenses = Readonly<{
   resistances: readonly string[];
   immunities: readonly string[];
   vulnerabilities: readonly string[];
-  /** Resistance to every damage type (SRD Petrified). Immunities still zero; a same-type vulnerability still cancels. */
+  /** Resistance to every damage type (SRD Petrified). Immunities still zero; a same-type vulnerability still doubles. */
   resistAll?: boolean;
 }>;
+export type DamageAdjustment = "resistance" | "immunity" | "vulnerability" | "resistance-and-vulnerability";
 export type AdjustedDamagePart = Readonly<{
   type: string;
   amount: number;
   adjusted: number;
-  adjustment: "resistance" | "immunity" | "vulnerability" | null;
+  adjustment: DamageAdjustment | null;
 }>;
 
 /** The one damage-type normaliser; the engine matches types by it and the homebrew editor writes with it. Lives
@@ -22,8 +23,8 @@ export const normalizeDamageType = (type: string): string => type.trim().toLower
 
 const normalizeType = normalizeDamageType;
 
-/** SRD per part: immunity zeroes, resistance halves (round down), vulnerability doubles; resistance and
- * vulnerability on the same type cancel. */
+/** SRD per part: immunity zeroes, resistance halves (round down), vulnerability doubles. Resistance comes before
+ * Vulnerability (SRD Order of Application), so both on one type halve and then double: 15 becomes 7, then 14. */
 export function adjustDamageParts(parts: readonly DamagePart[], defenses: DamageDefenses): AdjustedDamagePart[] {
   const resistances = new Set(defenses.resistances.map(normalizeType));
   const immunities = new Set(defenses.immunities.map(normalizeType));
@@ -34,23 +35,60 @@ export function adjustDamageParts(parts: readonly DamagePart[], defenses: Damage
       return { type: part.type, amount: part.amount, adjusted: 0, adjustment: "immunity" as const };
     const resistant = resistances.has(type) || defenses.resistAll === true;
     const vulnerable = vulnerabilities.has(type);
-    if (resistant && !vulnerable)
-      return {
-        type: part.type,
-        amount: part.amount,
-        adjusted: Math.floor(part.amount / 2),
-        adjustment: "resistance" as const
-      };
-    if (vulnerable && !resistant)
-      return { type: part.type, amount: part.amount, adjusted: part.amount * 2, adjustment: "vulnerability" as const };
-    return { type: part.type, amount: part.amount, adjusted: part.amount, adjustment: null };
+    const halved = resistant ? Math.floor(part.amount / 2) : part.amount;
+    const adjusted = vulnerable ? halved * 2 : halved;
+    const adjustment =
+      resistant && vulnerable
+        ? ("resistance-and-vulnerability" as const)
+        : resistant
+          ? ("resistance" as const)
+          : vulnerable
+            ? ("vulnerability" as const)
+            : null;
+    return { type: part.type, amount: part.amount, adjusted, adjustment };
   });
 }
 
-/** Flat reduction ("reduce the damage by 3", Heavy Armor Master): applied once to the total after per-type
- * adjustments, so resistance halves first. Floors at 0. */
-export function reduceDamageTotal(total: number, reduction: number): number {
-  return reduction <= 0 ? total : Math.max(0, total - reduction);
+/** A flat reduction of incoming damage ("reduce the damage by 3"); `types` null covers every type. */
+export type DamageReduction = Readonly<{ amount: number; types: readonly string[] | null }>;
+
+/**
+ * SRD Order of Application, first step: flat adjustments come off before Resistance and Vulnerability. Each
+ * reduction is taken once from the hit, from the largest part it covers first, and no part drops below 0.
+ * `reduced` is how much actually came off.
+ */
+export function reduceDamageParts(
+  parts: readonly DamagePart[],
+  reductions: readonly DamageReduction[]
+): Readonly<{ parts: DamagePart[]; reduced: number }> {
+  const amounts = parts.map((part) => part.amount);
+  let reduced = 0;
+  for (const reduction of reductions) {
+    const covers = reduction.types === null ? null : new Set(reduction.types.map(normalizeType));
+    let left = Math.max(0, reduction.amount);
+    const order = parts
+      .map((_, index) => index)
+      .filter((index) => covers === null || covers.has(normalizeType(parts[index].type)))
+      .sort((a, b) => amounts[b] - amounts[a]);
+    for (const index of order) {
+      if (left <= 0) break;
+      const taken = Math.min(left, Math.max(0, amounts[index]));
+      amounts[index] -= taken;
+      left -= taken;
+      reduced += taken;
+    }
+  }
+  return { parts: parts.map((part, index) => ({ type: part.type, amount: amounts[index] })), reduced };
+}
+
+/** Half damage (a successful save, Uncanny Dodge): half the hit's total, rounded down once, spread back over its
+ *  types so each still meets its defences. Parts that come to nothing drop out. */
+export function halveDamageParts(parts: readonly DamagePart[]): DamagePart[] {
+  const total = parts.reduce((sum, part) => sum + Math.max(0, part.amount), 0);
+  return rescaleDamageParts(
+    parts.filter((part) => part.amount > 0),
+    Math.floor(total / 2)
+  ).filter((part) => part.amount > 0);
 }
 
 /** Re-weight a hand-entered total across the rolled damage types so an amended hit still runs the defence
@@ -143,17 +181,20 @@ export function resolveDeathSave(current: DeathSaveState, naturalRoll: number): 
 /**
  * Damage taken while already at 0 HP: one automatic failure, two on a critical hit; instant death
  * when the damage equals or exceeds the hit point maximum. Losing stability resumes dying.
+ * `damageToHitPoints` is what got past Temporary Hit Points: any damage taken costs a failure ("If you take any
+ * damage while you have 0 Hit Points"), but only what carries over can kill outright, as with Massive Damage.
  */
 export function damageWhileDying(
   current: DeathSaveState,
   damage: number,
   critical: boolean,
-  hpMaximum: number
+  hpMaximum: number,
+  damageToHitPoints: number = damage
 ): Readonly<{ state: DeathSaveState; failuresAdded: number; dead: boolean }> {
   // A stable character's counters were reset; damage breaks stability and dying resumes from zero.
   const base = current.stable ? { successes: 0, failures: 0 } : current;
   if (damage <= 0) return { state: current, failuresAdded: 0, dead: current.failures >= 3 };
-  if (damage >= hpMaximum)
+  if (damageToHitPoints >= hpMaximum)
     return {
       state: { successes: base.successes, stable: false, failures: 3 },
       failuresAdded: 3 - base.failures,
