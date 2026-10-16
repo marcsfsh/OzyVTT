@@ -260,7 +260,8 @@ function cantripActionFor(
     activation: activationOf(spell.castingTime),
     description: spell.description.slice(0, 12000),
     ...mechanics,
-    ...(spell.area ? { area: spell.area } : {}),
+    // A healing area heals up to a number of creatures the caster picks (Mass Cure Wounds' six), so it is picked.
+    ...(spell.area && !mechanics.healing ? { area: spell.area } : {}),
     ...(spell.effect?.reaction ? { reaction: spell.effect.reaction } : {}),
     // `spell-id-is` riders (Agonizing Blast) match on this field alone.
     spellId: spell.id
@@ -309,7 +310,8 @@ function leveledSpellActionFor(
     activation: activationOf(spell.castingTime),
     description: spell.description.slice(0, 12000),
     ...mechanics,
-    ...(spell.area ? { area: spell.area } : {}),
+    // A healing area heals up to a number of creatures the caster picks (Mass Cure Wounds' six), so it is picked.
+    ...(spell.area && !mechanics.healing ? { area: spell.area } : {}),
     // A reaction spell's trigger rides its action, so the table offers it (Shield when an attack would hit).
     ...(spell.effect?.reaction ? { reaction: spell.effect.reaction } : {}),
     ...(freeCast ? (free ? { uses: free } : {}) : { spellSlot: { level: spell.level } }),

@@ -174,7 +174,8 @@ export function castAction(
     { attackBonus, saveDc: clampDc(saveDc), bearersDc, modifier: scoreModifierOf(definition, ability) },
     { roll: upcast }
   );
-  return { ...base, ...(spell.area ? { area: spell.area } : {}), ...mechanics };
+  // A healing area heals the creatures the caster picks (up to its count), so it is picked rather than templated.
+  return { ...base, ...(spell.area && !mechanics.healing ? { area: spell.area } : {}), ...mechanics };
 }
 
 /** What an action casting this spell does, from the spell's cast model (`SpellReference.effect`): its spell

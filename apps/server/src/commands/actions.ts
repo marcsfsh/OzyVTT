@@ -2,7 +2,7 @@ import type { RollRecord } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
 import { resolveDefinitionAction } from "../action-resolution.js";
 import { addAnnotation, shapeGeometry } from "../annotations.js";
-import { tokensInTemplate } from "../area-targeting.js";
+import { areaOriginatesFromCaster, tokensInTemplate } from "../area-targeting.js";
 import { canPlayerTarget, GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { builtinAction } from "../builtin-actions.js";
 import { effectiveActions } from "../effective-actions.js";
@@ -29,7 +29,6 @@ import { gmGradeLabelOf, initiatorOf, isGmGrade, principalTag, sessionIdOf } fro
 import { defineCommand } from "./pipeline.js";
 
 // Stat-block actions, the server-routed "use this action" tap, and free dice rolls.
-
 export const actionCommands = [
   defineCommand({
     type: "action.resolve",
@@ -102,13 +101,17 @@ export const actionCommands = [
           const calibration = geometry!.calibration!;
           // Snap the template the same way the drawn annotation will, then find who is under it.
           const snapped = shapeGeometry(calibration, template.shape, template.origin, template.target);
+          const spell = action.spellId ? kit.equipmentCatalog().spellRecord?.(action.spellId) : undefined;
+          const casterOutside = areaOriginatesFromCaster(action.area?.shape ?? template.shape, spell?.range.text);
           resolvedTargetIds = tokensInTemplate(
             draft,
             calibration,
             snapped,
             template.shape,
             action.area?.widthFeet ?? null
-          ).filter((id) => id !== actorId && draft.combat.initiative.some((entry) => entry.actorId === id));
+          ).filter(
+            (id) => (id !== actorId || !casterOutside) && draft.combat.initiative.some((entry) => entry.actorId === id)
+          );
           if (resolvedTargetIds.length === 0) throw new CommandRejectedError("No combatants are inside that area.");
         } else {
           resolvedTargetIds = targetIds ?? [];

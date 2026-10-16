@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ALLY, build, clericInput, druidInput, fight, FOE, wizardInput } from "./spell-casters.js";
+import { castAction } from "../src/item-actions.js";
+import { ALLY, build, clericInput, druidInput, fight, FOE, view, wizardInput } from "./spell-casters.js";
 
 // What each cast does, per SRD 5.2.1: damage dealt when a spell appears, saves made later rather than on the cast,
 // a damage type the caster picks, a flame hurled on later turns, and a save that ignores cover.
@@ -125,5 +126,27 @@ describe("a spell that takes a minute or more to cast", () => {
     const { resolve, hero } = fight(caster);
     hero.conditions = [{ id: "unconscious" }];
     expect(() => resolve("spell-alarm", { targetIds: [] })).toThrowError(/can't take actions/);
+  });
+});
+
+describe("a healing spell with an area", () => {
+  it("is cast at the creatures the caster picks, not every creature under a template", () => {
+    const massCure = castAction(
+      "ring",
+      { spellId: "mass-cure-wounds", consumesSpellSlot: false },
+      "Ring",
+      cleric,
+      view.spellRecord("mass-cure-wounds")
+    );
+    expect(massCure.healing).toBeDefined();
+    expect(massCure.area).toBeUndefined();
+    const fireball = castAction(
+      "ring",
+      { spellId: "fireball", consumesSpellSlot: false },
+      "Ring",
+      cleric,
+      view.spellRecord("fireball")
+    );
+    expect(fireball.area).toMatchObject({ shape: "sphere", sizeFeet: 20 });
   });
 });
