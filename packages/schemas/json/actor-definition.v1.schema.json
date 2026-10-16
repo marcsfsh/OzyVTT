@@ -291,7 +291,7 @@
         "equipped": { "type": "boolean" },
         "attuned": { "type": "boolean" },
         "weightEach": { "type": "number", "minimum": 0 },
-        "description": { "type": "string", "maxLength": 4000 },
+        "description": { "type": "string", "maxLength": 12000 },
         "category": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 40 },
         "weapon": {
           "type": "object",

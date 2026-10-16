@@ -76,6 +76,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // Metal Shell (timed immunity, once per dawn) is not authored: a standing immunity grant would be permanent.
   "armor-of-invulnerability": { grants: { damageResistances: ["bludgeoning", "piercing", "slashing"] } },
 
+  // The curse alone: attuning locks the armor on (SRD: attunement to a cursed item can't be ended voluntarily).
+  // The resistance and the two vulnerabilities depend on a type the GM picks per copy, so they stay prose.
+  "armor-of-vulnerability": { cursed: true },
+
   // Kept as the curse alone: the SRD item is a trap, and the attunement lock is what springs it. The GM
   // applies the rest from the description, since neither half is expressible: resistance to ranged-weapon
   // damage (resistance is by damage type, not source) and the redirect of nearby ranged attacks.
@@ -106,16 +110,21 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // ---- Ammunition ------------------------------------------------------------------------------
 
   /**
-   * Ammunition has no weapon block, so `attack-bonus` is bearer-scoped; the `when` pair limits it to
-   * ranged attacks so melee swings are unaffected. It applies to all of the bearer's ranged attacks,
-   * not only those using this ammunition. The damage half is not authored.
+   * Ammunition has no weapon block, so its riders are bearer-scoped; `weapon-property-is: ammunition`
+   * limits them to shots from a launcher, so a thrown dagger or a spell gets nothing. Not modeled: which
+   * launcher fires which kind of ammunition, and the piece losing its magic once it hits.
    */
   "ammunition-1": {
     modifiers: [
       {
         type: "attack-bonus",
         amount: 1,
-        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["ranged"] }]
+        when: [{ type: "on-attack-roll" }, { type: "weapon-property-is", properties: ["ammunition"] }]
+      },
+      {
+        type: "damage-bonus",
+        amount: 1,
+        when: [{ type: "on-damage-roll" }, { type: "weapon-property-is", properties: ["ammunition"] }]
       }
     ]
   },
@@ -124,7 +133,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       {
         type: "attack-bonus",
         amount: 2,
-        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["ranged"] }]
+        when: [{ type: "on-attack-roll" }, { type: "weapon-property-is", properties: ["ammunition"] }]
+      },
+      {
+        type: "damage-bonus",
+        amount: 2,
+        when: [{ type: "on-damage-roll" }, { type: "weapon-property-is", properties: ["ammunition"] }]
       }
     ]
   },
@@ -133,7 +147,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       {
         type: "attack-bonus",
         amount: 3,
-        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["ranged"] }]
+        when: [{ type: "on-attack-roll" }, { type: "weapon-property-is", properties: ["ammunition"] }]
+      },
+      {
+        type: "damage-bonus",
+        amount: 3,
+        when: [{ type: "on-damage-roll" }, { type: "weapon-property-is", properties: ["ammunition"] }]
       }
     ]
   },
@@ -285,8 +304,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // Not modeled: +1 HP per level (`hit-points-per-level` is refused on items) and the curse.
+  // The curse's attunement lock is authored (SRD: attunement to a cursed item can't be ended voluntarily). Not
+  // modeled: +1 HP per level (`hit-points-per-level` is refused on items) and the curse's berserk save.
   "berserker-axe": {
+    cursed: true,
     modifiers: [
       { type: "attack-bonus", amount: 1 },
       { type: "damage-bonus", amount: 1 }
@@ -318,8 +339,6 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //   `ammunition-of-slaying` - entirely gated on creature type.
   //   `oathbow` - everything is gated on a player-declared sworn enemy.
   //   `sword-of-life-stealing`, `sword-of-sharpness` - crit damage of 15 and 14 exceeds the range.
-  //   `armor-of-vulnerability` - no `grants.damageVulnerabilities`; authoring only the resistance
-  //       would make the cursed item strictly better than plain armor.
 
   // ==== Wands, staffs, rods, rings and the spell scroll ===========================================
   //

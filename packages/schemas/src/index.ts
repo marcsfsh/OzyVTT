@@ -628,7 +628,8 @@ export const InventoryItemSchema = z
     equipped: z.boolean().default(false),
     attuned: z.boolean().default(false),
     weightEach: z.number().nonnegative().max(1_000_000).optional(),
-    description: z.string().max(4000).optional(),
+    /** The catalog text copied on add; as long as `EquipmentReferenceSchema.description` allows. */
+    description: z.string().max(12000).optional(),
     /** Equipment category slug (weapon/armor/tool/...), open for homebrew. Drives sheet grouping. */
     category: z
       .string()

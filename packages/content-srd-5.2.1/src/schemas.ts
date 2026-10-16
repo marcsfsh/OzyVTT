@@ -289,8 +289,9 @@ export const EquipmentReferenceSchema = z
       .max(40),
     costGp: z.number().nonnegative().max(1_000_000).nullable(),
     weightLb: z.number().nonnegative().max(1000).nullable(),
-    /** Matches `InventoryItemSchema.description`, which add-from-catalog copies this string onto. */
-    description: z.string().max(4000).nullable(),
+    /** Matches `InventoryItemSchema.description`, which add-from-catalog copies this string onto. Long enough for
+     *  the longest SRD item with its tables (Mysterious Deck). */
+    description: z.string().max(12000).nullable(),
     weapon: EquipmentWeaponStatsSchema.nullable().optional(),
     armor: z
       .object({

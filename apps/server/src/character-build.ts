@@ -945,7 +945,7 @@ export function buildCharacterDefinition(
               : false,
             attuned: false,
             ...(record?.weightLb !== null && record?.weightLb !== undefined ? { weightEach: record.weightLb } : {}),
-            ...(record?.description ? { description: record.description.slice(0, 4000) } : {}),
+            ...(record?.description ? { description: record.description.slice(0, 12000) } : {}),
             ...(record ? { category: record.category } : {}),
             // `mastery` is not copied: it resolves against the catalog and is gated on the bearer having unlocked
             // this weapon. Omit `properties` when the catalog records none (absent means "not recorded").

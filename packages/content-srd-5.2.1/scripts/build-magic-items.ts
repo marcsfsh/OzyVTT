@@ -277,7 +277,7 @@ const LADDER_RARITIES = /^(.+?)\s*\(\+1\),\s*(.+?)\s*\(\+2\),\s*or\s*(.+?)\s*\(\
  * Matches `InventoryItemSchema.description`, which add-from-catalog copies this string onto. Overflow
  * is cut at the last sentence boundary and marked; the bundle test names every row that is cut.
  */
-const DESCRIPTION_LIMIT = 4000;
+const DESCRIPTION_LIMIT = 12000;
 const TRUNCATION_MARK = " […]";
 
 function renderDescription(entry: Entry, printedTypeLine: string): { text: string; truncated: boolean } {
