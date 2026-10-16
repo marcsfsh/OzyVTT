@@ -34,6 +34,7 @@ import { answerSave, type SaveAnswerDependencies } from "../src/saving-throws.js
 import { pushTokenAway } from "../src/forced-movement.js";
 import { mapDistance, tokenCreatureDistance } from "../src/movement-narration.js";
 import { moveEncounterToken, setActorSize, type TokenMapGeometry } from "../src/token-placement.js";
+import { png } from "./image-fixtures.js";
 
 // Weapon Mastery, proved where a player sees it: damage on a miss, a foe's die rolled twice keeping the
 // worse, a condition from the foe's own save, a pushed token, a smaller Speed on the foe's turn, the attacker's
@@ -1185,15 +1186,6 @@ describe("a mastery that cannot act off-turn says so where the GM reads it", () 
 const LURKER = "10000000-0000-4000-8000-000000000003";
 
 /** A 900x600 PNG header, which is all `inspectMapImage` reads. */
-function png(width: number, height: number) {
-  const buffer = Buffer.alloc(24);
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer);
-  buffer.writeUInt32BE(13, 8);
-  buffer.write("IHDR", 12, "ascii");
-  buffer.writeUInt32BE(width, 16);
-  buffer.writeUInt32BE(height, 20);
-  return buffer;
-}
 
 async function joinSocket(base: string, token: string) {
   const socket = connect(base, { auth: { token }, transports: ["websocket"], reconnection: false, forceNew: true });

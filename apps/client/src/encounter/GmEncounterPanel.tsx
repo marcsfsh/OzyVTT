@@ -16,6 +16,9 @@ import { FightMenu } from "./FightMenu";
 import { ActingConsole } from "./ActingConsole";
 import { GmInitiativeRow } from "./GmInitiativeRow";
 
+/** How long a turn button ignores taps after a turn command settles: longer than a double tap. */
+const TURN_SETTLE_MS = 500;
+
 export function GmEncounterPanel({
   state,
   selectedMap,
@@ -40,6 +43,9 @@ export function GmEncounterPanel({
   );
   const liveMapRef = useRef(state.combat.mapAssetId);
   const [busy, setBusy] = useState(false);
+  // On a LAN the turn changes before a double tap's second tap lands, so a turn button ignores taps
+  // until shortly after the last turn command settled; otherwise one double tap skips a combatant.
+  const turnSettlesAt = useRef(0);
   const [message, setMessage] = useState("");
   // The GM's rolls follow the shared per-browser dice-input preference.
   const { rollMode } = useRollPreference();
@@ -152,6 +158,8 @@ export function GmEncounterPanel({
     success: string,
     onConfirm?: () => Promise<MutationResult>
   ) => {
+    if (performance.now() < turnSettlesAt.current) return;
+    turnSettlesAt.current = Number.POSITIVE_INFINITY;
     setBusy(true);
     setMessage("");
     setConfirm(null);
@@ -162,10 +170,12 @@ export function GmEncounterPanel({
         return;
       }
       if (!result.ok) throw new Error(result.message ?? "The turn command was rejected.");
+      turnSettlesAt.current = performance.now() + TURN_SETTLE_MS;
       setMessage(success);
     } catch (error) {
       setMessage((error as Error).message);
     } finally {
+      if (turnSettlesAt.current === Number.POSITIVE_INFINITY) turnSettlesAt.current = 0;
       setBusy(false);
     }
   };

@@ -11,6 +11,7 @@ import { MapAssetStore } from "../src/map-assets.js";
 import { createCodexRouter } from "../src/codex-http.js";
 import { CODEX_ASSET_PATHS, CODEX_PATHS } from "@vtt/api-contract";
 import { openApiDocument } from "../src/openapi/document.js";
+import { png } from "./image-fixtures.js";
 
 // HTTP-boundary tests for the codex router, which enforces viewer safety by choosing a GM or player
 // projection per role. These confirm the wiring: unrevealed = 404 not 403, gmBody never reaches a
@@ -23,16 +24,6 @@ const cleanups: Array<() => Promise<void> | void> = [];
 afterEach(async () => {
   while (cleanups.length) await cleanups.pop()!();
 });
-
-function png(width: number, height: number) {
-  const buffer = Buffer.alloc(24);
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer);
-  buffer.writeUInt32BE(13, 8);
-  buffer.write("IHDR", 12, "ascii");
-  buffer.writeUInt32BE(width, 16);
-  buffer.writeUInt32BE(height, 20);
-  return buffer;
-}
 
 async function fixture(pings?: unknown[][]) {
   const directory = await mkdtemp(join(tmpdir(), "vtt-codex-http-"));

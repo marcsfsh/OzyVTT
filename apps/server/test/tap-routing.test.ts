@@ -10,6 +10,7 @@ import { RulesBlockedError } from "../src/game-store.js";
 import { looseRollPlan, offTurnVerdict, routeForTap, NOT_YOUR_TURN } from "../src/tap-routing.js";
 import { familyOf } from "../src/rules-families.js";
 import { createServer } from "../src/server.js";
+import { png } from "./image-fixtures.js";
 
 // Tapping an action is a server routing decision with three named outcomes. Also pinned: a monster
 // sheet outside the fight rolls loose for the GM, and an off-turn tap is a rules block with an
@@ -156,16 +157,6 @@ describe("tap routing (the seam)", () => {
 });
 
 // ---------------------------------------------------------------------------------------------
-
-function png(width: number, height: number) {
-  const buffer = Buffer.alloc(24);
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer);
-  buffer.writeUInt32BE(13, 8);
-  buffer.write("IHDR", 12, "ascii");
-  buffer.writeUInt32BE(width, 16);
-  buffer.writeUInt32BE(height, 20);
-  return buffer;
-}
 
 async function boot(state: GameState) {
   const directory = await mkdtemp(join(tmpdir(), "vtt-tap-"));

@@ -6,6 +6,7 @@ import { GameStateSchema, type CombatLogEntry } from "@vtt/domain";
 import { GAME_PATHS } from "@vtt/api-contract";
 import { afterEach, describe, expect, it } from "vitest";
 import { createServer } from "../src/server.js";
+import { png } from "./image-fixtures.js";
 
 // Typed damage in the feed row the table reads. `answerSave` and both reaction paths must carry
 // `application.parts` through, so a resisted number arrives with its reason. These drive the HTTP
@@ -18,16 +19,6 @@ const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
 });
-
-function png(width: number, height: number) {
-  const buffer = Buffer.alloc(24);
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer);
-  buffer.writeUInt32BE(13, 8);
-  buffer.write("IHDR", 12, "ascii");
-  buffer.writeUInt32BE(width, 16);
-  buffer.writeUInt32BE(height, 20);
-  return buffer;
-}
 
 const baseDefinition = {
   schemaVersion: 1,

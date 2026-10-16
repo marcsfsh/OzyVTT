@@ -210,6 +210,7 @@
 }
 .encounter-end {
   width: 100%;
+  min-height: var(--tap-min);
   margin-top: 0.6rem;
   padding: 0.55rem;
   border: 1px solid var(--danger);
@@ -405,6 +406,7 @@
 }
 .turn-end {
   margin-left: auto;
+  min-height: var(--tap-min);
   padding: 0.24rem 0.8rem;
   font-size: var(--fs-sm);
   font-weight: 700;

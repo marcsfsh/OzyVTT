@@ -183,6 +183,53 @@ function inspectBmp(buffer: Buffer): MapImageInspection | null {
   };
 }
 
+const INCOMPLETE = "The image file is incomplete; it may not have finished downloading. Save it again and re-upload.";
+
+/** A PNG's chunk chain reaches IEND. Bytes after IEND are ignored, as browsers do. */
+function pngComplete(buffer: Buffer) {
+  let offset = PNG_SIGNATURE.length;
+  while (offset + 12 <= buffer.length) {
+    const length = buffer.readUInt32BE(offset);
+    if (ascii(buffer, offset + 4, offset + 8) === "IEND") return true;
+    offset += 12 + length;
+  }
+  return false;
+}
+
+/** A JPEG's segments and scans reach EOI. Entropy-coded data can't hold a bare 0xFF marker (it is stuffed),
+ *  so the next marker after a scan is the first 0xFF followed by neither 0x00 nor a restart marker. */
+function jpegComplete(buffer: Buffer) {
+  let offset = 2;
+  while (offset + 1 < buffer.length) {
+    if (buffer[offset] !== 0xff) return false;
+    while (buffer[offset] === 0xff) offset++;
+    const marker = buffer[offset++];
+    if (marker === 0xd9) return true;
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    if (offset + 2 > buffer.length) return false;
+    offset += buffer.readUInt16BE(offset);
+    if (marker !== 0xda) continue;
+    for (;;) {
+      offset = buffer.indexOf(0xff, offset);
+      if (offset === -1 || offset + 1 >= buffer.length) return false;
+      const next = buffer[offset + 1];
+      if (next !== 0x00 && !(next >= 0xd0 && next <= 0xd7) && next !== 0xff) break;
+      offset += next === 0xff ? 1 : 2;
+    }
+  }
+  return false;
+}
+
+/** Whether the bytes hold the whole image. A truncated download still has a valid header, uploads, and then
+ *  renders broken or half-drawn on the table, so it is refused here. GIF has no cheap end check. */
+function looksComplete(buffer: Buffer, format: MapImageFormat) {
+  if (format === "png") return pngComplete(buffer);
+  if (format === "jpeg") return jpegComplete(buffer);
+  if (format === "webp") return buffer.readUInt32LE(4) + 8 <= buffer.length;
+  if (format === "bmp") return buffer.readUInt32LE(2) <= buffer.length;
+  return true;
+}
+
 export function inspectMapImage(input: Uint8Array, policy: MapImagePolicy = {}): MapImageInspection {
   const buffer = Buffer.from(input);
   const maxBytes = policy.maxBytes ?? DEFAULT_MAX_BYTES;
@@ -194,6 +241,7 @@ export function inspectMapImage(input: Uint8Array, policy: MapImagePolicy = {}):
     throw new InvalidRequestError(
       "Unsupported map image. Use a valid PNG, JPEG, WebP, GIF, or BMP; additional normalized formats are planned."
     );
+  if (!looksComplete(buffer, inspection.format)) throw new InvalidRequestError(INCOMPLETE);
   if (
     !Number.isInteger(inspection.width) ||
     !Number.isInteger(inspection.height) ||

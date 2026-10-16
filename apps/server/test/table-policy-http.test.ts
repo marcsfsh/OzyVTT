@@ -8,6 +8,7 @@ import { loadActorFixture } from "@vtt/test-fixtures";
 import { ENCOUNTER_ARCHIVE_PATHS, GAME_PATHS } from "@vtt/api-contract";
 import { afterEach, describe, expect, it } from "vitest";
 import { createServer } from "../src/server.js";
+import { png } from "./image-fixtures.js";
 
 // The table-policy surface over the integration HTTP adapter, with real authorization, persistence
 // and projection: standing rules policy, per-family exceptions, staging defaults, mid-fight add,
@@ -15,16 +16,6 @@ import { createServer } from "../src/server.js";
 
 const HERO_ID = "10000000-0000-4000-8000-000000000001";
 const SECOND_ID = "10000000-0000-4000-8000-000000000002";
-
-function png(width: number, height: number) {
-  const buffer = Buffer.alloc(24);
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer);
-  buffer.writeUInt32BE(13, 8);
-  buffer.write("IHDR", 12, "ascii");
-  buffer.writeUInt32BE(width, 16);
-  buffer.writeUInt32BE(height, 20);
-  return buffer;
-}
 
 /** A real, schema-valid character sheet so the sheet-editing door under test has something to edit. */
 const HERO_DEFINITION = ActorDefinitionSchema.parse(loadActorFixture("torva-grimtusk"));
