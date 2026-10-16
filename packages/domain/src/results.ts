@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ActionReactionSchema, CharacterChoiceSchema, type CharacterChoice } from "@vtt/schemas";
 import { CharacterDraftSchema } from "./character-draft.js";
-import { AbilityIdSchema, RuleModeSchema, type AnnotationPoint } from "./state.js";
+import { AbilityIdSchema, BuilderAbilityMethodSchema, RuleModeSchema, type AnnotationPoint } from "./state.js";
 import type { Wire } from "./wire.js";
 
 /**
@@ -383,10 +383,24 @@ export type BuilderOffersRequest = Readonly<{
   backgroundId?: string;
   classId?: string;
   level: number;
+  /** The class each character level went to, in order (index 0 is level 1); absent for one class. */
+  classLevels?: readonly string[];
   picks?: Readonly<Record<string, readonly string[]>>;
   asiIncreases?: Readonly<Record<string, readonly BuilderAbilityIncrease[]>>;
   choices?: readonly CharacterChoice[];
+  /** With `choices`, the stored sheet's level and ability scores: the reply then says how those scores were made. */
+  sheet?: Readonly<{ level: number; abilityScores: Readonly<Record<BuilderAbility, number>> }>;
 }>;
+type BuilderAbility = z.infer<typeof AbilityIdSchema>;
+
+/** How a stored character's ability scores were made: the ledger's record, or for a sheet built before the ledger
+ *  kept one, the base scores and background increase that rebuild its totals (`derived`). */
+const BuilderSheetAbilitiesSchema = z.strictObject({
+  abilityMethod: BuilderAbilityMethodSchema,
+  baseScores: z.record(AbilityIdSchema, z.number().int()),
+  backgroundBonusAllocation: z.array(z.strictObject({ ability: AbilityIdSchema, amount: z.number().int() })),
+  derived: z.boolean()
+});
 
 /** What the build offers, the answers it still accepts (picks it no longer offers are dropped), and the
  *  ledger rows those answers make, which `character.create` carries. */
@@ -395,7 +409,10 @@ export const BuilderOffersReplySchema = z.strictObject({
   picks: z.record(z.string(), z.array(z.string())),
   asiIncreases: z.record(z.string(), BuilderAbilityIncreasesSchema),
   subclassId: z.string().nullable(),
-  choices: z.array(CharacterChoiceSchema)
+  choices: z.array(CharacterChoiceSchema),
+  /** For a draft that sent `sheet`: how that sheet's scores were made. Null when not asked, or when no base scores
+   *  and background increase reproduce them. */
+  abilities: BuilderSheetAbilitiesSchema.nullable()
 });
 export type BuilderOffersReply = Wire<z.infer<typeof BuilderOffersReplySchema>>;
 export type BuilderOffersResult = MutationResult & Partial<BuilderOffersReply>;

@@ -209,9 +209,13 @@ export function resolvePickChoice(
     if (!source.where) return true;
     const spell = spellsById.get(id);
     if (!spell) return false;
-    if (source.where === "deals-damage") return spell.damageRoll !== null || spell.damageTypes.length > 0;
+    const dealsDamage = spell.damageRoll !== null || spell.damageTypes.length > 0;
+    const ranged = (spell.rangeFeet ?? 0) >= 10;
+    if (source.where === "deals-damage") return dealsDamage;
     if (source.where === "attack-roll") return spell.attackRoll;
-    if (source.where === "ranged") return (spell.rangeFeet ?? 0) >= 10;
+    if (source.where === "ranged") return ranged;
+    // Eldritch Spear: "one of your known Warlock cantrips that deals damage and has a range of 10+ feet".
+    if (source.where === "ranged-damage") return dealsDamage && ranged;
     return false;
   };
   const seen = new Set<string>();

@@ -11,7 +11,8 @@ import { featurePicks } from "@vtt/content-srd-5.2.1";
 import {
   CLASS_CANTRIP_BUDGET,
   CLASS_SPELL_BUDGET,
-  classSpellList,
+  classBudgetKey,
+  classSpellOptions,
   levelOfPick,
   SPELLCASTING_ABILITY_KIND,
   surveyDraft,
@@ -21,6 +22,7 @@ import {
 } from "./character-offers.js";
 import type { ContentView } from "./content-library.js";
 import { featHoldings, featPrerequisiteFailure } from "./feat-prerequisites.js";
+import { sheetAbilityScores } from "./sheet-abilities.js";
 
 /**
  * The character builder's offers for a draft (`builder:offers`): the survey `character.create` validates
@@ -59,7 +61,8 @@ export function builderOffers(request: BuilderOffersRequest, library: ContentVie
     speciesId: request.speciesId,
     backgroundId: request.backgroundId,
     classId: request.classId,
-    level: request.level
+    level: request.level,
+    ...(request.classLevels ? { classLevels: request.classLevels } : {})
   };
   let picks: Picks = request.picks ?? {};
   let increases: Increases = request.asiIncreases ?? {};
@@ -67,8 +70,11 @@ export function builderOffers(request: BuilderOffersRequest, library: ContentVie
   if (request.choices) {
     // A stored ledger: one survey places every row, then each row is read back onto the card it answers.
     const rows = request.choices.filter((row) => row.level <= request.level);
-    const subclassId = rows.find((row) => row.kind === "subclass")?.id;
-    offers = offersFor(surveyDraft({ ...identity, subclassId, choices: rows }, library), library, {});
+    offers = offersFor(
+      surveyDraft({ ...identity, ...subclassesInLedger(rows, request.classId), choices: rows }, library),
+      library,
+      {}
+    );
     ({ picks, increases } = answersFromLedger(rows, offers));
   } else {
     offers = offersFor(surveyDraft({ ...identity, choices: [] }, library), library, {});
@@ -78,8 +84,11 @@ export function builderOffers(request: BuilderOffersRequest, library: ContentVie
   for (let pass = 0; pass < MAX_PASSES; pass += 1) {
     const kept = pruned(picks, offers);
     const choices = rowsOf(offers, kept, increases);
-    const subclassId = subclassOf(offers, kept) ?? undefined;
-    const next = offersFor(surveyDraft({ ...identity, subclassId, choices }, library), library, kept);
+    const next = offersFor(
+      surveyDraft({ ...identity, ...subclassesOf(offers, kept, request.classId), choices }, library),
+      library,
+      kept
+    );
     const settled = JSON.stringify(next) === JSON.stringify(offers);
     offers = next;
     if (settled) break;
@@ -91,10 +100,58 @@ export function builderOffers(request: BuilderOffersRequest, library: ContentVie
     offers,
     picks,
     asiIncreases: increases,
-    subclassId: subclassOf(offers, picks),
-    choices: rowsOf(offers, picks, increases)
+    subclassId: subclassesOf(offers, picks, request.classId).subclassId ?? null,
+    choices: rowsOf(offers, picks, increases),
+    abilities: abilitiesOf(request, library)
   };
 }
+
+/** How the stored sheet a rebuild reads back made its scores, when the draft sent that sheet. */
+function abilitiesOf(request: BuilderOffersRequest, library: ContentView): BuilderOffersReply["abilities"] {
+  const { sheet, choices, speciesId, backgroundId, classId } = request;
+  if (!sheet || !choices || !speciesId || !backgroundId || !classId) return null;
+  const found = sheetAbilityScores(
+    { speciesId, backgroundId, classId, level: sheet.level, abilityScores: sheet.abilityScores, choices },
+    library
+  );
+  return found
+    ? {
+        abilityMethod: found.abilityMethod,
+        baseScores: { ...found.baseScores },
+        backgroundBonusAllocation: found.backgroundBonusAllocation.map((entry) => ({ ...entry })),
+        derived: found.derived
+      }
+    : null;
+}
+
+/** Every class's subclass in a draft: the starting class's as `subclassId`, a later class's by its id. */
+type DraftSubclasses = { subclassId?: string; subclassIds: Record<string, string> };
+
+const subclassesBy = (answers: ReadonlyArray<{ classId: string | null; id: string }>, startingClassId?: string) => {
+  const found: DraftSubclasses = { subclassIds: {} };
+  for (const { classId, id } of answers) {
+    if (classId === null || classId === startingClassId) found.subclassId ??= id;
+    else found.subclassIds[classId] ??= id;
+  }
+  return found;
+};
+
+/** Each subclass offer's answer. */
+const subclassesOf = (offers: readonly BuilderOffer[], picks: Picks, startingClassId?: string): DraftSubclasses =>
+  subclassesBy(
+    offers.flatMap((offer) => {
+      const id = offer.kind === "subclass" ? picks[offer.key]?.[0] : undefined;
+      return id ? [{ classId: offer.classId, id }] : [];
+    }),
+    startingClassId
+  );
+
+/** A stored ledger's subclass rows; a row naming no class is the starting class's. */
+const subclassesInLedger = (rows: readonly CharacterChoice[], startingClassId?: string): DraftSubclasses =>
+  subclassesBy(
+    rows.filter((row) => row.kind === "subclass").map((row) => ({ classId: row.classId ?? null, id: row.id })),
+    startingClassId
+  );
 
 /** Each offer's answers that it still takes: a listed option (or the ASI shorthand), within capacity. */
 function pruned(picks: Picks, offers: readonly BuilderOffer[]): Record<string, readonly string[]> {
@@ -107,12 +164,6 @@ function pruned(picks: Picks, offers: readonly BuilderOffer[]): Record<string, r
   }
   return kept;
 }
-
-/** The subclass is the subclass offer's answer. */
-const subclassOf = (offers: readonly BuilderOffer[], picks: Picks): string | null => {
-  const offer = offers.find((candidate) => candidate.kind === "subclass");
-  return (offer && picks[offer.key]?.[0]) ?? null;
-};
 
 /** The ledger rows these answers make, one per pick, stamped with the offer's level, class and feature. */
 function rowsOf(offers: readonly BuilderOffer[], picks: Picks, increases: Increases): CharacterChoice[] {
@@ -186,7 +237,15 @@ function offersFor(survey: DraftSurvey, library: ContentView, picks: Picks): Bui
     library,
     picks
   );
+  // An option whose own prerequisite is unmet (a Warlock cantrip that deals damage) stays listed, greyed.
+  for (const { card, source } of cards)
+    if (source && source.unmet.size > 0)
+      card.unavailable = { ...card.unavailable, ...Object.fromEntries(source.unmet) };
   greyRepeatedGrants(cards, picks);
+  greyClassSpellsTakenElsewhere(
+    cards.map(({ card }) => card),
+    picks
+  );
   greyExpertiseOutOfReach(
     cards.map(({ card }) => card),
     survey,
@@ -255,15 +314,14 @@ function cardsOf(offer: ChoiceOffer, survey: DraftSurvey): Card[] {
   }));
 }
 
-/** An offer's options as cards: inside its spell window, a cantrip pick offering only cantrips and a spell
- *  pick only levelled spells, each named. */
+/** An offer's options as cards: inside its spell window, a cantrip pick offering only cantrips, each named. A spell
+ *  pick's window is its own floor: Magical Discoveries may take a cantrip, as the build accepts. */
 function optionsOf(offer: ChoiceOffer, survey: DraftSurvey): CatalogChoiceOption[] {
   const options: CatalogChoiceOption[] = [];
   for (const id of offer.options) {
     const level = offer.optionLevels?.get(id);
     if (!withinOfferSpellWindow(offer, id)) continue;
     if (level !== undefined && offer.kind === "cantrip" && level !== 0) continue;
-    if (level !== undefined && offer.kind === "spell" && level < 1) continue;
     options.push({
       id,
       name: offer.names.get(id) ?? nameOf(offer.kind, id, survey),
@@ -295,9 +353,9 @@ const titleCase = (slug: string): string =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
 
-/** The picks the class table and the starting gear ask for, which the build reads outside its offers. */
+/** The picks the class tables and the starting gear ask for, which the build reads outside its offers. */
 function fixedCards(survey: DraftSurvey): Card[] {
-  const { classRecord, background, species, subclass } = survey;
+  const { classRecord, background, species } = survey;
   const cards: Card[] = [];
   const card = (
     fields: Pick<Card, "key" | "step" | "kind" | "label" | "capacity" | "options" | "classId"> & Partial<Card>
@@ -322,38 +380,41 @@ function fixedCards(survey: DraftSurvey): Card[] {
       options: species.sizes.map((size) => ({ id: size, name: titleCase(size) })),
       classId: null
     });
-  const levelRow = classRecord?.levelTable[survey.level - 1];
-  const list =
-    classRecord && levelRow
-      ? classSpellList(classRecord, subclass, levelRow, survey.catalogs, survey.extraSpellLists)
-      : null;
-  if (classRecord && list) {
-    // The printed level-row columns plus what features granted (Thaumaturge's extra cantrip).
-    if (survey.printedCantrips > 0)
+  // Each casting class prepares from its own list and its own columns, as if single-classed (SRD Multiclassing); its
+  // picks are stamped at the level the class was taken. The printed columns plus what features granted
+  // (Thaumaturge's extra cantrip).
+  for (const budget of survey.classSpells) {
+    const list = classSpellOptions(budget, survey.catalogs);
+    const key = (base: string) => classBudgetKey(base, budget.classId, classRecord?.id ?? null);
+    if (budget.printedCantrips > 0)
       card({
-        key: CLASS_CANTRIP_BUDGET,
+        key: key(CLASS_CANTRIP_BUDGET),
         step: "features",
         kind: "cantrip",
-        label: `${classRecord.name} cantrips`,
-        capacity: survey.printedCantrips + (survey.extraPickBudgets.get(CLASS_CANTRIP_BUDGET) ?? 0),
+        label: `${budget.className} cantrips`,
+        capacity: budget.cantrips,
         options: list.options.filter((option) => option.level === 0),
         maxSpellLevel: 0,
-        classId: classRecord.id,
+        level: budget.takenAt,
+        classId: budget.classId,
         unresolvable: list.unresolvable
       });
-    if (survey.printedPrepared > 0 && list.maxSlotLevel > 0)
+    if (budget.printedPrepared > 0 && budget.maxSlotLevel > 0)
       card({
-        key: CLASS_SPELL_BUDGET,
+        key: key(CLASS_SPELL_BUDGET),
         step: "features",
         kind: "spell",
         label:
-          classRecord.spellcasting?.prepares === "known"
-            ? `${classRecord.name} spells known`
-            : `${classRecord.name} prepared spells`,
-        capacity: survey.printedPrepared + (survey.extraPickBudgets.get(CLASS_SPELL_BUDGET) ?? 0),
-        options: list.options.filter((option) => (option.level ?? 0) >= 1 && (option.level ?? 0) <= list.maxSlotLevel),
-        maxSpellLevel: list.maxSlotLevel,
-        classId: classRecord.id,
+          budget.casting.prepares === "known"
+            ? `${budget.className} spells known`
+            : `${budget.className} prepared spells`,
+        capacity: budget.prepared,
+        options: list.options.filter(
+          (option) => (option.level ?? 0) >= 1 && (option.level ?? 0) <= budget.maxSlotLevel
+        ),
+        maxSpellLevel: budget.maxSlotLevel,
+        level: budget.takenAt,
+        classId: budget.classId,
         unresolvable: list.unresolvable
       });
   }
@@ -409,6 +470,7 @@ function markUnavailable(cards: Card[], survey: DraftSurvey, library: ContentVie
     hold(background.languages, background.name);
   }
   if (classRecord) hold(classRecord.toolProficiencies, classRecord.name);
+  for (const { record } of survey.classes.slice(1)) hold(record.multiclassProficiencies?.tools ?? [], record.name);
   if (species) hold(species.languages, species.name);
   for (const { record } of survey.granted) {
     // Only ungated grants are baked into the sheet, so only they make a pick a repeat.
@@ -467,6 +529,25 @@ function greyRepeatedGrants(cards: ReadonlyArray<{ card: Card; source: ChoiceOff
       if (id !== ASI_SHORTHAND && !earlier.has(id))
         earlier.set(id, `already chosen for ${card.label} at level ${card.level}`);
     spent.set(source, earlier);
+  }
+}
+
+/** A spell sits on the sheet once, so a multiclass build's class spell cards grey what another class's card took. */
+function greyClassSpellsTakenElsewhere(cards: Card[], picks: Picks): void {
+  const classSpellCards = cards.filter(
+    (card) => card.featureId === null && (card.kind === "cantrip" || card.kind === "spell") && card.classId !== null
+  );
+  if (new Set(classSpellCards.map((card) => card.classId)).size < 2) return;
+  for (const card of classSpellCards) {
+    const taken: Record<string, string> = {};
+    for (const other of classSpellCards) {
+      if (other.classId === card.classId) continue;
+      for (const id of picks[other.key] ?? []) taken[id] ??= `already chosen for ${other.label}`;
+    }
+    const greyed = Object.fromEntries(
+      Object.entries(taken).filter(([id]) => card.options.some((option) => option.id === id))
+    );
+    if (Object.keys(greyed).length > 0) card.unavailable = { ...greyed, ...card.unavailable };
   }
 }
 

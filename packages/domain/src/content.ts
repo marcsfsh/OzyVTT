@@ -195,7 +195,10 @@ export const ContentFeatureChoiceSummarySchema = z.strictObject({
   minSpellLevel: z.number().int().min(0).max(9).nullable(),
   /** Options drawn from the character's own earlier picks; `offer` names the budget, `where` a predicate slug. */
   fromPicks: z
-    .strictObject({ offer: z.string(), where: z.enum(["deals-damage", "attack-roll", "ranged"]).nullable() })
+    .strictObject({
+      offer: z.string(),
+      where: z.enum(["deals-damage", "attack-roll", "ranged", "ranged-damage"]).nullable()
+    })
     .nullable(),
   /** Inline options with their names and any nested pick. Empty when the options come from `fromCatalog` or are plain ids in `from`. */
   get options(): z.ZodArray<typeof ContentFeatureOptionSummarySchema> {
@@ -296,7 +299,9 @@ export const ContentClassSummarySchema = z.strictObject({
       armor: z.array(slug()),
       weapons: z.array(slug()),
       tools: z.array(slug()),
-      skillChoices: ContentChoiceListSchema.nullable()
+      skillChoices: ContentChoiceListSchema.nullable(),
+      /** "One Musical Instrument of your choice" (Bard); null when the class keeps no tool pick. */
+      toolChoices: ContentChoiceListSchema.nullable()
     })
     .nullable(),
   /** Ability minimums for multiclassing into this class; `mode: "any"` covers "STR 13 or DEX 13". Null = always allowed. Display only; the server re-validates. */

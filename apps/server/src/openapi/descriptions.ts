@@ -101,7 +101,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     statPriority:
       "All six abilities, best first - the random generator's core input as DATA, so a homebrew class supplies its own without touching @vtt/rules-5e",
     multiclassProficiencies:
-      "Proficiencies gained when the class is taken as a MULTICLASS - narrower than the level-1 set",
+      "Proficiencies gained when the class is taken as a MULTICLASS - narrower than the level-1 set. The builder grants them to every class after the first",
     subclassLabel: 'What this class calls its subclass ("Martial Archetype")',
     levelTable:
       "Exactly 20 rows, row N at level N. Each row's `features` must resolve against this record's own `features[]` - the server refuses the record otherwise, which is why re-minting an id on import never rewrites intra-record ids"
@@ -1430,6 +1430,9 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "classes[].multiclassProficiencies":
       "Proficiencies gained when this class is taken as a MULTICLASS (narrower than the level-1 set); null when the record declares none",
     "classes[].multiclassProficiencies.skillChoices.fromCatalog": CHOICE_CATALOG,
+    "classes[].multiclassProficiencies.toolChoices":
+      '"One Musical Instrument of your choice" (Bard); null when the class keeps no tool pick',
+    "classes[].multiclassProficiencies.toolChoices.fromCatalog": CHOICE_CATALOG,
     "classes[].multiclassPrerequisites":
       'Ability minimums for multiclassing INTO this class; mode "any" covers "STR 13 or DEX 13". null = always allowed. Display data - the server re-validates',
     "classes[].subclassLabel": 'What this class calls its subclass ("Martial Archetype")',
@@ -1544,7 +1547,11 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "offers[].unavailable": "Option id -> why this build cannot usefully take it (already held, or no proficiency)",
     picks: "The answers the build still accepts, by offer key",
     subclassId: "The subclass offer's answer",
-    choices: "The ledger rows these answers make: a create's `choices`"
+    choices: "The ledger rows these answers make: a create's `choices`",
+    abilities:
+      "For a draft that sent `sheet`: how that sheet's ability scores were made, which a rebuild re-sends as the scores the character already has. The ledger's own record, or for a sheet built before the ledger kept one, the base scores and background increase that rebuild its totals exactly. Null when not asked, or when nothing reproduces them.",
+    "abilities.derived":
+      "True when worked out from the sheet's totals rather than read from its ledger. A rebuild may re-send these whatever ability methods the table allows today."
   },
   MapAssetMetadata: {
     folder: MAP_FOLDER

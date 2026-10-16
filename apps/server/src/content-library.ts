@@ -385,7 +385,8 @@ const classSummaryOf = (entry: ClassReference): ContentClassSummary => ({
         armor: entry.multiclassProficiencies.armor,
         weapons: entry.multiclassProficiencies.weapons,
         tools: entry.multiclassProficiencies.tools,
-        skillChoices: choiceListOf(entry.multiclassProficiencies.skills)
+        skillChoices: choiceListOf(entry.multiclassProficiencies.skills),
+        toolChoices: choiceListOf(entry.multiclassProficiencies.toolChoices)
       }
     : null,
   multiclassPrerequisites: entry.multiclassPrerequisites

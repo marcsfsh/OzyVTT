@@ -847,13 +847,15 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
   {
     at: "multiclassProficiencies.**",
     types: ["class"],
-    reason: "the builder does not multiclass — no reader on the build path and no control",
+    reason:
+      "the builder grants these to a class taken after the first, but its skill and instrument picks (a Bard's, Ranger's or Rogue's) have no control",
     status: "gap"
   },
   {
     at: "multiclassPrerequisites.**",
     types: ["class"],
-    reason: "the builder does not multiclass — the schema key has no reader on the build path and no control",
+    reason:
+      "the builder checks these minimums when a class is taken, but no control authors the mode or the minimums list the rows sit in",
     status: "gap"
   },
   {
