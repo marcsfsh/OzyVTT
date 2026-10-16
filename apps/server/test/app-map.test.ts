@@ -7,7 +7,7 @@ import { GameStateSchema } from "@vtt/domain";
 import { renderAppMap } from "../src/app-map.js";
 
 describe("generated app map", () => {
-  it("matches the committed docs/app-map.md exactly (regenerate with `npm run docs`, or `npm run map` for this file alone)", () => {
+  it("matches the committed docs/app-map.md exactly (regenerate with `npm run map`)", () => {
     const committed = readFileSync(fileURLToPath(new URL("../../../docs/app-map.md", import.meta.url)), "utf8");
     expect(committed).toBe(renderAppMap());
   });

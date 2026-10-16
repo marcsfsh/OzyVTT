@@ -49,6 +49,13 @@ ability-only`. The builder later _fills the same fields_; no consumer changes. (
    `ActorDefinitionSchema`. Shared bundle content is never editable this way. Guided creation
    stays deferred to the builder.
 
+   **Amendment (2026-10-16):** the identity hand-edit is narrowed. A player may rename (class, subclass,
+   species, background) but not change what the rules read: class rows, levels, species and background ids,
+   feats, features, the choice ledger and Martial Arts are the GM's. On a sheet the builder made (it carries
+   the choice ledger) those belong to the builder for everyone; the Level flow (`character.rebuild`) changes
+   them, re-validated, so a hand-added class or feat can no longer slip past the rules or vanish at the next
+   rebuild.
+
 **Amendment (v6, 2026-07-23): a slice of "rules auto-derivation" ships in the play sheet.**
 Originally this ADR parked all auto-derivation (incl. AC-from-armor) for the builder. In
 response to direct GM feedback, the play sheet now derives two things from equipped gear, using

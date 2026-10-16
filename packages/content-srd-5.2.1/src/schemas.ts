@@ -408,6 +408,15 @@ export const RuleReferenceSchema = z.object({
 });
 export type RuleReference = z.infer<typeof RuleReferenceSchema>;
 
+/** One Rules Glossary term: its name, its tag in brackets ("Condition", "Action", "Hazard"), and its text. */
+export const GlossaryEntrySchema = z.object({
+  id: z.string().regex(/^[a-z0-9-]+$/),
+  name: z.string().min(1).max(80),
+  tag: z.string().min(1).max(40).nullable(),
+  description: z.string().min(1).max(20000)
+});
+export type GlossaryEntry = z.infer<typeof GlossaryEntrySchema>;
+
 export const ContentAttributionSchema = z.object({
   license: z.literal("CC-BY-4.0"),
   attribution: z.string().min(1),

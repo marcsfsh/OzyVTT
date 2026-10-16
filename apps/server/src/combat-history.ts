@@ -19,8 +19,8 @@ export type TimelineOutcome =
   | { kind: "rewrote"; label: string }
   | { kind: "legacy" };
 
-/** The slice a restore rolls back: combat (minus scene prep, timeline fields and timed annotations) plus
- *  actor hp/conditions/effects. Changes outside it never dirty the timeline. */
+/** The slice a restore rolls back: combat (minus scene prep, timeline fields and timed annotations) plus each
+ *  actor's hp, conditions, effects and spent resources. Changes outside it never dirty the timeline. */
 function restorableSlice(state: GameState): string {
   // Fog and terrain are scene dressing: painting mid-review must neither dirty the timeline nor be undone by a
   // rewind.
@@ -45,7 +45,11 @@ function restorableSlice(state: GameState): string {
       conditions: actor.conditions,
       effects: actor.effects,
       deathSaves: actor.deathSaves,
-      actionUses: actor.actionUses
+      actionUses: actor.actionUses,
+      // A rewound Fireball gives its slot back; a rewound short rest its Hit Dice.
+      spellSlots: actor.spellSlots,
+      pactSlots: actor.pactSlots,
+      hitDice: actor.hitDice
     }))
   });
 }
@@ -81,7 +85,10 @@ export function applyTimelineRestore(state: GameState, snapshot: GameState, curs
           conditions: structuredClone(past.conditions),
           effects: structuredClone(past.effects),
           deathSaves: structuredClone(past.deathSaves),
-          actionUses: structuredClone(past.actionUses)
+          actionUses: structuredClone(past.actionUses),
+          spellSlots: structuredClone(past.spellSlots),
+          pactSlots: structuredClone(past.pactSlots),
+          hitDice: structuredClone(past.hitDice)
         }
       : actor;
   });
@@ -98,6 +105,15 @@ export function applyTimelineRestore(state: GameState, snapshot: GameState, curs
     historyCursor: cursor,
     historyDirty: false
   };
+}
+
+/** A scene swap or replay launch invalidates the snapshots, which belonged to the fight that parked. The
+ *  resumed fight gets a fresh baseline, so Previous restores it rather than only moving the turn pointer,
+ *  which made the next Next tick durations and roll Recharge a second time. */
+export function restartTimeline(state: GameState, timeline: TimelineOps) {
+  timeline.truncateAll();
+  if (state.combat.active && state.combat.turnActorId !== null)
+    timeline.capture("turn", `Resumed - ${turnLabel(state)}`, state);
 }
 
 /** Previous: from live, park the present as a return-point and restore the last boundary; while rewound,

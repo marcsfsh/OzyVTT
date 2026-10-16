@@ -541,6 +541,39 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].conditionalDamage[].**",
+    types: ACTION_CARRIERS,
+    reason:
+      "a stat block's damage under a printed condition (Bloodied swarms, a charge), read from the hit clause as the catalog is built; no control on the action row yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].reminder",
+    types: ACTION_CARRIERS,
+    reason: "what the engine leaves to the GM, read from a save's later-turn damage as the catalog is built",
+    status: "gap"
+  },
+  {
+    at: "actions[].healingByLevel[].**",
+    types: FEATURE_CARRIERS,
+    reason: "healing that grows with level - feature-carrier actions only, beside damageByLevel",
+    status: "gap"
+  },
+  {
+    at: "actions[].adds.**",
+    types: FEATURE_CARRIERS,
+    reason:
+      "a level multiple or ability modifier added at build (Second Wind, Divine Spark) - feature-carrier actions only",
+    status: "gap"
+  },
+  {
+    at: "actions[].grantScaling.**",
+    types: FEATURE_CARRIERS,
+    reason:
+      "a granted damage bonus read off a printed class column at build (Rage Damage) - feature-carrier actions only",
+    status: "gap"
+  },
+  {
     at: "effect.**",
     types: ["spell"],
     reason: "the cast model, read from the attack box, damage roll and description as the catalog is built",
@@ -690,6 +723,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "replacesFeatureId",
     types: ["species"],
     reason: "supersession at species-trait scope — the control exists on class features, not here",
+    status: "gap"
+  },
+  {
+    at: "extraSpellLists",
+    types: "*",
+    reason:
+      "spell lists a feature adds to the class's own picks (Magical Secrets) — no list control at feature scope yet",
     status: "gap"
   },
 

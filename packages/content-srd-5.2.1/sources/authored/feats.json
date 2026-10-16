@@ -11,6 +11,13 @@
       "description": "You gain the following benefits. Initiative Proficiency: When you roll Initiative, you can add your Proficiency Bonus to the roll. Initiative Swap: Immediately after you roll Initiative, you can swap your Initiative with the Initiative of one willing ally in the same combat, unless either of you has the Incapacitated condition.",
       "tags": [
         "initiative"
+      ],
+      "modifiers": [
+        {
+          "type": "initiative",
+          "amount": 0,
+          "proficiencyBonus": true
+        }
       ]
     }
   },
@@ -44,7 +51,17 @@
           "kind": "spell",
           "choose": 1,
           "fromCatalog": "cleric-spells",
+          "minSpellLevel": 1,
           "maxSpellLevel": 1
+        },
+        {
+          "kind": "spellcasting-ability",
+          "choose": 1,
+          "from": [
+            "int",
+            "wis",
+            "cha"
+          ]
         }
       ],
       "uses": {
@@ -83,7 +100,17 @@
           "kind": "spell",
           "choose": 1,
           "fromCatalog": "druid-spells",
+          "minSpellLevel": 1,
           "maxSpellLevel": 1
+        },
+        {
+          "kind": "spellcasting-ability",
+          "choose": 1,
+          "from": [
+            "int",
+            "wis",
+            "cha"
+          ]
         }
       ],
       "uses": {
@@ -107,7 +134,7 @@
     "feature": {
       "id": "magic-initiate-wizard",
       "name": "Magic Initiate (Wizard)",
-      "description": "You learn two cantrips of your choice from the Wizard spell list. You also choose one level 1 spell from that list; you always have it prepared and can cast it once without a spell slot, regaining that use on a Long Rest. Intelligence is your spellcasting ability for these spells.",
+      "description": "You learn two cantrips of your choice from the Wizard spell list. You also choose one level 1 spell from that list; you always have it prepared and can cast it once without a spell slot, regaining that use on a Long Rest, and you can also cast it using any spell slots you have. Intelligence, Wisdom, or Charisma is your spellcasting ability for these spells (choose when you select this feat). Whenever you gain a new level, you can replace one of the spells you chose for this feat with a different spell of the same level from the Wizard spell list.",
       "tags": [
         "spellcasting"
       ],
@@ -122,7 +149,17 @@
           "kind": "spell",
           "choose": 1,
           "fromCatalog": "wizard-spells",
+          "minSpellLevel": 1,
           "maxSpellLevel": 1
+        },
+        {
+          "kind": "spellcasting-ability",
+          "choose": 1,
+          "from": [
+            "int",
+            "wis",
+            "cha"
+          ]
         }
       ],
       "uses": {
@@ -208,7 +245,17 @@
     "prerequisite": {
       "level": 4,
       "requires": [],
-      "abilityScores": [],
+      "abilityScores": [
+        {
+          "ability": "str",
+          "minimum": 13
+        },
+        {
+          "ability": "dex",
+          "minimum": 13
+        }
+      ],
+      "abilityScoreMode": "any",
       "text": "Strength or Dexterity 13+."
     },
     "feature": {
@@ -244,6 +291,29 @@
       "description": "You gain a +2 bonus to attack rolls you make with Ranged weapons.",
       "tags": [
         "fighting-style"
+      ],
+      "modifiers": [
+        {
+          "type": "attack-bonus",
+          "amount": 2,
+          "when": [
+            {
+              "type": "on-attack-roll"
+            },
+            {
+              "type": "attack-kind-is",
+              "kinds": [
+                "ranged"
+              ]
+            },
+            {
+              "type": "weapon-property-is",
+              "properties": [
+                "ammunition"
+              ]
+            }
+          ]
+        }
       ]
     }
   },

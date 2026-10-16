@@ -59,13 +59,15 @@ const HUMAN: Row[] = [
 const SAGE_FEAT: Row[] = [
   { level: 1, kind: "cantrip", id: "minor-illusion", payload: { featureId: "magic-initiate-wizard" } },
   { level: 1, kind: "cantrip", id: "dancing-lights", payload: { featureId: "magic-initiate-wizard" } },
-  { level: 1, kind: "spell", id: "magic-missile", payload: { featureId: "magic-initiate-wizard" } }
+  { level: 1, kind: "spell", id: "magic-missile", payload: { featureId: "magic-initiate-wizard" } },
+  { level: 1, kind: "spellcasting-ability", id: "int", payload: { featureId: "magic-initiate-wizard" } }
 ];
 /** The same for the Acolyte's Magic Initiate (Cleric), on the Charisma class. */
 const ACOLYTE_FEAT: Row[] = [
   { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
   { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
-  { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } }
+  { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+  { level: 1, kind: "spellcasting-ability", id: "wis", payload: { featureId: "magic-initiate-cleric" } }
 ];
 
 // A Druid of any level. `sage` is the background because it can raise Wisdom; its origin feat's
@@ -170,18 +172,6 @@ const bard = (level: number, cha: 8 | 15, extra: Row[] = []): Mutable =>
         ? ([
             { level: 9, classId: "bard", kind: "expertise", id: "deception", payload: { featureId: "expertise" } },
             { level: 9, classId: "bard", kind: "expertise", id: "stealth", payload: { featureId: "expertise" } }
-          ] as Row[])
-        : []),
-      ...(level >= 10
-        ? ([
-            {
-              level: 10,
-              classId: "bard",
-              kind: "spell",
-              id: "hypnotic-pattern",
-              payload: { featureId: "magical-secrets" }
-            },
-            { level: 10, classId: "bard", kind: "spell", id: "fear", payload: { featureId: "magical-secrets" } }
           ] as Row[])
         : []),
       // Magical Discoveries: two spells from the Cleric, Druid or Wizard list (the union slug). Neither is
@@ -292,7 +282,7 @@ describe("Druidic - a language and an always-prepared spell (audit row 35)", () 
         .filter((spell) => spell.level === 1 && !spell.alwaysPrepared)
         .map((spell) => spell.id)
         .sort()
-    ).toEqual(["cure-wounds", "entangle", "faerie-fire", "fog-cloud", "magic-missile"]); // 4 class + the Sage feat's own
+    ).toEqual(["cure-wounds", "entangle", "faerie-fire", "fog-cloud"]); // the Sage feat's own is always prepared
     expect(() =>
       build(druid(1, [primalOrder("magician"), ...four, { level: 1, kind: "spell", id: "thunderwave" } as Row]))
     ).toThrowError(/Druid prepares 4 spells at level 1; got 5/);
@@ -463,7 +453,7 @@ describe("Nature's Ward - the half of audit row 65 that is authorable", () => {
 });
 
 describe("Epic Boon - the level-19 feat nine classes lost outright (audit row 6)", () => {
-  it("makes a level-19 Druid pick one, and refuses a feat that is not an Epic Boon", () => {
+  it("makes a level-19 Druid pick one, or another feat it qualifies for", () => {
     const taken = build(
       druid(19, [
         primalOrder("warden"),
@@ -473,12 +463,17 @@ describe("Epic Boon - the level-19 feat nine classes lost outright (audit row 6)
     );
     expect((taken.character?.feats ?? []).map((feat) => feat.id)).toContain("boon-of-dimensional-travel");
     expect(() => build(druid(19, [primalOrder("warden"), elementalFury("primal-strike")]))).toThrowError(/Epic Boon/);
-    const wrongFeat = druid(19, [
+    // "or another feat of your choice for which you qualify": Grappler (DEX 14), but not Alert, already held.
+    const grappler = build(
+      druid(19, [primalOrder("warden"), elementalFury("primal-strike"), ...epicBoon("druid", "grappler", "dex")])
+    );
+    expect((grappler.character?.feats ?? []).map((feat) => feat.id)).toContain("grappler");
+    const held = druid(19, [
       primalOrder("warden"),
       elementalFury("primal-strike"),
-      { level: 19, classId: "druid", kind: "feat", id: "grappler", payload: { featureId: "epic-boon" } } as Row
+      { level: 19, classId: "druid", kind: "feat", id: "alert", payload: { featureId: "epic-boon" } } as Row
     ]);
-    expect(() => build(wrongFeat)).toThrowError(/not an offered option/);
+    expect(() => build(held)).toThrowError(/Alert is already on this character/);
   });
 
   it("does the same for the Bard", () => {
@@ -662,5 +657,71 @@ describe("Divine Intervention - a pool that now costs the action the SRD prints"
         deps(definition)
       )
     ).toThrowError(/no uses remaining \(1\/long rest\)/);
+  });
+});
+
+describe("Circle of the Land Spells - the chosen land's spells for the Druid's level and lower", () => {
+  const alwaysPrepared = (level: number) =>
+    (
+      build(druid(level, [primalOrder("warden"), ...(level >= 7 ? [elementalFury("primal-strike")] : [])])).spellcasting
+        ?.spells ?? []
+    )
+      .filter((spell) => spell.alwaysPrepared)
+      .map((spell) => spell.id);
+
+  it("gives a Polar Druid each row of the table as it reaches that level", () => {
+    expect(alwaysPrepared(3)).toEqual(expect.arrayContaining(["fog-cloud", "hold-person", "ray-of-frost"]));
+    expect(alwaysPrepared(3)).not.toContain("sleet-storm");
+    const five = alwaysPrepared(5);
+    expect(five).toContain("sleet-storm");
+    expect(five).not.toContain("ice-storm");
+    expect(alwaysPrepared(9)).toEqual(expect.arrayContaining(["sleet-storm", "ice-storm", "cone-of-cold"]));
+  });
+
+  it("describes each land with the spells the SRD table prints", () => {
+    const lands = new Map(
+      (
+        library
+          .subclassRecord("circle-of-the-land")!
+          .features.find((feature) => feature.id === "circle-of-the-land-spells")!.choice!.options ?? []
+      ).map((option) => [option.id, option.description])
+    );
+    expect(lands.get("arid")).toContain("Wall of Stone");
+    expect(lands.get("arid")).not.toContain("Wall of Fire");
+    expect(lands.get("polar")).toContain("Cone of Cold");
+    expect(lands.get("polar")).not.toContain("Slow");
+    expect(lands.get("temperate")).toContain("Tree Stride");
+    expect(lands.get("temperate")).not.toContain("Ice Storm");
+  });
+});
+
+describe("Magical Secrets - the Bard's own picks may come from three more lists", () => {
+  // Spirit Guardians is a Cleric spell, on no Bard list.
+  const guardians = { level: 10, kind: "spell", id: "spirit-guardians" } as Row;
+
+  it("lets a Bard 10 prepare a Cleric spell as a Bard spell, and a Bard 9 not", () => {
+    const skills = loreSkills("arcana", "history", "nature");
+    const built = build(bard(10, 15, [...skills, guardians]));
+    expect(spellOf(built, "spirit-guardians")).toMatchObject({ classId: "bard", alwaysPrepared: false });
+    expect(() => build(bard(9, 15, [...skills, { ...guardians, level: 9 }]))).toThrowError(/"spirit-guardians"/);
+  });
+
+  it("adds no picks of its own: the Bard 10 prepares the printed number", () => {
+    const built = build(bard(10, 15, loreSkills("arcana", "history", "nature")));
+    expect(built.spellcasting?.classes?.[0]).toMatchObject({ classId: "bard", prepared: 15 });
+  });
+});
+
+describe("Magical Discoveries - a spell the Bard has slots for", () => {
+  it("refuses Wish to a Bard 6, whose highest slot is level 3", () => {
+    const input = bard(6, 15);
+    input.choices = [
+      ...input.choices.filter((row) => row.payload?.featureId !== "magical-discoveries"),
+      { level: 6, kind: "spell", id: "spiritual-weapon", payload: { featureId: "magical-discoveries" } },
+      { level: 6, kind: "spell", id: "wish", payload: { featureId: "magical-discoveries" } }
+    ] as Row[];
+    expect(() => build(input)).toThrowError(
+      '"wish" is level 9, above the maximum spell level (3) for "Magical Discoveries".'
+    );
   });
 });

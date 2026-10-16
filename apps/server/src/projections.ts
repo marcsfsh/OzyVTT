@@ -446,7 +446,10 @@ export function projectPlayerView(
       customFormula: state.builderPolicy.customFormula,
       maxLevel: state.builderPolicy.maxLevel,
       playerBuilder: state.builderPolicy.playerBuilder,
-      playerRandom: state.builderPolicy.playerRandom
+      playerRandom: state.builderPolicy.playerRandom,
+      // Players need both to know whether they may type their dice and how a rolled level counts.
+      typedRolls: state.builderPolicy.typedRolls,
+      hitPointRollFloor: state.builderPolicy.hitPointRollFloor
     },
     // Archived characters the GM shared: id + name only, and only ones that were public.
     archivedCharacters: state.actors

@@ -22,6 +22,7 @@ const isTargetless = (action: ContentActionSummary) =>
   action.saveAbility === null &&
   action.damage.length === 0 &&
   action.targeting !== "single" &&
+  action.targeting !== "multi" &&
   (action.grants || action.multiattack !== null || action.usesLimit !== null || action.builtin === true);
 
 /**

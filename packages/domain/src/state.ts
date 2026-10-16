@@ -60,7 +60,9 @@ export type PlayerRollRecord = Omit<RollRecord, "initiatorSessionId">;
 export const InitiativeEntrySchema = z.object({
   actorId: z.uuid(),
   score: z.number().int().min(-1000).max(1000),
-  tieBreaker: z.number().int().min(-1000).max(1000).default(0)
+  tieBreaker: z.number().int().min(-1000).max(1000).default(0),
+  /** Surprised when the fight began (SRD Surprise), kept so a later roll of this entry has Disadvantage too. */
+  surprised: z.boolean().optional()
 });
 export type InitiativeEntry = z.infer<typeof InitiativeEntrySchema>;
 
@@ -255,7 +257,27 @@ export const ParkedAttackSchema = z
     initiatorRole: z.enum(["gm", "player"]),
     initiatorSessionId: z.string().min(1).max(200),
     /** The bonus lasts until the reactor's next turn (Shield) rather than against this attack only (Parry). */
-    untilNextTurn: z.boolean()
+    untilNextTurn: z.boolean(),
+    /** Extras chosen for the hit (Sneak Attack, a smite), checked and spent only if it still hits. */
+    hitOptions: z
+      .array(
+        z
+          .object({
+            id: z
+              .string()
+              .regex(/^[a-z0-9-]+$/)
+              .max(120),
+            damageType: z
+              .string()
+              .regex(/^[a-z]+$/)
+              .max(40)
+              .optional(),
+            slotLevel: z.number().int().min(1).max(9).optional()
+          })
+          .strict()
+      )
+      .max(6)
+      .default([])
   })
   .strict();
 export type ParkedAttack = z.infer<typeof ParkedAttackSchema>;
@@ -464,6 +486,8 @@ const sceneCombatShape = {
       movementUsedFeet: z.number().nonnegative().max(100000).default(0),
       /** Rule families the GM already waved through this turn. Stripped from player projections. */
       rulesOverriddenFamilies: z.array(RuleFamilySchema).max(5).optional(),
+      /** The turn's actor has made its one death save (SRD: at the start of its turn). Never projected. */
+      deathSaveRolled: z.boolean().optional(),
       /** What this turn's attacks opened for an extra attack: the Light weapons its actor swung in the Attack action,
        *  and the creature a Cleave weapon hit; and the Loading weapons already fired in that action, which can't
        *  fire again in it. Engine bookkeeping, never projected. */
@@ -678,7 +702,12 @@ export const BuilderPolicySchema = z
     /** Whether players may run the character builder themselves; enforced in `character.create`. */
     playerBuilder: z.enum(["open", "gm-only"]).default("open"),
     /** Whether players may roll a random character; "gm-only" by default because it fills a roster slot in one tap. */
-    playerRandom: z.enum(["open", "gm-only"]).default("gm-only")
+    playerRandom: z.enum(["open", "gm-only"]).default("gm-only"),
+    /** Whether players may type what their own dice showed for rolled ability scores and hit points. Closed by
+     *  default: a player's rolls are then thrown by the server (the GM may always type). */
+    typedRolls: z.enum(["open", "gm-only"]).default("gm-only"),
+    /** A table rule raising a rolled hit-point level to the class average; "none" is the SRD (the roll stands). */
+    hitPointRollFloor: z.enum(["none", "average"]).default("none")
   })
   .strict();
 export type BuilderPolicy = z.infer<typeof BuilderPolicySchema>;

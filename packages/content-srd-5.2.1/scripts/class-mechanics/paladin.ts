@@ -1,5 +1,5 @@
 // Paladin and Oath of Devotion mechanics, merged over the ETL-generated prose.
-import type { ClassMechanicsModule } from "./overlay.js";
+import { spellTableStages, type ClassMechanicsModule } from "./overlay.js";
 
 export const paladin: ClassMechanicsModule = {
   features: {
@@ -50,8 +50,7 @@ export const paladin: ClassMechanicsModule = {
       ]
     },
 
-    // Applies only to actions the feature declares; a Paladin's swings come from inventory, so this
-    // currently reaches nothing (pinned in `rogue-ranger-paladin-mechanics.test.ts`).
+    // A standing rider `effective-actions` folds onto every weapon swing (attack count 2).
     "extra-attack": {
       modifiers: [{ type: "extra-attack", count: 1 }]
     },
@@ -97,16 +96,44 @@ export const paladin: ClassMechanicsModule = {
     },
 
     "epic-boon": {
-      choice: { kind: "feat", choose: 1, fromCatalog: "epic-boon-feats" }
+      choice: { kind: "feat", choose: 1, fromCatalog: "feats" }
     }
+  },
+  subclassStages: {
+    "oath-of-devotion": spellTableStages("oath-of-devotion-spells", "Oath of Devotion Spells", "Paladin", [
+      [
+        5,
+        [
+          ["aid", "Aid", 2],
+          ["zone-of-truth", "Zone of Truth", 2]
+        ]
+      ],
+      [
+        9,
+        [
+          ["beacon-of-hope", "Beacon of Hope", 3],
+          ["dispel-magic", "Dispel Magic", 3]
+        ]
+      ],
+      [
+        13,
+        [
+          ["freedom-of-movement", "Freedom of Movement", 4],
+          ["guardian-of-faith", "Guardian of Faith", 4]
+        ]
+      ],
+      [
+        17,
+        [
+          ["commune", "Commune", 5],
+          ["flame-strike", "Flame Strike", 5]
+        ]
+      ]
+    ])
   },
   subclasses: {
     "oath-of-devotion": {
-      /**
-       * Only the level-3 pair is authored: `grants.spells` has no character-level gate, and the overlay
-       * cannot mint per-tier feature records the way Life Domain's hand-authored ones do. The full table
-       * is in the description.
-       */
+      // The level-3 pair; the table's later rows are staged features (`subclassStages`).
       "oath-of-devotion-spells": {
         grants: {
           spells: [

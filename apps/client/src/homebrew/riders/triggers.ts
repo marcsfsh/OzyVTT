@@ -272,6 +272,7 @@ export const whenField = (): FieldDef => ({
         opt("melee", "Melee"),
         opt("ranged", "Ranged"),
         opt("spell", "Spell"),
+        opt("weapon", "Weapon"),
         opt("unarmed", "Unarmed"),
         opt("thrown", "Thrown"),
         opt("reaction", "Reaction"),

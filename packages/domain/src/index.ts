@@ -4,6 +4,8 @@ export * from "./pick-budget.js";
 export * from "./character-draft.js";
 /** The AC an attack meets, shared so the server's roll and the sheets agree. */
 export * from "./armor-class.js";
+/** The typed damage a resolution owes, shared so the card's total and every apply path agree. */
+export * from "./damage-parts.js";
 
 /** Codex field vocabulary, shared so the GM UI and the server's prune-and-seal read one copy. */
 export * from "./codex-entities.js";

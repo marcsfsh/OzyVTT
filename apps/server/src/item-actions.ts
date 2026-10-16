@@ -348,9 +348,12 @@ export function weaponSwing(
   return { action, dice, modifier };
 }
 
-/** "1d8 + 3", "1d4 - 1", or the dice alone; a flat die ("1", a blowgun) keeps its own term. */
+/** "1d8 + 3", "1d4 - 1", or the dice alone. A fixed amount ("1", a Blowgun) stays as it is: the SRD adds no ability
+ *  modifier to fixed damage that doesn't use a roll. */
 const withModifier = (dice: string, modifier: number) =>
-  `${dice}${modifier === 0 ? "" : modifier > 0 ? ` + ${modifier}` : ` - ${Math.abs(modifier)}`}`;
+  !/d/i.test(dice)
+    ? dice
+    : `${dice}${modifier === 0 ? "" : modifier > 0 ? ` + ${modifier}` : ` - ${Math.abs(modifier)}`}`;
 
 /**
  * The extra attack a weapon can make beside its own (SRD 5.2.1), minted with it: the Light property's (after an

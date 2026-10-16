@@ -9,8 +9,9 @@
 
 export type RiderAbility = "str" | "dex" | "con" | "int" | "wis" | "cha";
 export type ArmorWeight = "light" | "medium" | "heavy";
-/** How an attack is being made. `reaction`/`opportunity` are only knowable from the resolve's caller. */
-export type AttackKind = "melee" | "ranged" | "spell" | "unarmed" | "thrown" | "reaction" | "opportunity";
+/** How an attack is being made. `reaction`/`opportunity` are only knowable from the resolve's caller. `weapon` is an
+ *  attack with a weapon, as opposed to a spell, an Unarmed Strike or a monster's natural attack. */
+export type AttackKind = "melee" | "ranged" | "spell" | "unarmed" | "thrown" | "reaction" | "opportunity" | "weapon";
 
 /** The named roll or event a rider fires at; at most one per rider. */
 export type RiderMoment =
@@ -87,6 +88,8 @@ export type RiderTrigger = Readonly<{
 export type RiderModifier = Readonly<{
   type: string;
   amount?: number;
+  /** `initiative`: the bearer's Proficiency Bonus on top of `amount` (Alert). */
+  proficiencyBonus?: boolean;
   ability?: RiderAbility;
   whileArmored?: boolean;
   /** `unarmored-defense`: does the benefit survive a shield? */

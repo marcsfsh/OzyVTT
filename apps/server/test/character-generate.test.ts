@@ -197,6 +197,15 @@ describe("random character generator - the far end", () => {
     }
   });
 
+  it("never answers Skilled with a tool the character already holds", () => {
+    // Seeds that once drew the background's tool again through a Human's Skilled: the Acolyte's
+    // Calligrapher's Supplies, the Soldier's gaming set, the Criminal's Thieves' Tools.
+    for (const seed of [538, 583, 1037, 1581]) {
+      const { request } = generateCharacterRequest({ level: 1 }, library, defaultPolicy, seeded(seed));
+      expect(() => buildCharacterDefinition(request, library, defaultPolicy), `seed ${seed}`).not.toThrow();
+    }
+  });
+
   // A generated character must level up like a hand-built one: `level-ledger.ts` matches a stored row to
   // a wizard offer on `(level, kind, classId, featureId)`, so every generated row must carry that tuple.
   it("stamps every row with the tuple the level-up flow matches on", () => {
@@ -235,23 +244,31 @@ describe("random character generator - the far end", () => {
   });
 
   it("records a chosen feat's own picks at the ASI that took it, not at the first one", () => {
-    // A feat's own picks must sit at the level the feat was taken, not at the first ASI level. A generated
-    // cleric 11 takes Grappler at the level-8 ASI.
-    const cleric = generateCharacterRequest(
-      { classId: "cleric", level: 11 },
-      library,
-      defaultPolicy,
-      seeded(11)
-    ).request;
+    // A feat's own picks must sit at the level the feat was taken, not at the first ASI level. The first seed
+    // whose cleric 11 takes a feat with picks of its own at the level-8 ASI shows it.
+    const cleric = Array.from({ length: 60 }, (_, index) =>
+      generateCharacterRequest({ classId: "cleric", level: 11 }, library, defaultPolicy, seeded(index + 1))
+    )
+      .map((generated) => generated.request)
+      .find((request) =>
+        request.choices.some(
+          (row) =>
+            row.kind === "asi-or-feat" &&
+            row.level === 8 &&
+            request.choices.some((own) => own.payload?.featureId === row.id && row.id !== "ability-score-improvement")
+        )
+      )!;
+    expect(cleric, "no seed took a feat with picks at the level-8 ASI").toBeDefined();
     const ledger = buildCharacterDefinition(cleric, library, defaultPolicy).character!.choices!;
-    expect(ledger.find((row) => row.kind === "asi-or-feat" && row.id === "grappler")).toMatchObject({
-      level: 8,
-      classId: "cleric"
-    });
-    expect(ledger.find((row) => row.payload?.featureId === "grappler")).toMatchObject({
-      level: 8,
-      kind: "ability-score"
-    });
+    const taken = ledger.find(
+      (row) =>
+        row.kind === "asi-or-feat" &&
+        row.level === 8 &&
+        ledger.some((own) => own.payload?.featureId === row.id && row.id !== "ability-score-improvement")
+    )!;
+    expect(taken).toMatchObject({ level: 8, classId: "cleric" });
+    for (const own of ledger.filter((row) => row.payload?.featureId === taken.id))
+      expect(own.level, `${taken.id}'s ${own.kind}`).toBe(8);
     // ...and the subclass row.
     expect(ledger.find((row) => row.kind === "subclass")).toMatchObject({
       level: 3,

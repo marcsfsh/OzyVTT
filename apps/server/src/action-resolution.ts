@@ -1,4 +1,10 @@
-import type { ActionAvailability, ActionResolution, GameState } from "@vtt/domain";
+import {
+  owedDamageParts,
+  owedDamageTotal,
+  type ActionAvailability,
+  type ActionResolution,
+  type GameState
+} from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { masteryMissDamage } from "./weapon-mastery.js";
@@ -13,6 +19,7 @@ import { applyGrant } from "./resolution/grant.js";
 import { applyHealing } from "./resolution/heal.js";
 import { recordCleaveOpening, recordLightAttack, recordLoadingShot } from "./resolution/extra-attacks.js";
 import { applyMasteryForces, masterySwingOf, offeredPush, spendSap, spendVex } from "./resolution/masteries.js";
+import { hitOffersOf, rollHitOptions, spendHitOptions } from "./resolution/hit-options.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
 import { parkActionSave, parkForAcReaction, parkReaction } from "./resolution/pending.js";
 import { releaseHideAndReady } from "./resolution/release.js";
@@ -62,6 +69,9 @@ export function resolveDefinitionAction(
   ctx.bonusDamage.push(...masteryMissDamage(ctx.masterySwing));
   rollRiderDamage(ctx);
   ctx.builtin?.hitDamage?.(ctx);
+  rollHitOptions(ctx);
+  // What the stat block leaves to the GM (damage on later turns) is said where the GM reads the result.
+  if (ctx.action.reminder) ctx.warnings.push(ctx.action.reminder);
 
   applyOnHitEffects(ctx);
   applyMasteryForces(ctx);
@@ -73,6 +83,7 @@ export function resolveDefinitionAction(
   parkActionSave(ctx);
 
   commitEconomy(ctx);
+  spendHitOptions(ctx);
   rollLastCharge(ctx);
   spendAmmunition(ctx);
   useUpConsumable(ctx);
@@ -102,13 +113,27 @@ function previewOf(ctx: ResolveContext): ActionResolution {
     ...(ctx.warnings.length > 0 ? { warnings: ctx.warnings } : {}),
     overridden: ctx.overridden,
     push: offeredPush(ctx),
-    preview: true
+    preview: true,
+    ...withOffers(hitOffersOf(ctx))
   };
+}
+
+const withOffers = (offers: ReturnType<typeof hitOffersOf>) => (offers.length > 0 ? { hitOffers: offers } : {});
+
+/** With no attack roll and no save, every target takes the damage (SRD Magic Missile: "A dart deals 1d4 + 1 Force
+ *  damage to its target"), owed like a hit's: the GM's Apply, or a player's proposal or direct damage. */
+function damageTargetsOf(ctx: ResolveContext): ActionResolution["damageTargets"] {
+  if (ctx.attack !== null || ctx.action.save || ctx.builtinSave) return undefined;
+  const parts = owedDamageParts(ctx);
+  const total = parts.reduce((sum, part) => sum + part.amount, 0);
+  if (total <= 0 || ctx.targets.length === 0) return undefined;
+  return ctx.targets.map((target) => ({ targetId: target.id, targetName: target.name, parts, total }));
 }
 
 function resolutionOf(ctx: ResolveContext): ActionResolution {
   const { state, action, attacker, targets, damage, bonusDamage, warnings } = ctx;
   const instance = state.combat.turn.actionInstance;
+  const damageTargets = damageTargetsOf(ctx);
   return {
     actionName: action.name,
     activation: action.activation,
@@ -121,8 +146,8 @@ function resolutionOf(ctx: ResolveContext): ActionResolution {
         }
       : ctx.builtinSave,
     damage,
-    damageTotal:
-      damage.reduce((sum, part) => sum + part.total, 0) + bonusDamage.reduce((sum, part) => sum + part.amount, 0),
+    // What every apply path lands: a negative part deals 0 of its type rather than eating another's.
+    damageTotal: owedDamageTotal({ damage, bonusDamage }),
     crit: ctx.crit,
     ...rollModeOf(ctx),
     ...(bonusDamage.length > 0 ? { bonusDamage } : {}),
@@ -139,7 +164,8 @@ function resolutionOf(ctx: ResolveContext): ActionResolution {
     ...(ctx.check ? { check: ctx.check } : {}),
     ...(ctx.effectsEnded.length > 0 ? { effectsEnded: ctx.effectsEnded } : {}),
     ...(ctx.healing ? { healing: ctx.healing } : {}),
-    ...(ctx.opens ? { opens: ctx.opens } : {})
+    ...(ctx.opens ? { opens: ctx.opens } : {}),
+    ...(damageTargets ? { damageTargets } : {})
   };
 }
 
@@ -163,6 +189,7 @@ export function actionAvailability(
       undefined,
       siblings,
       undefined,
+      false,
       catalog
     );
     let usesRemaining: number | null = null;

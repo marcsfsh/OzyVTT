@@ -74,12 +74,39 @@ export type ActionTableNarration = Readonly<{
   /** The resolver already knows this line names a hidden combatant; true forces the GM-only read. */
   gmOnly?: boolean;
 }>;
+/** An extra a hit can carry, offered on the attack's preview and chosen when it is confirmed (`hitOptions`): Sneak
+ *  Attack, a smite, Divine Strike, a charge. Its dice join the hit's, so a crit doubles them. */
+export type HitOffer = Readonly<{
+  /** What the confirm names: the rider's action id, or `charge` for the attack's own run-up damage. */
+  id: string;
+  name: string;
+  /** What it adds, for the label ("3d6 Piercing", "2d8 Radiant"). */
+  dice: string;
+  /** What choosing it spends ("1st-level slot and your Bonus Action", "once per turn"), or null. */
+  cost: string | null;
+  /** Pick one when choosing it (Divine Strike: Necrotic or Radiant). */
+  damageTypes?: readonly string[];
+  /** The spell slots it can be cast with, lowest first (a smite). */
+  slotLevels?: readonly number[];
+  /** What the engine could not check, so the attacker vouches for it ("No map to check for an ally within 5 feet"). */
+  unverified?: string;
+}>;
+/** One extra chosen at confirm, and how. */
+export type HitOptionChoice = Readonly<{ id: string; damageType?: string; slotLevel?: number }>;
+/** The damage an action with no attack roll and no save owes one target (Magic Missile, a smite resolved alone). */
+export type DamageTarget = Readonly<{
+  targetId: string;
+  targetName: string;
+  parts: ReadonlyArray<Readonly<{ amount: number; type: string }>>;
+  total: number;
+}>;
 export type ActionResolution = Readonly<{
   actionName: string;
   activation: "action" | "bonus-action" | "reaction" | "other";
   attack: ActionResolutionAttack | null;
   save: { ability: string; dc: number; targets: ReadonlyArray<{ targetId: string; targetName: string }> } | null;
-  damage: ReadonlyArray<{ formula: string; type: string; total: number }>;
+  /** Rolled damage. `source` names an extra that rode the hit (Sneak Attack, Divine Smite); absent for the action's own. */
+  damage: ReadonlyArray<{ formula: string; type: string; total: number; source?: string }>;
   damageTotal: number;
   crit: boolean;
   /** Advantage/disadvantage aggregation for the attack roll; absent when nothing contributed (plain 1d20). */
@@ -129,6 +156,10 @@ export type ActionResolution = Readonly<{
   effectsEnded?: ReadonlyArray<Readonly<{ actorId: string; actorName: string; name: string }>>;
   /** An attack-roll preview: the d20 is shown but nothing is applied until confirmed or re-rolled. */
   preview?: boolean;
+  /** On a previewed hit, the extras the attacker may add when confirming (`hitOptions`). */
+  hitOffers?: readonly HitOffer[];
+  /** No attack roll and no save, but damage (Magic Missile): what each target is owed, applied or proposed like a hit. */
+  damageTargets?: readonly DamageTarget[];
 }>;
 /** A strict-mode rules rejection: what rule blocked the command and whether an override may bypass it. */
 export type RulesBlocked = Readonly<{ rule: string; message: string; overridable: boolean }>;
@@ -141,7 +172,8 @@ export type DamageApplication = Readonly<{
     type: string;
     amount: number;
     adjusted: number;
-    adjustment: "resistance" | "immunity" | "vulnerability" | null;
+    /** Both Resistance and Vulnerability: halved, then doubled (SRD Order of Application). */
+    adjustment: "resistance" | "immunity" | "vulnerability" | "resistance-and-vulnerability" | null;
     adjustmentSource: string | null;
   }>;
   temporaryAbsorbed: number;
@@ -153,7 +185,8 @@ export type DamageApplication = Readonly<{
   instantDeath: boolean;
   /** A non-PC hit 0 HP: effects it sustained were ended (grapples released). */
   defeated: boolean;
-  /** Flat `damage-reduction` taken once off the post-resistance total, floored at 0. */
+  /** Flat `damage-reduction` taken off the hit before Resistance (SRD Order of Application); each part's `amount`
+   *  is what was left of it. */
   flatReduction?: number;
 }>;
 export type DamageApplyResult = MutationResult & { applied?: DamageApplication };
@@ -184,7 +217,7 @@ export type SaveAnswerResult = MutationResult & {
       string | null;
     /** Advantage/disadvantage sources that shaped the save roll (Restrained, Dodge). */ rollMode?: ActionRollMode;
     /** The typed breakdown behind `appliedDamage`; absent when the save applied no damage. */ parts?: DamageApplication["parts"];
-    /** Flat reduction taken off the post-resistance total. */ flatReduction?: number;
+    /** Flat reduction taken off before Resistance. */ flatReduction?: number;
   };
 };
 /** Outcome of answering a reaction prompt; any damage it settles is already applied server-side. A strike (an
@@ -319,6 +352,8 @@ const BuilderOfferSchema = z.strictObject({
   capacity: z.number().int().min(0),
   options: z.array(z.strictObject({ id: z.string(), name: z.string(), level: z.number().int().optional() })),
   maxSpellLevel: z.number().int().nullable(),
+  /** The ceiling an ability-score pick from this offer may reach (an Epic Boon's 30); null is the SRD's 20. */
+  maximum: z.number().int().nullable(),
   /** Character level stamped on this offer's ledger rows. */
   level: z.number().int().min(1).max(20),
   classId: z.string().nullable(),

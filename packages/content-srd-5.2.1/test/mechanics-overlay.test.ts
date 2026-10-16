@@ -106,7 +106,8 @@ describe("the mechanics overlay", () => {
     const draconic = loadSubclasses().find((record) => record.id === "draconic-sorcery")!;
     // `allowShield: true` is authored: the printed feature restricts only "wearing armor", not a Shield.
     expect(draconic.features.find((entry) => entry.id === "draconic-resilience")!.modifiers).toEqual([
-      { type: "unarmored-defense", ability: "cha", allowShield: true }
+      { type: "unarmored-defense", ability: "cha", allowShield: true },
+      { type: "hit-points-per-level", amount: 1 }
     ]);
   });
 

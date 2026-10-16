@@ -1,9 +1,9 @@
-import type { ActionResolution, ActionResolutionAttack } from "@vtt/domain";
+import { owedDamageParts, type ActionResolution, type ActionResolutionAttack } from "@vtt/domain";
 import { collectRiders, parseDiceFormula, resolveDice, type DiceExpression, type RiderMoment } from "@vtt/rules-5e";
 import { abilityModifier, recordRoll, type ResolveContext } from "./context.js";
 
 /** 2024 crit rule: double every dice term (modifiers once); `extraFirstTermDice` adds Savage Attacks dice. */
-function criticalExpression(expression: DiceExpression, extraFirstTermDice = 0): DiceExpression {
+export function criticalExpression(expression: DiceExpression, extraFirstTermDice = 0): DiceExpression {
   let firstDice = true;
   const terms = expression.terms.map((term) => {
     if (term.kind !== "dice") return term;
@@ -25,21 +25,57 @@ function rollsDamage(attack: ActionResolutionAttack | null): boolean {
   return attack === null || attack.outcome === "crit" || attack.outcome === "hit" || attack.outcome === "unknown";
 }
 
-/** Typed damage parts (rolled dice and flat bonus lines) of a resolution, for parking or applying. */
+/** Typed damage parts (rolled dice and flat bonus lines) of a resolution, for parking or applying: the shared
+ *  `owedDamageParts`, so what lands is what the card shows. */
 export function damagePartsOf(
   resolution: Pick<ActionResolution, "damage" | "bonusDamage">
 ): Array<{ amount: number; type: string }> {
-  return [
-    ...resolution.damage.map((part) => ({ amount: part.total, type: part.type })),
-    ...(resolution.bonusDamage ?? []).map((part) => ({ amount: part.amount, type: part.type }))
-  ].filter((part) => part.amount > 0);
+  return owedDamageParts(resolution);
+}
+
+const bloodied = (hp: Readonly<{ current: number; maximum: number }>) => hp.current > 0 && hp.current * 2 <= hp.maximum;
+
+/** Whether a stat block's conditional damage holds for this hit; a charge is the attacker's to confirm, so it comes
+ *  through the hit's options instead (`hit-options.ts`). */
+function conditionHolds(
+  ctx: ResolveContext,
+  when: NonNullable<ResolveContext["action"]["conditionalDamage"]>[number]["when"]
+): boolean {
+  const target = ctx.targets[0];
+  switch (when) {
+    case "advantage":
+      return ctx.rollMode?.mode === "advantage";
+    case "self-bloodied":
+      return bloodied(ctx.attacker.hp);
+    case "target-bloodied":
+      return target !== undefined && bloodied(target.hp);
+    case "target-grappled-by-self":
+      return (
+        target !== undefined &&
+        target.effects.some(
+          (effect) => effect.sourceActorId === ctx.attacker.id && effect.linkedConditionIds.includes("grappled")
+        )
+      );
+    case "charge":
+      return false;
+  }
+}
+
+/** The action's damage parts for this hit: a stat block's "or 2 (1d4) Piercing damage if the swarm is Bloodied"
+ *  replaces the first part, and "plus 2 (1d4) Slashing damage if the attack roll had Advantage" adds one. */
+function damageInForce(ctx: ResolveContext): ResolveContext["action"]["damage"] {
+  const variants = (ctx.action.conditionalDamage ?? []).filter((variant) => conditionHolds(ctx, variant.when));
+  const instead = variants.find((variant) => variant.mode === "instead");
+  const base = instead ? [...instead.damage, ...ctx.action.damage.slice(1)] : ctx.action.damage;
+  return [...base, ...variants.filter((variant) => variant.mode === "plus").flatMap((variant) => variant.damage)];
 }
 
 /** The action's own damage dice: crit-doubled, Savage Attacks on the first part. */
 export function rollWeaponDamage(ctx: ResolveContext): void {
   const { action, deps, damage } = ctx;
-  if (action.damage.length === 0 || !rollsDamage(ctx.attack)) return;
-  action.damage.forEach((part, index) => {
+  const parts = damageInForce(ctx);
+  if (parts.length === 0 || !rollsDamage(ctx.attack)) return;
+  parts.forEach((part, index) => {
     const expression = parseDiceFormula(part.formula);
     const extraCritDice = index === 0 ? (action.attack?.criticalBonusDice ?? 0) : 0;
     const rolled = resolveDice(ctx.crit ? criticalExpression(expression, extraCritDice) : expression, deps.random);
@@ -49,8 +85,8 @@ export function rollWeaponDamage(ctx: ResolveContext): void {
 }
 
 /** Riders that add damage, from every carrier (items, feats, features, live effects): typed `extra-damage` as
- *  its own `damage[]` entry (crit-doubled only with `doubleOnCritical`, since 5e doesn't double dice added
- *  after the attack) and moment-gated flat `damage-bonus` as a bonus line. A rider with no `when` fires on
+ *  its own `damage[]` entry (crit-doubled unless `doubleOnCritical` is false: a Critical Hit rolls the attack's
+ *  other damage dice twice too) and moment-gated flat `damage-bonus` as a bonus line. A rider with no `when` fires on
  *  every damage roll of its action; `on-hit`/`on-critical-hit` narrow it. The moments collected here are
  *  `DAMAGE_ROLL_MOMENTS`. */
 export function rollRiderDamage(ctx: ResolveContext): void {
@@ -88,7 +124,7 @@ export function rollRiderDamage(ctx: ResolveContext): void {
       }
       const expression = parseDiceFormula(modifier.formula);
       const rolled = resolveDice(
-        crit && modifier.doubleOnCritical === true ? criticalExpression(expression) : expression,
+        crit && modifier.doubleOnCritical !== false ? criticalExpression(expression) : expression,
         deps.random
       );
       recordRoll(ctx, rolled, "damage");

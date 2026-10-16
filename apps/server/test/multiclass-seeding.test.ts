@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema, type GameState } from "@vtt/domain";
 import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
-import { hitDiceFromDefinition, importActorDefinition, seedHitDice, spellSlotMaxima } from "../src/actor-roster.js";
-import { applyRest, spendHitDice } from "../src/rests.js";
+import { SRD_CLASS_PROGRESSION, progressionFromClass } from "@vtt/rules-5e";
+import {
+  hitDiceFromDefinition,
+  importActorDefinition,
+  seedHitDice,
+  spellSlotMaxima,
+  withDerivedSlots
+} from "../src/actor-roster.js";
+import { applyRest, hitDieSizesToSpend, spendHitDice } from "../src/rests.js";
 import { setSpellSlotRemaining } from "../src/spellcasting.js";
 import { projectPlayerView } from "../src/projections.js";
 
@@ -116,6 +123,13 @@ describe("multiclass seeding", () => {
     });
     const unmodeled = ActorDefinitionSchema.parse({ ...BASE, hitPoints: { maximum: 30 } });
     expect(seedHitDice(unmodeled)).toBeNull();
+  });
+
+  it("rolls each spent die at its own size, biggest first", () => {
+    const game = gameWith(fighterWizard());
+    // Three d10s and two d6s: spending four rolls d10, d10, d10, d6, never a d10 for a d6.
+    expect(hitDieSizesToSpend(actorOf(game).hitDice!.entries, 4)).toEqual([10, 10, 10, 6]);
+    expect(hitDieSizesToSpend(actorOf(game).hitDice!.entries, 9)).toEqual([10, 10, 10, 6, 6]);
   });
 
   it("spends the pool largest die first and a long rest restores every die size", () => {
@@ -309,5 +323,63 @@ describe("multiclass seeding", () => {
     });
     // A re-serialised save round-trips through the schema unchanged (persistence is JSON in SQLite).
     expect(GameStateSchema.parse(JSON.parse(JSON.stringify(legacy)))).toEqual(legacy);
+  });
+});
+
+describe("a homebrew caster class on an imported multiclass sheet", () => {
+  // Wizard 3 / Blood Knight 4, a homebrew half caster: caster level 3 + 2 = 5, so 4/3/2 slots. The SRD rows
+  // know no Blood Knight, so read without the table's own class rows it adds nothing (caster level 3).
+  const bloodKnight = () =>
+    ActorDefinitionSchema.parse({
+      ...BASE,
+      hitPoints: { maximum: 40, formula: "3d6 + 10" },
+      character: {
+        classes: [
+          { id: "wizard", name: "Wizard", level: 3 },
+          { id: "blood-knight", name: "Blood Knight", level: 4, hitDie: "d10" }
+        ],
+        feats: []
+      },
+      spellcasting: {
+        ability: "int",
+        slots: [],
+        classes: [
+          { classId: "wizard", ability: "int" },
+          { classId: "blood-knight", ability: "cha" }
+        ],
+        spells: []
+      }
+    });
+  const table = {
+    ...SRD_CLASS_PROGRESSION,
+    "blood-knight": progressionFromClass({
+      id: "blood-knight",
+      hitDie: "d10",
+      statPriority: ["str", "cha", "con", "dex", "wis", "int"],
+      primaryAbilities: ["str", "cha"],
+      savingThrows: ["str", "cha"],
+      asiLevels: [4, 8, 12, 16, 19],
+      subclassLevel: 3,
+      spellcasting: { ability: "cha", multiclassProgression: "half" }
+    })
+  };
+
+  it("counts the homebrew class's levels by its own progression when the sheet is imported", () => {
+    expect(spellSlotMaxima(bloodKnight())).toEqual([
+      { level: 1, max: 4 },
+      { level: 2, max: 2 }
+    ]);
+    const imported = withDerivedSlots(bloodKnight(), table);
+    expect(spellSlotMaxima(imported)).toEqual([
+      { level: 1, max: 4 },
+      { level: 2, max: 3 },
+      { level: 3, max: 2 }
+    ]);
+    // Stated slots are the sheet's own and are kept as they are.
+    const stated = ActorDefinitionSchema.parse({
+      ...bloodKnight(),
+      spellcasting: { ...bloodKnight().spellcasting, slots: [{ level: 1, max: 2 }] }
+    });
+    expect(withDerivedSlots(stated, table).spellcasting?.slots).toEqual([{ level: 1, max: 2 }]);
   });
 });

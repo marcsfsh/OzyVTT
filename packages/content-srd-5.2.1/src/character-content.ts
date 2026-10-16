@@ -11,6 +11,7 @@ import {
   AbilitySchema,
   ActionSchema,
   DiceFormulaSchema,
+  HealingFormulaSchema,
   EffectGrantSchema,
   GrantWhenSchema,
   HitDieSchema,
@@ -153,6 +154,33 @@ export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true 
       z.object({ level: ContentLevelSchema, formula: DiceFormulaSchema, type: z.string().min(1).max(40) }).strict()
     )
     .max(20)
+    .optional(),
+  /** Healing that grows with level, replacing `healing.formula` at the highest matching level (Divine Spark's heal,
+   *  Wholeness of Body's Martial Arts die). */
+  healingByLevel: z
+    .array(z.object({ level: ContentLevelSchema, formula: HealingFormulaSchema }).strict())
+    .max(20)
+    .optional(),
+  /** What the built action adds to its first damage part and its healing, read off the character when it is built:
+   *  a multiple of its level ("1d10 plus your Fighter level", "five times your Cleric level") and an ability
+   *  modifier ("add your Wisdom modifier"). */
+  adds: z
+    .object({
+      classLevel: z.number().int().min(1).max(10).optional(),
+      abilityModifier: AbilitySchema.optional()
+    })
+    .strict()
+    .optional(),
+  /** The `amount` of the granted effect's `damage-bonus` riders is the printed class column at the character's
+   *  level (Rage Damage), so the bonus grows as the table does. */
+  grantScaling: z
+    .object({
+      resource: z
+        .string()
+        .regex(/^[a-z0-9-]+$/)
+        .max(60)
+    })
+    .strict()
     .optional(),
   /** A compound plan that grows with level, replacing `multiattack` at the highest matching level (Flurry of
    *  Blows' third strike at Monk 10). */
@@ -409,6 +437,9 @@ export const FeatureOptionSchema = z
      * options as the capacity, consumers adopt them without asking.
      */
     requires: z.object({ offer: PickBudgetKeySchema, id: ContentIdSchema }).strict().optional(),
+    /** The class level this option may first be chosen at (an invocation's "Prerequisite: Level 5+ Warlock");
+     *  a build below it is not offered the option. */
+    level: ContentLevelSchema.optional(),
     /** A pick this option asks for once chosen, from a list of its own. */
     choice: FeatureOptionChoiceSchema.optional(),
     /** Several picks this option asks for; see `FeatureRecordSchema.choices`. Author one or the other. */
@@ -475,7 +506,8 @@ export const FeatureRecordSchema = z
   .object({
     id: ContentIdSchema,
     name: z.string().min(1).max(120),
-    /** Class/subclass level this feature is gained at. Absent for always-on records (species traits, feats). */
+    /** Class/subclass level this feature is gained at; on a species or lineage trait, the character level it
+     *  arrives at (Draconic Flight at 5). Absent for records held from level 1 (most traits, feats). */
     level: ContentLevelSchema.optional(),
     description: z.string().min(1).max(20000),
     /** A pick this feature asks the player to make; writes a `choices[]` row. */
@@ -486,6 +518,9 @@ export const FeatureRecordSchema = z
     extraPicks: extraPicksField,
     /** Picks this feature lets the character re-make later - on a level-up, or on a rest (see `ReplaceableChoiceSchema`). */
     replaces: replacesField,
+    /** Spell lists the class's own spell picks may also draw on, the spells counting as the class's (Magical
+     *  Secrets: "from the Bard, Cleric, Druid, and Wizard spell lists"). */
+    extraSpellLists: z.array(ContentIdSchema).min(1).max(8).optional(),
     ...featureRiders,
     /** This feature replaces an earlier one of the same id lineage (Indomitable at 9/13/17). */
     replacesFeatureId: ContentIdSchema.optional()
@@ -799,6 +834,8 @@ export const FeatReferenceSchema = z
           .array(z.object({ ability: AbilitySchema, minimum: z.number().int().min(1).max(20) }).strict())
           .max(6)
           .default([]),
+        /** Whether every minimum must be met, or any one of them (Grappler's "Strength or Dexterity 13+"). */
+        abilityScoreMode: z.enum(["all", "any"]).default("all"),
         /** Proficiency or feature slugs the character must already have ("martial", "spellcasting"). */
         requires: z.array(ContentIdSchema).max(10).default([]),
         /** Anything not modeled above, printed for the player to judge (ADR-0008 prose fallback). */

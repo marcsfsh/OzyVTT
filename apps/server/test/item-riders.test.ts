@@ -493,6 +493,21 @@ describe("criterion 5: a cloak granting advantage on Initiative while attuned", 
     const derivation = deriveEquipment(state.actors[0], definition, catalogOf([CLOAK]));
     expect(derivation.initiative).toBe(2);
   });
+
+  it("adds the bearer's Proficiency Bonus once when a rider says so", () => {
+    const alertCloak = {
+      ...CLOAK,
+      modifiers: [
+        { type: "initiative", amount: 1, proficiencyBonus: true },
+        { type: "initiative", amount: 0, proficiencyBonus: true }
+      ]
+    };
+    const state = stateWith([
+      item({ id: "cloak-of-quickness", name: "Cloak", category: "wondrous", equipped: true, attuned: true })
+    ]);
+    // +1 flat, +2 for proficiency (counted once), on a sheet whose Proficiency Bonus is 2.
+    expect(deriveEquipment(state.actors[0], definitionOf(), catalogOf([alertCloak])).initiative).toBe(3);
+  });
 });
 
 describe("criterion 6: a shield granting a Paladin one more use of Lay on Hands", () => {

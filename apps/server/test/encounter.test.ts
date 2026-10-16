@@ -94,11 +94,19 @@ describe("authoritative encounter and Initiative", () => {
     previousInitiativeTurn(game);
     expect(game.combat).toMatchObject({ round: 1, turnActorId: IDS.beta });
     setInitiativeScore(game, IDS.beta, 20);
-    expect(game.combat.initiative.map(({ actorId, score }) => ({ actorId, score }))).toEqual([
+    // Mid-round, Alpha has already acted, so Beta's higher score takes effect from the next round.
+    const scores = () => game.combat.initiative.map(({ actorId, score }) => ({ actorId, score }));
+    expect(scores()).toEqual([
+      { actorId: IDS.alpha, score: 15 },
+      { actorId: IDS.beta, score: 20 }
+    ]);
+    expect(game.combat.turnActorId).toBe(IDS.beta);
+    nextInitiativeTurn(game);
+    expect(game.combat).toMatchObject({ round: 2, turnActorId: IDS.beta });
+    expect(scores()).toEqual([
       { actorId: IDS.beta, score: 20 },
       { actorId: IDS.alpha, score: 15 }
     ]);
-    expect(game.combat.turnActorId).toBe(IDS.beta);
     endEncounter(game);
     expect(game.combat).toMatchObject({ active: false, turnActorId: null, mapAssetId: IDS.map });
     expect(game.combat.initiative).toHaveLength(2);

@@ -23,6 +23,15 @@ function spendFromPool(entries: readonly HitDiceEntry[], count: number): HitDice
     });
 }
 
+/** The sizes of the next `count` Hit Dice a pool spends, biggest first, matching `spendFromPool`: a
+ *  Fighter 3 / Wizard 2 rolls d10s, then d6s. Short when the pool holds fewer. */
+export function hitDieSizesToSpend(entries: readonly HitDiceEntry[], count: number): number[] {
+  return [...entries]
+    .sort((a, b) => Number(b.die.slice(1)) - Number(a.die.slice(1)))
+    .flatMap((entry) => Array.from({ length: entry.remaining }, () => Number(entry.die.slice(1))))
+    .slice(0, count);
+}
+
 /** Spends Hit Point Dice to heal (SRD 5.2.1 Short Rest): each die heals `face + Con modifier`, minimum 1.
  *  The caller rolls the faces before the store executes (so retries never reroll) and records them; this
  *  owns validation, healing (via healActor) and the pool decrement. */
@@ -31,7 +40,8 @@ export function spendHitDice(
   actorId: string,
   faces: readonly number[],
   scope: Initiator,
-  resolveDefinition: (definitionId: string) => ActorDefinition | undefined
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
+  count: number = faces.length
 ): { healed: number; events: EffectNarration[]; conModifier: number } {
   requireActorAccess(scope, state, actorId, "resource");
   const actor = state.actors.find((candidate) => candidate.id === actorId);
@@ -40,7 +50,7 @@ export function spendHitDice(
     throw new CommandRejectedError("Hit Dice are spent on a rest - end the encounter first.");
   if (!actor.hitDice)
     throw new CommandRejectedError(`${actor.name} has no Hit Dice pool (its stat block has no hit-point formula).`);
-  if (actor.hitDice.remaining < faces.length)
+  if (actor.hitDice.remaining < count || faces.length < count)
     throw new CommandRejectedError(
       `${actor.name} has ${actor.hitDice.remaining} Hit ${actor.hitDice.remaining === 1 ? "Die" : "Dice"} left.`
     );

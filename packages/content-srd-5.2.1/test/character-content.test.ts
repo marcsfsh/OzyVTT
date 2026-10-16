@@ -241,8 +241,9 @@ describe("character-builder content records", () => {
         ]
       }
     });
-    expect(channel.actions.map((action) => action.id)).toEqual(["divine-spark", "turn-undead"]);
-    expect(channel.actions[1].save).toEqual({
+    // Divine Spark's healing branch is its own action, so the table can heal with it.
+    expect(channel.actions.map((action) => action.id)).toEqual(["divine-spark", "divine-spark-heal", "turn-undead"]);
+    expect(channel.actions[2].save).toEqual({
       ability: "wis",
       dc: "spellcasting",
       successDamage: "none",
@@ -523,7 +524,13 @@ describe("character-builder content records", () => {
     expect(soldier.startingEquipment.at(-1)).toMatchObject({ items: [], goldPieces: 50 });
     // The soldier's gaming set points at real catalog ids.
     expect(soldier.startingEquipment[0].items.map((item) => item.id)).toContain("gaming-set-dice");
-    expect(soldier.toolChoices?.from).toEqual(["gaming-set-dice", "gaming-set-playing-cards"]);
+    // "Choose one kind of Gaming Set": all four SRD variants.
+    expect(soldier.toolChoices?.from).toEqual([
+      "gaming-set-dice",
+      "gaming-set-dragonchess",
+      "gaming-set-playing-cards",
+      "gaming-set-three-dragon-ante"
+    ]);
     // Acolyte and Criminal complete the SRD 5.2.1 set of four.
     expect(backgrounds.map((background) => background.id).sort()).toEqual(["acolyte", "criminal", "sage", "soldier"]);
     const acolyte = backgrounds.find((background) => background.id === "acolyte")!;
@@ -644,6 +651,9 @@ describe("character-builder content records", () => {
       if (slug === "weapons") return weaponCount > 0;
       if (slug === "tools") return toolCount > 0;
       if (slug === "languages") return languages.length > 0;
+      if (slug === "feats") return feats.length > 0;
+      const school = /^(.+)-spells-of-([a-z0-9]+)$/.exec(slug);
+      if (school) return spells.some((spell) => spell.classes.includes(school[1]) && spell.school === school[2]);
       if (slug.endsWith("-languages"))
         return languages.some((entry) => entry.table === slug.slice(0, -"-languages".length));
       if (slug.endsWith("-spells"))
@@ -897,8 +907,20 @@ describe("character-builder content records", () => {
     const defense = feats.find((feat) => feat.id === "defense")!;
     expect(defense.category).toBe("fighting-style");
     expect(defense.feature.modifiers).toEqual([{ type: "armor-class", amount: 1, whileArmored: true }]);
-    // Every other SRD fighting style stays prose - none of the three has a modeled rider.
-    for (const id of ["archery", "great-weapon-fighting", "two-weapon-fighting"]) {
+    // Archery's +2 is a roll-time rider on Ranged weapons (ammunition marks one; a thrown melee weapon and a
+    // spell attack do not qualify). The other two stay prose.
+    expect(feats.find((feat) => feat.id === "archery")!.feature.modifiers).toEqual([
+      {
+        type: "attack-bonus",
+        amount: 2,
+        when: [
+          { type: "on-attack-roll" },
+          { type: "attack-kind-is", kinds: ["ranged"] },
+          { type: "weapon-property-is", properties: ["ammunition"] }
+        ]
+      }
+    ]);
+    for (const id of ["great-weapon-fighting", "two-weapon-fighting"]) {
       expect(feats.find((feat) => feat.id === id)!.feature.modifiers, id).toEqual([]);
     }
     // An unconditional +1 AC is still expressible and still means "always" (back-compat).
@@ -946,6 +968,18 @@ describe("character-builder content records", () => {
       ]);
       // The damage type agrees with the resistance the same ancestry grants.
       expect(lineage.traits[0].grants!.damageResistances, lineage.id).toEqual([type]);
+      // "Either a 15-foot Cone or a 30-foot Line": the cone is the same exhalation in the other shape, and both
+      // stand in for one attack of the Attack action.
+      const cone = trait.actions.find((candidate) => candidate.id === "breath-weapon-cone")!;
+      expect(cone.area, lineage.id).toEqual({ shape: "cone", sizeFeet: 15, widthFeet: null });
+      expect(action.area, lineage.id).toEqual({ shape: "line", sizeFeet: 30, widthFeet: 5 });
+      expect({ ...cone, id: action.id, name: "", area: null, description: "" }, lineage.id).toEqual({
+        ...action,
+        name: "",
+        area: null,
+        description: ""
+      });
+      expect([action.replacesAttack, cone.replacesAttack], lineage.id).toEqual([true, true]);
     }
     // Divine Spark: a Channel Divinity save (the class's own spell save DC) and the scaling damage.
     const spark = classes
@@ -1063,6 +1097,24 @@ describe("2a - no class or subclass feature falls back to a pointer at an extern
     for (const feature of arcana) expect(feature.description).toContain("a magical secret called an arcanum");
   });
 
+  it("reads each invocation's printed prerequisite into a class level and the invocation it needs", () => {
+    const options = new Map(
+      classes
+        .find((record) => record.id === "warlock")!
+        .features.find((feature) => feature.id === "eldritch-invocations")!
+        .choice!.options!.map((option) => [option.id, option])
+    );
+    expect(options.get("armor-of-shadows")?.level).toBeUndefined();
+    expect(options.get("witch-sight")?.level).toBe(15);
+    expect(options.get("devouring-blade")).toMatchObject({
+      level: 12,
+      requires: { offer: "feature:eldritch-invocations", id: "thirsting-blade" }
+    });
+    // "a Warlock Cantrip That Deals Damage" names no invocation: the level is read and the rest stays in the text.
+    expect(options.get("agonizing-blast")?.level).toBe(2);
+    expect(options.get("agonizing-blast")?.requires).toBeUndefined();
+  });
+
   it('drops the table\'s "Subclass feature" reminder rows, as the hand-authored three already do', () => {
     // It is not a class feature: the SRD prints no heading for it, so it can carry no prose, and the
     // real feature is on the subclass record. Cleric's empty levels 6 and 17 are the oracle.
@@ -1096,8 +1148,12 @@ describe("the subclass authoring surface, and the tables the parser used to thro
   it("merges SUBCLASS_MECHANICS into an ETL-GENERATED subclass", () => {
     // Draconic Sorcery is ETL-generated, so this rider can only come from SUBCLASS_MECHANICS.
     const resilience = featureOf(subclasses, "draconic-sorcery", "draconic-resilience");
-    // `allowShield: true` is authored: the printed sentence restricts only wearing armor.
-    expect(resilience.modifiers).toEqual([{ type: "unarmored-defense", ability: "cha", allowShield: true }]);
+    // `allowShield: true` is authored: the printed sentence restricts only wearing armor. The Hit Point half is
+    // +1 per level, the feature arriving at 3.
+    expect(resilience.modifiers).toEqual([
+      { type: "unarmored-defense", ability: "cha", allowShield: true },
+      { type: "hit-points-per-level", amount: 1 }
+    ]);
   });
 
   it("carries the spell tables of the four subclass spell features into their descriptions", () => {
@@ -1599,8 +1655,8 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
     });
     const rider = mace.modifiers[0];
     expect(rider).toMatchObject({ type: "extra-damage", formula: "1d6", damageType: "fire" });
-    // 5e does not double dice added after the attack, so the default is false and a GM opts in.
-    expect(rider).toMatchObject({ doubleOnCritical: false });
+    // A Critical Hit rolls the attack's other damage dice twice too (SRD), so the default is true and a GM opts out.
+    expect(rider).toMatchObject({ doubleOnCritical: true });
     expect(riderLayer(rider.when)).toBe("momentary");
     // `critical-bonus-dice` is an untyped count of extra weapon dice, a different thing from typed extra damage.
     expect(ModifierSchema.parse({ type: "critical-bonus-dice", count: 2 })).toMatchObject({ count: 2 });

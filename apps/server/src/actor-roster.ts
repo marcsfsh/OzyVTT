@@ -1,4 +1,5 @@
 import { makeHitDicePool, type Actor, type ActorDefinition, type GameState, type HitDiceEntry } from "@vtt/domain";
+import type { ActorAction } from "@vtt/schemas";
 import {
   ABILITIES,
   abilityModifier,
@@ -10,10 +11,12 @@ import {
   wornBodyArmor,
   type Ability,
   type ClassLevelEntry,
+  type ClassProgressionTable,
   type UnarmoredDefense
 } from "@vtt/rules-5e";
 import { withProseFacts } from "@vtt/content-srd-5.2.1/action-prose";
 import { endEffectsSustainedBy } from "./effects.js";
+import { actionPools, effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, withResolvedSlots, type EquipmentCatalog } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
 
@@ -89,6 +92,34 @@ function baseSpellSlotMaxima(definition: ActorDefinition | undefined): ReadonlyA
   return multiclassSpellSlots(multiclassCasterLevel(casterLevels))
     .map((count, index) => ({ level: index + 1, max: count }))
     .filter((slot) => slot.max > 0);
+}
+
+/**
+ * An imported sheet that lists its casting classes but states no slots, with the slots written in from the
+ * table's own class rows. The live reads above fall back to the SRD rows, which know no homebrew class, so a
+ * homebrew half caster's levels would otherwise add nothing to the shared table.
+ */
+export function withDerivedSlots(definition: ActorDefinition, table: ClassProgressionTable): ActorDefinition {
+  const spellcasting = definition.spellcasting;
+  if (!spellcasting || (spellcasting.slots.length > 0 && spellcasting.pact)) return definition;
+  const casterIds = new Set((spellcasting.classes ?? []).map((entry) => entry.classId));
+  if (casterIds.size === 0) return definition;
+  const casterLevels = classLevelsOf(definition).filter((entry) => casterIds.has(entry.classId));
+  const slots =
+    spellcasting.slots.length > 0
+      ? spellcasting.slots
+      : multiclassSpellSlots(multiclassCasterLevel(casterLevels, table))
+          .map((count, index) => ({ level: index + 1, max: count }))
+          .filter((slot) => slot.max > 0);
+  const pact = spellcasting.pact ?? multiclassPactSlots(casterLevels, table);
+  return {
+    ...definition,
+    spellcasting: {
+      ...spellcasting,
+      slots,
+      ...(pact ? { pact: "max" in pact ? pact : { level: pact.level, max: pact.slots } } : {})
+    }
+  };
 }
 
 /** Warlock Pact Magic maximum, derived from the Warlock levels when the sheet did not state one. */
@@ -381,8 +412,11 @@ export function assertNotArchived(state: GameState, actorId: string) {
 /**
  * Rebuilds one character in place (level up/down, respec) from a definition built by
  * `buildCharacterDefinition`. Keeps table identity and campaign state (conditions, effects, notes,
- * currency, re-reconciled inventory); resets sheet-owned resources and derived stats. HP:
- * `current += newMaximum - oldMaximum`, clamped, so 5 -> 3 -> 5 lands where it started.
+ * currency, re-reconciled inventory) and what has been spent: a level is not a rest (SRD: "Each time you gain
+ * a level, you gain an additional Hit Die"; uses come back only on the rest a feature names), so spent uses,
+ * Hit Dice and slots carry over against the new maxima. Derived stats are recomputed. HP:
+ * `current += newMaximum - oldMaximum`, clamped, so 5 -> 3 -> 5 lands where it started; a character at 0 stays
+ * at 0, since gaining a level neither wakes nor revives anyone.
  */
 export function rebuildActorDefinition(
   state: GameState,
@@ -417,6 +451,11 @@ export function rebuildActorDefinition(
   // Carry over the old sheet's `hp-roll` rows for levels the new build doesn't cover, so levelling back
   // up restores the original rolls.
   const previous = state.definitions.find((entry) => entry.id === definitionId)?.definition;
+  // A one-class build would silently drop a sheet's other classes.
+  if ((previous?.character?.classes.length ?? 0) > (definition.character?.classes.length ?? 0))
+    throw new CommandRejectedError(
+      `${actor.name} has more classes than this build carries, and rebuilding would drop them.`
+    );
   const rebuilt = rememberHitPointRolls(previous, definition);
 
   const inventory = actor.inventory.map((item) => ({ ...item }));
@@ -426,7 +465,7 @@ export function rebuildActorDefinition(
   const maximum = definition.hitPoints.maximum;
 
   actor.hp = {
-    current: Math.max(0, Math.min(maximum, actor.hp.current + (maximum - previousMaximum))),
+    current: actor.hp.current <= 0 ? 0 : Math.max(0, Math.min(maximum, actor.hp.current + (maximum - previousMaximum))),
     maximum,
     temporary: actor.hp.temporary
   };
@@ -434,17 +473,84 @@ export function rebuildActorDefinition(
   actor.initiative = definition.initiativeBonus + derivation.initiative;
   actor.speedFeet = definition.speedFeet;
   actor.conditionImmunities = definition.conditionImmunities ? [...definition.conditionImmunities] : [];
-  actor.hitDice = seedHitDice(definition);
-  actor.spellSlots = seedSpellSlots(definition, derivation.spellSlots);
-  actor.pactSlots = seedPactSlots(definition);
-  actor.preparedSpellIds = seedPreparedSpellIds(definition);
-  actor.actionUses = {};
+  actor.hitDice = carriedHitDice(actor.hitDice, seedHitDice(definition));
+  actor.spellSlots = carriedSlots(
+    actor.spellSlots,
+    previous ? spellSlotMaxima(previous, deriveEquipment(actor, previous, catalog).spellSlots) : [],
+    seedSpellSlots(definition, derivation.spellSlots)
+  );
+  actor.pactSlots = carriedPactSlots(actor.pactSlots, pactSlotMaximum(previous), seedPactSlots(definition));
+  actor.preparedSpellIds = carriedPreparedSpells(actor.preparedSpellIds, previous, definition);
+  actor.actionUses = carriedUses(actor.actionUses, effectiveActions(definition, { ...actor, inventory }, catalog));
   actor.size = definition.size;
   actor.sizeCells = Math.max(definition.token.footprint.width, definition.token.footprint.height);
   state.definitions = state.definitions.map((entry) =>
     entry.id === definitionId ? { id: definitionId, definition: rebuilt } : entry
   );
   return actor;
+}
+
+/** Spent counts kept against the new limits; a pool the new sheet no longer has is dropped. */
+function carriedUses(spent: Actor["actionUses"], actions: readonly ActorAction[]): Actor["actionUses"] {
+  const limits = new Map(actionPools(actions).map((pool) => [pool.id, pool.limit]));
+  const carried: Record<string, number> = {};
+  for (const [key, used] of Object.entries(spent)) {
+    const limit = limits.get(key);
+    if (limit !== undefined && used > 0) carried[key] = Math.min(used, limit);
+  }
+  return carried;
+}
+
+/** The new Hit Dice pool with each die size's spent dice still spent: a level adds a die, it restores none. */
+function carriedHitDice(previous: Actor["hitDice"], next: Actor["hitDice"]): Actor["hitDice"] {
+  if (!previous || !next) return next;
+  return makeHitDicePool(
+    next.entries.map((entry) => {
+      const before = previous.entries.find((candidate) => candidate.die === entry.die);
+      const spent = before ? Math.max(0, before.maximum - before.remaining) : 0;
+      return { ...entry, remaining: Math.max(0, entry.maximum - spent) };
+    })
+  );
+}
+
+/** The new slot maxima with each level's spent slots still spent. */
+function carriedSlots(
+  previous: Actor["spellSlots"],
+  previousMaxima: ReadonlyArray<{ level: number; max: number }>,
+  next: Actor["spellSlots"]
+): Actor["spellSlots"] {
+  if (!previous || !next) return next;
+  return next.map((slot) => {
+    const before = previous.find((candidate) => candidate.level === slot.level);
+    const max = previousMaxima.find((candidate) => candidate.level === slot.level)?.max ?? before?.remaining ?? 0;
+    const spent = before ? Math.max(0, max - before.remaining) : 0;
+    return { ...slot, remaining: Math.max(0, slot.remaining - spent) };
+  });
+}
+
+function carriedPactSlots(
+  previous: Actor["pactSlots"],
+  previousMaximum: { level: number; max: number } | null,
+  next: Actor["pactSlots"]
+): Actor["pactSlots"] {
+  if (!previous || !next || !previousMaximum) return next;
+  const spent = Math.max(0, previousMaximum.max - previous.remaining);
+  return { ...next, remaining: Math.max(0, next.remaining - spent) };
+}
+
+/** What the player had prepared, where the new sheet still knows it, plus what the new sheet adds prepared. */
+function carriedPreparedSpells(
+  prepared: readonly string[],
+  previous: ActorDefinition | undefined,
+  next: ActorDefinition
+): string[] {
+  const defaults = seedPreparedSpellIds(next);
+  if (!previous?.spellcasting || !next.spellcasting) return defaults;
+  const known = new Set(previous.spellcasting.spells.map((spell) => spell.id));
+  const always = new Set(next.spellcasting.spells.filter((spell) => spell.alwaysPrepared).map((spell) => spell.id));
+  return next.spellcasting.spells
+    .map((spell) => spell.id)
+    .filter((id) => always.has(id) || (known.has(id) ? prepared.includes(id) : defaults.includes(id)));
 }
 
 /** The new sheet, plus any `hp-roll` row the old one recorded for a level this build does not cover. */

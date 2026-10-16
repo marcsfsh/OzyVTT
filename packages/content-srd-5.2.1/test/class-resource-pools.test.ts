@@ -118,9 +118,12 @@ describe("the mechanics overlay merges over generated prose", () => {
     expect(rage.actions[0].grants?.tags).toEqual(["raging"]);
     expect(rage.actions[0].grants?.modifiers.map((modifier) => modifier.type)).toEqual([
       "damage-resistance",
+      "damage-bonus",
       "roll-mode",
       "roll-mode"
     ]);
+    // Rage Damage reads the printed column when the character is built.
+    expect(rage.actions[0].grantScaling).toEqual({ resource: "rage-damage" });
   });
 
   it("scales its uses off the printed Rages column, which stopped being display-only", () => {

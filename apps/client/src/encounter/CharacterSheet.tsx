@@ -232,6 +232,7 @@ export function CharacterSheet({
         <SheetIdentityEditor
           actorId={actor.id}
           definition={definition}
+          role={role}
           busy={busy}
           edit={edit}
           onEdited={showEdited}

@@ -227,6 +227,8 @@ function TableGroup({
       customFormula: string | null;
       maxLevel: number;
       playerBuilder: "open" | "gm-only";
+      typedRolls: "open" | "gm-only";
+      hitPointRollFloor: "none" | "average";
     }>
   ) =>
     send(
@@ -425,6 +427,16 @@ function TableGroup({
             />
           ))}
         </div>
+        <Switch
+          checked={builder.typedRolls === "open"}
+          onChange={(open) => setBuilderPolicy({ typedRolls: open ? "open" : "gm-only" })}
+          label="Players can type their own dice for rolled scores and hit points"
+        />
+        <Switch
+          checked={builder.hitPointRollFloor === "average"}
+          onChange={(raise) => setBuilderPolicy({ hitPointRollFloor: raise ? "average" : "none" })}
+          label="Raise a hit point roll below the average to the average"
+        />
         {builder.allowedAbilityMethods.includes("custom") && (
           <div className="settings-inline">
             <Input

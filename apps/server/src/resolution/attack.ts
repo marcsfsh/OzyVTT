@@ -1,11 +1,13 @@
 import { armorClassInPlay } from "@vtt/domain";
 import {
+  abilityModifier as scoreModifier,
   aggregateRollMode,
   collectRiders,
   d20TestFormula,
   parseDiceFormula,
   resolveDice,
   sumRiders,
+  weaponAbilityFrom,
   type AttackKind
 } from "@vtt/rules-5e";
 import { conditionLabel, exhaustionLevel, exhaustionPenalty, isIncapacitated } from "../condition-rules.js";
@@ -19,7 +21,8 @@ import {
 } from "../equipment-derivation.js";
 import { UNARMED_STRIKE_ACTION_ID } from "../item-actions.js";
 import { VEXED_TAG } from "../weapon-mastery.js";
-import { statblockFacts } from "../statblock-facts.js";
+import { areEnemies } from "../creature-sides.js";
+import { statblockFacts, swimSpeedFeet } from "../statblock-facts.js";
 import { naturalFace, recordRoll, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
 
 /** Whether this swing is at range. A thrown weapon needs the measured distance; unmeasurable resolves to
@@ -36,9 +39,10 @@ export function attackUsedAsRanged(
 /** melee/ranged/thrown derive from reach and range, spell from the spell the action casts; reaction/opportunity
  *  come from `input.attackKinds`. */
 function attackKindsOf(ctx: ResolveContext, distance: number | null): AttackKind[] {
-  const { action, input } = ctx;
+  const { action, input, attacker } = ctx;
   const kinds = new Set<AttackKind>(input.attackKinds ?? []);
   const attack = action.attack;
+  const unarmed = action.id === UNARMED_STRIKE_ACTION_ID;
   if (attack) {
     const melee = attack.reachFeet !== undefined;
     const ranged = attack.rangeFeet !== undefined;
@@ -48,11 +52,35 @@ function attackKindsOf(ctx: ResolveContext, distance: number | null): AttackKind
     const thrownWeapon = weaponPropertiesOf(ctx.riderItemId, ctx.attacker.inventory).includes("thrown");
     if ((melee && ranged) || (ranged && thrownWeapon)) kinds.add("thrown");
     if (action.spellId !== undefined) kinds.add("spell");
+    // A weapon attack (Improved Critical, Divine Smite): a swing with a carried weapon, or a character's own
+    // non-spell attack (an imported sheet lists its Longsword as an action). A monster's Bite is neither.
+    const carried =
+      ctx.riderItemId !== null && attacker.inventory.some((item) => item.id === ctx.riderItemId && item.weapon);
+    if (
+      !unarmed &&
+      action.spellId === undefined &&
+      (action.extraAttack !== undefined || carried || attacker.kind === "player-character")
+    )
+      kinds.add("weapon");
   }
   // Matched by id so a Monk's own strike (which shadows the builtin) still counts as unarmed.
-  if (action.id === UNARMED_STRIKE_ACTION_ID) kinds.add("unarmed");
+  if (unarmed) kinds.add("unarmed");
   if (action.activation === "reaction") kinds.add("reaction");
   return [...kinds];
+}
+
+/** The ability a weapon or Unarmed Strike attack uses, for riders gated on it (Rage Damage: "an attack using
+ *  Strength"). Unknown for a stat block's own attacks, so such riders don't fire there. */
+function attackAbilityOf(ctx: ResolveContext): "str" | "dex" | undefined {
+  const scores = ctx.deps.definition?.abilityScores;
+  if (!scores) return undefined;
+  const str = scoreModifier(scores.str);
+  const dex = scoreModifier(scores.dex);
+  // Martial Arts lets a Monk's strike use Dexterity; the builtin strike is Strength.
+  if (ctx.action.id === UNARMED_STRIKE_ACTION_ID)
+    return ctx.deps.definition?.character?.martialArts && dex > str ? "dex" : "str";
+  const weapon = ctx.attacker.inventory.find((item) => item.id === ctx.riderItemId)?.weapon;
+  return weapon ? weaponAbilityFrom(weapon.properties ?? [], weapon.rangeFeet, str, dex) : undefined;
 }
 
 /** Conditions that by themselves give an attack advantage or disadvantage (SRD conditions appendix), in
@@ -120,31 +148,37 @@ function conditionClaims(ctx: ResolveContext, target: LiveActor, distance: numbe
   }
 }
 
-/** Where the attack is made from: underwater melee, long range, and a ranged shot in close combat. */
+/** Where the attack is made from: underwater, long range, and a ranged shot in close combat. */
 function positionClaims(ctx: ResolveContext, distance: number | null, sources: RollModeClaims): void {
   const { state, attacker, action, deps } = ctx;
   const attack = action.attack!;
-  // SRD Underwater Combat: melee attacks have Disadvantage unless the weapon deals piercing damage
-  // (the SRD's weapon list, generalized to its damage type).
-  if (state.combat.underwater && attack.reachFeet !== undefined) {
-    const piercing = action.damage.some((part) => part.type === "piercing");
-    if (!attackUsedAsRanged(attack, distance) && !piercing)
-      sources.disadvantage.push({ source: "underwater-melee", label: "Underwater (non-piercing melee)" });
+  const ranged = attackUsedAsRanged(attack, distance);
+  // SRD Underwater Combat, for attacks with a weapon (a spell attack is not impeded): a melee attack has
+  // Disadvantage unless the creature has a Swim Speed or the weapon deals Piercing damage (the SRD's weapon list,
+  // generalized to its damage type); a ranged one has Disadvantage within normal range (beyond it, it misses).
+  if (state.combat.underwater && action.spellId === undefined) {
+    if (!ranged && attack.reachFeet !== undefined) {
+      const piercing = action.damage.some((part) => part.type === "piercing");
+      const swimmer = swimSpeedFeet(deps.definition) !== null;
+      if (!piercing && !swimmer)
+        sources.disadvantage.push({ source: "underwater-melee", label: "Underwater (non-piercing melee)" });
+    } else if (ranged) {
+      sources.disadvantage.push({ source: "underwater-ranged", label: "Underwater (ranged weapon)" });
+    }
   }
   // Ranged-attack penalties (SRD), only when this shot is actually ranged and distance is measurable.
-  if (attack.rangeFeet === undefined || !deps.distanceFeet || !attackUsedAsRanged(attack, distance)) return;
+  if (attack.rangeFeet === undefined || !deps.distanceFeet || !ranged) return;
   const normal = attack.rangeNormalFeet;
   if (normal !== undefined && distance !== null && distance > normal + 1e-6) {
     sources.disadvantage.push({ source: "long-range", label: `Long range (beyond ${normal} ft)` });
   }
-  // An able enemy within 5 feet spoils the shot; "who can see you" stays GM adjudication.
-  const enemyKind =
-    attacker.kind === "player-character" ? "monster" : attacker.kind === "monster" ? "player-character" : null;
-  if (!enemyKind) return;
+  // An able enemy within 5 feet spoils the shot; "who can see you" stays GM adjudication. A creature at 0 HP is
+  // dead or dying, and an ally is no enemy whatever its kind.
   for (const entry of state.combat.initiative) {
     if (entry.actorId === attacker.id) continue;
     const enemy = state.actors.find((candidate) => candidate.id === entry.actorId);
-    if (!enemy || enemy.kind !== enemyKind || isIncapacitated(enemy)) continue;
+    if (!enemy || enemy.hp.current <= 0 || isIncapacitated(enemy)) continue;
+    if (!areEnemies(attacker, enemy, deps.resolveDefinition)) continue;
     // A creature the players can't see never spoils a visible attacker's shot on its own: the Disadvantage
     // would reveal it. The GM can still impose it.
     if (enemy.visibility !== "public" && attacker.visibility === "public") continue;
@@ -229,8 +263,10 @@ export function rollAttack(ctx: ResolveContext): void {
   const targetDefinition = target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined;
   const targetDerivation = deriveEquipment(target, targetDefinition, deps.catalog);
   const creatureType = targetDefinition ? statblockFacts(targetDefinition).creatureType : null;
+  const ability = attackAbilityOf(ctx);
   ctx.riderFilters = {
     attackKinds: attackKindsOf(ctx, distance),
+    ...(ability ? { ability } : {}),
     weaponProperties: weaponPropertiesOf(ctx.riderItemId, attacker.inventory),
     damageTypes,
     targetSize: target.size ?? "medium",
@@ -269,7 +305,8 @@ export function rollAttack(ctx: ResolveContext): void {
   const targetAc = inPlay !== undefined ? inPlay + ctx.coverBonus + reactionBonus : null;
   // A declared crit (total mode) or a natural roll at or above the threshold crits (a `critical-range`
   // rider can widen it); a nat 1 fumbles only when a natural die is known.
-  ctx.crit = declaredCrit || (!manualTotal && naturalRoll >= criticalThreshold(derivation, attacker, action));
+  ctx.crit =
+    declaredCrit || (!manualTotal && naturalRoll >= criticalThreshold(derivation, attacker, action, ctx.riderFilters));
   let outcome = ctx.crit
     ? ("crit" as const)
     : !manualTotal && naturalRoll === 1

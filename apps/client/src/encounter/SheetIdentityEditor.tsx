@@ -20,10 +20,15 @@ type ClassDraft = {
 };
 const blankClassDraft = (): ClassDraft => ({ key: newId(), id: null, name: "", subclass: "", level: 1 });
 
-/** Light hand-edit of a character's classes, race and background (owner and GM, server-enforced). */
+/**
+ * Light hand-edit of a character's classes, race and background (owner and GM, server-enforced). Only the GM
+ * changes levels and classes, and only on a sheet the builder did not make: a built sheet (it carries the
+ * choice ledger) changes those in the Level flow. Anyone may rename.
+ */
 export function SheetIdentityEditor({
   actorId,
   definition,
+  role,
   busy,
   edit,
   onEdited,
@@ -31,6 +36,7 @@ export function SheetIdentityEditor({
 }: Readonly<{
   actorId: string;
   definition: ActorDefinition;
+  role: "gm" | "player";
   busy: boolean;
   edit: SheetEdit;
   /** Shows the edited definition before the server's broadcast arrives. */
@@ -38,6 +44,9 @@ export function SheetIdentityEditor({
   onDone: () => void;
 }>) {
   const character = definition.character;
+  const built = character?.choices !== undefined;
+  /** Levels, classes and the ids the rules read; the server refuses any other change. */
+  const structural = role === "gm" && !built;
   const [idDraft, setIdDraft] = useState<{ classes: ClassDraft[]; race: string; background: string }>(() => {
     const rows = (character?.classes ?? []).map((klass, index) => ({
       key: `${klass.id}-${index}`,
@@ -58,25 +67,32 @@ export function SheetIdentityEditor({
       ...draft,
       classes: draft.classes.map((row) => (row.key === key ? { ...row, ...patch } : row))
     }));
+  const renamedSubclass = (row: ClassDraft) => {
+    const stored = character?.classes.find((klass) => klass.id === row.id)?.subclass;
+    return !structural && stored
+      ? { ...stored, name: row.subclass.trim() }
+      : { id: slugify(row.subclass), name: row.subclass.trim() };
+  };
   const saveIdentity = () => {
     const classes = idDraft.classes
       .filter((row) => row.name.trim().length > 0)
       .map((row) => ({
         id: row.id ?? slugify(row.name),
         name: row.name.trim(),
-        ...(row.subclass.trim() ? { subclass: { id: slugify(row.subclass), name: row.subclass.trim() } } : {}),
+        ...(row.subclass.trim() ? { subclass: renamedSubclass(row) } : {}),
         level: row.level,
         ...(row.hitDie ? { hitDie: row.hitDie } : {})
         // The server merges rows by class id, so of two rows resolving to the same id only the first ships.
       }))
       .filter((row, index, rows) => rows.findIndex((other) => other.id === row.id) === index);
+    // A rename keeps the id the rules read; only a structural edit may mint a new one.
+    const renamed = <T extends { id: string; name: string }>(stored: T | undefined, name: string) =>
+      !structural && stored ? { ...stored, name } : { id: slugify(name), name };
     const next = {
       classes,
       feats: character?.feats ? [...character.feats] : [],
-      ...(idDraft.race.trim() ? { race: { id: slugify(idDraft.race), name: idDraft.race.trim() } } : {}),
-      ...(idDraft.background.trim()
-        ? { background: { id: slugify(idDraft.background), name: idDraft.background.trim() } }
-        : {})
+      ...(idDraft.race.trim() ? { race: renamed(character?.race, idDraft.race.trim()) } : {}),
+      ...(idDraft.background.trim() ? { background: renamed(character?.background, idDraft.background.trim()) } : {})
     };
     // Spread over the stored identity to mirror the server's carry-forward merge (the `choices` ledger stays).
     onEdited({ ...definition, character: { ...character, ...next } });
@@ -116,6 +132,7 @@ export function SheetIdentityEditor({
                 type="number"
                 min="1"
                 max="20"
+                disabled={!structural}
                 value={row.level}
                 onChange={(event) =>
                   editClassDraft(row.key, {
@@ -128,7 +145,12 @@ export function SheetIdentityEditor({
         );
       })}
       {/* The schema allows up to four classes; removing one is a respec, which the builder owns. */}
-      {idDraft.classes.length < 4 && (
+      {!structural && (
+        <p className="sheet-status">
+          {built ? "Change classes and levels in the Level flow." : "Your GM changes classes and levels."}
+        </p>
+      )}
+      {structural && idDraft.classes.length < 4 && (
         <Button
           size="sm"
           variant="ghost"

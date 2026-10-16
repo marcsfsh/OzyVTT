@@ -42,6 +42,8 @@ describe("rule families", () => {
       ["economy.bonus-action-used", "economy"],
       ["economy.reaction-used", "economy"],
       ["economy.not-your-turn", "economy"],
+      // No one acts while a wait-mode fight gathers initiative: the turn economy hasn't begun.
+      ["initiative.gathering", "economy"],
       // Being incapacitated or down is "you have no actions" - economy, not a targeting rule.
       ["condition.incapacitated", "economy"],
       ["condition.down", "economy"],
@@ -57,6 +59,8 @@ describe("rule families", () => {
       ["attack.two-handed", "economy"],
       // Casting in untrained armor: what the character can do at all, like the hands rule.
       ["spell.untrained-armor", "economy"],
+      // Sneak Attack or a smite taken alone, with no hit to add to.
+      ["attack.rides-a-hit", "economy"],
       ["feature.no-uses-remaining", "resources"],
       ["feature.requires-effect", "resources"],
       ["feature.no-spell-slot", "resources"],
@@ -70,6 +74,8 @@ describe("rule families", () => {
       ["condition.charmed-charmer", "targeting"],
       ["attack.cleave-same-target", "targeting"],
       ["attack.cleave-too-far", "targeting"],
+      // The hit can't carry the extra: no Advantage or ally for Sneak Attack, no melee weapon for a smite.
+      ["attack.hit-option-unqualified", "targeting"],
       // Not thrown yet, but the family is already part of the wire vocabulary.
       ["slots.none-remaining", "slots"]
     ];

@@ -17,6 +17,7 @@ import {
   type RuleId
 } from "../rules-families.js";
 import { builtinHandlerFor } from "./builtins.js";
+import { hitRiderOf } from "./hit-riders.js";
 import { sizeRank, type DefinitionAction, type LiveActor, type ResolveContext, type ResolveInput } from "./context.js";
 
 type RuleViolation = Readonly<{ rule: RuleId; message: string }>;
@@ -88,6 +89,8 @@ export function evaluateActionEconomy(
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null,
   siblings: ReadonlyArray<DefinitionAction> = definition?.actions ?? [],
   slotLevel?: number,
+  /** The action rides a hit it was chosen for (Sneak Attack), rather than being taken alone. */
+  asHitRider = false,
   catalog?: EquipmentCatalog
 ): EconomyEvaluation {
   const evaluation: Evaluation = {
@@ -104,11 +107,13 @@ export function evaluateActionEconomy(
     notes: []
   };
   checkAbleToAct(evaluation);
+  checkTurnsBegun(evaluation);
   checkExtraAttackOpened(evaluation);
   checkLoading(evaluation);
   checkHands(evaluation);
   checkArmorTraining(evaluation, definition);
   checkAmmunition(evaluation, catalog);
+  if (!asHitRider) checkTakenAlone(evaluation);
   const spendUse = checkLimitedUse(evaluation);
   const slots = checkActionSlots(evaluation);
   const spendLegendary = checkLegendary(evaluation, definition);
@@ -121,6 +126,17 @@ export function evaluateActionEconomy(
     proseMultiattack: evaluation.proseMultiattack,
     notes: evaluation.notes
   };
+}
+
+/** In wait mode the order is provisional until every player has rolled, and the turn economy resets when
+ *  turns begin, so an action taken before then would come free. */
+function checkTurnsBegun({ state, violations }: Evaluation): void {
+  const { active, playerInitiativeMode, pendingInitiative } = state.combat;
+  if (active && playerInitiativeMode === "wait" && pendingInitiative.length > 0)
+    violations.push({
+      rule: "initiative.gathering",
+      message: "Players are still rolling initiative - turns begin once everyone has rolled."
+    });
 }
 
 /** Incapacitation and 0 HP forbid all three activation kinds (SRD 2024 "Incapacitated"); a required
@@ -249,6 +265,16 @@ function checkLoading({ state, attacker, action, onOwnTurn, violations }: Evalua
     });
 }
 
+/** Sneak Attack, a smite and the like add their dice to a hit, so they're chosen on the attack's result before it
+ *  is confirmed; taken alone they would deal damage with no hit to ride. */
+function checkTakenAlone({ action, violations }: Evaluation): void {
+  if (hitRiderOf(action))
+    violations.push({
+      rule: "attack.rides-a-hit",
+      message: `${action.name} adds to a hit: choose it on the attack's result before you confirm the hit.`
+    });
+}
+
 const USE_SCOPE_LABELS: Readonly<Record<"turn" | "encounter" | "short-rest" | "long-rest", string>> = {
   turn: "turn",
   encounter: "encounter",
@@ -372,6 +398,9 @@ function checkActionSlot({
     } else if (action.attack && (action.attack.count ?? 1) > 1) {
       // Count-based attacks open a generic pool so Extra Attack can mix weapons legally.
       components = { attack: (action.attack.count ?? 1) - 1 };
+    } else if (action.replacesAttack && attacksInAttackAction(siblings) > 1) {
+      // Breath Weapon as the first attack of the Attack action: the rest stay open for weapon swings.
+      components = { attack: attacksInAttackAction(siblings) - 1 };
     }
     // The instance stays even when exhausted so a further resolve gets "no attacks remaining".
     return {
@@ -411,7 +440,7 @@ function checkActionSlot({
       });
   } else if ((components[action.id] ?? 0) > 0) {
     components[action.id] -= 1;
-  } else if (action.attack && (components["attack"] ?? 0) > 0) {
+  } else if ((action.attack || action.replacesAttack) && (components["attack"] ?? 0) > 0) {
     components["attack"] -= 1;
   } else {
     const named = leftovers();
@@ -424,6 +453,18 @@ function checkActionSlot({
     });
   }
   return { ...plan, instance: { actorId: attacker.id, components } };
+}
+
+/** How many attacks the Attack action makes: the most any one attack action makes, which is where Extra Attack is
+ *  folded (weapon swings and the Unarmed Strike). Spells and Multiattack plans are not the Attack action. */
+function attacksInAttackAction(siblings: ReadonlyArray<DefinitionAction>): number {
+  return siblings.reduce(
+    (most, candidate) =>
+      candidate.attack && candidate.activation === "action" && !candidate.multiattack && !candidate.spellId
+        ? Math.max(most, candidate.attack.count ?? 1)
+        : most,
+    1
+  );
 }
 
 /** SRD Legendary Actions: taken at the end of other creatures' turns from a per-round pool that refills
@@ -612,6 +653,7 @@ export function planEconomy(
   warnings: string[],
   distanceFeet: ((actorIdA: string, actorIdB: string) => number | null) | undefined,
   siblings: ReadonlyArray<DefinitionAction>,
+  asHitRider = false,
   catalog?: EquipmentCatalog
 ): { plan: EconomyPlan; overridden: { rule: RuleId; reason: string } | null } {
   const { violations, softViolations, plan, proseMultiattack, notes } = evaluateActionEconomy(
@@ -623,6 +665,7 @@ export function planEconomy(
     distanceFeet,
     siblings,
     input.slotLevel,
+    asHitRider,
     catalog
   );
   warnings.push(...notes);
