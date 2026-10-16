@@ -231,6 +231,9 @@ function spellDamage(
   }));
 }
 
+/** A casting time of a minute or more ("10 minutes", "8 hours"). */
+export const isLongCastingTime = (castingTime: string): boolean => /\b\d+\s*(?:minute|hour)s?\b/i.test(castingTime);
+
 /** The id of the action a spell's later action is minted as ("spell-spirit-guardians-then-save"). */
 export const laterSpellActionId = (spellId: string, name: string): string =>
   `spell-${spellId}-then-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;

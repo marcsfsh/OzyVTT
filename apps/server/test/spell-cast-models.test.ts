@@ -109,3 +109,21 @@ describe("Sacred Flame", () => {
     expect(state.combat.pendingSaves[0]!.saveBonus).toBe(0);
   });
 });
+
+describe("a spell that takes a minute or more to cast", () => {
+  const caster = build(wizardInput(["alarm", "magic-missile"]));
+
+  it("takes the Magic action, with a reminder of the turns and Concentration it needs", () => {
+    const { resolve, action } = fight(caster);
+    expect(action("spell-alarm").activation).toBe("action");
+    expect(resolve("spell-alarm", { targetIds: [] }).warnings?.join(" ")).toMatch(
+      /Alarm takes 1 minute to cast: the Magic action on each of the caster's turns/
+    );
+  });
+
+  it("can't be cast while the caster is Incapacitated", () => {
+    const { resolve, hero } = fight(caster);
+    hero.conditions = [{ id: "unconscious" }];
+    expect(() => resolve("spell-alarm", { targetIds: [] })).toThrowError(/can't take actions/);
+  });
+});

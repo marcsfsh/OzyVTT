@@ -11985,7 +11985,12 @@
       "formula": "6d6",
       "type": "thunder"
      }
-    ]
+    ],
+    "area": {
+     "shape": "sphere",
+     "sizeFeet": 20,
+     "widthFeet": null
+    }
    },
    {
     "id": "spellcasting",
@@ -35118,6 +35123,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "sphere",
+     "sizeFeet": 10,
+     "widthFeet": null
     }
    },
    {

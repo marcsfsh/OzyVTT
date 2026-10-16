@@ -24,6 +24,7 @@ import { outDir, sourcePath } from "./paths.js";
 import { SPELL_SAVE_OVERRIDE_IDS, spellSaveOutcomeFor, statBlockSaveOutcome } from "./save-outcomes.js";
 import { areaOfProse, withProseFacts } from "../src/action-prose.js";
 import { castingOptionsFor, spellEffectFor } from "./spell-effects.js";
+import { castingTimeText, SPELL_FIELD_CORRECTIONS } from "./spell-corrections.js";
 
 const sourceDir = sourcePath("open5e-srd-2024");
 
@@ -509,13 +510,8 @@ const CORRECTIONS: Record<string, Partial<CreatureFields>> = {
   ...Object.fromEntries(TINY_PER_SRD.map((slug) => [`srd-2024_${slug}`, { size: "tiny" }]))
 };
 
-/**
- * Same idea for spells. greater-invisibility ships with an empty `desc` upstream; the text is
- * the printed SRD 5.2.1 sentence.
- */
-const SPELL_CORRECTIONS: Record<string, Partial<SpellFields>> = {
-  "srd-2024_greater-invisibility": { desc: "A creature you touch has the Invisible condition until the spell ends." }
-};
+/** Same idea for spells: reviewed against the SRD 5.2.1 spells chapter (`spell-corrections.ts`). */
+const SPELL_CORRECTIONS: Readonly<Record<string, Partial<SpellFields>>> = SPELL_FIELD_CORRECTIONS;
 
 for (const pk of [...Object.keys(CORRECTIONS), ...EXCLUSIONS]) {
   if (!creatures.some((creature) => creature.pk === pk))
@@ -848,7 +844,7 @@ const spellRecords = onlySrd(spells).map((spell) => {
     name: fields.name,
     level: fields.level,
     school: fields.school,
-    castingTime: fields.casting_time,
+    castingTime: castingTimeText(fields.casting_time),
     reactionCondition: fields.reaction_condition || null,
     range: { distance: fields.range, unit: fields.range_unit, text: fields.range_text || null },
     components: {

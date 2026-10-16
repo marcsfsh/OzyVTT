@@ -34,7 +34,7 @@ import {
 } from "./character-offers.js";
 import type { ContentView } from "./content-library.js";
 import { BUILDER_BAKED_MODIFIER_TYPES, type CharacterFeatureRef } from "./equipment-derivation.js";
-import { laterSpellAction, spellCastMechanics, UNARMED_STRIKE_ACTION_ID } from "./item-actions.js";
+import { isLongCastingTime, laterSpellAction, spellCastMechanics, UNARMED_STRIKE_ACTION_ID } from "./item-actions.js";
 import { bindTemplateItem } from "./inventory.js";
 import { CommandRejectedError } from "./game-store.js";
 
@@ -267,11 +267,14 @@ function cantripActionFor(
   } as ActorAction;
 }
 
-/** The action economy a casting time names ("1 action", "1 bonus action", "1 reaction, which you take when..."). */
+/** The action economy a casting time names ("Action", "Bonus Action", "Reaction, which you take when..."). A casting
+ *  time of a minute or more takes the Magic action on each turn of it (SRD "Longer Casting Times"), so it is an action
+ *  too, refused while Incapacitated. */
 function activationOf(castingTime: string): ActorAction["activation"] {
   if (/bonus/i.test(castingTime)) return "bonus-action";
   if (/reaction/i.test(castingTime)) return "reaction";
-  return /^(?:1 )?action$/i.test(castingTime.trim()) ? "action" : "other";
+  if (/^(?:1 )?action\b/i.test(castingTime.trim()) || isLongCastingTime(castingTime)) return "action";
+  return "other";
 }
 
 type CasterNumbers = Readonly<{ attackBonus: number; saveDc: number; characterLevel: number; modifier: number }>;

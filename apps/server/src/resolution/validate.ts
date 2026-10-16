@@ -4,7 +4,7 @@ import { effectiveActions } from "../effective-actions.js";
 import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
 import { effectiveModeFor, overrideCovers, overrideReason, overrideWaives } from "../rules-families.js";
-import { laterSpellActionId, upcastAction, withSpellAttackReach } from "../item-actions.js";
+import { isLongCastingTime, laterSpellActionId, upcastAction, withSpellAttackReach } from "../item-actions.js";
 import { builtinHandlerFor } from "./builtins.js";
 import type { DefinitionAction, LiveActor, ResolveContext, ResolveDependencies, ResolveInput } from "./context.js";
 import { castLevelOf, planEconomy, type EconomyPlan } from "./economy.js";
@@ -161,8 +161,16 @@ export function withChosenDamageType(action: DefinitionAction, chosen: string | 
  *  area or a turn come round, so the GM resolves the later action when it happens. */
 function laterActionReminders(spell: SpellReference | undefined, action: DefinitionAction): string[] {
   const later = spell?.effect?.laterActions ?? [];
-  if (later.some((row) => laterSpellActionId(spell!.id, row.name) === action.id)) return [];
-  return later.map((row) => `${spell!.name}: ${row.when} Use "${spell!.name}: ${row.name}" for it.`);
+  if (!spell || later.some((row) => laterSpellActionId(spell.id, row.name) === action.id)) return [];
+  return [
+    // SRD "Longer Casting Times": the Magic action every turn of the cast, keeping Concentration throughout.
+    ...(isLongCastingTime(spell.castingTime)
+      ? [
+          `${spell.name} takes ${spell.castingTime} to cast: the Magic action on each of the caster's turns until then, keeping Concentration. If that breaks, the spell fails and its slot isn't spent - restore it on the sheet.`
+        ]
+      : []),
+    ...later.map((row) => `${spell.name}: ${row.when} Use "${spell.name}: ${row.name}" for it.`)
+  ];
 }
 
 /** The plan of a resolve whose economy was already spent: it changes nothing. */
