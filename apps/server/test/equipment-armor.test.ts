@@ -214,6 +214,32 @@ describe("what body armor costs", () => {
   });
 });
 
+describe("what can be worn together", () => {
+  it("wears only one of each thing the SRD lists, and lets a player wear the rest side by side", () => {
+    const table = tableOf({ [IDS.wizard]: wizardInput() });
+    // Gloves and bracers, a cloak and a robe, two neck pieces, lenses and a helm, a third ring.
+    for (const id of [
+      "bracers-of-defense",
+      "gloves-of-thievery",
+      "cloak-of-protection",
+      "robe-of-stars",
+      "amulet-of-health",
+      "periapt-of-wound-closure",
+      "eyes-of-charming",
+      "helm-of-telepathy",
+      "ring-of-protection",
+      "ring-of-evasion",
+      "ring-of-resistance"
+    ])
+      expect(() => write(table, IDS.wizard, catalogRow(id)), id).not.toThrow();
+    // A second cloak, pair of boots or helm is still refused.
+    expect(() => write(table, IDS.wizard, catalogRow("cloak-of-elvenkind"))).toThrow(/occupies the shoulders slot/);
+    write(table, IDS.wizard, catalogRow("boots-of-elvenkind"));
+    expect(() => write(table, IDS.wizard, catalogRow("winged-boots"))).toThrow(/occupies the feet slot/);
+    expect(() => write(table, IDS.wizard, catalogRow("hat-of-disguise"))).toThrow(/occupies the head slot/);
+  });
+});
+
 describe("attunement", () => {
   const ROGUE = "7a4b1a58-0f6c-4a52-9a51-2f60cf6f9d40";
   function thief(level: number) {

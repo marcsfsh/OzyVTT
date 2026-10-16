@@ -9,14 +9,14 @@ const MAX_ITEMS = 200;
 /** SRD: "a creature can't be attuned to more than three magic items at a time"; Use Magic Device raises it. */
 const MAX_ATTUNED = 3;
 
-/** How many of a slot may be equipped at once. Anything unlisted is unlimited (weapons, gear, consumables). */
+/** How many of a slot may be worn at once, as the SRD lists them: "one pair of footwear, one pair of gloves or
+ *  gauntlets, one pair of bracers, one suit of armor, one item of headwear, or one cloak", and one Shield. Anything
+ *  unlisted is unlimited (rings, amulets, belts, robes, lenses, weapons, gear). */
 const SLOT_CAPACITY: Readonly<Record<string, number>> = {
-  ring: 2,
   head: 1,
-  neck: 1,
   shoulders: 1,
   hands: 1,
-  belt: 1,
+  bracers: 1,
   feet: 1,
   armor: 1,
   shield: 1

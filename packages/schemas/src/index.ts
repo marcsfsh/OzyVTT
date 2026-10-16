@@ -83,9 +83,12 @@ export const ItemSlotSchema = z.enum([
   "shield",
   "armor",
   "head",
+  "eyes", // lenses and goggles, apart from headwear
   "neck",
-  "shoulders",
-  "hands",
+  "shoulders", // a cloak or cape
+  "body", // a robe, worn over clothes and under a cloak
+  "hands", // gloves or gauntlets
+  "bracers",
   "ring",
   "belt",
   "feet", // worn

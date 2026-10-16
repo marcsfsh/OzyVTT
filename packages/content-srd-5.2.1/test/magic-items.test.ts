@@ -123,19 +123,19 @@ describe("the generated magic-item bundle", () => {
         "Cloak of the Bat",
         "Cloak of the Manta Ray",
         "Mantle of Spell Resistance",
+        "Wings of Flying"
+      ],
+      // The SRD's one-of-each list caps cloaks and headwear, not robes or lenses, so they wear apart.
+      body: [
         "Robe of Eyes",
         "Robe of Scintillating Colors",
         "Robe of Stars",
         "Robe of Useful Items",
-        "Robe of the Archmagi",
-        "Wings of Flying"
+        "Robe of the Archmagi"
       ],
+      eyes: ["Eyes of Charming", "Eyes of Minute Seeing", "Eyes of the Eagle", "Goggles of Night"],
       head: [
         "Circlet of Blasting",
-        "Eyes of Charming",
-        "Eyes of Minute Seeing",
-        "Eyes of the Eagle",
-        "Goggles of Night",
         "Hat of Disguise",
         "Headband of Intellect",
         "Helm of Brilliance",
@@ -152,9 +152,9 @@ describe("the generated magic-item bundle", () => {
         "Slippers of Spider Climbing",
         "Winged Boots"
       ],
+      // "One pair of gloves or gauntlets, one pair of bracers": two caps, so two slots.
+      bracers: ["Bracers of Archery", "Bracers of Defense"],
       hands: [
-        "Bracers of Archery",
-        "Bracers of Defense",
         "Gauntlets of Ogre Power",
         "Gloves of Missile Snaring",
         "Gloves of Swimming and Climbing",
