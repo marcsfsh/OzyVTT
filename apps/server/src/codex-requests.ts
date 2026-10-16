@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CodexAutosaveSettingsSchema, CodexInWorldDateSchema, CodexQuestObjectiveSchema } from "@vtt/domain";
 import { CODEX_BUNDLE_VERSION } from "./codex/bundle.js";
 
 /**
@@ -10,11 +11,7 @@ const TagsSchema = z.array(z.string().trim().min(1).max(40)).max(24);
 /** Optional idempotency key on JSON-body writes, stripped before the store. Body-less POSTs and DELETEs are naturally idempotent. */
 const CommandIdSchema = z.uuid().optional();
 /** A raw in-world date, shared by the journal and page schemas so both accept the same bounds. */
-export const InWorldDateFields = z.object({
-  year: z.number().int().min(-100_000).max(100_000),
-  month: z.number().int().min(0).max(23),
-  day: z.number().int().min(1).max(400)
-});
+export const InWorldDateFields = CodexInWorldDateSchema;
 const InWorldDateSchema = InWorldDateFields.nullable();
 const EntityTypeSchema = z.enum(["note", "character", "location", "faction", "item", "species", "religion", "event"]);
 const FieldsSchema = z.record(z.string().max(40), z.string().max(2000));
@@ -226,7 +223,7 @@ export const SessionUpdateSchema = z
   .strict();
 /** Bounds mirror the store's. Objective text may be empty (the editor autosaves right after "Add item"). */
 const QuestStatusSchema = z.enum(["not-started", "active", "completed", "failed", "canceled"]);
-export const ObjectiveSchema = z.object({ text: z.string().max(120), done: z.boolean() }).strict();
+export const ObjectiveSchema = CodexQuestObjectiveSchema;
 const ObjectivesSchema = z.array(ObjectiveSchema).max(24);
 const QuestEntityIdsSchema = z.array(z.uuid()).max(24);
 export const QuestCreateSchema = z
@@ -274,12 +271,7 @@ export const CodexSettingsSchema = z
       })
       .strict(),
     /** In seconds, same rules as `windowMinutes`. Required: this PUT is wholesale, so an omitted group would reset it. */
-    autosave: z
-      .object({
-        enabled: z.boolean(),
-        intervalSeconds: z.number().min(1).max(600)
-      })
-      .strict(),
+    autosave: CodexAutosaveSettingsSchema,
     commandId: CommandIdSchema
   })
   .strict();

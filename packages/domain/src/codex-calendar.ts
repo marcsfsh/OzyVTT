@@ -2,11 +2,19 @@
 // display agree. A calendar the server stores has at least one month of at least one day; the guards here
 // keep a half-edited calendar on the client from dividing by zero.
 
+import { z } from "zod";
+
 export type CodexCalendarMonth = Readonly<{ name: string; days: number }>;
 /** An era runs from `startYear` until the next. A date's era is derived from its year, never stored. */
 export type CodexCalendarEra = Readonly<{ name: string; startYear: number }>;
-/** A structured in-world date; `month` is a 0-based index into the calendar's months. */
-export type CodexInWorldDate = Readonly<{ year: number; month: number; day: number }>;
+/** A structured in-world date; `month` is a 0-based index into the calendar's months. Requests and responses
+ *  carry the same bounds, so both read this one schema. */
+export const CodexInWorldDateSchema = z.object({
+  year: z.number().int().min(-100_000).max(100_000),
+  month: z.number().int().min(0).max(23),
+  day: z.number().int().min(1).max(400)
+});
+export type CodexInWorldDate = Readonly<z.infer<typeof CodexInWorldDateSchema>>;
 /** The world's calendar. Eras are sorted by `startYear`; `currentDate` is the GM's "now". */
 export type CodexCalendar = Readonly<{
   yearName: string;

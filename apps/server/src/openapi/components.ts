@@ -9,6 +9,7 @@ import {
   RiderTriggerSchema
 } from "@vtt/schemas";
 import * as content from "@vtt/content-srd-5.2.1";
+import * as wire from "@vtt/domain";
 import * as codex from "../codex-requests.js";
 import { DESCRIPTIONS } from "./descriptions.js";
 import { commandBodySchemas, gameCommandDocs, type JsonSchema } from "./game-commands.js";
@@ -82,11 +83,11 @@ const VOCABULARY: ReadonlyArray<readonly [string, z.ZodType]> = [
 
 /** Each Codex write's body, and the pieces several of them share. */
 const CODEX_BODIES: ReadonlyArray<readonly [string, z.ZodType]> = [
-  ["CodexInWorldDate", codex.InWorldDateFields],
+  ["CodexInWorldDate", wire.CodexInWorldDateSchema],
   ["CodexDowntimeInput", codex.DowntimeInputSchema],
   ["CodexMilestoneInput", codex.MilestoneInputSchema],
-  ["CodexQuestObjective", codex.ObjectiveSchema],
-  ["CodexAutosaveSettings", shapeOf(codex.CodexSettingsSchema, "autosave")],
+  ["CodexQuestObjective", wire.CodexQuestObjectiveSchema],
+  ["CodexAutosaveSettings", wire.CodexAutosaveSettingsSchema],
   ["CodexPageCreateRequest", codex.PageCreateSchema],
   ["CodexPageUpdateRequest", codex.PageUpdateSchema],
   ["CodexRevealRequest", codex.RevealSchema],
@@ -115,6 +116,54 @@ const CODEX_BODIES: ReadonlyArray<readonly [string, z.ZodType]> = [
   ["CodexSettingsRequest", codex.CodexSettingsSchema],
   ["CodexRevisionsDeleteRequest", codex.RevisionsDeleteSchema],
   ["CodexImportRequest", codex.CodexImportSchema]
+];
+
+/** Each Codex record as it is read back. A player's projection of `Codex<X>` is `Codex<X>Player`. */
+const CODEX_RESPONSES: ReadonlyArray<readonly [string, z.ZodType]> = [
+  ["CodexPageSummary", wire.CodexPageSummarySchema],
+  ["CodexPage", wire.CodexPageSchema],
+  ["CodexPageSummaryPlayer", wire.PlayerCodexPageSummarySchema],
+  ["CodexPagePlayer", wire.PlayerCodexPageSchema],
+  ["CodexPageRevision", wire.CodexPageRevisionSchema],
+  ["CodexConnection", wire.CodexConnectionSchema],
+  ["CodexConnectionPlayer", wire.PlayerCodexConnectionSchema],
+  ["CodexPageConnection", wire.CodexPageConnectionSchema],
+  ["CodexPageConnectionPlayer", wire.PlayerCodexPageConnectionSchema],
+  ["CodexMap", wire.CodexMapSchema],
+  ["CodexMapPlayer", wire.PlayerCodexMapSchema],
+  ["CodexMarker", wire.CodexMarkerSchema],
+  ["CodexMarkerPlayer", wire.PlayerCodexMarkerSchema],
+  ["CodexDowntimePayload", wire.CodexDowntimePayloadSchema],
+  ["CodexMilestonePayload", wire.CodexMilestonePayloadSchema],
+  ["CodexStandingPayload", wire.CodexStandingPayloadSchema],
+  ["CodexQuestHistoryPayload", wire.CodexQuestEventPayloadSchema],
+  ["CodexDowntimePlayerPayload", wire.PlayerCodexDowntimePayloadSchema],
+  ["CodexStandingPlayerPayload", wire.PlayerCodexStandingPayloadSchema],
+  ["CodexQuestHistoryPlayerPayload", wire.PlayerCodexQuestEventPayloadSchema],
+  ["CodexJournalEntry", wire.CodexJournalEntrySchema],
+  ["CodexJournalEntryPlayer", wire.PlayerCodexJournalEntrySchema],
+  ["CodexChronicleRecord", wire.CodexChronicleRecordSchema],
+  ["CodexChronicleRecordPlayer", wire.PlayerCodexChronicleRecordSchema],
+  ["CodexSession", wire.CodexSessionSchema],
+  ["CodexSessionPlayer", wire.PlayerCodexSessionSchema],
+  ["CodexQuest", wire.CodexQuestSchema],
+  ["CodexQuestPlayer", wire.PlayerCodexQuestSchema],
+  ["CodexStanding", wire.CodexStandingSchema],
+  ["CodexStandingPlayer", wire.PlayerCodexStandingSchema],
+  ["CodexCalendarMonth", wire.CodexCalendarMonthSchema],
+  ["CodexCalendarEra", wire.CodexCalendarEraSchema],
+  ["CodexCalendar", wire.GmCodexCalendarSchema],
+  ["CodexCalendarPlayer", wire.PlayerCodexCalendarSchema],
+  ["CodexSearchHit", wire.CodexSearchHitSchema],
+  ["CodexSearchData", wire.CodexSearchResultSchema],
+  ["CodexRevisionHistorySettings", wire.CodexRevisionHistorySchema],
+  ["CodexSettings", wire.CodexSettingsSchema],
+  ["CodexCalendarMove", wire.CodexCalendarMoveSchema],
+  ["CodexRevealAuditRow", wire.CodexRevealAuditRowSchema],
+  ["CodexRevealAuditSection", wire.CodexRevealAuditSectionSchema],
+  ["CodexRevealAudit", wire.CodexRevealAuditSchema],
+  ["CodexImportCounts", wire.CodexImportCountsSchema],
+  ["CodexAsset", wire.CodexAssetSchema]
 ];
 
 /** The record body a homebrew type is authored as; a monster's is an ActorDefinition. */
@@ -189,9 +238,9 @@ function describe(schemas: Record<string, JsonSchema>) {
 }
 
 /**
- * The components generated from the Zod schemas the server parses with: the HTTP contract's shapes, the homebrew
- * authoring vocabulary and record bodies, the Codex write bodies, and each game command's request body, plus the
- * game command operations.
+ * The components generated from Zod schemas: the HTTP contract's shapes, the homebrew authoring vocabulary and
+ * record bodies, the Codex write bodies and records, and each game command's request body, plus the game command
+ * operations.
  * One registry, so a schema that appears in several places is one `$ref`'d component. Prose comes from
  * `descriptions.ts`.
  */
@@ -206,6 +255,7 @@ export function generatedDocs() {
   register("HomebrewRecord", contract.HomebrewRecordSchema);
   for (const [id, schema] of VOCABULARY) register(id, schema);
   for (const [id, schema] of CODEX_BODIES) register(id, schema);
+  for (const [id, schema] of CODEX_RESPONSES) register(id, schema);
   for (const type of RECORD_TYPES) register(recordName(type), content.HOMEBREW_BODY_SCHEMAS[type] as z.ZodType);
   // Commands that share a payload schema (several take only the optional revision) share its generated body.
   const aliases: Array<readonly [string, string]> = [];
