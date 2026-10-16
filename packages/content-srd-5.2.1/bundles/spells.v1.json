@@ -10767,7 +10767,12 @@
      "type": "fire"
     }
    ],
-   "healing": null
+   "healing": null,
+   "reaction": {
+    "trigger": "damaged-by-creature",
+    "response": "strike-back",
+    "rangeFeet": 60
+   }
   },
   "classes": [
    "warlock"
@@ -17964,7 +17969,13 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "reaction": {
+    "trigger": "hit-by-attack",
+    "response": "ac-bonus",
+    "amount": 5,
+    "untilNextTurn": true
+   }
   },
   "classes": [
    "sorcerer",

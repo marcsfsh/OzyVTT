@@ -22,6 +22,8 @@ const DODGE: PlayerPendingReaction = {
   proposedDamageParts: [{ amount: 17, type: "fire" }],
   critical: false,
   weighed: { use: 4, decline: 8 },
+  acBonus: null,
+  rollsAttack: false,
   createdAt: 0
 };
 
@@ -41,5 +43,54 @@ describe("the reaction prompt's buttons", () => {
     mount({ ...DODGE, weighed: null });
     expect(screen.getByRole("button", { name: "Use - take 8" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Decline - take 17" })).toBeTruthy();
+  });
+});
+
+describe("the prompt for each trigger", () => {
+  it("offers Parry's AC bonus before the attack lands", () => {
+    mount({
+      ...DODGE,
+      kind: "attack-would-hit",
+      actionId: "parry",
+      actionName: "Parry",
+      proposedDamage: 0,
+      proposedDamageParts: [],
+      weighed: null,
+      acBonus: 2
+    });
+    expect(screen.getByText(/attack would hit; \+2 AC/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Use - +2 AC" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Decline - take the hit" })).toBeTruthy();
+  });
+
+  it("strikes back with the spell itself, or with a melee swing to roll first", () => {
+    const rebuke: PlayerPendingReaction = {
+      ...DODGE,
+      kind: "damaged-by-creature",
+      actionId: "spell-hellish-rebuke",
+      actionName: "Hellish Rebuke",
+      targetActorId: "10000000-0000-4000-8000-000000000009",
+      proposedDamage: 0,
+      proposedDamageParts: [],
+      weighed: null
+    };
+    const { unmount } = render(
+      <ReactionPrompt reaction={rebuke} actorName="Borin" canDismiss={false} onFeedback={() => {}} rollMode="manual" />
+    );
+    expect(screen.getByText(/Dragon damaged you/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Use" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Decline" })).toBeTruthy();
+    unmount();
+    render(
+      <ReactionPrompt
+        reaction={{ ...rebuke, actionId: "retaliation", actionName: "Retaliation", rollsAttack: true }}
+        actorName="Borin"
+        canDismiss={false}
+        onFeedback={() => {}}
+        rollMode="manual"
+      />
+    );
+    expect(screen.getByRole("button", { name: "Attack" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Decline" })).toBeTruthy();
   });
 });

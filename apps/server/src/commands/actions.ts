@@ -159,7 +159,8 @@ export const actionCommands = [
               resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
               newId: kit.context.newId,
               now: () => Date.now(),
-              catalog: kit.equipmentCatalog()
+              catalog: kit.equipmentCatalog(),
+              distanceFeet
             }) ?? undefined;
         // Record the blast as a public shape; id=commandId keeps re-delivery idempotent.
         if (template)
@@ -196,40 +197,7 @@ export const actionCommands = [
             text: `OVERRIDE (${resolution.overridden.rule}): ${kit.actorName(actorId)} used ${resolution.actionName} - ${resolution.overridden.reason}`,
             actorIds: [actorId]
           });
-        for (const warning of resolution.warnings ?? [])
-          kit.context.appendLog({ kind: "action", text: `Rules note: ${warning}`, actorIds: [actorId], gmOnly: true });
-        kit.appendTableNarration(resolution);
-        for (const applied of resolution.effectsApplied ?? [])
-          kit.context.broadcastTableEvent({
-            kind: "effect",
-            text: `${applied.targetName} is ${applied.name}.`,
-            actorIds: [applied.targetId],
-            gmOnly: hidden
-          });
-        if (resolution.effectGranted)
-          kit.context.broadcastTableEvent({
-            kind: "effect",
-            text: `${kit.actorName(actorId)} gains ${resolution.effectGranted.name}.`,
-            actorIds: [actorId],
-            gmOnly: hidden
-          });
-        // A reaction window opened: the rolled damage waits on the answer, so the table hears why nothing landed yet.
-        for (const prompt of resolution.reactionPrompts ?? []) {
-          const promptHidden = hidden || kit.actorHidden(prompt.actorId);
-          kit.context.appendLog({
-            kind: "reaction",
-            text: `${prompt.actorName} may use ${prompt.actionName} - the damage waits on their answer.`,
-            actorIds: [prompt.actorId],
-            gmOnly: promptHidden
-          });
-          kit.context.broadcastTableEvent({
-            kind: "reaction",
-            text: `${prompt.actorName} may use ${prompt.actionName}.`,
-            actorIds: [prompt.actorId],
-            gmOnly: promptHidden
-          });
-        }
-        // Builtin check rolls and rule-consequence endings narrate to the table.
+        // Builtin check rolls narrate to the table.
         if (resolution.check) {
           const verdict =
             resolution.check.success === null ? "" : resolution.check.success ? " - success" : " - failure";
@@ -240,13 +208,7 @@ export const actionCommands = [
             gmOnly: hidden
           });
         }
-        for (const ended of resolution.effectsEnded ?? [])
-          kit.context.broadcastTableEvent({
-            kind: "effect",
-            text: `${ended.name} ended on ${ended.actorName}.`,
-            actorIds: [ended.actorId],
-            gmOnly: hidden || kit.actorHidden(ended.actorId)
-          });
+        kit.narrateResolution(resolution, actorId);
         if (playerDamageApplied) {
           // Narrated like actor:apply-damage. Both actors ride actorIds so the line is gm-only if either is hidden.
           const { outcome, targetId, sourceActorId, label } = playerDamageApplied;

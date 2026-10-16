@@ -183,9 +183,13 @@ const PENDING_REACTION_FIELDS = {
   critical: "player",
   // Weighed through the reactor's own defences, and only the reactor's owner gets the prompt.
   weighed: "player",
+  acBonus: "player",
+  rollsAttack: "player",
   createdAt: "player",
   sourceName: "derived",
-  sourceActorId: "never"
+  sourceActorId: "never",
+  // Names the attacker's action and how it rolled, which the reactor's player has no need of.
+  parkedAttack: "never"
 } as const satisfies Record<keyof PendingReaction, FieldAudience>;
 
 const PENDING_RULE_ASK_FIELDS = {

@@ -101,6 +101,25 @@ describe("a leveled spell cast with a slot", () => {
     );
   });
 
+  it("carries a reaction spell's trigger, so the table can offer it (Shield)", () => {
+    const input = druid();
+    const shielded = buildCharacterDefinition(
+      {
+        ...input,
+        choices: input.choices.map((choice) =>
+          choice.kind === "spell" && choice.id === "magic-missile" ? { ...choice, id: "shield" } : choice
+        )
+      } as CharacterCreateRequestInput,
+      view,
+      BuilderPolicySchema.parse({})
+    );
+    expect(shielded.actions.find((action) => action.id === "spell-shield")).toMatchObject({
+      activation: "reaction",
+      spellSlot: { level: 1 },
+      reaction: { trigger: "hit-by-attack", response: "ac-bonus", amount: 5, untilNextTurn: true }
+    });
+  });
+
   it("heals with a 2nd-level slot's dice, and spends that slot", () => {
     const state = fight();
     const hero = state.actors[0];

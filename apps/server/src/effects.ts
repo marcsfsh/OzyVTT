@@ -11,7 +11,7 @@ import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.j
 /** `immune` marks a condition skipped for immunity, so a caller can drop its generic "is X" line without reading
  *  the text. */
 export type EffectNarration = Readonly<{
-  kind: "effect" | "condition";
+  kind: "effect" | "condition" | "reaction";
   text: string;
   actorId: string;
   immune?: true;

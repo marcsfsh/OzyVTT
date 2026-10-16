@@ -5459,6 +5459,12 @@
     "uses": {
      "limit": 3,
      "per": "long-rest"
+    },
+    "reaction": {
+     "trigger": "hit-by-attack",
+     "response": "ac-bonus",
+     "amount": 5,
+     "untilNextTurn": true
     }
    },
    {
@@ -6521,7 +6527,13 @@
     "name": "Parry",
     "activation": "reaction",
     "description": "The captain adds 2 to its AC against one melee attack that would hit it. To do so, the captain must see the attacker and be wielding a melee weapon.",
-    "damage": []
+    "damage": [],
+    "reaction": {
+     "trigger": "hit-by-attack",
+     "response": "ac-bonus",
+     "amount": 2,
+     "melee": true
+    }
    },
    {
     "id": "scimitar",
@@ -13722,7 +13734,13 @@
     "name": "Parry",
     "activation": "reaction",
     "description": "_Trigger:_ The erinyes is hit by a melee attack roll while holding a weapon. _Response:_ The erinyes adds 4 to its AC against that attack, possibly causing it to miss.",
-    "damage": []
+    "damage": [],
+    "reaction": {
+     "trigger": "hit-by-attack",
+     "response": "ac-bonus",
+     "amount": 4,
+     "melee": true
+    }
    },
    {
     "id": "withering-sword",
@@ -18807,7 +18825,13 @@
     "name": "Parry",
     "activation": "reaction",
     "description": "_Trigger:_ The gladiator is hit by a melee attack roll while holding a weapon. _Response:_ The gladiator adds 3 to its AC against that attack, possibly causing it to miss.",
-    "damage": []
+    "damage": [],
+    "reaction": {
+     "trigger": "hit-by-attack",
+     "response": "ac-bonus",
+     "amount": 3,
+     "melee": true
+    }
    },
    {
     "id": "spear",
@@ -23607,7 +23631,13 @@
     "name": "Parry",
     "activation": "reaction",
     "description": "_Trigger:_ The knight is hit by a melee attack roll while holding a weapon. _Response:_ The knight adds 2 to its AC against that attack, possibly causing it to miss.",
-    "damage": []
+    "damage": [],
+    "reaction": {
+     "trigger": "hit-by-attack",
+     "response": "ac-bonus",
+     "amount": 2,
+     "melee": true
+    }
    },
    {
     "id": "greatsword",
@@ -24319,7 +24349,13 @@
     "name": "Protective Magic",
     "activation": "reaction",
     "description": "The lich casts Counterspell or Shield in response to the spell's trigger, using the same spellcasting ability as Spellcasting.",
-    "damage": []
+    "damage": [],
+    "reaction": {
+     "trigger": "hit-by-attack",
+     "response": "ac-bonus",
+     "amount": 5,
+     "untilNextTurn": true
+    }
    },
    {
     "id": "disrupt-life",
@@ -24749,6 +24785,12 @@
     "uses": {
      "limit": 3,
      "per": "long-rest"
+    },
+    "reaction": {
+     "trigger": "hit-by-attack",
+     "response": "ac-bonus",
+     "amount": 5,
+     "untilNextTurn": true
     }
    },
    {
@@ -25330,7 +25372,13 @@
     "name": "Parry",
     "activation": "reaction",
     "description": "_Trigger:_ The marilith is hit by a melee attack roll while holding a weapon. _Response:_ The marilith adds 5 to its AC against that attack, possibly causing it to miss.",
-    "damage": []
+    "damage": [],
+    "reaction": {
+     "trigger": "hit-by-attack",
+     "response": "ac-bonus",
+     "amount": 5,
+     "melee": true
+    }
    },
    {
     "id": "teleport-recharge-5-6",
@@ -26578,7 +26626,12 @@
     "name": "Whirlwind of Sand",
     "activation": "reaction",
     "description": "_Trigger:_ The mummy is hit by an attack roll. _Response:_ The mummy adds 2 to its AC against the attack, possibly causing the attack to miss, and the mummy teleports up to 60 feet to an unoccupied space it can see. Each creature of its choice that it can see within 5 feet of its destination space has the Blinded condition until the end of the mummy’s next turn.",
-    "damage": []
+    "damage": [],
+    "reaction": {
+     "trigger": "hit-by-attack",
+     "response": "ac-bonus",
+     "amount": 2
+    }
    },
    {
     "id": "necrotic-strike",
@@ -27182,7 +27235,13 @@
     "name": "Parry",
     "activation": "reaction",
     "description": "_Trigger_: The noble is hit by a melee attack roll while holding a weapon. _Response:_ The noble adds 2 to its AC against that attack, possibly causing it to miss.",
-    "damage": []
+    "damage": [],
+    "reaction": {
+     "trigger": "hit-by-attack",
+     "response": "ac-bonus",
+     "amount": 2,
+     "melee": true
+    }
    },
    {
     "id": "rapier",
@@ -28744,7 +28803,13 @@
     "name": "Riposte",
     "activation": "reaction",
     "description": "_Trigger:_ The pirate is hit by a melee attack roll while holding a weapon. _Response:_ The pirate adds 3 to its AC against that attack, possibly causing it to miss. On a miss, the pirate makes one Rapier attack against the triggering creature if within range.",
-    "damage": []
+    "damage": [],
+    "reaction": {
+     "trigger": "hit-by-attack",
+     "response": "ac-bonus",
+     "amount": 3,
+     "melee": true
+    }
    },
    {
     "id": "rapier",
@@ -38616,7 +38681,13 @@
     "name": "Parry",
     "activation": "reaction",
     "description": "_Trigger:_ The warrior is hit by a melee attack roll while holding a weapon. _Response:_ The warrior adds 2 to its AC against that attack, possibly causing it to miss.",
-    "damage": []
+    "damage": [],
+    "reaction": {
+     "trigger": "hit-by-attack",
+     "response": "ac-bonus",
+     "amount": 2,
+     "melee": true
+    }
    },
    {
     "id": "greatsword",

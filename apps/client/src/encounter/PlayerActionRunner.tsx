@@ -177,6 +177,16 @@ export function PlayerActionRunner({
               Each target: DC {result.save.dc} {result.save.ability.toUpperCase()} save - the GM answers these.
             </p>
           )}
+          {result.waitingOnReaction && result.attack && (
+            <p className="action-save-note">
+              Waiting on {result.attack.targetName}'s{" "}
+              <strong>
+                {result.reactionPrompts?.find((candidate) => candidate.actorId === result.attack!.targetId)
+                  ?.actionName ?? "reaction"}
+              </strong>{" "}
+              - it may turn the hit into a miss. The attack finishes in the turn order.
+            </p>
+          )}
           {result.damage.length > 0 &&
             !result.preview &&
             (() => {

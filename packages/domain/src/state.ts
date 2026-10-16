@@ -230,20 +230,52 @@ export const PendingSaveSchema = z
   .strict();
 export type PendingSave = z.infer<typeof PendingSaveSchema>;
 
-/** A declared reaction (ADR-0020), e.g. Uncanny Dodge, awaiting an answer; the triggering damage waits here
- * ("use" = halved, "decline" = full, or GM dismiss) and persists until answered so it is never lost. */
+/** An attack a reaction (Parry, Shield) may still turn into a miss, held at the roll until the prompt is answered and
+ * then replayed with the same die. The economy it spent was committed when it rolled. GM-only. */
+export const ParkedAttackSchema = z
+  .object({
+    actionId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(120),
+    /** The action came from the builtin catalog (Unarmed Strike). */
+    builtin: z.boolean(),
+    /** The kept d20, or null when the total was typed by hand. */
+    attackNatural: z.number().int().min(1).max(20).nullable(),
+    attackTotal: z.number().int().min(-50).max(100).nullable(),
+    cover: z.enum(["half", "three-quarters"]).nullable(),
+    conditionId: z.string().max(60).nullable(),
+    /** How the attack was made where the action can't say (an opportunity attack). */
+    attackKinds: z.array(z.enum(["reaction", "opportunity"])).max(2),
+    pushFeet: z.number().int().min(0).max(100).nullable(),
+    /** The slot the spell was cast with, so the replay rolls the same dice. */
+    slotLevel: z.number().int().min(1).max(9).nullable(),
+    /** Attacker to target when it rolled, so the replay classifies the swing (melee or thrown) the same way. */
+    distanceFeet: z.number().min(0).max(100000).nullable(),
+    initiatorRole: z.enum(["gm", "player"]),
+    initiatorSessionId: z.string().min(1).max(200),
+    /** The bonus lasts until the reactor's next turn (Shield) rather than against this attack only (Parry). */
+    untilNextTurn: z.boolean()
+  })
+  .strict();
+export type ParkedAttack = z.infer<typeof ParkedAttackSchema>;
+
+/** A declared reaction (ADR-0020) awaiting an answer, which persists until it is answered or the GM dismisses it, so
+ * nothing it holds is lost. What it holds depends on the trigger: a hit's damage (Uncanny Dodge), an attack not yet
+ * landed (Parry), or nothing, when answering strikes a creature (an opportunity attack, Hellish Rebuke). */
 export const PendingReactionSchema = z
   .object({
     id: z.uuid(),
-    /** What opened the window: an attack that hit the reactor, or an enemy leaving its reach (opportunity attack). */
-    kind: z.enum(["hit-by-attack", "leaves-reach"]).default("hit-by-attack"),
+    /** What opened the window: an attack that hit the reactor, an enemy leaving its reach (opportunity attack), an
+     *  attack that would hit before its damage (`attack-would-hit`), or a creature damaging the reactor. */
+    kind: z.enum(["hit-by-attack", "leaves-reach", "attack-would-hit", "damaged-by-creature"]).default("hit-by-attack"),
     actorId: z.uuid(),
     actionId: z
       .string()
       .regex(/^[a-z0-9-]+$/)
       .max(120),
     actionName: z.string().min(1).max(120),
-    /** leaves-reach: the mover the reaction would strike. */
+    /** leaves-reach and damaged-by-creature: the creature the reaction would strike. */
     targetActorId: z.uuid().nullable().default(null),
     /** Source actor for GM bookkeeping; stripped from player projections. */
     sourceActorId: z.uuid().nullable().default(null),
@@ -266,6 +298,12 @@ export const PendingReactionSchema = z
       .strict()
       .nullable()
       .default(null),
+    /** attack-would-hit: what the reaction adds to AC. */
+    acBonus: z.number().int().min(1).max(10).nullable().default(null),
+    /** Answering "use" rolls an attack, previewed before it lands (Retaliation; an opportunity attack always does). */
+    rollsAttack: z.boolean().default(false),
+    /** attack-would-hit: the attack the answer finishes. */
+    parkedAttack: ParkedAttackSchema.nullable().default(null),
     createdAt: z.number().int().nonnegative()
   })
   .strict();

@@ -145,9 +145,23 @@ export const barbarian: ClassMechanicsModule = {
           conditionImmunities: ["charmed", "frightened"],
           when: [{ type: "while-effect-tag", tags: ["raging"] }]
         }
+      },
+      /** Offered when a creature within 5 feet deals damage; answering makes one melee attack with the weapon the
+       *  player picks (else the first melee attack, else an Unarmed Strike), as an opportunity attack does. */
+      retaliation: {
+        actions: [
+          {
+            id: "retaliation",
+            name: "Retaliation",
+            activation: "reaction",
+            description:
+              "When you take damage from a creature within 5 feet of you, make one melee attack against that creature, using a weapon or an Unarmed Strike.",
+            damage: [],
+            reaction: { trigger: "damaged-by-creature", response: "melee-attack", rangeFeet: 5 }
+          }
+        ]
       }
-      // Not modeled: Frenzy (dice count read from the Rage Damage column) and Retaliation (the attack
-      // depends on the weapon in hand).
+      // Not modeled: Frenzy (dice count read from the Rage Damage column).
     }
   },
   liveResources: ["rage"]

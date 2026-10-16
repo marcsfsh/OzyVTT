@@ -77,6 +77,29 @@ export function ActionResultCard({
         </p>
       )}
       {result.attack && <AttackOutcome attack={result.attack} audience="gm" />}
+      {result.waitingOnReaction &&
+        result.attack &&
+        (() => {
+          // The target's Parry or Shield may turn this hit into a miss; its answer finishes the attack, damage and all.
+          const targetId = result.attack.targetId;
+          const prompt = result.reactionPrompts?.find((candidate) => candidate.actorId === targetId);
+          const waiting = state.combat.pendingReactions.some(
+            (reaction) =>
+              reaction.kind === "attack-would-hit" &&
+              reaction.actorId === targetId &&
+              reaction.sourceActorId === actor.id
+          );
+          return waiting ? (
+            <p className="action-save-note">
+              Waiting on {result.attack.targetName}'s <strong>{prompt?.actionName ?? "reaction"}</strong> - answer it in
+              the turn order; the attack finishes there.
+            </p>
+          ) : (
+            <p className="action-applied">
+              {prompt?.actionName ?? "The reaction"} answered - the attack finished in the turn order.
+            </p>
+          );
+        })()}
       {result.preview && result.attack && (
         <AttackPreview
           attack={result.attack}

@@ -25,6 +25,35 @@ describe("reading an action's prose facts", () => {
     );
   });
 
+  it("reads a Parry's AC bonus, melee only when the trigger says so, and keeps an authored reaction", () => {
+    const parry = withProseFacts(
+      action({
+        activation: "reaction",
+        description:
+          "Trigger: The knight is hit by a melee attack roll while holding a weapon. Response: The knight adds 2 to its AC against that attack, possibly causing it to miss."
+      })
+    );
+    expect(parry.reaction).toEqual({ trigger: "hit-by-attack", response: "ac-bonus", amount: 2, melee: true });
+    const sand = withProseFacts(
+      action({
+        activation: "reaction",
+        description:
+          "Trigger: The mummy is hit by an attack roll. Response: The mummy adds 2 to its AC against the attack."
+      })
+    );
+    expect(sand.reaction).toEqual({ trigger: "hit-by-attack", response: "ac-bonus", amount: 2 });
+    // Only a reaction reads it, and an authored one wins.
+    expect(
+      withProseFacts(action({ description: "It adds 2 to its AC against that attack." })).reaction
+    ).toBeUndefined();
+    const authored = { trigger: "hit-by-attack", response: "half-damage" } as const;
+    expect(
+      withProseFacts(
+        action({ activation: "reaction", description: "adds 3 to its AC against that attack", reaction: authored })
+      ).reaction
+    ).toEqual(authored);
+  });
+
   it("marks a Multiattack nothing structured names, and only that one", () => {
     expect(withProseFacts(action({ name: "Multiattack" })).untrackedMultiattack).toBe(true);
     const tracked = withProseFacts(

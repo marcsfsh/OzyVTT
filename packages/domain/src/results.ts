@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CharacterChoiceSchema, type CharacterChoice } from "@vtt/schemas";
+import { ActionReactionSchema, CharacterChoiceSchema, type CharacterChoice } from "@vtt/schemas";
 import { AbilityIdSchema, RuleModeSchema, type AnnotationPoint } from "./state.js";
 import type { Wire } from "./wire.js";
 
@@ -49,6 +49,10 @@ export type ActionResolutionAttack = Readonly<{
   targetAc: number | null;
   outcome: "crit" | "hit" | "miss" | "fumble" | "unknown";
   /** Cover's AC bonus folded into targetAc (SRD Cover: +2 half, +5 three-quarters). */ coverBonus?: number;
+  /** A reaction's AC bonus folded into targetAc (Parry +2, Shield +5), and what gave it. */ reactionAcBonus?: Readonly<{
+    amount: number;
+    source: string;
+  }>;
 }>;
 /** Every source behind an attack's advantage/disadvantage, so the table can see the math (ADR-0020). */
 export type ActionRollMode = Readonly<{
@@ -107,6 +111,9 @@ export type ActionResolution = Readonly<{
   push?: Readonly<{ targetName: string; maxFeet: number }> | null;
   /** Reaction prompts this hit opened (Uncanny Dodge): the triggering damage waits on the answer instead of the apply button. */
   reactionPrompts?: ReadonlyArray<Readonly<{ actorId: string; actorName: string; actionName: string }>>;
+  /** The attack would hit, and the target's reaction (Parry, Shield) may still turn it into a miss. Nothing past the
+   *  roll has happened yet: answering the prompt finishes the attack, damage included. */
+  waitingOnReaction?: true;
   /** A builtin action's check roll (Hide vs DC 15; Influence/Search/Study with dc/success null - GM adjudicates). */
   check?: Readonly<{
     skill: string;
@@ -177,7 +184,8 @@ export type SaveAnswerResult = MutationResult & {
     /** Flat reduction taken off the post-resistance total. */ flatReduction?: number;
   };
 };
-/** Outcome of answering a reaction prompt; the (halved or full) damage already applied server-side. A used opportunity attack carries its full attack `resolution`. */
+/** Outcome of answering a reaction prompt; any damage it settles is already applied server-side. A strike (an
+ *  opportunity attack, Hellish Rebuke) and a parked attack finished by the answer carry their full `resolution`. */
 export type ReactionAnswerResult = MutationResult & {
   outcome?: {
     used: boolean;
@@ -217,7 +225,7 @@ export const ActionAvailabilitySchema = z.strictObject({
   usesPool: z.string().nullable(),
   requiresEffectTag: z.string().nullable(),
   multiattack: z.array(z.strictObject({ actionId: z.string(), count: z.number().int() })).nullable(),
-  reaction: z.strictObject({ trigger: z.enum(["hit-by-attack"]), response: z.enum(["half-damage"]) }).nullable()
+  reaction: ActionReactionSchema.nullable()
 });
 export type ActionAvailability = Wire<z.infer<typeof ActionAvailabilitySchema>>;
 /** The sheet's derived numbers. Sent only via `actor:available-actions` (authorized per actor), not `PlayerView`. */

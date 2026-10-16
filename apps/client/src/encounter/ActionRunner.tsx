@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { usePrompt } from "../components/feedback";
-import type { ContentActionSummary, GmActor, GmView } from "@vtt/domain";
+import { armorClassInPlay, type ContentActionSummary, type GmActor, type GmView } from "@vtt/domain";
 import { ActionResultCard } from "./ActionResultCard";
 import { ActionTargetPicker } from "./ActionTargetPicker";
 import { componentLabel } from "./action-summary";
@@ -205,7 +205,7 @@ export function ActionRunner({
             .filter((target) => target.id !== actor.id)
             .map((target) => ({
               id: target.id,
-              label: `${target.name}${target.armorClass !== undefined ? ` (AC ${target.armorClass})` : ""}`
+              label: `${target.name}${target.armorClass !== undefined ? ` (AC ${armorClassInPlay(target)})` : ""}`
             }))}
           onMap
           busy={resolveBusy}

@@ -40,19 +40,42 @@ export const actorHealthCommands = [
     schema: ApplyDamageSchema,
     malformed: "The damage command is malformed.",
     async run({ principal, request, execute }, kit) {
-      const { actorId, amount, parts, damageType, damageOverride, sourceName, critical, nonlethal } = request;
+      const {
+        commandId,
+        actorId,
+        amount,
+        parts,
+        damageType,
+        damageOverride,
+        sourceActorId,
+        sourceName,
+        critical,
+        nonlethal
+      } = request;
+      const distance = await kit.creatureDistance();
       let outcome: ReturnType<typeof applyDamageDetailed> | undefined;
       const { duplicate } = await execute((state) => {
         outcome = applyDamageDetailed(
           state,
           actorId,
-          { amount, parts, damageType, damageOverride, critical, sourceName: sourceName ?? null, nonlethal },
+          {
+            amount,
+            parts,
+            damageType,
+            damageOverride,
+            critical,
+            sourceName: sourceName ?? null,
+            sourceActorId: sourceActorId ?? null,
+            nonlethal
+          },
           initiatorOf(principal),
           {
             resolveDefinition: kit.resolveDefinition,
             newId: kit.context.newId,
             now: () => new Date().toISOString(),
-            catalog: kit.equipmentCatalog()
+            catalog: kit.equipmentCatalog(),
+            commandId,
+            distanceFeet: (actorIdA, actorIdB) => distance(state, actorIdA, actorIdB)
           }
         );
       });

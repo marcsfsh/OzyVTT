@@ -21,6 +21,7 @@ import {
   removeConditionDirect,
   type EffectNarration
 } from "./effects.js";
+import { offerDamageReaction } from "./damage-reactions.js";
 import { choiceOverrideDefenses, type OverrideDamageDefenses } from "./choice-overrides.js";
 import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 
@@ -48,6 +49,8 @@ export type DamageInput = Readonly<{
   damageOverride?: number;
   critical?: boolean;
   sourceName?: string | null;
+  /** The creature that dealt it, when known; its damage can open the target's strike-back reaction. */
+  sourceActorId?: string | null;
   /** Knocking out a creature (SRD): a nonlethal drop to 0 leaves it Unconscious and stable. */
   nonlethal?: boolean;
 }>;
@@ -59,6 +62,10 @@ export type DamageDeps = Readonly<{
   now?: () => string;
   /** The item catalog, so item-granted resistances and immunities reach the damage math. Absent means none. */
   catalog?: EquipmentCatalog;
+  /** Creature-to-creature distance on the map, for a strike-back reaction's range; absent skips the check. */
+  distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
+  /** The command applying the damage, recorded on a reaction prompt it opens. */
+  commandId?: string;
 }>;
 export type DamageOutcome = Readonly<{ application: DamageApplication; events: EffectNarration[] }>;
 
@@ -377,6 +384,12 @@ export function applyDamageDetailed(
         actorId: actor.id
       });
     }
+  }
+
+  // Damage from a creature can open the target's strike-back reaction (Hellish Rebuke). Skipped without an id-minter.
+  if (totalAdjusted > 0 && input.sourceActorId && deps) {
+    const offered = offerDamageReaction(state, actor, input.sourceActorId, deps);
+    if (offered) events.push(offered);
   }
 
   return {

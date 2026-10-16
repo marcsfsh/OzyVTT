@@ -188,6 +188,9 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
             proposedDamageParts: [],
             critical: false,
             weighed: null,
+            acBonus: null,
+            rollsAttack: true,
+            parkedAttack: null,
             createdAt: input.now()
           }
         ]

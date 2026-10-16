@@ -1,3 +1,4 @@
+import { armorClassInPlay } from "@vtt/domain";
 import {
   aggregateRollMode,
   collectRiders,
@@ -252,8 +253,11 @@ export function rollAttack(ctx: ResolveContext): void {
   const { naturalRoll, total, declaredCrit } = rollD20(ctx, mode, bonus);
   const manualTotal = input.attackTotal !== undefined;
 
-  // Cover raises the effective AC (SRD Cover: +2 half, +5 three-quarters), shown in the result.
-  const targetAc = target.armorClass !== undefined ? target.armorClass + ctx.coverBonus : null;
+  // Cover raises the effective AC (SRD Cover: +2 half, +5 three-quarters), and so does a reaction against this
+  // attack (Parry); both are shown in the result. A lasting reaction bonus (Shield) is already in `armorClassInPlay`.
+  const reactionBonus = input.reactionAcBonus?.amount ?? 0;
+  const inPlay = armorClassInPlay(target);
+  const targetAc = inPlay !== undefined ? inPlay + ctx.coverBonus + reactionBonus : null;
   // A declared crit (total mode) or a natural roll at or above the threshold crits (a `critical-range`
   // rider can widen it); a nat 1 fumbles only when a natural die is known.
   ctx.crit = declaredCrit || (!manualTotal && naturalRoll >= criticalThreshold(derivation, attacker, action));
@@ -279,6 +283,7 @@ export function rollAttack(ctx: ResolveContext): void {
     naturalRoll,
     targetAc,
     outcome,
-    ...(ctx.coverBonus > 0 ? { coverBonus: ctx.coverBonus } : {})
+    ...(ctx.coverBonus > 0 ? { coverBonus: ctx.coverBonus } : {}),
+    ...(input.reactionAcBonus ? { reactionAcBonus: { ...input.reactionAcBonus } } : {})
   };
 }

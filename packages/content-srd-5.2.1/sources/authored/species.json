@@ -1322,7 +1322,12 @@
                       "formula": "1d8",
                       "type": "thunder"
                     }
-                  ]
+                  ],
+                  "reaction": {
+                    "trigger": "damaged-by-creature",
+                    "response": "strike-back",
+                    "rangeFeet": 60
+                  }
                 }
               ],
               "uses": {

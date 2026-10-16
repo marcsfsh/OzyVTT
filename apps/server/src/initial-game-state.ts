@@ -379,6 +379,8 @@ const LYRA: ActorDefinition = {
       name: "Shield (1st, Reaction)",
       activation: "reaction",
       damage: [],
+      // Offered when an attack would hit her and +5 would turn it into a miss.
+      reaction: { trigger: "hit-by-attack", response: "ac-bonus", amount: 5, untilNextTurn: true },
       description:
         "*Reaction, when hit by an attack or targeted by Magic Missile:* +5 bonus to AC until the start of your next turn, including against the triggering attack."
     },

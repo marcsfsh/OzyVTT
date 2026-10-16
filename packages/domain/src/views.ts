@@ -82,8 +82,9 @@ export type PlayerInitiativeEntry = Readonly<{
 export type PlayerAnnotation = Omit<Annotation, "ownerSessionId"> & { mine: boolean };
 /** A player's own pending saves only; source actor ids and concentration effect references never cross the wire, and a hidden source's name is masked server-side. */
 export type PlayerPendingSave = Omit<PendingSave, "sourceActorId" | "endsEffects">;
-/** A player's own pending reaction prompts only; same masking rules as saves. */
-export type PlayerPendingReaction = Omit<PendingReaction, "sourceActorId">;
+/** A player's own pending reaction prompts only, masked like saves; the parked attack stays with the GM, since it names
+ *  the attacker's action and how it was rolled. */
+export type PlayerPendingReaction = Omit<PendingReaction, "sourceActorId" | "parkedAttack">;
 /** A player's view of their own parked ask. `command` is omitted: its payload can name ids the player may not know. */
 export type PlayerPendingRuleAsk = Omit<PendingRuleAsk, "command">;
 export type PlayerCombatView = Readonly<{

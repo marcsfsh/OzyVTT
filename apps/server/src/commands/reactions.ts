@@ -2,20 +2,75 @@ import { DamageResolveSchema, ReactionAnswerSchema, ReactionDismissSchema } from
 import { damageAdjustmentDetail } from "../hit-points.js";
 import { resolvePendingDamage, type AppliedDamage } from "../player-damage.js";
 import { pushTokenAway } from "../forced-movement.js";
-import { answerReaction, dismissReaction } from "../reactions.js";
+import { answerReaction, dismissReaction, type ReactionOutcome } from "../reactions.js";
 import { initiatorOf, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
 // Answers to what a hit leaves open: reaction prompts (ADR-0020) and the GM's damage proposals.
+
+/** The feed line for an answered prompt; null when there is nothing to say yet (a previewed swing) or at all (an
+ *  opportunity let go). */
+function reactionLine(outcome: ReactionOutcome): { kind: "reaction" | "damage"; text: string } | null {
+  const detail = damageAdjustmentDetail({
+    parts: outcome.parts ?? [],
+    ...(outcome.flatReduction ? { flatReduction: outcome.flatReduction } : {})
+  });
+  const damage = outcome.appliedDamage > 0 ? `${outcome.appliedDamage} damage${detail}` : null;
+  const resolution = outcome.resolution;
+  const attack = resolution?.attack ?? null;
+  const verdict = attack ? (attack.outcome === "crit" ? "CRIT" : attack.outcome.toUpperCase()) : null;
+  switch (outcome.kind) {
+    case "hit-by-attack":
+      return outcome.used
+        ? {
+            kind: "reaction",
+            text: `${outcome.actorName} used ${outcome.actionName} - ${outcome.proposedDamage} damage becomes ${outcome.appliedDamage}${detail}.`
+          }
+        : {
+            kind: "damage",
+            text: `${outcome.actorName} declined ${outcome.actionName} - ${outcome.sourceName} hit for ${outcome.appliedDamage} damage${detail}.`
+          };
+    case "attack-would-hit": {
+      if (!resolution) return null;
+      const swing = `${outcome.sourceName}'s ${resolution.actionName}`;
+      const landed =
+        resolution.waitingOnReaction || resolution.reactionPrompts?.length
+          ? `${swing} hits`
+          : attack && (attack.outcome === "hit" || attack.outcome === "crit")
+            ? `${swing} hits${damage ? ` for ${damage}` : ""}`
+            : `${swing} misses`;
+      return {
+        kind: "reaction",
+        text: outcome.used
+          ? `${outcome.actorName} used ${outcome.actionName} - ${landed}.`
+          : `${outcome.actorName} declined ${outcome.actionName} - ${landed}.`
+      };
+    }
+    case "leaves-reach":
+    case "damaged-by-creature": {
+      if (!outcome.used || !resolution) return null;
+      const target = outcome.other?.name ?? outcome.sourceName;
+      const what =
+        outcome.kind === "leaves-reach"
+          ? `made an opportunity attack against ${target}`
+          : `used ${outcome.actionName} against ${target}${attack && resolution.actionName !== outcome.actionName ? ` (${resolution.actionName})` : ""}`;
+      const result = verdict
+        ? `${verdict}${damage ? `, ${damage}` : ""}`
+        : resolution.save
+          ? `DC ${resolution.save.dc} ${resolution.save.ability.toUpperCase()} save`
+          : (damage ?? "no damage");
+      return { kind: "reaction", text: `${outcome.actorName} ${what} - ${result}.` };
+    }
+  }
+}
 
 export const reactionCommands = [
   defineCommand({
     type: "reaction.answer",
     operationId: "answerReaction",
     description:
-      "Answers a pending reaction prompt (Uncanny Dodge). The triggering attack's damage was parked on the prompt, so both answers apply it here: `use: true` spends the reaction and halves each typed part first; `use: false` applies it in full. Player sessions may answer only their claimed character's prompts. The response carries the `outcome`.",
-    summary:
-      "Answer a pending reaction prompt: use it (spend the reaction, halve the parked damage) or decline (apply it in full).",
+      "Answers a pending reaction prompt; `use: true` spends the reaction, `use: false` declines it. What else happens depends on the prompt's `kind`. `hit-by-attack` (Uncanny Dodge): the hit's parked damage applies either way, each typed part halved first on use. `attack-would-hit` (Parry, Shield): the attack waiting at its roll finishes either way with the same die, against AC raised by the reaction on use, and a hit's damage applies. `leaves-reach` (an opportunity attack) and `damaged-by-creature` (Hellish Rebuke, Retaliation): use strikes the creature, a melee attack previewable with `commit: false`, and damage that lands applies. Player sessions may answer only their claimed character's prompts. The response carries the `outcome`.",
+    summary: "Answer a pending reaction prompt: use it (spend the reaction) or decline it.",
     schema: ReactionAnswerSchema,
     malformed: "The reaction answer is malformed.",
     async run({ principal, request, execute }, kit) {
@@ -32,6 +87,7 @@ export const reactionCommands = [
       // The grid, fetched up front like `action.resolve`'s, so Push on an opportunity attack moves the token.
       const mapAssetId = kit.read().combat.mapAssetId;
       const geometry = mapAssetId ? await kit.context.tokenGeometryFor(mapAssetId) : null;
+      const distance = await kit.creatureDistance();
       let outcome: ReturnType<typeof answerReaction> | undefined;
       const { state, duplicate } = await execute((draft) => {
         outcome = answerReaction(
@@ -49,44 +105,27 @@ export const reactionCommands = [
             gmSessionId: sessionIdOf(principal),
             now: () => new Date().toISOString(),
             pushToken: (input) =>
-              draft.combat.mapAssetId === mapAssetId ? pushTokenAway(draft, input, geometry) : null
+              draft.combat.mapAssetId === mapAssetId ? pushTokenAway(draft, input, geometry) : null,
+            distanceFeet: (actorIdA, actorIdB) => distance(draft, actorIdA, actorIdB)
           },
           { commit, rollMode, attackNatural, ...(pushFeet !== undefined ? { pushFeet } : {}) }
         );
       });
       if (duplicate || !outcome) return;
       kit.publishRolls(state, commandId);
-      const hidden = kit.actorHidden(outcome.actorId);
-      // The breakdown explains numbers the defences changed.
-      const detail = damageAdjustmentDetail({
-        parts: outcome.parts ?? [],
-        ...(outcome.flatReduction ? { flatReduction: outcome.flatReduction } : {})
-      });
-      if (outcome.kind === "leaves-reach") {
-        if (outcome.used && outcome.resolution) {
-          const attack = outcome.resolution.attack;
-          const verdict = attack ? (attack.outcome === "crit" ? "CRIT" : attack.outcome.toUpperCase()) : "resolved";
-          const text = `${outcome.actorName} made an opportunity attack against ${outcome.sourceName} - ${verdict}${outcome.appliedDamage > 0 ? `, ${outcome.appliedDamage} damage${detail}` : ""}.`;
-          kit.context.broadcastTableEvent({ kind: "reaction", text, actorIds: [outcome.actorId], gmOnly: hidden });
-          // The off-turn swing runs the same resolver, so its rules notes (Push's "move the token", Topple's DC)
-          // go to the GM too. `used` excludes the preview, so nothing is said twice.
-          for (const warning of outcome.resolution.warnings ?? [])
-            kit.context.appendLog({
-              kind: "action",
-              text: `Rules note: ${warning}`,
-              actorIds: [outcome.actorId],
-              gmOnly: true
-            });
-          // The off-turn swing's table lines drain here too, an accomplished push included.
-          kit.appendTableNarration(outcome.resolution);
-        }
-      } else if (outcome.used) {
-        const text = `${outcome.actorName} used ${outcome.actionName} - ${outcome.proposedDamage} damage becomes ${outcome.appliedDamage}${detail}.`;
-        kit.context.broadcastTableEvent({ kind: "reaction", text, actorIds: [outcome.actorId], gmOnly: hidden });
-      } else {
-        const text = `${outcome.actorName} declined ${outcome.actionName} - ${outcome.sourceName} hit for ${outcome.appliedDamage} damage${detail}.`;
-        kit.context.broadcastTableEvent({ kind: "damage", text, actorIds: [outcome.actorId], gmOnly: hidden });
+      const line = reactionLine(outcome);
+      if (line) {
+        // Either creature hidden keeps the line with the GM: it names both.
+        const gmOnly = kit.actorHidden(outcome.actorId) || (outcome.other ? kit.actorHidden(outcome.other.id) : false);
+        kit.context.broadcastTableEvent({ kind: line.kind, text: line.text, actorIds: [outcome.actorId], gmOnly });
       }
+      // A strike or a finished attack ran the resolver, so its rules notes, narration and any reaction window it opened
+      // (the struck creature's own Parry) are told like any resolve's. A preview tells nothing yet.
+      if (outcome.resolution && !outcome.resolution.preview)
+        kit.narrateResolution(
+          outcome.resolution,
+          outcome.kind === "attack-would-hit" ? outcome.other!.id : outcome.actorId
+        );
       kit.publishNarrations(outcome.events);
       return {
         outcome: {
@@ -104,8 +143,8 @@ export const reactionCommands = [
     type: "reaction.dismiss",
     operationId: "dismissReaction",
     description:
-      "Dismisses a pending reaction prompt WITHOUT applying its parked damage (GM-grade only) - for when the damage was already applied manually.",
-    summary: "Dismiss a pending reaction prompt without applying its damage (GM).",
+      "Dismisses a pending reaction prompt WITHOUT applying anything it holds (GM-grade only): parked damage is dropped, and so is an attack waiting on a Parry or Shield - for when the GM settled it by hand.",
+    summary: "Dismiss a pending reaction prompt without applying what it holds (GM).",
     schema: ReactionDismissSchema,
     malformed: "The dismissal is malformed.",
     gmOnly: "Only the GM can dismiss a reaction prompt.",
@@ -125,6 +164,7 @@ export const reactionCommands = [
     gmOnly: "Only the GM can apply proposed damage.",
     async run({ request, execute }, kit) {
       const { proposalId, apply, amount } = request;
+      const distance = await kit.creatureDistance();
       let applied: AppliedDamage | undefined;
       const { duplicate } = await execute((state) => {
         applied =
@@ -132,7 +172,8 @@ export const reactionCommands = [
             resolveDefinition: kit.resolveDefinition,
             newId: kit.context.newId,
             now: () => Date.now(),
-            catalog: kit.equipmentCatalog()
+            catalog: kit.equipmentCatalog(),
+            distanceFeet: (actorIdA, actorIdB) => distance(state, actorIdA, actorIdB)
           }) ?? undefined;
       });
       if (duplicate || !applied) return;

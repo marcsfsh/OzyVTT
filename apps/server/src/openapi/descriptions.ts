@@ -397,7 +397,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     requiresEffectTag: 'The action requires an active self effect carrying this tag (Frenzy requires "raging")',
     uses: "Limited uses; unlike a feature's, an action's may recharge on a d6",
     reaction:
-      'A declared reaction the engine can offer as a pending prompt (Uncanny Dodge). Only meaningful on activation "reaction"',
+      'A declared reaction the engine offers as a pending prompt when its trigger happens: half-damage (Uncanny Dodge), ac-bonus (Parry, Shield), strike-back (Hellish Rebuke) or melee-attack (Retaliation). Only meaningful on activation "reaction"',
     legendary:
       'SRD Legendary Action: taken on OTHER creatures\' turns, spending `cost` from the per-round pool. Pairs with activation "other"',
     spellSlot:
@@ -421,7 +421,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     requiresEffectTag: 'The action requires an active self effect carrying this tag (Frenzy requires "raging")',
     uses: "Limited uses; unlike a feature's, an action's may recharge on a d6",
     reaction:
-      'A declared reaction the engine can offer as a pending prompt (Uncanny Dodge). Only meaningful on activation "reaction"',
+      'A declared reaction the engine offers as a pending prompt when its trigger happens: half-damage (Uncanny Dodge), ac-bonus (Parry, Shield), strike-back (Hellish Rebuke) or melee-attack (Retaliation). Only meaningful on activation "reaction"',
     legendary:
       'SRD Legendary Action: taken on OTHER creatures\' turns, spending `cost` from the per-round pool. Pairs with activation "other"',
     spellSlot:

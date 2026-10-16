@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AbilitySchema, HitDieSchema, PickBudgetScalingSchema } from "@vtt/schemas";
+import { AbilitySchema, HitDieSchema, PickBudgetScalingSchema, type ActionReaction } from "@vtt/schemas";
 import type { Wire } from "./wire.js";
 
 /** An open identity slug; ids are never closed enums, so homebrew stays additive. */
@@ -456,7 +456,7 @@ export type ContentActionSummary = Readonly<{
   requiresEffectTag: string | null;
   multiattack: ReadonlyArray<{ actionId: string; count: number }> | null;
   grants: boolean;
-  reaction: Readonly<{ trigger: "hit-by-attack"; response: "half-damage" }> | null;
+  reaction: Wire<ActionReaction> | null;
   /** SRD generic action rows (Dodge, Dash, Help, ...) appended after the stat block's own. */ builtin?: boolean;
   /** Builtin targeting: "single" picks one combatant, "none" is a direct tap. */ targeting?: "single" | "none";
   /** SRD Legendary Action cost against the creature's per-round pool (taken on other creatures' turns). */ legendaryCost?: number;

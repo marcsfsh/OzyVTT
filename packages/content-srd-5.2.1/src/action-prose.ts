@@ -2,7 +2,7 @@
  * What an action's prose says that play needs as data. Read where an action enters the system (the content
  * build, a homebrew save, an import), so the engine never reads prose while a fight runs.
  */
-import type { ActionArea, ActorAction } from "@vtt/schemas";
+import type { ActionArea, ActionReaction, ActorAction } from "@vtt/schemas";
 
 /**
  * The area of effect a description names. SRD 2024 phrasing is consistent enough to pattern-match ("60-foot
@@ -26,16 +26,40 @@ export function areaOfProse(description: string): ActionArea | null {
   return null;
 }
 
-/** The action with its prose facts filled: the area (an authored one wins), and whether it is a Multiattack whose
- *  attacks nothing structured names. The same object when nothing changes. */
+/**
+ * The AC a Parry-style reaction adds ("adds 2 to its AC against that attack"), melee only when the text names a
+ * melee attack. Null for any other reaction, which stays prose.
+ */
+export function acReactionOfProse(description: string): ActionReaction | null {
+  const match = /\badds (\d+) to its AC against (?:one|that|the) (?:melee )?attack/i.exec(description);
+  const amount = match ? Number(match[1]) : 0;
+  if (amount < 1 || amount > 10) return null;
+  return {
+    trigger: "hit-by-attack",
+    response: "ac-bonus",
+    amount,
+    ...(/\bmelee attack\b/i.test(description) ? { melee: true } : {})
+  };
+}
+
+/** The action with its prose facts filled: the area (an authored one wins), whether it is a Multiattack whose
+ *  attacks nothing structured names, and a Parry's AC reaction (an authored reaction wins). The same object when
+ *  nothing changes. */
 export function withProseFacts<Action extends ActorAction>(action: Action): Action {
   const area = action.area ?? areaOfProse(action.description);
   const untracked = /multiattack/i.test(action.name) && !action.multiattack;
-  if (area === (action.area ?? null) && untracked === (action.untrackedMultiattack === true)) return action;
+  const reaction = action.reaction ?? (action.activation === "reaction" ? acReactionOfProse(action.description) : null);
+  if (
+    area === (action.area ?? null) &&
+    untracked === (action.untrackedMultiattack === true) &&
+    reaction === (action.reaction ?? null)
+  )
+    return action;
   const { untrackedMultiattack: _previous, ...rest } = action;
   return {
     ...rest,
     ...(area ? { area } : {}),
-    ...(untracked ? { untrackedMultiattack: true as const } : {})
+    ...(untracked ? { untrackedMultiattack: true as const } : {}),
+    ...(reaction ? { reaction } : {})
   } as Action;
 }

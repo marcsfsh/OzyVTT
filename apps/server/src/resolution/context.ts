@@ -57,6 +57,11 @@ export type ResolveInput = Readonly<{
   pushFeet?: number;
   /** The slot a spell is cast with; absent, its own level, else the lowest above it with a slot left. */
   slotLevel?: number;
+  /** A parked attack finishing (see `parkForAcReaction`): its economy was checked and spent when it rolled, so it is
+   *  neither checked nor spent again, and its target is not offered the AC reaction a second time. */
+  economyPaid?: boolean;
+  /** A reaction's AC bonus against this attack only (Parry), added to the target's AC. */
+  reactionAcBonus?: Readonly<{ amount: number; source: string }>;
 }>;
 
 export type ResolveDependencies = Readonly<{

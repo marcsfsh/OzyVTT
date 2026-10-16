@@ -82,6 +82,7 @@ export const saveCommands = [
       const initiator = initiatorOf(principal);
       const { commandId, saveId, method, total, rollMode, commit, legendaryResistance, damageOverride } = request;
       const pending = kit.read().combat.pendingSaves.find((entry) => entry.id === saveId);
+      const distance = await kit.creatureDistance();
       let answered: ReturnType<typeof answerSave> | undefined;
       const { state, duplicate } = await execute((draft) => {
         answered = answerSave(
@@ -99,7 +100,8 @@ export const saveCommands = [
             role: initiator.role,
             now: () => new Date().toISOString(),
             resolveDefinition: kit.resolveDefinition,
-            catalog: kit.equipmentCatalog()
+            catalog: kit.equipmentCatalog(),
+            distanceFeet: (actorIdA, actorIdB) => distance(draft, actorIdA, actorIdB)
           },
           legendaryResistance,
           rollMode,

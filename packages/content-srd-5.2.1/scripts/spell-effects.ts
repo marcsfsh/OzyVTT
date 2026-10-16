@@ -89,6 +89,14 @@ const CAST_ATTACKS: Readonly<Record<string, number>> = {
   "flame-blade": 0
 };
 
+/** Reaction spells the table offers as prompts: what triggers each and what casting it does. Counterspell and Feather
+ *  Fall answer triggers the engine doesn't see (a spell being cast, a fall), so they stay with the GM. */
+const CAST_REACTIONS: Readonly<Record<string, NonNullable<SpellEffect["reaction"]>>> = {
+  // +5 AC until the start of the caster's next turn, including against the triggering attack.
+  shield: { trigger: "hit-by-attack", response: "ac-bonus", amount: 5, untilNextTurn: true },
+  "hellish-rebuke": { trigger: "damaged-by-creature", response: "strike-back", rangeFeet: 60 }
+};
+
 /** The cast model for one SRD spell from its text and the source's damage columns. */
 export function spellEffectFor(
   id: string,
@@ -98,7 +106,8 @@ export function spellEffectFor(
 ): SpellEffect {
   const healing = healingOfText(description);
   const attacks = CAST_ATTACKS[id] ?? (/\bmakes? an? (?:ranged|melee) spell attack\b/i.test(description) ? 1 : 0);
-  return { attacks, damage: castDamage(id, roll, types, healing !== null), healing };
+  const reaction = CAST_REACTIONS[id];
+  return { attacks, damage: castDamage(id, roll, types, healing !== null), healing, ...(reaction ? { reaction } : {}) };
 }
 
 function castDamage(id: string, roll: string | null, types: readonly string[], heals: boolean): Damage {
@@ -112,5 +121,6 @@ function castDamage(id: string, roll: string | null, types: readonly string[], h
 export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...Object.keys(NO_CAST_DAMAGE),
   ...Object.keys(CAST_DAMAGE),
-  ...Object.keys(CAST_ATTACKS)
+  ...Object.keys(CAST_ATTACKS),
+  ...Object.keys(CAST_REACTIONS)
 ];
