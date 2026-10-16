@@ -3,6 +3,7 @@ import { halvedDamageParts, previewDamage } from "../hit-points.js";
 import { offerableReaction } from "../reaction-offers.js";
 import { createPendingSaves } from "../saving-throws.js";
 import type { ResolveContext } from "./context.js";
+import { coverBonusOf, coverFor } from "../cover.js";
 import { damagePartsOf } from "./damage.js";
 
 type HalfDamageReaction = Extract<ActionReaction, { response: "half-damage" }>;
@@ -148,21 +149,28 @@ export function parkActionSave(ctx: ResolveContext): void {
   const rider = attack !== null;
   if (rider && attack.outcome !== "hit" && attack.outcome !== "crit") return;
   const parts = rider ? [] : damagePartsOf(ctx);
-  createPendingSaves(state, {
-    sourceActorId: attacker.id,
-    sourceName: attacker.name,
-    actionName: action.name,
-    ability: action.save.ability,
-    dc: action.save.dc,
-    targetIds: targets.map((target) => target.id),
-    proposedDamage: parts.reduce((sum, part) => sum + part.amount, 0),
-    proposedDamageParts: parts,
-    // Cover adds to Dexterity saving throws (SRD Cover) - carried on the prompt.
-    saveBonus: action.save.ability === "dex" ? ctx.coverBonus : 0,
-    halfOnSuccess: action.save.successDamage === "half",
-    // The GM's explicit choice wins over the condition the action declares.
-    conditionIds: input.conditionId ? [input.conditionId] : action.save.failureConditions,
-    newSaveId: deps.newRollId,
-    createdAt: Date.parse(deps.now())
-  });
+  // Cover adds to Dexterity saving throws (SRD Cover), each target's own: the GM's choice for this resolve, else the
+  // cover the GM marked it with. Carried on the prompt.
+  const saveBonusOf = (target: (typeof targets)[number]) =>
+    action.save!.ability === "dex" ? coverBonusOf(coverFor(input.cover, target)) : 0;
+  const groups = new Map<number, string[]>();
+  for (const target of targets)
+    groups.set(saveBonusOf(target), [...(groups.get(saveBonusOf(target)) ?? []), target.id]);
+  for (const [saveBonus, targetIds] of groups)
+    createPendingSaves(state, {
+      sourceActorId: attacker.id,
+      sourceName: attacker.name,
+      actionName: action.name,
+      ability: action.save.ability,
+      dc: action.save.dc,
+      targetIds,
+      proposedDamage: parts.reduce((sum, part) => sum + part.amount, 0),
+      proposedDamageParts: parts,
+      saveBonus,
+      halfOnSuccess: action.save.successDamage === "half",
+      // The GM's explicit choice wins over the condition the action declares.
+      conditionIds: input.conditionId ? [input.conditionId] : action.save.failureConditions,
+      newSaveId: deps.newRollId,
+      createdAt: Date.parse(deps.now())
+    });
 }

@@ -2,6 +2,7 @@ import type { GmActor, GmView, MutationResult } from "@vtt/domain";
 import { Button } from "@vtt/ui";
 import { command } from "../lib/command";
 import { ConditionEditor } from "./conditions";
+import { CoverControl } from "./CoverControl";
 import { HpAdjust } from "./HpAdjust";
 import { EffectChips } from "./EffectChips";
 
@@ -48,6 +49,7 @@ export function RowTools({
         />
         <ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={onFeedback} />
         <EffectChips actorId={actor.id} effects={actor.effects} canEnd onFeedback={onFeedback} />
+        <CoverControl actor={actor} onFeedback={onFeedback} />
         <div className="initiative-row-tools">
           <Button
             type="button"

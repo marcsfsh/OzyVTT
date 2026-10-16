@@ -3,6 +3,7 @@ import { GameStateSchema, type GameState } from "@vtt/domain";
 import { ActionSchema, ActorDefinitionSchema, InventoryItemSchema } from "@vtt/schemas";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { startEncounter } from "../src/encounter.js";
+import { addEffect, makeEffect } from "../src/effects.js";
 import { applyDamageDetailed, halvedDamageParts } from "../src/hit-points.js";
 import { weaponAction } from "../src/item-actions.js";
 import { settlePlayerDamage, settlePlayerHit } from "../src/player-damage.js";
@@ -424,5 +425,67 @@ describe("a stat block's conditional damage", () => {
     const { strike } = monsterFight("gelatinous-cube");
     const engulf = strike("engulf", [3, 3, 3]);
     expect(engulf.warnings).toContainEqual(expect.stringMatching(/at the start of each of the cube's turns/));
+  });
+});
+
+describe("cover the GM marked on a creature", () => {
+  const mark = (game: GameState, tag: string) =>
+    addEffect(
+      game,
+      IDS.foe,
+      makeEffect({ id: `cover-${tag}`, name: "Cover", tags: [tag], duration: { type: "manual" } })
+    );
+  const bow = {
+    id: "bow",
+    name: "Bow",
+    activation: "action" as const,
+    description: "A bow.",
+    attack: { bonus: 5, rangeFeet: 80 },
+    damage: [{ formula: "1d6", type: "piercing" }]
+  };
+
+  it("counts against a player's attack, though the player can't send cover", () => {
+    const game = fight();
+    mark(game, "cover-three-quarters");
+    const shot = resolveDefinitionAction(
+      game,
+      bow,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(), cover: null },
+      queuedDeps([7, 3], { initiatorRole: "player", initiatorSessionId: IDS.player })
+    );
+    // 7 + 5 = 12 hits AC 10, but not AC 15 behind three-quarters cover.
+    expect(shot.attack).toMatchObject({ targetAc: 15, coverBonus: 5, outcome: "miss" });
+  });
+
+  it("adds to the Dexterity save of a save spell, per target", () => {
+    const game = fight();
+    mark(game, "cover-half");
+    resolveDefinitionAction(
+      game,
+      {
+        id: "burning-hands",
+        name: "Burning Hands",
+        activation: "action",
+        description: "A cone of fire.",
+        save: { ability: "dex", dc: 13, successDamage: "half", failureConditions: [] },
+        damage: [{ formula: "3d6", type: "fire" }]
+      },
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd() },
+      queuedDeps([2, 2, 2])
+    );
+    expect(game.combat.pendingSaves).toEqual([expect.objectContaining({ targetActorId: IDS.foe, saveBonus: 2 })]);
+  });
+
+  it("refuses a creature behind total cover as a single target", () => {
+    const game = fight();
+    mark(game, "cover-total");
+    expect(() =>
+      resolveDefinitionAction(
+        game,
+        bow,
+        { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd() },
+        queuedDeps([15])
+      )
+    ).toThrowError(/Total Cover/);
   });
 });
