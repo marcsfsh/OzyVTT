@@ -1,9 +1,9 @@
 /* The landing: the title screen, the GM password card and the entry drive into the app. Only
    shell/Landing.tsx imports this. */
 
-/* The landing: an 80s retro-cyber title screen (star field, slatted sun, grid rolling toward the
-   viewer, neon wordmark, two arcade doors). Raw colours live in the --landing-* tokens, re-skinned per
-   theme. Reduced motion freezes the motion rather than hiding the scene. */
+/* The landing: the Chrome sun title screen (star field, a slatted sunset sun between two mountain ranges,
+   the grid rolling toward the viewer, the chrome wordmark and two buttons). Raw colours live in the
+   --landing-* tokens, re-skinned per theme. Reduced motion freezes the motion rather than hiding the scene. */
 .landing {
   position: relative;
   /* `clip`, not `hidden`: the scene overflows the frame, and a hidden box still scrolls when focus moves
@@ -17,9 +17,9 @@
   text-align: center;
   background: var(--landing-sky);
 }
-/* Excluded: the flare, which must paint over the CRT dressing (z-2) and the content (z-3) and cannot
-   from inside the scene's stacking context; and the theme switch, which this rule would otherwise
-   size and position (each `:not()` adds specificity over the switch's own rule). */
+/* Excluded: the flare, which must paint over the vignette (z-2) and the content (z-3) and cannot from
+   inside the scene's stacking context; and the theme switch, which this rule would otherwise size and
+   position (each `:not()` adds specificity over the switch's own rule). */
 .landing > *:not(.landing-scene):not(.landing-flare):not(.home-theme-switch) {
   position: relative;
   z-index: 3;
@@ -32,24 +32,6 @@
   z-index: 2;
   pointer-events: none;
   background: var(--landing-vignette);
-}
-.landing::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-  opacity: 0.75;
-  /* A 3px background tile rather than one huge repeating gradient, which rasterized unevenly over a
-     full-viewport layer. */
-  background-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent calc(var(--scanline-gap) - 1px),
-    var(--landing-scanline) calc(var(--scanline-gap) - 1px),
-    var(--landing-scanline) var(--scanline-gap)
-  );
-  background-size: 100% var(--scanline-gap);
 }
 
 .landing-scene {
@@ -83,11 +65,16 @@
     radial-gradient(1px 1px at 58% 26%, var(--landing-star-dim) 50%, transparent 51%),
     radial-gradient(1px 1px at 82% 48%, var(--landing-star-dim) 50%, transparent 51%);
 }
+/* The band above the horizon clips the sun at the line. Its filter is the sun's glow: a filter on the sun
+   itself would be cut away by the sun's own mask. */
 .landing-skyband {
   position: absolute;
   inset: 0 0 36% 0;
   overflow: hidden;
+  filter: var(--landing-sun-glow);
 }
+/* 72% of the disc shows above the horizon. The slats are masked out of its lower half and widen toward the
+   horizon, so the sky shows through them. */
 .landing-sun {
   --sun-d: clamp(15rem, 36vw, 27rem);
   position: absolute;
@@ -97,15 +84,51 @@
   width: var(--sun-d);
   aspect-ratio: 1;
   border-radius: 50%;
-  overflow: hidden;
   background: var(--landing-sun);
-  box-shadow: var(--landing-sun-glow);
+  -webkit-mask-image: var(--landing-slats);
+  mask-image: var(--landing-slats);
 }
-.landing-sun::after {
+/* Two ranges either side of the sun, standing on the horizon. The rim is the same silhouette in the rim
+   gradient, with the dark fill laid 3px lower, so the ridge line is an even 3px everywhere. */
+.landing-mountains {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 64%;
+  height: clamp(3.5rem, 13%, 7rem);
+  transform: translateY(-100%);
+  --ridge: polygon(
+    0 100%,
+    0 70%,
+    6% 40%,
+    12% 62%,
+    18% 22%,
+    26% 58%,
+    31% 44%,
+    36% 100%,
+    64% 100%,
+    68% 46%,
+    74% 18%,
+    80% 54%,
+    86% 30%,
+    93% 66%,
+    100% 40%,
+    100% 100%
+  );
+}
+.landing-mountains::before,
+.landing-mountains::after {
   content: "";
   position: absolute;
-  inset: 46% 0 0 0;
-  background: repeating-linear-gradient(to bottom, transparent 0 0.5rem, var(--landing-slat) 0.5rem 1rem);
+  inset: 0;
+  clip-path: var(--ridge);
+}
+.landing-mountains::before {
+  background: var(--landing-mountain-rim);
+}
+.landing-mountains::after {
+  background: var(--landing-mountain);
+  transform: translateY(3px);
 }
 .landing-horizon {
   position: absolute;
@@ -129,25 +152,6 @@
     repeating-linear-gradient(to bottom, var(--landing-grid-y) 0 2px, transparent 2px var(--landing-grid-cell));
   transform: perspective(340px) rotateX(63deg);
   transform-origin: center top;
-}
-.landing-planet {
-  position: absolute;
-  right: 11%;
-  top: 9%;
-  width: clamp(3.25rem, 6vw, 5.5rem);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: var(--landing-planet);
-  box-shadow: var(--landing-planet-glow);
-  opacity: var(--landing-planet-opacity);
-}
-.landing-planet::after {
-  content: "";
-  position: absolute;
-  inset: 26% -38%;
-  border: 2px solid var(--landing-planet-ring);
-  border-radius: 50%;
-  transform: rotate(-18deg);
 }
 
 /* Analog grain with a per-theme opacity token (`.static-noise` is hidden in light, but daybreak still
@@ -217,7 +221,8 @@
 .landing--drive .landing-sun {
   animation: entry-sunrise 940ms cubic-bezier(0.22, 0.58, 0.3, 1) 560ms forwards;
 }
-.landing--drive .landing-horizon {
+.landing--drive .landing-horizon,
+.landing--drive .landing-mountains {
   animation: entry-horizon 1000ms ease-in forwards;
 }
 .landing--drive .landing-stars {
@@ -270,11 +275,11 @@
 }
 @keyframes entry-horizon {
   from {
-    transform: scaleX(1);
+    scale: 1 1;
     opacity: 1;
   }
   to {
-    transform: scaleX(1.4);
+    scale: 1.4 1;
     opacity: 0;
   }
 }
@@ -324,9 +329,7 @@
   }
 }
 
-/* The sign: the banded sunset fill is restated because the light theme swaps `.wordmark-name` to
-   solid ink. The warm top half stands on dark sky and the violet bottom on the sun's crown, so the
-   outline and glow can stay tight. */
+/* The wordmark in chrome (`.wordmark-name`), at title scale. */
 .landing .home-hero {
   padding-bottom: clamp(1rem, 3.5vh, 2rem);
 }
@@ -334,228 +337,52 @@
   display: block;
   font-size: clamp(3.4rem, 16vw, 10.5rem);
   line-height: 0.92;
-  background: var(--landing-sign);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-stroke: 0.5px var(--landing-stroke);
-  filter: var(--landing-title-glow);
 }
 
-/* The doors: two chamfered arcade panels (magenta and cyan). The glow uses drop-shadow filters because
-   box-shadow cannot follow a clip-path cut. Colours come from the --landing-* set. */
+/* The two ways in, both in the display face: the player's is the primary (the sun frame), the GM's a raised
+   control with the GM violet on its leading edge. */
 .choices {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: clamp(1rem, 3vw, 1.75rem);
+  gap: clamp(1rem, 3vw, 1.25rem);
   margin-top: clamp(1.5rem, 4.5vh, 2.75rem);
 }
 .choices .nh-btn {
-  position: relative;
-  flex: 0 1 18rem;
-  justify-content: center;
+  flex: 0 1 16rem;
   min-height: 3.5rem;
-  padding: 1.05rem 2.4rem;
-  font-family: var(--font-display);
-  font-size: 1.02rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  border-radius: 0;
-  clip-path: polygon(0 0.6rem, 0.6rem 0, 100% 0, 100% calc(100% - 0.6rem), calc(100% - 0.6rem) 100%, 0 100%);
-  transition:
-    color var(--dur-hover),
-    background var(--dur-hover),
-    filter var(--dur-hover),
-    transform var(--dur-press) var(--ease-settle);
-}
-.choices .nh-btn::after {
-  content: "";
-  position: absolute;
-  inset: 4px;
-  pointer-events: none;
-  border: 1px solid currentColor;
-  opacity: 0.22;
-  clip-path: polygon(0 0.45rem, 0.45rem 0, 100% 0, 100% calc(100% - 0.45rem), calc(100% - 0.45rem) 100%, 0 100%);
-}
-/* A blinking cue triangle on hover/focus, drawn with clip-path (no glyph characters). */
-.choices .nh-btn::before {
-  content: "";
-  position: absolute;
-  left: 0.95rem;
-  top: 50%;
-  width: 0.55rem;
-  height: 0.85rem;
-  transform: translateY(-50%);
-  background: currentColor;
-  clip-path: polygon(0 0, 100% 50%, 0 100%);
-  opacity: 0;
-}
-.choices .nh-btn:hover:not(:disabled)::before,
-.choices .nh-btn:focus-visible::before {
-  opacity: 1;
-}
-.choices .nh-btn:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: -6px;
-}
-.choices .nh-btn--primary {
-  background:
-    repeating-linear-gradient(to bottom, transparent 0 3px, var(--landing-scanline) 3px 4px), var(--landing-door-bg);
-  border: 2px solid var(--landing-door-play-rim);
-  color: var(--landing-door-label);
-  filter: var(--landing-door-play-glow);
-}
-.choices .nh-btn--primary:hover:not(:disabled),
-.choices .nh-btn--primary:focus-visible {
-  filter: var(--landing-door-play-glow-strong) brightness(1.15);
-  transform: translateY(-1px);
+  padding: 1rem 2rem;
+  font: 400 1.1rem / 1 var(--font-display);
+  letter-spacing: 0.02em;
 }
 .choices .nh-btn--secondary {
-  background:
-    repeating-linear-gradient(to bottom, transparent 0 3px, var(--landing-scanline) 3px 4px), var(--landing-door-bg);
-  border: 2px solid var(--landing-door-gm-rim);
-  color: var(--landing-door-label);
-  filter: var(--landing-door-gm-glow);
-}
-.choices .nh-btn--secondary:hover:not(:disabled),
-.choices .nh-btn--secondary:focus-visible {
-  filter: var(--landing-door-gm-glow-strong) brightness(1.15);
-  transform: translateY(-1px);
+  --nh-sheen: var(--raised-sheen), inset 4px 0 0 var(--rim-gm);
 }
 .choices .nav-arrow {
   color: currentColor;
 }
-@media (prefers-reduced-motion: no-preference) {
-  .choices .nh-btn:hover:not(:disabled)::before,
-  .choices .nh-btn:focus-visible::before {
-    animation: landing-cue-blink 1.1s steps(2, jump-none) infinite;
-  }
-}
-@keyframes landing-cue-blink {
-  50% {
-    opacity: 0.25;
-  }
-}
 
-/* The theme switch stands on the scene, so it wears the scene's chrome pinned to the --landing-* set
-   (the landing's colours never follow the theme). */
 .landing .home-theme-switch {
   position: absolute;
   right: 0.75rem;
   bottom: 0.75rem;
   width: auto;
   margin: 0;
-  opacity: 0.8;
-}
-.landing .home-theme-switch:hover,
-.landing .home-theme-switch:focus-within {
-  opacity: 1;
-}
-.landing .home-theme-switch .nh-segmented {
-  background: var(--landing-glass);
-  border-color: color-mix(in srgb, var(--landing-door-gm-rim) 38%, transparent);
-  backdrop-filter: blur(4px);
-}
-/* Labels use the landing ink, not the theme's text ink, since the switch always sits on violet glass. */
-.landing .home-theme-switch .nh-segmented-option {
-  color: color-mix(in srgb, var(--landing-star) 66%, transparent);
-}
-.landing .home-theme-switch .nh-segmented-option:hover {
-  color: var(--landing-star);
-}
-.landing .home-theme-switch .nh-segmented-option[aria-pressed="true"] {
-  background: color-mix(in srgb, var(--landing-door-gm-rim) 16%, transparent);
-  color: var(--landing-door-label);
-  box-shadow: var(--glow-violet);
 }
 .landing .notice {
   max-width: 32rem;
   margin-inline: auto;
   text-align: left;
 }
+/* The GM sign-in card replaces the buttons: a panel with the GM violet on its leading edge. */
 .landing .card {
-  position: relative;
-  overflow: hidden;
   margin-inline: auto;
   text-align: left;
-  background: var(--landing-glass);
-  backdrop-filter: blur(8px);
-  border-color: var(--landing-door-gm-rim);
-  box-shadow: var(--glow-violet);
-}
-.landing .card::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  opacity: 0.4;
-  border-radius: inherit;
-  background-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent calc(var(--scanline-gap) - 1px),
-    var(--landing-scanline) calc(var(--scanline-gap) - 1px),
-    var(--landing-scanline) var(--scanline-gap)
-  );
-  background-size: 100% var(--scanline-gap);
-}
-.landing .card > * {
-  position: relative;
-  z-index: 1;
-}
-.landing .card h2 {
-  color: var(--landing-door-label);
-}
-.landing .card p {
-  color: color-mix(in srgb, var(--landing-star) 82%, transparent);
-}
-.landing .card input {
-  border-color: color-mix(in srgb, var(--landing-door-gm-rim) 45%, transparent);
-  background: color-mix(in srgb, var(--landing-ink-deep) 62%, transparent);
-  color: var(--landing-door-label);
-}
-.landing .card input::placeholder {
-  color: color-mix(in srgb, var(--landing-star) 55%, transparent);
-}
-.landing .card input:focus {
-  border-color: var(--landing-door-gm-rim);
-  box-shadow: var(--glow-violet);
-}
-/* Its actions are doors too: "Enter table" is a cyan door that fills on hover; Back is a pink ghost.
-   These set `--nh-fill`/`--nh-rim`, not `background`/`border-color`: every `.nh-btn` paints its fill
-   and rim on a `::before` backing layer (for the chamfer), which would cover a plain background. */
-.landing .card .nh-btn--primary {
-  --nh-fill: var(--landing-glass);
-  --nh-rim: var(--landing-door-gm-rim);
-  --nh-tex: transparent;
-  color: var(--landing-door-label);
-  filter: var(--landing-door-gm-glow);
-  font-family: var(--font-display);
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-}
-.landing .card .nh-btn--primary:hover:not(:disabled),
-.landing .card .nh-btn--primary:focus-visible {
-  --nh-fill: var(--landing-door-gm-rim);
-  --nh-rim: var(--landing-door-gm-rim);
-  color: var(--landing-ink-deep);
-  filter: var(--landing-door-gm-glow-strong);
-}
-.landing .card .nh-btn--primary:disabled {
-  --nh-fill: var(--landing-glass);
-  --nh-rim: var(--landing-door-gm-rim);
-  color: var(--landing-door-label);
-  filter: var(--landing-door-gm-glow);
-}
-.landing .card .link {
-  color: color-mix(in srgb, var(--landing-door-play-rim) 80%, transparent);
-}
-.landing .card .link:hover:not(:disabled) {
-  color: var(--landing-door-label);
-  background: color-mix(in srgb, var(--landing-door-play-rim) 14%, transparent);
+  border-color: var(--line-strong);
+  background: var(--material-lip), var(--material-plate);
+  box-shadow:
+    inset 4px 0 0 var(--rim-gm),
+    var(--shadow-2);
 }
 
 /* Motion: ignition, twinkle and the drive; frozen under reduced motion. `will-change` is declared at
@@ -638,19 +465,7 @@
 .home-theme-switch {
   margin-top: var(--space-6);
 }
-.landing .home-hero-bloom {
-  top: 12%;
-  height: 40%;
-  opacity: 0.38;
-}
-.landing .home-hero-grid {
-  bottom: 0;
-  height: 42%;
-  opacity: 0.8;
-}
 @media (max-width: 560px) {
-  /* Stacked on a phone, the doors sit on the sun's slats, so their glass goes near-opaque to keep the
-     labels legible. */
   .choices .nh-btn {
     flex: 1 1 100%;
   }

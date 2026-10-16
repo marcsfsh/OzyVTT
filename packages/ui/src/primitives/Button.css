@@ -1,21 +1,15 @@
 /* ============================================================================
-   The button material.
-   `clip-path` clips hit-testing as well as paint, so the button element is never clipped. A backing layer
-   (`::before`, z-index -1 inside the button's stacking context) carries the clip-path and paints fill, rim,
-   texture and cue; the tap area stays a whole rectangle.
+   The button.
+   Fill and edge are painted on a backing layer (`::before`, z-index -1 inside the button's stacking context)
+   so a variant can change its edge width (the primary's 3px sun frame) without the button changing size:
      - `isolation: isolate` keeps the z-index -1 layer inside the button instead of behind an ancestor.
-     - `inset: -1px` spans the border box, so the layer covers any rectangle a consumer draws underneath.
-     - The rim is a border on the backing layer; the cut leaves the diagonals bare, like the landing door.
-     - Glow is `filter: drop-shadow` on the layer (box-shadow can't follow a cut), so the label never blooms.
-   Variants set only colours (`--nh-fill`, `--nh-rim`, `--nh-tex`, `--nh-cue`) and a filter.
-   This duplicates `.chamfer` / `.rim` / `.cue` from design-tokens.css because many `.nh-btn`s are
-   hand-written in app code and never receive those classes. Colours come from the shared tokens.
-   `:active` appears wherever `:hover` does, because many devices have no hover.
+     - `inset: -1px` spans the border box, so the layer covers the 1px transparent border too.
+   Variants set only `--nh-fill`, `--nh-rim`, `--nh-rim-w`, `--nh-sheen` and `--nh-glow`; the primary paints its
+   frame itself. `:active` appears wherever `:hover` does, because many devices have no hover.
    ============================================================================ */
 
 .nh-btn {
   position: relative;
-  /* The backing layer's stacking context. */
   isolation: isolate;
   display: inline-flex;
   align-items: center;
@@ -25,14 +19,11 @@
      `.tap-target::after` instead, so their paint stays compact. */
   min-height: var(--tap-min);
   padding: var(--space-3) var(--space-5);
-  /* Geometry only; the visible edge is `--nh-rim` on the backing layer. Kept so no button changes size. */
+  /* Geometry only; the visible edge is on the backing layer. */
   border: 1px solid transparent;
   border-radius: 0;
   background: transparent;
-  /* Labels use the display face; tracking is lighter than the landing doors' because a label is a word in a row. */
-  font: 700 var(--fs-body) / 1 var(--font-display);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font: 600 var(--fs-body) / 1 var(--font-label);
   color: var(--text);
   text-decoration: none;
   white-space: nowrap;
@@ -40,14 +31,9 @@
 
   --nh-fill: transparent;
   --nh-rim: transparent;
-  /* Texture, weaker than the `.scanlines` utility so the label on a magenta fill still clears 4.5:1. */
-  --nh-tex: color-mix(in srgb, var(--scanline-color) 35%, transparent);
-  --nh-cue: none;
+  --nh-rim-w: var(--rim-w);
+  --nh-sheen: none;
   --nh-glow: none;
-  /* The shared cue at button scale, inset for a button's padding. Keep the 1:2 w:h ratio the conic wedge needs. */
-  --cue-w: 0.3rem;
-  --cue-h: 0.6rem;
-  --cue-inset: 0.34rem;
 }
 
 .nh-btn::before {
@@ -57,39 +43,19 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
-  border: var(--rim-w, 2px) solid var(--nh-rim);
-  background-color: var(--nh-fill);
-  /* Three layers, top first: cue, scanline tile, gradient sheen. The cue is a background because `::after` is the
-     `.tap-target` hit-area extension on `--sm`. */
-  background-image:
-    var(--nh-cue),
-    linear-gradient(
-      to bottom,
-      transparent 0 calc(var(--scanline-gap) - 1px),
-      var(--nh-tex) calc(var(--scanline-gap) - 1px) var(--scanline-gap)
-    ),
-    linear-gradient(to bottom, color-mix(in srgb, var(--text) 7%, transparent), transparent 60%);
-  background-repeat: no-repeat, repeat, no-repeat;
-  background-size:
-    var(--cue-w) var(--cue-h),
-    100% var(--scanline-gap),
-    100% 100%;
-  background-position:
-    var(--cue-inset) center,
-    0 0,
-    0 0;
-  background-origin: border-box;
-  background-clip: border-box;
+  border: var(--nh-rim-w) solid var(--nh-rim);
+  background: var(--nh-fill);
+  box-shadow: var(--nh-sheen);
   filter: var(--nh-glow);
   transition:
     background-color var(--dur-hover),
     border-color var(--dur-hover),
+    box-shadow var(--dur-hover),
     filter var(--dur-hover);
 }
 
-/* Small keeps its light paint; `.tap-target` grows the hit area to 44px. The cut doesn't shrink with the box
-   (`--chamfer-cut` is computed on :root). The width floor is scoped so `--sm` and the icon button keep their paint. */
+/* Small keeps its light paint; `.tap-target` grows the hit area to 44px. The width floor is scoped so `--sm` and
+   the icon button keep their paint. */
 .nh-btn:not(.nh-btn--sm) {
   min-width: var(--tap-min);
 }
@@ -103,48 +69,57 @@
   width: 100%;
 }
 
-/* Primary: magenta fill, dark ink, glow only on hover */
+/* Primary: the sun frame. A 3px sunset edge around a dark warm-tinted fill, with the label in Bungee. The label is
+   white on dark (deep ink on pale in daybreak), never dark ink on the sun itself. */
 .nh-btn--primary {
-  --nh-fill: var(--primary);
-  --nh-rim: var(--magenta-hi);
-  color: var(--text-on-neon);
+  font: 400 var(--fs-body) / 1 var(--font-display);
+  letter-spacing: 0.02em;
+  color: var(--primary-ink);
+  text-shadow: var(--primary-ink-shadow);
+}
+.nh-btn--primary::before {
+  border: 3px solid transparent;
+  background:
+    var(--primary-tint) padding-box,
+    linear-gradient(var(--primary-base), var(--primary-base)) padding-box,
+    var(--grad-sun-x) border-box;
+  box-shadow: var(--glow-sun);
+}
+.nh-btn--primary.nh-btn--sm {
+  font-size: var(--fs-sm);
 }
 
-/* Secondary: the resting default, no fill, a rim for the whole edge (`--rim-color`, so daybreak gets a dark line). */
+/* Secondary: the resting default, a raised control. */
 .nh-btn--secondary {
-  --nh-rim: var(--rim-color);
-  color: var(--text);
+  --nh-fill: var(--raised);
+  --nh-rim: var(--line-raised);
+  --nh-sheen: var(--raised-sheen);
 }
 
-/* Ghost: text only, no rim at rest; the cue and a quiet fill are its interaction. */
+/* Ghost: text only; a quiet fill is its interaction. */
 .nh-btn--ghost {
   color: var(--text-dim);
-  --nh-tex: transparent;
 }
 
-/* Destructive — danger edge at rest, fills on hover, always with a clear label */
+/* Destructive: a danger edge on a plain panel fill at rest, filled on hover, always with a clear label. */
 .nh-btn--destructive {
+  --nh-fill: var(--surface-1);
   --nh-rim: var(--danger);
+  --nh-rim-w: 2px;
   color: var(--danger-text);
 }
 
-/* ---- Interaction: the rim brightens and the cue appears, on :active as well as :hover. ---- */
-.nh-btn:hover:not(:disabled),
-.nh-btn:active:not(:disabled),
-.nh-btn:focus-visible {
-  --nh-cue: var(--cue-mark);
-}
+/* ---- Interaction, on :active as well as :hover ---- */
 .nh-btn--primary:hover:not(:disabled),
 .nh-btn--primary:active:not(:disabled),
 .nh-btn--primary:focus-visible {
-  --nh-fill: var(--magenta-hi);
-  --nh-rim: var(--magenta-hi);
+  --primary-tint: var(--primary-tint-hover);
   --nh-glow: var(--glow-drop-magenta);
 }
 .nh-btn--secondary:hover:not(:disabled),
 .nh-btn--secondary:active:not(:disabled),
 .nh-btn--secondary:focus-visible {
-  --nh-fill: var(--surface-3);
+  --nh-fill: var(--raised-hover);
   --nh-rim: var(--rim-color-hi);
 }
 .nh-btn--ghost:hover:not(:disabled),
@@ -152,35 +127,35 @@
 .nh-btn--ghost:focus-visible {
   color: var(--text);
   --nh-fill: color-mix(in srgb, var(--surface-3) 60%, transparent);
-  --nh-rim: var(--rim-color);
 }
 .nh-btn--destructive:hover:not(:disabled),
 .nh-btn--destructive:active:not(:disabled),
 .nh-btn--destructive:focus-visible {
-  --nh-fill: var(--danger);
-  --nh-rim: var(--danger-hi);
-  color: var(--text-on-neon);
+  --nh-fill: color-mix(in srgb, var(--danger) 22%, var(--surface-1));
   --nh-glow: var(--glow-drop-danger);
+  color: var(--text);
 }
 
-/* Disabled drops the rim and texture and keeps a flat box; the cut corner stays (it is the silhouette, not a
-   signal). */
+/* Disabled is a flat box: no edge, no sheen, no glow. The primary loses its frame too, so a disabled primary can't
+   read as the thing to press. */
 .nh-btn:disabled {
   color: var(--text-muted);
+  text-shadow: none;
   cursor: not-allowed;
   --nh-fill: var(--surface-2);
   --nh-rim: transparent;
-  --nh-tex: transparent;
-  --nh-cue: none;
+  --nh-sheen: none;
   --nh-glow: none;
 }
-.nh-btn:disabled::before {
-  background-image: none;
+.nh-btn--primary:disabled::before {
+  border: var(--rim-w) solid var(--line);
+  background: var(--surface-2);
+  box-shadow: none;
 }
 
 /* Icon-only square control: compact paint, with `.tap-target` (added by the component) for the 44px hit area.
    Fill and edge live on `--nh-fill` / `--nh-rim`, so setting `background` or `border-color` on `.nh-iconbtn`
-   has no visible effect. */
+   has no visible effect. Pressed is a cyan fill, because cyan is selection. */
 .nh-iconbtn {
   position: relative;
   isolation: isolate;
@@ -196,10 +171,9 @@
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
-  --nh-fill: var(--surface-2);
-  --nh-rim: var(--rim-color);
-  --nh-tex: transparent;
-  --nh-glow: none;
+  --nh-fill: var(--raised);
+  --nh-rim: var(--line-raised);
+  --nh-sheen: var(--raised-sheen);
 }
 .nh-iconbtn::before {
   content: "";
@@ -208,14 +182,12 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
-  border: var(--rim-w, 2px) solid var(--nh-rim);
+  border: var(--rim-w) solid var(--nh-rim);
   background: var(--nh-fill);
-  filter: var(--nh-glow);
+  box-shadow: var(--nh-sheen);
   transition:
     background-color var(--dur-hover),
-    border-color var(--dur-hover),
-    filter var(--dur-hover);
+    border-color var(--dur-hover);
 }
 .nh-iconbtn--sm {
   width: 1.85rem;
@@ -224,16 +196,19 @@
 .nh-iconbtn:hover:not(:disabled),
 .nh-iconbtn:active:not(:disabled) {
   color: var(--text);
+  --nh-fill: var(--raised-hover);
   --nh-rim: var(--rim-color-hi);
 }
 .nh-iconbtn[aria-pressed="true"] {
-  color: var(--text);
-  --nh-rim: var(--magenta);
-  --nh-glow: var(--glow-drop-magenta);
+  color: var(--text-on-neon);
+  --nh-fill: var(--cyan);
+  --nh-rim: var(--cyan);
+  --nh-sheen: none;
 }
 .nh-iconbtn:disabled {
   color: var(--text-muted);
   cursor: not-allowed;
+  --nh-fill: var(--surface-2);
   --nh-rim: transparent;
-  --nh-glow: none;
+  --nh-sheen: none;
 }

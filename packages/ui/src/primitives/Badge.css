@@ -1,99 +1,64 @@
-/* The badge wears the system's cut corner on a backing layer, so a badge placed inside a control can never clip
-   its hit-testing. `--chamfer-cut` is redeclared here because it computes on :root with `var()`s already
-   substituted; re-sizing `--chamfer` further down would do nothing. */
+/* A badge is a status label or a count: a tinted strip with a 3px bar on its leading edge, in its tone. Painted on
+   the element; nothing here needs a second layer. */
 .nh-badge {
-  position: relative;
-  isolation: isolate;
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  padding: 1px var(--space-2);
-  border: 1px solid transparent;
+  padding: 1px var(--space-2) 1px calc(3px + var(--space-2));
+  border: 0;
   border-radius: 0;
-  background: transparent;
+  background-color: color-mix(in srgb, var(--nh-badge-tone) var(--nh-badge-mix), transparent);
+  box-shadow: inset 3px 0 0 var(--nh-badge-tone);
   color: var(--text-dim);
-  font: 700 var(--fs-xs) / 1.5 var(--font-body);
+  font: 700 var(--fs-xs) / 1.5 var(--font-label);
   letter-spacing: 0.03em;
   white-space: nowrap;
-  --chamfer: 0.3rem;
-  --chamfer-cut: polygon(
-    0 var(--chamfer),
-    var(--chamfer) 0,
-    100% 0,
-    100% calc(100% - var(--chamfer)),
-    calc(100% - var(--chamfer)) 100%,
-    0 100%
-  );
-  --nh-fill: var(--surface-3);
-  --nh-rim: var(--line-strong);
-}
-.nh-badge::before {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  z-index: -1;
-  box-sizing: border-box;
-  pointer-events: none;
-  clip-path: var(--chamfer-cut);
-  /* 1px, not `--rim-w`: two 2px rims would close most of a 20px box. */
-  border: 1px solid var(--nh-rim);
-  background: var(--nh-fill);
+  --nh-badge-tone: var(--line-raised);
+  --nh-badge-mix: 22%;
 }
 
-/* Soft outline tones: a coloured edge and readable tinted text on a quiet surface. */
+/* Soft tones: a tinted strip and readable tinted text. */
 .nh-badge--primary {
-  --nh-rim: var(--magenta);
+  --nh-badge-tone: var(--magenta);
+  --nh-badge-mix: 15%;
   color: var(--magenta-text);
 }
 .nh-badge--success {
-  --nh-rim: var(--success);
+  --nh-badge-tone: var(--success);
+  --nh-badge-mix: 14%;
   color: var(--cyan-hi);
 }
 .nh-badge--caution {
-  --nh-rim: var(--caution);
+  --nh-badge-tone: var(--caution);
+  --nh-badge-mix: 15%;
   color: var(--caution-hi);
 }
 .nh-badge--danger {
-  --nh-rim: var(--danger);
+  --nh-badge-tone: var(--danger);
+  --nh-badge-mix: 15%;
   color: var(--danger-text);
 }
 .nh-badge--info {
-  --nh-rim: var(--info);
+  --nh-badge-tone: var(--info);
+  --nh-badge-mix: 18%;
   color: var(--indigo-text);
 }
 
-/* Solid: filled tone for counts and high emphasis, dark ink on neon. */
-.nh-badge--solid {
-  --nh-rim: transparent;
+/* Solid: a filled tone for counts and high emphasis, dark ink on neon. The bar disappears into the fill. Two
+   classes so it beats every tone whatever their order. */
+.nh-badge.nh-badge--solid {
+  --nh-badge-mix: 100%;
   color: var(--text-on-neon);
 }
-.nh-badge--solid.nh-badge--primary {
-  --nh-fill: var(--primary);
-}
-.nh-badge--solid.nh-badge--success {
-  --nh-fill: var(--success);
-}
-.nh-badge--solid.nh-badge--caution {
-  --nh-fill: var(--caution);
-}
-.nh-badge--solid.nh-badge--danger {
-  --nh-fill: var(--danger);
-}
-.nh-badge--solid.nh-badge--info {
-  --nh-fill: var(--info);
-}
-.nh-badge--solid:not([class*="nh-badge--primary"]):not([class*="nh-badge--success"]):not(
+.nh-badge.nh-badge--solid:not([class*="nh-badge--primary"]):not([class*="nh-badge--success"]):not(
     [class*="nh-badge--caution"]
-  ):not([class*="nh-badge--danger"]):not([class*="nh-badge--info"]) {
-  --nh-fill: var(--line-strong);
+  ):not([class*="nh-badge--danger"]):not([class*="nh-badge--info"]):not([class*="nh-badge--violet"]) {
   color: var(--text);
 }
 
 /* Violet is reserved for GM-only content. A tone so `GmOnlyTag` uses this component. */
 .nh-badge--violet {
-  --nh-rim: var(--violet);
+  --nh-badge-tone: var(--violet);
+  --nh-badge-mix: 20%;
   color: var(--violet-hi);
-}
-.nh-badge--solid.nh-badge--violet {
-  --nh-fill: var(--violet);
 }

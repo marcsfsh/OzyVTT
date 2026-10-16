@@ -1,81 +1,55 @@
-/* The chip wears the system's cut corner on a backing layer: a pressable chip carries `.tap-target`, and
-   clip-path on the element would clip its ::after hit area. See Badge.css for why `--chamfer-cut` is redeclared. */
+/* A chip is a tinted strip with a 3px bar on its leading edge, both in the chip's tone. Painted on the element:
+   a pressable chip carries `.tap-target`, whose `::after` is the hit area, and nothing here needs a second layer.
+   The tone's text token keeps the label at 4.5:1. */
 .nh-chip {
-  position: relative;
-  isolation: isolate;
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  padding: 2px var(--space-2);
-  border: 1px solid transparent;
+  padding: 2px var(--space-2) 2px calc(3px + var(--space-2));
+  border: 0;
   border-radius: 0;
-  background: transparent;
-  color: var(--text);
-  font: 600 var(--fs-xs) / 1.4 var(--font-body);
+  background-color: color-mix(in srgb, var(--nh-chip-tone) var(--nh-chip-mix), transparent);
+  box-shadow: inset 3px 0 0 var(--nh-chip-tone);
+  color: var(--nh-chip-ink);
+  font: 600 var(--fs-xs) / 1.4 var(--font-label);
   white-space: nowrap;
-  --chamfer: 0.3rem;
-  --chamfer-cut: polygon(
-    0 var(--chamfer),
-    var(--chamfer) 0,
-    100% 0,
-    100% calc(100% - var(--chamfer)),
-    calc(100% - var(--chamfer)) 100%,
-    0 100%
-  );
-  --nh-fill: var(--surface-3);
-  --nh-rim: var(--line-strong);
-  --nh-glow: none;
-}
-.nh-chip::before {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  z-index: -1;
-  box-sizing: border-box;
-  pointer-events: none;
-  clip-path: var(--chamfer-cut);
-  /* 1px: a 2px rim on a 24px box is too heavy. */
-  border: 1px solid var(--nh-rim);
-  background: var(--nh-fill);
-  filter: var(--nh-glow);
   transition:
     background-color var(--dur-hover),
-    border-color var(--dur-hover),
-    filter var(--dur-hover);
+    box-shadow var(--dur-hover);
+  --nh-chip-tone: var(--line-raised);
+  --nh-chip-ink: var(--text);
+  --nh-chip-mix: 22%;
 }
 .nh-chip--harmful {
-  --nh-rim: var(--danger);
+  --nh-chip-tone: var(--danger);
+  --nh-chip-ink: var(--danger-text);
+  --nh-chip-mix: 15%;
 }
 .nh-chip--beneficial {
-  --nh-rim: var(--cyan);
+  --nh-chip-tone: var(--cyan);
+  --nh-chip-ink: var(--cyan-hi);
+  --nh-chip-mix: 14%;
 }
 .nh-chip--magical {
-  --nh-rim: var(--violet);
+  --nh-chip-tone: var(--violet);
+  --nh-chip-ink: var(--violet-hi);
+  --nh-chip-mix: 20%;
 }
 .nh-chip--info {
-  --nh-rim: var(--indigo);
+  --nh-chip-tone: var(--indigo);
+  --nh-chip-ink: var(--indigo-text);
+  --nh-chip-mix: 18%;
 }
-/* Glow is a drop-shadow filter, since box-shadow can't follow the cut. */
 .nh-chip--at-risk {
-  --nh-glow: var(--glow-drop-violet);
+  box-shadow:
+    inset 3px 0 0 var(--nh-chip-tone),
+    var(--glow-violet);
 }
 
 .nh-chip-icon {
   font-size: 1em;
   line-height: 1;
-  color: var(--text-dim);
-}
-.nh-chip--harmful .nh-chip-icon {
-  color: var(--danger-text);
-}
-.nh-chip--beneficial .nh-chip-icon {
-  color: var(--cyan);
-}
-.nh-chip--magical .nh-chip-icon {
-  color: var(--violet-hi);
-}
-.nh-chip--info .nh-chip-icon {
-  color: var(--indigo);
+  color: inherit;
 }
 
 /* The remove ✕ stays round: it's a small close control, and squaring it would look like a nested chip. */
@@ -108,33 +82,25 @@
 }
 
 /* Pressable chip (filter and condition toggles): 2rem of paint plus `.tap-target` for the 44px floor. The 6px
-   overhang means a wrapping chip row needs at least --space-3 between chips. */
+   overhang means a wrapping chip row needs at least --space-3 between chips. Every pressable chip keeps a lane
+   for the pressed tick, so pressing never shifts the row. */
 .nh-chip--pressable {
   min-height: 2rem;
+  padding-left: calc(3px + var(--space-2) + 0.55rem);
   cursor: pointer;
 }
 /* `:active` says what `:hover` says. */
 .nh-chip--pressable:hover:not(:disabled),
 .nh-chip--pressable:active:not(:disabled) {
-  --nh-rim: var(--rim-color-hi);
+  --nh-chip-mix: 32%;
 }
-/* Selected = a lifted fill plus the leading tick, the same "on" mark as a pressed segment. The tick is a
-   background inside the existing padding, so pressing never shifts the row. */
+/* Pressed = a deeper tint plus the leading tick, the same "on" mark the cue draws elsewhere. */
 .nh-chip--pressable[aria-pressed="true"] {
-  --nh-fill: color-mix(in srgb, var(--surface-3) 55%, var(--surface-2));
-  --nh-rim: currentColor;
-}
-.nh-chip--pressable[aria-pressed="true"]::before {
-  background-image:
-    linear-gradient(to top right, var(--state-on, var(--magenta)) 0 50%, transparent 50%),
-    linear-gradient(to bottom right, var(--state-on, var(--magenta)) 0 50%, transparent 50%);
-  background-repeat: no-repeat, no-repeat;
-  background-size:
-    0.26rem 0.2rem,
-    0.26rem 0.2rem;
-  background-position:
-    left 0.17rem top calc(50% - 0.2rem),
-    left 0.17rem top 50%;
+  --nh-chip-mix: 40%;
+  background-image: var(--cue-mark);
+  background-repeat: no-repeat;
+  background-size: 0.3rem 0.6rem;
+  background-position: calc(3px + 0.3rem) center;
 }
 .nh-chip--pressable:disabled {
   opacity: 0.6;

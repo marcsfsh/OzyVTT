@@ -17,7 +17,7 @@
   border-radius: 0;
   background: var(--surface-3);
   color: var(--text);
-  font: 600 var(--fs-sm) / 1.4 var(--font-body);
+  font: 600 var(--fs-sm) / 1.4 var(--font-label);
   max-width: 100%;
 }
 .nh-combobox-chiplabel {

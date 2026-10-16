@@ -26,9 +26,8 @@
   gap: 1.4rem;
 }
 
-/* Panel material on a backing layer, never the element: `clip-path` clips hit-testing, and the
-   groups are full of tap targets. `.settings-group` is outermost and takes the scanline;
-   `.settings-exceptions` is nested and gets rim + bezel over a plain plate. No rest glow.
+/* Panel material on a backing layer behind the content. `.settings-group` is outermost and takes the
+   chrome lip; `.settings-exceptions` is nested and gets the edge over a plain plate. No rest glow.
    The rules switching off `.surface-glass`'s blur and wash here are a backstop. Do not delete the
    class itself: `/viewer-controls` still uses it. */
 .settings-group,
@@ -48,7 +47,6 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
   border: var(--rim-w) solid var(--rim-color);
   background: var(--material-fill);
   background-origin: border-box;
@@ -60,13 +58,13 @@
     background var(--dur-hover);
 }
 .settings-group {
-  --material-fill: var(--material-scanline), var(--material-plate);
+  --material-fill: var(--material-lip), var(--material-plate);
 }
 .settings-exceptions {
   --material-fill: var(--surface-2);
 }
 /* `.rim-gm` is an inset box-shadow on the element, which the backing layer would paint over, so the
-   GM edge moves onto the layer (where it also follows the cut). */
+   GM edge moves onto the layer. */
 .settings-group.rim-gm {
   box-shadow: none;
 }

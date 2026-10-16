@@ -85,17 +85,6 @@
   color: var(--text);
   cursor: pointer;
 }
-.encounter-primary,
-.turn-controls .encounter-primary {
-  background: var(--primary);
-  color: var(--text-on-neon);
-  border-color: transparent;
-}
-.encounter-primary:hover:not(:disabled),
-.turn-controls .encounter-primary:hover:not(:disabled) {
-  background: var(--magenta-hi);
-  box-shadow: var(--glow-magenta);
-}
 .encounter-primary:disabled,
 .turn-controls button:disabled {
   opacity: 0.45;
@@ -114,83 +103,42 @@
   padding: 0.8rem var(--space-4);
   border-top: 1px solid var(--line);
 }
-/* Active row: hairline rules and a leading tick instead of a filled box. Two tinted hairlines
-   bracket the acting block so it reads as one unit; the tick carries the region's one glow. */
+/* The current turn: the row becomes a lit box (the warm wash, a 4px magenta leading edge and a soft bloom), and
+   the sun glyph stands before the name in the display face. The box holds the acting console, prompts and popover
+   too, so the whole turn reads as one unit. */
 .initiative-list > li.active {
   border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  border-top-color: color-mix(in srgb, var(--magenta) 55%, var(--line));
-  border-bottom: 1px solid color-mix(in srgb, var(--magenta) 55%, var(--line));
+  border-top-color: transparent;
+  background: var(--turn-wash), var(--surface-2);
+  box-shadow:
+    inset 4px 0 0 var(--turn-edge),
+    inset 0 0 0 1px var(--line-raised),
+    var(--turn-glow);
 }
-/* The tick rides the row line, not the `<li>`, which grows to hold the console, prompts and popover.
-   The GM's row line is `.initiative-row-main`; the player's is the shared `.init-row`, so both are
-   named wherever the mark is drawn. */
+.initiative-list > li.active + li {
+  border-top-color: transparent;
+}
+/* The row line leaves a gutter for the 4px edge, and everything nested under it indents to the row's text
+   column. `.85rem` is the gutter and `.3rem` is `.initiative-expand`'s padding. */
 .initiative-list.gm > li.active .initiative-row-main,
 .initiative-list.player > li.active > .init-row {
-  position: relative;
   padding-inline-start: 0.85rem;
 }
-/* Slightly taller than the staging tray's tick, with the region's one glow; both fit the .85rem
-   gutter the row indents by, so nothing reflows. */
-.initiative-list.gm > li.active .initiative-row-main::before,
-.initiative-list.player > li.active > .init-row::before {
-  content: "";
-  position: absolute;
-  inset-inline-start: 0;
-  top: 50%;
-  width: 0.5rem;
-  height: 1.1rem;
-  transform: translateY(-50%);
-  color: var(--magenta);
-  background: var(--cue-mark);
-  filter: var(--glow-drop-magenta);
-  pointer-events: none;
-  animation: init-tick-arrive 0.5s var(--ease-settle, ease-out) 1;
-}
-/* The tick's arrival flare. The `::before` exists only while the row is `.active`, so it runs once
-   per turn change. */
-@keyframes init-tick-arrive {
-  0% {
-    opacity: 0;
-    transform: translateY(-50%) translateX(-0.4rem) scaleY(0.55);
-  }
-  45% {
-    opacity: 1;
-    transform: translateY(-50%) translateX(0) scaleY(1.3);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(-50%) translateX(0) scaleY(1);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .initiative-list.gm > li.active .initiative-row-main::before,
-  .initiative-list.player > li.active > .init-row::before {
-    animation: none;
-  }
-}
-/* Everything nested under the active row indents to the row's text column, leaving the tick alone in
-   the gutter. `.85rem` is the gutter and `.3rem` is `.initiative-expand`'s padding. The player's
-   `.init-row` carries the tick, so it is excluded. */
 .initiative-list.gm > li.active > :not(.initiative-row-main) {
   margin-inline-start: calc(0.85rem + 0.3rem);
 }
 .initiative-list.player > li.active > :not(.init-row) {
   margin-inline-start: 0.85rem;
 }
-/* The tick replaces the row's `▶` caret here; the shared screen keeps its caret. */
-.initiative-list.gm > li.active .initiative-caret,
-.initiative-list.player > li.active .init-row-caret {
-  display: none;
+.initiative-list > li.active .initiative-name-text,
+.initiative-list > li.active .init-row-name {
+  font-family: var(--font-display);
+  font-weight: 400;
+  color: var(--heading-ink);
 }
 .initiative-list > li.you {
   background: transparent;
   border-top-color: color-mix(in srgb, var(--cyan) 55%, var(--line));
-}
-.initiative-list > li.you.active {
-  background: transparent;
-  box-shadow: none;
 }
 .initiative-list > li > span {
   display: flex;
@@ -198,7 +146,7 @@
 }
 .initiative-list > li > strong {
   color: var(--text);
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
 }
 .encounter-place-nudge {
   margin: var(--space-2) 0 0;
@@ -219,11 +167,6 @@
   padding: 0.18rem 0.2rem;
   position: relative;
 }
-.initiative-caret {
-  flex: none;
-  color: var(--text-dim);
-  font-size: var(--fs-xs);
-}
 .initiative-score-value {
   flex: none;
   min-width: 1.9rem;
@@ -236,7 +179,7 @@
   font-size: var(--fs-sm);
   text-align: right;
   cursor: pointer;
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-variant-numeric: tabular-nums;
 }
 .initiative-score-value:hover:not(:disabled) {
@@ -257,7 +200,7 @@
   color: var(--text);
   font-size: var(--fs-body);
   text-align: center;
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
 }
 .turn-controls {
   display: grid;
@@ -430,10 +373,6 @@
   box-shadow: none;
   color: var(--text);
 }
-/* The resume state stays cyan, at a specificity that beats the shared `.encounter-primary::before` rim. */
-.encounter-topbar .turn-controls .encounter-primary.resume::before {
-  border-color: var(--cyan);
-}
 .turn-economy {
   display: flex;
   flex-wrap: wrap;
@@ -501,7 +440,7 @@
 }
 .initiative-list:not(.gm) .initiative-row-main > strong {
   color: var(--text);
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
 }
 .player-sheet-door {
   flex: 0 0 auto;
@@ -559,10 +498,6 @@
   color: var(--text-dim);
   font-size: var(--fs-sm);
   line-height: 1.4;
-}
-.turn-controls .encounter-primary.resume {
-  background: color-mix(in srgb, var(--surface-3) 70%, var(--cyan));
-  border-color: var(--cyan);
 }
 .own-effect-row {
   margin-top: var(--space-1);
@@ -685,7 +620,7 @@
   flex: none;
   font-size: var(--fs-xs);
   font-weight: 700;
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-variant-numeric: tabular-nums;
 }
 .initiative-hp-text small {
@@ -725,10 +660,10 @@
   background: var(--danger);
 }
 
-/* Panel material on a backing layer, never the element, because `clip-path` clips hit-testing.
-   `inset: -1px` spans the border box, so nothing changes size. Only `.encounter-panel` and
-   `.sheet-header` carry the scanline; everything a player reads a number from gets a flat plate.
-   No rest glow: the active turn is the region's one glowing element. */
+/* Panel material on a backing layer behind the content; `inset: -1px` spans the border box, so nothing
+   changes size. Only `.encounter-panel` and a reaction prompt take the chrome lip; everything nested that a
+   player reads a number from gets a flat plate. No rest glow: the active turn is the region's one glowing
+   element, and a reaction prompt only appears during one. */
 .encounter-panel,
 .encounter-round,
 .condition-picker,
@@ -766,19 +701,18 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
   border: var(--rim-w) solid var(--rim-color);
   background: var(--material-fill);
-  background-origin: border-box;
-  background-clip: border-box;
-  outline: 1px solid var(--bezel-color);
-  outline-offset: calc(-1 * var(--bezel-inset));
   transition:
     border-color var(--dur-hover),
     background var(--dur-hover);
 }
-.encounter-panel {
-  --material-fill: var(--material-scanline), var(--material-plate);
+.encounter-panel,
+.save-prompt.reaction-prompt {
+  --material-fill: var(--material-lip), var(--material-plate);
+}
+.save-prompt.reaction-prompt::before {
+  box-shadow: var(--turn-glow);
 }
 .encounter-round,
 .condition-picker,
@@ -805,31 +739,13 @@
 .row-tools-popover {
   position: absolute;
 }
-/* Small chips need a smaller cut, and `--bezel-inset` must stay at least half the cut or the bezel
-   corner is clipped to a notch (as in Badge.css). */
-.encounter-round,
-.sheet-vital,
-.sheet-ability,
-.action-row {
-  --chamfer: 0.32rem;
-  --chamfer-cut: polygon(
-    0 var(--chamfer),
-    var(--chamfer) 0,
-    100% 0,
-    100% calc(100% - var(--chamfer)),
-    calc(100% - var(--chamfer)) 100%,
-    0 100%
-  );
-  --bezel-inset: calc(var(--rim-w) + 1px);
-}
 .encounter-round {
   border-radius: 0;
 }
 
-/* Hand-rolled controls (bare buttons and inputs predating the primitives) take the material at button
-   scale: smaller cut, shared rim, flat plate, cue wedge on hover/focus/press. Never the scanline.
-   The cut rides a backing layer, never the element (`clip-path` clips hit-testing), and
-   `inset: -1px` keeps every control's size. */
+/* Hand-rolled controls (bare buttons and inputs predating the primitives) are raised controls like
+   `.nh-btn--secondary`: the raised fill, edge and top highlight on a backing layer, with `inset: -1px`
+   keeping every control's size. A state repaints `--material-fill` on the element. */
 .dock-log-door,
 .encounter-dock-choice,
 .encounter-primary,
@@ -868,19 +784,7 @@
   border-radius: 0;
   background: none;
   border-color: transparent;
-  --material-fill: var(--material-plate);
-  --chamfer: 0.32rem;
-  --chamfer-cut: polygon(
-    0 var(--chamfer),
-    var(--chamfer) 0,
-    100% 0,
-    100% calc(100% - var(--chamfer)),
-    calc(100% - var(--chamfer)) 100%,
-    0 100%
-  );
-  --cue-w: 0.26rem;
-  --cue-h: 0.52rem;
-  --cue-inset: 0.26rem;
+  --material-fill: var(--raised);
 }
 .dock-log-door::before,
 .encounter-dock-choice::before,
@@ -921,17 +825,15 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
-  border: var(--rim-w) solid var(--rim-color);
+  border: var(--rim-w) solid var(--line-raised);
   background: var(--material-fill);
-  background-origin: border-box;
-  background-clip: border-box;
+  box-shadow: var(--raised-sheen);
   transition:
     border-color var(--dur-hover),
     background var(--dur-hover);
 }
-/* Interaction for all of them: the rim brightens and the cue wedge appears. `:active` matters
-   because touch devices have no hover. */
+/* Interaction for all of them: the fill steps up and the edge brightens. `:active` matters because touch
+   devices have no hover. */
 .dock-log-door:hover:not(:disabled)::before,
 .dock-log-door:focus-visible::before,
 .dock-log-door:active:not(:disabled)::before,
@@ -976,17 +878,66 @@
 .legendary-offer:hover:not(:disabled)::before,
 .legendary-offer:focus-visible::before {
   border-color: var(--rim-color-hi);
+  background: var(--raised-hover);
+}
+/* The primary action is the sun frame, as `.nh-btn--primary`: a 3px sunset edge round a dark warm-tinted
+   fill, the label in the display face. `.turn-prev` (‹) shares `.encounter-primary` only for its metrics
+   and stays a plain raised control. */
+.encounter-primary:not(.turn-prev) {
+  color: var(--primary-ink);
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  text-shadow: var(--primary-ink-shadow);
+}
+.encounter-primary:not(.turn-prev)::before,
+.encounter-primary:not(.turn-prev):hover:not(:disabled)::before,
+.encounter-primary:not(.turn-prev):focus-visible::before,
+.encounter-primary:not(.turn-prev):active:not(:disabled)::before {
+  border: 3px solid transparent;
   background:
-    var(--cue-mark) no-repeat var(--cue-inset) center / var(--cue-w) var(--cue-h),
-    var(--material-fill);
+    var(--primary-tint) padding-box,
+    linear-gradient(var(--primary-base), var(--primary-base)) padding-box,
+    var(--grad-sun-x) border-box;
+  box-shadow: var(--glow-sun);
 }
-/* Meaning-bearing edges stay on the layer: primary action magenta, reaction prompt cyan, legendary
-   violet. `.turn-prev` (‹) shares `.encounter-primary` only for its metrics and keeps the neutral rim. */
-.encounter-primary:not(.turn-prev)::before {
-  border-color: var(--magenta);
+.encounter-primary:not(.turn-prev):hover:not(:disabled),
+.encounter-primary:not(.turn-prev):focus-visible,
+.encounter-primary:not(.turn-prev):active:not(:disabled) {
+  --primary-tint: var(--primary-tint-hover);
 }
-.encounter-primary {
-  color: var(--text);
+/* Reviewing history, Next turn resumes live play: a cyan edge instead of the sun, since it is a different
+   kind of step. */
+.turn-controls .encounter-primary.resume::before,
+.turn-controls .encounter-primary.resume:hover:not(:disabled)::before {
+  border: 2px solid var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 18%, var(--surface-2));
+  box-shadow: none;
+}
+.turn-controls .encounter-primary.resume {
+  text-shadow: none;
+}
+/* An action economy slot that is still available is lit cyan; a spent one sinks into the track, struck
+   through. */
+.economy-slot {
+  font-family: var(--font-label);
+}
+.economy-slot:not([aria-pressed="true"]) {
+  color: var(--text-on-neon);
+}
+.economy-slot:not([aria-pressed="true"])::before,
+.economy-slot:not([aria-pressed="true"]):hover:not(:disabled)::before {
+  border-color: var(--cyan);
+  background: var(--cyan);
+  box-shadow: none;
+}
+.economy-slot:not([aria-pressed="true"]):hover:not(:disabled)::before {
+  background: color-mix(in srgb, var(--cyan) 82%, white);
+}
+.economy-slot[aria-pressed="true"]::before {
+  border-color: var(--track-edge);
+  background: var(--track);
+  box-shadow: none;
 }
 .legendary-offer::before {
   border-color: var(--violet);
@@ -999,6 +950,7 @@
 }
 .dock-log-door:disabled::before,
 .encounter-primary:disabled::before,
+.encounter-primary:not(.turn-prev):disabled::before,
 .turn-controls button:disabled::before,
 .hp-editor > button:disabled::before,
 .sheet-prepare:disabled::before,
@@ -1007,4 +959,5 @@
 .monster-browser-add:disabled::before {
   border-color: transparent;
   background: var(--surface-2);
+  box-shadow: none;
 }

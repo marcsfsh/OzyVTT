@@ -1,5 +1,5 @@
 import type { PlayerView } from "@vtt/domain";
-import { Badge, Tabs } from "@vtt/ui";
+import { Badge, Tabs, Wordmark } from "@vtt/ui";
 import { MyCharacter } from "../actors/MyCharacter";
 import { useRecapBadge } from "../codex/useRecapBadge";
 import { lazySurface } from "../components/lazySurface";
@@ -37,6 +37,7 @@ export function PlayerTabBar({ token }: Readonly<{ token: string }>) {
   const recapBadge = useRecapBadge(token);
   return (
     <div className="frame-tabbar rim-player">
+      <Wordmark variant="solid" sun className="app-logo" aria-hidden="true" />
       <Tabs
         className="player-view-tabs"
         ariaLabel="Player sections"

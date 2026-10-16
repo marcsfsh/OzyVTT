@@ -1,6 +1,5 @@
 /* Severity is a 2px leading rule, not a fill: text sits on a neutral ground in every theme (tinted text on a tint
-   fails in daybreak). The material is on a backing layer because an Alert can contain a Button and clip-path
-   clips hit-testing. */
+   fails in daybreak). The material is on a backing layer behind the content. */
 .nh-alert {
   position: relative;
   isolation: isolate;
@@ -20,7 +19,6 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
   border: 1px solid var(--line);
   /* The 2px leading rule. */
   border-left: 2px solid var(--nh-rule);

@@ -20,16 +20,14 @@
 .nh-modal--full .nh-modal-surface {
   max-height: min(94vh, 60rem);
 }
-/* The scrim darkens with a vignette (a second pass of `--overlay`, so it deepens correctly in every theme). No
-   scanlines on the scrim: the dialog itself carries them, and stacking two would cause moiré. */
+/* The scrim darkens with a vignette (a second pass of `--overlay`, so it deepens correctly in every theme). */
 .nh-modal::backdrop {
   background: radial-gradient(ellipse 125% 115% at 50% 42%, transparent 30%, var(--overlay) 100%), var(--overlay);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
 
-/* The dialog takes the full material (rim, scanline-over-gradient fill, inner bezel) on a backing layer, since a
-   modal is mostly tap targets. */
+/* The dialog is a panel: plate, 1px edge and the chrome lip, painted on a backing layer behind its content. */
 .nh-modal-surface {
   position: relative;
   isolation: isolate;
@@ -48,30 +46,11 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
   border: var(--rim-w) solid var(--rim-color);
-  background-color: var(--surface-2);
-  background-image:
-    linear-gradient(
-      to bottom,
-      transparent 0 calc(var(--scanline-gap) - 1px),
-      var(--scanline-color) calc(var(--scanline-gap) - 1px) var(--scanline-gap)
-    ),
-    linear-gradient(to bottom, color-mix(in srgb, var(--text) 5%, transparent), transparent 45%);
-  background-repeat: repeat, no-repeat;
-  background-size:
-    100% var(--scanline-gap),
-    100% 100%;
-  background-origin: border-box;
-  background-clip: border-box;
-  /* The inner bezel as two inset shadows, the first re-laying the fill so the bezel reads as a separate line. */
-  box-shadow:
-    inset 0 0 0 var(--bezel-inset) var(--surface-2),
-    inset 0 0 0 calc(var(--bezel-inset) + 1px) var(--bezel-color);
-  /* The dialog keeps its lift, as a filter because box-shadow can't follow the cut and holds the bezel. */
-  filter: drop-shadow(0 10px 24px color-mix(in srgb, var(--void) 60%, transparent));
+  background: var(--material-lip), var(--material-plate);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--void) 60%, transparent);
 }
-/* The accent hairline uses `::after`: `::before` on the same element is the material's backing layer, and
+/* An accent bar replaces the lip. It uses `::after`: `::before` on the same element is the backing layer, and
    styling it here would collapse the plate and clear its background (leaving the dialog transparent). */
 .nh-modal--accent-magenta::after,
 .nh-modal--accent-cyan::after,
@@ -107,6 +86,8 @@
 .nh-modal-title {
   margin: 0;
   font: 400 var(--fs-h1) / var(--lh-snug) var(--font-display);
+  color: var(--heading-ink);
+  text-shadow: var(--heading-shadow);
 }
 .nh-modal-close {
   /* Pinned to the surface's top-right corner (position:relative on .nh-modal-surface), with or without a header. */
@@ -132,7 +113,7 @@
   isolation: isolate;
   --nh-rim: var(--rim-color);
 }
-/* The close ✕ is cut on a backing layer too, never on the button. */
+/* The close ✕ is painted on a backing layer too, never on the button. */
 .nh-modal-close::before {
   content: "";
   position: absolute;
@@ -140,7 +121,6 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: polygon(0 0.3rem, 0.3rem 0, 100% 0, 100% calc(100% - 0.3rem), calc(100% - 0.3rem) 100%, 0 100%);
   border: 1px solid var(--nh-rim);
   background: var(--surface-3);
   transition: border-color var(--dur-hover);
@@ -179,9 +159,8 @@
     height: 100dvh;
     max-height: 100dvh;
   }
-  /* An edge-to-edge sheet has no corner to cut and no edge to rim. */
+  /* An edge-to-edge sheet has no edge to draw. */
   .nh-modal--full .nh-modal-surface::before {
-    clip-path: none;
     border: 0;
     box-shadow: none;
     filter: none;

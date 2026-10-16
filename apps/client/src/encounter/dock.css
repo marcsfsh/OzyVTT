@@ -30,7 +30,7 @@
      box is set here, so the paint does not depend on which stylesheet loads first. */
   border: 1px solid transparent;
   color: var(--text-dim);
-  font: 700 var(--fs-2xs)/1 var(--font-mono);
+  font: 700 var(--fs-2xs)/1 var(--font-label);
   text-transform: uppercase;
   letter-spacing: 0.03em;
   cursor: pointer;
@@ -116,8 +116,7 @@
 }
 /* Count of questions waiting on the GM, on the header that stays on screen while the body that
    would show them is unmounted. Caution tone: someone is waiting on a call.
-   Chamfered, not a pill. The cut rides a backing layer because the count sits inside a tab header
-   (a tap target), and `clip-path` on a child clips hit-testing. */
+   Square, not a pill, painted on a backing layer inside the tab header. */
 .dock-waiting-count {
   position: relative;
   isolation: isolate;
@@ -129,17 +128,8 @@
   border-radius: 0;
   background: none;
   color: var(--text-on-neon);
-  font: 800 var(--fs-2xs)/1.7 var(--font-mono);
+  font: 800 var(--fs-2xs)/1.7 var(--font-numeric);
   vertical-align: baseline;
-  --chamfer: 0.3rem;
-  --chamfer-cut: polygon(
-    0 var(--chamfer),
-    var(--chamfer) 0,
-    100% 0,
-    100% calc(100% - var(--chamfer)),
-    calc(100% - var(--chamfer)) 100%,
-    0 100%
-  );
 }
 .dock-waiting-count::before {
   content: "";
@@ -147,7 +137,6 @@
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
   background: var(--caution);
 }
 

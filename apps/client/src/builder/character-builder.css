@@ -50,7 +50,7 @@
 .cb-offer-level {
   margin-left: var(--space-2);
   color: var(--text-dim);
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-size: var(--fs-sm);
 }
 /* The running count: numbers only. `.tabular` on the element supplies the mono face. */
@@ -107,7 +107,7 @@
 }
 .cb-asi-label {
   color: var(--text-dim);
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-size: var(--fs-sm);
   white-space: nowrap;
 }
@@ -211,9 +211,9 @@
   color: var(--text-dim);
 }
 
-/* Panel material on a backing layer, never the element, because `clip-path` clips hit-testing.
-   `inset: -1px` spans the border box. The gate also gets the rim glow as a filter (it follows the
-   cut, and on the element it would make a containing block for fixed overlays). */
+/* Panel material on a backing layer behind the content; `inset: -1px` spans the border box. The gate
+   also gets the rim glow as a filter on the layer (on the element it would make a containing block for
+   fixed overlays). */
 .cb-level-gate,
 .cb-level-preview {
   position: relative;
@@ -229,7 +229,6 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
   border: var(--rim-w) solid var(--rim-color);
   background: var(--material-fill);
   background-origin: border-box;
@@ -241,7 +240,7 @@
     background var(--dur-hover);
 }
 .cb-level-gate {
-  --material-fill: var(--material-scanline), var(--material-plate);
+  --material-fill: var(--material-lip), var(--material-plate);
 }
 .cb-level-gate::before {
   filter: var(--rim-glow);

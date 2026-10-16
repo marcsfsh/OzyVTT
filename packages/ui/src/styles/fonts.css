@@ -1,19 +1,20 @@
 /* Self-hosted fonts (no runtime CDN on a LAN): @fontsource bundles WOFF2 and Vite serves them. Family names match
-   the --font-* tokens in design-tokens.css. */
+   the --font-* tokens in design-tokens.css, and only the weights the tokens and primitives use are loaded. */
 
-/* Wordmark — Bungee (chunky arcade signage) */
+/* Wordmark and display: Bungee (short, square signage letters; one weight) */
 @import "@fontsource/bungee/400.css";
 
-/* Display — Russo One (bold squared retro) */
-@import "@fontsource/russo-one/400.css";
+/* Labels: Bai Jamjuree (tabs, uppercase labels, chips, secondary buttons) */
+@import "@fontsource/bai-jamjuree/500.css";
+@import "@fontsource/bai-jamjuree/600.css";
+@import "@fontsource/bai-jamjuree/700.css";
 
-/* Body / UI — Manrope */
-@import "@fontsource/manrope/400.css";
-@import "@fontsource/manrope/500.css";
-@import "@fontsource/manrope/600.css";
-@import "@fontsource/manrope/700.css";
-@import "@fontsource/manrope/800.css";
+/* Body and numbers: Tomorrow */
+@import "@fontsource/tomorrow/400.css";
+@import "@fontsource/tomorrow/500.css";
+@import "@fontsource/tomorrow/600.css";
+@import "@fontsource/tomorrow/700.css";
 
-/* Mono / live data — Space Mono */
+/* Code only: Space Mono */
 @import "@fontsource/space-mono/400.css";
 @import "@fontsource/space-mono/700.css";

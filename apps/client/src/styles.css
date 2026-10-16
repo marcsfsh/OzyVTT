@@ -27,19 +27,11 @@ main {
      every rimmed site still names its role in words. viewer.html never loads this file, so the public
      screen gets no role hue. Falls back to the neutral --rim-color before auth. */
   --role-hue: var(--rim-color);
+  /* The chrome rows sit on the night, a shade below the panels, faintly tinted by the role. */
   --chrome-plate: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--role-hue) 13%, var(--surface-2)) 0%,
-    color-mix(in srgb, var(--role-hue) 6%, var(--surface-1)) 100%
-  );
-  /* Chrome-tier scanline shared by rows 1 and 2. `.scanlines` halves the strength (opacity .5) for the
-     scene tier. */
-  --chrome-scanline: linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent calc(var(--scanline-gap) - 1px),
-    var(--scanline-color) calc(var(--scanline-gap) - 1px),
-    var(--scanline-color) var(--scanline-gap)
+    color-mix(in srgb, var(--role-hue) 9%, var(--void)) 0%,
+    color-mix(in srgb, var(--role-hue) 5%, var(--bg)) 100%
   );
 }
 main:has(> .frame-tabbar.rim-gm) {
@@ -47,9 +39,6 @@ main:has(> .frame-tabbar.rim-gm) {
 }
 main:has(> .frame-tabbar.rim-player) {
   --role-hue: var(--rim-player);
-}
-[data-theme="light"] main {
-  --chrome-scanline: none;
 }
 :root {
   --connection-banner-h: 2.5rem;
@@ -283,15 +272,21 @@ main.anim-cascade > * {
   animation: none;
 }
 
-h1 {
+/* Headings are solid Bungee with the hard heading shadow. Bungee ships one weight; 400 stops a bold. */
+h1,
+h2 {
   font-family: var(--font-display);
+  font-weight: 400;
+  color: var(--heading-ink);
+  text-shadow: var(--heading-shadow);
+}
+h1 {
   font-size: clamp(2.5rem, 10vw, 5rem);
   line-height: 1;
   letter-spacing: var(--tracking-display);
   margin: 0.35rem 0 var(--space-4);
 }
 h2 {
-  font-family: var(--font-display);
   font-size: var(--fs-h1);
   line-height: var(--lh-snug);
   margin: 0 0 var(--space-2);
@@ -303,6 +298,7 @@ p {
 .eyebrow {
   display: inline-block;
   color: var(--text-muted);
+  font-family: var(--font-label);
   font-size: var(--fs-xs);
   font-weight: 700;
   letter-spacing: var(--tracking-eyebrow);
@@ -514,17 +510,11 @@ textarea:focus {
   margin: 0;
   padding: 0 var(--space-4);
   border: 0;
-  background-color: var(--surface-2);
-  background-image:
-    var(--chrome-scanline),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--caution) 9%, var(--surface-3)) 0%,
-      color-mix(in srgb, var(--role-hue) 7%, var(--surface-2)) 100%
-    );
-  background-size:
-    100% var(--scanline-gap),
-    auto;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--caution) 9%, var(--surface-3)) 0%,
+    color-mix(in srgb, var(--role-hue) 7%, var(--surface-2)) 100%
+  );
   box-shadow: inset 3px 0 0 0 var(--caution);
   color: var(--text-dim);
   font-size: 0.9rem;
@@ -547,29 +537,50 @@ textarea:focus {
   }
 }
 
-/* Frame row 2 is this wrapper, not the bar: the overflowing `<Tabs>` bar's edge-fade mask erases
-   everything it paints, so the role rim, plate and scanline live on this unmasked box. The bar's own
-   rim comes from Tabs.css; redeclaring `--rim-color` here gives it the role hue (magenta player,
-   violet GM). Each bar's aria-label also names its role. No glow (`.rim-lit` must stay absent). */
+/* Frame row 2, the app bar: the logo, then the tab track. The track scrolls and fades its own edges, so the
+   plate, the role edge (`.rim-gm` / `.rim-player`, a 3px inset bar) and the horizon rule along the bottom live
+   on this wrapper. Each bar's aria-label also names its role. */
 .frame-tabbar {
   grid-row: 2;
+  position: relative;
   min-width: 0;
-  --rim-color: var(--role-hue);
-  --rim-color-hi: var(--role-hue);
-  background-image: var(--chrome-scanline), var(--chrome-plate);
-  background-size:
-    100% var(--scanline-gap),
-    auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-2) var(--pane-gutter) calc(var(--space-2) + 1px);
+  background-image: var(--chrome-plate);
 }
-.gm-tabs,
-.player-view-tabs {
-  padding-inline: var(--pane-gutter);
+.frame-tabbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background-image: var(--rule-beam);
+  box-shadow: var(--rule-beam-glow);
+  pointer-events: none;
 }
-.frame-tabbar.rim-gm {
-  background-color: var(--rim-gm-wash);
+.frame-tabbar .nh-tabs {
+  min-width: 0;
 }
-.frame-tabbar.rim-player {
-  background-color: var(--rim-player-wash);
+.app-logo {
+  flex: none;
+}
+/* A phone spends the bar's width on the tabs: no logo, and the tabs share the track. */
+@media (max-width: 760px) {
+  .app-logo {
+    display: none;
+  }
+  .frame-tabbar {
+    padding-inline: var(--space-3);
+  }
+  .frame-tabbar .nh-tabs {
+    flex: 1;
+  }
+  .frame-tabbar .nh-tab {
+    flex: 1 0 auto;
+  }
 }
 
 /* Faint everyday CRT texture behind all panels; off in the light theme and with reduced transparency. */

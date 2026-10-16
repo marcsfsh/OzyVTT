@@ -22,7 +22,7 @@
 }
 
 .nh-mdeditor-letter {
-  font: 800 var(--fs-sm) / 1 var(--font-body);
+  font: 700 var(--fs-sm) / 1 var(--font-body);
 }
 .nh-mdeditor-letter--italic {
   font-style: italic;

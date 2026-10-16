@@ -47,7 +47,7 @@ export function useEntryAnimation() {
 }
 
 /**
- * The landing page: one centred column with the wordmark and the two doors. The GM password card
+ * The landing page: one centred column with the wordmark and the two ways in. The GM password card
  * replaces the buttons in place. While the entry drives, it stays mounted as the curtain.
  */
 export function Landing({
@@ -75,22 +75,22 @@ export function Landing({
   const submit = () => (bootstrapped ? onSignIn(password) : onSetPassword(password));
   return (
     <div className={driving ? "landing landing--drive" : "landing"}>
-      {/* The title screen, layer by layer: star field, the slatted sun behind the horizon, the receding
-        grid, grain, and the CRT vignette/scanlines from `.landing`'s pseudo-elements. Colours are
-        --landing-* tokens, re-skinned per theme. */}
+      {/* The title screen, layer by layer: star field, the slatted sun behind the horizon, the mountains on
+        it, the receding grid, grain, and the vignette from `.landing::before`. Colours are --landing-*
+        tokens, re-skinned per theme. */}
       <div className="landing-scene" aria-hidden="true">
         <span className="landing-stars-far" />
         <span className="landing-stars" />
         <span className="landing-skyband">
           <span className="landing-sun" />
         </span>
-        <span className="landing-planet" />
+        <span className="landing-mountains" />
         <span className="landing-horizon" />
         <span className="landing-grid" />
         <span className="landing-noise" />
       </div>
-      {/* A sibling of the scene, not inside it: it must paint over the CRT dressing and the content, and
-        the scene is its own stacking context. */}
+      {/* A sibling of the scene, not inside it: it must paint over the vignette and the content, and the
+        scene is its own stacking context. */}
       <span className="landing-flare" aria-hidden="true" />
       <header className="home-hero anim-view">
         <h1 className="home-hero-title">

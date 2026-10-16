@@ -168,30 +168,25 @@
     background: none;
   }
 }
-/* The dock takes the panel material: rim, bezel and a scanline-over-gradient fill, with no shadow (it
-   is part of the shell, not floating). The rim is on the left edge only, the seam against the map.
-   The fill is 88% translucent so the horizon shows through; reduced transparency makes it solid.
-   Only at 980px+, where the dock is a column; below, it is a full-width row with no seam. */
+/* The dock is a panel with the chrome lip and no shadow (it is part of the shell, not floating). Its edge
+   is on the left only, the seam against the map, in the role hue. The fill is 88% translucent so the
+   horizon shows through; reduced transparency makes it solid. Only at 980px+, where the dock is a column;
+   below, it is a full-width row with no seam. */
 @media (min-width: 980px) {
   .table-sidebar {
     border-left: var(--rim-w) solid var(--role-hue);
-    background-image:
-      var(--chrome-scanline),
+    background:
+      var(--material-lip),
       linear-gradient(
         180deg,
         color-mix(in srgb, var(--surface-1) 88%, transparent) 0%,
         color-mix(in srgb, var(--surface-2) 92%, transparent) 100%
       );
-    background-size:
-      100% var(--scanline-gap),
-      auto;
-    outline: 1px solid var(--bezel-color);
-    outline-offset: calc(-1 * var(--bezel-inset));
     box-shadow: none;
   }
   @media (prefers-reduced-transparency: reduce) {
     .table-sidebar {
-      background-image: linear-gradient(180deg, var(--surface-1) 0%, var(--surface-2) 100%);
+      background: var(--material-lip), linear-gradient(180deg, var(--surface-1) 0%, var(--surface-2) 100%);
     }
   }
 }

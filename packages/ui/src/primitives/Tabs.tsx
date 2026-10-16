@@ -18,8 +18,8 @@ interface TabsProps {
   className?: string;
 }
 
-/** The one tab bar. Rest = text-dim; active = text + 2px magenta underline (left bar when vertical) with a faint
-    glow. Full keyboard control. An overflowing horizontal bar hides its scrollbar, keeps the active tab in view
+/** The one tab bar: a sunken track whose chosen tab is raised and underlined in cyan (a left bar when vertical).
+    Full keyboard control. An overflowing horizontal bar hides its scrollbar, keeps the active tab in view
     and fades whichever edge has more content (no fade when everything fits). */
 export function Tabs({ tabs, activeId, onChange, orientation = "horizontal", ariaLabel, className }: TabsProps) {
   const refs = useRef<Array<HTMLButtonElement | null>>([]);

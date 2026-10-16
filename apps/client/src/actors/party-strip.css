@@ -53,7 +53,7 @@ button.party-strip-entry:hover {
 }
 .party-strip-hp {
   flex: 0 0 auto;
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-variant-numeric: tabular-nums;
   font-size: 0.8rem;
   color: var(--text-dim);

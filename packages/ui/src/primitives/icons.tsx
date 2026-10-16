@@ -110,7 +110,7 @@ export function IconPencil({ className }: Readonly<{ className?: string }>) {
   );
 }
 
-/** Warning / blocked / incomplete / locked: the one caution mark. Replaces "⚠", which Manrope lacks and phones
+/** Warning / blocked / incomplete / locked: the one caution mark. Replaces "⚠", which the body face lacks and phones
     render as emoji. Takes `currentColor`, so it is `--caution` unless the caller says otherwise. */
 export function IconWarning({ className }: Readonly<{ className?: string }>) {
   return (
@@ -189,7 +189,7 @@ export function IconEyeOff({ className }: Readonly<{ className?: string }>) {
   );
 }
 
-/* ---- Chrome glyphs a primitive must not render as text (`✕`, `▶`): Manrope lacks them, so they fall back to
+/* ---- Chrome glyphs a primitive must not render as text (`✕`, `▶`): the body face lacks them, so they fall back to
    a system face or emoji. ---- */
 
 /** Dismiss. Always paired with an accessible name on the control that holds it. */

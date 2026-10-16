@@ -315,9 +315,8 @@
   margin-top: var(--space-2);
 }
 
-/* Panel material on a backing layer, never the element, because `clip-path` clips hit-testing and
-   the summary is the control. Rim and bezel but no scanline: `.api-reference` only renders inside
-   `.settings-group--table`, which already has one, and nested scanlines cause moiré. */
+/* Panel material on a backing layer behind the content, since the summary is the control. The edge but
+   no lip: `.api-reference` only renders inside `.settings-group--table`, which already has one. */
 .api-reference {
   position: relative;
   isolation: isolate;
@@ -332,7 +331,6 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
   border: var(--rim-w) solid var(--rim-color);
   background: var(--material-fill);
   background-origin: border-box;

@@ -6,7 +6,7 @@
 /* Same font as `.nh-field-label` so a labeled Stepper's label occupies the identical band in a form row. */
 .nh-stepper-label {
   color: var(--text-dim);
-  font: 600 var(--fs-sm) / 1.3 var(--font-body);
+  font: 600 var(--fs-sm) / 1.3 var(--font-label);
 }
 /* A visible label stacks above the control so the −/+ group lines up with neighbouring input wells. The unlabeled
    form (aria-label only, e.g. the ability steppers) stays inline. */

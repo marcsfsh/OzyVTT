@@ -173,7 +173,7 @@ export function FightMenu({
                   : { visibility: "hidden" }
               }
             >
-              {/* The frame does not scroll; this body does. `.encounter-menu::before` (plate, rim, chamfer)
+              {/* The frame does not scroll; this body does. `.encounter-menu::before` (plate and edge)
               is `inset: -1px`, so if the menu itself scrolled the plate would scroll away with the
               content. `role="none"` keeps the wrapper out of the menu's accessibility tree. */}
               <div ref={menuBodyRef} className="encounter-menu-body scroll-y" role="none">

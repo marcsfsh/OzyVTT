@@ -125,9 +125,8 @@
   font-size: 0.74rem;
 }
 
-/* Panel material on a backing layer, never the element, because `clip-path` clips hit-testing. The
-   tray keeps the panel rim but no scanline: both of its hosts already paint one, and nested
-   scanlines interfere. */
+/* Panel material on a backing layer behind the content. The tray keeps the panel edge but no lip:
+   both of its hosts already paint one, and a lip marks the outermost panel only. */
 .staging-tray {
   position: relative;
   isolation: isolate;
@@ -141,7 +140,6 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
   border: var(--rim-w) solid var(--rim-color);
   background: var(--material-fill);
   background-origin: border-box;

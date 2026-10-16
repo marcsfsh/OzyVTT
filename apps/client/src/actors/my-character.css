@@ -54,7 +54,7 @@
 }
 .my-character-hp {
   color: var(--cyan-hi);
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-variant-numeric: tabular-nums;
   font-size: 0.85rem;
   font-weight: 700;
@@ -143,7 +143,7 @@ button.my-character-party-row:hover {
 }
 .party-sheet-stats dd {
   margin: 0;
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-variant-numeric: tabular-nums;
   font-size: 1.05rem;
   font-weight: 700;
@@ -173,7 +173,7 @@ button.my-character-party-row:hover {
 }
 .party-sheet-mod {
   color: var(--cyan-hi);
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-size: 0.85rem;
   font-weight: 700;
 }

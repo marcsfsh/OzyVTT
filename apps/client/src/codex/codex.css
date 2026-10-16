@@ -213,12 +213,13 @@
 }
 .codex-hit-kind {
   flex: none;
-  font-family: var(--font-display);
+  font-family: var(--font-label);
+  font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 .codex-hit-tag {
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -276,7 +277,8 @@
   border: none;
   background: transparent;
   cursor: pointer;
-  font-family: var(--font-display);
+  font-family: var(--font-label);
+  font-weight: 700;
   font-size: var(--fs-2xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -312,7 +314,7 @@
   white-space: nowrap;
 }
 .codex-tree-count {
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-size: var(--fs-2xs);
   color: var(--text-muted);
 }
@@ -465,7 +467,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-1);
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-size: var(--fs-2xs);
   color: var(--text-muted);
 }
@@ -716,7 +718,8 @@
 }
 
 .codex-backlinks-title {
-  font-family: var(--font-display);
+  font-family: var(--font-label);
+  font-weight: 700;
   font-size: var(--fs-2xs);
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -748,7 +751,8 @@
   gap: var(--space-2);
 }
 .codex-connections-sub {
-  font-family: var(--font-display);
+  font-family: var(--font-label);
+  font-weight: 700;
   font-size: var(--fs-2xs);
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -824,7 +828,7 @@
   font-size: var(--fs-sm);
 }
 .codex-page-timeline-meta {
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-size: 11px;
   color: var(--text-muted);
   white-space: nowrap;
@@ -945,7 +949,7 @@
   color: var(--text-muted);
 }
 .codex-now-chip {
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-size: var(--fs-2xs);
   color: var(--cyan);
   background: color-mix(in srgb, var(--cyan) 14%, transparent);
@@ -958,7 +962,7 @@
   text-overflow: ellipsis;
 }
 .codex-timeline-now {
-  font-family: var(--font-mono);
+  font-family: var(--font-label);
   font-size: var(--fs-2xs);
   letter-spacing: 0.06em;
   color: var(--cyan);
@@ -1042,7 +1046,8 @@
   gap: var(--space-3);
 }
 .codex-campaign-h {
-  font-family: var(--font-display);
+  font-family: var(--font-label);
+  font-weight: 700;
   font-size: var(--fs-2xs);
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -1112,7 +1117,7 @@
   color: var(--text);
 }
 .codex-tag-count {
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-size: var(--fs-2xs);
   color: var(--text-muted);
 }
@@ -1143,7 +1148,7 @@
 }
 .codex-campaign-recentwhen {
   flex: none;
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-size: var(--fs-2xs);
   color: var(--text-muted);
   white-space: nowrap;
@@ -1200,7 +1205,7 @@
 .codex-campaign-questprogress,
 .codex-campaign-deadlinewhen {
   flex: none;
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-size: var(--fs-2xs);
   color: var(--text-dim);
   white-space: nowrap;
@@ -1234,7 +1239,7 @@
 }
 .codex-campaign-standingvalue {
   flex: none;
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-size: var(--fs-2xs);
   color: var(--text-dim);
   white-space: nowrap;
@@ -1397,7 +1402,8 @@
 }
 .codex-quest-subhead {
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-label);
+  font-weight: 700;
   font-size: var(--fs-2xs);
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -1405,7 +1411,7 @@
 }
 /* A readout in words, never a bare "2/5". */
 .codex-quest-progress {
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-size: var(--fs-2xs);
   color: var(--text-dim);
 }
@@ -1536,7 +1542,7 @@
 .codex-graph-edgelabel {
   fill: var(--text-dim);
   font-size: 9px;
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   pointer-events: none;
 }
 .codex-graph-node {
@@ -1652,7 +1658,7 @@
 }
 .codex-revision-when {
   color: var(--text-muted);
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-size: var(--fs-xs);
 }
 
@@ -1778,7 +1784,8 @@
   border: none;
   color: var(--cyan);
   cursor: pointer;
-  font-family: var(--font-display);
+  font-family: var(--font-label);
+  font-weight: 700;
   font-size: var(--fs-sm);
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
@@ -1808,7 +1815,7 @@
   margin-top: calc(-1 * var(--space-1));
 }
 .codex-descend-label {
-  font-family: var(--font-mono);
+  font-family: var(--font-label);
   font-size: var(--fs-2xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -1824,7 +1831,8 @@
   border: 1px solid var(--line);
   color: var(--text);
   cursor: pointer;
-  font-family: var(--font-display);
+  font-family: var(--font-label);
+  font-weight: 700;
   font-size: var(--fs-sm);
   padding: var(--space-1) var(--space-3);
   border-radius: 0;
@@ -1945,7 +1953,8 @@
   stroke: var(--void);
   stroke-width: 3px;
   stroke-linejoin: round;
-  font-family: var(--font-display);
+  font-family: var(--font-label);
+  font-weight: 700;
 }
 /* The party ring is a scanning aid only; the "The party is here" label and the `<title>` carry the meaning. */
 .codex-marker-partyring {
@@ -1961,7 +1970,8 @@
   stroke: var(--void);
   stroke-width: 3px;
   stroke-linejoin: round;
-  font-family: var(--font-display);
+  font-family: var(--font-label);
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -2333,7 +2343,7 @@
 }
 .codex-entry-when {
   color: var(--text-muted);
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-size: var(--fs-xs);
 }
 .codex-entry-title {
@@ -2365,7 +2375,7 @@
   list-style: none;
 }
 .codex-entry-tags .nh-badge {
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
 }
 /* The footer wraps on a phone; 12px gaps keep stacked small-button ::after hit areas from overlapping. */
 .codex-entry-foot {
@@ -2501,7 +2511,7 @@
   gap: var(--space-2);
 }
 .codex-standing-delta {
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-size: var(--fs-2xs);
   color: var(--text-muted);
 }
@@ -2543,7 +2553,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-family: var(--font-display);
+  font-family: var(--font-label);
+  font-weight: 700;
   font-size: var(--fs-2xs);
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -2555,7 +2566,7 @@
 }
 /* Says "not read" when a category didn't arrive, so it never looks empty. */
 .codex-audit-sectioncount {
-  font-family: var(--font-mono);
+  font-family: var(--font-label);
   font-size: var(--fs-2xs);
   color: var(--text-dim);
   text-transform: none;
@@ -3143,7 +3154,7 @@
   padding: var(--space-1);
   text-align: center;
   color: var(--text-muted);
-  font: 700 var(--fs-2xs) / 1.2 var(--font-mono);
+  font: 700 var(--fs-2xs) / 1.2 var(--font-label);
   letter-spacing: var(--tracking-eyebrow);
   text-transform: uppercase;
 }
@@ -3185,7 +3196,7 @@
   border-color: var(--magenta);
 }
 .codex-calendar-daynum {
-  font: 600 var(--fs-sm) / 1 var(--font-mono);
+  font: 600 var(--fs-sm) / 1 var(--font-numeric);
   color: var(--text);
 }
 .codex-calendar-marks {
@@ -3292,7 +3303,7 @@
   gap: var(--space-4);
 }
 .codex-tagview-h {
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
 }
 
 /* The Atlas pin filter, and the pins it dims. */
@@ -3442,9 +3453,8 @@
   color: var(--codex-type);
 }
 
-/* Panel material: chamfer, rim and fill on a `::before` backing layer, never the element, because
-   `clip-path` would also clip hit-testing. Outermost panels take the texture; nested ones a flat plate.
-   Never put it on a scroller: the layer would scroll with the content. */
+/* Panel material: edge and fill on a `::before` backing layer behind the content. Outermost panels take the
+   chrome lip; nested ones a flat plate. Never put it on a scroller: the layer would scroll with the content. */
 .codex-sidebar,
 .codex-rail,
 .codex-main-empty,
@@ -3498,7 +3508,6 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
   border: var(--rim-w) solid var(--rim-color);
   background: var(--material-fill);
   background-origin: border-box;
@@ -3521,7 +3530,7 @@
 .codex-calendar-day,
 .codex-downtime-section,
 .codex-pindetails {
-  --material-fill: var(--material-scanline), var(--material-plate);
+  --material-fill: var(--material-lip), var(--material-plate);
 }
 /* Nested: rim and bezel over a flat plate, no texture. */
 .codex-campaign-typecard,

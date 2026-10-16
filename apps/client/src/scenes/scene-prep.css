@@ -157,8 +157,8 @@
   }
 }
 
-/* Panel material on a backing layer, never the element, because `clip-path` clips hit-testing. The
-   Recent disclosure is nested, so rim + bezel and no texture. */
+/* Panel material on a backing layer behind the content. The Recent disclosure is nested, so the edge
+   over a flat plate and no lip. */
 .scene-prep-recent > summary {
   position: relative;
   isolation: isolate;
@@ -172,7 +172,6 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
   border: var(--rim-w) solid var(--rim-color);
   background: var(--material-fill);
   background-origin: border-box;
