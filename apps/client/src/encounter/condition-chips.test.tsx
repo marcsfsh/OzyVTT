@@ -145,4 +145,22 @@ describe("an effect chip", () => {
     expect(sent().at(-1)?.[0]).toBe("effect:end");
     expect(sent().at(-1)?.[1]).toMatchObject({ actorId: ACTOR, effectId: "e2" });
   });
+
+  it("shows the GM what an effect deals at the start of a turn", async () => {
+    render(
+      <EffectChips
+        actorId={ACTOR}
+        effects={[
+          {
+            ...effect({ name: "Blinded by Behir (Swallow)", linkedConditionIds: ["blinded"], escapeDc: null }),
+            ongoingDamage: { damage: [{ formula: "6d6", type: "acid" }], at: "source-turn-start" }
+          }
+        ]}
+        canEnd
+        onFeedback={() => {}}
+      />
+    );
+    await userEvent.click(screen.getByRole("button", { name: /Blinded by Behir/ }));
+    expect(screen.getByText("6d6 Acid at the start of each of its source's turns")).toBeTruthy();
+  });
 });

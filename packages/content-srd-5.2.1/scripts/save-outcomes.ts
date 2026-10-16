@@ -4,7 +4,13 @@
  * each turn, the grapple's escape DC, taking damage). Each reader covers one printing style, the override
  * table holds the reviewed cases a reader gets wrong, and `test/save-outcomes.test.ts` pins known ones.
  */
-import { SaveConditionSchema, type SaveCondition, type SaveFailureDuration } from "@vtt/schemas";
+import {
+  DamageTypeSchema,
+  SaveConditionSchema,
+  type OngoingDamage,
+  type SaveCondition,
+  type SaveFailureDuration
+} from "@vtt/schemas";
 
 export type SaveOutcome = {
   successDamage: "half" | "none";
@@ -16,6 +22,7 @@ export type SaveOutcome = {
   speedZero?: true;
   rangeFeet?: number;
   failsAtHitPoints?: number;
+  ongoingDamage?: OngoingDamage;
 };
 
 const CONDITIONS: ReadonlySet<string> = new Set(SaveConditionSchema.options);
@@ -87,19 +94,58 @@ function repeatsEachTurn(clause: string): boolean {
 const ENDS_ON_DAMAGE =
   /\bif it takes (?:any )?damage\b|\buntil it takes damage\b|\bends early if the target takes (?:any )?damage\b|\bends for the target if it takes damage\b|\bIf it takes any damage\b/;
 
+const DICE = String.raw`\d+ \((\d+d\d+(?: [+-] \d+)?)\) ([A-Z][a-z]+) damage`;
+/** "takes 21 (6d6) Acid damage at the start of each of the behir's turns", one or two typed terms. */
+const ONGOING_DAMAGE = new RegExp(
+  String.raw`\btakes ${DICE}(?: plus ${DICE})? at the start of each of (its|the [A-Za-z' -]+?(?:'s|s')) turns\b`
+);
+
+/**
+ * Damage the failure's conditions bring at the start of each turn while they last: on the target's turns ("each of
+ * its turns") or the source's ("each of the behir's turns"). Damage at the end of a turn, or on a hit-point
+ * threshold, is left to the GM.
+ */
+function ongoingDamageOf(clause: string): OngoingDamage | undefined {
+  const match = clause.match(ONGOING_DAMAGE);
+  if (!match) return undefined;
+  const damage = [
+    [match[1], match[2]],
+    [match[3], match[4]]
+  ].flatMap(([formula, type]) => {
+    const parsed = DamageTypeSchema.safeParse(type?.toLowerCase());
+    return formula && parsed.success ? [{ formula, type: parsed.data }] : [];
+  });
+  if (damage.length === 0) return undefined;
+  return { damage, at: match[5] === "its" ? "bearer-turn-start" : "source-turn-start" };
+}
+
+/** The reminder text without the ongoing damage the engine now deals: the clause is cut from its sentence, and a
+ *  sentence that was only that damage goes. Null when nothing is left to remind. */
+export function withoutOngoingDamage(text: string): string | null {
+  const clause = new RegExp(String.raw`,? and (?:it )?${ONGOING_DAMAGE.source.replace(/^\\b/, "")}`);
+  const kept = text.split(/(?<=\.)\s+/).flatMap((sentence) => {
+    if (!ONGOING_DAMAGE.test(sentence)) return [sentence];
+    const cut = sentence.replace(clause, "");
+    return cut === sentence ? [] : [cut];
+  });
+  return kept.length > 0 ? kept.join(" ") : null;
+}
+
 /** Everything a failure clause says about its conditions' lifetime. */
 function failureLifetime(clause: string, first: readonly SaveCondition[]): Omit<SaveOutcome, "successDamage"> {
   const failureConditions = [...new Set([...first, ...companionConditions(clause, first)])].slice(0, 4);
   if (failureConditions.length === 0) return { failureConditions };
   const escape = first.includes("grappled") ? clause.match(/\(escape DC (\d+)\)/) : null;
   const duration = failureDurationOf(clause);
+  const ongoing = ongoingDamageOf(clause);
   return {
     failureConditions,
     ...(duration ? { failureDuration: duration } : {}),
     ...(repeatsEachTurn(clause) ? { repeatSave: true as const } : {}),
     ...(escape ? { escapeDc: Number.parseInt(escape[1]!, 10) } : {}),
     ...(ENDS_ON_DAMAGE.test(clause) ? { endsOnDamage: true as const } : {}),
-    ...(/\ba Speed of 0\b/.test(clause) ? { speedZero: true as const } : {})
+    ...(/\ba Speed of 0\b/.test(clause) ? { speedZero: true as const } : {}),
+    ...(ongoing ? { ongoingDamage: ongoing } : {})
   };
 }
 

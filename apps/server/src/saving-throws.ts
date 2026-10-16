@@ -290,7 +290,8 @@ export function applyFailureEffect(
       ...(onFail.endsOnDamage ? { endsOnDamage: true } : {}),
       ...(onFail.speedZero ? { speedZero: true } : {}),
       ...(onFail.castId !== undefined ? { castId: onFail.castId } : {}),
-      ...(onFail.rangeFeet !== undefined ? { rangeFeet: onFail.rangeFeet } : {})
+      ...(onFail.rangeFeet !== undefined ? { rangeFeet: onFail.rangeFeet } : {}),
+      ...(onFail.ongoingDamage ? { ongoingDamage: onFail.ongoingDamage } : {})
     }),
     events,
     immunities

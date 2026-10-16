@@ -243,7 +243,9 @@ export const PendingSaveSchema = z
          * once that has ended. */
         castId: z.string().min(1).max(120).optional(),
         /** The action it came from, so a second hit from the same action refreshes rather than stacks. */
-        sourceActionId: z.string().max(120).optional()
+        sourceActionId: z.string().max(120).optional(),
+        /** Damage the effect deals at the start of a turn while it lasts (a swallow's acid). */
+        ongoingDamage: EffectInstanceSchema.shape.ongoingDamage
       })
       .strict()
       .optional(),

@@ -161,8 +161,9 @@ and reactions, the action economy, release); builtin actions such as Hide and th
 add their special cases through the handler table in `resolution/builtins.ts`. Every condition
 write goes through `applyCondition` in `effects.ts`, which honours innate and item-granted
 immunities and runs what gaining a condition sets off (an Incapacitated creature drops its
-Concentration and its grapples). Effects end by their duration at turn start and turn end, and the
-end of a turn opens any repeat saves (`turn-boundaries.ts`).
+Concentration and its grapples). Effects end by their duration at turn start and turn end; the
+start of a turn deals any ongoing damage, and the end opens any repeat saves
+(`turn-boundaries.ts`).
 
 Bonuses, advantage, extra damage and defences are modifiers in one vocabulary (`ModifierSchema` in
 `packages/schemas`), shared by features, feats, chosen options, magic items and live effects, and

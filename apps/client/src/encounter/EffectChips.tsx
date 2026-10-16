@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { type PlayerEffect } from "@vtt/domain";
+import { type EffectInstance, type PlayerEffect } from "@vtt/domain";
 import { Button, Chip } from "@vtt/ui";
 import { command } from "../lib/command";
 import { newId } from "../lib/ids";
 import "./effect-chips.css";
 
-type ChipEffect = PlayerEffect & { escapeDc?: number | null };
+/** The GM's copy also carries the ongoing damage dice, which players never receive. */
+type ChipEffect = PlayerEffect & { escapeDc?: number | null; ongoingDamage?: EffectInstance["ongoingDamage"] };
 
 /** How long an effect has left, in the table's words. */
 export function effectDurationLabel(effect: Pick<PlayerEffect, "duration">): string {
@@ -36,6 +37,20 @@ function endingNotes(effect: ChipEffect): string[] {
   if (effect.escapeDc) notes.push(`escape DC ${effect.escapeDc}`);
   if (effect.endsOnDamage) notes.push("ends on taking damage");
   return notes;
+}
+
+const capitalised = (type: string) => (type.length > 0 ? `${type[0].toUpperCase()}${type.slice(1)}` : type);
+
+/** What it deals at the start of a turn while it lasts ("6d6 Acid at the start of each of its source's turns"). */
+function ongoingDamageNote(effect: ChipEffect): string | null {
+  const ongoing = effect.ongoingDamage;
+  if (!ongoing) return null;
+  const dice = ongoing.damage.map((part) => `${part.formula} ${capitalised(part.type)}`).join(" + ");
+  const when = ongoing.at === "bearer-turn-start" ? "its turns" : "its source's turns";
+  const save = ongoing.saveToEnd
+    ? `, then a ${ongoing.saveToEnd.ability.toUpperCase()} save DC ${ongoing.saveToEnd.dc} that ends it`
+    : "";
+  return `${dice} at the start of each of ${when}${save}`;
 }
 
 /**
@@ -106,6 +121,7 @@ export function EffectChips({
             {effectDurationLabel(open)}
             {endingNotes(open).length > 0 ? ` · ${endingNotes(open).join(" · ")}` : ""}
           </p>
+          {ongoingDamageNote(open) && <p className="effect-detail-line">{ongoingDamageNote(open)}</p>}
           <div className="effect-detail-actions">
             {canEnd || open.yours ? (
               <Button size="sm" variant="secondary" disabled={busy} onClick={() => end(open.id, open.name)}>

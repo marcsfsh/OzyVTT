@@ -191,4 +191,33 @@ describe("save outcomes in the shipped content", () => {
     // A rider that waits on a charge stays prose.
     expect(monsterAction("elk", "ram").onHit).toBeUndefined();
   });
+
+  it("reads damage a failure brings at the start of each turn, and leaves it out of the GM's reminder", () => {
+    expect(monsterAction("behir", "swallow")).toMatchObject({
+      save: {
+        failureConditions: ["blinded", "restrained"],
+        ongoingDamage: { damage: [{ formula: "6d6", type: "acid" }], at: "source-turn-start" }
+      },
+      reminder:
+        "While swallowed, a creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the behir."
+    });
+    expect(monsterAction("remorhaz", "swallow").save?.ongoingDamage?.damage).toEqual([
+      { formula: "3d6", type: "acid" },
+      { formula: "3d6", type: "fire" }
+    ]);
+    expect(monsterAction("pit-fiend", "bite")).toMatchObject({
+      save: {
+        failureConditions: ["poisoned"],
+        repeatSave: true,
+        ongoingDamage: { damage: [{ formula: "6d6", type: "poison" }], at: "bearer-turn-start" }
+      },
+      reminder:
+        "While Poisoned, the target can't regain Hit Points, and it repeats the save at the end of each of its turns, ending the effect on itself on a success."
+    });
+    // A reminder that was only the damage goes.
+    expect(monsterAction("vrock", "spores").save?.ongoingDamage?.at).toBe("bearer-turn-start");
+    expect(monsterAction("vrock", "spores").reminder).toBeUndefined();
+    // Losing hit points is not damage, and with no condition there is nothing for it to last with.
+    expect(monsterAction("horned-devil", "infernal-tail").save).not.toHaveProperty("ongoingDamage");
+  });
 });

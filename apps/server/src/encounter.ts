@@ -12,7 +12,7 @@ import { aggregateRollMode } from "@vtt/rules-5e";
 import { deriveEquipment, rollModeClaims, type EquipmentCatalog } from "./equipment-derivation.js";
 import { effectiveActions } from "./effective-actions.js";
 import { expireEffectsAtTurnStart, type EffectNarration } from "./effects.js";
-import { endOfTurn } from "./turn-boundaries.js";
+import { endOfTurn, startOfTurn } from "./turn-boundaries.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 import { conditionLabel, exhaustionPenalty, incapacitatingCondition } from "./condition-rules.js";
 
@@ -460,8 +460,8 @@ function settleGatherIfComplete(state: GameState) {
   state.combat = { ...state.combat, turnActorId: top, round: 1, turn: { ...EMPTY_TURN } };
 }
 
-/** Dependencies for start-of-turn recharge rolls and end-of-turn repeat saves; optional so scene bookkeeping can
- *  advance turns without them. */
+/** Dependencies for start-of-turn recharge rolls and ongoing damage and end-of-turn repeat saves; optional so scene
+ *  bookkeeping can advance turns without them. */
 export type TurnAdvanceDeps = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
   /** The item catalog, so an item's recharge pool re-arms like a stat block's. */
@@ -544,7 +544,12 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   // The incoming actor's durations tick: Reckless ends, Rage counts down (ADR-0020).
   const expiry = expireEffectsAtTurnStart(state, nextActorId);
   events?.push(...expiry);
-  if (deps) rollRecharges(state, nextActorId, deps, events);
+  if (!deps) return;
+  // Then what lands at the start of its turn: a swallow's acid, Searing Smite's fire.
+  const starting: EffectNarration[] = [];
+  startOfTurn(state, nextActorId, starting, deps);
+  events?.push(...starting);
+  rollRecharges(state, nextActorId, deps, events);
 }
 
 export function previousInitiativeTurn(state: GameState) {

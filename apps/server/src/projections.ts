@@ -168,6 +168,7 @@ const PENDING_SAVE_FIELDS = {
 } as const satisfies Record<keyof PendingSave, FieldAudience>;
 
 // How long what a failure imposes would last is the save's own text, read on the prompt by the one who owes it.
+// Its ongoing damage dice are the stat block's, so they stay with the GM; the damage itself shows when it lands.
 const ON_FAIL_EFFECT_FIELDS = {
   tags: "player",
   linkedConditionIds: "player",
@@ -182,7 +183,8 @@ const ON_FAIL_EFFECT_FIELDS = {
   sourceName: "derived",
   sourceActorId: "derived",
   castId: "never",
-  sourceActionId: "never"
+  sourceActionId: "never",
+  ongoingDamage: "never"
 } as const satisfies Record<keyof NonNullable<PendingSave["onFailEffect"]>, FieldAudience>;
 
 const PENDING_REACTION_FIELDS = {
@@ -325,15 +327,21 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
   };
 }
 
-/** An effect as players see it: no source or cast ids, and a hidden source masked in both `sourceName` and `name`.
- *  `yours` marks one the viewer's own character is the source of, which they may end (their grapple, their
- *  Concentration); a hidden source is never a player's character, so the flag says nothing about one. */
+/** An effect as players see it: no source or cast ids or ongoing damage dice, and a hidden source masked in both
+ *  `sourceName` and `name`. `yours` marks one the viewer's own character is the source of, which they may end (their
+ *  grapple, their Concentration); a hidden source is never a player's character, so the flag says nothing about one. */
 function playerEffect(
   effect: GameState["actors"][number]["effects"][number],
   publicActorIds: ReadonlySet<string>,
   yourActorIds: ReadonlySet<string> = new Set()
 ): PlayerEffect {
-  const { sourceActorId, sourceActionId: _sourceActionId, castId: _castId, ...visible } = effect;
+  const {
+    sourceActorId,
+    sourceActionId: _sourceActionId,
+    castId: _castId,
+    ongoingDamage: _ongoingDamage,
+    ...visible
+  } = effect;
   const yours = sourceActorId !== null && yourActorIds.has(sourceActorId) ? { yours: true as const } : {};
   if (!isHiddenSource(sourceActorId, publicActorIds)) return { ...visible, ...yours };
   return { ...visible, name: withoutSourceName(visible.name, effect.sourceName), sourceName: HIDDEN_SOURCE };

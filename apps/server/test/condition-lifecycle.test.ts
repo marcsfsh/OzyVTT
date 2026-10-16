@@ -6,6 +6,7 @@ import { resolveDefinitionAction, type ResolveDependencies } from "../src/action
 import { setCondition } from "../src/actor-conditions.js";
 import {
   addEffect,
+  endEffect,
   endEncounterEffects,
   makeEffect,
   releaseGrapplesOutOfRange,
@@ -19,6 +20,7 @@ import { currentSpeedFeet } from "../src/speed.js";
 import { deriveEquipment } from "../src/equipment-derivation.js";
 import { builtinAction } from "../src/builtin-actions.js";
 import { turnReminder } from "../src/turn-reminder.js";
+import { projectPlayerView } from "../src/projections.js";
 import { testCatalog } from "./catalog-records.js";
 
 // How conditions and effects end (SRD 5.2.1 Rules Glossary, conditions; Playing the Game, Concentration): every
@@ -586,6 +588,134 @@ describe("the fight's end and a long rest end only what they should", () => {
     applyRest(state, IDS.hero, "long", resolveDefinition);
     expect(actor(state, IDS.hero).effects).toEqual([]);
     expect(conditionIds(state, IDS.hero)).toEqual(["prone"]);
+  });
+});
+
+describe("damage an effect deals at the start of a turn", () => {
+  /** The foe's `actionId` lands on the hero through a failed save. */
+  function failed(state: GameState, slug: string, actionId: string) {
+    setTurn(state, IDS.foe);
+    resolveDefinitionAction(
+      state,
+      monsterAction(slug, actionId),
+      { actorId: IDS.foe, targetIds: [IDS.hero], commandId: nextId() },
+      resolveDeps([], slug)
+    );
+    answer(state, IDS.hero, 1);
+  }
+  /** The next turn, its dice from `faces`. */
+  const advanceRolling = (state: GameState, faces: number[]) => {
+    const events: EffectNarration[] = [];
+    nextInitiativeTurn(state, events, { ...turnDeps, rollDie: () => faces.shift() ?? 1 });
+    return events;
+  };
+
+  it("a swallow's acid lands at the start of each of the swallower's turns, through the bearer's defences", () => {
+    const state = game("behir");
+    failed(state, "behir", "swallow");
+    const hero = actor(state, IDS.hero);
+    expect(hero.effects[0]).toMatchObject({
+      name: "Blinded by Foe (Swallow)",
+      ongoingDamage: { damage: [{ formula: "6d6", type: "acid" }], at: "source-turn-start" }
+    });
+    advanceRolling(state, [6, 6, 6, 6, 6, 6]); // the ally's turn
+    advanceRolling(state, [6, 6, 6, 6, 6, 6]); // the hero's own turn: not the swallower's
+    expect(hero.hp.current).toBe(30);
+    addEffect(
+      state,
+      IDS.hero,
+      makeEffect({
+        id: "ward",
+        name: "Acid ward",
+        duration: { type: "manual" },
+        modifiers: [{ type: "damage-resistance", damageTypes: ["acid"] }]
+      })
+    );
+    const events = advanceRolling(state, [1, 2, 3, 4, 5, 6]); // the behir's turn: 21 acid, halved
+    expect(hero.hp.current).toBe(20);
+    expect(events.map((event) => event.text)).toContain(
+      "Hero takes 10 Acid damage from Blinded by Foe (Swallow) (21 acid → 10, resistance: Acid ward)."
+    );
+    // Ended, it deals nothing more.
+    endEffect(state, IDS.hero, hero.effects[0].id);
+    advanceRolling(state, []);
+    advanceRolling(state, []);
+    advanceRolling(state, [6, 6, 6, 6, 6, 6]);
+    expect(hero.hp.current).toBe(20);
+  });
+
+  it("poison at the start of the bearer's own turns, until its repeated save ends it", () => {
+    const state = game("vrock");
+    failed(state, "vrock", "spores");
+    const hero = actor(state, IDS.hero);
+    advanceRolling(state, [9]); // the ally's turn
+    expect(hero.hp.current).toBe(30);
+    const starting = advanceRolling(state, [7]); // the hero's turn starts
+    expect(hero.hp.current).toBe(23);
+    expect(starting.map((event) => event.text)).toContain(
+      "Hero takes 7 Poison damage from Poisoned by Foe (Spores (Recharge 6))."
+    );
+    advanceRolling(state, []); // the hero's turn ends: the repeated save opens
+    answer(state, IDS.hero, 20);
+    expect(hero.effects).toEqual([]);
+    advanceRolling(state, []);
+    advanceRolling(state, [9]);
+    expect(hero.hp.current).toBe(23);
+  });
+
+  it("a source at 0 HP has no turns to deal it on", () => {
+    const state = game("behir");
+    failed(state, "behir", "swallow");
+    actor(state, IDS.foe).hp.current = 0;
+    advanceRolling(state, []);
+    advanceRolling(state, []);
+    advanceRolling(state, [6, 6, 6, 6, 6, 6]);
+    expect(actor(state, IDS.hero).hp.current).toBe(30);
+  });
+
+  it("a save that follows the damage ends the effect on a success (Searing Smite)", () => {
+    const state = game();
+    addEffect(
+      state,
+      IDS.foe,
+      makeEffect({
+        id: "searing",
+        name: "Searing Smite",
+        sourceActorId: IDS.hero,
+        sourceName: "Hero",
+        duration: { type: "rounds", remaining: 10 },
+        ongoingDamage: {
+          damage: [{ formula: "2d6", type: "fire" }],
+          at: "bearer-turn-start",
+          saveToEnd: { ability: "con", dc: 13 }
+        }
+      })
+    );
+    const events = advanceRolling(state, [3, 4]); // the foe's turn starts
+    expect(actor(state, IDS.foe).hp.current).toBe(33);
+    expect(events.map((event) => event.text)).toEqual(
+      expect.arrayContaining([
+        "Foe takes 7 Fire damage from Searing Smite.",
+        "Foe makes the CON save against Searing Smite (DC 13); a success ends it."
+      ])
+    );
+    answer(state, IDS.foe, 5);
+    expect(actor(state, IDS.foe).effects).toHaveLength(1);
+    advanceRolling(state, []);
+    advanceRolling(state, []);
+    advanceRolling(state, [1, 1]);
+    expect(actor(state, IDS.foe).hp.current).toBe(31);
+    answer(state, IDS.foe, 15);
+    expect(actor(state, IDS.foe).effects).toEqual([]);
+  });
+
+  it("keeps the dice with the GM: players see the effect, not its ongoing damage", () => {
+    const state = game("behir");
+    failed(state, "behir", "swallow");
+    const view = projectPlayerView(state, IDS.session, () => null);
+    const effect = view.actors.find((entry) => entry.id === IDS.hero)!.effects[0];
+    expect(effect.name).toBe("Blinded by Foe (Swallow)");
+    expect(effect).not.toHaveProperty("ongoingDamage");
   });
 });
 

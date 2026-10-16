@@ -1005,7 +1005,7 @@ const preparing = (input: MutableInput, spellId: string): MutableInput => {
   return input;
 };
 
-describe("Paladin - a smite that needs Concentration starts it", () => {
+describe("Paladin - smites that outlast the hit", () => {
   it("Shining Smite gives the Paladin its Concentration, ends the one held before, and its mark ends with it", () => {
     const built = table(preparing(paladinInput(5), "shining-smite"));
     addEffect(
@@ -1033,6 +1033,25 @@ describe("Paladin - a smite that needs Concentration starts it", () => {
     // Dropping the Concentration ends the mark.
     endEffect(built.state, IDS.hero, built.hero.effects[0].id);
     expect(built.foe.effects.map((effect) => effect.name)).toEqual(["Sapped by Bree"]);
+  });
+
+  it("Searing Smite keeps burning: its slot's dice at the start of each of the target's turns, then the spell's save", () => {
+    const built = table(preparing(paladinInput(5), "searing-smite"));
+    const result = swing(built, "item-longsword", [19, 4, 2, 2, 2, 2], {
+      hitOptions: [{ id: "spell-searing-smite", slotLevel: 2 }]
+    });
+    const dc = actionOf(built, "spell-searing-smite")!.save!.dc;
+    expect(built.foe.effects.find((effect) => effect.name === "Searing Smite")).toMatchObject({
+      sourceActorId: IDS.hero,
+      duration: { type: "rounds", remaining: 10 },
+      ongoingDamage: {
+        damage: [{ formula: "2d6", type: "fire" }],
+        at: "bearer-turn-start",
+        saveToEnd: { ability: "con", dc }
+      }
+    });
+    // The engine runs it, so it is no longer a note for the table.
+    expect(result.warnings ?? []).not.toContainEqual(expect.stringMatching(/^Searing Smite:/));
   });
 });
 

@@ -456,7 +456,9 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "save.speedZero": "The failure also makes the target's Speed 0 while its conditions last (Hypnotic Pattern)",
     "save.rangeFeet": "The save's reach: a grapple it imposes ends once a move takes the two farther apart",
     "save.failsAtHitPoints":
-      "No save when it lands: a target with this many hit points or fewer has the failure outright and only the repeated save ends it (Power Word Stun)"
+      "No save when it lands: a target with this many hit points or fewer has the failure outright and only the repeated save ends it (Power Word Stun)",
+    "save.ongoingDamage":
+      "Damage the failure's conditions bring at the start of each turn while they last, rolled and applied by the engine: on the target's own turns (bearer-turn-start) or the source's (source-turn-start, a swallow's acid)"
   },
   FeatureAttack: {
     "": 'An attack a FEATURE grants. Same vocabulary as a stat block\'s attack except the to-hit bonus is DERIVED: the feature names the ability (or "spellcasting") and the builder resolves the number.'

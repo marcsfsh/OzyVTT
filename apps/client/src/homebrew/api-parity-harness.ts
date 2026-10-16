@@ -442,7 +442,8 @@ const SAVE_LIFETIME_KEYS = [
   "endsOnDamage",
   "speedZero",
   "rangeFeet",
-  "failsAtHitPoints"
+  "failsAtHitPoints",
+  "ongoingDamage.**"
 ] as const;
 
 /** The exemption table. First match wins, so specific rows sit above general ones. */

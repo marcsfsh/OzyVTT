@@ -7417,10 +7417,19 @@
      "failureConditions": [
       "blinded",
       "restrained"
-     ]
+     ],
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "6d6",
+        "type": "acid"
+       }
+      ],
+      "at": "source-turn-start"
+     }
     },
     "damage": [],
-    "reminder": "While swallowed, a creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the behir, and takes 21 (6d6) Acid damage at the start of each of the behir's turns."
+    "reminder": "While swallowed, a creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the behir."
    },
    {
     "id": "bite",
@@ -15660,7 +15669,16 @@
      "successDamage": "half",
      "failureConditions": [
       "restrained"
-     ]
+     ],
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "3d6",
+        "type": "acid"
+       }
+      ],
+      "at": "source-turn-start"
+     }
     },
     "damage": [
      {
@@ -15668,7 +15686,7 @@
       "type": "acid"
      }
     ],
-    "reminder": "An engulfed target is suffocating, can't cast spells with a Verbal component, has the Restrained condition, and takes 10 (3d6) Acid damage at the start of each of the cube's turns."
+    "reminder": "An engulfed target is suffocating, can't cast spells with a Verbal component, has the Restrained condition."
    }
   ],
   "token": {
@@ -24295,7 +24313,16 @@
      "failureConditions": [
       "grappled"
      ],
-     "escapeDc": 13
+     "escapeDc": 13,
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "2d6",
+        "type": "thunder"
+       }
+      ],
+      "at": "source-turn-start"
+     }
     },
     "damage": [
      {
@@ -24303,7 +24330,7 @@
       "type": "thunder"
      }
     ],
-    "reminder": "Until the grapple ends, the target can't cast spells with a Verbal component and takes 7 (2d6) Thunder damage at the start of each of the stalker's turns."
+    "reminder": "Until the grapple ends, the target can't cast spells with a Verbal component."
    }
   ],
   "token": {
@@ -25136,7 +25163,16 @@
      "successDamage": "none",
      "failureConditions": [
       "restrained"
-     ]
+     ],
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "7d6",
+        "type": "acid"
+       }
+      ],
+      "at": "bearer-turn-start"
+     }
     },
     "damage": [
      {
@@ -25144,7 +25180,7 @@
       "type": "piercing"
      }
     ],
-    "reminder": "A swallowed creature has the Restrained condition, has Total Cover against attacks and other effects outside the kraken, and takes 24 (7d6) Acid damage at the start of each of its turns."
+    "reminder": "A swallowed creature has the Restrained condition, has Total Cover against attacks and other effects outside the kraken."
    }
   ],
   "token": {
@@ -30398,7 +30434,16 @@
       "type": "rounds",
       "rounds": 10
      },
-     "repeatSave": true
+     "repeatSave": true,
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "6d6",
+        "type": "poison"
+       }
+      ],
+      "at": "bearer-turn-start"
+     }
     },
     "damage": [
      {
@@ -30406,7 +30451,7 @@
       "type": "piercing"
      }
     ],
-    "reminder": "While Poisoned, the target can't regain Hit Points and takes 21 (6d6) Poison damage at the start of each of its turns, and it repeats the save at the end of each of its turns, ending the effect on itself on a success."
+    "reminder": "While Poisoned, the target can't regain Hit Points, and it repeats the save at the end of each of its turns, ending the effect on itself on a success."
    },
    {
     "id": "devilish-claw",
@@ -31554,10 +31599,19 @@
      "failureConditions": [
       "blinded",
       "restrained"
-     ]
+     ],
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "5d6",
+        "type": "acid"
+       }
+      ],
+      "at": "source-turn-start"
+     }
     },
     "damage": [],
-    "reminder": "A swallowed creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the worm, and takes 17 (5d6) Acid damage at the start of each of the worm's turns."
+    "reminder": "A swallowed creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the worm."
    },
    {
     "id": "bite",
@@ -32496,10 +32550,23 @@
      "failureConditions": [
       "blinded",
       "restrained"
-     ]
+     ],
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "3d6",
+        "type": "acid"
+       },
+       {
+        "formula": "3d6",
+        "type": "fire"
+       }
+      ],
+      "at": "source-turn-start"
+     }
     },
     "damage": [],
-    "reminder": "A swallowed creature has the Blinded and Restrained conditions, it has Total Cover against attacks and other effects outside the remorhaz, and it takes 10 (3d6) Acid damage plus 10 (3d6) Fire damage at the start of each of the remorhaz's turns."
+    "reminder": "A swallowed creature has the Blinded and Restrained conditions, it has Total Cover against attacks and other effects outside the remorhaz."
    }
   ],
   "token": {
@@ -34323,10 +34390,19 @@
       "restrained"
      ],
      "escapeDc": 14,
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "3d6",
+        "type": "lightning"
+       }
+      ],
+      "at": "bearer-turn-start"
+     },
      "rangeFeet": 5
     },
     "damage": [],
-    "reminder": "Until the grapple ends, the target has the Blinded and Restrained conditions, and it takes 10 (3d6) Lightning damage at the start of each of its turns."
+    "reminder": "Until the grapple ends, the target has the Blinded and Restrained conditions."
    }
   ],
   "token": {
@@ -37995,10 +38071,19 @@
      "failureConditions": [
       "blinded",
       "restrained"
-     ]
+     ],
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "16d6",
+        "type": "acid"
+       }
+      ],
+      "at": "source-turn-start"
+     }
     },
     "damage": [],
-    "reminder": "A swallowed creature has the Blinded and Restrained conditions and can't teleport, it has Total Cover against attacks and other effects outside the tarrasque, and it takes 56 (16d6) Acid damage at the start of each of the tarrasque's turns."
+    "reminder": "A swallowed creature has the Blinded and Restrained conditions and can't teleport, it has Total Cover against attacks and other effects outside the tarrasque."
    },
    {
     "id": "bite",
@@ -40115,10 +40200,18 @@
      "failureConditions": [
       "poisoned"
      ],
-     "repeatSave": true
+     "repeatSave": true,
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "1d10",
+        "type": "poison"
+       }
+      ],
+      "at": "bearer-turn-start"
+     }
     },
     "damage": [],
-    "reminder": "While Poisoned, the target takes 5 (1d10) Poison damage at the start of each of its turns.",
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -40835,7 +40928,16 @@
       "grappled",
       "restrained"
      ],
-     "escapeDc": 14
+     "escapeDc": 14,
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "2d8",
+        "type": "bludgeoning"
+       }
+      ],
+      "at": "source-turn-start"
+     }
     },
     "damage": [
      {
@@ -40843,7 +40945,7 @@
       "type": "bludgeoning"
      }
     ],
-    "reminder": "Until the grapple ends, the target has the Restrained condition, is suffocating unless it can breathe water, and takes 9 (2d8) Bludgeoning damage at the start of each of the elemental's turns.",
+    "reminder": "Until the grapple ends, the target has the Restrained condition, is suffocating unless it can breathe water.",
     "uses": {
      "limit": 1,
      "per": "recharge",

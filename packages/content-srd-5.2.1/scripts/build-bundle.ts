@@ -32,7 +32,8 @@ import {
   failureDurationOf,
   SPELL_SAVE_OVERRIDE_IDS,
   spellSaveOutcomeFor,
-  statBlockSaveOutcome
+  statBlockSaveOutcome,
+  withoutOngoingDamage
 } from "./save-outcomes.js";
 import { areaOfProse, withProseFacts } from "../src/action-prose.js";
 import { spellEffectFor } from "./spell-effects.js";
@@ -749,7 +750,20 @@ const monsters: ActorDefinition[] = creatures
       if (printed) report.printedAttackDamage += 1;
       // A save rider on an attack deals its damage through the hit, but may still deal more on later turns.
       const saveDamage = save ? printedSaveDamage(action.fields.desc) : null;
-      const reminder = fix?.reminder ?? saveDamage?.laterDamage ?? undefined;
+      // A reviewed failure the engine can't apply keeps only what a success does.
+      const saveOutcome = save
+        ? fix?.drop === "outcome"
+          ? { successDamage: statBlockSaveOutcome(action.fields.desc).successDamage, failureConditions: [] }
+          : statBlockSaveOutcome(action.fields.desc)
+        : null;
+      // Later-turn damage the engine deals itself (`ongoingDamage`) leaves the GM's reminder.
+      const laterDamage = saveDamage?.laterDamage ?? null;
+      const reminder =
+        fix?.reminder ??
+        (laterDamage !== null && saveOutcome && "ongoingDamage" in saveOutcome
+          ? withoutOngoingDamage(laterDamage)
+          : laterDamage) ??
+        undefined;
       const fromRows = row
         ? [
             ...(row.damage_die_count && row.damage_die_type
@@ -828,10 +842,7 @@ const monsters: ActorDefinition[] = creatures
               save: {
                 ability: ABILITY_BY_NAME[save[1] as keyof typeof ABILITY_BY_NAME],
                 dc: Number.parseInt(save[2], 10),
-                // A reviewed failure the engine can't apply keeps only what a success does.
-                ...(fix?.drop === "outcome"
-                  ? { successDamage: statBlockSaveOutcome(action.fields.desc).successDamage, failureConditions: [] }
-                  : statBlockSaveOutcome(action.fields.desc))
+                ...saveOutcome!
               }
             }
           : {}),

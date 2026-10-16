@@ -524,6 +524,19 @@ export const SaveFailureDurationSchema = z.discriminatedUnion("type", [
 ]);
 export type SaveFailureDuration = z.infer<typeof SaveFailureDurationSchema>;
 
+/** Damage a lasting effect deals at the start of a turn while it lasts: "takes 21 (6d6) Acid damage at the start of
+ * each of the behir's turns" is the source's turn, "... of each of its turns" the bearer's. */
+export const OngoingDamageSchema = z
+  .object({
+    damage: z
+      .array(z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema }).strict())
+      .min(1)
+      .max(2),
+    at: z.enum(["bearer-turn-start", "source-turn-start"])
+  })
+  .strict();
+export type OngoingDamage = z.infer<typeof OngoingDamageSchema>;
+
 /** A live rules-engine effect on an actor (Rage, a grapple), with source links, duration and typed modifiers.
  * Ids derive from the commandId so retries mint the same effect. */
 export const EffectInstanceSchema = z
@@ -589,7 +602,17 @@ export const EffectInstanceSchema = z
      * this, so they end together, and starting another Concentration ends them all. */
     castId: z.string().min(1).max(120).optional(),
     /** A grapple's range: it ends once a move leaves the bearer and its source farther apart than this. */
-    rangeFeet: z.number().int().min(5).max(120).optional()
+    rangeFeet: z.number().int().min(5).max(120).optional(),
+    /** Damage it deals at the start of a turn while it lasts (a swallowed creature's acid), and a save the bearer
+     * makes right after it, a success ending the effect (Searing Smite). */
+    ongoingDamage: OngoingDamageSchema.extend({
+      saveToEnd: z
+        .object({ ability: AbilitySchema, dc: z.number().int().min(1).max(40) })
+        .strict()
+        .optional()
+    })
+      .strict()
+      .optional()
   })
   .strict();
 export type EffectInstance = z.infer<typeof EffectInstanceSchema>;
@@ -1008,7 +1031,9 @@ export const SaveOutcomeFields = {
   rangeFeet: z.number().int().min(5).max(120).optional(),
   /** No save when it lands: a target with this many hit points or fewer has the failure outright, and only the
    * repeated save can end it (Power Word Stun's 150); one with more is spared. */
-  failsAtHitPoints: z.number().int().min(1).max(1000).optional()
+  failsAtHitPoints: z.number().int().min(1).max(1000).optional(),
+  /** Damage the failure's conditions bring at the start of each turn while they last (a swallow's acid). */
+  ongoingDamage: OngoingDamageSchema.optional()
 };
 
 /** An area of effect the GM places as a map template ("60-foot Cone"). `widthFeet` is a line's width, null otherwise. */

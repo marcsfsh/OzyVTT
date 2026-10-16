@@ -1,5 +1,6 @@
 import type { HitOffer } from "@vtt/domain";
 import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
+import { DamageTypeSchema, DiceFormulaSchema } from "@vtt/schemas";
 import { isIncapacitated } from "../condition-rules.js";
 import { areAllies } from "../creature-sides.js";
 import { addEffect, applyCondition, makeEffect, type EffectNarration } from "../effects.js";
@@ -255,9 +256,48 @@ export function rollHitOptions(ctx: ResolveContext): void {
         ctx.tableNarration.push({ kind: "effect", text: event.text, actorIds: [event.actorId] });
       ctx.effectsApplied.push({ targetId: target.id, targetName: target.name, name: effect.name, conditionIds: [] });
     }
+    if (rider.lingers) lingerOn(ctx, target, action, cast, rider.lingers);
     if (rider.reminder) ctx.warnings.push(rider.reminder);
     ctx.hitRiders.push({ action, ...(slotLevel !== undefined ? { slotLevel } : {}) });
   }
+}
+
+/** SRD Searing Smite: "At the start of each of its turns until the spell ends, the target takes 1d6 Fire damage and then
+ *  makes a Constitution saving throw", at the slot's dice ("All the damage increases"). Only typed dice can recur. */
+function lingerOn(
+  ctx: ResolveContext,
+  target: ResolveContext["targets"][number],
+  action: DefinitionAction,
+  cast: DefinitionAction,
+  lingers: NonNullable<HitRider["lingers"]>
+): void {
+  const damage = cast.damage.flatMap((part) => {
+    const formula = DiceFormulaSchema.safeParse(part.formula);
+    const type = DamageTypeSchema.safeParse(part.type);
+    return formula.success && type.success ? [{ formula: formula.data, type: type.data }] : [];
+  });
+  if (damage.length === 0 || !action.save) return;
+  const effect = addEffect(
+    ctx.state,
+    target.id,
+    makeEffect({
+      id: `${ctx.input.commandId}:${action.id}:${target.id}`,
+      name: lingers.name,
+      sourceActorId: ctx.attacker.id,
+      sourceName: ctx.attacker.name,
+      sourceActionId: action.id,
+      startedRound: ctx.state.combat.round,
+      duration: { type: "rounds", remaining: lingers.rounds },
+      ongoingDamage: {
+        damage: damage.slice(0, 2),
+        at: "bearer-turn-start",
+        saveToEnd: { ability: action.save.ability, dc: action.save.dc }
+      }
+    }),
+    undefined,
+    ctx.deps
+  );
+  ctx.effectsApplied.push({ targetId: target.id, targetName: target.name, name: effect.name, conditionIds: [] });
 }
 
 /** Spends what each chosen extra costs (its uses, its slot, its Bonus Action), once the hit's own economy is in. */

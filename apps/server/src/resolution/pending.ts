@@ -148,9 +148,9 @@ const BARE_FAILURE_CONDITIONS: ReadonlySet<string> = new Set(["prone", "exhausti
 /**
  * What a failed save puts on its target, as one source-linked effect (SRD: each condition ends by its own rules):
  * the conditions with their printed duration, the save repeated at the end of each of the target's turns, a
- * grapple's escape DC and range, ending on damage, and the Concentration the cast is sustained by. Charmed's
- * "can't attack the charmer" and Grappled's "except the grappler" read the source from it. Undefined when every
- * condition stays bare.
+ * grapple's escape DC and range, ending on damage, the damage it deals at the start of each turn, and the
+ * Concentration the cast is sustained by. Charmed's "can't attack the charmer" and Grappled's "except the grappler"
+ * read the source from it. Undefined when every condition stays bare.
  */
 export function failureEffectFor(
   ctx: Pick<ResolveContext, "action" | "attacker" | "castId">,
@@ -175,6 +175,7 @@ export function failureEffectFor(
     ...(save.endsOnDamage ? { endsOnDamage: true } : {}),
     ...(save.speedZero ? { speedZero: true } : {}),
     ...(grapple ? { endsWhenSourceDefeated: true, rangeFeet: save.rangeFeet ?? action.attack?.reachFeet ?? 5 } : {}),
+    ...(save.ongoingDamage ? { ongoingDamage: save.ongoingDamage } : {}),
     ...(castId !== null ? { castId } : {}),
     sourceActionId: action.id
   };
