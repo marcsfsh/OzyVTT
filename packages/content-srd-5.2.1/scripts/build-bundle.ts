@@ -23,6 +23,7 @@ import {
 import { outDir, sourcePath } from "./paths.js";
 import { SPELL_SAVE_OVERRIDE_IDS, spellSaveOutcomeFor, statBlockSaveOutcome } from "./save-outcomes.js";
 import { areaOfProse, withProseFacts } from "../src/action-prose.js";
+import { spellEffectFor } from "./spell-effects.js";
 
 const sourceDir = sourcePath("open5e-srd-2024");
 
@@ -861,6 +862,7 @@ const spellRecords = onlySrd(spells).map((spell) => {
       ? { type: fields.shape_type, size: fields.shape_size, unit: fields.shape_size_unit }
       : null,
     area: areaOfProse(fields.desc),
+    effect: spellEffectFor(slugOf(spell.pk), fields.desc, fields.damage_roll || null, fields.damage_types),
     classes: fields.classes.map(slugOf).sort(),
     description: fields.desc,
     higherLevel: fields.higher_level || null,

@@ -7,7 +7,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./schemas": "./src/schemas.ts",
-    "./action-prose": "./src/action-prose.ts"
+    "./action-prose": "./src/action-prose.ts",
+    "./spell-effect": "./src/spell-effect.ts"
   },
   "scripts": {
     "check": "tsc --noEmit",

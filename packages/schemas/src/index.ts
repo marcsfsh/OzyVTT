@@ -23,6 +23,10 @@ const SizeSchema = z.enum(["tiny", "small", "medium", "large", "huge", "gargantu
 export const DiceFormulaSchema = z
   .string()
   .regex(/^\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?$/i, "Use a safe dice formula such as 1d8 + 3.");
+/** Hit points restored: dice, or a flat number (Heal's 70). */
+export const HealingFormulaSchema = z
+  .string()
+  .regex(/^(?:\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?|\d+)$/i, "Use dice such as 2d8 + 3, or a number.");
 export const AbilitySchema = z.enum(["str", "dex", "con", "int", "wis", "cha"]);
 export type AbilityId = z.infer<typeof AbilitySchema>;
 /** The SRD's 13 damage types. Riders name one of these, so a misspelled type is refused instead of publishing a
@@ -970,6 +974,8 @@ export const ActionSchema = z.object({
     .array(z.object({ formula: DiceFormulaSchema, type: z.string().min(1).max(40) }))
     .max(8)
     .default([]),
+  /** Hit points each target regains, rolled once and applied when the action resolves (Cure Wounds). */
+  healing: z.object({ formula: HealingFormulaSchema }).strict().optional(),
   /** Compound action: one shared action slot, components tracked (crocodile Multiattack = one Bite + one Tail). */
   multiattack: z
     .array(z.object({ actionId: z.string().regex(/^[a-z0-9-]+$/), count: z.number().int().min(1).max(4) }).strict())

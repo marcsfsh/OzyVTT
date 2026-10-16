@@ -25,3 +25,14 @@ export function ActionResultHead({ result, children }: Readonly<{ result: Action
     </div>
   );
 }
+
+/** The hit points an action restored: the roll, and what each target regained (capped at its maximum). */
+export function HealingOutcome({ healing }: Readonly<{ healing: NonNullable<ActionResolution["healing"]> }>) {
+  return (
+    <p className="action-healing">
+      Healing: <strong>{healing.total}</strong>
+      {healing.targets.length > 0 &&
+        ` - ${healing.targets.map((target) => `${target.targetName} regains ${target.regained}`).join(", ")}`}
+    </p>
+  );
+}

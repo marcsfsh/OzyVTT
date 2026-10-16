@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { HomebrewContentTypeSchema, type HomebrewContentState, type HomebrewContentType } from "@vtt/api-contract";
 import { type ActorAction, type ActorDefinition } from "@vtt/schemas";
 import { areaOfProse, withProseFacts } from "@vtt/content-srd-5.2.1/action-prose";
+import { spellEffectFromColumns } from "@vtt/content-srd-5.2.1/spell-effect";
 import {
   HOMEBREW_BODY_SCHEMAS,
   type BackgroundReference,
@@ -750,12 +751,17 @@ function parseBody(type: HomebrewContentType, json: string): unknown {
   }
 }
 
-/** What a body's prose says that play needs as data, filled as the content build fills the SRD's: a spell's area,
- *  and every action's facts wherever the record nests its actions (a monster's list, an item's, a feature's). */
+/** What a body's prose says that play needs as data, filled as the content build fills the SRD's: a spell's area
+ *  and cast model (from the columns its author set), and every action's facts wherever the record nests its
+ *  actions (a monster's list, an item's, a feature's). */
 function withBodyProseFacts(type: HomebrewContentType, body: unknown): unknown {
   if (type !== "spell") return withActionProseFacts(body);
   const spell = body as SpellReference;
-  return spell.area === null ? { ...spell, area: areaOfProse(spell.description) } : spell;
+  return {
+    ...spell,
+    area: spell.area ?? areaOfProse(spell.description),
+    effect: spell.effect ?? spellEffectFromColumns(spell)
+  };
 }
 
 function withActionProseFacts(node: unknown): unknown {

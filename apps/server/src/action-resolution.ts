@@ -6,6 +6,7 @@ import type { DefinitionAction, ResolveContext, ResolveDependencies, ResolveInpu
 import { rollRiderDamage, rollWeaponDamage } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
+import { applyHealing } from "./resolution/heal.js";
 import { applyMasteryForces, masterySwingOf, offeredPush } from "./resolution/masteries.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
 import { parkActionSave, parkReaction } from "./resolution/pending.js";
@@ -44,6 +45,7 @@ export function resolveDefinitionAction(
   applyOnHitEffects(ctx);
   applyMasteryForces(ctx);
   applyGrant(ctx);
+  applyHealing(ctx);
 
   parkReaction(ctx);
   ctx.builtin?.forcedSave?.(ctx);
@@ -108,7 +110,8 @@ function resolutionOf(ctx: ResolveContext): ActionResolution {
     overridden: ctx.overridden,
     ...(ctx.reactionPrompts.length > 0 ? { reactionPrompts: ctx.reactionPrompts } : {}),
     ...(ctx.check ? { check: ctx.check } : {}),
-    ...(ctx.effectsEnded.length > 0 ? { effectsEnded: ctx.effectsEnded } : {})
+    ...(ctx.effectsEnded.length > 0 ? { effectsEnded: ctx.effectsEnded } : {}),
+    ...(ctx.healing ? { healing: ctx.healing } : {})
   };
 }
 

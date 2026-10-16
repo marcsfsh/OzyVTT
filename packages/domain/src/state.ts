@@ -24,7 +24,7 @@ export const PendingImportSchema = z
 export type PendingImport = z.infer<typeof PendingImportSchema>;
 
 export const RollVisibilitySchema = z.enum(["public", "gm-only", "blind", "self-only"]);
-export const RollPurposeSchema = z.enum(["attack", "save", "check", "damage", "manual"]);
+export const RollPurposeSchema = z.enum(["attack", "save", "check", "damage", "healing", "manual"]);
 export const RollRecordSchema = z.object({
   id: z.uuid(),
   commandId: z.uuid(),

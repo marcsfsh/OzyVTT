@@ -35,6 +35,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 1,
+   "damage": [
+    {
+     "formula": "4d4",
+     "type": "acid"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "wizard"
   ],
@@ -133,6 +143,16 @@
    "sizeFeet": 5,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "1d6",
+     "type": "acid"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -194,6 +214,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -290,6 +315,11 @@
    "sizeFeet": 20,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "ranger",
    "wizard"
@@ -332,6 +362,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -380,6 +415,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "druid",
@@ -476,6 +516,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "druid",
@@ -562,6 +607,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid"
   ],
@@ -603,6 +653,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "wizard"
@@ -682,6 +737,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -754,6 +814,11 @@
    "sizeFeet": 10,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid"
   ],
@@ -798,6 +863,11 @@
    "shape": "emanation",
    "sizeFeet": 10,
    "widthFeet": null
+  },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
   },
   "classes": [
    "cleric",
@@ -845,6 +915,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "druid",
@@ -888,6 +963,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "wizard"
   ],
@@ -929,6 +1009,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -996,6 +1081,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "wizard"
   ],
@@ -1039,6 +1129,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "wizard"
@@ -1081,6 +1176,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "wizard"
   ],
@@ -1122,6 +1222,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "warlock",
@@ -1165,6 +1270,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -1214,6 +1324,11 @@
    "sizeFeet": 30,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "paladin"
@@ -1256,6 +1371,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "druid"
@@ -1302,6 +1422,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -1400,6 +1525,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "paladin",
@@ -1476,6 +1606,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "ranger"
@@ -1522,6 +1657,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric"
   ],
@@ -1569,6 +1709,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "10d12",
+     "type": "psychic"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "bard",
    "druid",
@@ -1619,6 +1769,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -1707,6 +1862,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "wizard"
   ],
@@ -1754,6 +1914,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric"
   ],
@@ -1795,6 +1960,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "paladin"
@@ -1892,6 +2062,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "8d8",
+     "type": "necrotic"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "druid",
    "sorcerer",
@@ -1973,6 +2153,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -2060,6 +2245,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -2102,6 +2292,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -2157,6 +2352,16 @@
    "shape": "cone",
    "sizeFeet": 15,
    "widthFeet": null
+  },
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "3d6",
+     "type": "fire"
+    }
+   ],
+   "healing": null
   },
   "classes": [
    "sorcerer",
@@ -2255,6 +2460,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "3d10",
+     "type": "lightning"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "druid"
   ],
@@ -2345,6 +2560,11 @@
    "sizeFeet": 20,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric"
@@ -2393,6 +2613,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "10d8",
+     "type": "lightning"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -2441,6 +2671,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "druid",
@@ -2523,6 +2758,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "druid",
@@ -2619,6 +2859,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 1,
+   "damage": [
+    {
+     "formula": "1d10",
+     "type": "necrotic"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "warlock",
@@ -2681,6 +2931,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 1,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -2786,6 +3041,16 @@
    "sizeFeet": 60,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "8d8",
+     "type": "necrotic"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "warlock",
@@ -2848,6 +3113,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -2892,6 +3162,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "wizard"
   ],
@@ -2946,6 +3221,11 @@
    "shape": "sphere",
    "sizeFeet": 20,
    "widthFeet": null
+  },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
   },
   "classes": [
    "sorcerer",
@@ -3028,6 +3308,11 @@
    "sizeFeet": 15,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -3075,6 +3360,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -3167,6 +3457,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric"
   ],
@@ -3208,6 +3503,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "ranger"
@@ -3250,6 +3550,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -3300,6 +3605,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard"
   ],
@@ -3354,6 +3664,16 @@
    "shape": "cone",
    "sizeFeet": 60,
    "widthFeet": null
+  },
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "8d8",
+     "type": "cold"
+    }
+   ],
+   "healing": null
   },
   "classes": [
    "druid",
@@ -3434,6 +3754,11 @@
    "shape": "sphere",
    "sizeFeet": 10,
    "widthFeet": null
+  },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
   },
   "classes": [
    "bard",
@@ -3516,6 +3841,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "ranger"
@@ -3595,6 +3925,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric"
   ],
@@ -3655,6 +3990,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "wizard"
@@ -3724,6 +4064,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid"
   ],
@@ -3787,6 +4132,11 @@
    "shape": "emanation",
    "sizeFeet": 15,
    "widthFeet": null
+  },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
   },
   "classes": [
    "druid",
@@ -3871,6 +4221,11 @@
    "sizeFeet": 10,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "ranger"
@@ -3952,6 +4307,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "warlock",
    "wizard"
@@ -4002,6 +4362,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "11d8",
+     "type": "necrotic"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid"
@@ -4044,6 +4414,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "wizard"
   ],
@@ -4085,6 +4460,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -4128,6 +4508,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -4171,6 +4556,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -4218,6 +4608,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "warlock",
@@ -4261,6 +4656,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "paladin"
@@ -4306,6 +4706,11 @@
    "shape": "cube",
    "sizeFeet": 30,
    "widthFeet": null
+  },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
   },
   "classes": [
    "cleric",
@@ -4398,6 +4803,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "warlock",
@@ -4468,6 +4878,11 @@
    "sizeFeet": 5,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -4535,6 +4950,14 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": {
+    "formula": "2d8",
+    "addsModifier": true
+   }
+  },
   "classes": [
    "bard",
    "cleric",
@@ -4629,6 +5052,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -4680,6 +5108,11 @@
    "sizeFeet": 15,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "warlock",
@@ -4723,6 +5156,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "ranger",
@@ -4775,6 +5213,11 @@
    "sizeFeet": 60,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -4820,6 +5263,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "paladin"
@@ -4876,6 +5324,11 @@
    "sizeFeet": 20,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -4931,6 +5384,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "warlock",
@@ -4974,6 +5432,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "paladin"
@@ -5016,6 +5479,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -5064,6 +5532,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -5112,6 +5585,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -5157,6 +5635,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -5201,6 +5684,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -5250,6 +5738,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "10d6 + 40",
+     "type": "force"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -5311,6 +5809,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "paladin"
@@ -5353,6 +5856,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -5450,6 +5958,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "3d6",
+     "type": "psychic"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "bard"
   ],
@@ -5491,6 +6009,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -5536,6 +6059,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "paladin"
   ],
@@ -5579,6 +6107,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "2d8",
+     "type": "radiant"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "paladin"
   ],
@@ -5673,6 +6211,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric"
   ],
@@ -5720,6 +6263,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "ranger",
@@ -5800,6 +6348,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -5857,6 +6410,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -5936,6 +6494,11 @@
    "shape": "cone",
    "sizeFeet": 15,
    "widthFeet": null
+  },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
   },
   "classes": [
    "sorcerer",
@@ -6028,6 +6591,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "warlock",
@@ -6074,6 +6642,11 @@
    "shape": "cube",
    "sizeFeet": 5,
    "widthFeet": null
+  },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
   },
   "classes": [
    "druid"
@@ -6128,6 +6701,11 @@
    "unit": "feet"
   },
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -6173,6 +6751,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 1,
+   "damage": [
+    {
+     "formula": "1d10",
+     "type": "force"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "warlock"
   ],
@@ -6237,6 +6825,11 @@
    "sizeFeet": 5,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "sorcerer",
@@ -6280,6 +6873,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -6373,6 +6971,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "druid",
@@ -6425,6 +7028,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "ranger"
   ],
@@ -6521,6 +7129,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "ranger"
@@ -6567,6 +7180,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "warlock"
@@ -6611,6 +7229,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -6669,6 +7292,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "warlock",
@@ -6716,6 +7344,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -6767,6 +7400,11 @@
    "shape": "cube",
    "sizeFeet": 10,
    "widthFeet": null
+  },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
   },
   "classes": [
    "wizard"
@@ -6821,6 +7459,11 @@
    "sizeFeet": 20,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "druid"
@@ -6869,6 +7512,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "wizard"
   ],
@@ -6910,6 +7558,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -7015,6 +7668,11 @@
    "sizeFeet": 30,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -7059,6 +7717,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -7102,6 +7765,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "wizard"
   ],
@@ -7143,6 +7811,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "paladin"
   ],
@@ -7227,6 +7900,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -7270,6 +7948,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -7319,6 +8002,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "7d8 + 30",
+     "type": "necrotic"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "warlock",
@@ -7364,6 +8057,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 1,
+   "damage": [
+    {
+     "formula": "1d10",
+     "type": "fire"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -7428,6 +8131,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "sorcerer",
@@ -7485,6 +8193,16 @@
    "sizeFeet": 10,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "7d10",
+     "type": "fire"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -7541,6 +8259,16 @@
    "shape": "sphere",
    "sizeFeet": 20,
    "widthFeet": null
+  },
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "8d6",
+     "type": "fire"
+    }
+   ],
+   "healing": null
   },
   "classes": [
    "sorcerer",
@@ -7623,6 +8351,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "sorcerer"
@@ -7715,6 +8448,20 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "5d6",
+     "type": "fire"
+    },
+    {
+     "formula": "5d6",
+     "type": "radiant"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "cleric"
   ],
@@ -7787,6 +8534,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "sorcerer",
@@ -7879,6 +8631,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "sorcerer",
@@ -7922,6 +8679,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "wizard"
   ],
@@ -7963,6 +8725,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "warlock",
@@ -8050,6 +8817,11 @@
    "shape": "sphere",
    "sizeFeet": 20,
    "widthFeet": null
+  },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
   },
   "classes": [
    "druid",
@@ -8146,6 +8918,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric"
   ],
@@ -8191,6 +8968,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "warlock",
@@ -8234,6 +9016,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "druid",
@@ -8288,6 +9075,11 @@
    "unit": "feet"
   },
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -8377,6 +9169,16 @@
    "sizeFeet": 60,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "10d6",
+     "type": "cold"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -8444,6 +9246,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "warlock",
@@ -8524,6 +9331,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "sorcerer",
@@ -8576,6 +9388,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -8634,6 +9451,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "paladin",
@@ -8677,6 +9499,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid"
   ],
@@ -8749,6 +9576,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "warlock"
@@ -8791,6 +9623,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -8855,6 +9692,11 @@
    "shape": "sphere",
    "sizeFeet": 20,
    "widthFeet": null
+  },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
   },
   "classes": [
    "bard",
@@ -8936,6 +9778,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "ranger"
@@ -8984,6 +9831,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -9026,6 +9878,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -9069,6 +9926,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -9120,6 +9982,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric"
   ],
@@ -9161,6 +10028,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "wizard"
@@ -9203,6 +10075,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid"
@@ -9247,6 +10124,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 1,
+   "damage": [
+    {
+     "formula": "4d6",
+     "type": "radiant"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "cleric"
   ],
@@ -9341,6 +10228,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "ranger",
@@ -9385,6 +10277,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric"
   ],
@@ -9433,6 +10330,11 @@
    "shape": "cube",
    "sizeFeet": 150,
    "widthFeet": null
+  },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
   },
   "classes": [
    "bard",
@@ -9484,6 +10386,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "14d6",
+     "type": "necrotic"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "cleric"
   ],
@@ -9529,6 +10441,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -9571,6 +10488,14 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": {
+    "formula": "70",
+    "addsModifier": false
+   }
+  },
   "classes": [
    "cleric",
    "druid"
@@ -9632,6 +10557,14 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": {
+    "formula": "2d4",
+    "addsModifier": true
+   }
+  },
   "classes": [
    "bard",
    "cleric",
@@ -9730,6 +10663,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "druid"
@@ -9821,6 +10759,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "2d10",
+     "type": "fire"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "warlock"
   ],
@@ -9921,6 +10869,11 @@
    "sizeFeet": 10,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -9964,6 +10917,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "paladin"
@@ -10057,6 +11015,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "warlock"
   ],
@@ -10154,6 +11117,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "warlock",
@@ -10252,6 +11220,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -10327,6 +11300,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -10420,6 +11398,11 @@
    "sizeFeet": 30,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric"
   ],
@@ -10463,6 +11446,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "ranger"
   ],
@@ -10561,6 +11549,11 @@
    "sizeFeet": 30,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -10612,6 +11605,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 1,
+   "damage": [
+    {
+     "formula": "1d10",
+     "type": "piercing"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "druid",
    "sorcerer",
@@ -10711,6 +11714,20 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "2d10",
+     "type": "bludgeoning"
+    },
+    {
+     "formula": "4d6",
+     "type": "cold"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "druid",
    "sorcerer",
@@ -10785,6 +11802,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "wizard"
@@ -10827,6 +11849,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "warlock",
@@ -10874,6 +11901,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "warlock",
    "wizard"
@@ -10930,6 +11962,11 @@
    "sizeFeet": 20,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "sorcerer",
@@ -10979,6 +12016,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "2d10",
+     "type": "necrotic"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "cleric"
   ],
@@ -11083,6 +12130,11 @@
    "sizeFeet": 20,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -11151,6 +12203,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "wizard"
   ],
@@ -11192,6 +12249,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -11285,6 +12347,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "wizard"
@@ -11327,6 +12394,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "ranger",
@@ -11420,6 +12492,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -11463,6 +12540,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -11506,6 +12588,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -11555,6 +12642,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -11597,6 +12689,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -11654,6 +12751,16 @@
    "shape": "line",
    "sizeFeet": 100,
    "widthFeet": 5
+  },
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "8d6",
+     "type": "lightning"
+    }
+   ],
+   "healing": null
   },
   "classes": [
    "sorcerer",
@@ -11734,6 +12841,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "druid",
@@ -11777,6 +12889,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -11823,6 +12940,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -11869,6 +12991,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "druid",
@@ -11962,6 +13089,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -12004,6 +13136,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -12052,6 +13189,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "paladin",
@@ -12137,6 +13279,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "wizard"
   ],
@@ -12180,6 +13327,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "3d4 + 3",
+     "type": "force"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -12271,6 +13428,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "wizard"
@@ -12313,6 +13475,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "paladin",
    "ranger",
@@ -12408,6 +13575,11 @@
    "sizeFeet": 10,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "wizard"
@@ -12457,6 +13629,11 @@
    "shape": "cube",
    "sizeFeet": 20,
    "widthFeet": null
+  },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
   },
   "classes": [
    "bard",
@@ -12547,6 +13724,14 @@
    "sizeFeet": 30,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": {
+    "formula": "5d8",
+    "addsModifier": true
+   }
+  },
   "classes": [
    "bard",
    "cleric",
@@ -12615,6 +13800,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric"
   ],
@@ -12656,6 +13846,14 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": {
+    "formula": "2d4",
+    "addsModifier": true
+   }
+  },
   "classes": [
    "bard",
    "cleric"
@@ -12741,6 +13939,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -12803,6 +14006,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "wizard"
   ],
@@ -12846,6 +14054,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -12889,6 +14102,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -12934,6 +14152,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "druid",
@@ -12993,6 +14216,20 @@
    "sizeFeet": 40,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "20d6",
+     "type": "fire"
+    },
+    {
+     "formula": "20d6",
+     "type": "bludgeoning"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -13037,6 +14274,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "wizard"
@@ -13085,6 +14327,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "3d8",
+     "type": "psychic"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "warlock",
@@ -13175,6 +14427,11 @@
    "sizeFeet": 5,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -13219,6 +14476,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "druid",
@@ -13262,6 +14524,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -13306,6 +14573,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "warlock",
@@ -13349,6 +14621,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "warlock",
@@ -13398,6 +14675,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "wizard"
@@ -13471,6 +14753,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "2d10",
+     "type": "radiant"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "druid"
   ],
@@ -13555,6 +14847,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "sorcerer",
@@ -13598,6 +14895,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "ranger",
@@ -13645,6 +14947,11 @@
    "sizeFeet": 30,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "ranger"
@@ -13687,6 +14994,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "wizard"
   ],
@@ -13742,6 +15054,11 @@
    "sizeFeet": 10,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -13791,6 +15108,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "4d10",
+     "type": "psychic"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "bard",
    "wizard"
@@ -13864,6 +15191,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "wizard"
   ],
@@ -13905,6 +15237,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric"
   ],
@@ -13950,6 +15287,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -14020,6 +15362,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -14069,6 +15416,11 @@
    "sizeFeet": 100,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "druid",
@@ -14114,6 +15466,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 1,
+   "damage": [
+    {
+     "formula": "1d12",
+     "type": "poison"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "druid",
    "sorcerer",
@@ -14181,6 +15543,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "druid",
@@ -14225,6 +15592,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric"
@@ -14269,6 +15641,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -14317,6 +15694,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -14361,6 +15743,14 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": {
+    "formula": "2d8",
+    "addsModifier": false
+   }
+  },
   "classes": [
    "cleric",
    "paladin"
@@ -14446,6 +15836,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -14508,6 +15903,11 @@
    "sizeFeet": 60,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -14564,6 +15964,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "wizard"
@@ -14606,6 +16011,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "wizard"
   ],
@@ -14680,6 +16090,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 1,
+   "damage": [
+    {
+     "formula": "1d8",
+     "type": "fire"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "druid"
   ],
@@ -14748,6 +16168,11 @@
    "sizeFeet": 30,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "wizard"
@@ -14790,6 +16215,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "wizard"
@@ -14832,6 +16262,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -14877,6 +16312,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -14924,6 +16364,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -14976,6 +16421,11 @@
    "sizeFeet": 5,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -15019,6 +16469,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -15066,6 +16521,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "warlock",
    "wizard"
@@ -15110,6 +16570,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 1,
+   "damage": [
+    {
+     "formula": "1d8",
+     "type": "cold"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -15173,6 +16643,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 1,
+   "damage": [
+    {
+     "formula": "2d8",
+     "type": "poison"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -15264,6 +16744,14 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": {
+    "formula": "4d8 + 15",
+    "addsModifier": false
+   }
+  },
   "classes": [
    "bard",
    "cleric",
@@ -15307,6 +16795,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid"
   ],
@@ -15348,6 +16841,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "paladin",
@@ -15396,6 +16894,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "wizard"
   ],
@@ -15437,6 +16940,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid"
@@ -15479,6 +16987,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric"
@@ -15525,6 +17038,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "sorcerer",
@@ -15568,6 +17086,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -15612,6 +17135,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "wizard"
   ],
@@ -15659,6 +17187,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "1d8",
+     "type": "radiant"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "cleric"
   ],
@@ -15723,6 +17261,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric"
   ],
@@ -15766,6 +17309,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 3,
+   "damage": [
+    {
+     "formula": "2d6",
+     "type": "fire"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -15855,6 +17408,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -15906,6 +17464,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "1d6",
+     "type": "fire"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "paladin"
   ],
@@ -15996,6 +17564,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "wizard"
   ],
@@ -16037,6 +17610,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -16084,6 +17662,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -16127,6 +17710,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -16170,6 +17758,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "wizard"
   ],
@@ -16211,6 +17804,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "wizard"
@@ -16266,6 +17864,16 @@
    "shape": "sphere",
    "sizeFeet": 10,
    "widthFeet": null
+  },
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "3d8",
+     "type": "thunder"
+    }
+   ],
+   "healing": null
   },
   "classes": [
    "bard",
@@ -16353,6 +17961,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -16395,6 +18008,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "paladin"
@@ -16439,6 +18057,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid"
   ],
@@ -16501,6 +18124,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "2d6",
+     "type": "radiant"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "paladin"
   ],
@@ -16587,6 +18220,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 1,
+   "damage": [
+    {
+     "formula": "1d8",
+     "type": "lightning"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -16658,6 +18301,11 @@
    "sizeFeet": 20,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -16709,6 +18357,11 @@
    "sizeFeet": 15,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -16752,6 +18405,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "wizard"
   ],
@@ -16807,6 +18465,11 @@
    "sizeFeet": 5,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -16856,6 +18519,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "sorcerer",
@@ -16911,6 +18579,11 @@
    "sizeFeet": 40,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -16954,6 +18627,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 1,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer"
   ],
@@ -17014,6 +18692,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid"
@@ -17075,6 +18758,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "druid",
@@ -17119,6 +18807,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -17166,6 +18859,11 @@
    "sizeFeet": 30,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "druid",
@@ -17209,6 +18907,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "warlock",
@@ -17305,6 +19008,11 @@
    "sizeFeet": 20,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "ranger"
@@ -17357,6 +19065,11 @@
    "shape": "emanation",
    "sizeFeet": 15,
    "widthFeet": null
+  },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
   },
   "classes": [
    "cleric"
@@ -17438,6 +19151,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric"
   ],
@@ -17524,6 +19242,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 1,
+   "damage": [
+    {
+     "formula": "1d8",
+     "type": "radiant"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "bard",
    "druid"
@@ -17599,6 +19327,11 @@
    "sizeFeet": 20,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -17642,6 +19375,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -17687,6 +19425,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "ranger",
@@ -17739,6 +19482,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid"
   ],
@@ -17786,6 +19534,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -17830,6 +19583,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "wizard"
   ],
@@ -17908,6 +19666,16 @@
    "sizeFeet": 60,
    "widthFeet": 5
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "6d8",
+     "type": "radiant"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -17968,6 +19736,16 @@
    "sizeFeet": 60,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "12d6",
+     "type": "radiant"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -18020,6 +19798,11 @@
    "sizeFeet": 60,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -18068,6 +19851,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -18110,6 +19898,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "wizard"
@@ -18152,6 +19945,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -18199,6 +19997,11 @@
    "unit": "feet"
   },
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -18243,6 +20046,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric"
   ],
@@ -18297,6 +20105,16 @@
    "shape": "cube",
    "sizeFeet": 15,
    "widthFeet": null
+  },
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "2d8",
+     "type": "thunder"
+    }
+   ],
+   "healing": null
   },
   "classes": [
    "bard",
@@ -18391,6 +20209,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -18437,6 +20260,11 @@
    "sizeFeet": 10,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "wizard"
@@ -18479,6 +20307,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -18524,6 +20357,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid"
   ],
@@ -18565,6 +20403,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "ranger"
@@ -18611,6 +20454,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "warlock",
@@ -18654,6 +20502,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid"
@@ -18696,6 +20549,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "cleric",
@@ -18743,6 +20601,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -18812,6 +20675,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid"
   ],
@@ -18853,6 +20721,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "bard",
    "warlock",
@@ -18898,6 +20771,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 1,
+   "damage": [
+    {
+     "formula": "3d6",
+     "type": "necrotic"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "warlock",
@@ -18984,6 +20867,16 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "1d6",
+     "type": "psychic"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "bard"
   ],
@@ -19057,6 +20950,16 @@
    "shape": "sphere",
    "sizeFeet": 20,
    "widthFeet": null
+  },
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "10d4",
+     "type": "acid"
+    }
+   ],
+   "healing": null
   },
   "classes": [
    "sorcerer",
@@ -19137,6 +21040,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "sorcerer",
@@ -19211,6 +21119,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "wizard"
   ],
@@ -19260,6 +21173,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "wizard"
   ],
@@ -19326,6 +21244,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "sorcerer",
@@ -19376,6 +21299,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid"
   ],
@@ -19436,6 +21364,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "paladin"
@@ -19478,6 +21411,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "ranger",
@@ -19522,6 +21460,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric",
    "druid",
@@ -19582,6 +21525,11 @@
    "sizeFeet": 20,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -19640,6 +21588,16 @@
    "sizeFeet": 30,
    "widthFeet": null
   },
+  "effect": {
+   "attacks": 0,
+   "damage": [
+    {
+     "formula": "10d10",
+     "type": "psychic"
+    }
+   ],
+   "healing": null
+  },
   "classes": [
    "warlock",
    "wizard"
@@ -19684,6 +21642,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid"
   ],
@@ -19731,6 +21694,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "druid",
    "ranger"
@@ -19775,6 +21743,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -19817,6 +21790,11 @@
   },
   "shape": null,
   "area": null,
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
+  },
   "classes": [
    "cleric"
   ],
@@ -19869,6 +21847,11 @@
    "shape": "sphere",
    "sizeFeet": 15,
    "widthFeet": null
+  },
+  "effect": {
+   "attacks": 0,
+   "damage": [],
+   "healing": null
   },
   "classes": [
    "bard",

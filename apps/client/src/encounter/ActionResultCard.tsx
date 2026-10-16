@@ -1,6 +1,6 @@
 import { IconRepeat, IconWarning } from "@vtt/ui";
 import type { ActionResolution, ContentActionSummary, GmActor, GmView } from "@vtt/domain";
-import { ActionResultHead } from "./ActionResultHead";
+import { ActionResultHead, HealingOutcome } from "./ActionResultHead";
 import { AttackOutcome, AttackPreview } from "./AttackPreview";
 import { componentLabel } from "./action-summary";
 import type { ResolveOptions } from "./targeting";
@@ -122,6 +122,7 @@ export function ActionResultCard({
             </p>
           );
         })()}
+      {result.healing && <HealingOutcome healing={result.healing} />}
       {result.attack &&
         (result.attack.outcome === "crit" || result.attack.outcome === "hit" || result.attack.outcome === "unknown") &&
         result.damageTotal > 0 &&

@@ -528,6 +528,18 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "permanent: system-synthesised"
   },
   {
+    at: "actions[].healing.**",
+    types: ACTION_CARRIERS,
+    reason: "hit points an action restores - no control on the action row yet",
+    status: "gap"
+  },
+  {
+    at: "effect.**",
+    types: ["spell"],
+    reason: "the cast model, read from the attack box, damage roll and description as the catalog is built",
+    status: "permanent: system-synthesised"
+  },
+  {
     at: "area.**",
     types: ["spell"],
     reason: "read from the spell's description as the catalog is built; the editor writes the description",
