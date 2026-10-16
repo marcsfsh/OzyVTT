@@ -269,6 +269,13 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       note: "Display only."
     },
     { key: "whileArmored", label: "Only while wearing armour", kind: "switch", visibleWhen: hasType("armor-class") },
+    {
+      key: "proficiencyBonus",
+      label: "Also add the Proficiency Bonus",
+      kind: "switch",
+      visibleWhen: hasType("initiative"),
+      help: "Alert's rule. Built into the character when it is built or levelled."
+    },
     /* On an item nothing reads `unarmored-defense` (it is builder-baked from features and feats
        only), so items get a note; features and feats need none. */
     {

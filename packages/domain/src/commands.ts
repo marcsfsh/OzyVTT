@@ -82,6 +82,8 @@ export const EncounterStartSchema = z
     ruleExceptions: WireRuleExceptionsSchema.optional(),
     /** When true, claimed player-characters roll their own initiative (a provisional auto-roll parks them until they do). */
     playersRollInitiative: z.boolean().optional(),
+    /** SRD: one initiative roll for each group of identical monsters, so they act together. */
+    groupMonsters: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -90,10 +92,13 @@ export const InitiativeScoreSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     score: z.number().int().min(-1000).max(1000),
+    /** Orders combatants tied on `score` (higher acts first); the GM settles ties the dice don't. */
+    tieBreaker: z.number().int().min(-1000).max(1000).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** A player rolls their own initiative (server rolls unless a manual d20 `natural` is given; adv/disadv supported). */
+/** A player rolls their own initiative: the server rolls unless a manual d20 `natural` is given, under the roll mode
+ *  the rules give (Surprise, conditions, features). `rollMode` is a GM override and is ignored from a player. */
 export const InitiativeRollSelfSchema = z
   .object({
     commandId: z.uuid(),
@@ -112,6 +117,15 @@ export const SetPlayerInitiativeModeSchema = z
   .object({
     commandId: z.uuid(),
     mode: z.enum(["immediate", "wait"]),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Alert's Initiative Swap, made by the GM for the table: two combatants trade initiative scores. */
+export const InitiativeSwapSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    withActorId: z.uuid(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

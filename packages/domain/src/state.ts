@@ -60,7 +60,9 @@ export type PlayerRollRecord = Omit<RollRecord, "initiatorSessionId">;
 export const InitiativeEntrySchema = z.object({
   actorId: z.uuid(),
   score: z.number().int().min(-1000).max(1000),
-  tieBreaker: z.number().int().min(-1000).max(1000).default(0)
+  tieBreaker: z.number().int().min(-1000).max(1000).default(0),
+  /** Surprised when the fight began (SRD Surprise), kept so a later roll of this entry has Disadvantage too. */
+  surprised: z.boolean().optional()
 });
 export type InitiativeEntry = z.infer<typeof InitiativeEntrySchema>;
 

@@ -462,7 +462,7 @@ function interpretFeature(feature: FeatureRecord, into: InterpretedFeatures, con
         else into.armorClassBonus += modifier.amount;
         break;
       case "initiative":
-        into.initiativeBonus += modifier.amount;
+        into.initiativeBonus += modifier.amount + (modifier.proficiencyBonus ? context.proficiencyBonus : 0);
         break;
       case "unarmored-defense":
         into.unarmoredDefense = { ability: modifier.ability, allowShield: modifier.allowShield };

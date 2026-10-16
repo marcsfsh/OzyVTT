@@ -42,6 +42,8 @@ describe("rule families", () => {
       ["economy.bonus-action-used", "economy"],
       ["economy.reaction-used", "economy"],
       ["economy.not-your-turn", "economy"],
+      // No one acts while a wait-mode fight gathers initiative: the turn economy hasn't begun.
+      ["initiative.gathering", "economy"],
       // Being incapacitated or down is "you have no actions" - economy, not a targeting rule.
       ["condition.incapacitated", "economy"],
       ["condition.down", "economy"],
