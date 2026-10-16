@@ -2145,7 +2145,8 @@
    "successDamage": "none",
    "failureConditions": [
     "blinded"
-   ]
+   ],
+   "repeatSave": true
   },
   "target": {
    "type": "creature",
@@ -3292,7 +3293,10 @@
    "successDamage": "none",
    "failureConditions": [
     "blinded"
-   ]
+   ],
+   "failureDuration": {
+    "type": "until-source-turn-end"
+   }
   },
   "target": {
    "type": "creature",
@@ -11114,7 +11118,8 @@
    "failureConditions": [
     "prone",
     "incapacitated"
-   ]
+   ],
+   "repeatSave": true
   },
   "target": {
    "type": "creature",
@@ -11217,7 +11222,8 @@
    "successDamage": "none",
    "failureConditions": [
     "paralyzed"
-   ]
+   ],
+   "repeatSave": true
   },
   "target": {
    "type": "creature",
@@ -11297,7 +11303,8 @@
    "successDamage": "none",
    "failureConditions": [
     "paralyzed"
-   ]
+   ],
+   "repeatSave": true
   },
   "target": {
    "type": "creature",
@@ -11537,8 +11544,11 @@
    "ability": "wis",
    "successDamage": "none",
    "failureConditions": [
-    "charmed"
-   ]
+    "charmed",
+    "incapacitated"
+   ],
+   "endsOnDamage": true,
+   "speedZero": true
   },
   "target": {
    "type": "creature",
@@ -14671,8 +14681,10 @@
    "ability": "wis",
    "successDamage": "none",
    "failureConditions": [
-    "charmed"
-   ]
+    "charmed",
+    "incapacitated"
+   ],
+   "endsOnDamage": true
   },
   "target": {
    "type": "creature",
@@ -15691,7 +15703,11 @@
   "save": {
    "ability": "con",
    "successDamage": "none",
-   "failureConditions": []
+   "failureConditions": [
+    "stunned"
+   ],
+   "repeatSave": true,
+   "failsAtHitPoints": 150
   },
   "target": {
    "type": "creature",
@@ -15961,7 +15977,11 @@
    "successDamage": "half",
    "failureConditions": [
     "blinded"
-   ]
+   ],
+   "failureDuration": {
+    "type": "rounds",
+    "rounds": 10
+   }
   },
   "target": {
    "type": "creature",
@@ -18460,7 +18480,11 @@
    "successDamage": "none",
    "failureConditions": [
     "incapacitated"
-   ]
+   ],
+   "endsOnDamage": true,
+   "failureDuration": {
+    "type": "until-bearer-turn-end"
+   }
   },
   "target": {
    "type": "creature",
@@ -19665,7 +19689,10 @@
    "successDamage": "half",
    "failureConditions": [
     "blinded"
-   ]
+   ],
+   "failureDuration": {
+    "type": "until-source-next-turn"
+   }
   },
   "target": {
    "type": "creature",
@@ -19731,7 +19758,12 @@
    "successDamage": "half",
    "failureConditions": [
     "blinded"
-   ]
+   ],
+   "repeatSave": true,
+   "failureDuration": {
+    "type": "rounds",
+    "rounds": 10
+   }
   },
   "target": {
    "type": "creature",
@@ -21583,7 +21615,8 @@
    "successDamage": "half",
    "failureConditions": [
     "frightened"
-   ]
+   ],
+   "repeatSave": true
   },
   "target": {
    "type": "creature",

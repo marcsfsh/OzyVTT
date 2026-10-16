@@ -60,7 +60,8 @@ export type MovementRulesOutcome = Readonly<{
  *
  * Opportunity attacks: leaving an enemy's melee reach opens a leaves-reach prompt answered as a real
  * melee attack; the move completes first (arrival-timing approximation). Disengage suppresses; a hidden
- * mover prompts no one (a player must not learn a hidden token's retreat). Sides use the
+ * mover prompts no one (a player must not learn a hidden token's retreat), and neither does a mover the enemy
+ * can't see (Invisible, or the enemy Blinded) unless its Blindsight or Truesight reaches. Sides use the
  * player-character vs monster heuristic; NPCs are GM-adjudicated.
  */
 /** A move spends movement only on the mover's own turn in combat, with movement rules on. While a wait-mode
@@ -90,6 +91,33 @@ export function movementStatus(
     usedFeet: counted ? state.combat.turn.movementUsedFeet : 0,
     enforcement: effectiveModeFor(state.combat, "movement.exceeds-speed")
   };
+}
+
+/** A sense a stat block prints ("blindsight 60 ft."), in feet; 0 when it has none. Characters record no senses. */
+function senseRangeFeet(definition: ActorDefinition | undefined, sense: "blindsight" | "truesight"): number {
+  const senses = (definition?.extensions["open5e.srd-2024"] as { senses?: unknown } | undefined)?.senses;
+  if (!Array.isArray(senses)) return 0;
+  for (const entry of senses) {
+    const match = typeof entry === "string" ? entry.match(new RegExp(`^${sense} (\\d+)`, "i")) : null;
+    if (match) return Number.parseInt(match[1], 10);
+  }
+  return 0;
+}
+
+/** SRD Opportunity Attack: "a creature that you can see". A Blinded reactor sees only within its Blindsight; an
+ *  Invisible mover is seen only within Blindsight or Truesight. `distanceFeet` is how far apart they were. */
+function seesMover(
+  reactor: GameState["actors"][number],
+  reactorDefinition: ActorDefinition | undefined,
+  mover: GameState["actors"][number],
+  distanceFeet: number
+): boolean {
+  const within = (range: number) => range > 0 && distanceFeet <= range + DISTANCE_TOLERANCE_FEET;
+  const blindsight = within(senseRangeFeet(reactorDefinition, "blindsight"));
+  if (reactor.conditions.some((condition) => condition.id === "blinded")) return blindsight;
+  if (mover.conditions.some((condition) => condition.id === "invisible"))
+    return blindsight || within(senseRangeFeet(reactorDefinition, "truesight"));
+  return true;
 }
 
 export function applyMovementRules(state: GameState, input: MovementRulesInput): MovementRulesOutcome {
@@ -167,6 +195,7 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
         nowOut <= reach + DISTANCE_TOLERANCE_FEET
       )
         continue;
+      if (!seesMover(enemy, enemyDefinition, mover, wasIn)) continue;
       if (
         state.combat.pendingReactions.some(
           (prompt) => prompt.kind === "leaves-reach" && prompt.actorId === enemy.id && prompt.targetActorId === actorId

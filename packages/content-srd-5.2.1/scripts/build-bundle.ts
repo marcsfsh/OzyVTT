@@ -10,7 +10,13 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import { ActorDefinitionSchema, type ActorAction, type ActorDefinition } from "@vtt/schemas";
+import {
+  ActorDefinitionSchema,
+  SaveConditionSchema,
+  type ActorAction,
+  type ActorDefinition,
+  type SaveFailureDuration
+} from "@vtt/schemas";
 import { experienceForChallenge } from "@vtt/rules-5e";
 import {
   ArmorReferenceSchema,
@@ -22,7 +28,13 @@ import {
   WeaponReferenceSchema
 } from "../src/index.js";
 import { outDir, sourcePath } from "./paths.js";
-import { SPELL_SAVE_OVERRIDE_IDS, spellSaveOutcomeFor, statBlockSaveOutcome } from "./save-outcomes.js";
+import {
+  failureDurationOf,
+  SPELL_SAVE_OVERRIDE_IDS,
+  spellSaveOutcomeFor,
+  statBlockSaveOutcome,
+  withoutOngoingDamage
+} from "./save-outcomes.js";
 import { areaOfProse, withProseFacts } from "../src/action-prose.js";
 import { spellEffectFor } from "./spell-effects.js";
 import { printedHitDamage, printedSaveDamage } from "./monster-damage.js";
@@ -323,26 +335,56 @@ const parseMultiattack = (
 /**
  * On-hit condition riders from the stock phrasing: "If the target is a Large or smaller creature,
  * it has the Grappled condition (escape DC 15). While Grappled, the target has the Restrained
- * condition." and "…it has the Prone condition." Only attack actions get riders (a save action's
- * conditions flow through the pending-save pipeline instead).
+ * condition." (or "...and it has the Restrained condition until the grapple ends"), "…it has the Prone
+ * condition.", and an unconditional timed one: "...and the target has the Poisoned condition until the start of
+ * the assassin's next turn." Only attack actions get riders (a save action's conditions flow through the
+ * pending-save pipeline instead); a rider that depends on a charge or a drop to 0 HP stays prose.
  */
 type OnHitRider = {
   conditions: Array<{ id: string }>;
   escapeDc?: number;
   maxTargetSize?: "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan";
+  duration?: SaveFailureDuration;
 };
+const RIDER_CONDITIONS: ReadonlySet<string> = new Set(SaveConditionSchema.options);
+const riderConditionIds = (names: string): string[] =>
+  names
+    .split(/ and /)
+    .map((name) => name.toLowerCase())
+    .filter((id) => RIDER_CONDITIONS.has(id) && id !== "grappled");
 const parseOnHitRiders = (desc: string): OnHitRider[] | null => {
   const size = desc.match(/If the target is a (Tiny|Small|Medium|Large|Huge) or smaller creature/i);
   const maxTargetSize = size ? (size[1].toLowerCase() as NonNullable<OnHitRider["maxTargetSize"]>) : undefined;
   const riders: OnHitRider[] = [];
   const grapple = desc.match(/has the Grappled condition \(escape DC (\d+)\)/i);
   if (grapple) {
-    const conditions = [{ id: "grappled" }];
-    if (/While Grappled, the target (?:also )?has the Restrained condition/i.test(desc))
-      conditions.push({ id: "restrained" });
+    // What lasts exactly as long as the grapple rides the same effect, so escaping ends it too.
+    const held = new Set<string>();
+    if (/While Grappled, the target (?:also )?has the Restrained condition/i.test(desc)) held.add("restrained");
+    for (const match of desc.matchAll(
+      /\b(?:it|the target) has the ([A-Z][a-z]+(?: and [A-Z][a-z]+)?) conditions? until the grapple ends|\bUntil the grapple ends, the target has the ([A-Z][a-z]+(?: and [A-Z][a-z]+)?) conditions?/g
+    ))
+      for (const id of riderConditionIds(match[1] ?? match[2]!)) held.add(id);
+    const conditions = [{ id: "grappled" }, ...[...held].slice(0, 2).map((id) => ({ id }))];
     riders.push({ conditions, escapeDc: Number.parseInt(grapple[1], 10), ...(maxTargetSize ? { maxTargetSize } : {}) });
   } else if (/it has the Prone condition/i.test(desc)) {
     riders.push({ conditions: [{ id: "prone" }], ...(maxTargetSize ? { maxTargetSize } : {}) });
+  }
+  // An unconditional rider in the hit's own sentence (not one opening with "If"): timed, or with no end printed there
+  // (an otyugh's Poisoned, which a later save ends), which lasts until ended.
+  const hit = desc.slice(Math.max(0, desc.search(/\bHit:|Attack Roll:/)));
+  for (const sentence of hit.split(/(?<=\.)\s+/)) {
+    if (/^If\b/.test(sentence) || /Grappled/.test(sentence)) continue;
+    const timed = sentence.match(
+      /\bthe target has the ([A-Z][a-z]+(?: and [A-Z][a-z]+)?) conditions? (until the (?:start|end) of (?:its|the [A-Za-z' -]+?(?:'s|s')) next turn)/
+    );
+    const untimed = timed
+      ? null
+      : sentence.match(/\bdamage, and the target has the ([A-Z][a-z]+(?: and [A-Z][a-z]+)?) conditions?\.$/);
+    const ids = riderConditionIds((timed ?? untimed)?.[1] ?? "");
+    const duration = timed ? failureDurationOf(timed[2]) : undefined;
+    if (ids.length > 0 && (duration || untimed) && riders.length < 2)
+      riders.push({ conditions: ids.map((id) => ({ id })), ...(duration ? { duration } : {}) });
   }
   return riders.length > 0 ? riders : null;
 };
@@ -712,7 +754,20 @@ const monsters: ActorDefinition[] = creatures
       if (printed) report.printedAttackDamage += 1;
       // A save rider on an attack deals its damage through the hit, but may still deal more on later turns.
       const saveDamage = save ? printedSaveDamage(action.fields.desc) : null;
-      const reminder = fix?.reminder ?? saveDamage?.laterDamage ?? undefined;
+      // A reviewed failure the engine can't apply keeps only what a success does.
+      const saveOutcome = save
+        ? fix?.drop === "outcome"
+          ? { successDamage: statBlockSaveOutcome(action.fields.desc).successDamage, failureConditions: [] }
+          : statBlockSaveOutcome(action.fields.desc)
+        : null;
+      // Later-turn damage the engine deals itself (`ongoingDamage`) leaves the GM's reminder.
+      const laterDamage = saveDamage?.laterDamage ?? null;
+      const reminder =
+        fix?.reminder ??
+        (laterDamage !== null && saveOutcome && "ongoingDamage" in saveOutcome
+          ? withoutOngoingDamage(laterDamage)
+          : laterDamage) ??
+        undefined;
       const fromRows = row
         ? [
             ...(row.damage_die_count && row.damage_die_type
@@ -791,8 +846,7 @@ const monsters: ActorDefinition[] = creatures
               save: {
                 ability: ABILITY_BY_NAME[save[1] as keyof typeof ABILITY_BY_NAME],
                 dc: Number.parseInt(save[2], 10),
-                ...statBlockSaveOutcome(action.fields.desc),
-                ...(fix?.drop === "outcome" ? { failureConditions: [] } : {})
+                ...saveOutcome!
               }
             }
           : {}),
@@ -928,6 +982,27 @@ if (report.skipped.length > 0) {
   process.exit(1);
 }
 
+/**
+ * The upstream condition texts carry PDF-extraction glitches, fixed here so the vendored source stays
+ * byte-identical: a bullet with no space after its star, a word hyphenated across a line ("move- ment"), and
+ * Unconscious's last bullet run into the one before it.
+ */
+const CONDITION_TEXT_FIXES: Readonly<Record<string, ReadonlyArray<readonly [string, string]>>> = {
+  unconscious: [[" of you. Unaware. ", " of you. \n* Unaware. "]]
+};
+for (const id of Object.keys(CONDITION_TEXT_FIXES)) {
+  if (!conditions.some((condition) => condition.fields.document === "srd-2024" && condition.fields.describes === id))
+    throw new Error(`Condition text fix targets unknown condition ${id} - check for a typo or an upstream rename.`);
+}
+const conditionText = (id: string, text: string): string => {
+  let fixed = text.replace(/\n\*(?=\S)/g, "\n* ").replace(/([a-z])- ([a-z])/g, "$1$2");
+  for (const [from, to] of CONDITION_TEXT_FIXES[id] ?? []) {
+    if (!fixed.includes(from)) throw new Error(`Condition text fix for ${id} no longer matches - review it.`);
+    fixed = fixed.replace(from, to);
+  }
+  return fixed;
+};
+
 const conditionRecords = conditions
   .filter((condition) => condition.fields.document === "srd-2024")
   .sort((left, right) => left.pk.localeCompare(right.pk))
@@ -937,7 +1012,7 @@ const conditionRecords = conditions
       .split("-")
       .map((part) => `${part[0].toUpperCase()}${part.slice(1)}`)
       .join(" "),
-    description: condition.fields.desc
+    description: conditionText(condition.fields.describes, condition.fields.desc)
   }));
 
 /** Printed English title case: interior particles stay lowercase ("sleight-of-hand" -> "Sleight of Hand"). */

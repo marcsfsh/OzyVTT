@@ -640,7 +640,7 @@
         "raging"
        ],
        "duration": {
-        "type": "encounter"
+        "type": "until-source-turn-end"
        },
        "modifiers": [
         {
@@ -755,6 +755,17 @@
         "abilities": [
          "dex"
         ]
+       },
+       {
+        "type": "while-condition",
+        "conditionIds": [
+         "incapacitated",
+         "paralyzed",
+         "petrified",
+         "stunned",
+         "unconscious"
+        ],
+        "present": false
        }
       ]
      }
@@ -2565,7 +2576,12 @@
        "failureConditions": [
         "frightened",
         "incapacitated"
-       ]
+       ],
+       "failureDuration": {
+        "type": "rounds",
+        "rounds": 10
+       },
+       "endsOnDamage": true
       },
       "damage": []
      }
@@ -5371,7 +5387,10 @@
        "successDamage": "none",
        "failureConditions": [
         "stunned"
-       ]
+       ],
+       "failureDuration": {
+        "type": "until-source-next-turn"
+       }
       }
      }
     ]
@@ -6381,7 +6400,12 @@
        "successDamage": "none",
        "failureConditions": [
         "frightened"
-       ]
+       ],
+       "failureDuration": {
+        "type": "rounds",
+        "rounds": 10
+       },
+       "endsOnDamage": true
       }
      }
     ]
@@ -6394,6 +6418,19 @@
     "grants": {
      "conditionImmunities": [
       "frightened"
+     ],
+     "when": [
+      {
+       "type": "while-condition",
+       "conditionIds": [
+        "incapacitated",
+        "paralyzed",
+        "petrified",
+        "stunned",
+        "unconscious"
+       ],
+       "present": false
+      }
      ]
     }
    },

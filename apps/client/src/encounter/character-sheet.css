@@ -65,7 +65,8 @@
 .sheet-conditions .condition-editor {
   margin-top: 0;
 }
-.sheet-rest-block {
+.sheet-rest-block,
+.sheet-saves-owed {
   margin-top: 0.85rem;
 }
 .sheet-rest {

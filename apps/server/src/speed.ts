@@ -3,12 +3,16 @@ import { collectRiders, sumRiders } from "@vtt/rules-5e";
 import { exhaustionLevel } from "./condition-rules.js";
 import type { EquipmentDerivation } from "./equipment-derivation.js";
 
-/** Conditions that set Speed to 0 (SRD conditions appendix). */
-const SPEED_ZERO_CONDITIONS = ["grappled", "restrained", "unconscious", "paralyzed", "petrified", "stunned"] as const;
+/** Conditions that set Speed to 0 (SRD 5.2.1 conditions appendix; Stunned no longer does). */
+const SPEED_ZERO_CONDITIONS = ["grappled", "restrained", "unconscious", "paralyzed", "petrified"] as const;
 
-/** True while a condition that sets Speed to 0 is active (SRD: "your Speed is 0 and can't increase"). */
-function speedZeroed(actor: Actor): boolean {
-  return actor.conditions.some((condition) => (SPEED_ZERO_CONDITIONS as readonly string[]).includes(condition.id));
+/** True while a condition, or an effect such as Hypnotic Pattern's charm, sets Speed to 0 (SRD: "your Speed is 0
+ *  and can't increase"). */
+export function speedZeroed(actor: Actor): boolean {
+  return (
+    actor.conditions.some((condition) => (SPEED_ZERO_CONDITIONS as readonly string[]).includes(condition.id)) ||
+    actor.effects.some((effect) => effect.speedZero === true)
+  );
 }
 
 /** Current Speed in feet, before Dash: base minus 5 x exhaustion (floored at 0, so no debt carries), plus the

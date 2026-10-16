@@ -457,7 +457,20 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       "The DC is the bearer's spell save DC (a spell, or a feature that uses it), so a `spell-save-dc` rider raises it. Absent: a printed DC no rider touches, such as a breath weapon's",
     "save.successDamage": 'The damage a successful save takes: "half" (Fireball) or "none" (Sacred Flame)',
     "save.failureConditions":
-      "Every condition a failed save imposes (Turn Undead: Frightened and Incapacitated); empty for none. Exhaustion is not offered: it stacks by level"
+      "Every condition a failed save imposes (Turn Undead: Frightened and Incapacitated); empty for none. Exhaustion is not offered: it stacks by level",
+    "save.failureDuration":
+      'How long the failure\'s conditions last, read from the text: "for 1 minute" (rounds), "until the start of the X\'s next turn", "until the end of its next turn" (the target\'s) or "until the end of your next turn" (the source\'s). Absent: until ended, or with the caster\'s Concentration',
+    "save.repeatSave":
+      "The target repeats the save at the end of each of its turns; a success ends the failure's conditions",
+    "save.escapeDc":
+      "A failure that grapples: the grapple's escape DC. Its other conditions last until the grapple ends",
+    "save.endsOnDamage": "The failure's conditions end early if the target takes any damage",
+    "save.speedZero": "The failure also makes the target's Speed 0 while its conditions last (Hypnotic Pattern)",
+    "save.rangeFeet": "The save's reach: a grapple it imposes ends once a move takes the two farther apart",
+    "save.failsAtHitPoints":
+      "No save when it lands: a target with this many hit points or fewer has the failure outright and only the repeated save ends it (Power Word Stun)",
+    "save.ongoingDamage":
+      "Damage the failure's conditions bring at the start of each turn while they last, rolled and applied by the engine: on the target's own turns (bearer-turn-start) or the source's (source-turn-start, a swallow's acid)"
   },
   FeatureAttack: {
     "": 'An attack a FEATURE grants. Same vocabulary as a stat block\'s attack except the to-hit bonus is DERIVED: the feature names the ability (or "spellcasting") and the builder resolves the number.'
@@ -649,8 +662,10 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       'What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer"'
   },
   ActionOnHit: {
-    "": "On-hit riders: conditions applied to the target as ONE source-linked effect (a crocodile's Bite applies Grappled + Restrained with escape DC 15).",
-    maxTargetSize: "The rider only applies to targets of at most this size"
+    "": "On-hit riders: conditions applied to the target as ONE source-linked effect (a crocodile's Bite applies Grappled + Restrained with escape DC 15). Prone and Exhaustion stand alone.",
+    maxTargetSize: "The rider only applies to targets of at most this size",
+    duration:
+      "How long the conditions last (a lich's touch: until the start of its next turn); absent, until ended or until the grapple ends"
   },
   ActionUses: {
     "": 'Limited uses for an ACTION. Unlike a feature\'s, this vocabulary includes "recharge" - a start-of-turn d6 at or above `recharge` (and any rest) restores it. `recharge` must be present when `per` is "recharge" and absent otherwise; the server enforces the biconditional.',
@@ -665,13 +680,16 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     endsWithTag:
       "The granted effect ends when the actor loses every other effect with this tag (Frenzy's marker ends with the Rage)",
     target: "Who receives it: the acting creature, or the action's single chosen target (Help)",
-    voidWhileIncapacitated: "Benefits lapse while the bearer is incapacitated (Dodge)"
+    voidWhileIncapacitated: "Benefits lapse while the bearer is incapacitated or its Speed is 0 (Dodge)"
   },
   EffectDurationRounds: {
     "": "A fixed number of rounds."
   },
   EffectDurationUntilSourceNextTurn: {
     "": "Until the granting creature's next turn begins."
+  },
+  EffectDurationUntilSourceTurnEnd: {
+    "": "Until the end of the granting creature's next turn (Rage, which its attacks keep extending)."
   },
   EffectDurationEncounter: {
     "": "Until the encounter ends."
@@ -680,7 +698,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "": "Until the GM clears it."
   },
   EffectOnEnd: {
-    "": "What happens when the effect ends - Frenzy leaves one level of Exhaustion behind."
+    "": "What happens when the effect ends - a homebrew curse that leaves a level of Exhaustion behind."
   },
   RiderTrigger: {
     "": "WHEN a rider applies. Twenty-eight named triggers in four KINDS, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. Every trigger has a reader in the engine. This is DATA, not an expression language - every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). A `when` list may carry at most one moment: a rider fires at one moment, not two."

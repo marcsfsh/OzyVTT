@@ -609,7 +609,13 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         area: { shape: "emanation", sizeFeet: 60, widthFeet: null },
         description:
           "The staff produces a thunderclap audible out to 600 feet. Every creature within a 60-foot Emanation originating from you makes a DC 17 Constitution saving throw. On a failed save, a creature takes 2d6 Thunder damage and has the Deafened condition for 1 minute. On a successful save, a creature takes half as much damage only.",
-        save: { ability: "con", dc: 17, successDamage: "half", failureConditions: ["deafened"] },
+        save: {
+          ability: "con",
+          dc: 17,
+          successDamage: "half",
+          failureConditions: ["deafened"],
+          failureDuration: { type: "rounds", rounds: 10 }
+        },
         damage: [{ formula: "2d6", type: "thunder" }],
         uses: { limit: 1, per: "long-rest" }
       }
@@ -682,7 +688,14 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Expend 1 charge to send a thin blue ray toward a creature you can see within 60 feet. The target must succeed on a DC 15 Constitution saving throw or have the Paralyzed condition for 1 minute. At the end of each of its turns, it repeats the save, ending the effect on itself on a success.",
-        save: { ability: "con", dc: 15, successDamage: "none", failureConditions: ["paralyzed"] },
+        save: {
+          ability: "con",
+          dc: 15,
+          successDamage: "none",
+          failureConditions: ["paralyzed"],
+          failureDuration: { type: "rounds", rounds: 10 },
+          repeatSave: true
+        },
         uses: { limit: 7, per: "long-rest", pool: "wand-of-paralysis-charges" }
       }
     ]
@@ -1236,9 +1249,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `pearl-of-power` - no rider refunds a spent spell slot (`spell-slot` raises the maximum).
 
   /**
-   * Spends a charge and puts a real DC 15 Wisdom save on the target that Frightens on a failure. Not
-   * modeled: the 1-minute duration (the GM clears the condition), the
-   * repeat save, and the 24-hour immunity after a success.
+   * Spends a charge and puts a real DC 15 Wisdom save on the target that Frightens on a failure for 1 minute,
+   * repeating the save at the end of each of its turns. Not modeled: the 24-hour immunity after a success.
    */
   "pipes-of-haunting": {
     actions: [
@@ -1248,7 +1260,14 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Expend 1 charge to play an eerie, spellbinding tune. Each creature of your choice within 30 feet of you must succeed on a DC 15 Wisdom saving throw or have the Frightened condition for 1 minute. A creature that fails the save repeats it at the end of each of its turns, ending the effect on itself on a success. A creature that succeeds on its save is immune to the effect of these pipes for 24 hours.",
-        save: { ability: "wis", dc: 15, successDamage: "none", failureConditions: ["frightened"] },
+        save: {
+          ability: "wis",
+          dc: 15,
+          successDamage: "none",
+          failureConditions: ["frightened"],
+          failureDuration: { type: "rounds", rounds: 10 },
+          repeatSave: true
+        },
         uses: { limit: 3, per: "long-rest", pool: "pipes-of-haunting-charges" }
       }
     ]

@@ -209,7 +209,13 @@ export const warlock: ClassMechanicsModule = {
             activation: "other",
             description:
               "Once per turn when you hit a creature with an attack roll, the target must succeed on a Charisma saving throw or hurtle through the Lower Planes, taking 8d10 Psychic damage if it isn't a Fiend and gaining the Incapacitated condition until the end of your next turn.",
-            save: { ability: "cha", dc: "spellcasting", successDamage: "none", failureConditions: ["incapacitated"] },
+            save: {
+              ability: "cha",
+              dc: "spellcasting",
+              successDamage: "none",
+              failureConditions: ["incapacitated"],
+              failureDuration: { type: "until-source-turn-end" }
+            },
             damage: [{ formula: "8d10", type: "psychic" }]
           }
         ]

@@ -5,13 +5,14 @@ import { resolveDefinitionAction, type ResolveDependencies } from "../src/action
 import { setCondition } from "../src/actor-conditions.js";
 import { importActorDefinition } from "../src/actor-roster.js";
 import { builtinAction } from "../src/builtin-actions.js";
-import { addEffect, endEffect } from "../src/effects.js";
+import { addEffect, endEffect, makeEffect } from "../src/effects.js";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { ContentLibrary } from "../src/content-library.js";
 import { criticalThreshold, effectiveActions } from "../src/effective-actions.js";
 import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation.js";
-import { initiativeRollMode, startEncounter } from "../src/encounter.js";
-import { saveRollSources } from "../src/saving-throws.js";
+import { initiativeRollMode, nextInitiativeTurn, startEncounter } from "../src/encounter.js";
+import { answerSave, saveRollSources } from "../src/saving-throws.js";
+import { evaluateActionEconomy } from "../src/resolution/economy.js";
 import { currentSpeedFeet } from "../src/speed.js";
 
 // Barbarian, Fighter and Monk mechanics, asserted as numbers a player can act on: sheet AC, the DC a
@@ -625,7 +626,10 @@ describe("Barbarian: Intimidating Presence holds the target to the Barbarian's o
       ability: "wis",
       dc: 18,
       successDamage: "none",
-      failureConditions: ["frightened"]
+      failureConditions: ["frightened"],
+      // "for 1 minute; at the end of each of its turns it repeats the save".
+      failureDuration: { type: "rounds", rounds: 10 },
+      repeatSave: true
     });
     const resolution = use(built, "intimidating-presence", [IDS.foe]);
     expect(resolution.save).toMatchObject({ ability: "wis", dc: 18 });
@@ -636,7 +640,10 @@ describe("Barbarian: Intimidating Presence holds the target to the Barbarian's o
       ability: "wis",
       dc: 19,
       successDamage: "none",
-      failureConditions: ["frightened"]
+      failureConditions: ["frightened"],
+      // "for 1 minute; at the end of each of its turns it repeats the save".
+      failureDuration: { type: "rounds", rounds: 10 },
+      repeatSave: true
     });
   });
 
@@ -650,7 +657,10 @@ describe("Barbarian: Intimidating Presence holds the target to the Barbarian's o
       ability: "wis",
       dc: 21,
       successDamage: "none",
-      failureConditions: ["frightened"]
+      failureConditions: ["frightened"],
+      // "for 1 minute; at the end of each of its turns it repeats the save".
+      failureDuration: { type: "rounds", rounds: 10 },
+      repeatSave: true
     });
     // The number the target is held to, not just the one printed on the sheet.
     expect(use(capstone, "intimidating-presence", [IDS.foe]).save).toMatchObject({ ability: "wis", dc: 21 });
@@ -1125,7 +1135,9 @@ describe("Monk: Stunning Strike holds the target to the Monk's own DC", () => {
       ability: "con",
       dc: 15,
       successDamage: "none",
-      failureConditions: ["stunned"]
+      failureConditions: ["stunned"],
+      // "until the start of your next turn".
+      failureDuration: { type: "until-source-next-turn" }
     });
     const resolution = use(built, "stunning-strike", [IDS.foe]);
     expect(resolution.save).toMatchObject({ ability: "con", dc: 15 });
@@ -1142,7 +1154,9 @@ describe("Monk: Stunning Strike holds the target to the Monk's own DC", () => {
       ability: "con",
       dc: 21,
       successDamage: "none",
-      failureConditions: ["stunned"]
+      failureConditions: ["stunned"],
+      // "until the start of your next turn".
+      failureDuration: { type: "until-source-next-turn" }
     });
     expect(use(capstone, "stunning-strike", [IDS.foe]).save).toMatchObject({ ability: "con", dc: 21 });
   });
@@ -1194,5 +1208,177 @@ describe("Monk: Uncanny Metabolism is a counter, and the Epic Boon is a feat", (
   it("puts the level-19 boon on the sheet", () => {
     expect(featIds(build(monkInput(20)))).toEqual(["alert", "boon-of-the-night-spirit"]);
     expect(featIds(build(monkInput(11)))).toEqual(["alert"]);
+  });
+});
+
+// SRD Rage: "The Rage lasts until the end of your next turn, and it ends early if you don Heavy armor or have the
+// Incapacitated condition", each attack roll against an enemy, forced save or Bonus Action extending it; and "you
+// can't maintain Concentration, and you can't cast spells".
+describe("Barbarian: Rage lasts while it is fed, and stops spells and Concentration", () => {
+  const raging = (built: Built) => built.hero.effects.find((effect) => effect.tags.includes("raging"));
+
+  it("lasts until the end of the next turn, and an attack extends it", () => {
+    const built = onTheTable(build(barbarianInput(5)));
+    use(built, "rage");
+    expect(raging(built)!.duration).toEqual({ type: "until-source-turn-end", skipsCurrentTurn: true });
+    nextInitiativeTurn(built.state); // the Barbarian's own turn ends: the Rage holds
+    nextInitiativeTurn(built.state); // the foe's ends; the Barbarian's next turn begins
+    expect(raging(built)).toBeDefined();
+    use(built, "item-greataxe", [IDS.foe], [3, 8]);
+    nextInitiativeTurn(built.state); // it attacked, so the Rage carries over
+    nextInitiativeTurn(built.state);
+    expect(raging(built)).toBeDefined();
+    nextInitiativeTurn(built.state); // a turn with no attack ends it
+    expect(raging(built)).toBeUndefined();
+  });
+
+  it("a Bonus Action re-declaring Rage extends it for no use", () => {
+    const built = onTheTable(build(barbarianInput(5)));
+    use(built, "rage");
+    expect(built.hero.actionUses.rage).toBe(1);
+    nextInitiativeTurn(built.state);
+    nextInitiativeTurn(built.state);
+    use(built, "rage");
+    expect(built.hero.actionUses.rage).toBe(1);
+    nextInitiativeTurn(built.state);
+    expect(raging(built)).toBeDefined();
+  });
+
+  it("ends when the Barbarian is Incapacitated", () => {
+    const built = onTheTable(build(barbarianInput(5)));
+    use(built, "rage");
+    setCondition(built.state, IDS.hero, "stunned", true, undefined, { role: "gm" });
+    expect(raging(built)).toBeUndefined();
+  });
+
+  it("ends the Barbarian's Concentration, and refuses a spell while it lasts", () => {
+    const built = onTheTable(build(barbarianInput(5)));
+    addEffect(
+      built.state,
+      IDS.foe,
+      makeEffect({
+        id: "held",
+        name: "Held",
+        sourceActorId: IDS.hero,
+        concentration: true,
+        duration: { type: "manual" }
+      })
+    );
+    use(built, "rage");
+    expect(built.state.actors.find((actor) => actor.id === IDS.foe)!.effects).toEqual([]);
+    nextInitiativeTurn(built.state);
+    nextInitiativeTurn(built.state);
+    expect(() =>
+      resolveDefinitionAction(
+        built.state,
+        {
+          id: "spell-produce-flame",
+          name: "Produce Flame",
+          activation: "action",
+          description: "",
+          attack: { bonus: 4 },
+          damage: [{ formula: "1d8", type: "fire" }],
+          spellId: "produce-flame"
+        },
+        { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-999999999901" },
+        deps(built)
+      )
+    ).toThrowError(/raging and can't cast spells/);
+  });
+
+  it("ends in Heavy armor", () => {
+    const built = onTheTable(build(barbarianInput(5)));
+    use(built, "rage");
+    built.hero.inventory = [
+      ...built.hero.inventory,
+      {
+        id: "plate",
+        name: "Plate Armor",
+        quantity: 1,
+        equipped: true,
+        category: "armor",
+        armor: {
+          acBase: 18,
+          addDexModifier: false,
+          dexModifierCap: null,
+          stealthDisadvantage: true,
+          strengthRequired: 15
+        }
+      } as (typeof built.hero.inventory)[number]
+    ];
+    const swung = use(built, "item-greataxe", [IDS.foe], [3, 8]);
+    expect(raging(built)).toBeUndefined();
+    expect(swung.warnings).toContain("Ozar is wearing Heavy armor, so its Rage ends.");
+  });
+});
+
+describe("Barbarian: Danger Sense is off while Incapacitated", () => {
+  it("drops the Dexterity-save Advantage while Stunned", () => {
+    const built = onTheTable(build(barbarianInput()), { fight: false });
+    setCondition(built.state, IDS.hero, "stunned", true, undefined, { role: "gm" });
+    expect(saveRollSources(built.hero, "dex", derivationOf(built)).advantage).toEqual([]);
+  });
+});
+
+// SRD Incapacitated: "You can't take any action, Bonus Action, or Reaction" - a feature's own activation included.
+describe("Incapacitated: feature activations are refused too", () => {
+  it("refuses Action Surge while Stunned, but Indomitable still answers a failed save", () => {
+    const built = onTheTable(build(fighterInput(9)));
+    setCondition(built.state, IDS.hero, "stunned", true, undefined, { role: "gm" });
+    expect(() => use(built, "action-surge")).toThrowError(/Stunned and can't take actions/);
+    use(built, "indomitable");
+    expect(built.hero.actionUses.indomitable).toBe(1);
+  });
+
+  it("refuses a legendary action while Stunned or at 0 HP", () => {
+    const built = onTheTable(build(fighterInput(5)));
+    const foe = built.state.actors.find((actor) => actor.id === IDS.foe)!;
+    const tail = {
+      id: "tail",
+      name: "Tail",
+      activation: "other" as const,
+      description: "",
+      attack: { bonus: 9, reachFeet: 15 },
+      damage: [],
+      legendary: { cost: 1 }
+    };
+    const check = () => evaluateActionEconomy(built.state, foe, tail, [IDS.hero], undefined).violations;
+    expect(check()).toEqual([]);
+    setCondition(built.state, IDS.foe, "stunned", true, undefined, { role: "gm" });
+    expect(check().map((violation) => violation.rule)).toEqual(["condition.incapacitated"]);
+    setCondition(built.state, IDS.foe, "stunned", false, undefined, { role: "gm" });
+    foe.hp.current = 0;
+    expect(check().map((violation) => violation.rule)).toEqual(["condition.down"]);
+  });
+});
+
+describe("Monk: Stunning Strike stuns until the start of the Monk's next turn", () => {
+  it("lands as an effect from the Monk that ends when its next turn begins", () => {
+    const built = onTheTable(build(monkInput(11)));
+    use(built, "stunning-strike", [IDS.foe]);
+    const pending = built.state.combat.pendingSaves[0]!;
+    answerSave(
+      built.state,
+      "50000000-0000-4000-8000-999999999902",
+      pending.id,
+      "manual",
+      1,
+      true,
+      { role: "gm" },
+      {
+        random: () => 10,
+        newRollId: () => "50000000-0000-4000-8000-999999999903",
+        sessionId: IDS.gmSession,
+        role: "gm",
+        now: () => "2026-08-07T00:00:00.000Z",
+        resolveDefinition: () => undefined
+      }
+    );
+    const foe = built.state.actors.find((actor) => actor.id === IDS.foe)!;
+    expect(foe.conditions.map((condition) => condition.id)).toEqual(["stunned"]);
+    nextInitiativeTurn(built.state);
+    expect(foe.conditions.map((condition) => condition.id)).toEqual(["stunned"]);
+    nextInitiativeTurn(built.state);
+    expect(foe.conditions).toEqual([]);
   });
 });

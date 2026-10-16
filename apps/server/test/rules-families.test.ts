@@ -38,6 +38,8 @@ describe("rule families", () => {
       ["movement.exceeds-speed", "movement"],
       ["movement.no-movement-remaining", "movement"],
       ["movement.stand-up-cost", "movement"],
+      // Standing spends movement, which only your own turn has.
+      ["movement.stand-up-off-turn", "movement"],
       ["economy.action-used", "economy"],
       ["economy.bonus-action-used", "economy"],
       ["economy.reaction-used", "economy"],
@@ -47,6 +49,9 @@ describe("rule families", () => {
       // Being incapacitated or down is "you have no actions" - economy, not a targeting rule.
       ["condition.incapacitated", "economy"],
       ["condition.down", "economy"],
+      // Ending what someone else imposed skips the action or save its rules ask for; a raging Barbarian can't cast.
+      ["condition.imposed", "economy"],
+      ["condition.raging", "economy"],
       ["legendary.own-turn", "economy"],
       // An extra attack waits on the swing that opens it: a matter of what this turn has done.
       ["attack.light-needs-attack", "economy"],

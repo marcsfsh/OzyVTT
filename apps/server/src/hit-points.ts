@@ -17,9 +17,14 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { requireActorAccess, requireGm, type Initiator } from "./authorization.js";
 import { CommandRejectedError } from "./game-store.js";
 import {
+  addEffect,
   applyCondition,
   endConcentrationSustainedBy,
+  endEffectsOnDamage,
   endEffectsSustainedBy,
+  endKnockOut,
+  KNOCKED_OUT_TAG,
+  makeEffect,
   removeConditionDirect,
   type EffectNarration
 } from "./effects.js";
@@ -53,7 +58,7 @@ export type DamageInput = Readonly<{
   sourceName?: string | null;
   /** The creature that dealt it, when known; its damage can open the target's strike-back reaction. */
   sourceActorId?: string | null;
-  /** Knocking out a creature (SRD): a nonlethal drop to 0 leaves it Unconscious and stable. */
+  /** Knocking out a creature (SRD): a melee attack that would drop it to 0 leaves it at 1 HP and Unconscious. */
   nonlethal?: boolean;
 }>;
 export type DamageDeps = Readonly<{
@@ -219,7 +224,7 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
     };
     const resisted = (adjustment: DamageApplication["parts"][number]["adjustment"]) =>
       adjustment === "resistance" || adjustment === "resistance-and-vulnerability";
-    // SRD Petrified: resistance to all damage + immunity to poison, on top of innate/effect defenses.
+    // SRD 5.2.1 Petrified: resistance to all damage (its poison immunity is to the condition, not the damage).
     const petrified = actor.conditions.some((condition) => condition.id === "petrified");
     // SRD Underwater Combat: everything fully underwater has resistance to fire damage.
     const underwater = state.combat.active && state.combat.underwater;
@@ -236,7 +241,7 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
     flatReduction = reduction.reduced;
     const adjusted = adjustDamageParts(reduction.parts, {
       resistances: [...types(standing.resistances), ...(underwater ? ["fire"] : [])],
-      immunities: [...types(standing.immunities), ...(petrified ? ["poison"] : [])],
+      immunities: types(standing.immunities),
       // Effects and items can make a target vulnerable as a stat block can; a same-type resistance cancels it.
       vulnerabilities: types(standing.vulnerabilities),
       resistAll: petrified
@@ -253,8 +258,8 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
         petrified &&
         choiceSource === null &&
         derivedSource === null &&
-        ((resisted(part.adjustment) && !innateHas(innate.resistances)) ||
-          (part.adjustment === "immunity" && type === "poison" && !innateHas(innate.immunities)))
+        resisted(part.adjustment) &&
+        !innateHas(innate.resistances)
           ? "Petrified"
           : null;
       const underwaterSource =
@@ -330,6 +335,11 @@ export function applyDamageDetailed(
   actor.hp.temporary -= absorbed;
   const damageToHp = totalAdjusted - absorbed;
   actor.hp.current = Math.max(0, hpBefore - damageToHp);
+  // SRD Knocking Out a Creature: a melee attack that would drop it to 0 can leave it at 1 HP and Unconscious instead.
+  const knockedOut = input.nonlethal === true && !wasAtZero && actor.hp.current === 0 && damageToHp > 0;
+  if (knockedOut) actor.hp.current = 1;
+  // Sleep, Turn Undead and the like end the moment the bearer takes any damage.
+  if (totalAdjusted > 0) events.push(...endEffectsOnDamage(state, actor));
 
   let deathSaveFailuresAdded = 0;
   let instantDeath = false;
@@ -346,18 +356,31 @@ export function applyDamageDetailed(
     instantDeath = outcome.dead && damageToHp >= actor.hp.maximum;
     applyCondition(actor, "unconscious", { immunities: deps });
     applyCondition(actor, "prone", { immunities: deps });
+  } else if (knockedOut) {
+    // Unconscious until it regains any hit points (or first aid, which the GM ends by hand). No dying, no defeat.
+    addEffect(
+      state,
+      actor.id,
+      makeEffect({
+        id: `${deps?.commandId ?? deps?.newId?.() ?? `${actor.id}:${hpBefore}`}:knocked-out`,
+        name: "Knocked out",
+        tags: [KNOCKED_OUT_TAG],
+        sourceActorId: input.sourceActorId ?? null,
+        sourceName: input.sourceName ?? null,
+        startedRound: state.combat.round,
+        duration: { type: "manual" },
+        linkedConditionIds: ["unconscious"]
+      }),
+      events,
+      deps
+    );
+    events.push({
+      kind: "condition",
+      text: `${actor.name} was knocked out - Unconscious at 1 HP until it regains hit points.`,
+      actorId
+    });
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0) {
-    if (input.nonlethal === true) {
-      // Knocking out (SRD): the target drops to 0, Unconscious and stable (no death saves, no defeat).
-      if (isPlayerCharacter) actor.deathSaves = { successes: 0, failures: 0, stable: true };
-      applyCondition(actor, "unconscious", { immunities: deps });
-      applyCondition(actor, "prone", { immunities: deps });
-      events.push({
-        kind: "condition",
-        text: `${actor.name} was knocked out - Unconscious and stable at 0 HP.`,
-        actorId
-      });
-    } else if (isPlayerCharacter) {
+    if (isPlayerCharacter) {
       const overflow = damageToHp - hpBefore;
       const outcome = droppedToZero(overflow, actor.hp.maximum);
       actor.deathSaves = outcome.state;
@@ -379,8 +402,9 @@ export function applyDamageDetailed(
   }
 
   // SRD Concentration: damage while concentrating prompts a CON save, DC max(10, half the damage) capped
-  // at 30. The prompt carries the effects a committed failure ends. Skipped without an id-minter.
-  if (totalAdjusted > 0 && actor.hp.current > 0 && deps?.newId && state.combat.active) {
+  // at 30, in a fight or out of one (a trap between fights). The prompt carries the effects a committed failure
+  // ends. Skipped without an id-minter.
+  if (totalAdjusted > 0 && actor.hp.current > 0 && deps?.newId) {
     const sustained: Array<{ actorId: string; effectId: string }> = [];
     for (const bearer of state.actors) {
       for (const effect of bearer.effects) {
@@ -451,6 +475,7 @@ export function applyDamage(state: GameState, actorId: string, amount: number, s
 /** Healing caps at maximum and never restores temp HP; healing from 0 clears dying and Unconscious (not Prone). */
 export function healActor(state: GameState, actorId: string, amount: number, scope: Initiator): EffectNarration[] {
   const actor = adjustableActor(state, actorId, scope);
+  const before = actor.hp.current;
   const wasDying = actor.hp.current <= 0 && actor.deathSaves !== null;
   actor.hp.current = Math.min(actor.hp.maximum, actor.hp.current + amount);
   const events: EffectNarration[] = [];
@@ -458,6 +483,25 @@ export function healActor(state: GameState, actorId: string, amount: number, sco
     actor.deathSaves = null;
     removeConditionDirect(actor, "unconscious");
     events.push({ kind: "condition", text: `${actor.name} regained consciousness.`, actorId });
+  }
+  events.push(...wakeOnHealing(state, actor, before));
+  return events;
+}
+
+/** SRD: an Unconscious creature at 0 HP, or one knocked out at 1, stays so "until it regains any Hit Points". */
+function wakeOnHealing(state: GameState, actor: Actor, before: number): EffectNarration[] {
+  if (actor.hp.current <= before) return [];
+  const events = endKnockOut(state, actor);
+  // A creature knocked out before the 1-HP rule (at 0, with no dying state) wakes the same way.
+  if (
+    before <= 0 &&
+    actor.deathSaves === null &&
+    actor.conditions.some((condition) => condition.id === "unconscious")
+  ) {
+    if (!actor.effects.some((effect) => effect.linkedConditionIds.includes("unconscious"))) {
+      removeConditionDirect(actor, "unconscious");
+      events.push({ kind: "condition", text: `${actor.name} regained consciousness.`, actorId: actor.id });
+    }
   }
   return events;
 }
@@ -483,11 +527,13 @@ export function setCurrentHp(state: GameState, actorId: string, current: number,
     if (actor.kind === "player-character" && actor.deathSaves === null) {
       actor.deathSaves = { successes: 0, failures: 0, stable: false };
       applyCondition(actor, "unconscious");
-      applyCondition(actor, "prone");
       events.push({ kind: "condition", text: `${actor.name} fell Unconscious and is dying.`, actorId });
     }
+    // The same transition as damage to 0: what it sustains ends, and so does its Concentration.
     events.push(...endEffectsSustainedBy(state, actor.id));
+    events.push(...endConcentrationSustainedBy(state, actor.id));
   }
+  events.push(...wakeOnHealing(state, actor, before));
   return events;
 }
 

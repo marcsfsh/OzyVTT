@@ -134,6 +134,7 @@ export function openResolve(
     reactionPrompts: [],
     builtinSave: null,
     opens: null,
+    castId: null,
     hitRiders: []
   };
   if (builtin?.prepare) ctx.action = builtin.prepare(ctx);

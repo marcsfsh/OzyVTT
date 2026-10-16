@@ -26,8 +26,12 @@ export type HealthBand = "healthy" | "bloodied" | "down";
 /** Player characters stay exact for the whole party; monsters/NPCs reach players only as a band so the GM keeps exact numbers. */
 export type PlayerHp =
   { kind: "exact"; current: number; maximum: number; temporary: number } | { kind: "band"; band: HealthBand };
-/** An effect as players see it: source ids never cross the wire, and a hidden source's name is masked server-side (viewer safety). */
-export type PlayerEffect = Omit<EffectInstance, "sourceActorId" | "sourceActionId">;
+/** An effect as players see it: source ids never cross the wire, and a hidden source's name is masked server-side
+ * (viewer safety). Its ongoing damage stays with the GM, since the dice are the stat block's. `yours` marks one the
+ * viewing player's own character is the source of (their grapple, their Concentration), which they may end. */
+export type PlayerEffect = Omit<EffectInstance, "sourceActorId" | "sourceActionId" | "castId" | "ongoingDamage"> & {
+  yours?: true;
+};
 /** A creature as one player sees it. Their own claimed character gets everything; another player's is limited by
  * `GameState.partyVisibility` (see apps/server/src/projections.ts). */
 /** Actor fields every player receives for every visible actor (apps/server/src/projections.ts). */
@@ -80,8 +84,10 @@ export type PlayerInitiativeEntry = Readonly<{
   conditions: readonly string[];
 }>;
 export type PlayerAnnotation = Omit<Annotation, "ownerSessionId"> & { mine: boolean };
-/** A player's own pending saves only; source actor ids and concentration effect references never cross the wire, and a hidden source's name is masked server-side. */
-export type PlayerPendingSave = Omit<PendingSave, "sourceActorId" | "endsEffects">;
+/** A player's own pending saves only; source actor ids and effect references never cross the wire, and a hidden source's name is masked server-side. */
+export type PlayerPendingSave = Omit<PendingSave, "sourceActorId" | "endsEffects" | "repeatOf" | "onFailEffect"> & {
+  onFailEffect?: Omit<NonNullable<PendingSave["onFailEffect"]>, "castId" | "sourceActionId" | "ongoingDamage">;
+};
 /** A player's own pending reaction prompts only, masked like saves; the parked attack stays with the GM, since it names
  *  the attacker's action and how it was rolled. */
 export type PlayerPendingReaction = Omit<PendingReaction, "sourceActorId" | "parkedAttack">;

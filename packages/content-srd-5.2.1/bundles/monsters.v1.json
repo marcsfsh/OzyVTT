@@ -733,7 +733,10 @@
      "successDamage": "none",
      "failureConditions": [
       "incapacitated"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [],
     "area": {
@@ -934,7 +937,10 @@
      "successDamage": "none",
      "failureConditions": [
       "deafened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [
      {
@@ -1304,7 +1310,10 @@
      "successDamage": "none",
      "failureConditions": [
       "incapacitated"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     }
     },
     "damage": [
      {
@@ -2040,7 +2049,10 @@
      "successDamage": "none",
      "failureConditions": [
       "incapacitated"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [],
     "area": {
@@ -3114,7 +3126,10 @@
      "successDamage": "none",
      "failureConditions": [
       "incapacitated"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [],
     "area": {
@@ -3315,7 +3330,10 @@
      "successDamage": "none",
      "failureConditions": [
       "deafened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [
      {
@@ -3685,7 +3703,10 @@
      "successDamage": "none",
      "failureConditions": [
       "incapacitated"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     }
     },
     "damage": [
      {
@@ -4421,7 +4442,10 @@
      "successDamage": "none",
      "failureConditions": [
       "incapacitated"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [],
     "area": {
@@ -5729,6 +5753,18 @@
      {
       "formula": "5d6",
       "type": "poison"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "poisoned"
+       }
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
      }
     ]
    },
@@ -7234,6 +7270,18 @@
       "formula": "1d8 + 3",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "poisoned"
+       }
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
+     }
     ]
    },
    {
@@ -7369,10 +7417,19 @@
      "failureConditions": [
       "blinded",
       "restrained"
-     ]
+     ],
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "6d6",
+        "type": "acid"
+       }
+      ],
+      "at": "source-turn-start"
+     }
     },
     "damage": [],
-    "reminder": "While swallowed, a creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the behir, and takes 21 (6d6) Acid damage at the start of each of the behir's turns."
+    "reminder": "While swallowed, a creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the behir."
    },
    {
     "id": "bite",
@@ -7404,8 +7461,11 @@
      "dc": 18,
      "successDamage": "none",
      "failureConditions": [
-      "grappled"
-     ]
+      "grappled",
+      "restrained"
+     ],
+     "escapeDc": 16,
+     "rangeFeet": 5
     },
     "damage": [
      {
@@ -8511,6 +8571,18 @@
       "formula": "4d8",
       "type": "poison"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "poisoned"
+       }
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
+     }
     ]
    }
   ],
@@ -8665,7 +8737,10 @@
      "successDamage": "none",
      "failureConditions": [
       "incapacitated"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [],
     "area": {
@@ -9075,7 +9150,9 @@
      "successDamage": "none",
      "failureConditions": [
       "grappled"
-     ]
+     ],
+     "escapeDc": 13,
+     "rangeFeet": 10
     },
     "damage": []
    },
@@ -9830,6 +9907,9 @@
       "conditions": [
        {
         "id": "grappled"
+       },
+       {
+        "id": "restrained"
        }
       ],
       "escapeDc": 14,
@@ -9848,7 +9928,10 @@
      "successDamage": "none",
      "failureConditions": [
       "restrained"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
     },
     "damage": [
      {
@@ -10184,8 +10267,14 @@
      "dc": 13,
      "successDamage": "none",
      "failureConditions": [
-      "poisoned"
-     ]
+      "poisoned",
+      "paralyzed"
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "repeatSave": true
     },
     "damage": []
    }
@@ -10442,7 +10531,10 @@
      "successDamage": "none",
      "failureConditions": [
       "frightened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
     },
     "damage": [],
     "area": {
@@ -10632,6 +10724,18 @@
      {
       "formula": "3d6 + 8",
       "type": "thunder"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "incapacitated"
+       }
+      ],
+      "duration": {
+       "type": "until-bearer-turn-end"
+      }
      }
     ]
    },
@@ -10938,7 +11042,9 @@
      "successDamage": "none",
      "failureConditions": [
       "grappled"
-     ]
+     ],
+     "escapeDc": 12,
+     "rangeFeet": 5
     },
     "damage": [
      {
@@ -11183,6 +11289,18 @@
       "formula": "1d12 + 5",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "poisoned"
+       }
+      ],
+      "duration": {
+       "type": "until-source-turn-end"
+      }
+     }
     ]
    },
    {
@@ -11206,8 +11324,11 @@
      "dc": 15,
      "successDamage": "none",
      "failureConditions": [
-      "grappled"
-     ]
+      "grappled",
+      "restrained"
+     ],
+     "escapeDc": 13,
+     "rangeFeet": 5
     },
     "damage": [
      {
@@ -12363,7 +12484,8 @@
      "successDamage": "none",
      "failureConditions": [
       "restrained"
-     ]
+     ],
+     "repeatSave": true
     },
     "damage": [],
     "reminder": "At the start of each of its turns, the Restrained target takes 21 (6d6) Thunder damage."
@@ -12514,7 +12636,12 @@
      "successDamage": "none",
      "failureConditions": [
       "frightened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "repeatSave": true
     },
     "damage": [],
     "uses": {
@@ -12899,7 +13026,10 @@
      "successDamage": "none",
      "failureConditions": [
       "poisoned"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [],
     "uses": {
@@ -13437,7 +13567,10 @@
      "successDamage": "none",
      "failureConditions": [
       "blinded"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
     },
     "damage": [],
     "uses": {
@@ -14368,6 +14501,18 @@
      {
       "formula": "1d4",
       "type": "poison"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "poisoned"
+       }
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
      }
     ]
    },
@@ -15524,7 +15669,16 @@
      "successDamage": "half",
      "failureConditions": [
       "restrained"
-     ]
+     ],
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "3d6",
+        "type": "acid"
+       }
+      ],
+      "at": "source-turn-start"
+     }
     },
     "damage": [
      {
@@ -15532,7 +15686,7 @@
       "type": "acid"
      }
     ],
-    "reminder": "An engulfed target is suffocating, can't cast spells with a Verbal component, has the Restrained condition, and takes 10 (3d6) Acid damage at the start of each of the cube's turns."
+    "reminder": "An engulfed target is suffocating, can't cast spells with a Verbal component, has the Restrained condition."
    }
   ],
   "token": {
@@ -15664,7 +15818,10 @@
      "successDamage": "none",
      "failureConditions": [
       "paralyzed"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [
      {
@@ -15804,7 +15961,10 @@
      "successDamage": "none",
      "failureConditions": [
       "frightened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     }
     },
     "damage": [
      {
@@ -15999,7 +16159,10 @@
      "successDamage": "none",
      "failureConditions": [
       "paralyzed"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [
      {
@@ -16546,6 +16709,18 @@
       "formula": "1d4 + 2",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "poisoned"
+       }
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
+     }
     ]
    }
   ],
@@ -16658,7 +16833,9 @@
      "successDamage": "none",
      "failureConditions": [
       "grappled"
-     ]
+     ],
+     "escapeDc": 14,
+     "rangeFeet": 10
     },
     "damage": [
      {
@@ -18826,6 +19003,18 @@
       "formula": "2d6 + 2",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "poisoned"
+       }
+      ],
+      "duration": {
+       "type": "until-bearer-turn-end"
+      }
+     }
     ]
    }
   ],
@@ -19247,7 +19436,10 @@
      "successDamage": "none",
      "failureConditions": [
       "blinded"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
     },
     "damage": [
      {
@@ -21570,7 +21762,10 @@
      "successDamage": "half",
      "failureConditions": [
       "blinded"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     }
     },
     "damage": [
      {
@@ -21849,8 +22044,10 @@
      "dc": 11,
      "successDamage": "none",
      "failureConditions": [
-      "charmed"
-     ]
+      "charmed",
+      "incapacitated"
+     ],
+     "repeatSave": true
     },
     "damage": [],
     "area": {
@@ -22356,6 +22553,18 @@
      {
       "formula": "2d10 + 5",
       "type": "bludgeoning"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "poisoned"
+       }
+      ],
+      "duration": {
+       "type": "until-bearer-turn-end"
+      }
      }
     ]
    }
@@ -22913,7 +23122,10 @@
      "successDamage": "none",
      "failureConditions": [
       "poisoned"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
     },
     "damage": [
      {
@@ -24100,7 +24312,17 @@
      "successDamage": "none",
      "failureConditions": [
       "grappled"
-     ]
+     ],
+     "escapeDc": 13,
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "2d6",
+        "type": "thunder"
+       }
+      ],
+      "at": "source-turn-start"
+     }
     },
     "damage": [
      {
@@ -24108,7 +24330,7 @@
       "type": "thunder"
      }
     ],
-    "reminder": "Until the grapple ends, the target can't cast spells with a Verbal component and takes 7 (2d6) Thunder damage at the start of each of the stalker's turns."
+    "reminder": "Until the grapple ends, the target can't cast spells with a Verbal component."
    }
   ],
   "token": {
@@ -24856,6 +25078,9 @@
       "conditions": [
        {
         "id": "grappled"
+       },
+       {
+        "id": "restrained"
        }
       ],
       "escapeDc": 20
@@ -24874,7 +25099,10 @@
      "failureConditions": [
       "blinded",
       "poisoned"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
     },
     "damage": [],
     "legendary": {
@@ -24935,7 +25163,16 @@
      "successDamage": "none",
      "failureConditions": [
       "restrained"
-     ]
+     ],
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "7d6",
+        "type": "acid"
+       }
+      ],
+      "at": "bearer-turn-start"
+     }
     },
     "damage": [
      {
@@ -24943,7 +25180,7 @@
       "type": "piercing"
      }
     ],
-    "reminder": "A swallowed creature has the Restrained condition, has Total Cover against attacks and other effects outside the kraken, and takes 24 (7d6) Acid damage at the start of each of its turns."
+    "reminder": "A swallowed creature has the Restrained condition, has Total Cover against attacks and other effects outside the kraken."
    }
   ],
   "token": {
@@ -25403,6 +25640,18 @@
       "formula": "3d6 + 5",
       "type": "cold"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "paralyzed"
+       }
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
+     }
     ]
    },
    {
@@ -25560,7 +25809,10 @@
      "successDamage": "none",
      "failureConditions": [
       "frightened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     }
     },
     "damage": []
    }
@@ -26432,8 +26684,11 @@
      "dc": 17,
      "successDamage": "none",
      "failureConditions": [
-      "grappled"
-     ]
+      "grappled",
+      "restrained"
+     ],
+     "escapeDc": 14,
+     "rangeFeet": 5
     },
     "damage": [
      {
@@ -26936,6 +27191,18 @@
      {
       "formula": "1d4 + 4",
       "type": "piercing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "poisoned"
+       }
+      ],
+      "duration": {
+       "type": "until-source-turn-end"
+      }
      }
     ]
    },
@@ -27616,7 +27883,10 @@
      "successDamage": "none",
      "failureConditions": [
       "frightened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
     },
     "damage": []
    }
@@ -27803,7 +28073,10 @@
      "successDamage": "none",
      "failureConditions": [
       "paralyzed"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
     },
     "damage": [
      {
@@ -27937,7 +28210,12 @@
      "successDamage": "none",
      "failureConditions": [
       "frightened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "endsOnDamage": true
     },
     "damage": [
      {
@@ -28966,6 +29244,18 @@
       "formula": "2d6 + 2",
       "type": "psychic"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "frightened"
+       }
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
+     }
     ]
    },
    {
@@ -29092,7 +29382,16 @@
       "type": "piercing"
      }
     ],
-    "reminder": "The hit gives the target the Poisoned condition. Whenever the Poisoned target finishes a Long Rest, it makes a DC 15 Constitution save: on a failure its Hit Point maximum decreases by 5 (1d10); on a success the Poisoned condition ends."
+    "reminder": "The hit gives the target the Poisoned condition. Whenever the Poisoned target finishes a Long Rest, it makes a DC 15 Constitution save: on a failure its Hit Point maximum decreases by 5 (1d10); on a success the Poisoned condition ends.",
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "poisoned"
+       }
+      ]
+     }
+    ]
    },
    {
     "id": "tentacle",
@@ -29132,7 +29431,10 @@
      "successDamage": "half",
      "failureConditions": [
       "stunned"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     }
     },
     "damage": [
      {
@@ -29885,7 +30187,10 @@
      "successDamage": "none",
      "failureConditions": [
       "charmed"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     }
     },
     "damage": []
    }
@@ -29973,7 +30278,10 @@
      "successDamage": "none",
      "failureConditions": [
       "charmed"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     }
     },
     "damage": []
    },
@@ -30130,7 +30438,21 @@
      "successDamage": "none",
      "failureConditions": [
       "poisoned"
-     ]
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "repeatSave": true,
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "6d6",
+        "type": "poison"
+       }
+      ],
+      "at": "bearer-turn-start"
+     }
     },
     "damage": [
      {
@@ -30138,7 +30460,7 @@
       "type": "piercing"
      }
     ],
-    "reminder": "While Poisoned, the target can't regain Hit Points and takes 21 (6d6) Poison damage at the start of each of its turns, and it repeats the save at the end of each of its turns, ending the effect on itself on a success."
+    "reminder": "While Poisoned, the target can't regain Hit Points, and it repeats the save at the end of each of its turns, ending the effect on itself on a success."
    },
    {
     "id": "devilish-claw",
@@ -31286,10 +31608,19 @@
      "failureConditions": [
       "blinded",
       "restrained"
-     ]
+     ],
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "5d6",
+        "type": "acid"
+       }
+      ],
+      "at": "source-turn-start"
+     }
     },
     "damage": [],
-    "reminder": "A swallowed creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the worm, and takes 17 (5d6) Acid damage at the start of each of the worm's turns."
+    "reminder": "A swallowed creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the worm."
    },
    {
     "id": "bite",
@@ -31311,6 +31642,9 @@
       "conditions": [
        {
         "id": "grappled"
+       },
+       {
+        "id": "restrained"
        }
       ],
       "escapeDc": 19,
@@ -31433,6 +31767,18 @@
       "formula": "1d4 + 3",
       "type": "slashing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "poisoned"
+       }
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
+     }
     ]
    },
    {
@@ -31446,7 +31792,12 @@
      "successDamage": "none",
      "failureConditions": [
       "frightened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "repeatSave": true
     },
     "damage": [],
     "uses": {
@@ -31606,7 +31957,10 @@
      "failureConditions": [
       "frightened",
       "incapacitated"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     }
     },
     "damage": [
      {
@@ -32183,6 +32537,9 @@
       "conditions": [
        {
         "id": "grappled"
+       },
+       {
+        "id": "restrained"
        }
       ],
       "escapeDc": 17,
@@ -32202,10 +32559,23 @@
      "failureConditions": [
       "blinded",
       "restrained"
-     ]
+     ],
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "3d6",
+        "type": "acid"
+       },
+       {
+        "formula": "3d6",
+        "type": "fire"
+       }
+      ],
+      "at": "source-turn-start"
+     }
     },
     "damage": [],
-    "reminder": "A swallowed creature has the Blinded and Restrained conditions, it has Total Cover against attacks and other effects outside the remorhaz, and it takes 10 (3d6) Acid damage plus 10 (3d6) Fire damage at the start of each of the remorhaz's turns."
+    "reminder": "A swallowed creature has the Blinded and Restrained conditions, it has Total Cover against attacks and other effects outside the remorhaz."
    }
   ],
   "token": {
@@ -32548,6 +32918,9 @@
       "conditions": [
        {
         "id": "grappled"
+       },
+       {
+        "id": "restrained"
        }
       ],
       "escapeDc": 19,
@@ -32674,6 +33047,9 @@
       "conditions": [
        {
         "id": "grappled"
+       },
+       {
+        "id": "poisoned"
        }
       ],
       "escapeDc": 14
@@ -33200,8 +33576,11 @@
      "dc": 15,
      "successDamage": "none",
      "failureConditions": [
-      "grappled"
-     ]
+      "grappled",
+      "restrained"
+     ],
+     "escapeDc": 14,
+     "rangeFeet": 10
     },
     "damage": [
      {
@@ -34015,11 +34394,24 @@
      "dc": 15,
      "successDamage": "none",
      "failureConditions": [
-      "grappled"
-     ]
+      "grappled",
+      "blinded",
+      "restrained"
+     ],
+     "escapeDc": 14,
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "3d6",
+        "type": "lightning"
+       }
+      ],
+      "at": "bearer-turn-start"
+     },
+     "rangeFeet": 5
     },
     "damage": [],
-    "reminder": "Until the grapple ends, the target has the Blinded and Restrained conditions, and it takes 10 (3d6) Lightning damage at the start of each of its turns."
+    "reminder": "Until the grapple ends, the target has the Blinded and Restrained conditions."
    }
   ],
   "token": {
@@ -34404,7 +34796,10 @@
      "successDamage": "none",
      "failureConditions": [
       "incapacitated"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [],
     "area": {
@@ -34621,7 +35016,11 @@
      "successDamage": "none",
      "failureConditions": [
       "blinded"
-     ]
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     }
     },
     "damage": [],
     "legendary": {
@@ -35016,7 +35415,10 @@
      "successDamage": "none",
      "failureConditions": [
       "incapacitated"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     }
     },
     "damage": [
      {
@@ -35212,7 +35614,11 @@
      "successDamage": "half",
      "failureConditions": [
       "frightened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     }
     },
     "damage": [],
     "reminder": "Roar runs its First Roar (Frightened for 1 minute). The Second Roar (Paralyzed) and Third Roar (Con save, 44 (8d10) Thunder damage and Prone, half on a success) are applied by hand.",
@@ -35730,6 +36136,18 @@
      {
       "formula": "1",
       "type": "piercing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "charmed"
+       }
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
      }
     ]
    },
@@ -36525,6 +36943,21 @@
      {
       "formula": "2d12 + 9",
       "type": "lightning"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "blinded"
+       },
+       {
+        "id": "deafened"
+       }
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
      }
     ]
    },
@@ -37413,7 +37846,10 @@
      "successDamage": "none",
      "failureConditions": [
       "deafened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     }
     },
     "damage": [],
     "uses": {
@@ -37644,10 +38080,19 @@
      "failureConditions": [
       "blinded",
       "restrained"
-     ]
+     ],
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "16d6",
+        "type": "acid"
+       }
+      ],
+      "at": "source-turn-start"
+     }
     },
     "damage": [],
-    "reminder": "A swallowed creature has the Blinded and Restrained conditions and can't teleport, it has Total Cover against attacks and other effects outside the tarrasque, and it takes 56 (16d6) Acid damage at the start of each of the tarrasque's turns."
+    "reminder": "A swallowed creature has the Blinded and Restrained conditions and can't teleport, it has Total Cover against attacks and other effects outside the tarrasque."
    },
    {
     "id": "bite",
@@ -37669,6 +38114,9 @@
       "conditions": [
        {
         "id": "grappled"
+       },
+       {
+        "id": "restrained"
        }
       ],
       "escapeDc": 20
@@ -37744,7 +38192,10 @@
      "failureConditions": [
       "deafened",
       "frightened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [
      {
@@ -39757,10 +40208,19 @@
      "successDamage": "none",
      "failureConditions": [
       "poisoned"
-     ]
+     ],
+     "repeatSave": true,
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "1d10",
+        "type": "poison"
+       }
+      ],
+      "at": "bearer-turn-start"
+     }
     },
     "damage": [],
-    "reminder": "While Poisoned, the target takes 5 (1d10) Poison damage at the start of each of its turns.",
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -39783,7 +40243,10 @@
      "successDamage": "none",
      "failureConditions": [
       "stunned"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
     },
     "damage": [
      {
@@ -40471,8 +40934,19 @@
      "dc": 15,
      "successDamage": "half",
      "failureConditions": [
-      "grappled"
-     ]
+      "grappled",
+      "restrained"
+     ],
+     "escapeDc": 14,
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "2d8",
+        "type": "bludgeoning"
+       }
+      ],
+      "at": "source-turn-start"
+     }
     },
     "damage": [
      {
@@ -40480,7 +40954,7 @@
       "type": "bludgeoning"
      }
     ],
-    "reminder": "Until the grapple ends, the target has the Restrained condition, is suffocating unless it can breathe water, and takes 9 (2d8) Bludgeoning damage at the start of each of the elemental's turns.",
+    "reminder": "Until the grapple ends, the target has the Restrained condition, is suffocating unless it can breathe water.",
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -42420,6 +42894,18 @@
       "formula": "7d6",
       "type": "poison"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "poisoned"
+       }
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
+     }
     ]
    }
   ],
@@ -43001,7 +43487,10 @@
      "successDamage": "none",
      "failureConditions": [
       "incapacitated"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [],
     "area": {
@@ -43943,7 +44432,10 @@
      "successDamage": "none",
      "failureConditions": [
       "incapacitated"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [],
     "area": {

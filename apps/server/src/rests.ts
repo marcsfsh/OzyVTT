@@ -5,7 +5,7 @@ import { pactSlotMaximum, spellSlotMaxima } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
 import { effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
-import { endEffect, removeConditionDirect, type EffectNarration } from "./effects.js";
+import { endEffectsAtLongRest, removeConditionDirect, type EffectNarration } from "./effects.js";
 import { requireActorAccess, type Initiator } from "./authorization.js";
 import { healActor } from "./hit-points.js";
 
@@ -71,7 +71,7 @@ function clearOverrides(overrides: Actor["choiceOverrides"], kind: "long" | "sho
 /**
  * Applies a rest to a rostered actor outside combat (SRD Resting, ADR-0020).
  * Short: per-short-rest and recharge pools re-arm; healing is only by spending Hit Point Dice.
- * Long: remaining effects end first (onEnd grants land), then HP to max, temp HP cleared, dying
+ * Long: Concentration and turn-measured effects end first (onEnd grants land), then HP to max, temp HP cleared, dying
  * cleared, all pools refreshed, all Hit Point Dice restored, Exhaustion drops one level.
  */
 export function applyRest(
@@ -102,7 +102,8 @@ export function applyRest(
     actor.choiceOverrides = clearOverrides(actor.choiceOverrides, "short");
     return events;
   }
-  for (const effect of [...actor.effects]) events.push(...endEffect(state, actorId, effect.id));
+  // Eight hours of sleep: Concentration ends and turn-measured effects lapse; "until ended" ones (a curse) stay.
+  events.push(...endEffectsAtLongRest(state, actorId));
   actor.hp.current = actor.hp.maximum;
   actor.hp.temporary = 0;
   // Every die size in the pool comes back, not just the largest (SRD 5.2.1 "Regain All HP").

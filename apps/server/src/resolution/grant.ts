@@ -1,4 +1,4 @@
-import { addEffect, makeEffect, type EffectNarration } from "../effects.js";
+import { addEffect, makeEffect, turnEndDuration, type EffectNarration } from "../effects.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { currentSpeedFeet } from "../speed.js";
 import type { ResolveContext } from "./context.js";
@@ -38,7 +38,11 @@ export function applyGrant(ctx: ResolveContext): void {
       sourceActionId: action.id,
       startedRound: state.combat.round,
       duration:
-        grant.duration.type === "rounds" ? { type: "rounds", remaining: grant.duration.rounds } : grant.duration,
+        grant.duration.type === "rounds"
+          ? { type: "rounds", remaining: grant.duration.rounds }
+          : grant.duration.type === "until-source-turn-end"
+            ? turnEndDuration(state, "until-source-turn-end", attacker.id)
+            : grant.duration,
       endsWhenSourceDefeated: true,
       voidWhileIncapacitated: grant.voidWhileIncapacitated,
       modifiers: grant.modifiers,

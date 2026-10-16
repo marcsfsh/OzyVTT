@@ -1331,7 +1331,10 @@
        "successDamage": "none",
        "failureConditions": [
         "incapacitated"
-       ]
+       ],
+       "failureDuration": {
+        "type": "until-source-turn-end"
+       }
       },
       "damage": [
        {
@@ -1708,6 +1711,19 @@
     "grants": {
      "conditionImmunities": [
       "charmed"
+     ],
+     "when": [
+      {
+       "type": "while-condition",
+       "conditionIds": [
+        "incapacitated",
+        "paralyzed",
+        "petrified",
+        "stunned",
+        "unconscious"
+       ],
+       "present": false
+      }
      ]
     }
    },
@@ -1916,7 +1932,12 @@
        "successDamage": "none",
        "failureConditions": [
         "frightened"
-       ]
+       ],
+       "failureDuration": {
+        "type": "rounds",
+        "rounds": 10
+       },
+       "repeatSave": true
       }
      }
     ]

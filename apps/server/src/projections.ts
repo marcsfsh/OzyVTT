@@ -118,12 +118,12 @@ export function projectPlayerAnnotations(
 }
 
 // The one mask a hidden source's identity collapses to; shared so adjacent fields never disagree.
-const HIDDEN_SOURCE = "A hidden threat";
+export const HIDDEN_SOURCE = "A hidden threat";
 
 /** Scrubs a hidden source's name out of a free-form label ("Grappled by Vashkar") at the security
  *  boundary, since resolvers interpolate it and blanking would leave an empty chip. Word-boundary match;
  *  it can't catch other spellings, so resolvers must only interpolate the source's own `sourceName`. */
-function withoutSourceName(text: string, sourceName: string | null): string {
+export function withoutSourceName(text: string, sourceName: string | null): string {
   const needle = sourceName?.trim() ?? "";
   if (needle.length === 0) return text;
   const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -151,26 +151,40 @@ const PENDING_SAVE_FIELDS = {
   targetActorId: "player",
   ability: "player",
   dc: "player",
-  actionName: "player",
   proposedDamage: "player",
   proposedDamageParts: "player",
   halfOnSuccess: "player",
   conditionIds: "player",
   saveBonus: "player",
   createdAt: "player",
+  // A repeated save is named for its effect, which can name a hidden source.
+  actionName: "derived",
   sourceName: "derived",
   onFailEffect: "derived",
   sourceActorId: "never",
-  endsEffects: "never"
+  endsEffects: "never",
+  // Names the effect a repeated save would end; the prompt's action name already says which.
+  repeatOf: "never"
 } as const satisfies Record<keyof PendingSave, FieldAudience>;
 
+// How long what a failure imposes would last is the save's own text, read on the prompt by the one who owes it.
+// Its ongoing damage dice are the stat block's, so they stay with the GM; the damage itself shows when it lands.
 const ON_FAIL_EFFECT_FIELDS = {
   tags: "player",
   linkedConditionIds: "player",
   escapeDc: "player",
+  duration: "player",
+  repeatSave: "player",
+  endsOnDamage: "player",
+  speedZero: "player",
+  endsWhenSourceDefeated: "player",
+  rangeFeet: "player",
   name: "derived",
   sourceName: "derived",
-  sourceActorId: "derived"
+  sourceActorId: "derived",
+  castId: "never",
+  sourceActionId: "never",
+  ongoingDamage: "never"
 } as const satisfies Record<keyof NonNullable<PendingSave["onFailEffect"]>, FieldAudience>;
 
 const PENDING_REACTION_FIELDS = {
@@ -284,9 +298,11 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
       .map((entry) => {
         const onFail = entry.onFailEffect;
         const onFailHidden = onFail !== undefined && isHiddenSource(onFail.sourceActorId, publicActorIds);
+        const hiddenSource = isHiddenSource(entry.sourceActorId, publicActorIds);
         return {
           ...copyPlayerFields(entry, PENDING_SAVE_FIELDS),
-          sourceName: isHiddenSource(entry.sourceActorId, publicActorIds) ? HIDDEN_SOURCE : entry.sourceName,
+          actionName: hiddenSource ? withoutSourceName(entry.actionName, entry.sourceName) : entry.actionName,
+          sourceName: hiddenSource ? HIDDEN_SOURCE : entry.sourceName,
           ...(onFail
             ? {
                 onFailEffect: {
@@ -311,13 +327,23 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
   };
 }
 
-/** An effect as players see it: no source ids, and a hidden source masked in both `sourceName` and `name`. */
+/** An effect as players see it: no source or cast ids or ongoing damage dice, and a hidden source masked in both
+ *  `sourceName` and `name`. `yours` marks one the viewer's own character is the source of, which they may end (their
+ *  grapple, their Concentration); a hidden source is never a player's character, so the flag says nothing about one. */
 function playerEffect(
   effect: GameState["actors"][number]["effects"][number],
-  publicActorIds: ReadonlySet<string>
+  publicActorIds: ReadonlySet<string>,
+  yourActorIds: ReadonlySet<string> = new Set()
 ): PlayerEffect {
-  const { sourceActorId, sourceActionId: _sourceActionId, ...visible } = effect;
-  if (!isHiddenSource(sourceActorId, publicActorIds)) return visible;
+  const {
+    sourceActorId,
+    sourceActionId: _sourceActionId,
+    castId: _castId,
+    ongoingDamage: _ongoingDamage,
+    ...visible
+  } = effect;
+  const yours = sourceActorId !== null && yourActorIds.has(sourceActorId) ? { yours: true as const } : {};
+  if (!isHiddenSource(sourceActorId, publicActorIds)) return { ...visible, ...yours };
   return { ...visible, name: withoutSourceName(visible.name, effect.sourceName), sourceName: HIDDEN_SOURCE };
 }
 
@@ -426,6 +452,12 @@ export function projectPlayerView(
     state.actors.filter((actor) => actor.visibility === "public" && !actor.archived).map((actor) => actor.id)
   );
   const tier = state.partyVisibility;
+  // The viewer's own characters, so the effects they are the source of are marked theirs to end.
+  const yourActorIds = new Set(
+    state.actors
+      .filter((actor) => playerSessionId !== undefined && actor.ownerSessionId === playerSessionId)
+      .map((actor) => actor.id)
+  );
   return {
     revision: state.revision,
     // The tier actually applied, so the client can tell "no sheet" from "sheet withheld".
@@ -484,7 +516,7 @@ export function projectPlayerView(
         return {
           ...pickFields(source, source.kind === "player-character" ? PARTY_FIELDS : TABLE_FIELDS),
           hp: playerHp(source),
-          effects: source.effects.map((effect) => playerEffect(effect, publicActorIds)),
+          effects: source.effects.map((effect) => playerEffect(effect, publicActorIds, yourActorIds)),
           claimStatus:
             ownerSessionId === null ? ("available" as const) : mine ? ("mine" as const) : ("claimed" as const),
           presence: ownerSessionId === null ? null : presenceFor(ownerSessionId),

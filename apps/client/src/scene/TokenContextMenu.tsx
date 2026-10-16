@@ -234,7 +234,13 @@ export function TokenContextMenu({
         <summary className="token-context-conditions-summary">
           Conditions{actor.conditions.length > 0 ? ` (${actor.conditions.length})` : ""}
         </summary>
-        <ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={setFeedback} />
+        <ConditionEditor
+          actorId={actor.id}
+          conditions={actor.conditions}
+          effects={actor.effects}
+          viewer={role}
+          onFeedback={setFeedback}
+        />
       </details>
       <button
         type="button"

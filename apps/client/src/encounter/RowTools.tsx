@@ -47,7 +47,13 @@ export function RowTools({
           onEscape={onClose}
           onFeedback={onFeedback}
         />
-        <ConditionEditor actorId={actor.id} conditions={actor.conditions} onFeedback={onFeedback} />
+        <ConditionEditor
+          actorId={actor.id}
+          conditions={actor.conditions}
+          effects={actor.effects}
+          viewer="gm"
+          onFeedback={onFeedback}
+        />
         <EffectChips actorId={actor.id} effects={actor.effects} canEnd onFeedback={onFeedback} />
         <CoverControl actor={actor} onFeedback={onFeedback} />
         {/* The GM settles ties the dice leave: this combatant can go just before anyone sharing its score. */}

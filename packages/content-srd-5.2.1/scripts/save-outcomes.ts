@@ -1,18 +1,42 @@
 /**
  * What a save does, read from the SRD text once at build time so the engine never reads prose: the damage
- * a success takes and the condition a failure imposes. Each reader covers one printing style, the override
+ * a success takes, the conditions a failure imposes and how they end (a duration, a save repeated at the end of
+ * each turn, the grapple's escape DC, taking damage). Each reader covers one printing style, the override
  * table holds the reviewed cases a reader gets wrong, and `test/save-outcomes.test.ts` pins known ones.
  */
-import { SaveConditionSchema, type SaveCondition } from "@vtt/schemas";
+import {
+  DamageTypeSchema,
+  SaveConditionSchema,
+  type OngoingDamage,
+  type SaveCondition,
+  type SaveFailureDuration
+} from "@vtt/schemas";
 
-export type SaveOutcome = { successDamage: "half" | "none"; failureConditions: SaveCondition[] };
+export type SaveOutcome = {
+  successDamage: "half" | "none";
+  failureConditions: SaveCondition[];
+  failureDuration?: SaveFailureDuration;
+  repeatSave?: true;
+  escapeDc?: number;
+  endsOnDamage?: true;
+  speedZero?: true;
+  rangeFeet?: number;
+  failsAtHitPoints?: number;
+  ongoingDamage?: OngoingDamage;
+};
 
 const CONDITIONS: ReadonlySet<string> = new Set(SaveConditionSchema.options);
 
+const conditionIdsOf = (names: string): SaveCondition[] =>
+  names
+    .split(/,? (?:and )?/)
+    .map((name) => name.toLowerCase())
+    .filter((id): id is SaveCondition => CONDITIONS.has(id));
+
 /**
  * The conditions the first "has the X condition" or "has the X and Y conditions" names. Only the first
- * phrase: later ones are usually conditional ("Failure by 5 or More", "while Charmed") or describe what the
- * first condition already does, and the engine applies everything it is given on any failure.
+ * phrase: later ones are usually conditional ("Failure by 5 or More") or describe what the first condition
+ * already does; the "while X, also Y" and "until the grapple ends" sentences are read separately.
  */
 function namedConditions(clause: string): SaveCondition[] {
   const match = clause.match(
@@ -20,39 +44,165 @@ function namedConditions(clause: string): SaveCondition[] {
   );
   if (!match) return [];
   // "X or Y" is a choice, not both: keep the first, as the engine cannot pick.
-  const names = /\bor\b/.test(match[1]) ? [match[1].split(/,? or /)[0]!] : match[1].split(/,? (?:and )?/);
-  return [...new Set(names.map((name) => name.toLowerCase()).filter((id) => CONDITIONS.has(id)))] as SaveCondition[];
+  const names = /\bor\b/.test(match[1]) ? match[1].split(/,? or /)[0]! : match[1];
+  return [...new Set(conditionIdsOf(names))];
+}
+
+/** "While Charmed, the creature has the Incapacitated condition" and "it has the Restrained condition until the
+ *  grapple ends": conditions that last exactly as long as the first, so they ride the same effect. */
+function companionConditions(clause: string, first: readonly SaveCondition[]): SaveCondition[] {
+  const found: SaveCondition[] = [];
+  for (const match of clause.matchAll(
+    /\bWhile ([A-Z][a-z]+)(?: (?:in this way|this way))?, the (?:target|creature) (?:also )?has the ([A-Z][a-z]+(?: and [A-Z][a-z]+)?) conditions?/g
+  )) {
+    if (first.includes(match[1].toLowerCase() as SaveCondition)) found.push(...conditionIdsOf(match[2]));
+  }
+  if (first.includes("grappled")) {
+    for (const match of clause.matchAll(
+      /\b(?:it|the target) has the ([A-Z][a-z]+(?: and [A-Z][a-z]+)?) conditions? until the grapple ends|\bUntil the grapple ends, the target has the ([A-Z][a-z]+(?: and [A-Z][a-z]+)?) conditions?/g
+    ))
+      found.push(...conditionIdsOf(match[1] ?? match[2]!));
+  }
+  return found;
+}
+
+/**
+ * How long the failure's conditions last, from the first duration phrase after them: "until the end of its next
+ * turn" is the target's turn, "until the end of the ghoul's / your next turn" the source's, "until the start of ...
+ * next turn" the source's start, "for 1 minute" ten rounds (as does "After 1 minute, it succeeds automatically").
+ * Longer spans (an hour, a day) and "for the duration" are left to their own ending (Concentration, the GM).
+ */
+export function failureDurationOf(clause: string): SaveFailureDuration | undefined {
+  const timed = clause.match(
+    /\buntil the (start|end) of (its|your|the [A-Za-z' -]+?(?:'s|s')) next turn\b|\bfor (1|10) minutes?\b|\bAfter (1|10) minutes?, it succeeds automatically\b/
+  );
+  if (!timed) return undefined;
+  if (timed[3] ?? timed[4]) return { type: "rounds", rounds: (timed[3] ?? timed[4]) === "1" ? 10 : 100 };
+  if (timed[1] === "start") return { type: "until-source-next-turn" };
+  return timed[2] === "its" ? { type: "until-bearer-turn-end" } : { type: "until-source-turn-end" };
+}
+
+/** "Repeats the save at the end of each of its turns" in its printings, ending on a success. A save repeated a
+ *  set number of times (Flesh to Stone's three) or once (a basilisk's next turn) is left to the GM. */
+function repeatsEachTurn(clause: string): boolean {
+  if (/\bthree (?:times|successes|of these)\b/i.test(clause)) return false;
+  return /\b(?:repeats? the save|makes? (?:another|a) [A-Z][a-z]+ saving throw) at the end of each of its turns\b|\bAt the end of each of its turns(?: and [^,.]+)?,? (?:the target |it )?(?:repeats the save|makes another [A-Z][a-z]+ saving throw)/i.test(
+    clause
+  );
+}
+
+const ENDS_ON_DAMAGE =
+  /\bif it takes (?:any )?damage\b|\buntil it takes damage\b|\bends early if the target takes (?:any )?damage\b|\bends for the target if it takes damage\b|\bIf it takes any damage\b/;
+
+const DICE = String.raw`\d+ \((\d+d\d+(?: [+-] \d+)?)\) ([A-Z][a-z]+) damage`;
+/** "takes 21 (6d6) Acid damage at the start of each of the behir's turns", one or two typed terms. */
+const ONGOING_DAMAGE = new RegExp(
+  String.raw`\btakes ${DICE}(?: plus ${DICE})? at the start of each of (its|the [A-Za-z' -]+?(?:'s|s')) turns\b`
+);
+
+/**
+ * Damage the failure's conditions bring at the start of each turn while they last: on the target's turns ("each of
+ * its turns") or the source's ("each of the behir's turns"). Damage at the end of a turn, or on a hit-point
+ * threshold, is left to the GM.
+ */
+function ongoingDamageOf(clause: string): OngoingDamage | undefined {
+  const match = clause.match(ONGOING_DAMAGE);
+  if (!match) return undefined;
+  const damage = [
+    [match[1], match[2]],
+    [match[3], match[4]]
+  ].flatMap(([formula, type]) => {
+    const parsed = DamageTypeSchema.safeParse(type?.toLowerCase());
+    return formula && parsed.success ? [{ formula, type: parsed.data }] : [];
+  });
+  if (damage.length === 0) return undefined;
+  return { damage, at: match[5] === "its" ? "bearer-turn-start" : "source-turn-start" };
+}
+
+/** The reminder text without the ongoing damage the engine now deals: the clause is cut from its sentence, and a
+ *  sentence that was only that damage goes. Null when nothing is left to remind. */
+export function withoutOngoingDamage(text: string): string | null {
+  const clause = new RegExp(String.raw`,? and (?:it )?${ONGOING_DAMAGE.source.replace(/^\\b/, "")}`);
+  const kept = text.split(/(?<=\.)\s+/).flatMap((sentence) => {
+    if (!ONGOING_DAMAGE.test(sentence)) return [sentence];
+    const cut = sentence.replace(clause, "");
+    return cut === sentence ? [] : [cut];
+  });
+  return kept.length > 0 ? kept.join(" ") : null;
+}
+
+/** Everything a failure clause says about its conditions' lifetime. */
+function failureLifetime(clause: string, first: readonly SaveCondition[]): Omit<SaveOutcome, "successDamage"> {
+  const failureConditions = [...new Set([...first, ...companionConditions(clause, first)])].slice(0, 4);
+  if (failureConditions.length === 0) return { failureConditions };
+  const escape = first.includes("grappled") ? clause.match(/\(escape DC (\d+)\)/) : null;
+  const duration = failureDurationOf(clause);
+  const ongoing = ongoingDamageOf(clause);
+  return {
+    failureConditions,
+    ...(duration ? { failureDuration: duration } : {}),
+    ...(repeatsEachTurn(clause) ? { repeatSave: true as const } : {}),
+    ...(escape ? { escapeDc: Number.parseInt(escape[1]!, 10) } : {}),
+    ...(ENDS_ON_DAMAGE.test(clause) ? { endsOnDamage: true as const } : {}),
+    ...(/\ba Speed of 0\b/.test(clause) ? { speedZero: true as const } : {}),
+    ...(ongoing ? { ongoingDamage: ongoing } : {})
+  };
 }
 
 /**
  * A 2024 stat-block save: "Failure: ... Success: Half damage." The failure clause runs from "Failure:" (or
  * "First Failure") to the next label; a success that is not printed does nothing, so only an explicit
- * "Success: Half damage" halves. "Failure or Success:" lines apply either way and are not the success line.
+ * "Success: Half damage" halves. "Failure or Success:" lines apply either way and are not the success line, and
+ * "Failure by 5 or More" is a further branch, not part of the plain failure. The save's reach ("within 10 feet")
+ * is a grapple's range.
  */
 export function statBlockSaveOutcome(description: string): SaveOutcome {
   const start = description.search(/\b(?:First Failure|Failure:)/);
   const tail = start === -1 ? "" : description.slice(start);
-  const end = tail.search(/\b(?:Failure or Success:|Success:|Second Failure|Subsequent Failures:)/);
+  const end = tail.search(
+    /\b(?:Failure or Success:|Success:|Second Failure|Subsequent Failures:|Failure by \d+ or More)|\s-\s(?:Second|Third) /
+  );
   const failure = end === -1 ? tail : tail.slice(0, end);
   const success = /(?<!or )\bSuccess:\s*Half damage\b/.test(description);
-  return { successDamage: success ? "half" : "none", failureConditions: namedConditions(failure) };
+  const lifetime = failureLifetime(failure, namedConditions(failure));
+  const reach =
+    lifetime.escapeDc !== undefined ? description.slice(0, Math.max(0, start)).match(/\bwithin (\d+) feet\b/) : null;
+  return {
+    successDamage: success ? "half" : "none",
+    ...lifetime,
+    ...(reach ? { rangeFeet: Number.parseInt(reach[1]!, 10) } : {})
+  };
 }
 
 /**
  * A spell's save, from its running prose: half when the text halves the damage of a successful save ("or
- * half as much damage on a successful one"), and the condition the failure sentence names ("must succeed on
- * a Wisdom saving throw or have the Charmed condition", "On a failed save, ... has the Restrained condition").
+ * half as much damage on a successful one"), the condition the failure sentence names ("must succeed on
+ * a Wisdom saving throw or have the Charmed condition", "On a failed save, ... has the Restrained condition"), and
+ * how the spell says it ends. "For the duration" conditions end with the spell (its Concentration).
  */
 function spellSaveOutcome(description: string): SaveOutcome {
   const half =
     /half as much(?: damage)?(?: only)?(?: on a success|,? on a successful| if it succeeds)|successful save[^.]*\bhalf\b/i.test(
       description
     );
-  const failureSentences = description
-    .split(/(?<=[.!?])\s+/)
+  const sentences = description.split(/(?<=[.!?])\s+/);
+  const failureIndex = sentences.findIndex((sentence) =>
+    /saving throw,? or\b|failed save|fails (?:the|its|a|this) save|on a failure/i.test(sentence)
+  );
+  const failureSentences = sentences
     .filter((sentence) => /saving throw,? or\b|failed save|fails (?:the|its|a|this) save|on a failure/i.test(sentence))
     .join(" ");
-  return { successDamage: half ? "half" : "none", failureConditions: namedConditions(failureSentences) };
+  const first = namedConditions(failureSentences);
+  // The failure sentence and the ones after it, where spells say what else the condition does and how it ends.
+  const after = failureIndex === -1 ? "" : sentences.slice(failureIndex).join(" ");
+  const duration = failureDurationOf(failureSentences);
+  const lifetime = failureLifetime(after, first);
+  const { failureDuration: _later, ...rest } = lifetime;
+  return {
+    successDamage: half ? "half" : "none",
+    ...rest,
+    ...(duration && first.length > 0 ? { failureDuration: duration } : {})
+  };
 }
 
 /** Reviewed corrections, keyed by spell id; each says why the reader is wrong there. */
@@ -62,12 +212,19 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   // The ray is rolled per target (Restrained is only the indigo ray), so no single condition applies.
   "prismatic-spray": { failureConditions: [] },
   // The first save's Thunder damage is all or nothing; the halving is the turn-3 lightning's.
-  "storm-of-vengeance": { successDamage: "none" }
+  "storm-of-vengeance": { successDamage: "none" },
+  // No save at the cast: 150 HP or fewer is Stunned outright, then a Constitution save at the end of each of its
+  // turns ends it. (A tougher target's Speed 0 until your next turn is left to the GM.)
+  "power-word-stun": { failureConditions: ["stunned"], repeatSave: true, failsAtHitPoints: 150 },
+  // Three successes or three failures, not one repeat: the GM keeps count.
+  "flesh-to-stone": { repeatSave: undefined },
+  contagion: { repeatSave: undefined }
 };
 
-/** `spellSaveOutcome` with the reviewed corrections applied. */
+/** `spellSaveOutcome` with the reviewed corrections applied. Unset fields an override names are dropped. */
 export function spellSaveOutcomeFor(spellId: string, description: string): SaveOutcome {
-  return { ...spellSaveOutcome(description), ...SPELL_SAVE_OVERRIDES[spellId] };
+  const merged: SaveOutcome = { ...spellSaveOutcome(description), ...SPELL_SAVE_OVERRIDES[spellId] };
+  return Object.fromEntries(Object.entries(merged).filter(([, value]) => value !== undefined)) as SaveOutcome;
 }
 
 /** Every override must still name a spell, so a renamed id fails the build instead of going quiet. */

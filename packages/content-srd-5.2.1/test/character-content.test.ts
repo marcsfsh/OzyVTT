@@ -247,7 +247,10 @@ describe("character-builder content records", () => {
       ability: "wis",
       dc: "spellcasting",
       successDamage: "none",
-      failureConditions: ["frightened", "incapacitated"]
+      failureConditions: ["frightened", "incapacitated"],
+      // "for 1 minute ... ends early on the creature if it takes any damage".
+      failureDuration: { type: "rounds", rounds: 10 },
+      endsOnDamage: true
     });
     // Divine Order is a level-1 choice between the two printed sacred roles.
     const order = cleric.features.find((feature) => feature.id === "divine-order")!;

@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { ActorDefinitionSchema, ActorSchema, HealthDisplaySchema } from "@vtt/schemas";
+import {
+  ActorDefinitionSchema,
+  ActorSchema,
+  EffectInstanceSchema,
+  HealthDisplaySchema,
+  SaveFailureDurationSchema
+} from "@vtt/schemas";
 
 /** An imported stat block persisted with the campaign: the inert definition plus the id actors reference via `definitionId`. */
 export const StoredDefinitionSchema = z
@@ -223,8 +229,29 @@ export const PendingSaveSchema = z
           .default([]),
         escapeDc: z.number().int().min(1).max(40).nullable().default(null),
         sourceActorId: z.uuid().nullable().default(null),
-        sourceName: z.string().max(120).nullable().default(null)
+        sourceName: z.string().max(120).nullable().default(null),
+        /** How long it lasts, as the text prints it; absent is until ended. */
+        duration: SaveFailureDurationSchema.optional(),
+        /** The save the target repeats at the end of each of its turns, a success ending the effect. */
+        repeatSave: EffectInstanceSchema.shape.repeatSave,
+        endsOnDamage: z.boolean().optional(),
+        speedZero: z.boolean().optional(),
+        /** A grapple: it ends with its source's defeat, and when a move takes them farther apart than `rangeFeet`. */
+        endsWhenSourceDefeated: z.boolean().optional(),
+        rangeFeet: EffectInstanceSchema.shape.rangeFeet,
+        /** The Concentration cast it belongs to: it is sustained by the caster's Concentration, and is not applied
+         * once that has ended. */
+        castId: z.string().min(1).max(120).optional(),
+        /** The action it came from, so a second hit from the same action refreshes rather than stacks. */
+        sourceActionId: z.string().max(120).optional(),
+        /** Damage the effect deals at the start of a turn while it lasts (a swallow's acid). */
+        ongoingDamage: EffectInstanceSchema.shape.ongoingDamage
       })
+      .strict()
+      .optional(),
+    /** A save the bearer repeats at the end of its turn: a success ends this effect. Stripped from player projections. */
+    repeatOf: z
+      .object({ actorId: z.uuid(), effectId: z.string().min(1).max(120) })
       .strict()
       .optional(),
     createdAt: z.number().int().nonnegative()
@@ -433,7 +460,13 @@ export type RuleExceptions = z.infer<typeof RuleExceptionsSchema>;
 export const DEFAULT_RULE_EXCEPTIONS: RuleExceptions = { slots: "assisted" };
 
 /** Closed list: `rules.answer` replays the parked payload under GM authority. */
-export const AskableCommandSchema = z.enum(["action.resolve", "action.use", "token.move", "actor.set-condition"]);
+export const AskableCommandSchema = z.enum([
+  "action.resolve",
+  "action.use",
+  "token.move",
+  "actor.set-condition",
+  "effect.end"
+]);
 export type AskableCommand = z.infer<typeof AskableCommandSchema>;
 
 /** A player's parked "Ask the GM": a blocked command waiting for the GM to allow or deny it. The owner is not

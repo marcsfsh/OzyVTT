@@ -558,7 +558,9 @@ describe("Fiend Patron: Hurl Through Hell rolls its 8d10 and holds the target to
       dc: 18,
       spellcasting: true,
       successDamage: "none",
-      failureConditions: ["incapacitated"]
+      failureConditions: ["incapacitated"],
+      // "until the end of your next turn": the Warlock's.
+      failureDuration: { type: "until-source-turn-end" }
     });
     expect(built.definition.spellcasting!.saveDc).toBe(18);
 

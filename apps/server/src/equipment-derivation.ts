@@ -21,6 +21,7 @@ import {
   type RollModeSource
 } from "@vtt/rules-5e";
 import { isIncapacitated } from "./condition-rules.js";
+import { speedZeroed } from "./speed.js";
 import {
   castAction,
   extraAttackAction,
@@ -242,12 +243,12 @@ function characterGatedGrants(
   return gated;
 }
 
-/** The actor's live effects as rider carriers. An effect that lapses while its bearer is incapacitated (Dodge)
- *  carries nothing then. */
+/** The actor's live effects as rider carriers. An effect that lapses while its bearer is incapacitated or its Speed
+ *  is 0 (Dodge) carries nothing then. */
 function effectCarriers(actor: Actor): RiderCarrier[] {
-  const incapacitated = isIncapacitated(actor);
+  const lapsed = isIncapacitated(actor) || speedZeroed(actor) || actor.speedFeet === 0;
   return actor.effects.flatMap((effect) => {
-    if (effect.voidWhileIncapacitated && incapacitated) return [];
+    if (effect.voidWhileIncapacitated && lapsed) return [];
     const modifiers = effect.modifiers.filter(notItemScoped);
     if (modifiers.length === 0) return [];
     return [

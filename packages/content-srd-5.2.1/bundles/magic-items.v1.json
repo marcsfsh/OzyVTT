@@ -4927,7 +4927,12 @@
      "successDamage": "none",
      "failureConditions": [
       "frightened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "repeatSave": true
     }
    }
   ],
@@ -7728,7 +7733,11 @@
      "successDamage": "half",
      "failureConditions": [
       "deafened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     }
     }
    }
   ],
@@ -8626,7 +8635,12 @@
      "successDamage": "none",
      "failureConditions": [
       "paralyzed"
-     ]
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "repeatSave": true
     }
    }
   ],
