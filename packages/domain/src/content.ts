@@ -281,7 +281,9 @@ export const ContentClassSummarySchema = z.strictObject({
       armor: z.array(slug()),
       weapons: z.array(slug()),
       tools: z.array(slug()),
-      skillChoices: ContentChoiceListSchema.nullable()
+      skillChoices: ContentChoiceListSchema.nullable(),
+      /** "One Musical Instrument of your choice" (Bard); null when the class keeps no tool pick. */
+      toolChoices: ContentChoiceListSchema.nullable()
     })
     .nullable(),
   /** Ability minimums for multiclassing into this class; `mode: "any"` covers "STR 13 or DEX 13". Null = always allowed. Display only; the server re-validates. */
