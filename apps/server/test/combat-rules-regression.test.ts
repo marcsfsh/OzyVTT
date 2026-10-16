@@ -1858,6 +1858,31 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     expect(moveRules(stunned, IDS.torva, { x: 5, y: 0 }, { x: 30, y: 0 }).prompts).toHaveLength(0);
   });
 
+  // SRD Opportunity Attacks: "a creature that you can see leaves your reach".
+  it("no prompt when the enemy can't see the mover: an Invisible mover, or a Blinded enemy without Blindsight", () => {
+    const unseen = buildGame();
+    place(unseen, IDS.croc1, 0, 0);
+    unseen.actors.find((actor) => actor.id === IDS.torva)!.conditions = [{ id: "invisible" }];
+    expect(moveRules(unseen, IDS.torva, { x: 5, y: 0 }, { x: 30, y: 0 }).prompts).toHaveLength(0);
+
+    const blinded = buildGame();
+    place(blinded, IDS.croc1, 0, 0);
+    blinded.actors.find((actor) => actor.id === IDS.croc1)!.conditions = [{ id: "blinded" }];
+    expect(moveRules(blinded, IDS.torva, { x: 5, y: 0 }, { x: 30, y: 0 }).prompts).toHaveLength(0);
+
+    // Blindsight reaching the mover's starting space sees it either way.
+    const sensing = buildGame();
+    place(sensing, IDS.croc1, 0, 0);
+    const croc = sensing.actors.find((actor) => actor.id === IDS.croc1)!;
+    croc.conditions = [{ id: "blinded" }];
+    const stored = sensing.definitions.find((entry) => entry.id === croc.definitionId)!;
+    stored.definition = {
+      ...stored.definition,
+      extensions: { ...stored.definition.extensions, "open5e.srd-2024": { senses: ["blindsight 10 ft."] } }
+    };
+    expect(moveRules(sensing, IDS.torva, { x: 5, y: 0 }, { x: 30, y: 0 }).prompts).toHaveLength(1);
+  });
+
   it("answering the opportunity prompt swings a real melee attack and auto-applies the damage", () => {
     const game = buildGame();
     place(game, IDS.croc1, 0, 0);
