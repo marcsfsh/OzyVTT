@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { BuilderPolicy, ContentClassSummary } from "@vtt/domain";
+import type { BuilderOffer, BuilderPolicy, ContentClassSummary } from "@vtt/domain";
 import type { BuilderCatalogs } from "../content/catalogs";
 import {
   buildCreatePayload,
@@ -126,19 +126,59 @@ describe("the ability step for a multiclass draft", () => {
     expect(reason([10, 7])).toBe("A d6 roll is 1-6 - fix the level 3 entry.");
   });
 
-  it("says which class's multiclass minimum the scores miss", () => {
+  it("says which class's multiclass minimum the scores miss, as the table does", () => {
     const draft = withClassAdded(fighterAt(2), "wizard");
-    const reason = (int: number) =>
+    const reason = (scores: Record<string, number>) =>
       stepBlockedReason(
         "abilities",
-        scored(draft, { str: 15, dex: 10, con: 14, int, wis: 10, cha: 8 }),
+        scored(draft, { str: 15, dex: 10, con: 14, int: 13, wis: 10, cha: 8, ...scores }),
         catalogs,
         [],
         pointBuyPolicy
       );
-    expect(reason(12)).toBe(
-      "Multiclassing needs 13 in each class's primary ability: Wizard needs Intelligence 13; you have 12."
+    expect(reason({ int: 12 })).toBe("To take Wizard at level 3: Wizard needs Intelligence 13; you have 12.");
+    expect(reason({})).toBeNull();
+    // The class already taken needs its own 13 too.
+    expect(reason({ str: 12, dex: 12 })).toBe(
+      "To take Wizard at level 3: Your Fighter needs Strength 13 or Dexterity 13; you have Strength 12 and Dexterity 12."
     );
-    expect(reason(13)).toBeNull();
+  });
+
+  it("checks a class with the scores of the level it is taken at, so a later improvement doesn't count", () => {
+    // An Ability Score Improvement at level 4 raises Intelligence 12 to 14.
+    const improvement: BuilderOffer = {
+      key: "feature:ability-score-improvement@4",
+      step: "features",
+      featureId: "ability-score-improvement",
+      kind: "asi-or-feat",
+      label: "Ability Score Improvement",
+      help: null,
+      capacity: 1,
+      options: [{ id: "asi", name: "Ability Score Improvement" }],
+      maxSpellLevel: null,
+      maximum: null,
+      level: 4,
+      classId: "fighter",
+      unresolvable: null,
+      unavailable: null
+    };
+    const reason = (draft: BuilderDraft) =>
+      stepBlockedReason(
+        "abilities",
+        {
+          ...scored(draft, { str: 15, dex: 10, con: 14, int: 12, wis: 10, cha: 8 }),
+          picks: { [improvement.key]: ["asi"] },
+          asiIncreases: { [improvement.key]: [{ ability: "int", amount: 2 }] }
+        },
+        catalogs,
+        [improvement],
+        pointBuyPolicy
+      );
+    // The Wizard at level 2 comes before the improvement, so Intelligence is still 12.
+    expect(reason(withClassLevels(withClassAdded(fighterAt(1), "wizard"), "fighter", 4))).toBe(
+      "To take Wizard at level 2: Wizard needs Intelligence 13; you have 12."
+    );
+    // At level 5 it comes after: Intelligence 14.
+    expect(reason(withClassAdded(fighterAt(4), "wizard"))).toBeNull();
   });
 });

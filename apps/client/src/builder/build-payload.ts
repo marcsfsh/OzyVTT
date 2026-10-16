@@ -19,7 +19,7 @@ import {
   abilityModifier,
   hitDieFaces,
   isPointBuyLegal,
-  meetsMulticlassMinimums,
+  multiclassShortfalls,
   multiclassShortfallText,
   pointBuyRemaining,
   POINT_BUY_BUDGET,
@@ -302,12 +302,14 @@ export function baseScoresOf(draft: BuilderDraft): Record<Ability, number | null
 /**
  * The bonuses the client can see: the background spread, the species' printed increases, and the
  * player's own ability picks (ASI split, feat `ability-score` picks). Riders that raise scores stay
- * server-side, so this is a preview; the server's total is what lands on the sheet.
+ * server-side, so this is a preview; the server's total is what lands on the sheet. With `beforeLevel`, only the
+ * picks of earlier levels count: the scores a class taken at that level is checked with.
  */
 export function abilityBonusesOf(
   draft: BuilderDraft,
   catalogs: BuilderCatalogs,
-  offers: readonly BuilderOffer[]
+  offers: readonly BuilderOffer[],
+  beforeLevel = Number.POSITIVE_INFINITY
 ): Record<Ability, number> {
   const bonuses = Object.fromEntries(ABILITIES.map((ability) => [ability, 0])) as Record<Ability, number>;
   for (const entry of draft.backgroundBonus) bonuses[entry.ability] += entry.amount;
@@ -316,6 +318,7 @@ export function abilityBonusesOf(
     if (ABILITIES.includes(bonus.ability as Ability)) bonuses[bonus.ability as Ability] += bonus.amount;
   }
   for (const offer of offers) {
+    if (offer.level >= beforeLevel) continue;
     if (offer.kind === "asi-or-feat") {
       for (const increase of draft.asiIncreases[offer.key] ?? []) {
         if ((draft.picks[offer.key] ?? [])[0] === ASI_SHORTHAND) bonuses[increase.ability] += increase.amount;
@@ -328,6 +331,34 @@ export function abilityBonusesOf(
     }
   }
   return bonuses;
+}
+
+/**
+ * Why a multiclass draft's scores can't take one of its classes, in the table's words, or null when they can (SRD
+ * Multiclassing: 13 in the primary ability of the new class and of each class already taken). Like the server, each
+ * class is checked with the scores of the level it is taken at, so an improvement taken later doesn't count.
+ */
+export function multiclassShortfallOf(
+  draft: BuilderDraft,
+  catalogs: BuilderCatalogs,
+  offers: readonly BuilderOffer[]
+): string | null {
+  const base = baseScoresOf(draft);
+  if (ABILITIES.some((ability) => base[ability] == null)) return null;
+  const sequence = classSequenceOf(draft);
+  const recordsOf = (ids: readonly string[]) =>
+    ids.flatMap((id) => catalogs.choice.classes.filter((entry) => entry.id === id));
+  for (const [index, classId] of sequence.entries()) {
+    const [joining] = index > 0 && sequence.indexOf(classId) === index ? recordsOf([classId]) : [];
+    if (!joining) continue;
+    const level = index + 1;
+    const bonuses = abilityBonusesOf(draft, catalogs, offers, level);
+    const scores = Object.fromEntries(ABILITIES.map((ability) => [ability, base[ability]! + bonuses[ability]]));
+    const shortfalls = multiclassShortfalls(scores, joining, recordsOf([...new Set(sequence.slice(0, index))]));
+    if (shortfalls.length > 0)
+      return `To take ${joining.name} at level ${level}: ${multiclassShortfallText(scores, joining, shortfalls)}`;
+  }
+  return null;
 }
 
 /** A finished score may not pass this; the server rejects it. */
@@ -705,16 +736,8 @@ export function stepBlockedReason(
       // The 20 cap, checked on the step that owns the scores (the features step guards the improvements).
       const breach = abilityCapPreview(draft, catalogs, offers).breach;
       if (breach) return breach.reason;
-      // Multiclassing needs 13 in each class's primary ability. A preview on the final totals: the server checks each
-      // class with the scores of the moment it is taken.
-      if (context.classes.length > 1) {
-        const bonuses = abilityBonusesOf(draft, catalogs, offers);
-        const totals = Object.fromEntries(ABILITIES.map((ability) => [ability, base[ability]! + bonuses[ability]]));
-        for (const { record } of context.classes) {
-          if (meetsMulticlassMinimums(totals, record.multiclassPrerequisites)) continue;
-          return `Multiclassing needs 13 in each class's primary ability: ${multiclassShortfallText(totals, record, [record])}`;
-        }
-      }
+      const shortfall = multiclassShortfallOf(draft, catalogs, offers);
+      if (shortfall) return shortfall;
       if (draft.hpMode === "entries") {
         const needed = draft.level - 1;
         if (draft.hpEntries.length !== needed)
