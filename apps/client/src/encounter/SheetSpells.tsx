@@ -65,6 +65,7 @@ function SpellCastControls({
   slotMaxByLevel,
   liveRemaining,
   pact,
+  policeSlots,
   free,
   busy,
   onCastSlot,
@@ -78,6 +79,8 @@ function SpellCastControls({
   liveRemaining: ReadonlyMap<number, number>;
   /** Pact Magic slots, which cast any of the character's spells at their level; the server spends them first. */
   pact: PactPool | null;
+  /** Whether an empty slot level blocks the cast here. */
+  policeSlots: boolean;
   /** A free casting: the uses it has left, or null at will. */
   free: Readonly<{ left: number | null }> | null;
   busy: boolean;
@@ -101,7 +104,10 @@ function SpellCastControls({
   // (helper · slot · Cast) that align across rows.
   const { label: effect } = spellEffectAt(content, spell.level, chosen === "free" ? spell.level : level);
   const canCast =
-    isCantrip || (chosen === "free" ? free !== null && free.left !== 0 : options.length > 0 && remainingAt(level) > 0);
+    isCantrip ||
+    (chosen === "free"
+      ? free !== null && free.left !== 0
+      : options.length > 0 && (!policeSlots || remainingAt(level) > 0));
   return (
     <>
       <span
@@ -122,7 +128,7 @@ function SpellCastControls({
           onChange={(event) => setChoice(event.target.value === "free" ? "free" : Number(event.target.value))}
         >
           {options.map((slot) => (
-            <option key={slot} value={slot} disabled={remainingAt(slot) === 0}>
+            <option key={slot} value={slot} disabled={policeSlots && remainingAt(slot) === 0}>
               {ordinal(slot)} · {remainingAt(slot)}/{maxAt(slot)}
               {atPact(slot) ? " · pact" : ""}
               {slot > spell.level ? " · upcast" : ""}
@@ -200,7 +206,8 @@ export function SheetSpells({
   onFeedback,
   routeSpell,
   castSpellAction,
-  spellSaveDcBonus = 0
+  spellSaveDcBonus = 0,
+  policeSlots = true
 }: Readonly<{
   actor: GmActor | PlayerActor;
   definition: ActorDefinition;
@@ -214,6 +221,9 @@ export function SheetSpells({
   castSpellAction: (actionId: string, slotLevel?: number) => void;
   /** The server's sum of standing spell-save-DC riders (an item, a feat), which the cast DC includes. */
   spellSaveDcBonus?: number;
+  /** Whether a cast with no slot left is refused here; otherwise the server warns or lets it pass ("Don't police
+   *  spell slots"). */
+  policeSlots?: boolean;
 }>) {
   const { rollFlat } = rolls;
   const spellcasting = definition.spellcasting;
@@ -273,7 +283,8 @@ export function SheetSpells({
     const fromPact = pact !== null && pact.level === level && pact.remaining > 0;
     const max = slotMaxByLevel.get(level) ?? 0;
     const rem = fromPact ? pact.remaining : (liveSlotRemaining.get(level) ?? max);
-    if (!fromPact && (max <= 0 || rem <= 0)) {
+    const none = !fromPact && (max <= 0 || rem <= 0);
+    if (none && policeSlots) {
       onFeedback(`No ${ordinal(level)}-level slots remain.`);
       return;
     }
@@ -281,12 +292,16 @@ export function SheetSpells({
     // Same helper as the displayed effect, so the roll matches what is shown.
     const { formula } = spellEffectAt(content, spell.level, level);
     const types = content && content.damageTypes.length ? ` ${content.damageTypes.join("/")}` : "";
-    void edit("character:set-slot", {
-      actorId: actor.id,
-      level,
-      remaining: rem - 1,
-      ...(fromPact ? { pact: true } : {})
-    }).then((result) => {
+    // With slots not policed and none left, the cast goes ahead with nothing to spend.
+    const spend = none
+      ? Promise.resolve({ ok: true })
+      : edit("character:set-slot", {
+          actorId: actor.id,
+          level,
+          remaining: rem - 1,
+          ...(fromPact ? { pact: true } : {})
+        });
+    void spend.then((result) => {
       if (!result.ok) return;
       // The slot is spent; on your turn a spell that targets a creature goes through the structured flow.
       // A utility spell stays a plain note. Known limitation: an upcast spell resolves at its base dice
@@ -439,6 +454,7 @@ export function SheetSpells({
                               slotMaxByLevel={slotMaxByLevel}
                               liveRemaining={liveSlotRemaining}
                               pact={pact}
+                              policeSlots={policeSlots}
                               free={freeCastOf(spell)}
                               busy={busy}
                               onCastSlot={(castLevel) => castSpell(spell, castLevel)}

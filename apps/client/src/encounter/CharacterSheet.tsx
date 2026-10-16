@@ -99,6 +99,10 @@ export function CharacterSheet({
     actor.kind === "player-character" &&
     definition !== null;
   // Outside the fight an item's action goes to the server's loose route, which rolls it and spends its charges.
+  // A cast past an empty slot is stopped here only when the fight enforces spell slots; otherwise the server warns
+  // or lets it through, and outside a fight it decides from the table's policy.
+  const slotsPoliced =
+    state?.combat.active === true && (state.combat.ruleExceptions.slots ?? state.combat.rulesMode) === "strict";
   const inFight = state
     ? state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actor.id)
     : liveCombat?.active === true;
@@ -277,6 +281,7 @@ export function CharacterSheet({
             rolls={rolls}
             onFeedback={setFeedback}
             spellSaveDcBonus={derived?.spellSaveDcBonus ?? 0}
+            policeSlots={slotsPoliced}
             castSpellAction={castSpellAction}
             routeSpell={(spell) => {
               const structured = structuredAttacks

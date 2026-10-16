@@ -1,7 +1,7 @@
-import type { Actor, CombatState, GameState } from "@vtt/domain";
+import type { Actor, CombatState, GameState, RuleMode } from "@vtt/domain";
 import { d20Die } from "@vtt/rules-5e";
 import type { ActorAction } from "@vtt/schemas";
-import { effectiveModeFor, overrideCovers, type RuleId } from "./rules-families.js";
+import { effectiveModeFor, familyModeFor, overrideCovers, type RuleId } from "./rules-families.js";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
 import { castSlot, noUsesRemaining, slotsLeft, spendSlot, useLimitFor } from "./resolution/economy.js";
 
@@ -72,26 +72,41 @@ export function looseRollPlan(
 
 /** What a loose use spends: an item's charges or a feature's per-rest uses count outside a fight as in one, and so
  *  does a spell slot an item cast consumes. Per-turn and per-encounter limits have no fight to count against.
- *  Mutates the actor, refusing before anything is spent when nothing remains. */
+ *  Mutates the actor, refusing before anything is spent when nothing remains. A missing spell slot is refused only
+ *  while the table polices slots (`slots`); advised, it is a GM note, and nothing is spent. */
 export function spendLooseUses(
   actor: Actor,
   action: ActorAction,
   siblings: readonly ActorAction[],
-  slotLevel?: number
-): Readonly<{ usesLeft: number | null; spent: boolean }> {
+  slotLevel?: number,
+  slots: RuleMode = "strict"
+): Readonly<{ usesLeft: number | null; spent: boolean; warning?: string }> {
   const uses = action.uses && action.uses.per !== "turn" && action.uses.per !== "encounter" ? action.uses : null;
   const key = uses ? (uses.pool ?? action.id) : null;
   const limit = uses ? useLimitFor(siblings, action) : 0;
   const used = key ? (actor.actionUses[key] ?? 0) : 0;
   if (key && used >= limit) throw new CommandRejectedError(noUsesRemaining(action, limit));
   const slot = action.spellSlot ? castSlot(actor, action.spellSlot.level, slotLevel) : null;
-  if (slot && action.spellSlot && slot.level < action.spellSlot.level)
-    throw new CommandRejectedError(`${action.name} needs a slot of level ${action.spellSlot.level} or higher.`);
-  if (slot && slotsLeft(actor, slot.level, slot.pact) <= 0)
-    throw new CommandRejectedError(
-      `${action.name} spends a level-${slot.level} ${slot.pact ? "Pact Magic" : "spell"} slot - ${actor.name} has none left.`
-    );
+  const refusal =
+    slot && action.spellSlot && slot.level < action.spellSlot.level
+      ? `${action.name} needs a slot of level ${action.spellSlot.level} or higher.`
+      : slot && slotsLeft(actor, slot.level, slot.pact) <= 0
+        ? `${action.name} spends a level-${slot.level} ${slot.pact ? "Pact Magic" : "spell"} slot - ${actor.name} has none left.`
+        : null;
+  if (refusal !== null && slots === "strict") throw new CommandRejectedError(refusal);
   if (key) actor.actionUses = { ...actor.actionUses, [key]: used + 1 };
-  if (slot) spendSlot(actor, slot);
-  return { usesLeft: key ? limit - used - 1 : null, spent: key !== null || slot !== null };
+  if (slot && refusal === null) spendSlot(actor, slot);
+  return {
+    usesLeft: key ? limit - used - 1 : null,
+    spent: key !== null || (slot !== null && refusal === null),
+    ...(refusal !== null && slots === "assisted" ? { warning: refusal } : {})
+  };
+}
+
+/** How strictly spell slots are policed for a tap: the fight's mode in a fight, the table's standing policy outside
+ *  one. */
+export function slotsModeFor(state: Pick<GameState, "combat" | "rulesPolicy">): RuleMode {
+  return state.combat.active
+    ? familyModeFor(state.combat, "slots")
+    : familyModeFor({ rulesMode: state.rulesPolicy.dial, ruleExceptions: state.rulesPolicy.exceptions }, "slots");
 }

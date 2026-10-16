@@ -14,7 +14,14 @@ import { tokenCreatureDistance } from "../movement-narration.js";
 import { settlePlayerDarts, settlePlayerHit, type AppliedDamage } from "../player-damage.js";
 import { recordRoll, rolledTerms } from "../roll-history.js";
 import { overrideReason, overrideWaives, rememberOverride } from "../rules-families.js";
-import { looseRollPlan, NOT_YOUR_TURN, offTurnVerdict, routeForTap, spendLooseUses } from "../tap-routing.js";
+import {
+  looseRollPlan,
+  NOT_YOUR_TURN,
+  offTurnVerdict,
+  routeForTap,
+  slotsModeFor,
+  spendLooseUses
+} from "../tap-routing.js";
 import { upcastAction } from "../item-actions.js";
 import { castSlotLevel } from "../resolution/economy.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, principalTag, sessionIdOf } from "./kit.js";
@@ -334,7 +341,7 @@ export const actionCommands = [
       const { state, duplicate } = await execute((draft) => {
         requireActorAccess(initiator, draft, actorId, "attack");
         const live = draft.actors.find((candidate) => candidate.id === actorId)!;
-        spend = spendLooseUses(live, action, available, castLevel);
+        spend = spendLooseUses(live, action, available, castLevel, slotsModeFor(draft));
         plan.forEach((entry, index) => {
           const resolution = rollDice(entry.formula, (sides) => kit.context.random(sides));
           recordRoll(draft, {
@@ -357,6 +364,14 @@ export const actionCommands = [
       });
       if (duplicate) return { route: "loose", rollIds };
       kit.publishRolls(state, commandId);
+      if (spend.warning)
+        kit.context.appendLog({
+          kind: "action",
+          text: `Rules note: ${spend.warning}`,
+          actorId,
+          actorIds: [actorId],
+          gmOnly: true
+        });
       // Rolls narrate themselves; a use with nothing to roll, or one that cost a charge, says so.
       if (plan.length === 0 || spend.spent) {
         const left =

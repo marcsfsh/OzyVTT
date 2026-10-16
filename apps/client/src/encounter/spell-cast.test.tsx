@@ -99,6 +99,26 @@ describe("casting a leveled spell from the sheet", () => {
     expect(cast).toHaveBeenLastCalledWith("spell-hunters-mark-free");
   });
 
+  it("casts past an empty slot when the table doesn't police spell slots, and not when it does", () => {
+    const spent = { ...actor, spellSlots: [{ level: 1, remaining: 0 }] } as unknown as GmActor;
+    const cast = vi.fn();
+    const props = {
+      definition,
+      busy: false,
+      edit: vi.fn() as unknown as SheetEdit,
+      rolls: { rollFlat: vi.fn() } as unknown as SheetRolls,
+      onFeedback: () => {},
+      routeSpell: () => false,
+      castSpellAction: cast
+    };
+    const { unmount } = render(<SheetSpells actor={spent} {...props} />);
+    expect((screen.getAllByRole("button", { name: "Cast" })[0] as HTMLButtonElement).disabled).toBe(true);
+    unmount();
+    render(<SheetSpells actor={spent} {...props} policeSlots={false} />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Cast" })[0]);
+    expect(cast).toHaveBeenLastCalledWith("spell-hunters-mark", 1);
+  });
+
   it("offers an invocation's spell only at will, without a slot", () => {
     const cast = mount();
     expect(screen.getByText("At will")).toBeTruthy();
