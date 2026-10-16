@@ -10,8 +10,8 @@ import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../s
 import { ContentLibrary } from "../src/content-library.js";
 import { criticalThreshold, effectiveActions } from "../src/effective-actions.js";
 import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation.js";
-import { initiativeRollMode, startEncounter } from "../src/encounter.js";
-import { saveRollSources } from "../src/saving-throws.js";
+import { initiativeRollMode, nextInitiativeTurn, startEncounter } from "../src/encounter.js";
+import { answerSave, saveRollSources } from "../src/saving-throws.js";
 
 // Barbarian, Fighter and Monk mechanics, asserted as numbers a player can act on: sheet AC, the DC a
 // target is held to, the die the engine keeps, the counter it spends, or the refusal it prints. Runs
@@ -586,7 +586,10 @@ describe("Barbarian: Intimidating Presence holds the target to the Barbarian's o
       ability: "wis",
       dc: 18,
       successDamage: "none",
-      failureConditions: ["frightened"]
+      failureConditions: ["frightened"],
+      // "for 1 minute; at the end of each of its turns it repeats the save".
+      failureDuration: { type: "rounds", rounds: 10 },
+      repeatSave: true
     });
     const resolution = use(built, "intimidating-presence", [IDS.foe]);
     expect(resolution.save).toMatchObject({ ability: "wis", dc: 18 });
@@ -597,7 +600,10 @@ describe("Barbarian: Intimidating Presence holds the target to the Barbarian's o
       ability: "wis",
       dc: 19,
       successDamage: "none",
-      failureConditions: ["frightened"]
+      failureConditions: ["frightened"],
+      // "for 1 minute; at the end of each of its turns it repeats the save".
+      failureDuration: { type: "rounds", rounds: 10 },
+      repeatSave: true
     });
   });
 
@@ -611,7 +617,10 @@ describe("Barbarian: Intimidating Presence holds the target to the Barbarian's o
       ability: "wis",
       dc: 21,
       successDamage: "none",
-      failureConditions: ["frightened"]
+      failureConditions: ["frightened"],
+      // "for 1 minute; at the end of each of its turns it repeats the save".
+      failureDuration: { type: "rounds", rounds: 10 },
+      repeatSave: true
     });
     // The number the target is held to, not just the one printed on the sheet.
     expect(use(capstone, "intimidating-presence", [IDS.foe]).save).toMatchObject({ ability: "wis", dc: 21 });
@@ -1016,7 +1025,9 @@ describe("Monk: Stunning Strike holds the target to the Monk's own DC", () => {
       ability: "con",
       dc: 15,
       successDamage: "none",
-      failureConditions: ["stunned"]
+      failureConditions: ["stunned"],
+      // "until the start of your next turn".
+      failureDuration: { type: "until-source-next-turn" }
     });
     const resolution = use(built, "stunning-strike", [IDS.foe]);
     expect(resolution.save).toMatchObject({ ability: "con", dc: 15 });
@@ -1033,7 +1044,9 @@ describe("Monk: Stunning Strike holds the target to the Monk's own DC", () => {
       ability: "con",
       dc: 21,
       successDamage: "none",
-      failureConditions: ["stunned"]
+      failureConditions: ["stunned"],
+      // "until the start of your next turn".
+      failureDuration: { type: "until-source-next-turn" }
     });
     expect(use(capstone, "stunning-strike", [IDS.foe]).save).toMatchObject({ ability: "con", dc: 21 });
   });
@@ -1084,5 +1097,36 @@ describe("Monk: Uncanny Metabolism is a counter, and the Epic Boon is a feat", (
   it("puts the level-19 boon on the sheet", () => {
     expect(featIds(build(monkInput(20)))).toEqual(["alert", "boon-of-the-night-spirit"]);
     expect(featIds(build(monkInput(11)))).toEqual(["alert"]);
+  });
+});
+
+describe("Monk: Stunning Strike stuns until the start of the Monk's next turn", () => {
+  it("lands as an effect from the Monk that ends when its next turn begins", () => {
+    const built = onTheTable(build(monkInput(11)));
+    use(built, "stunning-strike", [IDS.foe]);
+    const pending = built.state.combat.pendingSaves[0]!;
+    answerSave(
+      built.state,
+      "50000000-0000-4000-8000-999999999902",
+      pending.id,
+      "manual",
+      1,
+      true,
+      { role: "gm" },
+      {
+        random: () => 10,
+        newRollId: () => "50000000-0000-4000-8000-999999999903",
+        sessionId: IDS.gmSession,
+        role: "gm",
+        now: () => "2026-08-07T00:00:00.000Z",
+        resolveDefinition: () => undefined
+      }
+    );
+    const foe = built.state.actors.find((actor) => actor.id === IDS.foe)!;
+    expect(foe.conditions.map((condition) => condition.id)).toEqual(["stunned"]);
+    nextInitiativeTurn(built.state);
+    expect(foe.conditions.map((condition) => condition.id)).toEqual(["stunned"]);
+    nextInitiativeTurn(built.state);
+    expect(foe.conditions).toEqual([]);
   });
 });

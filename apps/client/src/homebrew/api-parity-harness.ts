@@ -434,6 +434,17 @@ const FEATURE_CARRIERS: readonly HomebrewBodyType[] = [
   "subclass"
 ];
 
+/** The save-block keys that say how a failure's conditions end (`SaveOutcomeFields`). */
+const SAVE_LIFETIME_KEYS = [
+  "failureDuration.**",
+  "repeatSave",
+  "escapeDc",
+  "endsOnDamage",
+  "speedZero",
+  "rangeFeet",
+  "failsAtHitPoints"
+] as const;
+
 /** The exemption table. First match wins, so specific rows sit above general ones. */
 export const EXEMPTIONS: readonly ExemptionRow[] = [
   // ---- action rider surface (every carrier that mounts actions) ----
@@ -491,6 +502,19 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
       "the feature save's DERIVED dc object (ability/base/proficiencyBonus) — the rows author the statblock's flat number only",
     status: "gap"
   },
+  ...SAVE_LIFETIME_KEYS.map((key): ExemptionRow => ({
+    at: `actions[].save.${key}`,
+    types: ACTION_CARRIERS,
+    reason:
+      "how a failed save's conditions end (duration, repeated save, grapple escape and range, ending on damage, Speed 0, an HP gate) - read from SRD prose or authored in the class and item overlays; no editor control yet",
+    status: "gap"
+  })),
+  ...SAVE_LIFETIME_KEYS.map((key): ExemptionRow => ({
+    at: `save.${key}`,
+    types: ["spell"],
+    reason: "how a failed save's conditions end, read from the spell's description as the catalog is built",
+    status: "gap"
+  })),
   {
     at: "actions[].grants.**",
     types: ACTION_CARRIERS,

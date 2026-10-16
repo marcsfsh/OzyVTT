@@ -2,15 +2,8 @@ import type { GameState } from "@vtt/domain";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
 import type { Initiator } from "./authorization.js";
 import { adjustableActor } from "./hit-points.js";
-import {
-  applyCondition,
-  applyExhaustionDeath,
-  endConcentrationSustainedBy,
-  releaseGrapplesHeldBy,
-  type ConditionImmunitySource,
-  type EffectNarration
-} from "./effects.js";
-import { conditionLabel, exhaustionLevel, INCAPACITATING_CONDITIONS } from "./condition-rules.js";
+import { applyCondition, conditionGained, type ConditionImmunitySource, type EffectNarration } from "./effects.js";
+import { conditionLabel, exhaustionLevel } from "./condition-rules.js";
 import { deriveEquipment } from "./equipment-derivation.js";
 import { currentSpeedFeet, effectiveSpeedFeet } from "./speed.js";
 import {
@@ -23,8 +16,9 @@ import {
 } from "./rules-families.js";
 
 /** Tracks a condition on an actor. The engine owns the mechanical hooks (ADR-0020): condition immunities
- *  skip with narration, and Exhaustion reaching level 6 is death. Returns narration events. `level` is
- *  Exhaustion's 1-6. Setting an active condition updates its level; clearing an absent one is a no-op. */
+ *  skip with narration, Exhaustion stacks a level each time it is received and level 6 is death, and an
+ *  incapacitating condition breaks Concentration and releases grapples (`conditionGained`). Returns narration
+ *  events. `level` sets Exhaustion's 1-6 outright. Clearing an absent condition is a no-op. */
 export function setCondition(
   state: GameState,
   actorId: string,
@@ -88,6 +82,7 @@ export function setCondition(
     actor.conditions = actor.conditions.filter((condition) => condition.id !== conditionId);
     return events;
   }
+  const present = actor.conditions.some((condition) => condition.id === conditionId);
   const previousExhaustion = exhaustionLevel(actor);
   // Immunity: skip with narration rather than reject (SRD condition immunity). Innate and item-granted
   // immunities read the same; without a catalog only innate ones apply.
@@ -103,14 +98,7 @@ export function setCondition(
     ];
   }
   if (written === "full") throw new CommandRejectedError("That combatant already has too many conditions.");
-  // SRD: Exhaustion level 6 is death, the same transition the onEnd grant path fires.
-  if (conditionId === "exhaustion" && previousExhaustion < 6 && (level ?? 1) >= 6) {
-    return applyExhaustionDeath(state, actor);
-  }
-  // SRD: an incapacitated creature releases its grapples and its concentration breaks. 0 HP separately
-  // releases everything it sustains.
-  if ((INCAPACITATING_CONDITIONS as readonly string[]).includes(conditionId)) {
-    return [...releaseGrapplesHeldBy(state, actor.id), ...endConcentrationSustainedBy(state, actor.id)];
-  }
-  return [];
+  // A re-set that changes nothing (Paralyzed again) has nothing new to break; Exhaustion always moved a level.
+  if (present && conditionId !== "exhaustion") return [];
+  return conditionGained(state, actor, conditionId, previousExhaustion);
 }

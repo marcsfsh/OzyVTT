@@ -20,6 +20,7 @@ import type { InitiativeRollSink } from "../encounter.js";
 import { equipmentCatalogOf } from "../equipment-derivation.js";
 import type { GameStore } from "../game-store.js";
 import { tokenCreatureDistance } from "../movement-narration.js";
+import { withoutSourceName } from "../projections.js";
 import { describeRoll, recordRoll, rollFeedIsGmOnly, rollsForCommand } from "../roll-history.js";
 import type { TokenMapGeometry } from "../token-placement.js";
 
@@ -234,9 +235,14 @@ export function createKit(context: CommandContext) {
     /** Shared narration fan-out for engine transitions (effect ends, dying, consciousness). */
     publishNarrations(events: readonly EffectNarration[]) {
       for (const event of events) {
+        // A line naming a hidden cause reaches the table with that name masked, as the projection masks it.
+        const masked =
+          event.source && actorHidden(event.source.actorId) && !actorHidden(event.actorId)
+            ? withoutSourceName(event.text, event.source.name ?? actorName(event.source.actorId))
+            : event.text;
         context.broadcastTableEvent({
           kind: event.kind,
-          text: event.text,
+          text: masked,
           actorIds: [event.actorId],
           gmOnly: actorHidden(event.actorId)
         });

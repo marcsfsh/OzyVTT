@@ -151,6 +151,8 @@ export type ResolveContext = {
   healing: ActionResolution["healing"];
   /** An extra attack this swing opened (Cleave), for the result card to offer. */
   opens: ActionResolution["opens"] | null;
+  /** The Concentration this cast started (a Concentration spell): what its failed saves impose is sustained by it. */
+  castId: string | null;
 };
 
 /** Records one rolled formula in the shared history, attributed like every roll of this resolve. */

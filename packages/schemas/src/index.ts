@@ -483,7 +483,7 @@ export const EffectModifiersSchema = z
     });
   });
 
-/** What happens when an effect ends (Frenzy: one level of Exhaustion when the rage ends). */
+/** What happens when an effect ends (a homebrew curse that leaves a level of Exhaustion behind). */
 export const EffectOnEndSchema = z
   .object({
     type: z.literal("condition"),
@@ -491,6 +491,24 @@ export const EffectOnEndSchema = z
     level: z.number().int().min(1).max(6).optional()
   })
   .strict();
+
+/** "Until the end of its next turn" belongs to a creature: the bearer's own turn, or the source's. `skipsCurrentTurn`
+ * marks one that began during that creature's turn, so the end of that turn doesn't count and the next one does. */
+const TurnEndDurationSchemas = [
+  z.object({ type: z.literal("until-bearer-turn-end"), skipsCurrentTurn: z.boolean().default(false) }).strict(),
+  z.object({ type: z.literal("until-source-turn-end"), skipsCurrentTurn: z.boolean().default(false) }).strict()
+] as const;
+
+/** How long a failed save's conditions last, as the text prints it: "for 1 minute" (10 rounds), "until the start of
+ * the X's next turn", "until the end of its next turn" (the target's) or "until the end of your next turn" (the
+ * source's). Absent: until something ends them (a Concentration spell's with its Concentration). */
+export const SaveFailureDurationSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("rounds"), rounds: z.number().int().min(1).max(100) }).strict(),
+  z.object({ type: z.literal("until-source-next-turn") }).strict(),
+  z.object({ type: z.literal("until-bearer-turn-end") }).strict(),
+  z.object({ type: z.literal("until-source-turn-end") }).strict()
+]);
+export type SaveFailureDuration = z.infer<typeof SaveFailureDurationSchema>;
 
 /** A live rules-engine effect on an actor (Rage, a grapple), with source links, duration and typed modifiers.
  * Ids derive from the commandId so retries mint the same effect. */
@@ -507,12 +525,13 @@ export const EffectInstanceSchema = z
     duration: z.discriminatedUnion("type", [
       z.object({ type: z.literal("rounds"), remaining: z.number().int().min(0).max(100) }).strict(),
       z.object({ type: z.literal("until-source-next-turn") }).strict(),
+      ...TurnEndDurationSchemas,
       z.object({ type: z.literal("encounter") }).strict(),
       z.object({ type: z.literal("manual") }).strict()
     ]),
     /** Grapples etc.: the effect ends when its source actor drops to 0 HP or leaves the roster. */
     endsWhenSourceDefeated: z.boolean().default(false),
-    /** Dodge: the effect's modifiers stop applying while the bearer is incapacitated (SRD). */
+    /** Dodge: the effect's modifiers stop applying while the bearer is Incapacitated or its Speed is 0 (SRD). */
     voidWhileIncapacitated: z.boolean().default(false),
     /** The source actor concentrates to sustain this (SRD Concentration): one at a time; damage prompts a CON save; incapacitation breaks it. */
     concentration: z.boolean().default(false),
@@ -539,9 +558,24 @@ export const EffectInstanceSchema = z
     modifiers: EffectModifiersSchema.default([]),
     /** Conditions this effect applied to the same actor; removed automatically when the effect ends. */
     linkedConditionIds: z.array(ConditionIdSchema).max(4).default([]),
-    /** Shown as "Escape DC 15"; ending the effect on escape is manual. */
+    /** The DC the Escape a Grapple action rolls against; a success ends the effect. */
     escapeDc: z.number().int().min(1).max(40).nullable().default(null),
-    onEnd: z.array(EffectOnEndSchema).max(2).default([])
+    onEnd: z.array(EffectOnEndSchema).max(2).default([]),
+    /** "Repeats the save at the end of each of its turns": the bearer owes this save as each of its turns ends, and
+     * a success ends the effect (Hold Person, a ghast's claws). */
+    repeatSave: z
+      .object({ ability: AbilitySchema, dc: z.number().int().min(1).max(40) })
+      .strict()
+      .optional(),
+    /** Ends early when the bearer takes any damage (Sleep, Turn Undead, Hypnotic Pattern, a knocked-out creature). */
+    endsOnDamage: z.boolean().optional(),
+    /** The bearer's Speed is 0 while this lasts, beyond what its conditions do (Hypnotic Pattern's charm). */
+    speedZero: z.boolean().optional(),
+    /** One Concentration cast: every effect it made (the caster's marker, each failed target's conditions) shares
+     * this, so they end together, and starting another Concentration ends them all. */
+    castId: z.string().min(1).max(120).optional(),
+    /** A grapple's range: it ends once a move leaves the bearer and its source farther apart than this. */
+    rangeFeet: z.number().int().min(5).max(120).optional()
   })
   .strict();
 export type EffectInstance = z.infer<typeof EffectInstanceSchema>;
@@ -780,7 +814,9 @@ export const ActorSchema = z.object({
             .string()
             .regex(/^[a-z0-9-]+$/)
             .max(60),
-          level: z.number().int().min(1).max(6).optional()
+          level: z.number().int().min(1).max(6).optional(),
+          /** Set on its own as well as linked by an effect, so that effect ending leaves it in place. */
+          standalone: z.literal(true).optional()
         })
         .strict()
     )
@@ -866,6 +902,8 @@ export const EffectGrantSchema = z
     duration: z.discriminatedUnion("type", [
       z.object({ type: z.literal("rounds"), rounds: z.number().int().min(1).max(100) }).strict(),
       z.object({ type: z.literal("until-source-next-turn") }).strict(),
+      /** Until the end of the granter's next turn (Rage, which the bearer's own attacks keep extending). */
+      z.object({ type: z.literal("until-source-turn-end") }).strict(),
       z.object({ type: z.literal("encounter") }).strict(),
       z.object({ type: z.literal("manual") }).strict()
     ]),
@@ -875,7 +913,7 @@ export const EffectGrantSchema = z
     endsWithTag: EffectTagSchema.optional(),
     /** Who receives the effect: the acting creature (default) or the action's single chosen target (Help). */
     target: z.enum(["self", "target"]).default("self"),
-    /** Dodge: benefits lapse while the bearer is incapacitated (SRD). */
+    /** Dodge: benefits lapse while the bearer is Incapacitated or its Speed is 0 (SRD). */
     voidWhileIncapacitated: z.boolean().default(false),
     /** The granter concentrates to sustain the effect (SRD Concentration). */
     concentration: z.boolean().default(false)
@@ -938,7 +976,22 @@ export type SaveCondition = z.infer<typeof SaveConditionSchema>;
 export const SaveOutcomeFields = {
   successDamage: z.enum(["half", "none"]).default("half"),
   /** Every condition a failed save imposes (Turn Undead: Frightened and Incapacitated). */
-  failureConditions: z.array(SaveConditionSchema).max(4).default([])
+  failureConditions: z.array(SaveConditionSchema).max(4).default([]),
+  /** How long the failure's conditions last. Absent: until ended (with the caster's Concentration, for a spell). */
+  failureDuration: SaveFailureDurationSchema.optional(),
+  /** The target repeats the save at the end of each of its turns, a success ending the failure's conditions. */
+  repeatSave: z.literal(true).optional(),
+  /** A failure that grapples: the grapple's escape DC. Its other conditions last until the grapple ends. */
+  escapeDc: z.number().int().min(1).max(40).optional(),
+  /** The failure's conditions end early if the target takes any damage (Turn Undead, Hypnotic Pattern). */
+  endsOnDamage: z.literal(true).optional(),
+  /** The failure also makes the target's Speed 0 while its conditions last (Hypnotic Pattern). */
+  speedZero: z.literal(true).optional(),
+  /** The save's reach ("within 10 feet"): a grapple it imposes ends once a move takes the two farther apart. */
+  rangeFeet: z.number().int().min(5).max(120).optional(),
+  /** No save when it lands: a target with this many hit points or fewer has the failure outright, and only the
+   * repeated save can end it (Power Word Stun's 150); one with more is spared. */
+  failsAtHitPoints: z.number().int().min(1).max(1000).optional()
 };
 
 /** An area of effect the GM places as a map template ("60-foot Cone"). `widthFeet` is a line's width, null otherwise. */
@@ -1043,7 +1096,10 @@ export const ActionSchema = z.object({
             .max(3),
           escapeDc: z.number().int().min(1).max(40).optional(),
           /** The rider only applies to targets of at most this size (crocodile Bite: large). */
-          maxTargetSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional()
+          maxTargetSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
+          /** How long the conditions last (a lich's touch: until the start of its next turn). Absent: until ended,
+           *  or until the grapple ends when the rider grapples. */
+          duration: SaveFailureDurationSchema.optional()
         })
         .strict()
     )

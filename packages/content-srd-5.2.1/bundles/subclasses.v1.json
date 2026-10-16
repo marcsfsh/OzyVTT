@@ -893,7 +893,10 @@
        "successDamage": "none",
        "failureConditions": [
         "incapacitated"
-       ]
+       ],
+       "failureDuration": {
+        "type": "until-source-turn-end"
+       }
       },
       "damage": [
        {
@@ -1309,7 +1312,12 @@
        "successDamage": "none",
        "failureConditions": [
         "frightened"
-       ]
+       ],
+       "failureDuration": {
+        "type": "rounds",
+        "rounds": 10
+       },
+       "repeatSave": true
       }
      }
     ]

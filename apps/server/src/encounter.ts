@@ -12,6 +12,7 @@ import { aggregateRollMode } from "@vtt/rules-5e";
 import { deriveEquipment, rollModeClaims, type EquipmentCatalog } from "./equipment-derivation.js";
 import { effectiveActions } from "./effective-actions.js";
 import { expireEffectsAtTurnStart, type EffectNarration } from "./effects.js";
+import { endOfTurn } from "./turn-boundaries.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 
 type StartEncounterInput = Readonly<{
@@ -352,12 +353,16 @@ function settleGatherIfComplete(state: GameState) {
   state.combat = { ...state.combat, turnActorId: top, round: 1, turn: { ...EMPTY_TURN } };
 }
 
-/** Dependencies for start-of-turn recharge rolls; optional so scene bookkeeping can advance turns without them. */
+/** Dependencies for start-of-turn recharge rolls and end-of-turn repeat saves; optional so scene bookkeeping can
+ *  advance turns without them. */
 export type TurnAdvanceDeps = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
   /** The item catalog, so an item's recharge pool re-arms like a stat block's. */
   catalog?: EquipmentCatalog;
   rollDie: (sides: number) => number;
+  /** Mint the repeat saves the ending turn opens; absent, effects still expire but no save is opened. */
+  newId?: () => string;
+  now?: () => string;
 }>;
 
 /** SRD Recharge X-Y: at the start of the owner's turn, a d6 at or above the threshold re-arms the spent
@@ -402,6 +407,15 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   if (currentIndex < 0) throw new CommandRejectedError("The current turn is not in Initiative.");
   const wraps = currentIndex === state.combat.initiative.length - 1;
   const nextActorId = state.combat.initiative[wraps ? 0 : currentIndex + 1].actorId;
+  // The outgoing turn ends first: its "until the end of the turn" effects lapse and repeated saves open.
+  const ending: EffectNarration[] = [];
+  endOfTurn(
+    state,
+    state.combat.turnActorId,
+    ending,
+    deps?.newId ? { newId: deps.newId, now: deps.now ?? (() => new Date().toISOString()) } : undefined
+  );
+  events?.push(...ending);
   state.combat = {
     ...state.combat,
     round: wraps ? state.combat.round + 1 : state.combat.round,

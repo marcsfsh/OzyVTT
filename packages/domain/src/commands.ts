@@ -447,6 +447,9 @@ export const EffectAddSchema = z
     modifiers: EffectModifiersSchema.optional(),
     /** The granter concentrates to sustain this effect (SRD Concentration): one at a time; damage prompts a CON save; incapacitation breaks it. */
     concentration: z.boolean().optional(),
+    /** The creature the effect comes from: with `concentration`, the one concentrating on it (the Cleric who cast
+     *  the Bless on the Fighter). Absent, a concentration effect is sustained by its bearer. */
+    sourceActorId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

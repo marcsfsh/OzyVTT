@@ -11,6 +11,7 @@ import { recordCleaveOpening, recordLightAttack } from "./resolution/extra-attac
 import { applyMasteryForces, masterySwingOf, offeredPush, spendVex } from "./resolution/masteries.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
 import { parkActionSave, parkForAcReaction, parkReaction } from "./resolution/pending.js";
+import { startConcentration } from "./resolution/concentration.js";
 import { releaseHideAndReady } from "./resolution/release.js";
 import { openResolve } from "./resolution/validate.js";
 
@@ -55,6 +56,7 @@ export function resolveDefinitionAction(
   applyOnHitEffects(ctx);
   applyMasteryForces(ctx);
   applyGrant(ctx);
+  startConcentration(ctx);
   applyHealing(ctx);
 
   parkReaction(ctx);

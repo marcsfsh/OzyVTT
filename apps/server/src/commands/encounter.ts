@@ -303,7 +303,9 @@ export const encounterCommands = [
           nextInitiativeTurn(advancing, effectEvents, {
             resolveDefinition: (definitionId) => kit.resolveDefinitionIn(advancing, definitionId),
             catalog: kit.equipmentCatalog(),
-            rollDie: (sides) => kit.context.random(sides)
+            rollDie: (sides) => kit.context.random(sides),
+            newId: kit.context.newId,
+            now: () => new Date().toISOString()
           })
         );
       });
@@ -354,7 +356,9 @@ export const encounterCommands = [
           endTurn(advancing, initiatorOf(principal), effectEvents, {
             resolveDefinition: (definitionId) => kit.resolveDefinitionIn(advancing, definitionId),
             catalog: kit.equipmentCatalog(),
-            rollDie: (sides) => kit.context.random(sides)
+            rollDie: (sides) => kit.context.random(sides),
+            newId: kit.context.newId,
+            now: () => new Date().toISOString()
           })
         );
       });

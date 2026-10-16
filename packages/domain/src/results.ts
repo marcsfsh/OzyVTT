@@ -67,7 +67,7 @@ export type ActionRollMode = Readonly<{
  * re-checking `actorIds` for `visibility !== "public"`. A leak needs both to fail. */
 export type ActionTableNarration = Readonly<{
   /** The feed row's kind, from the `CombatLogEntry` vocabulary. */
-  kind: "movement" | "save" | "heal";
+  kind: "movement" | "save" | "heal" | "effect";
   text: string;
   /** Everyone the line names. The feed keeps it from players when any of them is a hidden combatant. */
   actorIds: readonly string[];

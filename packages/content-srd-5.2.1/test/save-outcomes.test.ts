@@ -96,9 +96,99 @@ describe("save outcomes in the shipped content", () => {
     expect(spellSave("hold-person")).toEqual({
       ability: "wis",
       successDamage: "none",
-      failureConditions: ["paralyzed"]
+      failureConditions: ["paralyzed"],
+      // "At the end of each of its turns, the target repeats the save"; "for the duration" is the Concentration's.
+      repeatSave: true
     });
     // A reviewed override: the condition is named in the sentence after the save.
     expect(spellSave("banishment")).toMatchObject({ failureConditions: ["incapacitated"] });
+  });
+
+  it("reads how long a failure's conditions last", () => {
+    // "until the end of its next turn" is the target's own turn.
+    expect(monsterAction("ghoul", "claw").save).toMatchObject({ failureDuration: { type: "until-bearer-turn-end" } });
+    // "until the start of the otyugh's next turn" is the source's.
+    expect(monsterAction("otyugh", "tentacle-slam").save).toMatchObject({
+      failureDuration: { type: "until-source-next-turn" }
+    });
+    // "until the end of the mummy's next turn" ends on the source's turn.
+    expect(monsterAction("mummy", "dreadful-glare").save).toMatchObject({
+      failureDuration: { type: "until-source-turn-end" }
+    });
+    // "repeats the save at the end of each of its turns ... After 1 minute, it succeeds automatically".
+    expect(monsterAction("doppelganger", "unsettling-visage").save).toMatchObject({
+      failureDuration: { type: "rounds", rounds: 10 },
+      repeatSave: true
+    });
+    expect(spellSave("color-spray")).toMatchObject({ failureDuration: { type: "until-source-turn-end" } });
+    expect(spellSave("sunburst")).toMatchObject({ failureDuration: { type: "rounds", rounds: 10 }, repeatSave: true });
+    // A save repeated three times, or once on the next turn, stays the GM's.
+    expect(spellSave("flesh-to-stone")).not.toHaveProperty("repeatSave");
+    expect(monsterAction("basilisk", "petrifying-gaze-recharge-4-6").save).not.toHaveProperty("repeatSave");
+    // "Failure by 5 or More" is a further branch: the plain failure's own duration stands.
+    expect(monsterAction("homunculus", "bite").save).toMatchObject({
+      failureConditions: ["poisoned"],
+      failureDuration: { type: "until-source-turn-end" }
+    });
+    expect(monsterAction("homunculus", "bite").save).not.toHaveProperty("endsOnDamage");
+  });
+
+  it("reads a grapple's escape DC, range and what lasts until it ends", () => {
+    expect(monsterAction("constrictor-snake", "constrict").save).toMatchObject({
+      failureConditions: ["grappled"],
+      escapeDc: 12,
+      rangeFeet: 5
+    });
+    expect(monsterAction("behir", "constrict").save).toMatchObject({
+      failureConditions: ["grappled", "restrained"],
+      escapeDc: 16
+    });
+    expect(monsterAction("shambling-mound", "engulf").save).toMatchObject({
+      failureConditions: ["grappled", "blinded", "restrained"],
+      escapeDc: 14
+    });
+    expect(monsterAction("water-elemental", "whelm").save).toMatchObject({
+      failureConditions: ["grappled", "restrained"],
+      escapeDc: 14
+    });
+  });
+
+  it("reads 'while X, also Y', Speed 0 and ending on damage", () => {
+    expect(spellSave("hypnotic-pattern")).toEqual({
+      ability: "wis",
+      successDamage: "none",
+      failureConditions: ["charmed", "incapacitated"],
+      endsOnDamage: true,
+      speedZero: true
+    });
+    expect(monsterAction("chuul", "paralyzing-tentacles").save).toMatchObject({
+      failureConditions: ["poisoned", "paralyzed"]
+    });
+    expect(spellSave("sleep")).toMatchObject({
+      failureConditions: ["incapacitated"],
+      failureDuration: { type: "until-bearer-turn-end" },
+      endsOnDamage: true
+    });
+    // No save at the cast below 150 HP; the save comes at the end of each of its turns.
+    expect(spellSave("power-word-stun")).toMatchObject({
+      failureConditions: ["stunned"],
+      repeatSave: true,
+      failsAtHitPoints: 150
+    });
+  });
+
+  it("reads on-hit grapples' companions and unconditional timed riders", () => {
+    expect(monsterAction("purple-worm", "bite").onHit).toEqual([
+      { conditions: [{ id: "grappled" }, { id: "restrained" }], escapeDc: 19, maxTargetSize: "large" }
+    ]);
+    expect(monsterAction("roper", "tentacle").onHit?.[0]?.conditions).toEqual([{ id: "grappled" }, { id: "poisoned" }]);
+    expect(monsterAction("lich", "paralyzing-touch").onHit).toEqual([
+      { conditions: [{ id: "paralyzed" }], duration: { type: "until-source-next-turn" } }
+    ]);
+    expect(monsterAction("cloud-giant", "thundercloud").onHit).toEqual([
+      { conditions: [{ id: "incapacitated" }], duration: { type: "until-bearer-turn-end" } }
+    ]);
+    // A rider that waits on a charge stays prose.
+    expect(monsterAction("elk", "ram").onHit).toBeUndefined();
   });
 });

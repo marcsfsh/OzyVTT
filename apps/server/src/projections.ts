@@ -118,12 +118,12 @@ export function projectPlayerAnnotations(
 }
 
 // The one mask a hidden source's identity collapses to; shared so adjacent fields never disagree.
-const HIDDEN_SOURCE = "A hidden threat";
+export const HIDDEN_SOURCE = "A hidden threat";
 
 /** Scrubs a hidden source's name out of a free-form label ("Grappled by Vashkar") at the security
  *  boundary, since resolvers interpolate it and blanking would leave an empty chip. Word-boundary match;
  *  it can't catch other spellings, so resolvers must only interpolate the source's own `sourceName`. */
-function withoutSourceName(text: string, sourceName: string | null): string {
+export function withoutSourceName(text: string, sourceName: string | null): string {
   const needle = sourceName?.trim() ?? "";
   if (needle.length === 0) return text;
   const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -151,26 +151,38 @@ const PENDING_SAVE_FIELDS = {
   targetActorId: "player",
   ability: "player",
   dc: "player",
-  actionName: "player",
   proposedDamage: "player",
   proposedDamageParts: "player",
   halfOnSuccess: "player",
   conditionIds: "player",
   saveBonus: "player",
   createdAt: "player",
+  // A repeated save is named for its effect, which can name a hidden source.
+  actionName: "derived",
   sourceName: "derived",
   onFailEffect: "derived",
   sourceActorId: "never",
-  endsEffects: "never"
+  endsEffects: "never",
+  // Names the effect a repeated save would end; the prompt's action name already says which.
+  repeatOf: "never"
 } as const satisfies Record<keyof PendingSave, FieldAudience>;
 
+// How long what a failure imposes would last is the save's own text, read on the prompt by the one who owes it.
 const ON_FAIL_EFFECT_FIELDS = {
   tags: "player",
   linkedConditionIds: "player",
   escapeDc: "player",
+  duration: "player",
+  repeatSave: "player",
+  endsOnDamage: "player",
+  speedZero: "player",
+  endsWhenSourceDefeated: "player",
+  rangeFeet: "player",
   name: "derived",
   sourceName: "derived",
-  sourceActorId: "derived"
+  sourceActorId: "derived",
+  castId: "never",
+  sourceActionId: "never"
 } as const satisfies Record<keyof NonNullable<PendingSave["onFailEffect"]>, FieldAudience>;
 
 const PENDING_REACTION_FIELDS = {
@@ -284,9 +296,11 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
       .map((entry) => {
         const onFail = entry.onFailEffect;
         const onFailHidden = onFail !== undefined && isHiddenSource(onFail.sourceActorId, publicActorIds);
+        const hiddenSource = isHiddenSource(entry.sourceActorId, publicActorIds);
         return {
           ...copyPlayerFields(entry, PENDING_SAVE_FIELDS),
-          sourceName: isHiddenSource(entry.sourceActorId, publicActorIds) ? HIDDEN_SOURCE : entry.sourceName,
+          actionName: hiddenSource ? withoutSourceName(entry.actionName, entry.sourceName) : entry.actionName,
+          sourceName: hiddenSource ? HIDDEN_SOURCE : entry.sourceName,
           ...(onFail
             ? {
                 onFailEffect: {
@@ -311,12 +325,12 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
   };
 }
 
-/** An effect as players see it: no source ids, and a hidden source masked in both `sourceName` and `name`. */
+/** An effect as players see it: no source or cast ids, and a hidden source masked in both `sourceName` and `name`. */
 function playerEffect(
   effect: GameState["actors"][number]["effects"][number],
   publicActorIds: ReadonlySet<string>
 ): PlayerEffect {
-  const { sourceActorId, sourceActionId: _sourceActionId, ...visible } = effect;
+  const { sourceActorId, sourceActionId: _sourceActionId, castId: _castId, ...visible } = effect;
   if (!isHiddenSource(sourceActorId, publicActorIds)) return visible;
   return { ...visible, name: withoutSourceName(visible.name, effect.sourceName), sourceName: HIDDEN_SOURCE };
 }

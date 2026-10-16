@@ -788,7 +788,9 @@
               "ability": "wis",
               "dc": "spellcasting",
               "successDamage": "none",
-              "failureConditions": ["frightened", "incapacitated"]
+              "failureConditions": ["frightened", "incapacitated"],
+              "failureDuration": { "type": "rounds", "rounds": 10 },
+              "endsOnDamage": true
             },
             "damage": []
           }

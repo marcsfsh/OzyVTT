@@ -1,5 +1,6 @@
 import { requireActorAccess } from "../authorization.js";
 import { addEffect, endEffect, makeEffect, type EffectNarration } from "../effects.js";
+import { CommandRejectedError } from "../game-store.js";
 import { EffectAddSchema, EffectEndSchema } from "@vtt/domain/commands";
 import { initiatorOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
@@ -11,16 +12,29 @@ export const effectCommands = [
     type: "effect.add",
     operationId: "addEffect",
     description:
-      "Adds a rules-engine effect to a combatant (GM-grade only): a named, tagged state with an optional duration and typed modifiers (damage bonus, damage resistance, advantage). Structured actions create richer effects via their own declarations; this is the house-rule/manual path. The response's `effectId` equals the commandId.",
+      "Adds a rules-engine effect to a combatant (GM-grade only): a named, tagged state with an optional duration and typed modifiers (damage bonus, damage resistance, advantage). Structured actions create richer effects via their own declarations; this is the house-rule/manual path. With `concentration`, `sourceActorId` names the creature concentrating on it (the caster of a Bless on an ally); without one, the bearer sustains it. The response's `effectId` equals the commandId.",
     summary: "Add a rules-engine effect to a combatant (GM).",
     schema: EffectAddSchema,
     malformed: "The effect command is malformed.",
     gmOnly: "Only the GM can add effects.",
     async run({ request, execute }, kit) {
-      const { commandId, actorId, name, tags, duration, modifiers, concentration } = request;
+      const { commandId, actorId, name, tags, duration, modifiers, concentration, sourceActorId } = request;
       let events: EffectNarration[] = [];
       const { duplicate } = await execute((state) => {
         events = [];
+        const source = sourceActorId ? state.actors.find((candidate) => candidate.id === sourceActorId) : undefined;
+        if (sourceActorId && !source) throw new CommandRejectedError("The effect's source is no longer on the table.");
+        // A concentration effect is sustained by its caster when named, else by its bearer: the one whose damage
+        // prompts the CON save. A named caster already concentrating holds this as part of that same Concentration
+        // (a Bless the GM puts on three allies), rather than ending it.
+        const sustainer = source?.id ?? (concentration ? actorId : null);
+        const ongoing =
+          concentration && source
+            ? state.actors
+                .flatMap((candidate) => candidate.effects)
+                .find((candidate) => candidate.concentration && candidate.sourceActorId === source.id)
+            : undefined;
+        const castId = concentration && source ? (ongoing?.castId ?? commandId) : undefined;
         addEffect(
           state,
           actorId,
@@ -28,8 +42,8 @@ export const effectCommands = [
             id: commandId,
             name,
             tags: tags ? [...tags] : [],
-            // A GM-added concentration effect is sustained by its bearer (damage to them prompts the CON save).
-            sourceActorId: concentration ? actorId : null,
+            sourceActorId: sustainer,
+            sourceName: source?.name ?? null,
             startedRound: state.combat.round,
             duration:
               duration === undefined
@@ -38,7 +52,8 @@ export const effectCommands = [
                   ? { type: "rounds", remaining: duration.rounds }
                   : duration,
             concentration: concentration ?? false,
-            modifiers: modifiers ? [...modifiers] : []
+            modifiers: modifiers ? [...modifiers] : [],
+            ...(castId !== undefined ? { castId } : {})
           }),
           events
         );

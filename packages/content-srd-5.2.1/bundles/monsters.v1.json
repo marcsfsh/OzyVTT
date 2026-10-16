@@ -721,7 +721,10 @@
      "successDamage": "none",
      "failureConditions": [
       "incapacitated"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [],
     "area": {
@@ -916,7 +919,10 @@
      "successDamage": "none",
      "failureConditions": [
       "deafened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [
      {
@@ -1276,7 +1282,10 @@
      "successDamage": "none",
      "failureConditions": [
       "incapacitated"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     }
     },
     "damage": [
      {
@@ -1996,7 +2005,10 @@
      "successDamage": "none",
      "failureConditions": [
       "incapacitated"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [],
     "area": {
@@ -3049,7 +3061,10 @@
      "successDamage": "none",
      "failureConditions": [
       "incapacitated"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [],
     "area": {
@@ -3244,7 +3259,10 @@
      "successDamage": "none",
      "failureConditions": [
       "deafened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [
      {
@@ -3604,7 +3622,10 @@
      "successDamage": "none",
      "failureConditions": [
       "incapacitated"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     }
     },
     "damage": [
      {
@@ -4324,7 +4345,10 @@
      "successDamage": "none",
      "failureConditions": [
       "incapacitated"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [],
     "area": {
@@ -5602,6 +5626,18 @@
      {
       "formula": "1d6 + 4",
       "type": "piercing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "poisoned"
+       }
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
      }
     ]
    },
@@ -7044,6 +7080,18 @@
       "formula": "1d8 + 3",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "poisoned"
+       }
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
+     }
     ]
    },
    {
@@ -7213,8 +7261,11 @@
      "dc": 18,
      "successDamage": "none",
      "failureConditions": [
-      "grappled"
-     ]
+      "grappled",
+      "restrained"
+     ],
+     "escapeDc": 16,
+     "rangeFeet": 5
     },
     "damage": [
      {
@@ -8262,6 +8313,18 @@
       "formula": "2d10 + 4",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "poisoned"
+       }
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
+     }
     ]
    }
   ],
@@ -8412,7 +8475,10 @@
      "successDamage": "none",
      "failureConditions": [
       "incapacitated"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [],
     "area": {
@@ -8811,7 +8877,9 @@
      "successDamage": "none",
      "failureConditions": [
       "grappled"
-     ]
+     ],
+     "escapeDc": 13,
+     "rangeFeet": 10
     },
     "damage": []
    },
@@ -9541,6 +9609,9 @@
       "conditions": [
        {
         "id": "grappled"
+       },
+       {
+        "id": "restrained"
        }
       ],
       "escapeDc": 14,
@@ -9559,7 +9630,10 @@
      "successDamage": "none",
      "failureConditions": [
       "restrained"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
     },
     "damage": [
      {
@@ -9879,8 +9953,14 @@
      "dc": 13,
      "successDamage": "none",
      "failureConditions": [
-      "poisoned"
-     ]
+      "poisoned",
+      "paralyzed"
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "repeatSave": true
     },
     "damage": []
    }
@@ -10129,7 +10209,10 @@
      "successDamage": "none",
      "failureConditions": [
       "frightened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
     },
     "damage": [],
     "area": {
@@ -10312,6 +10395,18 @@
      {
       "formula": "3d6 + 8",
       "type": "thunder"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "incapacitated"
+       }
+      ],
+      "duration": {
+       "type": "until-bearer-turn-end"
+      }
      }
     ]
    },
@@ -10612,7 +10707,9 @@
      "successDamage": "none",
      "failureConditions": [
       "grappled"
-     ]
+     ],
+     "escapeDc": 12,
+     "rangeFeet": 5
     },
     "damage": [
      {
@@ -10849,6 +10946,18 @@
       "formula": "1d12 + 5",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "poisoned"
+       }
+      ],
+      "duration": {
+       "type": "until-source-turn-end"
+      }
+     }
     ]
    },
    {
@@ -10872,8 +10981,11 @@
      "dc": 15,
      "successDamage": "none",
      "failureConditions": [
-      "grappled"
-     ]
+      "grappled",
+      "restrained"
+     ],
+     "escapeDc": 13,
+     "rangeFeet": 5
     },
     "damage": [
      {
@@ -11978,7 +12090,8 @@
      "successDamage": "none",
      "failureConditions": [
       "restrained"
-     ]
+     ],
+     "repeatSave": true
     },
     "damage": [
      {
@@ -12132,7 +12245,12 @@
      "successDamage": "none",
      "failureConditions": [
       "frightened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "repeatSave": true
     },
     "damage": [],
     "uses": {
@@ -12507,7 +12625,10 @@
      "successDamage": "none",
      "failureConditions": [
       "poisoned"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [],
     "uses": {
@@ -13027,7 +13148,10 @@
      "successDamage": "none",
      "failureConditions": [
       "blinded"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
     },
     "damage": [],
     "uses": {
@@ -13912,6 +14036,18 @@
      {
       "formula": "1d6 + 2",
       "type": "piercing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "poisoned"
+       }
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
      }
     ]
    },
@@ -15146,7 +15282,10 @@
      "successDamage": "none",
      "failureConditions": [
       "paralyzed"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [
      {
@@ -15285,7 +15424,10 @@
      "successDamage": "none",
      "failureConditions": [
       "frightened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     }
     },
     "damage": [
      {
@@ -15475,7 +15617,10 @@
      "successDamage": "none",
      "failureConditions": [
       "paralyzed"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [
      {
@@ -15994,6 +16139,18 @@
       "formula": "1d4 + 2",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "poisoned"
+       }
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
+     }
     ]
    }
   ],
@@ -16105,7 +16262,9 @@
      "successDamage": "none",
      "failureConditions": [
       "grappled"
-     ]
+     ],
+     "escapeDc": 14,
+     "rangeFeet": 10
     },
     "damage": [
      {
@@ -18146,6 +18305,18 @@
       "formula": "2d6 + 2",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "poisoned"
+       }
+      ],
+      "duration": {
+       "type": "until-bearer-turn-end"
+      }
+     }
     ]
    }
   ],
@@ -18546,7 +18717,10 @@
      "successDamage": "none",
      "failureConditions": [
       "blinded"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
     },
     "damage": [
      {
@@ -20731,7 +20905,10 @@
      "successDamage": "half",
      "failureConditions": [
       "blinded"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     }
     },
     "damage": [
      {
@@ -21000,8 +21177,10 @@
      "dc": 11,
      "successDamage": "none",
      "failureConditions": [
-      "charmed"
-     ]
+      "charmed",
+      "incapacitated"
+     ],
+     "repeatSave": true
     },
     "damage": [],
     "area": {
@@ -21486,6 +21665,18 @@
      {
       "formula": "2d10 + 5",
       "type": "bludgeoning"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "poisoned"
+       }
+      ],
+      "duration": {
+       "type": "until-bearer-turn-end"
+      }
      }
     ]
    }
@@ -22020,7 +22211,10 @@
      "successDamage": "none",
      "failureConditions": [
       "poisoned"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
     },
     "damage": []
    }
@@ -22994,7 +23188,8 @@
      "successDamage": "none",
      "failureConditions": [
       "unconscious"
-     ]
+     ],
+     "endsOnDamage": true
     },
     "damage": [
      {
@@ -23156,7 +23351,8 @@
      "successDamage": "none",
      "failureConditions": [
       "grappled"
-     ]
+     ],
+     "escapeDc": 13
     },
     "damage": [
      {
@@ -23888,6 +24084,9 @@
       "conditions": [
        {
         "id": "grappled"
+       },
+       {
+        "id": "restrained"
        }
       ],
       "escapeDc": 20
@@ -23906,7 +24105,10 @@
      "failureConditions": [
       "blinded",
       "poisoned"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
     },
     "damage": [],
     "legendary": {
@@ -24424,6 +24626,18 @@
       "formula": "3d6 + 5",
       "type": "cold"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "paralyzed"
+       }
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
+     }
     ]
    },
    {
@@ -24575,7 +24789,10 @@
      "successDamage": "none",
      "failureConditions": [
       "frightened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     }
     },
     "damage": []
    }
@@ -25418,8 +25635,11 @@
      "dc": 17,
      "successDamage": "none",
      "failureConditions": [
-      "grappled"
-     ]
+      "grappled",
+      "restrained"
+     ],
+     "escapeDc": 14,
+     "rangeFeet": 5
     },
     "damage": [
      {
@@ -25902,6 +26122,18 @@
      {
       "formula": "1d4 + 4",
       "type": "piercing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "poisoned"
+       }
+      ],
+      "duration": {
+       "type": "until-source-turn-end"
+      }
      }
     ]
    },
@@ -26514,7 +26746,10 @@
      "successDamage": "none",
      "failureConditions": [
       "frightened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
     },
     "damage": []
    }
@@ -26696,7 +26931,10 @@
      "successDamage": "none",
      "failureConditions": [
       "paralyzed"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
     },
     "damage": [
      {
@@ -26825,7 +27063,12 @@
      "successDamage": "none",
      "failureConditions": [
       "frightened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "endsOnDamage": true
     },
     "damage": [
      {
@@ -27817,6 +28060,18 @@
       "formula": "2d6 + 2",
       "type": "psychic"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "frightened"
+       }
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
+     }
     ]
    },
    {
@@ -27983,7 +28238,10 @@
      "successDamage": "half",
      "failureConditions": [
       "stunned"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     }
     },
     "damage": [
      {
@@ -28699,7 +28957,10 @@
      "successDamage": "none",
      "failureConditions": [
       "charmed"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     }
     },
     "damage": []
    }
@@ -28786,7 +29047,10 @@
      "successDamage": "none",
      "failureConditions": [
       "charmed"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     }
     },
     "damage": []
    },
@@ -28939,7 +29203,12 @@
      "successDamage": "none",
      "failureConditions": [
       "poisoned"
-     ]
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "repeatSave": true
     },
     "damage": [
      {
@@ -30075,6 +30344,9 @@
       "conditions": [
        {
         "id": "grappled"
+       },
+       {
+        "id": "restrained"
        }
       ],
       "escapeDc": 19,
@@ -30192,6 +30464,18 @@
       "formula": "1d4 + 3",
       "type": "slashing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "poisoned"
+       }
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
+     }
     ]
    },
    {
@@ -30205,7 +30489,12 @@
      "successDamage": "none",
      "failureConditions": [
       "frightened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "repeatSave": true
     },
     "damage": [],
     "uses": {
@@ -30358,7 +30647,10 @@
      "failureConditions": [
       "frightened",
       "incapacitated"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     }
     },
     "damage": [
      {
@@ -30903,6 +31195,9 @@
       "conditions": [
        {
         "id": "grappled"
+       },
+       {
+        "id": "restrained"
        }
       ],
       "escapeDc": 17,
@@ -31256,6 +31551,9 @@
       "conditions": [
        {
         "id": "grappled"
+       },
+       {
+        "id": "restrained"
        }
       ],
       "escapeDc": 19,
@@ -31379,6 +31677,9 @@
       "conditions": [
        {
         "id": "grappled"
+       },
+       {
+        "id": "poisoned"
        }
       ],
       "escapeDc": 14
@@ -31889,8 +32190,11 @@
      "dc": 15,
      "successDamage": "none",
      "failureConditions": [
-      "grappled"
-     ]
+      "grappled",
+      "restrained"
+     ],
+     "escapeDc": 14,
+     "rangeFeet": 10
     },
     "damage": [
      {
@@ -32674,8 +32978,12 @@
      "dc": 15,
      "successDamage": "none",
      "failureConditions": [
-      "grappled"
-     ]
+      "grappled",
+      "blinded",
+      "restrained"
+     ],
+     "escapeDc": 14,
+     "rangeFeet": 5
     },
     "damage": [
      {
@@ -33058,7 +33366,10 @@
      "successDamage": "none",
      "failureConditions": [
       "incapacitated"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [],
     "area": {
@@ -33270,7 +33581,11 @@
      "successDamage": "none",
      "failureConditions": [
       "blinded"
-     ]
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     }
     },
     "damage": [],
     "legendary": {
@@ -33665,7 +33980,10 @@
      "successDamage": "none",
      "failureConditions": [
       "incapacitated"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     }
     },
     "damage": [
      {
@@ -33855,7 +34173,11 @@
      "successDamage": "half",
      "failureConditions": [
       "frightened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     }
     },
     "damage": [
      {
@@ -34342,7 +34664,19 @@
      "rangeFeet": 160,
      "rangeNormalFeet": 40
     },
-    "damage": []
+    "damage": [],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "charmed"
+       }
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
+     }
+    ]
    },
    {
     "id": "heart-sight",
@@ -35094,6 +35428,21 @@
      {
       "formula": "2d12 + 9",
       "type": "lightning"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "blinded"
+       },
+       {
+        "id": "deafened"
+       }
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
      }
     ]
    },
@@ -35892,7 +36241,10 @@
      "successDamage": "none",
      "failureConditions": [
       "deafened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     }
     },
     "damage": [],
     "uses": {
@@ -36132,6 +36484,9 @@
       "conditions": [
        {
         "id": "grappled"
+       },
+       {
+        "id": "restrained"
        }
       ],
       "escapeDc": 20
@@ -36207,7 +36562,10 @@
      "failureConditions": [
       "deafened",
       "frightened"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [
      {
@@ -38153,7 +38511,8 @@
      "successDamage": "none",
      "failureConditions": [
       "poisoned"
-     ]
+     ],
+     "repeatSave": true
     },
     "damage": [
      {
@@ -38183,7 +38542,10 @@
      "successDamage": "none",
      "failureConditions": [
       "stunned"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
     },
     "damage": [
      {
@@ -38843,8 +39205,10 @@
      "dc": 15,
      "successDamage": "half",
      "failureConditions": [
-      "grappled"
-     ]
+      "grappled",
+      "restrained"
+     ],
+     "escapeDc": 14
     },
     "damage": [
      {
@@ -40716,6 +41080,18 @@
       "formula": "2d6 + 4",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "poisoned"
+       }
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
+     }
     ]
    }
   ],
@@ -41282,7 +41658,10 @@
      "successDamage": "none",
      "failureConditions": [
       "incapacitated"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [],
     "area": {
@@ -42194,7 +42573,10 @@
      "successDamage": "none",
      "failureConditions": [
       "incapacitated"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [],
     "area": {

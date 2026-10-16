@@ -10,7 +10,13 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import { ActorDefinitionSchema, type ActorAction, type ActorDefinition } from "@vtt/schemas";
+import {
+  ActorDefinitionSchema,
+  SaveConditionSchema,
+  type ActorAction,
+  type ActorDefinition,
+  type SaveFailureDuration
+} from "@vtt/schemas";
 import {
   ArmorReferenceSchema,
   ConditionReferenceSchema,
@@ -21,7 +27,12 @@ import {
   WeaponReferenceSchema
 } from "../src/index.js";
 import { outDir, sourcePath } from "./paths.js";
-import { SPELL_SAVE_OVERRIDE_IDS, spellSaveOutcomeFor, statBlockSaveOutcome } from "./save-outcomes.js";
+import {
+  failureDurationOf,
+  SPELL_SAVE_OVERRIDE_IDS,
+  spellSaveOutcomeFor,
+  statBlockSaveOutcome
+} from "./save-outcomes.js";
 import { areaOfProse, withProseFacts } from "../src/action-prose.js";
 import { spellEffectFor } from "./spell-effects.js";
 
@@ -321,26 +332,52 @@ const parseMultiattack = (
 /**
  * On-hit condition riders from the stock phrasing: "If the target is a Large or smaller creature,
  * it has the Grappled condition (escape DC 15). While Grappled, the target has the Restrained
- * condition." and "…it has the Prone condition." Only attack actions get riders (a save action's
- * conditions flow through the pending-save pipeline instead).
+ * condition." (or "...and it has the Restrained condition until the grapple ends"), "…it has the Prone
+ * condition.", and an unconditional timed one: "...and the target has the Poisoned condition until the start of
+ * the assassin's next turn." Only attack actions get riders (a save action's conditions flow through the
+ * pending-save pipeline instead); a rider that depends on a charge or a drop to 0 HP stays prose.
  */
 type OnHitRider = {
   conditions: Array<{ id: string }>;
   escapeDc?: number;
   maxTargetSize?: "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan";
+  duration?: SaveFailureDuration;
 };
+const RIDER_CONDITIONS: ReadonlySet<string> = new Set(SaveConditionSchema.options);
+const riderConditionIds = (names: string): string[] =>
+  names
+    .split(/ and /)
+    .map((name) => name.toLowerCase())
+    .filter((id) => RIDER_CONDITIONS.has(id) && id !== "grappled");
 const parseOnHitRiders = (desc: string): OnHitRider[] | null => {
   const size = desc.match(/If the target is a (Tiny|Small|Medium|Large|Huge) or smaller creature/i);
   const maxTargetSize = size ? (size[1].toLowerCase() as NonNullable<OnHitRider["maxTargetSize"]>) : undefined;
   const riders: OnHitRider[] = [];
   const grapple = desc.match(/has the Grappled condition \(escape DC (\d+)\)/i);
   if (grapple) {
-    const conditions = [{ id: "grappled" }];
-    if (/While Grappled, the target (?:also )?has the Restrained condition/i.test(desc))
-      conditions.push({ id: "restrained" });
+    // What lasts exactly as long as the grapple rides the same effect, so escaping ends it too.
+    const held = new Set<string>();
+    if (/While Grappled, the target (?:also )?has the Restrained condition/i.test(desc)) held.add("restrained");
+    for (const match of desc.matchAll(
+      /\b(?:it|the target) has the ([A-Z][a-z]+(?: and [A-Z][a-z]+)?) conditions? until the grapple ends|\bUntil the grapple ends, the target has the ([A-Z][a-z]+(?: and [A-Z][a-z]+)?) conditions?/g
+    ))
+      for (const id of riderConditionIds(match[1] ?? match[2]!)) held.add(id);
+    const conditions = [{ id: "grappled" }, ...[...held].slice(0, 2).map((id) => ({ id }))];
     riders.push({ conditions, escapeDc: Number.parseInt(grapple[1], 10), ...(maxTargetSize ? { maxTargetSize } : {}) });
   } else if (/it has the Prone condition/i.test(desc)) {
     riders.push({ conditions: [{ id: "prone" }], ...(maxTargetSize ? { maxTargetSize } : {}) });
+  }
+  // An unconditional timed rider in the hit's own sentence (not one opening with "If").
+  const hit = desc.slice(Math.max(0, desc.search(/\bHit:|Attack Roll:/)));
+  for (const sentence of hit.split(/(?<=\.)\s+/)) {
+    if (/^If\b/.test(sentence) || /Grappled/.test(sentence)) continue;
+    const timed = sentence.match(
+      /\bthe target has the ([A-Z][a-z]+(?: and [A-Z][a-z]+)?) conditions? (until the (?:start|end) of (?:its|the [A-Za-z' -]+?(?:'s|s')) next turn)/
+    );
+    const ids = timed ? riderConditionIds(timed[1]) : [];
+    const duration = timed ? failureDurationOf(timed[2]) : undefined;
+    if (ids.length > 0 && duration && riders.length < 2)
+      riders.push({ conditions: ids.map((id) => ({ id })), duration });
   }
   return riders.length > 0 ? riders : null;
 };
