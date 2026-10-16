@@ -4,7 +4,7 @@ import { resolveDefinitionAction } from "../action-resolution.js";
 import { addAnnotation, shapeGeometry } from "../annotations.js";
 import { areaOriginatesFromCaster, tokensInTemplate } from "../area-targeting.js";
 import { canPlayerTarget, GameAccessDeniedError, requireActorAccess } from "../authorization.js";
-import { builtinAction } from "../builtin-actions.js";
+import { builtinActionFor } from "../builtin-actions.js";
 import { effectiveActions } from "../effective-actions.js";
 import { pushTokenAway } from "../forced-movement.js";
 import { ActionResolveSchema, ActionUseSchema, DiceRollSchema } from "@vtt/domain/commands";
@@ -83,7 +83,7 @@ export const actionCommands = [
         const statBlockAction = effectiveActions(definition, attacker, kit.equipmentCatalog()).find(
           (candidate) => candidate.id === actionId
         );
-        const action = statBlockAction ?? builtinAction(actionId);
+        const action = statBlockAction ?? builtinActionFor(definition, actionId);
         if (!action) throw new CommandRejectedError("That action is not on the stat block.");
         let resolvedTargetIds: readonly string[];
         if (template) {
@@ -288,7 +288,7 @@ export const actionCommands = [
 
       const definition = actor.definitionId ? kit.resolveDefinitionIn(snapshot, actor.definitionId) : undefined;
       const available = effectiveActions(definition, actor, kit.equipmentCatalog());
-      const listed = available.find((candidate) => candidate.id === actionId) ?? builtinAction(actionId);
+      const listed = available.find((candidate) => candidate.id === actionId) ?? builtinActionFor(definition, actionId);
       if (!listed) throw new CommandRejectedError("That action is not on the stat block.");
       // A spell cast with a higher slot rolls that slot's dice, on the loose route as in the fight.
       const castLevel = listed.spellSlot ? castSlotLevel(actor, listed.spellSlot.level, slotLevel) : undefined;

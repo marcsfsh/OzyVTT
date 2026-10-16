@@ -210,11 +210,148 @@ export function builtinAction(actionId: string): BuiltinAction | undefined {
   return BUILTIN_ACTIONS.find((action) => action.id === actionId);
 }
 
+/** The generic actions a feature can turn into a Bonus Action. */
+type BonusBase =
+  "dash" | "disengage" | "hide" | "unarmed-strike" | "unarmed-grapple" | "unarmed-shove-prone" | "unarmed-shove-push";
+const UNARMED: readonly BonusBase[] = [
+  "unarmed-strike",
+  "unarmed-grapple",
+  "unarmed-shove-prone",
+  "unarmed-shove-push"
+];
+
+/** The id a generic action takes as a Bonus Action ("dash-bonus"); its handler is the base action's. */
+export const BONUS_SUFFIX = "-bonus";
+
+/** "The goblin takes the Disengage or Hide action": the generic actions a stat block's Bonus Action offers one of. A
+ *  row that takes two at once ("the Dash and Disengage actions") is `withTakenActions`'s. */
+function offeredActions(description: string): BonusBase[] {
+  const match = /\btakes the ((?:Dash|Disengage|Hide)(?:,? (?:or )?(?:Dash|Disengage|Hide))*) action\b/i.exec(
+    description
+  );
+  if (!match) return [];
+  return [...match[1].matchAll(/Dash|Disengage|Hide/gi)].map((found) => found[0].toLowerCase() as BonusBase);
+}
+
+/** The generic actions whose whole effect is a grant, so two taken at once can share one effect. */
+type GrantedBase = "dash" | "disengage" | "dodge";
+
+/** Feature actions that take two generic actions at once, by id: the Focus Point forms of Patient Defense and Step of
+ *  the Wind (SRD 5.2.1 Monk's Focus). Keyed by id so sheets built before this table get them too. */
+const TAKEN_TOGETHER: Readonly<Record<string, readonly GrantedBase[]>> = {
+  "patient-defense": ["disengage", "dodge"],
+  "step-of-the-wind": ["disengage", "dash"]
+};
+
+function takenTogether(action: BuiltinAction): readonly GrantedBase[] {
+  const listed = TAKEN_TOGETHER[action.id];
+  if (listed) return listed;
+  // A stat block's row: "The golem takes the Dash and Disengage actions."
+  const match = /\btakes the (Dash|Disengage|Dodge) and (?:the )?(Dash|Disengage|Dodge) actions\b/i.exec(
+    action.description
+  );
+  return match ? [match[1].toLowerCase() as GrantedBase, match[2].toLowerCase() as GrantedBase] : [];
+}
+
+/**
+ * An action that takes two generic actions at once grants both: one effect carrying each one's tags and modifiers
+ * (Dash's measured movement, Disengage's no-provoke, Dodge's Disadvantage), lasting as they do. An action that grants
+ * something of its own keeps it.
+ */
+export function withTakenActions(action: BuiltinAction): BuiltinAction {
+  if (action.grants !== undefined) return action;
+  const taken = takenTogether(action);
+  if (taken.length < 2) return action;
+  const grants = taken.flatMap((id) => {
+    const grant = builtinAction(id)?.grants;
+    return grant ? [grant] : [];
+  });
+  return {
+    ...action,
+    grants: {
+      name: action.name,
+      tags: [...new Set(grants.flatMap((grant) => grant.tags))],
+      duration: { type: "until-source-next-turn" },
+      modifiers: grants.flatMap((grant) => grant.modifiers),
+      onEnd: [],
+      target: "self",
+      // Dodge's half lapses while Incapacitated or at Speed 0; the tags still answer for Dash and Disengage.
+      voidWhileIncapacitated: grants.some((grant) => grant.voidWhileIncapacitated),
+      concentration: false
+    }
+  };
+}
+
+/**
+ * The generic actions this creature may take as a Bonus Action, and the feature that lets it: Cunning Action (Dash,
+ * Disengage or Hide), a stat block's Nimble Escape and the like, the free Dash of Step of the Wind and Disengage of
+ * Patient Defense, and Martial Arts' Unarmed Strike (SRD 5.2.1). Read from the sheet's features and actions, so a
+ * sheet built before this list gets them too. The first feature offering one names it.
+ */
+function bonusSources(definition: ActorDefinition | undefined): ReadonlyMap<BonusBase, string> {
+  const offered = new Map<BonusBase, string>();
+  const offer = (bases: readonly BonusBase[], source: string) => {
+    for (const base of bases) if (!offered.has(base)) offered.set(base, source);
+  };
+  const features = definition?.character?.features ?? [];
+  const actions = definition?.actions ?? [];
+  const holds = (id: string) =>
+    features.some((feature) => feature.id === id) || actions.some((action) => action.id === id);
+  if (holds("cunning-action")) offer(["dash", "disengage", "hide"], "Cunning Action");
+  if (features.some((feature) => feature.id === "martial-arts")) offer(UNARMED, "Martial Arts");
+  if (holds("step-of-the-wind")) offer(["dash"], "Step of the Wind");
+  if (holds("patient-defense")) offer(["disengage"], "Patient Defense");
+  for (const action of actions)
+    if (action.activation === "bonus-action") offer(offeredActions(action.description), action.name);
+  return offered;
+}
+
+/** A generic action taken as a Bonus Action through a feature. Martial Arts' strike keeps the Monk's own numbers
+ *  (its die, Dexterity) when the sheet has them; it is one attack, not part of the Attack action, so Extra Attack's
+ *  count and the attack it replaces don't come along. */
+function bonusVariant(base: BonusBase, source: string, definition: ActorDefinition | undefined): BuiltinAction {
+  const generic = builtinAction(base)!;
+  const own =
+    base === "unarmed-strike"
+      ? definition?.actions.find((action) => action.id === base && action.attack !== undefined)
+      : undefined;
+  const { replacesAttack: _attack, ...shape } = own ?? generic;
+  const { count: _count, ...attack } = shape.attack ?? { bonus: 0 };
+  return {
+    ...shape,
+    ...(shape.attack ? { attack } : {}),
+    id: `${base}${BONUS_SUFFIX}`,
+    name: `${source}: ${generic.name}`,
+    activation: "bonus-action",
+    description: `${source} lets you take this as a Bonus Action. ${generic.description}`
+  };
+}
+
+/** The generic actions every combatant has, then the Bonus Action forms its features give it. */
+export function builtinActionsFor(definition: ActorDefinition | undefined): readonly BuiltinAction[] {
+  const variants = [...bonusSources(definition)].map(([base, source]) => bonusVariant(base, source, definition));
+  return [...BUILTIN_ACTIONS, ...variants];
+}
+
+/** One generic action this combatant can take, by id. */
+export function builtinActionFor(definition: ActorDefinition | undefined, actionId: string): BuiltinAction | undefined {
+  return builtinActionsFor(definition).find((action) => action.id === actionId);
+}
+
+/** The id of the generic action a Bonus Action form is taken from ("hide" for "hide-bonus"), or the id itself. */
+export function builtinBaseId(actionId: string): string {
+  return actionId.endsWith(BONUS_SUFFIX) ? actionId.slice(0, -BONUS_SUFFIX.length) : actionId;
+}
+
 /** Builtins that resolve against exactly one chosen combatant; everything else is a single direct tap. */
 export const BUILTIN_TARGETING: Readonly<Record<string, "single">> = {
   help: "single",
   "unarmed-strike": "single",
   "unarmed-grapple": "single",
   "unarmed-shove-prone": "single",
-  "unarmed-shove-push": "single"
+  "unarmed-shove-push": "single",
+  "unarmed-strike-bonus": "single",
+  "unarmed-grapple-bonus": "single",
+  "unarmed-shove-prone-bonus": "single",
+  "unarmed-shove-push-bonus": "single"
 };

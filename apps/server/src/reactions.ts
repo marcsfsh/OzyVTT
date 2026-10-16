@@ -6,7 +6,7 @@ import { requireGm, type Initiator } from "./authorization.js";
 import { adjustableActor, applyDamageDetailed, halvedDamageParts, type DamageInput } from "./hit-points.js";
 import { addEffect, makeEffect, type EffectNarration } from "./effects.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "./action-resolution.js";
-import { builtinAction } from "./builtin-actions.js";
+import { builtinAction, builtinActionFor } from "./builtin-actions.js";
 import { effectiveActions } from "./effective-actions.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import type { LiveActor } from "./resolution/context.js";
@@ -319,7 +319,7 @@ function answerParkedAttack(answer: Answer): ReactionOutcome {
   const action =
     attacker && parked
       ? parked.builtin
-        ? builtinAction(parked.actionId)
+        ? builtinActionFor(attackerDefinition, parked.actionId)
         : effectiveActions(attackerDefinition, attacker, deps.catalog).find(
             (candidate) => candidate.id === parked.actionId
           )

@@ -2,6 +2,7 @@ import { d20TestFormula, parseDiceFormula, resolveDice, type RiderAbility } from
 import type { ActorDefinition } from "@vtt/schemas";
 import { checkRollMode } from "../ability-checks.js";
 import { exhaustionPenalty } from "../condition-rules.js";
+import { builtinBaseId } from "../builtin-actions.js";
 import { addEffect, endEffect, makeEffect } from "../effects.js";
 import { checkRiderBonus } from "../equipment-derivation.js";
 import { CommandRejectedError } from "../game-store.js";
@@ -179,16 +180,21 @@ const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
   study: { check: skillCheck("Intelligence (Study)", { ability: "int" }, null) },
   "escape-grapple": { check: escapeGrapple },
 
-  /** Strength + Proficiency Bonus to hit, then flat 1 + Strength Bludgeoning damage. */
+  /** Strength + Proficiency Bonus to hit, then flat 1 + Strength Bludgeoning damage. A Monk's Martial Arts strike taken
+   *  as a Bonus Action brings its own numbers, which stand. */
   "unarmed-strike": {
-    prepare: ({ action, deps }) => ({
-      ...action,
-      attack: {
-        bonus: abilityModifier(deps.definition, "str") + (deps.definition?.proficiencyBonus ?? 0),
-        reachFeet: 5
-      }
-    }),
+    prepare: ({ action, deps }) =>
+      action.attack !== undefined
+        ? action
+        : {
+            ...action,
+            attack: {
+              bonus: abilityModifier(deps.definition, "str") + (deps.definition?.proficiencyBonus ?? 0),
+              reachFeet: 5
+            }
+          },
     hitDamage: (ctx) => {
+      if (ctx.action.damage.length > 0) return;
       if (ctx.attack === null || (ctx.attack.outcome !== "crit" && ctx.attack.outcome !== "hit")) return;
       ctx.bonusDamage.push({
         amount: Math.max(0, 1 + abilityModifier(ctx.deps.definition, "str")),
@@ -207,7 +213,9 @@ const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
   help: { grantName: ({ attacker }) => `Distracted by ${attacker.name}`, distractsAnEnemy: true }
 };
 
-/** The special cases for a builtin action id, or undefined when it has none. */
+/** The special cases for a builtin action id, or undefined when it has none. A Bonus Action form ("hide-bonus") has
+ *  its generic action's. */
 export function builtinHandlerFor(actionId: string): BuiltinHandler | undefined {
-  return Object.hasOwn(BUILTIN_HANDLERS, actionId) ? BUILTIN_HANDLERS[actionId] : undefined;
+  const id = builtinBaseId(actionId);
+  return Object.hasOwn(BUILTIN_HANDLERS, id) ? BUILTIN_HANDLERS[id] : undefined;
 }

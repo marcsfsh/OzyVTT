@@ -4,7 +4,7 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { setCondition } from "../src/actor-conditions.js";
 import { importActorDefinition } from "../src/actor-roster.js";
-import { builtinAction } from "../src/builtin-actions.js";
+import { builtinAction, builtinActionFor } from "../src/builtin-actions.js";
 import { addEffect, endEffect, makeEffect } from "../src/effects.js";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { ContentLibrary } from "../src/content-library.js";
@@ -1095,6 +1095,71 @@ describe("Monk: Flurry of Blows opens its own Unarmed Strikes", () => {
   it("makes it three strikes from Monk level 10", () => {
     const built = onTheTable(build(monkInput(10)));
     expect(actionOf(built, "flurry-of-blows").multiattack).toEqual([{ actionId: "unarmed-strike", count: 3 }]);
+  });
+});
+
+describe("Monk: the Bonus Action forms Martial Arts and Monk's Focus give", () => {
+  /** A generic action this Monk can take by id, the Bonus Action forms its features give included. */
+  const take = (built: Built, actionId: string, targetIds: string[] = [], faces: number[] = []) =>
+    resolveDefinitionAction(
+      built.state,
+      builtinActionFor(built.definition, actionId)!,
+      {
+        actorId: IDS.hero,
+        targetIds,
+        commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`,
+        builtin: true
+      },
+      deps(built, faces)
+    );
+
+  it("makes an Unarmed Strike as a Bonus Action with the Martial Arts numbers, after the Attack action", () => {
+    // Monk 5: Dex 19 (+4), proficiency 3, the 1d8 Martial Arts die; Extra Attack makes the Attack action two swings.
+    const built = onTheTable(build(monkInput(5)));
+    use(built, "unarmed-strike", [IDS.foe], [17, 5]);
+    use(built, "unarmed-strike", [IDS.foe], [17, 5]);
+    expect(built.state.combat.turn.actionUsed).toBe(true);
+    const bonus = take(built, "unarmed-strike-bonus", [IDS.foe], [17, 6]);
+    expect(bonus.attack).toMatchObject({ total: 24, outcome: "hit" });
+    expect(bonus.damage).toEqual([{ formula: "1d8 + 4", type: "bludgeoning", total: 10 }]);
+    expect(bonus.damageTotal).toBe(10);
+    expect(built.state.combat.turn.bonusActionUsed).toBe(true);
+    // One strike: Extra Attack belongs to the Attack action, not to the Bonus Action.
+    expect(builtinActionFor(built.definition, "unarmed-strike-bonus")!.attack?.count).toBeUndefined();
+    expect(() => take(built, "unarmed-strike-bonus", [IDS.foe], [17, 6])).toThrow(/already used a bonus action/);
+  });
+
+  it("takes Disengage or Dash alone as a Bonus Action for no Focus Point", () => {
+    const built = onTheTable(build(monkInput(2)));
+    expect(builtinActionFor(built.definition, "disengage-bonus")?.name).toBe("Patient Defense: Disengage");
+    expect(builtinActionFor(built.definition, "dash-bonus")?.name).toBe("Step of the Wind: Dash");
+    take(built, "dash-bonus");
+    expect(built.hero.effects.find((effect) => effect.tags.includes("dashing"))?.movementGrantFeet).toBe(40);
+    expect(built.hero.actionUses["focus-points"]).toBeUndefined();
+    // A level-1 Monk has Martial Arts but not Monk's Focus yet.
+    expect(builtinActionFor(build(monkInput(1)), "dash-bonus")).toBeUndefined();
+  });
+
+  it("spends a Focus Point to take Disengage and Dash together (Step of the Wind)", () => {
+    const built = onTheTable(build(monkInput(2)));
+    const step = use(built, "step-of-the-wind");
+    expect(step.effectGranted).toEqual({ name: "Step of the Wind", tags: ["disengaged", "dashing"] });
+    expect(built.hero.actionUses["focus-points"]).toBe(1);
+    const effect = built.hero.effects.find((entry) => entry.tags.includes("dashing"))!;
+    expect(effect.tags).toContain("disengaged");
+    // Speed 40 at Monk 2 (Unarmored Movement): the Dash is worth that much extra movement.
+    expect(effect.movementGrantFeet).toBe(40);
+  });
+
+  it("spends a Focus Point to take Disengage and Dodge together (Patient Defense)", () => {
+    const built = onTheTable(build(monkInput(2)));
+    use(built, "patient-defense");
+    const effect = built.hero.effects.find((entry) => entry.tags.includes("dodging"))!;
+    expect(effect.tags).toEqual(["disengaged", "dodging"]);
+    expect(effect.modifiers).toContainEqual({ type: "roll-mode", roll: "incoming-attack", mode: "disadvantage" });
+    // Dodge's half lapses at Speed 0 or while Incapacitated, as the Dodge action does.
+    expect(effect.voidWhileIncapacitated).toBe(true);
+    expect(built.hero.actionUses["focus-points"]).toBe(1);
   });
 });
 

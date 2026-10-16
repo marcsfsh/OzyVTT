@@ -10,7 +10,9 @@ import { setCondition } from "../src/actor-conditions.js";
 import { answerSave, saveRollSources } from "../src/saving-throws.js";
 import { deriveEquipment } from "../src/equipment-derivation.js";
 import { rollDeathSave } from "../src/death-saves.js";
-import { builtinAction } from "../src/builtin-actions.js";
+import { builtinAction, builtinActionFor, builtinActionsFor } from "../src/builtin-actions.js";
+import { actionSummaryOf } from "../src/content-library.js";
+import { effectiveActions } from "../src/effective-actions.js";
 import { addEffect, endEffect, endEncounterEffects, expireEffectsAtTurnStart, hasEffectTag } from "../src/effects.js";
 import { applyRest, spendHitDice } from "../src/rests.js";
 import { hitDiceFromDefinition } from "../src/actor-roster.js";
@@ -4023,5 +4025,134 @@ describe("hit dice (SRD Hit Point Dice; short-rest healing adoption)", () => {
       ]
     });
     expect(legacy.actors[0].hitDice).toBeNull();
+  });
+});
+
+describe("Bonus Action forms of the generic actions (SRD Cunning Action, Nimble Escape)", () => {
+  const goblinDefinition = loadMonsterDefinitions().find((monster) => monster.source.externalId === "goblin-warrior")!;
+  const clayGolemDefinition = loadMonsterDefinitions().find((monster) => monster.source.externalId === "clay-golem")!;
+  const GOBLIN = "10000000-0000-4000-8000-000000000006";
+
+  /** Resolves the generic action this combatant can take by id, the Bonus Action forms its features give included. */
+  const take = (
+    game: GameState,
+    definition: ActorDefinition,
+    actorId: string,
+    actionId: string,
+    targetIds: readonly string[] = [],
+    faces: number[] = []
+  ) =>
+    resolveDefinitionAction(
+      game,
+      builtinActionFor(definition, actionId)!,
+      { actorId, targetIds, commandId: nextCommandId(), builtin: true, rollMode: null, override: null },
+      {
+        ...deps(faces, definition),
+        resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition
+      }
+    );
+
+  it("lists a Rogue's Cunning Action forms and none for a creature without the feature", () => {
+    const ids = (definition: ActorDefinition) =>
+      builtinActionsFor(definition)
+        .filter((action) => action.activation === "bonus-action")
+        .map((action) => `${action.id}:${action.name}`);
+    expect(ids(pipDefinition)).toEqual([
+      "dash-bonus:Cunning Action: Dash",
+      "disengage-bonus:Cunning Action: Disengage",
+      "hide-bonus:Cunning Action: Hide"
+    ]);
+    expect(ids(goblinDefinition)).toEqual([
+      "disengage-bonus:Nimble Escape: Disengage",
+      "hide-bonus:Nimble Escape: Hide"
+    ]);
+    expect(ids(torvaDefinition)).toEqual([]);
+  });
+
+  it("lets a Rogue attack and then Dash with the Bonus Action, which grants extra movement", () => {
+    const game = buildGame([
+      { actorId: IDS.pip, score: 20 },
+      { actorId: IDS.croc1, score: 8 }
+    ]);
+    resolve(game, pipDefinition, "rapier", { actorId: IDS.pip, targetIds: [IDS.croc1] }, [15, 4]);
+    expect(game.combat.turn.actionUsed).toBe(true);
+    // The generic Dash is the action, already spent; Cunning Action's form is the Bonus Action.
+    expect(() => take(game, pipDefinition, IDS.pip, "dash")).toThrow(/already used an action/);
+    const dash = take(game, pipDefinition, IDS.pip, "dash-bonus");
+    expect(dash.effectGranted).toEqual({ name: "Dashing", tags: ["dashing"] });
+    expect(game.combat.turn.bonusActionUsed).toBe(true);
+    const pip = game.actors.find((actor) => actor.id === IDS.pip)!;
+    expect(pip.effects.find((effect) => effect.tags.includes("dashing"))?.movementGrantFeet).toBe(25);
+    // One Bonus Action a turn.
+    expect(() => take(game, pipDefinition, IDS.pip, "disengage-bonus")).toThrow(/already used a bonus action/);
+  });
+
+  it("lets a goblin hit and then Disengage with Nimble Escape, so leaving reach provokes nothing", () => {
+    const game = buildGame([
+      { actorId: IDS.sable, score: 5 },
+      { actorId: IDS.torva, score: 3 }
+    ]);
+    game.actors.push(
+      ActorSchema.parse({
+        id: GOBLIN,
+        name: "Goblin Warrior",
+        kind: "monster",
+        visibility: "public",
+        hp: { current: 10, maximum: 10 },
+        armorClass: 15,
+        definitionId: "goblin-warrior",
+        size: "small",
+        speedFeet: 30
+      })
+    );
+    game.definitions.push({ id: "goblin-warrior", definition: goblinDefinition });
+    game.combat = {
+      ...game.combat,
+      turnActorId: GOBLIN,
+      initiative: [{ actorId: GOBLIN, score: 30, tieBreaker: 0 }, ...game.combat.initiative],
+      tokens: [
+        {
+          actorId: GOBLIN,
+          position: { x: 5, y: 0 },
+          sizeCells: 1,
+          sizePx: 50,
+          gridSizePx: null,
+          gridRotationRadians: null
+        },
+        ...game.combat.tokens.map((token) =>
+          token.actorId === IDS.sable ? { ...token, position: { x: 0, y: 0 } } : token
+        )
+      ]
+    };
+    const scimitar = goblinDefinition.actions.find((action) => action.id === "scimitar")!;
+    resolveDefinitionAction(
+      game,
+      scimitar,
+      { actorId: GOBLIN, targetIds: [IDS.sable], commandId: nextCommandId(), rollMode: null, override: null },
+      deps([15, 3], goblinDefinition)
+    );
+    const disengage = take(game, goblinDefinition, GOBLIN, "disengage-bonus");
+    expect(disengage.effectGranted).toEqual({ name: "Disengaged", tags: ["disengaged"] });
+    expect(game.combat.turn.bonusActionUsed).toBe(true);
+    const away = applyMovementRules(game, {
+      actorId: GOBLIN,
+      from: { x: 5, y: 0 },
+      to: { x: 30, y: 0 },
+      distance: (a, b) => Math.hypot(b.x - a.x, b.y - a.y),
+      override: null,
+      resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition,
+      newPromptId: () => "70000000-0000-4000-8000-0000000000aa",
+      now: () => 0,
+      commandId: nextCommandId()
+    });
+    expect(away.prompts).toEqual([]);
+  });
+
+  it("gives a row that takes the Dash and Disengage actions both effects (the clay golem's Hasten)", () => {
+    const hasten = effectiveActions(clayGolemDefinition, undefined, undefined).find((action) =>
+      /takes the Dash and Disengage actions/.test(action.description)
+    )!;
+    expect(hasten.grants).toMatchObject({ tags: ["dashing", "disengaged"], target: "self" });
+    expect(actionSummaryOf(clayGolemDefinition.actions.find((action) => action.id === hasten.id)!).grants).toBe(true);
   });
 });
