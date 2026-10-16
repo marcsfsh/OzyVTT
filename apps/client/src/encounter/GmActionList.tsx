@@ -65,9 +65,9 @@ function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSu
     // The Multiattack plan row stays a live "continue" while any component remains.
     if (action.multiattack && instance && Object.values(instance).some((count) => count > 0))
       return "In progress - pick the next attack";
-    const remaining = instance
-      ? (instance[action.id] ?? 0) + (action.attackBonus !== null ? (instance["attack"] ?? 0) : 0)
-      : 0;
+    // A weapon attack or an Unarmed Strike spends one of the Attack action's attacks.
+    const attackMember = action.attackBonus !== null || action.replacesAttack === true;
+    const remaining = instance ? (instance[action.id] ?? 0) + (attackMember ? (instance["attack"] ?? 0) : 0) : 0;
     if (remaining > 0) return `${remaining} attack${remaining === 1 ? "" : "s"} left`;
     return "Action used";
   }

@@ -258,6 +258,34 @@ describe("report test 2 - Extra Attack", () => {
       resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [])
     ).toThrow(/no attacks remaining in this action/);
   });
+
+  // SRD Attack action: "you can make one attack roll with a weapon or an Unarmed Strike"; Grapple and Shove are
+  // Unarmed Strike options, so each takes the place of one of Extra Attack's attacks.
+  const unarmed = (game: GameState, actionId: string, targetId: string, faces: number[]) =>
+    resolveDefinitionAction(
+      game,
+      builtinAction(actionId)!,
+      { actorId: IDS.torva, targetIds: [targetId], commandId: nextCommandId(), builtin: true },
+      deps(faces, torvaDefinition)
+    );
+
+  it("lets an Unarmed Strike open the Attack action and a weapon finish it", () => {
+    const game = buildGame();
+    const strike = unarmed(game, "unarmed-strike", IDS.croc1, [15]);
+    expect(strike.componentsRemaining).toEqual({ attack: 1 });
+    const swing = resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6]);
+    expect(swing.componentsRemaining).toBeNull();
+    expect(() => unarmed(game, "unarmed-strike", IDS.croc1, [15])).toThrow(/no attacks remaining in this action/);
+  });
+
+  it("lets a Grapple or a Shove be the second attack after a weapon swing", () => {
+    const game = buildGame();
+    resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6]);
+    const grapple = unarmed(game, "unarmed-grapple", IDS.pip, []);
+    expect(grapple.save).toMatchObject({ dc: 15 });
+    expect(game.combat.pendingSaves).toHaveLength(1);
+    expect(() => unarmed(game, "unarmed-shove-prone", IDS.pip, [])).toThrow(/no attacks remaining in this action/);
+  });
 });
 
 describe("report test 3 - Reckless Attack", () => {

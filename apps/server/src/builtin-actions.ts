@@ -9,7 +9,8 @@ type BuiltinAction = ActorDefinition["actions"][number];
  *
  * Ids are a frozen replay contract (journaled payloads reference them); a stat-block action with the
  * same id wins on lookup. What the declarative vocabulary can't express (check rolls, unarmed strike
- * math) is a handler keyed by id in `resolution/builtins.ts`. Descriptions quote the SRD rule.
+ * math) is a handler keyed by id in `resolution/builtins.ts`. Descriptions quote the SRD rule. The Unarmed Strike
+ * options are attacks of the Attack action (`replacesAttack`), so Extra Attack covers them as it covers a weapon.
  */
 export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
   {
@@ -164,7 +165,8 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     activation: "action",
     description:
       "A melee attack within 5 feet using your body: attack roll is Strength modifier + Proficiency Bonus; on a hit the target takes Bludgeoning damage equal to 1 + your Strength modifier. (SRD 5.2.1, Unarmed Strike)",
-    damage: []
+    damage: [],
+    replacesAttack: true
   },
   {
     id: "unarmed-grapple",
@@ -172,7 +174,8 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     activation: "action",
     description:
       "The target must succeed on a Strength or Dexterity saving throw (its choice) against DC 8 + your Strength modifier + your Proficiency Bonus, or it has the Grappled condition (that DC is also the escape DC). Only targets no more than one size larger, and you need a hand free - the GM adjudicates the hand. (SRD 5.2.1, Unarmed Strike / Grappling)",
-    damage: []
+    damage: [],
+    replacesAttack: true
   },
   {
     id: "unarmed-shove-prone",
@@ -180,7 +183,8 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     activation: "action",
     description:
       "The target must succeed on a Strength or Dexterity saving throw (its choice) against DC 8 + your Strength modifier + your Proficiency Bonus, or it has the Prone condition. Only targets no more than one size larger. (SRD 5.2.1, Unarmed Strike)",
-    damage: []
+    damage: [],
+    replacesAttack: true
   },
   {
     id: "unarmed-shove-push",
@@ -188,7 +192,8 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     activation: "action",
     description:
       "The target must succeed on a Strength or Dexterity saving throw (its choice) against DC 8 + your Strength modifier + your Proficiency Bonus, or you push it 5 feet away - on a failure, the GM moves the token. Only targets no more than one size larger. (SRD 5.2.1, Unarmed Strike)",
-    damage: []
+    damage: [],
+    replacesAttack: true
   },
   {
     id: "escape-grapple",
