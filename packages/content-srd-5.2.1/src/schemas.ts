@@ -346,6 +346,8 @@ export const EquipmentReferenceSchema = z
     cursed: z.boolean().default(false),
     casts: z.array(ItemSpellCastSchema).max(8).default([]),
     charges: ItemChargesSchema.optional(),
+    /** Mithral: the armor it is bound to has no Stealth Disadvantage and no Strength requirement. */
+    removesArmorDrawbacks: z.boolean().optional(),
     /** Each use of one of its actions uses one up (a potion drunk, a flask thrown), and its actions work from the
      *  pack: drinking or throwing one needs no equipping. */
     consumedOnUse: z.boolean().optional(),

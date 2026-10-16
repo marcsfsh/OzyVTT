@@ -87,6 +87,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     modifiers: [{ type: "armor-class", amount: 1 }]
   },
 
+  // "If the armor normally imposes Disadvantage on Dexterity (Stealth) checks or has a Strength requirement, the
+  // mithral version of the armor doesn't."
+  "mithral-armor": { removesArmorDrawbacks: true },
+
   // "The GM chooses the type or determines it randomly": lightning (the d10 table's row 5) until the GM picks.
   "armor-of-resistance": { grants: { damageResistances: ["lightning"] }, damageTypeChoice: RESISTANCE_TABLE },
 

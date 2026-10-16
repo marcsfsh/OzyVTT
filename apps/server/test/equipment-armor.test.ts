@@ -423,3 +423,33 @@ describe("the sheet's Attune control reads the catalog record", () => {
     expect(reconcileMagicMarkers(table.state, catalog)).toBe(false);
   });
 });
+
+describe("Mithral armor", () => {
+  it("keeps neither the Stealth Disadvantage nor the Strength requirement of its base", () => {
+    // Wizard 3 with Str 10, made able to wear Plate so only the drawbacks are under test.
+    const table = tableOf({ [IDS.wizard]: wizardInput() }, false);
+    const stored = table.state.definitions.find((entry) => entry.id === `import-${IDS.wizard}`)!;
+    stored.definition = {
+      ...stored.definition,
+      proficiencies: { ...stored.definition.proficiencies!, armor: ["light", "medium", "heavy"] }
+    };
+    write(table, IDS.wizard, catalogRow("mithral-armor", { baseId: "plate-armor" }));
+    const row = table.actor(IDS.wizard).inventory.find((entry) => entry.id === "mithral-armor")!;
+    expect(row.armor).toMatchObject({ acBase: 18, stealthDisadvantage: false, strengthRequired: null });
+    const derivation = deriveEquipment(table.actor(IDS.wizard), table.definition(IDS.wizard), catalog);
+    expect(checkRollMode(derivation, { ability: "dex", skill: "stealth" }).disadvantage).toEqual([]);
+    expect(currentSpeedFeet(table.actor(IDS.wizard), derivation)).toBe(30);
+
+    // A row bound before the rule still carries its base's drawbacks; the record wins.
+    table.actor(IDS.wizard).inventory = table
+      .actor(IDS.wizard)
+      .inventory.map((entry) =>
+        entry.id === "mithral-armor"
+          ? { ...entry, armor: { ...entry.armor!, stealthDisadvantage: true, strengthRequired: 15 } }
+          : entry
+      );
+    const legacy = deriveEquipment(table.actor(IDS.wizard), table.definition(IDS.wizard), catalog);
+    expect(checkRollMode(legacy, { ability: "dex", skill: "stealth" }).disadvantage).toEqual([]);
+    expect(currentSpeedFeet(table.actor(IDS.wizard), legacy)).toBe(30);
+  });
+});

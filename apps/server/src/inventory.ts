@@ -266,7 +266,7 @@ function bindTemplateStats(item: InventoryItem, deps: InventoryDeps, stored?: In
   const { weapon: _clientWeapon, armor: _clientArmor, ...bare } = item;
   return record.category === "weapon"
     ? { ...bare, baseId, weapon: weaponStatsFrom(base!.weapon)! }
-    : { ...bare, baseId, armor: armorStatsFrom(base!.armor)! };
+    : { ...bare, baseId, armor: withoutDrawbacks(armorStatsFrom(base!.armor)!, record) };
 }
 
 type CatalogRecord = NonNullable<ReturnType<NonNullable<InventoryDeps["catalog"]>["equipmentRecord"]>>;
@@ -284,6 +284,11 @@ function weaponStatsFrom(stats: CatalogRecord["weapon"]): InventoryItem["weapon"
     ...(stats.versatileDice !== undefined ? { versatileDice: stats.versatileDice } : {}),
     ...(stats.properties !== undefined ? { properties: [...stats.properties] } : {})
   };
+}
+
+/** Mithral armor has no Stealth Disadvantage and no Strength requirement, whatever its base prints. */
+function withoutDrawbacks(armor: NonNullable<InventoryItem["armor"]>, record: CatalogRecord): InventoryItem["armor"] {
+  return record.removesArmorDrawbacks ? { ...armor, stealthDisadvantage: false, strengthRequired: null } : armor;
 }
 
 function armorStatsFrom(stats: CatalogRecord["armor"]): InventoryItem["armor"] {

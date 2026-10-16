@@ -4517,6 +4517,7 @@
   },
   "cursed": false,
   "casts": [],
+  "removesArmorDrawbacks": true,
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],

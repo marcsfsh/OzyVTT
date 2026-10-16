@@ -776,6 +776,7 @@ const MAGIC_KEYS = [
   "cursed",
   "charges",
   "damageTypeChoice",
+  "removesArmorDrawbacks",
   "casts",
   "grantsFeatIds",
   "modifiers",
@@ -924,6 +925,13 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           label: "Roll a d20 when the last charge is spent",
           kind: "switch",
           help: "On a 1 the item's own text says what happens. You are told the roll.",
+          visibleWhen: (draft) => draft.isMagic === true
+        },
+        {
+          key: "removesArmorDrawbacks",
+          label: "No Stealth or Strength drawback",
+          kind: "switch",
+          help: "Like mithral: the armor it is made from keeps neither its Stealth Disadvantage nor its Strength minimum.",
           visibleWhen: (draft) => draft.isMagic === true
         },
         // Like a Ring of Resistance: the record grants one resistance, and the GM picks its type per copy.

@@ -218,21 +218,24 @@ export function armorTrainingGaps(
  *  requirement's -10 feet, Disadvantage on Dexterity (Stealth) checks, and, without training, Disadvantage on
  *  Strength and Dexterity D20 Tests (attack rolls, saves, checks and Initiative, a Dexterity check). */
 function bodyArmorCarriers(
-  body: InventoryItem | undefined,
+  worn: ActiveItem | undefined,
   definition: ActorDefinition | undefined,
   untrained: boolean
 ): RiderCarrier[] {
+  const body = worn?.item;
   const armor = body?.armor;
   if (!body || !armor) return [];
   const carriers: RiderCarrier[] = [];
+  // Mithral keeps neither drawback, whatever a row bound before the rule copied from its base.
+  const drawbacks = worn?.record?.removesArmorDrawbacks !== true;
   const strength = definition?.abilityScores.str;
-  if (armor.strengthRequired !== null && strength !== undefined && strength < armor.strengthRequired)
+  if (drawbacks && armor.strengthRequired !== null && strength !== undefined && strength < armor.strengthRequired)
     carriers.push({
       label: `${body.name} (needs Strength ${armor.strengthRequired})`,
       sourceItemId: body.id,
       modifiers: [{ type: "speed", amount: -10 }]
     });
-  if (armor.stealthDisadvantage)
+  if (drawbacks && armor.stealthDisadvantage)
     carriers.push({
       label: `${body.name} (Stealth)`,
       sourceItemId: body.id,
@@ -544,9 +547,7 @@ export function deriveEquipment(
 
   // Armor training counts what items grant in this same recomputation (Elven Chain-style training).
   const training = armorTrainingGaps(withResolvedSlots(actor.inventory, catalog), definition, armorProficiencies);
-  const body = equipped.find(
-    (entry) => entry.item.armor !== undefined && effectiveSlot(slotView(entry)) === "armor"
-  )?.item;
+  const body = equipped.find((entry) => entry.item.armor !== undefined && effectiveSlot(slotView(entry)) === "armor");
   carriers.push(...bodyArmorCarriers(body, definition, training.untrainedArmor !== null));
 
   // The standing + conditional pass: riders naming no moment whose static and dynamic gates pass.
