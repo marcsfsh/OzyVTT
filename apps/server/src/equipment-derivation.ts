@@ -439,7 +439,7 @@ export function deriveEquipment(
     const label = record.name;
     const isWeapon = effectiveSlot(slotView(entry)) === "weapon" || item.weapon !== undefined;
     carriers.push({ label, modifiers: record.modifiers, sourceItemId: item.id, isWeapon });
-    takeGrants(record, item.id, label);
+    takeGrants(withChosenResistance(record, item), item.id, label);
     takeEffects(record, item.id, label);
     for (const declared of record.actions) actions.push(itemAction(item, declared, definition));
     for (const cast of record.casts)
@@ -629,6 +629,14 @@ function defencesOf(riders: readonly ResolvedRider[], type: "damage-resistance" 
   return riders.flatMap((rider) =>
     rider.modifier.type === type ? (rider.modifier.damageTypes ?? []).map((id) => ({ id, source: rider.label })) : []
   );
+}
+
+/** "The GM chooses the type": the row's pick replaces the record's printed resistance, when it is one of the
+ *  record's choices. */
+function withChosenResistance(record: EquipmentReference, item: InventoryItem): EquipmentReference {
+  const chosen = item.chosenDamageType;
+  if (!chosen || !record.grants || !record.damageTypeChoice?.includes(chosen)) return record;
+  return { ...record, grants: { ...record.grants, damageResistances: [chosen] } };
 }
 
 function summarise(record: RiderBlock | EquipmentReference): string {

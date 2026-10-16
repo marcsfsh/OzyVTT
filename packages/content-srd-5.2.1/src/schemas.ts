@@ -341,6 +341,9 @@ export const EquipmentReferenceSchema = z
     cursed: z.boolean().default(false),
     casts: z.array(ItemSpellCastSchema).max(8).default([]),
     charges: ItemChargesSchema.optional(),
+    /** "The GM chooses the type": the types the GM may pick for this item's one granted resistance, which then
+     *  replaces the printed default in `grants.damageResistances` for that carried copy. */
+    damageTypeChoice: z.array(DamageTypeSchema).min(2).max(13).optional(),
     /** Feats granted while active, depth 1. Nothing has `grants.items`, so a grant cycle cannot be expressed. */
     grantsFeatIds: z.array(ContentIdSchema).max(4).default([]),
 
@@ -357,6 +360,15 @@ export const EquipmentReferenceSchema = z
         message:
           "A cursed item must require attunement - attunement is both what springs the curse and what reveals it."
       });
+    }
+    if (item.damageTypeChoice) {
+      const printed = item.grants?.damageResistances ?? [];
+      if (printed.length !== 1 || !(item.damageTypeChoice as readonly string[]).includes(printed[0]))
+        context.addIssue({
+          code: "custom",
+          path: ["damageTypeChoice"],
+          message: "A chosen damage type replaces one granted resistance: grant exactly one, from the choices."
+        });
     }
     // Enforced on the item carrier only: the identical rider on a feat is valid.
     item.modifiers.forEach((modifier, index) => {

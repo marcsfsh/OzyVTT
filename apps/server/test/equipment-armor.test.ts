@@ -355,3 +355,51 @@ describe("actor.set-armor-class over the API", () => {
     expect(wizard().armorClassOverride).toBeUndefined();
   });
 });
+
+describe("an item whose resistance the GM chooses", () => {
+  const PLAYER_SESSION = "30000000-0000-4000-8000-0000000000b1";
+  const resistances = (table: ReturnType<typeof tableOf>) =>
+    deriveEquipment(table.actor(IDS.fighter), table.definition(IDS.fighter), catalog).damageResistances.map(
+      (entry) => entry.id
+    );
+  const ring = (table: ReturnType<typeof tableOf>) =>
+    table.actor(IDS.fighter).inventory.find((row) => row.id === "ring-of-resistance")!;
+
+  it("resists the GM's pick instead of the printed default, and only the GM can pick", () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput() }, false);
+    write(table, IDS.fighter, catalogRow("ring-of-resistance", { attuned: true }));
+    expect(resistances(table)).toContain("fire");
+
+    write(table, IDS.fighter, edit(table, IDS.fighter, "ring-of-resistance", { chosenDamageType: "acid" }), "gm");
+    expect(resistances(table)).toContain("acid");
+    expect(resistances(table)).not.toContain("fire");
+
+    // A player's write neither changes nor clears it.
+    write(table, IDS.fighter, edit(table, IDS.fighter, "ring-of-resistance", { chosenDamageType: "cold" }));
+    const { chosenDamageType: _pick, ...sent } = ring(table);
+    write(table, IDS.fighter, sent);
+    expect(ring(table).chosenDamageType).toBe("acid");
+
+    expect(() =>
+      write(table, IDS.fighter, edit(table, IDS.fighter, "ring-of-resistance", { chosenDamageType: "slashing" }), "gm")
+    ).toThrow(
+      "Ring of Resistance can resist acid, cold, fire, force, lightning, necrotic, poison, psychic, radiant, thunder."
+    );
+    expect(() => write(table, IDS.fighter, catalogRow("longsword", { chosenDamageType: "fire" }), "gm")).toThrow(
+      "Longsword has no damage type to choose."
+    );
+  });
+
+  it("keeps the pick from the bearer until they attune", () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput() }, false);
+    table.actor(IDS.fighter).ownerSessionId = PLAYER_SESSION;
+    write(table, IDS.fighter, catalogRow("ring-of-resistance", { chosenDamageType: "psychic" }), "gm");
+    const seen = () =>
+      projectPlayerView(table.state, PLAYER_SESSION, () => "online")
+        .actors.find((actor) => actor.id === IDS.fighter)!
+        .inventory!.find((row) => row.id === "ring-of-resistance")!;
+    expect(seen().chosenDamageType).toBeUndefined();
+    write(table, IDS.fighter, edit(table, IDS.fighter, "ring-of-resistance", { attuned: true }));
+    expect(seen().chosenDamageType).toBe("psychic");
+  });
+});

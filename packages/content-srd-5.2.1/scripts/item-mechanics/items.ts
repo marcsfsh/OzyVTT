@@ -5,7 +5,22 @@
  * A rider is authored only where a consumer reads it and produces the printed effect. Where an item
  * stays prose for a reason worth keeping, a comment in its section says why.
  */
+import type { DamageType } from "@vtt/schemas";
 import type { ItemMechanicsModule } from "./overlay.js";
+
+/** The d10 table Armor of Resistance and Ring of Resistance roll on for their type. */
+const RESISTANCE_TABLE = [
+  "acid",
+  "cold",
+  "fire",
+  "force",
+  "lightning",
+  "necrotic",
+  "poison",
+  "psychic",
+  "radiant",
+  "thunder"
+] satisfies DamageType[];
 
 export const ITEM_MECHANICS: ItemMechanicsModule = {
   // ==== Weapons, armor, shields and ammunition ====================================================
@@ -65,13 +80,15 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // Not modeled: Advantage on saves against dragon breath (no trigger names a save's source) and the dragon sense.
+  // The dragon's kind sets the type; fire (a red dragon) until the GM picks.
   "dragon-scale-mail": {
     grants: { damageResistances: ["fire"] },
+    damageTypeChoice: ["acid", "cold", "fire", "lightning", "poison"],
     modifiers: [{ type: "armor-class", amount: 1 }]
   },
 
-  // "The GM chooses the type": lightning, the d10 table's row 5.
-  "armor-of-resistance": { grants: { damageResistances: ["lightning"] } },
+  // "The GM chooses the type or determines it randomly": lightning (the d10 table's row 5) until the GM picks.
+  "armor-of-resistance": { grants: { damageResistances: ["lightning"] }, damageTypeChoice: RESISTANCE_TABLE },
 
   // Metal Shell (timed immunity, once per dawn) is not authored: a standing immunity grant would be permanent.
   "armor-of-invulnerability": { grants: { damageResistances: ["bludgeoning", "piercing", "slashing"] } },
@@ -419,7 +436,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `ring-of-regeneration` - no out-of-combat healing timer.
 
   // "The GM chooses the type": fire (the d10's Garnet row). Copy the item to choose another.
-  "ring-of-resistance": { grants: { damageResistances: ["fire"] } },
+  // As Armor of Resistance: fire until the GM picks from the same d10 table.
+  "ring-of-resistance": { grants: { damageResistances: ["fire"] }, damageTypeChoice: RESISTANCE_TABLE },
 
   /**
    * The two cantrips are at will; Shooting Stars is the ring's own effect, at its one-charge size.

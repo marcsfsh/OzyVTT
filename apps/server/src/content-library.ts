@@ -581,7 +581,9 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
     weapon: item.weapon ?? null,
     armor: item.armor ?? null,
     // The template eligibility list, for the base chooser. Printed SRD text plus resolved ids; nothing GM-secret.
-    appliesTo: item.appliesTo ?? null
+    appliesTo: item.appliesTo ?? null,
+    // The types the GM may pick for its resistance, as printed; the pick itself is the GM's, on the row.
+    ...(item.damageTypeChoice ? { damageTypeChoice: [...item.damageTypeChoice] } : {})
   }));
 
   const monstersById = new Map<string, ActorDefinition>();

@@ -663,6 +663,9 @@ export const InventoryItemSchema = z
       .optional(),
     weapon: ItemWeaponSchema.optional(),
     armor: ItemArmorSchema.optional(),
+    /** The type the GM picked for an item whose record lets the GM choose its resistance (Ring of Resistance). Only
+     *  the GM sets it; the server checks it against the record's `damageTypeChoice`. */
+    chosenDamageType: DamageTypeSchema.optional(),
     /** Display-only marker so the sheet can offer Attune without the catalog; never the riders. */
     magic: ItemMagicMarkerSchema.optional()
   })

@@ -126,6 +126,24 @@ function enforceEquipRules(
   }
 }
 
+/**
+ * "The GM chooses the type" (Ring of Resistance): only the GM picks, and only from the record's choices. Any other
+ * write keeps the stored pick, so a sheet that never saw it cannot clear or change it.
+ */
+function withDamageTypeChoice(actor: Actor, item: InventoryItem, deps: InventoryDeps): InventoryItem {
+  if (deps.role !== "gm") {
+    const stored = actor.inventory.find((entry) => entry.id === item.id)?.chosenDamageType;
+    const { chosenDamageType: _sent, ...rest } = item;
+    return stored ? { ...rest, chosenDamageType: stored } : rest;
+  }
+  if (item.chosenDamageType === undefined) return item;
+  const choices = deps.catalog?.equipmentRecord(catalogIdOf(item))?.damageTypeChoice;
+  if (!choices) throw new CommandRejectedError(`${item.name} has no damage type to choose.`);
+  if (!choices.includes(item.chosenDamageType))
+    throw new CommandRejectedError(`${item.name} can resist ${choices.join(", ")}.`);
+  return item;
+}
+
 /** Once attuned, a cursed item can't be unattuned, unequipped or deleted by a player; a GM can ("remove curse"). */
 function enforceCurse(actor: Actor, incoming: InventoryItem, deps: InventoryDeps): void {
   if (deps.role === "gm" || !deps.catalog) return;
@@ -280,6 +298,7 @@ export function setInventoryItem(
       deps,
       actor.inventory.find((entry) => entry.id === item.id)
     );
+  item = withDamageTypeChoice(actor, item, deps);
   const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
   enforceCurse(actor, item, deps);
   enforceEquipRules(actor, item, definition, deps);

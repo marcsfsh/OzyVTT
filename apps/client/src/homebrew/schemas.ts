@@ -20,7 +20,7 @@ import {
   type SectionDef
 } from "./schema";
 import type { HomebrewType } from "./types";
-import { ABILITIES, SIZES } from "./vocabulary";
+import { ABILITIES, DAMAGE_TYPES, SIZES } from "./vocabulary";
 
 const LEVEL_CHIPS = Array.from({ length: 20 }, (_, index) => opt(String(index + 1), String(index + 1)));
 
@@ -766,6 +766,7 @@ const MAGIC_KEYS = [
   "attunement",
   "cursed",
   "charges",
+  "damageTypeChoice",
   "casts",
   "grantsFeatIds",
   "modifiers",
@@ -885,6 +886,23 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           kind: "switch",
           help: "On a 1 the item's own text says what happens. You are told the roll.",
           visibleWhen: (draft) => draft.isMagic === true
+        },
+        // Like a Ring of Resistance: the record grants one resistance, and the GM picks its type per copy.
+        {
+          key: "damageTypeChoice",
+          label: "The GM picks its resistance from",
+          kind: "multiselect",
+          wide: true,
+          options: DAMAGE_TYPES,
+          help: "Pick two or more, one of them its granted resistance. The GM chooses the type for each copy on the sheet.",
+          // Shown once the item grants a resistance, the one this choice replaces.
+          visibleWhen: (draft) =>
+            draft.isMagic === true &&
+            ((getAt(draft, "grants.damageResistances") as unknown[] | undefined)?.length ?? 0) > 0,
+          write: (next, draft) => {
+            const { damageTypeChoice: _old, ...rest } = draft;
+            return Array.isArray(next) && next.length > 0 ? { ...rest, damageTypeChoice: next } : rest;
+          }
         },
         // Template pair, like the SRD's "Weapon, +1 (Any Simple or Martial)": with both set, the
         // player picks the base when the item lands on a sheet and the server copies its stats.

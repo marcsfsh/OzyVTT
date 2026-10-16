@@ -113,7 +113,9 @@ export const ContentEquipmentSummarySchema = z.strictObject({
       strengthRequired: z.number().int().nullable()
     })
     .nullable(),
-  appliesTo: z.strictObject({ label: z.string(), baseIds: z.array(slug(60)).min(1).max(40) }).nullable()
+  appliesTo: z.strictObject({ label: z.string(), baseIds: z.array(slug(60)).min(1).max(40) }).nullable(),
+  /** The damage types the GM may pick for the item's resistance ("The GM chooses the type"). */
+  damageTypeChoice: z.array(slug(20)).max(13).optional()
 });
 export type ContentEquipmentSummary = Wire<z.infer<typeof ContentEquipmentSummarySchema>>;
 export type ContentEquipmentResult = {

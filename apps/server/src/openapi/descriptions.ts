@@ -197,6 +197,10 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     cursed:
       "A cursed item cannot be voluntarily removed once attuned, and its magic half is withheld from the player until attunement. It MUST require attunement - a curse you can drop by taking the hat off is not a curse, and requiring attunement gives the hiding rule one well-defined boundary: hidden until attuned, fully visible after, because by then the player has learned it and hiding further would only make their own sheet lie to them",
     casts: "Spells the item can cast (Amulet of Message, Wand of Fireballs)",
+    charges:
+      "How a charged item's charges come back. `regain` is the dice a long rest rolls (absent: every charge returns); `lastChargeRoll` rolls a d20 when the last charge is spent and tells the GM, since a 1 does what the item's text says. The charges themselves are the `uses` on its casts and actions, counted per carried copy",
+    damageTypeChoice:
+      '"The GM chooses the type" (Ring of Resistance, Dragon Scale Mail): the types the GM may pick for the ONE resistance in `grants.damageResistances`, which is the printed default until the GM picks. The pick is stored per carried copy as the row\'s `chosenDamageType`, which only the GM can set',
     grantsFeatIds:
       "Feats the item grants while active. Depth 1, no transitive expansion, and the grant edge is one-directional - nothing ever grants an item back - so a cycle cannot be drawn rather than merely being checked for",
     tags: "Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity)",
@@ -1312,6 +1316,8 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "equipment[].weapon.properties":
       "The SRD weapon table's Properties column (finesse, light, thrown, versatile, reach, heavy, two-handed, loading, ammunition). Unlike `mastery` these ARE copied onto an inventory row and the engine reads them there - finesse decides whether the swing uses Dexterity, reach decides 10 feet versus 5. An empty array means the weapon genuinely has none.",
     "equipment[].armor": "Populated for armor and shields only",
+    "equipment[].damageTypeChoice":
+      "The damage types the GM may pick for the item's resistance, as the SRD prints them (absent when the item has no such choice)",
     "equipment[].appliesTo":
       'The eligibility column for a TEMPLATE magic item - the printed type-line qualifier ("Any Simple or Martial") plus the base ids it RESOLVED to at build/authoring time. Null everywhere except weapon/armor templates. A template row derives nothing until the player\'s pick binds it to one of `baseIds`, validated and copied server-side at set-inventory.'
   },
