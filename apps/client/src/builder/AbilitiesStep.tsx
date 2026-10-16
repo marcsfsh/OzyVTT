@@ -184,10 +184,17 @@ export function AbilitiesStep({
       current.hpEntries.length >= current.level - 1 ? current : { ...current, hpEntries: [...current.hpEntries, total] }
     );
   const hitDie = (context.hitDie ?? "d8") as HitDie;
+  /** Each level rolls its own class's die (a Fighter level a d10, a Wizard level a d6). */
+  const dieAt = (level: number) => (context.levelDice[level - 1] ?? hitDie) as HitDie;
+  const dice = [...new Set(context.levelDice.filter((die): die is HitDie => die !== null))];
+  const multiclass = context.classes.length > 1;
+  const nextLevel = draft.hpEntries.length + 2;
   const rollAllHp = () => {
     const missing = draft.level - 1 - draft.hpEntries.length;
-    for (let index = 0; index < missing; index += 1)
-      rolls.roll(`1d${hitDieFaces(hitDie)}`, `Hit points, level ${draft.hpEntries.length + index + 2}`, addHpRoll);
+    for (let index = 0; index < missing; index += 1) {
+      const level = draft.hpEntries.length + index + 2;
+      rolls.roll(`1d${hitDieFaces(dieAt(level))}`, `Hit points, level ${level}`, addHpRoll);
+    }
   };
   const allocatorRows = ABILITIES.map((ability) => {
     const score = base[ability];
@@ -218,6 +225,21 @@ export function AbilitiesStep({
           {context.classRecord.savingThrows.map((ability) => ability.toUpperCase()).join("/")}
           {context.classRecord.primaryAbilities.length > 0 &&
             ` · primary ${context.classRecord.primaryAbilities.map((ability) => ability.toUpperCase()).join(", ")}`}
+        </p>
+      )}
+      {/* A multiclass build needs 13 in each class's primary ability; the server checks it level by level. */}
+      {multiclass && (
+        <p className="cb-note">
+          Multiclassing:{" "}
+          {context.classes
+            .map(({ record }) =>
+              record.multiclassPrerequisites
+                ? `${record.name} ${record.multiclassPrerequisites.minimums
+                    .map((minimum) => `${minimum.ability.toUpperCase()} ${minimum.minimum}`)
+                    .join(record.multiclassPrerequisites.mode === "any" ? " or " : " and ")}`
+                : `${record.name} has no minimum`
+            )
+            .join(" · ")}
         </p>
       )}
       <AbilityScoreAllocator
@@ -351,7 +373,7 @@ export function AbilitiesStep({
           <h3 className="cb-offer-title">Hit points</h3>
           {/* The hit die and CON modifier that decide the hit points about to be rolled. */}
           <span className="cb-offer-count tabular" role="status">
-            {hitDie} · CON{" "}
+            {multiclass ? dice.join("/") : hitDie} · CON{" "}
             {base.con == null
               ? "—"
               : abilityModifier(base.con + bonuses.con) >= 0
@@ -372,7 +394,10 @@ export function AbilitiesStep({
           value={draft.hpMode}
           onChange={(next) => patch({ hpMode: next as BuilderDraft["hpMode"], hpEntries: [] })}
           options={[
-            { value: "average", label: `Average (${hitDieAverage(hitDie)} per level)` },
+            {
+              value: "average",
+              label: multiclass ? "Average of each level's die" : `Average (${hitDieAverage(hitDie)} per level)`
+            },
             // Typing physical dice is the GM's, or every player's at a table that allows it.
             ...(mayTypeDice ? [{ value: "entries", label: "Enter rolls" }] : []),
             { value: "roll", label: "Table rolls" }
@@ -380,8 +405,12 @@ export function AbilitiesStep({
         />
         {draft.hpMode === "roll" && draft.level > 1 && (
           <p className="cb-note">
-            The table rolls a {hitDie} for each level from 2 to {draft.level} when you finish, and everyone sees the
-            roll. Rolls already on this character are kept.
+            {multiclass
+              ? `The table rolls each level's own die (${context.classes
+                  .map(({ record }) => `${record.hitDie} for ${record.name}`)
+                  .join(", ")}) for levels 2 to ${draft.level} when you finish, and everyone sees the roll.`
+              : `The table rolls a ${hitDie} for each level from 2 to ${draft.level} when you finish, and everyone sees the roll.`}{" "}
+            Rolls already on this character are kept.
           </p>
         )}
         {draft.hpMode === "entries" &&
@@ -389,8 +418,12 @@ export function AbilitiesStep({
             <p className="cb-note">A level 1 character rolls nothing — your hit points are the full {hitDie}.</p>
           ) : (
             <DiceInputRow
-              label={`Levels 2-${draft.level} (${draft.hpEntries.length} of ${draft.level - 1})`}
-              notation={`1${hitDie}`}
+              label={
+                multiclass && nextLevel <= draft.level
+                  ? `Levels 2-${draft.level} (${draft.hpEntries.length} of ${draft.level - 1}) · level ${nextLevel} is a ${dieAt(nextLevel)}`
+                  : `Levels 2-${draft.level} (${draft.hpEntries.length} of ${draft.level - 1})`
+              }
+              notation={`1${dieAt(Math.min(nextLevel, draft.level))}`}
               mode={hpEntry}
               onModeChange={onHpEntryChange}
               rollLabel="Roll the rest for me"
@@ -399,7 +432,7 @@ export function AbilitiesStep({
               onReroll={draft.hpEntries.length > 0 ? () => patch({ hpEntries: [] }) : undefined}
               result={draft.hpEntries.length > 0 ? draft.hpEntries.join(", ") : undefined}
               min={1}
-              max={hitDieFaces(hitDie)}
+              max={hitDieFaces(dieAt(Math.min(nextLevel, draft.level)))}
               busy={rolls.rolling}
               complete={draft.hpEntries.length >= draft.level - 1}
             />

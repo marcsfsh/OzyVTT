@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { BuilderAbilityMethod, BuilderOffer, GmView, PlayerView } from "@vtt/domain";
 import type { Ability } from "@vtt/rules-5e";
-import { Alert, Button, NameField, ReviewSummary, Stepper, useToast, WizardShell } from "@vtt/ui";
+import { Alert, Button, Field, NameField, ReviewSummary, Select, Stepper, useToast, WizardShell } from "@vtt/ui";
 import type { DiceEntryMode, StepItem } from "@vtt/ui";
 import { useBuilderCatalogs, type BuilderCatalogs } from "../content/catalogs";
 import { command } from "../lib/command";
@@ -12,8 +12,11 @@ import {
   abilityCapPreview,
   baseScoresOf,
   buildCreatePayload,
+  draftClassesOf,
   emptyDraft,
   FEAT_KINDS,
+  levelsLeft,
+  MAX_CLASSES,
   offerContext,
   offerFilled,
   offersRequestOf,
@@ -24,6 +27,10 @@ import {
   stepBlockedReason,
   titleize,
   withAnswersFrom,
+  withClassAdded,
+  withClassLevels,
+  withoutClass,
+  withStartingClass,
   type BuilderDraft,
   type StepId
 } from "./build-payload";
@@ -195,12 +202,15 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
   /** Every player edit goes through here; the pruning effect does not. */
   const editDraft = (update: (current: BuilderDraft) => BuilderDraft) => setDraft(update);
   const patch = (change: Partial<BuilderDraft>) => editDraft((current) => ({ ...current, ...change }));
-  // A subclass answer shows its detail at once; the table's answer confirms it.
+  // A subclass answer shows its detail at once; the table's answer confirms it. Only the starting class's subclass is
+  // the draft's `subclassId`; a later class's stays its own pick.
   const setPicks = (offer: BuilderOffer, ids: readonly string[]) =>
     editDraft((current) => ({
       ...current,
       picks: { ...current.picks, [offer.key]: ids.slice(0, offer.capacity) },
-      ...(offer.kind === "subclass" ? { subclassId: ids[0] ?? null } : {})
+      ...(offer.kind === "subclass" && (offer.classId ?? current.classId) === current.classId
+        ? { subclassId: ids[0] ?? null }
+        : {})
     }));
   const setIncreases = (offer: BuilderOffer, increases: ReadonlyArray<{ ability: Ability; amount: number }>) =>
     editDraft((current) => ({ ...current, asiIncreases: { ...current.asiIncreases, [offer.key]: increases } }));
@@ -404,12 +414,26 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
    * pane, which is hidden on narrow screens) says when the subclass arrives.
    */
   const subclassPending =
-    context.classRecord && draft.level < context.classRecord.subclassLevel
+    context.classRecord && (context.classes[0]?.levels ?? draft.level) < context.classRecord.subclassLevel
       ? {
           label: context.classRecord.subclassLabel?.toLowerCase() ?? "subclass",
           level: context.classRecord.subclassLevel
         }
       : null;
+  /** A multiclass draft's later classes that have not reached their subclass level yet. */
+  const laterSubclassesPending = context.classes
+    .slice(1)
+    .filter(({ record, levels }) => levels < record.subclassLevel)
+    .map(({ record }) => ({
+      name: record.name,
+      label: record.subclassLabel?.toLowerCase() ?? "subclass",
+      level: record.subclassLevel
+    }));
+  const multiclass = context.classes.length > 1;
+  const room = levelsLeft(draft, policy.maxLevel);
+  const addableClasses = catalogs.choice.classes.filter(
+    (entry) => !context.classes.some(({ record }) => record.id === entry.id)
+  );
 
   const stepOffers = (owner: BuilderOffer["step"]) => offers.filter((offer) => offer.step === owner);
   const renderOffer = (offer: BuilderOffer) =>
@@ -494,29 +518,85 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
               ariaLabel="Classes"
               options={classOptionsOf(catalogs)}
               value={draft.classId}
-              onChange={(value) => patch({ classId: value })}
+              onChange={(value) => editDraft((current) => withStartingClass(current, value))}
               searchPlaceholder="Search classes…"
             />
             <section className="cb-offer">
               <div className="cb-offer-head">
-                {/* The Stepper below is the readout. */}
+                {/* The Stepper below is the readout; a multiclass draft adds its classes up here. */}
                 <h3 className="cb-offer-title">Level</h3>
+                {multiclass && (
+                  <span className="cb-offer-count tabular" role="status">
+                    Level {draft.level}
+                  </span>
+                )}
               </div>
               <p className="cb-offer-help">
                 {policy.maxLevel < 20
                   ? `Your GM has set the party's level cap to ${policy.maxLevel}.`
                   : "Your GM grants the level; every choice it opens is yours to make."}
               </p>
-              {/* The cap is the control's maximum, so it cannot be typed past. */}
-              <Stepper
-                value={Math.min(draft.level, policy.maxLevel)}
-                min={1}
-                max={policy.maxLevel}
-                aria-label="Character level"
-                onChange={(level) => patch({ level, hpEntries: draft.hpEntries.slice(0, Math.max(0, level - 1)) })}
-              />
+              {multiclass ? (
+                /* One row per class in the order taken: its levels, and a way to drop a later class. */
+                <ul className="cb-class-levels" aria-label="Class levels">
+                  {context.classes.map(({ record, levels }, index) => (
+                    <li key={record.id} className="cb-class-level">
+                      <span className="cb-class-name">{record.name}</span>
+                      <Stepper
+                        value={levels}
+                        min={1}
+                        max={levels + room}
+                        aria-label={`${record.name} levels`}
+                        onChange={(next) => editDraft((current) => withClassLevels(current, record.id, next))}
+                      />
+                      {index > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="cb-class-remove"
+                          onClick={() => editDraft((current) => withoutClass(current, record.id))}
+                        >
+                          Remove {record.name}
+                        </Button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                /* The cap is the control's maximum, so it cannot be typed past. */
+                <Stepper
+                  value={Math.min(draft.level, policy.maxLevel)}
+                  min={1}
+                  max={policy.maxLevel}
+                  aria-label="Character level"
+                  onChange={(level) => patch({ level, hpEntries: draft.hpEntries.slice(0, Math.max(0, level - 1)) })}
+                />
+              )}
               {draft.level >= policy.maxLevel && (
                 <p className="cb-note">At the table&rsquo;s level cap ({policy.maxLevel}).</p>
+              )}
+              {draft.classId && room > 0 && context.classes.length < MAX_CLASSES && (
+                <Field
+                  label="Add a class"
+                  htmlFor="cb-add-class"
+                  help="Its first level goes after the levels above. A new class needs 13 in its primary ability and in each class before it, checked with your ability scores."
+                >
+                  <Select
+                    id="cb-add-class"
+                    value=""
+                    onChange={(event) => {
+                      const classId = event.target.value;
+                      if (classId) editDraft((current) => withClassAdded(current, classId));
+                    }}
+                  >
+                    <option value="">Choose a class</option>
+                    {addableClasses.map((entry) => (
+                      <option key={entry.id} value={entry.id}>
+                        {entry.name}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
               )}
             </section>
             {stepOffers("class").map(renderOffer)}
@@ -527,14 +607,22 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
           <>
             {subclassPending && (
               <p className="cb-note">
-                You choose a {subclassPending.label} at level {subclassPending.level}.
+                You choose a {subclassPending.label} at {multiclass ? `${context.classRecord!.name} ` : ""}level{" "}
+                {subclassPending.level}.
               </p>
             )}
+            {laterSubclassesPending.map((pending) => (
+              <p key={pending.name} className="cb-note">
+                You choose a {pending.name} {pending.label} at {pending.name} level {pending.level}.
+              </p>
+            ))}
             {stepOffers("features").length === 0 ? (
               <div className="nh-empty">
                 <span className="nh-empty-title">Nothing to choose yet</span>
                 <span className="nh-empty-text">
-                  This class asks for no decisions at level {draft.level}. Carry on.
+                  {multiclass
+                    ? `These classes ask for no decisions at level ${draft.level}. Carry on.`
+                    : `This class asks for no decisions at level ${draft.level}. Carry on.`}
                 </span>
               </div>
             ) : (
@@ -652,7 +740,12 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
         resumed.name.trim() || null,
         catalogs.choice.species.find((entry) => entry.id === resumed.speciesId)?.name ?? null,
         resumed.classId
-          ? `${catalogs.choice.classes.find((entry) => entry.id === resumed.classId)?.name ?? titleize(resumed.classId)} ${resumed.level}`
+          ? draftClassesOf(resumed)
+              .map(
+                ({ id, levels }) =>
+                  `${catalogs.choice.classes.find((entry) => entry.id === id)?.name ?? titleize(id)} ${levels}`
+              )
+              .join(" / ")
           : null
       ].filter((part): part is string => part !== null)
     : [];

@@ -19,6 +19,8 @@ import {
   abilityModifier,
   hitDieFaces,
   isPointBuyLegal,
+  meetsMulticlassMinimums,
+  multiclassShortfallText,
   pointBuyRemaining,
   POINT_BUY_BUDGET,
   POINT_BUY_MAXIMUM,
@@ -72,15 +74,98 @@ export function emptyDraft(): BuilderDraft {
 
 /** The offers read for a draft: the identity so far and every answer by offer key. */
 export function offersRequestOf(draft: BuilderDraft): BuilderOffersRequest {
+  const classLevels = multiclassLevelsOf(draft);
   return {
     ...(draft.speciesId ? { speciesId: draft.speciesId } : {}),
     ...(draft.backgroundId ? { backgroundId: draft.backgroundId } : {}),
     ...(draft.classId ? { classId: draft.classId } : {}),
     level: draft.level,
+    ...(classLevels ? { classLevels } : {}),
     picks: draft.picks,
     asiIncreases: draft.asiIncreases
   };
 }
+
+// Classes: a multiclass draft names the class each level went to (`classLevels`, index 0 is level 1).
+
+/** The most classes a character can have (the server's limit). */
+export const MAX_CLASSES = 4;
+
+/** The class each level of the draft goes to, in order; empty before a class is chosen. */
+export function classSequenceOf(draft: BuilderDraft): string[] {
+  if (!draft.classId) return [];
+  const listed = draft.classLevels;
+  return listed && listed.length === draft.level && listed[0] === draft.classId
+    ? [...listed]
+    : Array.from({ length: draft.level }, () => draft.classId!);
+}
+
+/** The class sequence a multiclass draft sends, or null for one class. */
+export function multiclassLevelsOf(draft: BuilderDraft): string[] | null {
+  const sequence = classSequenceOf(draft);
+  return new Set(sequence).size > 1 ? sequence : null;
+}
+
+/** The draft's classes in the order first taken, each with its levels. */
+export function draftClassesOf(draft: BuilderDraft): Array<{ id: string; levels: number }> {
+  const counts = new Map<string, number>();
+  for (const id of classSequenceOf(draft)) counts.set(id, (counts.get(id) ?? 0) + 1);
+  return [...counts].map(([id, levels]) => ({ id, levels }));
+}
+
+/** The draft with a new class sequence. Hit-point rolls are kept for the levels before the first one that changed,
+ *  since each roll belongs to its level's class die. */
+function withSequence(draft: BuilderDraft, sequence: readonly string[], unchanged: number): BuilderDraft {
+  const { classLevels: _previous, ...rest } = draft;
+  return {
+    ...rest,
+    classId: sequence[0] ?? draft.classId,
+    level: sequence.length,
+    hpEntries: draft.hpEntries.slice(0, Math.max(0, Math.min(unchanged, sequence.length) - 1)),
+    ...(new Set(sequence).size > 1 ? { classLevels: [...sequence] } : {})
+  };
+}
+
+/** One class taken to `levels`: new levels go on the end, and levels taken off come from its last ones. */
+export function withClassLevels(draft: BuilderDraft, classId: string, levels: number): BuilderDraft {
+  const sequence = classSequenceOf(draft);
+  const held = sequence.filter((id) => id === classId).length;
+  if (levels >= held) return withSequence(draft, [...sequence, ...Array(levels - held).fill(classId)], sequence.length);
+  const dropped = new Set<number>();
+  for (let index = sequence.length - 1; index > 0 && dropped.size < held - levels; index -= 1)
+    if (sequence[index] === classId) dropped.add(index);
+  return withSequence(
+    draft,
+    sequence.filter((_, index) => !dropped.has(index)),
+    Math.min(...dropped)
+  );
+}
+
+/** A level of a class the draft does not have yet, on the end. */
+export const withClassAdded = (draft: BuilderDraft, classId: string): BuilderDraft =>
+  withSequence(draft, [...classSequenceOf(draft), classId], draft.level);
+
+/** Every level of a later class taken off. */
+export function withoutClass(draft: BuilderDraft, classId: string): BuilderDraft {
+  const sequence = classSequenceOf(draft);
+  if (sequence[0] === classId) return draft;
+  return withSequence(
+    draft,
+    sequence.filter((id) => id !== classId),
+    sequence.indexOf(classId)
+  );
+}
+
+/** A different starting class: one class at the draft's level, or the old starting class's levels handed over. */
+export function withStartingClass(draft: BuilderDraft, classId: string): BuilderDraft {
+  const sequence = classSequenceOf(draft);
+  if (!multiclassLevelsOf(draft)) return { ...draft, classId };
+  const replaced = sequence.map((id) => (id === sequence[0] ? classId : id));
+  return withSequence({ ...draft, classId }, replaced, 0);
+}
+
+/** The total level the draft can still add before the table's cap. */
+export const levelsLeft = (draft: BuilderDraft, cap: number) => Math.max(0, cap - draft.level);
 
 /** The draft with the answers the server kept: a pick the build no longer offers is gone, and the subclass
  *  is the subclass offer's answer. The same object when nothing changed, so it is safe from an effect. */
@@ -108,10 +193,16 @@ const sameAnswers = (left: Readonly<Record<string, unknown>>, right: Readonly<Re
 export type OfferContext = Readonly<{
   species: ContentSpeciesSummary | null;
   background: ContentBackgroundSummary | null;
+  /** The starting class. */
   classRecord: ContentClassSummary | null;
   subclass: ContentSubclassSummary | null;
   originFeat: ContentFeatSummary | null;
+  /** The starting class's hit die. */
   hitDie: HitDie | null;
+  /** Every class in the order first taken, with its levels; one entry for a single class. */
+  classes: ReadonlyArray<{ record: ContentClassSummary; levels: number }>;
+  /** Each level's hit die, from its class: index 0 is level 1. */
+  levelDice: readonly (HitDie | null)[];
 }>;
 
 export function offerContext(draft: BuilderDraft, catalogs: BuilderCatalogs): OfferContext {
@@ -122,15 +213,27 @@ export function offerContext(draft: BuilderDraft, catalogs: BuilderCatalogs): Of
   const originFeat = background?.originFeatId
     ? (catalogs.choice.feats.find((entry) => entry.id === background.originFeatId) ?? null)
     : null;
+  const recordOf = (id: string) => catalogs.choice.classes.find((entry) => entry.id === id) ?? null;
   return {
     species,
     background,
     classRecord,
     subclass,
     originFeat,
-    hitDie: (classRecord?.hitDie as HitDie | undefined) ?? null
+    hitDie: (classRecord?.hitDie as HitDie | undefined) ?? null,
+    classes: draftClassesOf(draft).flatMap(({ id, levels }) => {
+      const record = recordOf(id);
+      return record ? [{ record, levels }] : [];
+    }),
+    levelDice: classSequenceOf(draft).map((id) => (recordOf(id)?.hitDie as HitDie | undefined) ?? null)
   };
 }
+
+/** "Fighter 3 / Wizard 2" for a multiclass draft, the class name for one class. */
+export const classLineOf = (context: OfferContext): string | null =>
+  context.classes.length > 1
+    ? context.classes.map(({ record, levels }) => `${record.name} ${levels}`).join(" / ")
+    : (context.classRecord?.name ?? null);
 
 /** The offer kinds answered by a feat, whose grids show each feat's summary. */
 export const FEAT_KINDS: ReadonlySet<string> = new Set(["feat", "fighting-style", "asi-or-feat"]);
@@ -340,6 +443,8 @@ export type CharacterCreatePayload = Readonly<{
   classId: string;
   level: number;
   subclassId?: string;
+  /** A multiclass build: the class each level went to. */
+  classLevels?: readonly string[];
   abilityMethod: BuilderAbilityMethod;
   baseScores: Record<Ability, number>;
   backgroundBonusAllocation: ReadonlyArray<{ ability: Ability; amount: number }>;
@@ -361,6 +466,7 @@ export function buildCreatePayload(draft: BuilderDraft, choices: readonly Charac
   }
   if (!draft.speciesId || !draft.backgroundId || !draft.classId)
     throw new Error("Species, background, and class are all required.");
+  const classLevels = multiclassLevelsOf(draft);
   return {
     name: draft.name.trim(),
     speciesId: draft.speciesId,
@@ -368,6 +474,7 @@ export function buildCreatePayload(draft: BuilderDraft, choices: readonly Charac
     classId: draft.classId,
     level: draft.level,
     ...(draft.subclassId ? { subclassId: draft.subclassId } : {}),
+    ...(classLevels ? { classLevels } : {}),
     abilityMethod: draft.abilityMethod,
     baseScores: scores,
     backgroundBonusAllocation: draft.backgroundBonus,
@@ -515,25 +622,39 @@ export function stepBlockedReason(
     }
     case "features": {
       if (!draft.classId) return "Choose a class first.";
-      const classRecord = context.classRecord;
+      const multiclass = context.classes.length > 1;
       // A class with no subclass content yet has an empty subclass offer; say that first, since nothing
       // on screen could satisfy it.
-      if (classRecord && draft.level >= classRecord.subclassLevel && !draft.subclassId) {
-        const subclassOffer = offers.find((offer) => offer.kind === "subclass");
+      for (const [index, { record, levels }] of context.classes.entries()) {
+        if (levels < record.subclassLevel) continue;
+        const subclassOffer = offers.find(
+          (offer) => offer.kind === "subclass" && (offer.classId ?? draft.classId) === record.id
+        );
+        if (index === 0 && draft.subclassId) continue;
         if (!subclassOffer || subclassOffer.options.length === 0) {
           const escape =
-            classRecord.subclassLevel > 1 ? ` Drop to level ${classRecord.subclassLevel - 1} to continue.` : "";
-          return `No ${classRecord.name} subclasses are available yet — a level ${classRecord.subclassLevel} ${classRecord.name} must have one.${escape}`;
+            record.subclassLevel > 1
+              ? multiclass
+                ? ` Take ${record.name} to level ${record.subclassLevel - 1} to continue.`
+                : ` Drop to level ${record.subclassLevel - 1} to continue.`
+              : "";
+          return `No ${record.name} subclasses are available yet - a level ${record.subclassLevel} ${record.name} must have one.${escape}`;
         }
       }
       const conflict = heldConflict("features");
       if (conflict) return conflict;
       const offer = unfilled("features");
       // Name the subclass only when it is the first unmet requirement.
-      if (offer)
-        return offer.kind === "subclass"
-          ? `Choose a ${classRecord?.subclassLabel ?? "subclass"} to continue.`
-          : pickReason(offer);
+      if (offer) {
+        if (offer.kind !== "subclass") return pickReason(offer);
+        const owner =
+          context.classes.find(({ record }) => record.id === (offer.classId ?? draft.classId))?.record ??
+          context.classRecord;
+        const label = owner?.subclassLabel ?? "subclass";
+        return multiclass && owner
+          ? `Choose a ${owner.name} ${label.toLowerCase()} to continue.`
+          : `Choose a ${label} to continue.`;
+      }
       // An ASI past 20 is chosen here but only visible once scores exist, so both steps guard the cap
       // with the same sentence.
       const breach = abilityCapPreview(draft, catalogs, offers).breach;
@@ -584,13 +705,26 @@ export function stepBlockedReason(
       // The 20 cap, checked on the step that owns the scores (the features step guards the improvements).
       const breach = abilityCapPreview(draft, catalogs, offers).breach;
       if (breach) return breach.reason;
+      // Multiclassing needs 13 in each class's primary ability. A preview on the final totals: the server checks each
+      // class with the scores of the moment it is taken.
+      if (context.classes.length > 1) {
+        const bonuses = abilityBonusesOf(draft, catalogs, offers);
+        const totals = Object.fromEntries(ABILITIES.map((ability) => [ability, base[ability]! + bonuses[ability]]));
+        for (const { record } of context.classes) {
+          if (meetsMulticlassMinimums(totals, record.multiclassPrerequisites)) continue;
+          return `Multiclassing needs 13 in each class's primary ability: ${multiclassShortfallText(totals, record, [record])}`;
+        }
+      }
       if (draft.hpMode === "entries") {
         const needed = draft.level - 1;
-        const faces = context.hitDie ? hitDieFaces(context.hitDie) : 12;
         if (draft.hpEntries.length !== needed)
           return `Enter your hit-point roll for level ${draft.hpEntries.length + 2} (${needed - draft.hpEntries.length} to go).`;
-        if (draft.hpEntries.some((entry) => entry < 1 || entry > faces))
-          return `A ${context.hitDie} roll is 1-${faces} — fix the out-of-range entry.`;
+        for (const [index, entry] of draft.hpEntries.entries()) {
+          const die = context.levelDice[index + 1] ?? context.hitDie;
+          const faces = die ? hitDieFaces(die) : 12;
+          if (entry < 1 || entry > faces)
+            return `A ${die ?? "d12"} roll is 1-${faces} - fix the level ${index + 2} entry.`;
+        }
       }
       return null;
     }

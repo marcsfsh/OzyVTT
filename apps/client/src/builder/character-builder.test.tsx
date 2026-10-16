@@ -129,7 +129,7 @@ const cleric = {
   toolProficiencies: [],
   toolChoices: null,
   multiclassProficiencies: null,
-  multiclassPrerequisites: null,
+  multiclassPrerequisites: { mode: "all", minimums: [{ ability: "wis", minimum: 13 }] },
   subclassLevel: 3,
   subclassLabel: "Cleric Subclass",
   asiLevels: [4],
@@ -170,6 +170,31 @@ const cleric = {
       ]
     })
   ]
+} as unknown as ContentClassSummary;
+
+/** A second class to multiclass into: no spells, and Strength or Dexterity 13 to take it. */
+const fighter = {
+  ...cleric,
+  id: "fighter",
+  name: "Fighter",
+  summary: "A master of arms.",
+  description: "Fighters are masters of weapons and armor.",
+  hitDie: "d10",
+  primaryAbilities: ["str", "dex"],
+  savingThrows: ["str", "con"],
+  multiclassPrerequisites: {
+    mode: "any",
+    minimums: [
+      { ability: "str", minimum: 13 },
+      { ability: "dex", minimum: 13 }
+    ]
+  },
+  subclassLabel: "Fighter Subclass",
+  spellcastingAbility: null,
+  spellcastingProgression: null,
+  spellcasting: null,
+  levelTable: [levelRow(1), levelRow(2), levelRow(3)],
+  features: []
 } as unknown as ContentClassSummary;
 
 const lifeDomain = {
@@ -254,7 +279,7 @@ const acolyte = {
 } as unknown as ContentBackgroundSummary;
 
 const CATALOG_ANSWERS: Readonly<Record<string, unknown>> = {
-  "content:classes": { ok: true, classes: [cleric], attribution: "SRD 5.2.1, CC BY 4.0." },
+  "content:classes": { ok: true, classes: [cleric, fighter], attribution: "SRD 5.2.1, CC BY 4.0." },
   "content:subclasses": { ok: true, subclasses: [lifeDomain], attribution: "SRD 5.2.1, CC BY 4.0." },
   "content:species": { ok: true, species: [elf, halfling], attribution: "SRD 5.2.1, CC BY 4.0." },
   "content:backgrounds": { ok: true, backgrounds: [acolyte], attribution: "SRD 5.2.1, CC BY 4.0." },
@@ -422,8 +447,10 @@ vi.mock("../socket", () => {
 });
 
 import { ToastProvider } from "@vtt/ui";
+import type { ActorDefinition, CharacterChoice } from "@vtt/schemas";
 import { socket } from "../socket";
 import { CharacterBuilder } from "./CharacterBuilder";
+import { LevelFlow } from "./LevelFlow";
 
 const gmView = {
   revision: 1,
@@ -714,6 +741,43 @@ describe("Issue 2c — a spell's rules can be read while choosing spells", () =>
   });
 });
 
+describe("multiclassing on the class step", () => {
+  const offersRequests = () =>
+    vi
+      .mocked(socket.emit)
+      .mock.calls.filter(([event]) => event === "builder:offers")
+      .map(([, payload]) => payload as BuilderOffersRequest);
+
+  it("adds a class with its own levels, sends the table the order, and takes it off again", async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.click(await screen.findByRole("radio", { name: /Elf/ }));
+    await user.click(within(offerNamed("Keen Senses")).getByRole("radio", { name: /Perception/ }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(await screen.findByRole("radio", { name: /Acolyte/ }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(await screen.findByRole("radio", { name: /Cleric/ }));
+
+    await user.selectOptions(screen.getByLabelText("Add a class"), "fighter");
+    // One row per class, each with its own levels, and the total beside the heading.
+    expect(screen.getByRole("group", { name: "Cleric levels" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Fighter levels" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Character level" })).toBeNull();
+    expect(screen.getByText("Level 2")).toBeInTheDocument();
+    await waitFor(() => expect(offersRequests().at(-1)?.classLevels).toEqual(["cleric", "fighter"]));
+
+    await user.click(
+      within(screen.getByRole("group", { name: "Cleric levels" })).getByRole("button", { name: "Increase" })
+    );
+    await waitFor(() => expect(offersRequests().at(-1)?.classLevels).toEqual(["cleric", "fighter", "cleric"]));
+
+    await user.click(screen.getByRole("button", { name: "Remove Fighter" }));
+    expect(screen.getByRole("group", { name: "Character level" })).toBeInTheDocument();
+    await waitFor(() => expect(offersRequests().at(-1)).not.toHaveProperty("classLevels"));
+    expect(offersRequests().at(-1)?.level).toBe(2);
+  });
+});
+
 describe("the offers come from the table", () => {
   /** Holds every `builder:offers` answer until the test releases it; catalogs still answer at once. */
   function holdOffers() {
@@ -766,5 +830,133 @@ describe("the offers come from the table", () => {
     const alert = screen.getByText("The table could not check these choices").closest(".nh-alert");
     expect(alert).toHaveTextContent('No species "elf" is in the content catalog.');
     expect(offerNamed("Keen Senses")).toBeInTheDocument();
+  });
+});
+
+describe("the Level flow's class choice", () => {
+  const HERO = "a1000000-0000-4000-8000-000000000001";
+
+  /** A Cleric built here, with the ledger the builder writes. */
+  const sheet = (
+    over: Readonly<{
+      classes?: ReadonlyArray<{ id: string; name: string; level: number }>;
+      choices?: readonly CharacterChoice[];
+      abilityScores?: Record<string, number>;
+    }> = {}
+  ) =>
+    ({
+      schemaId: "vtt.actor-character",
+      schemaVersion: 1,
+      source: { name: "test", version: "1" },
+      name: "Mira",
+      size: "medium",
+      abilityScores: over.abilityScores ?? { str: 10, dex: 12, con: 14, int: 10, wis: 12, cha: 8 },
+      proficiencyBonus: 2,
+      armorClass: 14,
+      hitPoints: { maximum: 20 },
+      speedFeet: 30,
+      actions: [],
+      token: { disposition: "friendly", footprint: { width: 1, height: 1 } },
+      extensions: {},
+      character: {
+        classes: over.classes ?? [{ id: "cleric", name: "Cleric", level: 3 }],
+        race: { id: "elf", name: "Elf" },
+        background: { id: "acolyte", name: "Acolyte" },
+        feats: [],
+        choices: over.choices ?? []
+      }
+    }) as unknown as ActorDefinition;
+
+  const levelView = (definition: ActorDefinition) =>
+    ({
+      ...gmView,
+      actors: [{ id: HERO, name: "Mira", kind: "player-character", definitionId: `import-${HERO}` }],
+      definitions: [{ id: `import-${HERO}`, definition }]
+    }) as unknown as GmView;
+
+  /** Holds every `builder:offers` read so the test can look at what the flow asked for. */
+  function heldOffers() {
+    const held: BuilderOffersRequest[] = [];
+    vi.mocked(socket.emit).mockImplementation(((event: string, payload: unknown, ack?: (result: unknown) => void) => {
+      if (!ack) return socket;
+      if (event === "builder:offers") held.push(payload as BuilderOffersRequest);
+      else ack((CATALOG_ANSWERS as Record<string, unknown>)[event] ?? { ok: false });
+      return socket;
+    }) as never);
+    return held;
+  }
+
+  const mountLevel = (definition: ActorDefinition) =>
+    render(
+      <ToastProvider>
+        <LevelFlow state={levelView(definition)} role="gm" actorId={HERO} onClose={() => {}} onDone={() => {}} />
+      </ToastProvider>
+    );
+
+  it("says plainly why a new class is out of reach with the scores the character has", async () => {
+    heldOffers();
+    mountLevel(sheet());
+    const grid = await screen.findByRole("radiogroup", { name: "Level 4 goes to" });
+    expect(within(grid).getByRole("radio", { name: /^Cleric/ })).toHaveAttribute("aria-checked", "true");
+    expect((within(grid).getByRole("radio", { name: /^Fighter/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      within(grid).getByText(
+        "Fighter needs Strength 13 or Dexterity 13; you have Strength 10 and Dexterity 12. Your Cleric needs Wisdom 13; you have 12."
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("levels into a new class it qualifies for, asking the table with the class order and the sheet's scores", async () => {
+    const offers = heldOffers();
+    const user = userEvent.setup();
+    const abilityScores = { str: 14, dex: 12, con: 14, int: 10, wis: 14, cha: 8 };
+    mountLevel(sheet({ abilityScores }));
+    const grid = await screen.findByRole("radiogroup", { name: "Level 4 goes to" });
+    await user.click(within(grid).getByRole("radio", { name: /^Fighter/ }));
+    await user.click(screen.getByRole("button", { name: "Level up to 4" }));
+    await waitFor(() => expect(offers.length).toBeGreaterThan(0));
+    expect(offers.at(-1)).toMatchObject({
+      classId: "cleric",
+      level: 4,
+      classLevels: ["cleric", "cleric", "cleric", "fighter"],
+      sheet: { level: 3, abilityScores }
+    });
+  });
+
+  it("names the class a level-down takes off, and reads a multiclass sheet's own order", async () => {
+    const offers = heldOffers();
+    const user = userEvent.setup();
+    mountLevel(
+      sheet({
+        abilityScores: { str: 14, dex: 12, con: 14, int: 10, wis: 14, cha: 8 },
+        classes: [
+          { id: "cleric", name: "Cleric", level: 2 },
+          { id: "fighter", name: "Fighter", level: 1 }
+        ],
+        choices: [
+          { level: 1, kind: "class-levels", id: "cleric", payload: { classes: ["cleric", "fighter", "cleric"] } }
+        ]
+      })
+    );
+    expect(
+      await screen.findByText(/Level 3 went to Cleric\./, { selector: ".cb-level-preview p" })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Cleric 2 \/ Fighter 1/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Level down to 2" }));
+    await waitFor(() => expect(offers.length).toBeGreaterThan(0));
+    expect(offers.at(-1)).toMatchObject({ level: 2, classLevels: ["cleric", "fighter"] });
+  });
+
+  it("refuses a built sheet whose classes were added by hand", async () => {
+    heldOffers();
+    mountLevel(
+      sheet({
+        classes: [
+          { id: "cleric", name: "Cleric", level: 2 },
+          { id: "fighter", name: "Fighter", level: 1 }
+        ]
+      })
+    );
+    expect(await screen.findByRole("heading", { name: "Mira's classes were added by hand" })).toBeInTheDocument();
   });
 });
