@@ -8,14 +8,13 @@ import { useTargetingResult } from "./targeting";
 import { useRollPreference } from "../dice/roll-preference";
 import { CharacterSheet } from "./CharacterSheet";
 import { InitiativeRow } from "./InitiativeList";
-import { DockPicker, type DockControl } from "./DockPicker";
-import { SavePrompt } from "./SavePrompt";
-import { ReactionPrompt } from "./ReactionPrompt";
 import { EffectChips } from "./EffectChips";
 import { DyingTracker } from "./DyingTracker";
 import { aidGiverOf, isKnockedOut, StabilizeControl } from "./StabilizeControl";
 import { PlayerActionRunner } from "./PlayerActionRunner";
-import { InitiativePrompt } from "./InitiativePrompt";
+import { isDying, owesDeathSave } from "../table/playerPrompts";
+import { hasPlayerPrompt } from "../table/PromptSlot";
+import { useTargeting } from "./targeting";
 
 /**
  * A player's own prompts keep their outcome line beside them: answering one unmounts it, and the
@@ -47,7 +46,9 @@ export function PlayerTurnEconomy({
   myId,
   myTurn,
   mySpeedFeet,
-  revision
+  revision,
+  endWaits,
+  quiet = false
 }: Readonly<{
   combat: PlayerView["combat"];
   myId: string;
@@ -55,6 +56,10 @@ export function PlayerTurnEconomy({
   mySpeedFeet?: number;
   /** The game's revision: this turn's movement budget (Dash and Slow included) is asked again as it changes. */
   revision?: number;
+  /** Why End turn waits (a death save still to roll); it is disabled meanwhile. */
+  endWaits?: string;
+  /** Another primary leads the view (a roll to make), so End turn steps down. */
+  quiet?: boolean;
 }>) {
   const [busy, setBusy] = useState(false);
   const budget = useMovementBudget(myTurn && revision !== undefined ? myId : null, revision ?? 0);
@@ -138,8 +143,9 @@ export function PlayerTurnEconomy({
       {myTurn && (
         <button
           type="button"
-          className="encounter-primary turn-end"
-          disabled={busy}
+          className={`encounter-primary turn-end${quiet || endWaits ? " is-quiet" : ""}`}
+          disabled={busy || endWaits !== undefined}
+          title={endWaits}
           onClick={() => emit(() => command("turn:end", {}), "The turn could not end.")}
         >
           End turn
@@ -154,7 +160,7 @@ export function PlayerTurnEconomy({
   );
 }
 
-export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerView; dock?: DockControl }>) {
+export function PlayerEncounterPanel({ state }: Readonly<{ state: PlayerView }>) {
   const { combat } = state;
   const myId = state.actors.find((actor) => "claimStatus" in actor && actor.claimStatus === "mine")?.id ?? null;
   // Bring the active combatant's row into view when the turn advances.
@@ -171,6 +177,9 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
   // returns to the sheet once it commits.
   const [returnToSheetAfterAttack, setReturnToSheetAfterAttack] = useState(false);
   const jumpAttackResult = useTargetingResult();
+  // One primary at a time: End turn steps down while a roll waits to be made or answered.
+  const targeting = useTargeting();
+  const rollPending = targeting !== null || jumpAttackResult?.preview === true || hasPlayerPrompt(state);
   useEffect(() => {
     if (returnToSheetAfterAttack && jumpAttackResult && !jumpAttackResult.preview) {
       setView("sheet");
@@ -178,9 +187,6 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
     }
   }, [returnToSheetAfterAttack, jumpAttackResult]);
   const myActor = state.actors.find((actor) => actor.id === myId) ?? null;
-  const calledSaveIds = new Set(
-    state.rollCalls.flatMap((call) => call.entries.flatMap((entry) => (entry.saveId ? [entry.saveId] : [])))
-  );
   if (!combat.active)
     return (
       <section className="encounter-panel compact" aria-labelledby="player-initiative-title">
@@ -223,9 +229,6 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
           </span>
         )}
       </div>
-      {/* Player-rolled initiative: a view-independent prompt, so it cannot be scrolled off or hidden
-        behind the sheet view. Clears once the player rolls. */}
-      {myId !== null && (combat.pendingInitiative ?? []).includes(myId) && <InitiativePrompt actorId={myId} />}
       {/* Questions this player has waiting, pinned above the region like the roll prompt. */}
       <MyPendingAsks state={state} />
       {/* The tracker's scroll region: the turn order scrolls here instead of growing the surface.
@@ -258,15 +261,6 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
             {orderedInitiative.map((entry) => {
               const isMe = entry.actorId === myId;
               const rowActor = state.actors.find((actor) => actor.id === entry.actorId);
-              // A save the GM called for is answered on the call's card, so it is not prompted twice.
-              const mySaves = isMe
-                ? combat.pendingSaves.filter(
-                    (save) => save.targetActorId === entry.actorId && !calledSaveIds.has(save.id)
-                  )
-                : [];
-              const myReactions = isMe
-                ? combat.pendingReactions.filter((reaction) => reaction.actorId === entry.actorId)
-                : [];
               return (
                 <li
                   key={entry.actorId}
@@ -283,6 +277,10 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                       myTurn={myTurn}
                       mySpeedFeet={rowActor?.speedFeet}
                       revision={state.revision}
+                      quiet={rollPending}
+                      {...(myActor && owesDeathSave(state, myActor)
+                        ? { endWaits: "Roll your death save first." }
+                        : {})}
                     />
                   )}
                   {/* On your turn, the interactive action console. */}
@@ -297,6 +295,7 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                         actorId: initiativeEntry.actorId,
                         name: initiativeEntry.name
                       }))}
+                      {...(myActor && isDying(myActor) ? { unavailable: "unavailable while Unconscious" } : {})}
                     />
                   )}
                   {isMe && rowActor && (
@@ -367,67 +366,12 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                       }
                     </OwnFeedback>
                   )}
-                  {isMe && rowActor && "deathSaves" in rowActor && rowActor.deathSaves && (
-                    <OwnFeedback className="own-dying">
-                      {(onFeedback) => (
-                        <DyingTracker
-                          actorId={entry.actorId}
-                          name={entry.name}
-                          deathSaves={rowActor.deathSaves!}
-                          // A death save comes at the start of the character's own turn.
-                          canRoll={myTurn}
-                          onFeedback={onFeedback}
-                          rollMode={rollMode}
-                          isActingTurn={myTurn}
-                          viewer="player"
-                          inspired={rowActor.heroicInspiration === true}
-                        />
-                      )}
-                    </OwnFeedback>
-                  )}
-                  {isMe && (
-                    <OwnFeedback className="own-save-prompts" empty={mySaves.length === 0}>
-                      {(onFeedback) =>
-                        mySaves.map((save) => (
-                          <SavePrompt
-                            key={save.id}
-                            save={save}
-                            targetName={entry.name}
-                            canDismiss={false}
-                            onFeedback={onFeedback}
-                            rollMode={rollMode}
-                            viewer="player"
-                            inspired={rowActor?.heroicInspiration === true}
-                          />
-                        ))
-                      }
-                    </OwnFeedback>
-                  )}
-                  {isMe && (
-                    <OwnFeedback className="own-save-prompts" empty={myReactions.length === 0}>
-                      {(onFeedback) =>
-                        myReactions.map((reaction) => (
-                          <ReactionPrompt
-                            key={reaction.id}
-                            reaction={reaction}
-                            actorName={entry.name}
-                            canDismiss={false}
-                            onFeedback={onFeedback}
-                            rollMode={rollMode}
-                            viewer="player"
-                            inspired={rowActor?.heroicInspiration === true}
-                          />
-                        ))
-                      }
-                    </OwnFeedback>
-                  )}
                 </li>
               );
             })}
           </ol>
         )}
       </div>
-      <DockPicker dock={dock} />
     </section>
   );
 }

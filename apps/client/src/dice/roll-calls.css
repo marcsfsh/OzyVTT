@@ -118,25 +118,33 @@
   flex: 1 1 auto;
 }
 
-/* The player's cards: a fixed stack over the bottom of the screen, above the safe area, its own scroll region when
-   several calls are open. Percentages of a fixed box are the viewport's, so the cap needs no viewport unit. */
-.roll-call-dock {
-  position: fixed;
-  z-index: 70;
-  right: var(--space-4);
-  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+.roll-call-card-eyebrow {
+  margin: 0;
+  color: var(--magenta-text);
+  font: 700 var(--fs-2xs) / 1.3 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+/* The player's cards away from the table: a row at the top of the pane that pushes the page down, so it never
+   covers a control. Several open calls scroll inside it. On the table the prompt slot holds them. */
+.app-pane > .roll-call-dock {
+  flex: 0 0 auto;
   display: grid;
   gap: var(--space-2);
-  width: min(28rem, calc(100% - 2 * var(--space-4)));
-  max-height: 60%;
+  max-height: 40%;
+  overflow-y: auto;
+  padding: var(--space-2) var(--pane-gutter);
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--surface-1);
 }
 .roll-call-dock .roll-call-card {
   border-color: color-mix(in srgb, var(--cyan) 45%, var(--line-strong));
   border-left-color: var(--cyan);
   background: var(--surface-1);
-  box-shadow: var(--shadow-2);
 }
-.roll-call-dock .save-prompt {
+.roll-call-dock .save-prompt,
+.prompt-slot .save-prompt {
   margin: 0;
   padding: 0;
 }

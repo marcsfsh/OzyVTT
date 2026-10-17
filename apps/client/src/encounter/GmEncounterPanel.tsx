@@ -3,18 +3,18 @@ import { rosterActors, type GmView, type MutationResult } from "@vtt/domain";
 import type { MapSelection } from "../maps/MapManager";
 import { Button, Chip, Switch, IconArrow, Eyebrow } from "@vtt/ui";
 import { command } from "../lib/command";
-import { PendingAsksForGm } from "./RuleAsk";
-import { useRollPreference } from "../dice/roll-preference";
 import { CharacterSheet } from "./CharacterSheet";
 import { MonsterBrowser } from "./MonsterBrowser";
 import { ScenePrepPanel } from "../scenes/ScenePrepPanel";
 import type { PickerMap } from "../maps/MapPicker";
 import { useConfirm } from "../components/feedback";
-import { DockPicker, type DockControl } from "./DockPicker";
 import { ConfirmRow } from "./ConfirmRow";
 import { FightMenu } from "./FightMenu";
 import { ActingConsole } from "./ActingConsole";
 import { GmInitiativeRow } from "./GmInitiativeRow";
+import { useTargeting, useTargetingResult } from "./targeting";
+import { holdsTheTurn } from "../table/NeedsYou";
+import { isDefeatedMonster } from "../table/needs";
 
 /** How long a turn button ignores taps after a turn command settles: longer than a double tap. */
 const TURN_SETTLE_MS = 500;
@@ -23,18 +23,21 @@ export function GmEncounterPanel({
   state,
   selectedMap,
   mapLibrary,
-  onSelectMap,
-  dock
+  onSelectMap
 }: Readonly<{
   state: GmView;
   selectedMap: MapSelection | null;
   mapLibrary?: readonly MapSelection[];
   onSelectMap?: (map: MapSelection | null) => void;
-  dock?: DockControl;
 }>) {
+  // A monster defeated in the last fight on this scene stays out of the next one unless the GM adds it back.
+  const stillStanding = (actorId: string) => {
+    const actor = state.actors.find((candidate) => candidate.id === actorId);
+    return actor !== undefined && !isDefeatedMonster(actor);
+  };
   const [selectedActors, setSelectedActors] = useState<ReadonlySet<string>>(() =>
     state.combat.initiative.length > 0
-      ? new Set(state.combat.initiative.map((entry) => entry.actorId))
+      ? new Set(state.combat.initiative.map((entry) => entry.actorId).filter(stillStanding))
       : new Set(
           rosterActors(state.actors)
             .filter((actor) => actor.kind === "player-character" && !actor.archived)
@@ -47,8 +50,6 @@ export function GmEncounterPanel({
   // until shortly after the last turn command settled; otherwise one double tap skips a combatant.
   const turnSettlesAt = useRef(0);
   const [message, setMessage] = useState("");
-  // The GM's rolls follow the shared per-browser dice-input preference.
-  const { rollMode } = useRollPreference();
   // Encounter-setup opt-in: claimed players roll their own initiative (per encounter, not persisted).
   const [playersRollInitiative, setPlayersRollInitiative] = useState(false);
   // SRD Surprise and group rolls, per fight: who rolls initiative at Disadvantage, and one roll per stat block.
@@ -83,7 +84,7 @@ export function GmEncounterPanel({
     if (state.combat.mapAssetId !== liveMapRef.current) {
       liveMapRef.current = state.combat.mapAssetId;
       if (!state.combat.active && state.combat.initiative.length > 0)
-        setSelectedActors(new Set(state.combat.initiative.map((entry) => entry.actorId)));
+        setSelectedActors(new Set(state.combat.initiative.map((entry) => entry.actorId).filter(stillStanding)));
     }
   }, [state.combat.mapAssetId, state.combat.active, state.combat.initiative]);
   useEffect(() => {
@@ -137,7 +138,7 @@ export function GmEncounterPanel({
         groupMonsters,
         expectedRevision: state.revision
       });
-    }, "The fight has started. Initiative was rolled, and every token is ready in the tray above.");
+    }, "The fight has started, and initiative was rolled.");
   const changeScore = (actorId: string, score: number) =>
     void run(
       () => command("initiative:set", { actorId, score, expectedRevision: state.revision }),
@@ -157,6 +158,10 @@ export function GmEncounterPanel({
           resumeNext: (state.turnHistory ?? []).find((entry) => entry.index > cursor)?.kind === "return"
         };
   const nextLabel = reviewing?.resumeNext ? "Resume live play" : "Next turn";
+  // One primary at a time: while a roll waits to be made or answered, Next turn steps down.
+  const targeting = useTargeting();
+  const targetingResult = useTargetingResult();
+  const rollPending = targeting !== null || targetingResult?.preview === true || holdsTheTurn(state);
   const runTurn = async (
     operation: () => Promise<MutationResult>,
     success: string,
@@ -284,8 +289,6 @@ export function GmEncounterPanel({
           </div>
         </div>
       )}
-      {/* Docking the tracker to the map is available before and during combat. */}
-      <DockPicker dock={dock} />
       {!state.combat.active ? (
         <>
           <ScenePrepPanel
@@ -367,7 +370,7 @@ export function GmEncounterPanel({
             const total = state.combat.initiative.length;
             return placed < total ? (
               <p className="encounter-place-nudge">
-                {placed} of {total} tokens placed - drag the rest from the tray above.
+                {placed} of {total} tokens are on the map. Drag the rest from the tray onto the map.
               </p>
             ) : null;
           })()}
@@ -395,7 +398,7 @@ export function GmEncounterPanel({
                 ‹
               </button>
               <button
-                className={`encounter-primary${reviewing?.resumeNext ? " resume" : ""}`}
+                className={`encounter-primary${reviewing?.resumeNext ? " resume" : ""}${rollPending ? " is-quiet" : ""}`}
                 disabled={busy}
                 onClick={next}
               >
@@ -405,6 +408,10 @@ export function GmEncounterPanel({
                 </span>
               </button>
             </div>
+            {/* Ending the fight sits beside the turn, where the GM looks for it. */}
+            <Button variant="secondary" size="sm" className="encounter-end" disabled={busy} onClick={() => void end()}>
+              End fight
+            </Button>
             {/* Mid-fight reinforcements are a combat action, so one visible tap. */}
             <button
               type="button"
@@ -440,36 +447,6 @@ export function GmEncounterPanel({
               {confirm.message}
             </ConfirmRow>
           )}
-          {/* Players' questions, pinned above the turn order. Allow replays the parked command with GM
-          authority; it can fail against current state, in which case the question stays and says so. */}
-          <PendingAsksForGm state={state} onFeedback={setMessage} />
-          {(state.combat.pendingInitiative ?? []).length > 0 && (
-            <div className="initiative-gathering" role="status">
-              <span>
-                Waiting on {state.combat.pendingInitiative.length} player
-                {state.combat.pendingInitiative.length === 1 ? "" : "s"} to roll initiative
-                {state.combat.playerInitiativeMode === "wait" ? " - turns begin once everyone has" : ""}.
-              </span>
-              <button
-                type="button"
-                className="encounter-primary"
-                disabled={busy}
-                onClick={() => {
-                  setBusy(true);
-                  void command("initiative:roll-remaining", {}).then((result) => {
-                    setBusy(false);
-                    setMessage(
-                      result.ok
-                        ? "Rolled initiative for the rest of the table."
-                        : (result.message ?? "Initiative could not be rolled.")
-                    );
-                  });
-                }}
-              >
-                Roll for the rest
-              </button>
-            </div>
-          )}
           {/* The GM's tracker scroll region; the topbar, start/stop controls and gathering notice stay
           pinned above it. */}
           <div className="encounter-region scroll-y">
@@ -496,13 +473,11 @@ export function GmEncounterPanel({
                         actorsById={actorsById}
                         busy={busy}
                         run={run}
-                        rollMode={rollMode}
                         onFeedback={setMessage}
                       />
                     }
                     busy={busy}
                     run={run}
-                    rollMode={rollMode}
                     hpDamageType={hpDamageType}
                     onHpDamageTypeChange={setHpDamageType}
                     onOpenSheet={setSheetActorId}

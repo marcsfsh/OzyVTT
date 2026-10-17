@@ -23,8 +23,8 @@ import {
 } from "./targeting";
 import "./action-runner.css";
 
-/** Maps a player's own stat-block action onto the ContentActionSummary the targeting store uses.
- *  Area templates are dropped: players target by explicit ids; the GM places AoE templates. */
+/** Maps a player's own stat-block action onto the ContentActionSummary the targeting store uses. An area spell keeps
+ *  its area, so the player aims it on the map and the server decides who is under it. */
 export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): ContentActionSummary {
   return {
     id: action.id,
@@ -38,7 +38,7 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
     saveAbility: action.save?.ability ?? null,
     saveDc: action.save?.dc ?? null,
     damage: action.damage.map((part) => ({ formula: part.formula, type: part.type })),
-    area: null,
+    area: action.area ?? null,
     attackCount: action.attack?.count ?? null,
     usesLimit: action.uses?.limit ?? null,
     usesPer: action.uses?.per ?? null,
@@ -103,7 +103,8 @@ export function PlayerActionRunner({
   inspired = false,
   playerDamageMode,
   targets,
-  effectTags = []
+  effectTags = [],
+  unavailable
 }: Readonly<{
   actorId: string;
   definition: ActorDefinition;
@@ -115,6 +116,8 @@ export function PlayerActionRunner({
   targets: readonly { actorId: string; name: string }[];
   /** The tags of the character's effects, which bring forward a generic action that needs one (Put Out the Fire). */
   effectTags?: readonly string[];
+  /** Why no action can be taken now ("unavailable while Unconscious"): the list stays in view, disabled. */
+  unavailable?: string;
 }>) {
   const [feedback, setFeedback] = useState("");
   const onFeedback = setFeedback;
@@ -194,7 +197,7 @@ export function PlayerActionRunner({
       {!picking && !result && (
         <>
           <p className="player-actions-label">
-            Your actions <span>· your turn</span>
+            Your actions <span>· {unavailable ?? "your turn"}</span>
           </p>
           <ul className="action-list">
             {actions.map((action) => (
@@ -202,8 +205,8 @@ export function PlayerActionRunner({
                 <ActionRow
                   action={action}
                   parts={actionSummaryParts(action, actions)}
-                  note="Tap to use"
-                  disabled={busy}
+                  note={unavailable ? "Unavailable" : "Tap to use"}
+                  disabled={busy || unavailable !== undefined}
                   onUse={() => {
                     setTargetingResult(null);
                     if (isTargetlessOwn(action)) resolveActionDirect(actorId, action.id, revision, onOutcome);
@@ -221,7 +224,7 @@ export function PlayerActionRunner({
           )}
           <CommonActionChips
             actions={facts.common}
-            busy={busy}
+            busy={busy || unavailable !== undefined}
             effectTags={effectTags}
             onUse={(action, targetless) => {
               setTargetingResult(null);

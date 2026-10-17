@@ -901,18 +901,19 @@
 }
 /* The primary action is the sun frame, as `.nh-btn--primary`: a 3px sunset edge round a dark warm-tinted
    fill, the label in the display face. `.turn-prev` (‹) shares `.encounter-primary` only for its metrics
-   and stays a plain raised control. */
-.encounter-primary:not(.turn-prev) {
+   and stays a plain raised control, and `.is-quiet` steps a primary down while another one leads the view
+   (a roll waiting to be confirmed). */
+.encounter-primary:not(.turn-prev, .is-quiet) {
   color: var(--primary-ink);
   font-family: var(--font-display);
   font-weight: 400;
   letter-spacing: 0.02em;
   text-shadow: var(--primary-ink-shadow);
 }
-.encounter-primary:not(.turn-prev)::before,
-.encounter-primary:not(.turn-prev):hover:not(:disabled)::before,
-.encounter-primary:not(.turn-prev):focus-visible::before,
-.encounter-primary:not(.turn-prev):active:not(:disabled)::before {
+.encounter-primary:not(.turn-prev, .is-quiet)::before,
+.encounter-primary:not(.turn-prev, .is-quiet):hover:not(:disabled)::before,
+.encounter-primary:not(.turn-prev, .is-quiet):focus-visible::before,
+.encounter-primary:not(.turn-prev, .is-quiet):active:not(:disabled)::before {
   border: 3px solid transparent;
   background:
     var(--primary-tint) padding-box,
@@ -920,9 +921,9 @@
     var(--grad-sun-x) border-box;
   box-shadow: var(--glow-sun);
 }
-.encounter-primary:not(.turn-prev):hover:not(:disabled),
-.encounter-primary:not(.turn-prev):focus-visible,
-.encounter-primary:not(.turn-prev):active:not(:disabled) {
+.encounter-primary:not(.turn-prev, .is-quiet):hover:not(:disabled),
+.encounter-primary:not(.turn-prev, .is-quiet):focus-visible,
+.encounter-primary:not(.turn-prev, .is-quiet):active:not(:disabled) {
   --primary-tint: var(--primary-tint-hover);
 }
 /* Reviewing history, Next turn resumes live play: a cyan edge instead of the sun, since it is a different
