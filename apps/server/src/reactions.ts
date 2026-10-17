@@ -13,6 +13,11 @@ import type { EquipmentCatalog } from "./equipment-derivation.js";
 import type { DefinitionAction, LiveActor, ResolveInput } from "./resolution/context.js";
 import { damagePartsOf } from "./resolution/damage.js";
 import { commitEconomy, planEconomy } from "./resolution/economy.js";
+import { checkPlan } from "./ability-checks.js";
+import { rollSettledCheck } from "./check-rolls.js";
+import { withOneUsedUp } from "./consumables.js";
+import { deriveEquipment } from "./equipment-derivation.js";
+import { scrollCheckOf, scrollLostLine, scrollOfAction, scrollReading } from "./scrolls.js";
 
 export type ReactionAnswerDependencies = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
@@ -357,6 +362,41 @@ function answerStrike(
   };
 }
 
+/**
+ * A Spell Scroll read as the reaction (Shield from a scroll): the scroll is used up, and a spell above the reader's
+ * levels needs its check first, a failure losing the spell with the scroll (SRD Spell Scroll). Null when the spell is
+ * cast (or no scroll was read), else the line the table reads.
+ */
+function scrollReadAsReaction(answer: Answer, declared: DefinitionAction): EffectNarration | null {
+  const { state, commandId, reactor, scope, deps } = answer;
+  const scroll = scrollOfAction(declared, reactor.inventory, deps.catalog);
+  if (!scroll) return null;
+  reactor.inventory = withOneUsedUp(reactor.inventory, scroll.row.id);
+  const definition = reactor.definitionId ? deps.resolveDefinition(reactor.definitionId) : undefined;
+  const reading = scrollReading(definition, scroll.spell, deps.catalog);
+  if (!reading.readable || reading.check === null) return null;
+  const check = scrollCheckOf(reading.check, scroll.spell.name);
+  const plan = checkPlan(reactor, definition, deriveEquipment(reactor, definition, deps.catalog), check.subject);
+  const rolled = rollSettledCheck(
+    state,
+    reactor,
+    plan,
+    {
+      id: deps.newRollId(),
+      commandId,
+      sessionId: scope.role === "player" ? scope.sessionId : deps.gmSessionId,
+      role: scope.role,
+      label: check.label,
+      visibility: reactor.visibility === "gm-only" ? "gm-only" : "public",
+      createdAt: deps.now()
+    },
+    deps.random
+  );
+  return rolled.total >= reading.check.dc
+    ? null
+    : { kind: "reaction", text: scrollLostLine(reactor.name, scroll.spell.name), actorId: reactor.id };
+}
+
 /** Parry or Shield: the attack stopped at its roll. "use" spends the reaction and what the action costs and raises AC
  *  (against this attack, or until the reactor's next turn); either answer then finishes the attack with the same die,
  *  and a hit's damage lands. */
@@ -380,6 +420,9 @@ function answerParkedAttack(answer: Answer): ReactionOutcome {
 
   clearPrompt(false);
   let effectName: string | null = null;
+  // Whether the AC rises: the reaction is used, and a scroll it was read from didn't lose the spell.
+  let raised = use;
+  let scrollLost: EffectNarration | null = null;
   if (use) {
     const definition = reactor.definitionId ? deps.resolveDefinition(reactor.definitionId) : undefined;
     const siblings = effectiveActions(definition, reactor, deps.catalog);
@@ -397,7 +440,9 @@ function answerParkedAttack(answer: Answer): ReactionOutcome {
       siblings
     );
     commitEconomy({ state, attacker: reactor, input: {}, plan: economy.plan, overridden: economy.overridden });
-    if (parked.untilNextTurn && pending.acBonus !== null) {
+    scrollLost = scrollReadAsReaction(answer, declared);
+    raised = scrollLost === null;
+    if (raised && parked.untilNextTurn && pending.acBonus !== null) {
       // Lasts until the reactor's next turn starts, so later attacks this round meet it too.
       effectName = addEffect(
         state,
@@ -437,7 +482,7 @@ function answerParkedAttack(answer: Answer): ReactionOutcome {
       attackBonusDice: parked.bonusDice,
       ...(parked.hitOptions.length > 0 ? { hitOptions: parked.hitOptions } : {}),
       economyPaid: true,
-      ...(use && effectName === null && pending.acBonus !== null
+      ...(raised && effectName === null && pending.acBonus !== null
         ? { reactionAcBonus: { amount: pending.acBonus, source: pending.actionName } }
         : {})
     },
@@ -478,7 +523,7 @@ function answerParkedAttack(answer: Answer): ReactionOutcome {
     appliedDamage,
     other: { id: attacker.id, name: attacker.name },
     resolution,
-    events,
+    events: scrollLost ? [scrollLost, ...events] : events,
     ...detailOf(application)
   };
 }
