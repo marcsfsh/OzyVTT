@@ -690,6 +690,8 @@ export function createServer(options: CreateServerOptions) {
         presence.connect(gm.sessionId, "gm");
         acknowledge({ ok: true, role: "gm", sessionId: gm.sessionId });
         broadcast();
+        // The board too, so a GM device that (re)joins never waits for the next change to see it.
+        socket.emit("sound:changed", sound.view());
         return;
       }
       const existingPlayer = auth.verifyPlayer(token);

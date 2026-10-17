@@ -53,13 +53,19 @@ async function boot() {
   return { ...booted, gm, json, upload, command, playerToken, pairScreen };
 }
 
-async function joinSocket(base: string, token: string) {
+/** A joined socket; with `expect`, also waits for the first such event the join brings. `heard` collects the name
+ *  of every event the socket is sent, from before it joins. */
+async function joinSocket(base: string, token: string, options: Readonly<{ expect?: string; heard?: string[] }> = {}) {
   const socket = connect(base, { auth: { token }, transports: ["websocket"], reconnection: false, forceNew: true });
+  if (options.heard) socket.onAny((event: string) => options.heard!.push(event));
   await new Promise<void>((resolve, reject) => {
     socket.once("connect", () => resolve());
     socket.once("connect_error", reject);
   });
+  const arrived = options.expect ? new Promise((resolve) => socket.once(options.expect!, resolve)) : Promise.resolve();
   await new Promise((resolve) => socket.emit("session:join", { token }, resolve));
+  // A GM's join brings the board straight away, so the device never waits for the next change to see it.
+  await arrived;
   cleanups.push(() => void socket.close());
   return socket;
 }
@@ -156,12 +162,9 @@ describe("the sound board", () => {
 
   it("reaches the GM's devices only: a player's socket is never sent it", async () => {
     const test = await boot();
-    const gm = await joinSocket(test.base, test.gmToken);
-    const player = await joinSocket(test.base, test.playerToken);
-    const playerHeard: unknown[] = [];
-    player.on("sound:changed" as never, (view: unknown) => {
-      playerHeard.push(view);
-    });
+    const gm = await joinSocket(test.base, test.gmToken, { expect: "sound:changed" });
+    const playerHeard: string[] = [];
+    const player = await joinSocket(test.base, test.playerToken, { heard: playerHeard });
     const playerBoard = await new Promise<Record<string, unknown>>((resolve) =>
       (player as Socket).emit("sound:board", {}, resolve)
     );
@@ -174,7 +177,9 @@ describe("the sound board", () => {
     expect((await heard).board.ambient).toEqual([expect.objectContaining({ assetId: sound.id, playing: null })]);
     await test.command("sound/play", { target: "ambient", assetId: sound.id });
     await new Promise((resolve) => setTimeout(resolve, 100));
-    expect(playerHeard).toEqual([]);
+    // The player's socket heard the game, never the sound board.
+    expect(playerHeard).toContain("state:updated");
+    expect(playerHeard.filter((event) => event.startsWith("sound"))).toEqual([]);
   });
 });
 
