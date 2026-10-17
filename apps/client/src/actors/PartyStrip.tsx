@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { rosterActors, type GmActor, type GmView, type PlayerActor, type PlayerView } from "@vtt/domain";
 import { Avatar, Button } from "@vtt/ui";
-import { CharacterSheet } from "../encounter/CharacterSheet";
+import { CharacterSheet } from "../sheet/CharacterSheet";
 import { navigate } from "../router";
 import { CLAIM_WORD, claimStateOf, classLine, hpLabel, presenceDot, presenceLabel } from "./actor-display";
 import { partyVisibilityOf } from "./MyCharacter";

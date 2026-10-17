@@ -1,0 +1,234 @@
+/* The pickers that open over a sheet or the table: equipment, spells, a heal's target and what is readied. The
+   roll-mode tag and notes mark a roll the rules give Advantage or Disadvantage. */
+.sheet-picker-controls {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: 0.6rem;
+}
+.sheet-picker-search {
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+.sheet-picker-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+/* Paint grows to 44px: these chips wrap .3rem apart, so an overhang would steal from neighbours
+   beside and above. */
+.sheet-picker-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  padding: 0.22rem 0.7rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  color: var(--text-muted);
+  font: 700 var(--fs-2xs)/1 var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+}
+.sheet-picker-chip.is-active {
+  color: var(--text);
+  background: color-mix(in srgb, var(--cyan) 22%, var(--surface-3));
+  border-color: color-mix(in srgb, var(--cyan) 50%, transparent);
+}
+/* `.scroll-y` is in equipment.tsx's markup. The 52vh cap bounds a modal layer, which is allowed. */
+.sheet-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.2rem;
+  max-height: 52vh;
+}
+/* `min-width: 0` lets the item shrink, so a long word cannot widen the list at 375px. */
+.sheet-picker-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: var(--space-2) 0.4rem;
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+.sheet-picker-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.sheet-picker-name {
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+.sheet-picker-owned {
+  color: var(--cyan);
+  font: 700 var(--fs-2xs)/1 var(--font-numeric);
+}
+.sheet-picker-meta {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+/* One clamped line (where rarity and attunement are). A line clamp, not `white-space: nowrap`, which
+   sizes the flex item to the whole entry and makes the list scroll sideways. */
+.sheet-picker-desc {
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.sheet-picker-add {
+  flex-shrink: 0;
+  padding: 0.28rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--cyan) 45%, var(--line-strong));
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+.sheet-picker-add:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.sheet-picker-empty {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  padding: var(--space-4) 0;
+  text-align: center;
+}
+.sheet-picker-attribution {
+  margin: 0.6rem 0 0;
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+  line-height: 1.4;
+}
+/* Advantage or Disadvantage the rules give a roll, marked on its button; the reason is in its accessible name and
+   in the notes under the scores. `span.` outweighs the ability cell's and skill row's own span rules. */
+span.roll-mode-tag {
+  display: inline-block;
+  margin-left: var(--space-1);
+  padding: 0.12rem 0.3rem;
+  border-left: 3px solid;
+  font: 800 var(--fs-2xs)/1 var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.roll-mode-tag.is-advantage {
+  border-left-color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 14%, transparent);
+  color: var(--cyan-hi);
+}
+.roll-mode-tag.is-disadvantage {
+  border-left-color: var(--caution);
+  background: color-mix(in srgb, var(--caution) 14%, transparent);
+  color: var(--caution-hi);
+}
+.sheet-roll-notes {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.sheet-roll-notes li {
+  padding: 0.2rem var(--space-2);
+  border-left: 3px solid var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 10%, transparent);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.sheet-roll-notes li.is-disadvantage {
+  border-left-color: var(--caution);
+  background: color-mix(in srgb, var(--caution) 10%, transparent);
+}
+.sheet-roll-notes strong {
+  color: var(--text);
+}
+/* Who a heal outside a fight lands on. The chips wrap with a gap that keeps each 44px target its own. */
+.heal-picker-ask {
+  margin: 0 0 var(--space-3);
+  color: var(--text-muted);
+}
+.heal-picker-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.heal-picker-targets > .sheet-picker-chip {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.heal-picker-spend {
+  margin-top: var(--space-4);
+}
+/* The spell pickers: one full-width row per spell, at least 44px tall; the modal's body scrolls the list. */
+.spell-choice-search {
+  width: 100%;
+  margin-bottom: var(--space-2);
+}
+.spell-choice-ask,
+.spell-choice-empty {
+  margin: 0 0 var(--space-3);
+  color: var(--text-muted);
+}
+.spell-choice-head {
+  margin: var(--space-3) 0 var(--space-2);
+}
+.spell-choice-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+.spell-choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.spell-choice-row:hover,
+.spell-choice-row:focus-visible {
+  border-color: var(--line-strong);
+  background: var(--surface-3);
+}
+.spell-choice-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+.spell-choice-detail {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}

@@ -1,5 +1,6 @@
 import type { ActorDerivedSheet } from "@vtt/domain";
 import { rollModeNotes, type RollModeSummary } from "./roll-mode-notes";
+import "./pickers.css";
 
 /** Marks a roll button the rules give Advantage or Disadvantage; the reason is in the button's accessible name. */
 export function RollModeTag({ mode }: Readonly<{ mode?: RollModeSummary | null }>) {

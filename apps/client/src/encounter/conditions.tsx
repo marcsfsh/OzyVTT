@@ -9,7 +9,7 @@ import "./conditions.css";
 type ConditionInstance = Actor["conditions"][number];
 
 /** The shared 16×16 SRD condition glyph as a chip-sized icon (inherits the chip's tone color). */
-const conditionIcon = (id: string) => {
+export const conditionIcon = (id: string) => {
   const d = CONDITION_GLYPHS[id];
   return d ? (
     <svg viewBox="0 0 16 16" width="1em" height="1em" aria-hidden="true">
@@ -18,7 +18,7 @@ const conditionIcon = (id: string) => {
   ) : undefined;
 };
 /** SRD conditions are debuffs (harmful); invisibility is a spell-flavored effect (magical). */
-const conditionTone = (id: string): ChipTone => (id === "invisible" ? "magical" : "harmful");
+export const conditionTone = (id: string): ChipTone => (id === "invisible" ? "magical" : "harmful");
 
 /**
  * One shared fetch of the 15 SRD condition names and texts. Failures are never cached, so a
@@ -74,11 +74,11 @@ export function healthBandFor(
   return exact.current <= 0 ? "down" : exact.current * 2 <= exact.maximum ? "bloodied" : "healthy";
 }
 
-const labelFor = (instance: ConditionInstance, reference: readonly ContentConditionSummary[]) => {
+export const labelFor = (instance: ConditionInstance, reference: readonly ContentConditionSummary[]) => {
   const name = reference.find((entry) => entry.id === instance.id)?.name ?? instance.id;
   return instance.id === "exhaustion" && instance.level !== undefined ? `${name} ${instance.level}` : name;
 };
-const descriptionFor = (id: string, reference: readonly ContentConditionSummary[]) =>
+export const descriptionFor = (id: string, reference: readonly ContentConditionSummary[]) =>
   reference.find((entry) => entry.id === id)?.description ?? "";
 
 /** The conditions' display names ("Prone", "Exhaustion 3"), in the order the actor carries them. */
@@ -116,7 +116,88 @@ export function ConditionText({ text }: Readonly<{ text: string }>) {
 }
 
 /** What links a condition: the effect holding it, when one does (its name says where it came from). */
-type LinkingEffect = Readonly<{ name: string; linkedConditionIds: readonly string[]; escapeDc: number | null }>;
+export type LinkingEffect = Readonly<{ name: string; linkedConditionIds: readonly string[]; escapeDc: number | null }>;
+
+/**
+ * The commands a condition chip sends: set or clear a condition (a level for Exhaustion), and a player's question to
+ * the GM about one imposed on them. `onCleared` hears which condition came off, so an open detail can close.
+ */
+export function useConditionCommands(
+  actorId: string,
+  onFeedback: (text: string) => void,
+  onCleared?: (conditionId: string) => void
+) {
+  const [busy, setBusy] = useState(false);
+  const send = (conditionId: string, active: boolean, level?: number) => {
+    setBusy(true);
+    const payload = { actorId, conditionId, active, ...(level !== undefined ? { level } : {}) };
+    void command("actor:set-condition", payload).then((result) => {
+      setBusy(false);
+      if (!result.ok) {
+        onFeedback(result.message ?? "The condition could not be updated.");
+        return;
+      }
+      if (!active) onCleared?.(conditionId);
+    });
+  };
+  const ask = (conditionId: string) => {
+    setBusy(true);
+    void command("rules:ask", {
+      type: "actor.set-condition",
+      payload: { commandId: newId(), actorId, conditionId, active: false }
+    }).then((result) => {
+      setBusy(false);
+      if (!result.ok) onFeedback(result.message ?? "That question could not be sent.");
+      else onFeedback(result.ran ? "Done. No question was needed." : "Asked the GM. Waiting for their call.");
+    });
+  };
+  return { busy, send, ask };
+}
+
+/** Every SRD condition as a chip that puts it on or takes it off, with Exhaustion's 1 to 6 level beside it. */
+export function ConditionPicker({
+  conditions,
+  busy,
+  onSet
+}: Readonly<{
+  conditions: readonly ConditionInstance[];
+  busy: boolean;
+  onSet: (conditionId: string, active: boolean, level?: number) => void;
+}>) {
+  const reference = useConditionReference();
+  const activeById = new Map(conditions.map((instance) => [instance.id, instance]));
+  return (
+    <div className="condition-picker" role="group" aria-label="Conditions">
+      {reference.map((entry) => {
+        const instance = activeById.get(entry.id);
+        return (
+          <span key={entry.id} className="condition-option">
+            <Chip
+              tone={conditionTone(entry.id)}
+              icon={conditionIcon(entry.id)}
+              pressed={instance !== undefined}
+              disabled={busy}
+              title={entry.description}
+              onClick={() => onSet(entry.id, instance === undefined, undefined)}
+            >
+              {entry.name}
+            </Chip>
+            {entry.id === "exhaustion" && instance && (
+              <Stepper
+                value={instance.level ?? 1}
+                min={1}
+                max={6}
+                disabled={busy}
+                aria-label="Exhaustion level"
+                onChange={(level) => onSet("exhaustion", true, level)}
+              />
+            )}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
 
 /**
  * Chips plus a toggleable picker for whoever may edit this actor (the server still enforces scope).
@@ -144,34 +225,12 @@ export function ConditionEditor({
 }>) {
   const reference = useConditionReference();
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [shown, setShown] = useState<string | null>(null);
   const activeById = new Map(conditions.map((instance) => [instance.id, instance]));
   const shownInstance = shown === null ? undefined : activeById.get(shown);
-
-  const send = (conditionId: string, active: boolean, level?: number) => {
-    setBusy(true);
-    const payload = { actorId, conditionId, active, ...(level !== undefined ? { level } : {}) };
-    void command("actor:set-condition", payload).then((result) => {
-      setBusy(false);
-      if (!result.ok) {
-        onFeedback(result.message ?? "The condition could not be updated.");
-        return;
-      }
-      if (!active && conditionId === shown) setShown(null);
-    });
-  };
-  const ask = (conditionId: string) => {
-    setBusy(true);
-    void command("rules:ask", {
-      type: "actor.set-condition",
-      payload: { commandId: newId(), actorId, conditionId, active: false }
-    }).then((result) => {
-      setBusy(false);
-      if (!result.ok) onFeedback(result.message ?? "That question could not be sent.");
-      else onFeedback(result.ran ? "Done - no question needed." : "Asked the GM. Waiting for their call.");
-    });
-  };
+  const { busy, send, ask } = useConditionCommands(actorId, onFeedback, (conditionId) => {
+    if (conditionId === shown) setShown(null);
+  });
 
   return (
     <div className="condition-editor">
@@ -222,43 +281,13 @@ export function ConditionEditor({
           onClose={() => setShown(null)}
         />
       )}
-      {open && (
-        <div className="condition-picker" role="group" aria-label="Conditions">
-          {reference.map((entry) => {
-            const instance = activeById.get(entry.id);
-            return (
-              <span key={entry.id} className="condition-option">
-                <Chip
-                  tone={conditionTone(entry.id)}
-                  icon={conditionIcon(entry.id)}
-                  pressed={instance !== undefined}
-                  disabled={busy}
-                  title={entry.description}
-                  onClick={() => send(entry.id, instance === undefined, undefined)}
-                >
-                  {entry.name}
-                </Chip>
-                {entry.id === "exhaustion" && instance && (
-                  <Stepper
-                    value={instance.level ?? 1}
-                    min={1}
-                    max={6}
-                    disabled={busy}
-                    aria-label="Exhaustion level"
-                    onChange={(level) => send("exhaustion", true, level)}
-                  />
-                )}
-              </span>
-            );
-          })}
-        </div>
-      )}
+      {open && <ConditionPicker conditions={conditions} busy={busy} onSet={send} />}
     </div>
   );
 }
 
 /** One condition opened from its chip: what it does, what holds it, and the way to end it this viewer has. */
-function ConditionDetail({
+export function ConditionDetail({
   instance,
   label,
   text,

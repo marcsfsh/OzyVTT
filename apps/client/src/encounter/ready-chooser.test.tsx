@@ -114,7 +114,7 @@ describe("the Ready action on a player's turn", () => {
     await user.click(await screen.findByRole("button", { name: "Ready" }));
     await user.click(screen.getByRole("button", { name: /An action or a move/ }));
     const refusal = await screen.findByText("Wren has already used an action this turn.");
-    const list = screen.getByText(/Your actions/);
+    const list = screen.getByRole("group", { name: "Common actions" });
     expect(refusal.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(revealInRegion).toHaveBeenCalledWith(
       expect.objectContaining({ className: "action-runner player-actions" }),

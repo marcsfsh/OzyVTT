@@ -33,7 +33,7 @@ import { GameStateSchema, type GmView, type PlayerView } from "@vtt/domain";
 import { RestAnswerSchema, RestAskSchema, RestMarkDoneSchema, RestPartySchema } from "@vtt/domain/commands";
 import { ToastProvider } from "@vtt/ui";
 import { socket } from "../socket";
-import { SheetRest } from "../encounter/SheetRest";
+import { RestButtons } from "../sheet/PlayTab";
 import { PartyRest as RestDialog } from "./PartyRest";
 import { ShortRestPrompt } from "./ShortRestPrompt";
 
@@ -175,19 +175,19 @@ describe("a player's rests", () => {
 
   it("the sheet asks the GM for a Long Rest instead of taking one, and can take the ask back", async () => {
     const user = userEvent.setup();
-    const { rerender } = render(<SheetRest actorId={TORVA} role="player" onFeedback={() => {}} />);
-    expect(screen.queryByRole("button", { name: "Long rest" })).toBeNull();
-    await user.click(screen.getByRole("button", { name: "Ask for a long rest" }));
+    const { rerender } = render(<RestButtons actorId={TORVA} role="player" asked={false} onFeedback={() => {}} />);
+    expect(screen.queryByRole("button", { name: "Long Rest" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Ask for a Long Rest" }));
     const [event, payload] = emitted().at(-1)!;
     expect(event).toBe("rest:ask");
     expect(RestAskSchema.parse({ ...payload, ...COMMAND })).toEqual({ ...COMMAND, actorId: TORVA });
-    rerender(<SheetRest actorId={TORVA} role="player" asked onFeedback={() => {}} />);
-    expect(screen.getByText("Long rest asked")).toBeTruthy();
+    rerender(<RestButtons actorId={TORVA} role="player" asked onFeedback={() => {}} />);
+    expect(screen.getByText("Long Rest asked")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Take back" }));
     expect(emitted().at(-1)![1]).toMatchObject({ actorId: TORVA, withdraw: true });
   });
 
-  it("the party's Short Rest shows the player's Hit Dice and a Done button", async () => {
+  it("the party's Short Rest shows the player's Hit Point Dice and a Done button", async () => {
     const user = userEvent.setup();
     const view = {
       revision: 3,
@@ -207,8 +207,8 @@ describe("a player's rests", () => {
         <ShortRestPrompt state={view} />
       </ToastProvider>
     );
-    const prompt = screen.getByRole("region", { name: "Short rest for Torva" });
-    expect(within(prompt).getByText("Hit Dice 3/7 (d12)")).toBeTruthy();
+    const prompt = screen.getByRole("region", { name: "Short Rest for Torva" });
+    expect(within(prompt).getByText("3 of 7 d12")).toBeTruthy();
     await user.click(within(prompt).getByRole("button", { name: "Done" }));
     const [event, payload] = emitted().at(-1)!;
     expect(event).toBe("rest:mark-done");

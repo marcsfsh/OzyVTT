@@ -114,12 +114,12 @@ export function PlayerShell({
     /* The player Codex owns its frame: a rail beside chrome rows over one scrolling region. */
     case "codex":
       return <PlayerCodex token={token} />;
-    /* My character, the player's first tab; it carries the release verb. */
+    /* My character, the player's first tab: the claimed character's sheet, whose menu carries the release verb. */
     case "mine":
       return (
         <MyCharacter
           state={state}
-          onOpenSheet={(actorId) => navigate(`/characters/${actorId}`)}
+          token={token}
           onCreateCharacter={() => navigate("/builder")}
           onLevel={(actorId) => navigate(`/characters/${actorId}/level`)}
           onGoToTable={() => navigate("/table")}

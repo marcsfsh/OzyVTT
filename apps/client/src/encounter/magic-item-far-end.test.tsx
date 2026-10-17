@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { loadEquipment } from "@vtt/content-srd-5.2.1";
@@ -21,7 +21,7 @@ vi.mock("../socket", () => {
 import { socket } from "../socket";
 import { EquipmentPicker } from "./equipment";
 import { ToastProvider } from "@vtt/ui";
-import { CharacterSheet } from "./CharacterSheet";
+import { CharacterSheet } from "../sheet/CharacterSheet";
 
 /**
  * A GM adds `Wand of the War Mage, +1` and its rarity and attunement requirement appear on screen,
@@ -50,6 +50,11 @@ function serveCatalog() {
     }
   );
 }
+
+afterEach(() => localStorage.clear());
+/** Opens the sheet's Gear tab, where the inventory and its picker live. */
+const openGear = async (user: ReturnType<typeof userEvent.setup>) =>
+  user.click(await screen.findByRole("tab", { name: "Gear" }));
 
 /** A real imported PC, so the sheet renders its Inventory section rather than the "no sheet yet" note. */
 const DEFINITION = ActorDefinitionSchema.parse(loadActorFixture("player-character"));
@@ -132,14 +137,18 @@ describe("the far end of the magic-item ETL", () => {
     };
     const holding = { ...ACTOR, inventory: [stored] } as unknown as PlayerActor;
     render(<CharacterSheet actor={holding} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    const user = userEvent.setup();
+    await openGear(user);
 
-    const row = screen.getByText("Wand of the War Mage, +1").closest(".sheet-inv-row") as HTMLElement;
+    const row = screen.getByText("Wand of the War Mage, +1").closest("button") as HTMLElement;
     expect(row).toBeTruthy();
     // The rendered row on the sheet carries the SRD rarity and attunement requirement for this tier.
     expect(row.textContent).toContain("Wand, Uncommon (Requires Attunement by a Spellcaster).");
-    expect(row.textContent).toContain("While holding this wand, you gain a bonus to spell attack rolls");
-    // The Attune control the requirement is asking about is on the same row.
-    expect(within(row).getByRole("button", { name: "Attune" })).toBeTruthy();
+    // Its detail holds the whole entry, and the Attune control the requirement is asking about.
+    await user.click(row);
+    const detail = within(screen.getByRole("region", { name: "Wand of the War Mage, +1" }));
+    expect(detail.getByText(/While holding this wand, you gain a bonus to spell attack rolls/)).toBeTruthy();
+    expect(detail.getByRole("button", { name: "Attune" })).toBeTruthy();
   });
 
   it("makes all 270 magic rows reachable without scrolling a 400-row list", async () => {
@@ -309,6 +318,7 @@ describe("the wire seam - the real sheet ships the pick", () => {
     const emits = captureEmits();
     render(<CharacterSheet actor={ACTOR} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
     const user = userEvent.setup();
+    await openGear(user);
     await user.click(await screen.findByRole("button", { name: "Browse SRD gear" }));
     await user.type(await screen.findByRole("searchbox", { name: "Search equipment" }), "Weapon, +1");
     await user.click(screen.getByRole("button", { name: "Add Weapon, +1" }));
@@ -344,6 +354,7 @@ describe("the wire seam - the real sheet ships the pick", () => {
     const holding = { ...ACTOR, inventory: [bound] } as unknown as PlayerActor;
     render(<CharacterSheet actor={holding} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
     const user = userEvent.setup();
+    await openGear(user);
     await user.click(await screen.findByRole("button", { name: "Browse SRD gear" }));
     await user.type(await screen.findByRole("searchbox", { name: "Search equipment" }), "Weapon, +1");
     await user.click(screen.getByRole("button", { name: "Add Weapon, +1" }));
@@ -373,6 +384,8 @@ describe("the wire seam - the real sheet ships the pick", () => {
     const holding = { ...ACTOR, inventory: [legacy] } as unknown as PlayerActor;
     render(<CharacterSheet actor={holding} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
     const user = userEvent.setup();
+    await openGear(user);
+    await user.click(await screen.findByText("Weapon, +2"));
     // The bound-base display is absent and the one sheet-side chooser is offered instead.
     await user.click(await screen.findByRole("button", { name: "Choose what it is" }));
     await user.click(await screen.findByRole("button", { name: "Make it a Warhammer" }));

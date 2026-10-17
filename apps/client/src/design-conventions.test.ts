@@ -109,8 +109,6 @@ const rawInput = (type: string) => new RegExp(`<input\\b[^>]*type="${type}"`, "g
 /** Raw number inputs still to move to `NumberField`; each is a compact inline field the primitive's steppers would crowd. */
 const RAW_NUMBER_ALLOW: readonly string[] = [
   "apps/client/src/encounter/GmInitiativeRow.tsx",
-  "apps/client/src/encounter/SheetIdentityEditor.tsx",
-  "apps/client/src/encounter/SheetInventory.tsx",
   // The X and Y of a point and the focus zoom.
   "apps/client/src/viewer/ViewerControls.tsx",
   "apps/client/src/viewer/ViewerControls.tsx",
@@ -293,13 +291,10 @@ const VIEWPORT_UNIT = /\b\d+(?:\.\d+)?(?:d|s)?vh\b/g;
 
 /** Values that are not caps on in-flow content, with the reason. */
 const VIEWPORT_ALLOW: ReadonlyArray<readonly [file: string, values: readonly string[], why: string]> = [
-  [
-    "apps/client/src/encounter/character-sheet.css",
-    ["52vh", "94vh"],
-    "caps on modal layers (the sheet and its picker)"
-  ],
+  ["apps/client/src/encounter/pickers.css", ["52vh"], "the cap on a picker's list in its modal"],
   ["apps/client/src/encounter/fight-menu.css", ["85vh"], "the cap on the fixed fight menu"],
   ["apps/client/src/encounter/monster-browser.css", ["92vh"], "the cap on the monster browser modal"],
+  ["apps/client/src/sheet/sheet.css", ["92dvh"], "the cap on the sheet's dialog"],
   ["apps/client/src/shell/landing.css", ["4vh", "3.5vh", "4.5vh"], "clamp() middle terms for the landing's spacing"],
   ["apps/client/src/viewer/viewer.css", ["32vh"], "the shared screen's portrait initiative band"]
 ];

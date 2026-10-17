@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button, Modal, Stepper } from "@vtt/ui";
+import "./pickers.css";
 
 /** A heal used outside a fight, waiting for who it lands on. */
 export type LooseHeal = Readonly<{

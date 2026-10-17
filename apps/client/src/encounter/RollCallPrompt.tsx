@@ -7,7 +7,7 @@ import { useRollPreference } from "../dice/roll-preference";
 import { command } from "../lib/command";
 import { FaceEntry, RerollControl } from "./RollControls";
 import { SavePrompt } from "./SavePrompt";
-import { checkLine } from "./useSheetRolls";
+import { checkLine } from "../sheet/useSheetRolls";
 import "../dice/roll-calls.css";
 
 type Entry = PlayerRollCall["entries"][number];

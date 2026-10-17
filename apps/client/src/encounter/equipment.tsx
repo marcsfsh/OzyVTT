@@ -6,6 +6,7 @@ import { registerContentCache } from "../content/invalidate";
 import { titleCase } from "./format";
 import { useSpellReference } from "./spells";
 import { withArticle } from "@vtt/domain";
+import "./pickers.css";
 
 /**
  * One shared, session-cached fetch of the equipment catalog, so every sheet browses the same list.

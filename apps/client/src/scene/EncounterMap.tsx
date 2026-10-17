@@ -14,7 +14,7 @@ import type {
   VisionPreviewReply
 } from "@vtt/domain";
 import { Button, useToastMute } from "@vtt/ui";
-import { CharacterSheet } from "../encounter/CharacterSheet";
+import { CharacterSheet } from "../sheet/CharacterSheet";
 import { read } from "../lib/command";
 import { useTargeting } from "../encounter/targeting";
 import { FogOverlay } from "./FogOverlay";

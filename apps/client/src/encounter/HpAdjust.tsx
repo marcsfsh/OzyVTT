@@ -10,7 +10,7 @@ import "./hp-adjust.css";
 export type HpControl = "damage" | "nonlethal" | "heal" | "temp" | "set" | "max" | "revive";
 
 const LABELS: Record<HpControl, { label: string; title?: string }> = {
-  damage: { label: "Dmg", title: "Apply as damage (or press Enter)" },
+  damage: { label: "Damage", title: "Apply as damage (or press Enter)" },
   nonlethal: {
     label: "KO",
     title: "Nonlethal damage - a drop to 0 knocks out (Unconscious and stable) instead of dying"
@@ -34,6 +34,7 @@ export function HpAdjust({
   damageType,
   onDamageTypeChange,
   autoFocus = false,
+  typed = true,
   onEscape,
   onFeedback
 }: Readonly<{
@@ -45,6 +46,8 @@ export function HpAdjust({
   damageType?: string | null;
   onDamageTypeChange?: (type: string | null) => void;
   autoFocus?: boolean;
+  /** False where the row has no room for the damage type; the full controls elsewhere carry it. */
+  typed?: boolean;
   onEscape?: () => void;
   onFeedback: (text: string) => void;
 }>) {
@@ -137,7 +140,7 @@ export function HpAdjust({
         </button>
       ))}
       {/* Below the buttons, which already fill this row at 375px: `DamageTypeField` takes its own line. */}
-      {(controls.includes("damage") || controls.includes("nonlethal")) && (
+      {typed && (controls.includes("damage") || controls.includes("nonlethal")) && (
         <DamageTypeField value={chosenType} disabled={busy} onChange={chooseType} />
       )}
     </div>

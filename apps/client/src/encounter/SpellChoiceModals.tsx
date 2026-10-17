@@ -1,19 +1,17 @@
 import { useState } from "react";
 import type { ContentSpellSummary, SpellChoices } from "@vtt/domain";
 import { Button, Input, Modal } from "@vtt/ui";
+import "./pickers.css";
 
 /** A spell's name and level, from the SRD reference (its id when the reference hasn't loaded). */
-type Named = Readonly<{ id: string; name: string; level: number }>;
-const namedFrom = (index: ReadonlyMap<string, ContentSpellSummary>) => (id: string) => {
+export type Named = Readonly<{ id: string; name: string; level: number }>;
+export const namedFrom = (index: ReadonlyMap<string, ContentSpellSummary>) => (id: string) => {
   const spell = index.get(id);
   return { id, name: spell?.name ?? id, level: spell?.level ?? 0 };
 };
 
-/** SRD "Copying a Spell into the Book": 2 hours and 50 GP for each level of the spell. */
-export const copyCostLine = (level: number) => `${2 * level} hours, ${50 * level} GP`;
-
 /** A searchable list of spells by level, each one tap. */
-function SpellList({
+export function SpellList({
   spells,
   detail,
   onPick
@@ -153,119 +151,6 @@ export function SpellSwapModal({
             {swap.classId === "wizard" ? "From your spellbook:" : `${swap.className} spells you have slots for:`}
           </p>
           <SpellList spells={swap.spellIds.map(named)} onPick={setIncoming} />
-        </>
-      )}
-    </Modal>
-  );
-}
-
-/** A Spell Scroll in the pack whose spell could go in the spellbook. */
-export type CopyableScroll = Readonly<{ itemId: string; spellId: string }>;
-
-/**
- * Adding to a Wizard's spellbook: `add` takes one of the spells the Wizard's levels give, free; `copy` copies one from a
- * Spell Scroll in the pack (an Intelligence (Arcana) check, and the scroll is used up) or, for the GM, from another
- * spellbook, each for 2 hours and 50 GP a level.
- */
-export function SpellbookModal({
-  mode,
-  spellbook,
-  scrolls,
-  gm,
-  spellIndex,
-  busy,
-  onAdd,
-  onClose
-}: Readonly<{
-  mode: "add" | "copy";
-  spellbook: NonNullable<SpellChoices["spellbook"]>;
-  scrolls: readonly CopyableScroll[];
-  gm: boolean;
-  spellIndex: ReadonlyMap<string, ContentSpellSummary>;
-  busy: boolean;
-  onAdd: (spellId: string, from: "level" | "scroll" | "book", itemId?: string) => void;
-  onClose: () => void;
-}>) {
-  const named = namedFrom(spellIndex);
-  const [picked, setPicked] = useState<Readonly<{
-    spell: Named;
-    from: "level" | "scroll" | "book";
-    itemId?: string;
-  }> | null>(null);
-  const addable = spellbook.addable.map(named);
-  const title = mode === "add" ? "Add to your spellbook" : "Copy a spell";
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      size="lg"
-      accent="violet"
-      title={picked ? picked.spell.name : title}
-      ariaLabel={picked ? `${mode === "add" ? "Add" : "Copy"} ${picked.spell.name}` : title}
-      footer={
-        picked ? (
-          <>
-            <Button variant="ghost" onClick={() => setPicked(null)}>
-              Back
-            </Button>
-            <Button disabled={busy} onClick={() => onAdd(picked.spell.id, picked.from, picked.itemId)}>
-              {mode === "add" ? "Add" : "Copy"}
-            </Button>
-          </>
-        ) : undefined
-      }
-    >
-      {picked ? (
-        <p className="spell-choice-ask">
-          {picked.from === "level"
-            ? `${picked.spell.name} goes in your spellbook as one of the spells your Wizard levels give.`
-            : picked.from === "scroll"
-              ? `Copying takes ${copyCostLine(picked.spell.level)}, and an Intelligence (Arcana) check against DC ${10 + picked.spell.level}. The scroll is destroyed either way.`
-              : `Copying from the other book takes ${copyCostLine(picked.spell.level)}.`}
-        </p>
-      ) : mode === "add" ? (
-        <>
-          <p className="spell-choice-ask">
-            {spellbook.freeLeft} more from your Wizard levels, up to level {spellbook.maxLevel}.
-          </p>
-          <SpellList spells={addable} onPick={(spell) => setPicked({ spell, from: "level" })} />
-        </>
-      ) : (
-        <>
-          <h4 className="spell-choice-head">From a Spell Scroll you carry</h4>
-          {scrolls.length === 0 ? (
-            <p className="spell-choice-empty">No scroll in your pack holds a Wizard spell you can copy.</p>
-          ) : (
-            <ul className="spell-choice-list">
-              {scrolls.map((scroll) => {
-                const spell = named(scroll.spellId);
-                return (
-                  <li key={scroll.itemId}>
-                    <button
-                      type="button"
-                      className="spell-choice-row"
-                      onClick={() => setPicked({ spell, from: "scroll", itemId: scroll.itemId })}
-                    >
-                      <span className="spell-choice-name">{spell.name}</span>
-                      <span className="spell-choice-detail">
-                        Level {spell.level} · {copyCostLine(spell.level)}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-          {gm && (
-            <>
-              <h4 className="spell-choice-head">From another spellbook</h4>
-              <SpellList
-                spells={addable}
-                detail={(spell) => `Level ${spell.level} · ${copyCostLine(spell.level)}`}
-                onPick={(spell) => setPicked({ spell, from: "book" })}
-              />
-            </>
-          )}
         </>
       )}
     </Modal>

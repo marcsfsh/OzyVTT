@@ -4,7 +4,7 @@ import { Avatar, Badge, Button, Eyebrow, Modal, RevealSwitch, useToast } from "@
 import { useConfirm } from "../components/feedback";
 import { JoinAddress } from "../components/JoinAddress";
 import { navigate } from "../router";
-import { CharacterSheet } from "../encounter/CharacterSheet";
+import { CharacterSheet } from "../sheet/CharacterSheet";
 import { PdfImportModal } from "./PdfImportModal";
 import { RandomCharacterModal } from "../builder/RandomCharacter";
 import { identityOf, ledgerOf } from "../builder/level-ledger";
