@@ -352,8 +352,8 @@ const CLASSIFICATION = [
   "  statistic reaches the rolls.",
   "- **Monster traits, conditions and the rules glossary:** curated by hand, each with a note.",
   "",
-  "Records the engine handles in code, which the data can't show, are curated too (`RECORD_OVERRIDES`), and each",
-  "group lists their notes after its records."
+  "Records the data can't classify, because the engine handles them in code or their data applies only part of",
+  "what they do, are curated too (`RECORD_OVERRIDES`). Each group lists their notes after its records."
 ];
 
 export function renderSrdCoverage(): string {
