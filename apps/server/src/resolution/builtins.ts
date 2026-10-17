@@ -1,12 +1,10 @@
-import { d20TestFormula, parseDiceFormula, resolveDice, type RiderAbility } from "@vtt/rules-5e";
+import { d20FacesFor } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
-import { checkRollMode } from "../ability-checks.js";
-import { exhaustionPenalty } from "../condition-rules.js";
+import { checkPlan, totalCheck, type CheckSubject } from "../ability-checks.js";
 import { addEffect, endEffect, makeEffect } from "../effects.js";
-import { checkRiderBonus } from "../equipment-derivation.js";
 import { CommandRejectedError } from "../game-store.js";
-import { createPendingSaves, saveModifierFor } from "../saving-throws.js";
-import { abilityModifier, naturalFace, recordRoll, type DefinitionAction, type ResolveContext } from "./context.js";
+import { createPendingSaves, saveModifierFor, shownRollMode } from "../saving-throws.js";
+import { abilityModifier, recordRoll, type DefinitionAction, type ResolveContext } from "./context.js";
 
 /** What the declarative action vocabulary can't express about a builtin action (`builtin-actions.ts`),
  *  one hook per moment of a resolve. A hook runs only for an action taken from the builtin catalog, so a
@@ -27,60 +25,70 @@ export type BuiltinHandler = Readonly<{
   atMostOneSizeLarger?: boolean;
 }>;
 
-type CheckNarrowing = Readonly<{ ability: RiderAbility; skill?: string }>;
-
-/** Skill bonus from the untyped open5e extension when the import carries one (mirrors saveModifierFor). */
-function skillBonusFromExtension(definition: ActorDefinition | undefined, skill: string): number | null {
-  const extension = definition?.extensions["open5e.srd-2024"];
-  if (extension && typeof extension === "object") {
-    const bonus = (extension as { skills?: Record<string, unknown> }).skills?.[skill];
-    if (typeof bonus === "number" && Number.isInteger(bonus) && bonus >= -20 && bonus <= 30) return bonus;
-  }
-  return null;
-}
-
-/** One d20 plus `modifier`, Exhaustion and the check-bonus riders, with `roll-mode {roll: "check"}` riders, both
- *  narrowed to the check's ability and skill (Boots of Elvenkind on Hide) as the sheet's rows are, recorded like
- *  any roll. Null success: no DC, the GM adjudicates. */
-function rollCheck(
-  ctx: ResolveContext,
-  label: string,
-  narrow: CheckNarrowing,
-  modifier: number,
-  dc: number | null
-): boolean | null {
-  const total = modifier + exhaustionPenalty(ctx.attacker) + checkRiderBonus(ctx.derivation, narrow);
-  const aggregated = checkRollMode(ctx.derivation, narrow);
-  if (aggregated.mode !== "normal") ctx.rollMode = aggregated;
-  const resolution = resolveDice(parseDiceFormula(d20TestFormula(aggregated.mode, total)), ctx.deps.random);
-  recordRoll(ctx, resolution, "check");
-  const success = dc === null ? null : resolution.total >= dc;
-  ctx.check = { skill: label, total: resolution.total, naturalRoll: naturalFace(resolution), dc, success };
+/**
+ * One ability check through the sheet's own plan (`checkPlan`): the skill's proficiency or Expertise, Jack of All
+ * Trades, a stat block's printed skill, check riders, Exhaustion, Reliable Talent, and the Advantage or Disadvantage
+ * the rules give (items, armor's Stealth, Poisoned, Frightened), recorded like any roll. The GM's explicit roll mode
+ * wins. Null success: no DC, the GM adjudicates.
+ */
+function rollCheck(ctx: ResolveContext, subject: CheckSubject, dc: number | null): boolean | null {
+  const plan = checkPlan(ctx.attacker, ctx.deps.definition, ctx.derivation, subject);
+  const forced = ctx.input.rollMode ?? undefined;
+  const mode = forced ?? plan.rollMode.mode;
+  ctx.rollMode = shownRollMode(plan.rollMode, forced);
+  const roll = totalCheck(plan, d20FacesFor(mode, [], ctx.deps.random), mode, ctx.deps.random);
+  recordRoll(ctx, roll.resolution, "check", undefined, { total: roll.total });
+  const success = dc === null ? null : roll.total >= dc;
+  ctx.check = { skill: plan.label, total: roll.total, naturalRoll: roll.natural, dc, success };
   return success;
 }
 
-/** An SRD [Action] resolved as a plain check: the ability modifier, or the skill bonus when the import
- *  carries one. */
-function skillCheck(label: string, narrow: CheckNarrowing, dc: number | null) {
-  return (ctx: ResolveContext): boolean | null => {
-    const definition = ctx.deps.definition;
-    const skillBonus = narrow.skill ? skillBonusFromExtension(definition, narrow.skill) : null;
-    return rollCheck(ctx, label, narrow, skillBonus ?? abilityModifier(definition, narrow.ability), dc);
-  };
+/** The skills an SRD [Action] check may use, and the ability each goes with: Search's are Wisdom (Insight, Medicine,
+ *  Perception, Survival), Study's Intelligence (Arcana, History, Investigation, Nature, Religion), Influence's Charisma
+ *  (Deception, Intimidation, Performance, Persuasion) or Wisdom (Animal Handling). */
+export const BUILTIN_CHECK_SKILLS: Readonly<Record<string, Readonly<Record<string, CheckSubject["ability"]>>>> = {
+  search: { insight: "wis", medicine: "wis", perception: "wis", survival: "wis" },
+  study: { arcana: "int", history: "int", investigation: "int", nature: "int", religion: "int" },
+  influence: { deception: "cha", intimidation: "cha", performance: "cha", persuasion: "cha", "animal-handling": "wis" }
+};
+
+/** The check a Search, Study or Influence makes: the chosen skill with its ability, or the action's own ability alone
+ *  when no skill fits (the SRD tables only suggest skills). */
+function chosenSubject(ctx: ResolveContext, ability: CheckSubject["ability"]): CheckSubject {
+  const skills = BUILTIN_CHECK_SKILLS[ctx.action.id] ?? {};
+  const skill = ctx.input.skill ?? undefined;
+  if (skill === undefined) return { ability };
+  const skillAbility = skills[skill];
+  if (skillAbility === undefined)
+    throw new CommandRejectedError(`${ctx.action.name} uses ${Object.keys(skills).join(", ")}, not ${skill}.`);
+  return { ability: skillAbility, skill };
 }
 
-const hideCheck = skillCheck("Dexterity (Stealth)", { ability: "dex", skill: "stealth" }, 15);
+/** SRD Search and Study: the GM sets the DC and adjudicates. */
+const searchOrStudy = (ability: CheckSubject["ability"]) => (ctx: ResolveContext) => {
+  rollCheck(ctx, chosenSubject(ctx, ability), null);
+};
 
-/** SRD Hide: on a success, Invisible while hidden; attacking ends it (`releaseHideAndReady`). */
+/** SRD Influence: "a default DC equal to 15 or the monster's Intelligence score, whichever is higher", so a monster
+ *  picked as the target sets it; with none, the GM does. Attitude (Friendly, Hostile) stays the GM's call. */
+function influence(ctx: ResolveContext): void {
+  const monster = ctx.targets[0];
+  const monsterDefinition = monster?.definitionId ? ctx.deps.resolveDefinition?.(monster.definitionId) : undefined;
+  const dc = monsterDefinition ? Math.max(15, monsterDefinition.abilityScores.int) : null;
+  rollCheck(ctx, chosenSubject(ctx, "cha"), dc);
+}
+
+/** SRD Hide: a DC 15 Dexterity (Stealth) check. On a success, Invisible while hidden; attacking ends it
+ *  (`releaseHideAndReady`). The total is the DC to find the creature, so the effect names it. */
 function hide(ctx: ResolveContext): void {
-  if (hideCheck(ctx) !== true) return;
+  if (rollCheck(ctx, { ability: "dex", skill: "stealth" }, 15) !== true) return;
   const { state, attacker, input, deps } = ctx;
   const effect = addEffect(
     state,
     attacker.id,
     makeEffect({
       id: `${input.commandId}:hide`,
-      name: "Hiding",
+      name: `Hiding (DC ${ctx.check!.total} to find)`,
       tags: ["hidden"],
       sourceActorId: attacker.id,
       sourceName: attacker.name,
@@ -95,8 +103,8 @@ function hide(ctx: ResolveContext): void {
   ctx.effectGranted = { name: effect.name, tags: effect.tags };
 }
 
-/** SRD Grappling: the better of Athletics and Acrobatics against the holding effect's escape DC; success
- *  ends the effect and its linked Grappled/Restrained. */
+/** SRD Grappling: a Strength (Athletics) or Dexterity (Acrobatics) check against the holding effect's escape DC, the
+ *  one asked for or else the better bonus; success ends the effect and its linked Grappled/Restrained. */
 function escapeGrapple(ctx: ResolveContext): void {
   const { state, attacker, input, deps } = ctx;
   const escapable =
@@ -104,19 +112,17 @@ function escapeGrapple(ctx: ResolveContext): void {
     attacker.effects.find((effect) => effect.escapeDc !== null);
   if (!escapable || escapable.escapeDc === null)
     throw new CommandRejectedError("No escapable effect (one with an escape DC) is active on this combatant.");
-  const athletics = skillBonusFromExtension(deps.definition, "athletics") ?? abilityModifier(deps.definition, "str");
-  const acrobatics = skillBonusFromExtension(deps.definition, "acrobatics") ?? abilityModifier(deps.definition, "dex");
-  // Rider roll modes narrow to whichever of the two skills won.
-  const narrow: CheckNarrowing =
-    athletics >= acrobatics ? { ability: "str", skill: "athletics" } : { ability: "dex", skill: "acrobatics" };
-  const success = rollCheck(
-    ctx,
-    "Escape (Athletics/Acrobatics)",
-    narrow,
-    Math.max(athletics, acrobatics),
-    escapable.escapeDc
-  );
-  if (success) {
+  const athletics: CheckSubject = { ability: "str", skill: "athletics" };
+  const acrobatics: CheckSubject = { ability: "dex", skill: "acrobatics" };
+  if (input.skill && input.skill !== "athletics" && input.skill !== "acrobatics")
+    throw new CommandRejectedError("Escaping a grapple uses Athletics or Acrobatics.");
+  const better =
+    checkPlan(attacker, deps.definition, ctx.derivation, athletics).modifier >=
+    checkPlan(attacker, deps.definition, ctx.derivation, acrobatics).modifier
+      ? athletics
+      : acrobatics;
+  const subject = input.skill === "athletics" ? athletics : input.skill === "acrobatics" ? acrobatics : better;
+  if (rollCheck(ctx, subject, escapable.escapeDc)) {
     endEffect(state, attacker.id, escapable.id);
     ctx.effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name: escapable.name });
   }
@@ -171,10 +177,9 @@ function unarmedSave(failure: "grappled" | "prone" | "pushed") {
 
 const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
   hide: { check: hide },
-  // Influence, Search and Study: the GM sets the DC and adjudicates the outcome.
-  influence: { check: skillCheck("Charisma (Influence)", { ability: "cha" }, null) },
-  search: { check: skillCheck("Wisdom (Search)", { ability: "wis" }, null) },
-  study: { check: skillCheck("Intelligence (Study)", { ability: "int" }, null) },
+  influence: { check: influence },
+  search: { check: searchOrStudy("wis") },
+  study: { check: searchOrStudy("int") },
   "escape-grapple": { check: escapeGrapple },
 
   /** Strength + Proficiency Bonus to hit, then flat 1 + Strength Bludgeoning damage. */

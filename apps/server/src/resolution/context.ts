@@ -51,6 +51,8 @@ export type ResolveInput = Readonly<{
   attackTotal?: number;
   /** Explicit "this was a natural 20" (critical hit) for the hand-entered-total path. Ignored when a natural is supplied. */
   critical?: boolean;
+  /** The skill a builtin check is made with (Influence, Search, Study, Escape a Grapple). */
+  skill?: string | null;
   /** How this attack is made, for `attack-kind-is` riders. Melee/ranged/thrown are derived; opportunity and
    *  reaction can't be, so `reactions.ts` announces them here. */
   attackKinds?: readonly AttackKind[];
@@ -167,12 +169,14 @@ export type ResolveContext = {
 };
 
 /** Records one rolled formula in the shared history, attributed like every roll of this resolve; `label` names a die
- *  that is not the action's own (Bless's d4). */
+ *  that is not the action's own (Bless's d4). `total` stands in for the dice's own sum where a rule changes it
+ *  (Reliable Talent's 10). */
 export function recordRoll(
   ctx: ResolveContext,
   resolution: DiceResolution,
   purpose: RollRecord["purpose"],
-  label?: string
+  label?: string,
+  extra: Readonly<{ total?: number }> = {}
 ): void {
   const record: RollRecord = {
     ...ctx.rollBase,
@@ -182,7 +186,7 @@ export function recordRoll(
     formula: resolution.expression.source,
     normalizedFormula: resolution.expression.normalized,
     ...rolledTerms(resolution),
-    total: resolution.total
+    total: extra.total ?? resolution.total
   };
   recordRollInHistory(ctx.state, record);
 }

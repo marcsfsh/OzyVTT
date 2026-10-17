@@ -1504,14 +1504,26 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       "DISPLAY ONLY, and the sheet's single source for every number beside a roll button. Derived from the actor's LIVE loadout with the same functions the resolver uses, so a chip cannot disagree with the roll it starts - a circlet's granted expertise and an amulet's save bonus are already inside these numbers. Present on every response; a client should still tolerate its absence so it can talk to an older server. It rides this REQUEST rather than the broadcast game-state projection on purpose: this endpoint already authorizes its caller for one named actor, so the block is never even computed for an actor the caller may not see.",
     "derived.armorClass": "Live AC, already reconciled against worn armour and item riders",
     "derived.initiative": "Live initiative bonus including item riders",
-    "derived.abilities[].check": "Ability-check bonus INCLUDING item check-bonus riders",
-    "derived.abilities[].checkWithProficiency":
-      "The same check plus proficiency, for a GM-called check against no named skill",
+    "derived.abilities[].check":
+      "The ability-check bonus the server rolls: item check-bonus riders and Exhaustion included",
+    "derived.abilities[].checkMode":
+      "Advantage or Disadvantage the rules give this ability's checks, with what grants each side (Poisoned, armor worn without training, Hex)",
     "derived.abilities[].save": "The save the server will actually roll, minus only per-save cover",
+    "derived.abilities[].saveMode": "Advantage or Disadvantage the rules give this save, with its sources",
     "derived.abilities[].saveFromItems": "The equipment share of `save`, so a sheet can say where the bonus came from",
+    "derived.abilities[].saveAutoFails":
+      "The condition that makes a Strength or Dexterity save fail without a roll (Paralyzed, Stunned); null otherwise",
     "derived.skills[].tier": "The EFFECTIVE tier: the sheet's base tier raised by any item grant",
-    "derived.skills[].bonus": "Null only when the skill names no ability, the one case a sheet cannot roll it",
+    "derived.skills[].bonus":
+      "What the server adds to the d20 (proficiency or Expertise, Jack of All Trades, a stat block's printed skill, riders, Exhaustion). Null only when the skill names no ability, the one case a sheet cannot roll it",
     "derived.skills[].sources": 'Item names that raised the tier, e.g. ["Circlet of Shadows"]',
+    "derived.skills[].mode": "Advantage or Disadvantage the rules give this skill's checks, with its sources",
+    "derived.skills[].reliableTalent": "A d20 of 9 or lower counts as 10 on this check (Reliable Talent)",
+    "derived.tools":
+      "The tools the character is proficient with that the SRD names an ability for, each with its check bonus",
+    "derived.passivePerception":
+      "10 plus the Wisdom (Perception) bonus, 5 more with Advantage on such checks or 5 less with Disadvantage",
+    "derived.speedFeet": "Speed now, before Dash: Exhaustion, Slow, heavy armor and Speed-0 conditions included",
     "derived.defences":
       "The damage defences in force outside any one hit, as the damage pipeline applies them: the stat block's, chosen features', items' and effects'. Petrified and underwater resistance are added per hit and are not listed.",
     "derived.defences.resistances[].type": DEFENCE_TYPE,

@@ -354,6 +354,14 @@ export const ActionResolveSchema = z
     attackTotal: z.number().int().min(-50).max(100).optional(),
     /** Declares a natural 20 (critical hit) for the hand-entered-total path, where the natural die can't be inferred. */
     critical: z.boolean().optional(),
+    /** The skill a check action is made with: Influence (Deception, Intimidation, Performance, Persuasion or Animal
+     *  Handling), Search (Insight, Medicine, Perception or Survival) or Study (Arcana, History, Investigation, Nature or
+     *  Religion). */
+    skill: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(60)
+      .optional(),
     /** Push mastery (SRD "up to 10 feet"): how far to push on this hit, 0 to decline; absent pushes the full 10. */
     pushFeet: z.number().int().min(0).max(10).multipleOf(5).optional(),
     /** The spell slot to cast with (upcasting rolls that slot's dice); absent, the spell's own level, else the lowest

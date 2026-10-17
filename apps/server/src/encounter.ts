@@ -6,6 +6,7 @@ import type {
   RuleExceptions,
   RuleMode
 } from "@vtt/domain";
+import { abilityCheckClaims } from "./ability-checks.js";
 import { assertNotArchived } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
 import { aggregateRollMode } from "@vtt/rules-5e";
@@ -72,9 +73,10 @@ export type InitiativeRollDeps = Readonly<{
 
 /**
  * The roll mode and penalty of one combatant's initiative (a Dexterity check, so a D20 Test). Advantage comes
- * from `roll-mode {roll: "initiative"}` riders (Feral Instinct, items) and Invisible; Disadvantage from riders,
- * Surprise and any Incapacitated condition. 2024 cancellation applies via `aggregateRollMode`: any Advantage
- * plus any Disadvantage is a normal roll. Exhaustion takes 2 per level off the total.
+ * from `roll-mode {roll: "initiative"}` riders (Feral Instinct, items), Dexterity check riders and Invisible;
+ * Disadvantage from those riders, Surprise, any Incapacitated condition, Poisoned and Frightened. 2024 cancellation
+ * applies via `aggregateRollMode`: any Advantage plus any Disadvantage is a normal roll. Exhaustion takes 2 per level
+ * off the total.
  */
 export function initiativeRollFor(
   state: GameState,
@@ -85,7 +87,14 @@ export function initiativeRollFor(
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) return { mode: "normal", penalty: 0, reasons: [] };
   const definition = actor.definitionId ? deps.resolveDefinition?.(actor.definitionId) : undefined;
-  const claims = rollModeClaims(deriveEquipment(actor, definition, deps.catalog), ["initiative"], "on-initiative-roll");
+  const derivation = deriveEquipment(actor, definition, deps.catalog);
+  const claims = rollModeClaims(derivation, ["initiative"], "on-initiative-roll");
+  // Initiative is a Dexterity check, so what the rules give Dexterity checks reaches it (Poisoned, Frightened, Hex). A
+  // carrier that also names initiative itself (armor worn without training) counts once.
+  const asCheck = abilityCheckClaims(actor, derivation, { ability: "dex" });
+  for (const side of ["advantage", "disadvantage"] as const)
+    for (const claim of asCheck[side])
+      if (!claims[side].some((held) => held.label === claim.label)) claims[side].push(claim);
   if (actor.conditions.some((condition) => condition.id === "invisible"))
     claims.advantage.push({ source: "invisible", label: "Invisible" });
   if (surprised) claims.disadvantage.push({ source: "surprised", label: "Surprised" });

@@ -189,6 +189,9 @@ What a save does is data on the action's save block, not read from its descripti
 (half or none) and the `failureCondition` a failed save imposes. They are written where the content
 is made (the SRD build, the builder, homebrew) and copied onto the pending save prompt.
 
+Every ability check, from a sheet chip or a builtin action, comes from one plan (`checkPlan` in
+`ability-checks.ts`), so the number a sheet shows is the bonus the server rolls with.
+
 How strictly rules are enforced is table policy (`GameState.rulesPolicy`): enforce, advise or
 off, with per-family exceptions (`rules-families.ts`). A player blocked by a rule can ask the GM
 (`rules.ask`); the GM allows or denies and the parked command replays with an override of that

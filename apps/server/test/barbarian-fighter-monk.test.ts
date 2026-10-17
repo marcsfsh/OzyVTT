@@ -811,7 +811,7 @@ describe("Champion: Remarkable Athlete changes the initiative die", () => {
       deps(champion, [4, 18])
     );
     expect(escaped.check).toMatchObject({
-      skill: "Escape (Athletics/Acrobatics)",
+      skill: "Strength (Athletics)",
       naturalRoll: 18,
       dc: 20,
       success: true

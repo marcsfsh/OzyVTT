@@ -148,6 +148,7 @@ export const actionCommands = [
             attackNatural,
             attackTotal,
             critical,
+            ...(request.skill !== undefined ? { skill: request.skill } : {}),
             ...(request.pushFeet !== undefined ? { pushFeet: request.pushFeet } : {}),
             ...(request.slotLevel !== undefined ? { slotLevel: request.slotLevel } : {}),
             ...(request.damageType !== undefined ? { damageType: request.damageType } : {}),

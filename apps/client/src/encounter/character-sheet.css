@@ -632,8 +632,7 @@
   align-items: center;
   gap: 0.1rem;
 }
-/* `align-self: stretch` spans the pair across the ability cell; `flex-wrap` stacks them when the cell
-   is too narrow for two 44px buttons. */
+/* `align-self: stretch` spans the check across the ability cell. */
 .sheet-ability-rolls {
   display: flex;
   flex-wrap: wrap;
@@ -641,8 +640,7 @@
   gap: var(--space-1);
   margin-top: 0.2rem;
 }
-/* Paint grows to 44px: these sit 4px apart in a tight grid, so an overhang would swallow the partner
-   and the cell above. */
+/* Paint grows to 44px: these sit 4px apart in a tight grid, so an overhang would swallow the cell above. */
 .sheet-ability-rolls button {
   display: inline-flex;
   align-items: center;
@@ -660,16 +658,6 @@
 }
 .sheet-ability-rolls button:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
-}
-.sheet-ability-rolls button.prof {
-  color: var(--magenta);
-}
-.sheet-ability-rolls button.prof em {
-  font-style: normal;
-  font-size: 0.62em;
-  opacity: 0.8;
-  margin-left: 0.1em;
-  vertical-align: super;
 }
 .sheet-ability-rolls button:disabled {
   opacity: 0.55;

@@ -18,6 +18,7 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { recordRoll as recordRollInHistory, rolledTerms } from "./roll-history.js";
 import { requireGm, type Initiator } from "./authorization.js";
+import { holdsFeature } from "./class-features.js";
 import { applyDamageDetailed, previewDamage, adjustableActor } from "./hit-points.js";
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
@@ -174,17 +175,7 @@ export function saveTotalFor(
  * trait of that name on the sheet.
  */
 export function hasEvasion(definition: ActorDefinition | undefined): boolean {
-  if (!definition) return false;
-  if ((definition.character?.features ?? []).some((feature) => feature.id === "evasion")) return true;
-  return Object.values(definition.extensions ?? {}).some((bag) => {
-    const traits = bag !== null && typeof bag === "object" ? (bag as { traits?: unknown }).traits : undefined;
-    return (
-      Array.isArray(traits) &&
-      traits.some(
-        (trait) => trait !== null && typeof trait === "object" && (trait as { name?: unknown }).name === "Evasion"
-      )
-    );
-  });
+  return holdsFeature(definition, "evasion", "Evasion");
 }
 
 /** Create one pending save per target when a save action resolves. Called inside the action:resolve mutation. */
@@ -347,6 +338,24 @@ function recordSaveRoll(
     total: resolution.total,
     createdAt: base.createdAt
   });
+}
+
+/** How a roll card names a mode the GM forced. */
+export const GM_CHOICE = "GM's choice";
+
+/** The roll mode a roll card shows: the rules' count with its sources, or the GM's forced choice named as such;
+ *  absent for a plain d20. */
+export function shownRollMode(
+  aggregated: AggregatedRollMode,
+  forced: "advantage" | "disadvantage" | "normal" | undefined
+): AggregatedRollMode | undefined {
+  if (forced === undefined) return aggregated.mode === "normal" ? undefined : aggregated;
+  if (forced === "normal") return undefined;
+  return {
+    mode: forced,
+    advantage: forced === "advantage" ? [GM_CHOICE] : [],
+    disadvantage: forced === "disadvantage" ? [GM_CHOICE] : []
+  };
 }
 
 /** Answers a pending save (roll or typed total) and auto-applies it: fail takes full damage and the

@@ -321,7 +321,7 @@ describe("Boots of Elvenkind make a Stealth check keep the higher die", () => {
       { face: 17, kept: true }
     ]);
     // The success half moved with it: Hiding grants the Invisible-linked effect.
-    expect(state.actors[0].effects.map((effect) => effect.name)).toEqual(["Hiding"]);
+    expect(state.actors[0].effects.map((effect) => effect.name)).toEqual(["Hiding (DC 19 to find)"]);
   });
 
   it("takes the boots off and the SAME queue gives one d20 and a failure", () => {

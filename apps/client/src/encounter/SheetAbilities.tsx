@@ -42,7 +42,6 @@ export function SheetAbilities({
           // difference is item `check-bonus` riders, which the client cannot see (rule 2).
           const row = derivedAbility(ability);
           const mod = row?.check ?? modifierOf(score);
-          const withProf = row?.checkWithProficiency ?? modifierOf(score) + definition.proficiencyBonus;
           return (
             <div key={ability} className="sheet-ability">
               <span>{ability.toUpperCase()}</span>
@@ -55,16 +54,6 @@ export function SheetAbilities({
                   onClick={() => void rollD20(mod, "check", `${ability.toUpperCase()} check`)}
                 >
                   {signed(mod)}
-                </button>
-                <button
-                  type="button"
-                  className="prof"
-                  disabled={rolling}
-                  title={`Roll a ${ability.toUpperCase()} check WITH proficiency (for a GM-called custom/unnamed check)`}
-                  onClick={() => void rollD20(withProf, "check", `${ability.toUpperCase()} check w/ proficiency`)}
-                >
-                  {signed(withProf)}
-                  <em>P</em>
                 </button>
               </div>
             </div>

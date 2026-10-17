@@ -4,21 +4,23 @@ import type {
   ActorDerivedSheet,
   ContentSkillSummary,
   DerivedAbilityRow,
-  DerivedSkillRow
+  DerivedSkillRow,
+  DerivedToolRow
 } from "@vtt/domain";
-import { abilityModifier, collectRiders, sumRiders } from "@vtt/rules-5e";
+import { aggregateRollMode, collectRiders, sumRiders } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
+import { checkPlan, passivePerception, toolAbility, toolProficiencies, type CheckNames } from "./ability-checks.js";
 import {
-  checkRiderBonus,
-  effectiveSkillTier,
   EMPTY_DERIVATION,
   skillTierSources,
   type EquipmentCatalog,
   type EquipmentDerivation
 } from "./equipment-derivation.js";
 import { choiceOverrideDefenses } from "./choice-overrides.js";
+import { autoFailsPhysicalSaves } from "./condition-rules.js";
 import { standingDefences } from "./hit-points.js";
-import { saveTotalFor } from "./saving-throws.js";
+import { saveRollSources, saveTotalFor } from "./saving-throws.js";
+import { currentSpeedFeet } from "./speed.js";
 
 /**
  * The numbers a character sheet shows next to its roll buttons, derived server-side with the same
@@ -42,45 +44,58 @@ export function deriveActorSheet(
   definition: ActorDefinition | undefined,
   derivation: EquipmentDerivation,
   skills: readonly ContentSkillSummary[],
-  catalog?: Pick<EquipmentCatalog, "featureRecord">
+  catalog?: Partial<Pick<EquipmentCatalog, "featureRecord" | "equipmentRecord">>
 ): ActorDerivedSheet {
-  const scores = definition?.abilityScores;
   const proficiencyBonus = definition?.proficiencyBonus ?? 0;
   const proficientSaves = new Set(definition?.proficiencies?.saves ?? []);
+  const names: CheckNames = {
+    skill: (id) => skills.find((skill) => skill.id === id)?.name,
+    tool: (id) => catalog?.equipmentRecord?.(id)?.name
+  };
 
   const abilities = ABILITIES.map((ability): DerivedAbilityRow => {
-    const modifier = scores ? abilityModifier(scores[ability]) : 0;
-    const check = modifier + checkRiderBonus(derivation, { ability });
+    const check = checkPlan(actor, definition, derivation, { ability }, { names });
     // The save the resolver would roll. Cover is excluded: it belongs to one attack's line of sight.
     const save = saveTotalFor(definition, actor, ability, derivation);
+    const saveSources = saveRollSources(actor, ability, derivation);
     return {
       ability,
-      check,
-      checkWithProficiency: check + proficiencyBonus,
+      check: check.modifier,
+      checkMode: check.rollMode,
       save,
+      saveMode: aggregateRollMode(saveSources.advantage, saveSources.disadvantage),
       // An item-granted save proficiency shows on the proficiency dot too.
       saveProficient: proficientSaves.has(ability) || derivation.saves.some((entry) => entry.id === ability),
       // The equipment's share, isolated by re-asking with the empty derivation so there is one sum.
-      saveFromItems: save - saveTotalFor(definition, actor, ability, EMPTY_DERIVATION)
+      saveFromItems: save - saveTotalFor(definition, actor, ability, EMPTY_DERIVATION),
+      saveAutoFails: ability === "str" || ability === "dex" ? autoFailsPhysicalSaves(actor) : null
     };
   });
 
   const derivedSkills = skills.map((skill): DerivedSkillRow => {
     const ability = (skill.ability ?? null) as AbilityId | null;
-    const tier = effectiveSkillTier(definition, derivation, skill.id);
-    const override = definition?.proficiencies?.skillOverrides?.[skill.id];
-    let bonus: number | null = null;
-    if (typeof override === "number") {
-      // A GM-typed total replaces the base, but item riders still apply on top.
-      bonus = override + (ability ? checkRiderBonus(derivation, { ability, skill: skill.id }) : 0);
-    } else if (ability && scores) {
-      const multiplier = tier === "expertise" ? 2 : tier === "proficient" ? 1 : 0;
-      bonus =
-        abilityModifier(scores[ability]) +
-        proficiencyBonus * multiplier +
-        checkRiderBonus(derivation, { ability, skill: skill.id });
-    }
-    return { id: skill.id, name: skill.name, ability, tier, bonus, sources: skillTierSources(derivation, skill.id) };
+    const plan = ability ? checkPlan(actor, definition, derivation, { ability, skill: skill.id }, { names }) : null;
+    return {
+      id: skill.id,
+      name: skill.name,
+      ability,
+      tier: skillTier(definition, derivation, skill.id),
+      bonus: plan?.modifier ?? null,
+      sources: skillTierSources(derivation, skill.id),
+      mode: plan?.rollMode ?? { mode: "normal", advantage: [], disadvantage: [] },
+      reliableTalent: plan?.reliableTalent ?? false
+    };
+  });
+
+  // Tools the SRD gives an ability ("Ability: Dexterity"); a proficiency the catalog can't name has no check to roll.
+  const tools = toolProficiencies(definition, derivation).flatMap((id): DerivedToolRow[] => {
+    const record = catalog?.equipmentRecord?.(id);
+    const ability = toolAbility(record?.description);
+    if (!record || !ability) return [];
+    const plan = checkPlan(actor, definition, derivation, { ability, tool: id }, { names });
+    return [
+      { id, name: record.name, ability, bonus: plan.modifier, mode: plan.rollMode, reliableTalent: plan.reliableTalent }
+    ];
   });
 
   return {
@@ -94,6 +109,11 @@ export function deriveActorSheet(
     initiative: (definition?.initiativeBonus ?? 0) + derivation.initiative,
     abilities,
     skills: derivedSkills,
+    tools,
+    passivePerception: passivePerception(
+      checkPlan(actor, definition, derivation, { ability: "wis", skill: "perception" }, { names })
+    ),
+    speedFeet: currentSpeedFeet(actor, derivation),
     defences: standingDefences(
       definition,
       choiceOverrideDefenses(definition, actor.choiceOverrides, catalog?.featureRecord),
@@ -107,4 +127,20 @@ export function deriveActorSheet(
     // The SRD's three, plus what an `attunement-slots` rider adds (Use Magic Device).
     attunementSlots: 3 + derivation.attunementSlots
   };
+}
+
+/** The skill's effective tier, for the proficiency dot: the sheet's base raised by any item grant, and a monster's
+ *  printed skill (its stat block lists only the skills it is proficient in). */
+function skillTier(
+  definition: ActorDefinition | undefined,
+  derivation: EquipmentDerivation,
+  skillId: string
+): DerivedSkillRow["tier"] {
+  const base = definition?.proficiencies?.skills.find((entry) => entry.id === skillId)?.proficiency ?? "none";
+  const tiers = [base, ...derivation.skills.filter((entry) => entry.id === skillId).map((entry) => entry.proficiency)];
+  if (tiers.includes("expertise")) return "expertise";
+  if (tiers.includes("proficient")) return "proficient";
+  const printed = (definition?.extensions["open5e.srd-2024"] as { skills?: Record<string, unknown> } | undefined)
+    ?.skills?.[skillId];
+  return definition?.proficiencies === undefined && typeof printed === "number" ? "proficient" : "none";
 }

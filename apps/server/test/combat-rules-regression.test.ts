@@ -1574,7 +1574,10 @@ describe("SRD generic actions - builtin catalog (rules glossary [Action] entries
     game.combat = { ...game.combat, turn: { ...game.combat.turn, actionUsed: false, actionInstance: null } };
     const strike = resolve(game, pipDefinition, "rapier", { actorId: IDS.pip, targetIds: [IDS.croc1] }, [2, 18, 5]);
     expect(strike.rollMode?.advantage).toContain("Attacker is Invisible");
-    expect(strike.effectsEnded).toEqual([{ actorId: IDS.pip, actorName: "Pip Underbough", name: "Hiding" }]);
+    // The effect names the total, the DC to find Pip (SRD Hide).
+    expect(strike.effectsEnded).toEqual([
+      { actorId: IDS.pip, actorName: "Pip Underbough", name: "Hiding (DC 16 to find)" }
+    ]);
     expect(pip.conditions.some((condition) => condition.id === "invisible")).toBe(false);
   });
 
