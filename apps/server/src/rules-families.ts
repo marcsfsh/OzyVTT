@@ -74,6 +74,8 @@ const RULE_FAMILIES = {
   // Hunter's Mark and Hex move only once the marked creature drops to 0 Hit Points.
   "target.mark-still-standing": "targeting",
   "cover.total": "targeting",
+  // SRD Hide: out of any enemy's line of sight, which dynamic vision can tell.
+  "hide.seen": "targeting",
   // Cleave's second creature: another one, within 5 feet of the first.
   "attack.cleave-same-target": "targeting",
   "attack.cleave-too-far": "targeting",

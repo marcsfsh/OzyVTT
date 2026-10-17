@@ -97,6 +97,8 @@ describe("rule families", () => {
       // Hunter's Mark and Hex move from a creature at 0 Hit Points only: whom the action may target.
       ["target.mark-still-standing", "targeting"],
       ["cover.total", "targeting"],
+      // Hiding in an enemy's sight: where the creature stands relative to the others, like cover.
+      ["hide.seen", "targeting"],
       ["condition.charmed-charmer", "targeting"],
       ["target.too-many", "targeting"],
       ["attack.cleave-same-target", "targeting"],
