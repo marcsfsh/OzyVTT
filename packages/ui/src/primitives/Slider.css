@@ -1,0 +1,75 @@
+/* A level slider: label, track, value. The input itself is 44px tall, so the whole row is the finger target, and the
+   track is drawn inside it. Square like every surface; the filled part is the selection colour. */
+.nh-slider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--text-dim);
+  font: 600 var(--fs-sm) / 1.3 var(--font-label);
+}
+.nh-slider-label {
+  flex: none;
+}
+.nh-slider-input {
+  --nh-slider-track: 6px;
+  --nh-slider-thumb: 18px;
+  flex: 1;
+  min-width: 6rem;
+  height: var(--tap-min);
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  appearance: none;
+  touch-action: pan-y;
+}
+.nh-slider-input:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+.nh-slider-input::-webkit-slider-runnable-track {
+  height: var(--nh-slider-track);
+  border: 1px solid var(--line-strong);
+  background: linear-gradient(90deg, var(--cyan) var(--nh-slider-fill), var(--surface-3) var(--nh-slider-fill));
+}
+.nh-slider-input::-moz-range-track {
+  height: var(--nh-slider-track);
+  border: 1px solid var(--line-strong);
+  background: linear-gradient(90deg, var(--cyan) var(--nh-slider-fill), var(--surface-3) var(--nh-slider-fill));
+}
+.nh-slider-input::-webkit-slider-thumb {
+  width: var(--nh-slider-thumb);
+  height: var(--nh-slider-thumb);
+  margin-top: calc((var(--nh-slider-track) - var(--nh-slider-thumb)) / 2 - 1px);
+  border: 2px solid var(--cyan);
+  background: var(--text);
+  appearance: none;
+}
+.nh-slider-input::-moz-range-thumb {
+  width: var(--nh-slider-thumb);
+  height: var(--nh-slider-thumb);
+  border: 2px solid var(--cyan);
+  border-radius: 0;
+  background: var(--text);
+}
+.nh-slider-value {
+  flex: none;
+  min-width: 4ch;
+  color: var(--text);
+  text-align: end;
+}
+/* Dimmed part by part, never with group opacity, per DESIGN.md. */
+.nh-slider--disabled {
+  color: var(--text-muted);
+}
+.nh-slider--disabled .nh-slider-input {
+  cursor: not-allowed;
+}
+.nh-slider--disabled .nh-slider-input::-webkit-slider-thumb {
+  border-color: var(--line-strong);
+  background: var(--text-muted);
+}
+.nh-slider--disabled .nh-slider-input::-moz-range-thumb {
+  border-color: var(--line-strong);
+  background: var(--text-muted);
+}
