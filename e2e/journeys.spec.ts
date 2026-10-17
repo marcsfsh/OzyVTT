@@ -291,16 +291,20 @@ test("a player answers the GM's call with a physical die, then rerolls it with H
 }) => {
   const hero = PARTY[2];
   const player = await open("/");
-  await joinAndClaim(player, hero);
+  await ensureGmPassword(player.request);
   // The GM's side is the API: this journey is about the player's card.
   const { token } = (
     await (await player.request.post("/api/v1/host/gm/sign-in", { data: { password: GM_PASSWORD } })).json()
   ).data;
   const headers = { authorization: `Bearer ${token}` };
   const { game } = (await (await player.request.get("/api/v1/game", { headers })).json()).data;
-  const actorId = game.actors.find((actor: { name: string }) => actor.name === hero).id;
+  const { id: actorId, ownerSessionId } = game.actors.find((actor: { name: string }) => actor.name === hero);
   const gm = (path: string, data: Record<string, unknown>) =>
     player.request.post(path, { headers, data: { commandId: randomUUID(), ...data } });
+  // An earlier journey's player may still hold the character: the GM frees it for this player.
+  if (ownerSessionId)
+    expect((await gm(`/api/v1/game/claims/${actorId}/force-release`, { actorId, inFight: true })).ok()).toBe(true);
+  await joinAndClaim(player, hero);
   expect((await gm(`/api/v1/game/actors/${actorId}/heroic-inspiration`, { actorId, has: true })).ok()).toBe(true);
   const call = { kind: "check", ability: "wis", skill: "perception", dc: 10, actorIds: [actorId] };
   expect((await gm("/api/v1/game/roll-calls", call)).ok()).toBe(true);
@@ -318,7 +322,7 @@ test("a player answers the GM's call with a physical die, then rerolls it with H
   await expectPageFits(player);
   await fillIn(face, "18");
   await press(card.getByRole("button", { name: "Use" }));
-  await expect(card).toContainText("(d20 18) · success");
+  await expect(card).toContainText("(d20 18, typed) vs DC 10 - success");
 
   // The reroll is typed too, and its button keeps its whole label on a phone.
   const reroll = card.getByRole("button", { name: "Reroll · Heroic Inspiration" });
@@ -331,7 +335,7 @@ test("a player answers the GM's call with a physical die, then rerolls it with H
   expect(fits, "the reroll button fits its label inside the card").toBe(true);
   await fillIn(card.getByLabel("The rerolled d20"), "2");
   await press(reroll);
-  await expect(card).toContainText("(d20 2)");
+  await expect(card).toContainText("(d20 2, typed)");
   await expectPageFits(player);
   await press(card.getByRole("button", { name: "Done" }));
   await expect(card).toBeHidden();
