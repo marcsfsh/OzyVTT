@@ -53,6 +53,37 @@ function visibleToPlayer(state: GameState, roll: RollRecord, playerSessionId?: s
   );
 }
 
+/** The total of the attack a reaction prompt holds, when the roll it came from is one this player may see in their
+ *  dice log: the attacker's latest d20 attack roll, showing the held attack's die (or, typed, its total). Null
+ *  otherwise, so a roll the GM kept hidden never reaches the player through the prompt. */
+function shownAttackRoll(
+  state: GameState,
+  pending: GameState["combat"]["pendingReactions"][number],
+  playerSessionId: string | undefined,
+  sight: AudienceSight
+): number | null {
+  const held = pending.parkedAttack;
+  const total = pending.attackTotal ?? held?.attackTotal ?? null;
+  if (pending.kind !== "attack-would-hit" || total === null || held === null || pending.sourceActorId === null)
+    return null;
+  // The attack's own roll: its d20, or a typed total with no dice. A bonus die (Bless) is a roll of its own.
+  const roll = [...state.rolls]
+    .reverse()
+    .find(
+      (candidate) =>
+        candidate.purpose === "attack" &&
+        candidate.actorId === pending.sourceActorId &&
+        (candidate.dice.length === 0 || candidate.dice.some((die) => die.sides === 20))
+    );
+  if (!roll) return null;
+  const keptFace = roll.dice.find((die) => die.sides === 20 && die.kept)?.face;
+  const same =
+    held.attackNatural !== null
+      ? keptFace === held.attackNatural
+      : roll.dice.length === 0 && roll.total === held.attackTotal;
+  return same && visibleToPlayer(state, roll, playerSessionId, sight) ? total : null;
+}
+
 /** The only roll shape players receive. A session id is credential-shaped, so the roller's is removed. */
 export function playerRoll(roll: RollRecord | PlayerRollRecord): PlayerRollRecord {
   const { initiatorSessionId: _privateSession, ...visible } = roll as RollRecord;
@@ -232,7 +263,9 @@ const PENDING_REACTION_FIELDS = {
   sourceName: "derived",
   sourceActorId: "never",
   // Names the attacker's action and how it rolled, which the reactor's player has no need of.
-  parkedAttack: "never"
+  parkedAttack: "never",
+  // Sent as `attackRoll`, and only when the roll it came from is in the player's dice log.
+  attackTotal: "derived"
 } as const satisfies Record<keyof PendingReaction, FieldAudience>;
 
 const PENDING_RULE_ASK_FIELDS = {
@@ -374,10 +407,17 @@ export function projectPlayerCombat(
       .map((entry) => copyPlayerFields(entry, PENDING_RULE_ASK_FIELDS)),
     pendingReactions: state.combat.pendingReactions
       .filter((entry) => ownedBy(state, entry.actorId, playerSessionId))
-      .map((entry) => ({
-        ...copyPlayerFields(entry, PENDING_REACTION_FIELDS),
-        sourceName: isHiddenSource(entry.sourceActorId, publicActorIds) ? HIDDEN_SOURCE : entry.sourceName
-      }))
+      .map((entry) => {
+        const attackRoll = shownAttackRoll(state, entry, playerSessionId, sight);
+        return {
+          ...copyPlayerFields(entry, PENDING_REACTION_FIELDS),
+          sourceName: isHiddenSource(entry.sourceActorId, publicActorIds) ? HIDDEN_SOURCE : entry.sourceName,
+          // The roll the prompt answers, only when the player already saw it in their dice log.
+          ...(attackRoll !== null ? { attackRoll } : {}),
+          // Whether the reactor's own reaction lasts (Shield): a fact of their own spell.
+          ...(entry.parkedAttack?.untilNextTurn === true ? { lastsUntilNextTurn: true as const } : {})
+        };
+      })
   };
 }
 

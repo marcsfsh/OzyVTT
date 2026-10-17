@@ -89,8 +89,22 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  min-height: 0;
   padding-top: var(--space-2);
   border-top: 1px solid var(--line-strong);
+}
+.encounter-acting-body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* While a target is chosen, Cancel and Roll stay at the foot of the scrolling console or tab. */
+.encounter-acting-body .action-targeting-buttons,
+.table-panel-body .action-targeting-buttons {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  padding: var(--space-2) 0;
+  background: var(--surface-1);
 }
 .encounter-acting-head {
   display: flex;
@@ -147,15 +161,10 @@
   flex: 1 1 auto;
   margin-top: 0;
 }
-.player-foot-watch {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  font-size: var(--fs-xs);
+.player-foot-hp {
+  flex: none;
   color: var(--text-dim);
-}
-.player-foot-watch strong {
-  color: var(--text);
+  font: 700 var(--fs-sm) / 1 var(--font-numeric);
 }
 .player-turn {
   display: flex;
@@ -168,10 +177,6 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-}
-.player-turn-hp {
-  color: var(--text-dim);
-  font: 700 var(--fs-sm) / 1 var(--font-numeric);
 }
 .player-turn-title {
   display: flex;
@@ -1129,4 +1134,51 @@
   .table-panel-foot .turn-controls > .encounter-end {
     display: none;
   }
+}
+
+/* The action economy as pips: a dark chip with a cyan dot while the slot is there to spend, a hollow dot and struck
+   label once it is spent, so they read as state first and controls second. A disabled pip (Unconscious) dims its
+   label and dot. */
+.economy-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: var(--tap-min);
+  font: 600 var(--fs-xs) / 1 var(--font-label);
+}
+.economy-slot::after {
+  content: "";
+  order: -1;
+  flex: none;
+  width: 0.6rem;
+  height: 0.6rem;
+  border: 1px solid var(--cyan);
+  border-radius: var(--radius-pill);
+  background: var(--cyan);
+}
+.economy-slot:not([aria-pressed="true"]) {
+  color: var(--text);
+}
+.economy-slot:not([aria-pressed="true"])::before,
+.economy-slot:not([aria-pressed="true"]):hover:not(:disabled)::before {
+  border-color: var(--line-raised);
+  background: var(--material-fill);
+}
+.economy-slot:not([aria-pressed="true"]):hover:not(:disabled)::before {
+  border-color: var(--cyan);
+}
+.economy-slot[aria-pressed="true"]::after {
+  background: transparent;
+  border-color: var(--line-raised);
+}
+.economy-slot:disabled {
+  color: var(--text-muted);
+}
+.economy-slot:disabled::after {
+  border-color: var(--line-raised);
+  background: var(--track);
+}
+.economy-slot.legendary-pill::after,
+.economy-slot:not([aria-pressed])::after {
+  display: none;
 }

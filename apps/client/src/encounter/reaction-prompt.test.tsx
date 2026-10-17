@@ -42,14 +42,14 @@ const mount = (reaction: PlayerPendingReaction) =>
 describe("the reaction prompt's buttons", () => {
   it("name what each answer takes off after the reactor's defences", () => {
     mount(DODGE);
-    expect(screen.getByRole("button", { name: "Use - take 4" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Decline - take 8" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Use Uncanny Dodge · take 4" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Take 8" })).toBeTruthy();
   });
 
   it("falls back to the raw numbers for a prompt parked before they were weighed", () => {
     mount({ ...DODGE, weighed: null });
-    expect(screen.getByRole("button", { name: "Use - take 8" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Decline - take 17" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Use Uncanny Dodge · take 8" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Take 17" })).toBeTruthy();
   });
 });
 
@@ -65,9 +65,9 @@ describe("the prompt for each trigger", () => {
       weighed: null,
       acBonus: 2
     });
-    expect(screen.getByText(/attack would hit; \+2 AC/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Use - +2 AC" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Decline - take the hit" })).toBeTruthy();
+    expect(screen.getByText(/attack would hit Borin\. \+2 AC turns it into a miss/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Use Parry" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Take the hit" })).toBeTruthy();
   });
 
   it("strikes back with the spell itself, or with a melee swing to roll first", () => {
@@ -91,8 +91,8 @@ describe("the prompt for each trigger", () => {
         viewer="player"
       />
     );
-    expect(screen.getByText(/Dragon damaged you/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Use" })).toBeTruthy();
+    expect(screen.getByText(/Dragon damaged Borin/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Cast Hellish Rebuke" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Decline" })).toBeTruthy();
     unmount();
     render(

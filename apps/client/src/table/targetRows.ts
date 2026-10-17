@@ -86,3 +86,24 @@ export function usePlayerTargetRows(state: PlayerView, attackerId: string | null
     insideNow: caught ? rows.filter((row) => caught.has(row.id)) : undefined
   };
 }
+
+/**
+ * A target list in the order it is used: the attacker's foes first and its own side last, or the other way round for a
+ * heal. Sides go by kind (a monster against the party), as a player's view can tell them; the order within a side
+ * stays as given.
+ */
+export function foesFirst<Row extends Readonly<{ kind?: string }>>(
+  rows: readonly Row[],
+  attackerKind: string | undefined,
+  heals = false
+): Row[] {
+  const party = attackerKind === "player-character";
+  const rank = (kind: string | undefined) => {
+    const side = kind === "npc" ? 1 : (kind === "player-character") === party ? 2 : 0;
+    return heals ? 2 - side : side;
+  };
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort((a, b) => rank(a.row.kind) - rank(b.row.kind) || a.index - b.index)
+    .map(({ row }) => row);
+}

@@ -4,6 +4,8 @@
  * sees them, so the numbers reveal nothing new.
  */
 
+import type { GmView, PlayerView } from "@vtt/domain";
+
 type Named = Readonly<{ id: string; name: string; kind?: string }>;
 
 const NUMBERED = /^(.*\S)\s+(\d{1,3})$/;
@@ -42,4 +44,28 @@ export function tokenLabel(creature: Named, number: number | undefined): string 
   const first = name.split(/\s+/)[0] ?? name;
   if (number !== undefined) return `${first} ${number}`;
   return `${name.slice(0, 13).trimEnd()}…`;
+}
+
+/**
+ * The view with the first creature of a numbered kind named as its badge reads: "Goblin Warrior" beside "Goblin Warrior
+ * 2" becomes "Goblin Warrior 1", in the roster and the turn order alike, so every list matches the tokens. Only the
+ * creatures this view holds count, so a creature hidden from the viewer never numbers one they see.
+ */
+export function withNumberedNames<View extends GmView | PlayerView>(view: View): View {
+  const numbers = creatureNumbers(view.actors);
+  const renamed = new Map<string, string>();
+  for (const actor of view.actors) {
+    const number = numbers.get(actor.id);
+    if (number !== undefined && splitNumber(actor.name).number === null)
+      renamed.set(actor.id, `${actor.name.trim()} ${number}`);
+  }
+  if (renamed.size === 0) return view;
+  const initiative = view.combat.initiative.map((entry) =>
+    "name" in entry && renamed.has(entry.actorId) ? { ...entry, name: renamed.get(entry.actorId)! } : entry
+  );
+  return {
+    ...view,
+    actors: view.actors.map((actor) => (renamed.has(actor.id) ? { ...actor, name: renamed.get(actor.id)! } : actor)),
+    combat: { ...view.combat, initiative }
+  } as View;
 }

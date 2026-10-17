@@ -1,4 +1,4 @@
-/* The player's prompt slot: one card at a time in reserved space, pushing what is under it down. */
+/* The player's prompt slot holds one card at a time in reserved space. What is under it moves down. */
 
 .prompt-slot {
   display: grid;
@@ -84,6 +84,12 @@
   border: 0;
   background: none;
 }
+/* The card is the frame, so the prompt's own plate (painted on `::before`) would draw an empty box round the
+   buttons. */
+.prompt-card .save-prompt::before,
+.prompt-card .dying-tracker::before {
+  display: none;
+}
 .prompt-slot-more,
 .prompt-slot-outcome {
   margin: 0;
@@ -92,4 +98,10 @@
 }
 .prompt-slot-outcome {
   color: var(--text);
+}
+@media (max-width: 979px) {
+  .prompt-card:not(.prompt-card--call),
+  .prompt-card--call .roll-call-card {
+    padding: var(--space-3);
+  }
 }

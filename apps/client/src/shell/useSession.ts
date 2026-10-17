@@ -17,6 +17,7 @@ import {
 import { forgetPlayerToken, joinTable, storedPlayerToken } from "../lib/session";
 import { navigate } from "../router";
 import { socket } from "../socket";
+import { withNumberedNames } from "../table/numbering";
 
 export type Connection = "online" | "reconnecting" | "offline";
 
@@ -86,7 +87,9 @@ export function useSession(enter: (commit: () => void) => void) {
     const onConnect = () => setConnection("online");
     const onDisconnect = () => setConnection("reconnecting");
     const onGaveUp = () => setConnection("offline");
-    socket.on("state:updated", setState);
+    // Creatures of one kind are numbered by name in every list, as on their tokens.
+    const onState = (next: PlayerView | GmView) => setState(withNumberedNames(next));
+    socket.on("state:updated", onState);
     socket.on("session:ended", sessionEnded);
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
@@ -99,7 +102,7 @@ export function useSession(enter: (commit: () => void) => void) {
     });
     const stopSharing = shareGmToken(() => (current.current?.role === "gm" ? current.current.token : null));
     return () => {
-      socket.off("state:updated", setState);
+      socket.off("state:updated", onState);
       socket.off("session:ended", sessionEnded);
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);

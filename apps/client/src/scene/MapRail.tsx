@@ -14,6 +14,7 @@ import {
 } from "@vtt/ui";
 import { isVisionTool, NEEDS_GRID, type MapRailProps, type MapTool } from "./mapTools";
 import { DrawGroup, FogGroup, LightGroup, TerrainGroup, ViewGroup, WallsGroup } from "./MapToolGroups";
+import { useMapToolGroupRequests } from "./tableGeometry";
 import "./map-rail.css";
 
 /**
@@ -71,6 +72,10 @@ export function MapRail(
   const baseId = useId();
   const groups: GroupId[] = role === "gm" ? ["draw", "fog", "terrain", "walls", "light", "view"] : ["draw", "view"];
   const activeGroup = groupOf(tool);
+  // The header's fog and vision chips open their tool here.
+  useMapToolGroupRequests((group) => {
+    if (groups.includes(group)) setOpenGroup(group);
+  });
 
   // Escape closes the open options.
   useEffect(() => {

@@ -51,7 +51,7 @@ type TableViewProps = Readonly<
 /** The phone table, below 980px (the stylesheet's breakpoint): the map pane over the panel, a bar under the thumb. */
 const PHONE_TABLE_QUERY = "(max-width: 979px)";
 /** While a target is being chosen on a phone, the map pane takes at least this share of the height. */
-const TARGETING_SHARE = 66;
+const TARGETING_SHARE = 55;
 
 /**
  * The table, for both roles: a docked workbench where nothing floats over the map but tokens and marks. A header bar

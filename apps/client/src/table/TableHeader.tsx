@@ -1,6 +1,6 @@
 import type { GmView, PlayerView } from "@vtt/domain";
 import { Button, IconChevronLeft, IconLocate, IconPlay, IconScene, Menu, MenuItem, ToastOutlet } from "@vtt/ui";
-import { focusTokenOnMap } from "../scene/tableGeometry";
+import { focusTokenOnMap, openMapToolGroup } from "../scene/tableGeometry";
 import { NowPlaying } from "../sound/NowPlaying";
 import { tableStatus } from "./status";
 import { TvControl } from "./TvControl";
@@ -107,10 +107,24 @@ export function TableHeader(
         </Menu>
       )}
       {status}
+      {/* Fog and vision as quiet chips while off; each opens its tool beside the map. */}
       <span className="table-header-chips">
-        {staged && gm.onSetGrid && <span className="table-header-chip">No grid yet</span>}
-        {fog.enabled && <span className="table-header-chip">Fog on</span>}
-        {vision.enabled && <span className="table-header-chip">Vision on · {vision.ambient}</span>}
+        <button
+          type="button"
+          className={`table-header-chip tap-target interactive${fog.enabled ? "" : " is-off"}`}
+          title="Open the fog tools"
+          onClick={() => openMapToolGroup("fog")}
+        >
+          {fog.enabled ? "Fog on" : "Fog off"}
+        </button>
+        <button
+          type="button"
+          className={`table-header-chip tap-target interactive${vision.enabled ? "" : " is-off"}`}
+          title="Open the light and vision tools"
+          onClick={() => openMapToolGroup("light")}
+        >
+          {vision.enabled ? `Vision on · ${vision.ambient}` : "Vision off"}
+        </button>
       </span>
       <TvControl
         gmToken={gm.token}

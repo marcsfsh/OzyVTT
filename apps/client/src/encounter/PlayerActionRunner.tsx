@@ -22,7 +22,7 @@ import {
   useTargetingBusy,
   useTargetingResult
 } from "./targeting";
-import type { TargetRow } from "../table/targetRows";
+import { foesFirst, type TargetRow } from "../table/targetRows";
 import "./action-runner.css";
 
 /** Maps a player's own stat-block action onto the ContentActionSummary the targeting store uses. An area spell keeps
@@ -222,9 +222,7 @@ export function PlayerActionRunner({
       <AskTheGmPrompt onFeedback={onFeedback} />
       {!picking && !result && (
         <>
-          <p className="player-actions-label">
-            Your actions <span>· {unavailable ?? "your turn"}</span>
-          </p>
+          <p className="player-actions-label">Your actions{unavailable && <span> · {unavailable}</span>}</p>
           <ul className="action-list">
             {actions.map((action) => (
               <li key={action.id}>
@@ -280,13 +278,22 @@ export function PlayerActionRunner({
       {picking && !result?.preview && (
         <ActionTargetPicker
           picking={picking}
-          targets={targets
-            // A heal may be for the healer too (a potion drunk, not handed over).
-            .filter(
-              (target) =>
-                target.actorId !== actorId || picking.action.healing != null || healingOf(picking.action) !== undefined
-            )
-            .map((target) => targetRows?.get(target.actorId) ?? { id: target.actorId, label: target.name })}
+          targets={foesFirst(
+            targets
+              // A heal may be for the healer too, as when a potion is drunk.
+              .filter(
+                (target) =>
+                  target.actorId !== actorId ||
+                  picking.action.healing != null ||
+                  healingOf(picking.action) !== undefined
+              )
+              .map(
+                (target): Pick<TargetRow, "id" | "label"> & Partial<TargetRow> =>
+                  targetRows?.get(target.actorId) ?? { id: target.actorId, label: target.name }
+              ),
+            "player-character",
+            picking.action.healing != null || healingOf(picking.action) !== undefined
+          )}
           onMap
           {...(insideNow ? { insideNow } : {})}
           busy={busy}

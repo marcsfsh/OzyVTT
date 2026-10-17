@@ -117,8 +117,12 @@ export type PlayerPendingSave = Omit<
   >;
 };
 /** A player's own pending reaction prompts only, masked like saves; the parked attack stays with the GM, since it names
- *  the attacker's action and how it was rolled. */
-export type PlayerPendingReaction = Omit<PendingReaction, "sourceActorId" | "parkedAttack">;
+ *  the attacker's action and how it was rolled. `attackRoll` is the held attack's total, present only when that roll
+ *  is in the player's own dice log; `lastsUntilNextTurn` says the reactor's reaction lasts (Shield). */
+export type PlayerPendingReaction = Omit<PendingReaction, "sourceActorId" | "parkedAttack"> & {
+  attackRoll?: number;
+  lastsUntilNextTurn?: true;
+};
 /** A player's view of their own parked ask. `command` is omitted: its payload can name ids the player may not know. */
 export type PlayerPendingRuleAsk = Omit<PendingRuleAsk, "command">;
 /** A polygon in image pixels as flat pairs: `[x0, y0, x1, y1, ...]`. */

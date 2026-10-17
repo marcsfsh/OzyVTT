@@ -168,9 +168,9 @@ describe("Needs you", () => {
     );
     expect(screen.getByText("Waiting on Lyra · Shield")).toBeTruthy();
     expect(screen.getByText("Goblin 1's hit (19 against AC 15) waits until Lyra answers.")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /Use - \+5 AC/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Use Shield" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Answer for Lyra" }));
-    expect(screen.getByRole("button", { name: /Use - \+5 AC/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Use Shield" })).toBeTruthy();
   });
 
   it("puts a held attack first and renders nothing when nothing waits", () => {

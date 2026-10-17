@@ -102,9 +102,12 @@
   margin: 0;
 }
 @media (max-width: 979px) {
-  .table-panel > .needs-you,
-  .table-panel > .prompt-slot {
+  .table-panel > .needs-you {
     max-height: 45%;
+  }
+  /* A player's prompt is what they must do now, so on a phone it may take most of the short panel whole. */
+  .table-panel > .prompt-slot {
+    max-height: 65%;
   }
   .table-panel-tabs {
     margin: var(--space-1) var(--space-2) 0;

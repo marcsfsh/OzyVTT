@@ -88,7 +88,7 @@ describe("a player's saving throw", () => {
     await user.click(screen.getByRole("button", { name: "Roll" }));
     expect(sent("save:answer")).toEqual([{ saveId: SAVE.id, method: "roll", commit: false }]);
     answerLast("save:answer", savePreview());
-    expect(await screen.findByText("Rolled 9 (d20 7) · Disadvantage (Poisoned) - Failure")).toBeTruthy();
+    expect(await screen.findByText("Rolled 9 (d20 7) · Disadvantage (Poisoned) · Failure")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Adv" })).toBeNull();
     expect(screen.queryByRole("button", { name: /Reroll/ })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Confirm" }));
@@ -166,7 +166,7 @@ describe("the GM's saving throw", () => {
         rollMode: { mode: "advantage", advantage: ["GM's choice"], disadvantage: [] }
       })
     );
-    expect(await screen.findByText("Rolled 17 (d20 15) · Advantage (GM's choice) - Success")).toBeTruthy();
+    expect(await screen.findByText("Rolled 17 (d20 15) · Advantage (GM's choice) · Success")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Reroll" }));
     expect(sent("save:answer").at(-1)).toMatchObject({ reroll: true, rollMode: "advantage" });
     answerLast("save:answer", savePreview({ success: true }));
@@ -248,7 +248,7 @@ describe("a death save", () => {
         committed: false
       }
     });
-    expect(await screen.findByText("Rolled 8 (total 11) - Success")).toBeTruthy();
+    expect(await screen.findByText("Rolled 8 (total 11) · Success")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Confirm" }));
     expect(sent("death-save:roll").at(-1)).toEqual({ actorId: SAVE.targetActorId, commit: true });
   });

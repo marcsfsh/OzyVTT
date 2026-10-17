@@ -80,3 +80,9 @@
   border: 0;
   background: none;
 }
+/* The card is the frame, so the prompt's own plate (painted on `::before`) would draw an empty box round the
+   buttons. */
+.needs-card .save-prompt::before,
+.needs-card .dying-tracker::before {
+  display: none;
+}
