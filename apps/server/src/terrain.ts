@@ -50,12 +50,17 @@ function revealedRegion(fog: CombatState["fog"]): readonly Rect[] | "everything"
   return region;
 }
 
-/** Terrain as players and the table screen get it: only what the fog reveals, so unrevealed ground keeps its
- *  layout. Difficult terrain under the fog is still charged when someone walks into it. */
-export function visibleTerrain(combat: Pick<CombatState, "fog" | "terrain">): CombatState["terrain"] {
+/** Terrain as players and the table screen get it: only what the fog reveals, and with dynamic vision only what the
+ *  party has seen (`seen`, disjoint rects), so unrevealed ground keeps its layout. Difficult terrain out of sight is
+ *  still charged when someone walks into it. */
+export function visibleTerrain(
+  combat: Pick<CombatState, "fog" | "terrain">,
+  seen?: readonly Rect[]
+): CombatState["terrain"] {
   const revealed = revealedRegion(combat.fog);
   const difficult = combat.terrain.difficult.map((rect) => ({ ...rect }));
-  return { difficult: revealed === "everything" ? difficult : intersectRegions(difficult, revealed) };
+  const unfogged = revealed === "everything" ? difficult : intersectRegions(difficult, revealed);
+  return { difficult: seen === undefined ? unfogged : intersectRegions(unfogged, seen) };
 }
 
 type Point = Readonly<{ x: number; y: number }>;

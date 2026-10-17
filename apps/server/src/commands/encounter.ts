@@ -34,6 +34,7 @@ import { requireTypedDie } from "../held-rolls.js";
 import { endTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "../turn-economy.js";
 import { initiatorOf, isGmGrade, principalTag } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
+import { refreshVisionMeasure } from "../vision/edit.js";
 import { recoverAmmunition } from "../ammunition.js";
 
 // The encounter lifecycle, initiative and the turn economy.
@@ -84,6 +85,8 @@ export const encounterCommands = [
           kit.equipmentCatalog(),
           kit.initiativeRollSink(draft, commandId, principal)
         );
+        // The fight may be on another map than the one the walls were drawn on: keep feet and pixels in step.
+        refreshVisionMeasure(draft, tokenGeometry);
         // Fresh fight: clear prior snapshots and record this start as the rewind baseline.
         timeline.truncateAll();
         // The previous fight's journal goes with it; this very command stays as the new fight's first entry.

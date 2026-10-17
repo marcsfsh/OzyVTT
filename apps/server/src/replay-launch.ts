@@ -1,4 +1,4 @@
-import type { GameState, Scene, SceneCombat } from "@vtt/domain";
+import { EMPTY_SCENE_VISION, type GameState, type Scene, type SceneCombat } from "@vtt/domain";
 import { CommandRejectedError } from "./game-store.js";
 import type { EncounterArchiveDocument } from "./encounter-archive.js";
 import { activateNewScene, sceneHeadroom, sceneSlotsNeededToGoLive, SCENE_ROOM_REFUSAL } from "./scenes.js";
@@ -76,6 +76,8 @@ function sceneCombatFrom(combat: GameState["combat"]): SceneCombat {
     legendaryUsed: combat.legendaryUsed,
     fog: combat.fog,
     terrain: combat.terrain,
+    // A recording made before dynamic vision has none.
+    vision: (combat.vision as SceneCombat["vision"] | undefined) ?? { ...EMPTY_SCENE_VISION },
     pendingSaves: combat.pendingSaves,
     pendingReactions: combat.pendingReactions,
     pendingDamage: combat.pendingDamage,

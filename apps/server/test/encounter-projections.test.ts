@@ -94,6 +94,7 @@ describe("recipient-safe encounter projections", () => {
       reactionsUsed: [],
       fog: { enabled: false, shapes: [] },
       terrain: { difficult: [] },
+      vision: { enabled: false },
       rewound: false,
       pendingSaves: [],
       pendingReactions: [],

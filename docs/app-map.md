@@ -6,7 +6,7 @@ machine-derivable surfaces of the app (state shape, command catalog, HTTP paths)
 file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.
 
 - API version `1` · realtime protocol `1`
-- 14 GameState fields · 114 commands · 232 HTTP paths
+- 14 GameState fields · 125 commands · 244 HTTP paths
 
 ## GameState shape
 
@@ -36,7 +36,7 @@ schema in `packages/domain/src/commands.ts`, its route and scope in `GAME_COMMAN
 OpenAPI operation, and one table entry under `apps/server/src/commands/`, which both transports
 register from. Then the projection decision.
 
-Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `damage`, `death-save`, `dice`, `effect`, `encounter`, `fog`, `initiative`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `table`, `terrain`, `time`, `token`, `turn`.
+Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `damage`, `death-save`, `dice`, `door`, `effect`, `encounter`, `fog`, `initiative`, `light`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `table`, `terrain`, `time`, `token`, `turn`, `vision`, `wall`.
 
 | Command | Scope |
 | --- | --- |
@@ -100,6 +100,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `damage.resolve` | `combat:write` |
 | `death-save.roll` | `combat:write` |
 | `dice.roll` | `roll:create` |
+| `door.set-open` | `combat:write` |
 | `effect.add` | `combat:write` |
 | `effect.end` | `combat:write` |
 | `encounter.add-combatant` | `combat:write` |
@@ -120,6 +121,9 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `initiative.roll-self` | `combat:write` |
 | `initiative.set` | `combat:write` |
 | `initiative.swap` | `combat:write` |
+| `light.add` | `scene:write` |
+| `light.move` | `scene:write` |
+| `light.remove` | `scene:write` |
 | `reaction.answer` | `combat:write` |
 | `reaction.dismiss` | `combat:write` |
 | `replay.launch` | `combat:write` |
@@ -154,6 +158,13 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `turn.use` | `combat:write` |
 | `turn.use-legendary` | `combat:write` |
 | `turn.use-reaction` | `combat:write` |
+| `vision.reset-explored` | `scene:write` |
+| `vision.set-ambient` | `scene:write` |
+| `vision.set-enabled` | `scene:write` |
+| `wall.add` | `scene:write` |
+| `wall.clear` | `scene:write` |
+| `wall.move` | `scene:write` |
+| `wall.remove` | `scene:write` |
 
 ## HTTP surface
 
@@ -301,6 +312,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `GET POST /api/v1/game/commands`
 - `POST /api/v1/game/damage/resolve`
 - `POST /api/v1/game/definitions/import`
+- `POST /api/v1/game/doors/{wallId}/open`
 - `POST /api/v1/game/encounter/combatants`
 - `POST /api/v1/game/encounter/combatants/{actorId}/remove`
 - `POST /api/v1/game/encounter/end`
@@ -319,6 +331,9 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/initiative/roll-self`
 - `POST /api/v1/game/initiative/set`
 - `POST /api/v1/game/initiative/swap`
+- `POST /api/v1/game/lights`
+- `DELETE /api/v1/game/lights/{lightId}`
+- `POST /api/v1/game/lights/{lightId}/move`
 - `GET /api/v1/game/log`
 - `POST /api/v1/game/reactions/{reactionId}/answer`
 - `POST /api/v1/game/reactions/{reactionId}/dismiss`
@@ -352,6 +367,14 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/turn/legendary`
 - `POST /api/v1/game/turn/reaction`
 - `POST /api/v1/game/turn/use`
+- `POST /api/v1/game/vision/ambient`
+- `POST /api/v1/game/vision/enabled`
+- `POST /api/v1/game/vision/explored/reset`
+- `GET /api/v1/game/vision/preview`
+- `POST /api/v1/game/walls`
+- `DELETE /api/v1/game/walls/{wallId}`
+- `POST /api/v1/game/walls/{wallId}/move`
+- `POST /api/v1/game/walls/clear`
 - `GET POST /api/v1/gm/integration-credentials`
 - `GET /api/v1/gm/integration-credentials/{id}/audit`
 - `POST /api/v1/gm/integration-credentials/{id}/revoke`

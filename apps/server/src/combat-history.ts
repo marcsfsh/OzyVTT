@@ -22,8 +22,8 @@ export type TimelineOutcome =
 /** The slice a restore rolls back: combat (minus scene prep, timeline fields and timed annotations) plus each
  *  actor's hp, conditions, effects and spent resources. Changes outside it never dirty the timeline. */
 function restorableSlice(state: GameState): string {
-  // Fog and terrain are scene dressing: painting mid-review must neither dirty the timeline nor be undone by a
-  // rewind.
+  // Fog, terrain and vision (walls, doors, lights, what the party has seen) are scene dressing: editing them
+  // mid-review must neither dirty the timeline nor be undone by a rewind.
   const {
     scenes: _scenes,
     activeSceneId: _activeSceneId,
@@ -31,6 +31,7 @@ function restorableSlice(state: GameState): string {
     historyDirty: _dirty,
     fog: _fog,
     terrain: _terrain,
+    vision: _vision,
     annotations,
     ...combat
   } = state.combat;
@@ -99,9 +100,10 @@ export function applyTimelineRestore(state: GameState, snapshot: GameState, curs
     tokens: snapshot.combat.tokens.filter((token) => currentActorIds.has(token.actorId)),
     scenes: state.combat.scenes,
     activeSceneId: state.combat.activeSceneId,
-    // Live fog and terrain survive the restore (excluded from the restorable slice for the same reason).
+    // Live fog, terrain and vision survive the restore (excluded from the restorable slice for the same reason).
     fog: state.combat.fog,
     terrain: state.combat.terrain,
+    vision: state.combat.vision,
     historyCursor: cursor,
     historyDirty: false
   };

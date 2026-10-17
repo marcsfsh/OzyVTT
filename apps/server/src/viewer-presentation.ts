@@ -52,6 +52,13 @@ export type ViewerTerrain = Readonly<{
   difficult: readonly Readonly<{ x: number; y: number; width: number; height: number }>[];
 }>;
 
+/** Dynamic vision as the shared screen gets it: where the party sees now (polygons as flat `[x0, y0, ...]` pairs)
+ *  and what it has seen. Everything else on the map is dark. */
+export type ViewerVision = Readonly<{
+  visible: readonly (readonly number[])[];
+  explored: readonly Readonly<{ x: number; y: number; width: number; height: number }>[];
+}>;
+
 export type ViewerInitiative = Readonly<{
   visible: boolean;
   round: number;
@@ -95,6 +102,8 @@ export type ViewerEncounterScene = Readonly<{
   fog?: ViewerFog;
   /** Absent on a presentation stored before terrain existed. */
   terrain?: ViewerTerrain;
+  /** Present while the scene's dynamic vision is on; the viewer darkens all but this. */
+  vision?: ViewerVision;
 }>;
 
 export type ViewerPresentationState = Readonly<{
@@ -296,7 +305,36 @@ function encounter(value: ViewerEncounterScene): ViewerEncounterScene {
     throw new InvalidRequestError("Viewer annotations require an active encounter map.");
   const fog = value.fog === undefined ? undefined : sanitizedFog(value.fog);
   const terrain = value.terrain === undefined ? undefined : sanitizedTerrain(value.terrain);
-  return { mapAssetId, tokens, annotations, ...(fog ? { fog } : {}), ...(terrain ? { terrain } : {}) };
+  const vision = value.vision === undefined ? undefined : sanitizedVision(value.vision);
+  return {
+    mapAssetId,
+    tokens,
+    annotations,
+    ...(fog ? { fog } : {}),
+    ...(terrain ? { terrain } : {}),
+    ...(vision ? { vision } : {})
+  };
+}
+
+const coordinate = (value: unknown) => typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= 1_000_000;
+
+function sanitizedVision(value: ViewerVision): ViewerVision {
+  const polygons = value.visible ?? [];
+  const rects = value.explored ?? [];
+  if (!Array.isArray(polygons) || polygons.length > 2000 || !Array.isArray(rects) || rects.length > 20000)
+    throw new InvalidRequestError("Viewer vision is too large.");
+  return {
+    visible: polygons.map((polygon) => {
+      if (!Array.isArray(polygon) || polygon.length % 2 !== 0 || polygon.length > 20000 || !polygon.every(coordinate))
+        throw new InvalidRequestError("Viewer vision geometry is invalid.");
+      return [...polygon];
+    }),
+    explored: rects.map((rect) => {
+      for (const bound of [rect.x, rect.y, rect.width, rect.height])
+        if (!coordinate(bound) || bound < 0) throw new InvalidRequestError("Viewer vision geometry is invalid.");
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+    })
+  };
 }
 
 function sanitizedTerrain(value: ViewerTerrain): ViewerTerrain {
