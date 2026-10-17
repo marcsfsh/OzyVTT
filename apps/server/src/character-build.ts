@@ -189,6 +189,7 @@ const CARRIER_RIDER_DISPOSITION: Readonly<
   "extra-attack": "standing", // effective-actions extraAttacksFor raises attack.count on a weapon swing
   "armor-class": "standing", // storedArmorClass, via derivation.armorClass, so Defense follows the armor worn now
   "attunement-slots": "standing", // inventory.ts, the attunement limit
+  "special-speed": "standing", // speed.ts specialSpeedsOf, the movement modes
   "roll-mode": "at-its-moment", // rollModeClaims: attacks, saves, checks, initiative
   "extra-damage": "at-its-moment", // resolution/damage.ts rolls it as its own typed damage entry
   "damage-bonus": "standing", // effective-actions folds it into the first damage part's formula; a moment-gated one lands as a bonusDamage line in resolution/damage.ts
@@ -335,7 +336,8 @@ function cantripActionFor(
       ...(tier?.targetCount && spell.effect?.attacks ? { attacks: tier.targetCount } : {})
     }
   );
-  if (mechanics.damage.length === 0 && !mechanics.save) return null;
+  // A cantrip that lasts and acts later (Produce Flame) is cast to start it, with nothing to roll.
+  if (mechanics.damage.length === 0 && !mechanics.save && (spell.effect?.laterActions ?? []).length === 0) return null;
   return {
     id: spellActionId(spell.id),
     name: spell.name,
@@ -384,7 +386,9 @@ function leveledSpellActionFor(
     mechanics.healing !== undefined ||
     mechanics.attack ||
     mechanics.grants !== undefined ||
-    spell.effect?.reaction !== undefined;
+    spell.effect?.reaction !== undefined ||
+    // A spell that lasts and acts on later turns (Flame Blade) is cast to start it.
+    (spell.effect?.laterActions ?? []).length > 0;
   if (free === null && !resolvable) return null;
   const freeCast = free !== undefined;
   return {

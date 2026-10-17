@@ -65,6 +65,7 @@ function sceneCombatFrom(combat: GameState["combat"]): SceneCombat {
     initiative: combat.initiative,
     tokens: combat.tokens,
     annotations: combat.annotations,
+    spellZones: combat.spellZones,
     turn: combat.turn,
     rulesMode: combat.rulesMode,
     ruleExceptions: combat.ruleExceptions,

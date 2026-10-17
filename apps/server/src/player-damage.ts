@@ -18,6 +18,8 @@ export type PlayerDamageDeps = Readonly<{
   catalog?: EquipmentCatalog;
   /** Creature-to-creature distance, for the strike-back reaction the damage may open. */
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
+  /** The server's dice, for what the target's stat block rolls as damage lands (Undead Fortitude). */
+  rollDie?: (sides: number) => number;
 }>;
 
 /** The applied result for table narration. `sourceActorId` rides along so narration includes it in `actorIds`,
@@ -51,7 +53,8 @@ function damageDepsOf(deps: PlayerDamageDeps): DamageDeps {
     newId: deps.newId,
     now: isoOf(deps.now),
     ...(deps.catalog ? { catalog: deps.catalog } : {}),
-    ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
+    ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {}),
+    ...(deps.rollDie ? { rollDie: deps.rollDie } : {})
   };
 }
 

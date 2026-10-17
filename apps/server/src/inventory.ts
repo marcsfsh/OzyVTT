@@ -1,11 +1,12 @@
 import type { Actor, GameState } from "@vtt/domain";
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import { catalogIdOf, type ActorDefinition, type Currency, type InventoryItem } from "@vtt/schemas";
-import { effectiveSlot } from "@vtt/rules-5e";
+import { effectiveSlot, wornBodyArmor } from "@vtt/rules-5e";
 import { spellSlotMaxima, storedArmorClass } from "./actor-roster.js";
 import { deriveEquipment, itemIsActive, type EquipmentCatalog } from "./equipment-derivation.js";
 import { castAction, itemAction } from "./item-actions.js";
 import { keepAmmunitionCount } from "./ammunition.js";
+import { endEffect, MAGE_ARMOR_TAG, type EffectNarration } from "./effects.js";
 import { CommandRejectedError } from "./game-store.js";
 import { scrollSpellProblem } from "./scrolls.js";
 
@@ -348,7 +349,7 @@ export function setInventoryItem(
   item: InventoryItem,
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
   deps: InventoryDeps = {}
-): void {
+): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   // A row naming itself as its own record is the plain form.
@@ -398,6 +399,15 @@ export function setInventoryItem(
     }
   }
   reconcileEquipment(actor, definition, deps);
+  return donningEndsMageArmor(state, actor);
+}
+
+/** SRD Mage Armor: "The spell ends early if the target dons armor." A Shield is no armor here: it still adds to it. */
+function donningEndsMageArmor(state: GameState, actor: Actor): EffectNarration[] {
+  if (!wornBodyArmor(actor.inventory)) return [];
+  return actor.effects
+    .filter((effect) => effect.tags.includes(MAGE_ARMOR_TAG))
+    .flatMap((effect) => endEffect(state, actor.id, effect.id));
 }
 
 /** The charge pools a row's own actions and casts count in, in the record's order, whether or not the row is worn. */

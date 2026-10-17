@@ -3,11 +3,14 @@ import {
   abilityModifier as scoreModifier,
   aggregateRollMode,
   collectRiders,
+  d20TestFormula,
   diceRiders,
   diceRiderTerms,
   halveDamageParts,
   otherDiceOf,
+  parseDiceFormula,
   rescaleDamageParts,
+  resolveDice,
   sumRiders,
   type AggregatedRollMode,
   type DiceResolution,
@@ -22,6 +25,7 @@ import { hiddenFrom } from "./vision/audience.js";
 import { holdsFeature } from "./class-features.js";
 import { areAllies } from "./creature-sides.js";
 import { holdRoll, releaseHeldRoll, rollHeldTest } from "./held-rolls.js";
+import { AURA_IMMUNE_TAG, auraOfAuthority, traitActionId } from "./statblock-traits.js";
 import { applyDamageDetailed, previewDamage, adjustableActor } from "./hit-points.js";
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
@@ -29,6 +33,7 @@ import {
   addEffect,
   CONCENTRATING_TAG,
   effectDurationOf,
+  endConcentrationSustainedBy,
   endEffectIfPresent,
   makeEffect,
   sourceOf,
@@ -42,6 +47,7 @@ import {
   type EquipmentDerivation,
   type RollModeClaims
 } from "./equipment-derivation.js";
+import { countZoneDamage } from "./spell-zone-state.js";
 
 export type SaveAnswerDependencies = Readonly<{
   random: RandomSource;
@@ -69,6 +75,8 @@ export type SaveOutcome = Readonly<{
   flatReduction?: number;
   /** The condition that forced an automatic failure (Paralyzed etc. on a Str/Dex save); null when the die was rolled. */
   autoFailed?: string | null;
+  /** The trait that made it succeed without a roll (Greater Magic Resistance against a spell). */
+  autoSucceeded?: string;
   /** Advantage/disadvantage sources that shaped the rolled save (Restrained, Dodge); absent for a plain d20. */
   rollMode?: AggregatedRollMode;
 }>;
@@ -224,6 +232,32 @@ export function saveModifierFor(definition: ActorDefinition | undefined, ability
   return scoreModifier(definition.abilityScores[ability]);
 }
 
+/** Stat-block traits that give every save Advantage: the berserker's Bloodied Frenzy ("While Bloodied, ... Advantage on
+ *  attack rolls and saving throws") and an allied hobgoblin captain's Aura of Authority within 10 feet. */
+function traitSaveClaims(
+  state: GameState,
+  target: Actor,
+  definition: ActorDefinition | undefined,
+  deps: Pick<SaveAnswerDependencies, "resolveDefinition" | "distanceFeet">
+): Array<{ source: string; label: string }> {
+  const bloodied = target.hp.current > 0 && target.hp.current * 2 <= target.hp.maximum;
+  const authority = auraOfAuthority(state, target, deps);
+  return [
+    ...(bloodied && holdsFeature(definition, "bloodied-frenzy", "Bloodied Frenzy")
+      ? [{ source: "bloodied-frenzy", label: "Bloodied Frenzy (Bloodied)" }]
+      : []),
+    ...(authority ? [authority] : [])
+  ];
+}
+
+/** SRD Magic Resistance: "Advantage on saving throws against spells and other magical effects"; Greater Magic
+ *  Resistance (the rakshasa's) "automatically succeeds" on them. Read from the stat block's trait by its name. */
+export function magicResistanceOf(definition: ActorDefinition | undefined): "advantage" | "succeeds" | null {
+  if (holdsFeature(definition, "greater-magic-resistance", "Greater Magic Resistance")) return "succeeds";
+  if (holdsFeature(definition, "magic-resistance", "Magic Resistance")) return "advantage";
+  return null;
+}
+
 /** Proficiency bonus when an item grants this save's proficiency and the sheet lacks it. */
 function saveProficiencyFromItems(
   definition: ActorDefinition | undefined,
@@ -249,6 +283,36 @@ export function saveTotalFor(
     (actor ? exhaustionPenalty(actor) : 0) +
     saveRiderBonus(derivation, ability)
   );
+}
+
+/**
+ * A save the server rolls at once, with no prompt, for a creature's own trait (Undead Fortitude): the same total, riders
+ * and Advantage the prompt would use, cover aside. The kept d20 and the total, with what shaped the roll.
+ */
+export function rollSaveAtOnce(
+  state: GameState,
+  actor: Actor,
+  ability: AbilityId,
+  deps: Readonly<{
+    resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
+    catalog?: EquipmentCatalog;
+    distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
+    rollDie: RandomSource;
+  }>
+): Readonly<{ natural: number; total: number; rollMode: AggregatedRollMode }> {
+  const definition = actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;
+  const derivation = deriveEquipment(actor, definition, deps.catalog);
+  const modifier =
+    saveTotalFor(definition, actor, ability, derivation) + (auraOfProtection(state, actor, deps)?.amount ?? 0);
+  const sources = saveRollSources(actor, ability, derivation);
+  const rollMode = aggregateRollMode(sources.advantage, sources.disadvantage);
+  const resolution = resolveDice(
+    parseDiceFormula(d20TestFormula(rollMode.mode, modifier) + saveRiderDiceTerms(derivation, ability)),
+    deps.rollDie
+  );
+  const d20 = resolution.terms.find((term) => term.kind === "dice");
+  const natural = d20 && d20.kind === "dice" ? (d20.dice.find((die) => die.kept) ?? d20.dice[0])!.face : 0;
+  return { natural, total: resolution.total, rollMode };
 }
 
 /**
@@ -283,6 +347,12 @@ export function createPendingSaves(
     replaceExisting?: boolean;
     /** The GM's call for a roll these saves answer. */
     callId?: string;
+    /** What else each save carries: what a success leaves, a line for a failure, the spell area that raised it. */
+    extra?: Pick<PendingSave, "onSuccessEffect" | "failureNote" | "breaksConcentration" | "zoneId">;
+    /** Against a spell or a magic item, which Magic Resistance meets with Advantage. */
+    magical?: boolean;
+    /** A success makes the target immune to this trait of its source for the fight (a ghast's Stench). */
+    immuneOnSuccess?: boolean;
     newSaveId: () => string;
     createdAt: number;
   }>
@@ -307,6 +377,12 @@ export function createPendingSaves(
       : {}),
     ...(input.repeatOf ? { repeatOf: input.repeatOf } : {}),
     ...(input.callId !== undefined ? { callId: input.callId } : {}),
+    ...(input.extra?.onSuccessEffect ? { onSuccessEffect: structuredClone(input.extra.onSuccessEffect) } : {}),
+    ...(input.extra?.failureNote ? { failureNote: input.extra.failureNote } : {}),
+    ...(input.extra?.breaksConcentration ? { breaksConcentration: true as const } : {}),
+    ...(input.extra?.zoneId !== undefined ? { zoneId: input.extra.zoneId } : {}),
+    ...(input.magical ? { magical: true as const } : {}),
+    ...(input.immuneOnSuccess ? { immuneOnSuccess: true as const } : {}),
     createdAt: input.createdAt
   }));
   // A re-cast against the same target replaces its older prompt.
@@ -368,7 +444,11 @@ export function applyFailureEffect(
       sourceName: onFail.sourceName,
       sourceActionId: onFail.sourceActionId ?? null,
       startedRound: state.combat.round,
-      duration: effectDurationOf(state, onFail.duration, target.id, onFail.sourceActorId),
+      // "Until the end of the current turn": this turn's end, not the next one's.
+      duration:
+        onFail.currentTurn && onFail.duration?.type === "until-bearer-turn-end"
+          ? { type: "until-bearer-turn-end", skipsCurrentTurn: false }
+          : effectDurationOf(state, onFail.duration, target.id, onFail.sourceActorId),
       // Saves parked before failures carried their own lifetime were all grapples.
       endsWhenSourceDefeated: onFail.endsWhenSourceDefeated ?? onFail.tags.includes("grapple"),
       concentration: onFail.castId !== undefined,
@@ -376,10 +456,12 @@ export function applyFailureEffect(
       escapeDc: onFail.escapeDc,
       ...(onFail.repeatSave ? { repeatSave: { ...onFail.repeatSave } } : {}),
       ...(onFail.endsOnDamage ? { endsOnDamage: true } : {}),
+      ...(onFail.endsOnSpellHealing ? { endsOnSpellHealing: true as const } : {}),
       ...(onFail.speedZero ? { speedZero: true } : {}),
       ...(onFail.castId !== undefined ? { castId: onFail.castId } : {}),
       ...(onFail.rangeFeet !== undefined ? { rangeFeet: onFail.rangeFeet } : {}),
       ...(onFail.ongoingDamage ? { ongoingDamage: onFail.ongoingDamage } : {}),
+      ...(onFail.magical ? { magical: true as const } : {}),
       // What it does while it lasts (Bane's -1d4).
       modifiers: [...onFail.modifiers]
     }),
@@ -480,7 +562,10 @@ export function answerSave(
   let total: number;
   let natural: number | null = null;
   let autoFailed: string | null = null;
+  let autoSucceeded: string | null = null;
   let rollMode: AggregatedRollMode | undefined;
+  const targetDefinition = target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined;
+  const magicResistance = pending.magical ? magicResistanceOf(targetDefinition) : null;
   if (method === "manual") {
     // The GM's typed total is a ruling, so it stands as given (a table may rule an exception to an auto-fail). A
     // player types the face their die shows instead, and the server adds the bonus.
@@ -492,8 +577,11 @@ export function answerSave(
     // SRD: Paralyzed/Petrified/Stunned/Unconscious auto-fail Str/Dex saves; no die is rolled, typed or not.
     autoFailed = autoFailsPhysicalSaves(target);
     total = 0;
+  } else if (magicResistance === "succeeds") {
+    autoSucceeded = "Greater Magic Resistance";
+    total = 0;
   } else {
-    const definition = target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined;
+    const definition = targetDefinition;
     const derivation = deriveEquipment(target, definition, deps.catalog);
     // Exhaustion (-2 x level, SRD 5.2.1) and item save bonuses come through `saveTotalFor`, shared with the sheet's
     // chip; cover's per-save bonus and an ally Paladin's aura are added on top.
@@ -507,6 +595,9 @@ export function answerSave(
       pending.endsEffects !== undefined,
       conditionsAtStake(state, pending)
     );
+    if (magicResistance === "advantage")
+      sources.advantage.push({ source: "magic-resistance", label: "Magic Resistance" });
+    sources.advantage.push(...traitSaveClaims(state, target, definition, deps));
     const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
     // A player's choice is never read: the rules count Advantage and Disadvantage, and only the GM may force a mode.
     const forced = scope.role === "gm" ? explicitRollMode : undefined;
@@ -553,7 +644,7 @@ export function answerSave(
     total = test.resolution.total;
   }
 
-  let success = autoFailed === null && total >= pending.dc;
+  let success = autoSucceeded !== null || (autoFailed === null && total >= pending.dc);
   // SRD Legendary Resistance: on a failed save the creature can choose to succeed. The GM commits with
   // the flag; the pool rides actionUses["legendary-resistance"] and a long rest re-arms it.
   let legendaryNote: string | null = null;
@@ -636,6 +727,7 @@ export function answerSave(
         conditionApplied: outcomeCondition,
         committed: false,
         autoFailed,
+        ...(autoSucceeded !== null ? { autoSucceeded } : {}),
         ...(natural !== null ? { natural } : {}),
         ...(rollMode ? { rollMode } : {}),
         ...(weighed && weighed.parts.length > 0 ? { parts: weighed.parts } : {}),
@@ -651,6 +743,12 @@ export function answerSave(
     events.push({
       kind: "condition",
       text: `${target.name} automatically fails the ${pending.ability.toUpperCase()} save (${conditionLabel(autoFailed)}).`,
+      actorId: target.id
+    });
+  if (autoSucceeded !== null)
+    events.push({
+      kind: "condition",
+      text: `${target.name} automatically succeeds on the ${pending.ability.toUpperCase()} save (${autoSucceeded}).`,
       actorId: target.id
     });
   let appliedDamage = 0;
@@ -671,6 +769,7 @@ export function answerSave(
         newId: deps.newRollId,
         now: deps.now,
         commandId,
+        rollDie: deps.random,
         ...(deps.catalog ? { catalog: deps.catalog } : {}),
         ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
       }
@@ -679,6 +778,8 @@ export function answerSave(
     // Keep the whole application, not just its total.
     application = outcome.application;
     events.push(...outcome.events);
+    // A spell area that stops after so much damage counts it (Guardian of Faith).
+    events.push(...countZoneDamage(state, pending.zoneId, appliedDamage, deps.catalog));
   }
   const immunities = {
     resolveDefinition: (definitionId: string) => deps.resolveDefinition(definitionId),
@@ -715,10 +816,34 @@ export function answerSave(
     events.push(
       ...applyFailureEffect(state, target.id, pending.onFailEffect, `${commandId}:${saveId}:fail`, immunities)
     );
+  // What a success leaves instead (Heat Metal's Disadvantage on a creature that keeps hold of the object).
+  if (success && pending.onSuccessEffect)
+    events.push(
+      ...applyFailureEffect(state, target.id, pending.onSuccessEffect, `${commandId}:${saveId}:success`, immunities)
+    );
+  if (!success && pending.failureNote) events.push({ kind: "effect", text: pending.failureNote, actorId: target.id });
+  // SRD Sleet Storm: a failure "and lose Concentration".
+  if (!success && pending.breaksConcentration) events.push(...endConcentrationSustainedBy(state, target.id));
   if (outcomeCondition)
     conditionApplied = target.conditions.some(
       (condition) =>
         pending.conditionIds.includes(condition.id) || pending.onFailEffect?.linkedConditionIds.includes(condition.id)
+    );
+  // "Success: The target is immune to this ghast's Stench for 24 hours", held for the fight.
+  if (success && pending.immuneOnSuccess && pending.sourceActorId !== null)
+    addEffect(
+      state,
+      target.id,
+      makeEffect({
+        id: `${commandId}:${saveId}:immune`,
+        name: `Immune to ${pending.sourceName}'s ${pending.actionName}`.slice(0, 120),
+        tags: [AURA_IMMUNE_TAG],
+        sourceActorId: pending.sourceActorId,
+        sourceName: pending.sourceName,
+        sourceActionId: traitActionId(pending.actionName),
+        startedRound: state.combat.round,
+        duration: { type: "encounter" }
+      })
     );
   // A repeated save that succeeds ends the effect it was repeated for (Hold Person ends on that target).
   if (success && pending.repeatOf)
@@ -742,6 +867,7 @@ export function answerSave(
       conditionApplied,
       committed: true,
       autoFailed,
+      ...(autoSucceeded !== null ? { autoSucceeded } : {}),
       ...(rollMode ? { rollMode } : {}),
       ...(application
         ? {

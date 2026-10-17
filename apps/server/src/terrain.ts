@@ -12,6 +12,7 @@ import {
 } from "@vtt/rules-5e";
 import { isIncapacitated } from "./condition-rules.js";
 import { areAllies } from "./creature-sides.js";
+import { holdsFeature } from "./class-features.js";
 import { CommandRejectedError } from "./game-store.js";
 import { gridToImage, imageToGrid } from "./grid-calibration.js";
 import { layerSlice, normalizedRect, type LayerMapGeometry, type PaintRectInput } from "./map-layers.js";
@@ -84,6 +85,8 @@ export type MovementCostOptions = Readonly<{
   /** With dynamic vision on, whether the mover perceives a creature; one it doesn't is no obstacle to its path, as a
    *  hidden one isn't, so a refusal can't give it away. Every creature counts when absent. */
   perceives?: (actorId: string) => boolean;
+  /** The mover may stop in other creatures' spaces (an air elemental's Air Form), so none bars its way. */
+  passesCreatures?: boolean;
 }>;
 
 /** The movement-blocking walls of the live scene (walls, closed doors, windows) in grid units, while its dynamic
@@ -130,12 +133,19 @@ export function movementCost(
     const occupant = state.actors.find((candidate) => candidate.id === token.actorId);
     if (!mover || !occupant || occupant.visibility === "gm-only") continue;
     if (options.perceives && !options.perceives(occupant.id)) continue;
-    const passage = spacePassage({
+    const printed = spacePassage({
       ally: areAllies(mover, occupant, options.resolveDefinition),
       incapacitated: isIncapacitated(occupant),
       moverSize: mover.size,
       occupantSize: occupant.size
     });
+    // A mover that can stop in a creature's space, or a swarm's space ("and vice versa"), is never barred; it is still
+    // another creature's space, so it costs as Difficult Terrain.
+    const swarm =
+      occupant.definitionId !== null &&
+      occupant.definitionId !== undefined &&
+      holdsFeature(options.resolveDefinition?.(occupant.definitionId), "swarm", "Swarm");
+    const passage = printed === "blocked" && (options.passesCreatures || swarm) ? "difficult" : printed;
     if (passage === "open") continue;
     const cells = passage === "blocked" ? closedCells : difficultCells;
     const origin = footprintOrigin(imageToGrid(calibration, token.position), token.sizeCells);

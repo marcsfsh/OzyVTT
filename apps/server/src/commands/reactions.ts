@@ -218,7 +218,8 @@ export const reactionCommands = [
             newId: kit.context.newId,
             now: () => Date.now(),
             catalog: kit.equipmentCatalog(),
-            distanceFeet: (actorIdA, actorIdB) => distance(state, actorIdA, actorIdB)
+            distanceFeet: (actorIdA, actorIdB) => distance(state, actorIdA, actorIdB),
+            rollDie: (sides) => kit.context.random(sides)
           }) ?? undefined;
       });
       if (duplicate || !applied) return;

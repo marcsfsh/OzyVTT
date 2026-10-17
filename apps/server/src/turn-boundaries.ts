@@ -4,14 +4,23 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { holdsFeature } from "./class-features.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { expireEffectsAtTurnEnd, sourceOf, type EffectNarration } from "./effects.js";
-import { applyDamageDetailed, damageAdjustmentDetail } from "./hit-points.js";
+import { applyDamageDetailed, damageAdjustmentDetail, loseHitPoints, UNTYPED_DAMAGE } from "./hit-points.js";
 import { createPendingSaves } from "./saving-throws.js";
+import { traitsAtTurnEnd, traitsAtTurnStart } from "./trait-turns.js";
 
 type Actor = GameState["actors"][number];
 type Effect = Actor["effects"][number];
 
-/** What the end-of-turn step needs to open prompts; without it (scene bookkeeping) durations still end. */
-export type TurnEndDeps = Readonly<{ newId: () => string; now: () => string }>;
+/** What the end-of-turn step needs to open prompts; without it (scene bookkeeping) durations still end. With dice and
+ *  the stat blocks, a trait that burns as its bearer's turn ends (Fire Aura) deals its damage too. */
+export type TurnEndDeps = Readonly<{
+  newId: () => string;
+  now: () => string;
+  rollDie?: (sides: number) => number;
+  resolveDefinition?: (definitionId: string) => ActorDefinition | undefined;
+  catalog?: EquipmentCatalog;
+  distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
+}>;
 
 /** What the start-of-turn step needs to roll ongoing damage and weigh it; prompts open only with `newId`. */
 export type TurnStartDeps = Readonly<{
@@ -20,17 +29,26 @@ export type TurnStartDeps = Readonly<{
   catalog?: EquipmentCatalog;
   newId?: () => string;
   now?: () => string;
+  /** Creature-to-creature distance on the map, for the auras a creature starts its turn in. */
+  distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
 }>;
 
 /**
  * SRD: "at the end of its turn". When `actorId`'s turn ends, before the next begins:
  * 1. "until the end of its/your next turn" durations it owns end (`expireEffectsAtTurnEnd`);
  * 2. each effect it bears that "repeats the save at the end of each of its turns" opens that save, a success ending
- *    the effect (`openRepeatSaves`).
+ *    the effect (`openRepeatSaves`);
+ * 3. its stat block's traits that act as its turn ends (Fire Aura) do (`traitsAtTurnEnd`), and the ongoing damage
+ *    printed for the end of a turn lands.
  */
 export function endOfTurn(state: GameState, actorId: string, events: EffectNarration[], deps?: TurnEndDeps): void {
   events.push(...expireEffectsAtTurnEnd(state, actorId));
   if (deps) events.push(...openRepeatSaves(state, actorId, deps));
+  if (!deps?.rollDie || !deps.resolveDefinition) return;
+  const dice = { ...deps, rollDie: deps.rollDie, resolveDefinition: deps.resolveDefinition };
+  events.push(...traitsAtTurnEnd(state, actorId, dice));
+  // "Takes 10 (3d6) Acid damage at the end of each of the toad's turns."
+  dealOngoingAt(state, actorId, "end", events, dice);
 }
 
 /**
@@ -38,20 +56,36 @@ export function endOfTurn(state: GameState, actorId: string, events: EffectNarra
  * (`expireEffectsAtTurnStart`), each effect whose ongoing damage falls on this turn deals it: one the creature bears
  * ("each of its turns") or one it is the source of ("each of the behir's turns"; a source at 0 HP has no turns to
  * deal it on). The dice roll here and the damage meets the bearer's defences like any hit. A save that follows the
- * damage opens next, a success ending the effect (Searing Smite).
+ * damage opens next, a success ending the effect (Searing Smite). Before that, its stat block's traits act
+ * (`traitsAtTurnStart`: Regeneration, Berserk, Barbed Hide) and the auras it starts its turn in ask their saves.
  */
 export function startOfTurn(state: GameState, actorId: string, events: EffectNarration[], deps: TurnStartDeps): void {
   heroicWarrior(state, actorId, events, deps);
+  events.push(...traitsAtTurnStart(state, actorId, deps));
+  dealOngoingAt(state, actorId, "start", events, deps);
+}
+
+/** The ongoing damage (or hit point loss) that falls as `actorId`'s turn starts or ends: an effect it bears ("each of
+ *  its turns") or one it is the source of ("each of the behir's turns"; a source at 0 HP has no turns to deal it on). */
+function dealOngoingAt(
+  state: GameState,
+  actorId: string,
+  boundary: "start" | "end",
+  events: EffectNarration[],
+  deps: TurnStartDeps
+): void {
   const inFight = new Set(state.combat.initiative.map((entry) => entry.actorId));
   for (const bearer of state.actors) {
     if (!inFight.has(bearer.id)) continue;
     for (const effect of [...bearer.effects]) {
       const ongoing = effect.ongoingDamage;
-      if (!ongoing || (ongoing.at === "bearer-turn-start" ? bearer.id : effect.sourceActorId) !== actorId) continue;
+      if (!ongoing || !ongoing.at.endsWith(`-turn-${boundary}`)) continue;
+      const bearers = ongoing.at.startsWith("bearer-");
+      if ((bearers ? bearer.id : effect.sourceActorId) !== actorId) continue;
       // Damage dealt earlier this turn may have ended it (a death, a cascade).
       if (!bearer.effects.some((candidate) => candidate.id === effect.id) || beyondHarm(bearer)) continue;
       const source = state.actors.find((candidate) => candidate.id === effect.sourceActorId);
-      if (ongoing.at === "source-turn-start" && (!source || source.hp.current <= 0)) continue;
+      if (!bearers && (!source || source.hp.current <= 0)) continue;
       events.push(...dealOngoingDamage(state, bearer, effect, deps));
       const stillOn = bearer.effects.some((candidate) => candidate.id === effect.id);
       if (ongoing.saveToEnd && stillOn && deps.newId)
@@ -83,28 +117,45 @@ const beyondHarm = (actor: Actor) =>
 const capitalised = (type: string) => (type.length > 0 ? `${type[0].toUpperCase()}${type.slice(1)}` : type);
 
 function dealOngoingDamage(state: GameState, bearer: Actor, effect: Effect, deps: TurnStartDeps): EffectNarration[] {
-  const parts = effect.ongoingDamage!.damage.map((part) => ({
+  const ongoing = effect.ongoingDamage!;
+  const rolled = ongoing.damage.map((part) => ({
     amount: Math.max(0, resolveDice(parseDiceFormula(part.formula), deps.rollDie).total),
-    type: part.type
+    type: part.type ?? UNTYPED_DAMAGE
   }));
+  const damageDeps = {
+    resolveDefinition: deps.resolveDefinition,
+    rollDie: deps.rollDie,
+    ...(deps.catalog ? { catalog: deps.catalog } : {}),
+    ...(deps.newId ? { newId: deps.newId } : {}),
+    ...(deps.now ? { now: deps.now } : {})
+  };
+  // "Loses 5 (1d10) Hit Points": no damage, so nothing meets it.
+  if (ongoing.hitPointLoss) {
+    const total = rolled.reduce((sum, part) => sum + part.amount, 0);
+    const { lost, events } = loseHitPoints(state, bearer.id, total, damageDeps);
+    return [
+      {
+        kind: "damage",
+        text: `${bearer.name} loses ${lost} hit points to ${effect.name}.`,
+        actorId: bearer.id,
+        ...sourceOf(effect)
+      },
+      ...events
+    ];
+  }
   const { application, events } = applyDamageDetailed(
     state,
     bearer.id,
     {
-      amount: parts.reduce((sum, part) => sum + part.amount, 0),
-      parts,
+      amount: rolled.reduce((sum, part) => sum + part.amount, 0),
+      parts: rolled,
       sourceName: effect.sourceName,
       sourceActorId: effect.sourceActorId
     },
     { role: "gm" },
-    {
-      resolveDefinition: deps.resolveDefinition,
-      ...(deps.catalog ? { catalog: deps.catalog } : {}),
-      ...(deps.newId ? { newId: deps.newId } : {}),
-      ...(deps.now ? { now: deps.now } : {})
-    }
+    damageDeps
   );
-  const typed = parts.length === 1 ? ` ${capitalised(parts[0].type)}` : "";
+  const typed = rolled.length === 1 && rolled[0].type !== UNTYPED_DAMAGE ? ` ${capitalised(rolled[0].type)}` : "";
   return [
     {
       kind: "damage",
@@ -146,6 +197,8 @@ function openEndingSave(
     halfOnSuccess: false,
     conditionIds: [],
     repeatOf: { actorId: bearer.id, effectId: effect.id },
+    // Repeated against a spell's effect (Hold Person), it is still a save against magic.
+    magical: effect.magical === true,
     newSaveId: deps.newId,
     createdAt: Date.parse(deps.now())
   });

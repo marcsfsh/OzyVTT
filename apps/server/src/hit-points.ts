@@ -18,6 +18,7 @@ import {
   rescaleDamageParts,
   type DamagePart,
   type DamageReduction,
+  type RandomSource,
   type ResolvedRider
 } from "@vtt/rules-5e";
 import { DAMAGE_TYPE_IDS } from "@vtt/content-srd-5.2.1/schemas";
@@ -45,6 +46,13 @@ import { leaveShortRest } from "./short-rest-interruptions.js";
 import { choiceOverrideDefenses, type OverrideDamageDefenses } from "./choice-overrides.js";
 import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 import { oilIgnition, OILED_TAG } from "./hazards.js";
+import {
+  deathBurst,
+  holdOnAtZero,
+  REGENERATING_AT_ZERO_TAG,
+  stopRegeneration,
+  undeadFortitude
+} from "./statblock-traits.js";
 
 export function healthBandOf(hp: Actor["hp"]): HealthBand {
   if (hp.current <= 0) return "down";
@@ -87,6 +95,9 @@ export type DamageDeps = Readonly<{
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
   /** The command applying the damage, recorded on a reaction prompt it opens. */
   commandId?: string;
+  /** The server's dice, for what a stat block rolls as damage lands (Undead Fortitude's save, a Death Burst's damage);
+   *  without them those traits are left to the GM. */
+  rollDie?: RandomSource;
 }>;
 export type DamageOutcome = Readonly<{ application: DamageApplication; events: EffectNarration[] }>;
 
@@ -334,6 +345,70 @@ export function previewDamage(
   };
 }
 
+/**
+ * What dropping to 0 Hit Points does, by damage or by hit points lost: a character falls Unconscious and is dying (or
+ * dies outright when the overflow reaches its maximum), any other creature is defeated (a troll lies down until its
+ * turn, a Death Burst goes off), and nobody at 0 sustains effects or Concentration.
+ */
+function fallToZero(
+  state: GameState,
+  actor: Actor,
+  definition: ActorDefinition | undefined,
+  overflow: number,
+  deps: DamageDeps | undefined,
+  events: EffectNarration[]
+): Readonly<{ instantDeath: boolean; defeated: boolean }> {
+  let instantDeath = false;
+  let defeated = false;
+  if (actor.kind === "player-character") {
+    const outcome = droppedToZero(overflow, actor.hp.maximum);
+    actor.deathSaves = outcome.state;
+    instantDeath = outcome.instantDeath;
+    applyCondition(actor, "unconscious", { immunities: deps });
+    applyCondition(actor, "prone", { immunities: deps });
+    events.push({
+      kind: "condition",
+      text: instantDeath ? `${actor.name} was killed outright.` : `${actor.name} fell Unconscious and is dying.`,
+      actorId: actor.id
+    });
+  } else {
+    defeated = true;
+    // A swallower that dies lets out what it swallowed (SRD: "can escape from the corpse").
+    events.push(...releaseSwallowedBy(state, actor.id, definition));
+    // A troll lies down until its next turn says whether it regenerates; anything else dies, and a Death Burst goes
+    // off as it does.
+    if (!holdOnAtZero(state, actor, definition, events) && deps) deathBurst(state, actor, definition, deps, events);
+  }
+  // At 0 HP a combatant can't sustain effects (grapples, rage); incapacitation also breaks
+  // concentration (SRD Concentration).
+  events.push(...endEffectsSustainedBy(state, actor.id));
+  events.push(...endConcentrationSustainedBy(state, actor.id));
+  return { instantDeath, defeated };
+}
+
+/**
+ * Hit points lost rather than damage taken (an infernal wound: "the target loses 5 (1d10) Hit Points"): no type, no
+ * defence, no Temporary Hit Points and no Concentration save, since none of those meet damage that isn't dealt. A
+ * creature it drops to 0 falls as damage would drop it, with no overflow to kill it outright. Returns what it lost.
+ */
+export function loseHitPoints(
+  state: GameState,
+  actorId: string,
+  amount: number,
+  deps?: DamageDeps
+): Readonly<{ lost: number; events: EffectNarration[] }> {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor || amount <= 0 || actor.hp.current <= 0) return { lost: 0, events: [] };
+  const before = actor.hp.current;
+  actor.hp.current = Math.max(0, before - amount);
+  const events: EffectNarration[] = [];
+  if (actor.hp.current === 0) {
+    const definition = actor.definitionId && deps ? deps.resolveDefinition(actor.definitionId) : undefined;
+    fallToZero(state, actor, definition, 0, deps, events);
+  }
+  return { lost: before - actor.hp.current, events };
+}
+
 /** The single damage entry point (ADR-0020): typed parts go through definition, effect and item
  *  defences; the untyped amount stays exact. Temp HP absorbs first. At 0 HP player characters start
  *  dying (or die on massive overflow) and any combatant releases the effects it sustains. */
@@ -363,6 +438,20 @@ export function applyDamageDetailed(
   // SRD Knocking Out a Creature: a melee attack that would drop it to 0 can leave it at 1 HP and Unconscious instead.
   const knockedOut = input.nonlethal === true && !wasAtZero && actor.hp.current === 0 && damageToHp > 0;
   if (knockedOut) actor.hp.current = 1;
+  const definition = actor.definitionId && deps ? deps.resolveDefinition(actor.definitionId) : undefined;
+  const isPlayerCharacter = actor.kind === "player-character";
+  // What its stat block does as the damage lands: Acid or Fire stops a troll's Regeneration, and Undead Fortitude may
+  // leave a zombie at 1 Hit Point instead of 0.
+  if (totalAdjusted > 0) events.push(...stopRegeneration(state, actor, definition, parts));
+  if (!isPlayerCharacter && !knockedOut && !wasAtZero && actor.hp.current === 0 && damageToHp > 0 && deps)
+    undeadFortitude(
+      state,
+      actor,
+      definition,
+      { taken: totalAdjusted, parts, critical: input.critical === true },
+      deps,
+      events
+    );
   // Sleep, Turn Undead and the like end the moment the bearer takes any damage, and so does a Short Rest.
   if (totalAdjusted > 0)
     events.push(...endEffectsOnDamage(state, actor), ...leaveShortRest(state, new Set([actor.id]), "took damage"));
@@ -370,7 +459,6 @@ export function applyDamageDetailed(
   let deathSaveFailuresAdded = 0;
   let instantDeath = false;
   let defeated = false;
-  const isPlayerCharacter = actor.kind === "player-character";
 
   if (isPlayerCharacter && wasAtZero && totalAdjusted > 0) {
     // Damage while dying: automatic failures (two on a crit), even when Temporary Hit Points soak it all ("If
@@ -406,28 +494,9 @@ export function applyDamageDetailed(
       actorId
     });
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0) {
-    if (isPlayerCharacter) {
-      const overflow = damageToHp - hpBefore;
-      const outcome = droppedToZero(overflow, actor.hp.maximum);
-      actor.deathSaves = outcome.state;
-      instantDeath = outcome.instantDeath;
-      applyCondition(actor, "unconscious", { immunities: deps });
-      applyCondition(actor, "prone", { immunities: deps });
-      events.push({
-        kind: "condition",
-        text: instantDeath ? `${actor.name} was killed outright.` : `${actor.name} fell Unconscious and is dying.`,
-        actorId
-      });
-    } else {
-      defeated = true;
-      // A swallower that dies lets out what it swallowed (SRD: "can escape from the corpse").
-      const definition = actor.definitionId ? deps?.resolveDefinition?.(actor.definitionId) : undefined;
-      events.push(...releaseSwallowedBy(state, actor.id, definition));
-    }
-    // At 0 HP a combatant can't sustain effects (grapples, rage); incapacitation also breaks
-    // concentration (SRD Concentration).
-    events.push(...endEffectsSustainedBy(state, actor.id));
-    events.push(...endConcentrationSustainedBy(state, actor.id));
+    const fell = fallToZero(state, actor, definition, damageToHp - hpBefore, deps, events);
+    instantDeath = fell.instantDeath;
+    defeated = fell.defeated;
   }
 
   // SRD Concentration: damage while concentrating prompts a CON save, DC max(10, half the damage) capped
@@ -526,6 +595,9 @@ export function healActor(state: GameState, actorId: string, amount: number, sco
 function wakeOnHealing(state: GameState, actor: Actor, before: number): EffectNarration[] {
   if (actor.hp.current <= before) return [];
   const events = endKnockOut(state, actor);
+  // A troll healed off 0 Hit Points no longer waits on its turn to live or die.
+  for (const effect of actor.effects.filter((candidate) => candidate.tags.includes(REGENERATING_AT_ZERO_TAG)))
+    events.push(...endEffect(state, actor.id, effect.id));
   // A creature knocked out before the 1-HP rule (at 0, with no dying state) wakes the same way.
   if (
     before <= 0 &&

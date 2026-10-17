@@ -43,16 +43,21 @@ describe("damage when the spell appears", () => {
     const resolution = resolve("spell-heat-metal", {}, [4, 4]);
     expect(resolution.damage).toEqual([{ formula: "2d8", type: "fire", total: 8 }]);
     expect(resolution.save).toBeNull();
-    expect(state.combat.pendingSaves).toEqual([]);
+    // The only save is the one to keep hold of the object, after the damage.
+    expect(state.combat.pendingSaves).toEqual([
+      expect.objectContaining({ ability: "con", proposedDamage: 0, actionName: "Heat Metal: keep hold" })
+    ]);
   });
 });
 
 describe("a save made later, not on the cast", () => {
-  it("prompts no save when Spirit Guardians is cast, and reminds the GM how the later save is made", () => {
+  it("prompts no save when Spirit Guardians is cast, and leaves the area the server runs around the caster", () => {
     const { resolve, state } = fight(cleric);
-    const resolution = resolve("spell-spirit-guardians", { targetIds: [] });
+    resolve("spell-spirit-guardians", { targetIds: [] });
     expect(state.combat.pendingSaves).toEqual([]);
-    expect(resolution.warnings?.join(" ")).toMatch(/ends its turn there.*Spirit Guardians: save/);
+    expect(state.combat.spellZones).toEqual([
+      expect.objectContaining({ spellId: "spirit-guardians", laterActionId: "spell-spirit-guardians-then-save" })
+    ]);
   });
 
   it("resolves the later save against a creature: Wisdom, 3d8 Radiant, half on a success", () => {
@@ -107,8 +112,14 @@ describe("a damage type the caster picks", () => {
 
 describe("Produce Flame", () => {
   it("is cast with no attack; the hurl is a Magic action out to 60 feet, scaling with the caster's level", () => {
-    expect(druid.actions.some((action) => action.id === "spell-produce-flame")).toBe(false);
-    const { resolve, action } = fight(druid, { distance: 50 });
+    expect(druid.actions.find((action) => action.id === "spell-produce-flame")).toMatchObject({
+      activation: "bonus-action",
+      damage: []
+    });
+    expect(druid.actions.find((action) => action.id === "spell-produce-flame")?.attack).toBeUndefined();
+    const { resolve, action, state } = fight(druid, { distance: 50 });
+    resolve("spell-produce-flame", { targetIds: [] });
+    state.combat.turn = { ...state.combat.turn, actionUsed: false };
     expect(action("spell-produce-flame-then-hurl")).toMatchObject({
       activation: "action",
       attack: { rangeFeet: 60 },

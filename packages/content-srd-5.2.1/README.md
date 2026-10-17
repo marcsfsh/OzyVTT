@@ -54,7 +54,9 @@ scratch directory and requires every committed bundle back byte for byte, so edi
   area of effect and for a Multiattack's plan (the other plan it can be, and the actions that can
   replace one of its attacks), read here by `src/action-prose.ts`; homebrew and imported stat
   blocks get the area, and the mark of a Multiattack nothing structured names, from it as they
-  enter the campaign. Each spell's cast model (the spell attacks one cast makes and how far they reach, its
+  enter the campaign. What a stat block's traits do (Regeneration, Undead Fortitude, auras, Death Burst) is
+  read the same way by `scripts/trait-mechanics.ts`, and the spells its actions cast (a Spellcasting
+  list's At Will and N/Day spells, a Misty Step) by `scripts/monster-spells.ts`. Each spell's cast model (the spell attacks one cast makes and how far they reach, its
   damage and its healing, whether its save waits for a later trigger, what it lets the caster do
   on later turns, and the effect it leaves on its targets or on a creature that fails its save) is read
   here too, by `scripts/spell-effects.ts` with a reviewed table, because the source's damage

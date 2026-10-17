@@ -511,6 +511,7 @@ export type ContentActionSummary = Readonly<{
   /** The hit points it restores, when it heals (a potion drunk from the pack). */ healing?: Readonly<{
     formula: string;
   }> | null;
+  /** How many creatures one use heals when it can be more than one (Prayer of Healing's five). */ healTargets?: number;
   /** SRD Legendary Action cost against the creature's per-round pool (taken on other creatures' turns). */ legendaryCost?: number;
   /** "Can't take this action again until the start of its next turn." */ legendaryOncePerRound?: true;
   /** Taken as one attack of the Attack action (an Unarmed Strike, a Breath Weapon), so it spends one the action has left. */ replacesAttack?: true;
@@ -522,6 +523,13 @@ export type ContentActionSummary = Readonly<{
     Readonly<{ id: string; ability: z.infer<typeof AbilitySchema> }>
   >;
   /** The cast chooses an ability (Hex); `action.resolve`'s `ability`. */ choosesAbility?: boolean;
+  /** A stat block's spell list (Spellcasting, Divine Aid): the numbers its casts are made with. */ spellList?: Readonly<{
+    ability: z.infer<typeof AbilitySchema>;
+    saveDc: number;
+    attackBonus: number;
+  }>;
+  /** The spell list this cast belongs to, by its action id; it is shown under that list. */ castFrom?: string;
+  /** The spell it casts. */ spellId?: string;
 }>;
 export type ContentActionsResult = {
   ok: boolean;

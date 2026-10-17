@@ -2,7 +2,7 @@ import { d20FacesFor } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { checkPlan, totalCheck, type CheckSubject } from "../ability-checks.js";
 import { builtinBaseId } from "../builtin-actions.js";
-import { addEffect, endEffect, makeEffect } from "../effects.js";
+import { addEffect, endEffect, ESCAPE_ATHLETICS_TAG, makeEffect } from "../effects.js";
 import { putOutFire } from "../hazards.js";
 import { CommandRejectedError } from "../game-store.js";
 import { createPendingSaves, saveModifierFor, shownRollMode } from "../saving-throws.js";
@@ -138,11 +138,18 @@ function escapeGrapple(ctx: ResolveContext): void {
     throw new CommandRejectedError("No escapable effect (one with an escape DC) is active on this combatant.");
   const athletics: CheckSubject = { ability: "str", skill: "athletics" };
   const acrobatics: CheckSubject = { ability: "dex", skill: "acrobatics" };
-  if (input.skill && input.skill !== "athletics" && input.skill !== "acrobatics")
-    throw new CommandRejectedError("Escaping a grapple uses Athletics or Acrobatics.");
+  // A spell's restraint (Web, Entangle) is broken with Strength (Athletics) alone.
+  const athleticsOnly = escapable.tags.includes(ESCAPE_ATHLETICS_TAG);
+  if (input.skill && input.skill !== "athletics" && (athleticsOnly || input.skill !== "acrobatics"))
+    throw new CommandRejectedError(
+      athleticsOnly
+        ? `Breaking free of ${escapable.name} takes a Strength (Athletics) check.`
+        : "Escaping a grapple uses Athletics or Acrobatics."
+    );
   const better =
+    athleticsOnly ||
     checkPlan(attacker, deps.definition, ctx.derivation, athletics).modifier >=
-    checkPlan(attacker, deps.definition, ctx.derivation, acrobatics).modifier
+      checkPlan(attacker, deps.definition, ctx.derivation, acrobatics).modifier
       ? athletics
       : acrobatics;
   const subject = input.skill === "athletics" ? athletics : input.skill === "acrobatics" ? acrobatics : better;
