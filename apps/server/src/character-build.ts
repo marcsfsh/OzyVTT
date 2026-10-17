@@ -201,6 +201,17 @@ const CARRIER_RIDER_DISPOSITION: Readonly<
   sense: "display-only" // like `darkvision`: the trait prose carries it; no definition field models senses
 };
 
+/** Where a modifier type is consumed, for the coverage manifest (`srd-coverage.ts`): baked by the builder, read at a
+ *  roll, or read by nothing yet. `darkvision` is baked, but only to be displayed, like `sense`. */
+export function modifierDisposition(
+  type: Modifier["type"]
+): "baked" | "standing" | "at-its-moment" | "unread" | "display-only" {
+  if (type === "darkvision") return "display-only";
+  return (BUILDER_BAKED_MODIFIER_TYPES as readonly string[]).includes(type)
+    ? "baked"
+    : CARRIER_RIDER_DISPOSITION[type as CarrierRiderType];
+}
+
 /** No-op for riders the roll-time collector owns; the parameter type proves `default:` covers only those. */
 function ownedByTheRollTimeCollector(modifier: { type: CarrierRiderType }): string {
   return CARRIER_RIDER_DISPOSITION[modifier.type];

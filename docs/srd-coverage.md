@@ -1,23 +1,27 @@
 # SRD 5.2.1 coverage (generated - do not edit by hand)
 
-Regenerate with `npm run map`; a test (`apps/server/test/srd-coverage.test.ts`) fails when this is stale
-or a condition, glossary entry or monster trait has no classification. Every SRD record is in one state:
+This page lists every record in the SRD 5.2.1 content and says what the app does with it. Each record is in
+one of three states:
 
-- **Enforced:** the server applies it (rolls, damage, conditions, uses, Armor Class, the builder's picks).
-- **Guided:** the app tracks it and walks the table through it (a spent slot, a counted use, a reminder, a
-  rolled save); a person applies the rest.
-- **Reference:** readable in the app where it's needed; there is nothing to apply.
+- **Enforced:** the server applies it in play. The GM may still supply a fact the map can't see, such as a
+  creature's line of sight or its degree of cover, and a note names any narrative part left to the table.
+- **Guided:** the app tracks it or applies part of it, and a person applies the rest. It may count a use, open a
+  prompt, roll a check or post a reminder. The note says which part is the table's.
+- **Reference:** the app shows the text and applies nothing.
 
-Records are classified from the mechanics their content bundle carries, since the engine is data-driven,
-with curated rows for what data can't say (`apps/server/src/srd-coverage-curated.ts`). Known gaps in
-enforced records are GitHub issues.
+A note names the module that applies a record, so it can be checked in the code. Enforcement follows the
+table's rules policy: under advise the server warns where it would refuse, and under off it says nothing.
+
+Regenerate this page with `npm run map`. A test (`apps/server/test/srd-coverage.test.ts`) fails when the page
+is stale, when a curated row is missing or names a record that no longer exists, and when a sampled claim
+stops matching the engine. Known gaps in enforced records are GitHub issues.
 
 ## Summary
 
 | Records | Enforced | Guided | Reference |
 | --- | --- | --- | --- |
 | Spells (339) | 132 | 198 | 9 |
-| Monster actions (989) | 895 | 49 | 45 |
+| Monster actions (989) | 877 | 67 | 45 |
 | Monster traits (106) | 0 | 0 | 106 |
 | Barbarian features (23) | 16 | 1 | 6 |
 | Bard features (16) | 9 | 3 | 4 |
@@ -26,20 +30,48 @@ enforced records are GitHub issues.
 | Fighter features (21) | 13 | 2 | 6 |
 | Monk features (30) | 17 | 1 | 12 |
 | Paladin features (26) | 18 | 3 | 5 |
-| Ranger features (22) | 11 | 4 | 7 |
+| Ranger features (22) | 10 | 4 | 8 |
 | Rogue features (23) | 11 | 2 | 10 |
 | Sorcerer features (18) | 11 | 4 | 3 |
 | Warlock features (20) | 15 | 2 | 3 |
 | Wizard features (15) | 7 | 2 | 6 |
-| Species traits (77) | 60 | 5 | 12 |
+| Species traits (77) | 53 | 5 | 19 |
 | Backgrounds (4) | 4 | 0 | 0 |
 | Feats (19) | 16 | 1 | 2 |
-| Magic items (270) | 108 | 81 | 81 |
-| Gear and tools (141) | 15 | 0 | 126 |
+| Magic items (270) | 87 | 106 | 77 |
+| Gear and tools (141) | 15 | 37 | 89 |
 | Weapons (38) | 38 | 0 | 0 |
 | Armor (13) | 13 | 0 | 0 |
 | Conditions (15) | 0 | 0 | 15 |
 | Rules glossary (155) | 0 | 0 | 155 |
+| All records (2420) | 1386 | 443 | 591 |
+
+## How records are classified
+
+Most records are classified from the mechanics their content bundle carries, because the engine is data-driven
+(`apps/server/src/srd-coverage.ts`); the rest are curated (`apps/server/src/srd-coverage-curated.ts`).
+
+- **Spells:** enforced when a cast applies its attack, save, damage, healing or lasting effect, or the area it
+  leaves applies them as creatures enter it or start or end a turn there (`spell-zones.ts`). Guided when the app
+  spends the slot and holds the Concentration, the area or a save while a person applies what the spell does. A
+  spell whose cast leaves a rider to the table (Ray of Frost's lower Speed) is curated as guided, with a note.
+- **Monster actions:** enforced when the attack, save, damage, healing or effect resolves, or when the server
+  offers the action as the generic action it names (Nimble Escape's Disengage or Hide). An action that casts
+  spells takes the state of the spells it casts, each a cast action at the stat block's numbers. Guided when the
+  server resolves it and reminds the GM of the rest, or only counts a use, a legendary cost or a recharge.
+- **Class features, species traits and feats:** enforced when their riders (an action that resolves, an
+  effect, a modifier the engine reads, a grant) or the builder's picks apply them. Guided when the app counts
+  their uses or offers an action that only spends a use, or when part of what they do is left to a person.
+- **Magic items and gear:** enforced for weapons, armor, ammunition, Spell Scrolls and items whose riders
+  apply. An item that casts spells takes the state of the spells it casts. Guided when the app only tracks
+  Attunement, charges or a curse, or binds the item to a base weapon or armor without its magic. Tools are
+  guided too: the server rolls their checks, and the GM sets what they achieve.
+- **Backgrounds, weapons and armor:** enforced. The builder applies a background, and every weapon and armor
+  statistic reaches the rolls.
+- **Monster traits, conditions and the rules glossary:** curated by hand, each with a note.
+
+Records the engine handles in code, which the data can't show, are curated too (`RECORD_OVERRIDES`), and each
+group lists their notes after its records.
 
 ## Spells
 
@@ -51,13 +83,15 @@ enforced records are GitHub issues.
 
 ## Monster actions
 
-**Enforced (895):** (listed by count only)
+**Enforced (877):** too many to list, so the guided and reference actions below stand out.
 
-**Guided (49):** Adult Blue Dragon: Cloaked Flight, Adult Red Dragon: Commanding Presence, Ancient Blue Dragon: Cloaked Flight, Ancient Red Dragon: Commanding Presence, Archmage: Misty Step (3/Day), Blink Dog: Teleport (Recharge 4-6), Cloaker: Phantasms (Recharge after a Short or Long Rest), Cloud Giant: Misty Step, Cloud Giant: Spellcasting, Darkmantle: Darkness Aura (1/Day), Deva: Spellcasting, Djinni: Spellcasting, Doppelganger: Read Thoughts, Frost Giant: War Cry (Recharge 5-6), Ghost: Etherealness, Giant Hyena: Rampage (1/Day), Giant Octopus: Ink Cloud (1/Day), Giant Owl: Spellcasting, Gnoll Warrior: Rampage (1/Day), Hydra: Multiattack, Ice Mephit: Fog Cloud (1/Day), Imp: Invisibility, Lich: Deathly Teleport, Mage: Misty Step (3/Day), Marilith: Teleport (Recharge 5-6), Mummy Lord: Dread Command, Mummy Lord: Necrotic Strike, Night Hag: Nightmare Haunting (1/Day), Octopus: Ink Cloud (1/Day), Oni: Invisibility, Pit Fiend: Hellfire Spellcasting (Recharge 4-6), Planetar: Spellcasting, Priest Acolyte: Spellcasting, Quasit: Invisibility, Roc: Swoop (Recharge 5-6), Sea Hag: Illusory Appearance, Solar: Spellcasting, Sphinx of Lore: Spellcasting, Sphinx of Valor: Spellcasting, Sphinx of Wonder: Burst of Ingenuity (2/Day), Sprite: Invisibility, Stone Giant: Deflect Missile (Recharge 5-6), Stone Golem: Slow (Recharge 5-6), Storm Giant: Spellcasting, Tarrasque: Onslaught, Tarrasque: World-Shaking Movement, Treant: Animate Trees (1/Day), Unicorn: Shimmering Shield, Vampire: Beguile
+**Guided (67):** Adult Blue Dragon: Cloaked Flight, Adult Red Dragon: Commanding Presence, Ancient Blue Dragon: Cloaked Flight, Ancient Red Dragon: Commanding Presence, Archmage: Misty Step (3/Day), Bearded Devil: Infernal Glaive, Behir: Swallow, Blink Dog: Teleport (Recharge 4-6), Cloaker: Phantasms (Recharge after a Short or Long Rest), Cloud Giant: Misty Step, Cloud Giant: Spellcasting, Darkmantle: Darkness Aura (1/Day), Deva: Spellcasting, Djinni: Create Whirlwind, Djinni: Spellcasting, Doppelganger: Read Thoughts, Frost Giant: War Cry (Recharge 5-6), Gelatinous Cube: Engulf, Ghost: Etherealness, Giant Hyena: Rampage (1/Day), Giant Octopus: Ink Cloud (1/Day), Giant Owl: Spellcasting, Gnoll Warrior: Rampage (1/Day), Horned Devil: Infernal Tail, Hydra: Multiattack, Ice Mephit: Fog Cloud (1/Day), Imp: Invisibility, Incubus: Nightmare (Recharge 6), Invisible Stalker: Vortex, Kraken: Swallow, Lich: Deathly Teleport, Mage: Misty Step (3/Day), Marilith: Teleport (Recharge 5-6), Mummy Lord: Dread Command, Mummy Lord: Necrotic Strike, Night Hag: Nightmare Haunting (1/Day), Octopus: Ink Cloud (1/Day), Oni: Invisibility, Otyugh: Bite, Pit Fiend: Bite, Pit Fiend: Hellfire Spellcasting (Recharge 4-6), Planetar: Spellcasting, Priest Acolyte: Spellcasting, Purple Worm: Swallow, Quasit: Invisibility, Remorhaz: Swallow, Roc: Swoop (Recharge 5-6), Sea Hag: Death Glare (Recharge 5-6), Sea Hag: Illusory Appearance, Shambling Mound: Engulf, Solar: Slaying Bow, Solar: Spellcasting, Sphinx of Lore: Spellcasting, Sphinx of Valor: Roar (3/Day), Sphinx of Valor: Spellcasting, Sphinx of Wonder: Burst of Ingenuity (2/Day), Sprite: Invisibility, Stone Giant: Deflect Missile (Recharge 5-6), Stone Golem: Slow (Recharge 5-6), Storm Giant: Spellcasting, Tarrasque: Onslaught, Tarrasque: Swallow, Tarrasque: World-Shaking Movement, Treant: Animate Trees (1/Day), Unicorn: Shimmering Shield, Vampire: Beguile, Water Elemental: Whelm (Recharge 4-6)
 
 **Reference (45):** Balor: Teleport, Black Pudding: Split, Bulette: Leap, Chain Devil: Unnerving Gaze, Doppelganger: Shape-Shift, Dryad: Tree Stride, Ettercap: Reel, Giant Ape: Leap, Giant Frog: Swallow, Giant Seahorse: Bubble Dash, Giant Toad: Swallow, Goblin Boss: Redirect Attack, Half-Dragon: Leap, Hezrou: Leap, Imp: Shape-Shift, Lamia: Leap, Magmin: Ignited Illumination, Mimic: Shape-Shift, Nalfeshnee: Pursuit, Nalfeshnee: Teleport, Night Hag: Shape-Shift, Nightmare: Ethereal Stride, Ochre Jelly: Split, Oni: Shape-Shift, Phase Spider: Ethereal Jaunt, Quasit: Shape-Shift, Roper: Reel, Rust Monster: Destroy Metal, Rust Monster: Reflexive Antennae, Sahuagin Warrior: Aquatic Charge, Seahorse: Bubble Dash, Shield Guardian: Protection, Shrieker Fungus: Shriek, Succubus: Shape-Shift, Troll: Charge, Vampire: Shape-Shift, Werebear: Shape-Shift, Wereboar: Shape-Shift, Wererat: Shape-Shift, Weretiger: Prowl (Tiger or Hybrid Form Only), Weretiger: Shape-Shift, Werewolf: Shape-Shift, Will-o'-Wisp: Vanish, Wraith: Create Specter, Xorn: Charge
 
 ## Monster traits
+
+The number after each trait is how many stat blocks print it.
 
 | Record | State | How |
 | --- | --- | --- |
@@ -210,7 +244,7 @@ enforced records are GitHub issues.
 
 ## Monk features
 
-**Enforced (17):** Ability Score Improvement, Body And Mind, Disciplined Survivor, Epic Boon, Extra Attack, Monk Subclass, Monks Focus, Quivering Palm (Warrior of the Open Hand), Stunning Strike, Superior Defense, Unarmored Defense, Unarmored Movement, Unarmored Movement, Unarmored Movement, Unarmored Movement, Unarmored Movement, Wholeness of Body (Warrior of the Open Hand)
+**Enforced (17):** Ability Score Improvement, Body And Mind, Disciplined Survivor, Epic Boon, Extra Attack, Monk Subclass, Monks Focus, Quivering Palm (Warrior of the Open Hand), Stunning Strike, Superior Defense, Unarmored Defense, Unarmored Movement (level 10), Unarmored Movement (level 14), Unarmored Movement (level 18), Unarmored Movement (level 2), Unarmored Movement (level 6), Wholeness of Body (Warrior of the Open Hand)
 
 **Guided (1):** Uncanny Metabolism
 
@@ -226,11 +260,11 @@ enforced records are GitHub issues.
 
 ## Ranger features
 
-**Enforced (11):** Ability Score Improvement, Deft Explorer, Epic Boon, Expertise, Extra Attack, Favored Enemy, Feral Senses, Fighting Style, Ranger Subclass, Roving, Weapon Mastery
+**Enforced (10):** Ability Score Improvement, Deft Explorer, Epic Boon, Expertise, Extra Attack, Favored Enemy, Fighting Style, Ranger Subclass, Roving, Weapon Mastery
 
 **Guided (4):** Defensive Tactics (Hunter), Hunter's Prey (Hunter), Natures Veil, Tireless
 
-**Reference (7):** Foe Slayer, Hunter's Lore (Hunter), Precise Hunter, Relentless Hunter, Spellcasting, Superior Hunter's Defense (Hunter), Superior Hunter's Prey (Hunter)
+**Reference (8):** Feral Senses, Foe Slayer, Hunter's Lore (Hunter), Precise Hunter, Relentless Hunter, Spellcasting, Superior Hunter's Defense (Hunter), Superior Hunter's Prey (Hunter)
 
 ## Rogue features
 
@@ -266,11 +300,11 @@ enforced records are GitHub issues.
 
 ## Species traits
 
-**Enforced (60):** Abyssal Legacy (Tiefling), Arcane Cantrip (Elf), Breath Weapon (Acid) (Dragonborn), Breath Weapon (Acid) (Dragonborn), Breath Weapon (Cold) (Dragonborn), Breath Weapon (Cold) (Dragonborn), Breath Weapon (Fire) (Dragonborn), Breath Weapon (Fire) (Dragonborn), Breath Weapon (Fire) (Dragonborn), Breath Weapon (Lightning) (Dragonborn), Breath Weapon (Lightning) (Dragonborn), Breath Weapon (Poison) (Dragonborn), Chthonic Legacy (Tiefling), Damage Resistance (Acid) (Dragonborn), Damage Resistance (Acid) (Dragonborn), Damage Resistance (Cold) (Dragonborn), Damage Resistance (Cold) (Dragonborn), Damage Resistance (Fire) (Dragonborn), Damage Resistance (Fire) (Dragonborn), Damage Resistance (Fire) (Dragonborn), Damage Resistance (Lightning) (Dragonborn), Damage Resistance (Lightning) (Dragonborn), Damage Resistance (Poison) (Dragonborn), Dancing Lights (Elf), Darkness (Elf), Darkness (Tiefling), Darkvision (Dragonborn), Darkvision (Dwarf), Darkvision (Elf), Darkvision (Gnome), Darkvision (Orc), Darkvision (Tiefling), Detect Magic (Elf), Draconic Ancestry (Dragonborn), Druidcraft (Elf), Dwarven Resilience (Dwarf), Dwarven Toughness (Dwarf), Elven Lineage (Elf), Faerie Fire (Elf), False Life (Tiefling), Fiendish Legacy (Tiefling), Fleet of Foot (Elf), Giant Ancestry (Goliath), Gnomish Lineage (Gnome), Hellish Rebuke (Tiefling), Hold Person (Tiefling), Infernal Legacy (Tiefling), Keen Senses (Elf), Longstrider (Elf), Minor Illusion (Gnome), Misty Step (Elf), Otherworldly Presence (Tiefling), Pass without Trace (Elf), Ray of Enfeeblement (Tiefling), Ray of Sickness (Tiefling), Rock Gnome Cantrips (Gnome), Skillful (Human), Speak with Animals (Gnome), Superior Darkvision (Elf), Versatile (Human)
+**Enforced (53):** Abyssal Legacy (Abyssal), Arcane Cantrip (High Elf), Breath Weapon (Acid) (Black Dragon), Breath Weapon (Acid) (Copper Dragon), Breath Weapon (Cold) (Silver Dragon), Breath Weapon (Cold) (White Dragon), Breath Weapon (Fire) (Brass Dragon), Breath Weapon (Fire) (Gold Dragon), Breath Weapon (Fire) (Red Dragon), Breath Weapon (Lightning) (Blue Dragon), Breath Weapon (Lightning) (Bronze Dragon), Breath Weapon (Poison) (Green Dragon), Chthonic Legacy (Chthonic), Damage Resistance (Acid) (Black Dragon), Damage Resistance (Acid) (Copper Dragon), Damage Resistance (Cold) (Silver Dragon), Damage Resistance (Cold) (White Dragon), Damage Resistance (Fire) (Brass Dragon), Damage Resistance (Fire) (Gold Dragon), Damage Resistance (Fire) (Red Dragon), Damage Resistance (Lightning) (Blue Dragon), Damage Resistance (Lightning) (Bronze Dragon), Damage Resistance (Poison) (Green Dragon), Dancing Lights (Drow), Darkness (Drow), Darkness (Infernal), Detect Magic (High Elf), Draconic Ancestry (Dragonborn), Druidcraft (Wood Elf), Dwarven Resilience (Dwarf), Dwarven Toughness (Dwarf), Elven Lineage (Elf), Faerie Fire (Drow), False Life (Chthonic), Fiendish Legacy (Tiefling), Fleet of Foot (Wood Elf), Giant Ancestry (Goliath), Gnomish Lineage (Gnome), Hellish Rebuke (Infernal), Hold Person (Abyssal), Infernal Legacy (Infernal), Keen Senses (Elf), Longstrider (Wood Elf), Minor Illusion (Forest Gnome), Misty Step (High Elf), Otherworldly Presence (Tiefling), Pass without Trace (Wood Elf), Ray of Enfeeblement (Chthonic), Ray of Sickness (Abyssal), Rock Gnome Cantrips (Rock Gnome), Skillful (Human), Speak with Animals (Forest Gnome), Versatile (Human)
 
 **Guided (5):** Adrenaline Rush (Orc), Draconic Flight (Dragonborn), Large Form (Goliath), Relentless Endurance (Orc), Stonecunning (Dwarf)
 
-**Reference (12):** Brave (Halfling), Breath Weapon (Dragonborn), Clockwork Devices (Gnome), Damage Resistance (Dragonborn), Fey Ancestry (Elf), Gnomish Cunning (Gnome), Halfling Nimbleness (Halfling), Luck (Halfling), Naturally Stealthy (Halfling), Powerful Build (Goliath), Resourceful (Human), Trance (Elf)
+**Reference (19):** Brave (Halfling), Breath Weapon (Dragonborn), Clockwork Devices (Rock Gnome), Damage Resistance (Dragonborn), Darkvision (Dragonborn), Darkvision (Dwarf), Darkvision (Elf), Darkvision (Gnome), Darkvision (Orc), Darkvision (Tiefling), Fey Ancestry (Elf), Gnomish Cunning (Gnome), Halfling Nimbleness (Halfling), Luck (Halfling), Naturally Stealthy (Halfling), Powerful Build (Goliath), Resourceful (Human), Superior Darkvision (Drow), Trance (Elf)
 
 ## Backgrounds
 
@@ -286,17 +320,19 @@ enforced records are GitHub issues.
 
 ## Magic items
 
-**Enforced (108):** Ammunition, +1, Ammunition, +2, Ammunition, +3, Animated Shield, Armor of Invulnerability, Armor of Resistance, Armor of Vulnerability, Armor, +1, Armor, +2, Armor, +3, Arrow-Catching Shield, Berserker Axe, Boots of Elvenkind, Boots of the Winterlands, Bracers of Archery, Bracers of Defense, Brooch of Shielding, Cloak of Arachnida, Cloak of Elvenkind, Cloak of Protection, Cloak of the Bat, Crystal Ball, Crystal Ball of Mind Reading, Crystal Ball of Telepathy, Crystal Ball of True Seeing, Cubic Gate, Dagger of Venom, Decanter of Endless Water, Defender, Demon Armor, Dragon Scale Mail, Dragon Slayer, Dwarven Plate, Dwarven Thrower, Elven Chain, Eyes of Charming, Flame Tongue, Frost Brand, Giant Slayer, Glamoured Studded Leather, Gloves of Thievery, Hammer of Thunderbolts, Hat of Disguise, Helm of Comprehending Languages, Helm of Telepathy, Holy Avenger, Iron Bands, Iron Flask, Luck Blade, Mace of Smiting, Medallion of Thoughts, Mithral Armor, Nine Lives Stealer, Periapt of Proof against Poison, Pipes of Haunting, Plate Armor of Etherealness, Potion of Flying, Potion of Healing (greater), Potion of Healing (superior), Potion of Healing (supreme), Quarterstaff of the Acrobat, Ring of Animal Influence, Ring of Jumping, Ring of Protection, Ring of Resistance, Ring of Shooting Stars, Ring of Swimming, Ring of Telekinesis, Ring of Water Walking, Robe of Scintillating Colors, Robe of Stars, Rod of Alertness, Rod of Rulership, Rope of Entanglement, Scarab of Protection, Scimitar of Speed, Sending Stones, Sentinel Shield, Shield of Missile Attraction, Shield of the Cavalier, Shield, +1, Shield, +2, Shield, +3, Slippers of Spider Climbing, Spell Scroll, Spellguard Shield, Staff of Charming, Staff of Fire, Staff of Frost, Staff of Power, Staff of the Magi, Staff of the Woodlands, Staff of Thunder and Lightning, Stone of Good Luck (Luckstone), Sword of Wounding, Trident of Fish Command, Vorpal Sword, Wand of Fear, Wand of Fireballs, Wand of Lightning Bolts, Wand of Magic Detection, Wand of Paralysis, Wand of Polymorph, Weapon of Warning, Weapon, +1, Weapon, +2, Weapon, +3, Winged Boots
+**Enforced (87):** Ammunition, +1, Ammunition, +2, Ammunition, +3, Armor of Invulnerability, Armor of Resistance, Armor of Vulnerability, Armor, +1, Armor, +2, Armor, +3, Berserker Axe, Boots of Elvenkind, Boots of the Winterlands, Bracers of Archery, Bracers of Defense, Brooch of Shielding, Cloak of Arachnida, Cloak of Elvenkind, Cloak of Protection, Cloak of the Bat, Dagger of Venom, Decanter of Endless Water, Defender, Demon Armor, Dragon Scale Mail, Dragon Slayer, Dwarven Plate, Dwarven Thrower, Elven Chain, Eyes of Charming, Flame Tongue, Frost Brand, Giant Slayer, Glamoured Studded Leather, Gloves of Thievery, Hammer of Thunderbolts, Helm of Telepathy, Holy Avenger, Iron Bands, Iron Flask, Luck Blade, Mace of Smiting, Mithral Armor, Nine Lives Stealer, Periapt of Proof against Poison, Pipes of Haunting, Potion of Flying, Potion of Healing (greater), Potion of Healing (superior), Potion of Healing (supreme), Quarterstaff of the Acrobat, Ring of Animal Influence, Ring of Protection, Ring of Resistance, Ring of Shooting Stars, Ring of Swimming, Robe of Scintillating Colors, Robe of Stars, Rod of Alertness, Rod of Rulership, Rope of Entanglement, Scarab of Protection, Scimitar of Speed, Sentinel Shield, Shield of the Cavalier, Shield, +1, Shield, +2, Shield, +3, Slippers of Spider Climbing, Spell Scroll, Staff of Charming, Staff of Fire, Staff of Frost, Staff of Power, Staff of the Woodlands, Staff of Thunder and Lightning, Stone of Good Luck (Luckstone), Sword of Wounding, Trident of Fish Command, Vorpal Sword, Wand of Fireballs, Wand of Lightning Bolts, Wand of Paralysis, Weapon of Warning, Weapon, +1, Weapon, +2, Weapon, +3, Winged Boots
 
-**Guided (81):** Amulet of Health, Amulet of Proof against Detection and Location, Amulet of the Planes, Bag of Tricks, Belt of Dwarvenkind, Belt of Giant Strength, Boots of Levitation, Boots of Speed, Boots of Striding and Springing, Bowl of Commanding Water Elementals, Brazier of Commanding Fire Elementals, Broom of Flying, Candle of Invocation, Censer of Controlling Air Elementals, Cloak of Displacement, Cloak of Invisibility, Cloak of the Manta Ray, Cube of Force, Dancing Sword, Dragon Orb, Energy Bow, Gauntlets of Ogre Power, Gem of Seeing, Gloves of Missile Snaring, Gloves of Swimming and Climbing, Hat of Many Spells, Headband of Intellect, Helm of Brilliance, Helm of Teleportation, Instant Fortress, Ioun Stone, Mace of Disruption, Mace of Terror, Mantle of Spell Resistance, Necklace of Adaptation, Necklace of Prayer Beads, Oathbow, Pearl of Power, Periapt of Health, Periapt of Wound Closure, Pipes of the Sewers, Ring of Djinni Summoning, Ring of Elemental Command, Ring of Evasion, Ring of Feather Falling, Ring of Free Action, Ring of Invisibility, Ring of Mind Shielding, Ring of Regeneration, Ring of Spell Storing, Ring of Spell Turning, Ring of the Ram, Ring of Warmth, Ring of X-ray Vision, Robe of Eyes, Robe of the Archmagi, Rod of Absorption, Rod of Lordly Might, Rod of Resurrection, Staff of Healing, Staff of Striking, Staff of Swarming Insects, Staff of the Python, Staff of Withering, Stone of Controlling Earth Elementals, Sun Blade, Sword of Life Stealing, Sword of Sharpness, Talisman of Pure Good, Talisman of the Sphere, Talisman of Ultimate Evil, Thunderous Greatclub, Wand of Binding, Wand of Enemy Detection, Wand of Secrets, Wand of the War Mage, +1, Wand of the War Mage, +2, Wand of the War Mage, +3, Wand of Web, Wand of Wonder, Wings of Flying
+**Guided (106):** Adamantine Armor, Ammunition of Slaying, Amulet of Health, Amulet of Proof against Detection and Location, Amulet of the Planes, Animated Shield, Arrow-Catching Shield, Bag of Tricks, Belt of Dwarvenkind, Belt of Giant Strength, Boots of Levitation, Boots of Speed, Boots of Striding and Springing, Bowl of Commanding Water Elementals, Brazier of Commanding Fire Elementals, Broom of Flying, Candle of Invocation, Censer of Controlling Air Elementals, Cloak of Displacement, Cloak of Invisibility, Cloak of the Manta Ray, Crystal Ball, Crystal Ball of Mind Reading, Crystal Ball of Telepathy, Crystal Ball of True Seeing, Cube of Force, Cubic Gate, Dancing Sword, Dragon Orb, Energy Bow, Gauntlets of Ogre Power, Gem of Seeing, Gloves of Missile Snaring, Gloves of Swimming and Climbing, Hat of Disguise, Hat of Many Spells, Headband of Intellect, Helm of Brilliance, Helm of Comprehending Languages, Helm of Teleportation, Instant Fortress, Ioun Stone, Javelin of Lightning, Mace of Disruption, Mace of Terror, Mantle of Spell Resistance, Medallion of Thoughts, Necklace of Adaptation, Necklace of Prayer Beads, Oathbow, Pearl of Power, Periapt of Health, Periapt of Wound Closure, Pipes of the Sewers, Plate Armor of Etherealness, Ring of Djinni Summoning, Ring of Elemental Command, Ring of Evasion, Ring of Feather Falling, Ring of Free Action, Ring of Invisibility, Ring of Jumping, Ring of Mind Shielding, Ring of Regeneration, Ring of Spell Storing, Ring of Spell Turning, Ring of Telekinesis, Ring of the Ram, Ring of Warmth, Ring of Water Walking, Ring of X-ray Vision, Robe of Eyes, Robe of the Archmagi, Rod of Absorption, Rod of Lordly Might, Rod of Resurrection, Sending Stones, Shield of Missile Attraction, Spellguard Shield, Staff of Healing, Staff of Striking, Staff of Swarming Insects, Staff of the Magi, Staff of the Python, Staff of Withering, Stone of Controlling Earth Elementals, Sun Blade, Sword of Life Stealing, Sword of Sharpness, Talisman of Pure Good, Talisman of the Sphere, Talisman of Ultimate Evil, Thunderous Greatclub, Vicious Weapon, Wand of Binding, Wand of Enemy Detection, Wand of Fear, Wand of Magic Detection, Wand of Polymorph, Wand of Secrets, Wand of the War Mage, +1, Wand of the War Mage, +2, Wand of the War Mage, +3, Wand of Web, Wand of Wonder, Wings of Flying
 
-**Reference (81):** Adamantine Armor, Ammunition of Slaying, Apparatus of the Crab, Bag of Beans, Bag of Devouring, Bag of Holding, Bead of Force, Bead of Nourishment, Cape of the Mountebank, Carpet of Flying, Chime of Opening, Circlet of Blasting, Deck of Illusions, Dimensional Shackles, Dust of Disappearance, Dust of Dryness, Dust of Sneezing and Choking, Efficient Quiver, Efreeti Bottle, Elemental Gem, Elixir of Health, Eversmoking Bottle, Eyes of Minute Seeing, Eyes of the Eagle, Feather Token, Figurine of Wondrous Power, Folding Boat, Gem of Brightness, Goggles of Night, Handy Haversack, Horn of Blasting, Horn of Valhalla, Horseshoes of a Zephyr, Horseshoes of Speed, Immovable Rod, Javelin of Lightning, Lantern of Revealing, Manual of Bodily Health, Manual of Gainful Exercise, Manual of Golems, Manual of Quickness of Action, Marvelous Pigments, Mirror of Life Trapping, Mysterious Deck, Necklace of Fireballs, Oil of Etherealness, Oil of Sharpness, Oil of Slipperiness, Philter of Love, Portable Hole, Potion of Animal Friendship, Potion of Clairvoyance, Potion of Climbing, Potion of Diminution, Potion of Gaseous Form, Potion of Giant Strength, Potion of Growth, Potion of Heroism, Potion of Invisibility, Potion of Invulnerability, Potion of Longevity, Potion of Mind Reading, Potion of Poison, Potion of Resistance, Potion of Speed, Potion of Vitality, Potion of Water Breathing, Ring of Three Wishes, Robe of Useful Items, Rod of Security, Rope of Climbing, Sovereign Glue, Sphere of Annihilation, Tome of Clear Thought, Tome of Leadership and Influence, Tome of Understanding, Universal Solvent, Vicious Weapon, Wand of Magic Missiles, Well of Many Worlds, Wind Fan
+**Reference (77):** Apparatus of the Crab, Bag of Beans, Bag of Devouring, Bag of Holding, Bead of Force, Bead of Nourishment, Cape of the Mountebank, Carpet of Flying, Chime of Opening, Circlet of Blasting, Deck of Illusions, Dimensional Shackles, Dust of Disappearance, Dust of Dryness, Dust of Sneezing and Choking, Efficient Quiver, Efreeti Bottle, Elemental Gem, Elixir of Health, Eversmoking Bottle, Eyes of Minute Seeing, Eyes of the Eagle, Feather Token, Figurine of Wondrous Power, Folding Boat, Gem of Brightness, Goggles of Night, Handy Haversack, Horn of Blasting, Horn of Valhalla, Horseshoes of a Zephyr, Horseshoes of Speed, Immovable Rod, Lantern of Revealing, Manual of Bodily Health, Manual of Gainful Exercise, Manual of Golems, Manual of Quickness of Action, Marvelous Pigments, Mirror of Life Trapping, Mysterious Deck, Necklace of Fireballs, Oil of Etherealness, Oil of Sharpness, Oil of Slipperiness, Philter of Love, Portable Hole, Potion of Animal Friendship, Potion of Clairvoyance, Potion of Climbing, Potion of Diminution, Potion of Gaseous Form, Potion of Giant Strength, Potion of Growth, Potion of Heroism, Potion of Invisibility, Potion of Invulnerability, Potion of Longevity, Potion of Mind Reading, Potion of Poison, Potion of Resistance, Potion of Speed, Potion of Vitality, Potion of Water Breathing, Ring of Three Wishes, Robe of Useful Items, Rod of Security, Rope of Climbing, Sovereign Glue, Sphere of Annihilation, Tome of Clear Thought, Tome of Leadership and Influence, Tome of Understanding, Universal Solvent, Wand of Magic Missiles, Well of Many Worlds, Wind Fan
 
 ## Gear and tools
 
 **Enforced (15):** Acid (vial), Alchemist's Fire (flask), Antitoxin (vial), Arrows (20), Blowgun Needles (50), Crossbow Bolts (20), Firearm Bullets (10), Holy Water (flask), Net, Oil (flask), Poison, Basic (vial), Potion of Healing, Sling Bullets (20), Spell Scroll (Cantrip), Spell Scroll (Level 1)
 
-**Reference (126):** Alchemist's Supplies, Arcane Focus (Crystal), Arcane Focus (Orb), Arcane Focus (Rod), Arcane Focus (Staff), Arcane Focus (Wand), Backpack, Ball Bearings (bag of 1,000), Barrel, Basket, Bedroll, Bell, Blanket, Block and Tackle, Book, Bottle, Glass, Brewer's Supplies, Bucket, Burglar's Pack, Calligrapher's Supplies, Caltrops (bag of 20), Candle, Carpenter's Tools, Cartographer's Tools, Case, Crossbow Bolt, Case, Map or Scroll, Chain (10 feet), Chalk (1 piece), Chest, Climber's Kit, Clothes, Fine, Clothes, Traveler's, Cobbler's Tools, Component Pouch, Cook's Utensils, Costume, Crowbar, Diplomat's Pack, Disguise Kit, Druidic Focus (Sprig of Mistletoe), Druidic Focus (Totem), Druidic Focus (Wooden Staff), Druidic Focus (Yew Wand), Dungeoneer's Pack, Entertainer's Pack, Explorer's Pack, Flask or Tankard, Forgery Kit, Gaming Set (Dice), Gaming Set (Dragonchess), Gaming Set (Playing Cards), Gaming Set (Three-Dragon Ante), Glassblower's Tools, Grappling Hook, Hammer, Healer's Kit, Herbalism Kit, Holy Symbol (Amulet), Holy Symbol (Emblem), Holy Symbol (Reliquary), Hunting Trap, Ink (1-ounce bottle), Ink Pen, Jeweler's Tools, Jug or Pitcher, Ladder (10-foot), Lamp, Lantern, Bullseye, Lantern, Hooded, Leatherworker's Tools, Lock, Magnifying Glass, Manacles, Map, Mason's Tools, Mess Kit, Mirror, Steel, Musical Instrument (Bagpipes), Musical Instrument (Drum), Musical Instrument (Dulcimer), Musical Instrument (Flute), Musical Instrument (Horn), Musical Instrument (Lute), Musical Instrument (Lyre), Musical Instrument (Pan Flute), Musical Instrument (Shawm), Musical Instrument (Viol), Navigator's Tools, Painter's Supplies, Paper (one sheet), Parchment (one sheet), Perfume (vial), Poisoner's Kit, Pole (10-foot), Pot, Iron, Potter's Tools, Pouch, Priest's Pack, Quiver, Ram, Portable, Rations (1 day), Robe, Rope (50 feet), Sack, Scale, Merchant's, Scholar's Pack, Sealing Wax, Shovel, Signal Whistle, Signet Ring, Smith's Tools, Soap, Spellbook, Spikes, Iron (10), Spyglass, String (10 feet), Tent, Two-Person, Thieves' Tools, Tinderbox, Tinker's Tools, Torch, Vial, Waterskin, Weaver's Tools, Whetstone, Woodcarver's Tools
+**Guided (37):** Alchemist's Supplies, Brewer's Supplies, Calligrapher's Supplies, Carpenter's Tools, Cartographer's Tools, Cobbler's Tools, Cook's Utensils, Disguise Kit, Forgery Kit, Gaming Set (Dice), Gaming Set (Dragonchess), Gaming Set (Playing Cards), Gaming Set (Three-Dragon Ante), Glassblower's Tools, Herbalism Kit, Jeweler's Tools, Leatherworker's Tools, Mason's Tools, Musical Instrument (Bagpipes), Musical Instrument (Drum), Musical Instrument (Dulcimer), Musical Instrument (Flute), Musical Instrument (Horn), Musical Instrument (Lute), Musical Instrument (Lyre), Musical Instrument (Pan Flute), Musical Instrument (Shawm), Musical Instrument (Viol), Navigator's Tools, Painter's Supplies, Poisoner's Kit, Potter's Tools, Smith's Tools, Thieves' Tools, Tinker's Tools, Weaver's Tools, Woodcarver's Tools
+
+**Reference (89):** Arcane Focus (Crystal), Arcane Focus (Orb), Arcane Focus (Rod), Arcane Focus (Staff), Arcane Focus (Wand), Backpack, Ball Bearings (bag of 1,000), Barrel, Basket, Bedroll, Bell, Blanket, Block and Tackle, Book, Bottle, Glass, Bucket, Burglar's Pack, Caltrops (bag of 20), Candle, Case, Crossbow Bolt, Case, Map or Scroll, Chain (10 feet), Chalk (1 piece), Chest, Climber's Kit, Clothes, Fine, Clothes, Traveler's, Component Pouch, Costume, Crowbar, Diplomat's Pack, Druidic Focus (Sprig of Mistletoe), Druidic Focus (Totem), Druidic Focus (Wooden Staff), Druidic Focus (Yew Wand), Dungeoneer's Pack, Entertainer's Pack, Explorer's Pack, Flask or Tankard, Grappling Hook, Hammer, Healer's Kit, Holy Symbol (Amulet), Holy Symbol (Emblem), Holy Symbol (Reliquary), Hunting Trap, Ink (1-ounce bottle), Ink Pen, Jug or Pitcher, Ladder (10-foot), Lamp, Lantern, Bullseye, Lantern, Hooded, Lock, Magnifying Glass, Manacles, Map, Mess Kit, Mirror, Steel, Paper (one sheet), Parchment (one sheet), Perfume (vial), Pole (10-foot), Pot, Iron, Pouch, Priest's Pack, Quiver, Ram, Portable, Rations (1 day), Robe, Rope (50 feet), Sack, Scale, Merchant's, Scholar's Pack, Sealing Wax, Shovel, Signal Whistle, Signet Ring, Soap, Spellbook, Spikes, Iron (10), Spyglass, String (10 feet), Tent, Two-Person, Tinderbox, Torch, Vial, Waterskin, Whetstone
 
 ## Weapons
 
