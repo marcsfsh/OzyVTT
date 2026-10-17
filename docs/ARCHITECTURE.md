@@ -390,6 +390,17 @@ its footer. Nothing floats over the map but tokens and marks; notices land in th
 `ToastOutlet`. The map and the panel share small module stores: the targeting session (`encounter/targeting.ts`),
 the live map's grid and size (`scene/tableGeometry.ts`) and the GM's selected token (`scene/selectedToken.ts`).
 
+The character sheet lives in `sheet/` (ADR-0030). `CharacterSheet.tsx` is one component for every place it sits: a
+page (My character, `/characters/<id>`, `sheet.html`), the GM's dialog, or the table panel's Me and Sheet tabs. It
+picks a narrow, wide or panel frame from the presentation and the width. Its tabs share one controller
+(`useSheetController.tsx`) that sends every change as a command. `useSheetDefinition.ts` reads
+`actor:available-actions` into the turn's options (`turn-options.ts`) with each row's reason, passive flag and mastery.
+The laptop's list (`ActionList.tsx`) and the phone's turn card (`TurnCard.tsx`) draw the same options, and the table's
+Turn tab runs them through `encounter/PlayerActionRunner.tsx`, which also aims a cast started on the sheet. A cast,
+an item or a spell to copy opens through `SheetDetail.tsx`: where its list was, in a drawer, or in the laptop's right
+column. The sheet notes the ids of the rolls it starts (`sheet-roll-ids.ts`), and its latest-roll line shows only
+those.
+
 Surfaces not needed for first paint load on first use (`components/lazySurface.tsx`): the Codex,
 homebrew, settings and the API reference, the character builder and level flow, replays, the map
 library, the shared-screen controls and the sound board. pdf.js loads with the first imported PDF. The build targets
