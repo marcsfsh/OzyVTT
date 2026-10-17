@@ -135,14 +135,16 @@
   .map-rail-locate {
     display: flex;
   }
-  /* The options as a second row: it wraps, and scrolls itself past a third of the map's height. */
+  /* The options as a second row: compact, wrapping, and scrolling itself past about two lines so the map keeps its
+     height. The hints fold away here; a disabled control still says why in its title. */
   .map-options {
     flex-direction: row;
     flex-wrap: wrap;
-    align-items: flex-start;
+    align-items: center;
+    gap: var(--space-2);
     width: auto;
-    max-height: 9.5rem;
-    padding: var(--space-2);
+    max-height: 6.75rem;
+    padding: var(--space-1) var(--space-2);
     border-right: 0;
     border-bottom: 1px solid var(--line-strong);
     background: var(--surface-2);
@@ -151,22 +153,30 @@
     flex: 0 1 auto;
   }
   .map-options-head {
-    flex-basis: 100%;
+    order: 99;
+    margin-left: auto;
   }
-  .map-options .map-toolbar-choices {
+  .map-options-title,
+  .map-options .map-toolbar-note,
+  .map-options .map-toolbar-label {
+    display: none;
+  }
+  .map-options .map-toolbar-choices,
+  .map-options .map-toolbar-actions,
+  .encounter-map-swatches {
     display: flex;
-    flex-wrap: wrap;
-  }
-  .map-options .map-toolbar-actions {
     flex-direction: row;
     flex-wrap: wrap;
   }
-  .map-options .map-toolbar-note {
-    flex-basis: 100%;
+  .map-options .nh-field {
+    grid-auto-flow: column;
+    align-items: center;
   }
 }
-
-/* What a group holds. */
+/* What a group holds. A long label wraps in the column. */
+.map-options .nh-btn {
+  white-space: normal;
+}
 .map-options .nh-field {
   gap: 0.2rem;
 }
