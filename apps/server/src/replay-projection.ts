@@ -77,6 +77,13 @@ function turnLabel(turn: EncounterArchiveTurn, sight: AudienceSight): string {
   return `${actor.name}'s turn`;
 }
 
+/** A turn's combat as the replay shows it. A replay is the fight, so a turn recorded outside one carries no map,
+ *  even where the live table would show players the scene. */
+function replayCombat(state: EncounterArchiveTurn["state"], now: number, content: SightContent, sight: AudienceSight) {
+  const combat = projectPlayerCombat(state, undefined, now, content, sight);
+  return state.combat.active ? combat : { ...combat, mapAssetId: null, tokens: [], annotations: [] };
+}
+
 /** Whether a public roll may be replayed: not one made, during its turn, by a creature the party couldn't perceive. */
 function rollShown(
   roll: RollRecord,
@@ -106,7 +113,7 @@ export function projectPlayerReplay(
     index: turn.index,
     at: turn.at,
     label: turnLabel(turn, sights[index]!),
-    combat: projectPlayerCombat(turn.state, undefined, now, content, sights[index]!),
+    combat: replayCombat(turn.state, now, content, sights[index]!),
     actors: turnActors(turn, sights[index]!),
     log: logSliceFor(document, index).flatMap((entry) => {
       const row = playerLogRow(entry);

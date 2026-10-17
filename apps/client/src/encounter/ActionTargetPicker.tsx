@@ -5,6 +5,8 @@ import { useSkillCatalog } from "../content/catalogs";
 import { ABILITY_WORDS } from "../dice/roll-call-words";
 import { useRollPreference } from "../dice/roll-preference";
 import { FaceEntry } from "./RollControls";
+import type { TargetRow } from "../table/targetRows";
+import { InFooter } from "../table/footerSlot";
 import {
   clearTargeting,
   setCheckSkill,
@@ -29,16 +31,19 @@ export function ActionTargetPicker({
   onMap = false,
   busy,
   onRoll,
-  onInvalidFace
+  onInvalidFace,
+  insideNow
 }: Readonly<{
   picking: TargetingSession;
-  targets: ReadonlyArray<{ id: string; label: string }>;
-  /** The GM can also pick by clicking tokens on the map, so the heading says so. */
+  targets: ReadonlyArray<Pick<TargetRow, "id" | "label"> & Partial<TargetRow>>;
+  /** Tokens on the map can be tapped to pick them too, so the heading says so. */
   onMap?: boolean;
   busy: boolean;
   /** `face` is a typed attack d20. */
   onRoll: (face?: number) => void;
   onInvalidFace?: (message: string) => void;
+  /** For an area: who it covers where it is placed, of the creatures this viewer can see. The server decides. */
+  insideNow?: readonly TargetRow[];
 }>) {
   const { mayType } = useRollPreference();
   const skillCatalog = useSkillCatalog();
@@ -54,18 +59,36 @@ export function ActionTargetPicker({
           <strong>{picking.action.name}</strong> - choose the skill, then Roll.
         </p>
       ) : picking.mode === "template" ? (
-        <p className="action-targeting-head">
-          <strong>{picking.action.name}</strong> - drag the {picking.action.area?.sizeFeet}-ft{" "}
-          {picking.action.area?.shape} on the map
-          {picking.template?.placed ? " (placed - Roll to resolve)" : ", then Roll"}. Everyone under it is caught
-          automatically.
-        </p>
+        <>
+          <p className="action-targeting-head">
+            <strong>{picking.action.name}</strong> · {picking.action.area?.sizeFeet}-foot {picking.action.area?.shape}
+          </p>
+          <p className="action-targeting-hint">
+            {picking.template?.placed
+              ? "Drag again to move it. Every creature inside is caught when you roll."
+              : "Drag on the map to place it. Every creature inside is caught when you roll."}
+          </p>
+          {picking.template?.placed && insideNow && (
+            <>
+              <p className="action-targeting-inside">Inside now · {insideNow.length}</p>
+              <ul className="action-target-list scroll-y">
+                {insideNow.map((target) => (
+                  <li key={target.id} className="action-target is-inside">
+                    <TargetAvatar target={target} />
+                    <span className="action-target-name">{target.label}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="action-targeting-hint">Only those you can see are listed.</p>
+            </>
+          )}
+        </>
       ) : (
         <>
           <p className="action-targeting-head">
             <strong>{picking.action.name}</strong> -{" "}
             {picking.mode === "single" ? "choose one target" : "choose targets"}
-            {onMap ? (picking.mode === "single" ? " (or click a token)" : " (or click tokens)") : ""}
+            {onMap ? (picking.mode === "single" ? " here or on the map" : " here or on the map") : ""}
             {darts
               ? `. ${darts.total} darts: ${assigned >= darts.total ? "all assigned" : `${darts.total - Math.min(assigned, darts.total)} left, which go round the chosen targets in order`}.`
               : ""}
@@ -73,14 +96,16 @@ export function ActionTargetPicker({
           <ul className="action-target-list scroll-y">
             {targets.map((target) => (
               <li key={target.id}>
-                <label className="action-target">
+                <label className={`action-target${picking.selected.includes(target.id) ? " is-picked" : ""}`}>
                   <input
                     type={picking.mode === "single" ? "radio" : "checkbox"}
                     name={group}
                     checked={picking.selected.includes(target.id)}
                     onChange={() => toggleTarget(target.id)}
                   />
-                  <span>{target.label}</span>
+                  {target.initials !== undefined && <TargetAvatar target={target as TargetRow} />}
+                  <span className="action-target-name">{target.label}</span>
+                  {target.detail && <span className="action-target-detail">{target.detail}</span>}
                 </label>
                 {darts && picking.selected.includes(target.id) && (
                   <Stepper
@@ -155,14 +180,17 @@ export function ActionTargetPicker({
           </Select>
         </label>
       )}
-      <div className="action-targeting-buttons">
-        <Button type="button" variant="secondary" disabled={busy} onClick={() => clearTargeting()}>
-          Back
-        </Button>
-        <button type="button" className="encounter-primary" disabled={busy || !ready} onClick={() => onRoll()}>
-          Roll {picking.action.name}
-        </button>
-      </div>
+      {/* On a phone Cancel and Roll go to the bar under the thumb. */}
+      <InFooter>
+        <div className="action-targeting-buttons">
+          <Button type="button" variant="secondary" disabled={busy} onClick={() => clearTargeting()}>
+            Cancel
+          </Button>
+          <button type="button" className="encounter-primary" disabled={busy || !ready} onClick={() => onRoll()}>
+            Roll {picking.action.name}
+          </button>
+        </div>
+      </InFooter>
       {mayType && ready && picking.mode === "single" && picking.action.attackBonus !== null && (
         <div className="action-targeting-face">
           <FaceEntry
@@ -174,5 +202,15 @@ export function ActionTargetPicker({
         </div>
       )}
     </div>
+  );
+}
+
+/** A target's avatar as its token shows it: initials, and the number it carries among its kind. */
+function TargetAvatar({ target }: Readonly<{ target: TargetRow }>) {
+  return (
+    <span className={`target-avatar ${target.kind}`} aria-hidden="true">
+      {target.initials}
+      {target.number !== undefined && <span className="target-avatar-number">{target.number}</span>}
+    </span>
   );
 }

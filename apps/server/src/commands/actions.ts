@@ -1,9 +1,10 @@
-import type { RollRecord } from "@vtt/domain";
+import type { GameState, RollRecord } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
 import { resolveDefinitionAction } from "../action-resolution.js";
 import { addAnnotation, shapeGeometry } from "../annotations.js";
 import { areaOriginatesFromCaster, tokensInTemplate } from "../area-targeting.js";
-import { canPlayerTarget, GameAccessDeniedError, requireActorAccess } from "../authorization.js";
+import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
+import { withSeenTargets } from "../resolution/seen-targets.js";
 import { builtinActionFor } from "../builtin-actions.js";
 import { effectiveActions } from "../effective-actions.js";
 import { pushTokenAway } from "../forced-movement.js";
@@ -46,7 +47,7 @@ export const actionCommands = [
     type: "action.resolve",
     operationId: "resolveAction",
     description:
-      "Runs a stat-block action: attack vs target AC with 2024 crit doubling, or save-DC surfacing with proposed damage. GM-grade for any combatant; a player session only for their own claimed character (area templates, cover, and rules overrides stay GM-only). A player's hit is handed to the GM as a damage proposal, or applied directly when the table's player-damage-mode is `direct`. Targets are explicit ids or an area template (never both); rolls are recorded in the shared history and the response carries the `resolution`. An action or Bonus Action off the creature's own turn meets the `economy.not-your-turn` block, except a Readied creature's response, which spends its Reaction.",
+      "Runs a stat-block action: attack vs target AC with 2024 crit doubling, or save-DC surfacing with proposed damage. GM-grade for any combatant; a player session only for their own claimed character (cover and rules overrides stay GM-only). A player's hit is handed to the GM as a damage proposal, or applied directly when the table's player-damage-mode is `direct`. Targets are explicit ids or an area template (never both). An area catches every combatant under it; for a player it is refused when none they can see is inside, and their reply names only the creatures they can see. Rolls are recorded in the shared history and the response carries the `resolution`. An action or Bonus Action off the creature's own turn meets the `economy.not-your-turn` block, except a Readied creature's response, which spends its Reaction.",
     summary:
       "Run a stat-block action: attack vs AC or save-DC with typed damage (GM anyone; a player their own claimed character).",
     schema: ActionResolveSchema,
@@ -69,11 +70,17 @@ export const actionCommands = [
         fumble
       } = request;
       // A player resolves only for their own claimed character (checked inside the mutation); GM-only
-      // inputs (templates, overrides, cover, applied conditions) are refused or stripped. The note is the Ready
-      // action's trigger, which the table reads in the effect's name, so a player's is kept.
+      // inputs (overrides, cover, applied conditions) are refused or stripped. A player may aim their own area: the
+      // server decides who is under it. The note is the Ready action's trigger, which the table reads in the effect's
+      // name, so a player's is kept.
       const initiator = initiatorOf(principal);
       const isPlayer = initiator.role === "player";
-      if (isPlayer && template) throw new GameAccessDeniedError("Your GM places area templates.");
+      // The creatures a player may not target or be told of: the shared hidden check from this player's own view
+      // (GM-only, out of their characters' sight, under the fog, or not on the map).
+      const hiddenFromPlayer = (state: GameState): ReadonlySet<string> => {
+        const hidden = kit.hiddenFor(initiator, state);
+        return new Set(state.actors.filter((actor) => hidden(actor.id)).map((actor) => actor.id));
+      };
       if (isPlayer && override) throw new GameAccessDeniedError("Your GM adjudicates rules overrides.");
       // A player types the face their die shows, never a total: the server adds the bonus and reads a 1 or a 20.
       if (isPlayer && (attackTotal !== undefined || critical !== undefined || fumble !== undefined))
@@ -134,18 +141,24 @@ export const actionCommands = [
           ).filter(
             (id) => (id !== actorId || !casterOutside) && draft.combat.initiative.some((entry) => entry.actorId === id)
           );
-          // A spell that leaves its area behind (Moonbeam, Web, a wall) may be placed where no one stands yet.
-          if (resolvedTargetIds.length === 0 && !(spell && zoneRowOf(spell)))
-            throw new CommandRejectedError("No combatants are inside that area.");
+          // An area catches everyone under it, seen or not. Whether it holds anyone is judged on what the caster's
+          // player can see, so an empty refusal never tells them a hidden creature is there. A spell that leaves its
+          // area behind (Moonbeam, Web, a wall) may be placed where no one stands yet.
+          const unseen = isPlayer ? hiddenFromPlayer(draft) : new Set<string>();
+          if (!resolvedTargetIds.some((id) => !unseen.has(id)) && !(spell && zoneRowOf(spell)))
+            throw new CommandRejectedError(
+              isPlayer ? "No creatures you can see are inside that area." : "No combatants are inside that area."
+            );
         } else {
           resolvedTargetIds = targetIds ?? [];
-        }
-        // A player may target only public combatants they can see: resolving against a hidden actor would leak
-        // its name/AC/outcome through the ack (and in direct mode damage it).
-        if (isPlayer) {
-          const unseen = kit.unseenBy(initiator, draft);
-          if (resolvedTargetIds.some((targetId) => !canPlayerTarget(draft, targetId, unseen)))
-            throw new CommandRejectedError("You can only target combatants you can see.");
+          // A player may target only public combatants they can see: resolving against a hidden actor would leak
+          // its name/AC/outcome through the ack (and in direct mode damage it). The refusal is the one a missing
+          // creature gets, at the same point, so it says nothing of what is hidden.
+          if (isPlayer && draft.combat.active && draft.combat.initiative.some((entry) => entry.actorId === actorId)) {
+            const unseen = hiddenFromPlayer(draft);
+            if (resolvedTargetIds.some((targetId) => unseen.has(targetId)))
+              throw new CommandRejectedError("Every target must be in this encounter.");
+          }
         }
         // Footprint-aware (SRD Creature Size): Medium adjacent to Large is 5 ft, not center-to-center 10.
         const distanceFeet = (actorIdA: string, actorIdB: string): number | null =>
@@ -244,6 +257,8 @@ export const actionCommands = [
           );
       });
       if (duplicate || !resolution) return;
+      // A player's reply names only the creatures they may see; the rest of an area's catch stays with the GM.
+      const reply = isPlayer ? withSeenTargets(resolution, hiddenFromPlayer(state)) : resolution;
       // A preview recorded only the attack die: publish the roll, but hold narration until the resolve is confirmed.
       kit.publishRolls(state, commandId);
       if (!resolution.preview) {
@@ -282,7 +297,7 @@ export const actionCommands = [
           kit.publishNarrations(outcome.events);
         }
       }
-      return { resolution };
+      return { resolution: reply };
     }
   }),
 

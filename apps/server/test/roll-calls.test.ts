@@ -138,10 +138,8 @@ describe("the GM's call for a check", () => {
       (await post(base, answerPath(callId), hero, { commandId: randomUUID(), callId, actorId: OTHER })).status
     ).toBe(403);
 
-    expect((await viewOf(base, hero)).rollCalls[0].entries[0]).toMatchObject({
-      answered: true,
-      result: { total: outcome.total }
-    });
+    // Answered, the call is done for that player: it leaves their view, and the GM keeps the result.
+    expect((await viewOf(base, hero)).rollCalls).toEqual([]);
     const call = server.store.snapshot.rollCalls.find((entry) => entry.id === callId)!;
     expect(call.entries.find((entry) => entry.actorId === HERO)!.result).toMatchObject({ total: outcome.total });
     expect(call.entries.find((entry) => entry.actorId === OTHER)!.result).toBeUndefined();
@@ -173,7 +171,7 @@ describe("the GM's call for a check", () => {
     const reply = (await answered.json()).data;
     expect(reply.hiddenFromRoller).toBe(true);
     expect(reply.check).toBeUndefined();
-    expect((await viewOf(base, hero)).rollCalls[0].entries).toEqual([{ actorId: HERO, answered: true }]);
+    expect((await viewOf(base, hero)).rollCalls).toEqual([]);
     expect(server.store.snapshot.rolls.at(-1)).toMatchObject({ actorId: HERO, visibility: "blind" });
     expect(server.store.snapshot.rollCalls[0].entries[0].result).toMatchObject({ success: expect.any(Boolean) });
   });

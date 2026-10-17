@@ -54,13 +54,14 @@ export function projectViewerEncounterScene(
   const vision = visionBlock.enabled
     ? { vision: { visible: visionBlock.visible, explored: visionBlock.explored } }
     : {};
-  // A live scene shows its map, fog and terrain immediately; tokens and drawings appear only once combat runs,
-  // so no combatant data reaches the public screen before then.
-  if (!state.combat.active)
-    return { mapAssetId: state.combat.mapAssetId, tokens: [], annotations: [], fog, terrain, ...vision };
+  // A live scene shows what players see on their own screens: its map, fog and terrain, the public tokens the GM
+  // has placed that the party may see, and public drawings. Before the fight only placed tokens show.
   const publicActors = new Map(
     state.actors
-      .filter((actor) => actor.visibility === "public" && !sight.hidden.has(actor.id) && tokenShown(sight, actor.id))
+      .filter(
+        (actor) =>
+          actor.visibility === "public" && !actor.archived && !sight.hidden.has(actor.id) && tokenShown(sight, actor.id)
+      )
       .map((actor) => [actor.id, actor])
   );
   return {

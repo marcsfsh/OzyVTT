@@ -560,11 +560,10 @@ export function createServer(options: CreateServerOptions) {
       authorizePlayer: (token, assetId) => {
         if (auth.verifyPlayer(token) === null) return false;
         const { combat } = committedState.read();
-        // A player may load the active battle map, any revealed atlas map, or the map of a replay the GM shared.
+        // A player may load the live battle map (before its fight too, as their projection names it), any revealed
+        // atlas map, or the map of a replay the GM shared.
         return (
-          (combat.active && combat.mapAssetId === assetId) ||
-          codexStore.isAssetRevealedToPlayers(assetId) ||
-          sharedReplayMap(assetId)
+          combat.mapAssetId === assetId || codexStore.isAssetRevealedToPlayers(assetId) || sharedReplayMap(assetId)
         );
       },
       authorizeViewer: (token, assetId) => {

@@ -182,7 +182,6 @@ describe("legendary actions on the GM's console", () => {
         }
         busy={false}
         run={run as never}
-        rollMode="auto"
         onFeedback={() => {}}
       />
     );

@@ -115,9 +115,12 @@ audience. There are four:
 - **Game** (`apps/server/src/projections.ts`): `projectPlayerView` and `projectGmView`. Players
   get only `public` actors, a health band instead of exact HP, and owner-only sheet resources
   for their own character. A hidden effect's source becomes "A hidden threat". Private rolls,
-  owner identity, GM notes and hidden turns are removed.
+  owner identity, GM notes and hidden turns are removed. A live scene's map reaches players before
+  its fight, with the public tokens the GM has placed; the turn order and the tray wait for the
+  fight. A player's reply to an area they aimed names only the creatures they may see.
 - **Table viewer** (`viewer-presentation.ts`, `viewer-encounter.ts`): the public screen in a
-  room that may hold non-players. Only public actors with a position become tokens; annotations
+  room that may hold non-players. It follows the live scene, before and during its fight, unless
+  the GM paused it. Only public actors with a position become tokens; annotations
   are public and unexpired; initiative appears only during combat; nothing is shown while
   paused. The fields that may cross are the `ViewerEncounterScene` and
   `ViewerPresentationProjection` types, plus `sound` (`ViewerSoundProjection`, added by
@@ -334,6 +337,13 @@ Codex and homebrew are fetched over HTTP. Socket request/replies go through `lib
 (`command` adds the `commandId`, `read` does not, and a lost reply becomes a refusal) and `/api/v1`
 calls through `lib/api.ts`. The table viewer is a separate bundle that never loads the game client.
 Rules checks on the client are hints only; the server decides.
+
+The table (`shell/TableView.tsx`) is a docked workbench (ADR-0025): a header bar over the map with the scene and
+the status line (`table/TableHeader.tsx`), the map's tool rail beside it (`scene/MapRail.tsx`), and one panel
+(`table/TablePanel.tsx`) with Needs you or the player's prompt slot above its tabs and the view's one primary in
+its footer. Nothing floats over the map but tokens and marks; notices land in the status line through
+`ToastOutlet`. The map and the panel share small module stores: the targeting session (`encounter/targeting.ts`),
+the live map's grid and size (`scene/tableGeometry.ts`) and the GM's selected token (`scene/selectedToken.ts`).
 
 Surfaces not needed for first paint load on first use (`components/lazySurface.tsx`): the Codex,
 homebrew, settings and the API reference, the character builder and level flow, replays, the map

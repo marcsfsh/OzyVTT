@@ -146,6 +146,7 @@ export function RollControls({
   rerollable = true,
   currentMode,
   faceLabel = "Your d20",
+  rollLabel = "Roll",
   onRoll,
   onTyped,
   onConfirm,
@@ -175,6 +176,8 @@ export function RollControls({
   /** The GM's forced mode, marked on its buttons. */
   currentMode?: DieMode;
   faceLabel?: string;
+  /** What the roll button says ("Roll death save"); "Roll" when absent. */
+  rollLabel?: ReactNode;
   onRoll: () => void;
   /** A typed d20: the face a physical die shows. */
   onTyped: (face: number) => void;
@@ -219,7 +222,7 @@ export function RollControls({
   return (
     <span className="save-prompt-actions">
       <button type="button" className="save-prompt-roll" disabled={busy} onClick={() => onRoll()}>
-        Roll
+        {rollLabel}
       </button>
       {mayType && <FaceEntry label={faceLabel} busy={busy} onFace={onTyped} onInvalid={onInvalidFace} />}
       {onDismiss && (

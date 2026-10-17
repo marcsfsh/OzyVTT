@@ -92,7 +92,6 @@ export function GmShell({
   token,
   connection,
   busy,
-  onOpenLog,
   onSignOut,
   onRevokeAll
 }: Readonly<{
@@ -100,7 +99,6 @@ export function GmShell({
   token: string;
   connection: Connection;
   busy: boolean;
-  onOpenLog: () => void;
   onSignOut: () => void;
   onRevokeAll: () => void;
 }>) {
@@ -220,7 +218,6 @@ export function GmShell({
           role="gm"
           state={state}
           token={token}
-          onOpenLog={onOpenLog}
           gm={{
             selectedMap,
             mapLibrary,

@@ -117,6 +117,8 @@ export type ViewerPresentationState = Readonly<{
   initiative: ViewerInitiative;
   encounter: ViewerEncounterScene;
   acceptedCommandIds: readonly string[];
+  /** The GM paused the screen. It stays paused when a scene goes live; absent on a state saved before this. */
+  pausedByGm?: boolean;
 }>;
 
 export type ViewerPresentationProjection = Readonly<{
@@ -400,11 +402,13 @@ export function applyViewerCommand(state: ViewerPresentationState, command: View
 
   let next: ViewerPresentationState = state;
   const payload = command.payload;
-  if (payload.type === "viewer.enabled.set") next = { ...state, enabled: payload.enabled };
+  if (payload.type === "viewer.enabled.set")
+    next = { ...state, enabled: payload.enabled, pausedByGm: !payload.enabled };
   else if (payload.type === "viewer.presentation.begin")
     next = {
       ...state,
       enabled: true,
+      pausedByGm: false,
       activeMap: {
         assetId: safeText(payload.assetId, "Map asset ID", 128),
         altText: safeText(payload.altText, "Map alternative text", 300, true)

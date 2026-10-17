@@ -511,3 +511,82 @@ export function IconThemeLight({ className }: Readonly<{ className?: string }>) 
     </Glyph>
   );
 }
+
+/* Table glyphs, drawn as strokes at the set's line weight. */
+function Stroke({ d }: Readonly<{ d: string }>) {
+  return (
+    <path d={d} fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+  );
+}
+
+/** Something waits on you: the GM's queue of decisions. */
+export function IconBell({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4zM10 21h4" />
+    </Glyph>
+  );
+}
+
+/** A handle the pointer drags: the divider between two panes. */
+export function IconGrip({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M6 9h12M6 15h12" />
+    </Glyph>
+  );
+}
+
+/** The table screen. */
+export function IconTv({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M3 5h18v12H3zM8 21h8M12 17v4" />
+    </Glyph>
+  );
+}
+
+/** Aiming at a creature. */
+export function IconTarget({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M12 5a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM12 2v5M12 17v5M2 12h5M17 12h5" />
+    </Glyph>
+  );
+}
+
+/** Find your own token on the map. */
+export function IconLocate({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v4M12 18v4M2 12h4M18 12h4" />
+    </Glyph>
+  );
+}
+
+/** Waiting on someone else. */
+export function IconWait({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M6 3h12M6 21h12M7 3c0 6 10 6 10 9s-10 3-10 9M17 3c0 6-10 6-10 9" />
+    </Glyph>
+  );
+}
+
+/** The log of what happened. */
+export function IconLog({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M5 6h14M5 12h14M5 18h9" />
+    </Glyph>
+  );
+}
+
+/** More choices in a menu. */
+export function IconMore({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M5 10.4a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM12 10.4a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM19 10.4a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2z" />
+    </Glyph>
+  );
+}

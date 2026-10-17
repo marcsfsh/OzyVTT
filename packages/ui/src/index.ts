@@ -18,7 +18,7 @@ export { Tabs } from "./primitives/Tabs";
 export { Menu, MenuItem } from "./primitives/Menu";
 export { Modal } from "./primitives/Modal";
 export { Drawer } from "./primitives/Drawer";
-export { ToastProvider, useToast, useToastMute, type ToastTone } from "./primitives/Toast";
+export { ToastProvider, ToastOutlet, useToast, useToastMute, type ToastTone } from "./primitives/Toast";
 export { Badge, type BadgeTone } from "./primitives/Badge";
 export { Avatar, type AvatarPresence } from "./primitives/Avatar";
 export { Meter, type MeterTone } from "./primitives/Meter";
@@ -83,7 +83,15 @@ export {
   IconDockLeft,
   IconDockRight,
   IconDockSidebar,
-  IconSparkle
+  IconSparkle,
+  IconBell,
+  IconGrip,
+  IconTv,
+  IconTarget,
+  IconLocate,
+  IconWait,
+  IconLog,
+  IconMore
 } from "./primitives/icons";
 export { Combobox } from "./primitives/Combobox";
 export { MarkdownEditor } from "./primitives/MarkdownEditor";

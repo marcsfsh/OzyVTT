@@ -178,6 +178,9 @@
 .spell-area-row.unplaced .spell-area-text {
   color: var(--caution-hi);
 }
+.spell-area-row.is-placing .spell-area-text {
+  color: var(--indigo-text);
+}
 .spell-area-text {
   flex: 1 1 12rem;
   min-width: 0;

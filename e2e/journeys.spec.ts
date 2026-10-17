@@ -8,6 +8,8 @@ import {
   PARTY,
   battleMap,
   drag,
+  expectTokenUncovered,
+  expectUncovered,
   ensureGmPassword,
   expect,
   expectPageFits,
@@ -104,14 +106,27 @@ test("the GM runs a fight on a new scene and the player moves their token", asyn
   await expectPageFits(gm);
   await press(bestiary.getByRole("button", { name: "Close" }));
   await press(gm.getByRole("button", { name: "Start the fight" }));
-  await expect(gm.getByText("Round 1")).toBeVisible();
+  await expect(gm.getByRole("tablist", { name: "The fight · round 1" })).toBeVisible();
   await expectPageFits(gm);
+  // The one primary sits in the panel's footer, inside the viewport and uncovered.
+  await expectUncovered(gm.getByRole("button", { name: "Next turn" }));
 
   // A move off the mover's turn goes to the GM, so if the goblin won initiative the GM ends its turn first.
-  await expect(player.getByText("Round 1")).toBeVisible();
-  const yourTurn = player.getByText("Your turn - act, then end it below");
+  await expect(player.getByRole("tablist", { name: "The fight · round 1" })).toBeVisible();
+  const yourTurn = player.getByRole("heading", { name: "Your turn" });
   if (!(await yourTurn.isVisible())) await press(gm.getByRole("button", { name: "Next turn" }));
   await expect(yourTurn).toBeVisible();
+  await expectUncovered(player.getByRole("button", { name: "End turn" }));
+  if (hasTouch) {
+    // On a phone a divider splits the map pane from the panel; the keys move it as well as a finger.
+    const divider = player.getByRole("separator", { name: "Map and panel split" });
+    const before = Number(await divider.getAttribute("aria-valuenow"));
+    await divider.focus();
+    await player.keyboard.press("ArrowUp");
+    await expect(divider).toHaveAttribute("aria-valuenow", String(before - 5));
+    await player.keyboard.press("ArrowDown");
+    await expectPageFits(player);
+  }
 
   // The player places their own token from the tray, then drags it across the map.
   await press(player.getByLabel("Staging tray").getByRole("button", { name: hero }));
@@ -136,6 +151,9 @@ test("the GM runs a fight on a new scene and the player moves their token", asyn
   // The GM sees the move the server accepted.
   const tokenId = await token.getAttribute("data-token-id");
   await expect(gm.locator(`g.encounter-token[data-token-id="${tokenId}"]`)).toHaveAttribute("transform", moved);
+  // Nothing covers the acting token, on either screen.
+  await expectTokenUncovered(player, tokenId!);
+  await expectTokenUncovered(gm, tokenId!);
 
   if (hasTouch) {
     // A second finger turns the drag into a pinch: the map zooms in and the drag commits nothing.

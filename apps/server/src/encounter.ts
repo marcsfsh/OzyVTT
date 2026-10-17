@@ -612,6 +612,18 @@ function legendaryRefilled(used: GameState["combat"]["legendaryUsed"], actorId: 
   return Object.fromEntries(Object.entries(used).filter(([key]) => key !== actorId && !key.startsWith(`${actorId}:`)));
 }
 
+/** A creature out of the fight for good: a monster or NPC at 0 HP. A character at 0 HP is dying and keeps its turns
+ *  for its death saves, and a creature whose turn decides whether it rises again (a troll's Regeneration) keeps its. */
+export function isDefeated(state: GameState, actorId: string): boolean {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  return (
+    actor !== undefined &&
+    actor.kind !== "player-character" &&
+    actor.hp.current <= 0 &&
+    !actor.effects.some((effect) => effect.tags.includes("regenerating-at-zero"))
+  );
+}
+
 /** The spell areas' deps from a turn change's, when it has dice and ids to act with. */
 function zoneDepsOf(deps: TurnAdvanceDeps | undefined): ZoneDeps | null {
   if (!deps?.newId) return null;
@@ -633,7 +645,13 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
     throw new CommandRejectedError("Players are still rolling initiative - roll for the rest to begin.");
   const currentIndex = state.combat.initiative.findIndex((entry) => entry.actorId === state.combat.turnActorId);
   if (currentIndex < 0) throw new CommandRejectedError("The current turn is not in Initiative.");
-  const wraps = currentIndex === state.combat.initiative.length - 1;
+  // A defeated creature takes no more turns: the order passes over it to the next one still in the fight.
+  const length = state.combat.initiative.length;
+  let steps = 1;
+  while (steps < length && isDefeated(state, state.combat.initiative[(currentIndex + steps) % length].actorId))
+    steps += 1;
+  if (steps === length) steps = 1;
+  const wraps = currentIndex + steps >= length;
   // The outgoing turn ends first: its "until the end of the turn" effects lapse and repeated saves open.
   const ending: EffectNarration[] = [];
   const outgoingId = state.combat.turnActorId;
@@ -649,7 +667,9 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   events?.push(...ending);
   // A new round sorts the whole order again, settling any mid-round score change.
   const order = wraps ? ordered(state, state.combat.initiative) : state.combat.initiative;
-  const nextActorId = order[wraps ? 0 : currentIndex + 1].actorId;
+  const nextActorId = wraps
+    ? (order.find((entry) => !isDefeated(state, entry.actorId)) ?? order[0]).actorId
+    : order[currentIndex + steps].actorId;
   state.combat = {
     ...state.combat,
     initiative: order,

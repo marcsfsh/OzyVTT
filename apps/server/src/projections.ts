@@ -272,16 +272,22 @@ export function projectPlayerCombat(
       .map((actor) => actor.id)
   );
   const currentIsPublic = initiative.some((entry) => entry.active);
-  const showsToken = (actorId: string) => publicActorIds.has(actorId) && tokenShown(sight, actorId);
+  // The live map reaches players before a fight as on the table screen; before a fight only placed tokens are sent,
+  // since who waits in the tray is the GM's.
+  const showsToken = (token: GameState["combat"]["tokens"][number]) =>
+    publicActorIds.has(token.actorId) &&
+    tokenShown(sight, token.actorId) &&
+    (state.combat.active || token.position !== null);
   return {
     active: state.combat.active,
     round: state.combat.round,
     turnActorId: currentIsPublic ? state.combat.turnActorId : null,
-    mapAssetId: state.combat.active ? state.combat.mapAssetId : null,
+    mapAssetId: state.combat.mapAssetId,
     hiddenTurn: state.combat.active && state.combat.turnActorId !== null && !currentIsPublic,
-    initiative,
-    tokens: state.combat.active ? state.combat.tokens.filter((token) => showsToken(token.actorId)) : [],
-    annotations: state.combat.active ? projectPlayerAnnotations(state, playerSessionId, now) : [],
+    // Before a fight the order holds only who the GM staged, which is not the players' to know yet.
+    initiative: state.combat.active ? initiative : [],
+    tokens: state.combat.mapAssetId ? state.combat.tokens.filter(showsToken) : [],
+    annotations: state.combat.mapAssetId ? projectPlayerAnnotations(state, playerSessionId, now) : [],
     // A hidden combatant's turn stays opaque: economy flags, action instance and per-turn uses (which
     // name stat-block action ids) reset to idle rather than narrate its activity.
     turn: currentIsPublic
@@ -304,7 +310,9 @@ export function projectPlayerCombat(
           turnUses: { ...state.combat.turn.turnUses },
           movementUsedFeet: state.combat.turn.movementUsedFeet,
           // Whether Action Surge or Haste left the creature another action: the table sees both taken.
-          ...(extraActionReady(state) ? { extraActionReady: true as const } : {})
+          ...(extraActionReady(state) ? { extraActionReady: true as const } : {}),
+          // A dying character's save for this turn is made, so its player is not offered a second.
+          ...(state.combat.turn.deathSaveRolled === true ? { deathSaveRolled: true as const } : {})
         }
       : {
           actionUsed: false,
@@ -328,10 +336,12 @@ export function projectPlayerCombat(
     fog: { enabled: state.combat.fog.enabled, shapes: state.combat.fog.shapes.map((shape) => ({ ...shape })) },
     // Only the revealed part: terrain under the fog would show the layout of ground players haven't seen.
     terrain: visibleTerrain(state.combat, sight.enabled ? exploredRectsOf(state) : undefined),
-    // Where their own characters see now and what the party has seen; computed on the server, only while the fight
-    // runs (the map itself reaches players only then).
+    // Where their own characters see now and what the party has seen; computed on the server whenever the map reaches
+    // them, before a fight as in one.
     vision:
-      sight.enabled && state.combat.active ? visionOf(state, sight.viewerIds, content) : { enabled: false as const },
+      sight.enabled && state.combat.mapAssetId
+        ? visionOf(state, sight.viewerIds, content)
+        : { enabled: false as const },
     // legendaryUsed is omitted: a monster's remaining legendary actions are GM knowledge.
     // While the GM reviews an earlier turn players get only the flag; turn labels can name hidden combatants.
     rewound: state.combat.historyCursor !== null,
@@ -407,7 +417,8 @@ export function projectPlayerRollCalls(state: GameState, playerSessionId: string
       .map((actor) => actor.id)
   );
   return state.rollCalls.flatMap((call) => {
-    const entries = call.entries.filter((entry) => mine.has(entry.actorId));
+    // An answered entry is done for its player: the call ends for them, and stays open only for the GM to close.
+    const entries = call.entries.filter((entry) => mine.has(entry.actorId) && entry.result === undefined);
     if (entries.length === 0) return [];
     return [
       {
