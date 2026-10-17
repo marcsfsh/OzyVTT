@@ -74,10 +74,11 @@ let sequence = 0;
 const nextId = () => `50000000-0000-4000-8000-${String(++sequence).padStart(12, "0")}`;
 const NOW = () => "2026-10-17T00:00:00.000Z";
 
-/** The hero (a PC), a foe from the SRD bundle, and an ally PC; initiative hero, foe, ally. */
-function game(foe: string, foeHp?: number): GameState {
+/** The hero (a PC), a foe from the SRD bundle, and an ally PC; initiative hero, foe, ally, and a second foe last. */
+function game(foe: string, options: Readonly<{ foeHp?: number; foe2?: string }> = {}): GameState {
   const definition = monster(foe);
-  const hp = foeHp ?? definition.hitPoints.maximum;
+  const hp = options.foeHp ?? definition.hitPoints.maximum;
+  const second = options.foe2 ? monster(options.foe2) : undefined;
   const state = GameStateSchema.parse({
     schemaVersion: 1,
     actors: [
@@ -108,7 +109,20 @@ function game(foe: string, foeHp?: number): GameState {
         definitionId: "hero",
         speedFeet: 30,
         armorClass: 12
-      }
+      },
+      ...(second
+        ? [
+            {
+              id: IDS.foe2,
+              name: `${second.name} 2`,
+              kind: "monster",
+              hp: { current: second.hitPoints.maximum, maximum: second.hitPoints.maximum },
+              definitionId: options.foe2,
+              speedFeet: second.speedFeet,
+              armorClass: second.armorClass
+            }
+          ]
+        : [])
     ]
   });
   startEncounter(
@@ -118,7 +132,8 @@ function game(foe: string, foeHp?: number): GameState {
       entries: [
         { actorId: IDS.hero, score: 20 },
         { actorId: IDS.foe, score: 15 },
-        { actorId: IDS.ally, score: 10 }
+        { actorId: IDS.ally, score: 10 },
+        ...(second ? [{ actorId: IDS.foe2, score: 5 }] : [])
       ]
     },
     () => 10,
@@ -128,6 +143,15 @@ function game(foe: string, foeHp?: number): GameState {
 }
 
 const actor = (state: GameState, id: string) => state.actors.find((candidate) => candidate.id === id)!;
+
+/** Creature-to-creature distance from positions in feet, measured as the grid does (diagonals count 5). */
+const distanceBy =
+  (positions: Readonly<Record<string, readonly [number, number]>>) =>
+  (a: string, b: string): number | null => {
+    const from = positions[a];
+    const to = positions[b];
+    return from && to ? Math.max(Math.abs(from[0] - to[0]), Math.abs(from[1] - to[1])) : null;
+  };
 
 function resolveDeps(faces: number[], actorDefinition: ActorDefinition): ResolveDependencies {
   return {
@@ -223,5 +247,40 @@ describe("Magic Resistance and Greater Magic Resistance", () => {
     const resolution = heroUses(state, FIRE_BOLT, [20]);
     expect(resolution.attack?.outcome).toBe("miss");
     expect(resolution.damageTotal).toBe(0);
+  });
+});
+
+describe("Pack Tactics", () => {
+  const bite = monster("wolf").actions.find((action) => action.id === "bite")!;
+  /** The wolf bites the hero on its turn, with the tokens where `positions` puts them. */
+  function wolfBites(state: GameState, positions: Readonly<Record<string, readonly [number, number]>>) {
+    state.combat = { ...state.combat, turnActorId: IDS.foe };
+    return resolveDefinitionAction(
+      state,
+      bite,
+      { actorId: IDS.foe, targetIds: [IDS.hero], commandId: nextId(), commit: false },
+      { ...resolveDeps([4, 17], monster("wolf")), distanceFeet: distanceBy(positions) }
+    );
+  }
+
+  it("gives Advantage when an able ally of the attacker is within 5 feet of the target", () => {
+    const state = game("wolf", { foe2: "wolf" });
+    const preview = wolfBites(state, { [IDS.hero]: [0, 0], [IDS.foe]: [5, 0], [IDS.foe2]: [0, 5] });
+    expect(preview.rollMode?.mode).toBe("advantage");
+    expect(preview.rollMode?.advantage).toContain("Pack Tactics (Wolf 2 within 5 ft)");
+    expect(preview.attack?.naturalRoll).toBe(17);
+  });
+
+  it("gives nothing when the ally is farther off, Incapacitated, or not an ally", () => {
+    const far = game("wolf", { foe2: "wolf" });
+    expect(wolfBites(far, { [IDS.hero]: [0, 0], [IDS.foe]: [5, 0], [IDS.foe2]: [0, 10] }).rollMode).toBeUndefined();
+
+    const stunned = game("wolf", { foe2: "wolf" });
+    actor(stunned, IDS.foe2).conditions = [{ id: "stunned" }];
+    expect(wolfBites(stunned, { [IDS.hero]: [0, 0], [IDS.foe]: [5, 0], [IDS.foe2]: [0, 5] }).rollMode).toBeUndefined();
+
+    // The hero's own ally beside it is no ally of the wolf's.
+    const alone = game("wolf");
+    expect(wolfBites(alone, { [IDS.hero]: [0, 0], [IDS.foe]: [5, 0], [IDS.ally]: [0, 5] }).rollMode).toBeUndefined();
   });
 });
