@@ -53,24 +53,31 @@ function ongoingDamageNote(effect: ChipEffect): string | null {
   return `${dice} at the start of each of ${when}${save}`;
 }
 
+/** The SRD Burning hazard's tag, and the builtin action that puts the fire out on its bearer. */
+const BURNING_TAG = "burning";
+const PUT_OUT_FIRE_ACTION_ID = "extinguish-fire";
+
 /**
  * Active rules-engine effects (Rage, a grapple, Concentration) as chips beside the condition chips. Tapping one
  * opens where it came from, how long it lasts and what else ends it, so the details read on a phone; ending it is
  * an explicit button there. Ending is a real engine transition: linked conditions clear and on-end grants fire
  * server-side (ADR-0020). `canEnd` is the GM's right to end anything; a player may end what their own character is
  * the source of (`yours`), and asks the GM about anything imposed on them (in a fight, where the GM's queue is).
+ * `canAct` (the GM, or the bearer's owner) may put out a fire the bearer is burning in, which takes its action.
  */
 export function EffectChips({
   actorId,
   effects,
   canEnd,
   canAsk = false,
+  canAct = canEnd,
   onFeedback
 }: Readonly<{
   actorId: string;
   effects: ReadonlyArray<ChipEffect>;
   canEnd: boolean;
   canAsk?: boolean;
+  canAct?: boolean;
   onFeedback: (text: string) => void;
 }>) {
   const [busy, setBusy] = useState(false);
@@ -82,6 +89,15 @@ export function EffectChips({
     void command("effect:end", { actorId, effectId }).then((result) => {
       setBusy(false);
       onFeedback(result.ok ? `${name} ended.` : (result.message ?? "The effect could not be ended."));
+      if (result.ok) setShown(null);
+    });
+  };
+  // The server routes it: the bearer's action in its turn, a question for the GM off it, free outside a fight.
+  const putOut = () => {
+    setBusy(true);
+    void command("action:use", { actorId, actionId: PUT_OUT_FIRE_ACTION_ID }).then((result) => {
+      setBusy(false);
+      onFeedback(result.ok ? "The fire is out." : (result.message ?? "The fire could not be put out."));
       if (result.ok) setShown(null);
     });
   };
@@ -121,8 +137,22 @@ export function EffectChips({
             {effectDurationLabel(open)}
             {endingNotes(open).length > 0 ? ` · ${endingNotes(open).join(" · ")}` : ""}
           </p>
-          {ongoingDamageNote(open) && <p className="effect-detail-line">{ongoingDamageNote(open)}</p>}
+          {ongoingDamageNote(open) ? (
+            <p className="effect-detail-line">{ongoingDamageNote(open)}</p>
+          ) : open.tags.includes(BURNING_TAG) ? (
+            <p className="effect-detail-line">1d4 Fire at the start of each of its turns until the fire is put out</p>
+          ) : null}
+          {canAct && open.tags.includes(BURNING_TAG) && (
+            <p className="effect-detail-line">
+              Rolling on the ground puts it out: it takes an action and leaves it Prone.
+            </p>
+          )}
           <div className="effect-detail-actions">
+            {canAct && open.tags.includes(BURNING_TAG) && (
+              <Button size="sm" variant="secondary" disabled={busy} onClick={putOut}>
+                Put out the fire
+              </Button>
+            )}
             {canEnd || open.yours ? (
               <Button size="sm" variant="secondary" disabled={busy} onClick={() => end(open.id, open.name)}>
                 End {open.name}

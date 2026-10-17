@@ -5,13 +5,25 @@ import {
   collectRiders,
   d20TestFormula,
   diceRiders,
+  keptD20,
   parseDiceFormula,
   resolveDice,
+  resolveWithD20s,
   sumRiders,
   weaponAbilityFrom,
   type AttackKind
 } from "@vtt/rules-5e";
 import { conditionLabel, exhaustionLevel, exhaustionPenalty, isIncapacitated } from "../condition-rules.js";
+import { CommandRejectedError } from "../game-store.js";
+import {
+  heldD20s,
+  heldRollFor,
+  holdRoll,
+  releaseHeldRoll,
+  requireTypedReroll,
+  spendRerollRight
+} from "../held-rolls.js";
+import { GM_CHOICE } from "../saving-throws.js";
 import { criticalThreshold } from "../effective-actions.js";
 import { endEffect, STEADY_AIM_TAG } from "../effects.js";
 import {
@@ -242,18 +254,23 @@ function attackRollSources(
   return sources;
 }
 
-/** The natural d20 and the total: a hand-entered total is used verbatim (its crit declared, its die
- *  unknown), a supplied natural replaces the roll, otherwise the d20 is rolled. A preview records the
- *  shown die; a confirm reuses it and records nothing new. */
+/**
+ * The natural d20 and the total. The GM's hand-entered total is used verbatim (its crit declared, its die unknown); a
+ * supplied natural (a typed die, a parked attack's replay) replaces the roll; otherwise the d20 is thrown. With a
+ * `holdKey` the die is held between a preview and its confirm (ADR-0012): a second preview shows the same die, the
+ * confirm uses it and records nothing new, and only a reroll throws again (a player's Heroic Inspiration rerolls one
+ * die; the GM throws afresh).
+ */
 function rollD20(
   ctx: ResolveContext,
   mode: "advantage" | "disadvantage" | "normal",
   bonus: number
 ): { naturalRoll: number; total: number; declaredCrit: boolean } {
-  const { input, deps } = ctx;
+  const { input, deps, state } = ctx;
   const isPreview = input.commit === false;
+  const key = input.holdKey;
   if (input.attackTotal !== undefined) {
-    // naturalRoll 0 means "not a rolled die", so no misleading "nat" is shown.
+    // naturalRoll 0 means "not a rolled die", so no misleading "nat" is shown; a declared 20 or 1 is that die.
     const total = input.attackTotal;
     const declaredCrit = input.critical === true;
     if (isPreview)
@@ -262,17 +279,54 @@ function rollD20(
         resolveDice(parseDiceFormula(String(total)), () => total),
         "attack"
       );
-    return { naturalRoll: declaredCrit ? 20 : 0, total, declaredCrit };
+    return { naturalRoll: declaredCrit ? 20 : input.fumble === true ? 1 : 0, total, declaredCrit };
   }
+  const scope =
+    deps.initiatorRole === "player"
+      ? { role: "player" as const, sessionId: deps.initiatorSessionId ?? "" }
+      : { role: "gm" as const };
   if (input.attackNatural !== undefined) {
     const naturalRoll = input.attackNatural;
-    if (isPreview)
+    const held = key ? heldRollFor(state, key) : undefined;
+    // A typed reroll: Heroic Inspiration, then the face the physical reroll shows.
+    if (input.reroll) {
+      requireTypedReroll(state, scope, held);
+      spendRerollRight(ctx.attacker, scope);
+    }
+    // A typed die is recorded once, when first shown; the confirm of a held one records nothing new.
+    const seen = input.reroll !== true && held?.typed === true && held.faces[0] === naturalRoll;
+    if (isPreview && !seen)
       recordRoll(
         ctx,
         resolveDice(parseDiceFormula(d20TestFormula("normal", bonus)), () => naturalRoll),
-        "attack"
+        "attack",
+        undefined,
+        { typed: input.typedFace === true }
       );
+    if (key && isPreview) holdRoll(state, { key, actorId: ctx.attacker.id, faces: [naturalRoll], typed: true });
+    if (key && !isPreview) releaseHeldRoll(state, key);
     return { naturalRoll, total: naturalRoll + bonus, declaredCrit: false };
+  }
+  if (key) {
+    const held = heldRollFor(state, key);
+    // A typed die stands until a typed reroll replaces it; only the GM may have the server throw over it.
+    if (held?.typed && !(input.reroll && scope.role === "gm")) {
+      if (input.reroll) throw new CommandRejectedError("Type the die your reroll shows.");
+      if (!isPreview) releaseHeldRoll(state, key);
+      return { naturalRoll: held.faces[0], total: held.faces[0] + bonus, declaredCrit: false };
+    }
+    let reroll: "none" | "one" | "all" = "none";
+    if (input.reroll) {
+      if (!held) throw new CommandRejectedError("Roll the attack first: a reroll throws again a die that was thrown.");
+      spendRerollRight(ctx.attacker, scope);
+      reroll = scope.role === "gm" ? "all" : "one";
+    }
+    const { faces, thrown } = heldD20s(held, mode, deps.random, reroll);
+    const resolution = resolveWithD20s(d20TestFormula(mode, bonus), faces, deps.random);
+    if (thrown) recordRoll(ctx, resolution, "attack");
+    if (isPreview) holdRoll(state, { key, actorId: ctx.attacker.id, faces });
+    else releaseHeldRoll(state, key);
+    return { naturalRoll: keptD20(faces, mode), total: resolution.total, declaredCrit: false };
   }
   const resolution = resolveDice(parseDiceFormula(d20TestFormula(mode, bonus)), deps.random);
   recordRoll(ctx, resolution, "attack");
@@ -340,14 +394,17 @@ export function rollAttack(ctx: ResolveContext): void {
   };
   const sources = attackRollSources(ctx, target, targetDerivation, distance);
   const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
-  const mode = input.rollMode ?? aggregated.mode;
-  ctx.rollMode = input.rollMode
-    ? {
-        mode: input.rollMode,
-        advantage: input.rollMode === "advantage" ? ["GM choice"] : [],
-        disadvantage: input.rollMode === "disadvantage" ? ["GM choice"] : []
-      }
-    : aggregated;
+  // Only the GM's choice reaches here (a player's is stripped by the command); it wins and is named as the GM's.
+  const forced = input.rollMode ?? undefined;
+  const mode = forced ?? aggregated.mode;
+  ctx.rollMode =
+    forced === undefined
+      ? aggregated
+      : {
+          mode: forced,
+          advantage: forced === "advantage" ? [GM_CHOICE] : [],
+          disadvantage: forced === "disadvantage" ? [GM_CHOICE] : []
+        };
   // A standing `attack-bonus` is already folded into `action.attack.bonus` by `effectiveActions`; only
   // momentary riders are added here. The two sets are disjoint.
   const atRoll = collectRiders(derivation.carriers, {
@@ -373,12 +430,12 @@ export function rollAttack(ctx: ResolveContext): void {
   const inPlay = armorClassInPlay(target);
   const targetAc = inPlay !== undefined ? inPlay + ctx.coverBonus + reactionBonus : null;
   // A declared crit (total mode) or a natural roll at or above the threshold crits (a `critical-range`
-  // rider can widen it); a nat 1 fumbles only when a natural die is known.
+  // rider can widen it); a nat 1 fumbles when the die is known or, with a typed total, declared.
   ctx.crit =
     declaredCrit || (!manualTotal && naturalRoll >= criticalThreshold(derivation, attacker, action, ctx.riderFilters));
   let outcome = ctx.crit
     ? ("crit" as const)
-    : !manualTotal && naturalRoll === 1
+    : naturalRoll === 1
       ? ("fumble" as const)
       : targetAc === null
         ? ("unknown" as const)

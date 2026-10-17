@@ -1,5 +1,5 @@
 import type { Actor } from "@vtt/domain";
-import type { ActorAction, ActorDefinition } from "@vtt/schemas";
+import { MAX_ACTION_USES, type ActorAction, type ActorDefinition } from "@vtt/schemas";
 import { collectRiders, sumRiders, type RiderContext } from "@vtt/rules-5e";
 import { withTakenActions } from "./builtin-actions.js";
 import {
@@ -70,7 +70,7 @@ export function withStandingRiders(action: ActorAction, derivation: EquipmentDer
       ? { save: { ...action.save, dc: Math.max(1, Math.min(40, action.save.dc + saveDc)) } }
       : {}),
     ...(action.uses && poolBonus !== 0
-      ? { uses: { ...action.uses, limit: Math.max(1, Math.min(20, action.uses.limit + poolBonus)) } }
+      ? { uses: { ...action.uses, limit: Math.max(1, Math.min(MAX_ACTION_USES, action.uses.limit + poolBonus)) } }
       : {}),
     // A standing `damage-bonus` (a +1 weapon) folds into the first damage part's formula, so sheet, roll
     // and resolver read one number; the constant is never crit-doubled. Moment-gated ones are added by
@@ -153,26 +153,23 @@ export function criticalThreshold(
 export function actionPools(
   actions: readonly ActorAction[]
 ): Array<{ id: string; name: string; limit: number; per: string }> {
-  const pools = new Map<string, { id: string; name: string; limit: number; per: string }>();
+  const pools = new Map<string, { id: string; name: string; limit: number; per: string; named: boolean }>();
   for (const action of actions) {
     if (!action.uses) continue;
     const id = action.uses.pool ?? action.id;
     const existing = pools.get(id);
     if (!existing) {
-      pools.set(id, {
-        id,
-        name: action.id === id ? action.name : titleCase(id),
-        limit: action.uses.limit,
-        per: action.uses.per
-      });
+      // A pool one action spends reads as that action ("Divine Smite (no slot)") until a second shares it.
+      pools.set(id, { id, name: action.name, limit: action.uses.limit, per: action.uses.per, named: action.id === id });
       continue;
     }
     // Same rule as `useLimitFor`: only a sibling in the same rest scope raises the ceiling.
     if (existing.per === action.uses.per) existing.limit = Math.max(existing.limit, action.uses.limit);
-    // An action whose own id is the pool key names it better than the derived title.
-    if (action.id === id) existing.name = action.name;
+    // An action whose own id is the pool key names it; several others share the derived title.
+    if (action.id === id) Object.assign(existing, { name: action.name, named: true });
+    else if (!existing.named) existing.name = titleCase(id);
   }
-  return [...pools.values()];
+  return [...pools.values()].map(({ named: _named, ...pool }) => pool);
 }
 
 const titleCase = (slug: string): string =>

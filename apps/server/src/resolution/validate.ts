@@ -1,6 +1,8 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { GameState } from "@vtt/domain";
 import { effectiveActions } from "../effective-actions.js";
+import { withShotAmmunitionOnly } from "../ammunition.js";
+import { consumableRowFor } from "../consumables.js";
 import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
 import { effectiveModeFor, overrideCovers, overrideReason, overrideWaives } from "../rules-families.js";
@@ -13,6 +15,7 @@ import {
   withSpellEffects
 } from "../item-actions.js";
 import { coverBonusOf, coverFor } from "../cover.js";
+import { scrollOfAction } from "../scrolls.js";
 import { builtinHandlerFor } from "./builtins.js";
 import type { DefinitionAction, LiveActor, ResolveContext, ResolveDependencies, ResolveInput } from "./context.js";
 import { castLevelOf, planEconomy, type EconomyPlan } from "./economy.js";
@@ -21,7 +24,8 @@ import { castLevelOf, planEconomy, type EconomyPlan } from "./economy.js";
 function combatantsOf(
   state: GameState,
   action: DefinitionAction,
-  input: ResolveInput
+  input: ResolveInput,
+  catalog: ResolveDependencies["catalog"]
 ): { attacker: LiveActor; targets: LiveActor[] } {
   if (!state.combat.active) throw new CommandRejectedError("Start an encounter before resolving actions.");
   const inFight = (actorId: string) => state.combat.initiative.some((entry) => entry.actorId === actorId);
@@ -42,16 +46,22 @@ function combatantsOf(
   if (action.grants?.target === "targets" && targets.length === 0)
     throw new CommandRejectedError("Choose the creatures this action targets.");
   // A limited use, a spell slot or the legendary pool is itself the mechanic (Action Surge, Arcane Recovery, a dragon's
-  // Commanding Presence), so an action that only spends one resolves without a roll or a target.
+  // Commanding Presence), so an action that only spends one resolves without a roll or a target; so does one that uses
+  // up an item (a scroll of Detect Magic read in the fight).
   const spendsALimitedUse =
-    action.uses !== undefined || action.spellSlot !== undefined || action.legendary !== undefined;
+    action.uses !== undefined ||
+    action.spellSlot !== undefined ||
+    action.legendary !== undefined ||
+    consumableRowFor(action, attacker.inventory, catalog) !== null;
   const structuredWithoutTargets =
     (action.grants !== undefined && action.grants.target !== "target") ||
     action.healing?.self === true ||
     action.multiattack !== undefined ||
     spendsALimitedUse ||
     input.builtin === true;
-  if (targets.length === 0 && !structuredWithoutTargets && action.grants?.target !== "target")
+  // A touch that heals by the points spent or ends a condition (Lay on Hands) is spent on someone.
+  const touchesSomeone = action.endsConditions !== undefined || action.healing?.perUse === true;
+  if (targets.length === 0 && (touchesSomeone || (!structuredWithoutTargets && action.grants?.target !== "target")))
     throw new CommandRejectedError("Choose at least one target.");
   if (
     !action.attack &&
@@ -77,7 +87,7 @@ export function openResolve(
 ): ResolveContext {
   const spell = declared.spellId ? deps.catalog?.spellRecord?.(declared.spellId) : undefined;
   const reaching = withSpellEffects(withSpellAttackReach(declared, spell), spell);
-  const { attacker, targets } = combatantsOf(state, reaching, input);
+  const { attacker, targets } = combatantsOf(state, reaching, input, deps.catalog);
   // A spell cast with a higher slot rolls that slot's dice and makes its rays (before the economy opens the action's
   // instance); a paid replay names the slot it was cast with.
   const castLevel = input.economyPaid ? input.slotLevel : castLevelOf(state, attacker, reaching, input.slotLevel);
@@ -87,9 +97,10 @@ export function openResolve(
       : reaching;
   const action = withChosenDamageType(upcast, input.damageType ?? null);
   const warnings: string[] = [];
-  const derivation = deriveEquipment(attacker, deps.definition, deps.catalog);
+  const derived = deriveEquipment(attacker, deps.definition, deps.catalog);
   const siblings = effectiveActions(deps.definition, attacker, deps.catalog);
-  const riderItemId = sourceItemOf(action, derivation, attacker.inventory);
+  const riderItemId = sourceItemOf(action, derived, attacker.inventory);
+  const derivation = withShotAmmunitionOnly(derived, attacker, riderItemId, deps.catalog);
   // Magic Missile: each dart at a creature of the caster's choice, the targets listed dart by dart.
   if (action.darts !== undefined && input.targetIds.length > action.darts)
     throw new CommandRejectedError(
@@ -176,10 +187,14 @@ export function openResolve(
     builtinSave: null,
     opens: null,
     castId: null,
-    hitRiders: []
+    hitRiders: [],
+    damageEffectIds: []
   };
   if (builtin?.prepare) ctx.action = builtin.prepare(ctx);
-  if (!input.economyPaid) warnings.push(...laterActionReminders(spell, action));
+  if (!input.economyPaid)
+    warnings.push(
+      ...laterActionReminders(spell, action, scrollOfAction(action, attacker.inventory, deps.catalog) !== null)
+    );
   return ctx;
 }
 
@@ -192,8 +207,13 @@ export function withChosenDamageType(action: DefinitionAction, chosen: string | 
 }
 
 /** The GM's reminder on casting a spell that does more later (SRD text): the engine can't see a creature enter an
- *  area or a turn come round, so the GM resolves the later action when it happens. */
-function laterActionReminders(spell: SpellReference | undefined, action: DefinitionAction): string[] {
+ *  area or a turn come round, so the GM resolves the later action when it happens. A scroll read for a long casting
+ *  time spends no slot, and "if the casting is interrupted, the scroll isn't lost". */
+function laterActionReminders(
+  spell: SpellReference | undefined,
+  action: DefinitionAction,
+  fromScroll: boolean
+): string[] {
   const later = spell?.effect?.laterActions ?? [];
   if (!spell || later.some((row) => laterSpellActionId(spell.id, row.name) === action.id)) return [];
   return [
@@ -204,7 +224,7 @@ function laterActionReminders(spell: SpellReference | undefined, action: Definit
         ]
       : isLongCastingTime(spell.castingTime)
         ? [
-            `${spell.name} takes ${spell.castingTime} to cast: the Magic action on each of the caster's turns until then, keeping Concentration. If that breaks, the spell fails and its slot isn't spent - restore it on the sheet.`
+            `${spell.name} takes ${spell.castingTime} to cast: the Magic action on each of the caster's turns until then, keeping Concentration. If that breaks, the spell fails and ${fromScroll ? "the scroll isn't lost - give it back on the sheet" : "its slot isn't spent - restore it on the sheet"}.`
           ]
         : []),
     ...later.map((row) => `${spell.name}: ${row.when} Use "${spell.name}: ${row.name}" for it.`)

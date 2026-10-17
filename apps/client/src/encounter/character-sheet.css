@@ -45,6 +45,11 @@
 .sheet-hp-meter {
   margin: 0.3rem 0 0.1rem;
 }
+.sheet-vital-note {
+  margin: 0.3rem 0 0;
+  color: var(--danger-text);
+  font-size: var(--fs-sm);
+}
 /* `.sheet-vital` is `isolation: isolate` (it keeps its `z-index: -1` backing layer inside), which
    traps the open combobox list's z-index inside the chip, so later positioned elements cover it and
    steal taps. The chip is lifted while a list is open instead; 3 clears `.sheet-float-resize` (2). */
@@ -66,8 +71,24 @@
   margin-top: 0;
 }
 .sheet-rest-block,
-.sheet-saves-owed {
+.sheet-dying-block,
+.sheet-saves-owed,
+.sheet-inspiration {
   margin-top: 0.85rem;
+}
+.sheet-inspiration-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.7rem;
+}
+.sheet-inspiration-state {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.sheet-inspiration-state.is-held {
+  color: var(--cyan-hi);
+  font-weight: 700;
 }
 .sheet-rest {
   display: flex;
@@ -91,7 +112,46 @@
 }
 .sheet-rest-buttons {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 0.4rem;
+}
+.sheet-pools-block {
+  margin-top: 0.85rem;
+}
+.sheet-pools {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sheet-pool {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.7rem;
+}
+.sheet-pool-name {
+  color: var(--text);
+  font-weight: 700;
+}
+.sheet-pool-count {
+  color: var(--text-dim);
+  font: 700 var(--fs-sm) var(--font-numeric);
+}
+.sheet-pool-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+.sheet-rest-asked {
+  color: var(--cyan-hi);
+  font-size: var(--fs-sm);
+  font-weight: 700;
 }
 .sheet-settings-label {
   color: var(--text-muted);
@@ -632,8 +692,7 @@
   align-items: center;
   gap: 0.1rem;
 }
-/* `align-self: stretch` spans the pair across the ability cell; `flex-wrap` stacks them when the cell
-   is too narrow for two 44px buttons. */
+/* `align-self: stretch` spans the check across the ability cell. */
 .sheet-ability-rolls {
   display: flex;
   flex-wrap: wrap;
@@ -641,8 +700,7 @@
   gap: var(--space-1);
   margin-top: 0.2rem;
 }
-/* Paint grows to 44px: these sit 4px apart in a tight grid, so an overhang would swallow the partner
-   and the cell above. */
+/* Paint grows to 44px: these sit 4px apart in a tight grid, so an overhang would swallow the cell above. */
 .sheet-ability-rolls button {
   display: inline-flex;
   align-items: center;
@@ -660,16 +718,6 @@
 }
 .sheet-ability-rolls button:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
-}
-.sheet-ability-rolls button.prof {
-  color: var(--magenta);
-}
-.sheet-ability-rolls button.prof em {
-  font-style: normal;
-  font-size: 0.62em;
-  opacity: 0.8;
-  margin-left: 0.1em;
-  vertical-align: super;
 }
 .sheet-ability-rolls button:disabled {
   opacity: 0.55;
@@ -752,6 +800,52 @@
 .sheet-roll-chip.is-proficient {
   border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
 }
+/* A Strength or Dexterity save that fails without a roll (Paralyzed): still tappable, so an owed save is answered. */
+.sheet-roll-chip.is-failing {
+  border-color: color-mix(in srgb, var(--caution) 60%, transparent);
+}
+/* Advantage or Disadvantage the rules give a roll, marked on its button; the reason is in its accessible name and
+   in the notes under the scores. `span.` outweighs the ability cell's and skill row's own span rules. */
+span.roll-mode-tag {
+  display: inline-block;
+  margin-left: var(--space-1);
+  padding: 0.12rem 0.3rem;
+  border-left: 3px solid;
+  font: 800 var(--fs-2xs)/1 var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.roll-mode-tag.is-advantage {
+  border-left-color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 14%, transparent);
+  color: var(--cyan-hi);
+}
+.roll-mode-tag.is-disadvantage {
+  border-left-color: var(--caution);
+  background: color-mix(in srgb, var(--caution) 14%, transparent);
+  color: var(--caution-hi);
+}
+.sheet-roll-notes {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.sheet-roll-notes li {
+  padding: 0.2rem var(--space-2);
+  border-left: 3px solid var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 10%, transparent);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.sheet-roll-notes li.is-disadvantage {
+  border-left-color: var(--caution);
+  background: color-mix(in srgb, var(--caution) 10%, transparent);
+}
+.sheet-roll-notes strong {
+  color: var(--text);
+}
 .sheet-roll-row .sheet-roll-chip {
   padding: 0.34rem 0.68rem;
   font-size: var(--fs-sm);
@@ -814,6 +908,23 @@
 }
 .sheet-prepare-step button {
   min-height: 44px;
+}
+/* A pick re-made after a Long Rest (a Land Druid's land): its name, then the choice, wrapping on a phone. */
+.sheet-rechoice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0.4rem 0;
+}
+.sheet-rechoice > span {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.sheet-rechoice > :last-child {
+  flex: 1 1 10rem;
+  min-width: 0;
+  max-width: 16rem;
 }
 .sheet-spell-group-head {
   display: flex;
@@ -1211,10 +1322,15 @@
 
 .sheet-rollbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
   padding: 0.35rem var(--space-5);
   border-bottom: 1px solid var(--line);
+}
+.sheet-roll-visibility {
+  width: auto;
+  max-width: 100%;
 }
 
 .sheet-workspace-cols {
@@ -1316,6 +1432,17 @@
 .sheet-workspace.show-log .sheet-last-roll {
   display: none;
 }
+/* Rerolling the sheet's last check: Heroic Inspiration for a player, free for the GM. */
+.sheet-last-reroll {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.25rem var(--space-5);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-1);
+}
+.sheet-workspace.show-log .sheet-last-reroll {
+  display: none;
+}
 
 /* Optional desktop dice dock beside the sheet. The 650/651 pair must move together: a gap or overlap
    would be a width where the dock toggle is both offered and impossible. */
@@ -1344,6 +1471,9 @@
   }
   .sheet-workspace.has-log.docked .sheet-last-roll {
     display: none;
+  }
+  .sheet-workspace.has-log.docked .sheet-last-reroll {
+    display: flex;
   }
 }
 @media (max-width: 650px) {
@@ -1435,7 +1565,8 @@
   .sheet-embedded .sheet-rollbar {
     padding: 0.2rem var(--space-3);
   }
-  .sheet-embedded .sheet-last-roll {
+  .sheet-embedded .sheet-last-roll,
+  .sheet-embedded .sheet-last-reroll {
     padding-inline: var(--space-3);
   }
   .sheet-embedded .sheet-pane {
@@ -1512,6 +1643,13 @@
 .sheet-item-choice {
   margin-top: var(--space-1);
   max-width: 14rem;
+}
+.sheet-recover-ammunition {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
 }
 .sheet-give {
   display: flex;

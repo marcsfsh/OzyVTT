@@ -4,13 +4,21 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { GAME_PATHS } from "@vtt/api-contract";
 import { GameStateSchema } from "@vtt/domain";
-import { InventoryItemSchema, type ActorDefinition } from "@vtt/schemas";
+import { ActorDefinitionSchema, InventoryItemSchema, type ActorDefinition } from "@vtt/schemas";
 import { checkRollMode } from "../src/ability-checks.js";
-import { importActorDefinition, reconcileArmorClasses, storedArmorClass } from "../src/actor-roster.js";
+import {
+  importActorDefinition,
+  reconcileArmorClasses,
+  resolvePendingImport,
+  storedArmorClass,
+  submitPendingImport
+} from "../src/actor-roster.js";
 import { deriveActorSheet } from "../src/actor-derived.js";
+import { setCharacterIdentity, setCharacterProficiencies } from "../src/character-edit.js";
 import { initiativeRollMode } from "../src/encounter.js";
 import { deriveEquipment } from "../src/equipment-derivation.js";
 import { RulesBlockedError } from "../src/game-store.js";
+import { previewDamage } from "../src/hit-points.js";
 import { reconcileMagicMarkers, setInventoryItem } from "../src/inventory.js";
 import { projectPlayerView } from "../src/projections.js";
 import { saveRollSources } from "../src/saving-throws.js";
@@ -124,6 +132,54 @@ describe("an imported sheet's printed Armor Class", () => {
     const { equip } = imported();
     expect(equip("plate-armor", true)).toBe(18);
     expect(equip("shield", true)).toBe(20);
+  });
+
+  it("moves when the GM's edit of the sheet changes what it derives from", () => {
+    const { state, equip } = imported();
+    equip("plate-armor", true);
+    // Defense: +1 while wearing armor.
+    setCharacterIdentity(
+      state,
+      ACTOR,
+      { classes: [{ id: "fighter", name: "Fighter", level: 3 }], feats: [{ id: "defense", name: "Defense" }] },
+      { gm: true },
+      catalog
+    );
+    expect(state.actors[0].armorClass).toBe(19);
+    // Recorded armor training without Shields: the Shield gives no AC until the GM adds the training.
+    setCharacterProficiencies(state, ACTOR, { saves: [], skills: [], armor: ["light", "medium", "heavy"] }, catalog);
+    expect(equip("shield", true)).toBe(19);
+    setCharacterProficiencies(
+      state,
+      ACTOR,
+      { saves: [], skills: [], armor: ["light", "medium", "heavy", "shields"] },
+      catalog
+    );
+    expect(state.actors[0].armorClass).toBe(21);
+  });
+
+  it("gives a player's queued sheet its items' riders when the GM approves it, as the GM's own import does", () => {
+    const state = GameStateSchema.parse({ schemaVersion: 1 });
+    const definition = ActorDefinitionSchema.parse({
+      schemaId: "vtt.actor-character",
+      schemaVersion: 1,
+      source: { name: "D&D Beyond PDF (2024)", version: "1" },
+      name: "Queued",
+      size: "medium",
+      abilityScores: { str: 10, dex: 14, con: 12, int: 10, wis: 12, cha: 10 },
+      proficiencyBonus: 2,
+      armorClass: 12,
+      hitPoints: { maximum: 20 },
+      speedFeet: 30,
+      token: { disposition: "friendly", footprint: { width: 1, height: 1 } },
+      // A Cloak of Protection: +1 AC while worn and attuned.
+      startingInventory: [
+        { id: "cloak-of-protection", name: "Cloak of Protection", quantity: 1, equipped: true, attuned: true }
+      ]
+    });
+    submitPendingImport(state, definition, "queued-1", IDS.gmSession);
+    resolvePendingImport(state, "queued-1", true, ACTOR, catalog);
+    expect(state.actors[0].armorClass).toBe(13);
   });
 });
 
@@ -409,6 +465,55 @@ describe("an item whose resistance the GM chooses", () => {
     expect(seen().chosenDamageType).toBeUndefined();
     write(table, IDS.fighter, edit(table, IDS.fighter, "ring-of-resistance", { attuned: true }));
     expect(seen().chosenDamageType).toBe("psychic");
+  });
+});
+
+describe("Armor of Vulnerability", () => {
+  const ROW = "armor-of-vulnerability";
+  const defences = (table: ReturnType<typeof tableOf>) => {
+    const derivation = deriveEquipment(table.actor(IDS.fighter), table.definition(IDS.fighter), catalog);
+    return {
+      resists: derivation.damageResistances.map((entry) => entry.id),
+      vulnerable: derivation.damageVulnerabilities.map((entry) => entry.id)
+    };
+  };
+  const wearing = () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput() }, false);
+    write(table, IDS.fighter, edit(table, IDS.fighter, "chain-mail", { equipped: false }));
+    write(table, IDS.fighter, catalogRow(ROW, { baseId: "chain-mail" }));
+    return table;
+  };
+
+  it("resists the GM's pick, and its curse leaves the other two types as vulnerabilities, worn or not", () => {
+    const table = wearing();
+    // Unattuned, it is a suit of chain mail and nothing more.
+    expect(defences(table)).toEqual({ resists: [], vulnerable: [] });
+    write(table, IDS.fighter, edit(table, IDS.fighter, ROW, { attuned: true }));
+    expect(defences(table)).toEqual({ resists: ["bludgeoning"], vulnerable: ["piercing", "slashing"] });
+    write(table, IDS.fighter, edit(table, IDS.fighter, ROW, { chosenDamageType: "piercing" }), "gm");
+    expect(defences(table)).toEqual({ resists: ["piercing"], vulnerable: ["bludgeoning", "slashing"] });
+    // "Removing the armor fails to end the curse": off, it resists nothing and the vulnerabilities stay.
+    write(table, IDS.fighter, edit(table, IDS.fighter, ROW, { equipped: false }), "gm");
+    expect(defences(table)).toEqual({ resists: [], vulnerable: ["bludgeoning", "slashing"] });
+    // Breaking the curse (the GM ends the attunement) ends them.
+    write(table, IDS.fighter, edit(table, IDS.fighter, ROW, { attuned: false }), "gm");
+    expect(defences(table)).toEqual({ resists: [], vulnerable: [] });
+  });
+
+  it("halves the resisted type and doubles the other two on a hit", () => {
+    const table = wearing();
+    write(table, IDS.fighter, edit(table, IDS.fighter, ROW, { attuned: true, chosenDamageType: "slashing" }), "gm");
+    const taken = (type: string) =>
+      previewDamage(
+        table.state,
+        IDS.fighter,
+        { amount: 10, parts: [{ amount: 10, type }] },
+        {
+          resolveDefinition: table.resolve,
+          catalog
+        }
+      ).totalApplied;
+    expect([taken("slashing"), taken("piercing"), taken("bludgeoning"), taken("fire")]).toEqual([5, 20, 20, 10]);
   });
 });
 

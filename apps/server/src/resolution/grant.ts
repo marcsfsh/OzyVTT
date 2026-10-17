@@ -1,5 +1,7 @@
+import { CHOSEN_ABILITY_TAG, type GameState } from "@vtt/domain";
 import { abilityModifier } from "@vtt/rules-5e";
 import type { EffectInstance, Modifier } from "@vtt/schemas";
+import { ABILITY_NAMES } from "../ability-checks.js";
 import {
   addEffect,
   HASTED_TAG,
@@ -14,7 +16,7 @@ import {
 } from "../effects.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { currentSpeedFeet } from "../speed.js";
-import type { LiveActor, ResolveContext } from "./context.js";
+import type { DefinitionAction, LiveActor, ResolveContext } from "./context.js";
 import { moveMark } from "./marks.js";
 
 /** A grant keyed on these tags measures its recipient when it lands, as Dash does: Mage Armor's AC, Haste's Speed. */
@@ -92,6 +94,21 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
   const steadyAim = grant.tags.includes(STEADY_AIM_TAG);
   const rage = rageTiming(ctx, recipient);
   const modifiers = grant.tags.includes(RECKLESS_TAG) ? grant.modifiers.map(strengthAttacksOnly) : grant.modifiers;
+  // Hex: "choose one ability. The target has Disadvantage on ability checks made with the chosen ability."
+  const hexed = grant.tags.includes(CHOSEN_ABILITY_TAG);
+  const hexAbility = hexed ? (input.ability ?? null) : null;
+  if (hexed && hexAbility === null)
+    warnings.push(`Hex on ${recipient.name}: no ability was chosen, so its checks have no Disadvantage.`);
+  const hexDisadvantage: Modifier[] = hexAbility
+    ? [
+        {
+          type: "roll-mode",
+          roll: "check",
+          mode: "disadvantage",
+          when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: [hexAbility] }]
+        }
+      ]
+    : [];
   // Mage Armor: base AC 13 + Dexterity for a creature wearing no armor, a shield still adding to it.
   let armorClassBonus = grant.armorClassBonus;
   if (grant.tags.includes(MAGE_ARMOR_TAG)) {
@@ -109,7 +126,9 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
     recipient.id,
     makeEffect({
       id: grant.target === "targets" ? `${input.commandId}:grant:${recipient.id}` : `${input.commandId}:grant`,
-      name: ctx.builtin?.grantName?.(ctx) ?? grant.name ?? action.name,
+      name:
+        ctx.builtin?.grantName?.(ctx) ??
+        (hexAbility ? `${grant.name ?? action.name} (${ABILITY_NAMES[hexAbility]})` : (grant.name ?? action.name)),
       tags: rage ? [...rage.tags] : grant.tags,
       sourceActorId: attacker.id,
       sourceName: attacker.name,
@@ -126,10 +145,11 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
               : grant.duration,
       endsWhenSourceDefeated: true,
       voidWhileIncapacitated: grant.voidWhileIncapacitated,
-      modifiers: [...modifiers, ...hasteSpeed],
+      modifiers: [...modifiers, ...hasteSpeed, ...hexDisadvantage],
       onEnd: grant.onEnd,
       endsWithTag: grant.endsWithTag ?? null,
       concentration: grant.concentration,
+      ...(grant.damageUses !== undefined ? { damageUses: grant.damageUses } : {}),
       // SRD Combining Game Effects: one spell's effects on a creature don't add up (two Blesses give one d4).
       ...(action.spellId !== undefined ? { stackKey: `spell:${action.spellId}` } : {}),
       // A Concentration spell's effects end with the caster's Concentration on that cast.
@@ -150,4 +170,48 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       conditionIds: []
     });
   else ctx.effectGranted = { name: effect.name, tags: effect.tags };
+}
+
+/** An item's self grant used outside a fight (Antitoxin drunk before the dungeon, a blade coated on the road): the
+ *  same effect on its user, counted once a fight's turns start. Nothing for a grant aimed at other creatures. */
+export function grantOutsideFight(
+  state: GameState,
+  actor: LiveActor,
+  action: DefinitionAction,
+  commandId: string
+): EffectNarration[] {
+  const grant = action.grants;
+  if (!grant || grant.target !== "self") return [];
+  const events: EffectNarration[] = [];
+  const effect = addEffect(
+    state,
+    actor.id,
+    makeEffect({
+      id: `${commandId}:grant`,
+      name: grant.name ?? action.name,
+      tags: grant.tags,
+      sourceActorId: actor.id,
+      sourceName: actor.name,
+      sourceActionId: action.id,
+      startedRound: state.combat.round,
+      duration:
+        grant.duration.type === "rounds"
+          ? { type: "rounds", remaining: grant.duration.rounds }
+          : grant.duration.type === "until-source-turn-end"
+            ? turnEndDuration(state, "until-source-turn-end", actor.id)
+            : grant.duration,
+      endsWhenSourceDefeated: true,
+      voidWhileIncapacitated: grant.voidWhileIncapacitated,
+      modifiers: grant.modifiers,
+      onEnd: grant.onEnd,
+      endsWithTag: grant.endsWithTag ?? null,
+      concentration: grant.concentration,
+      ...(grant.damageUses !== undefined ? { damageUses: grant.damageUses } : {}),
+      // A scroll's spell read on the road stacks as that spell cast in a fight does.
+      ...(action.spellId !== undefined ? { stackKey: `spell:${action.spellId}` } : {}),
+      ...(grant.armorClassBonus !== undefined ? { armorClassBonus: grant.armorClassBonus } : {})
+    }),
+    events
+  );
+  return [{ kind: "effect", text: `${actor.name} gains ${effect.name}.`, actorId: actor.id }, ...events];
 }

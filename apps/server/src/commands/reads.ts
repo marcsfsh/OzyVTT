@@ -8,9 +8,11 @@ import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { builderOffers } from "../builder-offers.js";
 import { draftOwnerOf } from "../character-drafts.js";
 import { BUILTIN_TARGETING, builtinActionsFor } from "../builtin-actions.js";
+import { builtinCheckSkills } from "../resolution/builtins.js";
 import { actionSummaryOf, type ContentView } from "../content-library.js";
 import { effectiveActions } from "../effective-actions.js";
 import { deriveEquipment } from "../equipment-derivation.js";
+import { rechoicesOf } from "../ledger-rechoice.js";
 import {
   ActorAvailableActionsSchema,
   ActorMovementSchema,
@@ -86,11 +88,16 @@ export const gameReads = [
       // SRD generic actions (Dodge, Dash, Help, ...) follow the stat block's own; a declared id shadows its builtin.
       const builtins = builtinActionsFor(definition)
         .filter((candidate) => !definition?.actions.some((declared) => declared.id === candidate.id))
-        .map((candidate) => ({
-          ...actionSummaryOf(candidate),
-          builtin: true,
-          targeting: BUILTIN_TARGETING[candidate.id] ?? ("none" as const)
-        }));
+        .map((candidate) => {
+          // Search, Study, Influence and Escape a Grapple are made with a skill the roller picks.
+          const checkSkills = builtinCheckSkills(candidate.id);
+          return {
+            ...actionSummaryOf(candidate),
+            builtin: true,
+            targeting: BUILTIN_TARGETING[candidate.id] ?? ("none" as const),
+            ...(checkSkills.length > 0 ? { checkSkills } : {})
+          };
+        });
       return {
         actions: [...actions, ...builtins],
         ...(definition?.legendary ? { legendary: definition.legendary } : {})
@@ -156,7 +163,9 @@ export const gameReads = [
           deriveEquipment(actor, definition, catalog),
           kit.catalogFor(principal).skillSummaries(),
           catalog
-        )
+        ),
+        // Read against the GM's content, as `actor.rechoose` checks them.
+        rechoices: rechoicesOf(actor, definition, kit.contentLibrary.forAudience("gm"))
       };
     }
   },

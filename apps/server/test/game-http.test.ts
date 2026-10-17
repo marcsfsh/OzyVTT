@@ -484,6 +484,28 @@ describe("public game API over /api/v1", () => {
       headers: bearer(reader.token)
     });
     expect(actions.status).toBe(200);
+    // The SRD's check actions offer the skills they are made with, the usual one first; Influence picks its target.
+    const rows = (await actions.json()).data.actions as ReadonlyArray<{
+      id: string;
+      targeting?: string;
+      checkSkills?: ReadonlyArray<{ id: string; ability: string }>;
+    }>;
+    const row = (id: string) => rows.find((entry) => entry.id === id);
+    expect(row("search")?.checkSkills?.[0]).toEqual({ id: "perception", ability: "wis" });
+    expect(row("study")?.checkSkills?.map((skill) => skill.id)).toEqual([
+      "investigation",
+      "arcana",
+      "history",
+      "nature",
+      "religion"
+    ]);
+    expect(row("influence")?.targeting).toBe("single");
+    expect(row("influence")?.checkSkills).toContainEqual({ id: "animal-handling", ability: "wis" });
+    expect(row("escape-grapple")?.checkSkills).toEqual([
+      { id: "athletics", ability: "str" },
+      { id: "acrobatics", ability: "dex" }
+    ]);
+    expect(row("dodge")?.checkSkills).toBeUndefined();
     const missing = await fetch(base + CONTENT_PATHS.monsterById.replace("{definitionId}", "no-such-monster"), {
       headers: bearer(reader.token)
     });
@@ -665,8 +687,8 @@ describe("public game API over /api/v1", () => {
       maxLevel: 20,
       playerBuilder: "open",
       playerRandom: "gm-only",
-      // Players' rolls are thrown by the server, and a rolled level counts as rolled (SRD).
-      typedRolls: "gm-only",
+      // Players may type what their physical dice show until the GM closes it, and a rolled level counts as rolled.
+      typedRolls: "open",
       hitPointRollFloor: "none"
     });
 
@@ -700,8 +722,7 @@ describe("public game API over /api/v1", () => {
       maxLevel: 20,
       playerBuilder: "open",
       playerRandom: "gm-only",
-      // Players' rolls are thrown by the server, and a rolled level counts as rolled (SRD).
-      typedRolls: "gm-only",
+      typedRolls: "open",
       hitPointRollFloor: "none"
     });
   });
@@ -1283,7 +1304,7 @@ describe("public game API over /api/v1", () => {
     const rows = body.data.actions as ReadonlyArray<{
       id: string;
       available: boolean;
-      violations: readonly unknown[];
+      violations: ReadonlyArray<{ rule: string }>;
       builtin?: boolean;
     }>;
     // Stat-block rows first, then the SRD builtin generic actions flagged builtin: true.
@@ -1296,8 +1317,14 @@ describe("public game API over /api/v1", () => {
     for (const id of ["dodge", "dash", "disengage", "help", "hide", "ready", "unarmed-grapple", "escape-grapple"]) {
       expect(rows.find((row) => row.id === id)?.builtin).toBe(true);
     }
-    // No encounter running: nothing is spent, so everything reports available with no violations.
-    expect(rows.every((row) => row.available && row.violations.length === 0)).toBe(true);
+    // No encounter running: nothing is spent, so everything reports available with no violations, but an action
+    // that needs an effect the crocodile doesn't have: putting out a fire needs it to be burning.
+    const putOut = rows.find((row) => row.id === "extinguish-fire");
+    expect(putOut?.available).toBe(false);
+    expect(putOut?.violations.map((violation) => violation.rule)).toEqual(["feature.requires-effect"]);
+    expect(rows.filter((row) => row !== putOut).every((row) => row.available && row.violations.length === 0)).toBe(
+      true
+    );
   });
 });
 

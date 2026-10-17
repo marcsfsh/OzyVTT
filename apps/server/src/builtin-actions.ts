@@ -203,6 +203,15 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     description:
       "Use your action to make a Strength (Athletics) or Dexterity (Acrobatics) check (your best) against the grapple's escape DC, ending the Grappled condition on a success. (SRD 5.2.1, Grappling)",
     damage: []
+  },
+  {
+    id: "extinguish-fire",
+    name: "Put Out the Fire",
+    activation: "action",
+    description:
+      "As an action, you can extinguish fire on yourself by giving yourself the Prone condition and rolling on the ground. The fire also goes out if it is doused, submerged, or suffocated; the GM ends it then. (SRD 5.2.1, Burning [Hazard])",
+    damage: [],
+    requiresEffectTag: "burning"
   }
 ] as const;
 
@@ -343,9 +352,11 @@ export function builtinBaseId(actionId: string): string {
   return actionId.endsWith(BONUS_SUFFIX) ? actionId.slice(0, -BONUS_SUFFIX.length) : actionId;
 }
 
-/** Builtins that resolve against exactly one chosen combatant; everything else is a single direct tap. */
+/** Builtins that resolve against exactly one chosen combatant; everything else is a single direct tap. Influence
+ *  targets the creature it would sway, whose Intelligence can raise its DC. */
 export const BUILTIN_TARGETING: Readonly<Record<string, "single">> = {
   help: "single",
+  influence: "single",
   "unarmed-strike": "single",
   "unarmed-grapple": "single",
   "unarmed-shove-prone": "single",

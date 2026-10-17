@@ -3,23 +3,31 @@ import { normalizeDamageType } from "@vtt/rules-5e";
 import type { Actor, ActorDefinition } from "@vtt/schemas";
 import type { ContentView } from "./content-library.js";
 
-/** Picks a character may re-make on a rest (a feature's `replaces` clause). Stored on the actor as
- *  `choiceOverrides`, not in the choices ledger, so no rebuild is needed. What may be re-chosen, and to
- *  what, comes from content. */
+/** Picks a character may re-make on a rest (a feature's `replaces` clause). Most are stored on the actor as
+ *  `choiceOverrides`, not in the choices ledger, so no rebuild is needed; a pick the build itself reads (a land
+ *  whose spells the character has prepared) goes into the ledger instead (`ledger-rechoice.ts`). What may be
+ *  re-chosen, and to what, comes from content. */
 
-/** The rider block as this module needs it; the two fields read are named explicitly. */
+/** An inline option as this module reads it: what it grants, and the earlier answer it needs. */
+type ReplaceableOption = Readonly<{
+  id: string;
+  name?: string;
+  grants?: Readonly<{ spells?: readonly unknown[] }>;
+  requires?: Readonly<{ offer: string; id: string }>;
+}>;
+type ReplaceableChoice = Readonly<{
+  from?: readonly string[];
+  fromCatalog?: string;
+  options?: ReadonlyArray<ReplaceableOption>;
+}>;
+
+/** The rider block as this module needs it; the fields read are named explicitly. */
 type ReplaceableRecord = Readonly<{
   id: string;
   name: string;
   replaces?: ReadonlyArray<Readonly<{ offer: string; when: string; amount: number }>>;
-  choice?: Readonly<{
-    from?: readonly string[];
-    fromCatalog?: string;
-    options?: ReadonlyArray<Readonly<{ id: string }>>;
-  }>;
-  choices?: ReadonlyArray<
-    Readonly<{ from?: readonly string[]; fromCatalog?: string; options?: ReadonlyArray<Readonly<{ id: string }>> }>
-  >;
+  choice?: ReplaceableChoice;
+  choices?: ReadonlyArray<ReplaceableChoice>;
 }>;
 
 /** One offer this character may re-choose on a rest, with the answers that are legal for it. */
@@ -30,16 +38,23 @@ export type ReplaceableOffer = Readonly<{
   /** The feature's display name, for the refusal message and the GM's log line. */
   label: string;
   options: readonly string[];
+  /** Each option's display name, by id. */
+  optionNames: Readonly<Record<string, string>>;
+  /** The build reads this answer (its options grant spells, or another pick depends on it), so a re-choice is
+   *  written to the ledger and the sheet rebuilt, rather than kept as an override. */
+  rebuilds: boolean;
 }>;
 
-/** Every option id a choice offers, from whichever sources it names. */
-function optionIdsOf(choice: NonNullable<ReplaceableRecord["choice"]>, catalogs: CatalogChoiceCatalogs): string[] {
-  const named = choice.options ? choice.options.map((option) => option.id) : [...(choice.from ?? [])];
+/** Every option a choice offers, from whichever sources it names. */
+function optionsOf(choice: ReplaceableChoice, catalogs: CatalogChoiceCatalogs): Array<{ id: string; name: string }> {
+  const named = choice.options
+    ? choice.options.map((option) => ({ id: option.id, name: option.name ?? option.id }))
+    : (choice.from ?? []).map((id) => ({ id, name: id }));
   if (!choice.fromCatalog) return named;
   try {
     const resolved = resolveCatalogChoice(choice.fromCatalog, catalogs);
-    const seen = new Set(named);
-    return [...named, ...resolved.map((option) => option.id).filter((id) => !seen.has(id))];
+    const seen = new Set(named.map((option) => option.id));
+    return [...named, ...resolved.filter((option) => !seen.has(option.id))];
   } catch (error) {
     // A catalog gap leaves the bespoke options standing, as in the builder.
     if (!(error instanceof CatalogChoiceError)) throw error;
@@ -47,31 +62,45 @@ function optionIdsOf(choice: NonNullable<ReplaceableRecord["choice"]>, catalogs:
   }
 }
 
+/** Whether another pick this character holds is gated on `offer`'s answer (Nature's Ward and the later land spells
+ *  read the land). */
+function hasDependents(carriers: readonly ReplaceableRecord[], offer: string): boolean {
+  return carriers.some((record) =>
+    [record.choice, ...(record.choices ?? [])].some((choice) =>
+      (choice?.options ?? []).some((option) => option.requires?.offer === offer)
+    )
+  );
+}
+
 /** Every rest-time re-choice this built character has. Empty for monsters, PDF imports, and content without `replaces`. */
 export function replaceableOffers(definition: ActorDefinition | undefined, library: ContentView): ReplaceableOffer[] {
   const carriers = definition?.character?.features ?? [];
+  const records = carriers
+    .map((ref) => library.featureRecord(ref) as ReplaceableRecord | undefined)
+    .filter((record): record is ReplaceableRecord => record !== undefined);
   const offers: ReplaceableOffer[] = [];
-  for (const ref of carriers) {
-    const record = library.featureRecord(ref) as ReplaceableRecord | undefined;
-    for (const clause of record?.replaces ?? []) {
+  for (const record of records) {
+    for (const clause of record.replaces ?? []) {
       // Only rest clauses become runtime state; build-time replacement belongs to the ledger.
       if (clause.when !== "short-rest" && clause.when !== "long-rest") continue;
       if (offers.some((existing) => existing.offer === clause.offer)) continue;
       // The options are the offer's own list: a re-choice can't reach past what the original pick could choose.
       const target =
-        clause.offer.startsWith("feature:") &&
-        clause.offer.slice("feature:".length).replace(/\/\d+$/, "") === record!.id
-          ? record!
-          : (carriers
-              .map((candidate) => library.featureRecord(candidate) as ReplaceableRecord | undefined)
-              .find((candidate) => candidate && `feature:${candidate.id}` === clause.offer) ?? null);
+        clause.offer.startsWith("feature:") && clause.offer.slice("feature:".length).replace(/\/\d+$/, "") === record.id
+          ? record
+          : (records.find((candidate) => `feature:${candidate.id}` === clause.offer) ?? null);
       const choice = target?.choice ?? target?.choices?.[0];
       if (!choice) continue; // a clause naming an offer with no option list re-chooses nothing
+      const options = optionsOf(choice, library.catalogChoiceCatalogs());
       offers.push({
         offer: clause.offer,
         per: clause.when,
         label: target!.name,
-        options: optionIdsOf(choice, library.catalogChoiceCatalogs())
+        options: options.map((option) => option.id),
+        optionNames: Object.fromEntries(options.map((option) => [option.id, option.name])),
+        rebuilds:
+          (choice.options ?? []).some((option) => (option.grants?.spells?.length ?? 0) > 0) ||
+          hasDependents(records, clause.offer)
       });
     }
   }

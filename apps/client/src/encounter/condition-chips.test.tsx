@@ -163,4 +163,20 @@ describe("an effect chip", () => {
     await userEvent.click(screen.getByRole("button", { name: /Blinded by Behir/ }));
     expect(screen.getByText("6d6 Acid at the start of each of its source's turns")).toBeTruthy();
   });
+
+  it("lets a burning creature's owner roll the fire out, which the server routes as its action", async () => {
+    const burning = effect({ id: "fire", name: "Burning", tags: ["burning"], linkedConditionIds: [], escapeDc: null });
+    const { rerender } = render(
+      <EffectChips actorId={ACTOR} effects={[burning]} canEnd={false} canAsk canAct onFeedback={() => {}} />
+    );
+    await userEvent.click(screen.getByRole("button", { name: /Burning/ }));
+    expect(screen.getByText("1d4 Fire at the start of each of its turns until the fire is put out")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Put out the fire" }));
+    expect(sent().at(-1)?.[0]).toBe("action:use");
+    expect(sent().at(-1)?.[1]).toMatchObject({ actorId: ACTOR, actionId: "extinguish-fire" });
+    // Someone else's fire: nothing to tap but the question for the GM.
+    rerender(<EffectChips actorId={ACTOR} effects={[burning]} canEnd={false} onFeedback={() => {}} />);
+    await userEvent.click(screen.getByRole("button", { name: /Burning/ }));
+    expect(screen.queryByRole("button", { name: "Put out the fire" })).toBeNull();
+  });
 });

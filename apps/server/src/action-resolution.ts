@@ -7,18 +7,21 @@ import {
 } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { BUILTIN_TARGETING } from "./builtin-actions.js";
+import { builtinCheckSkills } from "./resolution/builtins.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { hitRiderOf } from "./resolution/hit-riders.js";
 import { masteryMissDamage } from "./weapon-mastery.js";
 import { spendAmmunition } from "./resolution/ammunition.js";
 import { useUpConsumable } from "./resolution/consumables.js";
+import { consumableRowFor } from "./consumables.js";
 import { rollAttack, spendDistraction, spendSteadyAim, spendUntilAttacked } from "./resolution/attack.js";
 import { rollLastCharge } from "./resolution/charges.js";
 import type { DefinitionAction, ResolveContext, ResolveDependencies, ResolveInput } from "./resolution/context.js";
-import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage } from "./resolution/damage.js";
+import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage, spendDamageUses } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
-import { applyHealing } from "./resolution/heal.js";
+import { readScroll } from "./resolution/scroll.js";
+import { applyConditionCures, applyHealing } from "./resolution/heal.js";
 import {
   recordAttackRoll,
   recordCleaveOpening,
@@ -51,6 +54,13 @@ export function resolveDefinitionAction(
 ): ActionResolution {
   const ctx = openResolve(state, action, input, deps);
   ctx.builtin?.check?.(ctx);
+  ctx.builtin?.apply?.(ctx);
+  // A failed check to read a scroll spends the cast and the scroll, and nothing else happens.
+  if (readScroll(ctx)) {
+    commitEconomy(ctx);
+    useUpConsumable(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
   rollAttack(ctx);
   // Preview: the d20 is rolled and shown, nothing else applies. The economy was validated already, so an
   // illegal attack is blocked before the preview roll.
@@ -92,6 +102,7 @@ export function resolveDefinitionAction(
   startConcentration(ctx);
   applyGrant(ctx);
   applyHealing(ctx);
+  applyConditionCures(ctx);
 
   parkReaction(ctx);
   ctx.builtin?.forcedSave?.(ctx);
@@ -100,6 +111,7 @@ export function resolveDefinitionAction(
 
   commitEconomy(ctx);
   spendHitOptions(ctx);
+  spendDamageUses(ctx);
   rollLastCharge(ctx);
   spendAmmunition(ctx);
   useUpConsumable(ctx);
@@ -243,7 +255,7 @@ export function actionAvailability(
       violations: evaluation.violations,
       usesRemaining,
       componentsRemaining,
-      ...(builtin ? { builtin: true, targeting: BUILTIN_TARGETING[action.id] ?? ("none" as const) } : {}),
+      ...(builtin ? { builtin: true } : {}),
       ...(hitRiderOf(action) ? { ridesAHit: true as const } : {}),
       // Display values only (ADR-0007), from the effective list; resolution recomputes from the id.
       description: action.description,
@@ -258,6 +270,7 @@ export function actionAvailability(
       usesLimit: action.uses ? useLimitFor(siblings, action) : null,
       usesPer: action.uses?.per ?? null,
       usesPool: action.uses?.pool ?? null,
+      useCost: action.useCost ?? null,
       requiresEffectTag: action.requiresEffectTag ?? null,
       multiattack: action.multiattack
         ? action.multiattack.map((component) => ({
@@ -266,7 +279,34 @@ export function actionAvailability(
             ...(component.or ? { or: [...component.or] } : {})
           }))
         : null,
-      reaction: action.reaction ?? null
+      reaction: action.reaction ?? null,
+      healing: action.healing ? { formula: action.healing.formula } : null,
+      // A builtin says what the stat block's action list says of it (Help picks one creature, Dodge none).
+      targeting: builtin
+        ? (BUILTIN_TARGETING[action.id] ?? "none")
+        : tapTargeting(action, consumableRowFor(action, attacker.inventory, catalog) !== null),
+      // A spell cast from an item picks as the spell's own cast does: darts by target, the type to deal.
+      darts: action.darts ?? null,
+      damageTypes: action.damageTypes ? [...action.damageTypes] : null,
+      // Search, Study, Influence and Escape a Grapple are made with a skill the roller picks.
+      ...(builtin && builtinCheckSkills(action.id).length > 0 ? { checkSkills: builtinCheckSkills(action.id) } : {})
     };
   });
+}
+
+/** Who a tap of this action picks, as the resolver will take it: one creature for an attack, a grant aimed at a
+ *  target or a heal (a potion: the drinker); several for a save, damage with no attack roll, a grant on each
+ *  creature it targets (a scroll of Bless) or a divided heal; none for what acts on its user (a self heal, Rage, a
+ *  scroll of Detect Magic). Null for an action with nothing structured to resolve. */
+function tapTargeting(action: DefinitionAction, usesUpItem: boolean): "none" | "single" | "multi" | null {
+  if (action.attack || action.grants?.target === "target") return "single";
+  if (action.save || action.damage.length > 0 || action.grants?.target === "targets") return "multi";
+  if (action.healing) return action.healing.self ? "none" : action.healing.divided ? "multi" : "single";
+  const structured =
+    action.grants !== undefined ||
+    action.multiattack !== undefined ||
+    action.uses !== undefined ||
+    action.spellSlot !== undefined ||
+    usesUpItem;
+  return structured ? "none" : null;
 }

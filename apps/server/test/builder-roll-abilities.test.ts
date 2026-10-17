@@ -8,9 +8,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createServer } from "../src/server.js";
 
 // Ability-score rolls for the builder go through the server's dice and record one public roll in the
-// table feed. While the table keeps players' dice on the server (the default), a player's rolled scores
-// must be that roll's six totals and their hit points are thrown by the server; the GM, and players at a
-// table that opens typed rolls, may submit physical dice within the formula's bounds.
+// table feed. While the table keeps players' dice on the server, a player's rolled scores must be that
+// roll's six totals and their hit points are thrown by the server; the GM, and players at a table that
+// lets them type their dice (the default), may submit physical dice within the formula's bounds.
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
@@ -143,8 +143,13 @@ const assigned = (scores: readonly number[]) => ({
 });
 
 describe("a player's rolled dice are the table's", () => {
-  it("refuses typed scores from a player by default, and takes the six the server rolled", async () => {
+  it("refuses typed scores from a player at a server-rolled table, and takes the six the server rolled", async () => {
     const { base, server, gmToken, playerToken } = await boot();
+    await post(base, GAME_PATHS.builderPolicy, gmToken, {
+      commandId: randomUUID(),
+      allowedAbilityMethods: ALL_METHODS,
+      typedRolls: "gm-only"
+    });
     const typed = await post(base, GAME_PATHS.characters, playerToken, fighterCreate());
     expect(typed.status).toBe(409);
     expect((await typed.json()).error.message).toMatch(/roll them in the builder/);
@@ -207,11 +212,96 @@ describe("a player's rolled dice are the table's", () => {
     expect((await levelFour(swapped)).status).toBe(200);
   });
 
-  it("refuses a player's typed hit points, and rolls them on the server instead", async () => {
+  it("lets a sheet that recorded no scores re-send the ones its totals imply, and nothing else", async () => {
+    const { base, server, gmToken, playerToken } = await boot();
+    const roll = (await (await post(base, GAME_PATHS.builderRollAbilities, playerToken, { method: "roll" })).json())
+      .data;
+    const created = await post(
+      base,
+      GAME_PATHS.characters,
+      playerToken,
+      fighterCreate({ abilityRollId: roll.rollId, baseScores: assigned(roll.scores) })
+    );
+    expect(created.status).toBe(200);
+    const actorId = (await created.json()).data.actorId as string;
+    // A sheet built before the ledger kept its scores: the same sheet with that row gone.
+    await server.store.execute({ id: randomUUID(), type: "test.forget-scores" }, (state) => {
+      const stored = state.definitions.find((entry) => entry.id === `import-${actorId}`)!.definition;
+      stored.character!.choices = stored.character!.choices!.filter((row) => row.kind !== "ability-scores");
+    });
+    await post(base, GAME_PATHS.builderPolicy, gmToken, {
+      commandId: randomUUID(),
+      allowedAbilityMethods: ["standard-array"]
+    });
+    const stored = server.store.snapshot.definitions.find((entry) => entry.id === `import-${actorId}`)!.definition;
+    const draft = {
+      speciesId: "dwarf",
+      backgroundId: "soldier",
+      classId: "fighter",
+      level: 4,
+      choices: stored.character!.choices,
+      sheet: { level: 3, abilityScores: stored.abilityScores }
+    };
+    const offers = await fetch(
+      `${base}${GAME_PATHS.builderOffers}?draft=${encodeURIComponent(JSON.stringify(draft))}`,
+      {
+        headers: bearer(playerToken)
+      }
+    );
+    const abilities = (await offers.json()).data.abilities;
+    // Base scores and a Soldier's +2/+1 that add up to the sheet's totals. How they were made is not recorded, so any
+    // method and spread that rebuild the same totals will do (rolled values can also be a legal point buy).
+    expect(abilities.derived).toBe(true);
+    expect(["roll", "point-buy", "standard-array"]).toContain(abilities.abilityMethod);
+    for (const ability of ["str", "dex", "con", "int", "wis", "cha"] as const) {
+      const raised = abilities.backgroundBonusAllocation.find(
+        (entry: { ability: string; amount: number }) => entry.ability === ability
+      );
+      expect(abilities.baseScores[ability] + (raised?.amount ?? 0)).toBe(stored.abilityScores[ability]);
+    }
+    const levelFour = (baseScores: Record<string, number>) =>
+      post(base, GAME_PATHS.characterRebuild.replace("{actorId}", actorId), playerToken, {
+        ...fighterCreate({
+          level: 4,
+          abilityMethod: abilities.abilityMethod,
+          baseScores,
+          backgroundBonusAllocation: abilities.backgroundBonusAllocation
+        }),
+        name: undefined,
+        actorId,
+        choices: [
+          ...fighterCreate().choices,
+          { level: 4, classId: "fighter", kind: "weapon-mastery", id: "rapier" },
+          {
+            level: 4,
+            classId: "fighter",
+            kind: "asi-or-feat",
+            id: "asi",
+            payload: { increases: [{ ability: "int", amount: 2 }] }
+          }
+        ]
+      });
+    // At a standard-array table only the sheet's own scores pass under another method.
+    const lowered = Object.fromEntries(
+      Object.entries(abilities.baseScores as Record<string, number>).map(([ability, score]) => [ability, score - 1])
+    );
+    expect((await levelFour(lowered)).status).toBe(409);
+    const kept = await levelFour(abilities.baseScores);
+    expect(kept.status).toBe(200);
+    const rebuilt = server.store.snapshot.definitions.find((entry) => entry.id === `import-${actorId}`)!.definition;
+    // From here on the ledger records them.
+    expect(rebuilt.character?.choices?.find((row) => row.kind === "ability-scores")).toMatchObject({
+      id: abilities.abilityMethod,
+      payload: { baseScores: abilities.baseScores }
+    });
+  });
+
+  it("refuses a player's typed hit points at a server-rolled table, and rolls them on the server instead", async () => {
     const { base, server, gmToken, playerToken } = await boot();
     await post(base, GAME_PATHS.builderPolicy, gmToken, {
       commandId: randomUUID(),
-      allowedAbilityMethods: ALL_METHODS
+      allowedAbilityMethods: ALL_METHODS,
+      typedRolls: "gm-only"
     });
     const standard = {
       abilityMethod: "standard-array",
@@ -243,8 +333,13 @@ describe("a player's rolled dice are the table's", () => {
     expect(rows.map((row) => row.payload?.roll)).toEqual(feed.dice.map((die) => die.face));
   });
 
-  it("lets players type their own dice when the GM opens it, and the GM always", async () => {
+  it("lets players type their own dice by default, and the GM always", async () => {
     const { base, gmToken, playerToken } = await boot();
+    await post(base, GAME_PATHS.builderPolicy, gmToken, {
+      commandId: randomUUID(),
+      allowedAbilityMethods: ALL_METHODS,
+      typedRolls: "gm-only"
+    });
     const byGm = await post(
       base,
       GAME_PATHS.characters,
@@ -252,15 +347,20 @@ describe("a player's rolled dice are the table's", () => {
       fighterCreate({ hp: { mode: "entries", entries: [9, 2] } })
     );
     expect(byGm.status).toBe(200);
-    await post(base, GAME_PATHS.builderPolicy, gmToken, {
-      commandId: randomUUID(),
-      allowedAbilityMethods: ALL_METHODS,
-      typedRolls: "open"
-    });
-    const byPlayer = await post(
+    const refused = await post(
       base,
       GAME_PATHS.characters,
       playerToken,
+      fighterCreate({ hp: { mode: "entries", entries: [9, 2] } })
+    );
+    expect(refused.status).toBe(409);
+
+    // A fresh table lets players type what their dice show.
+    const fresh = await boot();
+    const byPlayer = await post(
+      fresh.base,
+      GAME_PATHS.characters,
+      fresh.playerToken,
       fighterCreate({ hp: { mode: "entries", entries: [9, 2] } })
     );
     expect(byPlayer.status).toBe(200);

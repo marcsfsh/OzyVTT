@@ -1,6 +1,8 @@
 import type { GameState } from "@vtt/domain";
 import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
+import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
+import { reconcileEquipment } from "./inventory.js";
 
 /** Resolves the per-PC editable definition (keyed `import-<actorId>`, 1:1 with the actor). Shared bundle
  *  content is never editable this way, so an edit only touches this one character's sheet. */
@@ -16,12 +18,21 @@ function editableDefinition(state: GameState, actorId: string): { definitionId: 
   return { definitionId, definition: entry.definition };
 }
 
-/** Persists an edited definition, re-validated through the schema so the stored sheet stays canonical. */
-function replaceDefinition(state: GameState, definitionId: string, next: ActorDefinition): void {
+/** Persists an edited definition, re-validated through the schema so the stored sheet stays canonical. What the
+ *  actor stores from its sheet is derived again: a feat, a class feature or armor training can move its AC. */
+function replaceDefinition(
+  state: GameState,
+  actorId: string,
+  definitionId: string,
+  next: ActorDefinition,
+  catalog: EquipmentCatalog | undefined
+): void {
   const parsed = ActorDefinitionSchema.parse(next);
   state.definitions = state.definitions.map((entry) =>
     entry.id === definitionId ? { id: entry.id, definition: parsed } : entry
   );
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (actor) reconcileEquipment(actor, parsed, { ...(catalog ? { catalog } : {}) });
 }
 
 /**
@@ -85,7 +96,8 @@ export function setCharacterIdentity(
   state: GameState,
   actorId: string,
   character: ActorDefinition["character"],
-  editor: Readonly<{ gm: boolean }> = { gm: true }
+  editor: Readonly<{ gm: boolean }> = { gm: true },
+  catalog?: EquipmentCatalog
 ): void {
   const { definitionId, definition } = editableDefinition(state, actorId);
   // The table's level cap applies here too, or the free-text identity editor bypasses it. Summed across classes.
@@ -105,17 +117,21 @@ export function setCharacterIdentity(
         ? "This character was built here: change classes, levels and feats in the Level flow, which checks them."
         : "Only the GM can change a character's classes, levels or feats - you can rename them."
     );
-  replaceDefinition(state, definitionId, { ...definition, character: next });
+  replaceDefinition(state, actorId, definitionId, { ...definition, character: next }, catalog);
 }
 
 export function setCharacterProficiencies(
   state: GameState,
   actorId: string,
-  proficiencies: ActorDefinition["proficiencies"]
+  proficiencies: ActorDefinition["proficiencies"],
+  catalog?: EquipmentCatalog
 ): void {
   const { definitionId, definition } = editableDefinition(state, actorId);
-  replaceDefinition(state, definitionId, {
-    ...definition,
-    proficiencies: carryForwardOmitted(definition.proficiencies, proficiencies)
-  });
+  replaceDefinition(
+    state,
+    actorId,
+    definitionId,
+    { ...definition, proficiencies: carryForwardOmitted(definition.proficiencies, proficiencies) },
+    catalog
+  );
 }

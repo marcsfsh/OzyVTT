@@ -126,11 +126,17 @@
   }
 }
 
-/* Level flow: the rail, the two directions, and the level-down preview. */
+/* Level flow: the rail, the two directions, and the level-down preview. The page is a block scroll region, so the
+   column inside keeps its height and scrolls rather than shrinking to the pane. */
+.cb-level-page {
+  position: relative;
+  background: var(--bg);
+}
 .cb-level {
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
+  width: 100%;
   max-width: 46rem;
   margin: 0 auto;
   padding: 1.4rem var(--space-4) var(--space-12);
@@ -247,4 +253,36 @@
 }
 .cb-level-preview {
   --material-fill: var(--material-plate);
+}
+
+/* A multiclass draft's classes in the order taken: each one's levels, and the way to drop a later one. The
+   steppers share a column whether or not a row has the button; on a phone the button goes under its row rather
+   than squeezing the stepper. */
+.cb-class-levels {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cb-class-level {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(10rem, auto);
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  min-height: var(--tap-min);
+}
+.cb-class-name {
+  min-width: 0;
+  color: var(--text);
+}
+@media (max-width: 560px) {
+  .cb-class-level {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .cb-class-remove {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
 }

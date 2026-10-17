@@ -56,7 +56,14 @@ const LEAVING: PlayerPendingReaction = {
 describe("an opportunity attack's hit", () => {
   it("offers Sneak Attack on the rolled swing and sends it with the confirm", async () => {
     render(
-      <ReactionPrompt reaction={LEAVING} actorName="Pip" canDismiss={false} onFeedback={() => {}} rollMode="auto" />
+      <ReactionPrompt
+        reaction={LEAVING}
+        actorName="Pip"
+        canDismiss={false}
+        onFeedback={() => {}}
+        rollMode="auto"
+        viewer="player"
+      />
     );
     const extra = await screen.findByRole("button", { name: "Sneak Attack +3d6 Piercing" });
     fireEvent.click(extra);
@@ -66,7 +73,6 @@ describe("an opportunity attack's hit", () => {
         reactionId: LEAVING.id,
         use: true,
         commit: true,
-        attackNatural: 15,
         hitOptions: [{ id: "sneak-attack" }]
       })
     );

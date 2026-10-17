@@ -290,13 +290,26 @@ describe("saving-throw prompts", () => {
     const game = state();
     createPendingSaves(game, pendingInput([IDS.pc]));
     const saveId = game.combat.pendingSaves[0].id;
+    const owner = { role: "player" as const, sessionId: IDS.pcSession };
     expect(() =>
-      answerSave(game, cmd(7), saveId, "manual", 20, true, { role: "player", sessionId: IDS.otherSession }, deps([]))
+      answerSave(
+        game,
+        cmd(7),
+        saveId,
+        "roll",
+        undefined,
+        true,
+        { role: "player", sessionId: IDS.otherSession },
+        deps([])
+      )
     ).toThrow(/own character/);
+    // A player types the face their die shows, never a total: 18 + Dex 2 = 20.
+    expect(() => answerSave(game, cmd(8), saveId, "manual", 20, true, owner, deps([]))).toThrow(/d20 your die shows/);
     expect(
-      answerSave(game, cmd(8), saveId, "manual", 20, true, { role: "player", sessionId: IDS.pcSession }, deps([]))
-        .outcome.success
-    ).toBe(true);
+      answerSave(game, cmd(8), saveId, "roll", undefined, true, owner, deps([]), false, undefined, undefined, {
+        face: 18
+      }).outcome
+    ).toMatchObject({ success: true, total: 20, natural: 18 });
 
     createPendingSaves(game, pendingInput([IDS.pc]));
     const saveId2 = game.combat.pendingSaves[0].id;

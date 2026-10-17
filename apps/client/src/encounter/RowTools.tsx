@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { GmActor, GmView, MutationResult } from "@vtt/domain";
+import { isDead, type GmActor, type GmView, type MutationResult } from "@vtt/domain";
 import { Button, Field, Select } from "@vtt/ui";
 import { command } from "../lib/command";
 import { ConditionEditor } from "./conditions";
@@ -47,7 +47,7 @@ export function RowTools({
       <div className="row-tools-popover" role="dialog" aria-label={`Tools for ${actor.name}`}>
         <HpAdjust
           actor={actor}
-          controls={["damage", "nonlethal", "heal", "temp", "set", "max"]}
+          controls={isDead(actor) ? ["revive", "max"] : ["damage", "nonlethal", "heal", "temp", "set", "max"]}
           revision={state.revision}
           damageType={hpDamageType}
           onDamageTypeChange={onHpDamageTypeChange}

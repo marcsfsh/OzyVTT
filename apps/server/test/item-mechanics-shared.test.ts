@@ -216,24 +216,20 @@ describe("the rider families held only by a bundle assertion, driven", () => {
         deps([9, 4], definition)
       ).attack!.total;
     };
-    // The bow and the mace come from the shipped catalog; the ammunition is picker-minted. d20 = 9.
-    expect(
-      shot([fromCatalog("longbow"), picked("ammunition-3")], "item-longbow"),
-      "the +3 did not reach the shot"
-    ).toBe(14);
+    // The bow and the mace come from the shipped catalog; the ammunition is picker-minted, picked as arrows (a +3
+    // still waiting for its kind fits no launcher). d20 = 9.
+    const arrows3 = picked("ammunition-3", { baseId: "arrows-20" });
+    expect(shot([fromCatalog("longbow"), arrows3], "item-longbow"), "the +3 did not reach the shot").toBe(14);
     expect(shot([fromCatalog("longbow"), picked("arrows-20")], "item-longbow"), "the control: Dex +2 alone").toBe(11);
     // `weapon-property-is: ["ammunition"]` keeps this from being a blanket +3.
-    expect(shot([fromCatalog("mace"), picked("ammunition-3")], "item-mace"), "the arrow reached a melee swing").toBe(9);
+    expect(shot([fromCatalog("mace"), arrows3], "item-mace"), "the arrow reached a melee swing").toBe(9);
     // A thrown dagger is a ranged attack that fires no ammunition: d20 9 + Dex 2 + PB 3.
-    expect(
-      shot([fromCatalog("dagger"), picked("ammunition-3")], "item-dagger"),
-      "the arrow reached a thrown dagger"
-    ).toBe(11);
+    expect(shot([fromCatalog("dagger"), arrows3], "item-dagger"), "the arrow reached a thrown dagger").toBe(11);
   });
 
   it("ammunition's damage half lands on the launcher's hit", () => {
     const definition = definitionOf();
-    const state = fight(stateWith([fromCatalog("longbow"), picked("ammunition-2")]));
+    const state = fight(stateWith([fromCatalog("longbow"), picked("ammunition-2", { baseId: "arrows-20" })]));
     const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === "item-longbow")!;
     const resolution = resolveDefinitionAction(
       state,
@@ -259,10 +255,10 @@ describe("the rider families held only by a bundle assertion, driven", () => {
     }
   });
 
-  // "Advantage on ... Wisdom (Perception) checks" is authored to the ability, because `BUILTIN_CHECKS.search`
-  // has no `skill` key and `skill-is` fails closed. The same rider must leave Hide and Study alone.
+  // "Advantage on ... Wisdom (Perception) checks" is gated on the Perception skill, which a Search made with it carries.
+  // The same rider must leave a Search made with Insight, Hide and Study alone.
   it("Wisdom (Perception) advantage reaches the SEARCH die on both its carriers, and no other check", () => {
-    const searchWith = (id: string, n: number, over: Record<string, unknown> = {}) => {
+    const searchWith = (id: string, n: number, over: Record<string, unknown> = {}, skill = "perception") => {
       const definition = definitionOf();
       const state = fight(stateWith([picked(id, over)]));
       const resolution = resolveDefinitionAction(
@@ -272,7 +268,8 @@ describe("the rider families held only by a bundle assertion, driven", () => {
           actorId: IDS.hero,
           targetIds: [],
           commandId: `50000000-0000-4000-8000-0000000000${String(n).padStart(2, "0")}`,
-          builtin: true
+          builtin: true,
+          skill
         },
         deps([6, 19], definition)
       );
@@ -286,10 +283,12 @@ describe("the rider families held only by a bundle assertion, driven", () => {
     ] as const) {
       const worn = searchWith(id, n);
       expect(worn.resolution.check, `${id}: Search did not keep the higher die`).toMatchObject({
-        skill: "Wisdom (Search)",
+        skill: "Wisdom (Perception)",
         naturalRoll: 19,
         total: 19
       });
+      // A Search made with Insight is no Perception check.
+      expect(searchWith(id, n + 20, {}, "insight").resolution.rollMode).toBeUndefined();
       expect(worn.formula).toBe("2d20kh1+0");
       expect(worn.resolution.rollMode).toEqual({ mode: "advantage", advantage: [name], disadvantage: [] });
 

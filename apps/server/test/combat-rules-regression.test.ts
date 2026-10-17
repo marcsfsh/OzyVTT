@@ -1189,6 +1189,60 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
     expect(game.actors.find((actor) => actor.id === IDS.torva)!.hp.current).toBeLessThan(torvaHp);
   });
 
+  it("holds an opportunity attack's previewed die, so looking again or confirming uses it (ADR-0012)", () => {
+    const game = buildGame([
+      { actorId: IDS.croc1, score: 20 },
+      { actorId: IDS.torva, score: 8 }
+    ]);
+    const promptId = "40000000-0000-4000-8000-0000000000ab";
+    game.combat = {
+      ...game.combat,
+      pendingReactions: [
+        {
+          id: promptId,
+          kind: "leaves-reach",
+          actorId: IDS.croc1,
+          actionId: "opportunity-attack",
+          actionName: "Opportunity Attack",
+          sourceActorId: IDS.torva,
+          sourceName: "Torva Grimtusk",
+          targetActorId: IDS.torva,
+          triggerCommandId: nextCommandId(),
+          proposedDamage: 0,
+          proposedDamageParts: [],
+          critical: false,
+          weighed: null,
+          acBonus: null,
+          rollsAttack: true,
+          parkedAttack: null,
+          createdAt: 0
+        }
+      ]
+    };
+    const look = (faces: number[], options: Record<string, unknown> = {}) =>
+      answerReaction(game, nextCommandId(), promptId, true, undefined, { role: "gm" }, reactionDeps(game, faces), {
+        commit: false,
+        ...options
+      });
+    expect(look([4]).resolution?.attack).toMatchObject({ naturalRoll: 4 });
+    // An empty queue: a second look throws no die.
+    expect(look([]).resolution?.attack).toMatchObject({ naturalRoll: 4 });
+    // The GM's reroll throws again; the confirm then uses that die and rolls only the damage.
+    expect(look([18], { reroll: true }).resolution?.attack).toMatchObject({ naturalRoll: 18, outcome: "hit" });
+    const committed = answerReaction(
+      game,
+      nextCommandId(),
+      promptId,
+      true,
+      undefined,
+      { role: "gm" },
+      reactionDeps(game, [6, 6, 6]),
+      { commit: true }
+    );
+    expect(committed.resolution?.attack).toMatchObject({ naturalRoll: 18 });
+    expect(game.heldRolls).toEqual([]);
+  });
+
   it("offers no prompt when the reaction is already spent, the reactor is incapacitated, or the mode is freeform", () => {
     const spent = crocTurn();
     spent.combat = { ...spent.combat, reactionsUsed: [IDS.pip] };
@@ -1754,7 +1808,10 @@ describe("SRD generic actions - builtin catalog (rules glossary [Action] entries
     game.combat = { ...game.combat, turn: { ...game.combat.turn, actionUsed: false, actionInstance: null } };
     const strike = resolve(game, pipDefinition, "rapier", { actorId: IDS.pip, targetIds: [IDS.croc1] }, [2, 18, 5]);
     expect(strike.rollMode?.advantage).toContain("Attacker is Invisible");
-    expect(strike.effectsEnded).toEqual([{ actorId: IDS.pip, actorName: "Pip Underbough", name: "Hiding" }]);
+    // The effect names the total, the DC to find Pip (SRD Hide).
+    expect(strike.effectsEnded).toEqual([
+      { actorId: IDS.pip, actorName: "Pip Underbough", name: "Hiding (DC 16 to find)" }
+    ]);
     expect(pip.conditions.some((condition) => condition.id === "invisible")).toBe(false);
   });
 

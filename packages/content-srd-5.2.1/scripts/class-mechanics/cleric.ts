@@ -7,6 +7,12 @@ import type { ClassMechanicsModule } from "./overlay.js";
 
 export const cleric: ClassMechanicsModule = {
   features: {
+    // "You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you
+    // finish a Long Rest."
+    "channel-divinity": {
+      modifiers: [{ type: "short-rest-regain", poolId: "channel-divinity", amount: 1 }]
+    },
+
     "divine-order": {
       options: {
         /**

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
 import { GAME_PATHS } from "@vtt/api-contract";
 import { ActorDefinitionSchema } from "@vtt/schemas";
@@ -270,7 +271,7 @@ describe("Ammunition", () => {
 
   it("draws +1 ammunition first while it is equipped, and a piece that hits is not recovered", () => {
     const table = tableOf({ [IDS.fighter]: fighterInput("fighter-b") });
-    write(table, IDS.fighter, catalogRow("ammunition-1", { quantity: 10 }));
+    write(table, IDS.fighter, catalogRow("ammunition-1", { quantity: 10, baseId: "arrows-20" }));
     fight(table, IDS.fighter);
     // d20 15 + Dex 1 + PB 3 + the arrow's 1.
     expect(resolveAt(table, IDS.fighter, "item-longbow", [15, 4], {}, 30).attack?.total).toBe(20);
@@ -304,6 +305,82 @@ describe("Ammunition", () => {
     expect(arrows).toMatchObject({ quantity: 2, ammunitionLeft: 39 });
     expect(arrows?.ammunitionFired).toBeUndefined();
     expect(await log()).toContain("Borin recovers 1 of the 2 pieces fired from Arrows (20).");
+  });
+
+  it("fits +1 ammunition only to the launchers of the kind it was made as", () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput("fighter-b") });
+    // "Weapon (Any Ammunition)": the pick is the kind, so these are bolts.
+    write(table, IDS.fighter, catalogRow("ammunition-1", { quantity: 10, baseId: "crossbow-bolts-20" }));
+    expect(row(table, "ammunition-1")).toMatchObject({ baseId: "crossbow-bolts-20" });
+    fight(table, IDS.fighter);
+    // The longbow fires a plain arrow, and the bolts' +1 stays off the shot: d20 15 + Dex 1 + PB 3.
+    expect(resolveAt(table, IDS.fighter, "item-longbow", [15, 4], {}, 30).attack?.total).toBe(19);
+    expect(row(table, "ammunition-1")).toMatchObject({ quantity: 10 });
+    expect(row(table, "arrows-20")).toMatchObject({ ammunitionLeft: 39 });
+    // A crossbow fires them, +1 and all.
+    write(table, IDS.fighter, catalogRow("light-crossbow"));
+    table.state.combat.turn = { ...table.state.combat.turn, actionUsed: false, actionInstance: null };
+    expect(resolveAt(table, IDS.fighter, "item-light-crossbow", [15, 4], {}, 30).attack?.total).toBe(20);
+    expect(row(table, "ammunition-1")).toMatchObject({ quantity: 9 });
+  });
+
+  it("fires magic ammunition only once its kind is picked, and refuses a kind that isn't ammunition", () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput("fighter-b") });
+    write(table, IDS.fighter, edit(table, IDS.fighter, "arrows-20", { quantity: 0 }));
+    write(table, IDS.fighter, catalogRow("ammunition-1", { quantity: 10 }));
+    expect(row(table, "ammunition-1")?.baseId).toBeUndefined();
+    fight(table, IDS.fighter);
+    expect(blockedRule(() => resolveAt(table, IDS.fighter, "item-longbow", [15, 4], {}, 30))).toBe(
+      "attack.no-ammunition"
+    );
+    expect(() => write(table, IDS.fighter, edit(table, IDS.fighter, "ammunition-1", { baseId: "longsword" }))).toThrow(
+      'Ammunition, +1 applies to Any Ammunition - "longsword" is not one of the kinds it can be.'
+    );
+    write(table, IDS.fighter, edit(table, IDS.fighter, "ammunition-1", { baseId: "arrows-20" }));
+    expect(resolveAt(table, IDS.fighter, "item-longbow", [15, 4], {}, 30).attack?.total).toBe(20);
+  });
+
+  it("spends an arrow on a shot outside a fight, refuses with none, and picks up half of them later", async () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput("fighter-b") });
+    write(table, IDS.fighter, edit(table, IDS.fighter, "arrows-20", { quantity: 1 }));
+    const { server, gmToken, post, log, close } = await serve(table);
+    cleanups.push(close);
+    const shoot = () =>
+      post(GAME_PATHS.actionUse, gmToken, { commandId: randomUUID(), actorId: IDS.fighter, actionId: "item-longbow" });
+    const arrows = () =>
+      server.store.snapshot.actors
+        .find((actor) => actor.id === IDS.fighter)!
+        .inventory.find((entry) => entry.id === "arrows-20");
+    for (let shot = 0; shot < 20; shot += 1) expect((await shoot()).status).toBe(200);
+    expect(arrows()).toMatchObject({ quantity: 0, ammunitionFired: 20 });
+    const refused = await shoot();
+    expect(refused.status).toBe(409);
+    expect((await refused.json()).error.message).toBe("Borin has no arrows to fire from Longbow.");
+    const pickUp = () =>
+      post(GAME_PATHS.characterRecoverAmmunition.replace("{actorId}", IDS.fighter), gmToken, {
+        commandId: randomUUID(),
+        actorId: IDS.fighter
+      });
+    expect((await pickUp()).status).toBe(200);
+    expect(arrows()).toMatchObject({ quantity: 1, ammunitionLeft: 10 });
+    expect(arrows()?.ammunitionFired).toBeUndefined();
+    expect(await log()).toContain("Borin recovers 10 of the 20 pieces fired from Arrows (20).");
+    // Nothing left to pick up.
+    expect((await pickUp()).status).toBe(409);
+  });
+
+  it("leaves a fight's arrows on the ground until the fight ends", async () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput("fighter-b") });
+    fight(table, IDS.fighter);
+    resolveAt(table, IDS.fighter, "item-longbow", [15, 4], {}, 30);
+    const { post, gmToken, close } = await serve(table);
+    cleanups.push(close);
+    const pickUp = await post(GAME_PATHS.characterRecoverAmmunition.replace("{actorId}", IDS.fighter), gmToken, {
+      commandId: randomUUID(),
+      actorId: IDS.fighter
+    });
+    expect(pickUp.status).toBe(409);
+    expect((await pickUp.json()).error.message).toBe("Ammunition is picked up after the fight.");
   });
 
   it("recovers nothing from a single piece, and clears the count", () => {

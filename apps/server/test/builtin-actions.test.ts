@@ -31,6 +31,7 @@ describe("builtin action catalog", () => {
       "disengage",
       "dodge",
       "escape-grapple",
+      "extinguish-fire",
       "help",
       "hide",
       "influence",

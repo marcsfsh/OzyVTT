@@ -3,6 +3,7 @@ import type { ActionReaction } from "@vtt/schemas";
 import { setCondition } from "../actor-conditions.js";
 import { conditionLabel } from "../condition-rules.js";
 import { addEffect, makeEffect } from "../effects.js";
+import { HAZARDS } from "../hazards.js";
 import { halvedDamageParts, previewDamage } from "../hit-points.js";
 import { offerableReaction } from "../reaction-offers.js";
 import { applyFailureEffect, createPendingSaves } from "../saving-throws.js";
@@ -154,9 +155,9 @@ const BARE_FAILURE_CONDITIONS: ReadonlySet<string> = new Set(["prone", "exhausti
  * What a failed save puts on its target, as one source-linked effect (SRD: each condition ends by its own rules):
  * the conditions with their printed duration, the save repeated at the end of each of the target's turns, a
  * grapple's escape DC and range, ending on damage, the damage it deals at the start of each turn, and the
- * Concentration the cast is sustained by, and what the action declares a failure leaves besides (Bane's -1d4).
- * Charmed's "can't attack the charmer" and Grappled's "except the grappler" read the source from it. Undefined when
- * every condition stays bare and the action declares nothing more.
+ * Concentration the cast is sustained by, what the action declares a failure leaves besides (Bane's -1d4), and the
+ * hazard it starts (Alchemist's Fire's burning). Charmed's "can't attack the charmer" and Grappled's "except the
+ * grappler" read the source from it. Undefined when every condition stays bare and the action declares nothing more.
  */
 export function failureEffectFor(
   ctx: Pick<ResolveContext, "action" | "attacker" | "castId">,
@@ -168,12 +169,18 @@ export function failureEffectFor(
   const linked = conditionIds.filter((id) => !BARE_FAILURE_CONDITIONS.has(id));
   // What the failure leaves besides conditions (Bane's -1d4, Faerie Fire's outline), declared by the action.
   const declared = save.failureEffect;
-  if (linked.length === 0 && !declared) return undefined;
+  // Alchemist's Fire sets its target burning, Oil covers it: an effect of its own, or riding the conditions.
+  const hazard = save.failureHazard ? HAZARDS[save.failureHazard] : undefined;
+  if (linked.length === 0 && !declared && !hazard) return undefined;
   const grapple = linked.includes("grappled");
-  const duration = save.failureDuration ?? declared?.duration;
+  const duration = save.failureDuration ?? declared?.duration ?? hazard?.duration;
+  const ongoingDamage = save.ongoingDamage ?? hazard?.ongoingDamage;
   return {
-    name: declared?.name ?? `${conditionLabel(linked[0]!)} by ${attacker.name} (${action.name})`.slice(0, 120),
-    tags: [...(grapple ? ["grapple"] : []), ...(declared?.tags ?? [])].slice(0, 8),
+    name: (
+      declared?.name ??
+      (linked.length > 0 ? `${conditionLabel(linked[0]!)} by ${attacker.name} (${action.name})` : hazard!.name)
+    ).slice(0, 120),
+    tags: [...(grapple ? ["grapple"] : []), ...(declared?.tags ?? []), ...(hazard ? [hazard.tag] : [])].slice(0, 8),
     modifiers: [...(declared?.modifiers ?? [])],
     linkedConditionIds: linked,
     // An escape DC the text doesn't print is the grapple's own DC, as the 2024 rules set it.
@@ -185,7 +192,7 @@ export function failureEffectFor(
     ...(save.endsOnDamage ? { endsOnDamage: true } : {}),
     ...(save.speedZero ? { speedZero: true } : {}),
     ...(grapple ? { endsWhenSourceDefeated: true, rangeFeet: save.rangeFeet ?? action.attack?.reachFeet ?? 5 } : {}),
-    ...(save.ongoingDamage ? { ongoingDamage: save.ongoingDamage } : {}),
+    ...(ongoingDamage ? { ongoingDamage } : {}),
     ...(castId !== null ? { castId } : {}),
     sourceActionId: action.id
   };

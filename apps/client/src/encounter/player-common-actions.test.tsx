@@ -45,7 +45,16 @@ const ROWS = [
   row("sneak-attack", "Sneak Attack", { activation: "other", usesLimit: 1, usesPer: "turn", ridesAHit: true }),
   row("dodge", "Dodge", { builtin: true, targeting: "none" }),
   row("help", "Help", { builtin: true, targeting: "single" }),
-  row("dash-bonus", "Cunning Action: Dash", { builtin: true, targeting: "none", activation: "bonus-action" })
+  row("dash-bonus", "Cunning Action: Dash", { builtin: true, targeting: "none", activation: "bonus-action" }),
+  row("search", "Search", {
+    builtin: true,
+    targeting: "none",
+    checkSkills: [
+      { id: "insight", ability: "wis" },
+      { id: "perception", ability: "wis" }
+    ]
+  }),
+  row("extinguish-fire", "Put Out the Fire", { builtin: true, targeting: "none", requiresEffectTag: "burning" })
 ];
 
 const ROGUE = {
@@ -70,16 +79,15 @@ const ROGUE = {
   ]
 } as unknown as ActorDefinition;
 
-const mount = () =>
+const mount = (effectTags: readonly string[] = []) =>
   render(
     <PlayerActionRunner
       actorId={ME}
       definition={ROGUE}
       revision={1}
-      rollMode="auto"
-      bonusMode="auto"
       playerDamageMode="proposal"
       targets={[]}
+      effectTags={effectTags}
     />
   );
 
@@ -103,5 +111,25 @@ describe("a player's actions on their turn", () => {
     await waitFor(() => expect(screen.getByText(/add it to a hit on the attack's result/)).toBeTruthy());
     expect(screen.queryByRole("button", { name: /Sneak Attack/ })).toBeNull();
     expect(screen.getByRole("button", { name: /Rapier/ })).toBeTruthy();
+  });
+});
+
+describe("the generic actions a player's state calls for, and the checks", () => {
+  it("brings Put Out the Fire forward while the character burns", async () => {
+    const { unmount } = mount();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Dodge" })).toBeTruthy());
+    expect(screen.queryByRole("button", { name: "Put Out the Fire" })).toBeNull();
+    unmount();
+    mount(["burning"]);
+    expect(await screen.findByRole("button", { name: "Put Out the Fire" })).toBeTruthy();
+  });
+
+  it("asks which skill a Search is made with before it is rolled", async () => {
+    command.mockClear();
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "More" }));
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(await screen.findByText("Skill")).toBeTruthy();
+    expect(command).not.toHaveBeenCalledWith("action:resolve", expect.anything());
   });
 });

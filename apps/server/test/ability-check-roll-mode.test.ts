@@ -150,11 +150,11 @@ describe("advantage on an ability check reaches the d20", () => {
     const state = stateWith([item(BOOTS_ROW)]);
     const resolution = resolveBuiltin(state, "hide", deps([3, 17], catalogOf([BOOTS]), definition));
 
-    // DEX 14 = +2. 17 + 2 = 19, which also clears Hide's DC 15: the outcome moved, not just the die.
+    // DEX 14 = +2, and Stealth proficiency adds PB 2: 17 + 4 = 21, which also clears Hide's DC 15.
     expect(resolution.check).toMatchObject({
       skill: "Dexterity (Stealth)",
       naturalRoll: 17,
-      total: 19,
+      total: 21,
       dc: 15,
       success: true
     });
@@ -162,12 +162,12 @@ describe("advantage on an ability check reaches the d20", () => {
 
     // The recorded roll shows two dice thrown and one kept.
     const record = state.rolls.find((roll) => roll.purpose === "check")!;
-    expect(record.normalizedFormula).toBe("2d20kh1+2");
+    expect(record.normalizedFormula).toBe("2d20kh1+4");
     expect(record.dice.map((die) => ({ face: die.face, kept: die.kept }))).toEqual([
       { face: 3, kept: false },
       { face: 17, kept: true }
     ]);
-    expect(record.total).toBe(19);
+    expect(record.total).toBe(21);
   });
 
   it("takes the boots off and the SAME queue gives 3 - one die, no advantage, DC 15 missed", () => {
@@ -175,9 +175,9 @@ describe("advantage on an ability check reaches the d20", () => {
     const state = stateWith([item({ ...BOOTS_ROW, equipped: false })]);
     const resolution = resolveBuiltin(state, "hide", deps([3, 17], catalogOf([BOOTS]), definition));
 
-    expect(resolution.check).toMatchObject({ naturalRoll: 3, total: 5, success: false });
+    expect(resolution.check).toMatchObject({ naturalRoll: 3, total: 7, success: false });
     expect(resolution.rollMode).toBeUndefined();
-    expect(state.rolls.find((roll) => roll.purpose === "check")!.normalizedFormula).toBe("1d20+2");
+    expect(state.rolls.find((roll) => roll.purpose === "check")!.normalizedFormula).toBe("1d20+4");
     // The success half moved with it: no Hiding effect, so nothing granted Invisible.
     expect(state.actors[0].effects).toEqual([]);
   });
@@ -195,7 +195,7 @@ describe("advantage on an ability check reaches the d20", () => {
     const state = stateWith([item(BOOTS_ROW)]);
     const resolution = resolveBuiltin(state, "hide", deps([3, 17], catalogOf([mundane]), definition));
 
-    expect(resolution.check).toMatchObject({ naturalRoll: 3, total: 5 });
+    expect(resolution.check).toMatchObject({ naturalRoll: 3, total: 7 });
     expect(resolution.rollMode).toBeUndefined();
   });
 
@@ -213,7 +213,7 @@ describe("which check the rider actually reaches", () => {
     const state = stateWith([item(BOOTS_ROW)]);
     const resolution = resolveBuiltin(state, "search", deps([3, 17], catalogOf([BOOTS]), definition));
     // WIS 10 = +0, so the natural die is the whole total: 3 means one d20 was thrown.
-    expect(resolution.check).toMatchObject({ skill: "Wisdom (Search)", naturalRoll: 3, total: 3 });
+    expect(resolution.check).toMatchObject({ skill: "Wisdom check", naturalRoll: 3, total: 3 });
     expect(resolution.rollMode).toBeUndefined();
   });
 
@@ -237,7 +237,7 @@ describe("which check the rider actually reaches", () => {
       })
     ]);
     const resolution = resolveBuiltin(state, "study", deps([3, 17], catalogOf([luckstone]), definition));
-    expect(resolution.check).toMatchObject({ skill: "Intelligence (Study)", naturalRoll: 17 });
+    expect(resolution.check).toMatchObject({ skill: "Intelligence check", naturalRoll: 17 });
     expect(resolution.rollMode).toMatchObject({ mode: "advantage", advantage: ["Stone of Good Luck"] });
   });
 
@@ -274,7 +274,7 @@ describe("which check the rider actually reaches", () => {
       "hide",
       deps([17, 3], catalogOf([cursed]), definitionOf())
     );
-    expect(down.check).toMatchObject({ naturalRoll: 3, total: 5, success: false });
+    expect(down.check).toMatchObject({ naturalRoll: 3, total: 7, success: false });
     expect(down.rollMode).toEqual({ mode: "disadvantage", advantage: [], disadvantage: ["Clumsy Boots"] });
 
     // 5e cancellation (aggregateRollMode): one of each is a plain d20, so only the first face is spent.
@@ -283,7 +283,7 @@ describe("which check the rider actually reaches", () => {
       "hide",
       deps([17, 3], catalogOf([BOOTS, cursed]), definition)
     );
-    expect(both.check).toMatchObject({ naturalRoll: 17, total: 19 });
+    expect(both.check).toMatchObject({ naturalRoll: 17, total: 21 });
     expect(both.rollMode).toBeUndefined();
   });
 
@@ -371,7 +371,7 @@ describe("Escape a Grapple takes the same consumer", () => {
     const won = grappled([item(ROW)]);
     const escaped = resolveBuiltin(won, "escape-grapple", deps([3, 17], catalogOf([GAUNTLETS]), definitionOf()));
     expect(escaped.check).toMatchObject({
-      skill: "Escape (Athletics/Acrobatics)",
+      skill: "Strength (Athletics)",
       naturalRoll: 17,
       total: 20,
       dc: 13,

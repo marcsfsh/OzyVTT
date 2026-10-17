@@ -57,6 +57,8 @@ export const RollRecordSchema = z.object({
   ),
   modifiers: z.array(z.object({ value: z.number().int().nonnegative(), sign: z.union([z.literal(1), z.literal(-1)]) })),
   total: z.number().int(),
+  /** The d20 was typed from a physical die rather than thrown by the server. */
+  typed: z.literal(true).optional(),
   createdAt: z.iso.datetime()
 });
 export type RollVisibility = z.infer<typeof RollVisibilitySchema>;
@@ -257,10 +259,110 @@ export const PendingSaveSchema = z
       .object({ actorId: z.uuid(), effectId: z.string().min(1).max(120) })
       .strict()
       .optional(),
+    /** The GM's call for a roll this save answers; the outcome is written back to the call. */
+    callId: z.uuid().optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();
 export type PendingSave = z.infer<typeof PendingSaveSchema>;
+
+/** What an ability check is made with: the ability, and a skill or a tool (or both) when one applies. */
+export const CheckSubjectSchema = z
+  .object({
+    ability: AbilityIdSchema,
+    skill: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(60)
+      .optional(),
+    tool: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional()
+  })
+  .strict();
+export type CheckSubject = z.infer<typeof CheckSubjectSchema>;
+
+/**
+ * Dice thrown before they count, held so a second look at the same roll returns the same dice (ADR-0012): a previewed
+ * save, death save, attack or opportunity attack, and the latest check, which Heroic Inspiration may still reroll.
+ * GM-only; the player saw the dice in the roll itself.
+ */
+export const HeldRollSchema = z
+  .object({
+    /** What the dice belong to: `save:<saveId>`, `death-save:<actorId>`, `attack:<actorId>`, `reaction:<reactionId>`
+     *  or `check:<actorId>`. */
+    key: z.string().min(1).max(200),
+    actorId: z.uuid(),
+    /** The d20 faces thrown so far, in order. */
+    faces: z.array(z.number().int().min(1).max(20)).min(1).max(2),
+    /** The roll's other dice as thrown (Bless's d4), kept with the d20s. */
+    others: z
+      .array(z.object({ sides: z.number().int().min(2).max(100), face: z.number().int().min(1).max(100) }).strict())
+      .max(20)
+      .default([]),
+    /** The roll the faces were recorded under. */
+    rollId: z.uuid().nullable().default(null),
+    /** Typed from a physical die rather than thrown by the server. */
+    typed: z.boolean().default(false),
+    /** The round and turn they were thrown in: a die held for one turn's attack is not reused on a later turn. */
+    round: z.number().int().nonnegative(),
+    turnActorId: z.uuid().nullable(),
+    /** A check's subject and how it was made, so Heroic Inspiration can reroll it. */
+    check: z
+      .object({
+        subject: CheckSubjectSchema,
+        dc: z.number().int().min(1).max(40).nullable(),
+        visibility: RollVisibilitySchema,
+        /** The GM's forced mode, which a reroll keeps. */
+        rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
+        callId: z.uuid().optional(),
+        findActorId: z.uuid().optional()
+      })
+      .strict()
+      .optional(),
+    createdAt: z.number().int().nonnegative()
+  })
+  .strict();
+export type HeldRoll = z.infer<typeof HeldRollSchema>;
+
+/** One character's part of a call for a roll: who, the pending save a save call opened, and the result once rolled. */
+export const RollCallEntrySchema = z
+  .object({
+    actorId: z.uuid(),
+    saveId: z.uuid().optional(),
+    result: z
+      .object({
+        natural: z.number().int().min(0).max(20),
+        total: z.number().int(),
+        /** Null when the call set no DC. */
+        success: z.boolean().nullable(),
+        /** The condition that made a Strength or Dexterity save fail without a roll. */
+        autoFailed: z.string().max(60).optional(),
+        rollId: z.uuid().optional()
+      })
+      .strict()
+      .optional()
+  })
+  .strict();
+/**
+ * The GM's call for a roll: a check or a save from one or several characters, with an optional DC. A save call opens a
+ * pending save for each character; a check call is answered with `roll-call.answer`. A blind call's rolls are hidden from
+ * the players who make them. Closed by the GM.
+ */
+export const RollCallSchema = z
+  .object({
+    id: z.uuid(),
+    kind: z.enum(["check", "save"]),
+    subject: CheckSubjectSchema,
+    dc: z.number().int().min(1).max(40).nullable(),
+    blind: z.boolean().default(false),
+    entries: z.array(RollCallEntrySchema).min(1).max(20),
+    createdAt: z.number().int().nonnegative()
+  })
+  .strict();
+export type RollCall = z.infer<typeof RollCallSchema>;
 
 /** An attack a reaction (Parry, Shield) may still turn into a miss, held at the roll until the prompt is answered and
  * then replayed with the same die. The economy it spent was committed when it rolled. GM-only. */
@@ -782,9 +884,11 @@ export const BuilderPolicySchema = z
     playerBuilder: z.enum(["open", "gm-only"]).default("open"),
     /** Whether players may roll a random character; "gm-only" by default because it fills a roster slot in one tap. */
     playerRandom: z.enum(["open", "gm-only"]).default("gm-only"),
-    /** Whether players may type what their own dice showed for rolled ability scores and hit points. Closed by
-     *  default: a player's rolls are then thrown by the server (the GM may always type). */
-    typedRolls: z.enum(["open", "gm-only"]).default("gm-only"),
+    /** The table's one setting for typed dice (ADR-0012): whether players may type what their physical dice show, for
+     *  every roll (checks, saves, attacks, damage, death saves, initiative, and rolled scores and hit points in the
+     *  builder). Open by default, for tables that roll physical dice; "gm-only" refuses a player's typed faces and the
+     *  server throws them. The GM may always type. */
+    typedRolls: z.enum(["open", "gm-only"]).default("open"),
     /** A table rule raising a rolled hit-point level to the class average; "none" is the SRD (the roll stands). */
     hitPointRollFloor: z.enum(["none", "average"]).default("none")
   })
@@ -818,6 +922,30 @@ export type StagingDefaults = z.infer<typeof StagingDefaultsSchema>;
 export const PartyVisibilitySchema = z.enum(["off", "name-and-class", "full-sheet", "sheet-and-resources"]);
 export type PartyVisibility = z.infer<typeof PartyVisibilitySchema>;
 
+/** A Short Rest the GM runs for several characters at once. Each player spends Hit Dice on their own device and
+ *  says when they are done; the benefits land when the GM finishes it. */
+export const PartyShortRestSchema = z
+  .object({
+    actorIds: z.array(z.uuid()).min(1).max(12),
+    /** Members whose players are done choosing. The GM may finish without them. */
+    done: z.array(z.uuid()).max(12).default([])
+  })
+  .strict();
+export type PartyShortRest = z.infer<typeof PartyShortRestSchema>;
+
+/** Game time and the rests waiting on the GM. The clock exists for the 16-hour rule between Long Rests; the GM
+ *  moves it, and a party rest moves it by the rest's length. */
+export const RestStateSchema = z
+  .object({
+    /** Whole hours of game time since the campaign's clock started. */
+    clockHours: z.number().int().min(0).max(10_000_000).default(0),
+    /** Characters whose players asked for a Long Rest, oldest first. */
+    requests: z.array(z.uuid()).max(50).default([]),
+    shortRest: PartyShortRestSchema.nullable().default(null)
+  })
+  .strict();
+export type RestState = z.infer<typeof RestStateSchema>;
+
 export const GameStateSchema = z.object({
   schemaVersion: z.literal(1),
   revision: z.number().int().nonnegative().default(0),
@@ -843,6 +971,12 @@ export const GameStateSchema = z.object({
   /** Table defaults for staging new combatants. GM-set, GM-read. */
   stagingDefaults: StagingDefaultsSchema.prefault({}),
   /** How much a player sees of another player's character (see PartyVisibilitySchema). GM-set; player-read via `PlayerView`. */
-  partyVisibility: PartyVisibilitySchema.default("name-and-class")
+  partyVisibility: PartyVisibilitySchema.default("name-and-class"),
+  /** Dice thrown before they count (see HeldRollSchema). GM-only. */
+  heldRolls: z.array(HeldRollSchema).max(100).default([]),
+  /** The GM's open calls for a roll. A player reads only their own part of each. */
+  rollCalls: z.array(RollCallSchema).max(20).default([]),
+  /** Game time, Long Rest requests and the party's Short Rest. Players see only their own characters' part. */
+  rest: RestStateSchema.prefault({})
 });
 export type GameState = z.infer<typeof GameStateSchema>;

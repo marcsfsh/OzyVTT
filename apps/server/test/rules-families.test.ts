@@ -76,6 +76,8 @@ describe("rule families", () => {
       ["attack.two-handed", "economy"],
       // Casting in untrained armor: what the character can do at all, like the hands rule.
       ["spell.untrained-armor", "economy"],
+      // A scroll whose spell the reader's lists lack: what the character can do at all.
+      ["spell.scroll-unreadable", "economy"],
       // Sneak Attack or a smite taken alone, with no hit to add to.
       ["attack.rides-a-hit", "economy"],
       ["feature.no-uses-remaining", "resources"],

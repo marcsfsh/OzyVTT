@@ -20,6 +20,7 @@ import type {
   ContentStartingEquipmentOption,
   ContentSubclassSummary
 } from "@vtt/domain";
+import { choosesAbility } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { progressionTableFromClasses, type ClassProgressionTable } from "@vtt/rules-5e";
 import {
@@ -209,6 +210,7 @@ export function actionSummaryOf(action: ActorDefinition["actions"][number]): Con
     usesPer: action.uses?.per ?? null,
     usesRecharge: action.uses?.recharge ?? null,
     usesPool: action.uses?.pool ?? null,
+    ...(action.useCost !== undefined ? { useCost: action.useCost } : {}),
     requiresEffectTag: action.requiresEffectTag ?? null,
     multiattack: action.multiattack ?? null,
     // A row taking two generic actions at once (Step of the Wind) grants their effects when it resolves.
@@ -220,10 +222,13 @@ export function actionSummaryOf(action: ActorDefinition["actions"][number]): Con
     ...(hitRiderOf(action) ? { ridesAHit: true as const } : {}),
     ...(action.darts !== undefined ? { darts: action.darts } : {}),
     ...(action.damageTypes !== undefined ? { damageTypes: [...action.damageTypes] } : {}),
+    ...(choosesAbility(action) ? { choosesAbility: true } : {}),
     // A heal for others picks its targets: one (Divine Spark's healing), or several for a divided pool (Preserve Life).
     ...(action.healing && !action.healing.self
       ? { targeting: action.healing.divided ? ("multi" as const) : ("single" as const) }
-      : {})
+      : {}),
+    // So does a touch that ends a condition (Lay on Hands' cure).
+    ...(action.endsConditions && !action.healing ? { targeting: "single" as const } : {})
   };
 }
 
@@ -391,7 +396,8 @@ const classSummaryOf = (entry: ClassReference): ContentClassSummary => ({
         armor: entry.multiclassProficiencies.armor,
         weapons: entry.multiclassProficiencies.weapons,
         tools: entry.multiclassProficiencies.tools,
-        skillChoices: choiceListOf(entry.multiclassProficiencies.skills)
+        skillChoices: choiceListOf(entry.multiclassProficiencies.skills),
+        toolChoices: choiceListOf(entry.multiclassProficiencies.toolChoices)
       }
     : null,
   multiclassPrerequisites: entry.multiclassPrerequisites
@@ -599,7 +605,9 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
     // The template eligibility list, for the base chooser. Printed SRD text plus resolved ids; nothing GM-secret.
     appliesTo: item.appliesTo ?? null,
     // The types the GM may pick for its resistance, as printed; the pick itself is the GM's, on the row.
-    ...(item.damageTypeChoice ? { damageTypeChoice: [...item.damageTypeChoice] } : {})
+    ...(item.damageTypeChoice ? { damageTypeChoice: [...item.damageTypeChoice] } : {}),
+    // The levels a Spell Scroll can bear, as its name says, for the picker's spell step.
+    ...(item.spellScroll ? { spellScroll: { ...item.spellScroll } } : {})
   }));
 
   const monstersById = new Map<string, ActorDefinition>();

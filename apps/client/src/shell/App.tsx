@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
 import { CombatLogDrawer } from "../encounter/CombatLog";
+import { RollCallPrompts } from "../encounter/RollCallPrompt";
 import {
   currentHref,
   navigate,
@@ -139,6 +140,8 @@ export function App() {
       {/* The combat log drawer lives outside the pane because it is `position: fixed` and the pane is
         where transforms happen. Non-modal, so the table stays live behind it. */}
       {shell && <CombatLogDrawer open={logOpen} onClose={() => setLogOpen(false)} />}
+      {/* The GM's calls for a roll follow the player to every tab, so they take no frame row either. */}
+      {shell?.role === "player" && <RollCallPrompts state={shell.state as PlayerView} />}
     </main>
   );
 }

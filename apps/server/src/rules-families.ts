@@ -52,6 +52,8 @@ const RULE_FAMILIES = {
   // No spellcasting in armor the caster isn't trained with: what the character can do at all, not a spent slot
   // (the slots family is advisory by default, and this rule is not).
   "spell.untrained-armor": "economy",
+  // A Spell Scroll in a spell the reader's lists don't have is unintelligible.
+  "spell.scroll-unreadable": "economy",
   // Sneak Attack, a smite and the like add to a hit: they're chosen when the hit is confirmed, not taken alone.
   "attack.rides-a-hit": "economy",
   // ...while "no legendary actions left this round" is a spent resource, like limited uses.

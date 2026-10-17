@@ -7,6 +7,7 @@ import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
 import { areAllies } from "../creature-sides.js";
 import { HASTED_TAG, hasEffectTag, RAGING_TAG, READIED_TAG, RECKLESS_TAG, STEADY_AIM_TAG } from "../effects.js";
 import { ammunitionFor, ammunitionLabel, launcherKind } from "../ammunition.js";
+import { SCROLL_UNREADABLE, scrollOfAction, scrollReading } from "../scrolls.js";
 import { armorTrainingGaps, type EquipmentCatalog } from "../equipment-derivation.js";
 import { RulesBlockedError } from "../game-store.js";
 import { isItemActionId, itemActionRest, TWO_HANDED_SUFFIX } from "../item-actions.js";
@@ -20,6 +21,7 @@ import {
   type RuleId
 } from "../rules-families.js";
 import { laterSpellActionId, ritualSpellActionId } from "../item-actions.js";
+import { notEnoughUses, useCostOf } from "../use-cost.js";
 import { builtinHandlerFor } from "./builtins.js";
 import { castMarks, markMoveOf } from "./marks.js";
 import { hitRiderOf } from "./hit-riders.js";
@@ -43,8 +45,8 @@ export type EconomyPlan = Readonly<{
   }> | null;
   /** The same for a compound bonus action (Flurry of Blows). */
   bonusInstance: Readonly<{ actorId: string; components: Record<string, number> }> | null;
-  /** Limited-use spend to record, keyed per scope. */
-  spendUse: Readonly<{ key: string; per: NonNullable<DefinitionAction["uses"]>["per"] }> | null;
+  /** Limited-use spend to record, keyed per scope: `amount` uses of it (one, or the action's cost). */
+  spendUse: Readonly<{ key: string; per: NonNullable<DefinitionAction["uses"]>["per"]; amount: number }> | null;
   /** Legendary-action cost to add to the attacker's per-round pool (SRD Legendary Actions), and the mark of one it
    *  can't take again until its next turn. */
   spendLegendary: Readonly<{ cost: number; onceKey?: string }> | null;
@@ -143,6 +145,7 @@ export function evaluateActionEconomy(
   checkHands(evaluation);
   checkArmorTraining(evaluation, definition);
   checkAmmunition(evaluation, catalog);
+  checkScrollLegible(evaluation, definition, catalog);
   if (!asHitRider) checkTakenAlone(evaluation);
   const spendUse = checkLimitedUse(evaluation);
   const oncePerTurn = checkOncePerTurn(evaluation);
@@ -440,6 +443,19 @@ function checkAmmunition({ attacker, action, violations }: Evaluation, catalog: 
   });
 }
 
+/** SRD Spell Scroll: "If the spell is on your spell list, you can read the scroll ... Otherwise, the scroll is
+ *  unintelligible." */
+function checkScrollLegible(
+  { attacker, action, violations }: Evaluation,
+  definition: ActorDefinition | undefined,
+  catalog: EquipmentCatalog | undefined
+): void {
+  const scroll = scrollOfAction(action, attacker.inventory, catalog);
+  if (!scroll) return;
+  const reading = scrollReading(definition, scroll.spell, catalog);
+  if (!reading.readable) violations.push({ rule: SCROLL_UNREADABLE, message: reading.message });
+}
+
 /** SRD Loading: "You can fire only one piece of ammunition from a Loading weapon when you use an action ... to fire
  *  it, regardless of the number of attacks you can normally make." Extra Attack's other swings stay open for
  *  another weapon. */
@@ -482,8 +498,14 @@ function checkLimitedUse({ state, attacker, action, siblings, violations }: Eval
   const limit = useLimitFor(siblings, action);
   const spent =
     uses.per === "turn" ? (state.combat.turn.turnUses[`${attacker.id}:${key}`] ?? 0) : (attacker.actionUses[key] ?? 0);
-  if (spent >= limit) violations.push({ rule: "feature.no-uses-remaining", message: noUsesRemaining(action, limit) });
-  return { key, per: uses.per };
+  // Some activations spend several (Lay on Hands' 5-point cure, or the points its user chose).
+  const cost = useCostOf(action);
+  if (spent + cost > limit)
+    violations.push({
+      rule: "feature.no-uses-remaining",
+      message: spent >= limit ? noUsesRemaining(action, limit) : notEnoughUses(action.name, limit - spent, cost)
+    });
+  return { key, per: uses.per, amount: cost };
 }
 
 /** Why a limited-use action is refused, in and out of a fight. */
@@ -1348,13 +1370,16 @@ export function commitEconomy({
         ...state.combat,
         turn: {
           ...state.combat.turn,
-          turnUses: { ...state.combat.turn.turnUses, [key]: (state.combat.turn.turnUses[key] ?? 0) + 1 }
+          turnUses: {
+            ...state.combat.turn.turnUses,
+            [key]: (state.combat.turn.turnUses[key] ?? 0) + plan.spendUse.amount
+          }
         }
       };
     } else {
       attacker.actionUses = {
         ...attacker.actionUses,
-        [plan.spendUse.key]: (attacker.actionUses[plan.spendUse.key] ?? 0) + 1
+        [plan.spendUse.key]: (attacker.actionUses[plan.spendUse.key] ?? 0) + plan.spendUse.amount
       };
     }
   }

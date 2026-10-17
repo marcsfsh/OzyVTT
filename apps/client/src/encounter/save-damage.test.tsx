@@ -78,6 +78,7 @@ const mount = (save: PendingSave, rollMode: "auto" | "manual" = "manual") =>
           feedback.push(text);
         }}
         rollMode={rollMode}
+        viewer="player"
       />
     </StrictMode>
   );
@@ -139,22 +140,29 @@ describe("the save prompt's damage field", () => {
     const user = userEvent.setup();
     mount(SAVE);
     await user.type(screen.getByLabelText(/Damage on a failure/), "12");
-    await user.type(screen.getByLabelText("Rolled save total"), "18");
-    await user.click(screen.getByRole("button", { name: "Apply" }));
+    // A physical die's face, not a total: the server adds the bonus and holds the die.
+    await user.type(screen.getByLabelText("Your save d20"), "18");
+    await user.click(screen.getByRole("button", { name: "Use" }));
     expect(lastAnswer()).toMatchObject({
       saveId: SAVE.id,
-      method: "manual",
-      total: 18,
-      commit: true,
+      method: "roll",
+      face: 18,
+      commit: false,
       damageOverride: 12
     });
+    expect("total" in lastAnswer()).toBe(false);
+    ack({ total: 18, success: true, appliedDamage: 6 });
+    await user.click(await screen.findByRole("button", { name: "Confirm" }));
+    // Confirm applies the held die: it names no face.
+    expect(lastAnswer()).toMatchObject({ method: "roll", commit: true, damageOverride: 12 });
+    expect("face" in lastAnswer()).toBe(false);
   });
 
   it("sends no damage field when the answerer leaves the number alone", async () => {
     const user = userEvent.setup();
     mount(SAVE);
-    await user.type(screen.getByLabelText("Rolled save total"), "18");
-    await user.click(screen.getByRole("button", { name: "Apply" }));
+    await user.type(screen.getByLabelText("Your save d20"), "18");
+    await user.click(screen.getByRole("button", { name: "Use" }));
     expect("damageOverride" in lastAnswer()).toBe(false);
   });
 
@@ -172,11 +180,10 @@ describe("the save prompt's damage field", () => {
     expect(screen.queryByText("8 dmg")).toBeNull();
     expect(screen.getByText("Amended to 12 - checking")).toBeTruthy();
 
-    // The recheck is Confirm's payload with `commit: false`: nothing is rolled or applied.
+    // The recheck is Confirm's payload with `commit: false`: the held die, so nothing is rolled or applied.
     expect(await nextAnswer(1)).toMatchObject({
       saveId: SAVE.id,
-      method: "manual",
-      total: 18,
+      method: "roll",
       commit: false,
       damageOverride: 12
     });
@@ -190,7 +197,7 @@ describe("the save prompt's damage field", () => {
 
     // Confirm still sends the pre-halving 12; the server does the halving and resistances.
     await user.click(screen.getByRole("button", { name: "Confirm" }));
-    expect(lastAnswer()).toMatchObject({ method: "manual", total: 18, commit: true, damageOverride: 12 });
+    expect(lastAnswer()).toMatchObject({ method: "roll", commit: true, damageOverride: 12 });
   });
 
   it("says 'no damage' when the amend lands as none - a success on a save that does not halve", async () => {

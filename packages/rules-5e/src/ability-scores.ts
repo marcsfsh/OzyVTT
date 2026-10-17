@@ -6,6 +6,16 @@ import type { Ability } from "./character.js";
 /** The six abilities in SRD sheet order; the stat priority of a class the table doesn't know. */
 export const ABILITIES: readonly Ability[] = ["str", "dex", "con", "int", "wis", "cha"];
 
+/** Each ability's name as the SRD prints it, for sentences a player reads. */
+export const ABILITY_NAMES: Readonly<Record<Ability, string>> = Object.freeze({
+  str: "Strength",
+  dex: "Dexterity",
+  con: "Constitution",
+  int: "Intelligence",
+  wis: "Wisdom",
+  cha: "Charisma"
+});
+
 /** SRD standard array, highest first. */
 export const STANDARD_ARRAY: readonly number[] = [15, 14, 13, 12, 10, 8];
 

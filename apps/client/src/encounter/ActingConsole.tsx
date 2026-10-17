@@ -95,6 +95,7 @@ export function ActingConsole({
             onFeedback={onFeedback}
             rollMode={rollMode}
             isActingTurn={state.combat.turnActorId === actor.id}
+            viewer="gm"
           />
         ) : (
           <p className="acting-down-note" role="status">

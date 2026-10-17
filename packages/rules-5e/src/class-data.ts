@@ -2,7 +2,7 @@
 // multiclass prerequisites). Every accessor takes the table as its last argument so homebrew classes supply
 // the same record; content bundles carry the authored copy and this table is the fallback.
 import type { Ability } from "./character.js";
-import { ABILITIES } from "./ability-scores.js";
+import { ABILITIES, ABILITY_NAMES } from "./ability-scores.js";
 
 export type HitDie = "d4" | "d6" | "d8" | "d10" | "d12";
 
@@ -254,6 +254,72 @@ export function progressionTableFromClasses(
   const table: Record<string, ClassProgression> = { ...fallback };
   for (const source of classes) table[source.id] = progressionFromClass(source);
   return table;
+}
+
+/** A class's multiclass minimums as content records and the wire catalogs carry them. */
+export type MulticlassMinimums = Readonly<{
+  mode: "all" | "any";
+  minimums: ReadonlyArray<Readonly<{ ability: Ability; minimum: number }>>;
+}>;
+
+/** A class as the multiclass check reads it: content records, catalog summaries and homebrew all fit. */
+export type MulticlassCandidate = Readonly<{
+  id: string;
+  name: string;
+  multiclassPrerequisites?: MulticlassMinimums | null;
+}>;
+
+/** Whether these scores meet one class's multiclass minimums; a class that declares none is open to anyone. */
+export function meetsMulticlassMinimums(
+  abilityScores: Readonly<Partial<Record<Ability, number>>>,
+  minimums: MulticlassMinimums | null | undefined
+): boolean {
+  if (!minimums || minimums.minimums.length === 0) return true;
+  const met = (entry: MulticlassMinimums["minimums"][number]) => (abilityScores[entry.ability] ?? 0) >= entry.minimum;
+  return minimums.mode === "any" ? minimums.minimums.some(met) : minimums.minimums.every(met);
+}
+
+/**
+ * SRD Multiclassing: "To qualify for a new class, you must have a score of at least 13 in the primary ability of the
+ * new class and your current classes." The classes whose minimums these scores miss, the new class first; empty
+ * when the new class may be taken.
+ */
+export function multiclassShortfalls<New extends MulticlassCandidate, Current extends MulticlassCandidate>(
+  abilityScores: Readonly<Partial<Record<Ability, number>>>,
+  newClass: New,
+  currentClasses: readonly Current[]
+): Array<New | Current> {
+  return [newClass, ...currentClasses.filter((entry) => entry.id !== newClass.id)].filter(
+    (entry) => !meetsMulticlassMinimums(abilityScores, entry.multiclassPrerequisites)
+  );
+}
+
+/**
+ * Why a new class can't be taken, in sentences: "Wizard needs Intelligence 13; you have 10." for the new class, and
+ * "Your Fighter needs Strength 13 or Dexterity 13; you have Strength 10 and Dexterity 12." for one already taken.
+ */
+export function multiclassShortfallText(
+  abilityScores: Readonly<Partial<Record<Ability, number>>>,
+  newClass: MulticlassCandidate,
+  shortfalls: readonly MulticlassCandidate[]
+): string {
+  return shortfalls
+    .map((entry) => {
+      const minimums = entry.multiclassPrerequisites!;
+      const wanted = minimums.minimums
+        .map((minimum) => `${ABILITY_NAMES[minimum.ability]} ${minimum.minimum}`)
+        .join(minimums.mode === "any" ? " or " : " and ");
+      const score = (ability: Ability) => abilityScores[ability] ?? 0;
+      const have =
+        minimums.minimums.length === 1
+          ? String(score(minimums.minimums[0].ability))
+          : minimums.minimums
+              .map((minimum) => `${ABILITY_NAMES[minimum.ability]} ${score(minimum.ability)}`)
+              .join(" and ");
+      const who = entry.id === newClass.id ? entry.name : `Your ${entry.name}`;
+      return `${who} needs ${wanted}; you have ${have}.`;
+    })
+    .join(" ");
 }
 
 /** SRD multiclass prerequisites for taking a level in `classId`. A class with none declared is allowed. */

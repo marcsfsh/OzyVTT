@@ -37,6 +37,7 @@ export function actionSummaryParts(action: ContentActionSummary, all: readonly C
     );
   if (action.saveAbility !== null) parts.push(`DC ${action.saveDc} ${action.saveAbility.toUpperCase()} save`);
   for (const part of action.damage) parts.push(`${part.formula} ${part.type} damage`);
+  if (action.healing) parts.push(`Heals ${action.healing.formula}`);
   // The charge pool: a limited-use feature has no roll, so this line is its mechanic.
   if (action.usesLimit !== null)
     parts.push(

@@ -8,7 +8,7 @@ import {
   weaponAbilityModifierFrom,
   type RiderAbility
 } from "@vtt/rules-5e";
-import { catalogIdOf, type ActorAction, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
+import { catalogIdOf, MAX_ACTION_USES, type ActorAction, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
 
 /**
  * Actions synthesised from what a character carries: an equipped weapon's swing, an item's declared actions and
@@ -49,7 +49,7 @@ export function itemPool(item: CarriedItem, pool: string): string {
   return key.length <= 60 ? key : `${item.id.slice(0, Math.max(1, 59 - suffix.length))}-${suffix}`.slice(0, 60);
 }
 
-/** Authored uses to `ActionUsesSchema`, clamped to 1-20 like `resolvedUseLimit`; below 1 means no charges. An
+/** Authored uses to `ActionUsesSchema`, clamped to its range like `resolvedUseLimit`; below 1 means no charges. An
  *  item action carries the action form (with `recharge`), a cast the feature form (with `scaling`). A shared pool
  *  is counted per carried copy (`itemPool`); an unpooled use is already, by the action's own id. */
 function usesOf(
@@ -61,7 +61,7 @@ function usesOf(
   const limit = uses.limit ?? ("scaling" in uses ? scaledLimit(uses.scaling, definition) : undefined);
   if (limit === undefined || limit < 1) return undefined;
   return {
-    limit: Math.min(20, limit),
+    limit: Math.min(MAX_ACTION_USES, limit),
     per: uses.per,
     ...(uses.pool ? { pool: itemPool(item, uses.pool) } : {}),
     ...("recharge" in uses && uses.recharge !== undefined ? { recharge: uses.recharge } : {})
@@ -130,7 +130,12 @@ export function itemAction(
     damage: declared.damage.map((part) => ({ ...part })),
     // A Potion of Healing's 2d4 + 2.
     ...(declared.healing ? { healing: { ...declared.healing } } : {}),
-    ...(uses ? { uses } : {})
+    ...(uses ? { uses } : {}),
+    // A thrown flask takes one attack of the Attack action, not the whole action.
+    ...(declared.replacesAttack ? { replacesAttack: true } : {}),
+    // What drinking or applying it puts on the user (Antitoxin's Advantage, a coat of poison).
+    ...(declared.grants ? { grants: structuredClone(declared.grants) } : {}),
+    ...(declared.area ? { area: { ...declared.area } } : {})
   };
 }
 

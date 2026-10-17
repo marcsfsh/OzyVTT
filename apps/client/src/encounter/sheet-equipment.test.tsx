@@ -1,10 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { loadEquipment } from "@vtt/content-srd-5.2.1";
+import { loadEquipment, loadSpells } from "@vtt/content-srd-5.2.1";
 import { loadActorFixture } from "@vtt/test-fixtures";
 import { ActorDefinitionSchema } from "@vtt/schemas";
-import type { ContentEquipmentSummary, GmActor, GmView } from "@vtt/domain";
+import type { ContentEquipmentSummary, ContentSpellSummary, GmActor, GmView } from "@vtt/domain";
 
 // `command()` sends through `socket.timeout(ms).emit` with an error-first ack; routed to `socket.emit` here.
 vi.mock("../socket", () => {
@@ -34,18 +34,29 @@ const CATALOG: readonly ContentEquipmentSummary[] = loadEquipment().map((item) =
   weapon: item.weapon ?? null,
   armor: item.armor ?? null,
   appliesTo: item.appliesTo ?? null,
-  ...(item.damageTypeChoice ? { damageTypeChoice: [...item.damageTypeChoice] } : {})
+  ...(item.damageTypeChoice ? { damageTypeChoice: [...item.damageTypeChoice] } : {}),
+  ...(item.spellScroll ? { spellScroll: { ...item.spellScroll } } : {})
 }));
+/** The spell reference's fields a scroll's spell list reads. */
+const SPELLS = loadSpells().map((spell) => ({
+  id: spell.id,
+  name: spell.name,
+  level: spell.level,
+  school: spell.school,
+  classes: [...spell.classes]
+})) as unknown as readonly ContentSpellSummary[];
 
 const emit = socket.emit as unknown as ReturnType<typeof vi.fn>;
-/** Answers the catalog read, the sheet's derived numbers (`attunementSlots`), and every command with ok. */
-function serve(attunementSlots = 3) {
+/** Answers the catalog and spell reads, the sheet's action rows and derived numbers (`attunementSlots`), and every
+ *  command with ok. */
+function serve(attunementSlots = 3, actions: readonly unknown[] = []) {
   emit.mockImplementation((event: string, _payload: unknown, ack?: (result: unknown) => void) => {
     if (event === "content:equipment") ack?.({ ok: true, equipment: CATALOG, attribution: "SRD 5.2.1, CC BY 4.0." });
+    else if (event === "content:spells") ack?.({ ok: true, spells: SPELLS, attribution: "SRD 5.2.1, CC BY 4.0." });
     else if (event === "actor:available-actions")
       ack?.({
         ok: true,
-        actions: [],
+        actions,
         derived: {
           proficiencyBonus: 3,
           armorClass: 12,
@@ -164,6 +175,174 @@ describe("the sheet's inventory", () => {
     await user.click(screen.getByRole("button", { name: "Give" }));
     expect(sent("character:give-item")).toEqual([
       expect.objectContaining({ actorId: HERO, toActorId: FRIEND, itemId: "rope" })
+    ]);
+  });
+
+  it("names a magic arrow's kind, and picks up fired arrows only outside a fight", async () => {
+    serve();
+    const archer = hero();
+    archer.inventory = [
+      ...archer.inventory.map((item) => (item.id === "arrows-20" ? { ...item, ammunitionFired: 4 } : item)),
+      {
+        id: "ammunition-1",
+        name: "Ammunition, +1",
+        quantity: 5,
+        equipped: true,
+        attuned: false,
+        category: "ammunition",
+        baseId: "arrows-20"
+      }
+    ];
+    const { unmount } = render(<CharacterSheet actor={archer} role="player" onClose={() => {}} />, {
+      wrapper: ToastProvider
+    });
+    const magic = (await screen.findByText("Ammunition, +1")).closest(".sheet-inv-row") as HTMLElement;
+    expect(await within(magic).findByText("(Arrows)")).toBeTruthy();
+    expect((screen.getByText("Arrows (20)").closest(".sheet-inv-row") as HTMLElement).textContent).toContain("4 fired");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Pick up fired ammunition" }));
+    expect(sent("character:recover-ammunition")).toEqual([expect.objectContaining({ actorId: HERO })]);
+    unmount();
+    // In the fight they come back when it ends, so the sheet offers nothing yet.
+    const fighting = {
+      ...stateWith(archer),
+      combat: { active: true, rulesMode: "strict", ruleExceptions: {}, initiative: [{ actorId: HERO }] }
+    } as unknown as GmView;
+    render(<CharacterSheet actor={archer} role="gm" state={fighting} onClose={() => {}} />, {
+      wrapper: ToastProvider
+    });
+    expect(screen.queryByRole("button", { name: "Pick up fired ammunition" })).toBeNull();
+  });
+
+  it("asks which kind a piece of magic ammunition is, naming the weapons each kind fits", async () => {
+    serve();
+    const added = vi.fn();
+    render(<EquipmentPicker ownedCounts={new Map()} busy={false} onAdd={added} onClose={() => {}} />);
+    const user = userEvent.setup();
+    await user.type(await screen.findByRole("searchbox", { name: "Search equipment" }), "ammunition, +1");
+    await user.click(screen.getByRole("button", { name: "Add Ammunition, +1" }));
+    expect(screen.getByText(/only a weapon that fires that kind can shoot it/)).toBeTruthy();
+    const bolts = screen.getByRole("button", { name: "Make it Crossbow Bolts" }).closest("li") as HTMLElement;
+    expect(bolts.textContent).toContain("Bolts for a Hand Crossbow, Light Crossbow or Heavy Crossbow");
+    await user.click(screen.getByRole("button", { name: "Make it Crossbow Bolts" }));
+    expect(added).toHaveBeenCalledWith(expect.objectContaining({ id: "ammunition-1" }), "crossbow-bolts-20");
+  });
+
+  it("asks which spell a Spell Scroll bears, from the levels it can hold", async () => {
+    serve();
+    const added = vi.fn();
+    render(<EquipmentPicker ownedCounts={new Map()} busy={false} onAdd={added} onClose={() => {}} />);
+    const user = userEvent.setup();
+    await user.type(await screen.findByRole("searchbox", { name: "Search equipment" }), "spell scroll (level 1)");
+    await user.click(screen.getByRole("button", { name: "Add Spell Scroll (Level 1)" }));
+    const step = screen.getByRole("dialog", { name: "Choose the spell on Spell Scroll (Level 1)" });
+    // Level 1 only: no cantrip, and the spell lists say who can read it.
+    expect(await within(step).findByRole("button", { name: "Put Magic Missile on the scroll" })).toBeTruthy();
+    expect(within(step).queryByRole("button", { name: "Put Fire Bolt on the scroll" })).toBeNull();
+    const missile = within(step).getByRole("button", { name: "Put Magic Missile on the scroll" }).closest("li")!;
+    expect(missile.textContent).toContain("Level 1 · Evocation · Sorcerer, Wizard");
+    await user.click(within(step).getByRole("button", { name: "Put Magic Missile on the scroll" }));
+    expect(added).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "spell-scroll-level-1" }),
+      undefined,
+      "magic-missile"
+    );
+  });
+
+  it("names a scroll's spell on its row, and asks for one on a scroll that has none", async () => {
+    serve();
+    const reader = hero();
+    reader.inventory = [
+      { id: "spell-scroll", name: "Spell Scroll", quantity: 1, equipped: false, attuned: false, spellId: "fireball" },
+      {
+        id: "spell-scroll-2",
+        recordId: "spell-scroll",
+        name: "Spell Scroll",
+        quantity: 1,
+        equipped: false,
+        attuned: false
+      }
+    ];
+    render(<CharacterSheet actor={reader} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    const [bearing, blank] = screen
+      .getAllByText("Spell Scroll")
+      .map((name) => name.closest(".sheet-inv-row") as HTMLElement);
+    expect(await within(bearing).findByText("(Fireball)")).toBeTruthy();
+    expect(within(bearing).queryByRole("button", { name: "Choose its spell" })).toBeNull();
+    const user = userEvent.setup();
+    await user.click(await within(blank).findByRole("button", { name: "Choose its spell" }));
+    const step = screen.getByRole("dialog", { name: "Choose the spell on Spell Scroll" });
+    // Any level: the chips narrow the list.
+    await user.click(within(step).getByRole("button", { name: "Level 3" }));
+    expect(within(step).queryByRole("button", { name: "Put Magic Missile on the scroll" })).toBeNull();
+    await user.click(within(step).getByRole("button", { name: "Put Fireball on the scroll" }));
+    expect(sent("character:set-inventory").at(-1)).toMatchObject({
+      actorId: HERO,
+      item: { id: "spell-scroll-2", spellId: "fireball" }
+    });
+  });
+
+  it("casts a scroll's spell on the player's turn with the spell's own choices", async () => {
+    // The server's row for a scroll of Chromatic Orb: an attack whose caster picks the damage type.
+    serve(3, [
+      {
+        id: "item-spell-scroll-read",
+        name: "Cast Chromatic Orb (Spell Scroll)",
+        activation: "action",
+        available: true,
+        violations: [],
+        usesRemaining: null,
+        componentsRemaining: null,
+        description: "Read the scroll to cast Chromatic Orb.",
+        attackBonus: 5,
+        reachFeet: null,
+        rangeFeet: 90,
+        rangeNormalFeet: null,
+        attackCount: null,
+        saveAbility: null,
+        saveDc: null,
+        damage: [{ formula: "3d8", type: "acid" }],
+        usesLimit: null,
+        usesPer: null,
+        usesPool: null,
+        requiresEffectTag: null,
+        multiattack: null,
+        reaction: null,
+        healing: null,
+        targeting: "single",
+        darts: null,
+        damageTypes: ["acid", "cold", "fire", "lightning", "poison", "thunder"]
+      }
+    ]);
+    const reader = hero();
+    const myTurn = {
+      ...stateWith(reader),
+      revision: 3,
+      combat: {
+        active: true,
+        rulesMode: "strict",
+        ruleExceptions: {},
+        turnActorId: HERO,
+        playerDamageMode: "proposal",
+        pendingSaves: [],
+        initiative: [
+          { actorId: HERO, name: "Aria" },
+          { actorId: FRIEND, name: "Brann" }
+        ]
+      }
+    } as unknown as GmView;
+    render(<CharacterSheet actor={reader} role="player" state={myTurn} onClose={() => {}} />, {
+      wrapper: ToastProvider
+    });
+    await userEvent.setup().click(await screen.findByRole("button", { name: /Cast Chromatic Orb/ }));
+    const picker = screen.getByRole("group", { name: "Targets for Cast Chromatic Orb (Spell Scroll)" });
+    const pick = within(picker).getByRole("combobox", { name: "Damage type" }) as HTMLSelectElement;
+    expect([...pick.options].map((option) => option.value)).toEqual([
+      "acid",
+      "cold",
+      "fire",
+      "lightning",
+      "poison",
+      "thunder"
     ]);
   });
 });

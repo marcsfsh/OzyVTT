@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type {
+  AbilityId,
   ActionResolution,
   AnnotationPoint,
   AnnotationShapeKind,
@@ -24,19 +25,28 @@ export type TargetingTemplate = Readonly<{
 export type TargetingSession = Readonly<{
   action: ContentActionSummary;
   attackerId: string;
-  mode: "single" | "multi" | "template";
+  /** "none": no target to pick (Search, Study), only the skill it is made with. */
+  mode: "single" | "multi" | "template" | "none";
   selected: readonly string[];
   template: TargetingTemplate | null;
   /** The spell slot a spell is cast with, sent with every resolve of this session. */
   slotLevel?: number;
+  /** How much of its pool an action whose user picks the cost spends (Lay on Hands' points). */
+  spend?: number;
   /** A darts action's darts (Magic Missile at this slot) and how many each selected target takes. */
   darts?: Readonly<{ total: number; counts: Readonly<Record<string, number>> }>;
   /** The damage type picked for an action whose caster chooses one (Chromatic Orb). */
   damageType?: NonNullable<ContentActionSummary["damageTypes"]>[number];
+  /** The skill a check action is made with (Search, Influence); absent, Escape a Grapple uses the better one. */
+  skill?: string;
+  /** The ability a cast chooses (Hex); it is not rolled until one is chosen. */
+  ability?: AbilityId;
 }>;
 
 let session: TargetingSession | null = null;
 let result: ActionResolution | null = null;
+/** The previewed attack's die was typed from a physical die, so its reroll is typed too. */
+let typedPreview = false;
 let busy = false;
 /** A strict-mode rejection awaiting the GM's call (ADR-0020); here so any surface can show the dialog. */
 let blockedPrompt: {
@@ -67,9 +77,14 @@ export function beginTargeting(
 ) {
   const area = action.area;
   const dartTotal = dartsAtSlot ?? action.darts;
+  // A check action starts on its usual skill; Escape a Grapple starts on the better of its two, the server's pick.
+  const usualSkill = action.id === "escape-grapple" ? undefined : action.checkSkills?.[0]?.id;
   const slot = {
     ...(slotLevel !== undefined ? { slotLevel } : {}),
-    ...(dartTotal !== undefined ? { darts: { total: dartTotal, counts: {} } } : {})
+    ...(dartTotal !== undefined ? { darts: { total: dartTotal, counts: {} } } : {}),
+    ...(usualSkill !== undefined ? { skill: usualSkill } : {}),
+    // A picked cost starts at one; the picker raises it.
+    ...(action.useCost === "chosen" ? { spend: 1 } : {})
   };
   if (area) {
     // Map the SRD area shape onto a drawable annotation shape (sphere/emanation → circle, cube → square).
@@ -89,17 +104,23 @@ export function beginTargeting(
     session = {
       action,
       attackerId,
-      mode: action.attackBonus !== null || action.targeting === "single" ? "single" : "multi",
+      mode:
+        action.attackBonus !== null || action.targeting === "single"
+          ? "single"
+          : action.targeting === "none"
+            ? "none"
+            : "multi",
       selected: [],
       template: null,
       ...slot
     };
   }
   result = null;
+  typedPreview = false;
   emit();
 }
 export function toggleTarget(actorId: string) {
-  if (!session || session.mode === "template") return;
+  if (!session || session.mode === "template" || session.mode === "none") return;
   const dropping = session.selected.includes(actorId);
   session =
     session.mode === "single"
@@ -121,6 +142,28 @@ export function setDamageType(damageType: string) {
   session = { ...session, damageType: picked };
   emit();
 }
+/** Picks the skill a check action is made with; undefined lets Escape a Grapple use the better one. */
+export function setCheckSkill(skill: string | undefined) {
+  if (!session) return;
+  if (skill !== undefined && !session.action.checkSkills?.some((entry) => entry.id === skill)) return;
+  const { skill: _previous, ...rest } = session;
+  session = skill === undefined ? rest : { ...rest, skill };
+  emit();
+}
+/** Picks the ability a cast chooses (Hex). */
+export function setChosenAbility(ability: AbilityId) {
+  if (!session?.action.choosesAbility) return;
+  session = { ...session, ability };
+  emit();
+}
+/** Whether the session has what its Roll needs: its targets or placed area, and a chosen ability for a cast that takes
+ *  one. */
+export function targetingReady(picking: TargetingSession): boolean {
+  if (picking.action.choosesAbility && picking.ability === undefined) return false;
+  if (picking.mode === "template") return Boolean(picking.template?.placed);
+  if (picking.mode === "none") return true;
+  return picking.selected.length > 0;
+}
 /** Sets how many darts a selected target takes, within the darts the action has left to assign. */
 export function setTargetDarts(actorId: string, count: number) {
   if (!session?.darts || !session.selected.includes(actorId)) return;
@@ -140,6 +183,12 @@ export function setTemplatePlacement(origin: AnnotationPoint, target: Annotation
     emit();
   }
 }
+/** How much of its pool the action being targeted spends (Lay on Hands' points). */
+export function setTargetingSpend(spend: number) {
+  if (!session || session.action.useCost !== "chosen") return;
+  session = { ...session, spend };
+  emit();
+}
 export function clearTargeting() {
   if (session !== null || blockedPrompt !== null) {
     session = null;
@@ -149,6 +198,7 @@ export function clearTargeting() {
 }
 export function setTargetingResult(next: ActionResolution | null) {
   result = next;
+  if (next === null) typedPreview = false;
   emit();
 }
 export function clearBlockedPrompt() {
@@ -166,14 +216,12 @@ export type ResolveOptions = Readonly<{
   override?: { reason: string };
   /** false previews the attack roll (no apply); the confirming call passes commit:true. Attacks default to preview. */
   commit?: boolean;
-  /** The answerer's advantage/disadvantage choice for the attack d20 (re-previewing). */
+  /** The GM's forced Advantage or Disadvantage for the attack d20; the server ignores a player's. */
   rollMode?: "advantage" | "disadvantage" | "normal";
-  /** A confirmed or hand-rolled natural d20, used instead of rolling. */
+  /** The face a physical d20 shows, used instead of the server's throw. */
   attackNatural?: number;
-  /** A hand-entered final total ("final total" manual mode), used as is against AC. */
-  attackTotal?: number;
-  /** Declares a natural 20 (crit) for the hand-entered-total path, where the natural die is unknown. */
-  critical?: boolean;
+  /** Throw the previewed d20 again: Heroic Inspiration for a player, free for the GM. */
+  reroll?: boolean;
   /** How far Push mastery shoves on the confirmed hit (0 declines); absent pushes the full distance. */
   pushFeet?: number;
   /** Extras the confirmed hit carries (Sneak Attack, a smite), from the preview's offers. */
@@ -186,38 +234,42 @@ export function resolveTargeting(
   opts: ResolveOptions = {}
 ) {
   if (!session || busy) return;
-  const { attackerId, action, mode, selected, template, slotLevel, darts, damageType } = session;
-  // A single-target attack previews first (commit: false) so the result card can offer Adv/Disadv, a
-  // typed d20 and Confirm. Templates, multi-target and save/utility actions resolve straight through.
-  // An explicit `commit` in opts wins (the Confirm tap).
+  const { attackerId, action, mode, selected, template, slotLevel, spend, darts, damageType, skill, ability } = session;
+  // A single-target attack previews first (commit: false) so the result card can offer Confirm, and the
+  // server holds the die for it. Templates, multi-target and save/utility actions resolve straight
+  // through. An explicit `commit` in opts wins (the Confirm tap).
   const isAttack = action.attackBonus !== null && mode === "single";
   const commit = opts.commit ?? !isAttack;
   const extra = {
     ...(opts.override ? { override: opts.override } : {}),
     ...(opts.rollMode ? { rollMode: opts.rollMode } : {}),
     ...(opts.attackNatural !== undefined ? { attackNatural: opts.attackNatural } : {}),
-    ...(opts.attackTotal !== undefined ? { attackTotal: opts.attackTotal } : {}),
-    ...(opts.critical !== undefined ? { critical: opts.critical } : {}),
+    ...(opts.reroll ? { reroll: true } : {}),
     ...(opts.pushFeet !== undefined ? { pushFeet: opts.pushFeet } : {}),
     ...(opts.hitOptions && opts.hitOptions.length > 0 ? { hitOptions: [...opts.hitOptions] } : {}),
     ...(slotLevel !== undefined ? { slotLevel } : {}),
+    ...(spend !== undefined ? { spend } : {}),
     ...(damageType !== undefined ? { damageType } : {}),
+    ...(skill !== undefined ? { skill } : {}),
+    ...(ability !== undefined ? { ability } : {}),
     commit,
     ...(revision !== undefined ? { expectedRevision: revision } : {})
   };
   const payload =
-    mode === "template"
-      ? template?.placed
-        ? {
-            actorId: attackerId,
-            actionId: action.id,
-            template: { shape: template.shape, origin: template.placed.origin, target: template.placed.target },
-            ...extra
-          }
-        : null
-      : selected.length > 0
-        ? { actorId: attackerId, actionId: action.id, targetIds: dartTargetIds(selected, darts), ...extra }
-        : null;
+    mode === "none"
+      ? { actorId: attackerId, actionId: action.id, ...extra }
+      : mode === "template"
+        ? template?.placed
+          ? {
+              actorId: attackerId,
+              actionId: action.id,
+              template: { shape: template.shape, origin: template.placed.origin, target: template.placed.target },
+              ...extra
+            }
+          : null
+        : selected.length > 0
+          ? { actorId: attackerId, actionId: action.id, targetIds: dartTargetIds(selected, darts), ...extra }
+          : null;
   if (!payload) return;
   busy = true;
   blockedPrompt = null;
@@ -227,6 +279,9 @@ export function resolveTargeting(
     // A preview keeps the session for re-rolls or confirm; a committed resolve ends it.
     if (response.ok && response.resolution) {
       result = response.resolution;
+      // A typed die stays typed until a reroll the server throws (the GM's) replaces it.
+      if (response.resolution.preview)
+        typedPreview = opts.attackNatural !== undefined ? true : opts.reroll ? false : typedPreview;
       if (!response.resolution.preview) session = null;
     }
     // Overridable rejection: keep the session (same targets) and offer the audited override; the retry
@@ -283,6 +338,14 @@ export function useTargetingResult() {
     subscribe,
     () => result,
     () => result
+  );
+}
+/** Whether the previewed attack's die was typed from a physical die. */
+export function useTargetingTyped() {
+  return useSyncExternalStore(
+    subscribe,
+    () => typedPreview,
+    () => typedPreview
   );
 }
 export function useTargetingBusy() {

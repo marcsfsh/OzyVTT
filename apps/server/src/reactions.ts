@@ -3,6 +3,7 @@ import type { RandomSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { requireGm, type Initiator } from "./authorization.js";
+import { releaseHeldRoll } from "./held-rolls.js";
 import { adjustableActor, applyDamageDetailed, halvedDamageParts, type DamageInput } from "./hit-points.js";
 import { addEffect, makeEffect, type EffectNarration } from "./effects.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "./action-resolution.js";
@@ -52,16 +53,24 @@ export type ReactionOutcome = Readonly<{
   events: readonly EffectNarration[];
 }>;
 
-/** Preview/confirm options for a strike that rolls an attack (an opportunity attack, Retaliation). */
+/** Preview/confirm options for a strike that rolls an attack (an opportunity attack, Retaliation). The strike's d20 is
+ *  held on the prompt between a preview and its confirm (ADR-0012). */
 export type OpportunityAttackOptions = Readonly<{
   commit?: boolean;
+  /** The GM's forced mode; a player's is never passed. */
   rollMode?: "advantage" | "disadvantage" | "normal";
+  /** A typed d20, already checked against the table's setting. */
   attackNatural?: number;
+  /** Throw the held d20 again: Heroic Inspiration for a player, free for the GM. */
+  reroll?: boolean;
   /** Push mastery's chosen distance on a hit (0 declines). */
   pushFeet?: number;
   /** The extras chosen for the hit on its preview (Sneak Attack). */
   hitOptions?: ResolveInput["hitOptions"];
 }>;
+
+/** The key a reaction's strike holds its d20 under. */
+export const reactionHoldKey = (reactionId: string) => `reaction:${reactionId}`;
 
 /** What every answer path reads: the prompt, who answers it, and how to close it. */
 type Answer = Readonly<{
@@ -70,6 +79,7 @@ type Answer = Readonly<{
   pending: PendingReaction;
   reactor: LiveActor;
   use: boolean;
+  scope: Initiator;
   deps: ReactionAnswerDependencies;
   base: Pick<ReactionOutcome, "actorId" | "actorName" | "actionName" | "sourceName" | "proposedDamage" | "kind">;
   /** Drops the prompt; `markUsed` also spends the reactor's reaction. */
@@ -115,6 +125,7 @@ export function answerReaction(
     pending,
     reactor,
     use,
+    scope,
     deps,
     base: {
       actorId: reactor.id,
@@ -228,9 +239,10 @@ function answerStrike(
   actionId: string | undefined,
   options: OpportunityAttackOptions
 ): ReactionOutcome {
-  const { state, commandId, pending, reactor, use, deps, base, clearPrompt } = answer;
+  const { state, commandId, pending, reactor, use, scope, deps, base, clearPrompt } = answer;
   if (!use) {
     clearPrompt(false);
+    releaseHeldRoll(state, reactionHoldKey(pending.id));
     return { ...base, used: false, appliedDamage: 0, events: [] };
   }
   const struck = pending.targetActorId
@@ -283,6 +295,10 @@ function answerStrike(
       override: null,
       commit,
       attackNatural: options.attackNatural,
+      ...(options.attackNatural !== undefined ? { typedFace: true } : {}),
+      // The strike's d20 is held on its prompt between a preview and the confirm.
+      holdKey: reactionHoldKey(pending.id),
+      ...(options.reroll === true ? { reroll: true } : {}),
       // The resolver can't infer how the attack was made from the action, so announce it for `attack-kind-is` riders.
       attackKinds: pending.kind === "leaves-reach" ? ["reaction", "opportunity"] : ["reaction"],
       ...(options.pushFeet !== undefined ? { pushFeet: options.pushFeet } : {}),
@@ -292,6 +308,9 @@ function answerStrike(
       random: deps.random,
       newRollId: deps.newRollId,
       gmSessionId: deps.gmSessionId,
+      // The answerer's own: a player's reroll spends their character's Heroic Inspiration.
+      initiatorRole: scope.role,
+      ...(scope.role === "player" ? { initiatorSessionId: scope.sessionId } : {}),
       now: deps.now,
       definition,
       resolveDefinition: deps.resolveDefinition,
@@ -473,4 +492,5 @@ export function dismissReaction(state: GameState, reactionId: string, scope: Ini
     ...state.combat,
     pendingReactions: state.combat.pendingReactions.filter((entry) => entry.id !== reactionId)
   };
+  releaseHeldRoll(state, reactionHoldKey(reactionId));
 }

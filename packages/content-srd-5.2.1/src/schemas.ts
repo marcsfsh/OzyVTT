@@ -417,9 +417,19 @@ export const EquipmentReferenceSchema = z
       .object({ kind: AmmunitionKindSchema, count: z.number().int().min(1).max(100) })
       .strict()
       .optional(),
+    /** A Spell Scroll: each carried copy bears one spell, of a level in this range, picked when it is added
+     *  (`InventoryItem.spellId`). Reading it casts that spell at its level, with the scroll's DC and attack bonus. */
+    spellScroll: z
+      .object({ minLevel: z.number().int().min(0).max(9), maxLevel: z.number().int().min(0).max(9) })
+      .strict()
+      .refine((range) => range.minLevel <= range.maxLevel, { message: "A scroll's lowest level is above its highest." })
+      .optional(),
     /** "The GM chooses the type": the types the GM may pick for this item's one granted resistance, which then
      *  replaces the printed default in `grants.damageResistances` for that carried copy. */
     damageTypeChoice: z.array(DamageTypeSchema).min(2).max(13).optional(),
+    /** Armor of Vulnerability's curse: while attuned, worn or not, Vulnerability to every type in `damageTypeChoice`
+     *  but the one it resists. */
+    vulnerableToOtherChoices: z.boolean().optional(),
     /** Feats granted while active, depth 1. Nothing has `grants.items`, so a grant cycle cannot be expressed. */
     grantsFeatIds: z.array(ContentIdSchema).max(4).default([]),
 
@@ -446,6 +456,20 @@ export const EquipmentReferenceSchema = z
           message: "A chosen damage type replaces one granted resistance: grant exactly one, from the choices."
         });
     }
+    // A scroll is read once: reading it uses it up.
+    if (item.spellScroll && item.consumedOnUse !== true)
+      context.addIssue({
+        code: "custom",
+        path: ["spellScroll"],
+        message: "A Spell Scroll crumbles once it is read: it must be used up on use."
+      });
+    // The vulnerability is a curse's, and "the other choices" needs choices to be the other of.
+    if (item.vulnerableToOtherChoices && (!item.damageTypeChoice || !item.cursed))
+      context.addIssue({
+        code: "custom",
+        path: ["vulnerableToOtherChoices"],
+        message: "Vulnerability to the other choices needs a cursed item whose resistance the GM chooses."
+      });
     // Enforced on the item carrier only: the identical rider on a feat is valid.
     item.modifiers.forEach((modifier, index) => {
       if (ITEM_REFUSED_MODIFIER_TYPES.includes(modifier.type)) {

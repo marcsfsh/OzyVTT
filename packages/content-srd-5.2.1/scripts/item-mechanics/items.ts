@@ -6,7 +6,7 @@
  * stays prose for a reason worth keeping, a comment in its section says why.
  */
 import type { DamageType } from "@vtt/schemas";
-import type { ItemMechanicsModule } from "./overlay.js";
+import type { ItemMechanics, ItemMechanicsModule } from "./overlay.js";
 
 /** The d10 table Armor of Resistance and Ring of Resistance roll on for their type. */
 const RESISTANCE_TABLE = [
@@ -97,20 +97,21 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // Metal Shell (timed immunity, once per dawn) is not authored: a standing immunity grant would be permanent.
   "armor-of-invulnerability": { grants: { damageResistances: ["bludgeoning", "piercing", "slashing"] } },
 
-  // The curse alone: attuning locks the armor on (SRD: attunement to a cursed item can't be ended voluntarily).
-  // The resistance and the two vulnerabilities depend on a type the GM picks per copy, so they stay prose.
-  "armor-of-vulnerability": { cursed: true },
+  // Resistance to the type the GM picks per copy (bludgeoning until then), and the curse: attuning locks the armor
+  // on and leaves Vulnerability to the other two while the curse holds, worn or not.
+  "armor-of-vulnerability": {
+    cursed: true,
+    grants: { damageResistances: ["bludgeoning"] },
+    damageTypeChoice: ["bludgeoning", "piercing", "slashing"],
+    vulnerableToOtherChoices: true
+  },
 
   // Kept as the curse alone: the SRD item is a trap, and the attunement lock is what springs it. The GM
   // applies the rest from the description, since neither half is expressible: resistance to ranged-weapon
   // damage (resistance is by damage type, not source) and the redirect of nearby ranged attacks.
   "shield-of-missile-attraction": { cursed: true },
 
-  /**
-   * The Perception half is gated on `ability-is: ["wis"]`, not `skill-is`: the server's Search check
-   * carries no skill, so a skill gate would never fire. This also applies to Searches the SRD would
-   * call Insight, Medicine or Survival.
-   */
+  // Advantage on Initiative and on Wisdom (Perception) checks: a sheet roll, Search or the GM's call made with Perception.
   "sentinel-shield": {
     modifiers: [
       { type: "roll-mode", roll: "initiative", mode: "advantage" },
@@ -118,7 +119,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         type: "roll-mode",
         roll: "check",
         mode: "advantage",
-        when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["wis"] }]
+        when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["perception"] }]
       }
     ]
   },
@@ -132,8 +133,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   /**
    * Ammunition has no weapon block, so its riders are bearer-scoped; `weapon-property-is: ammunition`
-   * limits them to shots from a launcher, so a thrown dagger or a spell gets nothing. Not modeled: which
-   * launcher fires which kind of ammunition, and the piece losing its magic once it hits.
+   * limits them to shots from a launcher, so a thrown dagger or a spell gets nothing. The server applies them
+   * only to a shot drawn from this row, which the piece's kind (its bound base) ties to its launchers.
    */
   "ammunition-1": {
     modifiers: [
@@ -489,9 +490,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `rod-of-absorption` - needs per-copy storage and a spell slot refund.
 
   /**
-   * Initiative and Perception advantage, four at-will detection casts, and the Protective Aura's
-   * once-per-dawn counter (the ally buff is prose). The Perception half is gated on `ability-is:
-   * ["wis"]` because the server's Search check carries no skill, so `skill-is` would never fire.
+   * Initiative and Wisdom (Perception) advantage, four at-will detection casts, and the Protective Aura's
+   * once-per-dawn counter (the ally buff is prose).
    */
   "rod-of-alertness": {
     modifiers: [
@@ -500,7 +500,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         type: "roll-mode",
         roll: "check",
         mode: "advantage",
-        when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["wis"] }]
+        when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["perception"] }]
       }
     ],
     casts: [
@@ -543,8 +543,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // ---- The scroll ------------------------------------------------------------------------------
 
-  // `spell-scroll` - a per-copy template (spell, DC, attack bonus by level); one `spellId` would fix
-  // every scroll to one spell. Mint concrete scrolls in the homebrew editor.
+  // One spell per carried copy, of any level, picked when it is added; the DC and attack bonus come from
+  // the scroll table by the spell's level (the server's `scrolls.ts`).
+  "spell-scroll": { spellScroll: { minLevel: 0, maxLevel: 9 }, consumedOnUse: true },
 
   // ---- Staffs ----------------------------------------------------------------------------------
 
@@ -1079,13 +1080,13 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // ==== Carried wondrous items (slot wondrous), potions and oils ==================================
   //
   // Recurring limits:
-  //   - Consumed items cannot be authored: no `per` value means "never recharges", and an unpooled
-  //     action would be unlimited. This rules out every potion and oil and most dusts, beads and gems.
-  //   - `itemAction` keeps only `attack`, `save`, `damage` and `uses`; `onHit`, `grants` and the rest
-  //     are dropped, so an item action cannot apply a timed effect or an on-hit condition.
+  //   - A consumed item is `consumedOnUse`: each use of its actions takes one from the stack. An item with
+  //     several charges that it spends as it goes (beads, dust pinches) still has no `per` value to say so.
+  //   - `itemAction` keeps `attack`, `save`, `damage`, `healing`, `uses`, `grants`, `area` and
+  //     `replacesAttack`; `onHit` and the rest are dropped, so an item action cannot apply an on-hit condition.
   //   - An item's `effects` ignore `duration`, so "Resistance for 1 hour" would be permanent.
   //   - Spell records describe the spell's text, not one cast (see the wands section), and there
-  //     is no healing or temporary-HP rider.
+  //     is no temporary-HP rider.
   //   - One use spends one charge, and pools are capped at 20.
   //   - `ability-score` is refused on items.
   //   - Item actions only resolve inside an encounter. Outside one, the loose route rolls them and spends the
@@ -1404,11 +1405,36 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       { type: "check-bonus", amount: 1 },
       { type: "save-bonus", amount: 1 }
     ]
-  }
+  },
 
   // `universal-solvent` - consumed ounces.
   // `well-of-many-worlds` - a rolled 1d8-hour cooldown and planar travel.
   // `wind-fan` - each reuse risks tearing it; authoring the cast alone would remove the risk.
 
-  // Potions and oils: none authored. Each is consumed, which no `per` value can express.
+  // ---- Potions -----------------------------------------------------------------------------------
+
+  // Potions of Healing: each strength is its own row, and the common one is the gear Potion of Healing. SRD
+  // Potions: "Drinking a potion or administering it to another creature requires a Bonus Action."
+  "potion-of-healing-greater": healingPotion("Potion of Healing (greater)", "4d4 + 4"),
+  "potion-of-healing-superior": healingPotion("Potion of Healing (superior)", "8d4 + 8"),
+  "potion-of-healing-supreme": healingPotion("Potion of Healing (supreme)", "10d4 + 20")
+
+  // The other potions and the oils stay prose: their effects last an hour or more, which an effect can't count.
 };
+
+/** A potion that heals its printed dice when drunk or given to a creature within 5 feet, and is used up. */
+function healingPotion(name: string, formula: string): ItemMechanics {
+  return {
+    consumedOnUse: true,
+    actions: [
+      {
+        id: "drink",
+        name: `Drink ${name}`,
+        activation: "bonus-action",
+        description: `Drink it, or give it to a creature within 5 feet of you. The drinker regains ${formula} Hit Points.`,
+        damage: [],
+        healing: { formula }
+      }
+    ]
+  };
+}

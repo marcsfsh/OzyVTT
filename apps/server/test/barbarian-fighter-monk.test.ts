@@ -929,7 +929,7 @@ describe("Champion: Remarkable Athlete changes the initiative die", () => {
       deps(champion, [4, 18])
     );
     expect(escaped.check).toMatchObject({
-      skill: "Escape (Athletics/Acrobatics)",
+      skill: "Strength (Athletics)",
       naturalRoll: 18,
       dc: 20,
       success: true
@@ -1401,6 +1401,17 @@ describe("Monk: Superior Defense grants Resistance to everything but Force", () 
     expect(types).not.toContain("force");
     expect(effect.duration).toEqual({ type: "rounds", remaining: 10 });
   });
+
+  it("costs the 3 Focus Points it prints, and is refused with 2 left", () => {
+    // "At the start of your turn, you can expend 3 Focus Points".
+    const built = onTheTable(build(monkInput(20)));
+    built.hero.actionUses = { "focus-points": 17 };
+    use(built, "superior-defense");
+    expect(built.hero.actionUses["focus-points"]).toBe(20);
+    const short = onTheTable(build(monkInput(20)));
+    short.hero.actionUses = { "focus-points": 18 };
+    expect(() => use(short, "superior-defense")).toThrowError("Superior Defense has 2 left - this spends 3.");
+  });
 });
 
 describe("Monk: Quivering Palm rolls the 10d12 the SRD prints", () => {
@@ -1409,6 +1420,8 @@ describe("Monk: Quivering Palm rolls the 10d12 the SRD prints", () => {
     const resolution = use(built, "quivering-palm", [IDS.foe], [12, 12, 12, 12, 12, 12, 12, 12, 12, 12]);
     expect(resolution.damage).toEqual([{ formula: "10d12", type: "force", total: 120 }]);
     expect(resolution.damageTotal).toBe(120);
+    // "expend 4 Focus Points".
+    expect(built.hero.actionUses["focus-points"]).toBe(4);
   });
 });
 
