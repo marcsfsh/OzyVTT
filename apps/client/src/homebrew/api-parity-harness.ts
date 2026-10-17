@@ -895,13 +895,6 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
-    at: "multiclassPrerequisites.**",
-    types: ["class"],
-    reason:
-      "the builder checks these minimums when a class is taken, but no control authors the mode or the minimums list the rows sit in",
-    status: "gap"
-  },
-  {
     at: "levelTable[].classResources[].**",
     types: ["class", "subclass"],
     reason:
@@ -923,10 +916,10 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
-    at: "prerequisite.**",
+    at: "prerequisite.requires",
     types: ["feat"],
     reason:
-      "feat prerequisites have no controls — the ability-score rows, the requires slug and the printed text alike",
+      'the proficiency or feature slugs a feat requires ("martial", "spellcasting") have no control. The printed text carries them.',
     status: "gap"
   },
   {
