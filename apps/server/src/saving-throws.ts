@@ -16,17 +16,16 @@ import {
   type DiceResolution,
   type RandomSource
 } from "@vtt/rules-5e";
-import type { ActorDefinition } from "@vtt/schemas";
+import type { ActorDefinition, DamageDrain, ForcedPush } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { withoutSameHazard } from "./hazards.js";
 import { recordRoll as recordRollInHistory, rolledTerms } from "./roll-history.js";
 import { requireGm, type Initiator } from "./authorization.js";
-import { hiddenFrom } from "./vision/audience.js";
 import { holdsFeature } from "./class-features.js";
-import { areAllies } from "./creature-sides.js";
 import { holdRoll, releaseHeldRoll, rollHeldTest } from "./held-rolls.js";
 import { AURA_IMMUNE_TAG, auraOfAuthority, traitActionId } from "./statblock-traits.js";
 import { applyDamageDetailed, previewDamage, adjustableActor } from "./hit-points.js";
+import { holyWardClaim, inPaladinAura, tableHiddenCheck, type AuraContext } from "./paladin-auras.js";
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
 import {
@@ -48,6 +47,7 @@ import {
   type RollModeClaims
 } from "./equipment-derivation.js";
 import { countZoneDamage } from "./spell-zone-state.js";
+import { sizeAtMost, sizeRank } from "./resolution/context.js";
 
 export type SaveAnswerDependencies = Readonly<{
   random: RandomSource;
@@ -60,6 +60,10 @@ export type SaveAnswerDependencies = Readonly<{
   catalog?: EquipmentCatalog;
   /** Creature-to-creature distance, for the strike-back reaction the save's damage may open. */
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
+  /** Moves a token straight away from another on the live map (a failure's push); null when the map can't. */
+  pushToken?: (
+    input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number }>
+  ) => Readonly<{ value: number; unit: string }> | null;
 }>;
 export type SaveOutcome = Readonly<{
   success: boolean;
@@ -148,14 +152,7 @@ export function anySaveRollSources(derivation: EquipmentDerivation): RollModeCla
   return rollModeClaims(derivation, ["save"], "on-saving-throw");
 }
 
-/** What Aura of Protection reads: who stands where. Without `distanceFeet` (no map) only a Paladin's own aura is known
- *  to reach it. */
-export type AuraContext = Readonly<{
-  resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
-  distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
-  /** The item catalog, for the senses that decide who the table can see; absent means fewer senses. */
-  catalog?: EquipmentCatalog;
-}>;
+export type { AuraContext };
 
 /** A Paladin's own Aura of Protection bonus: its Charisma modifier, at least +1, while it holds the feature and isn't
  *  Incapacitated ("The aura is inactive while you have the Incapacitated condition"); null otherwise. */
@@ -176,23 +173,12 @@ export function auraOfProtection(
   context: AuraContext
 ): Readonly<{ amount: number; source: string }> | null {
   let best: { amount: number; source: string } | null = null;
-  const hidden = hiddenFrom(state, {
-    definition: context.resolveDefinition,
-    ...(context.catalog ? { catalog: context.catalog } : {})
-  });
+  const hidden = tableHiddenCheck(state, context);
   for (const paladin of state.actors) {
-    if (paladin.archived) continue;
     // Only a Paladin with the aura is asked about, so a table with none builds no sight.
     const definition = paladin.definitionId ? context.resolveDefinition(paladin.definitionId) : undefined;
     const amount = auraBonusOf(paladin, definition);
-    if (amount === null) continue;
-    if (hidden(paladin.id) && !hidden(target.id)) continue;
-    if (paladin.id !== target.id) {
-      if (!areAllies(paladin, target, context.resolveDefinition)) continue;
-      const reach = holdsFeature(definition, "aura-expansion", "Aura Expansion") ? 30 : 10;
-      const distance = context.distanceFeet?.(paladin.id, target.id) ?? null;
-      if (distance === null || distance > reach + 1e-6) continue;
-    }
+    if (amount === null || !inPaladinAura(state, paladin, definition, target, context, hidden)) continue;
     if (!best || amount > best.amount)
       best = {
         amount,
@@ -353,6 +339,12 @@ export function createPendingSaves(
     magical?: boolean;
     /** A success makes the target immune to this trait of its source for the fight (a ghast's Stench). */
     immuneOnSuccess?: boolean;
+    /** What the save's damage drains as it lands (Harm's lower Hit Point maximum). */
+    drain?: DamageDrain;
+    /** Where a failure pushes the creature (Thunderwave). */
+    failurePush?: ForcedPush;
+    /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
+    advantageAtSize?: PendingSave["advantageAtSize"];
     newSaveId: () => string;
     createdAt: number;
   }>
@@ -383,6 +375,9 @@ export function createPendingSaves(
     ...(input.extra?.zoneId !== undefined ? { zoneId: input.extra.zoneId } : {}),
     ...(input.magical ? { magical: true as const } : {}),
     ...(input.immuneOnSuccess ? { immuneOnSuccess: true as const } : {}),
+    ...(input.drain ? { drain: { ...input.drain } } : {}),
+    ...(input.failurePush ? { failurePush: { ...input.failurePush } } : {}),
+    ...(input.advantageAtSize ? { advantageAtSize: input.advantageAtSize } : {}),
     createdAt: input.createdAt
   }));
   // A re-cast against the same target replaces its older prompt.
@@ -462,6 +457,7 @@ export function applyFailureEffect(
       ...(onFail.rangeFeet !== undefined ? { rangeFeet: onFail.rangeFeet } : {}),
       ...(onFail.ongoingDamage ? { ongoingDamage: onFail.ongoingDamage } : {}),
       ...(onFail.magical ? { magical: true as const } : {}),
+      ...(onFail.armorClassBonus !== undefined ? { armorClassBonus: onFail.armorClassBonus } : {}),
       // What it does while it lasts (Bane's -1d4).
       modifiers: [...onFail.modifiers]
     }),
@@ -471,6 +467,42 @@ export function applyFailureEffect(
   return [
     { kind: "effect", text: `${target.name} is ${applied.name}.`, actorId: target.id, ...sourceOf(applied) },
     ...events
+  ];
+}
+
+/**
+ * A failure's push (Thunderwave's 10 feet, a dragon's Repulsion Breath "up to 60 feet"), the whole way, straight away
+ * from the save's source on the live map. Too big a creature stays put; a map that can't place it asks the GM to move
+ * the token.
+ */
+function pushOnFailure(
+  target: GameState["actors"][number],
+  pending: PendingSave,
+  deps: SaveAnswerDependencies
+): EffectNarration[] {
+  const push = pending.failurePush!;
+  const sourceId = pending.sourceActorId;
+  if (sourceId === null || sourceId === target.id) return [];
+  if (push.maxTargetSize && !sizeAtMost(target.size, push.maxTargetSize)) return [];
+  const moved = deps.pushToken?.({ actorId: target.id, awayFromActorId: sourceId, distanceFeet: push.feet }) ?? null;
+  if (moved === null)
+    return [
+      {
+        kind: "effect",
+        text: `${target.name} is pushed ${push.feet} feet straight away from ${pending.sourceName} - move the token.`,
+        actorId: target.id,
+        gmOnly: true
+      }
+    ];
+  const travelled = Math.round(moved.value * 10) / 10;
+  if (travelled <= 0) return [];
+  return [
+    {
+      kind: "effect",
+      text: `${target.name} is pushed ${travelled} ${moved.unit} straight away from ${pending.sourceName}.`,
+      actorId: target.id,
+      source: { actorId: sourceId, name: pending.sourceName }
+    }
   ];
 }
 
@@ -597,7 +629,12 @@ export function answerSave(
     );
     if (magicResistance === "advantage")
       sources.advantage.push({ source: "magic-resistance", label: "Magic Resistance" });
+    // "A Large or larger creature has Advantage on this save" (Ensnaring Strike).
+    if (pending.advantageAtSize && sizeRank(target.size) >= sizeRank(pending.advantageAtSize))
+      sources.advantage.push({ source: "size", label: `${pending.actionName}: its size` });
     sources.advantage.push(...traitSaveClaims(state, target, definition, deps));
+    const ward = holyWardClaim(state, target, pending.sourceActorId, deps.resolveDefinition);
+    if (ward) sources.advantage.push(ward);
     const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
     // A player's choice is never read: the rules count Advantage and Disadvantage, and only the GM may force a mode.
     const forced = scope.role === "gm" ? explicitRollMode : undefined;
@@ -761,7 +798,9 @@ export function answerSave(
       {
         amount: outcomeDamage,
         ...(outcomeParts !== null ? { parts: outcomeParts } : {}),
-        sourceActorId: pending.sourceActorId
+        sourceActorId: pending.sourceActorId,
+        // Harm drains only on a failed save; a Life Drain whose save halves the damage drains either way.
+        ...(pending.drain && (!success || pending.drain.failedSaveOnly !== true) ? { drain: pending.drain } : {})
       },
       { role: "gm" },
       {
@@ -781,29 +820,18 @@ export function answerSave(
     // A spell area that stops after so much damage counts it (Guardian of Faith).
     events.push(...countZoneDamage(state, pending.zoneId, appliedDamage, deps.catalog));
   }
+  // Where the target stands counts too: a Paladin's aura can ward off what the failure imposes.
   const immunities = {
     resolveDefinition: (definitionId: string) => deps.resolveDefinition(definitionId),
-    ...(deps.catalog ? { catalog: deps.catalog } : {})
+    ...(deps.catalog ? { catalog: deps.catalog } : {}),
+    ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
   };
   if (outcomeCondition) {
     // What the failure's effect links lands with the effect below; the rest (Prone, Exhaustion) stands alone.
     // setCondition narrates immunity skips; whether any condition landed is read back.
     const linked = new Set(pending.onFailEffect?.linkedConditionIds ?? []);
     for (const conditionId of pending.conditionIds.filter((id) => !linked.has(id)))
-      events.push(
-        ...setCondition(
-          state,
-          target.id,
-          conditionId,
-          true,
-          undefined,
-          { role: "gm" },
-          {
-            resolveDefinition: (definitionId) => deps.resolveDefinition(definitionId),
-            ...(deps.catalog ? { catalog: deps.catalog } : {})
-          }
-        )
-      );
+      events.push(...setCondition(state, target.id, conditionId, true, undefined, { role: "gm" }, immunities));
   }
   // A committed failed concentration check ends the sustained effects (SRD Concentration); tolerant of
   // effects already gone.
@@ -830,6 +858,7 @@ export function answerSave(
       actorId: target.id,
       ...(pending.sourceActorId ? { source: { actorId: pending.sourceActorId, name: pending.sourceName } } : {})
     });
+  if (!success && pending.failurePush) events.push(...pushOnFailure(target, pending, deps));
   // SRD Sleet Storm: a failure "and lose Concentration".
   if (!success && pending.breaksConcentration) events.push(...endConcentrationSustainedBy(state, target.id));
   if (outcomeCondition)

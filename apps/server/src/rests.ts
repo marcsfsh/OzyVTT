@@ -192,6 +192,8 @@ export function applyRest(
     // until the character chooses again.
     actor.choiceOverrides = clearOverrides(actor.choiceOverrides, "short");
     restorePactSlots(actor, definition);
+    // SRD Tireless: "Whenever you finish a Short Rest, your Exhaustion level, if any, also decreases by 1."
+    if (holdsFeature(definition, "tireless", "Tireless")) reduceExhaustion(actor);
     return events;
   }
   // Eight hours of sleep: Concentration ends and turn-measured effects lapse; "until ended" ones (a curse) stay.

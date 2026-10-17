@@ -5,6 +5,7 @@ import { holdsFeature } from "./class-features.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { expireEffectsAtTurnEnd, sourceOf, type EffectNarration } from "./effects.js";
 import { applyDamageDetailed, damageAdjustmentDetail, loseHitPoints, UNTYPED_DAMAGE } from "./hit-points.js";
+import { holyNimbusBurns } from "./paladin-auras.js";
 import { createPendingSaves } from "./saving-throws.js";
 import { traitsAtTurnEnd, traitsAtTurnStart } from "./trait-turns.js";
 
@@ -61,8 +62,42 @@ export function endOfTurn(state: GameState, actorId: string, events: EffectNarra
  */
 export function startOfTurn(state: GameState, actorId: string, events: EffectNarration[], deps: TurnStartDeps): void {
   heroicWarrior(state, actorId, events, deps);
+  temporaryHitPointsEachTurn(state, actorId, events);
   events.push(...traitsAtTurnStart(state, actorId, deps));
+  holyNimbus(state, actorId, events, deps);
   dealOngoingAt(state, actorId, "start", events, deps);
+}
+
+/** SRD Holy Nimbus: an enemy that starts its turn in the Paladin's aura takes its Radiant damage, which meets the
+ *  creature's defences like any damage. Unmeasurable on a map that can't say where creatures stand. */
+function holyNimbus(state: GameState, actorId: string, events: EffectNarration[], deps: TurnStartDeps): void {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) return;
+  for (const { paladin, amount } of holyNimbusBurns(state, actor, deps)) {
+    const { application, events: landed } = applyDamageDetailed(
+      state,
+      actor.id,
+      { amount, parts: [{ amount, type: "radiant" }], sourceName: paladin.name, sourceActorId: paladin.id },
+      { role: "gm" },
+      {
+        resolveDefinition: deps.resolveDefinition,
+        rollDie: deps.rollDie,
+        ...(deps.catalog ? { catalog: deps.catalog } : {}),
+        ...(deps.newId ? { newId: deps.newId } : {}),
+        ...(deps.now ? { now: deps.now } : {}),
+        ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
+      }
+    );
+    events.push(
+      {
+        kind: "damage",
+        text: `${actor.name} takes ${application.totalApplied} Radiant damage from ${paladin.name}'s Holy Nimbus${damageAdjustmentDetail(application)}.`,
+        actorId: actor.id,
+        source: { actorId: paladin.id, name: paladin.name }
+      },
+      ...landed
+    );
+  }
 }
 
 /** The ongoing damage (or hit point loss) that falls as `actorId`'s turn starts or ends: an effect it bears ("each of
@@ -96,6 +131,24 @@ function dealOngoingAt(
           })
         );
     }
+  }
+}
+
+/** SRD Heroism: "gains Temporary Hit Points equal to your spellcasting ability modifier at the start of each of its
+ *  turns". Temporary Hit Points don't add up, so the creature keeps the higher of what it has and the new. */
+function temporaryHitPointsEachTurn(state: GameState, actorId: string, events: EffectNarration[]): void {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor || actor.hp.current <= 0) return;
+  for (const effect of actor.effects) {
+    const amount = effect.temporaryHitPointsEachTurn;
+    if (amount === undefined || amount <= actor.hp.temporary) continue;
+    actor.hp = { ...actor.hp, temporary: amount };
+    events.push({
+      kind: "effect",
+      text: `${actor.name} gains ${amount} Temporary Hit Points (${effect.name}).`,
+      actorId,
+      ...sourceOf(effect)
+    });
   }
 }
 

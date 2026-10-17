@@ -3,7 +3,7 @@
  * riders already there (Divine Order, Blessed Strikes, Channel Divinity, the domain spell tiers) are
  * not restated here.
  */
-import type { ClassMechanicsModule } from "./overlay.js";
+import { potentSpellcasting, type ClassMechanicsModule } from "./overlay.js";
 
 export const cleric: ClassMechanicsModule = {
   features: {
@@ -21,6 +21,11 @@ export const cleric: ClassMechanicsModule = {
          */
         thaumaturge: { extraPicks: [{ offer: "class-cantrips", amount: 1 }] }
       }
+    },
+
+    // Sacred Flame is the SRD's one Cleric cantrip that deals damage.
+    "blessed-strikes": {
+      options: { "potent-spellcasting": { modifiers: [potentSpellcasting(["sacred-flame"])] } }
     },
 
     /**

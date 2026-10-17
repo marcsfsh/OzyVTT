@@ -5,10 +5,22 @@
  * A rider is authored only where a consumer reads it and produces the printed effect. Where an item
  * stays prose for a reason worth keeping, a comment in its section says why.
  */
-import type { DamageType } from "@vtt/schemas";
+import type { DamageType, Modifier } from "@vtt/schemas";
 import type { ItemMechanics, ItemMechanicsModule } from "./overlay.js";
 
 /** The d10 table Armor of Resistance and Ring of Resistance roll on for their type. */
+/** Extra damage when the weapon hits a creature of one of these types ("an extra 3d6 damage of the weapon's type if the
+ *  target is a Dragon"); with no `damageType` it is the weapon's own. */
+function versusTypes(formula: string, creatureTypes: string[], damageType?: DamageType): Modifier {
+  return {
+    type: "extra-damage",
+    formula,
+    ...(damageType ? { damageType } : {}),
+    doubleOnCritical: true,
+    when: [{ type: "on-hit" }, { type: "versus-creature-type", creatureTypes }]
+  };
+}
+
 const RESISTANCE_TABLE = [
   "acid",
   "cold",
@@ -33,7 +45,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //
   // Recurring limits:
   //   - `damage-bonus` is bounded to +/-10.
-  //   - `versus-creature-type` is inert: nothing sets `RiderContext.targetCreatureType`.
+  //   - `versus-creature-type` reads the target's stat block, so a character target never matches one.
   //   - `armor-class` is read in the standing pass, so it cannot be narrowed to a kind of attack.
   //   - An item's `grants.languages` reaches no reader.
   //
@@ -61,8 +73,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // Not modeled: the Reaction reducing forced movement.
   "dwarven-plate": { modifiers: [{ type: "armor-class", amount: 2 }] },
 
-  // "Considered trained with this armor" is not authored: nothing penalises untrained armor.
-  "elven-chain": { modifiers: [{ type: "armor-class", amount: 1 }] },
+  // "You are considered trained with this armor even if you lack training with Medium or Heavy armor": training with
+  // both weights while it is worn, since the chain is a Chain Shirt or Chain Mail.
+  "elven-chain": { grants: { armor: ["medium", "heavy"] }, modifiers: [{ type: "armor-class", amount: 1 }] },
 
   "glamoured-studded-leather": { modifiers: [{ type: "armor-class", amount: 1 }] },
 
@@ -120,6 +133,19 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         roll: "check",
         mode: "advantage",
         when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["perception"] }]
+      }
+    ]
+  },
+
+  // "Spell attack rolls have Disadvantage against you." The Advantage on saves against spells and other magical
+  // effects has no gate for a save's source and stays the GM's.
+  "spellguard-shield": {
+    modifiers: [
+      {
+        type: "roll-mode",
+        roll: "incoming-attack",
+        mode: "disadvantage",
+        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["spell"] }]
       }
     ]
   },
@@ -255,11 +281,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // Not modeled: 2d10 Radiant vs Fiends/Undead (creature-type gate) and the ally aura.
+  // Not modeled: the aura's Advantage on saves against spells for the wielder's allies.
   "holy-avenger": {
     modifiers: [
       { type: "attack-bonus", amount: 3 },
-      { type: "damage-bonus", amount: 3 }
+      { type: "damage-bonus", amount: 3 },
+      versusTypes("2d10", ["fiend", "undead"], "radiant")
     ]
   },
 
@@ -295,28 +322,52 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // The extra 2d6 vs Giants needs a creature-type gate and a "weapon's type" damage.
+  // The extra 2d6 of the weapon's type against a Giant; the Giant's save against Prone is not modeled.
   "giant-slayer": {
-    modifiers: [
-      { type: "attack-bonus", amount: 1 },
-      { type: "damage-bonus", amount: 1 }
-    ]
+    modifiers: [{ type: "attack-bonus", amount: 1 }, { type: "damage-bonus", amount: 1 }, versusTypes("2d6", ["giant"])]
   },
 
-  // The extra 3d6 vs Dragons needs a creature-type gate and a "weapon's type" damage.
+  // "The weapon deals an extra 3d6 damage of the weapon's type if the target is a Dragon."
   "dragon-slayer": {
     modifiers: [
       { type: "attack-bonus", amount: 1 },
-      { type: "damage-bonus", amount: 1 }
+      { type: "damage-bonus", amount: 1 },
+      versusTypes("3d6", ["dragon"])
     ]
   },
 
-  // Not modeled: +3 vs Constructs (creature-type gate) and the crit-only 7 Bludgeoning.
+  // +3 against a Construct, and 7 Bludgeoning more on a Critical Hit (14 against a Construct); a mace's damage is
+  // Bludgeoning, so a flat bonus carries it. Destroying a Construct at 25 Hit Points or fewer is not modeled.
   "mace-of-smiting": {
     modifiers: [
       { type: "attack-bonus", amount: 1 },
-      { type: "damage-bonus", amount: 1 }
+      { type: "damage-bonus", amount: 1 },
+      {
+        type: "attack-bonus",
+        amount: 2,
+        when: [{ type: "on-attack-roll" }, { type: "versus-creature-type", creatureTypes: ["construct"] }]
+      },
+      {
+        type: "damage-bonus",
+        amount: 2,
+        when: [{ type: "on-hit" }, { type: "versus-creature-type", creatureTypes: ["construct"] }]
+      },
+      { type: "damage-bonus", amount: 7, when: [{ type: "on-critical-hit" }] },
+      {
+        type: "damage-bonus",
+        amount: 7,
+        when: [{ type: "on-critical-hit" }, { type: "versus-creature-type", creatureTypes: ["construct"] }]
+      }
     ]
+  },
+
+  // "When you hit a Fiend or an Undead with this magic weapon, that creature takes an extra 2d6 Radiant damage." The
+  // save against destruction at 25 Hit Points or fewer is not modeled.
+  "mace-of-disruption": { modifiers: [versusTypes("2d6", ["fiend", "undead"], "radiant")] },
+
+  // "An extra 2d6 damage to any creature it hits", of the weapon's own type.
+  "vicious-weapon": {
+    modifiers: [{ type: "extra-damage", formula: "2d6", doubleOnCritical: true, when: [{ type: "on-hit" }] }]
   },
 
   // Not modeled: the thrown thunderclap area, Giant's Bane and Might of Giants (cross-item triggers).
@@ -347,11 +398,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Prose-only items:
   //   `javelin-of-lightning` - Lightning instead of Piercing, and a Line area.
-  //   `mace-of-disruption` - the extra Radiant needs a creature-type gate.
   //   `sun-blade`, `energy-bow` - deal Radiant/Force instead of the weapon's type; unbound until
   //       weapon-swing overrides exist. Energy Bow's arrow options are not expressible either.
-  //   `vicious-weapon` - extra damage "of the same type as the weapon" (`extra-damage` needs a type).
-  //   `spellguard-shield` - needs a "spell" attack kind and an "against spells" save gate.
   //   `thunderous-greatclub` - "your Strength is 20" is `ability-score`, refused on items; areas.
   //   `adamantine-armor` - no rider suppresses an incoming critical hit.
   //   `mithral-armor` - no rider removes a base armor's stealth disadvantage or Strength requirement.
@@ -378,8 +426,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //     damage, Magic Missile rolls one dart, Web always deals its fire damage, and Faerie Fire,
   //     Protection from Evil and Good and Ray of Enfeeblement gain an attack roll. Those casts are not
   //     authored.
-  //   - `spell-attack-bonus` has no reader (the overlay refuses it), and no "spell" attack kind is
-  //     ever announced.
+  //   - `spell-attack-bonus` lands on the bearer's spell attacks while the item is held.
 
   // ---- Rings -----------------------------------------------------------------------------------
 
@@ -579,14 +626,15 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // is multi-charge.
 
   /**
-   * The AC and save bonuses only. Not authored: Magic Missile and Ray of Enfeeblement (wrong cast
-   * effects), the spell attack bonus (no reader), the +2 Quarterstaff (no weapon block), the
-   * multi-charge spells, and Retributive Strike (damage from live charge count).
+   * The AC, save and spell attack bonuses. Not authored: Magic Missile and Ray of Enfeeblement (wrong cast
+   * effects), the +2 Quarterstaff (no weapon block), the multi-charge spells, and Retributive Strike (damage from
+   * live charge count).
    */
   "staff-of-power": {
     modifiers: [
       { type: "armor-class", amount: 2 },
-      { type: "save-bonus", amount: 2 }
+      { type: "save-bonus", amount: 2 },
+      { type: "spell-attack-bonus", amount: 2 }
     ]
   },
 
@@ -609,19 +657,21 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   /**
-   * The four zero-charge casts; 50 charges exceed the pool cap. Not authored: Protection from Evil and
-   * Good (bogus attack roll), the spell attack bonus, the +2 Quarterstaff, advantage on saves against
-   * spells, the multi-charge rows, Spell Absorption and Retributive Strike.
+   * The four zero-charge casts and the +2 to spell attack rolls; 50 charges exceed the pool cap. Not authored:
+   * Protection from Evil and Good (bogus attack roll), the +2 Quarterstaff, advantage on saves against spells, the
+   * multi-charge rows, Spell Absorption and Retributive Strike.
    */
   "staff-of-the-magi": {
+    modifiers: [{ type: "spell-attack-bonus", amount: 2 }],
     casts: [{ spellId: "arcane-lock" }, { spellId: "detect-magic" }, { spellId: "enlargereduce" }, { spellId: "light" }]
   },
 
   // `staff-of-the-python` - summoning a controlled creature is not expressible.
 
-  // The three one-charge properties on the 6-charge pool. Not authored: the spell attack bonus, the
+  // The three one-charge properties on the 6-charge pool and the +2 to spell attack rolls. Not authored: the
   // +2 Quarterstaff, the multi-charge spells.
   "staff-of-the-woodlands": {
+    modifiers: [{ type: "spell-attack-bonus", amount: 2 }],
     charges: { regain: "1d6", lastChargeRoll: true },
     casts: [
       { spellId: "animal-friendship", uses: { limit: 6, per: "long-rest", pool: "staff-of-the-woodlands-charges" } },
@@ -782,8 +832,11 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `wand-of-the-war-mage-1`, `wand-of-the-war-mage-2`, `wand-of-the-war-mage-3` - a spell attack
-  // bonus (no reader) and ignoring Half Cover on spell attacks (no "spell" attack kind).
+  // The bonus to spell attack rolls by rarity. Ignoring Half Cover on a spell attack is not authored: no rider sets
+  // aside the target's cover.
+  "wand-of-the-war-mage-1": { modifiers: [{ type: "spell-attack-bonus", amount: 1 }] },
+  "wand-of-the-war-mage-2": { modifiers: [{ type: "spell-attack-bonus", amount: 2 }] },
+  "wand-of-the-war-mage-3": { modifiers: [{ type: "spell-attack-bonus", amount: 3 }] },
 
   // `wand-of-web` - the spell record's 2d4 Fire would be dealt on every cast.
 
@@ -985,8 +1038,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // AC only. Preservation (save outcome, crumbles when spent) and spell-save advantage are not expressible.
   "scarab-of-protection": { modifiers: [{ type: "armor-class", amount: 1 }] },
 
-  // `talisman-of-pure-good`, `talisman-of-ultimate-evil` - spell attack bonus (no reader), touch damage
-  //     by creature type, and charges that destroy the item.
+  // The +2 to spell attack rolls. The touch damage by creature type and the charges that destroy a creature are not
+  // authored.
+  "talisman-of-pure-good": { modifiers: [{ type: "spell-attack-bonus", amount: 2 }] },
+  "talisman-of-ultimate-evil": { modifiers: [{ type: "spell-attack-bonus", amount: 2 }] },
   // `talisman-of-the-sphere` - Arcana advantage only against a Sphere of Annihilation, which the engine does not hold.
 
   // ---- Shoulders -------------------------------------------------------------------------------

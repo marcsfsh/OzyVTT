@@ -7,7 +7,11 @@ import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../s
 import { ContentLibrary } from "../src/content-library.js";
 import { effectiveActions } from "../src/effective-actions.js";
 import { startEncounter } from "../src/encounter.js";
-import { equipmentCatalogOf } from "../src/equipment-derivation.js";
+import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation.js";
+import { checkPlan } from "../src/ability-checks.js";
+import { applyDamageDetailed } from "../src/hit-points.js";
+import { saveRollSources } from "../src/saving-throws.js";
+import { currentSpeedFeet, specialSpeedsOf } from "../src/speed.js";
 
 // Species, backgrounds and origin feats as SRD 5.2.1 prints them (character-origins.md, feats.md), built
 // through the real builder against the shipped bundles.
@@ -409,5 +413,161 @@ describe("the Soldier's gaming set", () => {
     const tools = (built.startingInventory ?? []).filter((item) => item.id.startsWith("gaming-set-"));
     expect(tools.map((item) => item.id)).toEqual(["gaming-set-three-dragon-ante"]);
     expect(built.proficiencies?.tools).toContain("gaming-set-three-dragon-ante");
+  });
+});
+
+describe("species traits that act in play", () => {
+  /** The character in a fight against one foe, with its effective actions resolvable on its own turn. */
+  function table(definition: ActorDefinition) {
+    const state = GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [
+        {
+          id: IDS.foe,
+          name: "Foe",
+          kind: "monster",
+          visibility: "public",
+          hp: { current: 99, maximum: 99 },
+          armorClass: 5
+        }
+      ]
+    }) as GameState;
+    importActorDefinition(state, definition, IDS.hero, "public", catalog);
+    startEncounter(
+      state,
+      {
+        mapAssetId: IDS.map,
+        entries: [
+          { actorId: IDS.hero, score: 20 },
+          { actorId: IDS.foe, score: 10 }
+        ]
+      },
+      () => 1,
+      { width: 900, height: 600, calibration: null }
+    );
+    const hero = state.actors.find((actor) => actor.id === IDS.hero)!;
+    const derivation = () => deriveEquipment(hero, definition, catalog);
+    let command = 0;
+    const use = (actionId: string) =>
+      resolveDefinitionAction(
+        state,
+        effectiveActions(definition, hero, catalog).find((entry) => entry.id === actionId)!,
+        {
+          actorId: IDS.hero,
+          targetIds: [],
+          commandId: `50000000-0000-4000-8000-0000000003${String(++command).padStart(2, "0")}`
+        },
+        {
+          random: () => 4,
+          newRollId: () => `40000000-0000-4000-8000-0000000003${String(command).padStart(2, "0")}`,
+          gmSessionId: IDS.gmSession,
+          now: () => "2026-10-17T00:00:00.000Z",
+          definition,
+          catalog
+        }
+      );
+    return { state, hero, derivation, use };
+  }
+  const advantageLabels = (claims: { advantage: ReadonlyArray<{ label: string }> }) =>
+    claims.advantage.map((claim) => claim.label);
+
+  it("Dwarven Resilience, Fey Ancestry and Brave: Advantage on saves against Poisoned, Charmed and Frightened", () => {
+    for (const [speciesId, rows, conditionId, trait] of [
+      ["dwarf", [], "poisoned", "Dwarven Resilience"],
+      ["elf", elf("high-elf"), "charmed", "Fey Ancestry"],
+      ["halfling", [], "frightened", "Brave"]
+    ] as const) {
+      const { hero, derivation } = table(build(fighter(1, { speciesId, rows })));
+      expect(advantageLabels(saveRollSources(hero, "wis", derivation(), false, [conditionId]))).toEqual([
+        expect.stringContaining(trait)
+      ]);
+      expect(saveRollSources(hero, "wis", derivation()).advantage).toEqual([]);
+    }
+  });
+
+  it("Gnomish Cunning: Advantage on Intelligence, Wisdom and Charisma saves, and on no other", () => {
+    const { hero, derivation } = table(
+      build(
+        fighter(1, {
+          speciesId: "gnome",
+          rows: [
+            { level: 1, kind: "lineage", id: "rock-gnome" },
+            { level: 1, kind: "spellcasting-ability", id: "int", payload: { featureId: "gnome-lineage" } }
+          ]
+        })
+      )
+    );
+    for (const ability of ["int", "wis", "cha"] as const)
+      expect(advantageLabels(saveRollSources(hero, ability, derivation()))).toEqual([
+        expect.stringContaining("Gnomish Cunning")
+      ]);
+    expect(saveRollSources(hero, "dex", derivation()).advantage).toEqual([]);
+  });
+
+  it("Powerful Build: Advantage on the check to escape a grapple", () => {
+    const definition = build(
+      fighter(1, {
+        speciesId: "goliath",
+        rows: [
+          { level: 1, kind: "giant-ancestry", id: "clouds-jaunt", payload: { featureId: "goliath-giant-ancestry" } }
+        ]
+      })
+    );
+    const { hero, derivation } = table(definition);
+    const athletics = { ability: "str", skill: "athletics" } as const;
+    expect(checkPlan(hero, definition, derivation(), athletics, { stakes: ["grappled"] }).rollMode.mode).toBe(
+      "advantage"
+    );
+    expect(checkPlan(hero, definition, derivation(), athletics).rollMode.mode).toBe("normal");
+  });
+
+  it("Relentless Endurance: an Orc dropped to 0 stays at 1, once a Long Rest", () => {
+    const { state, hero } = table(build(fighter(1, { speciesId: "orc" })));
+    const hit = () =>
+      applyDamageDetailed(
+        state,
+        IDS.hero,
+        { amount: hero.hp.current, parts: [{ amount: hero.hp.current, type: "slashing" }] },
+        { role: "gm" },
+        { resolveDefinition: (id) => state.definitions.find((entry) => entry.id === id)?.definition }
+      );
+    const first = hit();
+    expect(hero.hp.current).toBe(1);
+    expect(first.events.map((event) => event.text)).toContain(
+      "Probe drops to 1 Hit Point instead (Relentless Endurance)."
+    );
+    hit();
+    expect(hero.hp.current).toBe(0);
+    expect(hero.conditions.map((condition) => condition.id)).toContain("unconscious");
+  });
+
+  it("Adrenaline Rush: a Bonus Action Dash and Temporary Hit Points equal to the Proficiency Bonus", () => {
+    const { hero, use } = table(build(fighter(1, { speciesId: "orc" })));
+    use("adrenaline-rush");
+    expect(hero.hp.temporary).toBe(2);
+    expect(hero.effects.map((effect) => effect.tags)).toEqual([["dashing"]]);
+  });
+
+  it("Draconic Flight gives a Fly Speed equal to Speed, and Large Form 10 more feet and Advantage on Strength checks", () => {
+    const dragon = table(
+      build(fighter(5, { speciesId: "dragonborn", rows: [{ level: 1, kind: "lineage", id: "red-dragon" }] }))
+    );
+    dragon.use("draconic-flight");
+    expect(specialSpeedsOf(dragon.hero, undefined, dragon.derivation()).fly).toBe(30);
+    const goliathDefinition = build(
+      fighter(5, {
+        speciesId: "goliath",
+        rows: [
+          { level: 1, kind: "giant-ancestry", id: "clouds-jaunt", payload: { featureId: "goliath-giant-ancestry" } }
+        ]
+      })
+    );
+    const goliath = table(goliathDefinition);
+    goliath.use("large-form");
+    expect(currentSpeedFeet(goliath.hero, goliath.derivation())).toBe(45);
+    expect(
+      checkPlan(goliath.hero, goliathDefinition, goliath.derivation(), { ability: "str", skill: "athletics" }).rollMode
+        .mode
+    ).toBe("advantage");
   });
 });

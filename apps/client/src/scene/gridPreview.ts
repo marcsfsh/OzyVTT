@@ -160,3 +160,35 @@ export function snapShapePreview(
     feet: cells * calibration.distancePerCell
   };
 }
+
+/**
+ * Mirror of the server's `templateOfArea`: an action's area keeps its own size ("a 20-foot-radius Sphere"), so a drag
+ * only places and points it. The shape snaps as a drawn one does, then reaches `sizeFeet` along the drag.
+ */
+export function sizedShapePreview(
+  calibration: GridCalibration,
+  shape: "circle" | "cone" | "line" | "square",
+  origin: { x: number; y: number },
+  target: { x: number; y: number },
+  sizeFeet: number
+): SnappedGeometry {
+  const cells = Math.max(1, Math.round(sizeFeet / calibration.distancePerCell));
+  const placed = snapShapePreview(calibration, shape, origin, target);
+  if (shape === "square") {
+    const start = imageToGridPreview(calibration, placed.origin);
+    const end = imageToGridPreview(calibration, placed.target);
+    const far = gridToImagePreview(calibration, {
+      column: start.column + (end.column < start.column ? -cells : cells),
+      row: start.row + (end.row < start.row ? -cells : cells)
+    });
+    return snapShapePreview(calibration, shape, placed.origin, far);
+  }
+  const dx = placed.target.x - placed.origin.x;
+  const dy = placed.target.y - placed.origin.y;
+  const length = Math.hypot(dx, dy) || 1;
+  const reach = cells * calibration.cellSizePx;
+  return snapShapePreview(calibration, shape, placed.origin, {
+    x: placed.origin.x + (dx / length) * reach,
+    y: placed.origin.y + (dy / length) * reach
+  });
+}

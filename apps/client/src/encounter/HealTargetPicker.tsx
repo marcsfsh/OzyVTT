@@ -63,8 +63,10 @@ export function HealTargetPicker({
     >
       <p className="heal-picker-ask">
         {several && heal.most < candidates.length
-          ? `Who regains hit points? Pick up to ${heal.most}.`
-          : "Who regains hit points?"}
+          ? `Choose up to ${heal.most} creatures to regain hit points.`
+          : several
+            ? "Choose the creatures who regain hit points."
+            : "Choose who regains hit points."}
       </p>
       <div className="heal-picker-targets" role="group" aria-label="Who regains hit points">
         {candidates.map((candidate) => (

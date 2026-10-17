@@ -170,7 +170,17 @@ export const sorcerer: ClassMechanicsModule = {
             activation: "bonus-action",
             description:
               "Draconic wings appear on your back for 1 hour or until you dismiss them (no action required). For the duration you have a Fly Speed of 60 feet. You regain the use on a Long Rest, or by spending 3 Sorcery Points.",
-            damage: []
+            damage: [],
+            grants: {
+              name: "Dragon Wings",
+              tags: ["dragon-wings"],
+              duration: { type: "manual" },
+              modifiers: [{ type: "special-speed", movement: "fly", feet: 60 }],
+              onEnd: [],
+              target: "self",
+              voidWhileIncapacitated: false,
+              concentration: false
+            }
           }
         ]
       },

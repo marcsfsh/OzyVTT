@@ -91,4 +91,36 @@ describe("picking how a creature moves", () => {
     expect(result.current.message).toBe("Asked the GM. Waiting for their call.");
     expect(result.current.blockedMove).toBeNull();
   });
+
+  it("stops saying the question waits once the GM has answered it", async () => {
+    command.mockReset();
+    command.mockResolvedValueOnce({
+      ok: false,
+      message: "It isn't Kesh's turn - moving now needs the GM's go-ahead.",
+      blocked: { rule: "movement.off-turn", message: "It isn't Kesh's turn.", overridable: true }
+    });
+    const { result, rerender } = renderHook(
+      ({ waitingAsks }: { waitingAsks: number }) =>
+        useMapCommands({
+          revision: 3,
+          size: { width: 500, height: 500 },
+          canMove: () => true,
+          drawing: { visibility: "public", visibleToActorId: null, color: "#ffffff" },
+          onShapeAdded: () => {},
+          waitingAsks
+        }),
+      { initialProps: { waitingAsks: 0 } }
+    );
+    await act(async () => {
+      await result.current.submitMove(HERO, { x: 75, y: 75 });
+    });
+    command.mockResolvedValueOnce({ ok: true, ran: false, askId: "a" });
+    await act(async () => {
+      await result.current.askAboutMove();
+    });
+    rerender({ waitingAsks: 1 });
+    expect(result.current.message).toBe("Asked the GM. Waiting for their call.");
+    rerender({ waitingAsks: 0 });
+    expect(result.current.message).toBe("");
+  });
 });

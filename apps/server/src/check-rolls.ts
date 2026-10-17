@@ -11,6 +11,7 @@ import {
 } from "./authorization.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
+import { wardedConditions } from "./paladin-auras.js";
 import { heldRollFor, holdRoll, requireTypedDie, requireTypedReroll, spendRerollRight } from "./held-rolls.js";
 import { recordRoll, rolledTerms } from "./roll-history.js";
 import { createPendingSaves, dismissSave, recordCallResult, shownRollMode } from "./saving-throws.js";
@@ -32,6 +33,8 @@ export type CheckRollDependencies = Readonly<{
   names?: CheckNames;
   /** Creatures hidden from a player by sight or the fog. */
   unseen?: ReadonlySet<string>;
+  /** Where creatures stand, for an ally's aura around the roller; absent, only the roller's own aura is known. */
+  distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
 }>;
 
 export type CheckRollInput = Readonly<{
@@ -74,9 +77,15 @@ function planFor(state: GameState, scope: Initiator, input: CheckRollInput, deps
     input.findActorId !== undefined && (scope.role === "gm" || canPlayerTarget(state, input.findActorId, deps.unseen))
       ? state.actors.find((candidate) => candidate.id === input.findActorId)
       : undefined;
+  const warded = wardedConditions(state, actor, {
+    resolveDefinition: deps.resolveDefinition,
+    ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {}),
+    ...(deps.catalog ? { catalog: deps.catalog } : {})
+  });
   const plan = checkPlan(actor, definition, derivation, input.subject, {
     ...(deps.names ? { names: deps.names } : {}),
-    ...(finding ? { finding } : {})
+    ...(finding ? { finding } : {}),
+    ...(warded.length > 0 ? { warded } : {})
   });
   return { actor, plan };
 }

@@ -1,6 +1,6 @@
 import { IconRepeat, IconWarning } from "@vtt/ui";
 import type { ActionResolution, ContentActionSummary, GmActor, GmView } from "@vtt/domain";
-import { ActionResultHead, HealingOutcome } from "./ActionResultHead";
+import { ActionResultHead, CheckOutcome, HealingOutcome } from "./ActionResultHead";
 import { AttackOutcome, AttackPreview } from "./AttackPreview";
 import { componentLabel } from "./action-summary";
 import { damageBreakdown } from "./format";
@@ -82,6 +82,7 @@ export function ActionResultCard({
         </p>
       )}
       {result.attack && <AttackOutcome attack={result.attack} audience="gm" />}
+      {result.check && <CheckOutcome check={result.check} />}
       {result.waitingOnReaction &&
         result.attack &&
         (() => {

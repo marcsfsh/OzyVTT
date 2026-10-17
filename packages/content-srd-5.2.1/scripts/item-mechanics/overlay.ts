@@ -104,7 +104,7 @@ export const CARRIER_RIDER_DISPOSITION_MIRROR: Readonly<
   "extra-damage": "at-its-moment",
   "damage-bonus": "standing",
   "check-bonus": "standing",
-  "spell-attack-bonus": "unread",
+  "spell-attack-bonus": "standing",
   "damage-reduction": "at-its-moment",
   "damage-resistance": "standing",
   "damage-vulnerability": "standing",

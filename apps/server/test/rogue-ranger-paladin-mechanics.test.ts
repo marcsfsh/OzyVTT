@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { applyRest } from "../src/rests.js";
 import { BuilderPolicySchema, GameStateSchema, type Actor, type GameState } from "@vtt/domain";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { ContentLibrary } from "../src/content-library.js";
 import { importActorDefinition } from "../src/actor-roster.js";
 import { effectiveActions } from "../src/effective-actions.js";
-import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation.js";
+import { deriveEquipment, equipmentCatalogOf, rollModeClaims } from "../src/equipment-derivation.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { answerReaction } from "../src/reactions.js";
 import { answerSave, createPendingSaves } from "../src/saving-throws.js";
@@ -12,7 +13,7 @@ import { setCondition } from "../src/actor-conditions.js";
 import { addEffect, endEffect, makeEffect } from "../src/effects.js";
 import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
 import { currentSpeedFeet } from "../src/speed.js";
-import type { ActorDefinition } from "@vtt/schemas";
+import type { ActorAction, ActorDefinition } from "@vtt/schemas";
 import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import { asiRows } from "./asi-rows.js";
 
@@ -547,7 +548,7 @@ describe("Rogue - the flat grants and the pick", () => {
     resolve(built, "stroke-of-luck", [], []);
     expect(built.hero.actionUses["stroke-of-luck"]).toBe(1);
     expect(() => resolve(built, "stroke-of-luck", [], [])).toThrowError(
-      /Stroke Of Luck: no uses remaining \(1\/short rest\)/
+      /Stroke of Luck: no uses remaining \(1\/short rest\)/
     );
   });
 
@@ -778,17 +779,32 @@ describe("Ranger - the rest of the kit", () => {
   it("scales Tireless off the FINAL Wisdom modifier, so an ASI moves the pool", () => {
     // `scaling: {type: "ability-modifier"}` resolves against the built scores: same record, same level,
     // two different numbers.
+    // Each use rolls its 1d8 of Temporary Hit Points.
+    const tire = (built: Table) => {
+      newTurn(built);
+      return resolve(built, "tireless", [4], []);
+    };
     const plain = table(rangerInput(10)); // Wis 15 -> +2
-    for (let use = 0; use < 2; use += 1) spend(plain, "tireless");
+    for (let use = 0; use < 2; use += 1) tire(plain);
     expect(plain.hero.actionUses["tireless"]).toBe(2);
     newTurn(plain);
     expect(() => resolve(plain, "tireless", [], [])).toThrowError(/Tireless: no uses remaining \(2\/long rest\)/);
 
     const focused = table(rangerInput(10, { wisFocus: true })); // Wis 15 + 4 -> +4
-    for (let use = 0; use < 4; use += 1) spend(focused, "tireless");
+    for (let use = 0; use < 4; use += 1) tire(focused);
     expect(focused.hero.actionUses["tireless"]).toBe(4);
     newTurn(focused);
     expect(() => resolve(focused, "tireless", [], [])).toThrowError(/Tireless: no uses remaining \(4\/long rest\)/);
+  });
+
+  it("gives Tireless's 1d8 + Wisdom as Temporary Hit Points, and takes a level of Exhaustion off at a Short Rest", () => {
+    const built = table(rangerInput(10)); // Wis 15 -> +2
+    resolve(built, "tireless", [5], []);
+    expect(built.hero.hp.temporary).toBe(7);
+    built.hero.conditions = [{ id: "exhaustion", level: 2 }];
+    built.state.combat = { ...built.state.combat, active: false };
+    applyRest(built.state, IDS.hero, "short", (id) => resolveIn(built.state, id));
+    expect(built.hero.conditions).toEqual([{ id: "exhaustion", level: 1 }]);
   });
 
   it("makes Nature's Veil a Bonus Action with its own Wisdom-sized pool", () => {
@@ -803,6 +819,17 @@ describe("Ranger - the rest of the kit", () => {
     expect(() => resolve(built, "natures-veil", [], [])).toThrowError(
       /Nature's Veil: no uses remaining \(2\/long rest\)/
     );
+  });
+
+  it("gives the Ranger the Invisible condition until the end of its next turn", () => {
+    const built = table(rangerInput(14));
+    resolve(built, "natures-veil", [], []);
+    expect(built.hero.conditions.map((condition) => condition.id)).toEqual(["invisible"]);
+    // Taken on its own turn, so the end of this turn doesn't count.
+    expect(built.hero.effects[0]).toMatchObject({
+      name: "Nature's Veil",
+      duration: { type: "until-source-turn-end", skipsCurrentTurn: true }
+    });
   });
 
   it("REFUSES a level-19 Ranger with no Epic Boon feat", () => {
@@ -881,6 +908,58 @@ describe("Ranger - Hunter's Prey and Defensive Tactics, audit rows 21 and 22", (
       table(rangerInput(7)).definition.extensions["open5e.srd-2024"] as { traits: Array<{ name: string }> }
     ).traits.map((trait) => trait.name);
     expect(traits).toContain("Escape the Horde");
+  });
+
+  it("gives a creature that hit a Multiattack Defense Ranger Disadvantage on its other attacks this turn", () => {
+    const input = rangerInput(7);
+    input.choices = input.choices.map((row) =>
+      row.kind === "defensive-tactics" ? { ...row, id: "multiattack-defense" } : row
+    );
+    const built = table(input);
+    built.state.combat = {
+      ...built.state.combat,
+      turnActorId: IDS.foe,
+      ruleExceptions: { economy: "freeform" }
+    };
+    const claw: ActorAction = {
+      id: "claw",
+      name: "Claw",
+      activation: "action",
+      description: "Melee Attack Roll: +5, reach 5 ft. Hit: 4 (1d6) Slashing damage.",
+      attack: { bonus: 5, reachFeet: 5 },
+      damage: [{ formula: "1d6", type: "slashing" }]
+    };
+    const swing = (faces: number[], commit = true) =>
+      resolveDefinitionAction(
+        built.state,
+        claw,
+        { actorId: IDS.foe, targetIds: [IDS.hero], commandId: nextCommandId(), commit },
+        { ...deps(built, faces), definition: undefined }
+      );
+    expect(swing([19, 4]).attack?.outcome).toBe("hit");
+    expect(built.hero.effects).toEqual([
+      expect.objectContaining({ name: "Multiattack Defense", sourceActorId: IDS.foe })
+    ]);
+    expect(swing([10, 12], false).rollMode).toMatchObject({ mode: "disadvantage" });
+    // The foe's turn ends, and the mark with it.
+    nextInitiativeTurn(built.state, [], {
+      resolveDefinition: (id) => resolveIn(built.state, id),
+      rollDie: () => 3,
+      newId: nextCommandId,
+      now: () => "2026-08-07T00:00:00.000Z"
+    });
+    expect(built.hero.effects).toEqual([]);
+  });
+
+  it("gives Opportunity Attacks against an Escape the Horde Ranger Disadvantage, and no other attack", () => {
+    const built = table(rangerInput(7));
+    const derivation = deriveEquipment(built.hero, built.definition, built.catalog);
+    const claims = (attackKinds: NonNullable<Parameters<typeof rollModeClaims>[3]>["attackKinds"]) =>
+      rollModeClaims(derivation, ["incoming-attack"], "on-attack-roll", { attackKinds }).disadvantage;
+    expect(claims(["melee", "reaction", "opportunity"])).toEqual([
+      expect.objectContaining({ label: expect.stringContaining("Escape the Horde") })
+    ]);
+    expect(claims(["melee"])).toEqual([]);
   });
 });
 
@@ -983,6 +1062,17 @@ describe("Paladin - the two free casts, audit rows 30 and 31", () => {
     // ...and a level-4 Paladin has neither the spell nor the pool.
     const early = table(paladinInput(4));
     expect((early.definition.spellcasting?.spells ?? []).some((spell) => spell.id === "find-steed")).toBe(false);
+  });
+
+  it("gives a Devotion Paladin's aura Smite of Protection's Half Cover when Divine Smite rides a hit", () => {
+    const built = table(paladinInput(15));
+    newTurn(built);
+    // The d20, the longsword's d8, Radiant Strikes' d8 and the smite's dice.
+    swing(built, "item-longsword", [19, 6, 3, 4, 4, 4, 4, 4, 4], { hitOptions: [{ id: "spell-divine-smite-free" }] });
+    expect(built.hero.effects.find((effect) => effect.tags.includes("smite-of-protection"))).toMatchObject({
+      name: "Smite of Protection",
+      duration: { type: "until-source-next-turn" }
+    });
   });
 });
 

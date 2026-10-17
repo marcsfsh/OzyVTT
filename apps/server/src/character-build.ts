@@ -194,12 +194,23 @@ const CARRIER_RIDER_DISPOSITION: Readonly<
   "extra-damage": "at-its-moment", // resolution/damage.ts rolls it as its own typed damage entry
   "damage-bonus": "standing", // effective-actions folds it into the first damage part's formula; a moment-gated one lands as a bonusDamage line in resolution/damage.ts
   "check-bonus": "standing", // checkRiderBonus, into every check and skill row and the builtin checks
-  "spell-attack-bonus": "unread", // no spell-attack path reads it yet
+  "spell-attack-bonus": "standing", // effective-actions folds it into a spell attack's bonus
   "damage-reduction": "at-its-moment", // hit-points.ts damageReductionsFor, taken off the hit before resistances
   "damage-resistance": "standing", // derivation.damageResistances, beside the definition's own
   "damage-vulnerability": "standing", // derivation.damageVulnerabilities, beside the definition's own
   sense: "display-only" // like `darkvision`: the trait prose carries it; no definition field models senses
 };
+
+/** Where a modifier type is consumed, for the coverage manifest (`srd-coverage.ts`): baked by the builder, read at a
+ *  roll, or read by nothing yet. `darkvision` is baked, but only to be displayed, like `sense`. */
+export function modifierDisposition(
+  type: Modifier["type"]
+): "baked" | "standing" | "at-its-moment" | "unread" | "display-only" {
+  if (type === "darkvision") return "display-only";
+  return (BUILDER_BAKED_MODIFIER_TYPES as readonly string[]).includes(type)
+    ? "baked"
+    : CARRIER_RIDER_DISPOSITION[type as CarrierRiderType];
+}
 
 /** No-op for riders the roll-time collector owns; the parameter type proves `default:` covers only those. */
 function ownedByTheRollTimeCollector(modifier: { type: CarrierRiderType }): string {
@@ -275,7 +286,8 @@ function interpretAction(
   if (adds) {
     const bonus =
       (adds.classLevel ?? 0) * context.level +
-      (adds.abilityModifier ? abilityModifier(context.finalScores[adds.abilityModifier]) : 0);
+      (adds.abilityModifier ? abilityModifier(context.finalScores[adds.abilityModifier]) : 0) +
+      (adds.proficiencyBonus ? context.proficiencyBonus : 0);
     const damage = assembled.damage as ActorAction["damage"] | undefined;
     if (damage && damage.length > 0)
       assembled.damage = [{ ...damage[0], formula: formulaPlus(damage[0].formula, bonus) }, ...damage.slice(1)];

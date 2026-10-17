@@ -6,7 +6,8 @@ import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../s
 import { importActorDefinition } from "../src/actor-roster.js";
 import { ContentLibrary } from "../src/content-library.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
-import { equipmentCatalogOf } from "../src/equipment-derivation.js";
+import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation.js";
+import { specialSpeedsOf } from "../src/speed.js";
 import { effectiveActions } from "../src/effective-actions.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
 import { endEncounter, startEncounter } from "../src/encounter.js";
@@ -282,7 +283,7 @@ describe("Warlock: Mystic Arcanum is a real pick and a real once-per-day casting
         POLICY
       )
     );
-    expect(message).toMatch(/"Mystic Arcanum Level 6 Spell" needs 1 pick\(s\) of kind "spell"/);
+    expect(message).toMatch(/"Mystic Arcanum \(level 6 spell\)" needs 1 pick\(s\) of kind "spell"/);
   });
 
   it("offers all FOUR arcana by level 17, each with its own level and its own daily use", () => {
@@ -1217,18 +1218,22 @@ describe("Draconic Sorcery: the level-3 spells and the affinity (audit rows 26, 
 describe("Draconic Sorcery: Dragon Wings and Dragon Companion carry their daily use", () => {
   const level18 = () => table(sorcerer(18));
 
-  it("gives Dragon Wings a Bonus Action and one use per Long Rest", () => {
+  it("gives Dragon Wings a Bonus Action and one use per Long Rest, and a Fly Speed of 60 feet", () => {
     const built = level18();
     expect(actionOf(built, "dragon-wings")).toMatchObject({
       activation: "bonus-action",
       uses: { limit: 1, per: "long-rest" }
     });
+    const flySpeed = () =>
+      specialSpeedsOf(built.hero, built.definition, deriveEquipment(built.hero, built.definition, built.catalog)).fly;
+    expect(flySpeed()).toBeUndefined();
     resolveDefinitionAction(
       built.state,
       actionOf(built, "dragon-wings"),
       { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000090" },
       deps(built, [])
     );
+    expect(flySpeed()).toBe(60);
     expect(() =>
       resolveDefinitionAction(
         built.state,

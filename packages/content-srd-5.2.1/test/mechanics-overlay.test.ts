@@ -101,6 +101,24 @@ describe("the mechanics overlay", () => {
     expect(thaumaturge.extraPicks).toEqual([{ offer: "class-cantrips", amount: 1 }]);
   });
 
+  it("adds Potent Spellcasting's Wisdom to the damage of each class's own damaging cantrips", () => {
+    const optionOf = (classId: string, featureId: string) =>
+      loadClasses()
+        .find((record) => record.id === classId)!
+        .features.find((entry) => entry.id === featureId)!
+        .choice!.options!.find((option) => option.id === "potent-spellcasting")!;
+    const gates = (classId: string, featureId: string) =>
+      optionOf(classId, featureId).modifiers!.map((modifier) =>
+        modifier.type === "extra-damage" ? modifier.when : []
+      );
+    expect(gates("cleric", "blessed-strikes")).toEqual([
+      [{ type: "on-damage-roll" }, { type: "spell-id-is", spellIds: ["sacred-flame"] }]
+    ]);
+    expect(gates("druid", "elemental-fury")).toEqual([
+      [{ type: "on-damage-roll" }, { type: "spell-id-is", spellIds: ["poison-spray", "produce-flame", "starry-wisp"] }]
+    ]);
+  });
+
   it("reaches a GENERATED subclass, which had no authoring surface at all", () => {
     expect(Object.keys(SUBCLASS_MECHANICS)).toContain("draconic-sorcery");
     const draconic = loadSubclasses().find((record) => record.id === "draconic-sorcery")!;

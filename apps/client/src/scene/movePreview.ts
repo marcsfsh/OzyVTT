@@ -57,7 +57,8 @@ export const alliesByKind = (mover: MapActor, occupant: MapActor) => {
  * extra foot per foot while crawling, climbing or swimming without the speed, or dragging. The client sees only what
  * it may (players get the revealed terrain, no hidden creatures, and no NPC's side), and the server leaves hidden
  * creatures out too, so the two agree except where unrevealed terrain lies under the fog or an NPC's side matters.
- * With dynamic vision on, the walls the view has bar the way as the server's do.
+ * With dynamic vision on, the walls the view has bar the way as the server's do. A spell's area that halves the
+ * mover's Speed (Spirit Guardians) is charged by the server alone.
  */
 export function previewMove(
   input: Readonly<{

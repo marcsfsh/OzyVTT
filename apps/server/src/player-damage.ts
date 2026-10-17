@@ -1,7 +1,7 @@
 import type { ActionResolution, GameState } from "@vtt/domain";
 import { applyDamageDetailed, type DamageDeps, type DamageOutcome } from "./hit-points.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
-import type { ActorDefinition } from "@vtt/schemas";
+import type { ActorDefinition, DamageDrain } from "@vtt/schemas";
 import { damagePartsOf } from "./resolution/damage.js";
 
 /** A player's confirmed hit never touches an enemy's HP through the client. The server is the only
@@ -67,7 +67,8 @@ export function settlePlayerHit(
   attackerName: string,
   sourceActorId: string,
   mode: "proposal" | "direct",
-  deps: PlayerDamageDeps
+  deps: PlayerDamageDeps,
+  drain?: DamageDrain
 ): AppliedDamage | null {
   const attack = resolution.attack;
   if (!attack || !playerHitOwesDamage(resolution)) return null;
@@ -83,7 +84,8 @@ export function settlePlayerHit(
     attackerName,
     sourceActorId,
     mode,
-    deps
+    deps,
+    drain
   );
 }
 
@@ -95,16 +97,17 @@ export function settlePlayerDamage(
   attackerName: string,
   sourceActorId: string,
   mode: "proposal" | "direct",
-  deps: PlayerDamageDeps
+  deps: PlayerDamageDeps,
+  drain?: DamageDrain
 ): AppliedDamage[] {
   if (resolution.attack) {
-    const applied = settlePlayerHit(state, resolution, attackerName, sourceActorId, mode, deps);
+    const applied = settlePlayerHit(state, resolution, attackerName, sourceActorId, mode, deps, drain);
     return applied ? [applied] : [];
   }
   if (resolution.preview) return [];
   return (resolution.damageTargets ?? []).flatMap((owed) => {
     if (owed.total <= 0) return [];
-    const applied = settleOne(state, owed, resolution, attackerName, sourceActorId, mode, deps);
+    const applied = settleOne(state, owed, resolution, attackerName, sourceActorId, mode, deps, drain);
     return applied ? [applied] : [];
   });
 }
@@ -117,7 +120,8 @@ function settleOne(
   attackerName: string,
   sourceActorId: string,
   mode: "proposal" | "direct",
-  deps: PlayerDamageDeps
+  deps: PlayerDamageDeps,
+  drain?: DamageDrain
 ): AppliedDamage | null {
   const parts = owed.parts.map((part) => ({ amount: part.amount, type: part.type }));
   const label = `${attackerName}'s ${resolution.actionName}`;
@@ -125,7 +129,14 @@ function settleOne(
     const outcome = applyDamageDetailed(
       state,
       owed.targetId,
-      { amount: owed.total, parts, critical: resolution.crit, sourceName: label, sourceActorId },
+      {
+        amount: owed.total,
+        parts,
+        critical: resolution.crit,
+        sourceName: label,
+        sourceActorId,
+        ...(drain ? { drain } : {})
+      },
       { role: "gm" },
       damageDepsOf(deps)
     );
@@ -145,6 +156,7 @@ function settleOne(
         proposedDamageParts: parts,
         proposedTotal: owed.total,
         critical: resolution.crit,
+        ...(drain ? { drain } : {}),
         createdAt: deps.now()
       }
     ]
@@ -176,7 +188,8 @@ export function resolvePendingDamage(
       ...(amount !== undefined ? { damageOverride: amount } : {}),
       critical: proposal.critical,
       sourceName: label,
-      sourceActorId: proposal.sourceActorId
+      sourceActorId: proposal.sourceActorId,
+      ...(proposal.drain ? { drain: proposal.drain } : {})
     };
     const outcome = applyDamageDetailed(state, proposal.targetActorId, input, { role: "gm" }, damageDepsOf(deps));
     applied = { outcome, targetId: proposal.targetActorId, sourceActorId: proposal.sourceActorId, label };

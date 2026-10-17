@@ -798,14 +798,12 @@ describe("the worn items left as prose, by name", () => {
     }
   });
 
-  it("leaves the four RESERVED items and the four ability-score refusals entirely to prose", () => {
+  it("leaves the two RESERVED items and the four ability-score refusals entirely to prose", () => {
     for (const id of [
       // The gloves need a rolled reduction ("1d10 plus your Dexterity modifier"), a free-hand gate and a
       // Reaction cost; `on-taking-damage` + `damage-reduction` alone cannot express it.
       "gloves-of-missile-snaring",
       "periapt-of-wound-closure", // rolled amount
-      "talisman-of-pure-good",
-      "talisman-of-ultimate-evil", // needs mechanics not modeled yet
       "amulet-of-health",
       "belt-of-giant-strength", // ITEM_REFUSED_MODIFIER_TYPES
       "gauntlets-of-ogre-power",
@@ -816,6 +814,15 @@ describe("the worn items left as prose, by name", () => {
       expect(row.casts ?? []).toEqual([]);
       expect(row.actions ?? []).toEqual([]);
       expect(Object.values(row.grants ?? {}).flat()).toEqual([]);
+    }
+  });
+
+  it("authors the talismans' +2 to spell attack rolls and nothing else", () => {
+    for (const id of ["talisman-of-pure-good", "talisman-of-ultimate-evil"]) {
+      const row = view.equipmentRecord(id)!;
+      expect(row.modifiers, id).toEqual([{ type: "spell-attack-bonus", amount: 2 }]);
+      expect(row.casts ?? []).toEqual([]);
+      expect(row.actions ?? []).toEqual([]);
     }
   });
 

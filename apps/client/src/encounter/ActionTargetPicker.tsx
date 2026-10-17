@@ -4,6 +4,7 @@ import { Button, Select, Stepper } from "@vtt/ui";
 import { useSkillCatalog } from "../content/catalogs";
 import { ABILITY_WORDS } from "../dice/roll-call-words";
 import { useRollPreference } from "../dice/roll-preference";
+import { areaWords } from "./action-summary";
 import { FaceEntry } from "./RollControls";
 import { plainActionName } from "./format";
 import type { TargetRow } from "../table/targetRows";
@@ -12,6 +13,7 @@ import {
   clearTargeting,
   setCheckSkill,
   setChosenAbility,
+  setConditionChoice,
   setDamageType,
   setTargetDarts,
   setTargetingSpend,
@@ -22,9 +24,10 @@ import {
 
 /**
  * Choosing who an action targets: one (radio) or several (checkboxes), or, for an area, where to drag
- * the template on the map; the skill a check action is made with (Search, Influence) and the ability a
- * cast chooses (Hex). Back drops the action; Roll sends it to the server, which throws the attack's d20,
- * or the face a physical die shows is typed in its place while the table lets this browser type.
+ * the template on the map; the skill a check action is made with (Search, Influence), the ability a
+ * cast chooses (Hex) and the condition it imposes or ends (Blindness/Deafness, Lesser Restoration).
+ * Cancel drops the action; Roll sends it to the server, which throws the attack's d20, or the face a
+ * physical die shows is typed in its place while the table lets this browser type.
  */
 export function ActionTargetPicker({
   picking,
@@ -67,12 +70,14 @@ export function ActionTargetPicker({
     <div className="action-targeting" role="group" aria-label={`Targets for ${name}`} ref={groupRef}>
       {picking.mode === "none" ? (
         <p className="action-targeting-head">
-          <strong>{name}</strong> · choose the skill, then Roll.
+          <strong>{name}</strong> ·{" "}
+          {picking.action.checkSkills?.length ? "choose the skill, then Roll." : "no target to choose. Roll to use it."}
         </p>
       ) : picking.mode === "template" ? (
         <>
+          {/* The area keeps the action's own size: the drag only places and points it. */}
           <p className="action-targeting-head">
-            <strong>{name}</strong> · {picking.action.area?.sizeFeet}-foot {picking.action.area?.shape}
+            <strong>{name}</strong> · {picking.action.area ? areaWords(picking.action.area) : "area"}
           </p>
           <p className="action-targeting-hint">
             {picking.template?.placed
@@ -185,6 +190,21 @@ export function ActionTargetPicker({
             {picking.action.damageTypes.map((type) => (
               <option key={type} value={type}>
                 {type.charAt(0).toUpperCase() + type.slice(1)}
+              </option>
+            ))}
+          </Select>
+        </label>
+      )}
+      {picking.action.conditionChoices && picking.action.conditionChoices.length > 1 && (
+        <label className="action-damage-type">
+          <span>{picking.action.saveAbility ? "Condition on a failed save" : "Condition to end"}</span>
+          <Select
+            value={picking.conditionId ?? picking.action.conditionChoices[0]}
+            onChange={(event) => setConditionChoice(event.target.value)}
+          >
+            {picking.action.conditionChoices.map((id) => (
+              <option key={id} value={id}>
+                {id.charAt(0).toUpperCase() + id.slice(1)}
               </option>
             ))}
           </Select>

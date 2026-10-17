@@ -132,7 +132,8 @@ export const paladin: ClassMechanicsModule = {
       ]
     },
 
-    // The Paladin is always inside their own aura; immunity for allies is not expressible.
+    // The Paladin's own immunity, which holds wherever it stands; its allies' is read where they stand
+    // (`paladin-auras.ts` in the server).
     "aura-of-courage": {
       grants: { conditionImmunities: ["frightened"], when: [AURA_ACTIVE] }
     },
@@ -222,8 +223,9 @@ export const paladin: ClassMechanicsModule = {
         grants: { conditionImmunities: ["charmed"], when: [AURA_ACTIVE] }
       },
 
-      // The counter only; the save advantage (keyed to the source's creature type), the Radiant aura tick
-      // and the sunlight stay prose.
+      // The nimbus is an effect on the Paladin for 10 minutes; the server reads it for the Radiant damage an enemy
+      // starting its turn in the aura takes and the Advantage on saves a Fiend or an Undead forces. The sunlight
+      // stays prose.
       "holy-nimbus": {
         uses: { limit: 1, per: "long-rest" },
         actions: [
@@ -233,7 +235,8 @@ export const paladin: ClassMechanicsModule = {
             activation: "bonus-action",
             description:
               "You imbue your Aura of Protection with holy power for 10 minutes or until you end it (no action required). You have Advantage on saving throws forced by Fiends and Undead; an enemy that starts its turn in the aura takes Radiant damage equal to your Charisma modifier plus your Proficiency Bonus; and the aura is filled with Bright Light that is sunlight. You can restore your use of this feature by expending a level 5 spell slot.",
-            damage: []
+            damage: [],
+            grants: { name: "Holy Nimbus", tags: ["holy-nimbus"], duration: { type: "rounds", rounds: 100 } }
           }
         ]
       }

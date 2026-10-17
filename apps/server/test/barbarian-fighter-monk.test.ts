@@ -12,7 +12,9 @@ import { criticalThreshold, effectiveActions } from "../src/effective-actions.js
 import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { initiativeRollMode, nextInitiativeTurn, startEncounter } from "../src/encounter.js";
 import { answerSave, saveRollSources } from "../src/saving-throws.js";
+import { checkPlan } from "../src/ability-checks.js";
 import { evaluateActionEconomy } from "../src/resolution/economy.js";
+import { UNARMED_STRIKE_ACTION_ID } from "../src/item-actions.js";
 import { currentSpeedFeet } from "../src/speed.js";
 
 // Barbarian, Fighter and Monk mechanics, asserted as numbers a player can act on: sheet AC, the DC a
@@ -367,6 +369,30 @@ describe("Barbarian: Primal Knowledge raises a budget the wizard already had", (
   });
 });
 
+describe("Barbarian: Primal Knowledge makes some checks Strength checks while raging", () => {
+  // Level 6: Str 19 (+4), Dex 14 (+2), Wis 12 (+1), proficiency +3, Perception proficient and Stealth not.
+  const plan = (built: Built, skill: string, ability: "dex" | "wis") =>
+    checkPlan(built.hero, built.definition, derivationOf(built), { ability, skill });
+
+  it("makes Stealth and Perception Strength checks once the Rage starts, with the Rage's Advantage", () => {
+    const table = onTheTable(build(barbarianInput(6)));
+    expect(plan(table, "stealth", "dex")).toMatchObject({ subject: { ability: "dex" }, modifier: 2 });
+    use(table, "rage");
+    expect(plan(table, "stealth", "dex")).toMatchObject({
+      subject: { ability: "str", skill: "stealth" },
+      modifier: 4,
+      rollMode: { mode: "advantage" }
+    });
+    expect(plan(table, "perception", "wis")).toMatchObject({ subject: { ability: "str" }, modifier: 7 });
+  });
+
+  it("leaves a raging level-2 Barbarian's Stealth a Dexterity check: the feature comes at 3", () => {
+    const table = onTheTable(build(barbarianInput(2)));
+    use(table, "rage");
+    expect(plan(table, "stealth", "dex").subject.ability).toBe("dex");
+  });
+});
+
 describe("Barbarian: Weapon Mastery follows the printed column", () => {
   it("takes four at level 20, two at level 1, and refuses the fifth", () => {
     expect(
@@ -669,6 +695,19 @@ describe("Berserker: Mindless Rage refuses Frightened only while the Rage is run
     );
     expect(after).toEqual([]);
     expect(table.hero.conditions.map((condition) => condition.id)).toEqual(["frightened"]);
+  });
+
+  it("ends Charmed and Frightened as the Rage starts", () => {
+    const table = built();
+    table.hero.conditions = [{ id: "frightened" }, { id: "charmed" }, { id: "prone" }];
+    const raged = use(table, "rage");
+    expect(table.hero.conditions.map((condition) => condition.id)).toEqual(["prone"]);
+    expect(raged.tableNarration?.map((line) => line.text)).toContain("Ozar is no longer Frightened (Raging).");
+    // A level-5 Berserker has no Mindless Rage, so the Rage leaves the condition.
+    const early = onTheTable(build(barbarianInput(5)));
+    early.hero.conditions = [{ id: "frightened" }];
+    use(early, "rage");
+    expect(early.hero.conditions.map((condition) => condition.id)).toEqual(["frightened"]);
   });
 
   it("gives a level-5 Berserker nothing - the feature is gained at 6", () => {
@@ -1363,7 +1402,8 @@ describe("Monk: Stunning Strike holds the target to the Monk's own DC", () => {
       successDamage: "none",
       failureConditions: ["stunned"],
       // "until the start of your next turn".
-      failureDuration: { type: "until-source-next-turn" }
+      failureDuration: { type: "until-source-next-turn" },
+      successEffect: expect.objectContaining({ name: "Stunning Strike" })
     });
     const resolution = use(built, "stunning-strike", [IDS.foe]);
     expect(resolution.save).toMatchObject({ ability: "con", dc: 15 });
@@ -1382,7 +1422,8 @@ describe("Monk: Stunning Strike holds the target to the Monk's own DC", () => {
       successDamage: "none",
       failureConditions: ["stunned"],
       // "until the start of your next turn".
-      failureDuration: { type: "until-source-next-turn" }
+      failureDuration: { type: "until-source-next-turn" },
+      successEffect: expect.objectContaining({ name: "Stunning Strike" })
     });
     expect(use(capstone, "stunning-strike", [IDS.foe]).save).toMatchObject({ ability: "con", dc: 21 });
   });
@@ -1649,6 +1690,48 @@ describe("Monk: Stunning Strike once per turn", () => {
     nextInitiativeTurn(built.state);
     use(built, "stunning-strike", [IDS.foe]);
     expect(built.hero.actionUses["focus-points"]).toBe(2);
+  });
+});
+
+describe("Monk: a save against Stunning Strike still slows the target", () => {
+  it("halves its Speed and gives the next attack roll against it Advantage, until the Monk's next turn", () => {
+    const built = onTheTable(build(monkInput(11)));
+    const foe = built.state.actors.find((actor) => actor.id === IDS.foe)!;
+    foe.speedFeet = 30;
+    const speed = () => currentSpeedFeet(foe, deriveEquipment(foe, undefined, catalog));
+    use(built, "stunning-strike", [IDS.foe]);
+    answerSave(
+      built.state,
+      "50000000-0000-4000-8000-999999999904",
+      built.state.combat.pendingSaves[0]!.id,
+      "manual",
+      30,
+      true,
+      { role: "gm" },
+      {
+        random: () => 10,
+        newRollId: () => "50000000-0000-4000-8000-999999999905",
+        sessionId: IDS.gmSession,
+        role: "gm",
+        now: () => "2026-08-07T00:00:00.000Z",
+        resolveDefinition: () => undefined
+      }
+    );
+    expect(foe.conditions).toEqual([]);
+    expect(foe.effects[0]).toMatchObject({
+      name: "Stunning Strike",
+      tags: ["speed-halved", "until-attacked"],
+      duration: { type: "until-source-next-turn" }
+    });
+    expect(speed()).toBe(15);
+    // The Monk's strike keeps the higher d20 and spends the Advantage; the halved Speed stays.
+    expect(use(built, UNARMED_STRIKE_ACTION_ID, [IDS.foe], [4, 17, 3]).attack?.naturalRoll).toBe(17);
+    expect(foe.effects[0]).toMatchObject({ tags: ["speed-halved"], modifiers: [] });
+    expect(speed()).toBe(15);
+    nextInitiativeTurn(built.state);
+    nextInitiativeTurn(built.state);
+    expect(foe.effects).toEqual([]);
+    expect(speed()).toBe(30);
   });
 });
 

@@ -48,7 +48,7 @@ export const warlock: ClassMechanicsModule = {
         /**
          * Agonizing Blast, Eldritch Spear and Repelling Blast pick one of the character's known cantrips
          * (`fromPicks`). Agonizing Blast's Charisma damage is gated to Eldritch Blast by id, since the gate
-         * cannot name the picked cantrip; Eldritch Spear's range and Repelling Blast's push stay prose.
+         * cannot name the picked cantrip; the engine reads Eldritch Spear's and Repelling Blast's picks off the sheet.
          */
         "agonizing-blast": {
           choice: { kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips", where: "deals-damage" } },
@@ -67,6 +67,8 @@ export const warlock: ClassMechanicsModule = {
         "repelling-blast": {
           choice: { kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips", where: "attack-roll" } }
         },
+        // "Advantage on Constitution saving throws that you make to maintain Concentration."
+        "eldritch-mind": { modifiers: [{ type: "roll-mode", roll: "concentration", mode: "advantage" }] },
         // ---- castings without a spell slot ---------------------------------------------------------
         "armor-of-shadows": { grants: { spells: [atWill("mage-armor", 1)] } },
         "ascendant-step": { grants: { spells: [atWill("levitate", 2)] } },
@@ -102,8 +104,8 @@ export const warlock: ClassMechanicsModule = {
         "pact-of-the-tome": { choice: { kind: "cantrip", choose: 3, fromCatalog: "warlock-spells", maxSpellLevel: 0 } }
         // Not modeled: Lessons of the First Ones (a feat pick on an option's nested choice cannot be
         // settled by the build's pass ordering), Devil's Sight and Witch Sight (senses are display-only),
-        // Eldritch Mind (concentration roll-mode has no reader), the pact-weapon invocations, and Gaze of Two
-        // Minds, Gift of the Protectors and Investment of the Chain Master.
+        // the pact-weapon invocations, and Gaze of Two Minds, Gift of the Protectors and Investment of the Chain
+        // Master.
       }
     },
     /** The sheet's spellcasting grouping slug, exactly as the hand-authored Wizard tags its own. */

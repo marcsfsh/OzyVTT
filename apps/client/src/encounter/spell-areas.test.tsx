@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GameStateSchema, type GmView, type MutationResult } from "@vtt/domain";
 import { ToastProvider } from "@vtt/ui";
@@ -51,7 +51,7 @@ const state = GameStateSchema.parse({
       { actorId: CLERIC, score: 12 }
     ],
     spellZones: [
-      zone(MOONBEAM, "moonbeam", "Moonbeam", DRUID, { shape: "sphere", sizeFeet: 5, widthFeet: null }),
+      zone(MOONBEAM, "moonbeam", "Moonbeam", DRUID, { shape: "cylinder", sizeFeet: 5, widthFeet: null }),
       zone(GUARDIANS, "spirit-guardians", "Spirit Guardians", CLERIC, null)
     ]
   }
@@ -92,7 +92,7 @@ describe("the GM's spell areas", () => {
     await user.click(screen.getByRole("button", { name: "Place" }));
     expect(screen.getByTestId("session").textContent).toBe(`Moonbeam area:${MOONBEAM}`);
     // The row says how to place it and holds the placement's own buttons.
-    expect(screen.getByText(/Drag the 5-foot sphere on the map/)).toBeTruthy();
+    expect(screen.getByText(/Drag on the map to place the 5-foot-radius cylinder/)).toBeTruthy();
     const set = screen.getByRole("button", { name: "Set it here" });
     expect((set as HTMLButtonElement).disabled).toBe(true);
     act(() => setTemplatePlacement({ x: 125, y: 125 }, { x: 175, y: 125 }));
@@ -103,6 +103,19 @@ describe("the GM's spell areas", () => {
       template: { shape: "circle", origin: { x: 125, y: 125 }, target: { x: 175, y: 125 } },
       expectedRevision: 4
     });
+  });
+
+  it("sizes the area from the spell and offers no roll, since placing it rolls nothing", async () => {
+    const user = userEvent.setup();
+    render(<SpellAreas state={state} busy={false} run={run} />, { wrapper: ToastProvider });
+    await user.click(screen.getByRole("button", { name: "Place" }));
+    const row = screen.getByRole("status");
+    expect(row.textContent).toBe("Moonbeam · Drag on the map to place the 5-foot-radius cylinder.");
+    expect(screen.queryByRole("button", { name: /Roll/ })).toBeNull();
+    act(() => setTemplatePlacement({ x: 125, y: 125 }, { x: 175, y: 125 }));
+    expect(row.textContent).toBe("Moonbeam · Drag again to move it, or set it here.");
+    const region = screen.getByRole("region", { name: "Spell areas" });
+    expect((within(region).getByRole("button", { name: "Set it here" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("ends an area", async () => {

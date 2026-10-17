@@ -2,18 +2,21 @@
  * What an action's prose says that play needs as data. Read where an action enters the system (the content
  * build, a homebrew save, an import), so the engine never reads prose while a fight runs.
  */
-import type { ActionArea, ActionReaction, ActorAction } from "@vtt/schemas";
+import type { ActionArea, ActionReaction, ActorAction, DamageDrain, ForcedPush } from "@vtt/schemas";
 
 /**
  * The area of effect a description names. SRD 2024 phrasing is consistent enough to pattern-match ("60-foot
  * Cone", "60-foot-long, 5-foot-wide Line", "20-foot-radius Sphere", "15-foot Emanation", "10-foot Cube").
- * Null when it names none, and the GM targets tokens directly. A line that omits its width is 5 feet wide. On a flat
- * map a Cylinder is the circle of its radius ("5-foot-radius, 40-foot-high Cylinder"), and an "N-foot square" on the
- * ground is a Cube of that side.
+ * Null when it names none, and the GM targets tokens directly. A line that omits its width is 5 feet wide, and one
+ * printed after its name gives its length and width in words ("a Line of strong wind 60 feet long and 10 feet wide").
+ * A Cylinder keeps its radius ("5-foot-radius, 40-foot-high Cylinder"), drawn on a flat map as that circle, and an
+ * "N-foot square" on the ground is a Cube of that side.
  */
 export function areaOfProse(description: string): ActionArea | null {
   const line = /(\d+)-foot(?:-long)?(?:,?\s*(\d+)-foot-wide)?\s+Line/i.exec(description);
   if (line) return { shape: "line", sizeFeet: Number(line[1]), widthFeet: line[2] ? Number(line[2]) : 5 };
+  const namedLine = /\bLine\b[^.]*?\b(\d+) feet long and (\d+) feet wide/i.exec(description);
+  if (namedLine) return { shape: "line", sizeFeet: Number(namedLine[1]), widthFeet: Number(namedLine[2]) };
   const cone = /(\d+)-foot\s+Cone/i.exec(description);
   if (cone) return { shape: "cone", sizeFeet: Number(cone[1]), widthFeet: null };
   const radial = /(\d+)-foot(?:-radius)?\s+(Sphere|Emanation)/i.exec(description);
@@ -24,9 +27,9 @@ export function areaOfProse(description: string): ActionArea | null {
       widthFeet: null
     };
   const cylinder =
-    /(\d+)-foot-radius,?\s+(?:\d+-foot-(?:high|tall)\s+)?Cylinder/i.exec(description) ??
-    /\d+-foot-(?:high|tall),\s+(\d+)-foot-radius\s+Cylinder/i.exec(description);
-  if (cylinder) return { shape: "sphere", sizeFeet: Number(cylinder[1]), widthFeet: null };
+    /(\d+)-foot-radius,?\s+(?:\d+[- ]foot[- ](?:high|tall)\s+)?Cylinder/i.exec(description) ??
+    /\d+[- ]foot[- ](?:high|tall),\s+(\d+)-foot-radius\s+Cylinder/i.exec(description);
+  if (cylinder) return { shape: "cylinder", sizeFeet: Number(cylinder[1]), widthFeet: null };
   const cube = /(\d+)-foot\s+Cube/i.exec(description) ?? /(\d+)-foot[- ]square\b/i.exec(description);
   if (cube) return { shape: "cube", sizeFeet: Number(cube[1]), widthFeet: null };
   return null;
@@ -189,17 +192,50 @@ export function multiattackOfProse(
   return { plan, alternatives, replacements };
 }
 
+/**
+ * What a stat block's damage drains, from its SRD 2024 text: "its Hit Point maximum decreases by an amount equal to the
+ * damage taken" (a wraith's Life Drain), "... equal to the Necrotic damage taken" (that type alone), and "the vampire
+ * regains Hit Points equal to that amount". Null when the text says neither, or names a fixed amount ("decreases by 5
+ * (1d10)"), which stays the GM's.
+ */
+export function drainOfProse(description: string): DamageDrain | null {
+  const lowered =
+    /\bHit Point maximum decreases by an amount equal to the (?:([A-Z][a-z]+) )?damage (?:taken|dealt)\b/.exec(
+      description
+    );
+  const heals = /\bregains Hit Points equal to (half )?(?:that amount|the damage (?:taken|dealt))\b/.exec(description);
+  if (!lowered && !heals) return null;
+  const type = lowered?.[1]?.toLowerCase();
+  return {
+    ...(type ? { damageType: type } : {}),
+    ...(lowered ? { reducesMaximum: true as const } : {}),
+    ...(heals ? { heals: heals[1] ? ("half" as const) : ("all" as const) } : {})
+  };
+}
+
+/** The push an attack's hit makes, from its SRD 2024 text: "the target is pushed up to 15 feet straight away from the
+ *  giant". Null when the text prints none. */
+export function hitPushOfProse(description: string): ForcedPush | null {
+  const push = /\bthe target is pushed (up to )?(\d+) feet (?:straight )?away from\b/.exec(description);
+  return push ? { feet: Number.parseInt(push[2]!, 10), ...(push[1] ? { upTo: true as const } : {}) } : null;
+}
+
 /** The action with its prose facts filled: the area (an authored one wins), whether it is a Multiattack whose
- *  attacks nothing structured names, and a Parry's AC reaction (an authored reaction wins). The same object when
- *  nothing changes. */
+ *  attacks nothing structured names, a Parry's AC reaction (an authored reaction wins), what its damage drains and
+ *  how far its hit pushes (an authored one wins). The same object when nothing changes. */
 export function withProseFacts<Action extends ActorAction>(action: Action): Action {
   const area = action.area ?? areaOfProse(action.description);
   const untracked = /multiattack/i.test(action.name) && !action.multiattack;
   const reaction = action.reaction ?? (action.activation === "reaction" ? acReactionOfProse(action.description) : null);
+  const drain = action.drain ?? (action.damage.length > 0 ? drainOfProse(action.description) : null);
+  // A save's push is the save's (`failurePush`); an attack's lands with the hit.
+  const push = action.onHitPush ?? (action.attack && !action.save ? hitPushOfProse(action.description) : null);
   if (
     area === (action.area ?? null) &&
     untracked === (action.untrackedMultiattack === true) &&
-    reaction === (action.reaction ?? null)
+    reaction === (action.reaction ?? null) &&
+    drain === (action.drain ?? null) &&
+    push === (action.onHitPush ?? null)
   )
     return action;
   const { untrackedMultiattack: _previous, ...rest } = action;
@@ -207,6 +243,8 @@ export function withProseFacts<Action extends ActorAction>(action: Action): Acti
     ...rest,
     ...(area ? { area } : {}),
     ...(untracked ? { untrackedMultiattack: true as const } : {}),
-    ...(reaction ? { reaction } : {})
+    ...(reaction ? { reaction } : {}),
+    ...(drain ? { drain } : {}),
+    ...(push ? { onHitPush: push } : {})
   } as Action;
 }

@@ -31,6 +31,7 @@ describe("trait mechanics in the monster bundle", () => {
       "Death Throes",
       "Barbed Hide",
       "Gibbering",
+      "Vile Appearance",
       "Berserk",
       "Corrosive Form"
     ])
@@ -106,6 +107,26 @@ describe("trait mechanics in the monster bundle", () => {
       save: { ability: "wis", dc: 10, failureConditions: [] },
       reminder: expect.stringContaining("1-4: The target does nothing.")
     });
+    // "Any Beast or Humanoid that starts its turn within 30 feet of the hag and can see the hag's true form": the types
+    // are read, and the sight is the GM's.
+    expect(mechanicsOf("sea-hag")).toEqual([
+      {
+        kind: "aura",
+        name: "Vile Appearance",
+        trigger: "turn-start-inside",
+        rangeFeet: 30,
+        affects: "all",
+        creatureTypes: ["beast", "humanoid"],
+        save: {
+          ability: "wis",
+          dc: 11,
+          successDamage: "none",
+          failureConditions: ["frightened"],
+          failureDuration: { type: "until-bearer-next-turn" },
+          immuneOnSuccess: true
+        }
+      }
+    ]);
     expect(mechanicsOf("barbed-devil")).toEqual([
       {
         kind: "aura",

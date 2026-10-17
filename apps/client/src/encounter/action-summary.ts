@@ -13,6 +13,13 @@ export const tagLabel = (tag: string) =>
 export const usesScopeLabel = (per: NonNullable<ContentActionSummary["usesPer"]>) =>
   per === "own-turn" ? "round" : per.replace(/-/g, " ");
 
+/** An area as the SRD sizes it: a Sphere's or a Cylinder's radius, another shape's length or side ("5-foot-radius
+ *  cylinder", "30-foot cone"). */
+export const areaWords = (area: Readonly<{ shape: string; sizeFeet: number }>) =>
+  area.shape === "sphere" || area.shape === "cylinder"
+    ? `${area.sizeFeet}-foot-radius ${area.shape}`
+    : `${area.sizeFeet}-foot ${area.shape}`;
+
 /**
  * An action's mechanics as discrete lines, each drawn as its own bullet under the action's name:
  * to-hit and reach, attack count, a Multiattack plan (named from `all`), the save, each damage part,

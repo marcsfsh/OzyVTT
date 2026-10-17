@@ -44,6 +44,20 @@ describe("movement over a square grid", () => {
     expect(path?.difficultSteps).toBe(3);
   });
 
+  it("charges twice a step's cost where the mover's Speed is halved, difficult terrain included", () => {
+    // Halved from column 3 on (Spirit Guardians' Emanation); column 4 is also rubble.
+    const path = movementPath({
+      from: { column: 0, row: 0 },
+      to: { column: 4, row: 0 },
+      sizeCells: 1,
+      isDifficult: (column) => column === 4,
+      isHalved: (column) => column >= 3
+    });
+    // Two open steps, one halved step (2) and one halved step into rubble (4).
+    expect(path?.costCells).toBe(8);
+    expect(path?.difficultSteps).toBe(1);
+  });
+
   it("walks round a patch of difficult terrain when that is cheaper", () => {
     const patch = cellSet([
       [2, 0],

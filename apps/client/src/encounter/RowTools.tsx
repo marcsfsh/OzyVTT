@@ -183,7 +183,8 @@ export function RowTools({
               ).then(onClose);
             }}
           >
-            Take {actor.name} out of the fight? Its turn and token go, and what it holds lets go.
+            Take {actor.name} out of the fight? {actor.name}'s turn and token are removed, and anything {actor.name} is
+            grappling or concentrating on ends.
           </ConfirmRow>
         )}
       </div>

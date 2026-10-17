@@ -58,7 +58,8 @@ export function ActionRunner({
   const resolveBusy = useTargetingBusy();
   const calibration = useTableCalibration(state.combat.mapAssetId);
   // Targeting and result in the store belong to this runner only when they are for this attacker.
-  const picking = session && session.attackerId === actor.id ? session : null;
+  // A spell area the GM places is the Spell areas row's to set, and placing it rolls nothing, so it opens no picker.
+  const picking = session && session.attackerId === actor.id && session.placeZoneId === undefined ? session : null;
 
   const definitionId = actor.definitionId;
   useEffect(() => {
@@ -161,6 +162,8 @@ export function ActionRunner({
       parts,
       ...(useOverride ? { damageOverride: overrideAmount } : {}),
       sourceActorId: actor.id,
+      // Names the action, so the server lands what its damage drains (a Life Drain's lower Hit Point maximum).
+      ...(result.actionId !== undefined && result.actionId.length <= 120 ? { sourceActionId: result.actionId } : {}),
       sourceName: `${actor.name}'s ${result.actionName}`,
       critical: result.crit
     }).then((response) => {

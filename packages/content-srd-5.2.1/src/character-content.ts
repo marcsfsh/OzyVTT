@@ -17,6 +17,7 @@ import {
   HitDieSchema,
   ModifierSchema,
   PickBudgetScalingSchema,
+  SaveFailureEffectSchema,
   SaveOutcomeFields,
   type Modifier
 } from "@vtt/schemas";
@@ -141,7 +142,11 @@ export const FeatureSaveSchema = z
   .object({
     ability: AbilitySchema,
     dc: FeatureSaveDcSchema,
-    ...SaveOutcomeFields
+    ...SaveOutcomeFields,
+    /** What a failed save leaves besides its conditions, as on a stat block's save. */
+    failureEffect: SaveFailureEffectSchema.optional(),
+    /** What a successful save leaves instead (Stunning Strike's halved Speed). */
+    successEffect: SaveFailureEffectSchema.optional()
   })
   .strict();
 
@@ -168,7 +173,9 @@ export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true 
   adds: z
     .object({
       classLevel: z.number().int().min(1).max(10).optional(),
-      abilityModifier: AbilitySchema.optional()
+      abilityModifier: AbilitySchema.optional(),
+      /** The Proficiency Bonus ("Temporary Hit Points equal to your Proficiency Bonus", Adrenaline Rush). */
+      proficiencyBonus: z.literal(true).optional()
     })
     .strict()
     .optional(),

@@ -1,5 +1,5 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
-import { isDead, type GameState } from "@vtt/domain";
+import { isDead, type ActionResolution, type GameState } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
 import type { ActorAction } from "@vtt/schemas";
 import { GameAccessDeniedError, type Initiator } from "./authorization.js";
@@ -86,20 +86,23 @@ export function applyLooseHealing(
   targets: readonly Actor[],
   rolled: number | null,
   rollDie: (sides: number) => number
-): Array<Readonly<{ text: string; actorId: string }>> {
+): Readonly<{ lines: Array<Readonly<{ text: string; actorId: string }>>; healing: ActionResolution["healing"] }> {
   const healing = action.healing;
-  if (!healing) return [];
+  if (!healing) return { lines: [], healing: null };
   let total = rolled ?? 0;
   if (rolled === null)
     for (let use = 0; use < (healing.perUse ? useCostOf(action) : 1); use += 1)
       total += rollDice(healing.formula, rollDie).total;
   const shares = healingShares(targets, Math.max(0, total), healing);
-  return targets.flatMap((target, index) => {
+  // Who regained what, for the reply to the one who used it: the same lines the table reads in the feed.
+  const regainedBy: Array<Readonly<{ targetId: string; targetName: string; regained: number }>> = [];
+  const lines = targets.flatMap((target, index) => {
     if (isDead(target)) return [{ text: deadCantHealLine(target.name), actorId: target.id }];
     const before = target.hp.current;
     // The use is already authorized; the heal lands on whoever it was given to.
     const events = healActor(state, target.id, shares[index], { role: "gm" });
     const regained = target.hp.current - before;
+    regainedBy.push({ targetId: target.id, targetName: target.name, regained });
     // "The wound closes ... after a spell restores Hit Points to the target," in a fight or out of one.
     if (action.spellId !== undefined && regained > 0)
       for (const effect of target.effects.filter((candidate) => candidate.endsOnSpellHealing))
@@ -112,4 +115,5 @@ export function applyLooseHealing(
       ...events.map((event) => ({ text: event.text, actorId: event.actorId }))
     ];
   });
+  return { lines, healing: { total: Math.max(0, total), targets: regainedBy } };
 }

@@ -476,6 +476,21 @@ describe("auras", () => {
     expect(pendingOn(stunned, IDS.hero)).toEqual([]);
   });
 
+  it("asks a Humanoid within 30 feet of a sea hag to save against its Vile Appearance, and spares a Construct", () => {
+    const state = game("sea-hag", { foe2: "animated-armor" });
+    // The hag's ally is a Construct and is spared whatever side it is on; the hero is a Humanoid 25 feet off.
+    const reach: Positions = { [IDS.hero]: [0, 0], [IDS.foe]: [25, 0], [IDS.ally]: [60, 0], [IDS.foe2]: [20, 0] };
+    advance(state, [], reach);
+    advance(state, [], reach);
+    advance(state, [], reach);
+    expect(state.combat.turnActorId).toBe(IDS.foe2);
+    expect(pendingOn(state, IDS.foe2)).toEqual([]);
+    const events = advance(state, [], reach);
+    expect(texts(events)).toContain("Hero starts its turn in Sea Hag's Vile Appearance: DC 11 WIS save.");
+    const [pending] = pendingOn(state, IDS.hero);
+    expect(pending).toMatchObject({ conditionIds: ["frightened"], immuneOnSuccess: true });
+  });
+
   it("burns everyone within 5 feet as a balor's turn ends, rolling the damage once", () => {
     const state = game("balor", { foe2: "imp" });
     state.combat = { ...state.combat, turnActorId: IDS.foe };

@@ -2508,6 +2508,22 @@
    {
     "type": "damage-bonus",
     "amount": 1
+   },
+   {
+    "type": "extra-damage",
+    "formula": "3d6",
+    "doubleOnCritical": true,
+    "when": [
+     {
+      "type": "on-hit"
+     },
+     {
+      "type": "versus-creature-type",
+      "creatureTypes": [
+       "dragon"
+      ]
+     }
+    ]
    }
   ]
  },
@@ -2804,6 +2820,22 @@
   "tags": [],
   "actions": [],
   "effects": [],
+  "grants": {
+   "skills": [],
+   "expertise": [],
+   "tools": [],
+   "languages": [],
+   "armor": [
+    "medium",
+    "heavy"
+   ],
+   "weapons": [],
+   "saves": [],
+   "damageResistances": [],
+   "damageImmunities": [],
+   "conditionImmunities": [],
+   "spells": []
+  },
   "modifiers": [
    {
     "type": "armor-class",
@@ -3323,6 +3355,22 @@
    {
     "type": "damage-bonus",
     "amount": 1
+   },
+   {
+    "type": "extra-damage",
+    "formula": "2d6",
+    "doubleOnCritical": true,
+    "when": [
+     {
+      "type": "on-hit"
+     },
+     {
+      "type": "versus-creature-type",
+      "creatureTypes": [
+       "giant"
+      ]
+     }
+    ]
    }
   ]
  },
@@ -3841,6 +3889,24 @@
    {
     "type": "damage-bonus",
     "amount": 3
+   },
+   {
+    "type": "extra-damage",
+    "formula": "2d10",
+    "damageType": "radiant",
+    "doubleOnCritical": true,
+    "when": [
+     {
+      "type": "on-hit"
+     },
+     {
+      "type": "versus-creature-type",
+      "creatureTypes": [
+       "fiend",
+       "undead"
+      ]
+     }
+    ]
    }
   ]
  },
@@ -4246,7 +4312,26 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "extra-damage",
+    "formula": "2d6",
+    "damageType": "radiant",
+    "doubleOnCritical": true,
+    "when": [
+     {
+      "type": "on-hit"
+     },
+     {
+      "type": "versus-creature-type",
+      "creatureTypes": [
+       "fiend",
+       "undead"
+      ]
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "mace-of-smiting",
@@ -4285,6 +4370,60 @@
    {
     "type": "damage-bonus",
     "amount": 1
+   },
+   {
+    "type": "attack-bonus",
+    "amount": 2,
+    "when": [
+     {
+      "type": "on-attack-roll"
+     },
+     {
+      "type": "versus-creature-type",
+      "creatureTypes": [
+       "construct"
+      ]
+     }
+    ]
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 2,
+    "when": [
+     {
+      "type": "on-hit"
+     },
+     {
+      "type": "versus-creature-type",
+      "creatureTypes": [
+       "construct"
+      ]
+     }
+    ]
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 7,
+    "when": [
+     {
+      "type": "on-critical-hit"
+     }
+    ]
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 7,
+    "when": [
+     {
+      "type": "on-critical-hit"
+     },
+     {
+      "type": "versus-creature-type",
+      "creatureTypes": [
+       "construct"
+      ]
+     }
+    ]
    }
   ]
  },
@@ -7490,7 +7629,24 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "roll-mode",
+    "roll": "incoming-attack",
+    "mode": "disadvantage",
+    "when": [
+     {
+      "type": "on-attack-roll"
+     },
+     {
+      "type": "attack-kind-is",
+      "kinds": [
+       "spell"
+      ]
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "sphere-of-annihilation",
@@ -7770,6 +7926,10 @@
    {
     "type": "save-bonus",
     "amount": 2
+   },
+   {
+    "type": "spell-attack-bonus",
+    "amount": 2
    }
   ]
  },
@@ -7899,7 +8059,12 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "spell-attack-bonus",
+    "amount": 2
+   }
+  ]
  },
  {
   "id": "staff-of-the-python",
@@ -7989,7 +8154,12 @@
    }
   ],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "spell-attack-bonus",
+    "amount": 2
+   }
+  ]
  },
  {
   "id": "staff-of-thunder-and-lightning",
@@ -8339,7 +8509,12 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "spell-attack-bonus",
+    "amount": 2
+   }
+  ]
  },
  {
   "id": "talisman-of-the-sphere",
@@ -8391,7 +8566,12 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "spell-attack-bonus",
+    "amount": 2
+   }
+  ]
  },
  {
   "id": "thunderous-greatclub",
@@ -8639,7 +8819,18 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "extra-damage",
+    "formula": "2d6",
+    "doubleOnCritical": true,
+    "when": [
+     {
+      "type": "on-hit"
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "vorpal-sword",
@@ -9116,7 +9307,12 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "spell-attack-bonus",
+    "amount": 1
+   }
+  ]
  },
  {
   "id": "wand-of-the-war-mage-2",
@@ -9144,7 +9340,12 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "spell-attack-bonus",
+    "amount": 2
+   }
+  ]
  },
  {
   "id": "wand-of-the-war-mage-3",
@@ -9172,7 +9373,12 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "spell-attack-bonus",
+    "amount": 3
+   }
+  ]
  },
  {
   "id": "wand-of-web",
