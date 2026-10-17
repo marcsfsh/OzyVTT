@@ -99,6 +99,33 @@ describe("casting a leveled spell from the sheet", () => {
     expect(cast).toHaveBeenLastCalledWith("spell-hunters-mark-free");
   });
 
+  it("names the spell slot a sheet without the spell's action spends, in SRD terms", async () => {
+    const onFeedback = vi.fn();
+    const sheet = {
+      ...definition,
+      actions: [],
+      spellcasting: {
+        ability: "wis",
+        slots: [{ level: 1, max: 2 }],
+        spells: [{ id: "detect-magic", name: "Detect Magic", level: 1, prepared: true, alwaysPrepared: true }]
+      }
+    } as unknown as ActorDefinition;
+    render(
+      <SheetSpells
+        actor={actor}
+        definition={sheet}
+        busy={false}
+        edit={vi.fn(async () => ({ ok: true })) as unknown as SheetEdit}
+        rolls={{ rollFlat: vi.fn() } as unknown as SheetRolls}
+        onFeedback={onFeedback}
+        routeSpell={() => false}
+        castSpellAction={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Cast" }));
+    await vi.waitFor(() => expect(onFeedback).toHaveBeenLastCalledWith("Cast Detect Magic with a level 1 spell slot."));
+  });
+
   it("casts past an empty slot when the table doesn't police spell slots, and not when it does", () => {
     const spent = { ...actor, spellSlots: [{ level: 1, remaining: 0 }] } as unknown as GmActor;
     const cast = vi.fn();
