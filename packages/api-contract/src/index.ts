@@ -290,6 +290,8 @@ export const CONTENT_PATHS = {
   monsters: `${API_NAMESPACE}/content/monsters`,
   monsterById: `${API_NAMESPACE}/content/monsters/{definitionId}`,
   monsterActions: `${API_NAMESPACE}/content/monsters/{definitionId}/actions`,
+  /** Outside `/monsters/` so it can never be read as a definition id. */
+  monsterBenchmarks: `${API_NAMESPACE}/content/monster-benchmarks`,
   conditions: `${API_NAMESPACE}/content/conditions`,
   glossary: `${API_NAMESPACE}/content/glossary`,
   skills: `${API_NAMESPACE}/content/skills`,

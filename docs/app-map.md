@@ -6,7 +6,7 @@ machine-derivable surfaces of the app (state shape, command catalog, HTTP paths)
 file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.
 
 - API version `1` · realtime protocol `1`
-- 14 GameState fields · 114 commands · 232 HTTP paths
+- 14 GameState fields · 114 commands · 233 HTTP paths
 
 ## GameState shape
 
@@ -220,6 +220,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `GET /api/v1/content/feats`
 - `GET /api/v1/content/glossary`
 - `GET /api/v1/content/languages`
+- `GET /api/v1/content/monster-benchmarks`
 - `GET /api/v1/content/monsters`
 - `GET /api/v1/content/monsters/{definitionId}`
 - `GET /api/v1/content/monsters/{definitionId}/actions`

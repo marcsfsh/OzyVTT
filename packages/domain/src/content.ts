@@ -36,6 +36,32 @@ export type ContentMonstersResult = {
   monsters?: readonly ContentMonsterSummary[];
   attribution?: string;
 };
+/** The low, middle and high of one number across the bundled stat blocks of a CR. */
+const ContentSpreadSchema = z.strictObject({
+  count: z.number().int().min(1),
+  min: z.number(),
+  median: z.number(),
+  max: z.number()
+});
+/** What the bundled SRD stat blocks of one challenge rating have, for authoring a homebrew monster: armour class, hit
+ *  points, the best attack bonus and save DC, and the most damage one turn deals at average rolls. A number none of
+ *  them has (no stat block of that CR forces a save) is null. */
+export const ContentMonsterBenchmarkSchema = z.strictObject({
+  challengeRating: z.number(),
+  count: z.number().int().min(1),
+  armorClass: ContentSpreadSchema,
+  hitPoints: ContentSpreadSchema,
+  attackBonus: ContentSpreadSchema.nullable(),
+  saveDc: ContentSpreadSchema.nullable(),
+  damagePerRound: ContentSpreadSchema
+});
+export type ContentMonsterBenchmark = Wire<z.infer<typeof ContentMonsterBenchmarkSchema>>;
+export type ContentMonsterBenchmarksResult = {
+  ok: boolean;
+  message?: string;
+  benchmarks?: readonly ContentMonsterBenchmark[];
+  attribution?: string;
+};
 /** One Rules Glossary term for the in-app rules reference; public information for any joined session. */
 export const ContentGlossaryEntrySchema = z.strictObject({
   id: z.string(),
