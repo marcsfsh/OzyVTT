@@ -40,6 +40,7 @@ import {
   writeChoiceAt,
   writeChoiceBlocks
 } from "./feature-fields";
+import { withArticle } from "@vtt/domain";
 
 export function FeatureEditor({
   draft,
@@ -550,7 +551,7 @@ export function FeatureEditor({
             ...(tableBacked ? { level: DEFAULT_GRANT_LEVEL } : {})
           }) as Feature
         }
-        addLabel={`Add a ${singular}`}
+        addLabel={`Add ${withArticle(singular)}`}
         emptyText={`No ${singular === "feature" ? "features" : `${singular}s`} yet.`}
         collapsible
         ariaLabel={`${singular} list`}

@@ -7,6 +7,7 @@ import { Badge, Button, ChoiceCard, ChoiceGrid, Field, FieldGrid, Modal, Select,
 import type { HomebrewRecordSummary } from "./api";
 import { useDuplicateSources } from "./sources";
 import { HOMEBREW_TYPES, isHomebrewType, typeLabel, typePlural, type HomebrewType } from "./types";
+import { withArticle } from "@vtt/domain";
 
 type StartingPoint = "blank" | "duplicate";
 
@@ -96,7 +97,7 @@ export function CreateRecordModal({
     start === null
       ? "Choose a starting point."
       : start === "duplicate" && !sourceId
-        ? `Choose a ${typeLabel(type)} to duplicate.`
+        ? `Choose ${withArticle(typeLabel(type))} to duplicate.`
         : null;
 
   const chosen = sourceId === null ? undefined : sources.find((candidate) => candidate.id === sourceId);
@@ -185,7 +186,7 @@ export function CreateRecordModal({
         {start === "duplicate" && (
           <div className="hb-create-grid">
             <ChoiceGrid
-              ariaLabel={`Choose a ${typeLabel(type)} to duplicate`}
+              ariaLabel={`Choose ${withArticle(typeLabel(type))} to duplicate`}
               options={options}
               value={sourceId}
               onChange={setSourceId}

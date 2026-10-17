@@ -31,6 +31,7 @@ import {
   type HitDie
 } from "@vtt/rules-5e";
 import type { BuilderCatalogs } from "../content/catalogs";
+import { withArticle } from "@vtt/domain";
 
 /**
  * The character builder's draft model and payload assembly (pure, no React, no socket).
@@ -683,8 +684,8 @@ export function stepBlockedReason(
           context.classRecord;
         const label = owner?.subclassLabel ?? "subclass";
         return multiclass && owner
-          ? `Choose a ${owner.name} ${label.toLowerCase()} to continue.`
-          : `Choose a ${label} to continue.`;
+          ? `Choose ${withArticle(`${owner.name} ${label.toLowerCase()}`)} to continue.`
+          : `Choose ${withArticle(label)} to continue.`;
       }
       // An ASI past 20 is chosen here but only visible once scores exist, so both steps guard the cap
       // with the same sentence.

@@ -5,6 +5,7 @@ import { usePrompt } from "../components/feedback";
 import { useRollPreference } from "../dice/roll-preference";
 import { command } from "../lib/command";
 import { modeWords } from "./roll-mode-notes";
+import { withArticle } from "@vtt/domain";
 
 const ABILITY_WORDS: Readonly<Record<AbilityId, string>> = {
   str: "Strength",
@@ -109,7 +110,7 @@ export function useSheetRolls(actorId: string, onFeedback: (text: string) => voi
   /** A saving throw from the sheet: it answers the matching save the character owes, or rolls a loose one. */
   const rollSave = async (ability: AbilityId) => {
     const name = `${ABILITY_WORDS[ability]} save`;
-    const face = rollMode === "manual" ? await typedFace(`Roll a ${name}`) : undefined;
+    const face = rollMode === "manual" ? await typedFace(`Roll ${withArticle(name)}`) : undefined;
     if (face === null) return;
     setRolling(true);
     const result = await command("save:roll", { actorId, ability, ...(face !== undefined ? { face } : {}) });

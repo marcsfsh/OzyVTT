@@ -20,6 +20,7 @@ import {
 import { CommandRejectedError } from "../game-store.js";
 import { initiatorOf, sessionIdOf, type GamePrincipal, type Kit } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
+import { withArticle } from "@vtt/domain";
 
 // Ability checks rolled on the server, the GM's calls for a roll, and Heroic Inspiration (ADR-0012).
 
@@ -157,8 +158,8 @@ export const rollCommands = [
         });
         const what =
           kind === "save"
-            ? `a ${ABILITY_NAMES[ability]} saving throw`
-            : `a ${label.endsWith(" check") ? label : `${label} check`}`;
+            ? withArticle(`${ABILITY_NAMES[ability]} saving throw`)
+            : withArticle(label.endsWith(" check") ? label : `${label} check`);
         kit.context.broadcastTableEvent({
           kind: "action",
           text: `The GM calls for ${what}${dc !== undefined && blind !== true ? ` (DC ${dc})` : ""}.`,

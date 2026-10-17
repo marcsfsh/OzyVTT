@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { ContentFeatureSummary } from "@vtt/domain";
 import { FeatureList, type FeatureItem } from "@vtt/ui";
 import { titleize, type OfferContext, type StepId } from "./build-payload";
+import { withArticle } from "@vtt/domain";
 
 /** The wizard's detail column: what the current pick is, read from the content catalogs. */
 
@@ -85,7 +86,7 @@ export function detailPlaceholder(step: StepId, context: OfferContext, subclassP
       ? {}
       : {
           features: context.classRecord?.subclassLabel
-            ? `Pick a ${context.classRecord.subclassLabel.toLowerCase()} to read about it here.`
+            ? `Pick ${withArticle(context.classRecord.subclassLabel.toLowerCase())} to read about it here.`
             : "Pick a subclass to read about it here."
         })
   };

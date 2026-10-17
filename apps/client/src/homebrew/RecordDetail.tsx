@@ -34,6 +34,7 @@ import type { CustomRenderer } from "./FieldRenderer";
 import { typeLabel, type HomebrewType } from "./types";
 import { WIZARDS } from "./wizard";
 import { REVIEW_STEP, WizardView } from "./wizard/WizardView";
+import { withArticle } from "@vtt/domain";
 
 type Body = Readonly<Record<string, unknown>>;
 
@@ -608,8 +609,8 @@ export function RecordDetail({
           ) : (
             <Alert tone="warning" title="No editor for this kind yet">
               <p>
-                Nothing here knows how to author a {typeLabel(doc.type)}. Your record is safe — it just can&rsquo;t be
-                edited from this screen.
+                Nothing here knows how to author {withArticle(typeLabel(doc.type))}. Your record is safe — it just
+                can&rsquo;t be edited from this screen.
               </p>
             </Alert>
           )}

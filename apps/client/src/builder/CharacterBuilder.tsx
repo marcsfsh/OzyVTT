@@ -47,6 +47,7 @@ import { reviewSections } from "./review";
 import { detailPlaceholder, stepDetail } from "./StepDetail";
 import { useBuilderOffers } from "./useBuilderOffers";
 import "./character-builder.css";
+import { withArticle } from "@vtt/domain";
 
 /**
  * The guided character-creation wizard: a full page on a laptop, a full-screen sheet on a phone.
@@ -610,13 +611,13 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
           <>
             {subclassPending && (
               <p className="cb-note">
-                You choose a {subclassPending.label} at {multiclass ? `${context.classRecord!.name} ` : ""}level{" "}
-                {subclassPending.level}.
+                You choose {withArticle(subclassPending.label)} at {multiclass ? `${context.classRecord!.name} ` : ""}
+                level {subclassPending.level}.
               </p>
             )}
             {laterSubclassesPending.map((pending) => (
               <p key={pending.name} className="cb-note">
-                You choose a {pending.name} {pending.label} at {pending.name} level {pending.level}.
+                You choose {withArticle(`${pending.name} ${pending.label}`)} at {pending.name} level {pending.level}.
               </p>
             ))}
             {stepOffers("features").length === 0 ? (

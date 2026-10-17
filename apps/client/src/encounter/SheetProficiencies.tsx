@@ -8,6 +8,7 @@ import { modeLabel } from "./roll-mode-notes";
 import { RollModeTag } from "./RollModeTag";
 import type { SheetEdit } from "./useSheetEdit";
 import type { SheetRolls } from "./useSheetRolls";
+import { withArticle } from "@vtt/domain";
 
 /** One skill row: the ability governing its check comes from the catalog. */
 type SheetSkill = Readonly<{ id: string; name: string; ability: Ability | null }>;
@@ -176,7 +177,7 @@ export function SheetProficiencies({
                   key={ability}
                   className={`sheet-roll-chip${isProf ? " is-proficient" : ""}${fails ? " is-failing" : ""}`}
                   disabled={rolling}
-                  aria-label={`Roll a ${name}, ${signed(bonus)}${isProf ? ", proficient" : ""}${fromItems !== 0 ? `, ${signed(fromItems)} from equipment` : ""}${fails ? ", fails automatically" : modeLabel(row?.saveMode)}`}
+                  aria-label={`Roll ${withArticle(name)}, ${signed(bonus)}${isProf ? ", proficient" : ""}${fromItems !== 0 ? `, ${signed(fromItems)} from equipment` : ""}${fails ? ", fails automatically" : modeLabel(row?.saveMode)}`}
                   onClick={() => void rollSave(ability)}
                 >
                   {ability.toUpperCase()} {signed(bonus)}

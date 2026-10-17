@@ -1,5 +1,5 @@
 import type { BuilderPolicy } from "@vtt/domain";
-import { CatalogChoiceError, resolveCatalogChoice } from "@vtt/domain";
+import { CatalogChoiceError, resolveCatalogChoice, withArticle } from "@vtt/domain";
 import {
   ActorDefinitionSchema,
   MAX_ACTION_USES,
@@ -1381,7 +1381,7 @@ export function buildCharacterDefinition(
       !background.startingEquipment.some((option) => option.id === row.id)
   );
   if (strayEquipment)
-    reject(`"${strayEquipment.id}" is not a ${classRecord.name} or ${background.name} equipment option.`);
+    reject(`"${strayEquipment.id}" is not ${withArticle(classRecord.name)} or ${background.name} equipment option.`);
   // Only one body armor stays equipped (two would fight over derived AC); keep the best base.
   const equippedArmor = inventory.filter((item) => item.category === "armor" && item.equipped);
   for (const extra of equippedArmor

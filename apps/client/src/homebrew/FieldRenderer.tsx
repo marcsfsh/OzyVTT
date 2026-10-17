@@ -29,6 +29,7 @@ import {
   type FieldDef,
   type SchemaContext
 } from "./schema";
+import { withArticle } from "@vtt/domain";
 
 export type CustomRenderer = (args: {
   field: FieldDef;
@@ -198,7 +199,7 @@ export function FieldRenderer(props: FieldRendererProps) {
             entries={entries}
             value={asString(raw) || null}
             onChange={(next) => set(next)}
-            emptyLabel={field.placeholder ?? `Choose a ${field.label.toLowerCase()}`}
+            emptyLabel={field.placeholder ?? `Choose ${withArticle(field.label.toLowerCase())}`}
             title={field.label}
             searchPlaceholder="Search…"
             ariaLabel={field.label}

@@ -3,6 +3,7 @@ import { endEffect } from "../effects.js";
 import { createPendingSaves } from "../saving-throws.js";
 import { masteryHitPushes, masteryHitSaves, SAPPED_TAG, VEXED_TAG, type MasterySwing } from "../weapon-mastery.js";
 import { endedEffect, sizeAtMost, type ResolveContext } from "./context.js";
+import { withArticle } from "@vtt/domain";
 
 /** The weapon mastery in force on this swing (rules in `weapon-mastery.ts`); null unless a mastery
  *  applies to an attack that rolled. */
@@ -58,7 +59,7 @@ function parkMasterySaves(ctx: ResolveContext): void {
       forced.conditionId === null ? "" : ` or have the ${conditionLabel(forced.conditionId)} condition`;
     tableNarration.push({
       kind: "save",
-      text: `${attacker.name}'s ${forced.actionName} forces ${forced.targetName} to make a ${forced.ability.toUpperCase()} save${orTheCondition}.`,
+      text: `${attacker.name}'s ${forced.actionName} forces ${forced.targetName} to make ${withArticle(`${forced.ability.toUpperCase()} save`)}${orTheCondition}.`,
       actorIds: [attacker.id, forced.targetId],
       ...(namesAHiddenCombatant(ctx, attacker.id, forced.targetId) ? { gmOnly: true } : {})
     });
