@@ -37,7 +37,7 @@ import type {
 } from "@vtt/domain";
 import { inWorldLabel } from "./codex/calendar.js";
 import { deadlineFired } from "./codex/journal-kinds.js";
-import type { CodexChronicleSource } from "./codex/journal.js";
+import { chronicleOrder, type CodexChronicleSource } from "./codex/journal.js";
 
 /**
  * The Codex viewer-safety boundary: every player-facing Codex read projects through here. The player shapes in
@@ -252,6 +252,29 @@ function playerSessionLink(
   if (row.sessionId === null) return { sessionId: null, sessionNumber: row.sessionNumber };
   if (context.unrevealedSessionIds.has(row.sessionId)) return { sessionId: null, sessionNumber: null };
   return { sessionId: row.sessionId, sessionNumber: row.sessionNumber };
+}
+
+/**
+ * Chronicle records in a player's order. The store places an entry by its session's number, and a hidden
+ * session's number would show players where that session falls, so here an entry is placed by the number a
+ * player receives for it.
+ */
+export function orderPlayerChronicle(
+  records: readonly CodexChronicleSource[],
+  context: PlayerSessionNumberContext
+): CodexChronicleSource[] {
+  return [...records].sort(chronicleOrder((entry) => playerSessionLink(entry, context).sessionNumber));
+}
+
+/** The journal timeline in a player's order, by the same rule as `orderPlayerChronicle`. */
+export function orderPlayerTimeline(
+  entries: readonly CodexJournalEntry[],
+  context: PlayerSessionNumberContext
+): CodexJournalEntry[] {
+  return orderPlayerChronicle(
+    entries.map((entry) => ({ kind: "entry", entry }) as const),
+    context
+  ).flatMap((record) => (record.kind === "entry" ? [record.entry] : []));
 }
 
 export function projectGmJournalEntry(row: CodexJournalEntry): CodexJournalEntry {

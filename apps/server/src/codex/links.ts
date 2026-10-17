@@ -95,12 +95,15 @@ function toMention(row: MentionRowRaw): CodexMentionRow {
   };
 }
 
-/** Every mention of the page with this link key, except the page's mentions of itself. */
+/**
+ * Every mention of the page with this link key, except the page's mentions of itself. In a fixed order: a save
+ * rewrites its record's rows, so table order would move other pages' panels on a GM-only save.
+ */
 export function mentionsOf(db: CodexDb, linkKey: string, pageId: string): CodexMentionRow[] {
   return (
     db.database
       .prepare(
-        "SELECT source_kind, source_id, layer, target_ref, section FROM codex_links WHERE target_kind = 'page' AND target_ref = ? AND NOT (source_kind = 'page' AND source_id = ?)"
+        "SELECT source_kind, source_id, layer, target_ref, section FROM codex_links WHERE target_kind = 'page' AND target_ref = ? AND NOT (source_kind = 'page' AND source_id = ?) ORDER BY source_kind, source_id, layer, section"
       )
       .all(linkKey, pageId) as MentionRowRaw[]
   ).map(toMention);

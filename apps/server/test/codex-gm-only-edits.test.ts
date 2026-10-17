@@ -135,3 +135,106 @@ describe("Codex pages: the GM half and the GM's filing move nothing a player rea
     );
   });
 });
+
+describe("Codex search: a player's hits and their order come from what players can read", () => {
+  it("keeps a player's order when the GM writes hidden pages full of one query word", async () => {
+    const { base, store } = await fixture();
+    store.createPage({ title: "First notes", playerBody: "amber amber amber vault", revealedToPlayers: true });
+    store.createPage({ title: "Second notes", playerBody: "vault vault vault amber", revealedToPlayers: true });
+    // Hidden prep: ten pages with neither word and two with "vault". A ranking that weighed a word by how many
+    // rows hold it, hidden ones included, would put the "amber" page first...
+    for (let index = 0; index < 10; index += 1) store.createPage({ title: `Prep ${index}`, playerBody: "rain" });
+    store.createPage({ title: "Prep vault one", playerBody: "vault" });
+    store.createPage({ title: "Prep vault two", playerBody: "vault" });
+
+    // ...and six more hidden pages holding "amber" would flip it.
+    await expectUnmoved(base, ["/search?q=amber%20vault"], () => {
+      for (let index = 0; index < 6; index += 1)
+        store.createPage({ title: `Prep amber ${index}`, playerBody: "amber" });
+    });
+  });
+
+  it("measures the cap after the player gates, so a record players cannot see never takes a place under it", async () => {
+    const { base, store } = await fixture();
+    for (let index = 0; index < 50; index += 1)
+      store.createPage({ title: `Barovia hamlet ${index}`, playerBody: "barovia", revealedToPlayers: true });
+    const faction = store.createPage({ title: "The Order", entityType: "faction" });
+    store.setStanding(faction.id, 10, "");
+
+    await expectUnmoved(base, ["/search?q=barovia"], () => {
+      // A standing record for a hidden faction, tagged so it matches: revealed, but gated by its faction.
+      const record = store.listTimeline().find((entry) => entry.kind === "standing")!;
+      store.updateEntry(record.id, { tags: ["barovia"] });
+      store.setEntryRevealed(record.id, true);
+    });
+    const answer = JSON.parse((await read(base, "/search?q=barovia", PLAYER_TOKEN)).body);
+    expect(answer.data.hits).toHaveLength(50);
+    expect(answer.data.truncated, "fifty matches a player can see are not a cut-off").toBe(false);
+  });
+});
+
+describe("Codex connections: a GM-only edit moves no player's connection", () => {
+  it("keeps the order of a page's mentions when the GM saves the GM half of one that mentions it", async () => {
+    const { base, store } = await fixture();
+    const target = store.createPage({ title: "Lantern Order", revealedToPlayers: true });
+    const first = store.createPage({ title: "Vallaki", playerBody: "[[Lantern Order]]", revealedToPlayers: true });
+    store.createPage({ title: "Krezk", playerBody: "[[Lantern Order]]", revealedToPlayers: true });
+
+    await expectUnmoved(base, [`/pages/${target.id}`, "/connections"], () =>
+      store.updatePage(first.id, { gmBody: "The order is a front." }, undefined, "gm")
+    );
+  });
+
+  it("keeps a revealed page's connections when the GM writes a hidden page with the same title", async () => {
+    const { base, store } = await fixture();
+    store.createPage({ title: "Lantern Order", revealedToPlayers: true });
+    const town = store.createPage({ title: "Vallaki", playerBody: "[[Lantern Order]]", revealedToPlayers: true });
+
+    await expectUnmoved(base, [`/pages/${town.id}`, "/connections"], () =>
+      store.createPage({ title: "Lantern Order", gmBody: "The real one." })
+    );
+  });
+
+  it("keeps a player's mention when the GM adds a GM-layer connection between the same two pages", async () => {
+    const { base, store } = await fixture();
+    const bree = store.createPage({ title: "Bree", revealedToPlayers: true });
+    const road = store.createPage({ title: "Road", playerBody: "leads to [[Bree]]", revealedToPlayers: true });
+
+    await expectUnmoved(base, [`/pages/${road.id}`, `/pages/${bree.id}`, "/connections"], () =>
+      store.createConnection(road.id, { toPageId: bree.id, layer: "gm" })
+    );
+  });
+});
+
+describe("Codex journal: a hidden session never places a player's entry", () => {
+  /** Three revealed, undated entries: one filed under a revealed session, two unfiled. */
+  const seed = (store: CodexStore) => {
+    const shown = store.createSession({ sessionNumber: 1 });
+    store.setSessionRevealed(shown.id, true);
+    const hidden = store.createSession({ sessionNumber: 2 });
+    const entries = ["We reached the town.", "We met the burgomaster.", "We left at dawn."].map((playerText) => {
+      const entry = store.createEntry({ playerText, sessionId: null, revealedToPlayers: true });
+      return entry.id;
+    });
+    store.updateEntry(entries[0], { sessionId: shown.id });
+    return { hidden, entries };
+  };
+
+  it("keeps a player's order when the GM files an entry under a hidden session", async () => {
+    const { base, store } = await fixture();
+    const { hidden, entries } = seed(store);
+    await expectUnmoved(base, ["/journal", "/timeline"], () => store.updateEntry(entries[2], { sessionId: hidden.id }));
+  });
+
+  it("keeps a player's order when the GM renumbers a hidden session that files an entry", async () => {
+    const { base, store } = await fixture();
+    const { hidden, entries } = seed(store);
+    const later = store.createSession({ sessionNumber: 3 });
+    store.setSessionRevealed(later.id, true);
+    store.updateEntry(entries[1], { sessionId: later.id });
+    store.updateEntry(entries[2], { sessionId: hidden.id });
+    await expectUnmoved(base, ["/journal", "/timeline"], () =>
+      store.updateSession(hidden.id, { sessionNumber: 9 }, undefined)
+    );
+  });
+});

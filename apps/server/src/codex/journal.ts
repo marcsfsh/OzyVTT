@@ -497,11 +497,14 @@ type ChronicleSortKey = Readonly<{
   createdAt: string;
   id: string;
 }>;
-function chronicleSortKey(record: CodexChronicleSource): ChronicleSortKey {
+function chronicleSortKey(
+  record: CodexChronicleSource,
+  sessionNumberOf: (entry: CodexJournalEntry) => number | null
+): ChronicleSortKey {
   return record.kind === "entry"
     ? {
         calendarInstant: record.entry.calendarInstant,
-        sessionNumber: record.entry.sessionNumber,
+        sessionNumber: sessionNumberOf(record.entry),
         createdAt: record.entry.createdAt,
         id: record.entry.id
       }
@@ -525,11 +528,18 @@ function compareChronicle(a: ChronicleSortKey, b: ChronicleSortKey): number {
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
+/** The chronicle's order, placing each entry by the session number `sessionNumberOf` gives it. */
+export function chronicleOrder(
+  sessionNumberOf: (entry: CodexJournalEntry) => number | null
+): (a: CodexChronicleSource, b: CodexChronicleSource) => number {
+  return (a, b) => compareChronicle(chronicleSortKey(a, sessionNumberOf), chronicleSortKey(b, sessionNumberOf));
+}
+
 /** Entries and dated event pages in one order. Ungated by design; `projectPlayerChronicleRecord` gates. */
 export function listChronicle(db: CodexDb): CodexChronicleSource[] {
   const records: CodexChronicleSource[] = [
     ...listTimeline(db).map((entry) => ({ kind: "entry", entry }) as const),
     ...listDatedEventPages(db).map((page) => ({ kind: "event", page }) as const)
   ];
-  return records.sort((a, b) => compareChronicle(chronicleSortKey(a), chronicleSortKey(b)));
+  return records.sort(chronicleOrder((entry) => entry.sessionNumber));
 }

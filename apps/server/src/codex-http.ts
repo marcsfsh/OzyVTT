@@ -16,6 +16,7 @@ import { InvalidRequestError } from "./invalid-request.js";
 import type { MapAssetStore } from "./map-assets.js";
 import { CODEX_BUNDLE_VERSION } from "./codex/bundle.js";
 import type { CodexRelationshipRow } from "./codex/connections.js";
+import { capSearch } from "./codex/search.js";
 import { CodexNotFoundError, CodexRevisionConflictError, CodexValidationError } from "./codex/validate.js";
 import {
   chronicleContext,
@@ -90,7 +91,9 @@ import {
   projectPlayerSearchHit,
   projectPlayerSession,
   projectPlayerStanding,
-  projectRevealAudit
+  projectRevealAudit,
+  orderPlayerChronicle,
+  orderPlayerTimeline
 } from "./codex-projections.js";
 
 /**
@@ -345,14 +348,22 @@ export function createCodexRouter(options: CodexRouterOptions) {
     const role = readGrade(request, response);
     if (!role) return;
     const query = typeof request.query.q === "string" ? request.query.q : "";
-    // Resolved for both roles: cheap, and a conditional here would make forgetting it a leak.
-    const playerContext = journalContext(store);
-    const found = store.searchAll(role, query);
+    if (role === "player") {
+      // Capped after the player gates, so a record a player cannot see never takes a place under the cap.
+      const playerContext = journalContext(store);
+      const hits = store
+        .searchMatches("player", query)
+        .map((ref) => searchRecord(store, ref))
+        .filter((record) => record !== null)
+        .map((record) => projectPlayerSearchHit(record, playerContext))
+        .filter((hit) => hit !== null);
+      return readEnvelope(request, response, role, capSearch(hits));
+    }
+    const found = store.searchAll("gm", query);
     const hits = found.hits
       .map((ref) => searchRecord(store, ref))
       .filter((record) => record !== null)
-      .map((record) => (role === "gm" ? projectGmSearchHit(record) : projectPlayerSearchHit(record, playerContext)))
-      .filter((hit) => hit !== null);
+      .map(projectGmSearchHit);
     // `truncated` is measured before projection, so it means the search itself was cut off.
     return readEnvelope(request, response, role, { hits, truncated: found.truncated });
   });
@@ -620,7 +631,9 @@ export function createCodexRouter(options: CodexRouterOptions) {
     const rows = markerId || pageId ? store.listEntriesFor({ markerId, pageId }) : store.listTimeline();
     if (role === "gm") return readEnvelope(request, response, role, { entries: rows.map(projectGmJournalEntry) });
     const context = journalContext(store);
-    const entries = rows.map((row) => projectPlayerJournalEntry(row, context)).filter((entry) => entry !== null);
+    // A pin's or page's entries come in creation order, which no hidden session moves.
+    const ordered = markerId || pageId ? rows : orderPlayerTimeline(rows, context);
+    const entries = ordered.map((row) => projectPlayerJournalEntry(row, context)).filter((entry) => entry !== null);
     return readEnvelope(request, response, role, { entries });
   });
 
@@ -643,7 +656,9 @@ export function createCodexRouter(options: CodexRouterOptions) {
       return readEnvelope(request, response, role, { records });
     }
     const context = chronicleContext(store);
-    const records = rows.map((row) => projectPlayerChronicleRecord(row, context)).filter((record) => record !== null);
+    const records = orderPlayerChronicle(rows, context)
+      .map((row) => projectPlayerChronicleRecord(row, context))
+      .filter((record) => record !== null);
     return readEnvelope(request, response, role, { records });
   });
 

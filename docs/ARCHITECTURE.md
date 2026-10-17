@@ -154,8 +154,12 @@ audience. There are four:
   the GM's private filing (a player's `folder` filter on the page list is ignored). A page's
   `updatedAt` moves on every save, so it stays with the GM too; players get `playerUpdatedAt`,
   which moves only when the title, kind, player text, shared fields, tags, banner, an event page's
-  date or the reveal flag changes. A hidden record is a 404, never a 403, and ETags are computed
-  after every gate.
+  date or the reveal flag changes. The order and length of a player's lists come from what the
+  player can read too: search ranks each hit on its own title and is capped after the player gates,
+  a player's journal places an entry by the session number the player receives, a page's mentions
+  keep a fixed order, a hidden page never takes a revealed page's title for `[[links]]`, and a
+  GM-layer connection never folds away a player-layer mention. A hidden record is a 404, never a
+  403, and ETags are computed after every gate.
 - **Replay** (`replay-projection.ts`): a shared fight archive is rebuilt per turn from an
   allow-list. It carries no session ids, notes, stat blocks, or rolls that were not public. A player's
   list of shared replays carries the GM's name for one, never the name of the scene it was fought on.

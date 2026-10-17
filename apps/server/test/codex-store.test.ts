@@ -176,8 +176,8 @@ describe("CodexStore search ranks the record NAMED for the query first", () => {
   });
 
   it("ranks identically for a PLAYER, so the two roles never disagree about where Enter lands", () => {
-    // Both audiences have their own FTS table; weighting only one would give the GM and the player
-    // different answers for the same name.
+    // Both audiences have their own FTS table and one ranking, so the GM and the player get the same answer
+    // for the same name.
     const { named, mentionsA, mentionsB } = seedNamedVersusMentions();
     const hits = store.searchAll("player", "Strahd").hits;
     expect(hits[0]).toEqual({ kind: "page", id: named });
@@ -185,8 +185,8 @@ describe("CodexStore search ranks the record NAMED for the query first", () => {
   });
 
   it("keeps the exact-title record first even against a body that repeats the term 120 times", () => {
-    // The exact-title tier: under bm25 alone (title 10x / body 1x) a body repeating the word ~80 times outranks
-    // the titled page, so prose length would decide. 120 repetitions is past that flip.
+    // The exact-title tier: a body that repeats the word 120 times still ranks below the page titled for it,
+    // so prose length never decides.
     const named = store.createPage({ title: "Strahd", playerBody: "A vampire lord.", revealedToPlayers: true });
     const spam = store.createPage({
       title: "QA Keep 111",
@@ -201,8 +201,8 @@ describe("CodexStore search ranks the record NAMED for the query first", () => {
   });
 
   it("weights a title hit over a body hit even when NEITHER title is exact", () => {
-    // Tier 2 alone: no title equals "Ravenloft", so tier 1 cannot fire, and this fails unless bm25 really
-    // weights the title column. (`bm25(t, 10.0, 1.0)` on the wrong columns is a silent no-op.)
+    // No title equals "Ravenloft", so the exact tier cannot fire. The castle's title holds the word, which puts
+    // it in the second tier, above a page that only repeats the word in its body.
     const titled = store.createPage({
       title: "Castle Ravenloft",
       playerBody: "the seat of the land",
@@ -221,8 +221,8 @@ describe("CodexStore search ranks the record NAMED for the query first", () => {
   });
 
   it("ranks across KINDS, not just within one: a map TITLED for the query beats a journal that mentions it", () => {
-    // Ordering must hold between kinds under the shared 50-result cap. A journal entry has an empty title, so
-    // only the title weight lifts the map (not titled exactly "Vallaki", so tier 2 alone) above it.
+    // Ordering must hold between kinds under the shared 50-result cap. A journal entry has an empty title, so it
+    // sits in the last tier, below the map whose title holds the word (not exactly "Vallaki", so the second tier).
     const map = store.createMap({
       assetId: crypto.randomUUID(),
       name: "Vallaki Town Square",
@@ -5410,6 +5410,7 @@ describe("every codex write bumps the coarse revision (the ETag's one premise)",
     "listRevisions",
     "listAllRevisions",
     "searchAll",
+    "searchMatches",
     "searchPages",
     "getMap",
     "listMaps",

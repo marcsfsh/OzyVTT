@@ -19,6 +19,11 @@ export type CodexSearchRefs = Readonly<{ hits: readonly CodexSearchRef[]; trunca
 /** The one cap for every kind. */
 const SEARCH_LIMIT = 50;
 
+/** The first `SEARCH_LIMIT` hits, and whether there were more. */
+export function capSearch<T>(hits: readonly T[]): Readonly<{ hits: T[]; truncated: boolean }> {
+  return { hits: hits.slice(0, SEARCH_LIMIT), truncated: hits.length > SEARCH_LIMIT };
+}
+
 type IndexText = Readonly<{ title: string; body: string }>;
 
 /** Replace one record's row in both indexes. `player` must contain player-layer text only. */
@@ -144,47 +149,73 @@ export function indexEntry(
 }
 
 /**
- * Search one audience's index. Only known kinds are asked for, so the cap counts rows a caller can use and
- * `truncated` is exact. Ranking: an exact title match first, then bm25 with the title weighted 10x (`bm25()`
- * takes a weight for every declared column, the UNINDEXED ones included).
+ * Every match in one audience's index, ranked, with no cap. Only known kinds are asked for, so a cap counts rows a
+ * caller can use. Ranking: a title equal to the query, then a title holding every query word, then the rest;
+ * within a tier by kind, title and id. Each row is ranked on its own title, never on bm25: bm25 weighs a word by
+ * how many rows hold it, hidden rows included, so a GM's hidden prep would reorder a player's hits.
  */
+export function searchMatches(
+  db: CodexDb,
+  audience: "player" | "gm",
+  query: string,
+  kinds: readonly CodexRecordKind[] = CODEX_RECORD_KINDS
+): CodexSearchRef[] {
+  const raw =
+    query
+      .toLowerCase()
+      .match(/[\p{L}\p{N}]+/gu)
+      ?.slice(0, 12) ?? [];
+  if (raw.length === 0) return [];
+  const match = raw.map((term) => `"${term}"*`).join(" ");
+  const terms = raw.map(folded);
+  // Never "" here (a query needs a letter or digit to get this far), so empty-titled rows cannot match tier 0.
+  const exactTitle = folded(query.trim());
+  const table = audience === "gm" ? "codex_search_gm" : "codex_search_player";
+  const wanted = kinds.length > 0 ? kinds : CODEX_RECORD_KINDS;
+  const visibility = audience === "gm" ? "" : ` AND ${PLAYER_SEARCH_VISIBLE_SQL}`;
+  const sql = `SELECT kind, record_id, title FROM ${table} WHERE ${table} MATCH ? AND ${table}.kind IN (${wanted.map(() => "?").join(", ")})${visibility}`;
+  let rows: Array<{ kind: CodexRecordKind; record_id: string; title: string }>;
+  try {
+    rows = db.database.prepare(sql).all(match, ...wanted) as typeof rows;
+  } catch {
+    return [];
+  }
+  const tierOf = (title: string) => {
+    if (folded(title.trim()) === exactTitle) return 0;
+    const words = wordsOf(title);
+    return terms.every((term) => words.some((word) => word.startsWith(term))) ? 1 : 2;
+  };
+  return rows
+    .map((row) => ({ row, tier: tierOf(row.title), title: folded(row.title) }))
+    .sort(
+      (a, b) =>
+        a.tier - b.tier ||
+        CODEX_RECORD_KINDS.indexOf(a.row.kind) - CODEX_RECORD_KINDS.indexOf(b.row.kind) ||
+        compareText(a.title, b.title) ||
+        compareText(a.row.record_id, b.row.record_id)
+    )
+    .map(({ row }) => ({ kind: row.kind, id: row.record_id }));
+}
+
+/** The first `SEARCH_LIMIT` matches, for a caller with no gate to apply after the index. */
 export function searchAll(
   db: CodexDb,
   audience: "player" | "gm",
   query: string,
   kinds: readonly CodexRecordKind[] = CODEX_RECORD_KINDS
 ): CodexSearchRefs {
-  const match = ftsQuery(query);
-  if (!match) return { hits: [], truncated: false };
-  // Never "" here (`ftsQuery` requires a letter or digit), so empty-titled rows cannot match the first tier.
-  const exactTitle = query.trim().toLowerCase();
-  const table = audience === "gm" ? "codex_search_gm" : "codex_search_player";
-  const wanted = kinds.length > 0 ? kinds : CODEX_RECORD_KINDS;
-  const visibility = audience === "gm" ? "" : ` AND ${PLAYER_SEARCH_VISIBLE_SQL}`;
-  // One row past the cap: its presence is what says the results were cut off.
-  const sql = `SELECT kind, record_id FROM ${table} WHERE ${table} MATCH ? AND ${table}.kind IN (${wanted.map(() => "?").join(", ")})${visibility}
-    ORDER BY (CASE WHEN LOWER(${table}.title) = ? THEN 0 ELSE 1 END), bm25(${table}, 0.0, 0.0, 10.0, 1.0)
-    LIMIT ${SEARCH_LIMIT + 1}`;
-  try {
-    const rows = db.database.prepare(sql).all(match, ...wanted, exactTitle) as Array<{
-      kind: CodexRecordKind;
-      record_id: string;
-    }>;
-    return {
-      hits: rows.slice(0, SEARCH_LIMIT).map((row) => ({ kind: row.kind, id: row.record_id })),
-      truncated: rows.length > SEARCH_LIMIT
-    };
-  } catch {
-    return { hits: [], truncated: false };
-  }
+  return capSearch(searchMatches(db, audience, query, kinds));
 }
 
-/** A free-text query as a safe FTS5 prefix MATCH; null when nothing usable remains. */
-function ftsQuery(raw: string): string | null {
-  const terms = raw.toLowerCase().match(/[\p{L}\p{N}]+/gu);
-  if (!terms || terms.length === 0) return null;
-  return terms
-    .slice(0, 12)
-    .map((term) => `"${term}"*`)
-    .join(" ");
+/** Lower case with accents dropped, as the index's tokenizer reads text. */
+function folded(text: string): string {
+  return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+}
+
+function wordsOf(text: string): string[] {
+  return folded(text).match(/[\p{L}\p{N}]+/gu) ?? [];
+}
+
+function compareText(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
 }
