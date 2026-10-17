@@ -61,6 +61,8 @@ const RULE_FAMILIES = {
   "target.too-large-to-grapple": "targeting",
   // Help distracts an enemy, so not the helper or one of its allies.
   "target.not-an-enemy": "targeting",
+  // Hunter's Mark and Hex move only once the marked creature drops to 0 Hit Points.
+  "target.mark-still-standing": "targeting",
   "cover.total": "targeting",
   // Cleave's second creature: another one, within 5 feet of the first.
   "attack.cleave-same-target": "targeting",

@@ -304,6 +304,8 @@ export function laterSpellAction(
         : {}),
     ...(spell.effect?.damageTypes && damage.length > 0 ? { damageTypes: [...spell.effect.damageTypes] } : {}),
     ...(later.area ? { area: later.area } : {}),
+    // Moving a mark lands the cast's grant on the new creature (`moveMark`).
+    ...(later.movesGrant && spell.effect?.grant ? { grants: structuredClone(spell.effect.grant) } : {}),
     spellId: spell.id
   };
 }

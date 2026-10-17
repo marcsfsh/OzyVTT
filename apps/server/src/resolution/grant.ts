@@ -15,6 +15,7 @@ import {
 import { deriveEquipment } from "../equipment-derivation.js";
 import { currentSpeedFeet } from "../speed.js";
 import type { LiveActor, ResolveContext } from "./context.js";
+import { moveMark } from "./marks.js";
 
 /** A grant keyed on these tags measures its recipient when it lands, as Dash does: Mage Armor's AC, Haste's Speed. */
 const MAGE_ARMOR_TAG = "mage-armor";
@@ -59,6 +60,7 @@ export function applyGrant(ctx: ResolveContext): void {
   const { action, attacker, targets, attack } = ctx;
   const grant = action.grants;
   if (!grant) return;
+  if (moveMark(ctx)) return;
   if (grant.onHit && (attack === null || (attack.outcome !== "hit" && attack.outcome !== "crit"))) return;
   const recipients =
     grant.target === "targets" ? targets : grant.target === "target" ? targets.slice(0, 1) : [attacker];

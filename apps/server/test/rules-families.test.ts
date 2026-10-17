@@ -86,6 +86,8 @@ describe("rule families", () => {
       ["target.too-large-to-grapple", "targeting"],
       // Help distracts an enemy: not the helper, not an ally.
       ["target.not-an-enemy", "targeting"],
+      // Hunter's Mark and Hex move from a creature at 0 Hit Points only: whom the action may target.
+      ["target.mark-still-standing", "targeting"],
       ["cover.total", "targeting"],
       ["condition.charmed-charmer", "targeting"],
       ["target.too-many", "targeting"],

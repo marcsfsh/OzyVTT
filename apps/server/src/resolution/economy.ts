@@ -21,6 +21,7 @@ import {
 } from "../rules-families.js";
 import { laterSpellActionId, ritualSpellActionId } from "../item-actions.js";
 import { builtinHandlerFor } from "./builtins.js";
+import { castMarks, markMoveOf } from "./marks.js";
 import { hitRiderOf } from "./hit-riders.js";
 import { sizeRank, type DefinitionAction, type LiveActor, type ResolveContext, type ResolveInput } from "./context.js";
 
@@ -160,6 +161,7 @@ export function evaluateActionEconomy(
     if (unprepared) evaluation.violations.push({ rule: "slots.not-prepared", message: unprepared });
   }
   checkTargeting(evaluation, distanceFeet);
+  if (spell) checkMarkMove(evaluation, spell);
   if (spell) checkSpellTargets(evaluation, spell, spendSpellSlot?.level ?? continued ?? spell.level, distanceFeet);
   const opensSpell = spendSpellSlot !== null && slots.markAction && slots.instance?.components[action.id] !== undefined;
   return {
@@ -179,6 +181,26 @@ export function evaluateActionEconomy(
     proseMultiattack: evaluation.proseMultiattack,
     notes: evaluation.notes
   };
+}
+
+/** SRD Hunter's Mark and Hex move "if the target drops to 0 Hit Points before this spell ends": the caster's
+ *  Concentration on the spell holds a mark, and the marked creature is down. */
+function checkMarkMove({ state, attacker, action, violations }: Evaluation, spell: SpellReference): void {
+  if (!markMoveOf(spell, action.id)) return;
+  const marks = castMarks(state, attacker, spell);
+  if (marks.length === 0) {
+    violations.push({
+      rule: "feature.requires-effect",
+      message: `${attacker.name} isn't concentrating on ${spell.name}, so there is no mark to move.`
+    });
+    return;
+  }
+  const standing = marks.find(({ bearer }) => bearer.hp.current > 0);
+  if (standing)
+    violations.push({
+      rule: "target.mark-still-standing",
+      message: `${spell.name} moves only once its creature drops to 0 Hit Points - ${standing.bearer.name} hasn't.`
+    });
 }
 
 /** In wait mode the order is provisional until every player has rolled, and the turn economy resets when

@@ -63,6 +63,19 @@ describe("a save made later, not on the cast", () => {
     ]);
   });
 
+  it("keeps the caster's Concentration on Spirit Guardians through its later save", () => {
+    const { resolve, state, hero } = fight(cleric);
+    resolve("spell-spirit-guardians", { targetIds: [] });
+    const concentrating = () => hero.effects.filter((effect) => effect.tags.includes("concentrating"));
+    const [cast] = concentrating();
+    const later = resolve("spell-spirit-guardians-then-save", {}, [3, 3, 3]);
+    expect(concentrating()).toEqual([cast]);
+    expect(later.tableNarration?.some((line) => /Concentrating on Spirit Guardians ended/.test(line.text))).not.toBe(
+      true
+    );
+    expect(state.combat.pendingSaves).toHaveLength(1);
+  });
+
   it("prompts nobody for a save when Haste lands on an ally", () => {
     const { resolve, state } = fight(wizard, { ally: true });
     resolve("spell-haste", { targetIds: [ALLY] });
