@@ -60,7 +60,7 @@ export function Tabs({
     };
   }, [horizontal, tabs.length]);
 
-  /* Scroll the bar itself, not `scrollIntoView`, which would scroll every ancestor (and the page on mount).
+  /* Scroll the bar itself: `scrollIntoView` would scroll every ancestor (and the page on mount).
      SCROLL_PAD matches `scroll-padding-inline` in Tabs.css so the tab lands clear of the edge fade. */
   useLayoutEffect(() => {
     const bar = barRef.current;

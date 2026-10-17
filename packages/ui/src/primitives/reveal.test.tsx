@@ -16,7 +16,7 @@ describe("RevealSwitch: the one reveal toggle", () => {
     expect(screen.getByRole("switch")).toHaveAttribute("aria-checked", "true");
 
     view.rerender(<RevealSwitch revealed={false} onChange={() => {}} />);
-    // "Hidden from players", not "GM only", so the record axis never collides with the content pill.
+    // "Hidden from players", so the record axis never collides with the content pill ("GM only").
     expect(screen.getByRole("tooltip")).toHaveTextContent("Hidden from players");
     expect(screen.getByRole("switch")).toHaveAttribute("title", "Hidden from players");
     expect(screen.getByRole("switch")).toHaveAttribute("aria-checked", "false");
