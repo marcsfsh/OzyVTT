@@ -1,5 +1,6 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, IconList, IconPin } from "@vtt/ui";
+import { revealInRegion } from "../lib/reveal";
 import { ActionList, ConcentrationTag } from "./ActionList";
 import { COST_GROUPS, type TurnOption } from "./turn-options";
 
@@ -127,6 +128,14 @@ export function TurnCard({
   onUse: (option: TurnOption) => void;
 }>) {
   const [view, setView] = useState<"tiles" | "all" | "edit">("tiles");
+  // Each view is a different length, and the one before may have been scrolled: the card's top comes into view.
+  const cardRef = useRef<HTMLElement | null>(null);
+  const viewSeen = useRef(view);
+  useEffect(() => {
+    if (viewSeen.current === view) return;
+    viewSeen.current = view;
+    revealInRegion(cardRef.current, "nearest");
+  }, [view]);
   const tiles = tilesOf(options, pins, counts);
   const pinned = (pins ?? []).filter((id) => options.some((option) => option.id === id));
   const togglePin = (id: string) => {
@@ -135,7 +144,7 @@ export function TurnCard({
     onSetPins(next);
   };
   return (
-    <section className="cs-turn" aria-label={myTurn ? "Your turn" : "The turn"}>
+    <section ref={cardRef} className="cs-turn" aria-label={myTurn ? "Your turn" : "The turn"}>
       <div className="cs-turn-head">
         <h2 className="cs-turn-title">{myTurn ? "Your turn" : `${acting ?? "Someone else"} is acting`}</h2>
         {round !== null && <span className="cs-turn-round">Round {round}</span>}

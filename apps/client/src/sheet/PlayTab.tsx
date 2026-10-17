@@ -484,7 +484,7 @@ function Vitals({
       </div>
       <div className="cs-group">
         <span className="cs-eyebrow">Conditions and effects</span>
-        <StatusStrip actor={actor} role={role} inFight={inFight} onFeedback={onFeedback} />
+        <StatusStrip actor={actor} role={role} inFight={inFight} inspiration={false} onFeedback={onFeedback} />
       </div>
       {!inFight && <RestButtons actorId={actor.id} role={role} asked={restAsked} onFeedback={onFeedback} />}
     </section>

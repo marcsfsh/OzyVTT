@@ -525,24 +525,26 @@
   flex-direction: column;
   min-width: 0;
 }
-/* One row that scrolls sideways on a narrow screen. */
+/* The chips wrap to a second line on a narrow screen, so every state is read whole. */
 .cs-status {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-1);
   padding: var(--space-1) var(--space-3);
-  overflow-x: auto;
-  scrollbar-width: none;
   background: var(--surface-1);
   border-bottom: 1px solid var(--line-strong);
 }
 .cs-status > * {
   flex: none;
+  max-width: 100%;
+}
+/* A chip longer than the row breaks its words; it never runs off the edge. */
+.cs-status > .nh-chip {
+  white-space: normal;
 }
 .cs-vitals .cs-status {
-  flex-wrap: wrap;
   padding: 0;
-  overflow-x: visible;
   background: none;
   border: 0;
 }
@@ -1144,8 +1146,8 @@ button.cs-lastroll-open {
 .cs-action-children {
   margin: var(--space-1) 0 0 var(--space-4);
 }
-/* The leading edge says what it costs, and the words say it too: magenta an action, indigo a spell, cyan a Bonus
-   Action, orange a Reaction. */
+/* The list sits under headings that name the cost, so its leading edge says what kind each option is: magenta an
+   attack or a feature, indigo a spell, cyan an item. */
 .cs-action {
   display: flex;
   align-items: center;
@@ -1165,15 +1167,8 @@ button.cs-lastroll-open {
 .cs-action.is-spell {
   border-left-color: var(--indigo);
 }
-.cs-action.is-bonus-action {
+.cs-action.is-item {
   border-left-color: var(--cyan);
-}
-.cs-action.is-reaction {
-  border-left-color: var(--caution);
-}
-.cs-action.is-magic,
-.cs-action.is-other {
-  border-left-color: var(--line-raised);
 }
 .cs-action:disabled {
   background: var(--surface-1);

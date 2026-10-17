@@ -28,13 +28,16 @@ type Shown = Readonly<{ kind: "condition" | "effect"; id: string }> | Readonly<{
 /**
  * Every live state on one strip under the sheet's header: Concentration with the spell and its time left, the
  * conditions, Heroic Inspiration while it is held, Exhaustion with what it costs, and timed effects with their time
- * left. A tap opens what the state does and the way to end it this viewer has; Add puts a condition on.
+ * left. A tap opens what the state does and the way to end it this viewer has; Add puts a condition on. Heroic
+ * Inspiration leaves the strip wherever a band or the Vitals show it.
  */
 export function StatusStrip({
   actor,
   role,
   inFight,
   leading,
+  states = true,
+  inspiration = true,
   onFeedback
 }: Readonly<{
   actor: SheetActor;
@@ -43,20 +46,26 @@ export function StatusStrip({
   inFight: boolean;
   /** Chips the compact row puts first (AC, Initiative, Dying). */
   leading?: React.ReactNode;
+  /** Shows the live states and Add after the leading chips. Off in the table's row while the Vitals show them. */
+  states?: boolean;
+  /** Shows Heroic Inspiration while held. Off where the laptop's band or the phone's Vitals already show it. */
+  inspiration?: boolean;
   onFeedback: (text: string) => void;
 }>) {
   const reference = useConditionReference();
-  const [shown, setShown] = useState<Shown>(null);
+  const [picked, setPicked] = useState<Shown>(null);
+  // With the states off the row, nothing of theirs stays open under it.
+  const shown = states ? picked : null;
   const commands = useConditionCommands(actor.id, onFeedback, (conditionId) => {
-    if (shown?.kind === "condition" && shown.id === conditionId) setShown(null);
+    if (shown?.kind === "condition" && shown.id === conditionId) setPicked(null);
   });
   const effects = actor.effects as readonly ChipEffect[];
   const concentration = concentrationOf(effects);
   const others = effects.filter((effect) => effect !== concentration);
   const exhaustion = exhaustionLevel(actor);
-  const inspired = heroicInspirationOf(actor) === true;
+  const inspired = states && inspiration && heroicInspirationOf(actor) === true;
   const toggle = (next: NonNullable<Shown>) =>
-    setShown((current) =>
+    setPicked((current) =>
       current && current.kind === next.kind && ("id" in current ? current.id : "") === ("id" in next ? next.id : "")
         ? null
         : next
@@ -86,31 +95,34 @@ export function StatusStrip({
     <div className="cs-status-block">
       <div className="cs-status" role="group" aria-label="Live states">
         {leading}
-        {concentration && effectChip(concentration, `Concentration · ${concentrationSpell(concentration.name)}`, true)}
-        {actor.conditions
-          .filter((condition) => condition.id !== "exhaustion")
-          .map((condition) => (
-            <Chip
-              key={condition.id}
-              tone={conditionTone(condition.id)}
-              icon={conditionIcon(condition.id)}
-              pressed={isShown("condition", condition.id)}
-              aria-expanded={isShown("condition", condition.id)}
-              title={descriptionFor(condition.id, reference)}
-              onClick={() => {
-                requestConditionReference();
-                toggle({ kind: "condition", id: condition.id });
-              }}
-            >
-              {labelFor(condition, reference)}
-            </Chip>
-          ))}
+        {states &&
+          concentration &&
+          effectChip(concentration, `Concentration · ${concentrationSpell(concentration.name)}`, true)}
+        {states &&
+          actor.conditions
+            .filter((condition) => condition.id !== "exhaustion")
+            .map((condition) => (
+              <Chip
+                key={condition.id}
+                tone={conditionTone(condition.id)}
+                icon={conditionIcon(condition.id)}
+                pressed={isShown("condition", condition.id)}
+                aria-expanded={isShown("condition", condition.id)}
+                title={descriptionFor(condition.id, reference)}
+                onClick={() => {
+                  requestConditionReference();
+                  toggle({ kind: "condition", id: condition.id });
+                }}
+              >
+                {labelFor(condition, reference)}
+              </Chip>
+            ))}
         {inspired && (
           <Chip tone="beneficial" icon={<IconStar />} className="cs-chip-static">
             Heroic Inspiration
           </Chip>
         )}
-        {exhaustion > 0 && (
+        {states && exhaustion > 0 && (
           <Chip
             className="cs-chip-caution"
             pressed={isShown("condition", "exhaustion")}
@@ -125,20 +137,22 @@ export function StatusStrip({
             <span className="cs-chip-time">{exhaustionCost(exhaustion)}</span>
           </Chip>
         )}
-        {others.map((effect) => effectChip(effect, effect.name))}
-        <Chip
-          className="cs-chip-add"
-          pressed={shown?.kind === "add"}
-          aria-expanded={shown?.kind === "add"}
-          aria-label="Edit conditions"
-          icon={<IconPlus />}
-          onClick={() => {
-            requestConditionReference();
-            toggle({ kind: "add" });
-          }}
-        >
-          {shown?.kind === "add" ? "Done" : "Add"}
-        </Chip>
+        {states && others.map((effect) => effectChip(effect, effect.name))}
+        {states && (
+          <Chip
+            className="cs-chip-add"
+            pressed={shown?.kind === "add"}
+            aria-expanded={shown?.kind === "add"}
+            aria-label="Edit conditions"
+            icon={<IconPlus />}
+            onClick={() => {
+              requestConditionReference();
+              toggle({ kind: "add" });
+            }}
+          >
+            {shown?.kind === "add" ? "Done" : "Add"}
+          </Chip>
+        )}
       </div>
       {openCondition && (
         <div className="cs-status-detail">
@@ -154,7 +168,7 @@ export function StatusStrip({
             busy={commands.busy}
             onRemove={() => commands.send(openCondition.id, false)}
             onAsk={() => commands.ask(openCondition.id)}
-            onClose={() => setShown(null)}
+            onClose={() => setPicked(null)}
           />
         </div>
       )}
@@ -167,7 +181,7 @@ export function StatusStrip({
             canAsk={role === "player" && inFight}
             canAct
             onFeedback={onFeedback}
-            onClose={() => setShown(null)}
+            onClose={() => setPicked(null)}
           />
         </div>
       )}

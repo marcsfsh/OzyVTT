@@ -176,6 +176,50 @@ describe("the sheet's tabs", () => {
   });
 });
 
+describe("Heroic Inspiration", () => {
+  const strip = () => within(screen.getAllByRole("group", { name: "Live states" })[0]!);
+  const inspired = () => hero({ heroicInspiration: true });
+
+  it("shows once on a phone's Play tab, in the Vitals, and on the strip from another tab", async () => {
+    const user = userEvent.setup();
+    render(<CharacterSheet actor={inspired()} role="player" state={view(inspired())} onClose={() => {}} />, {
+      wrapper: ToastProvider
+    });
+    const vitals = within(screen.getByRole("region", { name: "Vitals" }));
+    expect(vitals.getByText("Held")).toBeTruthy();
+    expect(screen.queryByText("Heroic Inspiration", { selector: ".nh-chip, .nh-chip *" })).toBeNull();
+    await user.click(screen.getByRole("tab", { name: "Notes" }));
+    expect(strip().getByText("Heroic Inspiration")).toBeTruthy();
+  });
+
+  it("stays off the table's compact row while the Vitals show it", async () => {
+    const user = userEvent.setup();
+    render(
+      <CharacterSheet
+        actor={inspired()}
+        role="player"
+        state={view(inspired())}
+        presentation="panel"
+        phone
+        onClose={() => {}}
+      />,
+      { wrapper: ToastProvider }
+    );
+    expect(strip().queryByText("Heroic Inspiration")).toBeNull();
+    await user.click(screen.getByRole("tab", { name: "Gear" }));
+    expect(strip().getByText("Heroic Inspiration")).toBeTruthy();
+  });
+
+  it("stays off a laptop's strip, since the band shows it", () => {
+    onLaptop(true);
+    render(<CharacterSheet actor={inspired()} role="player" state={view(inspired())} onClose={() => {}} />, {
+      wrapper: ToastProvider
+    });
+    expect(strip().queryByText("Heroic Inspiration")).toBeNull();
+    expect(screen.getByText("Heroic Inspiration", { selector: ".cs-band *" })).toBeTruthy();
+  });
+});
+
 describe("the phone's header", () => {
   it("opens the Hit Points drawer from its tile", async () => {
     const user = userEvent.setup();

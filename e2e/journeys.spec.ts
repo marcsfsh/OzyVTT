@@ -408,11 +408,19 @@ test("a player takes a turn on a phone: a tile, its cast, a target and the roll"
   const card = player.getByRole("region", { name: "Your turn" });
   await expect(card.getByText("Action · cantrip").first()).toBeVisible();
   await expectPageFits(player);
-  // Every option is a tap away; a levelled spell opens its cast card in place.
-  const bolt = card.getByRole("button", { name: /Guiding Bolt/ }).first();
-  if (!(await bolt.isVisible())) await press(card.getByRole("button", { name: /^All \d+ options$/ }));
+  // Every option is a tap away. A levelled spell opens its cast card in place with its top in view, however far down
+  // the list was scrolled, and Back gives the card back the same way.
+  const allOptions = card.getByRole("button", { name: /^All \d+ options$/ });
+  await press(allOptions);
   await press(card.getByRole("button", { name: /Guiding Bolt/ }).first());
   const cast = player.getByRole("region", { name: "Cast Guiding Bolt" });
+  await expect(cast.getByRole("button", { name: "Back" })).toBeInViewport({ ratio: 1 });
+  await press(cast.getByRole("button", { name: "Back" }));
+  await expect(yourTurn).toBeInViewport({ ratio: 1 });
+  // A favourite tile opens the same cast card.
+  const tile = card.getByRole("button", { name: /Guiding Bolt/ }).first();
+  if (!(await tile.isVisible())) await press(allOptions);
+  await press(card.getByRole("button", { name: /Guiding Bolt/ }).first());
   await expect(cast.getByRole("button", { name: /^Level 1/ })).toHaveAttribute("aria-pressed", "true");
   await expectPageFits(player);
   await press(cast.getByRole("button", { name: "Cast at level 1" }));

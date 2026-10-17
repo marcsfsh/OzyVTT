@@ -441,7 +441,19 @@ export function CharacterSheet({
         return gmBody;
     }
   };
-  const status = <StatusStrip actor={actor} role={role} inFight={controller.inFight} onFeedback={say} />;
+  // On a phone's Play tab between fights the Vitals hold the numbers and live states, so the header shows only who and
+  // the table's row only its numbers.
+  const vitalsShow = phoneViews && tab === "play" && !controller.inFight;
+  // The laptop's band carries Heroic Inspiration, so its strip leaves it out.
+  const status = (
+    <StatusStrip
+      actor={actor}
+      role={role}
+      inFight={controller.inFight}
+      inspiration={layout !== "wide"}
+      onFeedback={say}
+    />
+  );
   const missing =
     !definition && role === "gm" && definitionId && !unloaded ? (
       <p className="cs-note">Loading the stat block.</p>
@@ -483,8 +495,6 @@ export function CharacterSheet({
     </div>
   );
   const toastRow = presentation === "dialog" ? <ToastOutlet className="cs-toast" /> : null;
-  // On a phone's Play tab between fights the Vitals hold the numbers and live states, so the header shows only who.
-  const vitalsShow = layout === "narrow" && phoneViews && tab === "play" && !controller.inFight;
 
   const name = (
     <span className="cs-id-text">
@@ -565,6 +575,7 @@ export function CharacterSheet({
             actor={actor}
             role={role}
             inFight={controller.inFight}
+            states={!vitalsShow}
             onFeedback={say}
             leading={
               <>

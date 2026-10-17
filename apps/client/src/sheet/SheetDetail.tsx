@@ -22,9 +22,10 @@ export function SheetDetail({
   children
 }: Readonly<{ place: DetailPlace; title: string; onClose: () => void; children: ReactNode }>) {
   const ref = useRef<HTMLDivElement | null>(null);
-  // The right column may be scrolled to its Hit Points: the new detail comes into view.
+  // The right column may be scrolled to its Hit Points, and a phone's list down to the tapped row: the new detail's
+  // top comes into view.
   useEffect(() => {
-    if (place.kind === "column") revealInRegion(ref.current, "nearest", "smooth");
+    if (place.kind !== "drawer") revealInRegion(ref.current, "nearest", place.kind === "column" ? "smooth" : "auto");
   }, [place.kind, title]);
   if (place.kind === "drawer")
     return (

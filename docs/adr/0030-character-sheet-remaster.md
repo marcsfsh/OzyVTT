@@ -63,7 +63,9 @@ What that means on the sheet:
 
 - **The frame.** A pinned header holds the avatar, the name, the identity line and the sheet menu, with tiles for Hit
   Points (with its bar), AC, Speed and Initiative. A status strip under it carries Concentration with its time left,
-  the conditions, Heroic Inspiration while held, Exhaustion with what it costs, and timed effects. A phone has the six
+  the conditions, Heroic Inspiration while held, Exhaustion with what it costs, and timed effects. Its chips wrap, so
+  no label is cut. Where the laptop's band or the phone's Vitals show Heroic Inspiration, the strip leaves it out. A
+  phone has the six
   tabs as a bar at the bottom; the GM's phone swaps Notes for a violet GM tab. A character with no spells has no
   Spells tab, and each device remembers the last tab. The Hit Points tile opens a drawer to change Hit Points from
   any tab.
@@ -83,8 +85,9 @@ What that means on the sheet:
   uses a rest gives back. On a phone B's Vitals take the top: a Hit Points box with Damage and Heal; tiles for AC,
   Initiative, Speed and Passive Perception; Hit Point Dice as boxes; Heroic Inspiration and Exhaustion; conditions
   with Add; Short Rest and Ask for a Long Rest. In a fight a laptop lists the options grouped by cost (Action, Magic
-  action from items, Bonus Action, Reaction) with the server's reason on each one that can't be used now. At 0 HP
-  Play opens with the Death Saving Throws card. Rest controls are hidden in a fight.
+  action from items, Bonus Action, Reaction) with the server's reason on each one that can't be used now. Each row's
+  leading edge names its kind: magenta an attack or a feature, indigo a spell, cyan an item. At 0 HP Play opens with
+  the Death Saving Throws card. Rest controls are hidden in a fight.
 - **The turn card** (phones). "Your turn" with the round, then up to eight favourite tiles two to a row. Each tile
   says its cost in words and its left edge takes the cost's colour. "All N options" opens the full list in place, and
   Edit favourites pins and unpins. Until the player pins any, the tiles are the options this character uses most,

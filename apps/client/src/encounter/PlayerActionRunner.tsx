@@ -259,6 +259,15 @@ export function PlayerActionRunner({
   useEffect(() => {
     if (shown) revealInRegion(rootRef.current, "nearest");
   }, [shown]);
+  // A cast in place takes the card's place and Back gives the card back. The list may have been scrolled down to the
+  // tapped option, so the top of whichever shows comes back into view.
+  const castingId = casting?.id ?? null;
+  const castSeen = useRef(castingId);
+  useEffect(() => {
+    if (castSeen.current === castingId) return;
+    castSeen.current = castingId;
+    if (castPlace.kind === "inline") revealInRegion(rootRef.current, "nearest");
+  }, [castingId, castPlace.kind]);
 
   if (actions.length === 0 && facts.common.length === 0) return null;
   const onOutcome = (ok: boolean, message?: string) => {

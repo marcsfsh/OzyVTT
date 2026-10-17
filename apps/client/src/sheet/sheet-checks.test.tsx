@@ -487,10 +487,12 @@ describe("Heroic Inspiration on the sheet", () => {
       { wrapper: ToastProvider }
     );
     const user = userEvent.setup();
-    expect(within(screen.getByRole("group", { name: "Live states" })).getByText("Heroic Inspiration")).toBeTruthy();
+    // The phone's Vitals hold it on Play, and the header's strip on every other tab.
+    expect(within(screen.getByRole("region", { name: "Vitals" })).getByText("Held")).toBeTruthy();
     // A player spends it from a reroll; it has no button of its own.
     expect(screen.queryByRole("button", { name: "Give Heroic Inspiration" })).toBeNull();
     await openTab(user, "Checks");
+    expect(within(screen.getByRole("group", { name: "Live states" })).getByText("Heroic Inspiration")).toBeTruthy();
     await user.click(await screen.findByRole("button", { name: "Roll a Strength check, +1" }));
     // The reroll is offered once the check is the character's latest roll.
     expect(screen.queryByRole("button", { name: "Reroll · Heroic Inspiration" })).toBeNull();

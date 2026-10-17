@@ -123,14 +123,17 @@ next to it.
 ADR-0030 records the layout and which views come from which mockup. A change to the sheet keeps these:
 
 - The header holds the numbers read most, and the status strip under it holds every live state with its time left.
-  A new live state goes in the strip.
+  A new live state goes in the strip. Its chips wrap to another line, and a state the laptop's band or the phone's
+  Vitals already show leaves the strip.
 - Six tabs: Play, Checks, Spells, Gear, Features and Notes. A phone has them as a bar at the bottom. From 980px a
   laptop gives the checks a left column and the Hit Points a right column, so its middle tabs leave out Checks. In the
   table's panel the tabs are a segmented strip, styled apart from the panel's own tabs.
 - A detail (a cast, an item, a spell to copy) is one component placed by `SheetDetail`: the right column on a laptop,
   a drawer on a phone. A player's cast on a phone takes the place of the card or list it came from.
-- An option's cost is a 3px leading edge and always words too: `--magenta` for an Action, `--indigo` for a spell,
-  `--cyan` for a Bonus Action and `--caution` for a Reaction.
+- A turn-card tile names its cost in words and colours its 3px leading edge by it: `--magenta` for an Action,
+  `--indigo` for a spell, `--cyan` for a Bonus Action and `--caution` for a Reaction. The laptop's list sits under
+  headings that name the cost, so its edge names the kind: `--magenta` for an attack or a feature, `--indigo` for a
+  spell and `--cyan` for an item.
 - An option that can't be used now stays in its list, disabled, with the server's reason at full strength.
 - Every control only the GM has is violet with a `GmOnlyTag` beside its group, wherever it sits.
 - Rest controls are hidden in a fight, where the server refuses them.

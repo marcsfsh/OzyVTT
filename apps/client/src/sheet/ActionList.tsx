@@ -27,7 +27,7 @@ function OptionRow({
   return (
     <button
       type="button"
-      className={`cs-action is-${option.cost} is-${option.kind}${option.reason ? " has-reason" : ""}`}
+      className={`cs-action is-${option.kind}${option.reason ? " has-reason" : ""}`}
       disabled={disabled}
       title={option.summary.description || undefined}
       onClick={() => onUse(option)}
