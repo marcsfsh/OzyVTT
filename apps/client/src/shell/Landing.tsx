@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, IconArrow, Input, ThemeToggle, Wordmark } from "@vtt/ui";
+import { Button, IconArrow, Input, Modal, Switch, ThemeToggle, Wordmark } from "@vtt/ui";
 import { Notice, type NoticeMessage } from "../components/feedback";
 import "./landing.css";
 
@@ -54,6 +54,8 @@ export function Landing({
   driving,
   bootstrapped,
   busy,
+  resuming,
+  gmPrompt,
   notice,
   onJoin,
   onSignIn,
@@ -64,15 +66,31 @@ export function Landing({
   /** Whether a GM password exists yet; null until the server says. */
   bootstrapped: boolean | null;
   busy: boolean;
+  /** A stored GM session is being tried; neither door opens until it settles. */
+  resuming: boolean;
+  /** Open on the GM sign-in, as after a GM session ended. */
+  gmPrompt: boolean;
   notice: NoticeMessage;
   onJoin: () => void;
-  onSignIn: (password: string) => void;
+  onSignIn: (password: string, keepSignedIn: boolean) => void;
   onSetPassword: (password: string) => void;
   onClearNotice: () => void;
 }>) {
-  const [door, setDoor] = useState<"choose" | "gm">("choose");
+  const [door, setDoor] = useState<"choose" | "gm">(gmPrompt ? "gm" : "choose");
+  useEffect(() => {
+    if (gmPrompt) setDoor("gm");
+  }, [gmPrompt]);
   const [password, setPassword] = useState("");
-  const submit = () => (bootstrapped ? onSignIn(password) : onSetPassword(password));
+  const [shown, setShown] = useState(false);
+  const [keepSignedIn, setKeepSignedIn] = useState(false);
+  const [resetSteps, setResetSteps] = useState(false);
+  const submit = () => {
+    if (busy || !password) return;
+    // The last attempt's error goes as this one starts, so it never sits beside the next answer.
+    onClearNotice();
+    if (bootstrapped) onSignIn(password, keepSignedIn);
+    else onSetPassword(password);
+  };
   return (
     <div className={driving ? "landing landing--drive" : "landing"}>
       {/* The title screen, layer by layer: star field, the slatted sun behind the horizon, the mountains on
@@ -99,13 +117,14 @@ export function Landing({
       </header>
       {door === "choose" ? (
         <section className="choices anim-view">
-          <Button variant="primary" size="md" lift onClick={onJoin} disabled={busy}>
+          <Button variant="primary" size="md" lift onClick={onJoin} disabled={busy || resuming}>
             {busy ? "Connecting…" : "Join as Player"}
             <IconArrow className="nav-arrow" />
           </Button>
           <Button
             variant="secondary"
             lift
+            disabled={resuming}
             onClick={() => {
               onClearNotice();
               setDoor("gm");
@@ -116,37 +135,82 @@ export function Landing({
           </Button>
         </section>
       ) : (
-        <section className="card anim-view">
-          <h2>{bootstrapped ? "GM sign-in" : "Set up the GM password"}</h2>
+        <section className="card landing-gm anim-view" aria-labelledby="landing-gm-title">
+          <h2 id="landing-gm-title">{bootstrapped ? "GM sign-in" : "Set up the GM password"}</h2>
           <p>
             {bootstrapped
               ? "Enter the GM password to run the table."
-              : "Do this once, on the host machine, before players join."}
+              : "Use at least 12 characters. Set it on this computer, the one that runs OzyVTT, before players join."}
           </p>
-          <Input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder="GM password"
-            autoFocus
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !busy) submit();
-            }}
-          />
-          <Button variant="primary" onClick={submit} disabled={busy || !password}>
-            {busy ? "Please wait…" : bootstrapped ? "Enter table" : "Set GM password"}
-            {!busy && <IconArrow className="nav-arrow" />}
-          </Button>
-          <Button
-            variant="ghost"
-            className="link"
-            onClick={() => {
-              onClearNotice();
-              setDoor("choose");
+          <form
+            className="landing-gm-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              submit();
             }}
           >
-            Back
-          </Button>
+            <div className="landing-password">
+              <Input
+                type={shown ? "text" : "password"}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="GM password"
+                aria-label="GM password"
+                autoComplete={bootstrapped ? "current-password" : "new-password"}
+                autoFocus
+              />
+              <Button
+                variant="ghost"
+                className="landing-password-show"
+                aria-label="Show password"
+                aria-pressed={shown}
+                onClick={() => setShown((current) => !current)}
+              >
+                {shown ? "Hide" : "Show"}
+              </Button>
+            </div>
+            {bootstrapped && (
+              <Switch
+                className="landing-keep"
+                checked={keepSignedIn}
+                onChange={setKeepSignedIn}
+                label="Keep me signed in on this computer"
+              />
+            )}
+            <div className="landing-gm-actions">
+              <Button variant="primary" type="submit" disabled={busy || !password}>
+                {busy ? "Please wait…" : bootstrapped ? "Enter table" : "Set GM password"}
+                {!busy && <IconArrow className="nav-arrow" />}
+              </Button>
+              <Button
+                variant="ghost"
+                className="link"
+                onClick={() => {
+                  onClearNotice();
+                  setDoor("choose");
+                }}
+              >
+                Back
+              </Button>
+            </div>
+          </form>
+          {/* In a dialog: the steps would push the card past a phone's screen, and the landing never scrolls. */}
+          {bootstrapped && (
+            <div className="landing-reset">
+              <Button variant="ghost" className="link" onClick={() => setResetSteps(true)}>
+                Forgot the password
+              </Button>
+              <Modal
+                open={resetSteps}
+                onClose={() => setResetSteps(false)}
+                size="sm"
+                title="Reset the GM password"
+                ariaLabel="Reset the GM password"
+              >
+                <ResetSteps />
+              </Modal>
+            </div>
+          )}
         </section>
       )}
       {/* Auth errors are the one inline exception to toast-only feedback. */}
@@ -154,6 +218,23 @@ export function Landing({
       <div className="home-theme-switch">
         <ThemeToggle />
       </div>
+    </div>
+  );
+}
+
+/** How to set a new GM password. The app can't do it: knowing the old one is the only proof of being the GM. */
+export function ResetSteps() {
+  return (
+    <div className="landing-reset-steps" role="note">
+      <p>The GM password can only be reset on the computer that runs OzyVTT.</p>
+      <ol>
+        <li>Stop OzyVTT there.</li>
+        <li>
+          Delete the file <code>data/auth.json</code> in the OzyVTT folder.
+        </li>
+        <li>Start OzyVTT again and set a new password on that computer.</li>
+      </ol>
+      <p>The campaign stays as it was. Players join again and claim their characters.</p>
     </div>
   );
 }

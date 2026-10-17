@@ -14,6 +14,15 @@ export function storedPlayerToken(): string | undefined {
   }
 }
 
+/** Drops a stored player token the server no longer accepts, so the next join takes a fresh seat. */
+export function forgetPlayerToken() {
+  try {
+    localStorage.removeItem(PLAYER_TOKEN_KEY);
+  } catch {
+    /* private mode: nothing was stored */
+  }
+}
+
 /**
  * Connects the socket with a session token and joins the table. The token rides in `socket.auth` too,
  * so a reconnect resumes without another join. A player token the server issues or renews is stored.

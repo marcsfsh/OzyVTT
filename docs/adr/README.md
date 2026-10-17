@@ -25,6 +25,8 @@
 | [021](0021-player-character-sheet.md)           | Accepted                                       | Interactive player character sheet (builder-ready): the play sheet ships. The guided builder was deferred and **has since shipped** — see [its closing record](0021-player-character-sheet-closing-record.md) |
 | [022](0022-manual-fog-of-war.md)                | Accepted                                       | Manual GM-painted fog as ordered rect strokes over the scene boundary — presentation only, never the security boundary                                                                                        |
 | [024](0024-table-sound.md)                      | Accepted                                       | Music and ambient sound on the table screen only: a GM sound library, a server-run board in its own store, and a viewer feed that carries only what is playing                                                |
+| [025](0025-session-lifecycle.md)                | Accepted                                       | One helper reads every caller: 401 for no credential or a dead one, 403 only for a valid one without the role; a session that ends is told; the GM tab resumes after a reload                                 |
+| [026](0026-table-screen-pairing.md)             | Accepted                                       | A table screen shows a short code and the GM types it; the code only names the request, and the screen's own secret collects the same viewer credential                                                       |
 
 Use [template.md](template.md) for material decisions. A proposed ADR becomes accepted only after its spike has evidence.
 

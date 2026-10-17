@@ -18,6 +18,12 @@ The product serves one trusted GM and a small home group joining directly by LAN
 
 All participants reach the same server at the same LAN address; there is no separate GM URL or player invitation link. A first-run GM password is bootstrapped only from a loopback request (`isLoopback` check in `apps/server/src/index.ts`) with a minimum length requirement, hashed with bcrypt (cost factor 12, `apps/server/src/auth.ts`) — the plaintext password is never stored. Subsequent GM logins receive a signed, time-limited (12-hour) session token (ADR-002). Players receive a signed player session token (30-day expiry) on join, with no password; that session claims ownership of exactly one player-character actor at a time by setting the actor's `ownerSessionId` (`packages/schemas/src/index.ts`). The server enforces, per claim command: the target actor is a player-character, it is not already claimed by a different session, and the claiming session does not already own a different character — a player must release before claiming another (`apps/server/src/index.ts`, `character:claim`/`character:release`). Both GM and player session tokens are self-contained, HMAC-SHA256-signed, and verified with a timing-safe comparison (`apps/server/src/auth.ts`).
 
+**Amended 2026-10-17 by [ADR-0025](0025-session-lifecycle.md) and [ADR-0026](0026-table-screen-pairing.md):** the GM
+token is kept in the tab's sessionStorage (and, on request, the computer's localStorage) so a reload stays signed in; a
+session that ends is told and dropped; a dead token at join is refused, never swapped for a new seat; the GM can change
+the password in Settings; force-release asks again for a character in the running fight and tells its player; and a
+table screen pairs from the code it shows.
+
 ## Consequences and tradeoffs
 
 Identity is per-browser-session, not per-person: a player who joins from a second device gets a second, independent session and must claim separately, and clearing browser storage loses the claim binding (recoverable by claiming again, since characters are not deleted). There is no password reset flow for players because there is no player password; losing a GM password requires host-machine access to reset. This trade is accepted because it matches the product's explicit no-accounts, trusted-LAN, small-home-group scope (README.md, "Scope boundaries").
