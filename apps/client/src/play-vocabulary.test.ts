@@ -202,8 +202,8 @@ describe("The structured copy, pinned at its one definition", () => {
     for (const phrase of [
       "Shown to players",
       "GM only",
-      "Hidden from players — you and the GM see it",
-      "GM only — you won't see the result"
+      "Hidden from players · you and the GM see it",
+      "GM only · you won't see the result"
     ]) {
       expect(
         source.includes(`"${phrase}"`),

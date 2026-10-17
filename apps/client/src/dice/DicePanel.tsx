@@ -24,8 +24,8 @@ const QUICK_DICE = [4, 6, 8, 10, 12, 20] as const;
 export const ROLL_VISIBILITY_WORD: Readonly<Record<RollVisibility, string>> = {
   public: "Shown to players",
   "gm-only": "GM only",
-  "self-only": "Hidden from players — you and the GM see it",
-  blind: "GM only — you won't see the result"
+  "self-only": "Hidden from players · you and the GM see it",
+  blind: "GM only · you won't see the result"
 };
 
 /**
@@ -72,6 +72,10 @@ export function DicePanel({
   const [advantage, setAdvantage] = useState(false);
   const [disadvantage, setDisadvantage] = useState(false);
   const [fallFeet, setFallFeet] = useState("");
+  // The GM's own panel calls for rolls; a character's dice pane does not. Calling sits beside rolling, one tap away.
+  const gmState = role === "gm" && !mineActorId && "definitions" in state ? state : null;
+  const [mode, setMode] = useState<"roll" | "call">("roll");
+  const openCalls = gmState?.rollCalls.length ?? 0;
   const { toast } = useToast();
   // The shared per-browser dice-input preference; no choice at a table that keeps players' dice on the server.
   const { rollInput, mayType, setRollInput } = useRollPreference();
@@ -139,15 +143,36 @@ export function DicePanel({
       });
   };
 
+  const modeSwitch = gmState ? (
+    <SegmentedControl
+      className="dice-mode"
+      ariaLabel="Roll dice or call for a roll"
+      value={mode}
+      onChange={(next) => setMode(next as "roll" | "call")}
+      options={[
+        { value: "roll", label: "Roll dice" },
+        { value: "call", label: openCalls > 0 ? `Call for a roll · ${openCalls} open` : "Call for a roll" }
+      ]}
+    />
+  ) : null;
+  if (gmState && mode === "call")
+    return (
+      <section className="dice-proof" aria-labelledby="roll-call-heading">
+        {modeSwitch}
+        <RollCallPanel state={gmState} />
+      </section>
+    );
+
   return (
     <section className="dice-proof" aria-labelledby="dice-proof-heading">
+      {modeSwitch}
       <div className="dice-heading">
         {/* The `id` is the section's `aria-labelledby` target. */}
         <div>
           <h2 id="dice-proof-heading">Roll dice</h2>
         </div>
         <label className="dice-visibility">
-          Who sees it?
+          Visibility
           <Select value={visibility} onChange={(event) => setVisibility(event.target.value as RollVisibility)}>
             {visibilityOptions.map((value) => (
               <option key={value} value={value}>
@@ -241,8 +266,6 @@ export function DicePanel({
         </div>
         <p className="dice-hint">Bludgeoning damage; the faller lands Prone (SRD Falling).</p>
       </details>
-      {/* The GM's own panel calls for rolls; a character's dice pane does not. */}
-      {role === "gm" && !mineActorId && "definitions" in state && <RollCallPanel state={state} />}
       {(() => {
         const rolls =
           mineActorId && rollFilter === "mine"

@@ -16,6 +16,7 @@ vi.mock("../socket", () => {
 import { socket } from "../socket";
 import { ToastProvider } from "@vtt/ui";
 import { RollCallPrompts } from "../encounter/RollCallPrompt";
+import { DicePanel } from "./DicePanel";
 import { RollCallPanel } from "./RollCallPanel";
 
 // The GM calls for a check or a save from the players; each player rolls it from a card that follows them across the
@@ -74,6 +75,28 @@ const gmState = (rollCalls: readonly RollCall[] = []) =>
 
 describe("the GM's call for a roll", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("sits at the top of the GM's dice tab beside rolling, and counts the calls still open", async () => {
+    serve();
+    const user = userEvent.setup();
+    const state = { ...gmState([openCall]), rolls: [], definitions: [] } as unknown as GmView;
+    render(<DicePanel role="gm" state={state} />, { wrapper: ToastProvider });
+    const modes = screen.getByRole("group", { name: "Roll dice or call for a roll" });
+    const call = within(modes).getByRole("button", { name: "Call for a roll · 1 open" });
+    await user.click(call);
+    expect(screen.getByRole("heading", { name: "Call for a roll" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Call for the check" })).toBeTruthy();
+    expect(
+      within(screen.getByRole("list", { name: "Open calls" })).getByText("Wisdom (Perception) check")
+    ).toBeTruthy();
+    await user.click(within(modes).getByRole("button", { name: "Roll dice" }));
+    expect(screen.getByRole("button", { name: "d20" })).toBeTruthy();
+  });
+
+  it("is not offered on a player's dice tab", () => {
+    render(<DicePanel role="player" state={{ rolls: [] } as unknown as PlayerView} />, { wrapper: ToastProvider });
+    expect(screen.queryByText("Call for a roll")).toBeNull();
+  });
 
   it("calls for a skill check from everyone, or a save with its DC from those picked", async () => {
     serve();
