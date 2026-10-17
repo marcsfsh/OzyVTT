@@ -24,9 +24,11 @@ function requireCalibration(geometry: AnnotationMapGeometry): SquareGridCalibrat
   return geometry.calibration;
 }
 
+const onMap = (point: AnnotationPoint, geometry: AnnotationMapGeometry) =>
+  point.x >= 0 && point.x <= geometry.width && point.y >= 0 && point.y <= geometry.height;
+
 function withinMap(point: AnnotationPoint, geometry: AnnotationMapGeometry, label: string) {
-  if (point.x < 0 || point.x > geometry.width || point.y < 0 || point.y > geometry.height)
-    throw new CommandRejectedError(`${label} must be inside the map.`);
+  if (!onMap(point, geometry)) throw new CommandRejectedError(`${label} must be inside the map.`);
 }
 
 /** Snaps both endpoints to grid cell centers and measures whole-cell Chebyshev distance (every cell = one grid step, no diagonal penalty), matching 5e's simplified movement rule. */
@@ -334,9 +336,13 @@ export function moveAnnotation(
   if (existing.kind !== "shape") throw new CommandRejectedError("Only placed shapes can be moved or resized.");
   requireMoveAllowed(existing, actor);
   const calibration = requireCalibration(geometryInput);
+  // A spell's lingering area moves the way it was placed: it keeps the spell's own size, and only where it stands
+  // must be on the map. Any other area placed reaching past the edge (a cast's blast) may go on reaching past it.
+  const area = state.combat.spellZones.find((zone) => zone.annotationId === id)?.area ?? null;
   withinMap(origin, geometryInput, "The starting point");
-  withinMap(target, geometryInput, "The endpoint");
-  const geometry = shapeGeometry(calibration, existing.shape!, origin, target);
+  if (area === null && onMap(existing.geometry.target, geometryInput)) withinMap(target, geometryInput, "The endpoint");
+  const placed = area ? templateOfArea(calibration, { origin, target }, area) : { origin, target };
+  const geometry = shapeGeometry(calibration, existing.shape!, placed.origin, placed.target);
   state.combat = {
     ...state.combat,
     annotations: state.combat.annotations.map((annotation) =>

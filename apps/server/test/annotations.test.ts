@@ -449,6 +449,52 @@ describe("authoritative annotation geometry", () => {
     expect(angle % 45).not.toBe(0);
   });
 
+  it("moves a cast's area that reaches past the map's edge along that edge, but keeps a drawn shape on the map", () => {
+    const state = activeState();
+    const shape = (id: string, target: { x: number; y: number }, reachesPastMap?: boolean) =>
+      addAnnotation(
+        state,
+        {
+          id,
+          kind: "shape",
+          shape: "circle",
+          origin: { x: 975, y: 525 },
+          target,
+          visibility: "public",
+          ...(reachesPastMap ? { reachesPastMap } : {}),
+          actor: gmActor,
+          now: 0
+        },
+        geometry
+      );
+    // A 20-foot-radius blast placed in the last column reaches past the right edge.
+    shape("a0000000-0000-4000-8000-000000000001", { x: 1175, y: 525 }, true);
+    moveAnnotation(
+      state,
+      "a0000000-0000-4000-8000-000000000001",
+      { x: 975, y: 225 },
+      { x: 1175, y: 225 },
+      gmActor,
+      geometry
+    );
+    const moved = state.combat.annotations.find(
+      (annotation) => annotation.id === "a0000000-0000-4000-8000-000000000001"
+    )!;
+    expect(moved.geometry).toMatchObject({ origin: { x: 975, y: 225 }, sizeFeet: 20 });
+    // A circle drawn by hand stays on the map when it moves.
+    shape("a0000000-0000-4000-8000-000000000002", { x: 925, y: 525 });
+    expect(() =>
+      moveAnnotation(
+        state,
+        "a0000000-0000-4000-8000-000000000002",
+        { x: 975, y: 225 },
+        { x: 1025, y: 225 },
+        gmActor,
+        geometry
+      )
+    ).toThrow("The endpoint must be inside the map.");
+  });
+
   it("pings are public, labeled with who sent them, and expire after 4s", () => {
     const state = activeState();
     const ping = addPing(
