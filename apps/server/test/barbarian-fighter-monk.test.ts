@@ -929,6 +929,46 @@ describe("Fighter: EXTRA ATTACK is a second swing that really resolves", () => {
   });
 });
 
+describe("Fighter: Action Surge is one more action on the turn", () => {
+  const generic = (built: Built, actionId: string) =>
+    resolveDefinitionAction(
+      built.state,
+      builtinAction(actionId)!,
+      {
+        actorId: IDS.hero,
+        targetIds: [],
+        commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`,
+        builtin: true
+      },
+      deps(built)
+    );
+
+  it("opens a second Attack action, Extra Attack and all, then refuses a third action", () => {
+    const built = onTheTable(build(fighterInput(5)));
+    use(built, "item-greatsword", [IDS.foe], [9, 5, 5]);
+    use(built, "item-greatsword", [IDS.foe], [9, 5, 5]);
+    expect(() => use(built, "item-greatsword", [IDS.foe], [9, 5, 5])).toThrow(/no attacks remaining in this action/);
+    use(built, "action-surge");
+    expect(built.hero.actionUses["action-surge"]).toBe(1);
+    // The surge's action is a whole Attack action: two swings again.
+    expect(use(built, "item-greatsword", [IDS.foe], [9, 5, 5]).componentsRemaining).toEqual({ attack: 1 });
+    use(built, "item-greatsword", [IDS.foe], [9, 5, 5]);
+    expect(() => use(built, "item-greatsword", [IDS.foe], [9, 5, 5])).toThrow(/no attacks remaining in this action/);
+  });
+
+  it("is not a second Magic action, is taken on your own turn, and only once on a turn", () => {
+    // Level 17: two uses, still one a turn.
+    const built = onTheTable(build(fighterInput(17)));
+    generic(built, "magic");
+    use(built, "action-surge");
+    expect(() => generic(built, "magic")).toThrow(/can't be a second Magic action/);
+    generic(built, "dash");
+    expect(() => use(built, "action-surge")).toThrow(/only once on a turn/);
+    nextInitiativeTurn(built.state);
+    expect(() => use(built, "action-surge")).toThrow(/own turn/);
+  });
+});
+
 describe("Barbarian and Monk get the same second swing - it was never Fighter-only", () => {
   it("opens a second attack for a level-5 Barbarian", () => {
     const built = onTheTable(build(barbarianInput(5)));

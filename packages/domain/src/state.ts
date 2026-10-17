@@ -569,6 +569,19 @@ const sceneCombatShape = {
             .default(null)
         })
         .strict()
+        .optional(),
+      /** The turn's actor's actions beyond its one (SRD Action Surge, Haste): Action Surges taken and not yet used,
+       *  whether Haste's limited action is used, and the Magic actions taken (Action Surge's isn't a second one).
+       *  Engine bookkeeping, never projected. */
+      extraActions: z
+        .object({
+          actorId: z.uuid(),
+          surges: z.number().int().min(0).max(4).default(0),
+          surgedThisTurn: z.boolean().default(false),
+          hasteUsed: z.boolean().default(false),
+          magicActions: z.number().int().min(0).max(10).default(0)
+        })
+        .strict()
         .optional()
     })
     .prefault({

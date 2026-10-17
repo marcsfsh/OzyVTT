@@ -1280,9 +1280,10 @@ describe("a feature whose only rider is limited USES still lands as a trackable 
       state,
       {
         mapAssetId: "20000000-0000-5000-8000-000000000001",
+        // Action Surge is taken "on your turn", so the Fighter goes first.
         entries: [
-          { actorId: other, score: 20 },
-          { actorId: ACTOR_ID, score: 5 }
+          { actorId: ACTOR_ID, score: 20 },
+          { actorId: other, score: 5 }
         ]
       },
       () => 1,

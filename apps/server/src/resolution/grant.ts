@@ -1,13 +1,12 @@
 import { abilityModifier } from "@vtt/rules-5e";
 import type { Modifier } from "@vtt/schemas";
-import { addEffect, makeEffect, turnEndDuration, type EffectNarration } from "../effects.js";
+import { addEffect, HASTED_TAG, makeEffect, turnEndDuration, type EffectNarration } from "../effects.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { currentSpeedFeet } from "../speed.js";
 import type { LiveActor, ResolveContext } from "./context.js";
 
 /** A grant keyed on these tags measures its recipient when it lands, as Dash does: Mage Armor's AC, Haste's Speed. */
 const MAGE_ARMOR_TAG = "mage-armor";
-const HASTED_TAG = "hasted";
 
 /** Granted effects (Rage, Reckless Attack on self; Help on an ally; Bless on each creature it targets): replace-on-
  *  refresh, ending when the granter drops to 0 HP, and with the cast's Concentration when it has one (`castId`, so

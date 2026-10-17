@@ -221,6 +221,9 @@ function paidPlan(state: GameState): EconomyPlan {
     spendUse: null,
     spendLegendary: null,
     spendSpellSlot: null,
-    castLevel: null
+    castLevel: null,
+    extraAction: null,
+    magicAction: false,
+    surge: false
   };
 }

@@ -31,6 +31,8 @@ export const RAGING_TAG = "raging";
 export const KNOCKED_OUT_TAG = "knocked-out";
 /** The Ready action's held response, taken with the Reaction when its trigger comes. */
 export const READIED_TAG = "readied";
+/** Haste on its target: doubled Speed, an additional action each turn, and lethargy when it ends. */
+export const HASTED_TAG = "hasted";
 
 /** What an effect must name; every other field takes `EffectInstanceSchema`'s default. */
 export type EffectSpec = Pick<EffectInstance, "id" | "name" | "duration"> & Partial<EffectInstance>;
@@ -264,8 +266,44 @@ export function applyExhaustionDeath(state: GameState, actor: Actor): EffectNarr
 export const sourceOf = (effect: Pick<EffectInstance, "sourceActorId" | "sourceName">) =>
   effect.sourceActorId !== null ? { source: { actorId: effect.sourceActorId, name: effect.sourceName } } : {};
 
-/** Tolerant single-effect removal used by every sweep; returns false when the effect is already gone. */
-function endEffectInternal(state: GameState, actor: Actor, effectId: string, events: EffectNarration[]): boolean {
+/** SRD Haste: "When the spell ends, the target is Incapacitated and has a Speed of 0 until the end of its next turn,
+ *  as a wave of lethargy washes over it." Only in a fight: outside one there is no next turn to wait out. */
+function addLethargy(state: GameState, actor: Actor, haste: EffectInstance, events: EffectNarration[]): void {
+  if (!state.combat.active || !state.combat.initiative.some((entry) => entry.actorId === actor.id)) return;
+  if (actor.effects.length >= MAX_EFFECTS) return;
+  addEffect(
+    state,
+    actor.id,
+    makeEffect({
+      id: `${haste.id}:lethargy`,
+      name: "Lethargy",
+      tags: ["lethargic"],
+      sourceActorId: haste.sourceActorId,
+      sourceName: haste.sourceName,
+      startedRound: state.combat.round,
+      duration: turnEndDuration(state, "until-bearer-turn-end", actor.id),
+      linkedConditionIds: ["incapacitated"],
+      speedZero: true
+    }),
+    events
+  );
+  events.push({
+    kind: "effect",
+    text: `${actor.name} is overcome by lethargy as ${haste.name} ends: Incapacitated and Speed 0 until the end of its next turn.`,
+    actorId: actor.id,
+    ...sourceOf(haste)
+  });
+}
+
+/** Tolerant single-effect removal used by every sweep; returns false when the effect is already gone. A fight's end
+ *  or a long rest (`sweeping`) starts nothing that would outlast it, such as Haste's lethargy. */
+function endEffectInternal(
+  state: GameState,
+  actor: Actor,
+  effectId: string,
+  events: EffectNarration[],
+  sweeping = false
+): boolean {
   const effect = actor.effects.find((candidate) => candidate.id === effectId);
   if (!effect) return false;
   actor.effects = actor.effects.filter((candidate) => candidate.id !== effectId);
@@ -304,11 +342,12 @@ function endEffectInternal(state: GameState, actor: Actor, effectId: string, eve
     if (applied && grant.conditionId === "exhaustion" && before < 6 && (level ?? 0) >= 6)
       events.push(...applyExhaustionDeath(state, actor));
   }
+  if (effect.tags.includes(HASTED_TAG) && !sweeping) addLethargy(state, actor, effect, events);
   // The caster's "Concentrating on X" ending ends everything that cast made, on every creature.
   if (effect.tags.includes(CONCENTRATING_TAG) && effect.castId !== undefined) {
     for (const bearer of state.actors) {
       for (const sustained of [...bearer.effects]) {
-        if (sustained.castId === effect.castId) endEffectInternal(state, bearer, sustained.id, events);
+        if (sustained.castId === effect.castId) endEffectInternal(state, bearer, sustained.id, events, sweeping);
       }
     }
   }
@@ -320,7 +359,7 @@ function endEffectInternal(state: GameState, actor: Actor, effectId: string, eve
         (candidate) => candidate.id !== dependent.id && candidate.tags.includes(dependent.endsWithTag!)
       )
     ) {
-      endEffectInternal(state, actor, dependent.id, events);
+      endEffectInternal(state, actor, dependent.id, events, sweeping);
     }
   }
   return true;
@@ -502,7 +541,7 @@ export function endEncounterEffects(state: GameState, combatantIds: readonly str
   for (const actor of state.actors) {
     if (!inFight.has(actor.id)) continue;
     for (const effect of [...actor.effects])
-      if (ENDS_WITH_THE_FIGHT.has(effect.duration.type)) endEffectInternal(state, actor, effect.id, events);
+      if (ENDS_WITH_THE_FIGHT.has(effect.duration.type)) endEffectInternal(state, actor, effect.id, events, true);
   }
   return events;
 }
@@ -514,7 +553,7 @@ export function endEffectsAtLongRest(state: GameState, actorId: string): EffectN
   if (!actor) return [];
   const events: EffectNarration[] = [...endConcentrationSustainedBy(state, actorId)];
   for (const effect of [...actor.effects])
-    if (ENDS_WITH_THE_FIGHT.has(effect.duration.type)) endEffectInternal(state, actor, effect.id, events);
+    if (ENDS_WITH_THE_FIGHT.has(effect.duration.type)) endEffectInternal(state, actor, effect.id, events, true);
   // The rest restores its hit points, and a knocked-out creature wakes when it regains any.
   events.push(...endKnockOut(state, actor));
   return events;

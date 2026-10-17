@@ -70,6 +70,8 @@ describe("rule families", () => {
       ["attack.rides-a-hit", "economy"],
       ["feature.no-uses-remaining", "resources"],
       ["feature.requires-effect", "resources"],
+      // Action Surge with two uses, Stunning Strike: once on a turn, a spent per-turn limit.
+      ["feature.once-per-turn", "resources"],
       ["legendary.no-actions-remaining", "resources"],
       ["range.out-of-range", "targeting"],
       ["range.out-of-reach", "targeting"],

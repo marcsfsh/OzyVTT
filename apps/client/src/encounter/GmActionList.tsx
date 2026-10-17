@@ -62,6 +62,10 @@ function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSu
   if (fromBonus > 0) return `${fromBonus} left from the bonus action`;
   if (action.activation === "bonus-action" && turn.bonusActionUsed) return "Bonus action used";
   if (action.activation === "action" && turn.actionUsed) {
+    // Action Surge or Haste left another action; the server says which actions it can take.
+    const extra = turn.extraActions?.actorId === actor.id ? turn.extraActions : undefined;
+    const hasted = actor.effects.some((effect) => effect.tags.includes("hasted")) && extra?.hasteUsed !== true;
+    if ((extra?.surges ?? 0) > 0 || hasted) return null;
     const instance = turn.actionInstance?.actorId === actor.id ? turn.actionInstance.components : null;
     // The Multiattack plan row stays a live "continue" while any component remains.
     if (action.multiattack && instance && Object.values(instance).some((count) => count > 0))

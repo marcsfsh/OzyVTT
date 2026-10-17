@@ -13,13 +13,21 @@ import { rollDeathSave } from "../src/death-saves.js";
 import { builtinAction, builtinActionFor, builtinActionsFor } from "../src/builtin-actions.js";
 import { actionSummaryOf } from "../src/content-library.js";
 import { effectiveActions } from "../src/effective-actions.js";
-import { addEffect, endEffect, endEncounterEffects, expireEffectsAtTurnStart, hasEffectTag } from "../src/effects.js";
+import {
+  addEffect,
+  endEffect,
+  endEncounterEffects,
+  expireEffectsAtTurnStart,
+  hasEffectTag,
+  makeEffect
+} from "../src/effects.js";
 import { applyRest, spendHitDice } from "../src/rests.js";
 import { hitDiceFromDefinition } from "../src/actor-roster.js";
 import { applyTimelineRestore, timelineDirtied } from "../src/combat-history.js";
 import { projectPlayerCombat, projectPlayerView } from "../src/projections.js";
 import { setLegendaryUsed } from "../src/turn-economy.js";
 import { applyMovementRules } from "../src/movement-rules.js";
+import { effectiveSpeedFeet } from "../src/speed.js";
 import { creatureDistance, mapDistance, tokenCreatureDistance } from "../src/movement-narration.js";
 import { gridToImage } from "../src/grid-calibration.js";
 import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
@@ -4154,5 +4162,86 @@ describe("Bonus Action forms of the generic actions (SRD Cunning Action, Nimble 
     )!;
     expect(hasten.grants).toMatchObject({ tags: ["dashing", "disengaged"], target: "self" });
     expect(actionSummaryOf(clayGolemDefinition.actions.find((action) => action.id === hasten.id)!).grants).toBe(true);
+  });
+});
+
+describe("Haste: one more action from a short list, and lethargy when it ends (SRD Haste)", () => {
+  const hasten = (game: GameState) =>
+    addEffect(
+      game,
+      IDS.torva,
+      makeEffect({
+        id: "haste-on-torva",
+        name: "Haste",
+        tags: ["hasted"],
+        sourceActorId: IDS.pip,
+        sourceName: "Pip Underbough",
+        startedRound: 1,
+        duration: { type: "rounds", remaining: 10 }
+      })
+    );
+  const generic = (game: GameState, actionId: string) =>
+    resolveDefinitionAction(
+      game,
+      builtinAction(actionId)!,
+      { actorId: IDS.torva, targetIds: [], commandId: nextCommandId(), builtin: true, rollMode: null, override: null },
+      deps([], torvaDefinition)
+    );
+
+  it("adds one attack, not a second Attack action's worth, after the creature's own action", () => {
+    const game = buildGame();
+    hasten(game);
+    resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6]);
+    resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6]);
+    // The table sees another action is ready.
+    expect(projectPlayerCombat(game).turn.extraActionReady).toBe(true);
+    // Haste's action: "the Attack (one attack only)".
+    const third = resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6]);
+    expect(third.componentsRemaining).toBeNull();
+    expect(projectPlayerCombat(game).turn.extraActionReady).toBeUndefined();
+    expect(() =>
+      resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6])
+    ).toThrow(/no attacks remaining in this action/);
+  });
+
+  it("takes only Attack, Dash, Disengage, Hide or Utilize", () => {
+    const game = buildGame();
+    hasten(game);
+    generic(game, "dodge");
+    expect(() => generic(game, "magic")).toThrow(
+      /Haste's additional action takes only the Attack \(one attack only\), Dash, Disengage, Hide or Utilize action/
+    );
+    generic(game, "dash");
+    expect(() => generic(game, "disengage")).toThrow(/already used an action/);
+  });
+
+  it("leaves the target Incapacitated with Speed 0 until the end of its next turn when it ends", () => {
+    const game = buildGame(); // Torva, Pip, croc2, croc1, Sable
+    hasten(game);
+    nextInitiativeTurn(game); // Pip's turn: the caster's Concentration breaks.
+    endEffect(game, IDS.torva, "haste-on-torva");
+    const torva = () => game.actors.find((actor) => actor.id === IDS.torva)!;
+    expect(torva().effects.map((effect) => effect.name)).toEqual(["Lethargy"]);
+    expect(torva().conditions.map((condition) => condition.id)).toContain("incapacitated");
+    nextInitiativeTurn(game);
+    nextInitiativeTurn(game);
+    nextInitiativeTurn(game);
+    nextInitiativeTurn(game); // Torva's next turn: it can't act or move.
+    expect(() => generic(game, "dash")).toThrow(/Incapacitated/);
+    const derivation = deriveEquipment(torva(), torvaDefinition, undefined);
+    expect(effectiveSpeedFeet(torva(), derivation)).toBe(0);
+    nextInitiativeTurn(game); // ...and the end of that turn ends it.
+    expect(torva().effects).toEqual([]);
+    expect(torva().conditions.some((condition) => condition.id === "incapacitated")).toBe(false);
+  });
+
+  it("starts no lethargy when the fight's end sweeps Haste away", () => {
+    const game = buildGame();
+    hasten(game);
+    endEncounterEffects(
+      game,
+      game.combat.initiative.map((entry) => entry.actorId)
+    );
+    expect(game.actors.find((actor) => actor.id === IDS.torva)!.effects).toEqual([]);
   });
 });

@@ -96,6 +96,11 @@ export function PlayerTurnEconomy({
           >
             Bonus
           </button>
+          {combat.turn.extraActionReady && (
+            <span className="economy-movement" title="Action Surge or Haste gives you another action this turn">
+              +1 action
+            </span>
+          )}
         </>
       )}
       <button

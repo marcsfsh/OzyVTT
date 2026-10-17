@@ -5,7 +5,7 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { effectiveSlot } from "@vtt/rules-5e";
 import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
 import { areAllies } from "../creature-sides.js";
-import { hasEffectTag, RAGING_TAG, READIED_TAG } from "../effects.js";
+import { HASTED_TAG, hasEffectTag, RAGING_TAG, READIED_TAG } from "../effects.js";
 import { ammunitionFor, ammunitionLabel, launcherKind } from "../ammunition.js";
 import { armorTrainingGaps, type EquipmentCatalog } from "../equipment-derivation.js";
 import { RulesBlockedError } from "../game-store.js";
@@ -45,6 +45,12 @@ export type EconomyPlan = Readonly<{
   /** The slot level this cast is at: the one it spends, or the one the open spell it continues spent (a later ray).
    *  Null for anything not cast with a slot. */
   castLevel: number | null;
+  /** The action beyond the creature's one that this resolve takes (SRD Action Surge, Haste), or null. */
+  extraAction: "surge" | "haste" | null;
+  /** It is a Magic action taken on the creature's turn, which Action Surge's additional action can't repeat. */
+  magicAction: boolean;
+  /** It is Action Surge, which gives one additional action this turn. */
+  surge: boolean;
 }>;
 
 type EconomyEvaluation = Readonly<{
@@ -124,15 +130,17 @@ export function evaluateActionEconomy(
   checkTurnsBegun(evaluation);
   checkOwnTurn(evaluation);
   checkExtraAttackOpened(evaluation);
-  checkLoading(evaluation);
   checkHands(evaluation);
   checkArmorTraining(evaluation, definition);
   checkAmmunition(evaluation, catalog);
   if (!asHitRider) checkTakenAlone(evaluation);
   const spendUse = checkLimitedUse(evaluation);
+  const surge = checkActionSurge(evaluation);
   // A later ray of a spell already cast this action spends no further slot; it rolls at the first ray's.
   const continued = continuedSpellSlot(evaluation);
   const slots = checkActionSlots(evaluation);
+  // A Loading weapon fires once per action; an additional action (Action Surge) is another.
+  if (slots.extraAction === null) checkLoading(evaluation);
   const spendLegendary = checkLegendary(evaluation, definition);
   const spendSpellSlot = continued === null ? checkSpellSlot(evaluation) : null;
   if (continued === null) {
@@ -151,7 +159,9 @@ export function evaluateActionEconomy(
       spendUse,
       spendLegendary,
       spendSpellSlot,
-      castLevel: spendSpellSlot?.level ?? continued
+      castLevel: spendSpellSlot?.level ?? continued,
+      magicAction: evaluation.onOwnTurn && isMagicAction(action),
+      surge
     },
     proseMultiattack: evaluation.proseMultiattack,
     notes: evaluation.notes
@@ -200,6 +210,24 @@ function checkOwnTurn({ state, attacker, action, onOwnTurn, violations }: Evalua
         ? `Not your turn yet - ${current.name} is up.`
         : "Not your turn yet - wait for your turn."
   });
+}
+
+/** SRD Action Surge: "On your turn, you can take one additional action, except the Magic action", and with two uses
+ *  "only once on a turn". Keyed by id so sheets built before this rule get it. True when this resolve is the surge. */
+function checkActionSurge({ state, attacker, action, onOwnTurn, violations }: Evaluation): boolean {
+  if (action.id !== "action-surge") return false;
+  const extra = state.combat.turn.extraActions;
+  if (!onOwnTurn)
+    violations.push({
+      rule: "economy.not-your-turn",
+      message: `Action Surge is taken on ${attacker.name}'s own turn.`
+    });
+  else if (extra?.actorId === attacker.id && extra.surgedThisTurn)
+    violations.push({
+      rule: "feature.once-per-turn",
+      message: `${attacker.name} has already used Action Surge this turn - only once on a turn.`
+    });
+  return true;
 }
 
 /**
@@ -441,7 +469,10 @@ function componentMap(parent: DefinitionAction): Record<string, number> {
   return components;
 }
 
-type SlotPlan = Pick<EconomyPlan, "markAction" | "markBonus" | "markReaction" | "instance" | "bonusInstance">;
+type SlotPlan = Pick<
+  EconomyPlan,
+  "markAction" | "markBonus" | "markReaction" | "instance" | "bonusInstance" | "extraAction"
+>;
 
 /** The action, bonus action and reaction slots, with the compound instance an action or bonus action opens or
  *  continues. */
@@ -452,7 +483,8 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
     markBonus: false,
     markReaction: false,
     instance: state.combat.turn.actionInstance,
-    bonusInstance: state.combat.turn.bonusActionInstance
+    bonusInstance: state.combat.turn.bonusActionInstance,
+    extraAction: null
   };
   // An open compound bonus action (Flurry of Blows) spends its own strikes first, costing no further slot.
   const bonusOpen = state.combat.turn.bonusActionInstance;
@@ -493,60 +525,119 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
   return unchanged;
 }
 
-function checkActionSlot({
-  state,
-  attacker,
-  action,
-  siblings,
-  proseMultiattack,
-  violations,
-  softViolations,
-  notes
-}: Evaluation): SlotPlan {
+/** A fresh action: opens a compound instance when the action (or its multiattack parent) declares one. Haste's
+ *  action is "the Attack action (one attack only)", so it opens no further attacks. */
+function freshActionSlot(
+  { state, attacker, action, siblings, notes }: Evaluation,
+  extraAction: EconomyPlan["extraAction"]
+): SlotPlan {
+  const parents = multiattackParents(siblings, action);
+  let components: Record<string, number> | null = null;
+  if (extraAction === "haste") {
+    components = action.attack || action.replacesAttack ? {} : null;
+  } else if (action.multiattack) {
+    components = componentMap(action); // resolving the parent itself opens the full plan, no rolls consumed
+  } else if (parents.length === 1) {
+    components = componentMap(parents[0]);
+    components[action.id] = (components[action.id] ?? 1) - 1;
+  } else if (parents.length > 1) {
+    if (action.attack && (action.attack.count ?? 1) > 1) components = attackPool(action);
+    notes.push(`${action.name} belongs to more than one Multiattack - tracking it standalone.`);
+  } else if (action.attack && (action.attack.count ?? 1) > 1) {
+    components = attackPool(action);
+  } else if (action.replacesAttack && attacksInAttackAction(siblings) > 1) {
+    // Breath Weapon as the first attack of the Attack action: the rest stay open for weapon swings.
+    components = { attack: attacksInAttackAction(siblings) - 1 };
+  }
+  // The instance stays even when exhausted so a further resolve gets "no attacks remaining".
+  return {
+    markAction: true,
+    markBonus: false,
+    markReaction: false,
+    instance: components ? { actorId: attacker.id, components } : null,
+    bonusInstance: state.combat.turn.bonusActionInstance,
+    extraAction
+  };
+}
+
+/** The Magic action: casting a spell whose casting time is an action, or using a feature or item that says so. */
+export function isMagicAction(
+  action: Pick<DefinitionAction, "id" | "activation" | "spellId" | "spellSlot" | "description">
+) {
+  return (
+    action.id === "magic" ||
+    (action.activation === "action" &&
+      (action.spellId !== undefined || action.spellSlot !== undefined || /\bMagic action\b/i.test(action.description)))
+  );
+}
+
+/** SRD Haste: "That action can be used to take only the Attack (one attack only), Dash, Disengage, Hide, or Utilize
+ *  action." */
+function hasteAllows(action: DefinitionAction): boolean {
+  if (["dash", "disengage", "hide", "utilize"].includes(action.id)) return true;
+  return (
+    action.activation === "action" &&
+    action.multiattack === undefined &&
+    action.spellId === undefined &&
+    (action.attack !== undefined || action.replacesAttack === true)
+  );
+}
+
+/** An action beyond the creature's one this turn: Haste's (each turn, from its limited list) or one Action Surge
+ *  gave (any but a second Magic action). `reason` says why neither can take this one. */
+function extraActionFor({ state, attacker, action }: Evaluation): {
+  kind: EconomyPlan["extraAction"];
+  reason: string | null;
+} {
+  const extra = state.combat.turn.extraActions?.actorId === attacker.id ? state.combat.turn.extraActions : undefined;
+  const hasteReady = hasEffectTag(attacker, HASTED_TAG) && extra?.hasteUsed !== true;
+  if (hasteReady && hasteAllows(action)) return { kind: "haste", reason: null };
+  if ((extra?.surges ?? 0) > 0) {
+    if (isMagicAction(action) && (extra?.magicActions ?? 0) > 0)
+      return { kind: null, reason: "Action Surge's additional action can't be a second Magic action." };
+    return { kind: "surge", reason: null };
+  }
+  return {
+    kind: null,
+    reason: hasteReady
+      ? "Haste's additional action takes only the Attack (one attack only), Dash, Disengage, Hide or Utilize action."
+      : null
+  };
+}
+
+function checkActionSlot(evaluation: Evaluation): SlotPlan {
+  const { state, attacker, action, siblings, proseMultiattack, violations, softViolations } = evaluation;
   const slotViolations = proseMultiattack ? softViolations : violations;
   const current = state.combat.turn.actionInstance;
   const active = current && current.actorId === attacker.id ? current : null;
-  if (!state.combat.turn.actionUsed) {
-    // Fresh action slot: open a compound instance when the action (or its multiattack parent) declares one.
-    const parents = multiattackParents(siblings, action);
-    let components: Record<string, number> | null = null;
-    if (action.multiattack) {
-      components = componentMap(action); // resolving the parent itself opens the full plan, no rolls consumed
-    } else if (parents.length === 1) {
-      components = componentMap(parents[0]);
-      components[action.id] = (components[action.id] ?? 1) - 1;
-    } else if (parents.length > 1) {
-      if (action.attack && (action.attack.count ?? 1) > 1) components = attackPool(action);
-      notes.push(`${action.name} belongs to more than one Multiattack - tracking it standalone.`);
-    } else if (action.attack && (action.attack.count ?? 1) > 1) {
-      components = attackPool(action);
-    } else if (action.replacesAttack && attacksInAttackAction(siblings) > 1) {
-      // Breath Weapon as the first attack of the Attack action: the rest stay open for weapon swings.
-      components = { attack: attacksInAttackAction(siblings) - 1 };
-    }
-    // The instance stays even when exhausted so a further resolve gets "no attacks remaining".
-    return {
-      markAction: true,
-      markBonus: false,
-      markReaction: false,
-      instance: components ? { actorId: attacker.id, components } : null,
-      bonusInstance: state.combat.turn.bonusActionInstance
-    };
-  }
+  if (!state.combat.turn.actionUsed) return freshActionSlot(evaluation, null);
   const plan = {
     markAction: false,
     markBonus: false,
     markReaction: false,
-    bonusInstance: state.combat.turn.bonusActionInstance
+    bonusInstance: state.combat.turn.bonusActionInstance,
+    extraAction: null
   };
-  if (!active) {
+  // The action is spent: an extra action (Action Surge, Haste) takes this one, or it is refused.
+  const refuse = (message: string, instance: SlotPlan["instance"]): SlotPlan => {
+    const extra = extraActionFor(evaluation);
+    if (extra.kind !== null) return freshActionSlot(evaluation, extra.kind);
     slotViolations.push({
       rule: "economy.action-used",
-      message: `${attacker.name} has already used an action this turn.`
+      message: extra.reason === null ? message : `${message} ${extra.reason}`
     });
-    return { ...plan, instance: current };
-  }
+    return { ...plan, instance };
+  };
+  if (!active) return refuse(`${attacker.name} has already used an action this turn.`, current);
   const components = { ...active.components };
+  const continued = {
+    ...plan,
+    instance: {
+      actorId: attacker.id,
+      components,
+      ...(active.slotLevel !== undefined ? { slotLevel: active.slotLevel } : {})
+    }
+  };
   const componentName = (id: string) =>
     id === "attack" ? "attack" : (siblings.find((candidate) => candidate.id === id)?.name ?? id);
   const leftovers = () =>
@@ -555,11 +646,7 @@ function checkActionSlot({
       .map(([id, count]) => `${count}× ${componentName(id)}`);
   if (action.multiattack) {
     // Tapping the Multiattack plan mid-instance is a continue, not a violation.
-    if (leftovers().length === 0)
-      slotViolations.push({
-        rule: "economy.action-used",
-        message: `${attacker.name} has no attacks remaining in this action.`
-      });
+    if (leftovers().length === 0) return refuse(`${attacker.name} has no attacks remaining in this action.`, current);
   } else if ((components[action.id] ?? 0) > 0) {
     components[action.id] -= 1;
   } else if (
@@ -569,22 +656,14 @@ function checkActionSlot({
     components["attack"] -= 1;
   } else {
     const named = leftovers();
-    slotViolations.push({
-      rule: "economy.action-used",
-      message:
-        named.length > 0
-          ? `${attacker.name} has no ${action.name} left in this action - remaining: ${named.join(", ")}.`
-          : `${attacker.name} has no attacks remaining in this action.`
-    });
+    return refuse(
+      named.length > 0
+        ? `${attacker.name} has no ${action.name} left in this action - remaining: ${named.join(", ")}.`
+        : `${attacker.name} has no attacks remaining in this action.`,
+      current
+    );
   }
-  return {
-    ...plan,
-    instance: {
-      actorId: attacker.id,
-      components,
-      ...(active.slotLevel !== undefined ? { slotLevel: active.slotLevel } : {})
-    }
-  };
+  return continued;
 }
 
 /** How many attacks the Attack action makes: the most any one attack action makes, which is where Extra Attack is
@@ -990,6 +1069,31 @@ export function commitEconomy({
     state.combat = {
       ...state.combat,
       reactionsUsed: [...state.combat.reactionsUsed.filter((id) => id !== attacker.id), attacker.id]
+    };
+  }
+  // Actions beyond the one (Action Surge, Haste) and the Magic actions taken, for the turn's own creature.
+  if ((plan.extraAction !== null || plan.magicAction || plan.surge) && state.combat.turnActorId === attacker.id) {
+    const before = state.combat.turn.extraActions;
+    const prior =
+      before?.actorId === attacker.id
+        ? before
+        : { actorId: attacker.id, surges: 0, surgedThisTurn: false, hasteUsed: false, magicActions: 0 };
+    state.combat = {
+      ...state.combat,
+      turn: {
+        ...state.combat.turn,
+        extraActions: {
+          ...prior,
+          surges: Math.max(0, prior.surges + (plan.surge ? 1 : 0) - (plan.extraAction === "surge" ? 1 : 0)),
+          surgedThisTurn: prior.surgedThisTurn || plan.surge,
+          hasteUsed: prior.hasteUsed || plan.extraAction === "haste",
+          magicActions: Math.min(10, prior.magicActions + (plan.magicAction ? 1 : 0))
+        },
+        // An additional action is a new action: a Loading weapon fires once in each.
+        ...(plan.extraAction !== null && state.combat.turn.extraAttacks
+          ? { extraAttacks: { ...state.combat.turn.extraAttacks, loading: null } }
+          : {})
+      }
     };
   }
   // Cleared on turn advance.

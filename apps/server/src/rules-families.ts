@@ -46,6 +46,8 @@ const RULE_FAMILIES = {
   "legendary.no-actions-remaining": "resources",
   "feature.no-uses-remaining": "resources",
   "feature.requires-effect": "resources",
+  // "Once per turn" or "only once on a turn" (Action Surge with two uses, Stunning Strike): a per-turn limit.
+  "feature.once-per-turn": "resources",
   "range.out-of-range": "targeting",
   "range.out-of-reach": "targeting",
   "range.underwater": "targeting",
