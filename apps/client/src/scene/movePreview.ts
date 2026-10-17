@@ -37,7 +37,8 @@ export const alliesByKind = (mover: MapActor, occupant: MapActor) => {
  * painted terrain and other creatures' spaces costing double or barring the way as the SRD says (`spacePassage`), an
  * extra foot per foot while crawling, climbing or swimming without the speed, or dragging. The client sees only what
  * it may (players get the revealed terrain, no hidden creatures, and no NPC's side), and the server leaves hidden
- * creatures out too, so the two agree except where unrevealed terrain lies under the fog or an NPC's side matters.
+ * creatures out too, so the two agree except where unrevealed terrain lies under the fog or an NPC's side matters. A
+ * spell's area that halves the mover's Speed (Spirit Guardians) is charged by the server alone.
  */
 export function previewMove(
   input: Readonly<{

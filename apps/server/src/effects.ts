@@ -3,6 +3,7 @@ import type { ActorDefinition, SaveFailureDuration } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { conditionLabel, exhaustionLevel, INCAPACITATING_CONDITIONS } from "./condition-rules.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
+import { wardingAura } from "./paladin-auras.js";
 import { endZonesOfCast } from "./spell-zone-state.js";
 
 /** Effect lifecycle (ADR-0020): the engine ends effects on turn boundaries, source defeat and explicit
@@ -28,6 +29,25 @@ const MAX_EFFECTS = 20;
 export const MAGE_ARMOR_TAG = "mage-armor";
 /** The bearer can't take an action or a Bonus Action while this lasts (SRD Stinking Cloud's poisoning). */
 export const NO_ACTIONS_TAG = "no-actions";
+/** The bearer can't take Reactions while this lasts. */
+export const NO_REACTIONS_TAG = "no-reactions";
+/** The bearer can't make Opportunity Attacks while this lasts (Shocking Grasp). */
+export const NO_OPPORTUNITY_ATTACKS_TAG = "no-opportunity-attacks";
+/** The bearer can't regain Hit Points while this lasts (Chill Touch). */
+export const NO_HEALING_TAG = "no-healing";
+/** Slow on its target: on its turns an action or a Bonus Action, not both, one attack with the Attack action, and a
+ *  chance that a spell with a Somatic component fails. */
+export const SLOWED_TAG = "slowed";
+/** The bearer can't cast spells or take the Magic action while this lasts (Befuddlement). */
+export const NO_SPELLS_TAG = "no-spells";
+/** Barkskin: the bearer's AC is 17 while it is lower, raised when the spell lands. */
+export const BARKSKIN_TAG = "barkskin";
+/** Death Ward: the first drop to 0 Hit Points leaves the bearer at 1 instead, and ends it. */
+export const DEATH_WARD_TAG = "death-ward";
+/** Protection from Energy: Resistance to the one damage type the caster picks from those the action offers. */
+export const RESISTS_CHOSEN_TYPE_TAG = "resists-chosen-type";
+/** Invisibility: it ends once its bearer makes an attack roll, deals damage or casts a spell. */
+export const UNTIL_IT_ACTS_TAG = "until-it-acts";
 /** On an escapable effect: the escape is a Strength (Athletics) check alone (a spell's restraint: Web, Entangle). */
 export const ESCAPE_ATHLETICS_TAG = "escape-athletics";
 /** The tag on a caster's own "Concentrating on X" effect; ending it ends everything its cast made. */
@@ -108,17 +128,31 @@ export function effectDurationOf(
 }
 
 /** Where item- and feat-granted condition immunities are read from. Without a catalog only the actor's
- *  innate immunities apply. */
+ *  innate immunities apply; with the game state an ally's ward reaches it too (Aura of Courage), measured with
+ *  `distanceFeet` where the map can. */
 export type ConditionImmunitySource = Readonly<{
   resolveDefinition?: (definitionId: string) => ActorDefinition | undefined;
   catalog?: EquipmentCatalog;
+  state?: GameState;
+  distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
 }>;
 
-/** SRD condition immunity: innate, granted by what the actor carries when a catalog is supplied, or Petrified's
- *  own immunity to the Poisoned condition. */
+/** SRD condition immunity: innate, granted by what the actor carries when a catalog is supplied, Petrified's own
+ *  immunity to the Poisoned condition, or a Paladin's aura it stands in. */
 function immuneToCondition(actor: Actor, conditionId: string, source?: ConditionImmunitySource): boolean {
   if (actor.conditionImmunities.includes(conditionId)) return true;
+  // An effect's own immunity while it lasts (Heroism: Frightened).
+  if (actor.effects.some((effect) => effect.conditionImmunities?.includes(conditionId))) return true;
   if (conditionId === "poisoned" && hasCondition(actor, "petrified")) return true;
+  if (
+    source?.state &&
+    source.resolveDefinition &&
+    wardingAura(source.state, actor, conditionId, {
+      resolveDefinition: source.resolveDefinition,
+      ...(source.distanceFeet ? { distanceFeet: source.distanceFeet } : {})
+    }) !== null
+  )
+    return true;
   if (!source?.catalog) return false;
   const definition = actor.definitionId ? source.resolveDefinition?.(actor.definitionId) : undefined;
   return deriveEquipment(actor, definition, source.catalog).conditionImmunities.some(
@@ -249,6 +283,12 @@ export function addEffect(
             candidate.sourceActorId === effect.sourceActorId && candidate.sourceActionId === effect.sourceActionId
         )
       : undefined;
+  // Aid: the Hit Point maximum and current hit points rise by the gain; a refresh adds only what it adds over the old.
+  const gain = (effect.hitPointMaximumGain ?? 0) - (replaced?.hitPointMaximumGain ?? 0);
+  if (gain !== 0) {
+    const maximum = Math.max(1, actor.hp.maximum + gain);
+    actor.hp = { ...actor.hp, maximum, current: Math.min(maximum, Math.max(0, actor.hp.current + gain)) };
+  }
   if (replaced) {
     // Refresh in place: no onEnd fires, linked conditions stay (re-applied below for safety).
     actor.effects = actor.effects.map((candidate) => (candidate.id === replaced.id ? effect : candidate));
@@ -264,7 +304,7 @@ export function addEffect(
       if (!present.standalone && !heldBefore.has(conditionId)) writeCondition(actor, { ...present, standalone: true });
       continue;
     }
-    if (immuneToCondition(actor, conditionId, immunities)) continue;
+    if (immuneToCondition(actor, conditionId, { ...immunities, state })) continue;
     if (actor.conditions.length >= 20) continue;
     const level = conditionId === "exhaustion" ? { level: 1 } : {};
     writeCondition(actor, { id: conditionId, ...level });
@@ -343,6 +383,14 @@ function endEffectInternal(
     actorId: actor.id,
     ...sourceOf(effect)
   });
+  // A drained Hit Point maximum returns to normal; the hit points lost with it stay lost.
+  if (effect.hitPointMaximumLoss !== undefined)
+    actor.hp = { ...actor.hp, maximum: actor.hp.maximum + effect.hitPointMaximumLoss };
+  // Aid's gain goes, and the current hit points over the maximum with it.
+  if (effect.hitPointMaximumGain !== undefined) {
+    const maximum = Math.max(1, actor.hp.maximum - effect.hitPointMaximumGain);
+    actor.hp = { ...actor.hp, maximum, current: Math.min(actor.hp.current, maximum) };
+  }
   for (const conditionId of effect.linkedConditionIds) {
     if (linkedByAnEffect(actor, conditionId)) continue;
     const entry = actor.conditions.find((condition) => condition.id === conditionId);
@@ -603,8 +651,15 @@ export function endEffectsAtLongRest(state: GameState, actorId: string): EffectN
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) return [];
   const events: EffectNarration[] = [...endConcentrationSustainedBy(state, actorId)];
+  // SRD Long Rest: "If your Hit Point maximum was reduced, it returns to normal." An eight-hour gain (Aid) is spent by
+  // the rest's end too.
   for (const effect of [...actor.effects])
-    if (ENDS_WITH_THE_FIGHT.has(effect.duration.type)) endEffectInternal(state, actor, effect.id, events, true);
+    if (
+      ENDS_WITH_THE_FIGHT.has(effect.duration.type) ||
+      effect.hitPointMaximumLoss !== undefined ||
+      effect.hitPointMaximumGain !== undefined
+    )
+      endEffectInternal(state, actor, effect.id, events, true);
   // The rest restores its hit points, and a knocked-out creature wakes when it regains any.
   events.push(...endKnockOut(state, actor));
   return events;

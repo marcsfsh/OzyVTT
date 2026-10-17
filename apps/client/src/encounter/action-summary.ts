@@ -18,6 +18,13 @@ export const usesScopeLabel = (per: NonNullable<ContentActionSummary["usesPer"]>
  * to-hit and reach, attack count, a Multiattack plan (named from `all`), the save, each damage part,
  * the use pool, and a legendary cost.
  */
+/** An area as the SRD sizes it: a Sphere's or a Cylinder's radius, another shape's length or side ("5-ft-radius
+ *  cylinder", "30-ft cone"). */
+export const areaWords = (area: NonNullable<ContentActionSummary["area"]>) =>
+  area.shape === "sphere" || area.shape === "cylinder"
+    ? `${area.sizeFeet}-ft-radius ${area.shape}`
+    : `${area.sizeFeet}-ft ${area.shape}`;
+
 export function actionSummaryParts(action: ContentActionSummary, all: readonly ContentActionSummary[] = []): string[] {
   const parts: string[] = [];
   const componentName = (id: string) => all.find((candidate) => candidate.id === id)?.name ?? tagLabel(id);

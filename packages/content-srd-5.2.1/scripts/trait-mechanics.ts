@@ -126,14 +126,20 @@ function turnEndAura(trait: Trait): TraitMechanic | null {
 /** "Constitution Saving Throw: DC 10, any creature that starts its turn in a 5-foot Emanation originating from the
  *  ghast. Failure: The target has the Poisoned condition until the start of its next turn. Success: The target is
  *  immune to this ghast's Stench for 24 hours." A pit fiend's names "any enemy ... in the aura" of a 20-foot
- *  Emanation; a gibbering mouther's "within 20 feet", its failure a d8 table the GM reads. */
+ *  Emanation; a gibbering mouther's "within 20 feet", its failure a d8 table the GM reads; a sea hag's "any Beast or
+ *  Humanoid that starts its turn within 30 feet of the hag and can see the hag's true form", whose sight the GM
+ *  judges. */
 function turnStartAura(trait: Trait): TraitMechanic | null {
   const text = trait.description;
   const match =
-    /\b([A-Z][a-z]+) Saving Throw: DC (\d+), any (creature|enemy) that starts its turn (?:in a (\d+)-foot Emanation originating from the [\w -]+?|in the aura|within (\d+) feet of the [\w -]+?)(?: while [^.]+)?\. Failure: ([^]*?)(?: Success: ([^]*))?$/.exec(
+    /\b([A-Z][a-z]+) Saving Throw: DC (\d+), any (creature|enemy|[A-Z][a-z]+(?:,? (?:or )?[A-Z][a-z]+)*) that starts its turn (?:in a (\d+)-foot Emanation originating from the [\w -]+?|in the aura|within (\d+) feet of the [\w -]+?)(?: (?:while|and) [^.]+)?\. Failure: ([^]*?)(?: Success: ([^]*))?$/.exec(
       text
     );
   if (!match) return null;
+  const creatureTypes =
+    match[3] === "creature" || match[3] === "enemy"
+      ? []
+      : match[3]!.split(/,? or |, /).map((word) => word.toLowerCase());
   const ability = abilityOf(match[1]!);
   const rangeFeet = Number(match[4] ?? match[5] ?? /\bin a (\d+)-foot Emanation\b/.exec(text)?.[1] ?? NaN);
   if (!ability || !Number.isFinite(rangeFeet)) return null;
@@ -147,6 +153,7 @@ function turnStartAura(trait: Trait): TraitMechanic | null {
     trigger: "turn-start-inside",
     rangeFeet,
     affects: match[3] === "enemy" ? "enemies" : "all",
+    ...(creatureTypes.length > 0 ? { creatureTypes } : {}),
     ...(NOT_WHILE_INCAPACITATED.test(text) ? { notWhileIncapacitated: true as const } : {}),
     save: {
       ability,

@@ -94,7 +94,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "armor-class.ts in the domain package works out AC from armor, Shield, Dexterity and riders, and every attack roll is compared with it."
   ),
   "armor-training": enforced(
-    "equipment-derivation.ts gives untrained armor Disadvantage on Strength and Dexterity D20 Tests, and resolution/economy.ts refuses spells while it is worn. An untrained Shield adds no AC."
+    "equipment-derivation.ts gives untrained armor Disadvantage on Strength and Dexterity D20 Tests, and resolution/economy.ts refuses spells while it is worn. An untrained Shield adds no AC. Training an item grants counts too (Elven Chain)."
   ),
   attack: enforced(
     "resolution/economy.ts counts the attacks the Attack action allows, Extra Attack included, and lets the creature move between them. Equipping or stowing a weapon is the table's."
@@ -553,8 +553,8 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Undead Restoration": revives,
   "Vampire Weakness": reference("Running water, invitations and the stake are the GM's to apply."),
   "Vampiric Connection": senses,
-  "Vile Appearance": reference(
-    "The bundle doesn't carry this aura as a mechanic, so the save for a creature that starts its turn within 30 feet is the GM's to call."
+  "Vile Appearance": enforced(
+    "trait-turns.ts opens the Wisdom save for each Beast or Humanoid that starts its turn within 30 feet of the hag. A failure is Frightened until the start of its next turn, and a success makes it immune for the fight. Whether the creature can see the hag's true form is the GM's, who dismisses the save when it can't."
   ),
   "Water Breathing": breath,
   "Water Form": sharesSpace("the elemental"),
@@ -627,14 +627,26 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:abjure-foes": guided(
     "The Wisdom save against the Paladin's spell save DC, its Frightened and the Channel Divinity use are applied. The number of targets and the frightened creature's limit of one thing a turn are the GM's."
   ),
-  "feature:aura-of-courage": guided(
-    "The Paladin's own Immunity to Frightened is applied while it isn't Incapacitated. The same for allies in its aura is the GM's."
+  "feature:aura-of-courage": enforced(
+    "paladin-auras.ts makes the Paladin and its allies in its Aura of Protection immune to Frightened while it isn't Incapacitated, and an ally already Frightened has no Disadvantage from it there (resolution/attack.ts, check-rolls.ts)."
   ),
-  "feature:aura-of-devotion": guided(
-    "The Paladin's own Immunity to Charmed is applied while it isn't Incapacitated. The same for allies in its aura is the GM's."
+  "feature:aura-of-devotion": enforced(
+    "paladin-auras.ts makes the Paladin and its allies in its Aura of Protection immune to Charmed while it isn't Incapacitated, and an ally already Charmed may target its charmer while there (resolution/economy.ts)."
   ),
-  "feature:dwarf-resilience": guided(
-    "Resistance to Poison damage is applied. Advantage on saves to avoid or end the Poisoned condition is the GM's."
+  "feature:holy-nimbus": enforced(
+    "The Bonus Action puts Holy Nimbus on the Paladin for 10 minutes. turn-boundaries.ts deals its Radiant damage to an enemy that starts its turn in the aura, and saving-throws.ts gives the Paladin Advantage on saves a Fiend or an Undead forces. The sunlight is the GM's, since the map has no light."
+  ),
+  "feature:smite-of-protection": enforced(
+    "resolution/hit-options.ts marks the Paladin when Divine Smite rides a hit, and until its next turn the creatures in its aura have Half Cover against attacks and on Dexterity saves (resolution/validate.ts, resolution/pending.ts)."
+  ),
+  "feature:orc-relentless-endurance": enforced(
+    "hit-points.ts holds an Orc reduced to 0 Hit Points, but not killed outright, at 1 Hit Point instead, once a Long Rest. It is taken the first time it can be."
+  ),
+  "feature:goliath-large-form": guided(
+    "The Bonus Action gives +10 feet of Speed and Advantage on Strength checks for 10 minutes. Becoming Large on the map, and whether the space is big enough, are the GM's."
+  ),
+  "feature:goliath-powerful-build": enforced(
+    "The escape from a grapple rolls with Advantage (resolution/builtins.ts). The app doesn't track carrying capacity, so counting one size larger for it is the GM's."
   ),
   "feature:goliath-giant-ancestry": guided(
     "The chosen ancestry and its uses are recorded, and Storm's Thunder is offered as a Reaction. The other boons' damage, push and teleport are the GM's."
@@ -643,25 +655,25 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Protector's training and Thaumaturge's extra cantrip are applied. Thaumaturge's bonus to Arcana and Religion checks is the GM's."
   ),
   "feature:eldritch-invocations": guided(
-    "Each invocation's spells and riders are applied (Agonizing Blast's damage, the free casts). Repelling Blast's push and Eldritch Spear's range are the GM's."
+    "Agonizing Blast's damage, Eldritch Spear's range on a spell attack, Repelling Blast's push (resolution/masteries.ts), Eldritch Mind's Advantage and the free casts are applied. The senses (Devil's Sight, Witch Sight), the pact-weapon invocations, Lessons of the First Ones, Gaze of Two Minds, Gift of the Protectors and Investment of the Chain Master are the GM's."
   ),
-  "feature:elemental-fury": guided(
-    "Primal Strike's extra damage is applied once a turn. Potent Spellcasting's bonus to cantrip damage is the GM's."
+  "feature:elemental-fury": enforced(
+    "Primal Strike's extra damage, of the type the Druid picks, is applied once a turn. Potent Spellcasting adds the Druid's Wisdom modifier to the damage of Poison Spray, Produce Flame and Starry Wisp."
   ),
   "feature:lands-aid": guided(
     "The save and its Necrotic damage against the Druid's spell save DC are applied, and a use of Wild Shape is spent. Healing the creature it picks is the GM's."
   ),
-  "feature:mindless-rage": guided(
-    "Immunity to Charmed and Frightened while raging is applied (equipment-derivation.ts). Ending either condition when the Rage starts is the GM's."
+  "feature:mindless-rage": enforced(
+    "Immunity to Charmed and Frightened while raging is applied (equipment-derivation.ts), and either condition ends as the Rage starts (resolution/grant.ts)."
   ),
-  "feature:primal-knowledge": guided(
-    "The extra skill is applied. Making those checks as Strength checks while raging is the GM's."
+  "feature:primal-knowledge": enforced(
+    "The extra skill is applied. While raging, Acrobatics, Intimidation, Perception, Stealth and Survival checks are made as Strength checks when that is the better roll (ability-checks.ts)."
   ),
   "feature:primal-order": guided(
     "Magician's extra cantrip and Warden's training are applied. The Wisdom bonus to the checks each role names is the GM's."
   ),
-  "feature:stunning-strike": guided(
-    "A target that fails its Constitution save against the Monk's DC is Stunned until the start of the Monk's next turn, once a turn for a Focus Point. The halved Speed and Advantage on a success are the GM's."
+  "feature:stunning-strike": enforced(
+    "A target that fails its Constitution save against the Monk's DC is Stunned until the start of the Monk's next turn, once a turn for a Focus Point. On a success resolution/pending.ts halves its Speed until then (speed.ts), and the next attack roll against it before then has Advantage and spends it (resolution/attack.ts)."
   ),
   "feature:use-magic-device": guided(
     "The fourth attuned item is applied (inventory.ts). The roll to save a charge, and reading any Spell Scroll, are the GM's."
@@ -718,18 +730,12 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:dragon-scale-mail": guided(
     "The +1 AC and the Resistance to one type are applied. Advantage on saves against a dragon's breath, and sensing dragons, are the GM's."
   ),
-  "item:dragon-slayer": guided(
-    "The +1 to attack and damage rolls is applied. The extra 3d6 against Dragons is the GM's."
-  ),
   "item:dwarven-plate": guided("The +2 AC is applied. The Reaction against forced movement is the GM's."),
   "item:dwarven-thrower": guided(
     "The +3 to attack and damage rolls is applied. Throwing it, its return and the extra damage against Giants are the GM's."
   ),
-  "item:elven-chain": guided(
-    "The +1 AC is applied. The SRD counts its wearer as trained with it, but equipment-derivation.ts doesn't, so a wearer without Medium armor training takes the untrained penalties."
-  ),
   "item:giant-slayer": guided(
-    "The +1 to attack and damage rolls is applied. The extra 2d6 against Giants is the GM's."
+    "The +1 to attack and damage rolls and the extra 2d6 against Giants are applied. The Giant's save against Prone is the GM's."
   ),
   "item:hammer-of-thunderbolts": guided(
     "The +1 to attack and damage rolls is applied. Its thrown thunderclap and its powers against Giants are the GM's."
@@ -738,7 +744,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Its Detect Thoughts and Suggestion casts are cast actions. The telepathy itself is the GM's."
   ),
   "item:holy-avenger": guided(
-    "The +3 to attack and damage rolls is applied. The extra 2d10 Radiant against Fiends and Undead, and its aura, are the GM's."
+    "The +3 to attack and damage rolls and the extra 2d10 Radiant against Fiends and Undead are applied. The aura's Advantage on saves against spells for its wielder's allies is the GM's."
   ),
   "item:iron-bands": guided(
     "The throw's attack roll is applied. Restraining the target on a hit, and the check to break free, are the GM's."
@@ -747,8 +753,11 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:luck-blade": guided(
     "The +1 to attack and damage rolls and saving throws is applied. Its Luck reroll and its Wish are the GM's."
   ),
+  "item:mace-of-disruption": guided(
+    "The extra 2d6 Radiant against Fiends and Undead is applied. The save against destruction at 25 Hit Points or fewer, and the Frightened condition a success leaves, are the GM's."
+  ),
   "item:mace-of-smiting": guided(
-    "The +1 to attack and damage rolls is applied. The extra bonus against Constructs and the damage on a 20 are the GM's."
+    "The +1 to attack and damage rolls, +3 against Constructs, and the 7 Bludgeoning on a Critical Hit (14 against a Construct) are applied. Destroying a Construct left at 25 Hit Points or fewer is the GM's."
   ),
   "item:nine-lives-stealer": guided(
     "The +2 to attack and damage rolls is applied. Life Stealing on a Critical Hit is the GM's."
@@ -780,6 +789,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:scimitar-of-speed": guided(
     "The +2 to attack and damage rolls is applied. The extra attack as a Bonus Action is the GM's."
   ),
+  "item:spellguard-shield": guided(
+    "Spell attack rolls against its holder have Disadvantage (resolution/attack.ts). Advantage on saves against spells and other magical effects is the GM's."
+  ),
   "item:staff-of-charming": guided(
     "Its one-charge casts are cast actions. Reflecting an enchantment, and resisting one, are the GM's."
   ),
@@ -790,13 +802,22 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Resistance to Cold damage and its one-charge Fog Cloud are applied. The spells that cost more charges are the GM's."
   ),
   "item:staff-of-power": guided(
-    "The +2 to AC and saving throws is applied. Its weapon bonus, its spells and its Retributive Strike are the GM's."
+    "The +2 to AC, saving throws and spell attack rolls is applied. Its weapon bonus, its spells and its Retributive Strike are the GM's."
+  ),
+  "item:staff-of-the-magi": guided(
+    "Its four casts that cost no charge and the +2 to spell attack rolls are applied. Its weapon bonus, the spells that cost charges, Spell Absorption and Retributive Strike are the GM's."
   ),
   "item:staff-of-the-woodlands": guided(
-    "Its one-charge casts are cast actions, and Tree Form's use is counted. Its weapon bonus, its spell attack bonus and the spells that cost more charges are the GM's."
+    "Its one-charge casts are cast actions, Tree Form's use is counted, and the +2 to spell attack rolls is applied. Its weapon bonus and the spells that cost more charges are the GM's."
   ),
   "item:staff-of-thunder-and-lightning": guided(
     "Lightning Strike and Thunderclap are applied, each once a day. Its weapon bonus and the powers on a hit are the GM's."
+  ),
+  "item:talisman-of-pure-good": guided(
+    "The +2 to spell attack rolls is applied. The 8d6 Radiant it deals a Fiend or an Undead that touches it, and Pure Rebuke's fissure on its charges, are the GM's."
+  ),
+  "item:talisman-of-ultimate-evil": guided(
+    "The +2 to spell attack rolls is applied. The 8d6 Necrotic it deals a creature other than a Fiend or an Undead that touches it, and Ultimate End's fissure on its charges, are the GM's."
   ),
   "item:sword-of-wounding": guided(
     "The extra Necrotic damage is applied. The save that stops the target regaining Hit Points is the GM's."
@@ -810,22 +831,25 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:wand-of-lightning-bolts": guided(
     "Lightning Bolt at DC 15 on its charges is applied. Spending more charges for a higher-level Lightning Bolt is the GM's."
   ),
+  "item:wand-of-the-war-mage-1": guided(
+    "The +1 to spell attack rolls is applied. Ignoring Half Cover on a spell attack is the GM's, who sets the cover."
+  ),
+  "item:wand-of-the-war-mage-2": guided(
+    "The +2 to spell attack rolls is applied. Ignoring Half Cover on a spell attack is the GM's, who sets the cover."
+  ),
+  "item:wand-of-the-war-mage-3": guided(
+    "The +3 to spell attack rolls is applied. Ignoring Half Cover on a spell attack is the GM's, who sets the cover."
+  ),
   "item:weapon-of-warning": guided(
     "Advantage on Initiative for its wielder is applied. The same for allies within 30 feet, and waking them, are the GM's."
   ),
 
   // Spells whose data applies the cast's main numbers and leaves a rider the table would expect the server to apply.
-  "spell:acid-arrow": guided(
-    "The hit's 4d4 Acid damage is applied. The 2d4 at the end of the target's next turn, and half damage on a miss, are the GM's."
+  "spell:befuddlement": enforced(
+    "A failed save deals the Psychic damage and bars the target from casting spells and the Magic action (resolution/economy.ts). The save every 30 days, and Greater Restoration, Heal or Wish ending it, are the GM's."
   ),
-  "spell:befuddlement": guided(
-    "The save and its 10d12 Psychic damage are applied. Keeping the target from casting spells and taking the Magic action is the GM's."
-  ),
-  "spell:blindnessdeafness": guided(
-    "A failed save imposes Blinded, repeated at the end of each of the target's turns. The content build keeps the first of \"Blinded or Deafened\" (save-outcomes.ts), so choosing Deafened is the GM's."
-  ),
-  "spell:chill-touch": guided(
-    "The hit's Necrotic damage is applied. Keeping the target from regaining Hit Points is the GM's."
+  "spell:blur": enforced(
+    "Attack rolls against the caster have Disadvantage while it lasts. An attacker that perceives the caster with Blindsight or Truesight is the GM's to spare."
   ),
   "spell:chromatic-orb": guided(
     "The attack and the chosen damage type are applied. The leap to another target on matching dice is the GM's."
@@ -839,9 +863,6 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:conjure-elemental": guided(
     "The spirit's save, its 8d8 damage and Restrained are a later action the GM calls. The repeat save with 4d8 damage at the start of each of the target's turns is the GM's."
   ),
-  "spell:conjure-fey": guided(
-    "The spirit's attacks and their Psychic damage are applied. The Frightened condition a hit imposes is the GM's."
-  ),
   "spell:contact-other-plane": guided(
     "The DC 15 Intelligence save is opened, and a failure imposes Incapacitated. The 6d6 Psychic damage on a failure, and the entity's answers, are the GM's."
   ),
@@ -850,6 +871,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "spell:delayed-blast-fireball": guided(
     "The explosion's save and 12d6 Fire damage are a later action. The 1d6 added for each turn the bead waits, and a creature touching it, are the GM's."
+  ),
+  "spell:death-ward": enforced(
+    "hit-points.ts leaves the target at 1 Hit Point the first time it would drop to 0, and ends the spell. Negating an effect that would kill it without damage is the GM's."
   ),
   "spell:dissonant-whispers": guided(
     "The save and its Psychic damage are applied. The target's move away with its Reaction is the GM's."
@@ -866,9 +890,6 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:earthquake": guided(
     "The cast's Dexterity save and Prone condition are applied. The save at the end of each of the caster's turns, the broken Concentration and the fissures are the GM's."
   ),
-  "spell:ensnaring-strike": guided(
-    "A failed save imposes Restrained. The 1d6 Piercing damage at the start of each of its turns, and the Strength (Athletics) check to break free, are the GM's."
-  ),
   "spell:fear": guided(
     "A failed save imposes Frightened. The Dash away on each of its turns, and the save out of the caster's sight, are the GM's."
   ),
@@ -878,24 +899,26 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:freedom-of-movement": guided(
     "speed.ts gives the target a Swim Speed equal to its Speed. Ignoring Difficult Terrain, the immunity to magical Paralyzed and Restrained, and slipping free of restraints are the GM's."
   ),
-  "spell:harm": guided(
-    "The save and its 14d6 Necrotic damage are applied. Lowering the Hit Point maximum is the GM's."
+  "spell:gust-of-wind": guided(
+    "The cast's save pushes a creature that fails 15 feet away from the caster. The save at the end of a creature's turn in the Line, the doubled cost of moving toward the caster and turning the Line are the GM's."
   ),
-  "spell:heal": guided("The 70 Hit Points are applied. Ending Blinded, Deafened and Poisoned is the GM's."),
   "spell:hideous-laughter": guided(
     "A failed save imposes Prone and Incapacitated, repeated at the end of each of the target's turns. The save with Advantage each time it takes damage is the GM's."
-  ),
-  "spell:ice-knife": guided(
-    "The attack's Piercing damage is applied. The explosion's Dexterity save and 2d6 Cold damage are the GM's."
   ),
   "spell:irresistible-dance": guided(
     "A failed save imposes Charmed. The dance's Disadvantage, the Advantage against the dancer and its save to collect itself are the GM's."
   ),
+  "spell:mass-heal": enforced(
+    "resolution/heal.ts divides the 700 Hit Points evenly among the creatures the caster picks, none past its maximum, and ends Blinded, Deafened and Poisoned on each. A different split is the caster's to make by hand."
+  ),
   "spell:phantasmal-killer": guided(
     "The save and its 4d10 Psychic damage are applied. The Disadvantage it leaves, and the save with damage at the end of each of its turns, are the GM's."
   ),
-  "spell:power-word-stun": guided(
-    "A target with 150 Hit Points or fewer is Stunned and repeats the save at the end of each of its turns. A tougher target's Speed 0 is the GM's."
+  "spell:power-word-heal": enforced(
+    "resolution/heal.ts restores all the target's Hit Points and ends Charmed, Frightened, Paralyzed, Poisoned and Stunned. Standing up from Prone with its Reaction is the creature's choice."
+  ),
+  "spell:power-word-stun": enforced(
+    "A target with 150 Hit Points or fewer is Stunned and repeats the save at the end of each of its turns; a tougher one's Speed is 0 until the start of the caster's next turn (resolution/pending.ts)."
   ),
   "spell:prayer-of-healing": guided(
     "The 2d8 Hit Points are applied. The Short Rest's benefits, and the limit of once per Long Rest, are the GM's."
@@ -903,13 +926,11 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:prismatic-wall": guided(
     "The save against Blinded for a creature near the wall is applied. Each layer's save and effect are the GM's."
   ),
-  "spell:ray-of-frost": guided("The hit's Cold damage is applied. The 10 feet off the target's Speed are the GM's."),
-  "spell:ray-of-sickness": guided("The hit's Poison damage is applied. The Poisoned condition is the GM's."),
+  "spell:protection-from-poison": enforced(
+    "The cast ends Poisoned and leaves Resistance to Poison damage and Advantage on saves to avoid or end Poisoned. The GM ends the effect when the hour is up."
+  ),
   "spell:regenerate": guided(
     "The 4d8 + 15 Hit Points are applied. The 1 Hit Point at the start of each of the target's turns is the GM's."
-  ),
-  "spell:shocking-grasp": guided(
-    "The hit's Lightning damage is applied. Keeping the target from making Opportunity Attacks is the GM's."
   ),
   "spell:sleep": guided(
     "A failed save imposes Incapacitated until the end of the target's next turn, and damage ends it. The second save, and Unconscious on its failure, are the GM's."
@@ -920,29 +941,14 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:sorcerous-burst": guided(
     "The attack and the chosen damage type are applied. Rolling another d8 on each 8 is the GM's."
   ),
-  "spell:spirit-guardians": guided(
-    "spell-zones.ts asks for the save when a creature enters the Emanation or ends its turn there. The halved Speed inside it is the GM's."
-  ),
-  "spell:starry-wisp": guided(
-    "The hit's Radiant damage is applied. Denying the target the Invisible condition is the GM's."
+  "spell:spirit-guardians": enforced(
+    "spell-zones.ts asks for the save when a creature enters the Emanation or ends its turn there, and charges an affected creature double for each step it moves inside (terrain.ts). The creatures the caster designates are its allies."
   ),
   "spell:storm-of-vengeance": guided(
     "The first turn's save, Thunder damage and Deafened condition are applied. The storm's turns 2 to 10 are the GM's."
   ),
-  "spell:thunderwave": guided(
-    "The save and its Thunder damage are applied. The 10-foot push on a failed save is the GM's to move."
-  ),
   "spell:tsunami": guided(
     "The wall's first save and damage are applied. Its movement and the damage on later turns are the GM's."
-  ),
-  "spell:vampiric-touch": guided(
-    "The touch's Necrotic damage is applied, on the cast and as a later Magic action. Regaining half the damage dealt is the GM's."
-  ),
-  "spell:vicious-mockery": guided(
-    "The save and its Psychic damage are applied. The Disadvantage on the target's next attack roll is the GM's."
-  ),
-  "spell:vitriolic-sphere": guided(
-    "The save and its 10d4 Acid damage are applied. The 5d4 Acid damage at the end of the target's next turn is the GM's."
   ),
   "spell:wall-of-ice": guided(
     "The save and its Cold damage for creatures in the wall's space are applied. The wall itself and its frigid air are the GM's."

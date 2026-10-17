@@ -25,7 +25,7 @@ import {
 } from "../held-rolls.js";
 import { GM_CHOICE, magicResistanceOf } from "../saving-throws.js";
 import { criticalThreshold } from "../effective-actions.js";
-import { endEffect, STEADY_AIM_TAG } from "../effects.js";
+import { CONCENTRATING_TAG, endEffect, STEADY_AIM_TAG, UNTIL_IT_ACTS_TAG } from "../effects.js";
 import {
   deriveEquipment,
   rollModeClaims,
@@ -41,6 +41,7 @@ import { holdsFeature } from "../class-features.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { statblockFacts, swimSpeedFeet } from "../statblock-facts.js";
 import { auraOfAuthority } from "../statblock-traits.js";
+import { wardedConditions } from "../paladin-auras.js";
 import { naturalFace, recordRoll, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
 
 /** Whether this swing is at range. A thrown weapon needs the measured distance; unmeasurable resolves to
@@ -133,6 +134,8 @@ const has = (actor: LiveActor, id: string) => actor.conditions.some((condition) 
 export const OUTLINED_TAG = "outlined";
 /** An effect that lasts until the next attack roll against its bearer, whoever makes it (Guiding Bolt's light). */
 export const UNTIL_ATTACKED_TAG = "until-attacked";
+/** An effect that lasts until its bearer's own next attack roll (Vicious Mockery's Disadvantage). */
+export const UNTIL_OWN_ATTACK_TAG = "until-own-attack";
 /** The Help action's mark on the distracted enemy: the next attack roll against it by an ally of the helper. */
 export const DISTRACTED_TAG = "distracted";
 
@@ -150,18 +153,53 @@ const outlined = (actor: LiveActor) => actor.effects.some((effect) => effect.tag
 
 /** Riders on both sides at `on-attack-roll`, read whoever's turn it is (opportunity attacks are off-turn): the
  *  attacker's claims on its attack (Reckless Attack, a cursed blade) and the target's on attacks against it
- *  (Dodge, a Cloak of Displacement). */
-function riderClaims(ctx: ResolveContext, targetDerivation: EquipmentDerivation, sources: RollModeClaims): void {
+ *  (Dodge, Blur). The target's riders see only the attack's kinds (Escape the Horde: "Opportunity Attacks have
+ *  Disadvantage against you"); the attacker's other filters describe the attacker. */
+function riderClaims(
+  ctx: ResolveContext,
+  target: LiveActor,
+  targetDerivation: EquipmentDerivation,
+  sources: RollModeClaims
+): void {
   rollModeClaims(ctx.derivation, ["attack"], "on-attack-roll", ctx.riderFilters, sources);
-  rollModeClaims(targetDerivation, ["incoming-attack"], "on-attack-roll", {}, sources, "Target: ");
+  const kinds = ctx.riderFilters.attackKinds;
+  const filters = kinds ? { attackKinds: kinds } : {};
+  rollModeClaims(targetDerivation, ["incoming-attack"], "on-attack-roll", filters, sources, "Target: ");
+  // What this attacker left on the target against itself alone (Multiattack Defense after its hit), read only for
+  // `by-effect-source` riders so nothing counts twice.
+  const marks = target.effects
+    .filter((effect) => effect.sourceActorId === ctx.attacker.id)
+    .map((effect) => ({
+      label: effect.name,
+      sourceEffectId: effect.id,
+      modifiers: effect.modifiers.filter((modifier) => modifier.when?.some((gate) => gate.type === "by-effect-source"))
+    }))
+    .filter((mark) => mark.modifiers.length > 0);
+  if (marks.length > 0)
+    rollModeClaims(
+      { ...targetDerivation, carriers: marks },
+      ["incoming-attack"],
+      "on-attack-roll",
+      { ...filters, fromEffectSource: true },
+      sources,
+      "Target: "
+    );
 }
 
 /** Conditions on either side, including the two that depend on who or where: Grappled and a Prone target. */
 function conditionClaims(ctx: ResolveContext, target: LiveActor, distance: number | null, sources: RollModeClaims) {
   const { attacker } = ctx;
+  // A Frightened attacker in a Paladin's Aura of Courage: "that condition has no effect on that ally while there".
+  const warded = ctx.deps.resolveDefinition
+    ? wardedConditions(ctx.state, attacker, {
+        resolveDefinition: ctx.deps.resolveDefinition,
+        ...(ctx.deps.distanceFeet ? { distanceFeet: ctx.deps.distanceFeet } : {})
+      })
+    : [];
   for (const entry of CONDITION_ROLL_MODES) {
     const side = entry.side === "attacker" ? attacker : target;
     if (!has(side, entry.condition)) continue;
+    if (entry.side === "attacker" && warded.includes(entry.condition)) continue;
     if (entry.condition === "invisible" && outlined(side)) continue;
     sources[entry.mode].push({
       source: `${entry.side}-${entry.condition}`,
@@ -283,7 +321,7 @@ function attackRollSources(
   distance: number | null
 ): RollModeClaims {
   const sources: RollModeClaims = { advantage: [], disadvantage: [] };
-  riderClaims(ctx, targetDerivation, sources);
+  riderClaims(ctx, target, targetDerivation, sources);
   conditionClaims(ctx, target, distance, sources);
   positionClaims(ctx, distance, sources);
   traitClaims(ctx, target, sources);
@@ -530,13 +568,66 @@ export function spendSteadyAim(ctx: ResolveContext): void {
 }
 
 /** The attack roll spends what lasts only until the next attack roll against its bearer (Guiding Bolt's light), hit
- *  or miss. A hit that lays a fresh one does so afterwards. */
+ *  or miss. A hit that lays a fresh one does so afterwards. An effect that holds more than that (Stunning Strike's
+ *  halved Speed) loses only the Advantage it gave and keeps the rest until its own end. */
 export function spendUntilAttacked(ctx: ResolveContext): void {
   const { state, attack, targets, effectsEnded } = ctx;
   if (attack === null) return;
   const target = targets[0];
   for (const effect of target.effects.filter((candidate) => candidate.tags.includes(UNTIL_ATTACKED_TAG))) {
+    const rest = effect.tags.filter((tag) => tag !== UNTIL_ATTACKED_TAG);
+    if (rest.length > 0) {
+      target.effects = target.effects.map((candidate) =>
+        candidate.id === effect.id
+          ? {
+              ...candidate,
+              tags: rest,
+              modifiers: candidate.modifiers.filter(
+                (modifier) => modifier.type !== "roll-mode" || modifier.roll !== "incoming-attack"
+              )
+            }
+          : candidate
+      );
+      continue;
+    }
     endEffect(state, target.id, effect.id);
     effectsEnded.push({ actorId: target.id, actorName: target.name, name: effect.name });
+  }
+}
+
+/** SRD Invisibility: "The spell ends early immediately after the target makes an attack roll, deals damage, or casts a
+ *  spell." Read once a resolve is committed; an effect this very resolve granted stays. */
+export function spendUntilItActs(ctx: ResolveContext): void {
+  const { state, action, attacker, attack, input, damage, effectsEnded } = ctx;
+  if (input.commit === false) return;
+  const acted = attack !== null || action.spellId !== undefined || action.spellSlot !== undefined || damage.length > 0;
+  if (!acted) return;
+  for (const effect of attacker.effects.filter(
+    (candidate) => candidate.tags.includes(UNTIL_IT_ACTS_TAG) && !candidate.id.startsWith(input.commandId)
+  )) {
+    endEffect(state, attacker.id, effect.id);
+    effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name: effect.name });
+    // Once no creature keeps the spell, it is over, and so is its caster's Concentration on it.
+    const { castId, sourceActorId } = effect;
+    if (castId === undefined || sourceActorId === null) continue;
+    const kept = state.actors.some((actor) =>
+      actor.effects.some((other) => other.castId === castId && !other.tags.includes(CONCENTRATING_TAG))
+    );
+    const caster = state.actors.find((actor) => actor.id === sourceActorId);
+    const holding = caster?.effects.find((other) => other.castId === castId && other.tags.includes(CONCENTRATING_TAG));
+    if (!kept && caster && holding) {
+      endEffect(state, caster.id, holding.id);
+      effectsEnded.push({ actorId: caster.id, actorName: caster.name, name: holding.name });
+    }
+  }
+}
+
+/** The bearer's own attack roll spends what lasts only until it (Vicious Mockery's Disadvantage), hit or miss. */
+export function spendUntilOwnAttack(ctx: ResolveContext): void {
+  const { state, attack, attacker, effectsEnded } = ctx;
+  if (attack === null) return;
+  for (const effect of attacker.effects.filter((candidate) => candidate.tags.includes(UNTIL_OWN_ATTACK_TAG))) {
+    endEffect(state, attacker.id, effect.id);
+    effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name: effect.name });
   }
 }

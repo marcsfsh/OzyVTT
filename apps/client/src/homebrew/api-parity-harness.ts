@@ -444,7 +444,9 @@ const SAVE_LIFETIME_KEYS = [
   "rangeFeet",
   "failsAtHitPoints",
   "ongoingDamage.**",
-  "failureHazard"
+  "failureHazard",
+  "failurePush.**",
+  "advantageAtSize"
 ] as const;
 
 /** The exemption table. First match wins, so specific rows sit above general ones. */
@@ -469,6 +471,34 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     reason:
       "conditions an action ends on its target (Lay on Hands' cure) - authored in the class overlays; no editor control yet",
     status: "gap"
+  },
+  {
+    at: "actions[].endsOneCondition",
+    types: ACTION_CARRIERS,
+    reason:
+      "a cure that ends the one condition its user picks (Lesser Restoration) - copied from the spell by the character build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].onHitPush.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "how far a hit pushes (a fire giant's Hammer Throw) - read from the action's description as the catalog is built; the editor writes the description",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].burst.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "what bursts after an attack (Ice Knife) - copied from the spell's cast model by the character build, zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].drain.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "what an action's damage drains (a Life Drain) - read from the action's description as the catalog is built, or copied from a spell's cast model; the editor writes the description",
+    status: "permanent: system-synthesised"
   },
   {
     at: "actions[].legendary.cost",
@@ -529,13 +559,14 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: `actions[].save.${key}`,
     types: ACTION_CARRIERS,
     reason:
-      "how a failed save's conditions end (duration, repeated save, grapple escape and range, ending on damage, Speed 0, an HP gate) - read from SRD prose or authored in the class and item overlays; no editor control yet",
+      "how a failed save's conditions end (duration, repeated save, grapple escape and range, ending on damage, Speed 0, an HP gate), where it pushes and who has Advantage on it - read from SRD prose or authored in the class and item overlays; no editor control yet",
     status: "gap"
   })),
   ...SAVE_LIFETIME_KEYS.map((key): ExemptionRow => ({
     at: `save.${key}`,
     types: ["spell"],
-    reason: "how a failed save's conditions end, read from the spell's description as the catalog is built",
+    reason:
+      "how a failed save's conditions end, where it pushes and who has Advantage on it, read from the spell's description as the catalog is built",
     status: "gap"
   })),
   {
@@ -599,6 +630,12 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "save.ignoresCover",
     types: ["spell"],
     reason: "one SRD author (Sacred Flame), a reviewed override in the content build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].save.successEffect.**",
+    types: ACTION_CARRIERS,
+    reason: "one SRD author (Stunning Strike's halved Speed), written in the class content; no editor control yet",
     status: "gap"
   },
   {

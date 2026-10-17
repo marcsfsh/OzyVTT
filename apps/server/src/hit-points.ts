@@ -22,12 +22,13 @@ import {
   type ResolvedRider
 } from "@vtt/rules-5e";
 import { DAMAGE_TYPE_IDS } from "@vtt/content-srd-5.2.1/schemas";
-import type { ActorDefinition } from "@vtt/schemas";
+import type { ActorDefinition, DamageDrain } from "@vtt/schemas";
 import { requireActorAccess, requireGm, type Initiator } from "./authorization.js";
 import { CommandRejectedError } from "./game-store.js";
 import {
   addEffect,
   applyCondition,
+  DEATH_WARD_TAG,
   endConcentrationSustainedBy,
   endEffect,
   endEffectsOnDamage,
@@ -35,8 +36,10 @@ import {
   endKnockOut,
   KNOCKED_OUT_TAG,
   makeEffect,
+  NO_HEALING_TAG,
   reduceExhaustion,
   removeConditionDirect,
+  sourceOf,
   type EffectNarration
 } from "./effects.js";
 import { reconcileEquipment } from "./inventory.js";
@@ -82,6 +85,8 @@ export type DamageInput = Readonly<{
   sourceActorId?: string | null;
   /** Knocking out a creature (SRD): a melee attack that would drop it to 0 leaves it at 1 HP and Unconscious. */
   nonlethal?: boolean;
+  /** What the damage drains as it lands (a Life Drain's lower Hit Point maximum, Vampiric Touch's healing). */
+  drain?: DamageDrain;
 }>;
 export type DamageDeps = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
@@ -386,6 +391,140 @@ function fallToZero(
   return { instantDeath, defeated };
 }
 
+/** SRD Death Ward: "The first time the target would drop to 0 Hit Points before the spell ends, the target instead
+ *  drops to 1 Hit Point, and the spell ends." True when it held the creature at 1. */
+function deathWard(state: GameState, actor: Actor, events: EffectNarration[]): boolean {
+  const ward = actor.effects.find((effect) => effect.tags.includes(DEATH_WARD_TAG));
+  if (!ward) return false;
+  actor.hp = { ...actor.hp, current: 1 };
+  events.push(
+    { kind: "condition", text: `${actor.name} drops to 1 Hit Point instead (${ward.name}).`, actorId: actor.id },
+    ...endEffect(state, actor.id, ward.id)
+  );
+  return true;
+}
+
+/** SRD Relentless Endurance (Orc): "When you are reduced to 0 Hit Points but not killed outright, you can drop to 1 Hit
+ *  Point instead", once a Long Rest. It is taken the first time it can be, since staying up is never the worse
+ *  choice. True when it held the creature at 1. */
+function relentlessEndurance(
+  actor: Actor,
+  definition: ActorDefinition | undefined,
+  overflow: number,
+  events: EffectNarration[]
+): boolean {
+  if (overflow >= actor.hp.maximum) return false;
+  const trait = definition?.actions.find((action) => /(^|-)relentless-endurance$/.test(action.id));
+  if (!trait?.uses) return false;
+  const key = trait.uses.pool ?? trait.id;
+  if ((actor.actionUses[key] ?? 0) >= trait.uses.limit) return false;
+  actor.actionUses = { ...actor.actionUses, [key]: (actor.actionUses[key] ?? 0) + 1 };
+  actor.hp = { ...actor.hp, current: 1 };
+  events.push({
+    kind: "condition",
+    text: `${actor.name} drops to 1 Hit Point instead (${trait.name}).`,
+    actorId: actor.id
+  });
+  return true;
+}
+
+/** Marks the effect that holds what drained damage took off a creature's Hit Point maximum. */
+export const DRAINED_TAG = "drained";
+
+/**
+ * What damage drains as it lands (`DamageDrainSchema`). The target's Hit Point maximum decreases by the damage it took,
+ * held on one "Hit Point maximum reduced" effect that gives it back when it ends (a Long Rest ends it), and a creature
+ * whose maximum reaches 0 dies. The creature that dealt the damage regains hit points from it. A monster's lower
+ * maximum and its healing are the GM's to know.
+ */
+function drainDamage(
+  state: GameState,
+  actor: Actor,
+  input: DamageInput,
+  taken: Readonly<{ parts: DamageApplication["parts"]; totalAdjusted: number }>,
+  definition: ActorDefinition | undefined,
+  deps: DamageDeps | undefined,
+  events: EffectNarration[]
+): Readonly<{ died: boolean }> {
+  const drain = input.drain!;
+  const type = drain.damageType?.toLowerCase();
+  const amount =
+    type === undefined
+      ? taken.totalAdjusted
+      : taken.parts.filter((part) => part.type.toLowerCase() === type).reduce((sum, part) => sum + part.adjusted, 0);
+  if (amount <= 0) return { died: false };
+  let died = false;
+  const loss = drain.reducesMaximum
+    ? Math.min(amount, Math.max(0, actor.hp.maximum - (drain.keepsOneMaximum ? 1 : 0)))
+    : 0;
+  if (loss > 0) {
+    const wasStanding = actor.hp.current > 0;
+    actor.hp = {
+      ...actor.hp,
+      maximum: actor.hp.maximum - loss,
+      current: Math.min(actor.hp.current, actor.hp.maximum - loss)
+    };
+    const held = actor.effects.find((effect) => effect.tags.includes(DRAINED_TAG));
+    if (held)
+      actor.effects = actor.effects.map((effect) =>
+        effect.id === held.id ? { ...effect, hitPointMaximumLoss: (effect.hitPointMaximumLoss ?? 0) + loss } : effect
+      );
+    else
+      addEffect(
+        state,
+        actor.id,
+        makeEffect({
+          id: `${deps?.commandId ?? deps?.newId?.() ?? `${actor.id}:${actor.hp.maximum}`}:drained`,
+          name: "Hit Point maximum reduced",
+          tags: [DRAINED_TAG],
+          sourceActorId: input.sourceActorId ?? null,
+          sourceName: input.sourceName ?? null,
+          startedRound: state.combat.round,
+          duration: { type: "manual" },
+          hitPointMaximumLoss: loss
+        }),
+        events,
+        deps
+      );
+    const pc = actor.kind === "player-character";
+    events.push({
+      kind: "damage",
+      text: `${actor.name}'s Hit Point maximum drops by ${loss}, until a Long Rest.`,
+      actorId: actor.id,
+      ...(pc ? {} : { gmOnly: true as const })
+    });
+    if (actor.hp.maximum <= 0) {
+      died = true;
+      if (pc) {
+        actor.deathSaves = { successes: 0, failures: 3, stable: false };
+        applyCondition(actor, "unconscious", { immunities: deps });
+        applyCondition(actor, "prone", { immunities: deps });
+        events.push({
+          kind: "condition",
+          text: `${actor.name} dies, its Hit Point maximum drained away.`,
+          actorId: actor.id
+        });
+      } else if (wasStanding) fallToZero(state, actor, definition, 0, deps, events);
+    }
+  }
+  const sourceId = drain.heals ? input.sourceActorId : null;
+  const source = sourceId ? state.actors.find((candidate) => candidate.id === sourceId) : undefined;
+  const regained = drain.heals === "half" ? Math.floor(amount / 2) : amount;
+  if (source && regained > 0) {
+    const before = source.hp.current;
+    const healed = healActor(state, source.id, regained, { role: "gm" });
+    if (source.hp.current > before)
+      events.push({
+        kind: "effect",
+        text: `${source.name} regains ${source.hp.current - before} hit points.`,
+        actorId: source.id,
+        ...(source.kind === "player-character" ? {} : { gmOnly: true as const })
+      });
+    events.push(...healed);
+  }
+  return { died };
+}
+
 /**
  * Hit points lost rather than damage taken (an infernal wound: "the target loses 5 (1d10) Hit Points"): no type, no
  * defence, no Temporary Hit Points and no Concentration save, since none of those meet damage that isn't dealt. A
@@ -493,10 +632,25 @@ export function applyDamageDetailed(
       text: `${actor.name} was knocked out - Unconscious at 1 HP until it regains hit points.`,
       actorId
     });
+  } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0 && deathWard(state, actor, events)) {
+    // Death Ward held the creature at 1 Hit Point: nothing falls.
+  } else if (
+    isPlayerCharacter &&
+    !wasAtZero &&
+    actor.hp.current === 0 &&
+    damageToHp > 0 &&
+    relentlessEndurance(actor, definition, damageToHp - hpBefore, events)
+  ) {
+    // Up at 1 Hit Point: nothing falls.
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0) {
     const fell = fallToZero(state, actor, definition, damageToHp - hpBefore, deps, events);
     instantDeath = fell.instantDeath;
     defeated = fell.defeated;
+  }
+  if (input.drain && totalAdjusted > 0) {
+    const drained = drainDamage(state, actor, input, { parts, totalAdjusted }, definition, deps, events);
+    instantDeath ||= drained.died && isPlayerCharacter;
+    defeated ||= drained.died && !isPlayerCharacter;
   }
 
   // SRD Concentration: damage while concentrating prompts a CON save, DC max(10, half the damage) capped
@@ -578,6 +732,17 @@ export const deadCantHealLine = (name: string) => `${name} is dead and can't reg
 export function healActor(state: GameState, actorId: string, amount: number, scope: Initiator): EffectNarration[] {
   const actor = adjustableActor(state, actorId, scope);
   if (isDead(actor)) return [{ kind: "condition", text: deadCantHealLine(actor.name), actorId }];
+  // "It can't regain Hit Points until the end of your next turn" (Chill Touch).
+  const barred = actor.effects.find((effect) => effect.tags.includes(NO_HEALING_TAG));
+  if (barred)
+    return [
+      {
+        kind: "condition",
+        text: `${actor.name} can't regain hit points while ${barred.name} lasts.`,
+        actorId,
+        ...sourceOf(barred)
+      }
+    ];
   const before = actor.hp.current;
   const wasDying = actor.hp.current <= 0 && actor.deathSaves !== null;
   actor.hp.current = Math.min(actor.hp.maximum, actor.hp.current + amount);

@@ -1,5 +1,8 @@
 // Druid and Circle of the Land mechanics, merged over the ETL-generated prose.
-import type { ClassMechanicsModule, TableSpell } from "./overlay.js";
+import { potentSpellcasting, type ClassMechanicsModule, type TableSpell } from "./overlay.js";
+
+/** The SRD Druid cantrips that deal damage, which Potent Spellcasting adds to. */
+const DRUID_DAMAGE_CANTRIPS = ["poison-spray", "produce-flame", "starry-wisp"];
 
 /** The Circle of the Land table: each land's spells by Druid level (3, 5, 7, 9). */
 const LANDS: ReadonlyArray<{
@@ -115,9 +118,9 @@ export const druid: ClassMechanicsModule = {
     },
 
     /**
-     * The use pool, read off the printed column (2 -> 3 -> 4), one use of which comes back on a Short Rest.
-     * Known Beast forms (needs a creature catalog with CR and Fly Speed filters), the temporary HP and form
-     * replacement stay prose.
+     * The use pool, read off the printed column (2 -> 3 -> 4), one use of which comes back on a Short Rest, and the
+     * Temporary Hit Points equal to the Druid level. Known Beast forms (needs a creature catalog with CR and Fly Speed
+     * filters) and the form replacement stay prose.
      */
     "wild-shape": {
       uses: { scaling: { type: "class-resource", id: "wild-shape" }, per: "long-rest" },
@@ -129,7 +132,9 @@ export const druid: ClassMechanicsModule = {
           activation: "bonus-action",
           description:
             "Shape-shift into a Beast form you have learned for this feature. You stay in that form for a number of hours equal to half your Druid level or until you use Wild Shape again, have the Incapacitated condition, or die. You can leave the form early as a Bonus Action, and you gain Temporary Hit Points equal to your Druid level when you assume a form.",
-          damage: []
+          damage: [],
+          healing: { formula: "0", self: true, temporary: true },
+          adds: { classLevel: 1 }
         }
       ]
     },
@@ -153,7 +158,8 @@ export const druid: ClassMechanicsModule = {
             id: "potent-spellcasting",
             name: "Potent Spellcasting",
             description:
-              "Add your Wisdom modifier to the damage you deal with any Druid cantrip. When Improved Elemental Fury takes effect at Druid level 15, a Druid cantrip with a range of 10 feet or greater has its range increased by 300 feet."
+              "Add your Wisdom modifier to the damage you deal with any Druid cantrip. When Improved Elemental Fury takes effect at Druid level 15, a Druid cantrip with a range of 10 feet or greater has its range increased by 300 feet.",
+            modifiers: [potentSpellcasting(DRUID_DAMAGE_CANTRIPS)]
           },
           {
             id: "primal-strike",

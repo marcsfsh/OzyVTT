@@ -2,29 +2,65 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { ActorAction } from "@vtt/schemas";
-import { areaOfProse, multiattackOfProse, withProseFacts } from "../src/action-prose.js";
+import { areaOfProse, drainOfProse, multiattackOfProse, withProseFacts } from "../src/action-prose.js";
 import { loadSpells } from "../src/index.js";
 
 const action = (fields: Partial<ActorAction>): ActorAction =>
   ({ id: "x", name: "X", activation: "action", description: "", damage: [], ...fields }) as ActorAction;
 
 describe("reading an action's prose facts", () => {
+  it("reads what damage drains: the Hit Point maximum, that type alone, and the healing the dealer regains", () => {
+    expect(
+      drainOfProse(
+        "If the target is a creature, its Hit Point maximum decreases by an amount equal to the damage taken."
+      )
+    ).toEqual({ reducesMaximum: true });
+    expect(
+      drainOfProse(
+        "The target's Hit Point maximum decreases by an amount equal to the Necrotic damage taken, and the vampire regains Hit Points equal to that amount."
+      )
+    ).toEqual({ damageType: "necrotic", reducesMaximum: true, heals: "all" });
+    // A fixed amount stays the GM's.
+    expect(
+      drainOfProse("Subsequent Failures: The Poisoned target's Hit Point maximum decreases by 5 (1d10).")
+    ).toBeNull();
+    expect(
+      withProseFacts(
+        action({
+          description: "its Hit Point maximum decreases by an amount equal to the damage taken.",
+          damage: [{ formula: "4d8", type: "necrotic" }]
+        })
+      ).drain
+    ).toEqual({ reducesMaximum: true });
+  });
+
   it("reads the SRD area phrasings, and nothing else", () => {
     expect(areaOfProse("each creature in a 60-foot Cone")).toEqual({ shape: "cone", sizeFeet: 60, widthFeet: null });
     expect(areaOfProse("a 60-foot-long, 5-foot-wide Line")).toEqual({ shape: "line", sizeFeet: 60, widthFeet: 5 });
     expect(areaOfProse("a 20-foot-radius Sphere")).toEqual({ shape: "sphere", sizeFeet: 20, widthFeet: null });
     expect(areaOfProse("a 15-foot Emanation")).toEqual({ shape: "emanation", sizeFeet: 15, widthFeet: null });
     expect(areaOfProse("a 10-foot Cube")).toEqual({ shape: "cube", sizeFeet: 10, widthFeet: null });
-    // On the map, a Cylinder is the circle of its radius and a square on the ground is a Cube.
+    // A Cylinder keeps its radius, however its height is printed, and a square on the ground is a Cube.
     expect(areaOfProse("in a 5-foot-radius, 40-foot-high Cylinder")).toEqual({
-      shape: "sphere",
+      shape: "cylinder",
       sizeFeet: 5,
       widthFeet: null
     });
     expect(areaOfProse("in a 40-foot-tall, 20-foot-radius Cylinder")).toEqual({
-      shape: "sphere",
+      shape: "cylinder",
       sizeFeet: 20,
       widthFeet: null
+    });
+    expect(areaOfProse("in a 50-foot-radius, 100 foot high Cylinder")).toEqual({
+      shape: "cylinder",
+      sizeFeet: 50,
+      widthFeet: null
+    });
+    // A Line printed before its size, in words.
+    expect(areaOfProse("A Line of strong wind 60 feet long and 10 feet wide blasts from you")).toEqual({
+      shape: "line",
+      sizeFeet: 60,
+      widthFeet: 10
     });
     expect(areaOfProse("fill a 20-foot square on ground")).toEqual({ shape: "cube", sizeFeet: 20, widthFeet: null });
     expect(areaOfProse("Melee Attack Roll: +9, reach 10 ft.")).toBeNull();
@@ -209,7 +245,8 @@ describe("the bundles carry what their prose says, so play never reads it", () =
     const lightningBolt = loadSpells().find((spell) => spell.id === "lightning-bolt")!;
     expect(lightningBolt.area).toEqual({ shape: "line", sizeFeet: 100, widthFeet: 5 });
     const areaOf = (id: string) => loadSpells().find((spell) => spell.id === id)!.area;
-    expect(areaOf("flame-strike")).toEqual({ shape: "sphere", sizeFeet: 10, widthFeet: null });
+    expect(areaOf("flame-strike")).toEqual({ shape: "cylinder", sizeFeet: 10, widthFeet: null });
+    expect(areaOf("gust-of-wind")).toEqual({ shape: "line", sizeFeet: 60, widthFeet: 10 });
     expect(areaOf("entangle")).toEqual({ shape: "cube", sizeFeet: 20, widthFeet: null });
     expect(
       loadSpells()

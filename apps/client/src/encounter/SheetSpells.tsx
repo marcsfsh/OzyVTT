@@ -135,7 +135,7 @@ function SpellCastControls({
       <span
         className="sheet-cast-effect"
         aria-hidden={effect ? undefined : true}
-        title={effect ? `Effect at ${isCantrip ? "your level" : ordinal(level)}` : undefined}
+        title={effect ? `Effect at ${isCantrip ? "your level" : `level ${level}`}` : undefined}
       >
         {effect ?? ""}
       </span>
@@ -341,7 +341,7 @@ export function SheetSpells({
     const rem = fromPact ? pact.remaining : (liveSlotRemaining.get(level) ?? max);
     const none = !fromPact && (max <= 0 || rem <= 0);
     if (none && policeSlots) {
-      onFeedback(`No ${ordinal(level)}-level slots remain.`);
+      onFeedback(`No level ${level} spell slots remain.`);
       return;
     }
     const content = spellIndex.get(spell.id);
@@ -364,8 +364,8 @@ export function SheetSpells({
       // here; the GM can adjust the parked damage.
       if (routeSpell(spell)) return;
       // Digital rolls the damage; manual prompts for the physical total.
-      if (formula) void rollFlat(formula, "damage", `${spell.name} at ${ordinal(level)}${types}`);
-      else onFeedback(`Cast ${spell.name} at ${ordinal(level)} - spent a ${ordinal(level)}-level slot.`);
+      if (formula) void rollFlat(formula, "damage", `${spell.name} at level ${level}${types}`);
+      else onFeedback(`Cast ${spell.name} with a level ${level} spell slot.`);
     });
   };
   // A grant's free casting: the uses its feature has left (shared with that feature's counter), or at will.

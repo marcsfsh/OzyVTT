@@ -467,16 +467,19 @@ export type ContentNamesResult = {
 };
 /** An area of effect parsed from a definition action's prose ("60-foot Cone", etc.); the GM places a matching template on the map. */
 export type ContentActionArea = Readonly<{
-  shape: "cone" | "line" | "sphere" | "cube" | "emanation";
+  shape: "cone" | "line" | "sphere" | "cube" | "emanation" | "cylinder";
   sizeFeet: number;
   widthFeet: number | null;
 }>;
 /** A cast whose granted effect carries this tag takes an ability its caster chooses (Hex: the target has Disadvantage on
  *  ability checks made with it). */
 export const CHOSEN_ABILITY_TAG = "hexed";
+/** Enhance Ability's grant: Advantage on the ability checks made with the ability its caster chooses. */
+export const ENHANCED_ABILITY_TAG = "enhanced-ability";
 /** Whether an action asks its caster to choose an ability (`action.resolve`'s `ability`). */
 export const choosesAbility = (action: Readonly<{ grants?: Readonly<{ tags: readonly string[] }> }>): boolean =>
-  action.grants?.tags.includes(CHOSEN_ABILITY_TAG) === true;
+  action.grants?.tags.includes(CHOSEN_ABILITY_TAG) === true ||
+  action.grants?.tags.includes(ENHANCED_ABILITY_TAG) === true;
 /** A definition action flattened for the GM's action runner. Structured fields only where the content has them; the ADR-0020 mechanics fields power availability hints (the server stays the authority). */
 export type ContentActionSummary = Readonly<{
   id: string;
@@ -518,6 +521,8 @@ export type ContentActionSummary = Readonly<{
   /** Added to a hit rather than taken alone (Sneak Attack, a smite): chosen on an attack's result. */ ridesAHit?: true;
   /** Darts the action makes, each assigned to a target (Magic Missile); see `ActorAction.darts`. */ darts?: number;
   /** Damage types the caster picks from (Chromatic Orb); see `ActorAction.damageTypes`. */ damageTypes?: readonly DamageType[];
+  /** The conditions the caster picks one of for a failed save (Blindness/Deafness); `action.resolve`'s
+   *  `conditionId`. */ conditionChoices?: readonly string[];
   /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple);
    *  `action.resolve`'s `skill`. */ checkSkills?: ReadonlyArray<
     Readonly<{ id: string; ability: z.infer<typeof AbilitySchema> }>

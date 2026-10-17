@@ -117,7 +117,7 @@ describe("the GM's spell areas", () => {
     );
     await user.click(screen.getByRole("button", { name: "Place" }));
     const picker = screen.getByRole("group", { name: "Targets for Moonbeam area" });
-    expect(picker.textContent).toContain("drag the 5-ft sphere on the map, then Place.");
+    expect(picker.textContent).toContain("place the 5-ft-radius sphere on the map, then Place.");
     expect(picker.textContent).not.toContain("Roll");
     act(() => setTemplatePlacement({ x: 125, y: 125 }, { x: 175, y: 125 }));
     expect(picker.textContent).toContain("(placed - Place to set it there).");

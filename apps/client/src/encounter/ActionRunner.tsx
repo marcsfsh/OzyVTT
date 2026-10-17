@@ -123,6 +123,8 @@ export function ActionRunner({
       parts,
       ...(useOverride ? { damageOverride: overrideAmount } : {}),
       sourceActorId: actor.id,
+      // Names the action, so the server lands what its damage drains (a Life Drain's lower Hit Point maximum).
+      ...(result.actionId !== undefined && result.actionId.length <= 120 ? { sourceActionId: result.actionId } : {}),
       sourceName: `${actor.name}'s ${result.actionName}`,
       critical: result.crit
     }).then((response) => {

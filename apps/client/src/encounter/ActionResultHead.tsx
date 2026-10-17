@@ -37,6 +37,15 @@ export function CheckOutcome({ check }: Readonly<{ check: NonNullable<ActionReso
 }
 
 /** The hit points an action restored: the roll, and what each target regained (capped at its maximum). */
+/** "Bran regains 7 hit points. Ysolde regains 0 hit points." for a heal's targets. */
+export const regainedText = (targets: NonNullable<ActionResolution["healing"]>["targets"]) =>
+  targets
+    .map(
+      (target) =>
+        `${target.targetName} regains ${target.regained} ${target.regained === 1 ? "hit point" : "hit points"}.`
+    )
+    .join(" ");
+
 export function HealingOutcome({ healing }: Readonly<{ healing: NonNullable<ActionResolution["healing"]> }>) {
   return (
     <p className="action-healing">

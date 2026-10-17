@@ -54,6 +54,9 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
     reaction: action.reaction ?? null,
     ...(action.darts !== undefined ? { darts: action.darts } : {}),
     ...(action.damageTypes !== undefined ? { damageTypes: [...action.damageTypes] } : {}),
+    ...(action.save?.conditionChoices ? { conditionChoices: [...action.save.conditionChoices] } : {}),
+    // A cure that ends one condition of several asks which (Lesser Restoration).
+    ...(action.endsOneCondition && action.endsConditions ? { conditionChoices: [...action.endsConditions] } : {}),
     ...(choosesAbility(action) ? { choosesAbility: true } : {}),
     // A heal for others picks its targets: one (Divine Spark's healing), or several for a divided pool.
     ...(action.healing && !action.healing.self
@@ -284,10 +287,17 @@ export function PlayerActionRunner({
         <ActionTargetPicker
           picking={picking}
           targets={targets
-            // A heal may be for the healer too (a potion drunk, not handed over).
+            // A heal may be for the healer too (a potion drunk, not handed over), and so may a touch that cures or
+            // protects with no attack, save or damage (Lesser Restoration, Enhance Ability on the caster).
             .filter(
               (target) =>
-                target.actorId !== actorId || picking.action.healing != null || healingOf(picking.action) !== undefined
+                target.actorId !== actorId ||
+                picking.action.healing != null ||
+                healingOf(picking.action) !== undefined ||
+                (picking.action.builtin !== true &&
+                  picking.action.attackBonus === null &&
+                  picking.action.saveAbility === null &&
+                  picking.action.damage.length === 0)
             )
             .map((target) => ({ id: target.actorId, label: target.name }))}
           busy={busy}

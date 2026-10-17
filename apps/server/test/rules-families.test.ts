@@ -62,6 +62,9 @@ describe("rule families", () => {
       // Ending what someone else imposed skips the action or save its rules ask for; a raging Barbarian can't cast.
       ["condition.imposed", "economy"],
       ["condition.raging", "economy"],
+      // An effect that takes away Reactions (Slow) is "you have no reaction", like Incapacitated.
+      ["condition.no-reactions", "economy"],
+      ["condition.no-spells", "economy"],
       ["legendary.own-turn", "economy"],
       // An extra attack waits on the swing that opens it: a matter of what this turn has done.
       ["attack.light-needs-attack", "economy"],
@@ -78,6 +81,8 @@ describe("rule families", () => {
       ["spell.untrained-armor", "economy"],
       // A scroll whose spell the reader's lists lack: what the character can do at all.
       ["spell.scroll-unreadable", "economy"],
+      // A later-turn spell action on the turn of its cast: what this turn has done.
+      ["spell.later-turn", "economy"],
       // Sneak Attack or a smite taken alone, with no hit to add to.
       ["attack.rides-a-hit", "economy"],
       ["feature.no-uses-remaining", "resources"],

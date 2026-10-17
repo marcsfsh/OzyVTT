@@ -177,7 +177,7 @@ export function setCondition(
   // immunities read the same; without a catalog only innate ones apply.
   const written = applyCondition(actor, conditionId, {
     level,
-    immunities: options,
+    immunities: { ...options, state },
     selfApplied: scope.role === "player"
   });
   if (written === "immune") {

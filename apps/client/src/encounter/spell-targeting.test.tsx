@@ -89,3 +89,73 @@ describe("assigning Magic Missile's darts", () => {
     expect(await lastResolve()).toMatchObject({ targetIds: [GOBLIN], damageType: "fire" });
   });
 });
+
+describe("the condition Blindness/Deafness imposes", () => {
+  it("sends the condition picked, and nothing when the first stands", async () => {
+    const curse = {
+      ...MISSILE,
+      id: "spell-blindnessdeafness",
+      name: "Blindness/Deafness",
+      darts: undefined,
+      damage: [],
+      saveAbility: "con",
+      conditionChoices: ["blinded", "deafened"]
+    };
+    beginTargeting(curse as unknown as ContentActionSummary, CASTER, 2);
+    render(<Picker />);
+    const select = screen.getByRole("combobox") as HTMLSelectElement;
+    expect(select.value).toBe("blinded");
+    act(() => toggleTarget(GOBLIN));
+    resolveTargeting(undefined, () => {});
+    expect(await lastResolve()).not.toHaveProperty("conditionId");
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "deafened" } });
+    resolveTargeting(undefined, () => {});
+    expect(await lastResolve()).toMatchObject({ targetIds: [GOBLIN], conditionId: "deafened" });
+  });
+});
+
+describe("the condition Lesser Restoration ends", () => {
+  it("asks which condition to end, and sends the one picked", async () => {
+    const cure = {
+      ...MISSILE,
+      id: "spell-lesser-restoration",
+      name: "Lesser Restoration",
+      darts: undefined,
+      damage: [],
+      conditionChoices: ["blinded", "deafened", "paralyzed", "poisoned"]
+    };
+    beginTargeting(cure as unknown as ContentActionSummary, CASTER, 2);
+    render(<Picker />);
+    expect(screen.getByText("Condition to end")).toBeTruthy();
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "poisoned" } });
+    act(() => toggleTarget(GOBLIN));
+    resolveTargeting(undefined, () => {});
+    expect(await lastResolve()).toMatchObject({ targetIds: [GOBLIN], conditionId: "poisoned" });
+  });
+});
+
+describe("an area the GM places", () => {
+  it("names a Cylinder by its radius, and maps it to a circle on the map", () => {
+    const moonbeam = {
+      ...MISSILE,
+      id: "spell-moonbeam",
+      name: "Moonbeam",
+      darts: undefined,
+      damage: [{ formula: "2d10", type: "radiant" }],
+      saveAbility: "con",
+      area: { shape: "cylinder", sizeFeet: 5, widthFeet: null }
+    };
+    beginTargeting(moonbeam as unknown as ContentActionSummary, CASTER, 2);
+    render(<Picker />);
+    expect(screen.getByRole("group", { name: "Targets for Moonbeam" }).textContent).toContain(
+      "place the 5-ft-radius cylinder on the map"
+    );
+    let shape: string | undefined;
+    function Shape() {
+      shape = useTargeting()?.template?.shape;
+      return null;
+    }
+    render(<Shape />);
+    expect(shape).toBe("circle");
+  });
+});

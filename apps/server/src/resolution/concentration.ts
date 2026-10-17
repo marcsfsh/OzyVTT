@@ -2,6 +2,7 @@ import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { EffectInstance, SpellZone } from "@vtt/domain";
 import { addEffect, CONCENTRATING_TAG, makeEffect, type EffectNarration } from "../effects.js";
 import { laterRowOf, laterSpellActionId } from "../item-actions.js";
+import { castThisTurnKey } from "../lasting-spells.js";
 import { endZone } from "../spell-zone-state.js";
 import { zoneRowOf } from "../spell-zones.js";
 import type { ResolveContext } from "./context.js";
@@ -76,6 +77,19 @@ export function beginConcentration(ctx: ResolveContext, spell: SpellReference, c
   });
   // The previous Concentration ending is the table's news.
   for (const event of ended) ctx.tableNarration.push({ kind: "effect", text: event.text, actorIds: [event.actorId] });
+}
+
+/** Marks the cast on its caster's own turn when the spell has something taken only on later turns. */
+export function markCastTurn(ctx: ResolveContext): void {
+  const spell = spellOf(ctx);
+  const { state, attacker } = ctx;
+  if (!spell || isLaterAction(ctx, spell) || state.combat.turnActorId !== attacker.id) return;
+  if (!(spell.effect?.laterActions ?? []).some((row) => row.laterTurnsOnly)) return;
+  const key = castThisTurnKey(attacker.id, spell.id);
+  state.combat = {
+    ...state.combat,
+    turn: { ...state.combat.turn, turnUses: { ...state.combat.turn.turnUses, [key]: 1 } }
+  };
 }
 
 /** A spell with no Concentration that its caster acts with on later turns (Produce Flame's hurl, Guardian of Faith's

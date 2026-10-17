@@ -4,11 +4,15 @@ import type { GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { effectiveSlot } from "@vtt/rules-5e";
 import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
+import { wardingAura } from "../paladin-auras.js";
 import { areAllies } from "../creature-sides.js";
 import {
   HASTED_TAG,
   hasEffectTag,
   NO_ACTIONS_TAG,
+  NO_REACTIONS_TAG,
+  SLOWED_TAG,
+  NO_SPELLS_TAG,
   RAGING_TAG,
   READIED_TAG,
   RECKLESS_TAG,
@@ -16,7 +20,7 @@ import {
 } from "../effects.js";
 import { ammunitionFor, ammunitionLabel, launcherKind } from "../ammunition.js";
 import { SCROLL_UNREADABLE, scrollOfAction, scrollReading } from "../scrolls.js";
-import { armorTrainingGaps, type EquipmentCatalog } from "../equipment-derivation.js";
+import { armorTrainingGaps, deriveEquipment, type EquipmentCatalog } from "../equipment-derivation.js";
 import { RulesBlockedError } from "../game-store.js";
 import { isItemActionId, itemActionRest, TWO_HANDED_SUFFIX } from "../item-actions.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
@@ -29,7 +33,7 @@ import {
   type RuleId
 } from "../rules-families.js";
 import { laterRowOf, laterSpellActionId, ritualSpellActionId } from "../item-actions.js";
-import { spellUpLevel, takenWhileUp } from "../lasting-spells.js";
+import { castThisTurnKey, spellUpLevel, takenWhileUp } from "../lasting-spells.js";
 import { notEnoughUses, useCostOf } from "../use-cost.js";
 import { builtinHandlerFor } from "./builtins.js";
 import { castMarks, markMoveOf } from "./marks.js";
@@ -152,7 +156,7 @@ export function evaluateActionEconomy(
   checkOwnTurn(evaluation);
   checkExtraAttackOpened(evaluation);
   checkHands(evaluation);
-  checkArmorTraining(evaluation, definition);
+  checkArmorTraining(evaluation, definition, catalog);
   checkAmmunition(evaluation, catalog);
   checkScrollLegible(evaluation, definition, catalog);
   if (!asHitRider) checkTakenAlone(evaluation);
@@ -175,6 +179,7 @@ export function evaluateActionEconomy(
   checkTargeting(evaluation, distanceFeet);
   if (spell) checkMarkMove(evaluation, spell);
   if (spell) checkSpellUp(evaluation, spell);
+  if (spell) checkLaterTurn(evaluation, spell);
   if (spell) checkSpellTargets(evaluation, spell, spendSpellSlot?.level ?? continued ?? spell.level, distanceFeet);
   const opensSpell = spendSpellSlot !== null && slots.markAction && slots.instance?.components[action.id] !== undefined;
   return {
@@ -229,6 +234,18 @@ function checkSpellUp({ attacker, action, siblings, violations }: Evaluation, sp
   });
 }
 
+/** What a spell offers "on your later turns" (Spiritual Weapon's attack, Heat Metal's heat, moving Hex) waits for a
+ *  turn after the one its caster cast it on. */
+function checkLaterTurn({ state, attacker, action, violations }: Evaluation, spell: SpellReference): void {
+  const row = laterRowOf(spell, action.id);
+  if (!row?.laterTurnsOnly || state.combat.turnActorId !== attacker.id) return;
+  if ((state.combat.turn.turnUses[castThisTurnKey(attacker.id, spell.id)] ?? 0) === 0) return;
+  violations.push({
+    rule: "spell.later-turn",
+    message: `${attacker.name} cast ${spell.name} this turn, and ${action.name} comes on later turns.`
+  });
+}
+
 /** In wait mode the order is provisional until every player has rolled, and the turn economy resets when
  *  turns begin, so an action taken before then would come free. */
 function checkTurnsBegun({ state, violations }: Evaluation): void {
@@ -244,7 +261,7 @@ function checkTurnsBegun({ state, violations }: Evaluation): void {
 export function heldReadiedSpell(
   attacker: Pick<LiveActor, "effects">,
   actionId: string
-): Readonly<{ actionId: string; level: number }> | undefined {
+): Readonly<{ actionId: string; level: number; raysLeft?: number }> | undefined {
   return attacker.effects.find(
     (effect) => effect.tags.includes(READIED_TAG) && effect.readiedSpell?.actionId === actionId
   )?.readiedSpell;
@@ -376,12 +393,26 @@ function checkAbleToAct({ attacker, action, violations }: Evaluation): void {
         message: `${attacker.name} is down (0 HP) and can't take actions, bonus actions, or reactions.`
       });
   }
+  // "Can't take Reactions" while an effect lasts.
+  const unreacting = attacker.effects.find((effect) => effect.tags.includes(NO_REACTIONS_TAG));
+  if (unreacting && action.activation === "reaction")
+    violations.push({
+      rule: "condition.no-reactions",
+      message: `${attacker.name} can't take Reactions while ${unreacting.name} lasts.`
+    });
   // SRD Stinking Cloud: while poisoned by it, "the creature can't take an action or a Bonus Action".
   const reeling = attacker.effects.find((effect) => effect.tags.includes(NO_ACTIONS_TAG));
   if (reeling && (action.activation === "action" || action.activation === "bonus-action"))
     violations.push({
       rule: "condition.incapacitated",
       message: `${attacker.name} is reeling from ${reeling.name} and can't take an action or a Bonus Action this turn.`
+    });
+  // SRD Befuddlement: the target "can't cast spells or take the Magic action".
+  const befuddled = attacker.effects.find((effect) => effect.tags.includes(NO_SPELLS_TAG));
+  if (befuddled && (action.spellId !== undefined || action.spellSlot !== undefined || isMagicAction(action)))
+    violations.push({
+      rule: "condition.no-spells",
+      message: `${attacker.name} can't cast spells or take the Magic action while ${befuddled.name} lasts.`
     });
   // SRD Rage: "you can't cast spells".
   if ((action.spellId !== undefined || action.spellSlot !== undefined) && hasEffectTag(attacker, RAGING_TAG))
@@ -435,11 +466,16 @@ function swingItemOf(attacker: LiveActor, action: DefinitionAction) {
 }
 
 /** SRD Armor Training: in Light, Medium or Heavy armor you lack training with, "you can't cast spells". Any action
- *  that casts a spell counts, a wand's included. Read from the sheet's own training; armor training an item grants
- *  is the GM's to allow. */
-function checkArmorTraining({ attacker, action, violations }: Evaluation, definition: ActorDefinition | undefined) {
+ *  that casts a spell counts, a wand's included. With the catalog, training an item grants counts too (Elven Chain). */
+function checkArmorTraining(
+  { attacker, action, violations }: Evaluation,
+  definition: ActorDefinition | undefined,
+  catalog: EquipmentCatalog | undefined
+) {
   if (action.spellId === undefined && action.spellSlot === undefined) return;
-  const { untrainedArmor } = armorTrainingGaps(attacker.inventory, definition);
+  const { untrainedArmor } = catalog
+    ? deriveEquipment(attacker, definition, catalog)
+    : armorTrainingGaps(attacker.inventory, definition);
   if (untrainedArmor)
     violations.push({
       rule: "spell.untrained-armor",
@@ -734,6 +770,18 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
       return { ...unchanged, bonusInstance: { actorId: attacker.id, components } };
     }
   }
+  // SRD Slow: "On its turns, it can take either an action or a Bonus Action, not both."
+  const slowed = onOwnTurn ? attacker.effects.find((effect) => effect.tags.includes(SLOWED_TAG)) : undefined;
+  if (slowed && action.activation === "bonus-action" && state.combat.turn.actionUsed)
+    violations.push({
+      rule: "economy.bonus-action-used",
+      message: `${attacker.name} took an action this turn, and ${slowed.name} leaves no Bonus Action as well.`
+    });
+  if (slowed && action.activation === "action" && !state.combat.turn.actionUsed && state.combat.turn.bonusActionUsed)
+    violations.push({
+      rule: "economy.action-used",
+      message: `${attacker.name} took a Bonus Action this turn, and ${slowed.name} leaves no action as well.`
+    });
   if (onOwnTurn && action.activation === "bonus-action") {
     if (state.combat.turn.bonusActionUsed)
       violations.push({
@@ -751,6 +799,8 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
   }
   if (onOwnTurn && action.activation === "action") return checkActionSlot(evaluation);
   const readied = isReadiedResponse(state, attacker, action);
+  // A released spell's later rays come with the Reaction its first ray took.
+  if (readied && heldReadiedSpell(attacker, action.id)?.raysLeft !== undefined) return unchanged;
   if (action.activation === "reaction" || readied) {
     if (state.combat.reactionsUsed.includes(attacker.id))
       violations.push({
@@ -774,7 +824,14 @@ function freshActionSlot(
   let components: Record<string, number> | null = null;
   let multiattack: ReturnType<typeof planRecord> | null = null;
   const opened = extraAction !== "haste" && parents.length === 1 ? openedBy(parents[0], action, siblings) : null;
-  if (extraAction === "haste") {
+  // Haste's additional action makes one attack only, and so does the Attack action of a creature under Slow (a
+  // monster's Multiattack is the GM's to judge).
+  const slowed =
+    action.spellId === undefined &&
+    !action.multiattack &&
+    parents.length === 0 &&
+    attacker.effects.some((effect) => effect.tags.includes(SLOWED_TAG));
+  if (extraAction === "haste" || slowed) {
     components = action.attack || action.replacesAttack ? {} : null;
   } else if (action.multiattack) {
     // Resolving the parent itself opens the full plan, no rolls consumed.
@@ -1155,8 +1212,14 @@ function checkTargeting(
   }
 
   // SRD Charmed: can't attack or harm the charmer. Enforceable only when the condition rides a
-  // source-linked effect naming the charmer.
-  if (action.attack !== undefined || action.save !== undefined || action.damage.length > 0) {
+  // source-linked effect naming the charmer. A Paladin's Aura of Devotion takes its effect away while there.
+  const charmWarded =
+    evaluation.resolveDefinition !== undefined &&
+    wardingAura(state, attacker, "charmed", {
+      resolveDefinition: evaluation.resolveDefinition,
+      ...(distanceFeet ? { distanceFeet } : {})
+    }) !== null;
+  if (!charmWarded && (action.attack !== undefined || action.save !== undefined || action.damage.length > 0)) {
     const charmers = attacker.effects.filter(
       (effect) => effect.linkedConditionIds.includes("charmed") && effect.sourceActorId !== null
     );

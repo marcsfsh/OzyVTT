@@ -80,6 +80,8 @@ export type MovementCostOptions = Readonly<{
   resolveDefinition?: (definitionId: string) => ActorDefinition | undefined;
   /** The mover may stop in other creatures' spaces (an air elemental's Air Form), so none bars its way. */
   passesCreatures?: boolean;
+  /** Whether the mover's Speed is halved with its centre at this point (Spirit Guardians' Emanation). */
+  halvedAt?: (position: Point, sizeCells: number) => boolean;
 }>;
 
 /**
@@ -133,6 +135,7 @@ export function movementCost(
       for (let row = 0; row < token.sizeCells; row++) cells.add(`${origin.column + column},${origin.row + row}`);
   }
   const terrain = state.combat.terrain.difficult;
+  const halvedAt = options.halvedAt;
   const path = movementPath({
     from: footprintOrigin(imageToGrid(calibration, from), sizeCells),
     to: footprintOrigin(imageToGrid(calibration, to), sizeCells),
@@ -146,7 +149,13 @@ export function movementCost(
       const center = gridToImage(calibration, { column: column + 0.5, row: row + 0.5 });
       return center.x >= 0 && center.y >= 0 && center.x <= geometry.width && center.y <= geometry.height;
     },
-    extraPerStep: extra
+    extraPerStep: extra,
+    ...(halvedAt
+      ? {
+          isHalved: (column: number, row: number) =>
+            halvedAt(gridToImage(calibration, footprintCenter({ column, row }, sizeCells)), sizeCells)
+        }
+      : {})
   });
   if (!path) {
     // Past the search budget (a very long drag): fall back to the straight count, as before terrain existed.

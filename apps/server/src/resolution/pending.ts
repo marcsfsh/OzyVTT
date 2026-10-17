@@ -7,8 +7,11 @@ import { HAZARDS } from "../hazards.js";
 import { halvedDamageParts, previewDamage } from "../hit-points.js";
 import { offerableReaction } from "../reaction-offers.js";
 import { applyFailureEffect, createPendingSaves } from "../saving-throws.js";
-import type { ResolveContext } from "./context.js";
+import { rollDice } from "@vtt/rules-5e";
+import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
+import { recordRoll, type ResolveContext } from "./context.js";
 import { coverBonusOf, coverFor } from "../cover.js";
+import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { damagePartsOf } from "./damage.js";
 
 type HalfDamageReaction = Extract<ActionReaction, { response: "half-damage" }>;
@@ -163,8 +166,9 @@ export function isMagicalAction(ctx: MagicalSource): boolean {
 const BARE_FAILURE_CONDITIONS: ReadonlySet<string> = new Set(["prone", "exhaustion"]);
 
 /** SRD restraints a creature escapes with an action and a Strength (Athletics) check against the spell save DC
- *  (Entangle, Web, Black Tentacles): the restraint carries the DC, and escaping takes Athletics alone. */
-const ATHLETICS_ESCAPES: ReadonlySet<string> = new Set(["entangle", "web", "black-tentacles"]);
+ *  (Entangle, Web, Black Tentacles, Ensnaring Strike): the restraint carries the DC, and escaping takes Athletics
+ *  alone. */
+const ATHLETICS_ESCAPES: ReadonlySet<string> = new Set(["entangle", "web", "black-tentacles", "ensnaring-strike"]);
 /** SRD Stinking Cloud: "While Poisoned in this way, the creature can't take an action or a Bonus Action." */
 const NO_ACTIONS_FAILURES: ReadonlySet<string> = new Set(["stinking-cloud"]);
 
@@ -207,6 +211,7 @@ export function failureEffectFor(
       ...(hazard ? [hazard.tag] : [])
     ].slice(0, 8),
     modifiers: [...(declared?.modifiers ?? [])],
+    ...(declared?.armorClassBonus !== undefined ? { armorClassBonus: declared.armorClassBonus } : {}),
     linkedConditionIds: linked,
     // An escape DC the text doesn't print is the grapple's own DC, as the 2024 rules set it; a spell's restraint is
     // escaped against the spell save DC.
@@ -220,6 +225,28 @@ export function failureEffectFor(
     ...(save.speedZero ? { speedZero: true } : {}),
     ...(grapple ? { endsWhenSourceDefeated: true, rangeFeet: save.rangeFeet ?? action.attack?.reachFeet ?? 5 } : {}),
     ...(ongoingDamage ? { ongoingDamage } : {}),
+    ...(castId !== null ? { castId } : {}),
+    ...(isMagicalAction(ctx) ? { magical: true as const } : {}),
+    sourceActionId: action.id
+  };
+}
+
+/** What a successful save leaves on its target instead, as the action declares it (Stunning Strike: the target's Speed
+ *  halved and the next attack roll against it with Advantage, until the start of the Monk's next turn). */
+function successEffectFor(ctx: MagicalSource & Pick<ResolveContext, "castId">): PendingSave["onSuccessEffect"] {
+  const { action, attacker, castId } = ctx;
+  const declared = action.save?.successEffect;
+  if (!declared) return undefined;
+  return {
+    name: declared.name,
+    tags: [...declared.tags],
+    modifiers: [...declared.modifiers],
+    ...(declared.armorClassBonus !== undefined ? { armorClassBonus: declared.armorClassBonus } : {}),
+    linkedConditionIds: [],
+    escapeDc: null,
+    sourceActorId: attacker.id,
+    sourceName: attacker.name,
+    ...(declared.duration ? { duration: declared.duration } : {}),
     ...(castId !== null ? { castId } : {}),
     ...(isMagicalAction(ctx) ? { magical: true as const } : {}),
     sourceActionId: action.id
@@ -296,10 +323,21 @@ export function parkActionSave(ctx: ResolveContext): void {
   }
   if (saving.length === 0) return;
   const parts = rider ? [] : damagePartsOf(ctx);
+  const onSuccessEffect = successEffectFor(ctx);
   // Cover adds to Dexterity saving throws (SRD Cover), each target's own: the GM's choice for this resolve, else the
   // cover the GM marked it with, unless the save ignores it (Sacred Flame). Carried on the prompt.
   const saveBonusOf = (target: (typeof targets)[number]) =>
-    action.save!.ability === "dex" && !action.save!.ignoresCover ? coverBonusOf(coverFor(input.cover, target)) : 0;
+    action.save!.ability === "dex" && !action.save!.ignoresCover
+      ? coverBonusOf(
+          coverFor(input.cover, target) ??
+            (deps.resolveDefinition
+              ? smiteOfProtectionCover(state, target, {
+                  resolveDefinition: deps.resolveDefinition,
+                  ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
+                })
+              : null)
+        )
+      : 0;
   const groups = new Map<number, string[]>();
   for (const target of saving) groups.set(saveBonusOf(target), [...(groups.get(saveBonusOf(target)) ?? []), target.id]);
   for (const [saveBonus, targetIds] of groups)
@@ -316,10 +354,59 @@ export function parkActionSave(ctx: ResolveContext): void {
       halfOnSuccess: action.save.successDamage === "half",
       conditionIds,
       ...(onFailEffect ? { onFailEffect } : {}),
+      ...(onSuccessEffect ? { extra: { onSuccessEffect } } : {}),
+      ...(action.drain ? { drain: action.drain } : {}),
+      ...(action.save.failurePush ? { failurePush: action.save.failurePush } : {}),
+      ...(action.save.advantageAtSize ? { advantageAtSize: action.save.advantageAtSize } : {}),
       magical: isMagicalAction(ctx),
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())
     });
+}
+
+/**
+ * What bursts after an attack, hit or miss (SRD Ice Knife: "the shard then explodes. The target and each creature within
+ * 5 feet of it must succeed on a Dexterity saving throw"): its damage is rolled once, and each creature the map puts
+ * within reach of the target owes the save, the attacker too. Without a map only the target does, and the GM is told
+ * to add the rest.
+ */
+export function parkBurstSave(ctx: ResolveContext): void {
+  const { state, action, attacker, attack, deps, input, warnings } = ctx;
+  const burst = action.burst;
+  if (!burst || attack === null || input.commit === false) return;
+  const target = state.actors.find((candidate) => candidate.id === attack.targetId);
+  if (!target) return;
+  const parts = burst.damage.map((part) => {
+    const rolled = rollDice(part.formula, deps.random);
+    recordRoll(ctx, rolled, "damage", `${action.name}: burst`);
+    return { amount: Math.max(0, rolled.total), type: part.type };
+  });
+  const near = deps.distanceFeet
+    ? state.combat.initiative.flatMap((entry) => {
+        if (entry.actorId === target.id) return [];
+        const distance = deps.distanceFeet!(target.id, entry.actorId);
+        return distance !== null && distance <= burst.radiusFeet + DISTANCE_TOLERANCE_FEET ? [entry.actorId] : [];
+      })
+    : [];
+  if (!deps.distanceFeet)
+    warnings.push(
+      `${action.name}: each creature within ${burst.radiusFeet} feet of ${target.name} also makes the save - add them by hand.`
+    );
+  createPendingSaves(state, {
+    sourceActorId: attacker.id,
+    sourceName: attacker.name,
+    actionName: `${action.name}: burst`,
+    ability: burst.ability,
+    dc: burst.dc,
+    targetIds: [target.id, ...near],
+    proposedDamage: parts.reduce((sum, part) => sum + part.amount, 0),
+    proposedDamageParts: parts,
+    halfOnSuccess: false,
+    conditionIds: [],
+    magical: isMagicalAction(ctx),
+    newSaveId: deps.newRollId,
+    createdAt: Date.parse(deps.now())
+  });
 }
 
 const conditionDeps = (deps: ResolveContext["deps"]) => ({

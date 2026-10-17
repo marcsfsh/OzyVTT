@@ -23,7 +23,9 @@ import { startEncounter } from "../src/encounter.js";
 import { deriveEquipment } from "../src/equipment-derivation.js";
 import { hasEvasion, magicResistanceOf, saveRollSources } from "../src/saving-throws.js";
 import { currentSpeedFeet, speedZeroed } from "../src/speed.js";
-import { monsterTraitKinds, renderSrdCoverage, srdCoverageRows, traitKind } from "../src/srd-coverage.js";
+import { wardingAura } from "../src/paladin-auras.js";
+import { applyDamageDetailed, healActor } from "../src/hit-points.js";
+import { monsterTraitKinds, renderSrdCoverage, spellState, srdCoverageRows, traitKind } from "../src/srd-coverage.js";
 import {
   CONDITION_COVERAGE,
   GLOSSARY_COVERAGE,
@@ -214,6 +216,118 @@ describe("the curated claims hold in the engine", () => {
       skill: "arcana"
     });
     expect(jack.modifier - plain.modifier).toBe(2);
+  });
+
+  it("Aura of Courage wards Frightened off an ally the map shows in the Paladin's aura", () => {
+    expect(state(RECORD_OVERRIDES["feature:aura-of-courage"]!)).toBe("enforced");
+    const paladin = { ...creature(), id: FOE, name: "Paladin", definitionId: "paladin" };
+    const ally = { ...creature(), definitionId: "ally" };
+    const game = GameStateSchema.parse({ schemaVersion: 1, actors: [paladin, ally] });
+    const definitions: Record<string, ActorDefinition> = { paladin: withFeature("aura-of-courage"), ally: sheet() };
+    const context = { resolveDefinition: (id: string) => definitions[id], distanceFeet: () => 10 };
+    expect(wardingAura(game, game.actors[1]!, "frightened", context)).toBe("Paladin's Aura of Courage");
+    expect(wardingAura(game, game.actors[1]!, "frightened", { ...context, distanceFeet: () => 15 })).toBeNull();
+  });
+
+  it("a spell's hit leaves its rider: Chill Touch bars healing, read by the healing path", () => {
+    const touch = loadSpells().find((spell) => spell.id === "chill-touch")!;
+    expect(spellState(touch)).toBe("enforced");
+    const touched = ActorSchema.parse({
+      ...creature(),
+      hp: { current: 5, maximum: 20 },
+      effects: [{ id: "chill", name: "Chill Touch", tags: touch.effect!.grant!.tags, duration: { type: "manual" } }]
+    });
+    const game = GameStateSchema.parse({ schemaVersion: 1, actors: [touched] });
+    healActor(game, HERO, 10, { role: "gm" });
+    expect(game.actors[0]!.hp.current).toBe(5);
+  });
+
+  it("a halved Speed: Slow's failed save carries the tag the Speed reader halves by", () => {
+    const slow = loadSpells().find((spell) => spell.id === "slow")!;
+    expect(spellState(slow)).toBe("enforced");
+    const slowed = ActorSchema.parse({
+      ...creature(),
+      speedFeet: 30,
+      effects: [{ id: "slow", name: "Slow", tags: slow.effect!.failureEffect!.tags, duration: { type: "manual" } }]
+    });
+    expect(currentSpeedFeet(slowed, deriveEquipment(slowed, undefined, undefined))).toBe(15);
+  });
+
+  it("a drain: a wraith's Life Drain lowers the Hit Point maximum by the damage taken", () => {
+    const wraith = loadMonsterDefinitions().find((entry) => entry.source.externalId === "wraith")!;
+    const drain = wraith.actions.find((action) => action.id === "life-drain")!.drain;
+    const game = GameStateSchema.parse({ schemaVersion: 1, actors: [creature()] });
+    applyDamageDetailed(game, HERO, { amount: 7, parts: [{ amount: 7, type: "necrotic" }], drain }, { role: "gm" });
+    expect(game.actors[0]!.hp).toMatchObject({ current: 13, maximum: 13 });
+  });
+
+  it("a cure: Heal ends Blinded on the creature it heals", () => {
+    const heal = loadSpells().find((spell) => spell.id === "heal")!;
+    expect(spellState(heal)).toBe("enforced");
+    expect(heal.effect!.endsConditions).toContain("blinded");
+  });
+
+  it("a push: Thunderwave's failed save carries the push the save answer makes", () => {
+    const thunderwave = loadSpells().find((spell) => spell.id === "thunderwave")!;
+    expect(spellState(thunderwave)).toBe("enforced");
+    expect(thunderwave.save?.failurePush).toEqual({ feet: 10 });
+  });
+
+  it("Temporary Hit Points: False Life's roll is temporary, and Heroism's grant carries its immunity", () => {
+    const spells = loadSpells();
+    const falseLife = spells.find((spell) => spell.id === "false-life")!;
+    expect(spellState(falseLife)).toBe("enforced");
+    expect(falseLife.effect!.healing).toMatchObject({ temporary: true, self: true });
+    expect(spells.find((spell) => spell.id === "heroism")!.effect!.grant).toMatchObject({
+      conditionImmunities: ["frightened"]
+    });
+  });
+
+  it("a protection: Stoneskin's grant carries the Resistance the damage path reads", () => {
+    const stoneskin = loadSpells().find((spell) => spell.id === "stoneskin")!;
+    expect(spellState(stoneskin)).toBe("enforced");
+    const game = GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [
+        {
+          ...creature(),
+          effects: [
+            {
+              id: "stone",
+              name: "Stoneskin",
+              modifiers: stoneskin.effect!.grant!.modifiers,
+              duration: { type: "manual" }
+            }
+          ]
+        }
+      ]
+    });
+    applyDamageDetailed(game, HERO, { amount: 10, parts: [{ amount: 10, type: "slashing" }] }, { role: "gm" });
+    expect(game.actors[0]!.hp.current).toBe(15);
+  });
+
+  it("a condition a grant holds: Greater Invisibility's grant carries the Invisible condition", () => {
+    const spell = loadSpells().find((entry) => entry.id === "greater-invisibility")!;
+    expect(spellState(spell)).toBe("enforced");
+    expect(spell.effect!.grant).toMatchObject({ conditions: ["invisible"] });
+  });
+
+  it("a check made with another ability: a raging Barbarian's Stealth is a Strength check with Primal Knowledge", () => {
+    expect(state(RECORD_OVERRIDES["feature:primal-knowledge"]!)).toBe("enforced");
+    expect(state(RECORD_OVERRIDES["feature:mindless-rage"]!)).toBe("enforced");
+    const raging = ActorSchema.parse({
+      ...creature(),
+      effects: [{ id: "rage", name: "Raging", tags: ["raging"], duration: { type: "manual" } }]
+    });
+    const barbarian = sheet({
+      abilityScores: { str: 16, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+      character: { classes: [], feats: [], features: [{ id: "primal-knowledge" }] }
+    });
+    const plan = checkPlan(raging, barbarian, deriveEquipment(raging, barbarian, undefined), {
+      ability: "dex",
+      skill: "stealth"
+    });
+    expect(plan.subject.ability).toBe("str");
   });
 
   it("a trait kind the bundle runs as a mechanic is never curated reference", () => {

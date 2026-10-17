@@ -41,6 +41,8 @@ export type TargetingSession = Readonly<{
   skill?: string;
   /** The ability a cast chooses (Hex); it is not rolled until one is chosen. */
   ability?: AbilityId;
+  /** The condition picked for a failed save whose caster chooses one (Blindness/Deafness); absent, the first. */
+  conditionId?: string;
   /** The GM places a spell's lingering area rather than resolving an action: the zone it is for. */
   placeZoneId?: string;
 }>;
@@ -89,9 +91,13 @@ export function beginTargeting(
     ...(action.useCost === "chosen" ? { spend: 1 } : {})
   };
   if (area) {
-    // Map the SRD area shape onto a drawable annotation shape (sphere/emanation → circle, cube → square).
+    // Map the SRD area shape onto a drawable annotation shape (sphere/cylinder/emanation → circle, cube → square).
     const shape: AnnotationShapeKind =
-      area.shape === "sphere" || area.shape === "emanation" ? "circle" : area.shape === "cube" ? "square" : area.shape;
+      area.shape === "sphere" || area.shape === "cylinder" || area.shape === "emanation"
+        ? "circle"
+        : area.shape === "cube"
+          ? "square"
+          : area.shape;
     session = {
       action,
       attackerId,
@@ -176,6 +182,12 @@ export function setDamageType(damageType: string) {
   const picked = session?.action.damageTypes?.find((type) => type === damageType);
   if (!session || picked === undefined) return;
   session = { ...session, damageType: picked };
+  emit();
+}
+/** Picks the condition a failed save imposes, for an action whose caster chooses one (Blindness/Deafness). */
+export function setConditionChoice(conditionId: string) {
+  if (!session?.action.conditionChoices?.includes(conditionId)) return;
+  session = { ...session, conditionId };
   emit();
 }
 /** Picks the skill a check action is made with; undefined lets Escape a Grapple use the better one. */
@@ -270,7 +282,20 @@ export function resolveTargeting(
   opts: ResolveOptions = {}
 ) {
   if (!session || busy) return;
-  const { attackerId, action, mode, selected, template, slotLevel, spend, darts, damageType, skill, ability } = session;
+  const {
+    attackerId,
+    action,
+    mode,
+    selected,
+    template,
+    slotLevel,
+    spend,
+    darts,
+    damageType,
+    skill,
+    ability,
+    conditionId
+  } = session;
   if (session.placeZoneId !== undefined) {
     if (!template?.placed) return;
     const zoneId = session.placeZoneId;
@@ -305,6 +330,7 @@ export function resolveTargeting(
     ...(damageType !== undefined ? { damageType } : {}),
     ...(skill !== undefined ? { skill } : {}),
     ...(ability !== undefined ? { ability } : {}),
+    ...(conditionId !== undefined ? { conditionId } : {}),
     commit,
     ...(revision !== undefined ? { expectedRevision: revision } : {})
   };

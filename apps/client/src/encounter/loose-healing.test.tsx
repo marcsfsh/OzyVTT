@@ -148,6 +148,31 @@ describe("healing outside a fight", () => {
     );
   });
 
+  it("says who regained what once the server has healed them", async () => {
+    emit.mockImplementation((event: string, _payload: unknown, ack?: (result: unknown) => void) => {
+      if (event === "actor:available-actions") ack?.({ ok: true, rulesMode: "assisted", actions: [POTION_ROW] });
+      else if (event === "action:use")
+        ack?.({
+          ok: true,
+          route: "loose",
+          healing: { total: 7, targets: [{ targetId: FRIEND, targetName: "Bryn", regained: 7 }] }
+        });
+      else ack?.({ ok: true });
+    });
+    const user = userEvent.setup();
+    mount("player");
+    await user.click(await useButton("Drink Potion of Healing"));
+    await user.click(
+      within(screen.getByRole("group", { name: "Who regains hit points" })).getByRole("button", { name: "Bryn" })
+    );
+    await user.click(
+      within(screen.getByRole("dialog", { name: "Who Drink Potion of Healing heals" })).getByRole("button", {
+        name: "Heal"
+      })
+    );
+    expect(await screen.findByText("Bryn regains 7 hit points.")).toBeTruthy();
+  });
+
   it("lets the GM heal anyone on the roster", async () => {
     const user = userEvent.setup();
     mount("gm");

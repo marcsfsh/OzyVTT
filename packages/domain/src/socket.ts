@@ -17,6 +17,7 @@ import type {
   ContentSubclassesResult
 } from "./content.js";
 import type {
+  ActionResolution,
   ActionResolveResult,
   BuilderOffersRequest,
   BuilderOffersResult,
@@ -277,11 +278,17 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof RulesSetPolicySchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
-  /** `route` is `resolved` (on this creature's turn in the fight) or `loose` (no fight). Off turn it returns `blocked`. */
+  /** `route` is `resolved` (on this creature's turn in the fight) or `loose` (no fight). Off turn it returns `blocked`.
+   *  A loose heal says who regained what (`healing`), as the fight's resolution does. */
   "action:use": (
     payload: CommandPayload<typeof ActionUseSchema>,
     acknowledgement: (
-      result: MutationResult & { route?: "resolved" | "loose"; rollIds?: readonly string[]; warning?: string }
+      result: MutationResult & {
+        route?: "resolved" | "loose";
+        rollIds?: readonly string[];
+        warning?: string;
+        healing?: ActionResolution["healing"];
+      }
     ) => void
   ) => void;
   /** Roll a saving throw: answers a matching pending save (`route: "answered"`), else a loose attributed save. */

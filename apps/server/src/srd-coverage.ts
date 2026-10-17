@@ -72,12 +72,16 @@ export function spellState(spell: SpellReference): CoverageState {
       effect.healing !== null ||
       effect.grant !== undefined ||
       effect.failureEffect !== undefined ||
+      effect.endsConditions !== undefined ||
       effect.reaction !== undefined ||
       effect.darts !== undefined ||
       (effect.laterActions ?? []).some(laterApplies));
   const saveApplies =
     spell.save !== null &&
-    (spell.save.failureConditions.length > 0 || (effect?.damage.length ?? 0) > 0 || spell.save.speedZero === true);
+    (spell.save.failureConditions.length > 0 ||
+      (effect?.damage.length ?? 0) > 0 ||
+      spell.save.speedZero === true ||
+      spell.save.failurePush !== undefined);
   if (applies || saveApplies) return "enforced";
   if (spell.level > 0 || spell.concentration || spell.area !== null || spell.save !== null) return "guided";
   return "reference";
@@ -339,8 +343,8 @@ const CLASSIFICATION = [
   "  numbers. A spell is enforced when its cast applies its attack, save, damage, healing or lasting effect, or",
   "  when the area it leaves applies them as creatures enter it or start or end a turn there (`spell-zones.ts`).",
   "  Guided when the app spends the slot and holds the Concentration, the area or a save while a person applies",
-  "  what the spell does. A spell whose cast leaves a rider to the table (Ray of Frost's lower Speed) is curated",
-  "  as guided, with a note.",
+  "  what the spell does. A spell whose cast leaves a rider to the table (Storm of Vengeance's later turns) is",
+  "  curated as guided, with a note.",
   "- **Monster actions:** enforced when the attack, save, damage, healing or effect resolves, or when the server",
   "  offers the action as the generic action it names (Nimble Escape's Disengage or Hide). An action that casts",
   "  spells takes the state of the spells it casts, each a cast action at the stat block's numbers. Guided when the",

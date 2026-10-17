@@ -2,6 +2,8 @@ import { z } from "zod";
 import {
   ActionAreaSchema,
   ActorDefinitionSchema,
+  DamageDrainSchema,
+  ForcedPushSchema,
   ActorSchema,
   EffectInstanceSchema,
   EffectModifiersSchema,
@@ -220,6 +222,8 @@ const PendingSaveEffectSchema = z
     endsOnSpellHealing: EffectInstanceSchema.shape.endsOnSpellHealing,
     /** What the effect does while it lasts (Bane's -1d4 on attack rolls and saves). */
     modifiers: EffectModifiersSchema.default([]),
+    /** What it adds to AC while it lasts (Slow's -2). */
+    armorClassBonus: EffectInstanceSchema.shape.armorClassBonus,
     /** "Until the end of the current turn" for a save made at the start of the bearer's own turn (Stinking Cloud),
      *  where "until the end of its next turn" would run a turn longer. */
     currentTurn: z.literal(true).optional()
@@ -286,6 +290,12 @@ export const PendingSaveSchema = z
     /** A success makes the target immune to this source's trait for the rest of the fight ("immune to this ghast's
      * Stench for 24 hours"). */
     immuneOnSuccess: z.literal(true).optional(),
+    /** What the save's damage drains as it lands (Harm's lower Hit Point maximum). GM bookkeeping, never projected. */
+    drain: DamageDrainSchema.optional(),
+    /** Where a failure pushes the creature (Thunderwave), narrated when it lands. */
+    failurePush: ForcedPushSchema.optional(),
+    /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
+    advantageAtSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();
@@ -520,6 +530,8 @@ export const PendingDamageSchema = z
     proposedTotal: z.number().int().nonnegative().max(10000).default(0),
     /** The hit was a critical (drives death-save failure ticks when the damage lands). */
     critical: z.boolean().default(false),
+    /** What the damage drains as it lands (Vampiric Touch's healing). */
+    drain: DamageDrainSchema.optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();

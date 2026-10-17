@@ -5,7 +5,8 @@ import {
   type ActionResolution,
   type GameState
 } from "@vtt/domain";
-import type { ActorDefinition } from "@vtt/schemas";
+import type { ActorDefinition, SaveCondition } from "@vtt/schemas";
+import { conditionChoicesOf } from "./item-actions.js";
 import { BUILTIN_TARGETING } from "./builtin-actions.js";
 import { builtinCheckSkills } from "./resolution/builtins.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
@@ -14,13 +15,21 @@ import { masteryMissDamage } from "./weapon-mastery.js";
 import { spendAmmunition } from "./resolution/ammunition.js";
 import { useUpConsumable } from "./resolution/consumables.js";
 import { consumableRowFor } from "./consumables.js";
-import { rollAttack, spendDistraction, spendSteadyAim, spendUntilAttacked } from "./resolution/attack.js";
+import {
+  rollAttack,
+  spendDistraction,
+  spendSteadyAim,
+  spendUntilAttacked,
+  spendUntilItActs,
+  spendUntilOwnAttack
+} from "./resolution/attack.js";
 import { rollLastCharge } from "./resolution/charges.js";
 import type { DefinitionAction, ResolveContext, ResolveDependencies, ResolveInput } from "./resolution/context.js";
 import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage, spendDamageUses } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
 import { readScroll } from "./resolution/scroll.js";
+import { slowedSpellFails } from "./resolution/slowed.js";
 import { applyConditionCures, applyHealing } from "./resolution/heal.js";
 import {
   recordAttackRoll,
@@ -31,9 +40,15 @@ import {
 import { applyMasteryForces, masterySwingOf, offeredPush, spendSap, spendVex } from "./resolution/masteries.js";
 import { hitOffersOf, rollHitOptions, spendHitOptions } from "./resolution/hit-options.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
-import { strikeBackOnHit } from "./resolution/struck.js";
-import { parkActionSave, parkForAcReaction, parkHeldObjectSave, parkReaction } from "./resolution/pending.js";
-import { markSpellUp, openSpellZone, startConcentration } from "./resolution/concentration.js";
+import { markMultiattackDefense, strikeBackOnHit } from "./resolution/struck.js";
+import {
+  parkActionSave,
+  parkBurstSave,
+  parkForAcReaction,
+  parkHeldObjectSave,
+  parkReaction
+} from "./resolution/pending.js";
+import { markCastTurn, markSpellUp, openSpellZone, startConcentration } from "./resolution/concentration.js";
 import { applyRageRules } from "./resolution/rage.js";
 import { releaseHideAndReady } from "./resolution/release.js";
 import { openResolve } from "./resolution/validate.js";
@@ -70,6 +85,11 @@ export function resolveDefinitionAction(
     useUpConsumable(ctx);
     return { ...resolutionOf(ctx), save: null };
   }
+  // A spell that Slow's chance makes fail spends its slot and its action, and nothing else happens.
+  if (slowedSpellFails(ctx)) {
+    commitEconomy(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
   rollAttack(ctx);
   // Preview: the d20 is rolled and shown, nothing else applies. The economy was validated already, so an
   // illegal attack is blocked before the preview roll.
@@ -81,6 +101,7 @@ export function resolveDefinitionAction(
     spendSap(ctx);
     spendDistraction(ctx);
     spendUntilAttacked(ctx);
+    spendUntilOwnAttack(ctx);
     spendSteadyAim(ctx);
   }
   // A hit the target's Parry or Shield may still turn into a miss: the attack is spent, and the answer finishes it.
@@ -93,6 +114,7 @@ export function resolveDefinitionAction(
     recordLoadingShot(ctx);
     recordAttackRoll(ctx);
     releaseHideAndReady(ctx);
+    spendUntilItActs(ctx);
     return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
   }
 
@@ -108,9 +130,11 @@ export function resolveDefinitionAction(
 
   applyOnHitEffects(ctx);
   strikeBackOnHit(ctx);
+  markMultiattackDefense(ctx);
   applyMasteryForces(ctx);
   startConcentration(ctx);
   markSpellUp(ctx);
+  markCastTurn(ctx);
   openSpellZone(ctx);
   applyGrant(ctx);
   applyHealing(ctx);
@@ -119,6 +143,7 @@ export function resolveDefinitionAction(
   parkReaction(ctx);
   ctx.builtin?.forcedSave?.(ctx);
   parkActionSave(ctx);
+  parkBurstSave(ctx);
   parkHeldObjectSave(ctx);
   applyRageRules(ctx);
 
@@ -133,6 +158,7 @@ export function resolveDefinitionAction(
   recordAttackRoll(ctx);
   recordCleaveOpening(ctx);
   releaseHideAndReady(ctx);
+  spendUntilItActs(ctx);
   return resolutionOf(ctx);
 }
 
@@ -180,6 +206,7 @@ function resolutionOf(ctx: ResolveContext): ActionResolution {
   const instance = state.combat.turn.actionInstance;
   const damageTargets = damageTargetsOf(ctx);
   return {
+    actionId: action.id,
     actionName: action.name,
     activation: action.activation,
     attack: ctx.attack,
@@ -308,6 +335,9 @@ export function actionAvailability(
       // A spell cast from an item picks as the spell's own cast does: darts by target, the type to deal.
       darts: action.darts ?? null,
       damageTypes: action.damageTypes ? [...action.damageTypes] : null,
+      ...(conditionChoicesOf(action, spell).length > 0
+        ? { conditionChoices: [...conditionChoicesOf(action, spell)] as SaveCondition[] }
+        : {}),
       // Search, Study, Influence and Escape a Grapple are made with a skill the roller picks.
       ...(builtin && builtinCheckSkills(action.id).length > 0 ? { checkSkills: builtinCheckSkills(action.id) } : {})
     };

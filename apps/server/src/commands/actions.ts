@@ -1,7 +1,7 @@
-import type { RollRecord } from "@vtt/domain";
+import type { AnnotationPoint, AnnotationShapeKind, RollRecord } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
 import { resolveDefinitionAction } from "../action-resolution.js";
-import { addAnnotation, shapeGeometry } from "../annotations.js";
+import { addAnnotation, shapeGeometry, templateOfArea } from "../annotations.js";
 import { areaOriginatesFromCaster, tokensInTemplate } from "../area-targeting.js";
 import { canPlayerTarget, GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { builtinActionFor } from "../builtin-actions.js";
@@ -16,7 +16,7 @@ import { settlePlayerDamage, type AppliedDamage } from "../player-damage.js";
 import { recordRoll, rolledTerms } from "../roll-history.js";
 import { effectiveModeFor, overrideWaives } from "../rules-families.js";
 import { looseRollPlan, routeForTap, slotsModeFor, spendLooseUses } from "../tap-routing.js";
-import { isItemActionId, upcastAction } from "../item-actions.js";
+import { conditionChoicesOf, isItemActionId, upcastAction } from "../item-actions.js";
 import { BURNING_TAG, PUT_OUT_FIRE_ACTION_ID, putOutFire } from "../hazards.js";
 import type { EffectNarration } from "../effects.js";
 import { grantOutsideFight } from "../resolution/grant.js";
@@ -78,10 +78,10 @@ export const actionCommands = [
       // A player types the face their die shows, never a total: the server adds the bonus and reads a 1 or a 20.
       if (isPlayer && (attackTotal !== undefined || critical !== undefined || fumble !== undefined))
         throw new GameAccessDeniedError("Type the d20 your die shows; the server adds your bonus.");
-      const effectiveConditionId = isPlayer ? null : (conditionId ?? null);
+      const requestedConditionId = conditionId ?? null;
       const effectiveCover = isPlayer ? null : (request.cover ?? null);
       const effectiveNote = request.note ?? null;
-      if (effectiveConditionId !== null && !kit.catalogFor(principal).hasCondition(effectiveConditionId))
+      if (requestedConditionId !== null && !kit.catalogFor(principal).hasCondition(requestedConditionId))
         throw new CommandRejectedError("That condition is not in the bundled reference.");
       // The grid is fetched up front (async) so template containment and token-distance rules can run
       // inside the synchronous mutation.
@@ -109,7 +109,22 @@ export const actionCommands = [
         if (!listed) throw new CommandRejectedError("That action is not on the stat block.");
         // An action whose user picks its cost (Lay on Hands) resolves at the amount picked.
         const action = withChosenCost(listed, request.spend);
+        // The GM may impose any condition; a player picks only among the ones the action lets its caster choose
+        // (Blindness/Deafness), read from the spell too for a sheet built before the action carried them.
+        const offered = conditionChoicesOf(
+          action,
+          action.spellId ? kit.equipmentCatalog().spellRecord?.(action.spellId) : undefined
+        );
+        const effectiveConditionId =
+          requestedConditionId === null || !isPlayer
+            ? requestedConditionId
+            : offered.includes(requestedConditionId)
+              ? requestedConditionId
+              : null;
         let resolvedTargetIds: readonly string[];
+        // The template as the action's area makes it, which the table's drawn shape records.
+        let placed: Readonly<{ shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint }> | null =
+          null;
         if (template) {
           if (action.attack)
             throw new CommandRejectedError(
@@ -118,15 +133,17 @@ export const actionCommands = [
           if (draft.combat.mapAssetId !== mapAssetId)
             throw new CommandRejectedError("The active encounter changed. Try again.");
           const calibration = geometry!.calibration!;
+          // The action's own area decides the shape and the size; the drag only places and points it.
+          placed = action.area ? templateOfArea(calibration, template, action.area) : template;
           // Snap the template the same way the drawn annotation will, then find who is under it.
-          const snapped = shapeGeometry(calibration, template.shape, template.origin, template.target);
+          const snapped = shapeGeometry(calibration, placed.shape, placed.origin, placed.target);
           const spell = action.spellId ? kit.equipmentCatalog().spellRecord?.(action.spellId) : undefined;
           const casterOutside = areaOriginatesFromCaster(action.area?.shape ?? template.shape, spell?.range.text);
           resolvedTargetIds = tokensInTemplate(
             draft,
             calibration,
             snapped,
-            template.shape,
+            placed.shape,
             action.area?.widthFeet ?? null
           ).filter(
             (id) => (id !== actorId || !casterOutside) && draft.combat.initiative.some((entry) => entry.actorId === id)
@@ -216,18 +233,19 @@ export const actionCommands = [
               catalog: kit.equipmentCatalog(),
               distanceFeet,
               rollDie: (sides) => kit.context.random(sides)
-            }
+            },
+            action.drain
           );
         // Record the blast as a public shape; id=commandId keeps re-delivery idempotent.
-        if (template)
+        if (placed)
           addAnnotation(
             draft,
             {
               id: commandId,
               kind: "shape",
-              shape: template.shape,
-              origin: template.origin,
-              target: template.target,
+              shape: placed.shape,
+              origin: placed.origin,
+              target: placed.target,
               visibility: "public",
               actor: { sessionId: gmSessionId, role: "gm" },
               now: Date.now()
@@ -282,7 +300,7 @@ export const actionCommands = [
     type: "action.use",
     operationId: "useAction",
     description:
-      "Uses an action and lets the SERVER decide what that means. In the fight on this creature's turn it delegates to the full structured resolution and acks `route: \"resolved\"`. Off turn it is refused with the overridable, askable rules block `economy.not-your-turn` (reactions and legendary actions are exempt - taking those off turn is the point); under an `economy` exception of advise/off it resolves, with a GM-only warning line under advise. With no fight running - or with this creature not in the turn order - the server rolls the action's own attack die (and, only with `includeDamage`, its damage parts) as attributed rolls, spends what the action costs (an item's charges or a feature's per-rest uses, and any spell slot an item cast consumes; refused when none remain; an item's last charge rolls its d20 for the GM), uses up a potion, flask or Spell Scroll and the shot's ammunition, reads a scroll only if the reader can (a spell above the reader's levels rolls its check first, and a failure loses the scroll with nothing else rolled), touches no combat state, and acks `route: \"loose\"` with the roll ids. An action with nothing to roll is still used, with a feed line. A heal (a potion, a healing spell, Second Wind, Lay on Hands) lands on `targetIds` through the fight's hit point rules (the dead stay dead), its user when none are named: a player heals their own character or another member of the party, the GM anyone; damage never moves on the loose route. GM-grade for any combatant, including a monster's sheet; a player session only for their own claimed character.",
+      "Uses an action and lets the SERVER decide what that means. In the fight on this creature's turn it delegates to the full structured resolution and acks `route: \"resolved\"`. Off turn it is refused with the overridable, askable rules block `economy.not-your-turn` (reactions and legendary actions are exempt - taking those off turn is the point); under an `economy` exception of advise/off it resolves, with a GM-only warning line under advise. With no fight running - or with this creature not in the turn order - the server rolls the action's own attack die (and, only with `includeDamage`, its damage parts) as attributed rolls, spends what the action costs (an item's charges or a feature's per-rest uses, and any spell slot an item cast consumes; refused when none remain; an item's last charge rolls its d20 for the GM), uses up a potion, flask or Spell Scroll and the shot's ammunition, reads a scroll only if the reader can (a spell above the reader's levels rolls its check first, and a failure loses the scroll with nothing else rolled), touches no combat state, and acks `route: \"loose\"` with the roll ids, and for a heal who regained what (`healing`). An action with nothing to roll is still used, with a feed line. A heal (a potion, a healing spell, Second Wind, Lay on Hands) lands on `targetIds` through the fight's hit point rules (the dead stay dead), its user when none are named: a player heals their own character or another member of the party, the GM anyone; damage never moves on the loose route. GM-grade for any combatant, including a monster's sheet; a player session only for their own claimed character.",
     summary:
       "Use an action and let the SERVER route it: resolved in the fight on your turn, refused off turn, loose dice outside a fight, where a heal lands on whoever it is given to (GM anyone; a player their own claimed character).",
     schema: ActionUseSchema,
@@ -362,7 +380,7 @@ export const actionCommands = [
       let usedUp = false;
       let narrations: EffectNarration[] = [];
       let rulesNote: string | null = null;
-      let healed: Array<Readonly<{ text: string; actorId: string }>> = [];
+      let healed: ReturnType<typeof applyLooseHealing> = { lines: [], healing: null };
       const { state, duplicate } = await execute((draft) => {
         requireActorAccess(initiator, draft, actorId, "attack");
         const live = draft.actors.find((candidate) => candidate.id === actorId)!;
@@ -371,7 +389,7 @@ export const actionCommands = [
           ? looseHealTargets(draft, live, action, targetIds, initiator, spell, castLevel)
           : [];
         let healRoll: number | null = null;
-        healed = [];
+        healed = { lines: [], healing: null };
         // A scroll outside a fight: one the reader can't read is refused, and a spell above their levels needs its
         // check first. A failure loses the scroll, and nothing else is rolled.
         const scroll = scrollOfAction(action, live.inventory, kit.equipmentCatalog());
@@ -496,10 +514,13 @@ export const actionCommands = [
         healed = applyLooseHealing(draft, action, healTargets, healRoll, (sides) => kit.context.random(sides));
       });
       const usedRollIds = scrollLost !== null ? [scrollCheckId] : scrollChecked ? [scrollCheckId, ...rollIds] : rollIds;
+      // Who regained what goes back to the one who used it, as the fight's resolution says it.
+      const healedReply = healed.healing ? { healing: healed.healing } : {};
       if (duplicate) return { route: "loose", rollIds: usedRollIds };
       kit.publishRolls(state, commandId);
       kit.publishNarrations(narrations);
-      for (const line of healed) kit.context.appendLog({ kind: "heal", text: line.text, actorIds: [line.actorId] });
+      for (const line of healed.lines)
+        kit.context.appendLog({ kind: "heal", text: line.text, actorIds: [line.actorId] });
       if (scrollLost !== null) {
         kit.context.appendLog({
           kind: "action",
@@ -544,7 +565,7 @@ export const actionCommands = [
           gmOnly: kit.actorHidden(actorId)
         });
       }
-      return { route: "loose", rollIds: usedRollIds };
+      return { route: "loose", rollIds: usedRollIds, ...healedReply };
     }
   }),
 

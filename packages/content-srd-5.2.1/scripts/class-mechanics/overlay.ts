@@ -71,6 +71,17 @@ export function spellTableStages(
   }));
 }
 
+/** Potent Spellcasting (the Cleric's Blessed Strikes, the Druid's Elemental Fury): "Add your Wisdom modifier to the
+ *  damage you deal with any Cleric cantrip". A gate can't name a class's list, so the class's damaging cantrips are
+ *  named by id. */
+export function potentSpellcasting(spellIds: readonly string[]): NonNullable<OptionInput["modifiers"]>[number] {
+  return {
+    type: "extra-damage",
+    abilityModifier: "wis",
+    when: [{ type: "on-damage-roll" }, { type: "spell-id-is", spellIds: [...spellIds] }]
+  };
+}
+
 /** What one class file contributes: class features, its subclass's features, and live resource columns. */
 export type ClassMechanicsModule = Readonly<{
   /** Riders keyed by this class's own feature ids. */

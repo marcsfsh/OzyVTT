@@ -16,6 +16,7 @@ import {
   withSpellEffects
 } from "../item-actions.js";
 import { coverBonusOf, coverFor } from "../cover.js";
+import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { scrollOfAction } from "../scrolls.js";
 import { builtinHandlerFor } from "./builtins.js";
 import type { DefinitionAction, LiveActor, ResolveContext, ResolveDependencies, ResolveInput } from "./context.js";
@@ -138,7 +139,16 @@ export function openResolve(
   // GM marked the target with, whoever attacks. Total cover can't be targeted; half/three-quarters add to AC and
   // Dexterity saves.
   const coverMode = effectiveModeFor(state.combat, "cover.total");
-  const attackCover = targets.length === 1 ? coverFor(input.cover, targets[0]) : (input.cover ?? null);
+  // A Paladin's Smite of Protection gives Half Cover to the creatures in its aura.
+  const auraCover = (target: LiveActor) =>
+    deps.resolveDefinition
+      ? smiteOfProtectionCover(state, target, {
+          resolveDefinition: deps.resolveDefinition,
+          ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
+        })
+      : null;
+  const attackCover =
+    targets.length === 1 ? (coverFor(input.cover, targets[0]) ?? auraCover(targets[0])) : (input.cover ?? null);
   // An area's other targets still take it, so a marked creature among several is the GM's to remove.
   if (targets.length > 1)
     for (const target of targets)

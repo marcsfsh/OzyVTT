@@ -6,6 +6,7 @@ import type {
   AnnotationVisibility,
   GameState
 } from "@vtt/domain";
+import type { ActionArea } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { gridToImage, imageToGrid, snapImagePoint, type SquareGridCalibration } from "./grid-calibration.js";
 import { measureGridPath } from "./map-measurement.js";
@@ -129,6 +130,46 @@ export function shapeGeometry(
   if (shape === "square") return squareGeometry(calibration, origin, target);
   if (shape === "circle") return radialGeometry(calibration, origin, target);
   return pointableGeometry(calibration, origin, target);
+}
+
+/** The drawable shape of an SRD area: a Sphere, a Cylinder and an Emanation are circles on the map, a Cube a square. */
+export function annotationShapeOfArea(shape: ActionArea["shape"]): AnnotationShapeKind {
+  if (shape === "cube") return "square";
+  if (shape === "cone" || shape === "line") return shape;
+  return "circle";
+}
+
+/**
+ * The template an action's own area makes where the GM's drag puts it: SRD areas have a size of their own ("a
+ * 20-foot-radius Sphere", "a 30-foot Cone"), so the drag only places the area and points it. The shape is the area's,
+ * snapped as a drawn one is, with its size (a radius, a length, a Cube's side) along the drag's direction.
+ */
+export function templateOfArea(
+  calibration: SquareGridCalibration,
+  template: Readonly<{ origin: AnnotationPoint; target: AnnotationPoint }>,
+  area: Pick<ActionArea, "shape" | "sizeFeet">
+): Readonly<{ shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint }> {
+  const shape = annotationShapeOfArea(area.shape);
+  const cells = Math.max(1, Math.round(area.sizeFeet / calibration.distancePerCell));
+  const placed = shapeGeometry(calibration, shape, template.origin, template.target);
+  if (shape === "square") {
+    const start = imageToGrid(calibration, placed.origin);
+    const end = imageToGrid(calibration, placed.target);
+    const target = gridToImage(calibration, {
+      column: start.column + (end.column < start.column ? -cells : cells),
+      row: start.row + (end.row < start.row ? -cells : cells)
+    });
+    return { shape, origin: placed.origin, target };
+  }
+  const dx = placed.target.x - placed.origin.x;
+  const dy = placed.target.y - placed.origin.y;
+  const length = Math.hypot(dx, dy) || 1;
+  const reach = cells * calibration.cellSizePx;
+  return {
+    shape,
+    origin: placed.origin,
+    target: { x: placed.origin.x + (dx / length) * reach, y: placed.origin.y + (dy / length) * reach }
+  };
 }
 
 function requireOwnedOrGm(annotation: Annotation, actor: AnnotationActor, action: string) {

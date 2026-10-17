@@ -391,7 +391,9 @@ export function deriveEquipment(
   const packed: ActiveItem[] = [];
   /** A curse's vulnerabilities, which hold while attuned whether or not the item is worn. */
   const cursedVulnerabilities: Defence[] = [];
-  for (const item of catalog ? actor.inventory : []) {
+  // Every row read with the catalog's armor block, so what armor does holds for a row that names the item only.
+  const inventory = catalog ? actor.inventory.map((item) => withCatalogArmor(item, catalog)) : [];
+  for (const item of inventory) {
     if (item.quantity <= 0) continue;
     const record = catalog!.equipmentRecord(catalogIdOf(item));
     const entry = { item, record };
@@ -572,7 +574,7 @@ export function deriveEquipment(
   }
 
   // Armor training counts what items grant in this same recomputation (Elven Chain-style training).
-  const training = armorTrainingGaps(withResolvedSlots(actor.inventory, catalog), definition, armorProficiencies);
+  const training = armorTrainingGaps(withResolvedSlots(inventory, catalog), definition, armorProficiencies);
   const body = equipped.find((entry) => entry.item.armor !== undefined && effectiveSlot(slotView(entry)) === "armor");
   carriers.push(...bodyArmorCarriers(body, definition, training.untrainedArmor !== null));
 
@@ -614,6 +616,16 @@ export function deriveEquipment(
     attunementSlots: sumRiders(standing, "attunement-slots"),
     ...training
   };
+}
+
+/** An armor row with the catalog's armor block when the row carries none (one added or seeded by its id and name):
+ *  the AC, Strength and Stealth facts are the catalog's either way. The row's own block wins. */
+function withCatalogArmor(item: InventoryItem, catalog: EquipmentCatalog): InventoryItem {
+  if (item.armor !== undefined) return item;
+  const armor = catalog.equipmentRecord(catalogIdOf(item))?.armor;
+  if (!armor) return item;
+  const { acBase, addDexModifier, dexModifierCap, stealthDisadvantage, strengthRequired } = armor;
+  return { ...item, armor: { acBase, addDexModifier, dexModifierCap, stealthDisadvantage, strengthRequired } };
 }
 
 /** A weapon row with the catalog's melee band and Versatile die filled in, for rows stored before the row carried

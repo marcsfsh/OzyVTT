@@ -141,6 +141,16 @@ describe("healing outside a fight", () => {
     expect(texts).toContain(`Friend regains ${healing.total} hit points (Potion of Healing).`);
   });
 
+  it("tells its user who regained what", async () => {
+    const { base, server, heroSession } = await boot(idle());
+    const drunk = await use(base, heroSession, "potion", { targetIds: [FRIEND] });
+    const healing = server.store.snapshot.rolls.find((roll) => roll.purpose === "healing")!;
+    expect((await drunk.json()).data).toMatchObject({
+      route: "loose",
+      healing: { total: healing.total, targets: [{ targetId: FRIEND, targetName: "Friend", regained: healing.total }] }
+    });
+  });
+
   it("heals its user when no one else is named, and a self heal always", async () => {
     const { base, server, heroSession } = await boot(idle());
     expect((await use(base, heroSession, "potion")).status).toBe(200);
