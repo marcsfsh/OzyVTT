@@ -57,7 +57,8 @@ export function ViewerPreviewPanel({ gmToken, onClose }: Readonly<{ gmToken: str
   };
   const endDrag = () => setDrag(null);
   const popOut = () => {
-    window.open("/viewer.html", "vtt-viewer-preview", "width=1280,height=720");
+    // `?preview`: the GM's copy shows what the table sees but stays silent; sound is the table screen's.
+    window.open("/viewer.html?preview", "vtt-viewer-preview", "width=1280,height=720");
     onClose();
   };
 
@@ -90,7 +91,12 @@ export function ViewerPreviewPanel({ gmToken, onClose }: Readonly<{ gmToken: str
         ) : session === "pending" ? (
           <p className="viewer-preview-empty">Starting preview…</p>
         ) : (
-          <iframe ref={iframeRef} className="viewer-preview-frame" src="/viewer.html" title="Live viewer preview" />
+          <iframe
+            ref={iframeRef}
+            className="viewer-preview-frame"
+            src="/viewer.html?preview"
+            title="Live viewer preview"
+          />
         )}
         {/* Keeps the iframe from capturing pointer events while dragging. */}
         {drag && <div className="viewer-preview-dragmask" aria-hidden="true" />}
