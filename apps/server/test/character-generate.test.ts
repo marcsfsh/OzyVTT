@@ -135,6 +135,30 @@ describe("random character generator - the far end", () => {
     expect(failures, failures.join("\n")).toEqual([]);
   });
 
+  it("draws Magic Initiate's spells from the ones the class does not already prepare", () => {
+    // Sage and Acolyte give Magic Initiate from the Wizard and Cleric lists: the class's own list.
+    const pairs = [
+      ["wizard", "sage"],
+      ["cleric", "acolyte"]
+    ] as const;
+    const repeats: string[] = [];
+    for (const [classId, backgroundId] of pairs)
+      for (let seed = 1; seed <= 12; seed += 1) {
+        const { request } = generateCharacterRequest(
+          { classId, level: 5, backgroundId },
+          library,
+          defaultPolicy,
+          seeded(seed)
+        );
+        const spells = request.choices
+          .filter((row) => row.kind === "spell" || row.kind === "cantrip")
+          .map((row) => row.id);
+        const twice = spells.filter((id, index) => spells.indexOf(id) !== index);
+        if (twice.length > 0) repeats.push(`${classId} seed ${seed}: ${twice.join(", ")}`);
+      }
+    expect(repeats, repeats.join("\n")).toEqual([]);
+  });
+
   it("distributes the standard array by the class's own stat priority, and aims the background spread the same way", () => {
     for (const classId of CLASS_IDS) {
       const { request } = generateCharacterRequest({ classId, level: 5 }, library, defaultPolicy, seeded(7));

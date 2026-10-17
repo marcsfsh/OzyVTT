@@ -390,6 +390,18 @@ function answerOffer(
     // Cast with the best of the abilities offered.
     const best = Math.max(...legal.map((id) => scores[id as Ability] ?? 0));
     preferred = legal.filter((id) => (scores[id as Ability] ?? 0) === best);
+  } else if (offer.kind === "cantrip" || offer.kind === "spell") {
+    // A spell sits on the sheet once: a feature's pick (Magic Initiate, an Evoker's Savant) of one the class already
+    // has would be spent for nothing, so it comes from the others while any are left.
+    const held = new Set([
+      ...choices.filter((row) => row.kind === "spell" || row.kind === "cantrip").map((row) => row.id),
+      ...alwaysPreparedGrants(survey)
+    ]);
+    const fresh = legal.filter((id) => !held.has(id));
+    if (fresh.length > 0) {
+      candidates = fresh;
+      preferred = fresh;
+    }
   } else if (offer.kind === "weapon-mastery") {
     // Mastery in an uncarried weapon is legal but useless, so carried weapons come first.
     const carried = carriedWeaponIds(survey, choices);
