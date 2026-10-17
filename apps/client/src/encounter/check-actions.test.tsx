@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ContentActionSummary, ContentSkillSummary } from "@vtt/domain";
+import type { ActionResolution, ActorDefinition, ContentActionSummary, ContentSkillSummary } from "@vtt/domain";
 
 // `command()` sends through `socket.timeout(ms).emit` with an error-first ack; routed to `socket.emit` here.
 vi.mock("../socket", () => {
@@ -15,7 +15,8 @@ vi.mock("../socket", () => {
 
 import { socket } from "../socket";
 import { ActionTargetPicker } from "./ActionTargetPicker";
-import { beginTargeting, clearTargeting, resolveTargeting, useTargeting } from "./targeting";
+import { PlayerActionRunner } from "./PlayerActionRunner";
+import { beginTargeting, clearTargeting, resolveTargeting, setTargetingResult, useTargeting } from "./targeting";
 
 // Search, Study, Influence and Escape a Grapple are made with a skill the roller picks; Hex's caster picks the ability
 // its target's checks have Disadvantage with. Both ride the action's resolve.
@@ -130,6 +131,59 @@ describe("a check action's skill", () => {
     await user.selectOptions(screen.getByLabelText("Skill"), "acrobatics");
     await user.click(screen.getByRole("button", { name: "Roll Escape a Grapple" }));
     expect(resolves().at(-1)).toMatchObject({ skill: "acrobatics" });
+  });
+});
+
+describe("a check action's result", () => {
+  const HIDE = {
+    actionName: "Hide",
+    activation: "action",
+    attack: null,
+    save: null,
+    damage: [],
+    damageTotal: 0,
+    crit: false,
+    rollMode: { mode: "disadvantage", advantage: [], disadvantage: ["Chain Mail (Stealth)"] },
+    check: { skill: "Dexterity (Stealth)", total: 3, naturalRoll: 2, dc: 15, success: false }
+  } as const satisfies ActionResolution;
+  const SEARCHED = {
+    ...HIDE,
+    actionName: "Search",
+    rollMode: undefined,
+    check: { skill: "Wisdom (Perception)", total: 16, naturalRoll: 9, dc: null, success: null }
+  } as const satisfies ActionResolution;
+  const KESH = {
+    name: "Kesh",
+    actions: [
+      {
+        id: "dagger",
+        name: "Dagger",
+        activation: "action",
+        description: "",
+        attack: { bonus: 5, reachFeet: 5 },
+        damage: [{ formula: "1d4 + 3", type: "piercing" }]
+      }
+    ]
+  } as unknown as ActorDefinition;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    emit.mockImplementation((_event: string, _payload: unknown, ack?: (result: unknown) => void) =>
+      ack?.({ ok: true, actions: [] })
+    );
+  });
+  afterEach(() => act(() => setTargetingResult(null)));
+
+  it("shows the player the roll, why it had Disadvantage, and how it went against the DC", () => {
+    render(
+      <PlayerActionRunner actorId={HERO} definition={KESH} revision={1} playerDamageMode="proposal" targets={[]} />
+    );
+    const card = () => screen.getByRole("status").textContent;
+    act(() => setTargetingResult(HIDE));
+    expect(card()).toContain("Disadvantage (Chain Mail (Stealth))");
+    expect(card()).toContain("Dexterity (Stealth): 3 (d20 2) vs DC 15 - failure.");
+    act(() => setTargetingResult(SEARCHED));
+    expect(card()).toContain("Wisdom (Perception): 16 (d20 9).");
   });
 });
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { choosesAbility, type ActorDefinition, type ContentActionSummary } from "@vtt/domain";
 import { read } from "../lib/command";
-import { ActionResultHead, HealingOutcome } from "./ActionResultHead";
+import { ActionResultHead, CheckOutcome, HealingOutcome } from "./ActionResultHead";
 import { ActionRow } from "./ActionRow";
 import { ActionTargetPicker } from "./ActionTargetPicker";
 import { actionSummaryParts } from "./action-summary";
@@ -285,11 +285,18 @@ export function PlayerActionRunner({
       {result && (
         <div className="action-result" role="status">
           <ActionResultHead result={result} />
-          {/* Why the d20 had Advantage or Disadvantage, before the player confirms it. */}
-          {result.attack && result.rollMode && result.rollMode.mode !== "normal" && (
+          {/* Why the d20 had Advantage or Disadvantage: an attack's before the player confirms it, a check's (Hide in
+              armor) with its total. */}
+          {(result.attack || result.check) && result.rollMode && result.rollMode.mode !== "normal" && (
             <p className="action-rollmode">{modeWords(result.rollMode).replace(/^ · /, "")}</p>
           )}
           {result.attack && <AttackOutcome attack={result.attack} audience="player" />}
+          {result.check && <CheckOutcome check={result.check} />}
+          {result.effectGranted && (
+            <p className="action-effect-granted">
+              {definition.name} gains <strong>{result.effectGranted.name}</strong>.
+            </p>
+          )}
           {result.preview && result.attack && (
             <AttackPreview
               attack={result.attack}
