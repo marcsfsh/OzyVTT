@@ -248,7 +248,8 @@ export function SheetSpells({
   canPrepare = true,
   rechoices = [],
   spellChoices = null,
-  gm = false
+  gm = false,
+  readiedActionId = null
 }: Readonly<{
   actor: GmActor | PlayerActor;
   definition: ActorDefinition;
@@ -274,6 +275,8 @@ export function SheetSpells({
   spellChoices?: SpellChoices | null;
   /** The GM's sheet: copies from another spellbook, which the GM knows the contents of. */
   gm?: boolean;
+  /** The cast a Ready holds, already paid for: released by casting it, whatever slots are left. */
+  readiedActionId?: string | null;
 }>) {
   const { rollFlat } = rolls;
   const spellcasting = definition.spellcasting;
@@ -599,7 +602,7 @@ export function SheetSpells({
                               slotMaxByLevel={slotMaxByLevel}
                               liveRemaining={liveSlotRemaining}
                               pact={pact}
-                              policeSlots={policeSlots}
+                              policeSlots={policeSlots && spell.actionId !== readiedActionId}
                               prepared={isPrepared || !keepsPreparedList}
                               free={freeCastOf(spell)}
                               ritual={spell.ritualActionId !== undefined}

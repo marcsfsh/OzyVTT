@@ -36,6 +36,7 @@ import { markSpellUp, openSpellZone, startConcentration } from "./resolution/con
 import { applyRageRules } from "./resolution/rage.js";
 import { releaseHideAndReady } from "./resolution/release.js";
 import { openResolve } from "./resolution/validate.js";
+import { holdReadiedSpell } from "./resolution/ready.js";
 import { healLimit } from "./loose-healing.js";
 
 export type { ResolveDependencies, ResolveInput };
@@ -56,6 +57,12 @@ export function resolveDefinitionAction(
   const ctx = openResolve(state, action, input, deps);
   ctx.builtin?.check?.(ctx);
   ctx.builtin?.apply?.(ctx);
+  // A readied spell is cast now and held: its slot and the action are spent, and nothing else happens yet.
+  if (input.ready === true) {
+    holdReadiedSpell(ctx);
+    commitEconomy(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
   // A failed check to read a scroll spends the cast and the scroll, and nothing else happens.
   if (readScroll(ctx)) {
     commitEconomy(ctx);

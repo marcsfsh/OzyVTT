@@ -404,6 +404,20 @@ export function endEffect(state: GameState, actorId: string, effectId: string): 
   return events;
 }
 
+/** The Ready is used up (its Reaction taken, or spent another way): the Readied effect ends, and a spell it held
+ *  dissipates with the Concentration holding it. The names of what ended, for the result card. */
+export function releaseReadied(state: GameState, actorId: string): string[] {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  const readied = actor?.effects.find((effect) => effect.tags.includes(READIED_TAG));
+  if (!actor || !readied) return [];
+  const holding = readied.castId
+    ? actor.effects.find((effect) => effect.tags.includes(CONCENTRATING_TAG) && effect.castId === readied.castId)
+    : undefined;
+  endEffectIfPresent(state, actorId, readied.id);
+  if (holding) endEffectIfPresent(state, actorId, holding.id);
+  return [readied.name, ...(holding ? [holding.name] : [])];
+}
+
 /** SRD Grappling: a grapple ends if the grappler is incapacitated. Only grapple-tagged effects; 0 HP releases
  *  everything via endEffectsSustainedBy. */
 export function releaseGrapplesHeldBy(state: GameState, grapplerActorId: string): EffectNarration[] {

@@ -7,6 +7,7 @@ import { ActionTargetPicker } from "./ActionTargetPicker";
 import { actionSummaryParts } from "./action-summary";
 import { AttackOutcome, AttackPreview } from "./AttackPreview";
 import { CommonActionChips } from "./CommonActionChips";
+import { ReadyChooser, readyableSpells } from "./ReadyChooser";
 import { damageBreakdown } from "./format";
 import { modeWords } from "./roll-mode-notes";
 import { AskTheGmPrompt } from "./RuleAsk";
@@ -124,6 +125,10 @@ export function PlayerActionRunner({
 }>) {
   const [feedback, setFeedback] = useState("");
   const onFeedback = setFeedback;
+  // The Ready action asks what is readied when a spell could be: a spell is cast now and held.
+  const [readying, setReadying] = useState(false);
+  const readySpells = readyableSpells(definition);
+  const slotLevels = (definition.spellcasting?.slots ?? []).filter((slot) => slot.max > 0).map((slot) => slot.level);
   // Casting a spell, or its Concentration ending, changes which of its later actions are offered.
   const facts = useServerActionFacts(actorId, definition, effectTags.join(","));
   // A limited use is a structured effect the server resolves, so Action Surge and the like get a
@@ -239,11 +244,28 @@ export function PlayerActionRunner({
             effectTags={effectTags}
             onUse={(action, targetless) => {
               setTargetingResult(null);
-              if (targetless) resolveActionDirect(actorId, action.id, revision, onOutcome);
+              if (action.id === "ready" && readySpells.length > 0) setReadying(true);
+              else if (targetless) resolveActionDirect(actorId, action.id, revision, onOutcome);
               else beginTargeting(action, actorId);
             }}
           />
         </>
+      )}
+      {readying && (
+        <ReadyChooser
+          spells={readySpells}
+          slotLevels={slotLevels}
+          busy={busy}
+          onClose={() => setReadying(false)}
+          onReady={(spell) => {
+            setReadying(false);
+            if (spell)
+              resolveActionDirect(actorId, spell.actionId, revision, onOutcome, undefined, {
+                ...(spell.slotLevel !== undefined ? { slotLevel: spell.slotLevel } : {})
+              });
+            else resolveActionDirect(actorId, "ready", revision, onOutcome);
+          }}
+        />
       )}
       {picking && !result?.preview && (
         <ActionTargetPicker

@@ -130,9 +130,12 @@ export function CharacterSheet({
   const savesOwed: ReadonlyArray<PendingSave | PlayerPendingSave> = (state?.combat.pendingSaves ?? []).filter(
     (save) => save.targetActorId === actor.id && !calledSaveIds.has(save.id)
   );
+  // Readied, a character acts off its turn with its Reaction (a readied spell is released by casting it), so the sheet
+  // resolves its actions then too.
+  const readied = actor.effects.some((effect) => effect.tags.includes("readied"));
   const structuredAttacks =
     liveCombat?.active === true &&
-    liveCombat.myTurn === true &&
+    (liveCombat.myTurn === true || readied) &&
     actor.kind === "player-character" &&
     definition !== null;
   // Outside the fight an item's action goes to the server's loose route, which rolls it and spends its charges.
@@ -509,6 +512,9 @@ export function CharacterSheet({
             rechoices={rechoices}
             spellChoices={spellChoices}
             gm={role === "gm"}
+            readiedActionId={
+              actor.effects.flatMap((effect) => (effect.readiedSpell ? [effect.readiedSpell.actionId] : []))[0] ?? null
+            }
             castSpellAction={castSpellAction}
             routeSpell={(spell) => {
               const note = hitExtraNote(spell.actionId);

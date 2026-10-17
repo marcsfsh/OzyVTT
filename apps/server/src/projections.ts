@@ -362,9 +362,14 @@ function playerEffect(
     sourceActionId: _sourceActionId,
     castId: _castId,
     ongoingDamage: _ongoingDamage,
+    // The level a spell was cast or readied at is the caster's to know; the effect's name says which spell. A spell
+    // the viewer's own character holds readied reaches them, so their sheet can release it.
+    spell: _spell,
+    readiedSpell,
     ...visible
   } = effect;
-  const yours = sourceActorId !== null && yourActorIds.has(sourceActorId) ? { yours: true as const } : {};
+  const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);
+  const yours = mine ? { yours: true as const, ...(readiedSpell ? { readiedSpell: { ...readiedSpell } } : {}) } : {};
   if (!isHiddenSource(sourceActorId, publicActorIds)) return { ...visible, ...yours };
   return { ...visible, name: withoutSourceName(visible.name, effect.sourceName), sourceName: HIDDEN_SOURCE };
 }

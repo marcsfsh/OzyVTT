@@ -183,7 +183,8 @@ export const actionCommands = [
             ...(request.slotLevel !== undefined ? { slotLevel: request.slotLevel } : {}),
             ...(request.damageType !== undefined ? { damageType: request.damageType } : {}),
             ...(request.hitOptions ? { hitOptions: request.hitOptions } : {}),
-            ...(template ? { areaPlaced: true } : {})
+            ...(template ? { areaPlaced: true } : {}),
+            ...(request.ready === true ? { ready: true } : {})
           },
           {
             random: (sides) => kit.context.random(sides),

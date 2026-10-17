@@ -357,11 +357,17 @@ export function resolveActionDirect(
   actionId: string,
   revision: number | undefined,
   onResult: (ok: boolean, message?: string) => void,
-  override?: { reason: string }
+  override?: { reason: string },
+  /** A spell readied rather than cast now, at a chosen slot level. */
+  readied?: Readonly<{ slotLevel?: number }>
 ) {
+  const extra = readied
+    ? { ready: true, ...(readied.slotLevel !== undefined ? { slotLevel: readied.slotLevel } : {}) }
+    : {};
   void command("action:resolve", {
     actorId: attackerId,
     actionId,
+    ...extra,
     ...(override ? { override } : {}),
     ...(revision !== undefined ? { expectedRevision: revision } : {})
   }).then((response) => {
@@ -371,8 +377,8 @@ export function resolveActionDirect(
     } else if (response.blocked?.overridable)
       blockedPrompt = {
         blocked: response.blocked,
-        retry: (confirmed) => resolveActionDirect(attackerId, actionId, undefined, onResult, confirmed),
-        asked: { type: "action.resolve", payload: { commandId: newId(), actorId: attackerId, actionId } }
+        retry: (confirmed) => resolveActionDirect(attackerId, actionId, undefined, onResult, confirmed, readied),
+        asked: { type: "action.resolve", payload: { commandId: newId(), actorId: attackerId, actionId, ...extra } }
       };
     emit();
     onResult(response.ok, response.blocked ? undefined : response.message);

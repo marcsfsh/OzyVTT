@@ -123,7 +123,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     name: "Ready",
     activation: "action",
     description:
-      "Choose a perceivable trigger and a response: the response is taken as a Reaction before the start of your next turn. Resolving any action off-turn while Readied spends your Reaction and releases the ready. (SRD 5.2.1, Ready [Action])",
+      "Choose a perceivable trigger and a response: the response is taken as a Reaction before the start of your next turn. Resolving any action off-turn while Readied spends your Reaction and releases the ready; a readied move goes up to your Speed. A spell is readied by casting it with Ready: its slot is spent now, and it is held with Concentration until the start of your next turn. (SRD 5.2.1, Ready [Action])",
     damage: [],
     grants: {
       name: "Readied",

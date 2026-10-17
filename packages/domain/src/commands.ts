@@ -355,6 +355,9 @@ export const ActionResolveSchema = z
     cover: z.enum(["half", "three-quarters", "total"]).optional(),
     /** Free-text annotation (the Ready action's trigger), shown in the granted effect's name. */
     note: z.string().trim().min(1).max(100).optional(),
+    /** Ready this spell rather than cast it now (SRD Ready): its slot is spent and it is held with Concentration until
+     *  the start of the caster's next turn; casting it off-turn then releases it with the Reaction. */
+    ready: z.boolean().optional(),
     /** false previews the attack roll only (no damage/riders/economy). The server holds the previewed d20, so a second
      *  preview of the same attack shows the same die, and the confirm (`commit: true`) uses it. Non-attack actions
      *  ignore it. */

@@ -84,6 +84,8 @@ export type ResolveInput = Readonly<{
   /** The cast's area was placed on the map as a template, whose annotation takes this command's id; a spell that
    *  leaves its area behind (Moonbeam) keeps acting there. */
   areaPlaced?: boolean;
+  /** Ready the spell rather than cast it now: its slot is spent and it is held with Concentration (SRD Ready). */
+  ready?: boolean;
 }>;
 
 export type ResolveDependencies = Readonly<{

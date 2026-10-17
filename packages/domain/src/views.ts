@@ -31,7 +31,10 @@ export type PlayerHp =
 /** An effect as players see it: source ids never cross the wire, and a hidden source's name is masked server-side
  * (viewer safety). Its ongoing damage stays with the GM, since the dice are the stat block's. `yours` marks one the
  * viewing player's own character is the source of (their grapple, their Concentration), which they may end. */
-export type PlayerEffect = Omit<EffectInstance, "sourceActorId" | "sourceActionId" | "castId" | "ongoingDamage"> & {
+export type PlayerEffect = Omit<
+  EffectInstance,
+  "sourceActorId" | "sourceActionId" | "castId" | "ongoingDamage" | "spell"
+> & {
   yours?: true;
 };
 /** A creature as one player sees it. Their own claimed character gets everything; another player's is limited by

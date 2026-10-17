@@ -240,6 +240,16 @@ function checkTurnsBegun({ state, violations }: Evaluation): void {
     });
 }
 
+/** The spell a Readied creature holds for this action (SRD Ready), while the Readied effect lasts. */
+export function heldReadiedSpell(
+  attacker: Pick<LiveActor, "effects">,
+  actionId: string
+): Readonly<{ actionId: string; level: number }> | undefined {
+  return attacker.effects.find(
+    (effect) => effect.tags.includes(READIED_TAG) && effect.readiedSpell?.actionId === actionId
+  )?.readiedSpell;
+}
+
 /** A Readied creature's response to its trigger: an action it takes off its own turn, which the SRD makes a Reaction
  *  ("you can either take your Reaction right after the trigger finishes"). */
 export function isReadiedResponse(
@@ -667,6 +677,9 @@ function continuedSpellSlot({
 }: Pick<Evaluation, "state" | "attacker" | "action">): number | null {
   const open = state.combat.turn.actionInstance;
   const onOwnTurn = state.combat.turnActorId === attacker.id;
+  // A readied spell is released at the level its slot was spent at when it was readied (SRD Ready).
+  const held = onOwnTurn ? undefined : heldReadiedSpell(attacker, action.id);
+  if (action.spellSlot && held) return held.level;
   if (!action.spellSlot || !onOwnTurn || !state.combat.turn.actionUsed || open?.actorId !== attacker.id) return null;
   return (open.components[action.id] ?? 0) > 0 ? (open.slotLevel ?? action.spellSlot.level) : null;
 }
