@@ -1286,7 +1286,11 @@
      "successDamage": "none",
      "failureConditions": [
       "prone"
-     ]
+     ],
+     "failurePush": {
+      "feet": 60,
+      "upTo": true
+     }
     },
     "damage": [],
     "area": {
@@ -2657,7 +2661,11 @@
      "ability": "dex",
      "dc": 19,
      "successDamage": "half",
-     "failureConditions": []
+     "failureConditions": [],
+     "failurePush": {
+      "feet": 30,
+      "upTo": true
+     }
     },
     "damage": [
      {
@@ -3177,7 +3185,11 @@
      "successDamage": "half",
      "failureConditions": [
       "prone"
-     ]
+     ],
+     "failurePush": {
+      "feet": 20,
+      "upTo": true
+     }
     },
     "damage": [
      {
@@ -4436,7 +4448,11 @@
      "successDamage": "none",
      "failureConditions": [
       "prone"
-     ]
+     ],
+     "failurePush": {
+      "feet": 60,
+      "upTo": true
+     }
     },
     "damage": [],
     "area": {
@@ -5850,7 +5866,11 @@
      "ability": "dex",
      "dc": 23,
      "successDamage": "half",
-     "failureConditions": []
+     "failureConditions": [],
+     "failurePush": {
+      "feet": 30,
+      "upTo": true
+     }
     },
     "damage": [
      {
@@ -10751,7 +10771,11 @@
      "successDamage": "none",
      "failureConditions": [
       "prone"
-     ]
+     ],
+     "failurePush": {
+      "feet": 30,
+      "upTo": true
+     }
     },
     "damage": [],
     "area": {
@@ -12319,7 +12343,11 @@
       "formula": "1d12",
       "type": "acid"
      }
-    ]
+    ],
+    "drain": {
+     "damageType": "acid",
+     "reducesMaximum": true
+    }
    }
   ],
   "token": {
@@ -14685,7 +14713,7 @@
     "damage": [],
     "reminder": "At the start of each of its turns, the Restrained target takes 21 (6d6) Thunder damage.",
     "area": {
-     "shape": "sphere",
+     "shape": "cylinder",
      "sizeFeet": 20,
      "widthFeet": null
     }
@@ -17508,7 +17536,11 @@
       "formula": "1d8",
       "type": "fire"
      }
-    ]
+    ],
+    "onHitPush": {
+     "feet": 15,
+     "upTo": true
+    }
    }
   ],
   "token": {
@@ -37981,6 +38013,31 @@
     "height": 1
    }
   },
+  "traitMechanics": [
+   {
+    "kind": "aura",
+    "name": "Vile Appearance",
+    "trigger": "turn-start-inside",
+    "rangeFeet": 30,
+    "affects": "all",
+    "creatureTypes": [
+     "beast",
+     "humanoid"
+    ],
+    "save": {
+     "ability": "wis",
+     "dc": 11,
+     "successDamage": "none",
+     "failureConditions": [
+      "frightened"
+     ],
+     "failureDuration": {
+      "type": "until-bearer-next-turn"
+     },
+     "immuneOnSuccess": true
+    }
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -39250,7 +39307,10 @@
       "formula": "2d6",
       "type": "necrotic"
      }
-    ]
+    ],
+    "drain": {
+     "reducesMaximum": true
+    }
    }
   ],
   "token": {
@@ -41275,7 +41335,7 @@
      "recharge": 5
     },
     "area": {
-     "shape": "sphere",
+     "shape": "cylinder",
      "sizeFeet": 10,
      "widthFeet": null
     }
@@ -41483,7 +41543,10 @@
       "formula": "3d8",
       "type": "psychic"
      }
-    ]
+    ],
+    "drain": {
+     "reducesMaximum": true
+    }
    }
   ],
   "token": {
@@ -44095,7 +44158,12 @@
       "formula": "3d8",
       "type": "necrotic"
      }
-    ]
+    ],
+    "drain": {
+     "damageType": "necrotic",
+     "reducesMaximum": true,
+     "heals": "all"
+    }
    }
   ],
   "token": {
@@ -44399,7 +44467,12 @@
       "formula": "3d6",
       "type": "necrotic"
      }
-    ]
+    ],
+    "drain": {
+     "damageType": "necrotic",
+     "reducesMaximum": true,
+     "heals": "all"
+    }
    }
   ],
   "token": {
@@ -46767,7 +46840,10 @@
       "formula": "1d8 + 2",
       "type": "necrotic"
      }
-    ]
+    ],
+    "drain": {
+     "reducesMaximum": true
+    }
    }
   ],
   "token": {
@@ -47360,7 +47436,10 @@
       "formula": "4d8 + 3",
       "type": "necrotic"
      }
-    ]
+    ],
+    "drain": {
+     "reducesMaximum": true
+    }
    },
    {
     "id": "create-specter",
@@ -48305,7 +48384,11 @@
      "successDamage": "none",
      "failureConditions": [
       "prone"
-     ]
+     ],
+     "failurePush": {
+      "feet": 40,
+      "upTo": true
+     }
     },
     "damage": [],
     "area": {

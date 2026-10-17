@@ -11,7 +11,7 @@ import { recordRoll, tableLineOf, type LiveActor, type ResolveContext } from "./
 /** Healing (Cure Wounds): rolled once, and every target regains it on the resolve. A willing creature's healing has
  *  nothing to gate, so it applies here instead of waiting on an Apply tap as damage does. Second Wind heals its user;
  *  Preserve Life divides one roll among its targets, none past half its maximum; Lay on Hands regains its formula once
- *  per point spent. */
+ *  per point spent; False Life's roll is Temporary Hit Points. */
 export function applyHealing(ctx: ResolveContext): void {
   const { action, state, deps, tableNarration } = ctx;
   const healing = action.healing;
@@ -22,18 +22,36 @@ export function applyHealing(ctx: ResolveContext): void {
   if (targets.every((target) => isDead(target)))
     throw new CommandRejectedError(targets.map((target) => deadCantHealLine(target.name)).join(" "));
   let total = 0;
-  for (let use = 0; use < (healing.perUse ? useCostOf(action) : 1); use += 1) {
-    const rolled = rollDice(healing.formula, deps.random);
-    // A flat amount ("1" a point) is no roll for the dice log.
-    if (rolled.terms.some((term) => term.kind === "dice")) recordRoll(ctx, rolled, "healing");
-    total += rolled.total;
-  }
-  const shares = healingShares(targets, Math.max(0, total), healing);
+  // "The target regains all its Hit Points" (Power Word Heal): nothing to roll.
+  const toMaximum = targets.map((target) => Math.max(0, target.hp.maximum - Math.max(0, target.hp.current)));
+  if (healing.toMaximum) total = toMaximum.reduce((sum, room) => sum + room, 0);
+  else
+    for (let use = 0; use < (healing.perUse ? useCostOf(action) : 1); use += 1) {
+      const rolled = rollDice(healing.formula, deps.random);
+      // A flat amount ("1" a point) is no roll for the dice log.
+      if (rolled.terms.some((term) => term.kind === "dice")) recordRoll(ctx, rolled, "healing");
+      total += rolled.total;
+    }
+  const shares = healing.toMaximum ? toMaximum : healingShares(targets, Math.max(0, total), healing);
   const healed = targets.map((target, index) => {
     // A dead target among living ones regains nothing until it is revived; the others still heal.
     if (isDead(target)) {
       tableNarration.push({ kind: "heal", text: deadCantHealLine(target.name), actorIds: [target.id] });
       return { targetId: target.id, targetName: target.name, regained: 0 };
+    }
+    // False Life, Tireless: Temporary Hit Points, which don't add up; the creature keeps the higher.
+    if (healing.temporary) {
+      const gained = shares[index] > target.hp.temporary ? shares[index] : 0;
+      if (gained > 0) target.hp = { ...target.hp, temporary: gained };
+      tableNarration.push({
+        kind: "heal",
+        text:
+          gained > 0
+            ? `${target.name} gains ${gained} Temporary Hit Points (${action.name}).`
+            : `${target.name} keeps the ${target.hp.temporary} Temporary Hit Points it has (${action.name}).`,
+        actorIds: [target.id]
+      });
+      return { targetId: target.id, targetName: target.name, regained: gained };
     }
     const before = target.hp.current;
     // The cast is already authorized; the caster heals whoever it targeted.
@@ -84,19 +102,28 @@ export function healingShares(
   return shares;
 }
 
-/** Conditions an action ends on its targets (Lay on Hands: Poisoned). Spent on a target with none of them, it is
- *  refused before anything is paid. */
+/** Conditions an action ends on its targets (Lay on Hands: Poisoned; Heal: Blinded, Deafened and Poisoned), or the
+ *  one its user picks (Lesser Restoration, the first present when none is named). A cure that does nothing else, spent
+ *  on a target with none of them, is refused before anything is paid; one that also heals or protects still lands. */
 export function applyConditionCures(ctx: ResolveContext): void {
-  const { action, state, tableNarration } = ctx;
+  const { action, state, tableNarration, input } = ctx;
   const cures = action.endsConditions;
   if (!cures) return;
+  const alone = !action.healing && !action.grants;
   for (const target of ctx.targets) {
     const present = cures.filter((id) => target.conditions.some((condition) => condition.id === id));
-    if (present.length === 0)
+    if (present.length === 0) {
+      if (!alone) continue;
       throw new CommandRejectedError(
         `${target.name} isn't ${cures.map((id) => conditionLabel(id)).join(" or ")} - ${action.name} would do nothing.`
       );
-    for (const id of present) {
+    }
+    const picked = action.endsOneCondition ? (input.conditionId ?? present[0]) : undefined;
+    if (picked !== undefined && !present.includes(picked))
+      throw new CommandRejectedError(
+        `${target.name} isn't ${conditionLabel(picked)} - ${action.name} would do nothing.`
+      );
+    for (const id of picked !== undefined ? [picked] : present) {
       // The action is already authorized; it ends the condition whoever imposed it.
       setCondition(state, target.id, id, false, undefined, { role: "gm" });
       tableNarration.push({

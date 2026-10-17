@@ -140,20 +140,14 @@ describe("the item mechanics overlay", () => {
     }
   });
 
-  it("refuses a rider type no consumer reads yet, pointing at the disposition table", () => {
-    // The map may only author riders that a consumer reads today (`CARRIER_RIDER_DISPOSITION`).
-    expect(CARRIER_RIDER_DISPOSITION_MIRROR["spell-attack-bonus"]).toBe("unread");
+  it("lets a spell attack bonus through now that spell attacks read it, leaving no rider type unread", () => {
+    // The map may only author riders that a consumer reads today (`CARRIER_RIDER_DISPOSITION`); the refusal stays
+    // for a rider type added before its reader.
+    expect(CARRIER_RIDER_DISPOSITION_MIRROR["spell-attack-bonus"]).toBe("standing");
+    expect(Object.values(CARRIER_RIDER_DISPOSITION_MIRROR)).not.toContain("unread");
     expect(() =>
       applyItemMechanics(rows, {
         "cloak-of-protection": { modifiers: [{ type: "spell-attack-bonus", amount: 1 }] }
-      })
-    ).toThrow(
-      'cloak-of-protection - modifiers.0 is "spell-attack-bonus", which CARRIER_RIDER_DISPOSITION (apps/server/src/character-build.ts) marks "unread": the rider reaches derivation and no consumer applies it yet, so it would change nothing at the table. Leave the item prose until a consumer reads it'
-    );
-    // Its readable sibling is not refused, so the check is about the disposition and not the family.
-    expect(() =>
-      applyItemMechanics(rows, {
-        "cloak-of-protection": { modifiers: [{ type: "spell-save-dc", amount: 1 }] }
       })
     ).not.toThrow();
   });

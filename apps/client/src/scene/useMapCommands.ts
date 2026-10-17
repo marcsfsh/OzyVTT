@@ -24,6 +24,8 @@ export type BlockedMove = Readonly<{
   blocked: RulesBlocked;
 }>;
 
+const ASKED = "Asked the GM. Waiting for their call.";
+
 export function useMapCommands({
   revision,
   sceneId,
@@ -31,7 +33,8 @@ export function useMapCommands({
   canMove,
   moveModeFor = () => undefined,
   drawing,
-  onShapeAdded
+  onShapeAdded,
+  waitingAsks = 0
 }: Readonly<{
   revision: number;
   sceneId?: string;
@@ -43,8 +46,16 @@ export function useMapCommands({
   drawing: Readonly<{ visibility: AnnotationVisibility; visibleToActorId: string | null; color: string }>;
   /** A new shape is selected for editing as soon as the server stores it. */
   onShapeAdded: (annotationId: string | null) => void;
+  /** How many of this viewer's questions wait on the GM; one fewer means the GM answered. */
+  waitingAsks?: number;
 }>) {
   const [message, setMessage] = useState("");
+  // Once the GM answers (the token moves, or stays), the line no longer says the question is waiting.
+  const [seenAsks, setSeenAsks] = useState(waitingAsks);
+  if (waitingAsks !== seenAsks) {
+    setSeenAsks(waitingAsks);
+    if (waitingAsks < seenAsks && message === ASKED) setMessage("");
+  }
   const [busyActorId, setBusyActorId] = useState<string | null>(null);
   const [annotationBusy, setAnnotationBusy] = useState<string | null>(null);
   const [fogBusy, setFogBusy] = useState(false);
@@ -109,7 +120,7 @@ export function useMapCommands({
         ? (result.message ?? "That question could not be sent.")
         : result.ran
           ? "That worked this time - no question needed."
-          : "Asked the GM. Waiting for their call."
+          : ASKED
     );
   };
   const placeAtCenter = (actorId: string) => {

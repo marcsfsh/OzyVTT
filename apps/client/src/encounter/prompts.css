@@ -44,11 +44,24 @@
 .save-prompt-roll {
   flex: 0 0 auto;
 }
+/* A typed face and its button: the button keeps its whole label ("Reroll · Heroic Inspiration") and drops under the
+   field when a phone's row is too narrow for both. */
 .save-prompt-manual {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: stretch;
   gap: 0.3rem;
   flex: 1 1 12rem;
+  min-width: 0;
+  max-width: 100%;
+}
+.save-prompt-manual > .nh-input {
+  flex: 1 1 6rem;
+  min-width: 0;
+  width: auto;
+}
+.save-prompt-manual > button {
+  flex: none;
 }
 .save-prompt-actions input {
   flex: 1 1 auto;

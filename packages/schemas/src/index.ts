@@ -656,8 +656,17 @@ export const EffectInstanceSchema = z
      * On a `dashing` effect without it, `effectiveSpeedFeet` falls back to doubling Speed. */
     movementGrantFeet: z.number().int().min(0).max(999).optional(),
     /** A reaction's lasting AC bonus (Shield: +5 until the caster's next turn), added to the stored AC while the
-     * effect lasts. Kept apart from `modifiers`, whose `armor-class` is written onto the sheet and would outlast it. */
-    armorClassBonus: z.number().int().min(1).max(10).optional(),
+     * effect lasts; a penalty is negative (Slow's -2). Kept apart from `modifiers`, whose `armor-class` is written onto
+     * the sheet and would outlast it. */
+    armorClassBonus: z.number().int().min(-10).max(10).optional(),
+    /** Hit points this effect took off the bearer's Hit Point maximum (a Life Drain), given back when it ends. */
+    hitPointMaximumLoss: z.number().int().min(1).max(10000).optional(),
+    /** What this effect adds to the bearer's Hit Point maximum (Aid), taken back when it ends. */
+    hitPointMaximumGain: z.number().int().min(1).max(1000).optional(),
+    /** Conditions the bearer is immune to while this lasts (Heroism: Frightened). */
+    conditionImmunities: z.array(ConditionIdSchema).max(6).optional(),
+    /** Temporary Hit Points the bearer gains at the start of each of its turns while this lasts (Heroism). */
+    temporaryHitPointsEachTurn: z.number().int().min(1).max(100).optional(),
     modifiers: EffectModifiersSchema.default([]),
     /** Conditions this effect applied to the same actor; removed automatically when the effect ends. */
     linkedConditionIds: z.array(ConditionIdSchema).max(4).default([]),
@@ -692,9 +701,14 @@ export const EffectInstanceSchema = z
     /** How many more times its damage riders may land before it ends (a coat of Basic Poison). */
     damageUses: z.number().int().min(1).max(10).optional(),
     /** A Ready action's held spell (SRD Ready): the action that casts it, released with the Reaction at the level its
-     *  slot was spent at when it was readied. */
+     *  slot was spent at when it was readied. `raysLeft`: the attacks a released spell still has to make with that
+     *  one Reaction (Scorching Ray's later rays). */
     readiedSpell: z
-      .object({ actionId: z.string().min(1).max(120), level: z.number().int().min(0).max(9) })
+      .object({
+        actionId: z.string().min(1).max(120),
+        level: z.number().int().min(0).max(9),
+        raysLeft: z.number().int().min(1).max(20).optional()
+      })
       .strict()
       .optional(),
     /** The spell this effect keeps up on its caster and the level it was cast at, so what the spell lets the caster do
@@ -1117,6 +1131,8 @@ export const EffectGrantSchema = z
     duration: z.discriminatedUnion("type", [
       z.object({ type: z.literal("rounds"), rounds: z.number().int().min(1).max(100) }).strict(),
       z.object({ type: z.literal("until-source-next-turn") }).strict(),
+      /** Until the start of the recipient's own next turn (Shocking Grasp: "until the start of its next turn"). */
+      z.object({ type: z.literal("until-bearer-next-turn") }).strict(),
       /** Until the end of the granter's next turn (Rage, which the bearer's own attacks keep extending). */
       z.object({ type: z.literal("until-source-turn-end") }).strict(),
       z.object({ type: z.literal("encounter") }).strict(),
@@ -1144,7 +1160,22 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   target: z.enum(["self", "target", "targets"]).default("self"),
   onHit: z.boolean().optional(),
   /** Kept apart from `modifiers`, whose `armor-class` is written onto the sheet, like a reaction's lasting bonus. */
-  armorClassBonus: z.number().int().min(1).max(10).optional()
+  armorClassBonus: z.number().int().min(1).max(10).optional(),
+  /** Conditions the recipient is immune to while it lasts (Heroism: Frightened). */
+  conditionImmunities: z.array(ConditionIdSchema).min(1).max(6).optional(),
+  /** Conditions the recipient has while it lasts, ending with it (Greater Invisibility: Invisible). */
+  conditions: z.array(ConditionIdSchema).min(1).max(3).optional(),
+  /** Temporary Hit Points the recipient gains at the start of each of its turns (Heroism: the caster's spellcasting
+   *  ability modifier, fixed when the spell is cast). */
+  temporaryHitPointsEachTurn: z
+    .union([z.number().int().min(1).max(100), z.literal("spellcasting-modifier")])
+    .optional(),
+  /** What the recipient's Hit Point maximum and current hit points rise by while it lasts (Aid's 5), `perSlot` more for
+   *  each slot level above the spell's. */
+  hitPointMaximumGain: z
+    .object({ amount: z.number().int().min(1).max(100), perSlot: z.number().int().min(1).max(50).optional() })
+    .strict()
+    .optional()
 }).strict();
 
 /** The most a limited-use pool can hold: Lay on Hands at Paladin 20 is 100 points. */
@@ -1199,6 +1230,17 @@ export const SaveConditionSchema = z.enum([
 ]);
 export type SaveCondition = z.infer<typeof SaveConditionSchema>;
 
+/** Forced movement straight away from the creature that causes it (SRD): Thunderwave's 10 feet, a fire giant's Hammer
+ *  Throw "up to 15 feet". `upTo` lets the source stop it short; `maxTargetSize` is the largest creature it moves. */
+export const ForcedPushSchema = z
+  .object({
+    feet: z.number().int().min(5).max(120),
+    upTo: z.literal(true).optional(),
+    maxTargetSize: SizeSchema.optional()
+  })
+  .strict();
+export type ForcedPush = z.infer<typeof ForcedPushSchema>;
+
 /**
  * What a saving throw does, as data: the damage a success takes ("half" for Fireball, "none" for Sacred
  * Flame) and the condition a failure imposes. Every save block (stat-block action, feature action, spell)
@@ -1208,6 +1250,9 @@ export const SaveOutcomeFields = {
   successDamage: z.enum(["half", "none"]).default("half"),
   /** Every condition a failed save imposes (Turn Undead: Frightened and Incapacitated). */
   failureConditions: z.array(SaveConditionSchema).max(4).default([]),
+  /** The condition is the caster's pick from these ("has the Blinded or Deafened condition"); `failureConditions`
+   *  holds the first, which a failure imposes when none is picked. */
+  conditionChoices: z.array(SaveConditionSchema).min(2).max(6).optional(),
   /** Cover gives no bonus to this save (Sacred Flame: "The target gains no benefit from Half Cover or
    *  Three-Quarters Cover for this save"). */
   ignoresCover: z.boolean().optional(),
@@ -1231,13 +1276,19 @@ export const SaveOutcomeFields = {
   /** What else a failure starts, from the SRD's own rules: "burning" (Rules Glossary Burning: 1d4 Fire at the start of
    * each of its turns until it is put out) or "oil" (covered in Oil: Fire damage before the oil dries, within 1
    * minute, brings 5 more Fire damage). */
-  failureHazard: z.enum(["burning", "oil"]).optional()
+  failureHazard: z.enum(["burning", "oil"]).optional(),
+  /** A failure also pushes the creature straight away from the source (Thunderwave: "is pushed 10 feet away from
+   *  you"). */
+  failurePush: ForcedPushSchema.optional(),
+  /** A creature this size or larger has Advantage on the save (Ensnaring Strike: "A Large or larger creature has
+   *  Advantage on this save"). */
+  advantageAtSize: SizeSchema.optional()
 };
 
 /** An area of effect the GM places as a map template ("60-foot Cone"). `widthFeet` is a line's width, null otherwise. */
 export const ActionAreaSchema = z
   .object({
-    shape: z.enum(["cone", "line", "sphere", "cube", "emanation"]),
+    shape: z.enum(["cone", "line", "sphere", "cube", "emanation", "cylinder"]),
     sizeFeet: z.number().int().min(1).max(1000),
     widthFeet: z.number().int().min(1).max(100).nullable()
   })
@@ -1290,15 +1341,73 @@ export const SaveFailureEffectSchema = z
   .object({
     name: z.string().min(1).max(120),
     tags: z.array(EffectTagSchema).max(8).default([]),
-    duration: z
-      .object({ type: z.literal("rounds"), rounds: z.number().int().min(1).max(100) })
-      .strict()
-      .optional(),
+    /** As the text prints it ("until the start of your next turn"); the save's own `failureDuration` wins. */
+    duration: SaveFailureDurationSchema.optional(),
     modifiers: EffectModifiersSchema.default([]),
+    /** What it adds to AC while it lasts; Slow's -2 is a penalty. Kept apart from `modifiers`, as on an effect. */
+    armorClassBonus: z.number().int().min(-10).max(10).optional(),
     /** It ends when a spell restores the bearer's hit points ("The wound closes after ... a spell restores Hit Points"). */
     endsOnSpellHealing: z.literal(true).optional()
   })
   .strict();
+
+/** What bursts after an attack, hit or miss (Ice Knife's shard): the target and each creature within `radiusFeet` of it
+ *  make the save, a failure taking `damage`, and `diceAddedPerSlot` more dice for each slot level above the spell's. */
+export const BurstSchema = z
+  .object({
+    radiusFeet: z.number().int().min(5).max(60),
+    ability: AbilitySchema,
+    damage: z
+      .array(z.object({ formula: DamageFormulaSchema, type: z.string().min(1).max(40) }).strict())
+      .min(1)
+      .max(3),
+    diceAddedPerSlot: z.number().int().min(1).max(4).optional()
+  })
+  .strict();
+export type Burst = z.infer<typeof BurstSchema>;
+
+/** What damage takes besides hit points as it lands (SRD Life Drain, Vampiric Touch, Harm): the target's Hit Point
+ *  maximum decreases by the damage it took, and the creature that dealt it regains hit points from it. With a
+ *  `damageType`, that type's damage alone counts ("equal to the Necrotic damage taken"). */
+export const DamageDrainSchema = z
+  .object({
+    damageType: z.string().min(1).max(40).optional(),
+    /** The Hit Point maximum decreases by the damage taken, until a Long Rest; at 0 the creature dies. */
+    reducesMaximum: z.literal(true).optional(),
+    /** It can't take the Hit Point maximum below 1 (Harm). */
+    keepsOneMaximum: z.literal(true).optional(),
+    /** How much of the damage taken the dealer regains as hit points. */
+    heals: z.enum(["all", "half"]).optional(),
+    /** Only a failed save drains (Harm, a wight's Life Drain). */
+    failedSaveOnly: z.literal(true).optional()
+  })
+  .strict();
+export type DamageDrain = z.infer<typeof DamageDrainSchema>;
+
+/** Conditions a hit lands on its target as one source-linked effect (a crocodile's Bite: Grappled and Restrained, escape
+ *  DC 15; Ray of Sickness: Poisoned until the end of the caster's next turn). */
+export const OnHitRiderSchema = z
+  .object({
+    /** None when the hit leaves only its `name`d effect (a stirge attached, draining blood). */
+    conditions: z
+      .array(z.object({ id: ConditionIdSchema, level: z.number().int().min(1).max(6).optional() }).strict())
+      .max(3),
+    /** The effect's name when the text names what it is ("Attached"); absent, the first condition's. */
+    name: z.string().min(1).max(60).optional(),
+    /** Damage it deals as turns start while it lasts (a stirge's 2d4 Necrotic at the start of each of its turns). */
+    ongoingDamage: OngoingDamageSchema.optional(),
+    /** It lands in place of the hit's damage ("the rug can give it the Grappled condition ... instead of dealing
+     *  damage"): a target it can't take still takes the damage. */
+    insteadOfDamage: z.literal(true).optional(),
+    escapeDc: z.number().int().min(1).max(40).optional(),
+    /** The rider only applies to targets of at most this size (crocodile Bite: large). */
+    maxTargetSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
+    /** How long the conditions last (a lich's touch: until the start of its next turn). Absent: until ended,
+     *  or until the grapple ends when the rider grapples. */
+    duration: SaveFailureDurationSchema.optional()
+  })
+  .strict();
+export type OnHitRider = z.infer<typeof OnHitRiderSchema>;
 
 /** One place in a Multiattack's plan: an action taken `count` times, or any of `or` in its place. */
 export const MultiattackComponentSchema = z
@@ -1375,7 +1484,10 @@ export const ActionSchema = z.object({
       spellcasting: z.boolean().optional(),
       ...SaveOutcomeFields,
       /** An effect a failed save puts on the creature, sourced by the actor (Bane's -1d4, Faerie Fire's outline). */
-      failureEffect: SaveFailureEffectSchema.optional()
+      failureEffect: SaveFailureEffectSchema.optional(),
+      /** What a successful save leaves on the creature instead (Stunning Strike: its Speed halved and the next attack
+       *  roll against it with Advantage). */
+      successEffect: SaveFailureEffectSchema.optional()
     })
     .optional(),
   damage: z
@@ -1393,7 +1505,11 @@ export const ActionSchema = z.object({
       /** No target is healed past this fraction of its maximum (Preserve Life: half). */
       upToFractionOfMaximum: z.number().min(0.1).max(1).optional(),
       /** The formula is regained once for each use spent (Lay on Hands: 1 hit point per point of its pool). */
-      perUse: z.literal(true).optional()
+      perUse: z.literal(true).optional(),
+      /** Each target regains all its hit points, whatever the formula says (Power Word Heal). */
+      toMaximum: z.literal(true).optional(),
+      /** The roll is Temporary Hit Points, which a creature takes only when they beat what it has (False Life). */
+      temporary: z.literal(true).optional()
     })
     .strict()
     .optional(),
@@ -1401,7 +1517,9 @@ export const ActionSchema = z.object({
    *  `chosen`, picked by the user each time (Lay on Hands' healing). Absent: one. */
   useCost: z.union([z.number().int().min(2).max(MAX_ACTION_USES), z.literal("chosen")]).optional(),
   /** Conditions this action ends on each target (Lay on Hands: Poisoned). */
-  endsConditions: z.array(ConditionIdSchema).min(1).max(4).optional(),
+  endsConditions: z.array(ConditionIdSchema).min(1).max(6).optional(),
+  /** It ends one of `endsConditions`, the one its user picks (Lesser Restoration); absent, it ends each one present. */
+  endsOneCondition: z.literal(true).optional(),
   /** Missiles that each deal `damage` to a creature of the caster's choice (Magic Missile's darts), rolled one by one.
    *  The resolve's targets assign them in order, a target named twice taking two. */
   darts: z.number().int().min(2).max(20).optional(),
@@ -1438,31 +1556,16 @@ export const ActionSchema = z.object({
     .max(3)
     .optional(),
   /** On-hit conditions applied to the target as one source-linked effect (Bite: Grappled + Restrained, escape DC 15). */
-  onHit: z
-    .array(
-      z
-        .object({
-          /** None when the hit leaves only its `name`d effect (a stirge attached, draining blood). */
-          conditions: z
-            .array(z.object({ id: ConditionIdSchema, level: z.number().int().min(1).max(6).optional() }).strict())
-            .max(3),
-          /** The effect's name when the text names what it is ("Attached"); absent, the first condition's. */
-          name: z.string().min(1).max(60).optional(),
-          /** Damage it deals as turns start while it lasts (a stirge's 2d4 Necrotic at the start of each of its turns). */
-          ongoingDamage: OngoingDamageSchema.optional(),
-          /** It lands in place of the hit's damage ("the rug can give it the Grappled condition ... instead of dealing
-           *  damage"): a target it can't take still takes the damage. */
-          insteadOfDamage: z.literal(true).optional(),
-          escapeDc: z.number().int().min(1).max(40).optional(),
-          /** The rider only applies to targets of at most this size (crocodile Bite: large). */
-          maxTargetSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
-          /** How long the conditions last (a lich's touch: until the start of its next turn). Absent: until ended,
-           *  or until the grapple ends when the rider grapples. */
-          duration: SaveFailureDurationSchema.optional()
-        })
-        .strict()
-    )
-    .max(2)
+  onHit: z.array(OnHitRiderSchema).max(2).optional(),
+  /** A miss still deals half the hit's damage, rounded down (Acid Arrow: "half as much of the initial damage only"). */
+  missDamage: z.literal("half").optional(),
+  /** What its damage drains as it lands (a wraith's Life Drain, Vampiric Touch). */
+  drain: DamageDrainSchema.optional(),
+  /** A hit also pushes the target straight away from the attacker (a fire giant's Hammer Throw). */
+  onHitPush: ForcedPushSchema.optional(),
+  /** What bursts after its attack, hit or miss, against the user's save DC (Ice Knife's explosion). */
+  burst: BurstSchema.extend({ dc: z.number().int().min(1).max(40) })
+    .strict()
     .optional(),
   /** Targeting restrictions the engine enforces (Tail can't target the creature this crocodile grapples). */
   targetRules: z
@@ -1887,6 +1990,8 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
       trigger: z.enum(["bearer-turn-end", "turn-start-inside", "bearer-turn-start"]),
       rangeFeet: z.number().int().min(5).max(120),
       affects: z.enum(["all", "enemies", "chosen", "grapple-partners"]),
+      /** Only creatures of these types ("any Beast or Humanoid", a sea hag's Vile Appearance). */
+      creatureTypes: z.array(RiderSlugSchema).min(1).max(6).optional(),
       notWhileIncapacitated: z.literal(true).optional(),
       damage: TraitDamageSchema.optional(),
       save: TraitSaveSchema.optional(),

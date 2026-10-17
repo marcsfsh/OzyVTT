@@ -403,35 +403,59 @@ describe("a staff's resistance and its shared charge pool", () => {
   });
 });
 
-describe("spell attack bonuses stay unauthored", () => {
-  it("leaves spell-attack-bonus off every carrier, since nothing reads it", () => {
-    // These carriers need a reader that does not exist yet; `applyItemMechanics` refuses the rider at
-    // build time, and this asserts the output.
-    for (const id of [
-      "wand-of-the-war-mage-1",
-      "wand-of-the-war-mage-2",
-      "wand-of-the-war-mage-3",
-      "staff-of-the-magi",
-      "staff-of-the-woodlands",
-      "staff-of-power"
-    ]) {
-      const record = view.equipmentRecord(id)!;
-      expect(
-        record.modifiers.map((modifier) => modifier.type),
-        id
-      ).not.toContain("spell-attack-bonus");
-    }
-    // Staff of Power's AC and saving-throw halves are readable and authored, from the same sentence.
-    expect(
-      view
-        .equipmentRecord("staff-of-power")!
-        .modifiers.map((modifier) => modifier.type)
-        .sort()
-    ).toEqual(["armor-class", "save-bonus"]);
+describe("a held item's bonus to spell attack rolls", () => {
+  it("is authored on the wands, staffs and talismans that print it", () => {
+    for (const [id, amount] of [
+      ["wand-of-the-war-mage-1", 1],
+      ["wand-of-the-war-mage-2", 2],
+      ["wand-of-the-war-mage-3", 3],
+      ["staff-of-the-magi", 2],
+      ["staff-of-the-woodlands", 2],
+      ["staff-of-power", 2],
+      ["talisman-of-pure-good", 2],
+      ["talisman-of-ultimate-evil", 2]
+    ] as const)
+      expect(view.equipmentRecord(id)!.modifiers, id).toContainEqual({ type: "spell-attack-bonus", amount });
     // Ring of Warmth stays prose.
     const warmth = view.equipmentRecord("ring-of-warmth")!;
     expect(warmth.category).toBe("ring");
     expect(warmth.modifiers).toEqual([]);
+  });
+
+  it("lands on its holder's spell attacks and on no weapon swing", () => {
+    const fireBolt = {
+      id: "spell-fire-bolt",
+      name: "Fire Bolt",
+      activation: "action",
+      description: "A spell attack.",
+      spellId: "fire-bolt",
+      attack: { bonus: 6, rangeFeet: 120 },
+      damage: [{ formula: "2d10", type: "fire" }]
+    };
+    const dagger = {
+      ...fireBolt,
+      id: "dagger",
+      name: "Dagger",
+      spellId: undefined,
+      attack: { bonus: 5, reachFeet: 5 }
+    };
+    const definition = definitionOf({ actions: [fireBolt, dagger] });
+    const state = fight(
+      stateWith([
+        item({
+          id: "wand-of-the-war-mage-2",
+          name: "Wand of the War Mage, +2",
+          quantity: 1,
+          equipped: true,
+          attuned: true,
+          category: "wand"
+        })
+      ])
+    );
+    const bonusOf = (id: string) =>
+      effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === id)!.attack!.bonus;
+    expect(bonusOf("spell-fire-bolt")).toBe(8);
+    expect(bonusOf("dagger")).toBe(5);
   });
 });
 

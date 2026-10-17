@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { regainedText } from "./ActionResultHead";
 import {
   rosterActors,
   type ActorDefinition,
@@ -10,7 +11,7 @@ import {
   type PlayerView,
   type RollVisibility
 } from "@vtt/domain";
-import { Button, IconButton, Modal, SegmentedControl, Select, IconX, useToast } from "@vtt/ui";
+import { Button, IconButton, Modal, SegmentedControl, Select, IconX, ToastOutlet, useToast } from "@vtt/ui";
 import { ConditionEditor } from "./conditions";
 import { SavePrompt } from "./SavePrompt";
 import { RichText } from "./RichText";
@@ -39,6 +40,7 @@ import { useSheetDefinition } from "./useSheetDefinition";
 import { useSheetEdit } from "./useSheetEdit";
 import { useSheetRolls } from "./useSheetRolls";
 import { command } from "../lib/command";
+import { revealInRegion } from "../lib/reveal";
 import "./character-sheet.css";
 
 /** Per-browser storage for the sheet's dice dock (private-mode safe). */
@@ -92,8 +94,23 @@ export function CharacterSheet({
   onLevel?: () => void;
   onClose: () => void;
 }>) {
-  const [feedback, setFeedback] = useState("");
   const { toast } = useToast();
+  // What the sheet did or refused is a toast: a line at the foot of the scrolling pane went unseen from a tap near its
+  // top. Stable, since the stat block's fetch depends on it.
+  const say = useCallback(
+    (text: string) => {
+      if (text) toast(text);
+    },
+    [toast]
+  );
+  const [unloaded, setUnloaded] = useState(false);
+  const sayUnloaded = useCallback(
+    (text: string) => {
+      setUnloaded(true);
+      toast(text, { tone: "error" });
+    },
+    [toast]
+  );
   // The GM's state carries every stored sheet (a built character's), which stays current when the sheet is rebuilt.
   const liveDefinition =
     role === "gm" && state && "definitions" in state && "definitionId" in actor
@@ -102,7 +119,7 @@ export function CharacterSheet({
   const { definitionId, definition, serverActions, derived, rechoices, spellChoices, showEdited } = useSheetDefinition(
     actor,
     role,
-    setFeedback,
+    sayUnloaded,
     liveDefinition
   );
   // On the player's own turn, targeted stat-block actions resolve through the shared structured flow
@@ -153,6 +170,8 @@ export function CharacterSheet({
   const sendLoose = (actionId: string, extra: Readonly<Record<string, unknown>>, failure: string) =>
     void command("action:use", { actorId: actor.id, actionId, ...extra }).then((response) => {
       if (!response.ok) toast(response.message ?? failure, { tone: "error" });
+      // A heal says who regained what.
+      else if (response.healing && response.healing.targets.length > 0) toast(regainedText(response.healing.targets));
     });
   // Who a heal outside a fight may land on, as the server allows: this character, then the party (for the GM, anyone
   // on the roster).
@@ -213,8 +232,8 @@ export function CharacterSheet({
       }}
     />
   ) : null;
-  const { busy, edit } = useSheetEdit(setFeedback);
-  const rolls = useSheetRolls(actor.id, setFeedback);
+  const { busy, edit } = useSheetEdit(say);
+  const rolls = useSheetRolls(actor.id, say);
   const [editMode, setEditMode] = useState<null | "prof" | "identity">(null);
   // The shared per-browser dice-input preference: thrown by the server, or a typed face from a physical die. A
   // player at a table that keeps players' dice on the server has no choice to make.
@@ -299,7 +318,11 @@ export function CharacterSheet({
       action.darts !== undefined && slotLevel !== undefined && action.spellSlot
         ? action.darts + Math.max(0, slotLevel - action.spellSlot.level)
         : undefined;
-    beginTargeting(summaryOfOwnAction(action), actor.id, slotLevel, darts);
+    // A cast with nothing to aim at (Spirit Guardians' Emanation around its caster) picks no targets, as the server says.
+    const own = summaryOfOwnAction(action);
+    const aimless =
+      own.targeting === undefined && serverActions.some((row) => row.id === action.id && row.targeting === "none");
+    beginTargeting(aimless ? { ...own, targeting: "none" } : own, actor.id, slotLevel, darts);
     if (effectiveAttackMode === "jump") onJumpToInitiative?.();
   };
   // A smite is added to a hit in a fight, so its Cast tap says where to find it rather than starting a refused cast.
@@ -351,7 +374,7 @@ export function CharacterSheet({
   const targetingSession = useTargeting();
   useEffect(() => {
     if (effectiveAttackMode === "inline" && targetingSession?.attackerId === actor.id)
-      runnerRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      revealInRegion(runnerRef.current, "nearest", "smooth");
   }, [effectiveAttackMode, targetingSession?.attackerId, targetingSession?.action.id, actor.id]);
 
   const extension = (definition?.extensions["open5e.srd-2024"] ?? {}) as SrdExtension;
@@ -389,7 +412,7 @@ export function CharacterSheet({
         definition={definition}
         extension={extension}
         speedFeet={derived?.speedFeet ?? null}
-        onFeedback={setFeedback}
+        onFeedback={say}
       />
       <div className="sheet-conditions">
         <span className="sheet-section-label">Conditions</span>
@@ -399,17 +422,11 @@ export function CharacterSheet({
           effects={actor.effects}
           viewer={role}
           canAsk={role === "player" && liveCombat?.active === true}
-          onFeedback={setFeedback}
+          onFeedback={say}
         />
       </div>
       {actor.kind === "player-character" && (role === "gm" || "heroicInspiration" in actor) && (
-        <SheetInspiration
-          actorId={actor.id}
-          name={actor.name}
-          held={holdsInspiration}
-          role={role}
-          onFeedback={setFeedback}
-        />
+        <SheetInspiration actorId={actor.id} name={actor.name} held={holdsInspiration} role={role} onFeedback={say} />
       )}
       {/* A save owed outside a fight (a concentration check after a trap): in a fight it waits on the
         initiative row instead. */}
@@ -422,7 +439,7 @@ export function CharacterSheet({
               save={save}
               targetName={actor.name}
               canDismiss={role === "gm"}
-              onFeedback={setFeedback}
+              onFeedback={say}
               rollMode="auto"
               viewer={role}
               inspired={holdsInspiration}
@@ -440,7 +457,7 @@ export function CharacterSheet({
               name={actor.name}
               deathSaves={actor.deathSaves}
               canRoll
-              onFeedback={setFeedback}
+              onFeedback={say}
               rollMode={rollModeOf(rollInput)}
               isActingTurn={false}
               viewer={role}
@@ -452,7 +469,7 @@ export function CharacterSheet({
                     targetName={actor.name}
                     helpers={partyHelpers(state as GmView, actor.id)}
                     gm
-                    onFeedback={setFeedback}
+                    onFeedback={say}
                   />
                 ) : undefined
               }
@@ -466,7 +483,7 @@ export function CharacterSheet({
                 helpers={partyHelpers(state as GmView, actor.id)}
                 gm
                 knockedOut
-                onFeedback={setFeedback}
+                onFeedback={say}
               />
             )
           )}
@@ -482,7 +499,7 @@ export function CharacterSheet({
             role={role}
             hitDice={actor.kind === "player-character" && "hitDice" in actor ? actor.hitDice : null}
             asked={state?.rest?.requests.includes(actor.id) ?? false}
-            onFeedback={setFeedback}
+            onFeedback={say}
           />
         </div>
       )}
@@ -511,7 +528,7 @@ export function CharacterSheet({
             busy={busy}
             edit={edit}
             rolls={rolls}
-            onFeedback={setFeedback}
+            onFeedback={say}
             spellSaveDcBonus={derived?.spellSaveDcBonus ?? 0}
             policeSlots={slotsPoliced}
             canPrepare={role === "gm" || Boolean(actor.preparation)}
@@ -584,15 +601,12 @@ export function CharacterSheet({
           </p>
         </>
       )}
-      {!definition && role === "gm" && definitionId && !feedback && <p className="sheet-status">Loading stat block…</p>}
+      {!definition && role === "gm" && definitionId && !unloaded && <p className="sheet-status">Loading stat block…</p>}
       {actor.kind === "player-character" && !definitionId && (
         <p className="sheet-status">
           No imported sheet yet - the GM can import this character's JSON sheet from the roster.
         </p>
       )}
-      <p className="sheet-feedback" role="status">
-        {feedback}
-      </p>
     </div>
   );
 
@@ -741,6 +755,8 @@ export function CharacterSheet({
     <div className={`sheet-workspace ${hasLog ? "has-log" : "no-log"} show-${mobilePane}${docked ? " docked" : ""}`}>
       {header(draggable)}
       {rollbar}
+      {/* Over the table the header's status line is behind the sheet, so the sheet says its results in its own row. */}
+      {!embedded && !standalone && <ToastOutlet className="sheet-toast" />}
       {latestRoll && (
         <button
           type="button"

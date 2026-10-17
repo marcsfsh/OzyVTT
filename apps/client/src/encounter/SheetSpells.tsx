@@ -135,7 +135,7 @@ function SpellCastControls({
       <span
         className="sheet-cast-effect"
         aria-hidden={effect ? undefined : true}
-        title={effect ? `Effect at ${isCantrip ? "your level" : ordinal(level)}` : undefined}
+        title={effect ? `Effect at ${isCantrip ? "your level" : `level ${level}`}` : undefined}
       >
         {effect ?? ""}
       </span>
@@ -364,7 +364,7 @@ export function SheetSpells({
       // here; the GM can adjust the parked damage.
       if (routeSpell(spell)) return;
       // Digital rolls the damage; manual prompts for the physical total.
-      if (formula) void rollFlat(formula, "damage", `${spell.name} at ${ordinal(level)}${types}`);
+      if (formula) void rollFlat(formula, "damage", `${spell.name} at level ${level}${types}`);
       else onFeedback(`Cast ${spell.name} with a level ${level} spell slot.`);
     });
   };
@@ -450,19 +450,19 @@ export function SheetSpells({
         {actor.preparation && (
           <div className="sheet-prepare-step" role="group" aria-label="Change prepared spells">
             <p>
-              Long Rest: change your prepared spells
+              After the Long Rest you can change your prepared spells.
               {actor.preparation.changesLeft === null
-                ? "."
-                : ` - ${actor.preparation.changesLeft} ${actor.preparation.changesLeft === 1 ? "swap" : "swaps"} left.`}
+                ? ""
+                : ` You have ${actor.preparation.changesLeft} ${actor.preparation.changesLeft === 1 ? "swap" : "swaps"} left.`}
             </p>
-            <button
-              type="button"
-              className="secondary"
+            <Button
+              size="sm"
+              variant="secondary"
               disabled={busy}
               onClick={() => void edit("character:finish-preparing", { actorId: actor.id })}
             >
               Done
-            </button>
+            </Button>
           </div>
         )}
         {canPrepare &&

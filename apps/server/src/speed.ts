@@ -5,6 +5,9 @@ import { exhaustionLevel } from "./condition-rules.js";
 import type { EquipmentDerivation } from "./equipment-derivation.js";
 import { STATBLOCK_EXTENSION } from "./statblock-facts.js";
 
+/** The bearer's Speed is halved while this lasts (Slow, a Stunning Strike the target saved against). */
+export const SPEED_HALVED_TAG = "speed-halved";
+
 /** Conditions that set Speed to 0 (SRD 5.2.1 conditions appendix; Stunned no longer does). */
 const SPEED_ZERO_CONDITIONS = ["grappled", "restrained", "unconscious", "paralyzed", "petrified"] as const;
 
@@ -23,14 +26,20 @@ function riderSpeed(derivation: EquipmentDerivation): number {
   return sumRiders(collectRiders(derivation.carriers, { ...derivation.context, moment: null }), "speed");
 }
 
+/** An effect that halves Speed applies after every other change, rounded down, and two of them halve it once (SRD
+ *  "Combining Game Effects": the same effect's instances don't stack). It halves a special speed too (SRD "Speed"). */
+function halvedIfSlowed(actor: Actor, feet: number): number {
+  return actor.effects.some((effect) => effect.tags.includes(SPEED_HALVED_TAG)) ? Math.floor(feet / 2) : feet;
+}
+
 /** Current Speed in feet, before Dash: base minus 5 x exhaustion (floored at 0, so no debt carries), plus the
- *  standing `speed` riders, floored again. A Speed-0 condition returns 0. Never writes `actor.speedFeet`. Null when
- *  base speed is unknown. */
+ *  standing `speed` riders, floored again, then halved where an effect halves it. A Speed-0 condition returns 0.
+ *  Never writes `actor.speedFeet`. Null when base speed is unknown. */
 export function currentSpeedFeet(actor: Actor, derivation: EquipmentDerivation): number | null {
   if (actor.speedFeet === undefined) return null;
   if (speedZeroed(actor)) return 0;
   const base = Math.max(0, actor.speedFeet - 5 * exhaustionLevel(actor));
-  return Math.max(0, base + riderSpeed(derivation));
+  return halvedIfSlowed(actor, Math.max(0, base + riderSpeed(derivation)));
 }
 
 /** How many Dashes the creature has taken this turn, and whether one predates the stored grant (then it doubles). */
@@ -130,6 +139,6 @@ export function travelBudgetFeet(
   if (special === undefined) return mode === "climb" || mode === "swim" ? walking : null;
   if (walking === null) return null;
   if (speedZeroed(actor)) return 0;
-  const speed = Math.max(0, special - 5 * exhaustionLevel(actor) + riderSpeed(derivation));
+  const speed = halvedIfSlowed(actor, Math.max(0, special - 5 * exhaustionLevel(actor) + riderSpeed(derivation)));
   return speed * (1 + dashesOf(actor).count);
 }

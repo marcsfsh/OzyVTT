@@ -7,6 +7,7 @@
 import {
   DamageTypeSchema,
   SaveConditionSchema,
+  type ForcedPush,
   type OngoingDamage,
   type SaveCondition,
   type SaveFailureDuration
@@ -15,6 +16,7 @@ import {
 export type SaveOutcome = {
   successDamage: "half" | "none";
   failureConditions: SaveCondition[];
+  conditionChoices?: SaveCondition[];
   failureDuration?: SaveFailureDuration;
   repeatSave?: true;
   escapeDc?: number;
@@ -24,7 +26,16 @@ export type SaveOutcome = {
   failsAtHitPoints?: number;
   ongoingDamage?: OngoingDamage;
   ignoresCover?: true;
+  failurePush?: ForcedPush;
+  advantageAtSize?: "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan";
 };
+
+/** The push a failure clause prints: "is pushed 10 feet away from you", "pushed up to 30 feet straight away from the
+ *  dragon". */
+export function failurePushOf(clause: string): ForcedPush | undefined {
+  const push = /\bpushed (up to )?(\d+) feet (?:straight )?away from\b/.exec(clause);
+  return push ? { feet: Number.parseInt(push[2]!, 10), ...(push[1] ? { upTo: true as const } : {}) } : undefined;
+}
 
 const CONDITIONS: ReadonlySet<string> = new Set(SaveConditionSchema.options);
 
@@ -34,19 +45,22 @@ const conditionIdsOf = (names: string): SaveCondition[] =>
     .map((name) => name.toLowerCase())
     .filter((id): id is SaveCondition => CONDITIONS.has(id));
 
+type NamedConditions = Readonly<{ conditions: SaveCondition[]; choices?: SaveCondition[] }>;
+
 /**
  * The conditions the first "has the X condition" or "has the X and Y conditions" names. Only the first
  * phrase: later ones are usually conditional ("Failure by 5 or More") or describe what the first condition
- * already does; the "while X, also Y" and "until the grapple ends" sentences are read separately.
+ * already does; the "while X, also Y" and "until the grapple ends" sentences are read separately. "X or Y" is the
+ * caster's choice of one ("the Blinded or Deafened condition"): the first stands until one is picked.
  */
-function namedConditions(clause: string): SaveCondition[] {
+function namedConditions(clause: string): NamedConditions {
   const match = clause.match(
     /\b(?:has|have|gains?|having) the ([A-Z][a-z]+(?:,? (?:and |or )?[A-Z][a-z]+)*) conditions?\b/
   );
-  if (!match) return [];
-  // "X or Y" is a choice, not both: keep the first, as the engine cannot pick.
-  const names = /\bor\b/.test(match[1]) ? match[1].split(/,? or /)[0]! : match[1];
-  return [...new Set(conditionIdsOf(names))];
+  if (!match) return { conditions: [] };
+  if (!/\bor\b/.test(match[1])) return { conditions: [...new Set(conditionIdsOf(match[1]))] };
+  const choices = [...new Set(conditionIdsOf(match[1].replace(/,? or /g, ", ")))];
+  return choices.length > 1 ? { conditions: choices.slice(0, 1), choices } : { conditions: choices };
 }
 
 /** "While Charmed, the creature has the Incapacitated condition" and "it has the Restrained condition until the
@@ -178,20 +192,24 @@ export function withoutOngoingDamage(text: string): string | null {
 }
 
 /** Everything a failure clause says about its conditions' lifetime. */
-function failureLifetime(clause: string, first: readonly SaveCondition[]): Omit<SaveOutcome, "successDamage"> {
+function failureLifetime(clause: string, named: NamedConditions): Omit<SaveOutcome, "successDamage"> {
+  const first = named.conditions;
   const failureConditions = [...new Set([...first, ...companionConditions(clause, first)])].slice(0, 4);
-  if (failureConditions.length === 0) return { failureConditions };
+  const push = failurePushOf(clause);
+  if (failureConditions.length === 0) return { failureConditions, ...(push ? { failurePush: push } : {}) };
   const escape = first.includes("grappled") ? clause.match(/\(escape DC (\d+)\)/) : null;
   const duration = failureDurationOf(clause);
   const ongoing = ongoingDamageOf(clause);
   return {
     failureConditions,
+    ...(named.choices ? { conditionChoices: named.choices } : {}),
     ...(duration ? { failureDuration: duration } : {}),
     ...(repeatsEachTurn(clause) ? { repeatSave: true as const } : {}),
     ...(escape ? { escapeDc: Number.parseInt(escape[1]!, 10) } : {}),
     ...(ENDS_ON_DAMAGE.test(clause) ? { endsOnDamage: true as const } : {}),
     ...(/\ba Speed of 0\b/.test(clause) ? { speedZero: true as const } : {}),
-    ...(ongoing ? { ongoingDamage: ongoing } : {})
+    ...(ongoing ? { ongoingDamage: ongoing } : {}),
+    ...(push ? { failurePush: push } : {})
   };
 }
 
@@ -238,16 +256,16 @@ function spellSaveOutcome(description: string): SaveOutcome {
   const failureSentences = sentences
     .filter((sentence) => /saving throw,? or\b|failed save|fails (?:the|its|a|this) save|on a failure/i.test(sentence))
     .join(" ");
-  const first = namedConditions(failureSentences);
+  const named = namedConditions(failureSentences);
   // The failure sentence and the ones after it, where spells say what else the condition does and how it ends.
   const after = failureIndex === -1 ? "" : sentences.slice(failureIndex).join(" ");
   const duration = failureDurationOf(failureSentences);
-  const lifetime = failureLifetime(after, first);
+  const lifetime = failureLifetime(after, named);
   const { failureDuration: _later, ...rest } = lifetime;
   return {
     successDamage: half ? "half" : "none",
     ...rest,
-    ...(duration && first.length > 0 ? { failureDuration: duration } : {})
+    ...(duration && named.conditions.length > 0 ? { failureDuration: duration } : {})
   };
 }
 
@@ -266,7 +284,20 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   "flesh-to-stone": { repeatSave: undefined },
   contagion: { repeatSave: undefined },
   // "The target gains no benefit from Half Cover or Three-Quarters Cover for this save."
-  "sacred-flame": { ignoresCover: true }
+  "sacred-flame": { ignoresCover: true },
+  // "An affected target repeats the save at the end of each of its turns, ending the spell on itself on a success."
+  // The spell names no condition, so the reader leaves the repeat out.
+  slow: { repeatSave: true },
+  // "Another 5d4 Acid damage at the end of its next turn", with no condition for the reader to hang it on.
+  "vitriolic-sphere": {
+    ongoingDamage: { damage: [{ formula: "5d4", type: "acid" }], at: "bearer-turn-end" }
+  },
+  // "While Restrained, the target takes 1d6 Piercing damage at the start of each of its turns", and "A Large or larger
+  // creature has Advantage on this save".
+  "ensnaring-strike": {
+    ongoingDamage: { damage: [{ formula: "1d6", type: "piercing" }], at: "bearer-turn-start" },
+    advantageAtSize: "large"
+  }
 };
 
 /** `spellSaveOutcome` with the reviewed corrections applied. Unset fields an override names are dropped. */

@@ -44,22 +44,35 @@ import { defineCommand } from "./pipeline.js";
 
 // Hit points, conditions and rests.
 
+type SourceKit = Readonly<{
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
+  equipmentCatalog: () => EquipmentCatalog;
+}>;
+
+/** The action a named source used, read from its own sheet or stat block. */
+function sourceActionOf(
+  state: Parameters<typeof applyDamageDetailed>[0],
+  sourceActorId: string,
+  sourceActionId: string,
+  kit: SourceKit
+) {
+  const source = state.actors.find((candidate) => candidate.id === sourceActorId);
+  if (!source) return undefined;
+  const definition = source.definitionId ? kit.resolveDefinition(source.definitionId) : undefined;
+  return (
+    effectiveActions(definition, source, kit.equipmentCatalog()).find((candidate) => candidate.id === sourceActionId) ??
+    builtinActionFor(definition, sourceActionId)
+  );
+}
+
 /** SRD Knocking Out a Creature: only "a melee attack" can, so a named source action that isn't one is refused. */
 function requireMeleeKnockOut(
   state: Parameters<typeof applyDamageDetailed>[0],
   sourceActorId: string,
   sourceActionId: string,
-  kit: Readonly<{
-    resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
-    equipmentCatalog: () => EquipmentCatalog;
-  }>
+  kit: SourceKit
 ): void {
-  const source = state.actors.find((candidate) => candidate.id === sourceActorId);
-  if (!source) return;
-  const definition = source.definitionId ? kit.resolveDefinition(source.definitionId) : undefined;
-  const action =
-    effectiveActions(definition, source, kit.equipmentCatalog()).find((candidate) => candidate.id === sourceActionId) ??
-    builtinActionFor(definition, sourceActionId);
+  const action = sourceActionOf(state, sourceActorId, sourceActionId, kit);
   if (!action) return;
   // A ranged attack, or a save or spell with no attack roll; an action that doesn't say stays the GM's call.
   const ranged =
@@ -74,7 +87,7 @@ export const actorHealthCommands = [
     type: "actor.apply-damage",
     operationId: "applyDamage",
     description:
-      "Applies damage (temporary hit points absorb first). Optional typed `parts` run the defense pipeline - immunity, then resistance (half, rounded down), then vulnerability (double) - from the target's definition and active effects, with the per-part breakdown returned in `applied`; the bare `amount` is the manual path (no defense math). Dropping a player character to 0 starts the dying state (Unconscious + Prone + death saves; `critical: true` while dying adds two failures). `nonlethal` knocks out instead (SRD): a melee attack that would drop the target to 0 leaves it at 1 HP and Unconscious until it regains hit points; a named `sourceActionId` that is not a melee attack is refused. Any damage ends the target's effects that end on damage (Sleep). Player sessions may target only their claimed character.",
+      "Applies damage (temporary hit points absorb first). Optional typed `parts` run the defense pipeline - immunity, then resistance (half, rounded down), then vulnerability (double) - from the target's definition and active effects, with the per-part breakdown returned in `applied`; the bare `amount` is the manual path (no defense math). Dropping a player character to 0 starts the dying state (Unconscious + Prone + death saves; `critical: true` while dying adds two failures). `nonlethal` knocks out instead (SRD): a melee attack that would drop the target to 0 leaves it at 1 HP and Unconscious until it regains hit points; a named `sourceActionId` that is not a melee attack is refused. On the GM's apply, a named `sourceActionId` whose damage drains (a Life Drain, Vampiric Touch) lowers the target's Hit Point maximum or heals the source as the action says. Any damage ends the target's effects that end on damage (Sleep). Player sessions may target only their claimed character.",
     summary: "Apply damage (GM anyone; a player their claimed character).",
     schema: ApplyDamageSchema,
     malformed: "The damage command is malformed.",
@@ -96,6 +109,12 @@ export const actorHealthCommands = [
       const { duplicate } = await execute((state) => {
         if (nonlethal && sourceActorId && request.sourceActionId)
           requireMeleeKnockOut(state, sourceActorId, request.sourceActionId, kit);
+        // What the named action's damage drains (a wraith's Life Drain), read from its own stat block. The GM's
+        // apply alone: a player's names their own character as the target, never a source to heal.
+        const drain =
+          isGmGrade(principal) && sourceActorId && request.sourceActionId
+            ? sourceActionOf(state, sourceActorId, request.sourceActionId, kit)?.drain
+            : undefined;
         outcome = applyDamageDetailed(
           state,
           actorId,
@@ -107,7 +126,8 @@ export const actorHealthCommands = [
             critical,
             sourceName: sourceName ?? null,
             sourceActorId: sourceActorId ?? null,
-            nonlethal
+            nonlethal,
+            ...(drain ? { drain } : {})
           },
           initiatorOf(principal),
           {

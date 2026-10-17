@@ -259,6 +259,17 @@ export function saveOutcomeFields(prefix: string): readonly FieldDef[] {
       kind: "multiselect",
       wide: true,
       options: SaveConditionSchema.options.map((id) => opt(id, `${id[0].toUpperCase()}${id.slice(1)}`))
+    },
+    {
+      key: `${prefix}.conditionChoices`,
+      label: "Or the caster picks one of",
+      kind: "multiselect",
+      wide: true,
+      help: "Pick two or more when the caster chooses the condition, as with Blindness/Deafness. Until the caster picks, a failure gives the conditions above.",
+      options: SaveConditionSchema.options.map((id) => opt(id, `${id[0].toUpperCase()}${id.slice(1)}`)),
+      // No choices is no key: the schema needs two or more when the key is there.
+      write: (next, scope) =>
+        setAt(scope, `${prefix}.conditionChoices`, Array.isArray(next) && next.length > 0 ? next : undefined)
     }
   ];
 }

@@ -41,6 +41,26 @@
     "kind": "ranged",
     "feet": 90
    },
+   "onHit": [
+    {
+     "conditions": [],
+     "name": "Acid Arrow",
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "2d4",
+        "type": "acid"
+       }
+      ],
+      "at": "bearer-turn-end"
+     },
+     "duration": {
+      "type": "rounds",
+      "rounds": 1
+     }
+    }
+   ],
+   "missDamage": "half",
    "damage": [
     {
      "formula": "4d4",
@@ -224,7 +244,25 @@
    "targets": {
     "count": 3
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Aid",
+    "tags": [
+     "aid"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "manual"
+    },
+    "hitPointMaximumGain": {
+     "amount": 5,
+     "perSlot": 5
+    }
+   }
   },
   "classes": [
    "bard",
@@ -1159,6 +1197,7 @@
      "name": "attack",
      "activation": "bonus-action",
      "when": "On your later turns, a Bonus Action moves the sword up to 30 feet and repeats the attack.",
+     "laterTurnsOnly": true,
      "attackRange": {
       "kind": "melee",
       "feet": 95
@@ -1689,7 +1728,21 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Barkskin",
+    "tags": [
+     "barkskin"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "druid",
@@ -1798,7 +1851,14 @@
      "type": "psychic"
     }
    ],
-   "healing": null
+   "healing": null,
+   "failureEffect": {
+    "name": "Befuddlement",
+    "tags": [
+     "no-spells"
+    ],
+    "modifiers": []
+   }
   },
   "classes": [
    "bard",
@@ -2337,6 +2397,10 @@
    "failureConditions": [
     "blinded"
    ],
+   "conditionChoices": [
+    "blinded",
+    "deafened"
+   ],
    "repeatSave": true
   },
   "target": {
@@ -2491,7 +2555,33 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "incoming-attack",
+      "mode": "disadvantage",
+      "when": [
+       {
+        "type": "on-attack-roll"
+       }
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Blur",
+    "tags": [
+     "blur"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    }
+   }
   },
   "classes": [
    "sorcerer",
@@ -3098,7 +3188,22 @@
      "type": "necrotic"
     }
    ],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Chill Touch",
+    "tags": [
+     "no-healing"
+    ],
+    "target": "target",
+    "onHit": true,
+    "duration": {
+     "type": "until-source-turn-end"
+    }
+   }
   },
   "classes": [
    "sorcerer",
@@ -4243,7 +4348,7 @@
   },
   "shape": null,
   "area": {
-   "shape": "sphere",
+   "shape": "cylinder",
    "sizeFeet": 10,
    "widthFeet": null
   },
@@ -4422,6 +4527,18 @@
     "kind": "melee",
     "feet": 65
    },
+   "onHit": [
+    {
+     "conditions": [
+      {
+       "id": "frightened"
+      }
+     ],
+     "duration": {
+      "type": "until-source-next-turn"
+     }
+    }
+   ],
    "damage": [
     {
      "formula": "3d12",
@@ -4434,10 +4551,23 @@
      "name": "attack",
      "activation": "bonus-action",
      "when": "On your later turns, a Bonus Action teleports the spirit up to 30 feet and makes the attack (a hit also Frightens the target until the start of your next turn).",
+     "laterTurnsOnly": true,
      "attackRange": {
       "kind": "melee",
       "feet": 65
      },
+     "onHit": [
+      {
+       "conditions": [
+        {
+         "id": "frightened"
+        }
+       ],
+       "duration": {
+        "type": "until-source-next-turn"
+       }
+      }
+     ],
      "damage": [
       {
        "formula": "3d12",
@@ -5678,7 +5808,21 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Death Ward",
+    "tags": [
+     "death-ward"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "cleric",
@@ -6550,7 +6694,40 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "extra-damage",
+      "formula": "1d4",
+      "damageType": "radiant",
+      "doubleOnCritical": true,
+      "when": [
+       {
+        "type": "on-hit"
+       },
+       {
+        "type": "attack-kind-is",
+        "kinds": [
+         "weapon"
+        ]
+       }
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Divine Favor",
+    "tags": [
+     "divine-favor"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    }
+   }
   },
   "classes": [
    "paladin"
@@ -7413,7 +7590,22 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Enhance Ability",
+    "tags": [
+     "enhance-ability",
+     "enhanced-ability"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "bard",
@@ -7557,7 +7749,17 @@
    "successDamage": "none",
    "failureConditions": [
     "restrained"
-   ]
+   ],
+   "ongoingDamage": {
+    "damage": [
+     {
+      "formula": "1d6",
+      "type": "piercing"
+     }
+    ],
+    "at": "bearer-turn-start"
+   },
+   "advantageAtSize": "large"
   },
   "target": {
    "type": "creature",
@@ -8143,7 +8345,13 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": {
+    "formula": "2d4 + 4",
+    "addsModifier": false,
+    "self": true,
+    "temporary": true,
+    "perSlot": 5
+   }
   },
   "classes": [
    "sorcerer",
@@ -9052,7 +9260,7 @@
   },
   "shape": null,
   "area": {
-   "shape": "sphere",
+   "shape": "cylinder",
    "sizeFeet": 10,
    "widthFeet": null
   },
@@ -9700,7 +9908,52 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "attack",
+      "mode": "advantage"
+     },
+     {
+      "type": "roll-mode",
+      "roll": "save",
+      "mode": "advantage"
+     },
+     {
+      "type": "roll-mode",
+      "roll": "check",
+      "mode": "advantage"
+     },
+     {
+      "type": "roll-mode",
+      "roll": "initiative",
+      "mode": "advantage"
+     },
+     {
+      "type": "roll-mode",
+      "roll": "incoming-attack",
+      "mode": "disadvantage",
+      "when": [
+       {
+        "type": "on-attack-roll"
+       }
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Foresight",
+    "tags": [
+     "foresight"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "bard",
@@ -10617,7 +10870,25 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Greater Invisibility",
+    "tags": [
+     "greater-invisibility"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    },
+    "conditions": [
+     "invisible"
+    ]
+   }
   },
   "classes": [
    "bard",
@@ -11024,14 +11295,21 @@
   "save": {
    "ability": "str",
    "successDamage": "none",
-   "failureConditions": []
+   "failureConditions": [],
+   "failurePush": {
+    "feet": 15
+   }
   },
   "target": {
    "type": "creature",
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "line",
+   "sizeFeet": 60,
+   "widthFeet": 10
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
@@ -11192,6 +11470,12 @@
   "area": null,
   "effect": {
    "attacks": 0,
+   "drain": {
+    "damageType": "necrotic",
+    "reducesMaximum": true,
+    "keepsOneMaximum": true,
+    "failedSaveOnly": true
+   },
    "damage": [
     {
      "formula": "14d6",
@@ -11335,7 +11619,12 @@
    "healing": {
     "formula": "70",
     "addsModifier": false
-   }
+   },
+   "endsConditions": [
+    "blinded",
+    "deafened",
+    "poisoned"
+   ]
   },
   "classes": [
    "cleric",
@@ -11521,6 +11810,7 @@
      "name": "heat again",
      "activation": "bonus-action",
      "when": "On your later turns, a Bonus Action deals the damage again if the object is within range; a creature holding or wearing it makes a Constitution save or drops it.",
+     "laterTurnsOnly": true,
      "damage": [
       {
        "formula": "2d8",
@@ -11792,7 +12082,26 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Heroism",
+    "tags": [
+     "heroism"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    },
+    "conditionImmunities": [
+     "frightened"
+    ],
+    "temporaryHitPointsEachTurn": "spellcasting-modifier"
+   }
   },
   "classes": [
    "bard",
@@ -11896,7 +12205,8 @@
      "activation": "bonus-action",
      "when": "If the cursed creature drops to 0 Hit Points before the spell ends, a Bonus Action on a later turn curses a new creature.",
      "damage": [],
-     "movesGrant": true
+     "movesGrant": true,
+     "laterTurnsOnly": true
     }
    ],
    "healing": null,
@@ -12577,6 +12887,17 @@
     "kind": "ranged",
     "feet": 60
    },
+   "burst": {
+    "radiusFeet": 5,
+    "ability": "dex",
+    "damage": [
+     {
+      "formula": "2d6",
+      "type": "cold"
+     }
+    ],
+    "diceAddedPerSlot": 1
+   },
    "damage": [
     {
      "formula": "1d10",
@@ -12684,7 +13005,7 @@
   },
   "shape": null,
   "area": {
-   "shape": "sphere",
+   "shape": "cylinder",
    "sizeFeet": 20,
    "widthFeet": null
   },
@@ -13293,7 +13614,25 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Invisibility",
+    "tags": [
+     "invisibility",
+     "until-it-acts"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "manual"
+    },
+    "conditions": [
+     "invisible"
+    ]
+   }
   },
   "classes": [
    "bard",
@@ -13636,7 +13975,14 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "endsConditions": [
+    "blinded",
+    "deafened",
+    "paralyzed",
+    "poisoned"
+   ],
+   "endsOneCondition": true
   },
   "classes": [
    "bard",
@@ -14274,7 +14620,7 @@
   },
   "shape": null,
   "area": {
-   "shape": "sphere",
+   "shape": "cylinder",
    "sizeFeet": 10,
    "widthFeet": null
   },
@@ -14897,7 +15243,16 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": {
+    "formula": "700",
+    "addsModifier": false,
+    "divided": true
+   },
+   "endsConditions": [
+    "blinded",
+    "deafened",
+    "poisoned"
+   ]
   },
   "classes": [
    "cleric"
@@ -15852,7 +16207,7 @@
   },
   "shape": null,
   "area": {
-   "shape": "sphere",
+   "shape": "cylinder",
    "sizeFeet": 5,
    "widthFeet": null
   },
@@ -16737,7 +17092,18 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": {
+    "formula": "1",
+    "addsModifier": false,
+    "toMaximum": true
+   },
+   "endsConditions": [
+    "charmed",
+    "frightened",
+    "paralyzed",
+    "poisoned",
+    "stunned"
+   ]
   },
   "classes": [
    "bard",
@@ -17435,7 +17801,29 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "damageTypes": [
+    "acid",
+    "cold",
+    "fire",
+    "lightning",
+    "thunder"
+   ],
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Protection from Energy",
+    "tags": [
+     "protection-from-energy",
+     "resists-chosen-type"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "cleric",
@@ -17537,7 +17925,47 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "endsConditions": [
+    "poisoned"
+   ],
+   "grant": {
+    "modifiers": [
+     {
+      "type": "damage-resistance",
+      "damageTypes": [
+       "poison"
+      ]
+     },
+     {
+      "type": "roll-mode",
+      "roll": "save",
+      "mode": "advantage",
+      "when": [
+       {
+        "type": "on-saving-throw"
+       },
+       {
+        "type": "versus-condition",
+        "conditionIds": [
+         "poisoned"
+        ]
+       }
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Protection from Poison",
+    "tags": [
+     "protection-from-poison"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "cleric",
@@ -17752,7 +18180,27 @@
      "type": "cold"
     }
    ],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "speed",
+      "amount": -10
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Ray of Frost",
+    "tags": [
+     "ray-of-frost"
+    ],
+    "target": "target",
+    "onHit": true,
+    "duration": {
+     "type": "until-source-next-turn"
+    }
+   }
   },
   "classes": [
    "sorcerer",
@@ -17823,6 +18271,18 @@
     "kind": "ranged",
     "feet": 60
    },
+   "onHit": [
+    {
+     "conditions": [
+      {
+       "id": "poisoned"
+      }
+     ],
+     "duration": {
+      "type": "until-source-turn-end"
+     }
+    }
+   ],
    "damage": [
     {
      "formula": "2d8",
@@ -18215,7 +18675,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "cylinder",
+   "sizeFeet": 50,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
@@ -19445,7 +19909,22 @@
      "type": "lightning"
     }
    ],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Shocking Grasp",
+    "tags": [
+     "no-opportunity-attacks"
+    ],
+    "target": "target",
+    "onHit": true,
+    "duration": {
+     "type": "until-bearer-next-turn"
+    }
+   }
   },
   "classes": [
    "sorcerer",
@@ -19740,7 +20219,7 @@
   },
   "shape": null,
   "area": {
-   "shape": "sphere",
+   "shape": "cylinder",
    "sizeFeet": 20,
    "widthFeet": null
   },
@@ -19810,7 +20289,8 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureConditions": []
+   "failureConditions": [],
+   "repeatSave": true
   },
   "target": {
    "type": "creature",
@@ -19829,7 +20309,33 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "failureEffect": {
+    "name": "Slow",
+    "tags": [
+     "speed-halved",
+     "no-reactions",
+     "slowed"
+    ],
+    "armorClassBonus": -2,
+    "modifiers": [
+     {
+      "type": "save-bonus",
+      "amount": -2,
+      "when": [
+       {
+        "type": "on-saving-throw"
+       },
+       {
+        "type": "ability-is",
+        "abilities": [
+         "dex"
+        ]
+       }
+      ]
+     }
+    ]
+   }
   },
   "classes": [
    "bard",
@@ -20405,7 +20911,8 @@
       "oncePerTurn": true,
       "around": "caster",
       "feet": 15,
-      "affects": "enemies"
+      "affects": "enemies",
+      "halvesSpeed": true
      }
     }
    ],
@@ -20509,6 +21016,7 @@
      "name": "attack",
      "activation": "bonus-action",
      "when": "On your later turns, a Bonus Action moves the force up to 20 feet and repeats the attack.",
+     "laterTurnsOnly": true,
      "attackRange": {
       "kind": "melee",
       "feet": 65
@@ -20622,7 +21130,22 @@
      "type": "radiant"
     }
    ],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Starry Wisp",
+    "tags": [
+     "outlined"
+    ],
+    "target": "target",
+    "onHit": true,
+    "duration": {
+     "type": "until-source-turn-end"
+    }
+   }
   },
   "classes": [
    "bard",
@@ -20824,7 +21347,30 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "damage-resistance",
+      "damageTypes": [
+       "bludgeoning",
+       "piercing",
+       "slashing"
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Stoneskin",
+    "tags": [
+     "stoneskin"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "druid",
@@ -21530,7 +22076,10 @@
   "save": {
    "ability": "con",
    "successDamage": "half",
-   "failureConditions": []
+   "failureConditions": [],
+   "failurePush": {
+    "feet": 10
+   }
   },
   "target": {
    "type": "creature",
@@ -22222,6 +22771,10 @@
     "kind": "melee",
     "feet": 5
    },
+   "drain": {
+    "damageType": "necrotic",
+    "heals": "half"
+   },
    "damage": [
     {
      "formula": "3d6",
@@ -22242,7 +22795,11 @@
        "formula": "3d6",
        "type": "necrotic"
       }
-     ]
+     ],
+     "drain": {
+      "damageType": "necrotic",
+      "heals": "half"
+     }
     }
    ],
    "healing": null
@@ -22344,7 +22901,23 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "failureEffect": {
+    "name": "Vicious Mockery",
+    "tags": [
+     "until-own-attack"
+    ],
+    "duration": {
+     "type": "until-bearer-turn-end"
+    },
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "attack",
+      "mode": "disadvantage"
+     }
+    ]
+   }
   },
   "classes": [
    "bard"
@@ -22404,7 +22977,16 @@
   "save": {
    "ability": "dex",
    "successDamage": "half",
-   "failureConditions": []
+   "failureConditions": [],
+   "ongoingDamage": {
+    "damage": [
+     {
+      "formula": "5d4",
+      "type": "acid"
+     }
+    ],
+    "at": "bearer-turn-end"
+   }
   },
   "target": {
    "type": "creature",
@@ -22428,7 +23010,18 @@
      "type": "acid"
     }
    ],
-   "healing": null
+   "healing": null,
+   "failureEffect": {
+    "name": "Vitriolic Sphere",
+    "tags": [
+     "vitriolic-sphere"
+    ],
+    "duration": {
+     "type": "rounds",
+     "rounds": 1
+    },
+    "modifiers": []
+   }
   },
   "classes": [
    "sorcerer",

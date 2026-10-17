@@ -19,6 +19,7 @@ import { coverBonusOf, coverFor } from "../cover.js";
 import { builtinBaseId } from "../builtin-actions.js";
 import { isIncapacitated } from "../condition-rules.js";
 import { areEnemies } from "../creature-sides.js";
+import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { sceneSight } from "../vision/sight.js";
 import { scrollOfAction } from "../scrolls.js";
 import { builtinHandlerFor } from "./builtins.js";
@@ -51,6 +52,8 @@ function combatantsOf(
     if (!target || !inFight(targetId)) throw new CommandRejectedError("Every target must be in this encounter.");
     return target;
   });
+  // A readied spell is cast now and aimed when its trigger comes (SRD Ready), so it names no target yet.
+  if (input.ready === true) return { attacker, targets };
   if (action.attack && targets.length !== 1)
     throw new CommandRejectedError("An attack roll resolves against exactly one target.");
   // A grant aimed at the action's target (Help) needs exactly one recipient; one for each target (Bless), at least one.
@@ -172,7 +175,17 @@ export function openResolve(
   // GM marked the target with, whoever attacks. Total cover can't be targeted; half/three-quarters add to AC and
   // Dexterity saves.
   const coverMode = effectiveModeFor(state.combat, "cover.total");
-  const attackCover = targets.length === 1 ? coverFor(input.cover, targets[0]) : (input.cover ?? null);
+  // A Paladin's Smite of Protection gives Half Cover to the creatures in its aura.
+  const auraCover = (target: LiveActor) =>
+    deps.resolveDefinition
+      ? smiteOfProtectionCover(state, target, {
+          resolveDefinition: deps.resolveDefinition,
+          ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {}),
+          ...(deps.catalog ? { catalog: deps.catalog } : {})
+        })
+      : null;
+  const attackCover =
+    targets.length === 1 ? (coverFor(input.cover, targets[0]) ?? auraCover(targets[0])) : (input.cover ?? null);
   // An area's other targets still take it, so a marked creature among several is the GM's to remove.
   if (targets.length > 1)
     for (const target of targets)

@@ -138,8 +138,8 @@ describe("a player's area spell", () => {
 
   it("refuses an area holding only creatures the player can't see the same way as an empty one", async () => {
     const { playerToken, aim } = await fight();
-    // A 5-foot sphere at the lurker and the hag catches only hidden creatures.
-    const hiddenOnly = await aim(playerToken, CASTER, { x: 575, y: 100 }, { x: 600, y: 100 });
+    // The burst's 10-foot sphere just east of the lurker and the hag catches only hidden creatures.
+    const hiddenOnly = await aim(playerToken, CASTER, { x: 625, y: 125 }, { x: 650, y: 125 });
     const empty = await aim(playerToken, CASTER, { x: 375, y: 325 }, { x: 400, y: 325 });
     expect(hiddenOnly.status).toBe(409);
     expect(empty.status).toBe(409);

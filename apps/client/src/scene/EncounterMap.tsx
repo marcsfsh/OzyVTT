@@ -298,7 +298,8 @@ export function EncounterMap({
           placedArea.shape,
           placedArea.placed,
           placedArea.widthFeet,
-          tokens.filter((placed) => placed.actorId !== activeTargeting?.attackerId)
+          tokens.filter((placed) => placed.actorId !== activeTargeting?.attackerId),
+          placedArea.sizeFeet
         )
       : []
   );
@@ -323,7 +324,8 @@ export function EncounterMap({
     onShapeAdded: (annotationId) => {
       setTool("select");
       setSelectedId(annotationId);
-    }
+    },
+    waitingAsks: state?.combat.pendingRuleAsks?.length ?? 0
   });
   const { message, busyActorId } = commands;
   const looking = role === "gm" && !moveSceneId && gmVision?.enabled === true ? lookThrough : null;
@@ -483,7 +485,9 @@ export function EncounterMap({
       y: above - fontSize > 0 ? above : dragSnappedPoint.y + fontSize * 2
     };
   })();
-  const preview = gesturePreview(calibration, gesture, annotationAt);
+  // Placing an area template, the drag places and points the area; its size is the action's own.
+  const templateFeet = activeTargeting?.mode === "template" ? activeTargeting.template?.sizeFeet : undefined;
+  const preview = gesturePreview(calibration, gesture, annotationAt, templateFeet);
   const selected = selectedId ? annotationAt(selectedId) : null;
 
   const inspector =

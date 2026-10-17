@@ -7,6 +7,7 @@ import type {
   RuleMode
 } from "@vtt/domain";
 import { abilityCheckClaims } from "./ability-checks.js";
+import { wardedConditions } from "./paladin-auras.js";
 import { assertNotArchived } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
 import { aggregateRollMode } from "@vtt/rules-5e";
@@ -102,7 +103,12 @@ export function initiativeRollFor(
   const claims = rollModeClaims(derivation, ["initiative"], "on-initiative-roll");
   // Initiative is a Dexterity check, so what the rules give Dexterity checks reaches it (Poisoned, Frightened, Hex). A
   // carrier that also names initiative itself (armor worn without training) counts once.
-  const asCheck = abilityCheckClaims(actor, derivation, { ability: "dex" });
+  // A Frightened Paladin's own Aura of Courage takes the condition's effect away; an ally's needs the map, which the
+  // roll isn't given.
+  const warded = deps.resolveDefinition
+    ? wardedConditions(state, actor, { resolveDefinition: deps.resolveDefinition })
+    : [];
+  const asCheck = abilityCheckClaims(actor, derivation, { ability: "dex" }, warded);
   for (const side of ["advantage", "disadvantage"] as const)
     for (const claim of asCheck[side])
       if (!claims[side].some((held) => held.label === claim.label)) claims[side].push(claim);

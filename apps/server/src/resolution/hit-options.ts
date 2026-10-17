@@ -1,12 +1,14 @@
 import type { HitOffer } from "@vtt/domain";
 import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import { DamageTypeSchema, DiceFormulaSchema } from "@vtt/schemas";
+import { holdsFeature } from "../class-features.js";
 import { isIncapacitated } from "../condition-rules.js";
 import { areAllies } from "../creature-sides.js";
 import { addEffect, applyCondition, makeEffect, type EffectNarration } from "../effects.js";
 import { RulesBlockedError } from "../game-store.js";
 import { upcastAction } from "../item-actions.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
+import { SMITE_OF_PROTECTION_TAG } from "../paladin-auras.js";
 import { effectiveModeFor, overrideCovers, overrideWaives } from "../rules-families.js";
 import { recordRoll, sizeAtMost, tableLineOf, type DefinitionAction, type ResolveContext } from "./context.js";
 import { beginConcentration } from "./concentration.js";
@@ -255,9 +257,35 @@ export function rollHitOptions(ctx: ResolveContext): void {
       ctx.effectsApplied.push({ targetId: target.id, targetName: target.name, name: effect.name, conditionIds: [] });
     }
     if (rider.lingers) lingerOn(ctx, target, action, cast, rider.lingers);
+    if (action.spellId === "divine-smite") smiteOfProtection(ctx);
     if (rider.reminder) ctx.warnings.push(rider.reminder);
     ctx.hitRiders.push({ action, ...(slotLevel !== undefined ? { slotLevel } : {}) });
   }
+}
+
+/** SRD Smite of Protection: "Whenever you cast Divine Smite, you and your allies have Half Cover while in your Aura of
+ *  Protection. The aura has this benefit until the start of your next turn." */
+function smiteOfProtection(ctx: ResolveContext): void {
+  if (!holdsFeature(ctx.deps.definition, "smite-of-protection", "Smite of Protection")) return;
+  addEffect(
+    ctx.state,
+    ctx.attacker.id,
+    makeEffect({
+      id: `${ctx.input.commandId}:smite-of-protection`,
+      name: "Smite of Protection",
+      tags: [SMITE_OF_PROTECTION_TAG],
+      sourceActorId: ctx.attacker.id,
+      sourceName: ctx.attacker.name,
+      sourceActionId: "smite-of-protection",
+      startedRound: ctx.state.combat.round,
+      duration: { type: "until-source-next-turn" }
+    })
+  );
+  ctx.tableNarration.push({
+    kind: "effect",
+    text: `${ctx.attacker.name}'s Smite of Protection gives Half Cover to the creatures in its aura until its next turn.`,
+    actorIds: [ctx.attacker.id]
+  });
 }
 
 /** SRD Searing Smite: "At the start of each of its turns until the spell ends, the target takes 1d6 Fire damage and then

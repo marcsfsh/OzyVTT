@@ -104,3 +104,46 @@ describe("a player's item actions in the fight", () => {
     expect(within(picker).getByRole("radio", { name: "Brann" })).toBeTruthy();
   });
 });
+
+describe("whom a player's own touch can pick", () => {
+  it("offers the player's own character for a cure, and never for an attack", async () => {
+    const cure: ContentActionSummary = {
+      ...ROW,
+      id: "spell-lesser-restoration",
+      name: "Lesser Restoration",
+      targeting: "single",
+      conditionChoices: ["blinded", "deafened", "paralyzed", "poisoned"]
+    };
+    const dart: ContentActionSummary = {
+      ...ROW,
+      id: "item-dart",
+      name: "Dart",
+      attackBonus: 4,
+      rangeFeet: 60,
+      damage: [{ formula: "1d4", type: "piercing" }],
+      targeting: "single"
+    };
+    render(
+      <PlayerActionRunner
+        actorId={ME}
+        definition={definition}
+        extraActions={[cure, dart]}
+        revision={7}
+        playerDamageMode="proposal"
+        targets={[
+          { actorId: ME, name: "Aria" },
+          { actorId: ALLY, name: "Brann" }
+        ]}
+      />
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /Lesser Restoration/ }));
+    const picker = screen.getByRole("group", { name: "Targets for Lesser Restoration" });
+    expect(within(picker).getByRole("radio", { name: "Aria" })).toBeTruthy();
+    await user.click(within(picker).getByRole("button", { name: "Cancel" }));
+    await user.click(screen.getByRole("button", { name: /Dart/ }));
+    const aim = screen.getByRole("group", { name: "Targets for Dart" });
+    expect(within(aim).queryByRole("radio", { name: "Aria" })).toBeNull();
+    expect(within(aim).getByRole("radio", { name: "Brann" })).toBeTruthy();
+  });
+});

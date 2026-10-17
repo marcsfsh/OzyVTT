@@ -1,14 +1,15 @@
 import type { GmView, MutationResult } from "@vtt/domain";
 import { Button } from "@vtt/ui";
 import { command } from "../lib/command";
+import { areaWords } from "./action-summary";
 import { beginZonePlacement, clearTargeting, resolveTargeting, useTargeting, useTargetingBusy } from "./targeting";
 import "./prompts.css";
 
 /**
  * The GM's list of spell areas still acting on the map (Moonbeam, Spirit Guardians, a wall of fire): the server raises
  * their saves and deals their damage as creatures enter them or start or end their turns there. One a player cast
- * waits to be placed; any can be ended (webs burned away, a guardian dismissed). Placing one happens here too: the
- * row says how, and holds Cancel and Set it here while the area is dragged on the map.
+ * waits to be placed; any can be ended (webs burned away, a guardian dismissed). Placing one happens here alone: the
+ * row says how, and holds Cancel and Set it here while the area is dragged on the map. Placing rolls nothing.
  */
 export function SpellAreas({
   state,
@@ -41,9 +42,10 @@ export function SpellAreas({
               <li key={zone.id} className="spell-area-row is-placing">
                 <span className="spell-area-text" role="status">
                   <strong>{zone.name}</strong> ·{" "}
+                  {/* The area keeps the spell's own size: the drag only places and points it. */}
                   {aiming.template?.placed
                     ? "Drag again to move it, or set it here."
-                    : `Drag the ${zone.area.sizeFeet}-foot ${zone.area.shape} on the map.`}
+                    : `Drag on the map to place the ${areaWords(zone.area)}.`}
                 </span>
                 <span className="spell-area-buttons">
                   <Button variant="secondary" disabled={placing} onClick={() => clearTargeting()}>

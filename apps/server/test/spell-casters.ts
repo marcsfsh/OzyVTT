@@ -7,6 +7,7 @@ import { ContentLibrary } from "../src/content-library.js";
 import { effectiveActions } from "../src/effective-actions.js";
 import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
 import { equipmentCatalogOf } from "../src/equipment-derivation.js";
+import { spellCastMechanics } from "../src/item-actions.js";
 
 /**
  * Built SRD casters for the spellcasting tests, in a fight with two foes: a Wizard 5 (Evoker), a Warlock 5 (Fiend),
@@ -301,6 +302,63 @@ export const druidInput = (spells: readonly string[]) =>
       { level: 1, kind: "equipment", id: "sage-a" }
     ]
   }) as CharacterCreateRequestInput;
+
+/** A Bard 5 (College of Lore) with Vicious Mockery among its cantrips. */
+export const bardInput = (spells: readonly string[]) =>
+  ({
+    name: "Ysolde",
+    speciesId: "human",
+    backgroundId: "acolyte",
+    classId: "bard",
+    level: 5,
+    subclassId: "college-of-lore",
+    abilityMethod: "standard-array",
+    baseScores: { str: 8, dex: 14, con: 13, int: 10, wis: 12, cha: 15 },
+    backgroundBonusAllocation: [
+      { ability: "cha", amount: 2 },
+      { ability: "wis", amount: 1 }
+    ],
+    hp: { mode: "average" },
+    choices: [
+      ...shared,
+      { level: 1, classId: "bard", kind: "skill", id: "performance" },
+      { level: 1, classId: "bard", kind: "skill", id: "persuasion" },
+      { level: 1, classId: "bard", kind: "skill", id: "deception" },
+      { level: 1, kind: "skill", id: "stealth", payload: { featureId: "human-skillful" } },
+      { level: 1, kind: "feat", id: "alert", payload: { featureId: "human-versatile" } },
+      { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
+      { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
+      { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+      { level: 1, kind: "spellcasting-ability", id: "wis", payload: { featureId: "magic-initiate-cleric" } },
+      { level: 1, classId: "bard", kind: "cantrip", id: "vicious-mockery" },
+      { level: 1, classId: "bard", kind: "cantrip", id: "mage-hand" },
+      ...spells.map((id) => ({ level: 1, classId: "bard", kind: "spell", id })),
+      { level: 2, classId: "bard", kind: "expertise", id: "performance", payload: { featureId: "expertise" } },
+      { level: 2, classId: "bard", kind: "expertise", id: "persuasion", payload: { featureId: "expertise" } },
+      { level: 3, classId: "bard", kind: "subclass", id: "college-of-lore" },
+      { level: 3, kind: "skill", id: "arcana", payload: { featureId: "bonus-proficiencies" } },
+      { level: 3, kind: "skill", id: "history", payload: { featureId: "bonus-proficiencies" } },
+      { level: 3, kind: "skill", id: "nature", payload: { featureId: "bonus-proficiencies" } },
+      { level: 4, classId: "bard", kind: "asi-or-feat", id: "ability-score-improvement" },
+      { level: 4, kind: "ability-score", id: "cha", payload: { featureId: "ability-score-improvement" } },
+      { level: 4, kind: "ability-score", id: "cha", payload: { featureId: "ability-score-improvement" } },
+      { level: 1, kind: "equipment", id: "bard-a" },
+      { level: 1, kind: "equipment", id: "acolyte-a" }
+    ]
+  }) as CharacterCreateRequestInput;
+
+/** A spell's cast as a plain action at fixed numbers (attack +7, DC 15, modifier +3), with no spell id, so a test needs
+ *  no caster of its level and no slot. */
+export function castOf(spellId: string): ActorAction {
+  const spell = view.spellRecord(spellId)!;
+  return {
+    id: `test-${spellId}`,
+    name: spell.name,
+    activation: "action",
+    description: spell.description,
+    ...spellCastMechanics(spell, { attackBonus: 7, saveDc: 15, bearersDc: false, modifier: 3 })
+  } as ActorAction;
+}
 
 export const build = (input: CharacterCreateRequestInput): ActorDefinition =>
   buildCharacterDefinition(input, view, POLICY);

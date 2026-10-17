@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { choosesAbility, type ActorDefinition, type ContentActionSummary } from "@vtt/domain";
 import { read } from "../lib/command";
-import { ActionResultHead, HealingOutcome } from "./ActionResultHead";
+import { ActionResultHead, CheckOutcome, HealingOutcome } from "./ActionResultHead";
 import { ActionRow } from "./ActionRow";
 import { ActionTargetPicker } from "./ActionTargetPicker";
 import { actionSummaryParts } from "./action-summary";
@@ -23,6 +23,7 @@ import {
   useTargetingResult
 } from "./targeting";
 import { foesFirst, type TargetRow } from "../table/targetRows";
+import { revealInRegion } from "../lib/reveal";
 import "./action-runner.css";
 
 /** Maps a player's own stat-block action onto the ContentActionSummary the targeting store uses. An area spell keeps
@@ -55,6 +56,9 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
     reaction: action.reaction ?? null,
     ...(action.darts !== undefined ? { darts: action.darts } : {}),
     ...(action.damageTypes !== undefined ? { damageTypes: [...action.damageTypes] } : {}),
+    ...(action.save?.conditionChoices ? { conditionChoices: [...action.save.conditionChoices] } : {}),
+    // A cure that ends one condition of several asks which (Lesser Restoration).
+    ...(action.endsOneCondition && action.endsConditions ? { conditionChoices: [...action.endsConditions] } : {}),
     ...(choosesAbility(action) ? { choosesAbility: true } : {}),
     // A heal for others picks its targets: one (Divine Spark's healing), or several for a divided pool.
     ...(action.healing && !action.healing.self
@@ -210,6 +214,13 @@ export function PlayerActionRunner({
     },
     []
   );
+  // The list gives way to the picker, the result or a refusal in place, and on a phone the list was scrolled down to
+  // the tapped row, so the runner's top is brought back into view.
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const shown = picking ? `pick:${picking.action.id}` : result ? `result:${result.actionName}` : feedback || null;
+  useEffect(() => {
+    if (shown) revealInRegion(rootRef.current, "nearest");
+  }, [shown]);
 
   if (actions.length === 0 && facts.common.length === 0) return null;
   const onOutcome = (ok: boolean, message?: string) => {
@@ -217,9 +228,15 @@ export function PlayerActionRunner({
   };
 
   return (
-    <div className="action-runner player-actions">
+    <div className="action-runner player-actions" ref={rootRef}>
       {/* On Enforce the resolve suppresses its own message, so the refusal and the ask are shown here. */}
       <AskTheGmPrompt onFeedback={onFeedback} />
+      {/* A refusal sits at the top, where the runner scrolls to: below a long list it went unseen. */}
+      {feedback && (
+        <p className="save-prompt-outcome" role="status">
+          {feedback}
+        </p>
+      )}
       {!picking && !result && (
         <>
           <p className="player-actions-label">Your actions{unavailable && <span> · {unavailable}</span>}</p>
@@ -280,12 +297,17 @@ export function PlayerActionRunner({
           picking={picking}
           targets={foesFirst(
             targets
-              // A heal may be for the healer too, as when a potion is drunk.
+              // A heal may be for the healer too (a potion drunk, not handed over), and so may a touch that cures or
+              // protects with no attack, save or damage (Lesser Restoration, Enhance Ability on the caster).
               .filter(
                 (target) =>
                   target.actorId !== actorId ||
                   picking.action.healing != null ||
-                  healingOf(picking.action) !== undefined
+                  healingOf(picking.action) !== undefined ||
+                  (picking.action.builtin !== true &&
+                    picking.action.attackBonus === null &&
+                    picking.action.saveAbility === null &&
+                    picking.action.damage.length === 0)
               )
               .map(
                 (target): Pick<TargetRow, "id" | "label"> & Partial<TargetRow> =>
@@ -304,11 +326,18 @@ export function PlayerActionRunner({
       {result && (
         <div className="action-result" role="status">
           <ActionResultHead result={result} />
-          {/* Why the d20 had Advantage or Disadvantage, before the player confirms it. */}
-          {result.attack && result.rollMode && result.rollMode.mode !== "normal" && (
+          {/* Why the d20 had Advantage or Disadvantage: an attack's before the player confirms it, a check's (Hide in
+              armor) with its total. */}
+          {(result.attack || result.check) && result.rollMode && result.rollMode.mode !== "normal" && (
             <p className="action-rollmode">{modeWords(result.rollMode).replace(/^ · /, "")}</p>
           )}
           {result.attack && <AttackOutcome attack={result.attack} audience="player" />}
+          {result.check && <CheckOutcome check={result.check} />}
+          {result.effectGranted && (
+            <p className="action-effect-granted">
+              {definition.name} gains <strong>{result.effectGranted.name}</strong>.
+            </p>
+          )}
           {result.preview && result.attack && (
             <AttackPreview
               attack={result.attack}
@@ -403,11 +432,6 @@ export function PlayerActionRunner({
               ) : null;
             })()}
         </div>
-      )}
-      {feedback && (
-        <p className="save-prompt-outcome" role="status">
-          {feedback}
-        </p>
       )}
     </div>
   );

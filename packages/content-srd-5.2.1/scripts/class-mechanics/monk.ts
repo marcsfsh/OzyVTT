@@ -79,8 +79,9 @@ export const monk: ClassMechanicsModule = {
     },
     /**
      * DC is 8 + Wisdom + Proficiency Bonus; the Focus Point comes off the shared pool. A failed save is
-     * Stunned until the start of the Monk's next turn; the success rider (halved Speed, Advantage) stays prose.
-     * The engine holds "once per turn" beside the Focus Point, keyed by the action's id.
+     * Stunned until the start of the Monk's next turn; a success halves the target's Speed for as long, and the next
+     * attack roll against it spends the Advantage. The engine holds "once per turn" beside the Focus Point, keyed by
+     * the action's id.
      */
     "stunning-strike": {
       uses: { scaling: { type: "class-resource", id: "focus-points" }, per: "short-rest", pool: "focus-points" },
@@ -97,7 +98,15 @@ export const monk: ClassMechanicsModule = {
             dc: { base: 8, ability: "wis", proficiencyBonus: true },
             successDamage: "none",
             failureConditions: ["stunned"],
-            failureDuration: { type: "until-source-next-turn" }
+            failureDuration: { type: "until-source-next-turn" },
+            successEffect: {
+              name: "Stunning Strike",
+              tags: ["speed-halved", "until-attacked"],
+              duration: { type: "until-source-next-turn" },
+              modifiers: [
+                { type: "roll-mode", roll: "incoming-attack", mode: "advantage", when: [{ type: "on-attack-roll" }] }
+              ]
+            }
           }
         }
       ]

@@ -1,3 +1,4 @@
+import type { Actor } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { experienceForChallenge } from "@vtt/rules-5e";
 
@@ -37,4 +38,12 @@ export function statblockFacts(definition: ActorDefinition): {
           ? null
           : experienceForChallenge(challengeRating)
   };
+}
+
+/** A creature's type for the rules that name one: its stat block's, else Humanoid for a player character (every SRD
+ *  species is a Humanoid); null when neither says. */
+export function creatureTypeOf(actor: Pick<Actor, "kind">, definition: ActorDefinition | undefined): string | null {
+  const printed = definition ? statblockFacts(definition).creatureType : null;
+  if (printed !== null) return printed.toLowerCase();
+  return actor.kind === "player-character" ? "humanoid" : null;
 }

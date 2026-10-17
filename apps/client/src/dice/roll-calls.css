@@ -126,6 +126,10 @@
 .roll-call-answered .roll-call-result {
   flex: 1 1 auto;
 }
+/* A typed reroll takes its own row under the result. */
+.roll-call-answered .save-prompt-manual {
+  flex: 1 1 100%;
+}
 
 .roll-call-card-eyebrow {
   margin: 0;
@@ -155,4 +159,10 @@
 .prompt-slot .save-prompt {
   margin: 0;
   padding: 0;
+}
+/* While a card is pinned to the foot of the screen, toasts come down from the top, so the one announcing the call
+   never covers the field the player types the die into. */
+body:has(.roll-call-dock) .nh-toast-viewport {
+  top: calc(var(--space-4) + env(safe-area-inset-top));
+  bottom: auto;
 }

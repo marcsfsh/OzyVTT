@@ -44,9 +44,18 @@ describe("what one cast of an SRD spell does", () => {
     // A Self spell's touch; a summoned weapon strikes 5 feet past where it appears.
     expect(effectOf("vampiric-touch")!.attackRange).toEqual({ kind: "melee", feet: 5 });
     expect(effectOf("spiritual-weapon")!.attackRange).toEqual({ kind: "melee", feet: 65 });
-    // Produce Flame's cast makes no attack; its hurl on a later turn reaches 60 feet.
+    // Produce Flame's cast makes no attack; its hurl, "until the spell ends", reaches 60 feet.
     expect(effectOf("produce-flame")!.attacks).toBe(0);
     expect(effectOf("produce-flame")!.laterActions?.[0]?.attackRange).toEqual({ kind: "ranged", feet: 60 });
+  });
+
+  it("waits for a later turn only where the text says so", () => {
+    const waiting = loadSpells()
+      .filter((spell) => spell.effect?.laterActions?.some((row) => row.laterTurnsOnly))
+      .map((spell) => spell.id);
+    expect(waiting).toEqual(["arcane-sword", "conjure-fey", "heat-metal", "hex", "spiritual-weapon"]);
+    // "Until the spell ends, you can take a Magic action": the turn of the cast too.
+    expect(effectOf("produce-flame")!.laterActions?.[0]?.laterTurnsOnly).toBeUndefined();
   });
 
   it("declares the reactions the table can offer, and none it can't see the trigger of", () => {
@@ -114,7 +123,9 @@ describe("what one cast of an SRD spell does", () => {
       oncePerTurn: true,
       around: "caster",
       feet: 15,
-      affects: "enemies"
+      affects: "enemies",
+      // "Any other creature's Speed is halved in the Emanation."
+      halvesSpeed: true
     });
     expect(zoneOf("web")).toEqual({ on: ["enter", "start-turn"] });
     expect(zoneOf("stinking-cloud")).toEqual({ on: ["start-turn"] });
@@ -142,7 +153,7 @@ describe("what one cast of an SRD spell does", () => {
     expect(areaOf("wall-of-fire")).toEqual({ shape: "line", sizeFeet: 60, widthFeet: 5 });
     expect(areaOf("blade-barrier")).toEqual({ shape: "line", sizeFeet: 100, widthFeet: 5 });
     expect(areaOf("flaming-sphere")).toEqual({ shape: "sphere", sizeFeet: 5, widthFeet: null });
-    expect(areaOf("moonbeam")).toEqual({ shape: "sphere", sizeFeet: 5, widthFeet: null });
+    expect(areaOf("moonbeam")).toEqual({ shape: "cylinder", sizeFeet: 5, widthFeet: null });
   });
 
   it("says how many creatures a cast targets, and how many more a higher slot adds", () => {
@@ -154,6 +165,33 @@ describe("what one cast of an SRD spell does", () => {
   it("lets the caster pick the damage type where the spell does", () => {
     expect(effectOf("chromatic-orb")!.damageTypes).toEqual(["acid", "cold", "fire", "lightning", "poison", "thunder"]);
     expect(effectOf("sorcerous-burst")!.damage).toEqual([{ formula: "1d8", type: "acid" }]);
+  });
+
+  it("says what a hit leaves on its target besides the damage, and what a miss still deals", () => {
+    expect(effectOf("ray-of-frost")!.grant).toMatchObject({
+      target: "target",
+      onHit: true,
+      duration: { type: "until-source-next-turn" },
+      modifiers: [{ type: "speed", amount: -10 }]
+    });
+    expect(effectOf("shocking-grasp")!.grant).toMatchObject({
+      tags: ["no-opportunity-attacks"],
+      duration: { type: "until-bearer-next-turn" }
+    });
+    expect(effectOf("chill-touch")!.grant).toMatchObject({ tags: ["no-healing"], onHit: true });
+    expect(effectOf("starry-wisp")!.grant).toMatchObject({ tags: ["outlined"], onHit: true });
+    expect(effectOf("ray-of-sickness")!.onHit).toEqual([
+      { conditions: [{ id: "poisoned" }], duration: { type: "until-source-turn-end" } }
+    ]);
+    expect(effectOf("acid-arrow")).toMatchObject({
+      missDamage: "half",
+      onHit: [{ ongoingDamage: { damage: [{ formula: "2d4", type: "acid" }], at: "bearer-turn-end" } }]
+    });
+    // Conjure Fey's spirit frightens what it hits, on the cast and on later turns.
+    expect(effectOf("conjure-fey")!.onHit).toEqual([
+      { conditions: [{ id: "frightened" }], duration: { type: "until-source-next-turn" } }
+    ]);
+    expect(effectOf("conjure-fey")!.laterActions![0]!.onHit).toEqual(effectOf("conjure-fey")!.onHit);
   });
 
   it("reviews only spells that exist", () => {

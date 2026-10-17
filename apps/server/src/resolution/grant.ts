@@ -1,11 +1,15 @@
-import { CHOSEN_ABILITY_TAG, type GameState } from "@vtt/domain";
+import { CHOSEN_ABILITY_TAG, ENHANCED_ABILITY_TAG, type GameState } from "@vtt/domain";
 import { abilityModifier } from "@vtt/rules-5e";
-import type { EffectInstance, Modifier } from "@vtt/schemas";
+import type { DamageType, EffectInstance, Modifier } from "@vtt/schemas";
 import { ABILITY_NAMES } from "../ability-checks.js";
+import { setCondition } from "../actor-conditions.js";
+import { conditionLabel } from "../condition-rules.js";
 import {
   addEffect,
   HASTED_TAG,
   MAGE_ARMOR_TAG,
+  BARKSKIN_TAG,
+  RESISTS_CHOSEN_TYPE_TAG,
   makeEffect,
   PERSISTENT_RAGE_TAG,
   RAGE_ROUNDS,
@@ -67,6 +71,22 @@ export function applyGrant(ctx: ResolveContext): void {
   for (const recipient of recipients) grantTo(ctx, recipient);
 }
 
+/** The Temporary Hit Points a grant gives at the start of each of the bearer's turns: a number, or the granter's
+ *  spellcasting ability modifier (a cast resolves it first, at the spell's own ability); none when it is under 1. */
+function turnStartTemporaryHitPoints(
+  each: NonNullable<DefinitionAction["grants"]>["temporaryHitPointsEachTurn"],
+  definition: ResolveContext["deps"]["definition"]
+): Partial<Pick<EffectInstance, "temporaryHitPointsEachTurn">> {
+  const ability = definition?.spellcasting?.ability;
+  const amount =
+    each === "spellcasting-modifier"
+      ? ability
+        ? abilityModifier(definition!.abilityScores[ability])
+        : 0
+      : (each ?? 0);
+  return amount >= 1 ? { temporaryHitPointsEachTurn: Math.min(100, amount) } : {};
+}
+
 function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
   const { state, action, attacker, input, deps, warnings } = ctx;
   const grant = action.grants!;
@@ -107,6 +127,32 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
         }
       ]
     : [];
+  // Enhance Ability: "Advantage on ability checks using the chosen ability", any but Constitution.
+  const enhanced = grant.tags.includes(ENHANCED_ABILITY_TAG);
+  const enhancedAbility = enhanced && input.ability !== undefined && input.ability !== "con" ? input.ability : null;
+  if (enhanced && enhancedAbility === null)
+    warnings.push(
+      `${grant.name ?? action.name} on ${recipient.name}: choose Strength, Dexterity, Intelligence, Wisdom or Charisma for its Advantage.`
+    );
+  const enhancedAdvantage: Modifier[] = enhancedAbility
+    ? [
+        {
+          type: "roll-mode",
+          roll: "check",
+          mode: "advantage",
+          when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: [enhancedAbility] }]
+        }
+      ]
+    : [];
+  // Protection from Energy: "Resistance to one damage type of your choice", one of those the action offers.
+  const chosenType = grant.tags.includes(RESISTS_CHOSEN_TYPE_TAG)
+    ? input.damageType !== undefined && (action.damageTypes ?? []).includes(input.damageType as never)
+      ? input.damageType
+      : action.damageTypes?.[0]
+    : undefined;
+  const chosenResistance: Modifier[] = chosenType
+    ? [{ type: "damage-resistance", damageTypes: [chosenType as DamageType] }]
+    : [];
   // Mage Armor: base AC 13 + Dexterity for a creature wearing no armor, a shield still adding to it.
   let armorClassBonus = grant.armorClassBonus;
   if (grant.tags.includes(MAGE_ARMOR_TAG)) {
@@ -119,6 +165,11 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
     const gain = mageArmor - (recipient.armorClass ?? mageArmor);
     armorClassBonus = gain > 0 ? Math.min(10, gain) : undefined;
   }
+  // Barkskin: "an Armor Class of 17 if its AC is lower than that", measured as it lands.
+  if (grant.tags.includes(BARKSKIN_TAG)) {
+    const gain = 17 - (recipient.armorClass ?? 17);
+    armorClassBonus = gain > 0 ? Math.min(10, gain) : undefined;
+  }
   const effect = addEffect(
     state,
     recipient.id,
@@ -126,7 +177,11 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       id: grant.target === "targets" ? `${input.commandId}:grant:${recipient.id}` : `${input.commandId}:grant`,
       name:
         ctx.builtin?.grantName?.(ctx) ??
-        (hexAbility ? `${grant.name ?? action.name} (${ABILITY_NAMES[hexAbility]})` : (grant.name ?? action.name)),
+        ((hexAbility ?? enhancedAbility)
+          ? `${grant.name ?? action.name} (${ABILITY_NAMES[(hexAbility ?? enhancedAbility)!]})`
+          : chosenType
+            ? `${grant.name ?? action.name} (${chosenType[0]!.toUpperCase()}${chosenType.slice(1)})`
+            : (grant.name ?? action.name)),
       tags: rage ? [...rage.tags] : grant.tags,
       sourceActorId: attacker.id,
       sourceName: attacker.name,
@@ -143,7 +198,9 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
               : grant.duration,
       endsWhenSourceDefeated: true,
       voidWhileIncapacitated: grant.voidWhileIncapacitated,
-      modifiers: [...modifiers, ...hasteSpeed, ...hexDisadvantage],
+      modifiers: [...modifiers, ...hasteSpeed, ...hexDisadvantage, ...enhancedAdvantage, ...chosenResistance],
+      // Greater Invisibility's Invisible condition, ending with the effect.
+      ...(grant.conditions ? { linkedConditionIds: [...grant.conditions] } : {}),
       onEnd: grant.onEnd,
       endsWithTag: grant.endsWithTag ?? null,
       concentration: grant.concentration,
@@ -154,18 +211,38 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       ...(ctx.castId !== null ? { castId: ctx.castId } : {}),
       ...(armorClassBonus !== undefined ? { armorClassBonus } : {}),
       ...(steadyAim ? { speedZero: true } : {}),
-      ...grantedMovement
+      ...grantedMovement,
+      // Heroism: immune to Frightened, and Temporary Hit Points at the start of each of the bearer's turns.
+      ...(grant.conditionImmunities ? { conditionImmunities: [...grant.conditionImmunities] } : {}),
+      ...turnStartTemporaryHitPoints(grant.temporaryHitPointsEachTurn, deps.definition),
+      // Aid: the Hit Point maximum and current hit points rise while it lasts (`addEffect`).
+      ...(grant.hitPointMaximumGain ? { hitPointMaximumGain: grant.hitPointMaximumGain.amount } : {})
     }),
     replaced,
     deps
   );
   warnings.push(...replaced.map((event) => event.text));
+  // Mindless Rage: "If you're Charmed or Frightened when you enter your Rage, the condition ends on you." A condition
+  // the Rage now makes its bearer immune to ends as it starts.
+  if (rage) {
+    const immune = deriveEquipment(recipient, recipientDefinition, deps.catalog).conditionImmunities.map(
+      (entry) => entry.id
+    );
+    for (const condition of recipient.conditions.filter((entry) => immune.includes(entry.id))) {
+      setCondition(state, recipient.id, condition.id, false, undefined, { role: "gm" });
+      ctx.tableNarration.push({
+        kind: "effect",
+        text: `${recipient.name} is no longer ${conditionLabel(condition.id)} (${effect.name}).`,
+        actorIds: [recipient.id]
+      });
+    }
+  }
   if (recipient.id !== attacker.id || grant.target !== "self")
     ctx.effectsApplied.push({
       targetId: recipient.id,
       targetName: recipient.name,
       name: effect.name,
-      conditionIds: []
+      conditionIds: [...(grant.conditions ?? [])]
     });
   else ctx.effectGranted = { name: effect.name, tags: effect.tags };
 }

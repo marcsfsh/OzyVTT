@@ -223,6 +223,37 @@ describe("the player's card for a call", () => {
     expect(screen.queryByText("The GM calls for a roll")).toBeNull();
   });
 
+  it("asks for a typed reroll after a typed answer, even on a card mounted again", async () => {
+    serve({
+      "roll-call:answer": {
+        ok: true,
+        check: {
+          label: "Wisdom (Perception)",
+          natural: 9,
+          total: 14,
+          dc: 15,
+          success: false,
+          typed: true,
+          rollId: "r5"
+        }
+      }
+    });
+    const user = userEvent.setup();
+    const { unmount } = render(<RollCallPrompts state={playerState([playerCall()], { heroicInspiration: true })} />, {
+      wrapper: ToastProvider
+    });
+    await user.type(await screen.findByLabelText("Your d20 for the Wisdom (Perception) check"), "9");
+    await user.click(screen.getByRole("button", { name: "Use" }));
+    expect(await screen.findByText("Wisdom (Perception): 14 (d20 9, typed) vs DC 15 - failure.")).toBeTruthy();
+    // The prompt slot drops the card while the server's view no longer holds the call, then mounts the kept one anew.
+    unmount();
+    render(<RollCallPrompts state={playerState([], { heroicInspiration: true })} />, { wrapper: ToastProvider });
+    await user.type(screen.getByLabelText("The rerolled d20"), "17");
+    await user.click(screen.getByRole("button", { name: "Reroll · Heroic Inspiration" }));
+    expect(sent("check:reroll")).toEqual([{ actorId: ARIA, face: 17 }]);
+    await user.click(screen.getByRole("button", { name: "Done" }));
+  });
+
   it("keeps a blind call's result with the GM", async () => {
     serve({ "roll-call:answer": { ok: true, hiddenFromRoller: true } });
     const user = userEvent.setup();

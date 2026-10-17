@@ -108,9 +108,10 @@ const NEIGHBOURS: ReadonlyArray<readonly [number, number]> = [
 /**
  * The cheapest path a footprint can take from `from` to `to` (both top-left cells), stepping to any of the
  * eight neighbouring positions. A step costs one cell, or two when any cell of the footprint's new position is
- * difficult; the extra cost doesn't stack. Among equally cheap paths it keeps closest to the straight line, so
- * the preview reads naturally. Null when the search gives up (`maxNodes`), and callers then fall back to the
- * straight-line count.
+ * difficult; the extra cost doesn't stack. A step into a position where the mover's Speed is halved costs twice
+ * that, since each foot there spends two of its Speed. Among equally cheap paths it keeps closest to the straight
+ * line, so the preview reads naturally. Null when the search gives up (`maxNodes`), and callers then fall back to
+ * the straight-line count.
  */
 export function movementPath(
   input: Readonly<{
@@ -126,6 +127,8 @@ export function movementPath(
     isStepOpen?: (from: GridCell, to: GridCell) => boolean;
     /** Cells added to every step's cost (1 while crawling, climbing or swimming without the speed). */
     extraPerStep?: number;
+    /** Whether the mover's Speed is halved at this position, its top-left cell given (Spirit Guardians' Emanation). */
+    isHalved?: (column: number, row: number) => boolean;
     maxNodes?: number;
   }>
 ): MovementPath | null {
@@ -203,7 +206,8 @@ export function movementPath(
       if (!inBox(column, row) || !footprintFits(column, row)) continue;
       if (input.isStepOpen && !input.isStepOpen({ column: node.column, row: node.row }, { column, row })) continue;
       const difficult = enteringIsDifficult(column, row);
-      const cost = node.cost + (difficult ? 2 : 1) + extraPerStep;
+      const halved = input.isHalved?.(column, row) === true;
+      const cost = node.cost + ((difficult ? 2 : 1) + extraPerStep) * (halved ? 2 : 1);
       const key = keyOf(column, row);
       const known = best.get(key);
       if (known !== undefined && known <= cost) continue;

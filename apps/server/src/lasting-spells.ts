@@ -28,6 +28,10 @@ export function spellUpLevel(actor: Pick<Actor, "effects">, spell: Pick<SpellRef
   return null;
 }
 
+/** The `turnUses` key a cast leaves on its caster's own turn, so what the spell offers "on your later turns" waits for
+ *  the next one (Spiritual Weapon's attack, Heat Metal's heat). */
+export const castThisTurnKey = (actorId: string, spellId: string) => `${actorId}:cast:${spellId}`;
+
 /** A later action the caster takes itself (an action or a Bonus Action), which the spell must be up for. Moving a mark
  *  has its own check, and an area's trigger is no action. */
 export function takenWhileUp(row: LaterRow): boolean {

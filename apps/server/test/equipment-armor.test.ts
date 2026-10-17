@@ -262,6 +262,19 @@ describe("what body armor costs", () => {
     expect(thrust.rollMode?.disadvantage).toEqual([label]);
   });
 
+  it("Elven Chain counts its wearer as trained with it, as Chain Shirt or Chain Mail (SRD Magic Items)", () => {
+    for (const base of ["chain-shirt", "chain-mail"]) {
+      const table = tableOf({ [IDS.wizard]: wizardInput() });
+      write(table, IDS.wizard, catalogRow("elven-chain", { baseId: base }));
+      const wizard = table.actor(IDS.wizard);
+      const derivation = deriveEquipment(wizard, table.definition(IDS.wizard), catalog);
+      expect(derivation.untrainedArmor, base).toBeNull();
+      expect(saveRollSources(wizard, "dex", derivation).disadvantage, base).toEqual([]);
+      fight(table, IDS.wizard);
+      expect(() => resolveAt(table, IDS.wizard, "spell-fire-bolt", [15, 4]), base).not.toThrow();
+    }
+  });
+
   it("a trained wearer pays none of it", () => {
     const table = tableOf({ [IDS.fighter]: fighterInput("fighter-a") });
     const derivation = deriveEquipment(table.actor(IDS.fighter), table.definition(IDS.fighter), catalog);

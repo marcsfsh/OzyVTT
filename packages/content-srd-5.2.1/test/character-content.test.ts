@@ -85,6 +85,19 @@ describe("character-builder content records", () => {
     }
   });
 
+  it("names class features as the level tables print them, apostrophes and small words included", () => {
+    const nameOf = (classId: string, featureId: string) =>
+      classes.find((entry) => entry.id === classId)?.features.find((feature) => feature.id === featureId)?.name;
+    expect(nameOf("monk", "monks-focus")).toBe("Monk's Focus");
+    expect(nameOf("paladin", "paladins-smite")).toBe("Paladin's Smite");
+    expect(nameOf("bard", "font-of-inspiration")).toBe("Font of Inspiration");
+    expect(nameOf("rogue", "thieves-cant")).toBe("Thieves' Cant");
+    // The source's one curly apostrophe is set straight.
+    expect(nameOf("ranger", "natures-veil")).toBe("Nature's Veil");
+    const curly = classes.flatMap((entry) => entry.features).filter((feature) => /[‘’“”]/.test(feature.name));
+    expect(curly.map((feature) => feature.id)).toEqual([]);
+  });
+
   it("agrees with the rules engine on hit dice, stat priority, ASI levels, and multiclass prerequisites", () => {
     // Full six-ability fixtures, so multi-ability prerequisites are actually exercised.
     const flatEight = { str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 } as const;
@@ -866,9 +879,16 @@ describe("character-builder content records", () => {
       { level: 7, formula: "1d8", type: "radiant" },
       { level: 14, formula: "2d8", type: "radiant" }
     ]);
-    // Potent Spellcasting stays prose: no rider expresses an ability-derived damage bonus (ADR-0008).
+    // Potent Spellcasting adds the Wisdom modifier to Sacred Flame's damage, the one Cleric cantrip that deals any.
     expect(strikes[1].actions).toEqual([]);
-    expect(strikes[1].modifiers).toEqual([]);
+    expect(strikes[1].modifiers).toEqual([
+      {
+        type: "extra-damage",
+        abilityModifier: "wis",
+        doubleOnCritical: true,
+        when: [{ type: "on-damage-roll" }, { type: "spell-id-is", spellIds: ["sacred-flame"] }]
+      }
+    ]);
 
     // Giant Ancestry: each of the six boons carries its own action and a PB-per-Long-Rest counter on
     // one shared pool.

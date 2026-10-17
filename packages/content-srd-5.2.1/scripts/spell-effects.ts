@@ -5,7 +5,7 @@
  * the caster makes ("Make a ranged spell attack"), never one the text only mentions. `test/spell-effects.test.ts`
  * pins the cases.
  */
-import { DamageTypeSchema, type ActionArea, type DamageType } from "@vtt/schemas";
+import { DamageTypeSchema, type ActionArea, type DamageType, type OnHitRider } from "@vtt/schemas";
 import { areaOfProse } from "../src/action-prose.js";
 import type { SpellEffect, SpellLaterAction, SpellReference } from "../src/schemas.js";
 import { healingOfText, spellAttackRangeOf, type SpellRange } from "../src/spell-effect.js";
@@ -87,7 +87,9 @@ const DAMAGE_CHOICES: Readonly<Record<string, readonly DamageType[]>> = {
   "dragons-breath": ["acid", "cold", "fire", "lightning", "poison"],
   "conjure-elemental": ["lightning", "thunder", "fire", "cold"],
   // Radiant for a good or neutral caster, Necrotic for an evil one.
-  "spirit-guardians": ["radiant", "necrotic"]
+  "spirit-guardians": ["radiant", "necrotic"],
+  // The Resistance the touched creature gains: "one damage type of your choice".
+  "protection-from-energy": ["acid", "cold", "fire", "lightning", "thunder"]
 };
 
 /** Spell attack rolls one cast makes, where the text's wording misleads the reader. */
@@ -208,6 +210,7 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       name: "attack",
       activation: "bonus-action",
       when: "On your later turns, a Bonus Action moves the sword up to 30 feet and repeats the attack.",
+      laterTurnsOnly: true,
       attackRange: melee(95),
       damage: [{ formula: "4d12", type: "force", addsModifier: true }]
     }
@@ -277,7 +280,9 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       name: "attack",
       activation: "bonus-action",
       when: "On your later turns, a Bonus Action teleports the spirit up to 30 feet and makes the attack (a hit also Frightens the target until the start of your next turn).",
+      laterTurnsOnly: true,
       attackRange: melee(65),
+      onHit: [{ conditions: [{ id: "frightened" }], duration: { type: "until-source-next-turn" } }],
       damage: [{ formula: "3d12", type: "psychic", addsModifier: true }]
     }
   ],
@@ -374,7 +379,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "bonus-action",
       when: "If the cursed creature drops to 0 Hit Points before the spell ends, a Bonus Action on a later turn curses a new creature.",
       damage: [],
-      movesGrant: true
+      movesGrant: true,
+      laterTurnsOnly: true
     }
   ],
   "heat-metal": [
@@ -382,6 +388,7 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       name: "heat again",
       activation: "bonus-action",
       when: "On your later turns, a Bonus Action deals the damage again if the object is within range; a creature holding or wearing it makes a Constitution save or drops it.",
+      laterTurnsOnly: true,
       damage: [{ formula: "2d8", type: "fire" }]
     }
   ],
@@ -461,7 +468,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: `When the Emanation enters a creature's space, or a creature enters it or ends its turn there, it makes the save. ${ONCE_PER_TURN} The creatures you designate are unaffected: your allies.`,
       save: save("wis"),
       damage: [{ formula: "3d8", type: "radiant" }],
-      zone: { ...ENTER_OR_END_ONCE, around: "caster", feet: 15, affects: "enemies" }
+      // "Any other creature's Speed is halved in the Emanation": moving there costs double.
+      zone: { ...ENTER_OR_END_ONCE, around: "caster", feet: 15, affects: "enemies", halvesSpeed: true }
     }
   ],
   "spiritual-weapon": [
@@ -469,6 +477,7 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       name: "attack",
       activation: "bonus-action",
       when: "On your later turns, a Bonus Action moves the force up to 20 feet and repeats the attack.",
+      laterTurnsOnly: true,
       attackRange: melee(65),
       damage: [{ formula: "1d8", type: "force", addsModifier: true }]
     }
@@ -511,7 +520,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "action",
       when: "Until the spell ends, a Magic action makes the attack again; you regain Hit Points equal to half the Necrotic damage dealt.",
       attackRange: melee(5),
-      damage: [{ formula: "3d6", type: "necrotic" }]
+      damage: [{ formula: "3d6", type: "necrotic" }],
+      drain: { damageType: "necrotic", heals: "half" }
     }
   ],
   "wall-of-fire": [
@@ -563,6 +573,60 @@ const CAST_REACTIONS: Readonly<Record<string, NonNullable<SpellEffect["reaction"
   "hellish-rebuke": { trigger: "damaged-by-creature", response: "strike-back", rangeFeet: 60 }
 };
 
+/** What a cast's hit lands on its target besides its damage (SRD 5.2.1 text). */
+const CAST_ON_HIT: Readonly<Record<string, readonly OnHitRider[]>> = {
+  "ray-of-sickness": [{ conditions: [{ id: "poisoned" }], duration: { type: "until-source-turn-end" } }],
+  // "With both you and the spirit as the source of the fear": the caster is.
+  "conjure-fey": [{ conditions: [{ id: "frightened" }], duration: { type: "until-source-next-turn" } }],
+  // "2d4 Acid damage at the end of its next turn": the target's next turn ends before the caster's next turn starts.
+  "acid-arrow": [
+    {
+      conditions: [],
+      name: "Acid Arrow",
+      ongoingDamage: { damage: [{ formula: "2d4", type: "acid" }], at: "bearer-turn-end" },
+      duration: { type: "rounds", rounds: 1 }
+    }
+  ]
+};
+
+/** A miss still deals this share of the hit's damage (Acid Arrow: "half as much of the initial damage only"). */
+const CAST_MISS_DAMAGE: Readonly<Record<string, "half">> = { "acid-arrow": "half" };
+
+/** Conditions a cast ends on its targets (SRD 5.2.1 text); `one` ends the one the caster picks. */
+const CAST_CURES: Readonly<Record<string, Readonly<{ conditions: readonly string[]; one?: true }>>> = {
+  heal: { conditions: ["blinded", "deafened", "poisoned"] },
+  // "Creatures healed by this spell also have the Blinded, Deafened, and Poisoned conditions removed from them."
+  "mass-heal": { conditions: ["blinded", "deafened", "poisoned"] },
+  "power-word-heal": { conditions: ["charmed", "frightened", "paralyzed", "poisoned", "stunned"] },
+  "lesser-restoration": { conditions: ["blinded", "deafened", "paralyzed", "poisoned"], one: true },
+  "protection-from-poison": { conditions: ["poisoned"] }
+};
+
+/** Healing the text gives as no single roll: Mass Heal's 700 divided among its targets, Power Word Heal's "regains all
+ *  its Hit Points", and False Life's Temporary Hit Points. */
+const CAST_HEALING: Readonly<Record<string, NonNullable<SpellEffect["healing"]>>> = {
+  "mass-heal": { formula: "700", addsModifier: false, divided: true },
+  // "You gain 2d4 + 4 Temporary Hit Points", and 5 more for each slot level above 1.
+  "false-life": { formula: "2d4 + 4", addsModifier: false, self: true, temporary: true, perSlot: 5 },
+  "power-word-heal": { formula: "1", addsModifier: false, toMaximum: true }
+};
+
+/** What bursts after the cast's attack, hit or miss (SRD 5.2.1 text). */
+const CAST_BURSTS: Readonly<Record<string, NonNullable<SpellEffect["burst"]>>> = {
+  // "Hit or miss, the shard then explodes. The target and each creature within 5 feet of it must succeed on a Dexterity
+  // saving throw or take 2d6 Cold damage." "The Cold damage increases by 1d6 for each spell slot level above 1."
+  "ice-knife": { radiusFeet: 5, ability: "dex", damage: [{ formula: "2d6", type: "cold" }], diceAddedPerSlot: 1 }
+};
+
+/** What the cast's damage drains as it lands (SRD 5.2.1 text). */
+const CAST_DRAINS: Readonly<Record<string, NonNullable<SpellEffect["drain"]>>> = {
+  // "Its Hit Point maximum is reduced by an amount equal to the Necrotic damage it took" on a failed save; "This spell
+  // can't reduce a target's Hit Point maximum below 1."
+  harm: { damageType: "necrotic", reducesMaximum: true, keepsOneMaximum: true, failedSaveOnly: true },
+  // "You regain Hit Points equal to half the amount of Necrotic damage dealt", on the cast and each later touch.
+  "vampiric-touch": { damageType: "necrotic", heals: "half" }
+};
+
 type Grant = NonNullable<SpellEffect["grant"]>;
 type FailureEffect = NonNullable<SpellEffect["failureEffect"]>;
 type Modifier = Grant["modifiers"][number];
@@ -605,6 +669,39 @@ const markDamage = (type: DamageType): Modifier => ({
  * and Haste's Speed are measured on the creature when it lands (`grant.ts`).
  */
 const CAST_GRANTS: Readonly<Record<string, Grant>> = {
+  // "Its Speed is reduced by 10 feet until the start of your next turn."
+  "ray-of-frost": spellGrant({
+    name: "Ray of Frost",
+    tags: ["ray-of-frost"],
+    target: "target",
+    onHit: true,
+    duration: { type: "until-source-next-turn" },
+    modifiers: [{ type: "speed", amount: -10 }]
+  }),
+  // "It can't make Opportunity Attacks until the start of its next turn."
+  "shocking-grasp": spellGrant({
+    name: "Shocking Grasp",
+    tags: ["no-opportunity-attacks"],
+    target: "target",
+    onHit: true,
+    duration: { type: "until-bearer-next-turn" }
+  }),
+  // "It can't regain Hit Points until the end of your next turn."
+  "chill-touch": spellGrant({
+    name: "Chill Touch",
+    tags: ["no-healing"],
+    target: "target",
+    onHit: true,
+    duration: { type: "until-source-turn-end" }
+  }),
+  // "Until the end of your next turn, it ... can't benefit from the Invisible condition"; its Dim Light is the GM's.
+  "starry-wisp": spellGrant({
+    name: "Starry Wisp",
+    tags: ["outlined"],
+    target: "target",
+    onHit: true,
+    duration: { type: "until-source-turn-end" }
+  }),
   bless: spellGrant({
     name: "Bless",
     tags: ["blessed"],
@@ -642,6 +739,132 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     target: "target",
     duration: { type: "manual" },
     modifiers: [markDamage("necrotic")]
+  }),
+  // "Advantage on saving throws to avoid or end the Poisoned condition, and it has Resistance to Poison damage", for
+  // the hour the GM ends it after.
+  "protection-from-poison": spellGrant({
+    name: "Protection from Poison",
+    tags: ["protection-from-poison"],
+    target: "target",
+    duration: { type: "manual" },
+    modifiers: [
+      { type: "damage-resistance", damageTypes: ["poison"] },
+      {
+        type: "roll-mode",
+        roll: "save",
+        mode: "advantage",
+        when: [{ type: "on-saving-throw" }, { type: "versus-condition", conditionIds: ["poisoned"] }]
+      }
+    ]
+  }),
+  // "Immune to the Frightened condition and gains Temporary Hit Points equal to your spellcasting ability modifier at
+  // the start of each of its turns."
+  heroism: spellGrant({
+    name: "Heroism",
+    tags: ["heroism"],
+    target: "targets",
+    duration: rounds(10),
+    conditionImmunities: ["frightened"],
+    temporaryHitPointsEachTurn: "spellcasting-modifier"
+  }),
+  // "Each target's Hit Point maximum and current Hit Points increase by 5 for the duration", and 5 more for each slot
+  // level above 2. Its 8 hours end at the GM's word or a Long Rest.
+  aid: spellGrant({
+    name: "Aid",
+    tags: ["aid"],
+    target: "targets",
+    duration: { type: "manual" },
+    hitPointMaximumGain: { amount: 5, perSlot: 5 }
+  }),
+  // "Resistance to Bludgeoning, Piercing, and Slashing damage", held by the caster's Concentration.
+  stoneskin: spellGrant({
+    name: "Stoneskin",
+    tags: ["stoneskin"],
+    target: "target",
+    duration: { type: "manual" },
+    modifiers: [{ type: "damage-resistance", damageTypes: ["bludgeoning", "piercing", "slashing"] }]
+  }),
+  // "Any creature has Disadvantage on attack rolls against you." An attacker that perceives the caster with
+  // Blindsight or Truesight is the GM's to spare.
+  blur: spellGrant({
+    name: "Blur",
+    tags: ["blur"],
+    target: "self",
+    duration: rounds(10),
+    modifiers: [
+      { type: "roll-mode", roll: "incoming-attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] }
+    ]
+  }),
+  // "Your attacks with weapons deal an extra 1d4 Radiant damage on a hit."
+  "divine-favor": spellGrant({
+    name: "Divine Favor",
+    tags: ["divine-favor"],
+    target: "self",
+    duration: rounds(10),
+    modifiers: [
+      {
+        type: "extra-damage",
+        formula: "1d4",
+        damageType: "radiant",
+        doubleOnCritical: true,
+        when: [{ type: "on-hit" }, { type: "attack-kind-is", kinds: ["weapon"] }]
+      }
+    ]
+  }),
+  // "Advantage on D20 Tests, and other creatures have Disadvantage on attack rolls against it", for 8 hours.
+  foresight: spellGrant({
+    name: "Foresight",
+    tags: ["foresight"],
+    target: "target",
+    duration: { type: "manual" },
+    modifiers: [
+      { type: "roll-mode", roll: "attack", mode: "advantage" },
+      { type: "roll-mode", roll: "save", mode: "advantage" },
+      { type: "roll-mode", roll: "check", mode: "advantage" },
+      { type: "roll-mode", roll: "initiative", mode: "advantage" },
+      { type: "roll-mode", roll: "incoming-attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] }
+    ]
+  }),
+  // "An Armor Class of 17 if its AC is lower than that", measured as the spell lands.
+  barkskin: spellGrant({ name: "Barkskin", tags: ["barkskin"], target: "target", duration: { type: "manual" } }),
+  // "The first time the target would drop to 0 Hit Points before the spell ends, the target instead drops to 1 Hit
+  // Point, and the spell ends."
+  "death-ward": spellGrant({
+    name: "Death Ward",
+    tags: ["death-ward"],
+    target: "target",
+    duration: { type: "manual" }
+  }),
+  // "Resistance to one damage type of your choice: Acid, Cold, Fire, Lightning, or Thunder."
+  "protection-from-energy": spellGrant({
+    name: "Protection from Energy",
+    tags: ["protection-from-energy", "resists-chosen-type"],
+    target: "target",
+    duration: { type: "manual" }
+  }),
+  // "Advantage on ability checks using the chosen ability", one for every target the cast takes.
+  "enhance-ability": spellGrant({
+    name: "Enhance Ability",
+    tags: ["enhance-ability", "enhanced-ability"],
+    target: "targets",
+    duration: { type: "manual" }
+  }),
+  // "A creature you touch has the Invisible condition until the spell ends."
+  "greater-invisibility": spellGrant({
+    name: "Greater Invisibility",
+    tags: ["greater-invisibility"],
+    target: "target",
+    duration: rounds(10),
+    conditions: ["invisible"]
+  }),
+  // Invisible "until the spell ends", which it does "immediately after the target makes an attack roll, deals damage,
+  // or casts a spell".
+  invisibility: spellGrant({
+    name: "Invisibility",
+    tags: ["invisibility", "until-it-acts"],
+    target: "targets",
+    duration: { type: "manual" },
+    conditions: ["invisible"]
   }),
   "mage-armor": spellGrant({
     name: "Mage Armor",
@@ -702,7 +925,32 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
 const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   bane: { name: "Bane", tags: ["baned"], duration: rounds(10), modifiers: d20Dice("-1d4") },
   // Outlined in light: attack rolls against it have Advantage, and it can't benefit from the Invisible condition.
-  "faerie-fire": { name: "Faerie Fire", tags: ["outlined"], duration: rounds(10), modifiers: [attackedWithAdvantage] }
+  "faerie-fire": { name: "Faerie Fire", tags: ["outlined"], duration: rounds(10), modifiers: [attackedWithAdvantage] },
+  // "Speed is halved, it takes a -2 penalty to AC and Dexterity saving throws, and it can't take Reactions", with
+  // one action or Bonus Action a turn, one attack with the Attack action and a chance a somatic spell fails.
+  slow: {
+    name: "Slow",
+    tags: ["speed-halved", "no-reactions", "slowed"],
+    armorClassBonus: -2,
+    modifiers: [
+      {
+        type: "save-bonus",
+        amount: -2,
+        when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["dex"] }]
+      }
+    ]
+  },
+  // "Can't cast spells or take the Magic action", until a repeated save every 30 days or a spell ends it.
+  befuddlement: { name: "Befuddlement", tags: ["no-spells"], modifiers: [] },
+  // "Another 5d4 Acid damage at the end of its next turn" (the save carries the damage).
+  "vitriolic-sphere": { name: "Vitriolic Sphere", tags: ["vitriolic-sphere"], duration: rounds(1), modifiers: [] },
+  // "Disadvantage on the next attack roll it makes before the end of its next turn": its own roll spends it.
+  "vicious-mockery": {
+    name: "Vicious Mockery",
+    tags: ["until-own-attack"],
+    duration: { type: "until-bearer-turn-end" },
+    modifiers: [{ type: "roll-mode", roll: "attack", mode: "disadvantage" }]
+  }
 };
 
 /** Areas the text gives no template shape for (a wall, a thing placed at a point), so the GM can place them on the
@@ -730,7 +978,7 @@ export function spellEffectFor(
   types: readonly string[],
   range: SpellRange
 ): SpellEffect {
-  const healing = healingOfText(description);
+  const healing = CAST_HEALING[id] ?? healingOfText(description);
   const attacks = CAST_ATTACKS[id] ?? (/\bmakes? an? (?:ranged|melee) spell attack\b/i.test(description) ? 1 : 0);
   const attackRange = attacks > 0 ? spellAttackRangeOf(description, range) : null;
   const reaction = CAST_REACTIONS[id];
@@ -740,16 +988,28 @@ export function spellEffectFor(
   const targets = CAST_TARGETS[id];
   const grant = CAST_GRANTS[id];
   const failureEffect = SAVE_FAILURE_EFFECTS[id];
+  const onHit = CAST_ON_HIT[id];
+  const missDamage = CAST_MISS_DAMAGE[id];
+  const drain = CAST_DRAINS[id];
+  const cures = CAST_CURES[id];
+  const burst = CAST_BURSTS[id];
   return {
     attacks,
     ...(attackRange ? { attackRange } : {}),
+    ...(onHit ? { onHit: structuredClone(onHit) as OnHitRider[] } : {}),
+    ...(missDamage ? { missDamage } : {}),
+    ...(drain ? { drain: { ...drain } } : {}),
+    ...(burst ? { burst: structuredClone(burst) } : {}),
     damage: castDamage(id, roll, types, healing !== null),
     ...(choices ? { damageTypes: [...choices] } : {}),
     ...(NO_CAST_SAVE.has(id) ? { noCastSave: true as const } : {}),
     ...(later ? { laterActions: later.map((row) => ({ ...row, damage: [...row.damage] })) } : {}),
     ...(darts ? { darts } : {}),
     ...(targets ? { targets: { ...targets } } : {}),
-    healing,
+    healing: healing ? { ...healing } : null,
+    ...(cures
+      ? { endsConditions: [...cures.conditions], ...(cures.one ? { endsOneCondition: true as const } : {}) }
+      : {}),
     ...(grant ? { grant: structuredClone(grant) } : {}),
     ...(failureEffect ? { failureEffect: structuredClone(failureEffect) } : {}),
     ...(reaction ? { reaction } : {})
@@ -823,6 +1083,12 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...Object.keys(UPCAST_CORRECTIONS),
   ...Object.keys(CAST_REACTIONS),
   ...Object.keys(CAST_GRANTS),
+  ...Object.keys(CAST_ON_HIT),
+  ...Object.keys(CAST_MISS_DAMAGE),
+  ...Object.keys(CAST_DRAINS),
+  ...Object.keys(CAST_BURSTS),
+  ...Object.keys(CAST_CURES),
+  ...Object.keys(CAST_HEALING),
   ...Object.keys(SAVE_FAILURE_EFFECTS),
   ...Object.keys(SPELL_AREAS)
 ];

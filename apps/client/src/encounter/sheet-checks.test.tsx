@@ -203,7 +203,24 @@ describe("the sheet's checks", () => {
     await user.type(screen.getByPlaceholderText("1 to 20"), "23");
     await user.click(screen.getByRole("button", { name: "Roll" }));
     expect(sent("check:roll")).toEqual([]);
-    expect(await screen.findByText("Type the d20's face, a whole number from 1 to 20.")).toBeTruthy();
+    const refusal = await screen.findByText("Type the d20's face, a whole number from 1 to 20.");
+    // A toast, said in the sheet's own row over the table: the pane scrolls, and a line at its foot is never seen from
+    // a skill near its top.
+    expect(refusal.closest(".sheet-pane")).toBeNull();
+    expect(refusal.closest(".sheet-toast")).not.toBeNull();
+  });
+
+  it("leaves an embedded sheet's results to the table's own status line", async () => {
+    serve(derivedSheet());
+    setRollInput("manual");
+    render(<CharacterSheet actor={hero()} role="player" embedded onClose={() => {}} />, { wrapper: ToastProvider });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Roll a Strength check, +1" }));
+    await user.type(screen.getByPlaceholderText("1 to 20"), "23");
+    await user.click(screen.getByRole("button", { name: "Roll" }));
+    const refusal = await screen.findByText("Type the d20's face, a whole number from 1 to 20.");
+    expect(refusal.closest(".sheet-toast")).toBeNull();
+    expect(refusal.closest(".nh-toast")).not.toBeNull();
   });
 
   it("marks and explains Advantage and Disadvantage before the roll", async () => {

@@ -217,7 +217,12 @@ const PENDING_SAVE_FIELDS = {
   // Whether a hidden source's save is magical says something about it; only Magic Resistance reads it.
   magical: "never",
   // What a success earns is the stat block's text, the GM's knowledge.
-  immuneOnSuccess: "never"
+  immuneOnSuccess: "never",
+  // What the damage drains, and where a failure pushes, are narrated when they land.
+  drain: "never",
+  failurePush: "never",
+  // The save's own roll mode is read when it is answered.
+  advantageAtSize: "never"
 } as const satisfies Record<keyof PendingSave, FieldAudience>;
 
 // How long what a failure imposes would last is the save's own text, read on the prompt by the one who owes it.
@@ -234,6 +239,7 @@ const ON_FAIL_EFFECT_FIELDS = {
   endsWhenSourceDefeated: "player",
   rangeFeet: "player",
   endsOnSpellHealing: "player",
+  armorClassBonus: "player",
   name: "derived",
   sourceName: "derived",
   sourceActorId: "derived",
@@ -439,6 +445,13 @@ function playerEffect(
     spell: _spell,
     readiedSpell,
     magical: _magical,
+    // A monster's lower Hit Point maximum is the GM's to know; a character's shows on its own sheet. So are the
+    // amounts a spell's level or its caster's modifier set (Aid's gain, Heroism's Temporary Hit Points), and what
+    // the effect makes its bearer immune to.
+    hitPointMaximumLoss: _hitPointMaximumLoss,
+    hitPointMaximumGain: _hitPointMaximumGain,
+    temporaryHitPointsEachTurn: _temporaryHitPointsEachTurn,
+    conditionImmunities: _conditionImmunities,
     ...visible
   } = effect;
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);
