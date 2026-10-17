@@ -1,5 +1,6 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { Tabs } from "@vtt/ui";
+import { FooterSlotContext } from "./footerSlot";
 import "./table-panel.css";
 
 export type PanelTab = Readonly<{
@@ -21,7 +22,8 @@ export function TablePanel({
   tabs,
   active,
   onActive,
-  footer
+  footer,
+  phone = false
 }: Readonly<{
   label: string;
   /** Needs you for the GM, the prompt slot for a player: above the tabs, never inside a scrolled list. */
@@ -30,39 +32,45 @@ export function TablePanel({
   active: string;
   onActive: (id: string) => void;
   footer?: ReactNode;
+  /** On a phone the footer is the bar under the thumb, and a target picker's Cancel and Roll move into it. */
+  phone?: boolean;
 }>) {
+  const [slot, setSlot] = useState<HTMLDivElement | null>(null);
   const idBase = `table-panel-${useId().replace(/[^a-zA-Z0-9-]/g, "")}`;
   const current = tabs.find((tab) => tab.id === active) ?? tabs[0];
   return (
     <section className="table-panel" aria-label={label}>
-      {top}
-      <Tabs
-        className="table-panel-tabs"
-        ariaLabel={label}
-        idBase={idBase}
-        activeId={current.id}
-        onChange={onActive}
-        tabs={tabs.map((tab) => ({ id: tab.id, label: tab.label }))}
-      />
-      {tabs.map((tab) => {
-        const shown = tab.id === current.id;
-        return (
-          <div
-            key={tab.id}
-            className={`table-panel-body${tab.scrolls === false ? "" : " scroll-y"}`}
-            role="tabpanel"
-            id={`${idBase}-panel-${tab.id}`}
-            aria-labelledby={`${idBase}-tab-${tab.id}`}
-            hidden={!shown}
-            tabIndex={tab.scrolls === false ? undefined : 0}
-          >
-            {shown ? tab.content : null}
-          </div>
-        );
-      })}
-      {footer && (
+      <FooterSlotContext.Provider value={phone ? slot : null}>
+        {top}
+        <Tabs
+          className="table-panel-tabs"
+          ariaLabel={label}
+          idBase={idBase}
+          activeId={current.id}
+          onChange={onActive}
+          tabs={tabs.map((tab) => ({ id: tab.id, label: tab.label }))}
+        />
+        {tabs.map((tab) => {
+          const shown = tab.id === current.id;
+          return (
+            <div
+              key={tab.id}
+              className={`table-panel-body${tab.scrolls === false ? "" : " scroll-y"}`}
+              role="tabpanel"
+              id={`${idBase}-panel-${tab.id}`}
+              aria-labelledby={`${idBase}-tab-${tab.id}`}
+              hidden={!shown}
+              tabIndex={tab.scrolls === false ? undefined : 0}
+            >
+              {shown ? tab.content : null}
+            </div>
+          );
+        })}
+      </FooterSlotContext.Provider>
+      {(footer || phone) && (
         <div className="table-panel-foot">
-          <div className="table-panel-foot-main">{footer}</div>
+          {phone && <div className="table-panel-foot-slot" ref={setSlot} />}
+          {footer && <div className="table-panel-foot-main">{footer}</div>}
         </div>
       )}
     </section>

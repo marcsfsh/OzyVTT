@@ -43,7 +43,10 @@ Option 3. The table (`shell/TableView.tsx`) is a frame of docked regions:
   `PlayerEncounterPanel`) build their tabs and footer, so one instance owns the turn controls whichever tab is
   shown.
 - **Below 980px** the same parts stack: the header as one row, the rail as a tool row with the options as a
-  second row, the map pane, then the panel, whose footer is the bar under the thumb.
+  second row, the map pane, a divider, then the panel, whose footer is the bar under the thumb. The divider
+  (`table/PaneDivider.tsx`) is a separator with a value that a finger drags and the arrow keys move, remembered
+  on the device. Choosing a target lowers it so the map takes most of the height, and the target picker's Cancel
+  and Roll move into the bar (`table/footerSlot.tsx`) while the bar's own controls step aside.
 
 The docked tracker, the dock picker, the accordion, Enlarge map, the floating toolbar and its phone Tools rail, the
 scene controls over the map, the GM's target bar and the combat log drawer are gone. The staging tray is a row of
@@ -74,6 +77,7 @@ tab choice is stored under `vtt.table-tab.<role>.<width>`. Reverting is a client
 
 - `table/panel-tabs.test.tsx`: the tablists per role and moment, panels tied to tabs, the remembered tab, and the
   footer's primary.
+- `table/pane-divider.test.tsx`: the separator's value, keys, drag and memory.
 - `table/needs-you.test.tsx`, `table/prompt-slot.test.tsx`, `table/tap-to-target.test.tsx`.
 - `e2e/journeys.spec.ts`: the fight journey on the new layout at 390 by 844 with touch and at 1280 by 800, with
   the uncovered-token and uncovered-primary checks.

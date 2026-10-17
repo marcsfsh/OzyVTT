@@ -440,6 +440,7 @@ export function PlayerEncounterPanel({
       tabs={tabs}
       active={tab}
       onActive={setTab}
+      phone={phone}
       footer={footer}
     />
   );

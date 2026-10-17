@@ -15,6 +15,8 @@ vi.mock("../lib/command", () => ({
 }));
 
 import { EncounterPanel } from "../encounter/EncounterPanel";
+import { InFooter } from "./footerSlot";
+import { TablePanel } from "./TablePanel";
 
 // The panel beside the map is one tablist per role and moment: its tabs are real tabs tied to their panels, the
 // chosen one is remembered per device, and the footer holds the view's one primary.
@@ -199,5 +201,41 @@ describe("a player's panel", () => {
     expect(tabNames(list)).toEqual(["Me", "Party", "Dice", "Log"]);
     await user.click(within(list).getByRole("tab", { name: "Party" }));
     expect(screen.getByRole("tabpanel", { name: "Party" }).textContent).toBe("The party");
+  });
+});
+
+describe("the bar under the thumb", () => {
+  const panel = (phone: boolean) => (
+    <TablePanel
+      label="The fight · round 2"
+      tabs={[
+        {
+          id: "turn",
+          label: "Turn",
+          content: (
+            <InFooter>
+              <button type="button">Roll Fire Bolt</button>
+            </InFooter>
+          )
+        }
+      ]}
+      active="turn"
+      onActive={() => {}}
+      footer={<button type="button">End turn</button>}
+      phone={phone}
+    />
+  );
+
+  it("takes a target picker's Roll on a phone, ahead of the bar's own controls", () => {
+    render(panel(true));
+    const roll = screen.getByRole("button", { name: "Roll Fire Bolt" });
+    expect(roll.closest(".table-panel-foot-slot")).not.toBeNull();
+    expect(roll.closest("[role=tabpanel]")).toBeNull();
+    expect(screen.getByRole("button", { name: "End turn" }).closest(".table-panel-foot-main")).not.toBeNull();
+  });
+
+  it("leaves the Roll in the tab on a laptop", () => {
+    render(panel(false));
+    expect(screen.getByRole("button", { name: "Roll Fire Bolt" }).closest("[role=tabpanel]")).not.toBeNull();
   });
 });

@@ -17,6 +17,10 @@
 .table-bench > .table-header {
   grid-area: head;
 }
+/* On a laptop the split is no box of its own: the map and the panel are cells of the bench's grid. */
+.table-bench-split {
+  display: contents;
+}
 .table-bench-map {
   grid-area: map;
   display: flex;
@@ -47,21 +51,27 @@
   }
 }
 
-/* Below 980px the header, the map and the panel stack. */
+/* On a phone the map pane takes its share of the height under the header (the divider sets it) and the panel the
+   rest, down to a floor that keeps the tabs and the bar under the thumb. */
 @media (max-width: 979px) {
   .table-bench {
     display: flex;
     flex-direction: column;
   }
+  .table-bench-split {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+  }
   .table-bench-map {
-    flex: 0 1 42%;
+    flex: 0 1 var(--map-share, 42%);
     min-height: 9rem;
   }
   .table-bench-panel {
     flex: 1 1 0;
     min-height: 9rem;
     border-left: 0;
-    border-top: 1px solid var(--line-strong);
   }
 }
 

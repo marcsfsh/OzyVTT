@@ -117,6 +117,16 @@ test("the GM runs a fight on a new scene and the player moves their token", asyn
   if (!(await yourTurn.isVisible())) await press(gm.getByRole("button", { name: "Next turn" }));
   await expect(yourTurn).toBeVisible();
   await expectUncovered(player.getByRole("button", { name: "End turn" }));
+  if (hasTouch) {
+    // On a phone a divider splits the map pane from the panel; the keys move it as well as a finger.
+    const divider = player.getByRole("separator", { name: "Map and panel split" });
+    const before = Number(await divider.getAttribute("aria-valuenow"));
+    await divider.focus();
+    await player.keyboard.press("ArrowUp");
+    await expect(divider).toHaveAttribute("aria-valuenow", String(before - 5));
+    await player.keyboard.press("ArrowDown");
+    await expectPageFits(player);
+  }
 
   // The player places their own token from the tray, then drags it across the map.
   await press(player.getByLabel("Staging tray").getByRole("button", { name: hero }));

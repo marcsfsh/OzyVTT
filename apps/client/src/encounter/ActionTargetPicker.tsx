@@ -6,6 +6,7 @@ import { ABILITY_WORDS } from "../dice/roll-call-words";
 import { useRollPreference } from "../dice/roll-preference";
 import { FaceEntry } from "./RollControls";
 import type { TargetRow } from "../table/targetRows";
+import { InFooter } from "../table/footerSlot";
 import {
   clearTargeting,
   setCheckSkill,
@@ -179,14 +180,17 @@ export function ActionTargetPicker({
           </Select>
         </label>
       )}
-      <div className="action-targeting-buttons">
-        <Button type="button" variant="secondary" disabled={busy} onClick={() => clearTargeting()}>
-          Back
-        </Button>
-        <button type="button" className="encounter-primary" disabled={busy || !ready} onClick={() => onRoll()}>
-          Roll {picking.action.name}
-        </button>
-      </div>
+      {/* On a phone Cancel and Roll go to the bar under the thumb. */}
+      <InFooter>
+        <div className="action-targeting-buttons">
+          <Button type="button" variant="secondary" disabled={busy} onClick={() => clearTargeting()}>
+            Cancel
+          </Button>
+          <button type="button" className="encounter-primary" disabled={busy || !ready} onClick={() => onRoll()}>
+            Roll {picking.action.name}
+          </button>
+        </div>
+      </InFooter>
       {mayType && ready && picking.mode === "single" && picking.action.attackBonus !== null && (
         <div className="action-targeting-face">
           <FaceEntry

@@ -586,6 +586,7 @@ export function GmEncounterPanel({
         tabs={tabs}
         active={tab}
         onActive={setTab}
+        phone={phone}
         footer={
           <>
             {feedback}

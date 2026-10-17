@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
 import { Button, IconScene } from "@vtt/ui";
 import { ClaimCharacter } from "../actors/ClaimCharacter";
@@ -6,6 +7,7 @@ import { PartyStrip } from "../actors/PartyStrip";
 import { DicePanel } from "../dice/DicePanel";
 import { CombatLogPanel } from "../encounter/CombatLog";
 import { EncounterPanel } from "../encounter/EncounterPanel";
+import { useTargeting } from "../encounter/targeting";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import type { MapSelection } from "../maps/MapManager";
 import { ReplayShelf } from "../replay/ReplayShelf";
@@ -16,6 +18,7 @@ import { PartyRest } from "../rest/PartyRest";
 import { ShortRestPrompt } from "../rest/ShortRestPrompt";
 import { needsItems } from "../table/needs";
 import { NeedsYou } from "../table/NeedsYou";
+import { PaneDivider, useTableSplit } from "../table/PaneDivider";
 import { PromptSlot } from "../table/PromptSlot";
 import { TableHeader } from "../table/TableHeader";
 import { TokenTab } from "../table/TokenTab";
@@ -45,6 +48,8 @@ type TableViewProps = Readonly<
 
 /** The phone table, below 980px (the stylesheet's breakpoint): the map pane over the panel, a bar under the thumb. */
 const PHONE_TABLE_QUERY = "(max-width: 979px)";
+/** While a target is being chosen on a phone, the map pane takes at least this share of the height. */
+const TARGETING_SHARE = 66;
 
 /**
  * The table, for both roles: a docked workbench where nothing floats over the map but tokens and marks. A header bar
@@ -64,6 +69,19 @@ export function TableView(props: TableViewProps) {
     props.role === "player" &&
     props.state.actors.some((actor) => actor.kind === "player-character" && actor.claimStatus === "mine");
   const staged = gm?.stagedScene ?? null;
+  // The phone's split between the map pane and the panel. Choosing a target lowers the divider so the map takes
+  // most of the height; the person's own split comes back when the choice ends, unless they move it meanwhile.
+  const splitRef = useRef<HTMLDivElement | null>(null);
+  const [split, setSplit] = useTableSplit();
+  const targeting = useTargeting();
+  const myId =
+    props.role === "player" ? (props.state.actors.find((actor) => actor.claimStatus === "mine")?.id ?? null) : null;
+  const choosing = phone && targeting !== null && (role === "gm" || targeting.attackerId === myId);
+  const [movedWhileChoosing, setMovedWhileChoosing] = useState(false);
+  useEffect(() => {
+    if (!choosing) setMovedWhileChoosing(false);
+  }, [choosing]);
+  const mapShare = choosing && !movedWhileChoosing ? Math.max(split, TARGETING_SHARE) : split;
   const liveMapName = gm?.selectedMap?.id === state.combat.mapAssetId ? (gm?.selectedMap?.name ?? null) : null;
 
   const header =
@@ -223,8 +241,24 @@ export function TableView(props: TableViewProps) {
   return (
     <div className={`table-bench anim-view ${role}${staged ? " is-staging" : ""}`}>
       {header}
-      <div className="table-bench-map">{map}</div>
-      <div className="table-bench-panel">{panel}</div>
+      <div
+        className="table-bench-split"
+        ref={splitRef}
+        style={phone ? ({ "--map-share": `${mapShare}%` } as React.CSSProperties) : undefined}
+      >
+        <div className="table-bench-map">{map}</div>
+        {phone && (
+          <PaneDivider
+            value={mapShare}
+            onChange={(next) => {
+              setSplit(next);
+              if (choosing) setMovedWhileChoosing(true);
+            }}
+            container={() => splitRef.current}
+          />
+        )}
+        <div className="table-bench-panel">{panel}</div>
+      </div>
     </div>
   );
 }

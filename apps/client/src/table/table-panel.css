@@ -49,10 +49,30 @@
   border-top: 1px solid var(--line-strong);
   background: var(--surface-1);
 }
-.table-panel-foot-main {
+.table-panel-foot-main,
+.table-panel-foot-slot {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+}
+/* While something holds the bar (a target picker's Cancel and Roll), the bar's own controls step aside, so it
+   keeps one primary. */
+.table-panel-foot-slot:empty {
+  display: none;
+}
+.table-panel-foot-slot:not(:empty) + .table-panel-foot-main {
+  display: none;
+}
+.table-panel-foot:not(:has(> .table-panel-foot-main)):has(> .table-panel-foot-slot:empty) {
+  display: none;
+}
+.table-panel-foot-slot .action-targeting-buttons {
+  display: flex;
+  gap: var(--space-2);
+  margin: 0;
+}
+.table-panel-foot-slot .action-targeting-buttons > .encounter-primary {
+  flex: 1 1 auto;
 }
 .table-panel-foot .encounter-feedback {
   margin: 0;

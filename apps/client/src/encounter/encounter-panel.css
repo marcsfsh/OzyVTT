@@ -1107,3 +1107,11 @@
 .encounter-topbar .encounter-end {
   flex: none;
 }
+/* On a phone the bar under the thumb keeps Previous, Next turn and the fight menu; adding monsters and ending the
+   fight are in that menu. */
+@media (max-width: 979px) {
+  .table-panel-foot .turn-controls > .encounter-end,
+  .table-panel-foot .turn-controls > .encounter-menu-toggle:not([aria-haspopup]) {
+    display: none;
+  }
+}

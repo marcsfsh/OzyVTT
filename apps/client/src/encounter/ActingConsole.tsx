@@ -116,7 +116,8 @@ export function ActingConsole({
               ) : (
                 actor.speedFeet !== undefined && (
                   <span className="economy-movement" title="Movement spent this turn / this turn's movement">
-                    {Math.round(state.combat.turn.movementUsedFeet)}/{movement?.speedFeet ?? actor.speedFeet} ft
+                    {/* One text node: Chromium drew a lone leading "0" node invisibly here. */}
+                    {`Move ${Math.round(state.combat.turn.movementUsedFeet)}/${movement?.speedFeet ?? actor.speedFeet} ft`}
                   </span>
                 )
               )}
