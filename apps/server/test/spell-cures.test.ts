@@ -1,13 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { GameState } from "@vtt/domain";
 import type { ActorAction } from "@vtt/schemas";
-import { loadSpells } from "@vtt/content-srd-5.2.1";
 import { actionAvailability, resolveDefinitionAction } from "../src/action-resolution.js";
 import { effectiveActions } from "../src/effective-actions.js";
-import { spellCastMechanics } from "../src/item-actions.js";
 import { saveRollSources } from "../src/saving-throws.js";
 import { deriveEquipment } from "../src/equipment-derivation.js";
-import { bardInput, build, catalog, druidInput, fight, FOE, FOE2, HERO, wizardInput } from "./spell-casters.js";
+import { bardInput, build, castOf, catalog, druidInput, fight, FOE, FOE2, HERO, wizardInput } from "./spell-casters.js";
 
 // SRD 5.2.1 spells that end conditions: Heal and Mass Heal end Blinded, Deafened and Poisoned on the creatures they
 // heal, Power Word Heal restores every hit point and ends five conditions, Lesser Restoration ends the one condition the
@@ -23,17 +21,6 @@ const afflict = (state: GameState, id: string, ...conditions: string[]) => {
   actor(state, id).conditions = conditions.map((condition) => ({ id: condition }));
 };
 
-/** A spell's cast as a plain action at fixed numbers, so the test needs no caster of its level. */
-function castOf(spellId: string): ActorAction {
-  const spell = loadSpells().find((entry) => entry.id === spellId)!;
-  return {
-    id: `test-${spellId}`,
-    name: spell.name,
-    activation: "action",
-    description: spell.description,
-    ...spellCastMechanics(spell, { attackBonus: 7, saveDc: 15, bearersDc: false, modifier: 3 })
-  } as ActorAction;
-}
 /** The wizard uses `action` on `targetIds`. */
 function use(state: GameState, action: ActorAction, targetIds: string[]) {
   return resolveDefinitionAction(

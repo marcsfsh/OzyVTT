@@ -38,6 +38,12 @@ export const NO_HEALING_TAG = "no-healing";
 /** Slow on its target: on its turns an action or a Bonus Action, not both, one attack with the Attack action, and a
  *  chance that a spell with a Somatic component fails. */
 export const SLOWED_TAG = "slowed";
+/** The bearer can't cast spells or take the Magic action while this lasts (Befuddlement). */
+export const NO_SPELLS_TAG = "no-spells";
+/** Barkskin: the bearer's AC is 17 while it is lower, raised when the spell lands. */
+export const BARKSKIN_TAG = "barkskin";
+/** Death Ward: the first drop to 0 Hit Points leaves the bearer at 1 instead, and ends it. */
+export const DEATH_WARD_TAG = "death-ward";
 /** On an escapable effect: the escape is a Strength (Athletics) check alone (a spell's restraint: Web, Entangle). */
 export const ESCAPE_ATHLETICS_TAG = "escape-athletics";
 /** The tag on a caster's own "Concentrating on X" effect; ending it ends everything its cast made. */

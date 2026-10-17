@@ -27,6 +27,7 @@ export type SaveOutcome = {
   ongoingDamage?: OngoingDamage;
   ignoresCover?: true;
   failurePush?: ForcedPush;
+  advantageAtSize?: "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan";
 };
 
 /** The push a failure clause prints: "is pushed 10 feet away from you", "pushed up to 30 feet straight away from the
@@ -286,7 +287,17 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   "sacred-flame": { ignoresCover: true },
   // "An affected target repeats the save at the end of each of its turns, ending the spell on itself on a success."
   // The spell names no condition, so the reader leaves the repeat out.
-  slow: { repeatSave: true }
+  slow: { repeatSave: true },
+  // "Another 5d4 Acid damage at the end of its next turn", with no condition for the reader to hang it on.
+  "vitriolic-sphere": {
+    ongoingDamage: { damage: [{ formula: "5d4", type: "acid" }], at: "bearer-turn-end" }
+  },
+  // "While Restrained, the target takes 1d6 Piercing damage at the start of each of its turns", and "A Large or larger
+  // creature has Advantage on this save".
+  "ensnaring-strike": {
+    ongoingDamage: { damage: [{ formula: "1d6", type: "piercing" }], at: "bearer-turn-start" },
+    advantageAtSize: "large"
+  }
 };
 
 /** `spellSaveOutcome` with the reviewed corrections applied. Unset fields an override names are dropped. */

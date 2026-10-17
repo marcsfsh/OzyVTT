@@ -6,6 +6,7 @@ import {
   addEffect,
   HASTED_TAG,
   MAGE_ARMOR_TAG,
+  BARKSKIN_TAG,
   makeEffect,
   PERSISTENT_RAGE_TAG,
   RAGE_ROUNDS,
@@ -133,6 +134,11 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
     const mageArmor =
       13 + abilityModifier(recipientDefinition?.abilityScores.dex ?? 10) + (derivation.context.shieldEquipped ? 2 : 0);
     const gain = mageArmor - (recipient.armorClass ?? mageArmor);
+    armorClassBonus = gain > 0 ? Math.min(10, gain) : undefined;
+  }
+  // Barkskin: "an Armor Class of 17 if its AC is lower than that", measured as it lands.
+  if (grant.tags.includes(BARKSKIN_TAG)) {
+    const gain = 17 - (recipient.armorClass ?? 17);
     armorClassBonus = gain > 0 ? Math.min(10, gain) : undefined;
   }
   const effect = addEffect(

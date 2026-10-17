@@ -283,6 +283,29 @@ describe("the curated claims hold in the engine", () => {
     });
   });
 
+  it("a protection: Stoneskin's grant carries the Resistance the damage path reads", () => {
+    const stoneskin = loadSpells().find((spell) => spell.id === "stoneskin")!;
+    expect(spellState(stoneskin)).toBe("enforced");
+    const game = GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [
+        {
+          ...creature(),
+          effects: [
+            {
+              id: "stone",
+              name: "Stoneskin",
+              modifiers: stoneskin.effect!.grant!.modifiers,
+              duration: { type: "manual" }
+            }
+          ]
+        }
+      ]
+    });
+    applyDamageDetailed(game, HERO, { amount: 10, parts: [{ amount: 10, type: "slashing" }] }, { role: "gm" });
+    expect(game.actors[0]!.hp.current).toBe(15);
+  });
+
   it("a trait kind the bundle runs as a mechanic is never curated reference", () => {
     const running = [...monsterTraitKinds()].filter(([, kind]) => kind.running > 0).map(([name]) => name);
     expect(running.length).toBeGreaterThan(0);

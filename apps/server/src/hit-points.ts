@@ -28,6 +28,7 @@ import { CommandRejectedError } from "./game-store.js";
 import {
   addEffect,
   applyCondition,
+  DEATH_WARD_TAG,
   endConcentrationSustainedBy,
   endEffect,
   endEffectsOnDamage,
@@ -390,6 +391,19 @@ function fallToZero(
   return { instantDeath, defeated };
 }
 
+/** SRD Death Ward: "The first time the target would drop to 0 Hit Points before the spell ends, the target instead
+ *  drops to 1 Hit Point, and the spell ends." True when it held the creature at 1. */
+function deathWard(state: GameState, actor: Actor, events: EffectNarration[]): boolean {
+  const ward = actor.effects.find((effect) => effect.tags.includes(DEATH_WARD_TAG));
+  if (!ward) return false;
+  actor.hp = { ...actor.hp, current: 1 };
+  events.push(
+    { kind: "condition", text: `${actor.name} drops to 1 Hit Point instead (${ward.name}).`, actorId: actor.id },
+    ...endEffect(state, actor.id, ward.id)
+  );
+  return true;
+}
+
 /** SRD Relentless Endurance (Orc): "When you are reduced to 0 Hit Points but not killed outright, you can drop to 1 Hit
  *  Point instead", once a Long Rest. It is taken the first time it can be, since staying up is never the worse
  *  choice. True when it held the creature at 1. */
@@ -618,6 +632,8 @@ export function applyDamageDetailed(
       text: `${actor.name} was knocked out - Unconscious at 1 HP until it regains hit points.`,
       actorId
     });
+  } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0 && deathWard(state, actor, events)) {
+    // Death Ward held the creature at 1 Hit Point: nothing falls.
   } else if (
     isPlayerCharacter &&
     !wasAtZero &&

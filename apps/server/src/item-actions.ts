@@ -8,7 +8,14 @@ import {
   weaponAbilityModifierFrom,
   type RiderAbility
 } from "@vtt/rules-5e";
-import { catalogIdOf, MAX_ACTION_USES, type ActorAction, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
+import {
+  catalogIdOf,
+  MAX_ACTION_USES,
+  type ActorAction,
+  type ActorDefinition,
+  type InventoryItem,
+  type OngoingDamage
+} from "@vtt/schemas";
 
 /**
  * Actions synthesised from what a character carries: an equipped weapon's swing, an item's declared actions and
@@ -635,11 +642,11 @@ export function extraAttackAction(
  *  Person) is a targeting limit, not read here. */
 /** "The damage (both initial and later) increases": what a hit leaves dealing later (Acid Arrow's 2d4) gains the dice
  *  the higher slot adds to the hit, die for die. */
-function withScaledOngoing(
-  rider: NonNullable<ActorAction["onHit"]>[number],
+function withScaledOngoing<Rider extends Readonly<{ ongoingDamage?: OngoingDamage }>>(
+  rider: Rider,
   base: string | null,
   roll: string | null
-): NonNullable<ActorAction["onHit"]>[number] {
+): Rider {
   const dice = (formula: string | null) => /^(\d+)d(\d+)$/.exec(formula?.trim() ?? "");
   const from = dice(base);
   const to = dice(roll);
@@ -698,6 +705,10 @@ export function upcastAction(action: ActorAction, spell: SpellReference, level: 
     ...action,
     damage: action.damage.map((part) => ({ ...part, formula: damage(part.formula) })),
     ...(action.onHit ? { onHit: action.onHit.map((rider) => withScaledOngoing(rider, spell.damage.roll, roll)) } : {}),
+    // A cast that deals no damage of its own scales its failure's damage on later turns (Ensnaring Strike's 1d6).
+    ...(action.save?.ongoingDamage && action.damage.length === 0
+      ? { save: { ...action.save, ...withScaledOngoing(action.save, spell.damage.roll, roll) } }
+      : {}),
     ...(action.healing
       ? { healing: { ...action.healing, formula: formulaPlus(healing(action.healing.formula), healingPerSlot) } }
       : {}),

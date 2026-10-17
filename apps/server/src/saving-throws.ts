@@ -47,7 +47,7 @@ import {
   type RollModeClaims
 } from "./equipment-derivation.js";
 import { countZoneDamage } from "./spell-zone-state.js";
-import { sizeAtMost } from "./resolution/context.js";
+import { sizeAtMost, sizeRank } from "./resolution/context.js";
 
 export type SaveAnswerDependencies = Readonly<{
   random: RandomSource;
@@ -341,6 +341,8 @@ export function createPendingSaves(
     drain?: DamageDrain;
     /** Where a failure pushes the creature (Thunderwave). */
     failurePush?: ForcedPush;
+    /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
+    advantageAtSize?: PendingSave["advantageAtSize"];
     newSaveId: () => string;
     createdAt: number;
   }>
@@ -373,6 +375,7 @@ export function createPendingSaves(
     ...(input.immuneOnSuccess ? { immuneOnSuccess: true as const } : {}),
     ...(input.drain ? { drain: { ...input.drain } } : {}),
     ...(input.failurePush ? { failurePush: { ...input.failurePush } } : {}),
+    ...(input.advantageAtSize ? { advantageAtSize: input.advantageAtSize } : {}),
     createdAt: input.createdAt
   }));
   // A re-cast against the same target replaces its older prompt.
@@ -624,6 +627,9 @@ export function answerSave(
     );
     if (magicResistance === "advantage")
       sources.advantage.push({ source: "magic-resistance", label: "Magic Resistance" });
+    // "A Large or larger creature has Advantage on this save" (Ensnaring Strike).
+    if (pending.advantageAtSize && sizeRank(target.size) >= sizeRank(pending.advantageAtSize))
+      sources.advantage.push({ source: "size", label: `${pending.actionName}: its size` });
     sources.advantage.push(...traitSaveClaims(state, target, definition, deps));
     const ward = holyWardClaim(state, target, pending.sourceActorId, deps.resolveDefinition);
     if (ward) sources.advantage.push(ward);

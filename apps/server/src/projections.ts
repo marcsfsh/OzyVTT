@@ -189,7 +189,9 @@ const PENDING_SAVE_FIELDS = {
   immuneOnSuccess: "never",
   // What the damage drains, and where a failure pushes, are narrated when they land.
   drain: "never",
-  failurePush: "never"
+  failurePush: "never",
+  // The save's own roll mode is read when it is answered.
+  advantageAtSize: "never"
 } as const satisfies Record<keyof PendingSave, FieldAudience>;
 
 // How long what a failure imposes would last is the save's own text, read on the prompt by the one who owes it.

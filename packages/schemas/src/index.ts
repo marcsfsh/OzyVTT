@@ -1267,7 +1267,10 @@ export const SaveOutcomeFields = {
   failureHazard: z.enum(["burning", "oil"]).optional(),
   /** A failure also pushes the creature straight away from the source (Thunderwave: "is pushed 10 feet away from
    *  you"). */
-  failurePush: ForcedPushSchema.optional()
+  failurePush: ForcedPushSchema.optional(),
+  /** A creature this size or larger has Advantage on the save (Ensnaring Strike: "A Large or larger creature has
+   *  Advantage on this save"). */
+  advantageAtSize: SizeSchema.optional()
 };
 
 /** An area of effect the GM places as a map template ("60-foot Cone"). `widthFeet` is a line's width, null otherwise. */

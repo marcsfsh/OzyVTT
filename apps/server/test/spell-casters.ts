@@ -7,6 +7,7 @@ import { ContentLibrary } from "../src/content-library.js";
 import { effectiveActions } from "../src/effective-actions.js";
 import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
 import { equipmentCatalogOf } from "../src/equipment-derivation.js";
+import { spellCastMechanics } from "../src/item-actions.js";
 
 /**
  * Built SRD casters for the spellcasting tests, in a fight with two foes: a Wizard 5 (Evoker), a Warlock 5 (Fiend),
@@ -345,6 +346,19 @@ export const bardInput = (spells: readonly string[]) =>
       { level: 1, kind: "equipment", id: "acolyte-a" }
     ]
   }) as CharacterCreateRequestInput;
+
+/** A spell's cast as a plain action at fixed numbers (attack +7, DC 15, modifier +3), with no spell id, so a test needs
+ *  no caster of its level and no slot. */
+export function castOf(spellId: string): ActorAction {
+  const spell = view.spellRecord(spellId)!;
+  return {
+    id: `test-${spellId}`,
+    name: spell.name,
+    activation: "action",
+    description: spell.description,
+    ...spellCastMechanics(spell, { attackBonus: 7, saveDc: 15, bearersDc: false, modifier: 3 })
+  } as ActorAction;
+}
 
 export const build = (input: CharacterCreateRequestInput): ActorDefinition =>
   buildCharacterDefinition(input, view, POLICY);

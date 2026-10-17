@@ -39,6 +39,7 @@ const RULE_FAMILIES = {
   "condition.raging": "economy",
   // An effect that takes away Reactions (Slow).
   "condition.no-reactions": "economy",
+  "condition.no-spells": "economy",
   // "Legendary actions are taken on other creatures' turns" is a timing/economy rule...
   "legendary.own-turn": "economy",
   // An extra attack (Light, Cleave) is owed only once the swing that opens it has happened this turn.

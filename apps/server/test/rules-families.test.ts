@@ -64,6 +64,7 @@ describe("rule families", () => {
       ["condition.raging", "economy"],
       // An effect that takes away Reactions (Slow) is "you have no reaction", like Incapacitated.
       ["condition.no-reactions", "economy"],
+      ["condition.no-spells", "economy"],
       ["legendary.own-turn", "economy"],
       // An extra attack waits on the swing that opens it: a matter of what this turn has done.
       ["attack.light-needs-attack", "economy"],

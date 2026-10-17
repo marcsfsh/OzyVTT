@@ -445,7 +445,8 @@ const SAVE_LIFETIME_KEYS = [
   "failsAtHitPoints",
   "ongoingDamage.**",
   "failureHazard",
-  "failurePush.**"
+  "failurePush.**",
+  "advantageAtSize"
 ] as const;
 
 /** The exemption table. First match wins, so specific rows sit above general ones. */
@@ -558,14 +559,14 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: `actions[].save.${key}`,
     types: ACTION_CARRIERS,
     reason:
-      "how a failed save's conditions end (duration, repeated save, grapple escape and range, ending on damage, Speed 0, an HP gate) and where it pushes - read from SRD prose or authored in the class and item overlays; no editor control yet",
+      "how a failed save's conditions end (duration, repeated save, grapple escape and range, ending on damage, Speed 0, an HP gate), where it pushes and who has Advantage on it - read from SRD prose or authored in the class and item overlays; no editor control yet",
     status: "gap"
   })),
   ...SAVE_LIFETIME_KEYS.map((key): ExemptionRow => ({
     at: `save.${key}`,
     types: ["spell"],
     reason:
-      "how a failed save's conditions end and where it pushes, read from the spell's description as the catalog is built",
+      "how a failed save's conditions end, where it pushes and who has Advantage on it, read from the spell's description as the catalog is built",
     status: "gap"
   })),
   {

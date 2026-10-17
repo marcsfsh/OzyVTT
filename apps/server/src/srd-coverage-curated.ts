@@ -842,8 +842,11 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
 
   // Spells whose data applies the cast's main numbers and leaves a rider the table would expect the server to apply.
-  "spell:befuddlement": guided(
-    "The save and its 10d12 Psychic damage are applied. Keeping the target from casting spells and taking the Magic action is the GM's."
+  "spell:befuddlement": enforced(
+    "A failed save deals the Psychic damage and bars the target from casting spells and the Magic action (resolution/economy.ts). The save every 30 days, and Greater Restoration, Heal or Wish ending it, are the GM's."
+  ),
+  "spell:blur": enforced(
+    "Attack rolls against the caster have Disadvantage while it lasts. An attacker that perceives the caster with Blindsight or Truesight is the GM's to spare."
   ),
   "spell:chromatic-orb": guided(
     "The attack and the chosen damage type are applied. The leap to another target on matching dice is the GM's."
@@ -866,6 +869,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:delayed-blast-fireball": guided(
     "The explosion's save and 12d6 Fire damage are a later action. The 1d6 added for each turn the bead waits, and a creature touching it, are the GM's."
   ),
+  "spell:death-ward": enforced(
+    "hit-points.ts leaves the target at 1 Hit Point the first time it would drop to 0, and ends the spell. Negating an effect that would kill it without damage is the GM's."
+  ),
   "spell:dissonant-whispers": guided(
     "The save and its Psychic damage are applied. The target's move away with its Reaction is the GM's."
   ),
@@ -880,9 +886,6 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "spell:earthquake": guided(
     "The cast's Dexterity save and Prone condition are applied. The save at the end of each of the caster's turns, the broken Concentration and the fissures are the GM's."
-  ),
-  "spell:ensnaring-strike": guided(
-    "A failed save imposes Restrained. The 1d6 Piercing damage at the start of each of its turns, and the Strength (Athletics) check to break free, are the GM's."
   ),
   "spell:fear": guided(
     "A failed save imposes Frightened. The Dash away on each of its turns, and the save out of the caster's sight, are the GM's."
@@ -943,9 +946,6 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "spell:tsunami": guided(
     "The wall's first save and damage are applied. Its movement and the damage on later turns are the GM's."
-  ),
-  "spell:vitriolic-sphere": guided(
-    "The save and its 10d4 Acid damage are applied. The 5d4 Acid damage at the end of the target's next turn is the GM's."
   ),
   "spell:wall-of-ice": guided(
     "The save and its Cold damage for creatures in the wall's space are applied. The wall itself and its frigid air are the GM's."

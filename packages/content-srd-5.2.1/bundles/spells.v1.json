@@ -1727,7 +1727,21 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Barkskin",
+    "tags": [
+     "barkskin"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "druid",
@@ -1836,7 +1850,14 @@
      "type": "psychic"
     }
    ],
-   "healing": null
+   "healing": null,
+   "failureEffect": {
+    "name": "Befuddlement",
+    "tags": [
+     "no-spells"
+    ],
+    "modifiers": []
+   }
   },
   "classes": [
    "bard",
@@ -2533,7 +2554,33 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "incoming-attack",
+      "mode": "disadvantage",
+      "when": [
+       {
+        "type": "on-attack-roll"
+       }
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Blur",
+    "tags": [
+     "blur"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    }
+   }
   },
   "classes": [
    "sorcerer",
@@ -5759,7 +5806,21 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Death Ward",
+    "tags": [
+     "death-ward"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "cleric",
@@ -6631,7 +6692,40 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "extra-damage",
+      "formula": "1d4",
+      "damageType": "radiant",
+      "doubleOnCritical": true,
+      "when": [
+       {
+        "type": "on-hit"
+       },
+       {
+        "type": "attack-kind-is",
+        "kinds": [
+         "weapon"
+        ]
+       }
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Divine Favor",
+    "tags": [
+     "divine-favor"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    }
+   }
   },
   "classes": [
    "paladin"
@@ -7638,7 +7732,17 @@
    "successDamage": "none",
    "failureConditions": [
     "restrained"
-   ]
+   ],
+   "ongoingDamage": {
+    "damage": [
+     {
+      "formula": "1d6",
+      "type": "piercing"
+     }
+    ],
+    "at": "bearer-turn-start"
+   },
+   "advantageAtSize": "large"
   },
   "target": {
    "type": "creature",
@@ -9787,7 +9891,52 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "attack",
+      "mode": "advantage"
+     },
+     {
+      "type": "roll-mode",
+      "roll": "save",
+      "mode": "advantage"
+     },
+     {
+      "type": "roll-mode",
+      "roll": "check",
+      "mode": "advantage"
+     },
+     {
+      "type": "roll-mode",
+      "roll": "initiative",
+      "mode": "advantage"
+     },
+     {
+      "type": "roll-mode",
+      "roll": "incoming-attack",
+      "mode": "disadvantage",
+      "when": [
+       {
+        "type": "on-attack-roll"
+       }
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Foresight",
+    "tags": [
+     "foresight"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "bard",
@@ -21112,7 +21261,30 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "damage-resistance",
+      "damageTypes": [
+       "bludgeoning",
+       "piercing",
+       "slashing"
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Stoneskin",
+    "tags": [
+     "stoneskin"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "druid",
@@ -22719,7 +22891,16 @@
   "save": {
    "ability": "dex",
    "successDamage": "half",
-   "failureConditions": []
+   "failureConditions": [],
+   "ongoingDamage": {
+    "damage": [
+     {
+      "formula": "5d4",
+      "type": "acid"
+     }
+    ],
+    "at": "bearer-turn-end"
+   }
   },
   "target": {
    "type": "creature",
@@ -22743,7 +22924,18 @@
      "type": "acid"
     }
    ],
-   "healing": null
+   "healing": null,
+   "failureEffect": {
+    "name": "Vitriolic Sphere",
+    "tags": [
+     "vitriolic-sphere"
+    ],
+    "duration": {
+     "type": "rounds",
+     "rounds": 1
+    },
+    "modifiers": []
+   }
   },
   "classes": [
    "sorcerer",

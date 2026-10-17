@@ -294,6 +294,8 @@ export const PendingSaveSchema = z
     drain: DamageDrainSchema.optional(),
     /** Where a failure pushes the creature (Thunderwave), narrated when it lands. */
     failurePush: ForcedPushSchema.optional(),
+    /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
+    advantageAtSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();

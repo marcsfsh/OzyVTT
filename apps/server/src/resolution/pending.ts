@@ -166,8 +166,9 @@ export function isMagicalAction(ctx: MagicalSource): boolean {
 const BARE_FAILURE_CONDITIONS: ReadonlySet<string> = new Set(["prone", "exhaustion"]);
 
 /** SRD restraints a creature escapes with an action and a Strength (Athletics) check against the spell save DC
- *  (Entangle, Web, Black Tentacles): the restraint carries the DC, and escaping takes Athletics alone. */
-const ATHLETICS_ESCAPES: ReadonlySet<string> = new Set(["entangle", "web", "black-tentacles"]);
+ *  (Entangle, Web, Black Tentacles, Ensnaring Strike): the restraint carries the DC, and escaping takes Athletics
+ *  alone. */
+const ATHLETICS_ESCAPES: ReadonlySet<string> = new Set(["entangle", "web", "black-tentacles", "ensnaring-strike"]);
 /** SRD Stinking Cloud: "While Poisoned in this way, the creature can't take an action or a Bonus Action." */
 const NO_ACTIONS_FAILURES: ReadonlySet<string> = new Set(["stinking-cloud"]);
 
@@ -356,6 +357,7 @@ export function parkActionSave(ctx: ResolveContext): void {
       ...(onSuccessEffect ? { extra: { onSuccessEffect } } : {}),
       ...(action.drain ? { drain: action.drain } : {}),
       ...(action.save.failurePush ? { failurePush: action.save.failurePush } : {}),
+      ...(action.save.advantageAtSize ? { advantageAtSize: action.save.advantageAtSize } : {}),
       magical: isMagicalAction(ctx),
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())

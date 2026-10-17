@@ -12,6 +12,7 @@ import {
   NO_ACTIONS_TAG,
   NO_REACTIONS_TAG,
   SLOWED_TAG,
+  NO_SPELLS_TAG,
   RAGING_TAG,
   READIED_TAG,
   RECKLESS_TAG,
@@ -392,6 +393,13 @@ function checkAbleToAct({ attacker, action, violations }: Evaluation): void {
     violations.push({
       rule: "condition.incapacitated",
       message: `${attacker.name} is reeling from ${reeling.name} and can't take an action or a Bonus Action this turn.`
+    });
+  // SRD Befuddlement: the target "can't cast spells or take the Magic action".
+  const befuddled = attacker.effects.find((effect) => effect.tags.includes(NO_SPELLS_TAG));
+  if (befuddled && (action.spellId !== undefined || action.spellSlot !== undefined || isMagicAction(action)))
+    violations.push({
+      rule: "condition.no-spells",
+      message: `${attacker.name} can't cast spells or take the Magic action while ${befuddled.name} lasts.`
     });
   // SRD Rage: "you can't cast spells".
   if ((action.spellId !== undefined || action.spellSlot !== undefined) && hasEffectTag(attacker, RAGING_TAG))

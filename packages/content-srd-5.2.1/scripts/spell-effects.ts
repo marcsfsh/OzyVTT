@@ -769,6 +769,65 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: { type: "manual" },
     hitPointMaximumGain: { amount: 5, perSlot: 5 }
   }),
+  // "Resistance to Bludgeoning, Piercing, and Slashing damage", held by the caster's Concentration.
+  stoneskin: spellGrant({
+    name: "Stoneskin",
+    tags: ["stoneskin"],
+    target: "target",
+    duration: { type: "manual" },
+    modifiers: [{ type: "damage-resistance", damageTypes: ["bludgeoning", "piercing", "slashing"] }]
+  }),
+  // "Any creature has Disadvantage on attack rolls against you." An attacker that perceives the caster with
+  // Blindsight or Truesight is the GM's to spare.
+  blur: spellGrant({
+    name: "Blur",
+    tags: ["blur"],
+    target: "self",
+    duration: rounds(10),
+    modifiers: [
+      { type: "roll-mode", roll: "incoming-attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] }
+    ]
+  }),
+  // "Your attacks with weapons deal an extra 1d4 Radiant damage on a hit."
+  "divine-favor": spellGrant({
+    name: "Divine Favor",
+    tags: ["divine-favor"],
+    target: "self",
+    duration: rounds(10),
+    modifiers: [
+      {
+        type: "extra-damage",
+        formula: "1d4",
+        damageType: "radiant",
+        doubleOnCritical: true,
+        when: [{ type: "on-hit" }, { type: "attack-kind-is", kinds: ["weapon"] }]
+      }
+    ]
+  }),
+  // "Advantage on D20 Tests, and other creatures have Disadvantage on attack rolls against it", for 8 hours.
+  foresight: spellGrant({
+    name: "Foresight",
+    tags: ["foresight"],
+    target: "target",
+    duration: { type: "manual" },
+    modifiers: [
+      { type: "roll-mode", roll: "attack", mode: "advantage" },
+      { type: "roll-mode", roll: "save", mode: "advantage" },
+      { type: "roll-mode", roll: "check", mode: "advantage" },
+      { type: "roll-mode", roll: "initiative", mode: "advantage" },
+      { type: "roll-mode", roll: "incoming-attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] }
+    ]
+  }),
+  // "An Armor Class of 17 if its AC is lower than that", measured as the spell lands.
+  barkskin: spellGrant({ name: "Barkskin", tags: ["barkskin"], target: "target", duration: { type: "manual" } }),
+  // "The first time the target would drop to 0 Hit Points before the spell ends, the target instead drops to 1 Hit
+  // Point, and the spell ends."
+  "death-ward": spellGrant({
+    name: "Death Ward",
+    tags: ["death-ward"],
+    target: "target",
+    duration: { type: "manual" }
+  }),
   "mage-armor": spellGrant({
     name: "Mage Armor",
     tags: ["mage-armor"],
@@ -843,6 +902,10 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
       }
     ]
   },
+  // "Can't cast spells or take the Magic action", until a repeated save every 30 days or a spell ends it.
+  befuddlement: { name: "Befuddlement", tags: ["no-spells"], modifiers: [] },
+  // "Another 5d4 Acid damage at the end of its next turn" (the save carries the damage).
+  "vitriolic-sphere": { name: "Vitriolic Sphere", tags: ["vitriolic-sphere"], duration: rounds(1), modifiers: [] },
   // "Disadvantage on the next attack roll it makes before the end of its next turn": its own roll spends it.
   "vicious-mockery": {
     name: "Vicious Mockery",
