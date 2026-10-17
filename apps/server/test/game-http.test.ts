@@ -332,8 +332,9 @@ describe("public game API over /api/v1", () => {
     // Revocation cuts access immediately.
     const revoked = await post(base, `/api/v1/gm/integration-credentials/${readOnly.id}/revoke`, gmToken);
     expect(revoked.status).toBe(200);
+    // A revoked credential must be replaced: 401, like no credential (ADR-0025).
     const afterRevoke = await fetch(base + GAME_PATHS.snapshot, { headers: bearer(readOnly.token) });
-    expect(afterRevoke.status).toBe(403);
+    expect(afterRevoke.status).toBe(401);
   });
 
   it("lets a player resolve their own claimed character's action but refuses a hidden target or GM-only inputs", async () => {

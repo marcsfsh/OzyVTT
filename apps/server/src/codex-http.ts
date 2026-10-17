@@ -5,7 +5,6 @@ import { CODEX_ASSET_PATHS, CODEX_PATHS } from "@vtt/api-contract";
 import type { CodexConnection } from "@vtt/domain";
 import {
   apiErrorHandler,
-  bearerToken,
   expressPath,
   issuesOf,
   pathParam,
@@ -33,6 +32,7 @@ import {
   standingContext
 } from "./codex/visibility.js";
 import type { CodexStore } from "./codex-store.js";
+import { callerOf, refuse, sendUnauthenticated, type CredentialVerifiers } from "./request-auth.js";
 import {
   CalendarSchema,
   CodexImportSchema,
@@ -99,21 +99,18 @@ import {
  * through `codex-projections.ts`.
  */
 
-/** `gm` and `integration` both read at GM grade. `none` = no bearer token (401); `denied` = a token that failed (403). */
-type CodexPrincipal = Readonly<{ kind: "gm" | "player" | "integration" | "none" | "denied" }>;
+/** `gm` and `integration` both read at GM grade. `none` and `invalid` have no live credential (401); `denied` is a
+ *  valid credential that does not reach the Codex, such as an integration credential without the scope (403). */
+type CodexPrincipal = Readonly<{ kind: "gm" | "player" | "integration" | "none" | "invalid" | "denied" }>;
 type CodexGrade = "gm" | "player";
 
 type CodexRouterOptions = Readonly<{
   store: CodexStore;
   /** Content-addressed store for page media (banners + inline images), separate from map/token assets. */
   assets: MapAssetStore;
-  authorizeGm: (token: string | undefined) => boolean;
-  authorizePlayer: (token: string | undefined) => boolean;
-  /** Null for any unusable token (one 403 for all). Required so no mount site silently disables credentials. */
-  verifyIntegration: (
-    token: string,
-    scope: "codex:read" | "codex:write"
-  ) => Readonly<{ id: string; name: string }> | null;
+  /** The server's credential checks. Required to carry `integration` so no mount site silently disables
+   *  credentials. */
+  verifiers: CredentialVerifiers & Required<Pick<CredentialVerifiers, "integration">>;
   /** Emit a content-free `codex:changed` ping so every client refetches its projected view. */
   notifyChanged: () => void;
   /** A real player token for the GM's preview: the GM's own token would still get GM projections. */
@@ -167,15 +164,14 @@ function declaredConnection(relationship: CodexRelationshipRow): CodexConnection
   };
 }
 
-const NO_TOKEN = "A GM session, player session, or integration bearer token is required.";
-const BAD_TOKEN = "The token is invalid, revoked, or missing the required scope.";
+const NO_SCOPE = "This credential does not carry the Codex scope this route needs.";
 
-/** Just the three authorization callbacks, so the import guard is built from the same ones the router gets. */
-export type CodexAuthOptions = Pick<CodexRouterOptions, "authorizeGm" | "authorizePlayer" | "verifyIntegration">;
+/** Just the credential checks, so the import guard is built from the same ones the router gets. */
+export type CodexAuthOptions = Pick<CodexRouterOptions, "verifiers">;
 
 /**
- * Who is calling: role comes only from the signed session token or verified credential, checked GM, then
- * player, then credential. Memoized per request because `IntegrationCredentialStore.verify` writes audit rows.
+ * Who is calling, read by the shared `callerOf` (ADR-0025): role comes only from the signed session token or a
+ * verified credential. `callerOf` memoizes per request, because checking a credential writes its audit rows.
  */
 function principalFor(
   request: Request,
@@ -183,28 +179,22 @@ function principalFor(
   options: CodexAuthOptions,
   scope: "codex:read" | "codex:write"
 ): CodexPrincipal {
-  const cached = response.locals.codexPrincipal as Readonly<{ scope: string; principal: CodexPrincipal }> | undefined;
-  if (cached && cached.scope === scope) return cached.principal;
-  const token = bearerToken(request);
-  const principal: CodexPrincipal =
-    token === undefined
-      ? { kind: "none" }
-      : options.authorizeGm(token)
-        ? { kind: "gm" }
-        : options.authorizePlayer(token)
-          ? { kind: "player" }
-          : options.verifyIntegration(token, scope)
-            ? { kind: "integration" }
-            : { kind: "denied" };
-  response.locals.codexPrincipal = { scope, principal };
-  return principal;
+  const caller = callerOf(request, response, options.verifiers, { scope });
+  if (caller.kind === "none" || caller.kind === "invalid" || caller.kind === "gm" || caller.kind === "player")
+    return { kind: caller.kind };
+  if (caller.kind === "integration" && caller.inScope) return { kind: "integration" };
+  return { kind: "denied" };
+}
+
+/** Answers a caller the route does not serve: 401 without a live credential, else 403 with `forbidden`. */
+function refusePrincipal(response: Response, principal: CodexPrincipal, forbidden: string) {
+  if (principal.kind === "none" || principal.kind === "invalid") return sendUnauthenticated(response, principal.kind);
+  return sendFailure(response, 403, "forbidden", principal.kind === "denied" ? NO_SCOPE : forbidden);
 }
 
 /** The one refusal a Codex write can get, shared by the router and the import guard. */
 function refuseWrite(response: Response, principal: CodexPrincipal) {
-  if (principal.kind === "none") return sendFailure(response, 401, "unauthenticated", NO_TOKEN);
-  if (principal.kind === "player") return sendFailure(response, 403, "forbidden", "Codex writes are the GM's.");
-  return sendFailure(response, 403, "forbidden", BAD_TOKEN);
+  return refusePrincipal(response, principal, "Codex writes are the GM's.");
 }
 
 /**
@@ -228,11 +218,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
     const principal = principalFor(request, response, options, "codex:read");
     if (principal.kind === "gm" || principal.kind === "integration") return "gm";
     if (principal.kind === "player") return "player";
-    if (principal.kind === "none") {
-      sendFailure(response, 401, "unauthenticated", NO_TOKEN);
-      return null;
-    }
-    sendFailure(response, 403, "forbidden", BAD_TOKEN);
+    refusePrincipal(response, principal, NO_SCOPE);
     return null;
   };
 
@@ -240,10 +226,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
   const requireGmRead = (request: Request, response: Response, next: NextFunction) => {
     const principal = principalFor(request, response, options, "codex:read");
     if (principal.kind === "gm" || principal.kind === "integration") return next();
-    if (principal.kind === "none") return sendFailure(response, 401, "unauthenticated", NO_TOKEN);
-    if (principal.kind === "player")
-      return sendFailure(response, 403, "forbidden", "The codex's GM surfaces are the GM's.");
-    return sendFailure(response, 403, "forbidden", BAD_TOKEN);
+    return refusePrincipal(response, principal, "The codex's GM surfaces are the GM's.");
   };
 
   /**
@@ -290,11 +273,9 @@ export function createCodexRouter(options: CodexRouterOptions) {
 
   /** Minting a player session token is GM-session only; a credential must not hand out player sessions. */
   const requireGmSession = (request: Request, response: Response, next: NextFunction) => {
-    const token = bearerToken(request);
-    if (token === undefined) return sendFailure(response, 401, "unauthenticated", "A valid GM session is required.");
-    if (!options.authorizeGm(token))
-      return sendFailure(response, 403, "forbidden", "Only a GM session may mint a player preview.");
-    next();
+    const caller = callerOf(request, response, options.verifiers, { scope: "codex:write" });
+    if (caller.kind === "gm") return next();
+    return refuse(response, caller, "Only a GM session may mint a player preview.");
   };
 
   /**
@@ -953,14 +934,14 @@ export function createCodexRouter(options: CodexRouterOptions) {
 
   router.get(expressPath(CODEX_ASSET_PATHS.content), async (request, response) => {
     const id = pathParam(request, "id");
-    // A GM or credential always; a player only when revealed player-facing content uses the image. Everyone
-    // else gets the same 403 before any lookup, so a media URL cannot be an existence oracle.
+    // A GM or credential always; a player only when revealed player-facing content uses the image. Everyone else is
+    // refused before any lookup, so the answer never depends on whether the image exists.
     const principal = principalFor(request, response, options, "codex:read");
     const allowed =
       principal.kind === "gm" ||
       principal.kind === "integration" ||
       (principal.kind === "player" && store.isMediaVisibleToPlayers(id));
-    if (!allowed) return sendFailure(response, 403, "forbidden", "That image is not available to this session.");
+    if (!allowed) return refusePrincipal(response, principal, "That image is not available to this session.");
     const metadata = await options.assets.get(id);
     const content = metadata ? await options.assets.readOriginal(id) : null;
     if (!metadata || !content) return sendFailure(response, 404, "not_found", "That image was not found.");

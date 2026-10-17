@@ -189,17 +189,17 @@ describe("the OpenAPI document", () => {
     // Asset paths are walked too, so the upload route's 403 stays documented.
     for (const path of [...Object.values(CODEX_PATHS), ...Object.values(CODEX_ASSET_PATHS)]) {
       for (const [method, op] of Object.entries(paths[path])) {
-        // The binary asset-content route answers 403 before any existence check, so it has no 401; pinned below.
-        if (path === CODEX_ASSET_PATHS.content) continue;
-        // 401 is "no credential"; 403 is "presented one and was refused". Every route accepts a bearer token.
+        // 401 is "no live credential"; 403 is "a valid one without the role" (ADR-0025). Every route accepts a
+        // bearer token.
         expect(Object.keys(op.responses), `${method} ${path} must document 401`).toContain("401");
         expect(Object.keys(op.responses), `${method} ${path} must document 403`).toContain("403");
         // Only the JSON reads answer 304.
         if (method === "get") expect(Object.keys(op.responses), `${method} ${path} must document 304`).toContain("304");
       }
     }
+    // The binary asset-content route refuses before any existence check, so a 404 only follows a caller it serves.
     const content = paths[CODEX_ASSET_PATHS.content].get;
-    expect(Object.keys(content.responses)).toEqual(["200", "304", "403", "404"]);
+    expect(Object.keys(content.responses)).toEqual(["200", "304", "401", "403", "404"]);
     // A route whose body parser exceeds the global limit must document the 413 it raises.
     expect(Object.keys(paths[CODEX_ASSET_PATHS.collection].post.responses)).toContain("413");
     expect(Object.keys(paths[CODEX_PATHS.import].post.responses)).toContain("413");
@@ -422,7 +422,10 @@ describe("the OpenAPI document", () => {
       "CodexPreviewSessionData.token",
       // The host's own sign-in: the GM password goes in and a GM session token comes out.
       "HostPasswordRequest.password",
-      "GmSignIn.token"
+      "GmSignIn.token",
+      // Changing the GM password: both passwords go in, and the GmSignIn token above comes out.
+      "GmPasswordChangeRequest.currentPassword",
+      "GmPasswordChangeRequest.newPassword"
     ]);
     for (const [name, schema] of Object.entries(openApiDocument.components.schemas)) {
       const properties =

@@ -169,6 +169,21 @@ export class IntegrationCredentialStore {
   }
 
   verify(token: string, requiredScope: IntegrationScope, gameId?: string) {
+    const checked = this.check(token, requiredScope, gameId);
+    return checked?.inScope ? checked.credential : null;
+  }
+
+  /**
+   * Null when `token` is no live credential (unknown, wrong secret, revoked or expired). Otherwise the credential and
+   * whether it reaches `requiredScope`; a null scope is a route that takes no integration credential, and `any` asks
+   * only whether it is live (no use is recorded, as the route checks its real scope next). Keeping the two apart lets
+   * a route answer 401 for a dead credential and 403 for a live one without the scope (ADR-0025).
+   */
+  check(
+    token: string,
+    requiredScope: IntegrationScope | null | "any",
+    gameId?: string
+  ): Readonly<{ credential: IntegrationCredentialMetadata; inScope: boolean }> | null {
     const parsed = parseToken(token);
     if (!parsed) return null;
     const database = this.requireDatabase();
@@ -182,10 +197,15 @@ export class IntegrationCredentialStore {
       return this.failed(row.id, now, "secret");
     if (row.revoked_at) return this.failed(row.id, now, "revoked");
     if (row.expires_at && Date.parse(row.expires_at) <= this.now()) return this.failed(row.id, now, "expired");
+    const outOfScope = (reason: string, detail: Record<string, unknown>) => {
+      this.audit(row.id, "verification_failed", now, { reason, ...detail });
+      return { credential: metadata(row), inScope: false };
+    };
+    if (requiredScope === null) return outOfScope("route", {});
+    if (requiredScope === "any") return { credential: metadata(row), inScope: true };
     const scopes = IntegrationScopeSchema.array().parse(JSON.parse(row.scopes_json));
-    if (!scopes.includes(requiredScope) && !scopes.includes("admin"))
-      return this.failed(row.id, now, "scope", { requiredScope });
-    if (row.game_id && row.game_id !== gameId) return this.failed(row.id, now, "game", { gameBound: true });
+    if (!scopes.includes(requiredScope) && !scopes.includes("admin")) return outOfScope("scope", { requiredScope });
+    if (row.game_id && row.game_id !== gameId) return outOfScope("game", { gameBound: true });
     const recentlyAudited =
       row.last_used_at !== null && this.now() - Date.parse(row.last_used_at) < USED_AUDIT_THROTTLE_MS;
     if (!recentlyAudited) {
@@ -194,7 +214,7 @@ export class IntegrationCredentialStore {
         this.audit(row.id, "used", now, { requiredScope, gameBound: row.game_id !== null });
       });
     }
-    return this.get(row.id);
+    return { credential: this.get(row.id)!, inScope: true };
   }
 
   revoke(id: string) {

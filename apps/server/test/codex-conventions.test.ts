@@ -11,6 +11,7 @@ import { CodexStore } from "../src/codex-store.js";
 import { MapAssetStore } from "../src/map-assets.js";
 import { createCodexRouter } from "../src/codex-http.js";
 import { requestConventions } from "../src/http-kit.js";
+import { credentialPerScope, fixedVerifiers } from "./fixed-verifiers.js";
 
 // The codex router's cross-cutting contract, tested at the HTTP boundary: request-id echo, the
 // 401/403 split, integration-credential scopes, structured validation issues,
@@ -44,10 +45,8 @@ async function fixture() {
     createCodexRouter({
       store,
       assets,
-      authorizeGm: (token) => token === "gm-token",
-      authorizePlayer: (token) => token === "player-token",
       // One credential per scope, so a verifier that ignored `scope` would fail the scope assertions below.
-      verifyIntegration: (token, scope) => (token === `int-${scope}` ? { id: "cred-1", name: "overlay" } : null),
+      verifiers: fixedVerifiers({ gm: ["gm-token"], player: ["player-token"], integration: credentialPerScope }),
       notifyChanged: () => {},
       issuePreviewSession: () => "preview-player-token"
     })
@@ -101,15 +100,16 @@ describe("codex request correlation (X-Request-Id)", () => {
   });
 });
 
-// 401 means "no credential"; 403 means "you presented one and were refused". An authenticated player
-// must never be told to sign in, because a retrying client acts on that.
+// 401 means "no live credential: sign in"; 403 means "your valid credential does not reach this" (ADR-0025). An
+// authenticated player must never be told to sign in, because a retrying client acts on that.
 describe("codex 401 vs 403", () => {
-  it("answers 401 only for a missing or unparseable Authorization header", async () => {
+  it("answers 401 for a missing, unparseable or dead credential", async () => {
     const { base } = await fixture();
     for (const headers of [
       ANONYMOUS,
       { ...ANONYMOUS, authorization: "Basic abc123" },
-      { ...ANONYMOUS, authorization: "gm-token" }
+      { ...ANONYMOUS, authorization: "gm-token" },
+      { ...ANONYMOUS, authorization: "Bearer nonsense" }
     ]) {
       const response = await get(base, "/api/v1/codex/pages", headers);
       expect(response.status, JSON.stringify(headers)).toBe(401);
@@ -117,7 +117,7 @@ describe("codex 401 vs 403", () => {
     }
   });
 
-  it("answers 403 to every token that was presented and failed - player, junk, expired-looking, underscoped", async () => {
+  it("answers 403 to every valid credential that does not reach the route - a player, an underscoped credential", async () => {
     const { base } = await fixture();
     const created = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Keep" }));
     const pageId = created.data.page.id as string;
@@ -125,13 +125,6 @@ describe("codex 401 vs 403", () => {
       ["player on a write", PLAYER, "POST", "/api/v1/codex/pages", { title: "Nope" }],
       ["player on a GM-grade read", PLAYER, "GET", "/api/v1/codex/settings", undefined],
       ["player on the reveal audit", PLAYER, "GET", "/api/v1/codex/reveal-audit", undefined],
-      [
-        "junk bearer on a role read",
-        { ...ANONYMOUS, authorization: "Bearer nonsense" },
-        "GET",
-        "/api/v1/codex/pages",
-        undefined
-      ],
       ["codex:read on a write", READ_CREDENTIAL, "PATCH", `/api/v1/codex/pages/${pageId}`, { title: "Mine" }],
       ["codex:write on a read", WRITE_CREDENTIAL, "GET", "/api/v1/codex/pages", undefined]
     ] as const) {

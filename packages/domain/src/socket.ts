@@ -179,6 +179,8 @@ export interface ServerToClientEvents {
   "homebrew:changed": (event: HomebrewChangedEvent) => void;
   /** The sound board changed, or a table screen's sound did. Sent to GM sessions only: players learn nothing of it. */
   "sound:changed": (view: SoundBoardView) => void;
+  /** This socket's session was revoked or ran out. The server disconnects it right after; the client signs in again. */
+  "session:ended": () => void;
 }
 export type SessionJoinResult = {
   ok: boolean;
@@ -186,6 +188,8 @@ export type SessionJoinResult = {
   sessionId?: string;
   token?: string;
   message?: string;
+  /** On a refusal: `unauthenticated` when the token sent is malformed, expired or revoked. The client drops it. */
+  code?: string;
 };
 
 /** JSON a caller may build from readonly data: arrays and objects at any depth may be readonly. */

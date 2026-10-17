@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomInt, randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import { migrate, openDatabase, type Migration } from "./database.js";
@@ -16,6 +16,9 @@ export type ViewerAccessMetadata = Readonly<z.infer<typeof ViewerAccessMetadataS
 /** A one-time code a table screen exchanges for its viewer credential. */
 export const ViewerPairingSchema = z.strictObject({ code: z.string(), expiresAt: z.iso.datetime() });
 export type ViewerPairing = Readonly<z.infer<typeof ViewerPairingSchema>>;
+/** What a table screen shows while it waits for the GM: its short code and when the code runs out. */
+export const ScreenPairingSchema = z.strictObject({ code: z.string(), expiresAt: z.iso.datetime() });
+export type ScreenPairing = Readonly<z.infer<typeof ScreenPairingSchema>>;
 
 type ViewerAccessRow = Readonly<{
   id: string;
@@ -34,6 +37,16 @@ const MAX_OUTSTANDING_PAIRINGS = 10;
 const FAILED_ATTEMPT_WINDOW_MS = 60_000;
 const MAX_FAILED_ATTEMPTS = 20;
 const TOKEN_PREFIX = "vtt_viewer_";
+/** A screen's code lasts this long; the screen asks for a fresh one when it runs out. */
+const SCREEN_PAIRING_TTL_MS = 10 * 60 * 1_000;
+/** Open screen requests at once. Few enough that a mistyped code almost never lands on another screen. */
+const MAX_OPEN_SCREEN_PAIRINGS = 20;
+/** Screen requests opened per minute, from every address together. */
+const MAX_SCREEN_PAIRINGS_PER_MINUTE = 30;
+const SCREEN_CODE_DIGITS = 6;
+const REQUEST_PREFIX = "vtt_pairing_";
+
+type ScreenRequest = { code: string; expiresAt: number; approvedName: string | null };
 
 const MIGRATIONS: readonly Migration[] = [
   {
@@ -87,6 +100,14 @@ function metadata(row: ViewerAccessRow): ViewerAccessMetadata {
   };
 }
 
+/** The screen code as typed: any spaces or dashes between the digits are ignored. */
+function normalizeScreenCode(value: string) {
+  const code = value.replace(/[\s-]/g, "");
+  if (!new RegExp(`^[0-9]{${SCREEN_CODE_DIGITS}}$`).test(code))
+    throw new ViewerAccessDeniedError("That code is not open on any screen. Check the code the screen shows.");
+  return code;
+}
+
 function normalizePairingCode(value: string) {
   const code = value.replace(/[\s-]/g, "").toUpperCase();
   if (!/^[0-9A-F]{12}$/.test(code)) throw new ViewerAccessDeniedError("Viewer pairing code is invalid or expired.");
@@ -96,6 +117,9 @@ function normalizePairingCode(value: string) {
 export class ViewerAccessStore {
   private database?: DatabaseSync;
   private readonly pairingCodes = new Map<string, number>();
+  /** Open screen requests by the hash of the secret the screen holds in its cookie. */
+  private readonly screenRequests = new Map<string, ScreenRequest>();
+  private screenOpenings: number[] = [];
   private failedAttempts: number[] = [];
 
   constructor(
@@ -134,8 +158,71 @@ export class ViewerAccessStore {
     };
   }
 
+  /**
+   * A table screen asks to pair (ADR-0026). It gets a short code to show and a secret to keep in its cookie; the code
+   * only names the request for the GM, and only the secret collects the viewer credential once the GM approves.
+   */
+  openScreenPairing(): ScreenPairing & Readonly<{ requestToken: string }> {
+    this.requireDatabase();
+    const now = this.now();
+    this.pruneScreenRequests(now);
+    this.screenOpenings = this.screenOpenings.filter((at) => at > now - FAILED_ATTEMPT_WINDOW_MS);
+    if (
+      this.screenRequests.size >= MAX_OPEN_SCREEN_PAIRINGS ||
+      this.screenOpenings.length >= MAX_SCREEN_PAIRINGS_PER_MINUTE
+    )
+      throw new ViewerPairingRateLimitError("Too many screens are asking to pair. Try again in a minute.");
+    const open = new Set([...this.screenRequests.values()].map((request) => request.code));
+    let code: string;
+    do code = String(randomInt(0, 10 ** SCREEN_CODE_DIGITS)).padStart(SCREEN_CODE_DIGITS, "0");
+    while (open.has(code));
+    const requestToken = `${REQUEST_PREFIX}${this.entropy(32).toString("base64url")}`;
+    const expiresAt = now + SCREEN_PAIRING_TTL_MS;
+    this.screenRequests.set(hash(requestToken), { code, expiresAt, approvedName: null });
+    this.screenOpenings.push(now);
+    return { requestToken, code, expiresAt: timestamp(expiresAt, "Pairing expiration") };
+  }
+
+  /**
+   * Where a screen's request stands. Null when the secret names no open request. Once the GM has approved, this
+   * mints the viewer credential and closes the request, so the secret works once.
+   */
+  collectScreenPairing(requestToken: string) {
+    const now = this.now();
+    this.pruneScreenRequests(now);
+    const key = /^vtt_pairing_[A-Za-z0-9_-]{43}$/.test(requestToken) ? hash(requestToken) : null;
+    const request = key ? this.screenRequests.get(key) : undefined;
+    if (!key || !request) return null;
+    if (request.approvedName === null)
+      return { status: "waiting" as const, code: request.code, expiresAt: timestamp(request.expiresAt, "Expiry") };
+    this.screenRequests.delete(key);
+    return { status: "paired" as const, ...this.issueViewer(request.approvedName, null) };
+  }
+
+  /** The GM lets in the screen showing `codeInput`. Wrong codes count toward the same limit as wrong pairing codes. */
+  approveScreenPairing(codeInput: string, nameInput: string) {
+    const now = this.now();
+    this.enforceAttemptLimit(now);
+    this.pruneScreenRequests(now);
+    const name = safeName(nameInput);
+    let code: string;
+    try {
+      code = normalizeScreenCode(codeInput);
+    } catch (error) {
+      this.recordFailure(now);
+      throw error;
+    }
+    const request = [...this.screenRequests.values()].find((candidate) => candidate.code === code);
+    if (!request || request.approvedName !== null) {
+      this.recordFailure(now);
+      throw new ViewerAccessDeniedError("That code is not open on any screen. Check the code the screen shows.");
+    }
+    request.approvedName = name;
+    return { name };
+  }
+
   exchangePairingCode(codeInput: string, nameInput: string, options: Readonly<{ expiresAt?: number | null }> = {}) {
-    const database = this.requireDatabase();
+    this.requireDatabase();
     const now = this.now();
     this.enforceAttemptLimit(now);
     let code: string;
@@ -157,6 +244,13 @@ export class ViewerAccessStore {
     const expiresAtMs = options.expiresAt ?? null;
     if (expiresAtMs !== null && (!Number.isFinite(expiresAtMs) || expiresAtMs <= now))
       throw new InvalidRequestError("Viewer access expiration must be in the future.");
+    return this.issueViewer(name, expiresAtMs);
+  }
+
+  /** Mints a viewer credential: both ways of pairing end here, so a screen paired either way holds the same thing. */
+  private issueViewer(name: string, expiresAtMs: number | null) {
+    const database = this.requireDatabase();
+    const now = this.now();
     const token = `${TOKEN_PREFIX}${this.entropy(32).toString("base64url")}`;
     const id = randomUUID();
     const createdAt = timestamp(now, "Viewer creation time");
@@ -237,9 +331,14 @@ export class ViewerAccessStore {
 
   close() {
     this.pairingCodes.clear();
+    this.screenRequests.clear();
     this.failedAttempts = [];
     this.database?.close();
     this.database = undefined;
+  }
+
+  private pruneScreenRequests(now: number) {
+    for (const [key, request] of this.screenRequests) if (request.expiresAt <= now) this.screenRequests.delete(key);
   }
 
   private prunePairings(now: number) {

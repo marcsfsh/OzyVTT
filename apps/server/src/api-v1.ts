@@ -7,13 +7,11 @@ import {
   OPENAPI_DOCUMENT_PATH,
   REALTIME_PROTOCOL_VERSION,
   RotateIntegrationCredentialRequestSchema,
-  SYSTEM_PATHS,
-  type IntegrationScope
+  SYSTEM_PATHS
 } from "@vtt/api-contract";
 import { openApiDocument } from "./openapi/document.js";
 import {
   apiErrorHandler,
-  bearerToken,
   expressPath,
   isUuidV4,
   issuesOf,
@@ -24,13 +22,14 @@ import {
 } from "./http-kit.js";
 import type { IntegrationCredentialStore } from "./integration-credentials.js";
 import { InvalidRequestError } from "./invalid-request.js";
+import { callerOf, refuse, type CredentialVerifiers } from "./request-auth.js";
 
 type ApiV1RouterOptions = {
   applicationVersion: string;
   actorDefinitionVersion: number;
-  authorizeIntegration: (token: string, requiredScope: IntegrationScope) => boolean | Promise<boolean>;
-  /** GM session bearer auth, distinct from integration-credential auth: only a signed-in GM may manage credentials. */
-  authorizeGm: (token: string | undefined) => boolean;
+  /** The server's credential checks. Only a GM session manages credentials; the capabilities read takes a
+   *  `system:read` integration credential. */
+  verifiers: CredentialVerifiers;
   credentialStore: Pick<IntegrationCredentialStore, "create" | "list" | "get" | "rotate" | "revoke" | "auditEvents">;
   /** The live-game surface (game-http.ts), mounted inside this router so it sits before the API 404. */
   gameRouter?: Router;
@@ -48,10 +47,9 @@ export function createApiV1Router(options: ApiV1RouterOptions) {
   const router = Router();
 
   function requireGm(req: Request, res: Response, next: NextFunction) {
-    const token = bearerToken(req);
-    if (!token || !options.authorizeGm(token))
-      return sendFailure(res, 401, "unauthenticated", "A valid GM session is required.");
-    next();
+    const caller = callerOf(req, res, options.verifiers);
+    if (caller.kind === "gm") return next();
+    return refuse(res, caller, "Only a GM session manages integration credentials.");
   }
 
   router.get(SYSTEM_PATHS.health, (_req, res) =>
@@ -67,11 +65,10 @@ export function createApiV1Router(options: ApiV1RouterOptions) {
     })
   );
 
-  router.get(SYSTEM_PATHS.capabilities, async (req, res) => {
-    const token = bearerToken(req);
-    if (!token) return sendFailure(res, 401, "unauthenticated", "A bearer integration token is required.");
-    if (!(await options.authorizeIntegration(token, "system:read")))
-      return sendFailure(res, 403, "forbidden", "The integration is not authorized for this capability.");
+  router.get(SYSTEM_PATHS.capabilities, (req, res) => {
+    const caller = callerOf(req, res, options.verifiers, { scope: "system:read" });
+    if (caller.kind !== "integration" || !caller.inScope)
+      return refuse(res, caller, "The capabilities read takes an integration credential with the system:read scope.");
     return sendData(res, 200, {
       api: { version: API_VERSION, namespace: `/api/v${API_VERSION}` },
       realtime: { protocolVersion: REALTIME_PROTOCOL_VERSION, transport: "socket.io" },
@@ -149,7 +146,12 @@ export function createApiV1Router(options: ApiV1RouterOptions) {
 
   if (options.gameRouter) router.use(options.gameRouter);
 
-  router.use((_req, res) => sendFailure(res, 404, "not_found", "API route not found."));
+  // Mounted on the app directly, so a request outside `/api/v1` passes on to the client hosting.
+  router.use((req, res, next) =>
+    req.path === "/api/v1" || req.path.startsWith("/api/v1/")
+      ? sendFailure(res, 404, "not_found", "API route not found.")
+      : next()
+  );
   router.use(apiErrorHandler("The request failed."));
   return router;
 }

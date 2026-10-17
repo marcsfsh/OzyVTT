@@ -16,6 +16,7 @@ import {
   SESSION_PATHS,
   SOUND_ASSET_PATHS,
   SYSTEM_PATHS,
+  VIEWER_PAIRING_COOKIE,
   VIEWER_PATHS,
   VIEWER_SESSION_COOKIE
 } from "@vtt/api-contract";
@@ -184,7 +185,7 @@ const homebrewOp = (
     [options.ok ?? "200"]: { description: "Success", ...homebrewJson(okRef) },
     ...(options.bad === false ? {} : { "400": apiError }),
     "401": apiError,
-    // A player session is authenticated and denied: 403, never 401.
+    // A player session is a valid credential without the role: 403, never 401.
     "403": apiError,
     ...(options.notFound ? { "404": apiError } : {}),
     ...(options.conflict
@@ -206,7 +207,7 @@ export const openApiDocument = {
     version: API_VERSION,
     // Described per surface: only game writes accept an optional `commandId`; codex and homebrew bodies are strict.
     description:
-      "Versioned, recipient-safe integration contract for a self-hosted VTT. Game writes accept an optional `commandId` (UUID) executed exactly once - supply your own and resend it to retry safely, and the server replays the stored outcome with `duplicate: true`; codex JSON-body writes accept one too - a replay carries `x-idempotent-replay: true` - while codex body-less POSTs, codex DELETEs and every homebrew write carry none and rely on `expectedRev` plus their own conflict rules instead. Stale-revision writes are rejected with 409 + `error.currentRevision` (`expectedRevision` targets the global game revision; `expectedRev` targets one record's revision). Role denials are 403, a missing credential is 401, and the existence of a secret record always reads as 404."
+      "Versioned, recipient-safe integration contract for a self-hosted VTT. Game writes accept an optional `commandId` (UUID) executed exactly once - supply your own and resend it to retry safely, and the server replays the stored outcome with `duplicate: true`; codex JSON-body writes accept one too - a replay carries `x-idempotent-replay: true` - while codex body-less POSTs, codex DELETEs and every homebrew write carry none and rely on `expectedRev` plus their own conflict rules instead. Stale-revision writes are rejected with 409 + `error.currentRevision` (`expectedRevision` targets the global game revision; `expectedRev` targets one record's revision). A missing, malformed, expired or revoked credential is 401; a valid credential without the role or scope is 403 (ADR-0025); and the existence of a secret record always reads as 404."
   },
   servers: [{ url: API_NAMESPACE }],
   paths: {
@@ -307,7 +308,8 @@ export const openApiDocument = {
             description: "Signed out",
             content: { "application/json": { schema: { $ref: "#/components/schemas/GmSignOutResponse" } } }
           },
-          "401": apiError
+          "401": apiError,
+          "403": apiError
         }
       }
     },
@@ -321,7 +323,43 @@ export const openApiDocument = {
             description: "Every GM session revoked",
             content: { "application/json": { schema: { $ref: "#/components/schemas/GmRevokeAllResponse" } } }
           },
-          "401": apiError
+          "401": apiError,
+          "403": apiError
+        }
+      }
+    },
+    [HOST_PATHS.gmPassword]: {
+      post: {
+        operationId: "changeGmPassword",
+        security: [{ gmAuth: [] }],
+        description:
+          "Replaces the GM password after checking the current one (at least 12 characters). Every GM session issued before the change ends; the response carries a new token for the caller. Failed attempts count toward the sign-in rate limit.",
+        requestBody: jsonBody("GmPasswordChangeRequest"),
+        responses: {
+          "200": {
+            description: "The password is changed; a new GM session token",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/GmSignInResponse" } } }
+          },
+          "400": apiError,
+          "401": apiError,
+          "403": apiError,
+          "429": apiError
+        }
+      }
+    },
+    [HOST_PATHS.joinUrls]: {
+      get: {
+        operationId: "listJoinUrls",
+        security: [{ gmAuth: [] }],
+        description:
+          "The addresses players open on the home network to join, one per network interface, and the host's own localhost address.",
+        responses: {
+          "200": {
+            description: "Join addresses",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/JoinUrlsResponse" } } }
+          },
+          "401": apiError,
+          "403": apiError
         }
       }
     },
@@ -335,7 +373,8 @@ export const openApiDocument = {
             description: "Viewer addresses",
             content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerUrlsResponse" } } }
           },
-          "401": apiError
+          "401": apiError,
+          "403": apiError
         }
       }
     },
@@ -369,7 +408,8 @@ export const openApiDocument = {
             }
           },
           "400": { $ref: "#/components/responses/ApiError" },
-          "401": { $ref: "#/components/responses/ApiError" }
+          "401": { $ref: "#/components/responses/ApiError" },
+          "403": { $ref: "#/components/responses/ApiError" }
         }
       },
       get: {
@@ -382,7 +422,8 @@ export const openApiDocument = {
               "application/json": { schema: { $ref: "#/components/schemas/IntegrationCredentialListResponse" } }
             }
           },
-          "401": { $ref: "#/components/responses/ApiError" }
+          "401": { $ref: "#/components/responses/ApiError" },
+          "403": { $ref: "#/components/responses/ApiError" }
         }
       }
     },
@@ -405,6 +446,7 @@ export const openApiDocument = {
             }
           },
           "401": { $ref: "#/components/responses/ApiError" },
+          "403": { $ref: "#/components/responses/ApiError" },
           "404": { $ref: "#/components/responses/ApiError" },
           "409": { $ref: "#/components/responses/ApiError" }
         }
@@ -421,6 +463,7 @@ export const openApiDocument = {
             content: { "application/json": { schema: { $ref: "#/components/schemas/IntegrationCredentialResponse" } } }
           },
           "401": { $ref: "#/components/responses/ApiError" },
+          "403": { $ref: "#/components/responses/ApiError" },
           "404": { $ref: "#/components/responses/ApiError" }
         }
       }
@@ -438,6 +481,7 @@ export const openApiDocument = {
             }
           },
           "401": { $ref: "#/components/responses/ApiError" },
+          "403": { $ref: "#/components/responses/ApiError" },
           "404": { $ref: "#/components/responses/ApiError" }
         }
       }
@@ -465,6 +509,7 @@ export const openApiDocument = {
           },
           "400": { $ref: "#/components/responses/ApiError" },
           "401": { $ref: "#/components/responses/ApiError" },
+          "403": { $ref: "#/components/responses/ApiError" },
           "413": { $ref: "#/components/responses/ApiError" }
         }
       },
@@ -476,7 +521,8 @@ export const openApiDocument = {
             description: "Safe metadata for every stored map asset",
             content: { "application/json": { schema: { $ref: "#/components/schemas/MapAssetListResponse" } } }
           },
-          "401": { $ref: "#/components/responses/ApiError" }
+          "401": { $ref: "#/components/responses/ApiError" },
+          "403": { $ref: "#/components/responses/ApiError" }
         }
       }
     },
@@ -491,6 +537,7 @@ export const openApiDocument = {
             content: { "application/json": { schema: { $ref: "#/components/schemas/MapAssetResponse" } } }
           },
           "401": { $ref: "#/components/responses/ApiError" },
+          "403": { $ref: "#/components/responses/ApiError" },
           "404": { $ref: "#/components/responses/ApiError" }
         }
       },
@@ -519,7 +566,8 @@ export const openApiDocument = {
             content: { "application/json": { schema: { $ref: "#/components/schemas/MapAssetResponse" } } }
           },
           "400": { $ref: "#/components/responses/ApiError" },
-          "401": { $ref: "#/components/responses/ApiError" }
+          "401": { $ref: "#/components/responses/ApiError" },
+          "403": { $ref: "#/components/responses/ApiError" }
         }
       }
     },
@@ -534,6 +582,7 @@ export const openApiDocument = {
           "200": { description: "Full image bytes" },
           "206": { description: "Partial content for a byte-range request" },
           "304": { description: "Not modified" },
+          "401": { $ref: "#/components/responses/ApiError" },
           "403": { $ref: "#/components/responses/ApiError" },
           "404": { $ref: "#/components/responses/ApiError" },
           "416": { description: "Range not satisfiable" }
@@ -570,7 +619,8 @@ export const openApiDocument = {
             content: { "application/json": { schema: { $ref: "#/components/schemas/MapAssetResponse" } } }
           },
           "400": { $ref: "#/components/responses/ApiError" },
-          "401": { $ref: "#/components/responses/ApiError" }
+          "401": { $ref: "#/components/responses/ApiError" },
+          "403": { $ref: "#/components/responses/ApiError" }
         }
       }
     },
@@ -588,6 +638,7 @@ export const openApiDocument = {
           },
           "400": { $ref: "#/components/responses/ApiError" },
           "401": { $ref: "#/components/responses/ApiError" },
+          "403": { $ref: "#/components/responses/ApiError" },
           "404": { $ref: "#/components/responses/ApiError" }
         }
       }
@@ -609,6 +660,7 @@ export const openApiDocument = {
           },
           "400": { $ref: "#/components/responses/ApiError" },
           "401": { $ref: "#/components/responses/ApiError" },
+          "403": { $ref: "#/components/responses/ApiError" },
           "404": { $ref: "#/components/responses/ApiError" }
         }
       }
@@ -630,6 +682,7 @@ export const openApiDocument = {
           },
           "400": { $ref: "#/components/responses/ApiError" },
           "401": { $ref: "#/components/responses/ApiError" },
+          "403": { $ref: "#/components/responses/ApiError" },
           "404": { $ref: "#/components/responses/ApiError" }
         }
       }
@@ -656,6 +709,7 @@ export const openApiDocument = {
           },
           "400": apiError,
           "401": apiError,
+          "403": apiError,
           "413": apiError
         }
       },
@@ -668,7 +722,8 @@ export const openApiDocument = {
             description: "Every sound in the library",
             content: { "application/json": { schema: { $ref: "#/components/schemas/SoundAssetListResponse" } } }
           },
-          "401": apiError
+          "401": apiError,
+          "403": apiError
         }
       }
     },
@@ -697,6 +752,7 @@ export const openApiDocument = {
           },
           "400": apiError,
           "401": apiError,
+          "403": apiError,
           "404": apiError
         }
       },
@@ -713,6 +769,7 @@ export const openApiDocument = {
           },
           "400": apiError,
           "401": apiError,
+          "403": apiError,
           "404": apiError
         }
       }
@@ -729,6 +786,7 @@ export const openApiDocument = {
           "206": { description: "Partial content for a byte-range request" },
           "304": { description: "Not modified" },
           "400": apiError,
+          "401": apiError,
           "403": apiError,
           "404": apiError,
           "416": { description: "Range not satisfiable" }
@@ -748,6 +806,7 @@ export const openApiDocument = {
           },
           "400": { $ref: "#/components/responses/ApiError" },
           "401": { $ref: "#/components/responses/ApiError" },
+          "403": { $ref: "#/components/responses/ApiError" },
           "429": { $ref: "#/components/responses/ApiError" }
         }
       }
@@ -768,6 +827,54 @@ export const openApiDocument = {
         }
       }
     },
+    [VIEWER_PATHS.screenPairings]: {
+      post: {
+        operationId: "openScreenPairing",
+        security: [],
+        description: `A table screen asks to pair. It gets a six-digit code to show and an HttpOnly \`${VIEWER_PAIRING_COOKIE}\` cookie that holds the request's secret. The code lasts ten minutes. Open requests are capped and rate-limited (429).`,
+        responses: {
+          "201": {
+            description: "The code to show",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ScreenPairingOpenResponse" } } }
+          },
+          "429": apiError
+        }
+      }
+    },
+    [VIEWER_PATHS.screenPairingsCurrent]: {
+      get: {
+        operationId: "getScreenPairing",
+        security: [],
+        description: `The screen's poll, read from its \`${VIEWER_PAIRING_COOKIE}\` cookie: still waiting with its code, or paired. Pairing sets the \`${VIEWER_SESSION_COOKIE}\` cookie and closes the request, so it pairs once.`,
+        responses: {
+          "200": {
+            description: "Waiting or paired",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ScreenPairingStatusResponse" } } }
+          },
+          "404": apiError
+        }
+      }
+    },
+    [VIEWER_PATHS.screenPairingsApprove]: {
+      post: {
+        operationId: "approveScreenPairing",
+        security: [{ gmAuth: [] }],
+        description:
+          "Lets in the screen showing this code. A code no screen is showing is a 404. Wrong codes count toward the pairing rate limit (429).",
+        requestBody: jsonBody("ScreenPairingApproveRequest"),
+        responses: {
+          "200": {
+            description: "The screen is let in and pairs on its next poll",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ScreenPairingApproveResponse" } } }
+          },
+          "400": apiError,
+          "401": apiError,
+          "403": apiError,
+          "404": apiError,
+          "429": apiError
+        }
+      }
+    },
     [VIEWER_PATHS.access]: {
       get: {
         operationId: "listViewerAccess",
@@ -777,7 +884,8 @@ export const openApiDocument = {
             description: "Every paired viewer plus which are currently connected",
             content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerAccessListResponse" } } }
           },
-          "401": { $ref: "#/components/responses/ApiError" }
+          "401": { $ref: "#/components/responses/ApiError" },
+          "403": { $ref: "#/components/responses/ApiError" }
         }
       }
     },
@@ -793,7 +901,8 @@ export const openApiDocument = {
             content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerSessionResponse" } } }
           },
           "400": { $ref: "#/components/responses/ApiError" },
-          "401": { $ref: "#/components/responses/ApiError" }
+          "401": { $ref: "#/components/responses/ApiError" },
+          "403": { $ref: "#/components/responses/ApiError" }
         }
       }
     },
@@ -807,7 +916,8 @@ export const openApiDocument = {
               "Current player-safe presentation state (map, camera, measurement, pings, initiative, encounter, and what the sound board is playing)",
             content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerPresentationResponse" } } }
           },
-          "401": { $ref: "#/components/responses/ApiError" }
+          "401": { $ref: "#/components/responses/ApiError" },
+          "403": { $ref: "#/components/responses/ApiError" }
         }
       }
     },
@@ -824,6 +934,7 @@ export const openApiDocument = {
           },
           "400": { $ref: "#/components/responses/ApiError" },
           "401": { $ref: "#/components/responses/ApiError" },
+          "403": { $ref: "#/components/responses/ApiError" },
           "409": { $ref: "#/components/responses/ApiError" }
         }
       }
@@ -839,7 +950,8 @@ export const openApiDocument = {
             description: "Preview cookie set",
             content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerSessionResponse" } } }
           },
-          "401": { $ref: "#/components/responses/ApiError" }
+          "401": { $ref: "#/components/responses/ApiError" },
+          "403": { $ref: "#/components/responses/ApiError" }
         }
       }
     },
@@ -871,7 +983,8 @@ export const openApiDocument = {
             content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerSoundStatusResponse" } } }
           },
           "400": apiError,
-          "401": apiError
+          "401": apiError,
+          "403": apiError
         }
       }
     },
@@ -883,7 +996,8 @@ export const openApiDocument = {
           "Server-Sent Events stream of presentation updates for a paired viewer session; not a normal JSON response.",
         responses: {
           "200": { description: "text/event-stream of `presentation` events" },
-          "401": { $ref: "#/components/responses/ApiError" }
+          "401": { $ref: "#/components/responses/ApiError" },
+          "403": { $ref: "#/components/responses/ApiError" }
         }
       }
     },
@@ -1907,6 +2021,7 @@ export const openApiDocument = {
         responses: {
           "200": { description: "Full image bytes" },
           "304": { description: "Not modified" },
+          "401": apiError,
           "403": apiError,
           "404": apiError
         }
@@ -2143,6 +2258,78 @@ export const openApiDocument = {
         properties: { viewerUrls: { type: "array", items: { type: "string", format: "uri" } } }
       },
       ViewerUrlsResponse: envelopeSchema("#/components/schemas/ViewerUrls"),
+      GmPasswordChangeRequest: {
+        type: "object",
+        additionalProperties: false,
+        required: ["currentPassword", "newPassword"],
+        properties: {
+          currentPassword: { type: "string", maxLength: 256 },
+          newPassword: { type: "string", minLength: 12, maxLength: 256 }
+        }
+      },
+      JoinUrls: {
+        type: "object",
+        additionalProperties: false,
+        required: ["joinUrls", "hostUrl"],
+        properties: {
+          joinUrls: { type: "array", items: { type: "string", format: "uri" } },
+          hostUrl: { type: "string", format: "uri" }
+        }
+      },
+      JoinUrlsResponse: envelopeSchema("#/components/schemas/JoinUrls"),
+      ScreenPairing: {
+        type: "object",
+        additionalProperties: false,
+        required: ["code", "expiresAt"],
+        properties: {
+          code: { type: "string", pattern: "^[0-9]{6}$" },
+          expiresAt: { type: "string", format: "date-time" }
+        }
+      },
+      ScreenPairingOpenData: {
+        type: "object",
+        additionalProperties: false,
+        required: ["pairing"],
+        properties: { pairing: { $ref: "#/components/schemas/ScreenPairing" } }
+      },
+      ScreenPairingOpenResponse: envelopeSchema("#/components/schemas/ScreenPairingOpenData"),
+      ScreenPairingStatusData: {
+        oneOf: [
+          {
+            type: "object",
+            additionalProperties: false,
+            required: ["status", "pairing"],
+            properties: { status: { const: "waiting" }, pairing: { $ref: "#/components/schemas/ScreenPairing" } }
+          },
+          {
+            type: "object",
+            additionalProperties: false,
+            required: ["status", "viewer"],
+            properties: { status: { const: "paired" }, viewer: { $ref: "#/components/schemas/ViewerAccess" } }
+          }
+        ]
+      },
+      ScreenPairingStatusResponse: envelopeSchema("#/components/schemas/ScreenPairingStatusData"),
+      ScreenPairingApproveRequest: {
+        type: "object",
+        additionalProperties: false,
+        required: ["code"],
+        properties: { code: { type: "string", maxLength: 32 }, name: { type: "string", maxLength: 100 } }
+      },
+      ScreenPairingApproveData: {
+        type: "object",
+        additionalProperties: false,
+        required: ["approved"],
+        properties: {
+          approved: {
+            type: "object",
+            additionalProperties: false,
+            required: ["name"],
+            properties: { name: { type: "string" } }
+          }
+        }
+      },
+      ScreenPairingApproveResponse: envelopeSchema("#/components/schemas/ScreenPairingApproveData"),
 
       ImagePoint: {
         type: "object",

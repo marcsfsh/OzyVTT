@@ -1,7 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import express, { Router, type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
-import { VIEWER_SESSION_COOKIE } from "@vtt/api-contract";
 import { sendAssetContent } from "./asset-content.js";
 import {
   adjustWizardGrid,
@@ -15,20 +14,12 @@ import {
   type GridCalibrationWizardState
 } from "./grid-calibration-wizard.js";
 import { gridOverlayLines } from "./grid-overlay.js";
-import {
-  apiErrorHandler,
-  bearerToken,
-  cookie,
-  isUuidV4,
-  pathParam,
-  sendData,
-  sendFailure,
-  sendRefusal
-} from "./http-kit.js";
+import { apiErrorHandler, bearerToken, isUuidV4, pathParam, sendData, sendFailure, sendRefusal } from "./http-kit.js";
 import { InvalidRequestError } from "./invalid-request.js";
 import type { MapAssetMetadata, MapAssetStore } from "./map-assets.js";
 import { deriveMapDistanceScale } from "./map-measurement.js";
 import type { MapCatalogEntry, MapCatalogStore, MapKind, PublicMapAsset } from "./map-catalog.js";
+import { callerOf, refuse, type CredentialVerifiers } from "./request-auth.js";
 
 const MAP_COLLECTION = "/api/v1/map-assets";
 const MAP_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -93,9 +84,11 @@ type WizardSession = { ownerHash: string; assetId: string; state: GridCalibratio
 type MapRouterOptions = Readonly<{
   assets: MapAssetStore;
   catalog: MapCatalogStore;
-  authorizeGm: (token: string | undefined) => boolean;
-  authorizePlayer: (token: string | undefined, assetId: string) => boolean;
-  authorizeViewer: (token: string | undefined, assetId: string) => boolean;
+  verifiers: CredentialVerifiers;
+  /** Whether a joined player may load this map now. */
+  playerMayLoad: (assetId: string) => boolean;
+  /** Whether a paired table screen may load this map now. */
+  viewerMayLoad: (assetId: string) => boolean;
   now?: () => number;
 }>;
 
@@ -129,16 +122,19 @@ export function createMapRouter(options: MapRouterOptions) {
   const wizards = new Map<string, WizardSession>();
 
   const requireGm = (request: Request, response: Response, next: NextFunction) => {
-    if (!options.authorizeGm(bearerToken(request)))
-      return sendFailure(response, 401, "unauthenticated", "A valid GM session is required.");
-    next();
+    const caller = callerOf(request, response, options.verifiers);
+    if (caller.kind === "gm") return next();
+    return refuse(response, caller, "The GM manages the map library.");
   };
-  const canReadContent = (request: Request, assetId: string) => {
-    const token = bearerToken(request);
-    const viewer = cookie(request, VIEWER_SESSION_COOKIE);
-    return (
-      options.authorizeGm(token) || options.authorizePlayer(token, assetId) || options.authorizeViewer(viewer, assetId)
-    );
+  /** Answers the refusal itself and returns false when the caller may not load this map now. */
+  const mayReadContent = (request: Request, response: Response, assetId: string) => {
+    const caller = callerOf(request, response, options.verifiers, { viewer: true });
+    const allowed =
+      caller.kind === "gm" ||
+      (caller.kind === "player" && options.playerMayLoad(assetId)) ||
+      (caller.kind === "viewer" && options.viewerMayLoad(assetId));
+    if (!allowed) refuse(response, caller, "That map is not available to this table session.");
+    return allowed;
   };
   const pruneWizards = () => {
     for (const [id, session] of wizards) if (session.touchedAt <= now() - WIZARD_TTL_MS) wizards.delete(id);
@@ -244,8 +240,7 @@ export function createMapRouter(options: MapRouterOptions) {
   router.get(`${MAP_COLLECTION}/:id/content`, async (request, response) => {
     const id = mapId(request);
     if (!id) return sendFailure(response, 400, "validation_failed", "Map asset ID is malformed.");
-    if (!canReadContent(request, id))
-      return sendFailure(response, 403, "forbidden", "That map is not available to this table session.");
+    if (!mayReadContent(request, response, id)) return;
     const metadata = await options.assets.get(id);
     const content = metadata ? await options.assets.readOriginal(id) : null;
     if (!metadata || !content) return sendFailure(response, 404, "not_found", "Map asset was not found.");
@@ -258,8 +253,7 @@ export function createMapRouter(options: MapRouterOptions) {
   router.get(`${MAP_COLLECTION}/:id/grid`, (request, response) => {
     const id = mapId(request);
     if (!id) return sendFailure(response, 400, "validation_failed", "Map asset ID is malformed.");
-    if (!canReadContent(request, id))
-      return sendFailure(response, 403, "forbidden", "That map is not available to this table session.");
+    if (!mayReadContent(request, response, id)) return;
     const entry = options.catalog.get(id);
     if (!entry) return sendFailure(response, 404, "not_found", "Map asset was not found.");
     return sendData(response, 200, { calibration: entry.calibration?.calibration ?? null });

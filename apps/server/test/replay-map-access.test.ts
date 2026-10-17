@@ -128,10 +128,10 @@ describe("a shared replay's battle map (D26 ride-along)", () => {
     // The shared fight's battlefield opens; the unshared one does not.
     expect(await image(shared.metadata.id, playerToken)).toBe(200);
     expect(await image(secret.metadata.id, playerToken)).toBe(403);
-    // The GM's access is unchanged, and a caller with no session still gets nothing (the map router
-    // answers 403 to every unauthorized reader).
+    // The GM's access is unchanged, and a caller with no session still gets nothing: a 401, decided before any
+    // lookup.
     expect(await image(secret.metadata.id, gmToken)).toBe(200);
-    expect((await fetch(`${base}/api/v1/map-assets/${shared.metadata.id}/content`)).status).toBe(403);
+    expect((await fetch(`${base}/api/v1/map-assets/${shared.metadata.id}/content`)).status).toBe(401);
 
     // Un-sharing takes the image back: access follows the flag, not the archive.
     expect(await setShared(sharedArchiveId, false)).toBe(200);

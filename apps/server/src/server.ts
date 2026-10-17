@@ -2,7 +2,7 @@ import { createServer as createHttpServer } from "node:http";
 import { randomInt, randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import express, { type Express } from "express";
-import { Server } from "socket.io";
+import { Server, type Socket } from "socket.io";
 import { CODEX_PATHS, HOST_NAMESPACE } from "@vtt/api-contract";
 import type {
   ClientToServerEvents,
@@ -30,6 +30,7 @@ import {
   createGameCommands,
   failureReply,
   NOT_JOINED_REPLY,
+  SESSION_ENDED_REPLY,
   socketEventOf,
   type GamePrincipal
 } from "./commands/index.js";
@@ -54,6 +55,7 @@ import { TokenCatalogStore } from "./token-catalog.js";
 import { createTokenRouter } from "./token-http.js";
 import { PresenceRegistry } from "./presence.js";
 import { projectGmView, projectPlayerView } from "./projections.js";
+import { callerOfToken, type CredentialVerifiers } from "./request-auth.js";
 import { playerReplayMapAssetIds } from "./replay-projection.js";
 import type { EncounterArchiveDocument } from "./encounter-archive.js";
 import type { TokenMapGeometry } from "./token-placement.js";
@@ -87,6 +89,10 @@ export type CreateServerOptions = {
   viewerBaseUrls?: readonly string[];
   /** How long a session stays "reconnecting" after its last connection drops before going "offline". */
   presenceGraceMs?: number;
+  /** How often connected sockets are re-checked for a session that ran out. */
+  sessionSweepMs?: number;
+  /** How long after a GM password change the other GM devices are told their session ended. */
+  passwordChangeGraceMs?: number;
 };
 
 const isLoopback = (ip: string | undefined) => ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
@@ -128,15 +134,26 @@ export function createServer(options: CreateServerOptions) {
   // records; drafts are in neither slice.
   const contentLibrary = new ContentLibrary(homebrewStore);
   const authorizeGm = (token: string | undefined) => auth.verify(token) !== null;
-  // The codex authorization callbacks, shared by `createCodexRouter` and the `POST /codex/import` guard
-  // so "who may write the codex" has one definition.
-  const codexAuth = {
-    authorizeGm,
-    authorizePlayer: (token: string | undefined) => auth.verifyPlayer(token) !== null,
-    // Same credential store as the game router. A codex credential acts at GM grade; scope decides
-    // read vs write, and `admin` implies both.
-    verifyIntegration: (token: string, scope: "codex:read" | "codex:write") => credentials.verify(token, scope)
-  };
+  /** Every credential the server accepts, checked one way for every HTTP route and the socket (ADR-0025). */
+  const verifiers = {
+    gm: (token) => auth.verify(token),
+    player: (token) => auth.verifyPlayer(token),
+    integration: (token, scope) => {
+      const checked = credentials.check(token, scope);
+      return checked && { id: checked.credential.id, name: checked.credential.name, inScope: checked.inScope };
+    },
+    viewer: (token) => {
+      try {
+        viewerAccess.verify(token);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  } satisfies Required<CredentialVerifiers>;
+  // Shared by `createCodexRouter` and the `POST /codex/import` guard so "who may write the codex" has one
+  // definition. A codex credential acts at GM grade; scope decides read vs write, and `admin` implies both.
+  const codexAuth = { verifiers };
   const viewerCoordinator = new ViewerCoordinator(viewerAccess, viewerPresentation, authorizeGm);
   // The table's sound (ADR-0024): the GM's library of files and the board, each in its own store. The board's
   // output reaches table screens through the viewer feed and the GM's devices as `sound:changed`; players get none.
@@ -187,7 +204,12 @@ export function createServer(options: CreateServerOptions) {
   function gmView(state: GameState, now = Date.now()) {
     return { ...projectGmView(state, presenceFor, now), turnHistory: store.listTurnSnapshots() };
   }
-  /** Also reauthorizes every connected socket, so a revoked GM client is downgraded or disconnected promptly. */
+  /** Tells a socket its session ended (revoked or expired) and drops it, so the client signs in again. */
+  function endSession(socket: Socket<ClientToServerEvents, ServerToClientEvents>) {
+    socket.emit("session:ended");
+    socket.disconnect(true);
+  }
+  /** Also reauthorizes every connected socket, so a revoked GM client is told and disconnected promptly. */
   function broadcast() {
     const current = committedState.read();
     for (const socket of io.sockets.sockets.values()) {
@@ -195,12 +217,20 @@ export function createServer(options: CreateServerOptions) {
       const gm = auth.verify(token);
       const player = auth.verifyPlayer(token);
       if (token && !gm && !player) {
-        socket.disconnect(true);
+        endSession(socket);
         continue;
       }
       socket.emit("state:updated", gm ? gmView(current) : projectPlayerView(current, player?.sessionId, presenceFor));
     }
   }
+  /** A session that runs out ends with no state change to notice it, so every socket is re-checked on a timer. */
+  const sessionSweep = setInterval(() => {
+    for (const socket of io.sockets.sockets.values()) {
+      const token = socket.handshake.auth?.token;
+      if (token && !auth.verify(token) && !auth.verifyPlayer(token)) endSession(socket);
+    }
+  }, options.sessionSweepMs ?? 30_000);
+  sessionSweep.unref?.();
   /** Sends the sound board to the GM's devices; a player's socket is never sent it. */
   function pushSoundToGm() {
     const view = sound.view();
@@ -405,6 +435,18 @@ export function createServer(options: CreateServerOptions) {
     }
   }
 
+  /**
+   * After the GM password is reset (data/auth.json deleted), every player session from before is dead, so the
+   * characters they claimed are let go and each player can claim again from a fresh seat.
+   */
+  async function releaseEveryClaim() {
+    if (!committedState.read().actors.some((actor) => actor.ownerSessionId !== null)) return;
+    const { state } = await store.execute({ id: randomUUID(), type: "host.release-claims" }, (draft) => {
+      for (const actor of draft.actors) actor.ownerSessionId = null;
+    });
+    await publishGameState(state);
+  }
+
   // The game commands and reads, served by both the Socket.IO handlers below and the HTTP API (ADR-0016).
   const game = createGameCommands({
     store,
@@ -488,10 +530,13 @@ export function createServer(options: CreateServerOptions) {
   app.use(
     createHostRouter({
       auth,
+      verifiers,
       loginLimiter: gmLoginRateLimiter,
       isLoopback,
       broadcast,
-      viewerBaseUrls: options.viewerBaseUrls
+      onBootstrapped: releaseEveryClaim,
+      viewerBaseUrls: options.viewerBaseUrls,
+      ...(options.passwordChangeGraceMs !== undefined ? { passwordChangeGraceMs: options.passwordChangeGraceMs } : {})
     })
   );
   app.use(
@@ -499,7 +544,7 @@ export function createServer(options: CreateServerOptions) {
       access: viewerAccess,
       presentation: viewerPresentation,
       coordinator: viewerCoordinator,
-      authorizeGm
+      verifiers
     })
   );
 
@@ -530,9 +575,8 @@ export function createServer(options: CreateServerOptions) {
     createMapRouter({
       assets: mapAssets,
       catalog: mapCatalog,
-      authorizeGm,
-      authorizePlayer: (token, assetId) => {
-        if (auth.verifyPlayer(token) === null) return false;
+      verifiers,
+      playerMayLoad: (assetId) => {
         const { combat } = committedState.read();
         // A player may load the active battle map, any revealed atlas map, or the map of a replay the GM shared.
         return (
@@ -541,15 +585,9 @@ export function createServer(options: CreateServerOptions) {
           sharedReplayMap(assetId)
         );
       },
-      authorizeViewer: (token, assetId) => {
-        if (!token) return false;
-        try {
-          viewerAccess.verify(token);
-          const presentation = viewerPresentation.project();
-          return presentation.enabled && presentation.activeMap?.assetId === assetId;
-        } catch {
-          return false;
-        }
+      viewerMayLoad: (assetId) => {
+        const presentation = viewerPresentation.project();
+        return presentation.enabled && presentation.activeMap?.assetId === assetId;
       }
     })
   );
@@ -557,43 +595,22 @@ export function createServer(options: CreateServerOptions) {
     createTokenRouter({
       assets: tokenAssets,
       catalog: tokenCatalog,
-      authorizeGm,
       // A joined player may browse the GM's token library and upload their own token image.
-      playerSession: (token) => auth.verifyPlayer(token),
-      authorizePlayer: (token, assetId) =>
-        auth.verifyPlayer(token) !== null &&
+      verifiers,
+      playerMayLoad: (assetId) =>
         committedState.read().actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId),
-      authorizeViewer: (token, assetId) => {
-        if (!token) return false;
-        try {
-          viewerAccess.verify(token);
-          return (
-            viewerPresentation.project().enabled &&
-            committedState
-              .read()
-              .actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId)
-          );
-        } catch {
-          return false;
-        }
-      }
+      viewerMayLoad: (assetId) =>
+        viewerPresentation.project().enabled &&
+        committedState.read().actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId)
     })
   );
   app.use(
     createSoundRouter({
       service: sound,
       assets: soundAssets,
-      authorizeGm,
+      verifiers,
       // A table screen may load a sound only while it is playing; the GM's library stays the GM's.
-      authorizeViewer: (token, assetId) => {
-        if (!token) return false;
-        try {
-          viewerAccess.verify(token);
-          return sound.isOnAir(assetId);
-        } catch {
-          return false;
-        }
-      }
+      viewerMayLoad: (assetId) => sound.isOnAir(assetId)
     })
   );
   app.use(
@@ -605,12 +622,11 @@ export function createServer(options: CreateServerOptions) {
       issuePreviewSession: () => auth.issuePreviewPlayerSession()
     })
   );
-  // GM-only end to end; `authorizePlayer` exists only so a player gets 403 rather than 401.
+  // GM-only end to end: any other valid credential gets 403.
   app.use(
     createHomebrewRouter({
       store: homebrewStore,
-      authorizeGm,
-      authorizePlayer: (token) => auth.verifyPlayer(token) !== null,
+      verifiers,
       notifyChanged: notifyHomebrewChanged,
       // The GM catalog: a dependency that is published but not player-visible is valid here.
       validate: createHomebrewValidator({
@@ -627,9 +643,7 @@ export function createServer(options: CreateServerOptions) {
   );
   const gameApiRouter = createGameApiRouter({
     game,
-    gmSession: (token) => auth.verify(token),
-    playerSession: (token) => auth.verifyPlayer(token),
-    verifyIntegration: (token, scope) => credentials.verify(token, scope),
+    verifiers,
     archives: {
       list: () => store.listEncounterArchives(),
       get: (id) => store.getEncounterArchive(id),
@@ -651,13 +665,12 @@ export function createServer(options: CreateServerOptions) {
   const apiV1Router = createApiV1Router({
     applicationVersion: options.applicationVersion ?? "0.1.0",
     actorDefinitionVersion: ACTOR_DEFINITION_SCHEMA_VERSION,
-    authorizeIntegration: (token, requiredScope) => credentials.verify(token, requiredScope) !== null,
-    authorizeGm,
+    verifiers,
     credentialStore: credentials,
     gameRouter: gameApiRouter
   });
-  // Keep the API-only 404 envelope scoped to /api/v1 so it cannot swallow the SPA or the viewer.
-  app.use((req, res, next) => (isApiV1(req.path) ? apiV1Router(req, res, next) : next()));
+  // Its API-only 404 envelope answers inside /api/v1 alone, so it cannot swallow the SPA or the viewer.
+  app.use(apiV1Router);
   app.use("/api", (_req, res) => res.status(404).json({ message: "API route not found." }));
   if (!options.useDevelopmentClient) {
     app.get("/viewer", (_req, res) => res.redirect(307, "/viewer.html"));
@@ -679,10 +692,18 @@ export function createServer(options: CreateServerOptions) {
     let joinedSession: { sessionId: string; role: ClientRole } | null = null;
     socket.on("session:join", (payload, ack) => {
       // Client input: a join without a payload or an acknowledgement must not throw out of the handler.
-      const token = typeof payload?.token === "string" ? payload.token : undefined;
+      const token = typeof payload?.token === "string" && payload.token !== "" ? payload.token : undefined;
       const acknowledge: typeof ack = (result) => {
         if (typeof ack === "function") ack(result);
       };
+      // The handshake reads the caller like every HTTP route (ADR-0025). A token that no longer verifies is refused,
+      // never swapped for a fresh player seat: a GM whose session ended must hear so, and a player's client drops
+      // the dead token and joins again without one.
+      const caller = callerOfToken(token, verifiers);
+      if (caller.kind === "invalid")
+        return acknowledge({ ok: false, code: "unauthenticated", message: "Your session ended. Sign in again." });
+      if (caller.kind !== "none" && caller.kind !== "gm" && caller.kind !== "player")
+        return acknowledge({ ok: false, code: "forbidden", message: "That credential does not join the table." });
       socket.handshake.auth.token = token;
       const gm = auth.verify(token);
       if (gm) {
@@ -727,6 +748,11 @@ export function createServer(options: CreateServerOptions) {
       const player = auth.verifyPlayer(token);
       return player ? { kind: "player", sessionId: player.sessionId } : null;
     };
+    /** Whether this socket joined with a token that has since been revoked or run out. */
+    const sessionEnded = () => {
+      const token = socket.handshake.auth?.token;
+      return typeof token === "string" && !auth.verify(token) && !auth.verifyPlayer(token);
+    };
     /** Socket adapter: resolve the principal, run the work, and answer through the same failure mapping as
      *  HTTP. A timeline confirmation bounce is an ok:true ack, and an emit without an acknowledgement still
      *  runs. */
@@ -738,6 +764,11 @@ export function createServer(options: CreateServerOptions) {
         if (typeof acknowledge === "function") acknowledge(result);
       };
       const principal = principalOf();
+      if (!principal && sessionEnded()) {
+        reply(SESSION_ENDED_REPLY);
+        endSession(socket);
+        return;
+      }
       if (!principal) return reply(NOT_JOINED_REPLY);
       let outcome: Record<string, unknown>;
       try {
@@ -794,6 +825,7 @@ export function createServer(options: CreateServerOptions) {
     await viewerCoordinator.synchronizeEncounter(store.revision, projectViewerEncounter(committedState.read()));
   }
   function close() {
+    clearInterval(sessionSweep);
     presence.dispose();
     viewerCoordinator.dispose();
     sound.dispose();

@@ -115,11 +115,11 @@ describe("the sound library", () => {
     const image = await test.upload(png(4, 4), "song.mp3");
     expect((await test.json(image)).error.message).toContain("This file is an image");
 
-    expect((await test.upload(mp3(10), "x.mp3", { authorization: `Bearer ${test.playerToken}` })).status).toBe(401);
+    expect((await test.upload(mp3(10), "x.mp3", { authorization: `Bearer ${test.playerToken}` })).status).toBe(403);
     expect(
       (await fetch(`${test.base}/api/v1/sound-assets`, { headers: { authorization: `Bearer ${test.playerToken}` } }))
         .status
-    ).toBe(401);
+    ).toBe(403);
 
     const renamed = await fetch(`${test.base}/api/v1/sound-assets/${sound.id}`, {
       method: "PATCH",
@@ -224,7 +224,7 @@ describe("the table screen's sound", () => {
     expect((await ranged.arrayBuffer()).byteLength).toBe(100);
     expect((await content(crypt.id, { cookie })).status).toBe(403);
     expect((await content(tavern.id, { authorization: `Bearer ${test.playerToken}` })).status).toBe(403);
-    expect((await content(tavern.id, {})).status).toBe(403);
+    expect((await content(tavern.id, {})).status).toBe(401);
     expect((await content(crypt.id, test.gm)).status).toBe(200);
 
     // A late joiner: a second screen connecting now is told how far into the track the table is.
@@ -261,7 +261,7 @@ describe("the table screen's sound", () => {
       headers: { authorization: `Bearer ${test.playerToken}`, "content-type": "application/json" },
       body: JSON.stringify({ sound: "on" })
     });
-    expect(forged.status).toBe(401);
+    expect(forged.status).toBe(403);
   });
 
   it("moves the playlist on by itself when a track ends", async () => {

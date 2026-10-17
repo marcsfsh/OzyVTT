@@ -20,7 +20,7 @@ import { sceneCommands } from "./scenes.js";
 import { soundCommands } from "./sound.js";
 import { tableSettingCommands } from "./table-settings.js";
 
-export { describeFailure, failureReply, NOT_JOINED_REPLY } from "./failures.js";
+export { describeFailure, failureReply, NOT_JOINED_REPLY, SESSION_ENDED_REPLY } from "./failures.js";
 export { isGmGrade, type CommandContext, type GamePrincipal } from "./kit.js";
 export { socketEventOf, type AnyCommand, type GameReply } from "./pipeline.js";
 

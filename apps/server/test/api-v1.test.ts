@@ -23,6 +23,7 @@ import { openApiDocument } from "../src/openapi/document.js";
 import { createApiV1Router } from "../src/api-v1.js";
 import { requestConventions } from "../src/http-kit.js";
 import { IntegrationCredentialStore } from "../src/integration-credentials.js";
+import { fixedVerifiers } from "./fixed-verifiers.js";
 
 const servers: Array<ReturnType<ReturnType<typeof express>["listen"]>> = [];
 const directories: string[] = [];
@@ -51,9 +52,7 @@ async function newCredentialStore() {
   return { store, path: join(directory, "credentials.sqlite") };
 }
 
-async function start(
-  overrides: { authorizeIntegration?: (token: string, scope: string) => boolean | Promise<boolean> } = {}
-) {
+async function start(overrides: { authorizeIntegration?: (token: string, scope: string) => boolean } = {}) {
   const { store } = await newCredentialStore();
   const app = express();
   // Mirrors server.ts, which stamps the request id once ahead of every /api/v1 router.
@@ -63,11 +62,23 @@ async function start(
     createApiV1Router({
       applicationVersion: "0.1.0-test",
       actorDefinitionVersion: 1,
-      // Defaults to real store-backed verification; individual tests may override with a simple fake to test router gating in isolation.
-      authorizeIntegration:
-        overrides.authorizeIntegration ??
-        ((token, scope) => store.verify(token, scope as Parameters<typeof store.verify>[1]) !== null),
-      authorizeGm: (token) => token === GM_TOKEN || token === OTHER_GM_TOKEN,
+      // Defaults to real store-backed verification; individual tests may override with a simple fake to test router
+      // gating in isolation. The fake names one live credential, `valid-token`.
+      verifiers: fixedVerifiers({
+        gm: [GM_TOKEN, OTHER_GM_TOKEN],
+        integration: (token, scope) => {
+          if (overrides.authorizeIntegration)
+            return token === "valid-token"
+              ? {
+                  id: "fake",
+                  name: "fake",
+                  inScope: scope === "any" || (scope !== null && overrides.authorizeIntegration(token, scope))
+                }
+              : null;
+          const checked = store.check(token, scope);
+          return checked && { id: checked.credential.id, name: checked.credential.name, inScope: checked.inScope };
+        }
+      }),
       credentialStore: store
     })
   );
@@ -105,11 +116,12 @@ describe("API v1 system router", () => {
     expect(missing.status).toBe(401);
     expect(ApiErrorEnvelopeSchema.parse(await missing.json()).error.code).toBe("unauthenticated");
 
-    const forbidden = await fetch(base + SYSTEM_PATHS.capabilities, {
+    // A token that is no live credential must sign in again: 401, like a missing one (ADR-0025).
+    const dead = await fetch(base + SYSTEM_PATHS.capabilities, {
       headers: { authorization: "Bearer invalid-token" }
     });
-    expect(forbidden.status).toBe(403);
-    expect(ApiErrorEnvelopeSchema.parse(await forbidden.json()).error.code).toBe("forbidden");
+    expect(dead.status).toBe(401);
+    expect(ApiErrorEnvelopeSchema.parse(await dead.json()).error.code).toBe("unauthenticated");
 
     const allowed = await fetch(base + SYSTEM_PATHS.capabilities, { headers: { authorization: "Bearer valid-token" } });
     expect(allowed.status).toBe(200);
@@ -124,7 +136,15 @@ describe("API v1 system router", () => {
   it("connects capability discovery to a durable integration credential requiring system:read", async () => {
     const { base, store } = await start();
     const noCredential = await fetch(base + SYSTEM_PATHS.capabilities, { headers: { authorization: "Bearer bogus" } });
-    expect(noCredential.status).toBe(403);
+    expect(noCredential.status).toBe(401);
+
+    // A live credential without the scope is the one 403.
+    const underscoped = store.create({ name: "Game reader", scopes: ["game:read"] });
+    const forbidden = await fetch(base + SYSTEM_PATHS.capabilities, {
+      headers: { authorization: `Bearer ${underscoped.token}` }
+    });
+    expect(forbidden.status).toBe(403);
+    expect(ApiErrorEnvelopeSchema.parse(await forbidden.json()).error.code).toBe("forbidden");
 
     const issued = store.create({ name: "Read-only overlay", scopes: ["system:read"] });
     const withCredential = await fetch(base + SYSTEM_PATHS.capabilities, {
@@ -173,10 +193,11 @@ describe("GM-authorized integration credential management", () => {
 
     const missing = await fetch(base + INTEGRATION_CREDENTIAL_PATHS.collection);
     expect(missing.status).toBe(401);
+    // A live integration credential is a valid credential without the GM's role: 403.
     const wrongKind = await fetch(base + INTEGRATION_CREDENTIAL_PATHS.collection, {
       headers: { authorization: `Bearer ${issued.token}` }
     });
-    expect(wrongKind.status).toBe(401);
+    expect(wrongKind.status).toBe(403);
     const malformed = await fetch(base + INTEGRATION_CREDENTIAL_PATHS.collection, {
       headers: { authorization: "not-bearer-shaped" }
     });
@@ -284,7 +305,7 @@ describe("GM-authorized integration credential management", () => {
     const stillVia401 = await fetch(base + SYSTEM_PATHS.capabilities, {
       headers: { authorization: `Bearer ${issued.token}` }
     });
-    expect(stillVia401.status).toBe(403);
+    expect(stillVia401.status).toBe(401);
   });
 
   it("reports safe audit history without ever exposing a secret", async () => {

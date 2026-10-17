@@ -6,7 +6,7 @@ machine-derivable surfaces of the app (state shape, command catalog, HTTP paths)
 file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.
 
 - API version `1` · realtime protocol `1`
-- 14 GameState fields · 120 commands · 243 HTTP paths
+- 14 GameState fields · 120 commands · 248 HTTP paths
 
 ## GameState shape
 
@@ -380,6 +380,8 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/homebrew/content/{id}/visibility`
 - `GET /api/v1/homebrew/packs/export`
 - `POST /api/v1/homebrew/packs/import`
+- `GET /api/v1/host/gm/join-urls`
+- `POST /api/v1/host/gm/password`
 - `POST /api/v1/host/gm/revoke-all`
 - `POST /api/v1/host/gm/sign-in`
 - `POST /api/v1/host/gm/sign-out`
@@ -408,6 +410,9 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `GET /api/v1/viewer/presentation`
 - `POST /api/v1/viewer/presentation/commands`
 - `POST /api/v1/viewer/preview-session`
+- `POST /api/v1/viewer/screen-pairings`
+- `POST /api/v1/viewer/screen-pairings/approve`
+- `GET /api/v1/viewer/screen-pairings/current`
 - `POST /api/v1/viewer/sound-status`
 
 ## Where things live

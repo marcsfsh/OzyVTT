@@ -1,9 +1,9 @@
 import express, { Router, type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
-import { VIEWER_SESSION_COOKIE } from "@vtt/api-contract";
 import { sendAssetContent } from "./asset-content.js";
 import type { AudioAssetStore } from "./audio-assets.js";
-import { bearerToken, cookie, pathParam, sendData, sendFailure, sendRefusal, apiErrorHandler } from "./http-kit.js";
+import { pathParam, sendData, sendFailure, sendRefusal, apiErrorHandler } from "./http-kit.js";
+import { callerOf, refuse, type CredentialVerifiers } from "./request-auth.js";
 import type { SoundService } from "./sound-service.js";
 
 /**
@@ -19,9 +19,9 @@ const RenameSchema = z.object({ name: z.string() }).strict();
 type SoundRouterOptions = Readonly<{
   service: SoundService;
   assets: AudioAssetStore;
-  authorizeGm: (token: string | undefined) => boolean;
-  /** A paired table screen's cookie, for a file that is playing on it now. */
-  authorizeViewer: (token: string | undefined, assetId: string) => boolean;
+  verifiers: CredentialVerifiers;
+  /** Whether a paired table screen may load this file: it is playing there now. */
+  viewerMayLoad: (assetId: string) => boolean;
 }>;
 
 function soundId(request: Request) {
@@ -32,9 +32,9 @@ function soundId(request: Request) {
 export function createSoundRouter(options: SoundRouterOptions) {
   const router = Router();
   const requireGm = (request: Request, response: Response, next: NextFunction) => {
-    if (!options.authorizeGm(bearerToken(request)))
-      return sendFailure(response, 401, "unauthenticated", "A valid GM session is required.");
-    next();
+    const caller = callerOf(request, response, options.verifiers);
+    if (caller.kind === "gm") return next();
+    return refuse(response, caller, "The GM manages the sound library.");
   };
 
   router.post(
@@ -95,10 +95,9 @@ export function createSoundRouter(options: SoundRouterOptions) {
     try {
       const id = soundId(request);
       if (!id) return sendFailure(response, 400, "validation_failed", "Sound ID is malformed.");
-      const allowed =
-        options.authorizeGm(bearerToken(request)) ||
-        options.authorizeViewer(cookie(request, VIEWER_SESSION_COOKIE), id);
-      if (!allowed) return sendFailure(response, 403, "forbidden", "That sound is not playing on this screen.");
+      const caller = callerOf(request, response, options.verifiers, { viewer: true });
+      const allowed = caller.kind === "gm" || (caller.kind === "viewer" && options.viewerMayLoad(id));
+      if (!allowed) return refuse(response, caller, "That sound is not playing on this screen.");
       const stored = await options.assets.readOriginal(id);
       if (!stored) return sendFailure(response, 404, "not_found", "That sound is not in the library.");
       return sendAssetContent(request, response, { ...stored.metadata, content: stored.buffer });
