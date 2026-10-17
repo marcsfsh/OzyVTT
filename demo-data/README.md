@@ -11,8 +11,8 @@ needs no code review. If that branch moves on, this one can stay where it is.
 app's own HTTP API so every record passed the server's validation:
 
 - Characters: a party of five level-7 characters (fighter, cleric, wizard, rogue, ranger) rolled by the
-  app's random generator, one retired bard (archived), and six named NPCs: two allies, one neutral, three
-  hostile. The app's built-in example party was removed.
+  app's random generator, one retired bard (archived), and six named NPCs on the roster. The app's built-in
+  example party was removed.
 - Battlemaps and scenes: four plain grid battlemaps, calibrated at five feet per square, with tokens.
   Three scenes hold finished fights. The fourth, "Assault on the Watchtower", is live on the table with
   fog, difficult terrain and staged tokens.
@@ -22,11 +22,20 @@ app's own HTTP API so every record passed the server's validation:
 - Homebrew: at least one of every type: class, subclass, species, background, feat, spell, equipment
   and monster. They mix published, shown-to-players, GM-only, a draft, and a published spell with an
   unpublished edit.
-- Codex: 36 pages of every kind (characters, locations, factions, items, species, faiths, events,
-  notes) in nested folders, with both halves filled in, wiki-links, banners and typed connections. Also:
-  a custom calendar; an atlas of seven nested maps with 15 pins and a party marker; four sessions (three
-  played, one planned); quests in every status; faction standing; and journal entries of every kind
-  (notes, combat, deadlines, downtime, milestones, standing and quest history).
+- Codex, 95 pages in 17 folders:
+  - 19 NPCs and a page for each party member, with backstory on the player side and secrets on the GM side.
+  - 22 places from the world map down to a single tavern, 7 factions, 8 items, 6 creatures and 4 faiths.
+  - 10 dated historical events, a player guide (primer, house rules, session zero, calendar and holidays,
+    prices, names and speech, travel times) and GM prep (pitch, secrets and clues, the villain's clock,
+    NPC voices, encounter and rumor tables).
+  - 97 typed connections, plus wiki-links throughout.
+- Campaign record:
+  - A custom calendar with eras and an atlas of seven nested maps with 23 pins and a party marker.
+  - Seven sessions: a session zero, five played sessions with full recaps and prep, and one planned.
+  - Eleven quests across every status, and standing with six factions that changes session by session.
+  - About 90 journal entries of every kind. They include a dated history, in-character diary entries,
+    letters and handouts, deadlines, downtime (applied and waiting), milestones, and the combat, standing
+    and quest records the server writes itself.
 
 The GM password is not included. You set your own the first time the server starts.
 
@@ -43,8 +52,9 @@ The GM password is not included. You set your own the first time the server star
 
 ## Rebuilding it
 
-`seed.mjs` builds the campaign from scratch against a running server with an empty data folder. The
-words live in `campaign.mjs`, and `images.mjs` draws the placeholder maps and tokens.
+`seed.mjs` builds the campaign from scratch against a running server with an empty data folder. The words
+live in `lore-people.mjs`, `lore-world.mjs`, `notes.mjs` and `chronicle.mjs`. `campaign.mjs` holds the
+calendar, folders, connections, quests and atlas pins, and `images.mjs` draws the placeholder maps and tokens.
 
 ```powershell
 $env:DATA_DIR = "C:\OzyVTT-demo"; npm run start

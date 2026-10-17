@@ -6,7 +6,8 @@
 // If the server has no GM password yet, the script sets the one given (it must run on the host machine).
 // Fights are played turn by turn with the server's own dice, so every run produces different combat logs.
 import { randomUUID } from "node:crypto";
-import { BANNERS, CALENDAR, CONNECTIONS, FOLDERS, PAGES, PLAYERS, QUESTS, SESSIONS, date } from "./campaign.mjs";
+import { BANNERS, CALENDAR, CONNECTIONS, FOLDERS, PAGES, PARTY, PINS, QUESTS, date } from "./campaign.mjs";
+import { HISTORY, SESSIONS } from "./chronicle.mjs";
 import { CELL_PX, atlasMap, gridMap, tokenDisc } from "./images.mjs";
 
 const args = new Map();
@@ -655,24 +656,54 @@ async function setDate(day) {
   await put("/api/v1/codex/calendar", { ...CALENDAR, currentDate: date(day) });
 }
 
-async function seedCodexBasics() {
+/** The rolled character's sheet line ("Level 7 Human Fighter (Champion) · Sage") and the species in it. */
+function sheetOf(actor, className) {
+  const line = actor.notes ?? "";
+  const species = line.match(new RegExp(`^Level \\d+ (.+?) ${className}\\b`))?.[1] ?? "";
+  return { line, species };
+}
+
+async function seedCodexBasics(roster) {
   await put("/api/v1/codex/settings", {
     revisionHistory: { enabled: true, windowMinutes: 0 },
     autosave: { enabled: true, intervalSeconds: 5 }
   });
-  await put("/api/v1/codex/calendar", { ...CALENDAR, currentDate: date(2) });
+  await put("/api/v1/codex/calendar", { ...CALENDAR, currentDate: date(1) });
   await post("/api/v1/codex/calendar/publish");
   for (const path of FOLDERS) await post("/api/v1/codex/folders", { path });
 
   const banners = {};
-  const bannerColors = ["#3A4B3F", "#2F4A5C", "#4B3A3A", "#3F3A4B", "#4B463A"];
+  const bannerColors = [
+    "#3A4B3F",
+    "#2F4A5C",
+    "#4B3A3A",
+    "#3F3A4B",
+    "#4B463A",
+    "#3A474B",
+    "#2F3F5C",
+    "#46503A",
+    "#4B3A46"
+  ];
   for (const [index, key] of BANNERS.entries()) {
     const bytes = atlasMap({ width: 1200, height: 300, field: bannerColors[index], line: "#6A7080", title: "" });
     const asset = await upload(`/api/v1/codex-assets?filename=banner-${key}.png`, bytes);
     banners[key] = asset.asset?.id ?? asset.id;
   }
+  const partyPages = PARTY.map(({ key, title, playerBody, fields, ...rest }) => {
+    const { line, species } = sheetOf(roster[title], PARTY_CLASSES[key]);
+    return {
+      key,
+      title,
+      entityType: "character",
+      folder: "Party",
+      fields: { race: species, ...fields },
+      playerBody: playerBody.replace("{summary}", line),
+      revealed: true,
+      ...rest
+    };
+  });
   const pages = {};
-  for (const page of PAGES) {
+  for (const page of [...partyPages, ...PAGES]) {
     const { key, revealed, ...body } = page;
     const created = await post("/api/v1/codex/pages", {
       ...body,
@@ -683,32 +714,39 @@ async function seedCodexBasics() {
   }
   for (const [from, to, label, layer] of CONNECTIONS)
     await post(`/api/v1/codex/pages/${pages[from].id}/connections`, { toPageId: pages[to].id, label, layer });
-  step(`codex: ${PAGES.length} pages in ${FOLDERS.length} folders, ${CONNECTIONS.length} connections`);
+  step(`codex: ${Object.keys(pages).length} pages in ${FOLDERS.length} folders, ${CONNECTIONS.length} connections`);
   return pages;
 }
 
-async function seedQuests(pages) {
-  const quests = {};
-  for (const quest of QUESTS) {
+/**
+ * Applies one quest change from the chronicle. A quest is created the first time it comes up, in the state
+ * that change names, so its history starts in the session where the party heard of it. `done` lists the
+ * objectives finished so far, by position.
+ */
+async function questChange(quests, pages, { key, status, done }) {
+  const quest = quests[key];
+  const objectives = quest.objectives.map((text, index) => ({ text, done: Boolean(done?.includes(index)) }));
+  if (!quest.record) {
     const created = await post("/api/v1/codex/quests", {
       title: quest.title,
-      status: "not-started",
+      status: status ?? "active",
       playerBody: quest.playerBody,
       gmBody: quest.gmBody,
-      objectives: quest.objectives.map((objective) => ({ ...objective, done: false })),
-      entityIds: quest.pages.map((key) => pages[key].id),
+      objectives,
+      entityIds: quest.pages.map((page) => pages[page].id),
       tags: quest.tags,
       revealedToPlayers: quest.revealed
     });
-    quests[quest.key] = { ...quest, record: created.quest ?? created };
+    quest.record = created.quest ?? created;
+    return;
   }
-  return quests;
-}
-
-async function updateQuest(quest, changes) {
   const current = (await get(`/api/v1/codex/quests/${quest.record.id}`)).quest;
   quest.record = (
-    await patch(`/api/v1/codex/quests/${quest.record.id}`, { ...changes, expectedRev: current.rev })
+    await patch(`/api/v1/codex/quests/${quest.record.id}`, {
+      ...(status ? { status } : {}),
+      ...(done ? { objectives } : {}),
+      expectedRev: current.rev
+    })
   ).quest;
 }
 
@@ -717,6 +755,38 @@ async function journal(path, { reveal, ...body }) {
   const entry = created.entry ?? created;
   if (reveal) await post(`/api/v1/codex/journal/${entry.id}/reveal`, { revealed: true });
   return entry;
+}
+
+/** One chronicle entry (see chronicle.mjs), filed under `session` when there is one. */
+async function writeEntry(entry, { pages, pins, session }) {
+  const body = {
+    playerText: entry.text ?? "",
+    gmText: entry.gm ?? null,
+    inWorldDate: date(entry.day, entry.month, entry.year),
+    attachPageId: entry.page ? pages[entry.page].id : null,
+    attachMarkerId: entry.marker ? pins[entry.marker].id : null,
+    sessionId: session?.id ?? null,
+    realDate: session?.realDate ?? null,
+    tags: entry.tags ?? [],
+    reveal: entry.reveal
+  };
+  if (entry.kind === "deadline") return journal("/deadline", body);
+  if (entry.kind === "milestone")
+    return journal("/milestone", { ...body, milestone: { level: entry.level, reason: entry.reason } });
+  if (entry.kind === "downtime") {
+    const created = await journal("/downtime", {
+      ...body,
+      downtime: {
+        who: entry.who,
+        activity: entry.activity,
+        days: entry.days,
+        characterPageId: entry.character ? pages[entry.character].id : null
+      }
+    });
+    if (entry.apply) await post(`/api/v1/codex/journal/${created.id}/apply-downtime`);
+    return created;
+  }
+  return journal("", body);
 }
 
 async function setStanding(pages, key, value, reason, reveal) {
@@ -728,7 +798,7 @@ async function createSession(session, sceneIds) {
   const created = await post("/api/v1/codex/sessions", {
     sessionNumber: session.number,
     realDate: session.realDate,
-    attendees: session.status === "played" ? PLAYERS : [],
+    attendees: session.attendees,
     prepBody: session.prepBody,
     recapBody: session.recapBody,
     status: session.status,
@@ -738,12 +808,67 @@ async function createSession(session, sceneIds) {
   });
   const record = created.session ?? created;
   await post(`/api/v1/codex/sessions/${record.id}/activate`);
-  return record;
+  return { ...record, realDate: session.realDate };
+}
+
+/** The atlas: world, regions and battlemaps, with pins linked to pages, sub-maps and people. */
+async function seedAtlas(maps, pages, roster) {
+  const nodes = {};
+  const node = async (key, kind, parent, revealed) => {
+    const created = await post("/api/v1/codex/maps", {
+      assetId: maps[key].id,
+      name: maps[key].name,
+      kind,
+      parentMapId: parent ? nodes[parent].id : null,
+      revealedToPlayers: revealed
+    });
+    nodes[key] = created.map ?? created;
+  };
+  await node("world", "world", null, true);
+  await node("vale", "regional", "world", true);
+  await node("port", "regional", "world", true);
+  await node("road", "battlemap", "vale", true);
+  await node("crypt", "battlemap", "vale", true);
+  await node("tower", "battlemap", "vale", false);
+  await node("warehouse", "battlemap", "port", true);
+
+  const pins = {};
+  for (const pin of PINS) {
+    const created = await post(`/api/v1/codex/maps/${nodes[pin.map].id}/markers`, {
+      x: pin.x,
+      y: pin.y,
+      iconId: pin.icon,
+      iconColor: pin.color,
+      label: pin.label,
+      revealedToPlayers: !pin.hidden,
+      pageIds: pin.pages.map((key) => pages[key].id),
+      ...(pin.sub ? { subMapId: nodes[pin.sub].id } : {}),
+      ...(pin.actor ? { actorId: roster[pin.actor].id } : {})
+    });
+    pins[pin.key] = created.marker ?? created;
+  }
+  await put(`/api/v1/codex/markers/${pins[PINS.find((pin) => pin.party).key].id}/party`, { isParty: true });
+  step(`atlas: ${Object.keys(nodes).length} maps nested world > region > battlemap, ${PINS.length} pins`);
+  return pins;
+}
+
+/** Points the atlas pin for a battle at the scene it was fought in. */
+async function linkScene(pins, fight, sceneId) {
+  for (const pin of PINS.filter((candidate) => candidate.scene === fight))
+    await patch(`/api/v1/codex/markers/${pins[pin.key].id}`, { sceneIds: [sceneId] });
 }
 
 // ---------------------------------------------------------------------------------------------------------
 // The campaign, in the order it happened
 
+const PARTY_CLASSES = {
+  rook: "Fighter",
+  maelis: "Cleric",
+  ivo: "Wizard",
+  tamsin: "Rogue",
+  corwin: "Ranger",
+  osric: "Bard"
+};
 const PARTY_NAMES = ["Rook Ashgrave", "Maelis Thorn", "Ivo Quillfeather", "Tamsin Vey", "Corwin Hale"];
 const PARTY_CELLS = (column, row) => [
   [column, row],
@@ -785,353 +910,256 @@ function partyTactics(fireballTargets) {
 const livingFoes = (context) =>
   context.foes.filter((foe) => context.state.actors.find((actor) => actor.id === foe.id).hp.current > 0);
 
+/** The three battles of the chronicle, keyed by the session field that names them. Each returns its scene. */
+function battles(maps, roster, homebrew) {
+  const party = PARTY_NAMES.map((name) => roster[name]);
+  return {
+    road: async () => {
+      const goblins = await spawn("goblin-warrior", 6);
+      const grub = roster.Grub;
+      const sceneId = await runFight({
+        maps,
+        scene: "Ambush at the Ford",
+        mapKey: "road",
+        party,
+        foes: [...goblins, grub],
+        partyCells: PARTY_CELLS(9, 7),
+        foeCells: [
+          [10, 6],
+          [10, 8],
+          [11, 7],
+          [14, 4],
+          [15, 10],
+          [8, 11],
+          [13, 7]
+        ],
+        maxRounds: 8,
+        tactics: partyTactics(null),
+        isOver: (context) => {
+          // Grub surrenders once bloodied, or once the warriors are down.
+          const current = context.state.actors.find((actor) => actor.id === grub.id);
+          const alone = livingFoes(context).every((foe) => foe.id === grub.id);
+          if (current.hp.current <= current.hp.maximum / 2 || alone) context.memory.spared.add(grub.id);
+          return livingFoes(context).every((foe) => context.memory.spared.has(foe.id));
+        }
+      });
+      const grubAfter = (await game()).actors.find((actor) => actor.id === grub.id);
+      if (grubAfter.hp.current <= 0) await post(`/api/v1/game/actors/${grub.id}/heal`, { amount: 4 });
+      await restParty(party);
+      return sceneId;
+    },
+    crypt: async () => {
+      const skeletons = await spawn("skeleton", 3);
+      const zombies = await spawn("zombie", 2);
+      const wight = (await spawn(homebrew["Ash Wight"].id, 1))[0];
+      const tamsin = roster["Tamsin Vey"];
+      const sceneId = await runFight({
+        maps,
+        scene: "The Saint's Ossuary",
+        mapKey: "crypt",
+        party,
+        foes: [...skeletons, ...zombies, wight],
+        partyCells: PARTY_CELLS(8, 10),
+        foeCells: [
+          [9, 9],
+          [9, 11],
+          [10, 10],
+          [11, 8],
+          [11, 12],
+          [9, 10]
+        ],
+        maxRounds: 8,
+        onStart: async () => {
+          await post("/api/v1/game/annotations", {
+            kind: "shape",
+            shape: "circle",
+            geometry: { origin: center([10, 10]), target: center([13, 10]) },
+            visibility: "public",
+            color: "#FF2E9A"
+          });
+          await post("/api/v1/game/annotations", {
+            kind: "measurement",
+            geometry: { origin: center([6, 10]), target: center([11, 8]) },
+            visibility: "gm-only",
+            color: "#2DE2FF"
+          });
+        },
+        tactics: async (actor, context) => {
+          if (actor.id === wight.id && !context.memory.drained) {
+            context.memory.drained = true;
+            return {
+              targets: [tamsin],
+              after: async () => {
+                // The claw that drops Tamsin, so the log shows a character dying and being brought back.
+                const current = (await game()).actors.find((candidate) => candidate.id === tamsin.id);
+                if (current.hp.current > 0)
+                  await post(`/api/v1/game/actors/${tamsin.id}/damage`, {
+                    amount: current.hp.current,
+                    parts: [{ amount: current.hp.current, type: "necrotic" }],
+                    sourceActorId: wight.id,
+                    sourceName: "Ash Wight's Withering Claw"
+                  });
+                await post(`/api/v1/game/actors/${roster["Rook Ashgrave"].id}/conditions`, {
+                  conditionId: "frightened",
+                  active: true
+                });
+              }
+            };
+          }
+          return partyTactics((ctx) => livingFoes(ctx).slice(0, 3))(actor, context);
+        }
+      });
+      await restParty(party);
+      return sceneId;
+    },
+    warehouse: async () => {
+      const captain = (await spawn("bandit-captain", 1))[0];
+      const bandits = await spawn("bandit", 4);
+      const pirate = (await spawn("pirate", 1))[0];
+      const corwin = roster["Corwin Hale"];
+      const sceneId = await runFight({
+        maps,
+        scene: "Smugglers in the Warehouse",
+        mapKey: "warehouse",
+        party,
+        foes: [captain, ...bandits, pirate],
+        partyCells: PARTY_CELLS(8, 7),
+        foeCells: [
+          [10, 7],
+          [9, 6],
+          [9, 8],
+          [11, 5],
+          [11, 9],
+          [12, 7]
+        ],
+        maxRounds: 8,
+        tactics: async (actor, context) => {
+          if (actor.id === captain.id && !context.memory.shoved) {
+            context.memory.shoved = true;
+            return {
+              targets: [corwin],
+              after: () => post(`/api/v1/game/actors/${corwin.id}/conditions`, { conditionId: "prone", active: true })
+            };
+          }
+          return partyTactics((ctx) => livingFoes(ctx).slice(1, 4))(actor, context);
+        }
+      });
+      await restParty(party);
+      return sceneId;
+    }
+  };
+}
+
+/** The next session's fight, staged live on the table with fog and rubble, waiting to start. */
+async function stageWatchtower(maps, roster, homebrew) {
+  const party = PARTY_NAMES.map((name) => roster[name]);
+  const initiates = await spawn("cultist", 4);
+  const hounds = await spawn(homebrew["Cinder Hound"].id, 2);
+  const foes = [...initiates, ...hounds, roster["Vessa the Pale"]];
+  const sceneId = randomUUID();
+  await post("/api/v1/game/scenes", {
+    commandId: sceneId,
+    name: "Assault on the Watchtower",
+    mapAssetId: maps.tower.id,
+    combatantIds: [...party, ...foes].map((actor) => actor.id)
+  });
+  for (const [index, actor] of party.entries())
+    await post(`/api/v1/game/tokens/${actor.id}/move`, { position: center(PARTY_CELLS(4, 12)[index]), sceneId });
+  const foeCells = [
+    [8, 6],
+    [10, 6],
+    [8, 8],
+    [10, 8],
+    [7, 4],
+    [11, 4],
+    [9, 2]
+  ];
+  for (const [index, actor] of foes.entries())
+    await post(`/api/v1/game/tokens/${actor.id}/move`, { position: center(foeCells[index]), sceneId });
+  const side = 16 * CELL_PX;
+  await post("/api/v1/game/fog/paint", { op: "hide", rect: { x: 0, y: 0, width: side, height: side }, sceneId });
+  await post("/api/v1/game/fog/paint", {
+    op: "reveal",
+    rect: { x: 0, y: 9 * CELL_PX, width: 8 * CELL_PX, height: 7 * CELL_PX },
+    sceneId
+  });
+  await post("/api/v1/game/terrain/paint", {
+    op: "difficult",
+    rect: { x: 5 * CELL_PX, y: 9 * CELL_PX, width: 3 * CELL_PX, height: 2 * CELL_PX },
+    sceneId
+  });
+  await post(`/api/v1/game/scenes/${sceneId}/activate`, {});
+  return sceneId;
+}
+
 async function main() {
   await signIn();
   const maps = await uploadMaps();
   const homebrew = await seedHomebrew();
   const roster = await seedCharacters();
-  const party = PARTY_NAMES.map((name) => roster[name]);
-  const pages = await seedCodexBasics();
-  const quests = await seedQuests(pages);
-  const scenes = {};
-  const sessions = {};
+  const pages = await seedCodexBasics(roster);
+  const quests = Object.fromEntries(QUESTS.map((quest) => [quest.key, { ...quest, record: null }]));
+  const pins = await seedAtlas(maps, pages, roster);
+  const fights = battles(maps, roster, homebrew);
 
-  // A letter from before the campaign opened.
-  await journal("", {
-    playerText:
-      "A rider brings a sealed letter from Lord Corvin Ashdown: every shrine flame in the vale went out at midnight. He offers 200 gp to anyone who can find out why.",
-    gmText: "Ashdown already suspects theft. He leaves that out.",
-    inWorldDate: date(1),
-    attachPageId: pages.corvin.id,
-    tags: ["hook"],
-    reveal: true
-  });
-  for (const [page, text, when] of [
-    ["reckoning", "Saint Ilvara walked into the pyre at Emberhold. The dead lay down.", { year: 1, month: 9, day: 32 }],
-    ["harbor-fire", "Fire on the Varrow docks. Three hundred lost.", { year: 1339, month: 7, day: 14 }],
-    ["burning", "Bog raiders burn half of Hollowmere.", { year: 1342, month: 4, day: 9 }]
-  ])
-    await journal("", {
-      playerText: text,
-      inWorldDate: when,
-      attachPageId: pages[page].id,
-      tags: ["history"],
-      reveal: true
-    });
+  for (const entry of HISTORY) await writeEntry(entry, { pages, pins, session: null });
+  step(`history: ${HISTORY.length} dated entries from before play began`);
 
-  // Session 1: the forest road.
-  sessions[1] = await createSession(SESSIONS[0], []);
-  await setDate(2);
-  await updateQuest(quests["cold-ash"], { status: "active" });
-  await updateQuest(quests.cart, { status: "active" });
-  await updateQuest(quests["drowned-road"], { status: "active" });
-  const goblins = await spawn("goblin-warrior", 6);
-  const grub = roster.Grub;
-  scenes.road = await runFight({
-    maps,
-    scene: "Ambush at the Ford",
-    mapKey: "road",
-    party,
-    foes: [...goblins, grub],
-    partyCells: PARTY_CELLS(9, 7),
-    foeCells: [
-      [10, 6],
-      [10, 8],
-      [11, 7],
-      [14, 4],
-      [15, 10],
-      [8, 11],
-      [13, 7]
-    ],
-    maxRounds: 8,
-    tactics: partyTactics(null),
-    isOver: (context) => {
-      // Grub surrenders once he is bloodied, or once his warriors are down.
-      const current = context.state.actors.find((actor) => actor.id === grub.id);
-      const alone = livingFoes(context).every((foe) => foe.id === grub.id);
-      if (current.hp.current <= current.hp.maximum / 2 || alone) context.memory.spared.add(grub.id);
-      return livingFoes(context).every((foe) => context.memory.spared.has(foe.id));
+  for (const session of SESSIONS.filter((candidate) => candidate.status === "played")) {
+    const record = await createSession(session, []);
+    await setDate(session.day);
+    const context = { pages, pins, session: record };
+    for (const entry of session.before ?? []) await writeEntry(entry, context);
+    if (session.fight) {
+      const sceneId = await fights[session.fight]();
+      await patch(`/api/v1/codex/sessions/${record.id}`, { sceneIds: [sceneId] });
+      await linkScene(pins, session.fight, sceneId);
     }
-  });
-  const grubAfter = (await game()).actors.find((actor) => actor.id === grub.id);
-  if (grubAfter.hp.current <= 0) await post(`/api/v1/game/actors/${grub.id}/heal`, { amount: 4 });
-  await restParty(party);
-  await journal("", {
-    playerText:
-      "Grub threw down his cleaver and begged. The Mudfoot goblins are running from 'walking bones' in the Gloomwood.",
-    gmText: "Grub keeps his word if the party returns his drum.",
-    attachPageId: pages.grub.id,
-    tags: ["goblins"],
-    reveal: true
-  });
-  await setStanding(pages, "mudfoot", -30, "Ambushed the party at the ford", true);
-  await setStanding(pages, "mudfoot", -10, "The party spared Grub", true);
-  await updateQuest(quests["drowned-road"], {
-    status: "completed",
-    objectives: quests["drowned-road"].objectives
-  });
-  await updateQuest(quests.cart, { status: "failed" });
-  await journal("/milestone", { milestone: { level: 6, reason: "Survived the ford" }, reveal: true });
-
-  // Session 2: the crypt.
-  sessions[2] = await createSession(SESSIONS[1], []);
-  await setDate(6);
-  const skeletons = await spawn("skeleton", 3);
-  const zombies = await spawn("zombie", 2);
-  const wight = (await spawn(homebrew["Ash Wight"].id, 1))[0];
-  const tamsin = roster["Tamsin Vey"];
-  scenes.crypt = await runFight({
-    maps,
-    scene: "The Saint's Ossuary",
-    mapKey: "crypt",
-    party,
-    foes: [...skeletons, ...zombies, wight],
-    partyCells: PARTY_CELLS(8, 10),
-    foeCells: [
-      [9, 9],
-      [9, 11],
-      [10, 10],
-      [11, 8],
-      [11, 12],
-      [9, 10]
-    ],
-    maxRounds: 8,
-    onStart: async () => {
-      await post("/api/v1/game/annotations", {
-        kind: "shape",
-        shape: "circle",
-        geometry: { origin: center([10, 10]), target: center([13, 10]) },
-        visibility: "public",
-        color: "#FF2E9A"
-      });
-      await post("/api/v1/game/annotations", {
-        kind: "measurement",
-        geometry: { origin: center([6, 10]), target: center([11, 8]) },
-        visibility: "gm-only",
-        color: "#2DE2FF"
-      });
-    },
-    tactics: async (actor, context) => {
-      if (actor.id === wight.id && !context.memory.drained) {
-        context.memory.drained = true;
-        return {
-          targets: [tamsin],
-          after: async () => {
-            // The claw that drops Tamsin, so the log shows a character dying and being brought back.
-            const current = (await game()).actors.find((candidate) => candidate.id === tamsin.id);
-            if (current.hp.current > 0)
-              await post(`/api/v1/game/actors/${tamsin.id}/damage`, {
-                amount: current.hp.current,
-                parts: [{ amount: current.hp.current, type: "necrotic" }],
-                sourceActorId: wight.id,
-                sourceName: "Ash Wight's Withering Claw"
-              });
-            await post(`/api/v1/game/actors/${roster["Rook Ashgrave"].id}/conditions`, {
-              conditionId: "frightened",
-              active: true
-            });
-          }
-        };
-      }
-      return partyTactics((ctx) => livingFoes(ctx).slice(0, 3))(actor, context);
-    }
-  });
-  await restParty(party);
-  await journal("", {
-    playerText:
-      "The reliquary niche was empty and the candles had burned down days ago. The skeletons hummed a hymn as they fell apart.",
-    gmText: "The hymn is the Pale Choir's. Ivo can recognize it with DC 14 History.",
-    attachPageId: pages.crypt.id,
-    tags: ["clue", "pale-choir"],
-    reveal: true
-  });
-  await journal("", {
-    playerText: "Rook claimed the Ember-Etched Blade from the guardian alcove.",
-    attachPageId: pages.blade.id,
-    tags: ["loot"],
-    reveal: true
-  });
-  await setStanding(pages, "wardens", 25, "Reported the theft to Emberhold", true);
-  await updateQuest(quests["cold-ash"], {
-    objectives: quests["cold-ash"].objectives.map((objective, index) => ({ ...objective, done: index < 2 }))
-  });
-  await journal("/milestone", {
-    milestone: { level: 7, reason: "Cleared the Crypt of the Ashen Saint" },
-    reveal: true
-  });
-
-  // Session 3: Port Varrow.
-  sessions[3] = await createSession(SESSIONS[2], []);
-  await setDate(10);
-  await journal("/deadline", {
-    playerText: "The harbor tithe is due to the guild.",
-    gmText: "The party is not on the hook for it, but Mags is.",
-    inWorldDate: date(10),
-    attachPageId: pages.guild.id,
-    tags: ["port-varrow"],
-    reveal: true
-  });
-  await setDate(11);
-  await updateQuest(quests.shipment, { status: "active" });
-  await updateQuest(quests.informant, { status: "active" });
-  const captain = (await spawn("bandit-captain", 1))[0];
-  const bandits = await spawn("bandit", 4);
-  const pirate = (await spawn("pirate", 1))[0];
-  const corwin = roster["Corwin Hale"];
-  scenes.warehouse = await runFight({
-    maps,
-    scene: "Smugglers in the Warehouse",
-    mapKey: "warehouse",
-    party,
-    foes: [captain, ...bandits, pirate],
-    partyCells: PARTY_CELLS(8, 7),
-    foeCells: [
-      [10, 7],
-      [9, 6],
-      [9, 8],
-      [11, 5],
-      [11, 9],
-      [12, 7]
-    ],
-    maxRounds: 8,
-    tactics: async (actor, context) => {
-      if (actor.id === captain.id && !context.memory.shoved) {
-        context.memory.shoved = true;
-        return {
-          targets: [corwin],
-          after: () => post(`/api/v1/game/actors/${corwin.id}/conditions`, { conditionId: "prone", active: true })
-        };
-      }
-      return partyTactics((ctx) => livingFoes(ctx).slice(1, 4))(actor, context);
-    }
-  });
-  await restParty(party);
-  await journal("", {
-    playerText:
-      "Among the smugglers' crates: grave goods from the crypt, and a ledger written half in cipher. Captain Marrow let the party keep it.",
-    gmText: "The ledger names Harbormaster Dunmore and three shipments 'to the tower'.",
-    attachPageId: pages.ledger.id,
-    tags: ["clue", "port-varrow"],
-    reveal: true
-  });
-  await updateQuest(quests.shipment, {
-    objectives: quests.shipment.objectives.map((objective, index) => ({ ...objective, done: index < 2 }))
-  });
-  await updateQuest(quests.informant, { status: "canceled" });
-  await setStanding(pages, "guild", -15, "Raided a guild warehouse", true);
-  await setStanding(pages, "choir", -50, "Took back the Choir's grave goods", false);
-
-  // Downtime after session 3: one applied (the clock moves a day), one still waiting for the GM.
-  const training = await journal("/downtime", {
-    playerText: "Rook drills with the Ember Wardens' sergeant at the Varrow chapter house.",
-    downtime: { who: "Rook Ashgrave", activity: "Training with the Ember Wardens", days: 1 },
-    tags: ["downtime"],
-    reveal: true
-  });
-  await post(`/api/v1/codex/journal/${training.id}/apply-downtime`);
-  await journal("/downtime", {
-    playerText: "Ivo copies Cinderburst from the crypt scroll into the spellbook.",
-    downtime: { who: "Ivo Quillfeather", activity: "Transcribing a spell", days: 2 },
-    tags: ["downtime"],
-    reveal: true
-  });
-  await journal("/downtime", {
-    playerText: "Tamsin works the dice tables at the Brine and Barrel, listening for rumors.",
-    gmText: "She hears rumor 3 (lights in the watchtower).",
-    downtime: { who: "Tamsin Vey", activity: "Carousing", days: 1 },
-    tags: ["downtime"]
-  });
-  await journal("/deadline", {
-    playerText: "The Pale Choir's rite at the watchtower completes.",
-    gmText: "If the party is not at the tower by Harvestide 20, the reliquary cracks and the drowned dead rise.",
-    inWorldDate: date(20),
-    attachPageId: pages.tower.id,
-    tags: ["pale-choir", "clock"]
-  });
-
-  // Session 4 is still being prepped: its scene waits on the live table with fog and rubble.
-  const initiates = await spawn("cultist", 4);
-  const hounds = await spawn(homebrew["Cinder Hound"].id, 2);
-  const vessa = roster["Vessa the Pale"];
-  const towerScene = randomUUID();
-  const towerFoes = [...initiates, ...hounds, vessa];
-  await post("/api/v1/game/scenes", {
-    commandId: towerScene,
-    name: "Assault on the Watchtower",
-    mapAssetId: maps.tower.id,
-    combatantIds: [...party, ...towerFoes].map((actor) => actor.id)
-  });
-  for (const [index, actor] of party.entries())
-    await post(`/api/v1/game/tokens/${actor.id}/move`, {
-      position: center(PARTY_CELLS(4, 12)[index]),
-      sceneId: towerScene
-    });
-  for (const [index, actor] of towerFoes.entries())
-    await post(`/api/v1/game/tokens/${actor.id}/move`, {
-      position: center(
-        [
-          [8, 6],
-          [10, 6],
-          [8, 8],
-          [10, 8],
-          [7, 4],
-          [11, 4],
-          [9, 2]
-        ][index]
-      ),
-      sceneId: towerScene
-    });
-  await post("/api/v1/game/fog/paint", {
-    op: "hide",
-    rect: { x: 0, y: 0, width: 16 * CELL_PX, height: 16 * CELL_PX },
-    sceneId: towerScene
-  });
-  await post("/api/v1/game/fog/paint", {
-    op: "reveal",
-    rect: { x: 0, y: 9 * CELL_PX, width: 8 * CELL_PX, height: 7 * CELL_PX },
-    sceneId: towerScene
-  });
-  await post("/api/v1/game/terrain/paint", {
-    op: "difficult",
-    rect: { x: 5 * CELL_PX, y: 9 * CELL_PX, width: 3 * CELL_PX, height: 2 * CELL_PX },
-    sceneId: towerScene
-  });
-  await post(`/api/v1/game/scenes/${towerScene}/activate`, {});
-  scenes.tower = towerScene;
-  sessions[4] = await createSession(SESSIONS[3], [towerScene]);
-  for (const number of [1, 2, 3]) {
-    const key = ["road", "crypt", "warehouse"][number - 1];
-    await patch(`/api/v1/codex/sessions/${sessions[number].id}`, { sceneIds: [scenes[key]] });
+    for (const entry of session.after ?? []) await writeEntry(entry, context);
+    for (const change of session.end?.quests ?? []) await questChange(quests, pages, change);
+    for (const change of session.end?.standing ?? [])
+      await setStanding(pages, change.faction, change.value, change.reason, change.reveal);
+    step(`session ${session.number}: ${(session.before ?? []).length + (session.after ?? []).length} journal entries`);
   }
-  step("4 sessions (3 played, 1 planned) with recaps, prep and scenes");
 
-  // Clock: the GM is on Harvestide 12 after Rook's training; players see it once published.
+  const towerScene = await stageWatchtower(maps, roster, homebrew);
+  await linkScene(pins, "tower", towerScene);
+  for (const session of SESSIONS.filter((candidate) => candidate.status === "planned"))
+    await createSession(session, [towerScene]);
+
+  // The GM is on Harvestide 12 after Rook's training; players see it once published.
   await post("/api/v1/codex/calendar/publish");
 
-  await seedAtlas(maps, pages, scenes, roster);
-
-  // Share two of the three fights with players.
+  // Share the first two fights with players.
   const { encounters } = await get("/api/v1/encounters");
-  for (const encounter of encounters.slice(-2))
-    await post(`/api/v1/encounters/${encounter.id}/visibility`, { playerVisible: true });
-  step(`${encounters.length} fights archived, ${Math.min(2, encounters.length)} shared with players`);
+  const shared = encounters.slice(-2);
+  for (const encounter of shared) await post(`/api/v1/encounters/${encounter.id}/visibility`, { playerVisible: true });
+  step(`${encounters.length} fights archived, ${shared.length} shared with players`);
 
   // The server files fights, standing changes and quest history as hidden entries. Show players the ones
   // that match what they already know: the shared fights, revealed standings and revealed quests.
-  const sharedFights = new Set(encounters.slice(-2).map((encounter) => encounter.id));
+  const sharedFights = new Set(shared.map((encounter) => encounter.id));
   const revealedQuests = new Set(
     Object.values(quests)
-      .filter((quest) => quest.revealed)
+      .filter((quest) => quest.revealed && quest.record)
       .map((quest) => quest.record.id)
   );
   const hiddenFaction = pages.choir.id;
-  for (const entry of (await get("/api/v1/codex/journal")).entries) {
+  const entries = (await get("/api/v1/codex/journal")).entries;
+  for (const entry of entries) {
     const show =
       (entry.kind === "combat" && sharedFights.has(entry.sourceEncounterId)) ||
       (entry.kind === "standing" && entry.payload?.factionPageId !== hiddenFaction) ||
       (entry.kind === "quest" && revealedQuests.has(entry.payload?.questId));
     if (show && !entry.revealedToPlayers) await post(`/api/v1/codex/journal/${entry.id}/reveal`, { revealed: true });
   }
+  const kinds = {};
+  for (const entry of entries) kinds[entry.kind] = (kinds[entry.kind] ?? 0) + 1;
+  step(
+    `journal: ${entries.length} entries (${Object.entries(kinds)
+      .map(([kind, count]) => `${count} ${kind}`)
+      .join(", ")})`
+  );
 
   // A few edits to a page so its revision history has entries, then the default revision window again.
   for (const status of ["Missing (seen in Port Varrow?)", "Missing - believed to be with the Pale Choir"]) {
@@ -1146,97 +1174,6 @@ async function main() {
     autosave: { enabled: true, intervalSeconds: 5 }
   });
   console.log("\nDone. Open the app, sign in as GM, and look around.");
-}
-
-async function seedAtlas(maps, pages, scenes, roster) {
-  const node = async (key, kind, parentMapId, revealed) => {
-    const created = await post("/api/v1/codex/maps", {
-      assetId: maps[key].id,
-      name: maps[key].name,
-      kind,
-      parentMapId,
-      revealedToPlayers: revealed
-    });
-    return created.map ?? created;
-  };
-  const world = await node("world", "world", null, true);
-  const vale = await node("vale", "regional", world.id, true);
-  const port = await node("port", "regional", world.id, true);
-  const road = await node("road", "battlemap", vale.id, true);
-  const crypt = await node("crypt", "battlemap", vale.id, true);
-  const tower = await node("tower", "battlemap", vale.id, false);
-  const warehouse = await node("warehouse", "battlemap", port.id, true);
-
-  const marker = async (map, x, y, iconId, iconColor, label, links, revealed = true) => {
-    const created = await post(`/api/v1/codex/maps/${map.id}/markers`, {
-      x,
-      y,
-      iconId,
-      iconColor,
-      label,
-      revealedToPlayers: revealed,
-      ...links
-    });
-    return created.marker ?? created;
-  };
-  const pageIds = (...keys) => ({ pageIds: keys.map((key) => pages[key].id) });
-  await marker(world, 620, 520, "hills", "#57E39A", "Gloamshire Vale", { ...pageIds("vale"), subMapId: vale.id });
-  await marker(world, 1380, 760, "city", "#2DE2FF", "Port Varrow", { ...pageIds("port"), subMapId: port.id });
-  await marker(world, 900, 300, "temple", "#FFB020", "Emberhold Abbey", pageIds("wardens", "saint"));
-  await marker(world, 420, 820, "forest", "#57E39A", "Gloomwood", pageIds("gloomwood", "moths"));
-  await marker(world, 1600, 1100, "water", "#2DE2FF", "The Drowned Coast", pageIds("mother", "harbor-fire"));
-
-  await marker(vale, 700, 560, "village", "#E8ECF4", "Hollowmere", pageIds("hollowmere", "corvin"));
-  await marker(vale, 820, 220, "dungeon", "#FF2D5E", "Crypt of the Ashen Saint", {
-    ...pageIds("crypt", "aldous"),
-    subMapId: crypt.id,
-    sceneIds: [scenes.crypt]
-  });
-  await marker(vale, 360, 700, "battle", "#FF2E9A", "The Ford", { subMapId: road.id, sceneIds: [scenes.road] });
-  await marker(
-    vale,
-    1260,
-    300,
-    "watchtower",
-    "#A45CFF",
-    "Ruined Watchtower",
-    { ...pageIds("tower", "vessa"), subMapId: tower.id, sceneIds: [scenes.tower] },
-    false
-  );
-  await marker(
-    vale,
-    260,
-    380,
-    "forest",
-    "#57E39A",
-    "Old Wren's Hut",
-    {
-      ...pageIds("wren"),
-      actorId: roster["Old Wren"].id
-    },
-    false
-  );
-
-  const brine = await marker(port, 520, 640, "flag", "#FFB020", "The Brine and Barrel", pageIds("brine", "mags"));
-  await marker(port, 860, 700, "treasure", "#FF2D5E", "Guild Warehouse", {
-    ...pageIds("warehouse", "ledger"),
-    subMapId: warehouse.id,
-    sceneIds: [scenes.warehouse]
-  });
-  await marker(port, 700, 380, "fort", "#2DE2FF", "Watch House", {
-    ...pageIds("hessa"),
-    actorId: roster["Captain Hessa Marrow"].id
-  });
-  await marker(port, 980, 300, "capital", "#94A3B8", "Guild Hall", pageIds("guild"));
-  await marker(port, 300, 820, "shrine", "#E8ECF4", "Shrine of the Drowned Mother", pageIds("mother"));
-  await put(`/api/v1/codex/markers/${brine.id}/party`, { isParty: true });
-  await journal("", {
-    playerText: "The party takes rooms above the Brine and Barrel.",
-    attachMarkerId: brine.id,
-    tags: ["port-varrow"],
-    reveal: true
-  });
-  step("atlas: 7 maps nested world > region > battlemap, 15 markers, party pin in Port Varrow");
 }
 
 await main();
