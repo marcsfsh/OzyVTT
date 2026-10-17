@@ -6,7 +6,14 @@ import type { DiceEntryMode, StepItem } from "@vtt/ui";
 import { useBuilderCatalogs, type BuilderCatalogs } from "../content/catalogs";
 import { command } from "../lib/command";
 import { newId } from "../lib/ids";
-import { AbilitiesStep, abilityMethodOf, allowedMethodsOf, methodChange, useServerRolls } from "./AbilitiesStep";
+import {
+  AbilitiesStep,
+  abilityMethodOf,
+  allowedMethodsOf,
+  HitPointsSection,
+  methodChange,
+  useServerRolls
+} from "./AbilitiesStep";
 import {
   abilityBonusesOf,
   abilityCapPreview,
@@ -43,6 +50,7 @@ import {
   PrimaryPick,
   speciesOptionsOf
 } from "./OfferPickers";
+import { LevelStep } from "./LevelStep";
 import { reviewSections } from "./review";
 import { detailPlaceholder, stepDetail } from "./StepDetail";
 import { useBuilderOffers } from "./useBuilderOffers";
@@ -81,10 +89,14 @@ export type CharacterBuilderProps = Readonly<{
     /** The classes the character keeps at the rebuilt level. The table refuses a rebuild that drops one (only a
      *  level-down below where it was taken does), so the class step offers no way to remove them. */
     heldClasses?: readonly string[];
-    startStep?: StepId;
+    /** Up opens on a step of the new level's choices; down opens on the review. */
+    mode?: "up" | "down";
     notice?: ReactNode;
   }>;
 }>;
+
+/** The builder's steps, and in a level-up the step that gathers the new level's choices before the review. */
+type WizardStep = StepId | "level";
 
 /** Before the table's first answer there is nothing to pick. */
 const NO_OFFERS: readonly BuilderOffer[] = [];
@@ -121,12 +133,20 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
     [state.builderPolicy, recordedMethod]
   );
   const [draft, setDraft] = useState<BuilderDraft>(() => rebuild?.seed ?? emptyDraft());
-  const [stepIndex, setStepIndex] = useState(0);
+  // A level-up opens on the new level's choices, with every earlier step answered and a tap away; it does not walk
+  // the steps from Species again.
+  const steps: readonly WizardStep[] = useMemo(
+    () => (rebuild?.mode === "up" ? [...STEP_IDS.slice(0, -1), "level", "review"] : STEP_IDS),
+    [rebuild?.mode]
+  );
+  const openingStep = rebuild?.mode === "up" ? steps.indexOf("level") : rebuild?.mode === "down" ? steps.length - 1 : 0;
+  const [stepIndex, setStepIndex] = useState(openingStep);
   /**
    * The furthest step the player has reached. A null blocked reason alone does not mean done (e.g.
-   * equipment has no reason before a class is chosen), so ticks and jumps are gated on this.
+   * equipment has no reason before a class is chosen), so ticks and jumps are gated on this. A level change starts
+   * with every step reached.
    */
-  const [furthest, setFurthest] = useState(0);
+  const [furthest, setFurthest] = useState(rebuild?.mode ? steps.length - 1 : 0);
   const [detailOpen, setDetailOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   /** The single submit-error surface, for both rejections and a silent server. */
@@ -152,7 +172,7 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
 
   const [pendingCreate, setPendingCreate] = useState<{ actorId: string; typedName: string } | null>(null);
 
-  const step: StepId = STEP_IDS[stepIndex];
+  const step: WizardStep = steps[stepIndex];
   /**
    * The offers come from the table, asked again after each answer. Until the next answer lands the last
    * offers stay on screen with the new pick already shown, so a tap never waits on the network.
@@ -220,22 +240,23 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
     editDraft((current) => ({ ...current, asiIncreases: { ...current.asiIncreases, [offer.key]: increases } }));
 
   /** Every step's blocked reason, computed once per draft for the rail, review and footer. */
-  const stepReasons = useMemo(
-    () =>
-      STEP_IDS.map((id) =>
-        catalogs.loaded ? stepBlockedReason(id, draft, catalogs, offers, policy) : "Loading the content catalogs…"
-      ),
-    [draft, catalogs, offers, policy]
-  );
+  const stepReasons = useMemo(() => {
+    const reasonOf = (id: StepId) =>
+      catalogs.loaded ? stepBlockedReason(id, draft, catalogs, offers, policy) : "Loading the content catalogs…";
+    // The level step holds the class, features and hit point answers, so it waits on whatever those wait on.
+    return steps.map((id) =>
+      id === "level" ? (reasonOf("class") ?? reasonOf("features") ?? reasonOf("abilities")) : reasonOf(id)
+    );
+  }, [steps, draft, catalogs, offers, policy]);
   const stepReason = stepReasons[stepIndex];
   /** A resumed draft reaches its first unsatisfied step, read once the table has answered for it. */
   const [resuming, setResuming] = useState(false);
   useEffect(() => {
     if (!resuming || !offersCurrent || !catalogs.loaded) return;
     const first = stepReasons.findIndex((reason) => reason !== null);
-    setFurthest(first === -1 ? STEP_IDS.length - 1 : first);
+    setFurthest(first === -1 ? steps.length - 1 : first);
     setResuming(false);
-  }, [resuming, offersCurrent, catalogs.loaded, stepReasons]);
+  }, [resuming, offersCurrent, catalogs.loaded, stepReasons, steps.length]);
   /** `.cb-page` is the scroll container, so a step change must reset its scrollTop. */
   const pageRef = useRef<HTMLDivElement | null>(null);
   useLayoutEffect(() => {
@@ -260,9 +281,9 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
    *   clickable(i)  ⟺  i <= furthest AND i !== current      (via `maxSelectable`)
    * Beyond `furthest` `Steps` falls back to its position rule, so those read as upcoming and stay locked.
    */
-  const stepsForShell: StepItem[] = STEP_IDS.map((id, index) => ({
-    label: STEP_LABELS[id],
-    shortLabel: STEP_SHORT[id],
+  const stepsForShell: StepItem[] = steps.map((id, index) => ({
+    label: id === "level" ? `Level ${draft.level}` : STEP_LABELS[id],
+    shortLabel: id === "level" ? `Level ${draft.level}` : STEP_SHORT[id],
     ...(index <= furthest && index !== stepIndex
       ? { state: stepReasons[index] === null ? ("done" as const) : ("incomplete" as const) }
       : {})
@@ -653,6 +674,31 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
             editDraft={editDraft}
           />
         );
+      case "level":
+        return (
+          <LevelStep
+            name={rebuild?.name ?? draft.name}
+            draft={draft}
+            context={context}
+            offers={offers}
+            catalogs={catalogs}
+            renderOffer={renderOffer}
+            hitPoints={
+              <HitPointsSection
+                draft={draft}
+                policy={policy}
+                mayTypeDice={"definitions" in state || policy.typedRolls === "open"}
+                context={context}
+                base={base}
+                bonuses={bonuses}
+                rolls={rolls}
+                hpEntry={hpEntry}
+                onHpEntryChange={setHpEntry}
+                editDraft={editDraft}
+              />
+            }
+          />
+        );
       case "equipment":
         return stepOffers("equipment").length === 0 ? (
           <div className="nh-empty">
@@ -696,7 +742,7 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
                 bonuses,
                 method,
                 onEdit: (id) => {
-                  setStepIndex(STEP_IDS.indexOf(id));
+                  setStepIndex(steps.indexOf(id));
                   setRejection(null);
                 }
               })}
@@ -713,10 +759,12 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
    * reflow the grid from five columns to three under the finger. Do not pass null until a pick: the
    * reflow on large grids is the cost this avoids.
    */
-  const realDetail = stepDetail(step, context, draft.level);
-  const placeholder = detailPlaceholder(step, context, subclassPending !== null);
+  // The level step spends the whole width on its choices.
+  const realDetail = step === "level" ? null : stepDetail(step, context, draft.level);
+  const placeholder = step === "level" ? undefined : detailPlaceholder(step, context, subclassPending !== null);
   const detailNode = realDetail ?? (placeholder ? <p className="cb-detail-empty">{placeholder}</p> : null);
-  const isLast = stepIndex === STEP_IDS.length - 1;
+  const isLast = stepIndex === steps.length - 1;
+  const levelIndex = steps.indexOf("level");
   const goTo = (index: number) => {
     setStepIndex(index);
     setDetailOpen(false);
@@ -731,7 +779,7 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
     blockedReason == null ? undefined : breachOffer ? (
       <>
         {blockedReason}{" "}
-        <Button variant="ghost" size="sm" onClick={() => goTo(STEP_IDS.indexOf("features"))}>
+        <Button variant="ghost" size="sm" onClick={() => goTo(steps.indexOf("features"))}>
           Edit that improvement
         </Button>
       </>
@@ -757,7 +805,9 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
   return (
     <div className="cb-page" ref={pageRef}>
       <WizardShell
-        title={rebuild ? `Level ${rebuild.name}` : "Create a character"}
+        title={
+          rebuild ? `${rebuild.mode === "down" ? "Level down" : "Level up"} ${rebuild.name}` : "Create a character"
+        }
         eyebrow="Character builder"
         steps={stepsForShell}
         current={stepIndex}
@@ -766,11 +816,17 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
           if (index <= furthest && index !== stepIndex) goTo(index);
         }}
         maxSelectable={furthest}
-        onBack={stepIndex > 0 ? () => goTo(stepIndex - 1) : undefined}
-        /* After reaching the end, an edit from review is a detour: one tap returns. */
+        /* A level-up's own step has nothing before it to walk back to; the earlier steps are on the rail. */
+        onBack={stepIndex > 0 && step !== "level" ? () => goTo(stepIndex - 1) : undefined}
+        /* After reaching the end, an edit from review is a detour: one tap returns. In a level-up an earlier step is a
+           detour from the new level's choices. */
         footerSecondary={
-          furthest === STEP_IDS.length - 1 && stepIndex < furthest ? (
-            <Button variant="secondary" onClick={() => goTo(STEP_IDS.length - 1)}>
+          levelIndex !== -1 && stepIndex < levelIndex ? (
+            <Button variant="secondary" onClick={() => goTo(levelIndex)}>
+              Back to level {draft.level}
+            </Button>
+          ) : furthest === steps.length - 1 && stepIndex < furthest && step !== "level" ? (
+            <Button variant="secondary" onClick={() => goTo(steps.length - 1)}>
               Back to review
             </Button>
           ) : undefined

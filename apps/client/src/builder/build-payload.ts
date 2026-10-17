@@ -283,6 +283,20 @@ export const ABILITY_LABELS: Readonly<Record<Ability, string>> = {
   cha: "Charisma"
 };
 
+const ORDINAL_WORDS = ["First", "Second", "Third", "Fourth", "Fifth", "Sixth"] as const;
+
+/**
+ * The accessible name of one ability-increase picker in a row of them: "Ability to raise by 2", and "First ability to
+ * raise by 1", "Second ability to raise by 1" when two or more pickers raise by the same amount.
+ */
+export function increaseLabel(amounts: readonly number[], index: number): string {
+  const amount = amounts[index];
+  const same = amounts.filter((each) => each === amount).length;
+  if (same < 2) return `Ability to raise by ${amount}`;
+  const rank = amounts.slice(0, index).filter((each) => each === amount).length;
+  return `${ORDINAL_WORDS[rank] ?? `Ability ${rank + 1}:`} ability to raise by ${amount}`;
+}
+
 /** Assign-mode methods hand out a fixed pool; point buy spends against a budget. */
 export const isAssignMethod = (method: BuilderAbilityMethod) => method !== "point-buy";
 

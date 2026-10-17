@@ -280,6 +280,31 @@ export function meetsMulticlassMinimums(
 }
 
 /**
+ * The order the standard array is spent in: the starting class's stat priority (the abilities it leaves out follow
+ * in sheet order), with a multiclass character's needs first, since every class wants 13 in its primary ability
+ * (SRD Multiclassing). An "any" minimum (the Fighter's Strength or Dexterity) takes whichever ranks higher. The
+ * random generator spends it this way, and the builder offers it as the suggested layout.
+ */
+export function standardArrayOrder(
+  priority: readonly Ability[],
+  classes: ReadonlyArray<Readonly<{ multiclassPrerequisites?: MulticlassMinimums | null }>>
+): Ability[] {
+  const ranked = [...priority, ...ABILITIES.filter((ability) => !priority.includes(ability))];
+  const needed = new Set<Ability>();
+  if (classes.length > 1) {
+    const minimums = classes.flatMap((entry) => (entry.multiclassPrerequisites ? [entry.multiclassPrerequisites] : []));
+    for (const minimum of minimums.filter((entry) => entry.mode === "all"))
+      for (const entry of minimum.minimums) needed.add(entry.ability);
+    for (const minimum of minimums.filter((entry) => entry.mode === "any")) {
+      const abilities = minimum.minimums.map((entry) => entry.ability);
+      if (!abilities.some((ability) => needed.has(ability)))
+        needed.add([...abilities].sort((left, right) => ranked.indexOf(left) - ranked.indexOf(right))[0]);
+    }
+  }
+  return [...ranked.filter((ability) => needed.has(ability)), ...ranked.filter((ability) => !needed.has(ability))];
+}
+
+/**
  * SRD Multiclassing: "To qualify for a new class, you must have a score of at least 13 in the primary ability of the
  * new class and your current classes." The classes whose minimums these scores miss, the new class first; empty
  * when the new class may be taken.

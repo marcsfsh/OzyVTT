@@ -5,6 +5,7 @@ import {
   hitDieFaces,
   meetsMulticlassMinimums,
   STANDARD_ARRAY,
+  standardArrayOrder,
   statPriorityFor,
   type Ability
 } from "@vtt/rules-5e";
@@ -96,28 +97,10 @@ function drawPreferring<T>(preferred: readonly T[], all: readonly T[], count: nu
 
 // Ability scores: the one decision that is not random.
 
-/**
- * The order the standard array is spent in: the starting class's `statPriorityFor` (an unknown homebrew class falls
- * back to sheet order), with a multiclass character's needs first, since every class wants 13 in its primary ability
- * (SRD Multiclassing). An "any" minimum (the Fighter's Strength or Dexterity) takes whichever ranks higher.
- */
+/** The order the standard array is spent in (`standardArrayOrder`), with the starting class's `statPriorityFor`: an
+ *  unknown homebrew class falls back to sheet order. */
 function abilityOrderFor(records: readonly ClassReference[], library: ContentView): Ability[] {
-  const priority = statPriorityFor(records[0].id, library.classProgressionTable());
-  const ranked = [...priority, ...ABILITIES.filter((ability) => !priority.includes(ability))];
-  const needed = new Set<Ability>();
-  if (records.length > 1) {
-    const minimums = records.flatMap((record) =>
-      record.multiclassPrerequisites ? [record.multiclassPrerequisites] : []
-    );
-    for (const minimum of minimums.filter((entry) => entry.mode === "all"))
-      for (const entry of minimum.minimums) needed.add(entry.ability);
-    for (const minimum of minimums.filter((entry) => entry.mode === "any")) {
-      const abilities = minimum.minimums.map((entry) => entry.ability);
-      if (!abilities.some((ability) => needed.has(ability)))
-        needed.add([...abilities].sort((left, right) => ranked.indexOf(left) - ranked.indexOf(right))[0]);
-    }
-  }
-  return [...ranked.filter((ability) => needed.has(ability)), ...ranked.filter((ability) => !needed.has(ability))];
+  return standardArrayOrder(statPriorityFor(records[0].id, library.classProgressionTable()), records);
 }
 
 /** `abilityOrderFor`, then the same order with each needed ability in turn moved to the last needed place: the one
