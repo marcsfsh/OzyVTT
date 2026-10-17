@@ -9,7 +9,9 @@ It has two parts:
 - **The table.** Upload a battlemap, calibrate its grid, stage scenes, and run initiative with
   server-enforced 5e rules: attacks, typed damage, saves, conditions, reactions, spell slots,
   rests and death saves. Players use an interactive character sheet and roll on their own turn.
-  A second screen (a TV or tablet) shows a player-safe view of the map and turn order.
+  Fog and dynamic vision (walls, doors, lights, Darkvision) are worked out on the server, so each
+  player's device receives only what their character can see. A second screen (a TV or tablet)
+  shows a player-safe view of the map and turn order.
 - **The Codex.** A wiki of typed pages (characters, locations, factions, items and more), an
   atlas of nested maps, a journal on a custom calendar, sessions, quests, downtime and a
   relationship graph. Every record has a player half and a GM-only half, and players only ever
