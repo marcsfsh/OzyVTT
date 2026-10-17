@@ -31,6 +31,7 @@ import type {
   DiceRollResult,
   LooseSaveOutcome,
   MutationResult,
+  SpellbookResult,
   ReactionAnswerResult,
   RulesBlocked,
   SaveAnswerResult,
@@ -84,6 +85,8 @@ import type {
   CharacterRecoverAmmunitionSchema,
   CharacterSetPreparedSchema,
   CharacterFinishPreparingSchema,
+  CharacterSwapSpellSchema,
+  CharacterAddToSpellbookSchema,
   CharacterSetProficienciesSchema,
   CharacterSetSlotSchema,
   CharacterSubmitImportSchema,
@@ -546,6 +549,14 @@ export interface ClientToServerEvents {
   "character:finish-preparing": (
     payload: CommandPayload<typeof CharacterFinishPreparingSchema>,
     acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "character:swap-spell": (
+    payload: CommandPayload<typeof CharacterSwapSpellSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "character:add-to-spellbook": (
+    payload: CommandPayload<typeof CharacterAddToSpellbookSchema>,
+    acknowledgement: (result: SpellbookResult) => void
   ) => void;
   // Optional item keys are declared so the type states the whole wire contract; the server validates `baseId`.
   "character:set-inventory": (

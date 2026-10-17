@@ -1030,6 +1030,22 @@ export const ActorSchema = z.object({
     .default(null),
   /** Spell ids prepared right now, re-chosen on a long rest. Owner-only. */
   preparedSpellIds: z.array(z.string().max(80)).max(400).default([]),
+  /** A Wizard's spellbook beyond the Wizard spells on its sheet: spells its Wizard levels added that the build didn't
+   *  list, and spells copied in (`copied`: from a scroll or another book, paid for). Owner-only. */
+  spellbook: z
+    .array(
+      z
+        .object({
+          id: z
+            .string()
+            .regex(/^[a-z0-9-]+$/)
+            .max(80),
+          copied: z.literal(true).optional()
+        })
+        .strict()
+    )
+    .max(300)
+    .default([]),
   /** Open after a Long Rest for a caster that changes its prepared spells then (SRD Spell Preparation by Class): the
    *  spells it may still swap in (null: any number). Null when closed. Owner-only. */
   preparation: z

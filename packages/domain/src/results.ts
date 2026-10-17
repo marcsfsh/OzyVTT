@@ -31,6 +31,8 @@ export type MutationResult = {
   /** Present when a rules-mode validation blocked the command (ADR-0020); resend with override to bypass. */ blocked?: RulesBlocked;
 };
 export type DiceRollResult = MutationResult & { rollId?: string; hiddenFromRoller?: boolean };
+/** A spellbook addition's reply: whether the spell is in the book now (a copy from a scroll can fail its check). */
+export type SpellbookResult = MutationResult & { inBook?: boolean };
 export type EncounterStartEntry = Readonly<{
   actorId: string;
   score?: number;
@@ -405,13 +407,38 @@ const RechoiceSchema = z.strictObject({
   chosen: z.string().nullable()
 });
 export type Rechoice = Wire<z.infer<typeof RechoiceSchema>>;
+/** What a prepared caster may change about its spells (SRD Spell Preparation by Class): for each class that changes its
+ *  list after a Long Rest, the spells it may swap in for one the sheet lists (its class list for which it has slots, a
+ *  Wizard's spellbook), and a Wizard's spellbook: the spells in it, how many more its levels add free, the highest
+ *  level it can prepare, and the Wizard spells that could go in. Null for a sheet that can't be rebuilt here. */
+const SpellChoicesSchema = z.strictObject({
+  swaps: z.array(
+    z.strictObject({
+      classId: z.string(),
+      className: z.string(),
+      /** The sheet's spells this class chose, which a swap replaces. */
+      replaces: z.array(z.string()),
+      spellIds: z.array(z.string())
+    })
+  ),
+  spellbook: z
+    .strictObject({
+      spellIds: z.array(z.string()),
+      freeLeft: z.number().int().min(0),
+      maxLevel: z.number().int().min(0).max(9),
+      addable: z.array(z.string())
+    })
+    .nullable()
+});
+export type SpellChoices = Wire<z.infer<typeof SpellChoicesSchema>>;
 /** What `actor:available-actions` answers: the table's rules mode, each action's availability, the sheet, and the
  *  picks the character may re-make on a rest. */
 export const AvailableActionsReplySchema = z.strictObject({
   rulesMode: z.enum(["strict", "assisted", "freeform"]),
   actions: z.array(ActionAvailabilitySchema),
   derived: ActorDerivedSheetSchema,
-  rechoices: z.array(RechoiceSchema)
+  rechoices: z.array(RechoiceSchema),
+  spellChoices: SpellChoicesSchema.nullable()
 });
 export type AvailableActionsReply = Wire<z.infer<typeof AvailableActionsReplySchema>>;
 export type ActorActionsAvailabilityResult = { ok: boolean; message?: string } & Partial<AvailableActionsReply>;

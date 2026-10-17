@@ -13,6 +13,7 @@ import { actionSummaryOf, type ContentView } from "../content-library.js";
 import { effectiveActions } from "../effective-actions.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { rechoicesOf } from "../ledger-rechoice.js";
+import { spellChoicesOf } from "../spell-choices.js";
 import {
   ActorAvailableActionsSchema,
   ActorMovementSchema,
@@ -165,7 +166,9 @@ export const gameReads = [
           catalog
         ),
         // Read against the GM's content, as `actor.rechoose` checks them.
-        rechoices: rechoicesOf(actor, definition, kit.contentLibrary.forAudience("gm"))
+        rechoices: rechoicesOf(actor, definition, kit.contentLibrary.forAudience("gm")),
+        // Read against the GM's content and the table's builder policy, as the swap and the spellbook check them.
+        spellChoices: spellChoicesOf(actor, definition, kit.contentLibrary.forAudience("gm"), state.builderPolicy)
       };
     }
   },

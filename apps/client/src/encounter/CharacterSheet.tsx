@@ -95,7 +95,7 @@ export function CharacterSheet({
     role === "gm" && state && "definitions" in state && "definitionId" in actor
       ? state.definitions.find((entry) => entry.id === actor.definitionId)?.definition
       : undefined;
-  const { definitionId, definition, serverActions, derived, rechoices, showEdited } = useSheetDefinition(
+  const { definitionId, definition, serverActions, derived, rechoices, spellChoices, showEdited } = useSheetDefinition(
     actor,
     role,
     setFeedback,
@@ -507,6 +507,8 @@ export function CharacterSheet({
             policeSlots={slotsPoliced}
             canPrepare={role === "gm" || Boolean(actor.preparation)}
             rechoices={rechoices}
+            spellChoices={spellChoices}
+            gm={role === "gm"}
             castSpellAction={castSpellAction}
             routeSpell={(spell) => {
               const note = hitExtraNote(spell.actionId);

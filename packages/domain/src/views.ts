@@ -71,6 +71,7 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
     /** Sheet resources (spell slots, prepared spells, inventory, currency). Your own claimed character always; another player's only at `partyVisibility` `sheet-and-resources`. */ spellSlots?: Actor["spellSlots"];
     pactSlots?: Actor["pactSlots"];
     preparedSpellIds?: Actor["preparedSpellIds"];
+    /** A Wizard's spellbook beyond its sheet. Same gate as `preparedSpellIds`. */ spellbook?: Actor["spellbook"];
     preparation?: Actor["preparation"];
     inventory?: Actor["inventory"];
     currency?: Actor["currency"];

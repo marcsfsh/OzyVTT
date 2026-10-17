@@ -1027,6 +1027,30 @@ export const CharacterFinishPreparingSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** Puts a spell on the prepared list in place of one the class chose: another spell of the class's list, or a
+ *  Wizard's from the spellbook. */
+export const CharacterSwapSpellSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    spellId: z.string().min(1).max(80),
+    /** The spell on the sheet it replaces. */
+    replaces: z.string().min(1).max(80),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Adds a Wizard spell to the spellbook: a pick the Wizard's levels give, or a copy from a Spell Scroll the character
+ *  carries (`itemId`) or from another spellbook. */
+export const CharacterAddToSpellbookSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    spellId: z.string().min(1).max(80),
+    from: z.enum(["level", "scroll", "book"]),
+    itemId: z.string().min(1).max(120).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const CharacterSetInventorySchema = z
   .object({
     commandId: z.uuid(),

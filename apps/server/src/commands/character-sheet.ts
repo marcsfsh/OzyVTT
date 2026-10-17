@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { requireActorAccess } from "../authorization.js";
 import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "../character-claims.js";
 import { setCharacterIdentity, setCharacterProficiencies } from "../character-edit.js";
@@ -9,6 +10,8 @@ import {
   CharacterSetIdentitySchema,
   CharacterSetInventorySchema,
   CharacterFinishPreparingSchema,
+  CharacterSwapSpellSchema,
+  CharacterAddToSpellbookSchema,
   CharacterSetPreparedSchema,
   CharacterSetProficienciesSchema,
   CharacterSetSlotSchema,
@@ -19,6 +22,7 @@ import type { EffectNarration } from "../effects.js";
 import { CommandRejectedError } from "../game-store.js";
 import { giveItem, setCurrency, setInventoryItem } from "../inventory.js";
 import { finishPreparing, setPreparedSpell, setSpellSlotRemaining } from "../spellcasting.js";
+import { addToSpellbook, swapClassSpell } from "../spell-choices.js";
 import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -129,6 +133,71 @@ export const characterSheetCommands = [
         requireActorAccess(initiatorOf(principal), state, request.actorId, "resource");
         finishPreparing(state, request.actorId);
       });
+    }
+  }),
+
+  defineCommand({
+    type: "character.swap-spell",
+    operationId: "swapSpell",
+    description:
+      "Puts a spell on a character's prepared list in place of one its class chose (`replaces`), and rebuilds the sheet from its choices ledger (SRD Spell Preparation by Class): a Cleric, Druid, Paladin or Ranger takes another spell of its class's list for which it has slots, a Wizard another spell from its spellbook, and the Wizard's replaced spell stays in the book. A player session may target only their claimed character, in the prepare step a Long Rest opens (a Paladin or Ranger once); the GM any time. Never mid-fight, and only on a sheet built here (it records its choices ledger).",
+    summary: "Swap a spell onto a prepared caster's list in place of one its class chose.",
+    schema: CharacterSwapSpellSchema,
+    malformed: "The swap-spell command is malformed.",
+    async run({ principal, request, execute }, kit) {
+      const { actorId, spellId, replaces } = request;
+      let line = "";
+      const { duplicate } = await execute((state) => {
+        requireActorAccess(initiatorOf(principal), state, actorId, "resource");
+        const swapped = swapClassSpell(state, actorId, spellId, replaces, initiatorOf(principal).role, {
+          library: kit.contentLibrary.forAudience("gm"),
+          policy: state.builderPolicy,
+          catalog: kit.equipmentCatalog()
+        });
+        line = `${kit.actorName(actorId)} prepares ${swapped.added} in place of ${swapped.removed}.`;
+      });
+      if (!duplicate)
+        kit.context.appendLog({ kind: "encounter", text: line, actorIds: [actorId], gmOnly: kit.actorHidden(actorId) });
+    }
+  }),
+
+  defineCommand({
+    type: "character.add-to-spellbook",
+    operationId: "addToSpellbook",
+    description:
+      "Adds a Wizard spell of a level the Wizard can prepare to its spellbook. `from: \"level\"` is one of the spells the Wizard's levels give (six at level 1, two more each level after), free. `scroll` copies it from a Spell Scroll of that spell the character carries (`itemId`): 2 hours and 50 GP for each level of the spell, then an Intelligence (Arcana) check against DC 10 + its level, and the scroll is destroyed whether it succeeds or fails. `book` copies it from another spellbook for the same price, GM-grade only, since the GM knows what that book holds. The clock is the GM's to move. A player session may target only their claimed character; never mid-fight, and only on a sheet built here.",
+    summary: "Add a spell to a Wizard's spellbook, free from its levels or copied from a scroll or another book.",
+    schema: CharacterAddToSpellbookSchema,
+    malformed: "The spellbook command is malformed.",
+    async run({ principal, request, execute }, kit) {
+      const { actorId, spellId, from, itemId, commandId } = request;
+      let line = "";
+      const { duplicate } = await execute((state) => {
+        requireActorAccess(initiatorOf(principal), state, actorId, "resource");
+        line = addToSpellbook(
+          state,
+          actorId,
+          { spellId, from, ...(itemId !== undefined ? { itemId } : {}) },
+          initiatorOf(principal),
+          {
+            library: kit.contentLibrary.forAudience("gm"),
+            policy: state.builderPolicy,
+            catalog: kit.equipmentCatalog(),
+            random: (sides) => kit.context.random(sides),
+            roll: {
+              id: randomUUID(),
+              commandId,
+              sessionId: sessionIdOf(principal),
+              createdAt: new Date().toISOString()
+            }
+          }
+        );
+      });
+      if (!duplicate)
+        kit.context.appendLog({ kind: "encounter", text: line, actorIds: [actorId], gmOnly: kit.actorHidden(actorId) });
+      // A scroll's copy can fail its check, so the reply says where the spell ended up.
+      const actor = kit.read().actors.find((candidate) => candidate.id === actorId);
+      return { inBook: actor?.spellbook.some((entry) => entry.id === spellId) ?? false };
     }
   }),
 

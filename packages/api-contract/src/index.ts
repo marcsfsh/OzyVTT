@@ -217,6 +217,8 @@ export const GAME_PATHS = {
   characterSetSlot: `${API_NAMESPACE}/game/actors/{actorId}/spell-slot`,
   characterSetPrepared: `${API_NAMESPACE}/game/actors/{actorId}/prepared-spell`,
   characterFinishPreparing: `${API_NAMESPACE}/game/actors/{actorId}/finish-preparing`,
+  characterSwapSpell: `${API_NAMESPACE}/game/actors/{actorId}/swap-spell`,
+  characterAddToSpellbook: `${API_NAMESPACE}/game/actors/{actorId}/spellbook`,
   characterSetInventory: `${API_NAMESPACE}/game/actors/{actorId}/inventory`,
   characterGiveItem: `${API_NAMESPACE}/game/actors/{actorId}/inventory/give`,
   characterRecoverAmmunition: `${API_NAMESPACE}/game/actors/{actorId}/inventory/recover-ammunition`,
@@ -594,6 +596,8 @@ export const GAME_COMMANDS = {
     method: "post",
     path: GAME_PATHS.characterFinishPreparing
   },
+  "character.swap-spell": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSwapSpell },
+  "character.add-to-spellbook": { scope: "actor:write", method: "post", path: GAME_PATHS.characterAddToSpellbook },
   "character.set-inventory": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetInventory },
   "character.give-item": { scope: "actor:write", method: "post", path: GAME_PATHS.characterGiveItem },
   "character.recover-ammunition": {
