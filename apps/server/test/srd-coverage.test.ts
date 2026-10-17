@@ -242,6 +242,17 @@ describe("the curated claims hold in the engine", () => {
     expect(game.actors[0]!.hp.current).toBe(5);
   });
 
+  it("a halved Speed: Slow's failed save carries the tag the Speed reader halves by", () => {
+    const slow = loadSpells().find((spell) => spell.id === "slow")!;
+    expect(spellState(slow)).toBe("enforced");
+    const slowed = ActorSchema.parse({
+      ...creature(),
+      speedFeet: 30,
+      effects: [{ id: "slow", name: "Slow", tags: slow.effect!.failureEffect!.tags, duration: { type: "manual" } }]
+    });
+    expect(currentSpeedFeet(slowed, deriveEquipment(slowed, undefined, undefined))).toBe(15);
+  });
+
   it("a trait kind the bundle runs as a mechanic is never curated reference", () => {
     const running = [...monsterTraitKinds()].filter(([, kind]) => kind.running > 0).map(([name]) => name);
     expect(running.length).toBeGreaterThan(0);

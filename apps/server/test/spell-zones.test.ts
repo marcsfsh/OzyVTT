@@ -5,7 +5,15 @@ import { endEffect } from "../src/effects.js";
 import { nextInitiativeTurn } from "../src/encounter.js";
 import { evaluateActionEconomy } from "../src/resolution/economy.js";
 import { answerSave, type SaveAnswerDependencies } from "../src/saving-throws.js";
-import { placeZone, zonesAfterAreaMove, zonesAfterMove, zonesAtTurnEnd, type ZoneDeps } from "../src/spell-zones.js";
+import {
+  placeZone,
+  speedHalvingAt,
+  zonesAfterAreaMove,
+  zonesAfterMove,
+  zonesAtTurnEnd,
+  type ZoneDeps
+} from "../src/spell-zones.js";
+import { movementCost } from "../src/terrain.js";
 import type { TokenMapGeometry } from "../src/token-placement.js";
 import {
   ALLY,
@@ -287,6 +295,18 @@ describe("Spirit Guardians: an Emanation that moves with its caster and spares i
         [8, 6]
       ])
     ).toEqual([]);
+  });
+
+  it("halves an enemy's Speed inside it, so each step there costs double, and leaves allies' Speed alone", () => {
+    const { state } = guardians();
+    const halvedAt = speedHalvingAt(state, FOE, zoneDeps());
+    expect(halvedAt).not.toBeNull();
+    // From 35 feet away to 15 feet away: three steps outside, the last one into the Emanation.
+    expect(movementCost(state, GRID, FOE, cell(12, 5), cell(8, 5), { halvedAt: halvedAt! })).toMatchObject({
+      feet: 25
+    });
+    expect(movementCost(state, GRID, FOE, cell(12, 5), cell(8, 5))).toMatchObject({ feet: 20 });
+    expect(speedHalvingAt(state, ALLY, zoneDeps())).toBeNull();
   });
 
   it("catches an enemy when the caster walks up to it", () => {

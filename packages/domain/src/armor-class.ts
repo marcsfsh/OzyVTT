@@ -16,7 +16,7 @@ export function armorClassInPlay(
   for (const effect of actor.effects ?? []) {
     const amount = effect.armorClassBonus ?? 0;
     if (effect.stackKey === undefined) bonus += amount;
-    else stacked.set(effect.stackKey, Math.max(stacked.get(effect.stackKey) ?? 0, amount));
+    else stacked.set(effect.stackKey, Math.max(stacked.get(effect.stackKey) ?? amount, amount));
   }
   for (const amount of stacked.values()) bonus += amount;
   return actor.armorClass + bonus;

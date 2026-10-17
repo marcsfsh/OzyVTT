@@ -17,6 +17,7 @@ import {
   HitDieSchema,
   ModifierSchema,
   PickBudgetScalingSchema,
+  SaveFailureEffectSchema,
   SaveOutcomeFields,
   type Modifier
 } from "@vtt/schemas";
@@ -141,7 +142,11 @@ export const FeatureSaveSchema = z
   .object({
     ability: AbilitySchema,
     dc: FeatureSaveDcSchema,
-    ...SaveOutcomeFields
+    ...SaveOutcomeFields,
+    /** What a failed save leaves besides its conditions, as on a stat block's save. */
+    failureEffect: SaveFailureEffectSchema.optional(),
+    /** What a successful save leaves instead (Stunning Strike's halved Speed). */
+    successEffect: SaveFailureEffectSchema.optional()
   })
   .strict();
 

@@ -203,6 +203,7 @@ const ON_FAIL_EFFECT_FIELDS = {
   endsWhenSourceDefeated: "player",
   rangeFeet: "player",
   endsOnSpellHealing: "player",
+  armorClassBonus: "player",
   name: "derived",
   sourceName: "derived",
   sourceActorId: "derived",

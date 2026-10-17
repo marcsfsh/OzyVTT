@@ -35,7 +35,7 @@ import {
 } from "../movement-narration.js";
 import { releaseGrapplesOutOfRange, type EffectNarration } from "../effects.js";
 import { endZone } from "../spell-zone-state.js";
-import { placeZone, zonesAfterAreaMove, zonesAfterMove } from "../spell-zones.js";
+import { placeZone, speedHalvingAt, zonesAfterAreaMove, zonesAfterMove } from "../spell-zones.js";
 import { movementCost } from "../terrain.js";
 import { moveEncounterToken, moveSceneToken } from "../token-placement.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf, type GamePrincipal, type Kit } from "./kit.js";
@@ -130,7 +130,10 @@ export const mapCommands = [
           mode,
           byPlayer: !isGmGrade(principal),
           distance: (a, b) => mapDistance(geometry, a, b)?.value ?? null,
-          cost: (a, b, options) => movementCost(state, geometry, actorId, a, b, options),
+          cost: (a, b, options) => {
+            const halvedAt = speedHalvingAt(state, actorId, kit.zoneDeps(state, geometry));
+            return movementCost(state, geometry, actorId, a, b, { ...options, ...(halvedAt ? { halvedAt } : {}) });
+          },
           calibration: geometry.calibration,
           dragging: {
             actorIds: dragged,

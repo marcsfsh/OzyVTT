@@ -35,6 +35,9 @@ export const NO_REACTIONS_TAG = "no-reactions";
 export const NO_OPPORTUNITY_ATTACKS_TAG = "no-opportunity-attacks";
 /** The bearer can't regain Hit Points while this lasts (Chill Touch). */
 export const NO_HEALING_TAG = "no-healing";
+/** Slow on its target: on its turns an action or a Bonus Action, not both, one attack with the Attack action, and a
+ *  chance that a spell with a Somatic component fails. */
+export const SLOWED_TAG = "slowed";
 /** On an escapable effect: the escape is a Strength (Athletics) check alone (a spell's restraint: Web, Entangle). */
 export const ESCAPE_ATHLETICS_TAG = "escape-athletics";
 /** The tag on a caster's own "Concentrating on X" effect; ending it ends everything its cast made. */

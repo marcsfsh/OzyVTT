@@ -272,7 +272,10 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   "flesh-to-stone": { repeatSave: undefined },
   contagion: { repeatSave: undefined },
   // "The target gains no benefit from Half Cover or Three-Quarters Cover for this save."
-  "sacred-flame": { ignoresCover: true }
+  "sacred-flame": { ignoresCover: true },
+  // "An affected target repeats the save at the end of each of its turns, ending the spell on itself on a success."
+  // The spell names no condition, so the reader leaves the repeat out.
+  slow: { repeatSave: true }
 };
 
 /** `spellSaveOutcome` with the reviewed corrections applied. Unset fields an override names are dropped. */

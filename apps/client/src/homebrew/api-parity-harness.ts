@@ -602,6 +602,12 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].save.successEffect.**",
+    types: ACTION_CARRIERS,
+    reason: "one SRD author (Stunning Strike's halved Speed), written in the class content; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "actions[].save.failureEffect.**",
     types: ACTION_CARRIERS,
     reason: "synthesised from a spell's cast model by the character build (Bane, Faerie Fire), zero hand authors",

@@ -19920,7 +19920,8 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureConditions": []
+   "failureConditions": [],
+   "repeatSave": true
   },
   "target": {
    "type": "creature",
@@ -19939,7 +19940,33 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "failureEffect": {
+    "name": "Slow",
+    "tags": [
+     "speed-halved",
+     "no-reactions",
+     "slowed"
+    ],
+    "armorClassBonus": -2,
+    "modifiers": [
+     {
+      "type": "save-bonus",
+      "amount": -2,
+      "when": [
+       {
+        "type": "on-saving-throw"
+       },
+       {
+        "type": "ability-is",
+        "abilities": [
+         "dex"
+        ]
+       }
+      ]
+     }
+    ]
+   }
   },
   "classes": [
    "bard",
@@ -20515,7 +20542,8 @@
       "oncePerTurn": true,
       "around": "caster",
       "feet": 15,
-      "affects": "enemies"
+      "affects": "enemies",
+      "halvesSpeed": true
      }
     }
    ],
@@ -22469,7 +22497,23 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "failureEffect": {
+    "name": "Vicious Mockery",
+    "tags": [
+     "until-own-attack"
+    ],
+    "duration": {
+     "type": "until-bearer-turn-end"
+    },
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "attack",
+      "mode": "disadvantage"
+     }
+    ]
+   }
   },
   "classes": [
    "bard"

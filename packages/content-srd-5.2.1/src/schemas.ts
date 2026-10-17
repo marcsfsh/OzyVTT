@@ -89,7 +89,9 @@ export const SpellZoneSchema = z
     around: z.enum(["caster", "point"]).optional(),
     feet: z.number().int().min(5).max(120).optional(),
     affects: z.literal("enemies").optional(),
-    damageCap: z.number().int().min(1).max(1000).optional()
+    damageCap: z.number().int().min(1).max(1000).optional(),
+    /** The creatures it affects move at half Speed inside it (Spirit Guardians). */
+    halvesSpeed: z.literal(true).optional()
   })
   .strict();
 export type SpellZone = z.infer<typeof SpellZoneSchema>;

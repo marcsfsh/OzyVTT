@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
-import type { GameState } from "@vtt/domain";
+import { armorClassInPlay, type GameState } from "@vtt/domain";
 import { deriveEquipment } from "../src/equipment-derivation.js";
 import { healActor } from "../src/hit-points.js";
 import { applyMovementRules } from "../src/movement-rules.js";
+import { answerSave } from "../src/saving-throws.js";
 import { currentSpeedFeet } from "../src/speed.js";
 import {
+  ALLY,
+  bardInput,
   build,
   catalog,
   druidInput,
   fight,
+  fighterInput,
   FOE,
   HERO,
   heroTurnAgain,
@@ -29,8 +33,32 @@ const druid = build({
   )
 } as typeof druidWithWisp);
 
+const bard = build(bardInput(["slow", "charm-person"]));
+const fighter = build(fighterInput());
+
 const actor = (state: GameState, id: string) => state.actors.find((candidate) => candidate.id === id)!;
 const effectNames = (state: GameState, id: string) => actor(state, id).effects.map((effect) => effect.name);
+let saveIds = 0;
+/** The target answers the save it owes with this total. */
+const answer = (state: GameState, targetId: string, total: number) =>
+  answerSave(
+    state,
+    `90000000-0000-4000-8000-${String((saveIds += 1)).padStart(12, "0")}`,
+    state.combat.pendingSaves.find((save) => save.targetActorId === targetId)!.id,
+    "manual",
+    total,
+    true,
+    { role: "gm" },
+    {
+      random: () => 10,
+      newRollId: () => `91000000-0000-4000-8000-${String((saveIds += 1)).padStart(12, "0")}`,
+      sessionId: "30000000-0000-4000-8000-00000000000a",
+      role: "gm",
+      now: () => "2026-10-17T00:00:00.000Z",
+      resolveDefinition: () => undefined,
+      catalog
+    }
+  );
 
 describe("Ray of Frost", () => {
   it("takes 10 feet off the target's Speed until the start of the caster's next turn", () => {
@@ -143,5 +171,93 @@ describe("Acid Arrow", () => {
     const { resolve, state } = fight(wizard);
     resolve("spell-acid-arrow", { slotLevel: 3 }, [15, 1, 1, 1, 1, 1]);
     expect(actor(state, FOE).effects[0]?.ongoingDamage?.damage).toEqual([{ formula: "3d4", type: "acid" }]);
+  });
+});
+
+describe("Vicious Mockery", () => {
+  it("gives a target that fails Disadvantage on its next attack roll before the end of its next turn", () => {
+    const { resolve, state } = fight(bard);
+    resolve("spell-vicious-mockery", {}, [4]);
+    answer(state, FOE, 1);
+    const mocked = actor(state, FOE).effects[0]!;
+    expect(mocked).toMatchObject({
+      name: "Vicious Mockery",
+      tags: ["until-own-attack"],
+      duration: { type: "until-bearer-turn-end" }
+    });
+    // The same mockery on a wizard: its Fire Bolt keeps the lower d20, and that roll spends it.
+    const mockedWizard = fight(wizard);
+    actor(mockedWizard.state, HERO).effects = [{ ...mocked, id: "mocked" }];
+    expect(mockedWizard.resolve("spell-fire-bolt", {}, [18, 5, 4]).attack?.naturalRoll).toBe(5);
+    expect(actor(mockedWizard.state, HERO).effects).toEqual([]);
+  });
+
+  it("leaves a target that succeeds alone", () => {
+    const { resolve, state } = fight(bard);
+    resolve("spell-vicious-mockery", {}, [4]);
+    answer(state, FOE, 25);
+    expect(actor(state, FOE).effects).toEqual([]);
+  });
+});
+
+describe("Slow", () => {
+  /** The bard's Slow, failed by the goblin. */
+  function slowed() {
+    const caster = fight(bard, { ally: true });
+    actor(caster.state, FOE).speedFeet = 30;
+    caster.resolve("spell-slow", { targetIds: [FOE] });
+    answer(caster.state, FOE, 1);
+    return { ...caster, slow: actor(caster.state, FOE).effects[0]! };
+  }
+
+  it("halves the target's Speed, takes 2 off its AC and Dexterity saves, and bars its Reactions", () => {
+    const { state, slow } = slowed();
+    const goblin = actor(state, FOE);
+    expect(currentSpeedFeet(goblin, deriveEquipment(goblin, undefined, catalog))).toBe(15);
+    expect(armorClassInPlay(goblin)).toBe(10);
+    expect(slow).toMatchObject({
+      name: "Slow",
+      tags: ["speed-halved", "no-reactions", "slowed"],
+      armorClassBonus: -2,
+      concentration: true,
+      repeatSave: { ability: "wis", dc: 15 },
+      modifiers: [{ type: "save-bonus", amount: -2 }]
+    });
+  });
+
+  it("allows an action or a Bonus Action on the bearer's turn, not both", () => {
+    const { slow } = slowed();
+    const slowedBard = fight(bard, { ally: true });
+    actor(slowedBard.state, HERO).effects = [{ ...slow, id: "slow", sourceActorId: FOE }];
+    slowedBard.resolve("spell-sacred-flame", {}, [20]);
+    expect(() => slowedBard.resolve("bardic-inspiration", { targetIds: [ALLY] })).toThrowError(
+      /Ysolde took an action this turn, and Slow leaves no Bonus Action as well/
+    );
+  });
+
+  it("lets the Attack action make one attack only, Extra Attack or not", () => {
+    const { slow } = slowed();
+    const free = fight(fighter);
+    free.resolve("item-greatsword", {}, [15, 3, 3]);
+    expect(free.resolve("item-greatsword", {}, [15, 3, 3]).attack?.outcome).toBe("hit");
+    const slowedFighter = fight(fighter);
+    actor(slowedFighter.state, HERO).effects = [{ ...slow, id: "slow", sourceActorId: FOE }];
+    slowedFighter.resolve("item-greatsword", {}, [15, 3, 3]);
+    expect(() => slowedFighter.resolve("item-greatsword", {}, [15, 3, 3])).toThrowError(
+      /Borin has no attacks remaining in this action/
+    );
+  });
+
+  it("fails a spell with a Somatic component on a d4's 1, with its slot spent", () => {
+    const { slow } = slowed();
+    const slowedBard = fight(bard);
+    actor(slowedBard.state, HERO).effects = [{ ...slow, id: "slow", sourceActorId: FOE }];
+    const slotsBefore = actor(slowedBard.state, HERO).spellSlots?.find((slot) => slot.level === 1)?.remaining ?? 0;
+    const failed = slowedBard.resolve("spell-charm-person", { targetIds: [FOE] }, [1]);
+    expect(failed.tableNarration?.map((line) => line.text)).toContain(
+      "Ysolde's Charm Person fails, its gestures made too slowly under Slow."
+    );
+    expect(slowedBard.state.combat.pendingSaves).toEqual([]);
+    expect(actor(slowedBard.state, HERO).spellSlots?.find((slot) => slot.level === 1)?.remaining).toBe(slotsBefore - 1);
   });
 });

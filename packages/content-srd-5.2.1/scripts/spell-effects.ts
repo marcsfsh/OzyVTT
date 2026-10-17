@@ -462,7 +462,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: `When the Emanation enters a creature's space, or a creature enters it or ends its turn there, it makes the save. ${ONCE_PER_TURN} The creatures you designate are unaffected: your allies.`,
       save: save("wis"),
       damage: [{ formula: "3d8", type: "radiant" }],
-      zone: { ...ENTER_OR_END_ONCE, around: "caster", feet: 15, affects: "enemies" }
+      // "Any other creature's Speed is halved in the Emanation": moving there costs double.
+      zone: { ...ENTER_OR_END_ONCE, around: "caster", feet: 15, affects: "enemies", halvesSpeed: true }
     }
   ],
   "spiritual-weapon": [
@@ -755,7 +756,28 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
 const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   bane: { name: "Bane", tags: ["baned"], duration: rounds(10), modifiers: d20Dice("-1d4") },
   // Outlined in light: attack rolls against it have Advantage, and it can't benefit from the Invisible condition.
-  "faerie-fire": { name: "Faerie Fire", tags: ["outlined"], duration: rounds(10), modifiers: [attackedWithAdvantage] }
+  "faerie-fire": { name: "Faerie Fire", tags: ["outlined"], duration: rounds(10), modifiers: [attackedWithAdvantage] },
+  // "Speed is halved, it takes a -2 penalty to AC and Dexterity saving throws, and it can't take Reactions", with
+  // one action or Bonus Action a turn, one attack with the Attack action and a chance a somatic spell fails.
+  slow: {
+    name: "Slow",
+    tags: ["speed-halved", "no-reactions", "slowed"],
+    armorClassBonus: -2,
+    modifiers: [
+      {
+        type: "save-bonus",
+        amount: -2,
+        when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["dex"] }]
+      }
+    ]
+  },
+  // "Disadvantage on the next attack roll it makes before the end of its next turn": its own roll spends it.
+  "vicious-mockery": {
+    name: "Vicious Mockery",
+    tags: ["until-own-attack"],
+    duration: { type: "until-bearer-turn-end" },
+    modifiers: [{ type: "roll-mode", roll: "attack", mode: "disadvantage" }]
+  }
 };
 
 /** Areas the text gives no template shape for (a wall, a thing placed at a point), so the GM can place them on the

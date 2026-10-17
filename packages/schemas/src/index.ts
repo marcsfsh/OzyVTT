@@ -656,8 +656,9 @@ export const EffectInstanceSchema = z
      * On a `dashing` effect without it, `effectiveSpeedFeet` falls back to doubling Speed. */
     movementGrantFeet: z.number().int().min(0).max(999).optional(),
     /** A reaction's lasting AC bonus (Shield: +5 until the caster's next turn), added to the stored AC while the
-     * effect lasts. Kept apart from `modifiers`, whose `armor-class` is written onto the sheet and would outlast it. */
-    armorClassBonus: z.number().int().min(1).max(10).optional(),
+     * effect lasts; a penalty is negative (Slow's -2). Kept apart from `modifiers`, whose `armor-class` is written onto
+     * the sheet and would outlast it. */
+    armorClassBonus: z.number().int().min(-10).max(10).optional(),
     modifiers: EffectModifiersSchema.default([]),
     /** Conditions this effect applied to the same actor; removed automatically when the effect ends. */
     linkedConditionIds: z.array(ConditionIdSchema).max(4).default([]),
@@ -1290,11 +1291,11 @@ export const SaveFailureEffectSchema = z
   .object({
     name: z.string().min(1).max(120),
     tags: z.array(EffectTagSchema).max(8).default([]),
-    duration: z
-      .object({ type: z.literal("rounds"), rounds: z.number().int().min(1).max(100) })
-      .strict()
-      .optional(),
+    /** As the text prints it ("until the start of your next turn"); the save's own `failureDuration` wins. */
+    duration: SaveFailureDurationSchema.optional(),
     modifiers: EffectModifiersSchema.default([]),
+    /** What it adds to AC while it lasts; Slow's -2 is a penalty. Kept apart from `modifiers`, as on an effect. */
+    armorClassBonus: z.number().int().min(-10).max(10).optional(),
     /** It ends when a spell restores the bearer's hit points ("The wound closes after ... a spell restores Hit Points"). */
     endsOnSpellHealing: z.literal(true).optional()
   })
@@ -1400,7 +1401,10 @@ export const ActionSchema = z.object({
       spellcasting: z.boolean().optional(),
       ...SaveOutcomeFields,
       /** An effect a failed save puts on the creature, sourced by the actor (Bane's -1d4, Faerie Fire's outline). */
-      failureEffect: SaveFailureEffectSchema.optional()
+      failureEffect: SaveFailureEffectSchema.optional(),
+      /** What a successful save leaves on the creature instead (Stunning Strike: its Speed halved and the next attack
+       *  roll against it with Advantage). */
+      successEffect: SaveFailureEffectSchema.optional()
     })
     .optional(),
   damage: z

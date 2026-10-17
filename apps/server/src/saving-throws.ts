@@ -441,6 +441,7 @@ export function applyFailureEffect(
       ...(onFail.rangeFeet !== undefined ? { rangeFeet: onFail.rangeFeet } : {}),
       ...(onFail.ongoingDamage ? { ongoingDamage: onFail.ongoingDamage } : {}),
       ...(onFail.magical ? { magical: true as const } : {}),
+      ...(onFail.armorClassBonus !== undefined ? { armorClassBonus: onFail.armorClassBonus } : {}),
       // What it does while it lasts (Bane's -1d4).
       modifiers: [...onFail.modifiers]
     }),

@@ -11,6 +11,7 @@ import {
   hasEffectTag,
   NO_ACTIONS_TAG,
   NO_REACTIONS_TAG,
+  SLOWED_TAG,
   RAGING_TAG,
   READIED_TAG,
   RECKLESS_TAG,
@@ -748,6 +749,18 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
       return { ...unchanged, bonusInstance: { actorId: attacker.id, components } };
     }
   }
+  // SRD Slow: "On its turns, it can take either an action or a Bonus Action, not both."
+  const slowed = onOwnTurn ? attacker.effects.find((effect) => effect.tags.includes(SLOWED_TAG)) : undefined;
+  if (slowed && action.activation === "bonus-action" && state.combat.turn.actionUsed)
+    violations.push({
+      rule: "economy.bonus-action-used",
+      message: `${attacker.name} took an action this turn, and ${slowed.name} leaves no Bonus Action as well.`
+    });
+  if (slowed && action.activation === "action" && !state.combat.turn.actionUsed && state.combat.turn.bonusActionUsed)
+    violations.push({
+      rule: "economy.action-used",
+      message: `${attacker.name} took a Bonus Action this turn, and ${slowed.name} leaves no action as well.`
+    });
   if (onOwnTurn && action.activation === "bonus-action") {
     if (state.combat.turn.bonusActionUsed)
       violations.push({
@@ -788,7 +801,14 @@ function freshActionSlot(
   let components: Record<string, number> | null = null;
   let multiattack: ReturnType<typeof planRecord> | null = null;
   const opened = extraAction !== "haste" && parents.length === 1 ? openedBy(parents[0], action, siblings) : null;
-  if (extraAction === "haste") {
+  // Haste's additional action makes one attack only, and so does the Attack action of a creature under Slow (a
+  // monster's Multiattack is the GM's to judge).
+  const slowed =
+    action.spellId === undefined &&
+    !action.multiattack &&
+    parents.length === 0 &&
+    attacker.effects.some((effect) => effect.tags.includes(SLOWED_TAG));
+  if (extraAction === "haste" || slowed) {
     components = action.attack || action.replacesAttack ? {} : null;
   } else if (action.multiattack) {
     // Resolving the parent itself opens the full plan, no rolls consumed.

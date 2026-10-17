@@ -134,6 +134,8 @@ const has = (actor: LiveActor, id: string) => actor.conditions.some((condition) 
 export const OUTLINED_TAG = "outlined";
 /** An effect that lasts until the next attack roll against its bearer, whoever makes it (Guiding Bolt's light). */
 export const UNTIL_ATTACKED_TAG = "until-attacked";
+/** An effect that lasts until its bearer's own next attack roll (Vicious Mockery's Disadvantage). */
+export const UNTIL_OWN_ATTACK_TAG = "until-own-attack";
 /** The Help action's mark on the distracted enemy: the next attack roll against it by an ally of the helper. */
 export const DISTRACTED_TAG = "distracted";
 
@@ -539,13 +541,39 @@ export function spendSteadyAim(ctx: ResolveContext): void {
 }
 
 /** The attack roll spends what lasts only until the next attack roll against its bearer (Guiding Bolt's light), hit
- *  or miss. A hit that lays a fresh one does so afterwards. */
+ *  or miss. A hit that lays a fresh one does so afterwards. An effect that holds more than that (Stunning Strike's
+ *  halved Speed) loses only the Advantage it gave and keeps the rest until its own end. */
 export function spendUntilAttacked(ctx: ResolveContext): void {
   const { state, attack, targets, effectsEnded } = ctx;
   if (attack === null) return;
   const target = targets[0];
   for (const effect of target.effects.filter((candidate) => candidate.tags.includes(UNTIL_ATTACKED_TAG))) {
+    const rest = effect.tags.filter((tag) => tag !== UNTIL_ATTACKED_TAG);
+    if (rest.length > 0) {
+      target.effects = target.effects.map((candidate) =>
+        candidate.id === effect.id
+          ? {
+              ...candidate,
+              tags: rest,
+              modifiers: candidate.modifiers.filter(
+                (modifier) => modifier.type !== "roll-mode" || modifier.roll !== "incoming-attack"
+              )
+            }
+          : candidate
+      );
+      continue;
+    }
     endEffect(state, target.id, effect.id);
     effectsEnded.push({ actorId: target.id, actorName: target.name, name: effect.name });
+  }
+}
+
+/** The bearer's own attack roll spends what lasts only until it (Vicious Mockery's Disadvantage), hit or miss. */
+export function spendUntilOwnAttack(ctx: ResolveContext): void {
+  const { state, attack, attacker, effectsEnded } = ctx;
+  if (attack === null) return;
+  for (const effect of attacker.effects.filter((candidate) => candidate.tags.includes(UNTIL_OWN_ATTACK_TAG))) {
+    endEffect(state, attacker.id, effect.id);
+    effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name: effect.name });
   }
 }

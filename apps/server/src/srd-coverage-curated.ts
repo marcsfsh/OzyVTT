@@ -666,8 +666,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:primal-order": guided(
     "Magician's extra cantrip and Warden's training are applied. The Wisdom bonus to the checks each role names is the GM's."
   ),
-  "feature:stunning-strike": guided(
-    "A target that fails its Constitution save against the Monk's DC is Stunned until the start of the Monk's next turn, once a turn for a Focus Point. The halved Speed and Advantage on a success are the GM's."
+  "feature:stunning-strike": enforced(
+    "A target that fails its Constitution save against the Monk's DC is Stunned until the start of the Monk's next turn, once a turn for a Focus Point. On a success resolution/pending.ts halves its Speed until then (speed.ts), and the next attack roll against it before then has Advantage and spends it (resolution/attack.ts)."
   ),
   "feature:use-magic-device": guided(
     "The fourth attuned item is applied (inventory.ts). The roll to save a charge, and reading any Spell Scroll, are the GM's."
@@ -906,8 +906,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:sorcerous-burst": guided(
     "The attack and the chosen damage type are applied. Rolling another d8 on each 8 is the GM's."
   ),
-  "spell:spirit-guardians": guided(
-    "spell-zones.ts asks for the save when a creature enters the Emanation or ends its turn there. The halved Speed inside it is the GM's."
+  "spell:spirit-guardians": enforced(
+    "spell-zones.ts asks for the save when a creature enters the Emanation or ends its turn there, and charges an affected creature double for each step it moves inside (terrain.ts). The creatures the caster designates are its allies."
   ),
   "spell:storm-of-vengeance": guided(
     "The first turn's save, Thunder damage and Deafened condition are applied. The storm's turns 2 to 10 are the GM's."
@@ -920,9 +920,6 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "spell:vampiric-touch": guided(
     "The touch's Necrotic damage is applied, on the cast and as a later Magic action. Regaining half the damage dealt is the GM's."
-  ),
-  "spell:vicious-mockery": guided(
-    "The save and its Psychic damage are applied. The Disadvantage on the target's next attack roll is the GM's."
   ),
   "spell:vitriolic-sphere": guided(
     "The save and its 10d4 Acid damage are applied. The 5d4 Acid damage at the end of the target's next turn is the GM's."

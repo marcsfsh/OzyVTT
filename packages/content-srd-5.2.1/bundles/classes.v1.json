@@ -5513,6 +5513,28 @@
        ],
        "failureDuration": {
         "type": "until-source-next-turn"
+       },
+       "successEffect": {
+        "name": "Stunning Strike",
+        "tags": [
+         "speed-halved",
+         "until-attacked"
+        ],
+        "duration": {
+         "type": "until-source-next-turn"
+        },
+        "modifiers": [
+         {
+          "type": "roll-mode",
+          "roll": "incoming-attack",
+          "mode": "advantage",
+          "when": [
+           {
+            "type": "on-attack-roll"
+           }
+          ]
+         }
+        ]
        }
       }
      }

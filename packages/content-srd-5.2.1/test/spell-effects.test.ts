@@ -114,7 +114,9 @@ describe("what one cast of an SRD spell does", () => {
       oncePerTurn: true,
       around: "caster",
       feet: 15,
-      affects: "enemies"
+      affects: "enemies",
+      // "Any other creature's Speed is halved in the Emanation."
+      halvesSpeed: true
     });
     expect(zoneOf("web")).toEqual({ on: ["enter", "start-turn"] });
     expect(zoneOf("stinking-cloud")).toEqual({ on: ["start-turn"] });

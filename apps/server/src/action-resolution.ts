@@ -15,13 +15,20 @@ import { masteryMissDamage } from "./weapon-mastery.js";
 import { spendAmmunition } from "./resolution/ammunition.js";
 import { useUpConsumable } from "./resolution/consumables.js";
 import { consumableRowFor } from "./consumables.js";
-import { rollAttack, spendDistraction, spendSteadyAim, spendUntilAttacked } from "./resolution/attack.js";
+import {
+  rollAttack,
+  spendDistraction,
+  spendSteadyAim,
+  spendUntilAttacked,
+  spendUntilOwnAttack
+} from "./resolution/attack.js";
 import { rollLastCharge } from "./resolution/charges.js";
 import type { DefinitionAction, ResolveContext, ResolveDependencies, ResolveInput } from "./resolution/context.js";
 import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage, spendDamageUses } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
 import { readScroll } from "./resolution/scroll.js";
+import { slowedSpellFails } from "./resolution/slowed.js";
 import { applyConditionCures, applyHealing } from "./resolution/heal.js";
 import {
   recordAttackRoll,
@@ -71,6 +78,11 @@ export function resolveDefinitionAction(
     useUpConsumable(ctx);
     return { ...resolutionOf(ctx), save: null };
   }
+  // A spell that Slow's chance makes fail spends its slot and its action, and nothing else happens.
+  if (slowedSpellFails(ctx)) {
+    commitEconomy(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
   rollAttack(ctx);
   // Preview: the d20 is rolled and shown, nothing else applies. The economy was validated already, so an
   // illegal attack is blocked before the preview roll.
@@ -82,6 +94,7 @@ export function resolveDefinitionAction(
     spendSap(ctx);
     spendDistraction(ctx);
     spendUntilAttacked(ctx);
+    spendUntilOwnAttack(ctx);
     spendSteadyAim(ctx);
   }
   // A hit the target's Parry or Shield may still turn into a miss: the attack is spent, and the answer finishes it.

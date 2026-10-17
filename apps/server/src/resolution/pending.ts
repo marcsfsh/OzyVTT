@@ -208,6 +208,7 @@ export function failureEffectFor(
       ...(hazard ? [hazard.tag] : [])
     ].slice(0, 8),
     modifiers: [...(declared?.modifiers ?? [])],
+    ...(declared?.armorClassBonus !== undefined ? { armorClassBonus: declared.armorClassBonus } : {}),
     linkedConditionIds: linked,
     // An escape DC the text doesn't print is the grapple's own DC, as the 2024 rules set it; a spell's restraint is
     // escaped against the spell save DC.
@@ -221,6 +222,28 @@ export function failureEffectFor(
     ...(save.speedZero ? { speedZero: true } : {}),
     ...(grapple ? { endsWhenSourceDefeated: true, rangeFeet: save.rangeFeet ?? action.attack?.reachFeet ?? 5 } : {}),
     ...(ongoingDamage ? { ongoingDamage } : {}),
+    ...(castId !== null ? { castId } : {}),
+    ...(isMagicalAction(ctx) ? { magical: true as const } : {}),
+    sourceActionId: action.id
+  };
+}
+
+/** What a successful save leaves on its target instead, as the action declares it (Stunning Strike: the target's Speed
+ *  halved and the next attack roll against it with Advantage, until the start of the Monk's next turn). */
+function successEffectFor(ctx: MagicalSource & Pick<ResolveContext, "castId">): PendingSave["onSuccessEffect"] {
+  const { action, attacker, castId } = ctx;
+  const declared = action.save?.successEffect;
+  if (!declared) return undefined;
+  return {
+    name: declared.name,
+    tags: [...declared.tags],
+    modifiers: [...declared.modifiers],
+    ...(declared.armorClassBonus !== undefined ? { armorClassBonus: declared.armorClassBonus } : {}),
+    linkedConditionIds: [],
+    escapeDc: null,
+    sourceActorId: attacker.id,
+    sourceName: attacker.name,
+    ...(declared.duration ? { duration: declared.duration } : {}),
     ...(castId !== null ? { castId } : {}),
     ...(isMagicalAction(ctx) ? { magical: true as const } : {}),
     sourceActionId: action.id
@@ -297,6 +320,7 @@ export function parkActionSave(ctx: ResolveContext): void {
   }
   if (saving.length === 0) return;
   const parts = rider ? [] : damagePartsOf(ctx);
+  const onSuccessEffect = successEffectFor(ctx);
   // Cover adds to Dexterity saving throws (SRD Cover), each target's own: the GM's choice for this resolve, else the
   // cover the GM marked it with, unless the save ignores it (Sacred Flame). Carried on the prompt.
   const saveBonusOf = (target: (typeof targets)[number]) =>
@@ -327,6 +351,7 @@ export function parkActionSave(ctx: ResolveContext): void {
       halfOnSuccess: action.save.successDamage === "half",
       conditionIds,
       ...(onFailEffect ? { onFailEffect } : {}),
+      ...(onSuccessEffect ? { extra: { onSuccessEffect } } : {}),
       magical: isMagicalAction(ctx),
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())

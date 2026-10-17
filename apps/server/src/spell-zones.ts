@@ -107,7 +107,12 @@ function insideTest(
 
 /** The creatures a zone can act on: those in the fight, on the map, not the anchor of an Emanation, and only the
  *  caster's enemies where the spell spares the rest. */
-function exposed(state: GameState, zone: SpellZone, trigger: ZoneTrigger, deps: ZoneDeps): Actor[] {
+function exposed(
+  state: GameState,
+  zone: SpellZone,
+  trigger: ZoneTrigger,
+  deps: Pick<ZoneDeps, "resolveDefinition">
+): Actor[] {
   const caster = state.actors.find((actor) => actor.id === zone.casterId);
   return state.combat.initiative.flatMap((entry) => {
     const creature = state.actors.find((actor) => actor.id === entry.actorId);
@@ -119,6 +124,27 @@ function exposed(state: GameState, zone: SpellZone, trigger: ZoneTrigger, deps: 
       return [];
     return [creature];
   });
+}
+
+/**
+ * Where a spell's area halves the mover's Speed (Spirit Guardians: "Any other creature's Speed is halved in the
+ * Emanation"), as a test of its centre, so moving there costs double. Null when no standing area it is exposed to
+ * does so, or the map can't place one.
+ */
+export function speedHalvingAt(
+  state: GameState,
+  actorId: string,
+  deps: Pick<ZoneDeps, "geometry" | "resolveDefinition" | "catalog">
+): ((position: Point, sizeCells: number) => boolean) | null {
+  const tests: Array<(position: Point, sizeCells: number) => boolean> = [];
+  for (const zone of liveZones(state)) {
+    const content = zoneContentOf(zone, deps.catalog);
+    if (!content?.trigger.halvesSpeed) continue;
+    if (!exposed(state, zone, content.trigger, deps).some((creature) => creature.id === actorId)) continue;
+    const inside = insideTest(state, zone, content.trigger, content.spell, deps.geometry);
+    if (inside) tests.push(inside);
+  }
+  return tests.length > 0 ? (position, sizeCells) => tests.some((inside) => inside(position, sizeCells)) : null;
 }
 
 /** SRD Sleet Storm: a failure "and lose Concentration". */

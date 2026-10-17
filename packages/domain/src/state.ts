@@ -220,6 +220,8 @@ const PendingSaveEffectSchema = z
     endsOnSpellHealing: EffectInstanceSchema.shape.endsOnSpellHealing,
     /** What the effect does while it lasts (Bane's -1d4 on attack rolls and saves). */
     modifiers: EffectModifiersSchema.default([]),
+    /** What it adds to AC while it lasts (Slow's -2). */
+    armorClassBonus: EffectInstanceSchema.shape.armorClassBonus,
     /** "Until the end of the current turn" for a save made at the start of the bearer's own turn (Stinking Cloud),
      *  where "until the end of its next turn" would run a turn longer. */
     currentTurn: z.literal(true).optional()
