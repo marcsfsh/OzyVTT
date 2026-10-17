@@ -40,6 +40,7 @@ import { useSheetDefinition } from "./useSheetDefinition";
 import { useSheetEdit } from "./useSheetEdit";
 import { useSheetRolls } from "./useSheetRolls";
 import { command } from "../lib/command";
+import { revealInRegion } from "../lib/reveal";
 import "./character-sheet.css";
 
 /** Per-browser storage for the sheet's dice dock (private-mode safe). */
@@ -373,7 +374,7 @@ export function CharacterSheet({
   const targetingSession = useTargeting();
   useEffect(() => {
     if (effectiveAttackMode === "inline" && targetingSession?.attackerId === actor.id)
-      runnerRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      revealInRegion(runnerRef.current, "nearest", "smooth");
   }, [effectiveAttackMode, targetingSession?.attackerId, targetingSession?.action.id, actor.id]);
 
   const extension = (definition?.extensions["open5e.srd-2024"] ?? {}) as SrdExtension;

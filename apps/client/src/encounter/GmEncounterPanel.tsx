@@ -17,6 +17,7 @@ import { useTargeting, useTargetingResult } from "./targeting";
 import { holdsTheTurn } from "../table/NeedsYou";
 import { isDefeatedMonster } from "../table/needs";
 import { TablePanel, useRememberedTab, type PanelTab } from "../table/TablePanel";
+import { revealInRegion } from "../lib/reveal";
 
 /** A monster defeated in the last fight on this scene stays out of the next one unless the GM adds it back. */
 function stillStanding(actors: GmView["actors"], actorId: string) {
@@ -96,7 +97,7 @@ export function GmEncounterPanel({
   // Scroll the newly active combatant's row into view on each real turn change.
   const activeRowRef = useRef<HTMLLIElement | null>(null);
   useEffect(() => {
-    activeRowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    revealInRegion(activeRowRef.current, "nearest", "smooth");
   }, [state.combat.turnActorId]);
 
   useEffect(() => {

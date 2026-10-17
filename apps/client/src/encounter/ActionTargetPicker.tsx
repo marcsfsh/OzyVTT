@@ -9,6 +9,7 @@ import { FaceEntry } from "./RollControls";
 import { plainActionName } from "./format";
 import type { TargetRow } from "../table/targetRows";
 import { InFooter } from "../table/footerSlot";
+import { revealInRegion } from "../lib/reveal";
 import {
   clearTargeting,
   setCheckSkill,
@@ -55,7 +56,7 @@ export function ActionTargetPicker({
   const actionId = picking.action.id;
   useEffect(() => {
     const phone = window.matchMedia?.("(max-width: 979px)").matches ?? false;
-    groupRef.current?.scrollIntoView({ block: phone ? "start" : "nearest" });
+    revealInRegion(groupRef.current, phone ? "start" : "nearest");
   }, [actionId]);
   const skillCatalog = useSkillCatalog();
   const group = useId();

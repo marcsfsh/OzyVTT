@@ -23,6 +23,7 @@ import {
   useTargetingResult
 } from "./targeting";
 import { foesFirst, type TargetRow } from "../table/targetRows";
+import { revealInRegion } from "../lib/reveal";
 import "./action-runner.css";
 
 /** Maps a player's own stat-block action onto the ContentActionSummary the targeting store uses. An area spell keeps
@@ -218,7 +219,7 @@ export function PlayerActionRunner({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const shown = picking ? `pick:${picking.action.id}` : result ? `result:${result.actionName}` : feedback || null;
   useEffect(() => {
-    if (shown) rootRef.current?.scrollIntoView({ block: "nearest" });
+    if (shown) revealInRegion(rootRef.current, "nearest");
   }, [shown]);
 
   if (actions.length === 0 && facts.common.length === 0) return null;

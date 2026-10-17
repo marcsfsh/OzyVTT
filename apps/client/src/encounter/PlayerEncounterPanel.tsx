@@ -17,6 +17,7 @@ import { hasPlayerPrompt } from "../table/PromptSlot";
 import { TablePanel, useRememberedTab, type PanelTab } from "../table/TablePanel";
 import { usePlayerTargetRows } from "../table/targetRows";
 import { useTargeting } from "./targeting";
+import { revealInRegion } from "../lib/reveal";
 
 /**
  * A player's own prompts keep their outcome line beside them: answering one unmounts it, and the
@@ -201,7 +202,7 @@ export function PlayerEncounterPanel({
   // Bring the active combatant's row into view when the turn advances.
   const activeRowRef = useRef<HTMLLIElement | null>(null);
   useEffect(() => {
-    activeRowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    revealInRegion(activeRowRef.current, "nearest", "smooth");
   }, [combat.turnActorId]);
   const fighting = combat.active;
   const tabIds = fighting ? ["turn", "order", "sheet", "dice", "log"] : ["me", "party", "dice", "log"];
