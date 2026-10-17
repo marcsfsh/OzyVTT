@@ -337,6 +337,15 @@ const EquipmentWeaponStatsSchema = z.object({
     .optional()
 });
 
+/** The light a lit item sheds, as its description prints it: Bright Light out to `brightFeet` and Dim Light for
+ *  `dimFeet` more (Torch: 20 and 20). Dynamic vision lights a carried one while it is equipped (ADR-0023). */
+const ItemLightSchema = z
+  .object({
+    brightFeet: z.number().int().min(0).max(240),
+    dimFeet: z.number().int().min(0).max(240)
+  })
+  .strict();
+
 /**
  * The base weapons or armors a template item may bind to: the SRD's printed qualifier (`label`) and
  * its resolved ids, computed at build or authoring time so the server's bind check is a membership
@@ -381,6 +390,7 @@ export const EquipmentReferenceSchema = z
     /** Matches `InventoryItemSchema.description`, which add-from-catalog copies this string onto. Long enough for
      *  the longest SRD item with its tables (Mysterious Deck). */
     description: z.string().max(12000).nullable(),
+    light: ItemLightSchema.optional(),
     weapon: EquipmentWeaponStatsSchema.nullable().optional(),
     armor: z
       .object({
