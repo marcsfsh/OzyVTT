@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { regainedText } from "./ActionResultHead";
 import {
   rosterActors,
   type ActorDefinition,
@@ -149,6 +150,8 @@ export function CharacterSheet({
   const sendLoose = (actionId: string, extra: Readonly<Record<string, unknown>>, failure: string) =>
     void command("action:use", { actorId: actor.id, actionId, ...extra }).then((response) => {
       if (!response.ok) toast(response.message ?? failure, { tone: "error" });
+      // A heal says who regained what.
+      else if (response.healing && response.healing.targets.length > 0) toast(regainedText(response.healing.targets));
     });
   // Who a heal outside a fight may land on, as the server allows: this character, then the party (for the GM, anyone
   // on the roster).

@@ -295,7 +295,7 @@ export const actionCommands = [
     type: "action.use",
     operationId: "useAction",
     description:
-      "Uses an action and lets the SERVER decide what that means. In the fight on this creature's turn it delegates to the full structured resolution and acks `route: \"resolved\"`. Off turn it is refused with the overridable, askable rules block `economy.not-your-turn` (reactions and legendary actions are exempt - taking those off turn is the point); under an `economy` exception of advise/off it resolves, with a GM-only warning line under advise. With no fight running - or with this creature not in the turn order - the server rolls the action's own attack die (and, only with `includeDamage`, its damage parts) as attributed rolls, spends what the action costs (an item's charges or a feature's per-rest uses, and any spell slot an item cast consumes; refused when none remain; an item's last charge rolls its d20 for the GM), uses up a potion, flask or Spell Scroll and the shot's ammunition, reads a scroll only if the reader can (a spell above the reader's levels rolls its check first, and a failure loses the scroll with nothing else rolled), touches no combat state, and acks `route: \"loose\"` with the roll ids. An action with nothing to roll is still used, with a feed line. A heal (a potion, a healing spell, Second Wind, Lay on Hands) lands on `targetIds` through the fight's hit point rules (the dead stay dead), its user when none are named: a player heals their own character or another member of the party, the GM anyone; damage never moves on the loose route. GM-grade for any combatant, including a monster's sheet; a player session only for their own claimed character.",
+      "Uses an action and lets the SERVER decide what that means. In the fight on this creature's turn it delegates to the full structured resolution and acks `route: \"resolved\"`. Off turn it is refused with the overridable, askable rules block `economy.not-your-turn` (reactions and legendary actions are exempt - taking those off turn is the point); under an `economy` exception of advise/off it resolves, with a GM-only warning line under advise. With no fight running - or with this creature not in the turn order - the server rolls the action's own attack die (and, only with `includeDamage`, its damage parts) as attributed rolls, spends what the action costs (an item's charges or a feature's per-rest uses, and any spell slot an item cast consumes; refused when none remain; an item's last charge rolls its d20 for the GM), uses up a potion, flask or Spell Scroll and the shot's ammunition, reads a scroll only if the reader can (a spell above the reader's levels rolls its check first, and a failure loses the scroll with nothing else rolled), touches no combat state, and acks `route: \"loose\"` with the roll ids, and for a heal who regained what (`healing`). An action with nothing to roll is still used, with a feed line. A heal (a potion, a healing spell, Second Wind, Lay on Hands) lands on `targetIds` through the fight's hit point rules (the dead stay dead), its user when none are named: a player heals their own character or another member of the party, the GM anyone; damage never moves on the loose route. GM-grade for any combatant, including a monster's sheet; a player session only for their own claimed character.",
     summary:
       "Use an action and let the SERVER route it: resolved in the fight on your turn, refused off turn, loose dice outside a fight, where a heal lands on whoever it is given to (GM anyone; a player their own claimed character).",
     schema: ActionUseSchema,
@@ -375,7 +375,7 @@ export const actionCommands = [
       let usedUp = false;
       let narrations: EffectNarration[] = [];
       let rulesNote: string | null = null;
-      let healed: Array<Readonly<{ text: string; actorId: string }>> = [];
+      let healed: ReturnType<typeof applyLooseHealing> = { lines: [], healing: null };
       const { state, duplicate } = await execute((draft) => {
         requireActorAccess(initiator, draft, actorId, "attack");
         const live = draft.actors.find((candidate) => candidate.id === actorId)!;
@@ -384,7 +384,7 @@ export const actionCommands = [
           ? looseHealTargets(draft, live, action, targetIds, initiator, spell, castLevel)
           : [];
         let healRoll: number | null = null;
-        healed = [];
+        healed = { lines: [], healing: null };
         // A scroll outside a fight: one the reader can't read is refused, and a spell above their levels needs its
         // check first. A failure loses the scroll, and nothing else is rolled.
         const scroll = scrollOfAction(action, live.inventory, kit.equipmentCatalog());
@@ -509,10 +509,13 @@ export const actionCommands = [
         healed = applyLooseHealing(draft, action, healTargets, healRoll, (sides) => kit.context.random(sides));
       });
       const usedRollIds = scrollLost !== null ? [scrollCheckId] : scrollChecked ? [scrollCheckId, ...rollIds] : rollIds;
+      // Who regained what goes back to the one who used it, as the fight's resolution says it.
+      const healedReply = healed.healing ? { healing: healed.healing } : {};
       if (duplicate) return { route: "loose", rollIds: usedRollIds };
       kit.publishRolls(state, commandId);
       kit.publishNarrations(narrations);
-      for (const line of healed) kit.context.appendLog({ kind: "heal", text: line.text, actorIds: [line.actorId] });
+      for (const line of healed.lines)
+        kit.context.appendLog({ kind: "heal", text: line.text, actorIds: [line.actorId] });
       if (scrollLost !== null) {
         kit.context.appendLog({
           kind: "action",
@@ -557,7 +560,7 @@ export const actionCommands = [
           gmOnly: kit.actorHidden(actorId)
         });
       }
-      return { route: "loose", rollIds: usedRollIds };
+      return { route: "loose", rollIds: usedRollIds, ...healedReply };
     }
   }),
 
