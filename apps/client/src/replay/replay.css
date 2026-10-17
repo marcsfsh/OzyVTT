@@ -90,7 +90,7 @@
   margin: 0;
 }
 
-/* `stretch`, not `start`: both columns are full height, and the row is a definite `1fr` so a long
+/* `stretch`: both columns are full height, and the row is a definite `1fr` so a long
    turn order cannot lengthen the surface. */
 .replay-layout {
   display: grid;

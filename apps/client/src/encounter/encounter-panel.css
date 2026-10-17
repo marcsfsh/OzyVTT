@@ -444,7 +444,7 @@
   z-index: 40;
   background: transparent;
 }
-/* `minmax(0, 1fr)`, not `auto` or `1fr` (whose auto minimum is max-content): otherwise the HP editor
+/* `minmax(0, 1fr)`: with `auto` or `1fr` (whose auto minimum is max-content) the HP editor
    row overflows the popover at 375px and pushes buttons off screen. */
 .row-tools-popover {
   position: absolute;

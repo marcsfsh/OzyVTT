@@ -310,7 +310,7 @@ export function revealAheadOfPlayers(
   record: Readonly<{ calendarInstant: number | null }>,
   calendar: GmCodexCalendar | null
 ): boolean {
-  // Falsy checks, not `=== null`: a caller with a narrower calendar shape passes `undefined`.
+  // Falsy checks: a caller with a narrower calendar shape passes `undefined`, which `=== null` misses.
   const published = calendar?.publishedDate;
   if (!calendar || !published || typeof record.calendarInstant !== "number") return false;
   // Snap the published date like the server does before comparing.

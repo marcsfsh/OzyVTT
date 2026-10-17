@@ -1213,7 +1213,7 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           /**
            * Weapon properties are mechanics as well as labels: `finesse` (better of Str/Dex), `reach`,
            * `thrown`, and `weapon-property-is` riders all read this column. Uses
-           * `WEAPON_PROPERTY_IDS`, not `ctx.weaponProperties` (which also includes masteries). Open
+           * `WEAPON_PROPERTY_IDS` (`ctx.weaponProperties` also includes masteries). Open
            * like other SRD vocabularies, so homebrew properties stay typeable.
            */
           {

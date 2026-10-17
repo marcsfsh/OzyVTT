@@ -43,7 +43,7 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
       setLoad("ready");
       setLoadMessage(null);
     } catch (error) {
-      // 404 (router not mounted) or 501 (store not mounted) means "not available", not "broken".
+      // 404 (router not mounted) or 501 (store not mounted) means "not available"; nothing is broken.
       const status = error instanceof ApiError ? error.status : 0;
       setLoad(status === 404 || status === 501 ? "unavailable" : "error");
       setLoadMessage(error instanceof Error ? error.message : "Couldn't load your homebrew.");
@@ -154,7 +154,7 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
       const made = name || `New ${typeLabel(request.type)}`;
       const copied = companions.length - failed.length;
       if (failed.length > 0) {
-        // `info`, not `error`: the requested record was created.
+        // `info`: the requested record was created.
         toast(`${made} created, but ${failed.join(" and ")} couldn't be copied. Add a subclass before publishing.`, {
           tone: "info"
         });

@@ -6,7 +6,7 @@
    --landing-* tokens, re-skinned per theme. Reduced motion freezes the motion and keeps the scene. */
 .landing {
   position: relative;
-  /* `clip`, not `hidden`: the scene overflows the frame, and a hidden box still scrolls when focus moves
+  /* `clip`: the scene overflows the frame, and a `hidden` box still scrolls when focus moves
      into it, which pushed the sign-in card off a phone screen. */
   overflow: clip;
   display: flex;
@@ -491,7 +491,7 @@
       0 var(--landing-grid-cell);
   }
 }
-/* The resting rise animates `translate`, not `transform`: individual transform properties compose with
+/* The resting rise animates `translate`: individual transform properties compose with
    `transform`, so the base `translateX(-50%)` survives and the drive can animate `transform` without
    contest. */
 @keyframes landing-sunrise {

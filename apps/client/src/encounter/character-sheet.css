@@ -574,7 +574,7 @@
   color: var(--text-muted);
   font-size: var(--fs-xs);
 }
-/* One clamped line (where rarity and attunement are). A line clamp, not `white-space: nowrap`, which
+/* One clamped line (where rarity and attunement are). A line clamp: `white-space: nowrap`
    sizes the flex item to the whole entry and makes the list scroll sideways. */
 .sheet-picker-desc {
   min-width: 0;

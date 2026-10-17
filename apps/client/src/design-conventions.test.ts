@@ -168,7 +168,7 @@ describe("(c) one eyebrow, the Eyebrow primitive", () => {
     const hits: Hit[] = [];
     for (const source of allTsx()) {
       const src = stripComments(source.read());
-      // A class token, not `\beyebrow\b`, which would match `viewer-eyebrow`.
+      // A class token: `\beyebrow\b` would match `viewer-eyebrow`.
       for (const { value, index } of classNameValues(src))
         if (value.split(/[^A-Za-z0-9_-]+/).includes("eyebrow"))
           hits.push({ key: source.path, at: cite(source.path, src, index, value.trim().slice(0, 60)) });

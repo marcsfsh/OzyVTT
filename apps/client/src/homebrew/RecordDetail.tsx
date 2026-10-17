@@ -533,7 +533,7 @@ export function RecordDetail({
         </Alert>
       )}
 
-      {/* The removal's consequence for other records. `warning`, not `error`: nothing failed,
+      {/* The removal's consequence for other records. `warning`: nothing failed,
           and Restore undoes it. */}
       {brokeOthers.length > 0 && (
         <Alert

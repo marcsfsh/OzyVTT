@@ -40,6 +40,6 @@ export function questProgress(
   objectives: readonly Readonly<{ done: boolean }>[]
 ): Readonly<{ done: number; total: number; label: string }> {
   const done = objectives.filter((objective) => objective.done).length;
-  // Words, not "2/5", so it reads aloud.
+  // "3 of 5 done" in words, so it reads aloud.
   return { done, total: objectives.length, label: `${done} of ${objectives.length} done` };
 }

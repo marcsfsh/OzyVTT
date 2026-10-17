@@ -122,7 +122,7 @@ describe("an inline option's gate can be cleared, not only set", () => {
     expect(form.option().requires).toEqual({ id: "emberborn" });
 
     await user.click(form.clear("emberborn"));
-    // No key at all, not `{}` (which would raise two "Required" issues for a removed gate).
+    // No key at all: `{}` would raise two "Required" issues for a removed gate.
     expect(Object.keys(form.option()), "the cleared clause must not survive as an empty object").not.toContain(
       "requires"
     );

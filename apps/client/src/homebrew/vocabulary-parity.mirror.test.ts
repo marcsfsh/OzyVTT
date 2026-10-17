@@ -2787,7 +2787,7 @@ describe("the spell window and the ASI ceiling: through both paths", () => {
     carriers(library.featSummaries(), (id) => library.featRecord(id));
 
     // Every floor but Evocation Savant's has `min === max`: a floor exists to make a pick exact ("a level 6
-    // spell", not "6 or lower"); the savant's "level 1 or 2" keeps cantrips out of a spellbook.
+    // spell"); the savant's "level 1 or 2" keeps cantrips out of a spellbook.
     const ceilings = found.filter((entry) => entry.max !== undefined);
     const floors = found.filter((entry) => entry.min !== undefined);
     const maxima = found.filter((entry) => entry.maximum !== undefined);

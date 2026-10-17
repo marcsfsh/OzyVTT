@@ -52,7 +52,7 @@ export function registerNavigationGuard(guard: Guard): () => void {
 
 async function mayLeave(): Promise<boolean> {
   for (const guard of [...guards]) {
-    // Sequential, not `Promise.all`: each guard may prompt, and two prompts at once is a trap.
+    // Sequential: each guard may prompt, and two prompts at once (as `Promise.all` would give) is a trap.
     if (!(await guard())) return false;
   }
   return true;

@@ -188,7 +188,7 @@ export const whenField = (): FieldDef => ({
       options: [opt("light", "Light"), opt("medium", "Medium"), opt("heavy", "Heavy")],
       visibleWhen: hasType("while-armored"),
       help: "Leave all off for any armour.",
-      // `weights` is `.min(1)` when present, so "any armour" means the key is absent, not `[]`.
+      // `weights` is `.min(1)` when present, so "any armour" means the key is absent (`[]` is refused).
       write: (next, row) => {
         const chosen = next as string[];
         if (chosen.length > 0) return { ...row, weights: chosen };

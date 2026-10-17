@@ -125,7 +125,7 @@ export function metaLine(item: ContentEquipmentSummary): string {
   return parts.join(" · ");
 }
 
-/** A piece of magic ammunition is one kind of the gear table's ammunition: "Arrows", not "Arrows (20)". */
+/** A piece of magic ammunition is one kind of the gear table's ammunition: "Arrows", with no "(20)". */
 export const ammunitionKindName = (base: Pick<ContentEquipmentSummary, "name">) => base.name.replace(/\s*\(\d+\)$/, "");
 
 /** What picking a base decides, for the chooser's lead line. */

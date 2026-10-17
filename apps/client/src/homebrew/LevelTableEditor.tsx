@@ -269,7 +269,7 @@ export function LevelTableEditor({
           <>
             <span className="hb-lt-cell hb-lt-slots">
               <span className="hb-lt-micro">Spell slots</span>
-              {/* Real visually-hidden text, not `aria-label`: an aria-label on a roleless
+              {/* Real visually-hidden text: an aria-label on a roleless
                   <span> is ignored by the accessible-name computation. */}
               <span className="tabular hb-lt-derived" aria-hidden="true">
                 {slots.text}

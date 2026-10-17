@@ -95,7 +95,7 @@ import type { CodexCalendar, CodexChronicleRecord, CodexSession, PlayerCodexSess
 
 /**
  * The console is a view: it fetches nothing of its own and never writes. Journal groups without a session
- * record stay plain headings. The recap badge keys on session id, not `updatedAt`.
+ * record stay plain headings. The recap badge keys on session id.
  */
 const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] };
 
