@@ -59,11 +59,12 @@ const CHECK_DISADVANTAGE_CONDITIONS = ["poisoned", "frightened"] as const;
 export function abilityCheckClaims(
   actor: Actor,
   derivation: EquipmentDerivation,
-  narrow: Readonly<{ ability?: RiderAbility; skill?: string }>
+  narrow: Readonly<{ ability?: RiderAbility; skill?: string }>,
+  warded: readonly string[] = []
 ): RollModeClaims {
   const claims = checkRiderClaims(derivation, narrow);
   for (const condition of CHECK_DISADVANTAGE_CONDITIONS)
-    if (actor.conditions.some((held) => held.id === condition))
+    if (actor.conditions.some((held) => held.id === condition) && !warded.includes(condition))
       claims.disadvantage.push({ source: `condition-${condition}`, label: conditionLabel(condition) });
   return claims;
 }
@@ -154,6 +155,8 @@ export type CheckContext = Readonly<{
   /** The creature a Wisdom (Perception or Survival) check is made to find; the roller's Hunter's Mark on it gives
    *  Advantage. */
   finding?: Actor;
+  /** Conditions an ally's aura keeps from having any effect where the roller stands (Aura of Courage). */
+  warded?: readonly string[];
 }>;
 
 /** The flat part of a skill check (SRD Skills, Expertise, Jack of All Trades): a GM-typed total, else the stat block's
@@ -201,7 +204,7 @@ export function checkPlan(
             (toolProficient ? (definition?.proficiencyBonus ?? 0) : 0),
           proficient: toolProficient
         };
-  const claims = abilityCheckClaims(actor, derivation, narrow);
+  const claims = abilityCheckClaims(actor, derivation, narrow, context.warded);
   // SRD Tools: "If you have proficiency in the skill that's also used with that check, you have Advantage".
   if (
     subject.tool !== undefined &&

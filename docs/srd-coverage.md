@@ -29,7 +29,7 @@ stops matching the engine. Known gaps in enforced records are GitHub issues.
 | Druid features (21) | 11 | 6 | 4 |
 | Fighter features (21) | 15 | 1 | 5 |
 | Monk features (30) | 18 | 3 | 9 |
-| Paladin features (26) | 18 | 6 | 2 |
+| Paladin features (26) | 22 | 3 | 1 |
 | Ranger features (22) | 11 | 4 | 7 |
 | Rogue features (23) | 13 | 3 | 7 |
 | Sorcerer features (18) | 12 | 4 | 2 |
@@ -44,7 +44,7 @@ stops matching the engine. Known gaps in enforced records are GitHub issues.
 | Armor (13) | 13 | 0 | 0 |
 | Conditions (15) | 12 | 3 | 0 |
 | Rules glossary (155) | 97 | 14 | 44 |
-| All records (2420) | 1420 | 588 | 412 |
+| All records (2420) | 1424 | 585 | 411 |
 
 ## How records are classified
 
@@ -354,11 +354,11 @@ Notes on the curated rows:
 
 ## Paladin features
 
-**Enforced (18):** Ability Score Improvement · Aura Expansion · Aura Of Protection · Epic Boon · Extra Attack · Faithful Steed · Fighting Style · Lay On Hands · Oath of Devotion Spells (Level 5) (Oath of Devotion) · Oath of Devotion Spells (Level 9) (Oath of Devotion) · Oath of Devotion Spells (Level 13) (Oath of Devotion) · Oath of Devotion Spells (Level 17) (Oath of Devotion) · Oath of Devotion Spells (Oath of Devotion) · Paladin Subclass · Paladins Smite · Radiant Strikes · Spellcasting · Weapon Mastery
+**Enforced (22):** Ability Score Improvement · Aura Expansion · Aura Of Courage · Aura of Devotion (Oath of Devotion) · Aura Of Protection · Epic Boon · Extra Attack · Faithful Steed · Fighting Style · Holy Nimbus (Oath of Devotion) · Lay On Hands · Oath of Devotion Spells (Level 5) (Oath of Devotion) · Oath of Devotion Spells (Level 9) (Oath of Devotion) · Oath of Devotion Spells (Level 13) (Oath of Devotion) · Oath of Devotion Spells (Level 17) (Oath of Devotion) · Oath of Devotion Spells (Oath of Devotion) · Paladin Subclass · Paladins Smite · Radiant Strikes · Smite of Protection (Oath of Devotion) · Spellcasting · Weapon Mastery
 
-**Guided (6):** Abjure Foes · Aura Of Courage · Aura of Devotion (Oath of Devotion) · Channel Divinity · Holy Nimbus (Oath of Devotion) · Sacred Weapon (Oath of Devotion)
+**Guided (3):** Abjure Foes · Channel Divinity · Sacred Weapon (Oath of Devotion)
 
-**Reference (2):** Restoring Touch · Smite of Protection (Oath of Devotion)
+**Reference (1):** Restoring Touch
 
 Notes on the curated rows:
 
@@ -366,9 +366,11 @@ Notes on the curated rows:
 | --- | --- | --- |
 | Abjure Foes | guided | The Wisdom save against the Paladin's spell save DC, its Frightened and the Channel Divinity use are applied. The number of targets and the frightened creature's limit of one thing a turn are the GM's. |
 | Aura Expansion | enforced | saving-throws.ts widens Aura of Protection to 30 feet. |
-| Aura Of Courage | guided | The Paladin's own Immunity to Frightened is applied while it isn't Incapacitated. The same for allies in its aura is the GM's. |
-| Aura of Devotion (Oath of Devotion) | guided | The Paladin's own Immunity to Charmed is applied while it isn't Incapacitated. The same for allies in its aura is the GM's. |
+| Aura Of Courage | enforced | paladin-auras.ts makes the Paladin and its allies in its Aura of Protection immune to Frightened while it isn't Incapacitated, and an ally already Frightened has no Disadvantage from it there (resolution/attack.ts, check-rolls.ts). |
+| Aura of Devotion (Oath of Devotion) | enforced | paladin-auras.ts makes the Paladin and its allies in its Aura of Protection immune to Charmed while it isn't Incapacitated, and an ally already Charmed may target its charmer while there (resolution/economy.ts). |
 | Aura Of Protection | enforced | saving-throws.ts adds the Paladin's Charisma modifier, at least 1, to its own saves and its allies' within 10 feet, while it isn't Incapacitated. A creature in two auras gets the better one. |
+| Holy Nimbus (Oath of Devotion) | enforced | The Bonus Action puts Holy Nimbus on the Paladin for 10 minutes. turn-boundaries.ts deals its Radiant damage to an enemy that starts its turn in the aura, and saving-throws.ts gives the Paladin Advantage on saves a Fiend or an Undead forces. The sunlight is the GM's, since the map has no light. |
+| Smite of Protection (Oath of Devotion) | enforced | resolution/hit-options.ts marks the Paladin when Divine Smite rides a hit, and until its next turn the creatures in its aura have Half Cover against attacks and on Dexterity saves (resolution/validate.ts, resolution/pending.ts). |
 | Spellcasting | enforced | character-build.ts gives the class its slots, cantrips and prepared spells, and each spell is a cast action at the class's spell save DC and attack bonus. resolution/economy.ts spends the slot, and rests.ts restores slots on a Long Rest. |
 
 ## Ranger features

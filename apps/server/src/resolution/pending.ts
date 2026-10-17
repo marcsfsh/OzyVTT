@@ -9,6 +9,7 @@ import { offerableReaction } from "../reaction-offers.js";
 import { applyFailureEffect, createPendingSaves } from "../saving-throws.js";
 import type { ResolveContext } from "./context.js";
 import { coverBonusOf, coverFor } from "../cover.js";
+import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { damagePartsOf } from "./damage.js";
 
 type HalfDamageReaction = Extract<ActionReaction, { response: "half-damage" }>;
@@ -299,7 +300,17 @@ export function parkActionSave(ctx: ResolveContext): void {
   // Cover adds to Dexterity saving throws (SRD Cover), each target's own: the GM's choice for this resolve, else the
   // cover the GM marked it with, unless the save ignores it (Sacred Flame). Carried on the prompt.
   const saveBonusOf = (target: (typeof targets)[number]) =>
-    action.save!.ability === "dex" && !action.save!.ignoresCover ? coverBonusOf(coverFor(input.cover, target)) : 0;
+    action.save!.ability === "dex" && !action.save!.ignoresCover
+      ? coverBonusOf(
+          coverFor(input.cover, target) ??
+            (deps.resolveDefinition
+              ? smiteOfProtectionCover(state, target, {
+                  resolveDefinition: deps.resolveDefinition,
+                  ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
+                })
+              : null)
+        )
+      : 0;
   const groups = new Map<number, string[]>();
   for (const target of saving) groups.set(saveBonusOf(target), [...(groups.get(saveBonusOf(target)) ?? []), target.id]);
   for (const [saveBonus, targetIds] of groups)

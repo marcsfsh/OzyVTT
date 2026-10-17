@@ -627,11 +627,17 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:abjure-foes": guided(
     "The Wisdom save against the Paladin's spell save DC, its Frightened and the Channel Divinity use are applied. The number of targets and the frightened creature's limit of one thing a turn are the GM's."
   ),
-  "feature:aura-of-courage": guided(
-    "The Paladin's own Immunity to Frightened is applied while it isn't Incapacitated. The same for allies in its aura is the GM's."
+  "feature:aura-of-courage": enforced(
+    "paladin-auras.ts makes the Paladin and its allies in its Aura of Protection immune to Frightened while it isn't Incapacitated, and an ally already Frightened has no Disadvantage from it there (resolution/attack.ts, check-rolls.ts)."
   ),
-  "feature:aura-of-devotion": guided(
-    "The Paladin's own Immunity to Charmed is applied while it isn't Incapacitated. The same for allies in its aura is the GM's."
+  "feature:aura-of-devotion": enforced(
+    "paladin-auras.ts makes the Paladin and its allies in its Aura of Protection immune to Charmed while it isn't Incapacitated, and an ally already Charmed may target its charmer while there (resolution/economy.ts)."
+  ),
+  "feature:holy-nimbus": enforced(
+    "The Bonus Action puts Holy Nimbus on the Paladin for 10 minutes. turn-boundaries.ts deals its Radiant damage to an enemy that starts its turn in the aura, and saving-throws.ts gives the Paladin Advantage on saves a Fiend or an Undead forces. The sunlight is the GM's, since the map has no light."
+  ),
+  "feature:smite-of-protection": enforced(
+    "resolution/hit-options.ts marks the Paladin when Divine Smite rides a hit, and until its next turn the creatures in its aura have Half Cover against attacks and on Dexterity saves (resolution/validate.ts, resolution/pending.ts)."
   ),
   "feature:dwarf-resilience": guided(
     "Resistance to Poison damage is applied. Advantage on saves to avoid or end the Poisoned condition is the GM's."

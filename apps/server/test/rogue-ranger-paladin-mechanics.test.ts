@@ -984,6 +984,17 @@ describe("Paladin - the two free casts, audit rows 30 and 31", () => {
     const early = table(paladinInput(4));
     expect((early.definition.spellcasting?.spells ?? []).some((spell) => spell.id === "find-steed")).toBe(false);
   });
+
+  it("gives a Devotion Paladin's aura Smite of Protection's Half Cover when Divine Smite rides a hit", () => {
+    const built = table(paladinInput(15));
+    newTurn(built);
+    // The d20, the longsword's d8, Radiant Strikes' d8 and the smite's dice.
+    swing(built, "item-longsword", [19, 6, 3, 4, 4, 4, 4, 4, 4], { hitOptions: [{ id: "spell-divine-smite-free" }] });
+    expect(built.hero.effects.find((effect) => effect.tags.includes("smite-of-protection"))).toMatchObject({
+      name: "Smite of Protection",
+      duration: { type: "until-source-next-turn" }
+    });
+  });
 });
 
 describe("Paladin - Channel Divinity is ONE counter that three features spend", () => {

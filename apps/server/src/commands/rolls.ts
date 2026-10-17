@@ -18,12 +18,21 @@ import {
   type CheckRollDependencies
 } from "../check-rolls.js";
 import { CommandRejectedError } from "../game-store.js";
+import { tokenCreatureDistance } from "../movement-narration.js";
+import type { TokenMapGeometry } from "../token-placement.js";
 import { initiatorOf, sessionIdOf, type GamePrincipal, type Kit } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
 // Ability checks rolled on the server, the GM's calls for a roll, and Heroic Inspiration (ADR-0012).
 
-function checkDeps(kit: Kit, principal: GamePrincipal, draft: GameState): CheckRollDependencies {
+/** Where creatures stand, for an ally's aura around the roller (Aura of Courage), from the live map read before the
+ *  command's turn. */
+function checkDeps(
+  kit: Kit,
+  principal: GamePrincipal,
+  draft: GameState,
+  geometry: TokenMapGeometry | null
+): CheckRollDependencies {
   const skills = kit.catalogFor(principal).skillSummaries();
   const catalog = kit.equipmentCatalog();
   return {
@@ -32,6 +41,12 @@ function checkDeps(kit: Kit, principal: GamePrincipal, draft: GameState): CheckR
     sessionId: sessionIdOf(principal),
     now: () => new Date().toISOString(),
     resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
+    ...(geometry
+      ? {
+          distanceFeet: (actorIdA: string, actorIdB: string) =>
+            tokenCreatureDistance(draft, geometry, actorIdA, actorIdB)?.value ?? null
+        }
+      : {}),
     catalog,
     names: {
       skill: (id) => skills.find((skill) => skill.id === id)?.name,
@@ -71,6 +86,7 @@ export const rollCommands = [
       const { commandId, actorId, ability, skill, tool, dc, visibility, face, rollMode, findActorId } = request;
       const initiator = initiatorOf(principal);
       let result: CheckResult | undefined;
+      const geometry = await kit.liveGeometry();
       const { state, duplicate } = await execute((draft) => {
         result = rollAbilityCheck(
           draft,
@@ -85,7 +101,7 @@ export const rollCommands = [
             ...(rollMode !== undefined ? { forcedMode: rollMode } : {}),
             ...(findActorId !== undefined ? { findActorId } : {})
           },
-          checkDeps(kit, principal, draft)
+          checkDeps(kit, principal, draft, geometry)
         );
       });
       if (duplicate || !result) return;
@@ -107,6 +123,7 @@ export const rollCommands = [
       const initiator = initiatorOf(principal);
       let result: CheckResult | undefined;
       let visibility = "public";
+      const geometry = await kit.liveGeometry();
       const { state, duplicate } = await execute((draft) => {
         visibility =
           draft.heldRolls.find((held) => held.key === `check:${request.actorId}`)?.check?.visibility ?? "public";
@@ -118,7 +135,7 @@ export const rollCommands = [
             actorId: request.actorId,
             ...(request.face !== undefined ? { face: request.face } : {})
           },
-          checkDeps(kit, principal, draft)
+          checkDeps(kit, principal, draft, geometry)
         );
       });
       if (duplicate || !result) return;
@@ -180,6 +197,7 @@ export const rollCommands = [
       const initiator = initiatorOf(principal);
       let result: CheckResult | undefined;
       let blind = false;
+      const geometry = await kit.liveGeometry();
       const { state, duplicate } = await execute((draft) => {
         blind = draft.rollCalls.find((call) => call.id === request.callId)?.blind === true;
         result = answerRollCall(
@@ -191,7 +209,7 @@ export const rollCommands = [
             actorId: request.actorId,
             ...(request.face !== undefined ? { face: request.face } : {})
           },
-          checkDeps(kit, principal, draft)
+          checkDeps(kit, principal, draft, geometry)
         );
       });
       if (duplicate || !result) return;

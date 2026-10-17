@@ -3,6 +3,7 @@ import type { ActorDefinition, SaveFailureDuration } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { conditionLabel, exhaustionLevel, INCAPACITATING_CONDITIONS } from "./condition-rules.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
+import { wardingAura } from "./paladin-auras.js";
 import { endZonesOfCast } from "./spell-zone-state.js";
 
 /** Effect lifecycle (ADR-0020): the engine ends effects on turn boundaries, source defeat and explicit
@@ -108,17 +109,29 @@ export function effectDurationOf(
 }
 
 /** Where item- and feat-granted condition immunities are read from. Without a catalog only the actor's
- *  innate immunities apply. */
+ *  innate immunities apply; with the game state an ally's ward reaches it too (Aura of Courage), measured with
+ *  `distanceFeet` where the map can. */
 export type ConditionImmunitySource = Readonly<{
   resolveDefinition?: (definitionId: string) => ActorDefinition | undefined;
   catalog?: EquipmentCatalog;
+  state?: GameState;
+  distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
 }>;
 
-/** SRD condition immunity: innate, granted by what the actor carries when a catalog is supplied, or Petrified's
- *  own immunity to the Poisoned condition. */
+/** SRD condition immunity: innate, granted by what the actor carries when a catalog is supplied, Petrified's own
+ *  immunity to the Poisoned condition, or a Paladin's aura it stands in. */
 function immuneToCondition(actor: Actor, conditionId: string, source?: ConditionImmunitySource): boolean {
   if (actor.conditionImmunities.includes(conditionId)) return true;
   if (conditionId === "poisoned" && hasCondition(actor, "petrified")) return true;
+  if (
+    source?.state &&
+    source.resolveDefinition &&
+    wardingAura(source.state, actor, conditionId, {
+      resolveDefinition: source.resolveDefinition,
+      ...(source.distanceFeet ? { distanceFeet: source.distanceFeet } : {})
+    }) !== null
+  )
+    return true;
   if (!source?.catalog) return false;
   const definition = actor.definitionId ? source.resolveDefinition?.(actor.definitionId) : undefined;
   return deriveEquipment(actor, definition, source.catalog).conditionImmunities.some(
@@ -264,7 +277,7 @@ export function addEffect(
       if (!present.standalone && !heldBefore.has(conditionId)) writeCondition(actor, { ...present, standalone: true });
       continue;
     }
-    if (immuneToCondition(actor, conditionId, immunities)) continue;
+    if (immuneToCondition(actor, conditionId, { ...immunities, state })) continue;
     if (actor.conditions.length >= 20) continue;
     const level = conditionId === "exhaustion" ? { level: 1 } : {};
     writeCondition(actor, { id: conditionId, ...level });

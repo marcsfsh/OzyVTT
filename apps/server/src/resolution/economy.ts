@@ -4,6 +4,7 @@ import type { GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { effectiveSlot } from "@vtt/rules-5e";
 import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
+import { wardingAura } from "../paladin-auras.js";
 import { areAllies } from "../creature-sides.js";
 import {
   HASTED_TAG,
@@ -1160,8 +1161,14 @@ function checkTargeting(
   }
 
   // SRD Charmed: can't attack or harm the charmer. Enforceable only when the condition rides a
-  // source-linked effect naming the charmer.
-  if (action.attack !== undefined || action.save !== undefined || action.damage.length > 0) {
+  // source-linked effect naming the charmer. A Paladin's Aura of Devotion takes its effect away while there.
+  const charmWarded =
+    evaluation.resolveDefinition !== undefined &&
+    wardingAura(state, attacker, "charmed", {
+      resolveDefinition: evaluation.resolveDefinition,
+      ...(distanceFeet ? { distanceFeet } : {})
+    }) !== null;
+  if (!charmWarded && (action.attack !== undefined || action.save !== undefined || action.damage.length > 0)) {
     const charmers = attacker.effects.filter(
       (effect) => effect.linkedConditionIds.includes("charmed") && effect.sourceActorId !== null
     );

@@ -23,6 +23,7 @@ import { startEncounter } from "../src/encounter.js";
 import { deriveEquipment } from "../src/equipment-derivation.js";
 import { hasEvasion, magicResistanceOf, saveRollSources } from "../src/saving-throws.js";
 import { currentSpeedFeet, speedZeroed } from "../src/speed.js";
+import { wardingAura } from "../src/paladin-auras.js";
 import { monsterTraitKinds, renderSrdCoverage, srdCoverageRows, traitKind } from "../src/srd-coverage.js";
 import {
   CONDITION_COVERAGE,
@@ -214,6 +215,17 @@ describe("the curated claims hold in the engine", () => {
       skill: "arcana"
     });
     expect(jack.modifier - plain.modifier).toBe(2);
+  });
+
+  it("Aura of Courage wards Frightened off an ally the map shows in the Paladin's aura", () => {
+    expect(state(RECORD_OVERRIDES["feature:aura-of-courage"]!)).toBe("enforced");
+    const paladin = { ...creature(), id: FOE, name: "Paladin", definitionId: "paladin" };
+    const ally = { ...creature(), definitionId: "ally" };
+    const game = GameStateSchema.parse({ schemaVersion: 1, actors: [paladin, ally] });
+    const definitions: Record<string, ActorDefinition> = { paladin: withFeature("aura-of-courage"), ally: sheet() };
+    const context = { resolveDefinition: (id: string) => definitions[id], distanceFeet: () => 10 };
+    expect(wardingAura(game, game.actors[1]!, "frightened", context)).toBe("Paladin's Aura of Courage");
+    expect(wardingAura(game, game.actors[1]!, "frightened", { ...context, distanceFeet: () => 15 })).toBeNull();
   });
 
   it("a trait kind the bundle runs as a mechanic is never curated reference", () => {

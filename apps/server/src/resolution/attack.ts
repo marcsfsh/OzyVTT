@@ -41,6 +41,7 @@ import { holdsFeature } from "../class-features.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { statblockFacts, swimSpeedFeet } from "../statblock-facts.js";
 import { auraOfAuthority } from "../statblock-traits.js";
+import { wardedConditions } from "../paladin-auras.js";
 import { naturalFace, recordRoll, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
 
 /** Whether this swing is at range. A thrown weapon needs the measured distance; unmeasurable resolves to
@@ -159,9 +160,17 @@ function riderClaims(ctx: ResolveContext, targetDerivation: EquipmentDerivation,
 /** Conditions on either side, including the two that depend on who or where: Grappled and a Prone target. */
 function conditionClaims(ctx: ResolveContext, target: LiveActor, distance: number | null, sources: RollModeClaims) {
   const { attacker } = ctx;
+  // A Frightened attacker in a Paladin's Aura of Courage: "that condition has no effect on that ally while there".
+  const warded = ctx.deps.resolveDefinition
+    ? wardedConditions(ctx.state, attacker, {
+        resolveDefinition: ctx.deps.resolveDefinition,
+        ...(ctx.deps.distanceFeet ? { distanceFeet: ctx.deps.distanceFeet } : {})
+      })
+    : [];
   for (const entry of CONDITION_ROLL_MODES) {
     const side = entry.side === "attacker" ? attacker : target;
     if (!has(side, entry.condition)) continue;
+    if (entry.side === "attacker" && warded.includes(entry.condition)) continue;
     if (entry.condition === "invisible" && outlined(side)) continue;
     sources[entry.mode].push({
       source: `${entry.side}-${entry.condition}`,

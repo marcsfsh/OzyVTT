@@ -22,10 +22,10 @@ import { withoutSameHazard } from "./hazards.js";
 import { recordRoll as recordRollInHistory, rolledTerms } from "./roll-history.js";
 import { requireGm, type Initiator } from "./authorization.js";
 import { holdsFeature } from "./class-features.js";
-import { areAllies } from "./creature-sides.js";
 import { holdRoll, releaseHeldRoll, rollHeldTest } from "./held-rolls.js";
 import { AURA_IMMUNE_TAG, auraOfAuthority, traitActionId } from "./statblock-traits.js";
 import { applyDamageDetailed, previewDamage, adjustableActor } from "./hit-points.js";
+import { holyWardClaim, inPaladinAura, type AuraContext } from "./paladin-auras.js";
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
 import {
@@ -147,12 +147,7 @@ export function anySaveRollSources(derivation: EquipmentDerivation): RollModeCla
   return rollModeClaims(derivation, ["save"], "on-saving-throw");
 }
 
-/** What Aura of Protection reads: who stands where. Without `distanceFeet` (no map) only a Paladin's own aura is known
- *  to reach it. */
-export type AuraContext = Readonly<{
-  resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
-  distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
-}>;
+export type { AuraContext };
 
 /** A Paladin's own Aura of Protection bonus: its Charisma modifier, at least +1, while it holds the feature and isn't
  *  Incapacitated ("The aura is inactive while you have the Incapacitated condition"); null otherwise. */
@@ -174,16 +169,9 @@ export function auraOfProtection(
 ): Readonly<{ amount: number; source: string }> | null {
   let best: { amount: number; source: string } | null = null;
   for (const paladin of state.actors) {
-    if (paladin.archived || (paladin.visibility !== "public" && target.visibility === "public")) continue;
     const definition = paladin.definitionId ? context.resolveDefinition(paladin.definitionId) : undefined;
     const amount = auraBonusOf(paladin, definition);
-    if (amount === null) continue;
-    if (paladin.id !== target.id) {
-      if (!areAllies(paladin, target, context.resolveDefinition)) continue;
-      const reach = holdsFeature(definition, "aura-expansion", "Aura Expansion") ? 30 : 10;
-      const distance = context.distanceFeet?.(paladin.id, target.id) ?? null;
-      if (distance === null || distance > reach + 1e-6) continue;
-    }
+    if (amount === null || !inPaladinAura(paladin, definition, target, context)) continue;
     if (!best || amount > best.amount)
       best = {
         amount,
@@ -589,6 +577,8 @@ export function answerSave(
     if (magicResistance === "advantage")
       sources.advantage.push({ source: "magic-resistance", label: "Magic Resistance" });
     sources.advantage.push(...traitSaveClaims(state, target, definition, deps));
+    const ward = holyWardClaim(state, target, pending.sourceActorId, deps.resolveDefinition);
+    if (ward) sources.advantage.push(ward);
     const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
     // A player's choice is never read: the rules count Advantage and Disadvantage, and only the GM may force a mode.
     const forced = scope.role === "gm" ? explicitRollMode : undefined;
@@ -772,29 +762,18 @@ export function answerSave(
     // A spell area that stops after so much damage counts it (Guardian of Faith).
     events.push(...countZoneDamage(state, pending.zoneId, appliedDamage, deps.catalog));
   }
+  // Where the target stands counts too: a Paladin's aura can ward off what the failure imposes.
   const immunities = {
     resolveDefinition: (definitionId: string) => deps.resolveDefinition(definitionId),
-    ...(deps.catalog ? { catalog: deps.catalog } : {})
+    ...(deps.catalog ? { catalog: deps.catalog } : {}),
+    ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
   };
   if (outcomeCondition) {
     // What the failure's effect links lands with the effect below; the rest (Prone, Exhaustion) stands alone.
     // setCondition narrates immunity skips; whether any condition landed is read back.
     const linked = new Set(pending.onFailEffect?.linkedConditionIds ?? []);
     for (const conditionId of pending.conditionIds.filter((id) => !linked.has(id)))
-      events.push(
-        ...setCondition(
-          state,
-          target.id,
-          conditionId,
-          true,
-          undefined,
-          { role: "gm" },
-          {
-            resolveDefinition: (definitionId) => deps.resolveDefinition(definitionId),
-            ...(deps.catalog ? { catalog: deps.catalog } : {})
-          }
-        )
-      );
+      events.push(...setCondition(state, target.id, conditionId, true, undefined, { role: "gm" }, immunities));
   }
   // A committed failed concentration check ends the sustained effects (SRD Concentration); tolerant of
   // effects already gone.

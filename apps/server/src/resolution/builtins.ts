@@ -1,4 +1,5 @@
 import { d20FacesFor } from "@vtt/rules-5e";
+import { wardedConditions } from "../paladin-auras.js";
 import type { ActorDefinition } from "@vtt/schemas";
 import { checkPlan, totalCheck, type CheckSubject } from "../ability-checks.js";
 import { builtinBaseId } from "../builtin-actions.js";
@@ -44,7 +45,15 @@ export function rollCheck(
   dc: number | null,
   label?: string
 ): boolean | null {
-  const plan = checkPlan(ctx.attacker, ctx.deps.definition, ctx.derivation, subject);
+  const warded = ctx.deps.resolveDefinition
+    ? wardedConditions(ctx.state, ctx.attacker, {
+        resolveDefinition: ctx.deps.resolveDefinition,
+        ...(ctx.deps.distanceFeet ? { distanceFeet: ctx.deps.distanceFeet } : {})
+      })
+    : [];
+  const plan = checkPlan(ctx.attacker, ctx.deps.definition, ctx.derivation, subject, {
+    ...(warded.length > 0 ? { warded } : {})
+  });
   const forced = label === undefined ? (ctx.input.rollMode ?? undefined) : undefined;
   const mode = forced ?? plan.rollMode.mode;
   ctx.rollMode = shownRollMode(plan.rollMode, forced);
