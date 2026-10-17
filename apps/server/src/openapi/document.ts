@@ -1522,7 +1522,7 @@ export const openApiDocument = {
         notModified: true,
         bad: false,
         description:
-          "Every page's summary (a player sees only revealed pages). Optional `folder` (empty string = top level) and `tag` filters.",
+          "Every page's summary (a player sees only revealed pages). Optional `folder` (empty string = top level) and `tag` filters. Folders are the GM's own filing, so a player's `folder` filter is ignored.",
         params: [
           { name: "folder", in: "query", schema: { type: "string" } },
           { name: "tag", in: "query", schema: { type: "string" } }

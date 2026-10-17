@@ -194,7 +194,11 @@ export type TableEvent = Readonly<{
 }>;
 /** Which character the GM released, told to the player who had it so the picker can say why it is back. */
 export type ClaimReleasedEvent = Readonly<{ actorId: string; name: string }>;
-/** The codex changed. Revision only, so each recipient refetches its own projection without learning what changed. */
+/**
+ * The codex changed. Revision only, so each recipient refetches its own projection without learning what changed.
+ * A GM's device gets the store's revision on every write; a player's gets a count of the changes players can read,
+ * and only when one happens.
+ */
 export type CodexChangedEvent = Readonly<{ codexRevision: number }>;
 /** The homebrew library changed. Revision only: a payload would hand players GM-only drafts. */
 export type HomebrewChangedEvent = Readonly<{ revision: number }>;

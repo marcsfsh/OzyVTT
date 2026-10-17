@@ -84,7 +84,11 @@ Socket.IO over the same origin as HTTP. Server-to-client events come in two kind
   belongs to exactly one player; `projectFeedRow` in `combat-log.ts` makes that decision.
 - **Ping channels** carry only a revision: `codex:changed` and `homebrew:changed`. Naming what
   changed would tell players which part of the world the GM is editing, so clients refetch
-  their own projected view instead.
+  their own projected view instead. The GM's devices get `codex:changed` with the Codex store's
+  revision on every write. A player's device gets it only when something players can read
+  changed, with a count of those changes alone: after each write the server hashes every player
+  read (`playerCodexFingerprint` in `codex/player-reads.ts`), so a GM-only write sends players
+  nothing.
 - **GM-only channels** go to GM sockets alone: `sound:changed` carries the sound board and the table
   screens' sound state. A player's socket is never sent it.
 
@@ -149,9 +153,23 @@ audience. There are four:
   while it is in that projection.
 - **Codex** (`codex-projections.ts`): a player gets the player half of a revealed record and
   nothing else. Reveal is a graph: a child never leaks an unrevealed parent or target, and
-  `codex/visibility.ts` resolves a record's neighbours for the projection. Some fields (staged
-  scene ids on markers and sessions) are GM-only even when revealed. A hidden record is a 404,
-  never a 403, and ETags are computed after every gate.
+  `codex/visibility.ts` resolves a record's neighbours for the projection. Some fields are GM-only
+  even when revealed: staged scene ids on markers and sessions, and a page's folder path, which is
+  the GM's private filing (a player's `folder` filter on the page list is ignored). A page's
+  `updatedAt` moves on every save, so it stays with the GM too; players get `playerUpdatedAt`,
+  which moves only when the title, kind, player text, shared fields, tags, banner, an event page's
+  date or the reveal flag changes. A record's `createdAt` would tell players when the GM prepared
+  it, so the player shapes of journal entries and chronicle rows leave it out and carry
+  `firstShownAt`: the moment players could first read the record, set by that write
+  (`codex/first-shown.ts` runs in every Codex write) and never moved after, through a hide or a
+  re-reveal. The order and length of a player's lists come from what the player can read too: a
+  player's search ranks each hit on its own title and is capped after the player gates (the GM's
+  keeps relevance ranking, since the GM reads every row anyway), a player's journal places an
+  entry by the session number the player receives and then by `firstShownAt`, a page's mentions
+  keep a fixed order, a hidden page never takes a revealed page's title for `[[links]]`, and a
+  GM-layer connection never folds away a player-layer mention. A hidden record is a 404, never a
+  403, and ETags are computed after every gate. A GM's ETag carries the store revision; a player's
+  hashes the body they receive, so a GM-only write leaves it as it was.
 - **Replay** (`replay-projection.ts`): a shared fight archive is rebuilt per turn from an
   allow-list. It carries no session ids, notes, stat blocks, or rolls that were not public. A player's
   list of shared replays carries the GM's name for one, never the name of the scene it was fought on.
@@ -337,9 +355,11 @@ aggregate in `apps/server/src/codex/`), router (`codex-http.ts`) and projection 
 not go through the game command pipeline. Every record has a player half, a GM half and a
 reveal flag. Its HTTP shapes are defined once in `packages/domain/src/codex-wire.ts`: a record's GM
 shape is the stored row, its player shape is a separate allow-list type, and the projections and
-the client's reads are typed against both. The GM can preview the player view through
-`POST /api/v1/codex/preview-session`, which mints a real player session. The player calendar and
-the GM calendar are separate dates; a date reaches players only when it is published.
+the client's reads are typed against both. Every read a player can make is built in one place,
+`PlayerCodexReads` in `codex/player-reads.ts`, which the router serves and the players' ping hashes.
+The GM can preview the player view through `POST /api/v1/codex/preview-session`, which mints a real
+player session. The player calendar and the GM calendar are separate dates; a date reaches players
+only when it is published.
 
 The table has one clock (ADR-0029): the Codex calendar keeps the day and the game state keeps the hour
 (`rest.clockHours`, which the 16-hour rule between Long Rests reads). A party rest or Pass time that

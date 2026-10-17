@@ -16,21 +16,9 @@ import { InvalidRequestError } from "./invalid-request.js";
 import type { MapAssetStore } from "./map-assets.js";
 import { CODEX_BUNDLE_VERSION } from "./codex/bundle.js";
 import type { CodexRelationshipRow } from "./codex/connections.js";
+import { PlayerCodexReads } from "./codex/player-reads.js";
 import { CodexNotFoundError, CodexRevisionConflictError, CodexValidationError } from "./codex/validate.js";
-import {
-  chronicleContext,
-  connectionContext,
-  isMapVisible,
-  isMarkerVisible,
-  isPageVisible,
-  journalContext,
-  mapContext,
-  markerRecord,
-  questContext,
-  revealAuditRecords,
-  searchRecord,
-  standingContext
-} from "./codex/visibility.js";
+import { revealAuditRecords, searchRecord } from "./codex/visibility.js";
 import type { CodexStore } from "./codex-store.js";
 import { callerOf, refuse, sendUnauthenticated, type CredentialVerifiers } from "./request-auth.js";
 import {
@@ -77,26 +65,13 @@ import {
   projectGmSearchHit,
   projectGmSession,
   projectGmStanding,
-  projectPlayerCalendar,
-  projectPlayerChronicleRecord,
-  projectPlayerConnections,
-  projectPlayerJournalEntry,
-  projectPlayerMap,
-  projectPlayerPage,
-  projectPlayerPageConnections,
-  projectPlayerPageMarker,
-  projectPlayerPageSummary,
-  projectPlayerQuest,
-  projectPlayerSearchHit,
-  projectPlayerSession,
-  projectPlayerStanding,
   projectRevealAudit
 } from "./codex-projections.js";
 
 /**
  * The Codex REST surface (`/api/v1/codex/*`), outside the GameState broadcast. Writes bump the store revision and
- * ping `notifyChanged`; reads branch on role, ask `codex/visibility.ts` what a player may see, and project
- * through `codex-projections.ts`.
+ * ping `notifyChanged`; reads branch on role. A player's read comes from `codex/player-reads.ts`, which asks
+ * `codex/visibility.ts` what a player may see and projects through `codex-projections.ts`.
  */
 
 /** `gm` and `integration` both read at GM grade. `none` and `invalid` have no live credential (401); `denied` is a
@@ -111,7 +86,7 @@ type CodexRouterOptions = Readonly<{
   /** The server's credential checks. Required to carry `integration` so no mount site silently disables
    *  credentials. */
   verifiers: CredentialVerifiers & Required<Pick<CredentialVerifiers, "integration">>;
-  /** Emit a content-free `codex:changed` ping so every client refetches its projected view. */
+  /** Say, with no content, that the Codex changed. The server decides which clients hear it. */
   notifyChanged: () => void;
   /** A real player token for the GM's preview: the GM's own token would still get GM projections. */
   issuePreviewSession: () => string;
@@ -212,6 +187,15 @@ export function createCodexImportGuard(options: CodexAuthOptions) {
 export function createCodexRouter(options: CodexRouterOptions) {
   const router = Router();
   const { store } = options;
+  /** Every player read is built by `PlayerCodexReads`, which the players' ping fingerprints too. */
+  const playerReads = () => new PlayerCodexReads(store);
+  /** A page and its Connections panel, both unfiltered, or null when there is no such page. */
+  const gmPageRead = (pageId: string) => {
+    const page = store.getPage(pageId);
+    return (
+      page && { page: projectGmPage(page), connections: projectGmPageConnections(store.connectionsForPage(page.id)) }
+    );
+  };
 
   /** The projection grade for a read, or null once a 401/403 has been sent. Credentials read at GM grade. */
   const readGrade = (request: Request, response: Response): CodexGrade | null => {
@@ -279,11 +263,17 @@ export function createCodexRouter(options: CodexRouterOptions) {
   };
 
   /**
-   * Weak `ETag` of store revision (every write bumps it), grade and resource, with a 304 on match. Called only
+   * Weak `ETag` of a version, the grade and the resource, with a 304 on match. A GM's version is the store
+   * revision, which every write bumps. A player's is a hash of the body they receive: the revision moves on
+   * GM-only writes too, and a tag that moved with it would tell the table the GM had saved something. Called only
    * after every auth and existence gate, so a 304 never confirms that a hidden record exists.
    */
   const readEnvelope = (request: Request, response: Response, grade: CodexGrade, data: unknown) => {
-    const etag = `W/"codex-r${store.revision}-${grade}-${resourceKey(request)}"`;
+    const version =
+      grade === "gm"
+        ? `r${store.revision}`
+        : `c${createHash("sha1").update(JSON.stringify(data)).digest("hex").slice(0, 16)}`;
+    const etag = `W/"codex-${version}-${grade}-${resourceKey(request)}"`;
     response.setHeader("etag", etag);
     if (request.header("if-none-match") === etag) return response.status(304).end();
     return sendData(response, 200, data);
@@ -321,20 +311,17 @@ export function createCodexRouter(options: CodexRouterOptions) {
   router.get(expressPath(CODEX_PATHS.pages), (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
-    const filter = {
-      folder:
-        request.query.folder === undefined
-          ? undefined
-          : request.query.folder === ""
-            ? null
-            : String(request.query.folder),
-      tag: request.query.tag === undefined ? undefined : String(request.query.tag)
-    };
-    const rows = store.listPages(filter);
-    const pages =
-      role === "gm"
-        ? rows.map(projectGmPageSummary)
-        : rows.map(projectPlayerPageSummary).filter((page) => page !== null);
+    const tag = request.query.tag === undefined ? undefined : String(request.query.tag);
+    // Folders are the GM's private filing. A player's folder filter is ignored, since an answer that changed
+    // with it would show which pages the GM filed where.
+    if (role === "player") return readEnvelope(request, response, role, playerReads().pages(tag));
+    const folder =
+      request.query.folder === undefined
+        ? undefined
+        : request.query.folder === ""
+          ? null
+          : String(request.query.folder);
+    const pages = store.listPages({ folder, tag }).map(projectGmPageSummary);
     return readEnvelope(request, response, role, { pages });
   });
 
@@ -343,14 +330,12 @@ export function createCodexRouter(options: CodexRouterOptions) {
     const role = readGrade(request, response);
     if (!role) return;
     const query = typeof request.query.q === "string" ? request.query.q : "";
-    // Resolved for both roles: cheap, and a conditional here would make forgetting it a leak.
-    const playerContext = journalContext(store);
-    const found = store.searchAll(role, query);
+    if (role === "player") return readEnvelope(request, response, role, playerReads().search(query));
+    const found = store.searchAll("gm", query);
     const hits = found.hits
       .map((ref) => searchRecord(store, ref))
       .filter((record) => record !== null)
-      .map((record) => (role === "gm" ? projectGmSearchHit(record) : projectPlayerSearchHit(record, playerContext)))
-      .filter((hit) => hit !== null);
+      .map(projectGmSearchHit);
     // `truncated` is measured before projection, so it means the search itself was cut off.
     return readEnvelope(request, response, role, { hits, truncated: found.truncated });
   });
@@ -358,20 +343,9 @@ export function createCodexRouter(options: CodexRouterOptions) {
   router.get(expressPath(CODEX_PATHS.pageById), (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
-    const page = store.getPage(pathParam(request, "id"));
-    if (!page) return sendFailure(response, 404, "not_found", "That page was not found.");
-    if (role === "gm")
-      return readEnvelope(request, response, role, {
-        page: projectGmPage(page),
-        connections: projectGmPageConnections(store.connectionsForPage(page.id))
-      });
-    const projected = projectPlayerPage(page);
-    if (!projected) return sendFailure(response, 404, "not_found", "That page was not found.");
-    // The same context as the graph feed, so the panel and the graph are gated by one rule.
-    return readEnvelope(request, response, role, {
-      page: projected,
-      connections: projectPlayerPageConnections(store.connectionsForPage(page.id), connectionContext(store))
-    });
+    const data = role === "gm" ? gmPageRead(pathParam(request, "id")) : playerReads().page(pathParam(request, "id"));
+    if (!data) return sendFailure(response, 404, "not_found", "That page was not found.");
+    return readEnvelope(request, response, role, data);
   });
 
   write(
@@ -462,11 +436,8 @@ export function createCodexRouter(options: CodexRouterOptions) {
   router.get(expressPath(CODEX_PATHS.connections), (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
-    const all = store.listAllConnections();
-    if (role === "gm") return readEnvelope(request, response, role, { connections: projectGmConnections(all) });
-    return readEnvelope(request, response, role, {
-      connections: projectPlayerConnections(all, connectionContext(store))
-    });
+    if (role === "player") return readEnvelope(request, response, role, playerReads().connections());
+    return readEnvelope(request, response, role, { connections: projectGmConnections(store.listAllConnections()) });
   });
 
   // The atlas: maps and their pins
@@ -474,12 +445,8 @@ export function createCodexRouter(options: CodexRouterOptions) {
   router.get(expressPath(CODEX_PATHS.maps), (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
-    const rows = store.listMaps();
-    const maps =
-      role === "gm"
-        ? rows.map(projectGmMap)
-        : rows.map((row) => projectPlayerMap(row, mapContext(store, row))).filter((map) => map !== null);
-    return readEnvelope(request, response, role, { maps });
+    if (role === "player") return readEnvelope(request, response, role, playerReads().maps());
+    return readEnvelope(request, response, role, { maps: store.listMaps().map(projectGmMap) });
   });
   write(
     "post",
@@ -505,30 +472,25 @@ export function createCodexRouter(options: CodexRouterOptions) {
     const role = readGrade(request, response);
     if (!role) return;
     const mapId = pathParam(request, "id");
-    if (!store.getMap(mapId)) return sendFailure(response, 404, "not_found", "That map was not found.");
-    const rows = store.listMarkers(mapId);
-    if (role === "gm") return readEnvelope(request, response, role, { markers: rows.map(projectGmMarker) });
-    if (!isMapVisible(store, mapId)) return sendFailure(response, 404, "not_found", "That map was not found.");
-    const markers = rows
-      .map((row) => projectPlayerPageMarker(markerRecord(store, row)))
-      .filter((marker) => marker !== null);
-    return readEnvelope(request, response, role, { markers });
+    const data =
+      role === "gm"
+        ? store.getMap(mapId) && { markers: store.listMarkers(mapId).map(projectGmMarker) }
+        : playerReads().mapMarkers(mapId);
+    if (!data) return sendFailure(response, 404, "not_found", "That map was not found.");
+    return readEnvelope(request, response, role, data);
   });
 
   // Pins pointing at a page. A player is refused a hidden page first, so ids cannot be probed.
   router.get(expressPath(CODEX_PATHS.pageMarkers), (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
-    const page = store.getPage(pathParam(request, "id"));
-    if (!page) return sendFailure(response, 404, "not_found", "That page was not found.");
-    if (role !== "gm" && !isPageVisible(store, page.id))
-      return sendFailure(response, 404, "not_found", "That page was not found.");
-    const rows = store.markersForPage(page.id);
-    if (role === "gm") return readEnvelope(request, response, role, { markers: rows.map(projectGmMarker) });
-    const markers = rows
-      .map((row) => projectPlayerPageMarker(markerRecord(store, row)))
-      .filter((marker) => marker !== null);
-    return readEnvelope(request, response, role, { markers });
+    const pageId = pathParam(request, "id");
+    const data =
+      role === "gm"
+        ? store.getPage(pageId) && { markers: store.markersForPage(pageId).map(projectGmMarker) }
+        : playerReads().pageMarkers(pageId);
+    if (!data) return sendFailure(response, 404, "not_found", "That page was not found.");
+    return readEnvelope(request, response, role, data);
   });
 
   write(
@@ -547,14 +509,11 @@ export function createCodexRouter(options: CodexRouterOptions) {
   router.get(expressPath(CODEX_PATHS.party), (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
+    if (role === "player") return readEnvelope(request, response, role, playerReads().party());
     const marker = store.partyMarker();
     const map = marker ? store.getMap(marker.mapId) : null;
-    if (!marker || !map) return readEnvelope(request, response, role, { party: null });
-    if (role === "gm")
-      return readEnvelope(request, response, role, { party: { marker: projectGmMarker(marker), mapName: map.name } });
-    const projected = projectPlayerPageMarker(markerRecord(store, marker));
     return readEnvelope(request, response, role, {
-      party: projected === null ? null : { marker: projected, mapName: map.name }
+      party: marker && map ? { marker: projectGmMarker(marker), mapName: map.name } : null
     });
   });
 
@@ -562,12 +521,11 @@ export function createCodexRouter(options: CodexRouterOptions) {
   router.get(expressPath(CODEX_PATHS.markerById), (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
-    const marker = store.getMarker(pathParam(request, "id"));
-    if (!marker) return sendFailure(response, 404, "not_found", "That pin was not found.");
-    if (role === "gm") return readEnvelope(request, response, role, { marker: projectGmMarker(marker) });
-    const projected = projectPlayerPageMarker(markerRecord(store, marker));
-    if (!projected) return sendFailure(response, 404, "not_found", "That pin was not found.");
-    return readEnvelope(request, response, role, { marker: projected });
+    const markerId = pathParam(request, "id");
+    const marker = role === "gm" ? store.getMarker(markerId) : null;
+    const data = role === "gm" ? marker && { marker: projectGmMarker(marker) } : playerReads().marker(markerId);
+    if (!data) return sendFailure(response, 404, "not_found", "That pin was not found.");
+    return readEnvelope(request, response, role, data);
   });
 
   write("patch", CODEX_PATHS.markerById, (request) => ({
@@ -607,19 +565,15 @@ export function createCodexRouter(options: CodexRouterOptions) {
     if (!role) return;
     const markerId = typeof request.query.markerId === "string" ? request.query.markerId : undefined;
     const pageId = typeof request.query.pageId === "string" ? request.query.pageId : undefined;
-    // A player reads a pin's or page's mini-timeline only when that pin or page is visible, so hidden ids
-    // cannot be probed. Each entry's own gate still applies below.
-    if (role !== "gm") {
-      if (markerId && !isMarkerVisible(store, markerId))
-        return sendFailure(response, 404, "not_found", "That was not found.");
-      if (pageId && !isPageVisible(store, pageId))
-        return sendFailure(response, 404, "not_found", "That was not found.");
+    if (role === "player") {
+      // A player reads a pin's or page's mini-timeline only when that pin or page is visible, so hidden ids
+      // cannot be probed. Each entry's own gate still applies.
+      const data = playerReads().journal({ markerId, pageId });
+      if (!data) return sendFailure(response, 404, "not_found", "That was not found.");
+      return readEnvelope(request, response, role, data);
     }
     const rows = markerId || pageId ? store.listEntriesFor({ markerId, pageId }) : store.listTimeline();
-    if (role === "gm") return readEnvelope(request, response, role, { entries: rows.map(projectGmJournalEntry) });
-    const context = journalContext(store);
-    const entries = rows.map((row) => projectPlayerJournalEntry(row, context)).filter((entry) => entry !== null);
-    return readEnvelope(request, response, role, { entries });
+    return readEnvelope(request, response, role, { entries: rows.map(projectGmJournalEntry) });
   });
 
   // The chronicle: entries and dated event pages in one order. `listChronicle` is ungated;
@@ -627,21 +581,16 @@ export function createCodexRouter(options: CodexRouterOptions) {
   router.get(expressPath(CODEX_PATHS.timeline), (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
-    const rows = store.listChronicle();
-    if (role === "gm") {
-      // The GM's own clock, kept to this branch so it cannot reach a player.
-      const campaignInstant = store.campaignInstant();
-      const records = rows.map((row) =>
-        projectGmChronicleRecord(row, {
-          campaignInstant,
-          // Only an unapplied downtime has a proposed date, and only the GM sees it.
-          proposedDate: row.kind === "entry" ? store.proposedDateFor(row.entry) : null
-        })
-      );
-      return readEnvelope(request, response, role, { records });
-    }
-    const context = chronicleContext(store);
-    const records = rows.map((row) => projectPlayerChronicleRecord(row, context)).filter((record) => record !== null);
+    if (role === "player") return readEnvelope(request, response, role, playerReads().chronicle());
+    // The GM's own clock, kept to this branch so it cannot reach a player.
+    const campaignInstant = store.campaignInstant();
+    const records = store.listChronicle().map((row) =>
+      projectGmChronicleRecord(row, {
+        campaignInstant,
+        // Only an unapplied downtime has a proposed date, and only the GM sees it.
+        proposedDate: row.kind === "entry" ? store.proposedDateFor(row.entry) : null
+      })
+    );
     return readEnvelope(request, response, role, { records });
   });
 
@@ -706,16 +655,10 @@ export function createCodexRouter(options: CodexRouterOptions) {
   router.get(expressPath(CODEX_PATHS.sessions), (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
-    const rows = store.listSessions();
-    if (role === "gm")
-      return readEnvelope(request, response, role, {
-        sessions: rows.map(projectGmSession),
-        activeSessionId: store.activeSessionId
-      });
-    // A player always gets `activeSessionId: null` (it may name a hidden session); the key keeps one shape.
+    if (role === "player") return readEnvelope(request, response, role, playerReads().sessions());
     return readEnvelope(request, response, role, {
-      sessions: rows.map(projectPlayerSession).filter((session) => session !== null),
-      activeSessionId: null
+      sessions: store.listSessions().map(projectGmSession),
+      activeSessionId: store.activeSessionId
     });
   });
   write(
@@ -729,12 +672,11 @@ export function createCodexRouter(options: CodexRouterOptions) {
   router.get(expressPath(CODEX_PATHS.sessionById), (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
-    const session = store.getSession(pathParam(request, "id"));
-    if (!session) return sendFailure(response, 404, "not_found", "That session was not found.");
-    if (role === "gm") return readEnvelope(request, response, role, { session: projectGmSession(session) });
-    const projected = projectPlayerSession(session);
-    if (!projected) return sendFailure(response, 404, "not_found", "That session was not found.");
-    return readEnvelope(request, response, role, { session: projected });
+    const sessionId = pathParam(request, "id");
+    const session = role === "gm" ? store.getSession(sessionId) : null;
+    const data = role === "gm" ? session && { session: projectGmSession(session) } : playerReads().session(sessionId);
+    if (!data) return sendFailure(response, 404, "not_found", "That session was not found.");
+    return readEnvelope(request, response, role, data);
   });
   write(
     "patch",
@@ -764,12 +706,8 @@ export function createCodexRouter(options: CodexRouterOptions) {
   router.get(expressPath(CODEX_PATHS.quests), (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
-    const rows = store.listQuests();
-    if (role === "gm") return readEnvelope(request, response, role, { quests: rows.map(projectGmQuest) });
-    const quests = rows
-      .map((row) => projectPlayerQuest(row, questContext(store, row)))
-      .filter((quest) => quest !== null);
-    return readEnvelope(request, response, role, { quests });
+    if (role === "player") return readEnvelope(request, response, role, playerReads().quests());
+    return readEnvelope(request, response, role, { quests: store.listQuests().map(projectGmQuest) });
   });
   write(
     "post",
@@ -782,12 +720,11 @@ export function createCodexRouter(options: CodexRouterOptions) {
   router.get(expressPath(CODEX_PATHS.questById), (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
-    const quest = store.getQuest(pathParam(request, "id"));
-    if (!quest) return sendFailure(response, 404, "not_found", "That quest was not found.");
-    if (role === "gm") return readEnvelope(request, response, role, { quest: projectGmQuest(quest) });
-    const projected = projectPlayerQuest(quest, questContext(store, quest));
-    if (!projected) return sendFailure(response, 404, "not_found", "That quest was not found.");
-    return readEnvelope(request, response, role, { quest: projected });
+    const questId = pathParam(request, "id");
+    const quest = role === "gm" ? store.getQuest(questId) : null;
+    const data = role === "gm" ? quest && { quest: projectGmQuest(quest) } : playerReads().quest(questId);
+    if (!data) return sendFailure(response, 404, "not_found", "That quest was not found.");
+    return readEnvelope(request, response, role, data);
   });
   write(
     "patch",
@@ -811,12 +748,8 @@ export function createCodexRouter(options: CodexRouterOptions) {
   router.get(expressPath(CODEX_PATHS.standing), (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
-    const rows = store.listStanding();
-    if (role === "gm") return readEnvelope(request, response, role, { standing: rows.map(projectGmStanding) });
-    const standing = rows
-      .map((row) => projectPlayerStanding(row, standingContext(store, row)))
-      .filter((row) => row !== null);
-    return readEnvelope(request, response, role, { standing });
+    if (role === "player") return readEnvelope(request, response, role, playerReads().standing());
+    return readEnvelope(request, response, role, { standing: store.listStanding().map(projectGmStanding) });
   });
   // The value and its history record are one write, hence `reason` here.
   write("put", CODEX_PATHS.standingByFaction, (request) => {
@@ -839,11 +772,9 @@ export function createCodexRouter(options: CodexRouterOptions) {
   router.get(expressPath(CODEX_PATHS.calendar), (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
-    const calendar = store.getCalendar();
-    const publishedDate = store.getPublishedDate();
+    if (role === "player") return readEnvelope(request, response, role, playerReads().calendar());
     return readEnvelope(request, response, role, {
-      calendar:
-        role === "gm" ? projectGmCalendar(calendar, publishedDate) : projectPlayerCalendar(calendar, publishedDate)
+      calendar: projectGmCalendar(store.getCalendar(), store.getPublishedDate())
     });
   });
   // Replacing the calendar moves only the GM's clock; it never publishes.
@@ -878,7 +809,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
   }));
 
   // Settings are GM-only, reads included. Their writes ping nobody (no client shows them), though the store
-  // still bumps the revision for ETags.
+  // still bumps the revision for the GM's ETags.
   router.get(expressPath(CODEX_PATHS.settings), requireGmRead, (request, response) =>
     readEnvelope(request, response, "gm", { settings: store.getSettings() })
   );

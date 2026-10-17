@@ -19,7 +19,7 @@ import * as quests from "./codex/quests.js";
 import * as receipts from "./codex/receipts.js";
 import * as revisions from "./codex/revisions.js";
 import { migrateCodex } from "./codex/schema.js";
-import { searchAll, type CodexSearchRefs } from "./codex/search.js";
+import { searchAll, searchPlayerMatches, type CodexSearchRef, type CodexSearchRefs } from "./codex/search.js";
 import * as sessions from "./codex/sessions.js";
 import * as settings from "./codex/settings.js";
 import * as standing from "./codex/standing.js";
@@ -29,8 +29,8 @@ import { openDatabase } from "./database.js";
 
 /**
  * The worldbuilding Codex's persistence, one module per aggregate under `codex/`. Every write bumps the coarse
- * `revision`, which pings clients and keys ETags. Rows hold both layers; only `codex-projections.ts` strips
- * GM data for players. Writes that reach across aggregates (deletes, mostly) are composed here.
+ * `revision`, which pings the GM's devices and keys the GM's ETags. Rows hold both layers; only `codex-projections.ts`
+ * strips GM data for players. Writes that reach across aggregates (deletes, mostly) are composed here.
  */
 export class CodexStore {
   #context: CodexDb | undefined;
@@ -101,6 +101,10 @@ export class CodexStore {
   }
   listPages(filter?: Readonly<{ folder?: string | null; tag?: string }>) {
     return pages.listPages(this.#db, filter);
+  }
+  /** Every page with both bodies. */
+  listFullPages() {
+    return pages.listFullPages(this.#db);
   }
   listFolders() {
     return pages.listFolders(this.#db);
@@ -178,6 +182,10 @@ export class CodexStore {
   /** The player index holds only player-layer text and its rows are checked against live reveal state. */
   searchAll(audience: "player" | "gm", query: string, kinds?: readonly CodexRecordKind[]): CodexSearchRefs {
     return searchAll(this.#db, audience, query, kinds);
+  }
+  /** Every match a player may see, ranked and uncapped, for a caller that gates hits and caps what is left. */
+  searchPlayerMatches(query: string): CodexSearchRef[] {
+    return searchPlayerMatches(this.#db, query);
   }
   searchPages(audience: "player" | "gm", query: string): Array<{ pageId: string }> {
     return this.searchAll(audience, query, ["page"]).hits.map((hit) => ({ pageId: hit.id }));

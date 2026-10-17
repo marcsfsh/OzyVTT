@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { CodexStore } from "../src/codex-store.js";
 import { MapAssetStore } from "../src/map-assets.js";
 import { createCodexRouter } from "../src/codex-http.js";
-import { CODEX_ASSET_PATHS, CODEX_PATHS } from "@vtt/api-contract";
+import { CODEX_ASSET_PATHS, CODEX_PATHS, VIEWER_SESSION_COOKIE } from "@vtt/api-contract";
 import { openApiDocument } from "../src/openapi/document.js";
 import { png } from "./image-fixtures.js";
 import { credentialPerScope, fixedVerifiers } from "./fixed-verifiers.js";
@@ -44,7 +44,9 @@ async function fixture(pings?: unknown[][]) {
       verifiers: fixedVerifiers({
         gm: ["gm-token"],
         player: ["player-token", PREVIEW_TOKEN],
-        integration: credentialPerScope
+        integration: credentialPerScope,
+        // A paired table screen's credential: valid, and never a Codex reader.
+        viewer: [VIEWER_TOKEN]
       }),
       // Records arguments as well as calls, so a content-free ping can be told from one carrying a scope word.
       notifyChanged: (...args: unknown[]) => {
@@ -66,6 +68,7 @@ async function fixture(pings?: unknown[][]) {
 }
 
 const PREVIEW_TOKEN = "preview-player-token";
+const VIEWER_TOKEN = "viewer-token";
 const GM = { authorization: "Bearer gm-token", "content-type": "application/json" };
 const PLAYER = { authorization: "Bearer player-token", "content-type": "application/json" };
 /** Integration credentials, one per scope: `codex:write` does not imply `codex:read`. */
@@ -128,7 +131,7 @@ describe("codex HTTP viewer-safety boundary", () => {
     // The exact projected key set (a substring search for the id could hit a uuid containing "42"), so any
     // new field fails here.
     expect(Object.keys(playerTimeline.data.entries[0]).sort()).toEqual([
-      "createdAt",
+      "firstShownAt",
       "id",
       "inWorldLabel",
       "kind",
@@ -1124,8 +1127,8 @@ describe("codex chronicle HTTP boundary", () => {
     // GM's clock; `payload` is who/activity/days only; `proposedDate` is GM prep and excluded.
     expect(Object.keys(playerRows[0]).sort()).toEqual([
       "calendarInstant",
-      "createdAt",
       "fired",
+      "firstShownAt",
       "id",
       "inWorldDate",
       "inWorldLabel",
@@ -3191,5 +3194,73 @@ describe("codex commandId idempotency", () => {
         })
       ).status
     ).toBe(401);
+  });
+});
+
+// A page's folder path is the GM's private filing (a folder can be named for the villains), and its `updatedAt`
+// moves on a GM-only save, so only the GM receives them. This reads as a player and as the GM's preview session,
+// which is a real player session, and checks that the table screen's credential reads no Codex at all.
+describe("a page's folder and GM edit time reach no player, preview or table screen", () => {
+  it("leaves both off every player read of the page, and ignores a player's folder filter", async () => {
+    const { base, store } = await fixture();
+    const order = store.createPage({
+      title: "Lantern Order",
+      entityType: "faction",
+      playerBody: "A guild of lamplighters.",
+      gmBody: "A front for the cult.",
+      folder: "Villains/Lantern Order",
+      revealedToPlayers: true
+    });
+    store.createPage({
+      title: "The Night of Lanterns",
+      entityType: "event",
+      playerBody: "The lamps went out.",
+      folder: "Villains/Plots",
+      inWorldDate: { year: 1, month: 0, day: 1 },
+      revealedToPlayers: true
+    });
+
+    for (const token of ["player-token", PREVIEW_TOKEN]) {
+      const headers = { authorization: `Bearer ${token}` };
+      const read = async (path: string) => {
+        const response = await get(base, `/api/v1/codex${path}`, headers);
+        expect(response.status, path).toBe(200);
+        return response.text();
+      };
+      for (const path of ["/pages", `/pages/${order.id}`, "/search?q=lantern", "/timeline"]) {
+        const text = await read(path);
+        expect(text, `${token} ${path}`).not.toContain("Villains");
+        expect(text, `${token} ${path}`).not.toContain('"folder"');
+        expect(text, `${token} ${path}`).not.toContain('"updatedAt"');
+      }
+      // A folder filter that worked for a player would tell them which pages the GM filed where.
+      expect(await read("/pages?folder=Villains%2FLantern%20Order"), token).toBe(await read("/pages"));
+      expect(await read("/pages?folder="), token).toBe(await read("/pages"));
+      const pages = (JSON.parse(await read("/pages")) as Json).data.pages as Json[];
+      expect(Object.keys(pages[0]).sort()).toEqual([
+        "bannerAssetId",
+        "entityType",
+        "id",
+        "playerUpdatedAt",
+        "tags",
+        "title"
+      ]);
+    }
+
+    // The table screen's credential is refused every Codex read, by header and by cookie alike.
+    for (const path of ["/pages", `/pages/${order.id}`, "/search?q=lantern", "/timeline"]) {
+      const asBearer = await get(base, `/api/v1/codex${path}`, { authorization: `Bearer ${VIEWER_TOKEN}` });
+      expect(asBearer.status, path).toBe(403);
+      expect(await asBearer.text()).not.toContain("Villains");
+      const asCookie = await get(base, `/api/v1/codex${path}`, { cookie: `${VIEWER_SESSION_COOKIE}=${VIEWER_TOKEN}` });
+      expect(asCookie.status, path).toBe(401);
+      expect(await asCookie.text()).not.toContain("Villains");
+    }
+
+    // The GM still files and sorts by both.
+    const gmPage = (await body(await get(base, `/api/v1/codex/pages/${order.id}`, GM))).data.page as Json;
+    expect(gmPage.folder).toBe("Villains/Lantern Order");
+    expect(typeof gmPage.updatedAt).toBe("string");
+    expect(typeof gmPage.playerUpdatedAt).toBe("string");
   });
 });

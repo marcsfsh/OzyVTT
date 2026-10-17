@@ -78,6 +78,7 @@ const ENTRY = (over: Partial<CodexJournalEntry> = {}): CodexJournalEntry => ({
   tags: ["dark-gift"],
   createdAt: "2026-07-28T00:00:00.000Z",
   updatedAt: "2026-07-28T00:00:00.000Z",
+  firstShownAt: null,
   ...over
 });
 

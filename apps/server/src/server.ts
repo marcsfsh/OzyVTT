@@ -37,6 +37,7 @@ import {
 import { CommandRejectedError, GameStore } from "./game-store.js";
 import { CodexStore } from "./codex-store.js";
 import { createCodexImportGuard, createCodexRouter } from "./codex-http.js";
+import { PlayerCodexChanges } from "./codex/player-reads.js";
 import { HomebrewStore } from "./homebrew-store.js";
 import { createHomebrewRouter, homebrewPackBodyParser, HOMEBREW_PACK_IMPORT_PATH } from "./homebrew-http.js";
 import { createHomebrewValidator, scenarioCatalogs } from "./homebrew-validate.js";
@@ -262,10 +263,34 @@ export function createServer(options: CreateServerOptions) {
     for (const socket of io.sockets.sockets.values())
       if (auth.verify(socket.handshake.auth?.token)) socket.emit("sound:changed", view);
   }
-  /** Tells every client the codex changed so it refetches its own projected view. Content-free (only a
-   *  revision): naming the changed scope would leak what the GM is working on. */
+  /** Set once the Codex store is open; counts the changes players can read. */
+  let playerCodexChanges: PlayerCodexChanges | undefined;
+  /** The players' check waiting to run, so writes in one tick share it. */
+  let playerCodexCheck: NodeJS.Immediate | undefined;
+  /**
+   * Tells clients the codex changed so each refetches its own projected view. Content-free (only a revision):
+   * naming the changed scope would leak what the GM is working on. The GM's devices hear of every write. A
+   * player's device hears only of a change it can read, with a count of those alone, since a ping on a GM-only
+   * write would tell the table when the GM is writing secrets. That check reads the players' whole Codex, so it
+   * runs after the write has answered.
+   */
   function notifyCodexChanged() {
-    io.emit("codex:changed", { codexRevision: codexStore.revision });
+    for (const socket of io.sockets.sockets.values())
+      if (auth.verify(socket.handshake.auth?.token))
+        socket.emit("codex:changed", { codexRevision: codexStore.revision });
+    playerCodexCheck ??= setImmediate(() => {
+      playerCodexCheck = undefined;
+      let playerRevision: number | null = null;
+      try {
+        playerRevision = playerCodexChanges?.next() ?? null;
+      } catch (error) {
+        // Best-effort (the write already committed), but logged. With no answer, players are not pinged.
+        console.error("checking the players' codex failed:", error instanceof Error ? error.message : error);
+      }
+      if (playerRevision === null) return;
+      for (const socket of io.sockets.sockets.values())
+        if (!auth.verify(socket.handshake.auth?.token)) socket.emit("codex:changed", { codexRevision: playerRevision });
+    });
   }
   /** Tells every client the homebrew library changed so it refetches its own merged catalog. Content-free
    *  (only a revision), so players learn nothing about what the GM is working on. */
@@ -878,6 +903,8 @@ export function createServer(options: CreateServerOptions) {
       soundCatalog.initialize(),
       soundStore.initialize()
     ]);
+    // The players' view as it stands at start, so the first write a player cannot see pings no player.
+    playerCodexChanges = new PlayerCodexChanges(codexStore);
     await sound.initialize();
     // The store's startup seeds may change the state without a revision bump.
     committedState.reset();
@@ -889,6 +916,7 @@ export function createServer(options: CreateServerOptions) {
   }
   function close() {
     clearInterval(sessionSweep);
+    if (playerCodexCheck) clearImmediate(playerCodexCheck);
     presence.dispose();
     viewerCoordinator.dispose();
     sound.dispose();

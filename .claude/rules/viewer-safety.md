@@ -5,6 +5,8 @@ paths:
   - "apps/server/src/replay-projection.ts"
   - "apps/server/src/codex-projections.ts"
   - "apps/server/src/codex/visibility.ts"
+  - "apps/server/src/codex/player-reads.ts"
+  - "apps/server/src/codex/first-shown.ts"
   - "apps/server/src/codex-http.ts"
   - "apps/client/src/viewer/**"
   - "apps/server/src/vision/audience.ts"
@@ -25,5 +27,8 @@ quantity and no identity, position or existence of a hidden thing. When in doubt
   `visibility === "gm-only"` alone.
 - In the Codex a player gets the player half of a revealed record and nothing else. A revealed
   child must not leak an unrevealed parent or target. A hidden record is a 404, never a 403.
+  Every read a player can make of the Codex is built in `codex/player-reads.ts`; the router serves it and
+  the players' `codex:changed` ping hashes it, so a GM-only edit must leave its output unchanged.
+  Players see a record's first-shown date (`codex/first-shown.ts`), never when the GM made or edited it.
 
 See the "Projections" section of `docs/ARCHITECTURE.md`.

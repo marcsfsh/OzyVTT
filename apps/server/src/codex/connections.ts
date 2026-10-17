@@ -190,21 +190,29 @@ function endpoint(
 }
 
 type LinkTarget = Readonly<{ id: string; title: string; entityType: CodexEntityType; revealed: boolean }>;
-/** Every page by its link key, read in one query with no query per mention. */
+/**
+ * Every page by its link key, read in one query with no query per mention. Where titles collide, a revealed page
+ * wins, then the oldest, so a hidden page never takes a revealed page's connections away from players.
+ */
 function pagesByLinkKey(db: CodexDb): Map<string, LinkTarget> {
   const byKey = new Map<string, LinkTarget>();
-  for (const page of db.database.prepare("SELECT id, title, entity_type, revealed FROM codex_pages").all() as Array<{
+  for (const page of db.database
+    .prepare("SELECT id, title, entity_type, revealed FROM codex_pages ORDER BY revealed DESC, created_at, id")
+    .all() as Array<{
     id: string;
     title: string;
     entity_type: string;
     revealed: number;
-  }>)
-    byKey.set(pageLinkKey(page.title), {
+  }>) {
+    const key = pageLinkKey(page.title);
+    if (byKey.has(key)) continue;
+    byKey.set(key, {
       id: page.id,
       title: page.title,
       entityType: page.entity_type as CodexEntityType,
       revealed: page.revealed === 1
     });
+  }
   return byKey;
 }
 
@@ -292,14 +300,15 @@ export function connectionsForPage(db: CodexDb, pageId: string): CodexPageConnec
     }
   }
 
-  // An unlabelled declared edge and a mention over the same pair fold into one row, the declared one winning.
-  const declaredPairs = new Set(
-    rows
-      .filter((row) => row.origin === "declared" && row.label === null)
-      .map((row) => `${row.direction}|${row.otherKind}|${row.otherId}`)
-  );
+  // An unlabelled declared edge and a mention over the same pair fold into one row, the declared one winning. A
+  // GM-layer edge folds only a GM-layer mention, or adding it would take a mention away from players.
+  const pairOf = (row: CodexPageConnection) => `${row.direction}|${row.otherKind}|${row.otherId}`;
+  const declared = rows.filter((row) => row.origin === "declared" && row.label === null);
+  const playerPairs = new Set(declared.filter((row) => row.layer === "player").map(pairOf));
+  const gmPairs = new Set(declared.filter((row) => row.layer === "gm").map(pairOf));
   return rows.filter(
-    (row) => row.origin === "declared" || !declaredPairs.has(`${row.direction}|${row.otherKind}|${row.otherId}`)
+    (row) =>
+      row.origin === "declared" || !(playerPairs.has(pairOf(row)) || (row.layer === "gm" && gmPairs.has(pairOf(row))))
   );
 }
 

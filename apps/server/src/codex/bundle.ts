@@ -24,6 +24,7 @@ import {
 import { insertMap, insertMarker, listMaps, listMarkers, partyMarker } from "./atlas.js";
 import { insertRelationship, listAllDeclaredConnections, type CodexRelationshipRow } from "./connections.js";
 import { stamp, write, type CodexDb } from "./db.js";
+import { backfillFirstShown } from "./first-shown.js";
 import { journalKind, payloadOf } from "./journal-kinds.js";
 import { insertEntry, listTimeline } from "./journal.js";
 import { listFolders, listFullPages, registerFolderPath, restorePage } from "./pages.js";
@@ -158,6 +159,8 @@ export function importBundle(db: CodexDb, raw: unknown): CodexImportCounts {
       db,
       bundle.activeSessionId !== null && sessionIds.has(bundle.activeSessionId) ? bundle.activeSessionId : null
     );
+    // A backup from before first-shown dates: what players can read takes its `createdAt`, as the migration does.
+    backfillFirstShown(db.database);
   });
   const count = (table: string) => (db.database.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n;
   return {
@@ -260,7 +263,11 @@ function normalizeBundle(raw: unknown): CodexBundle {
     inWorldDate: date(row.inWorldDate),
     rev: Math.max(1, count(row.rev, 1)),
     createdAt: text(row.createdAt),
-    updatedAt: text(row.updatedAt)
+    updatedAt: text(row.updatedAt),
+    // A backup from before this date has only `updatedAt`, which players could already read.
+    playerUpdatedAt: text(row.playerUpdatedAt) || text(row.updatedAt),
+    // Absent from an older backup; `importBundle` fills it as the migration does.
+    firstShownAt: nullableText(row.firstShownAt)
   }));
   const maps = rows("maps", (row): CodexMap => ({
     id: id(text(row.id)),
@@ -329,7 +336,9 @@ function normalizeBundle(raw: unknown): CodexBundle {
       // The parser a stored row uses, so a hand-edited payload degrades exactly as it would on read.
       payload: payloadOf(kind, row.payload === undefined || row.payload === null ? null : JSON.stringify(row.payload)),
       createdAt: text(row.createdAt),
-      updatedAt: text(row.updatedAt)
+      updatedAt: text(row.updatedAt),
+      // Absent from an older backup; `importBundle` fills it as the migration does.
+      firstShownAt: nullableText(row.firstShownAt)
     };
   });
   const quests = rows("quests", (row): CodexQuest => ({

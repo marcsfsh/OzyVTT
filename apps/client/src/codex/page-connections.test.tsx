@@ -110,7 +110,9 @@ const summary = (
   inWorldDate: null,
   rev: 1,
   createdAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z"
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  playerUpdatedAt: "2026-07-28T00:00:00.000Z",
+  firstShownAt: null
 });
 const full = (row: CodexPageSummary): CodexPage => ({ ...row, playerBody: "", gmBody: "", gmFields: {} });
 
@@ -137,6 +139,7 @@ const ENTRY = (over: Partial<CodexJournalEntry> = {}): CodexJournalEntry => ({
   tags: [],
   createdAt: "2026-07-28T00:00:00.000Z",
   updatedAt: "2026-07-28T00:00:00.000Z",
+  firstShownAt: null,
   ...over
 });
 
@@ -444,19 +447,17 @@ describe("The player Graph reads the PLAYER links feed (viewer safety)", () => {
       id: "p1",
       title: "Barovia",
       entityType: "location",
-      folder: null,
       tags: [],
       bannerAssetId: null,
-      updatedAt: "2026-07-28T00:00:00.000Z"
+      playerUpdatedAt: "2026-07-28T00:00:00.000Z"
     },
     {
       id: "p2",
       title: "Strahd",
       entityType: "character",
-      folder: null,
       tags: [],
       bannerAssetId: null,
-      updatedAt: "2026-07-28T00:00:00.000Z"
+      playerUpdatedAt: "2026-07-28T00:00:00.000Z"
     }
   ];
 

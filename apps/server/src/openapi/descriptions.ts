@@ -17,6 +17,15 @@ const GM_ONLY_CHRONICLE = "GM-only; not declared on `CodexChronicleRecordPlayer`
 const GM_REV =
   "GM-only optimistic-concurrency counter; absent from a player projection. Pass it back as `expectedRev` to reject a stale edit.";
 const REVEALED_SUBSET = "Filtered to the revealed subset.";
+const PAGE_FOLDER =
+  "GM-only. The folder path the page is filed under, null at the top level. It is the GM's own filing, so no player shape carries it.";
+const PAGE_UPDATED_AT = "GM-only. Moves on every save, including one that changes only the GM half.";
+const FIRST_SHOWN_AT =
+  "When players could first read the record: set by the write that first lets them read it, and never moved after, so a hide and a re-reveal keep it. Null until then. A record players could read before this date existed takes its `createdAt`.";
+const FIRST_SHOWN_AT_PLAYER =
+  "When players could first read the record. It stands in for `createdAt`, which would tell them when the GM prepared it, and a hide and a re-reveal never move it.";
+const PAGE_PLAYER_UPDATED_AT =
+  "When something a player can see last changed: the title, kind, player body, shared fields, tags or banner, an event page's date, or a reveal or hide. It is the only edit time a player receives, since `updatedAt` also moves on GM-only saves.";
 
 // Prose the content catalogs share.
 const CHOICE_CATALOG =
@@ -1024,25 +1033,35 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   },
   CodexPageSummary: {
     fields: "Player-facing typed entity fields (free-form key/value).",
+    folder: PAGE_FOLDER,
     inWorldLabel: IN_WORLD_LABEL,
     calendarInstant: CALENDAR_INSTANT,
-    inWorldDate: IN_WORLD_DATE
+    inWorldDate: IN_WORLD_DATE,
+    updatedAt: PAGE_UPDATED_AT,
+    playerUpdatedAt: PAGE_PLAYER_UPDATED_AT,
+    firstShownAt: FIRST_SHOWN_AT
   },
   CodexPage: {
     gmFields: "GM-only fields; never present in a player projection.",
     playerBody: "Player-facing markdown body.",
     gmBody: "GM-only markdown body; stripped from a player projection.",
+    folder: PAGE_FOLDER,
     inWorldLabel: IN_WORLD_LABEL,
     calendarInstant: CALENDAR_INSTANT,
-    inWorldDate: IN_WORLD_DATE
+    inWorldDate: IN_WORLD_DATE,
+    updatedAt: PAGE_UPDATED_AT,
+    playerUpdatedAt: PAGE_PLAYER_UPDATED_AT,
+    firstShownAt: FIRST_SHOWN_AT
   },
   CodexPageSummaryPlayer: {
-    "": "A page summary as a PLAYER receives it. A strict subset of the GM summary: no `fields`, no dating trio, no `rev`, no `revealedToPlayers`, no `createdAt`."
+    "": "A page summary as a PLAYER receives it. A strict subset of the GM summary: no `fields`, no dating trio, no `rev`, no `revealedToPlayers`, no `createdAt`, no `folder` and no `updatedAt`.",
+    playerUpdatedAt: PAGE_PLAYER_UPDATED_AT
   },
   CodexPagePlayer: {
-    "": "A page as a PLAYER receives it: the player body (renamed `body`; the layer prefix only means something when there are two layers), the player-facing `fields`, and no `gmBody`, `gmFields`, `rev`, `revealedToPlayers` or `createdAt`. An unrevealed page is never projected at all; it 404s.",
+    "": "A page as a PLAYER receives it: the player body (renamed `body`; the layer prefix only means something when there are two layers), the player-facing `fields`, and no `gmBody`, `gmFields`, `rev`, `revealedToPlayers`, `createdAt`, `folder` or `updatedAt`. An unrevealed page is never projected at all; it 404s.",
     fields: "The player-facing typed entity fields. `gmFields` has no player form.",
-    body: "The page's `playerBody`."
+    body: "The page's `playerBody`.",
+    playerUpdatedAt: PAGE_PLAYER_UPDATED_AT
   },
   CodexConnection: {
     "": "One edge in the codex graph, GM view. ONE shape for both origins: a connection the GM declared and a connection derived from `[[wiki link]]` text differ only by an `origin` attribute, in one system with one panel and one edge kind.",
@@ -1142,16 +1161,18 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       "The linked session's number, resolved LIVE from that record, so renumbering a session updates every one of its entries with no journal write. Server-owned display data: a write body that carries it is a 400. It survives its session in exactly one case: deleting a REVEALED numbered session stamps its number back onto its entries as a bare label, because the players were already reading it.",
     calendarInstant: CALENDAR_INSTANT,
     payload:
-      'Kind-specific structured data, discriminated by `kind`: the downtime payload, the milestone payload, the standing payload, and null for the other three kinds. GM-only; the player journal projection carries no payload at all (a revealed record\'s facts are read on the chronicle). A DEADLINE deliberately has none: its text is the "what" and its `inWorldDate` is the "when".'
+      'Kind-specific structured data, discriminated by `kind`: the downtime payload, the milestone payload, the standing payload, and null for the other three kinds. GM-only; the player journal projection carries no payload at all (a revealed record\'s facts are read on the chronicle). A DEADLINE deliberately has none: its text is the "what" and its `inWorldDate` is the "when".',
+    firstShownAt: FIRST_SHOWN_AT
   },
   CodexJournalEntryPlayer: {
-    "": "A journal entry as a PLAYER receives it: the mini-timeline row on a page or a pin. The player text (renamed `text`), and no `gmText`, `revealedToPlayers`, attachments, `sourceEncounterId`, `payload`, `sortKey`, dating internals or `updatedAt`. A downtime's facts and a deadline's fired state are read on the CHRONICLE, which carries them; a player-facing field the player Codex does not read is a field with no reason to travel.",
+    "": "A journal entry as a PLAYER receives it: the mini-timeline row on a page or a pin. The player text (renamed `text`), and no `gmText`, `revealedToPlayers`, attachments, `sourceEncounterId`, `payload`, `sortKey`, dating internals, `createdAt` or `updatedAt`. A downtime's facts and a deadline's fired state are read on the CHRONICLE, which carries them; a player-facing field the player Codex does not read is a field with no reason to travel.",
     text: "The entry's `playerText`.",
     kind: "Visibility NEVER depends on this: every kind is gated by `revealedToPlayers` alone.",
     sessionId:
       "The session this entry belongs to, so a player can navigate from an entry to its recap. Present ONLY when that session is revealed, in which case the player can already list and open it, so this adds no information. Nulled TOGETHER with `sessionNumber` when the session is hidden: either half of the link would announce that a session they have not been shown exists.",
     sessionNumber:
-      "Nulled together with `sessionId` when the linked session has not been revealed, because a session's very existence is GM information. A bare label with no link survives only where the number was already player-visible."
+      "Nulled together with `sessionId` when the linked session has not been revealed, because a session's very existence is GM information. A bare label with no link survives only where the number was already player-visible.",
+    firstShownAt: FIRST_SHOWN_AT_PLAYER
   },
   CodexChronicleRecord: {
     "": "One row on the ONE chronicle as the **GM** receives it, in the single row shape every timeline record uses. `kind` says what it is and therefore what opening it means: `entry`/`combat`/`deadline`/`downtime` carry a journal-entry id, `event` carries a PAGE id. Every key is present on every kind (null where it does not apply), so no reader branches on key presence. The player's row is the separate `CodexChronicleRecordPlayer`; the two are joined by `CodexChronicleRecordProjected`.",
@@ -1180,7 +1201,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     updatedAt: GM_ONLY_CHRONICLE
   },
   CodexChronicleRecordPlayer: {
-    "": "One chronicle row as a PLAYER receives it. Absent by construction: `gmText`, `revealedToPlayers`, `attachPageId`, `attachMarkerId`, `sourceEncounterId`, `proposedDate` and `updatedAt`. `fired` is measured against the PUBLISHED date, never the GM's clock, so it can never tell the party that a date they have not been shown has gone by.",
+    "": "One chronicle row as a PLAYER receives it. Absent by construction: `gmText`, `revealedToPlayers`, `attachPageId`, `attachMarkerId`, `sourceEncounterId`, `proposedDate`, `createdAt` and `updatedAt`. `fired` is measured against the PUBLISHED date, never the GM's clock, so it can never tell the party that a date they have not been shown has gone by.",
     sessionId: "Present only when the linked session is revealed; nulled together with `sessionNumber` otherwise.",
     inWorldDate:
       "the row's raw in-world date, so a calendar view can place it on a day without re-parsing prose. Information-equivalent to `inWorldLabel` beside it, which already spells out weekday, day, month and year; the structured parts add no bits and remove a client parse. Not the campaign's \"now\": the GM's clock is `CodexCalendarPlayer.currentDate`, which is the PUBLISHED date.",
@@ -1188,7 +1209,8 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       "the sortable day index for `inWorldDate` against the calendar the player already holds: a pure function of two things they have, computed once on the server. It is here so the client never re-derives it: the two derivations disagreed on a day that overflows its month, and one authority for one number is the fix. Null exactly when `inWorldDate` is.",
     fired: "Derived against the PUBLISHED date.",
     payload:
-      "The player half of the kind's structured facts: downtime without `applied`, a milestone's `{ level, reason }` unchanged, a standing change with `factionPageId` nulled unless that faction page is revealed."
+      "The player half of the kind's structured facts: downtime without `applied`, a milestone's `{ level, reason }` unchanged, a standing change with `factionPageId` nulled unless that faction page is revealed.",
+    firstShownAt: FIRST_SHOWN_AT_PLAYER
   },
   CodexSession: {
     "": "One play session: the GM's prep for an evening at the table, and the recap of it afterwards. Two layers in one record, like a page's `playerBody`/`gmBody`: `recapBody` is the player-facing half and `prepBody` is the GM's. A player projection is deliberately narrow: a revealed session reduces to EXACTLY `id`, `sessionNumber`, `realDate`, and `recap` (the recap body, renamed the way a page's `playerBody` becomes `body` and a journal entry's `playerText` becomes `text`). Everything else here is GM-only. `sessionNumber` is the join to the journal: entries carry the same number, which is what the journal's by-session lens groups on, so it is unique across sessions, and a number already in use is refused, so no group silently turns ambiguous.",
@@ -1285,9 +1307,9 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       "The map a marker sits on; null for every other kind. Never names an unrevealed map, because a player only ever receives a marker hit when that map is revealed."
   },
   CodexSearchData: {
-    hits: "The one ranked result list, all record kinds.",
+    hits: "The one ranked result list, all record kinds. A title equal to the query comes first for both roles. After it, a GM's hits are ranked by relevance (bm25, the title weighted 10x). A player's come by tier: a title holding every query word, then the rest, each tier ordered by kind, title and id. A player hit's place depends on its own title alone, so records a player cannot see never move it.",
     truncated:
-      'The result list was CUT at the cap. Narrow the query. The Codex is unpaginated by design at LAN scale, which is honest only while a caller can tell a complete list from a clipped one; this is that difference. Measured by asking the index for one row past the cap, so it can distinguish "exactly 50 matches" from "50 and more". For a player it reports whether the SEARCH was cut, before their own reveal gates removed anything, so it stays true and never turns into a count of what they may see.'
+      'The result list was CUT at the cap. Narrow the query. The Codex is unpaginated by design at LAN scale, which is honest only while a caller can tell a complete list from a clipped one; this is that difference, and it tells "exactly 50 matches" from "50 and more". A player\'s list is counted after every player gate, so a record they cannot see never takes a place under the cap or sets this flag.'
   },
   CodexRevisionHistorySettings: {
     "": "How much page version history the codex keeps, and what keeping it costs. The two knobs are exactly `CodexRevisionHistoryInput`'s; the two usage figures are server-computed and READ-ONLY, and they ride along here in one object because a settings screen wants the cost beside the control that changes it.",

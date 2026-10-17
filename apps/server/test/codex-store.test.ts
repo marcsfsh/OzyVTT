@@ -176,8 +176,8 @@ describe("CodexStore search ranks the record NAMED for the query first", () => {
   });
 
   it("ranks identically for a PLAYER, so the two roles never disagree about where Enter lands", () => {
-    // Both audiences have their own FTS table; weighting only one would give the GM and the player
-    // different answers for the same name.
+    // Each audience has its own FTS table and ranking, and both put the record named for the query first, so
+    // the GM and the player land on the same record for a name.
     const { named, mentionsA, mentionsB } = seedNamedVersusMentions();
     const hits = store.searchAll("player", "Strahd").hits;
     expect(hits[0]).toEqual({ kind: "page", id: named });
@@ -185,8 +185,8 @@ describe("CodexStore search ranks the record NAMED for the query first", () => {
   });
 
   it("keeps the exact-title record first even against a body that repeats the term 120 times", () => {
-    // The exact-title tier: under bm25 alone (title 10x / body 1x) a body repeating the word ~80 times outranks
-    // the titled page, so prose length would decide. 120 repetitions is past that flip.
+    // The exact-title tier: a body that repeats the word 120 times still ranks below the page titled for it,
+    // so prose length never decides.
     const named = store.createPage({ title: "Strahd", playerBody: "A vampire lord.", revealedToPlayers: true });
     const spam = store.createPage({
       title: "QA Keep 111",
@@ -201,8 +201,9 @@ describe("CodexStore search ranks the record NAMED for the query first", () => {
   });
 
   it("weights a title hit over a body hit even when NEITHER title is exact", () => {
-    // Tier 2 alone: no title equals "Ravenloft", so tier 1 cannot fire, and this fails unless bm25 really
-    // weights the title column. (`bm25(t, 10.0, 1.0)` on the wrong columns is a silent no-op.)
+    // No title equals "Ravenloft", so the exact tier cannot fire. The GM's bm25 weights the title 10x, and a
+    // player's second tier is a title holding the word, so for both the castle beats a page that only repeats
+    // the word in its body.
     const titled = store.createPage({
       title: "Castle Ravenloft",
       playerBody: "the seat of the land",
@@ -222,7 +223,7 @@ describe("CodexStore search ranks the record NAMED for the query first", () => {
 
   it("ranks across KINDS, not just within one: a map TITLED for the query beats a journal that mentions it", () => {
     // Ordering must hold between kinds under the shared 50-result cap. A journal entry has an empty title, so
-    // only the title weight lifts the map (not titled exactly "Vallaki", so tier 2 alone) above it.
+    // only the title lifts the map above it: by the GM's title weight, and by a player's second tier.
     const map = store.createMap({
       assetId: crypto.randomUUID(),
       name: "Vallaki Town Square",
@@ -236,6 +237,30 @@ describe("CodexStore search ranks the record NAMED for the query first", () => {
       expect(hits[0]).toEqual({ kind: "map", id: map.id });
       expect(hits).toContainEqual({ kind: "journal", id: entry.id });
     }
+  });
+
+  // The GM reads every row, so the index's statistics tell the GM nothing new, and relevance stays the GM's
+  // order. A player's order uses each hit's own title, so here the two differ.
+  const seedOnceAndOften = () => ({
+    once: store.createPage({ title: "Alpha notes", playerBody: "Strahd rides at dawn.", revealedToPlayers: true }).id,
+    often: store.createPage({ title: "Zed notes", playerBody: "Strahd Strahd Strahd Strahd", revealedToPlayers: true })
+      .id
+  });
+
+  it("ranks the GM's body-only matches by relevance, as it always has", () => {
+    const { once, often } = seedOnceAndOften();
+    expect(store.searchAll("gm", "Strahd").hits).toEqual([
+      { kind: "page", id: often },
+      { kind: "page", id: once }
+    ]);
+  });
+
+  it("ranks a player's body-only matches by title", () => {
+    const { once, often } = seedOnceAndOften();
+    expect(store.searchAll("player", "Strahd").hits).toEqual([
+      { kind: "page", id: once },
+      { kind: "page", id: often }
+    ]);
   });
 
   it("still finds a record whose ONLY match is a tag or a body: re-ranking never filters", () => {
@@ -1200,8 +1225,8 @@ describe("Codex chronicle: the projection layer, on its own", () => {
     // `payload` is a downtime's who/activity/days, never GM-only `applied`.
     expect(Object.keys(projected).sort()).toEqual([
       "calendarInstant",
-      "createdAt",
       "fired",
+      "firstShownAt",
       "id",
       "inWorldDate",
       "inWorldLabel",
@@ -1643,6 +1668,248 @@ describe("CodexStore recency semantics: what counts as an update", () => {
     expect(updatedAt(strahd.id) > afterCreate).toBe(true);
     expect(updatedAt(barovia.id) > afterCreate).toBe(true);
     expect(rev(strahd.id)).toBe(strahd.rev);
+  });
+});
+
+// `playerUpdatedAt` is the edit time players get, so it moves only for what a player can see: the title, the
+// kind, the player text, the shared fields, the tags, the banner, an event page's date, and a reveal or hide.
+describe("CodexStore playerUpdatedAt: the date only the player half moves", () => {
+  let playerDirectory: string;
+  let clock: number;
+  let pages: CodexStore;
+
+  beforeEach(async () => {
+    playerDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-player-recency-"));
+    clock = Date.parse("2026-07-01T00:00:00.000Z");
+    pages = new CodexStore(join(playerDirectory, "vtt.sqlite"), () => clock);
+    await pages.initialize();
+  });
+  afterEach(async () => {
+    pages.close();
+    await rm(playerDirectory, { recursive: true, force: true });
+  });
+
+  const playerUpdatedAt = (pageId: string) => pages.getPage(pageId)!.playerUpdatedAt;
+  /** Moves the clock, runs `edit`, and says whether the player date moved with it. */
+  const moved = (pageId: string, edit: () => unknown) => {
+    const before = playerUpdatedAt(pageId);
+    clock += 60_000;
+    edit();
+    return playerUpdatedAt(pageId) !== before;
+  };
+  const seed = () =>
+    pages.createPage({
+      title: "The Lantern Order",
+      entityType: "faction",
+      playerBody: "Lamplighters.",
+      gmBody: "A front.",
+      folder: "Villains",
+      revealedToPlayers: true
+    });
+  const update = (pageId: string, input: Parameters<CodexStore["updatePage"]>[1]) => () =>
+    pages.updatePage(pageId, input, undefined, "gm");
+
+  it("starts at the page's creation", () => {
+    const page = seed();
+    expect(page.playerUpdatedAt).toBe(page.createdAt);
+  });
+
+  it("does NOT move for anything only the GM sees", () => {
+    const page = seed();
+    expect(moved(page.id, update(page.id, { gmBody: "A front for the cult." })), "GM notes").toBe(false);
+    expect(moved(page.id, update(page.id, { gmFields: { goals: "The capital" } })), "GM fields").toBe(false);
+    expect(moved(page.id, update(page.id, { folder: "Villains/Cults" })), "a folder in the editor").toBe(false);
+    expect(
+      moved(page.id, () => pages.moveFolder("Villains", "Foes")),
+      "a folder move"
+    ).toBe(false);
+    expect(
+      moved(page.id, () => pages.deleteFolder("Foes")),
+      "a folder delete"
+    ).toBe(false);
+    expect(
+      moved(page.id, update(page.id, { inWorldDate: { year: 1, month: 0, day: 2 } })),
+      "a date no player view shows"
+    ).toBe(false);
+    // A save that sends the player half back unchanged, as autosave does with a whole draft.
+    expect(
+      moved(page.id, update(page.id, { title: "The Lantern Order", playerBody: "Lamplighters." })),
+      "a resave"
+    ).toBe(false);
+    const other = pages.createPage({ title: "Vallaki", revealedToPlayers: true });
+    expect(
+      moved(page.id, () => pages.createConnection(page.id, { toPageId: other.id, layer: "gm" })),
+      "a GM-layer connection"
+    ).toBe(false);
+    // The GM's own recency moved through all of that.
+    expect(pages.getPage(page.id)!.updatedAt > page.updatedAt).toBe(true);
+  });
+
+  it("moves for each part of the page a player can see", () => {
+    const page = seed();
+    expect(moved(page.id, update(page.id, { title: "The Lantern Guild" })), "title").toBe(true);
+    expect(moved(page.id, update(page.id, { playerBody: "Lamplighters, mostly." })), "player text").toBe(true);
+    expect(moved(page.id, update(page.id, { fields: { leader: "Maelis" } })), "shared fields").toBe(true);
+    expect(moved(page.id, update(page.id, { tags: ["guild"] })), "tags").toBe(true);
+    expect(moved(page.id, update(page.id, { bannerAssetId: crypto.randomUUID() })), "banner").toBe(true);
+    expect(moved(page.id, update(page.id, { entityType: "religion" })), "kind").toBe(true);
+    expect(
+      moved(page.id, () => pages.setPageRevealed(page.id, false)),
+      "hide"
+    ).toBe(true);
+    expect(
+      moved(page.id, () => pages.setPageRevealed(page.id, true)),
+      "reveal"
+    ).toBe(true);
+    expect(
+      moved(page.id, () => pages.setPageRevealed(page.id, true)),
+      "a reveal of a shown page"
+    ).toBe(false);
+  });
+
+  it("moves for an event page's date, which the players' chronicle shows", () => {
+    const event = pages.createPage({ title: "The Feast", entityType: "event", revealedToPlayers: true });
+    expect(moved(event.id, update(event.id, { inWorldDate: { year: 1, month: 0, day: 3 } }))).toBe(true);
+  });
+
+  it("round-trips through a backup, and a backup from before it takes the old edit time", () => {
+    const page = seed();
+    clock += 60_000;
+    pages.updatePage(page.id, { gmBody: "Later GM notes." }, undefined, "gm");
+    const saved = pages.getPage(page.id)!;
+    expect(saved.playerUpdatedAt).not.toBe(saved.updatedAt);
+
+    const bundle = pages.exportBundle();
+    pages.importBundle(bundle);
+    expect(pages.getPage(page.id)!.playerUpdatedAt).toBe(saved.playerUpdatedAt);
+
+    // Players could already read `updatedAt` before this date existed, so an older backup reveals nothing new.
+    const older = { ...bundle, pages: bundle.pages.map(({ playerUpdatedAt: _dropped, ...rest }) => rest) };
+    pages.importBundle(older);
+    expect(pages.getPage(page.id)!.playerUpdatedAt).toBe(saved.updatedAt);
+  });
+
+  it("fills an existing page's date from its edit time when an older database opens", async () => {
+    const page = seed();
+    pages.close();
+    // The file as the release before this column left it.
+    const raw = new DatabaseSync(join(playerDirectory, "vtt.sqlite"));
+    raw.exec("ALTER TABLE codex_pages DROP COLUMN player_updated_at");
+    raw.prepare("DELETE FROM migrations WHERE store = 'codex' AND version = 2").run();
+    raw.prepare("UPDATE codex_pages SET updated_at = ? WHERE id = ?").run("2026-06-30T12:00:00.000Z", page.id);
+    raw.close();
+
+    await pages.initialize();
+    expect(pages.getPage(page.id)!.playerUpdatedAt).toBe("2026-06-30T12:00:00.000Z");
+  });
+});
+
+// `firstShownAt` replaces `createdAt` in the player shapes. Every write dates what it first lets players read, and
+// a record from before the date existed takes its `createdAt` only if players can read it today.
+describe("CodexStore firstShownAt: when players could first read a record", () => {
+  let shownDirectory: string;
+  let clock: number;
+  let shown: CodexStore;
+
+  beforeEach(async () => {
+    shownDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-first-shown-"));
+    clock = Date.parse("2026-07-01T00:00:00.000Z");
+    shown = new CodexStore(join(shownDirectory, "vtt.sqlite"), () => clock);
+    await shown.initialize();
+  });
+  afterEach(async () => {
+    shown.close();
+    await rm(shownDirectory, { recursive: true, force: true });
+  });
+
+  const later = () => {
+    clock += 60_000;
+    return new Date(clock).toISOString();
+  };
+  /** A page and an entry of each reveal state, plus a revealed standing record its hidden faction still gates. */
+  const seed = () => {
+    const shownPage = shown.createPage({ title: "Vallaki", revealedToPlayers: true });
+    const hiddenPage = shown.createPage({ title: "The Cult", entityType: "faction" });
+    const shownEntry = shown.createEntry({ playerText: "We arrived.", revealedToPlayers: true, sessionId: null });
+    const hiddenEntry = shown.createEntry({ playerText: "Prep.", sessionId: null });
+    shown.setStanding(hiddenPage.id, 10, "");
+    const gated = shown.listTimeline().find((entry) => entry.kind === "standing")!;
+    shown.setEntryRevealed(gated.id, true);
+    return { shownPage, hiddenPage, shownEntry, hiddenEntry, gated };
+  };
+
+  it("dates a record created revealed at its creation, and leaves one players cannot read undated", () => {
+    const { shownPage, hiddenPage, shownEntry, hiddenEntry, gated } = seed();
+    expect(shownPage.firstShownAt).toBe(shownPage.createdAt);
+    expect(shownEntry.firstShownAt).toBe(shownEntry.createdAt);
+    expect(shown.getPage(hiddenPage.id)!.firstShownAt).toBeNull();
+    expect(shown.getEntry(hiddenEntry.id)!.firstShownAt).toBeNull();
+    expect(shown.getEntry(gated.id)!.firstShownAt, "revealed, but its faction is hidden").toBeNull();
+  });
+
+  it("dates a record at the write that first lets players read it, and never moves the date after", () => {
+    const { hiddenPage, hiddenEntry, gated } = seed();
+    const revealed = later();
+    shown.setEntryRevealed(hiddenEntry.id, true);
+    expect(shown.getEntry(hiddenEntry.id)!.firstShownAt).toBe(revealed);
+
+    const factionShown = later();
+    shown.setPageRevealed(hiddenPage.id, true);
+    expect(shown.getPage(hiddenPage.id)!.firstShownAt).toBe(factionShown);
+    expect(shown.getEntry(gated.id)!.firstShownAt, "its faction's reveal let players read it").toBe(factionShown);
+
+    later();
+    shown.setEntryRevealed(hiddenEntry.id, false);
+    shown.setPageRevealed(hiddenPage.id, false);
+    shown.updateEntry(hiddenEntry.id, { playerText: "Prep, redone." });
+    later();
+    shown.setEntryRevealed(hiddenEntry.id, true);
+    shown.setPageRevealed(hiddenPage.id, true);
+    expect(shown.getEntry(hiddenEntry.id)!.firstShownAt).toBe(revealed);
+    expect(shown.getPage(hiddenPage.id)!.firstShownAt).toBe(factionShown);
+  });
+
+  it("dates what players can read today by its creation when an older database opens", async () => {
+    const { shownPage, hiddenPage, shownEntry, hiddenEntry, gated } = seed();
+    shown.close();
+    // The file as the release before this column left it.
+    const raw = new DatabaseSync(join(shownDirectory, "vtt.sqlite"));
+    raw.exec(
+      "ALTER TABLE codex_pages DROP COLUMN first_shown_at; ALTER TABLE codex_journal DROP COLUMN first_shown_at;"
+    );
+    raw.prepare("DELETE FROM migrations WHERE store = 'codex' AND version = 3").run();
+    raw.close();
+
+    await shown.initialize();
+    expect(shown.getPage(shownPage.id)!.firstShownAt).toBe(shownPage.createdAt);
+    expect(shown.getEntry(shownEntry.id)!.firstShownAt).toBe(shownEntry.createdAt);
+    expect(shown.getPage(hiddenPage.id)!.firstShownAt).toBeNull();
+    expect(shown.getEntry(hiddenEntry.id)!.firstShownAt).toBeNull();
+    expect(shown.getEntry(gated.id)!.firstShownAt).toBeNull();
+  });
+
+  it("keeps the date through a backup, and dates an older backup as the migration does", () => {
+    const { shownPage, hiddenPage, hiddenEntry, gated } = seed();
+    later();
+    shown.setEntryRevealed(hiddenEntry.id, true);
+    const firstShown = shown.getEntry(hiddenEntry.id)!.firstShownAt!;
+    expect(firstShown).not.toBe(shown.getEntry(hiddenEntry.id)!.createdAt);
+
+    later();
+    const bundle = shown.exportBundle();
+    shown.importBundle(bundle);
+    expect(shown.getEntry(hiddenEntry.id)!.firstShownAt, "a restore is not a reveal").toBe(firstShown);
+    expect(shown.getPage(shownPage.id)!.firstShownAt).toBe(shownPage.createdAt);
+
+    const older = {
+      ...bundle,
+      pages: bundle.pages.map(({ firstShownAt: _dropped, ...rest }) => rest),
+      journal: bundle.journal.map(({ firstShownAt: _dropped, ...rest }) => rest)
+    };
+    shown.importBundle(older);
+    expect(shown.getEntry(hiddenEntry.id)!.firstShownAt).toBe(shown.getEntry(hiddenEntry.id)!.createdAt);
+    expect(shown.getPage(hiddenPage.id)!.firstShownAt).toBeNull();
+    expect(shown.getEntry(gated.id)!.firstShownAt).toBeNull();
   });
 });
 
@@ -2633,7 +2900,7 @@ describe("Codex journal: the unrevealed-session number gate, on its own", () => 
     const projected = projectPlayerJournalEntry(entry, playerSessionNumbers())!;
     // The exact key set: the fields are nulled, never dropped, so one response shape serves both roles.
     expect(Object.keys(projected).sort()).toEqual([
-      "createdAt",
+      "firstShownAt",
       "id",
       "inWorldLabel",
       "kind",
@@ -5269,6 +5536,7 @@ describe("every codex write bumps the coarse revision (the ETag's one premise)",
     "listFolders",
     "getPage",
     "listPages",
+    "listFullPages",
     "exportBundle",
     "listAllDeclaredConnections",
     "connectionsForPage",
@@ -5277,6 +5545,7 @@ describe("every codex write bumps the coarse revision (the ETag's one premise)",
     "listRevisions",
     "listAllRevisions",
     "searchAll",
+    "searchPlayerMatches",
     "searchPages",
     "getMap",
     "listMaps",

@@ -26,18 +26,21 @@ import {
   type PlayerCodexStandingPayload
 } from "@vtt/domain";
 
-/** How a record says when it happened, in order of preference. Shared by both journals and the dashboard. */
+/**
+ * How a record says when it happened, in order of preference. Shared by both journals and the dashboard. The last
+ * resort is the GM's `createdAt` for a GM row and `firstShownAt` for a player row, which carries no creation time.
+ */
 export type ChronicleWhen = Readonly<{
   inWorldLabel: string | null;
   sessionNumber: number | null;
   realDate: string | null;
-  createdAt: string;
-}>;
+}> &
+  (Readonly<{ createdAt: string }> | Readonly<{ firstShownAt: string }>);
 export function chronicleWhenLabel(record: ChronicleWhen): string {
   if (record.inWorldLabel) return record.inWorldLabel;
   if (record.sessionNumber !== null) return `Session ${record.sessionNumber}`;
   if (record.realDate) return record.realDate;
-  return new Date(record.createdAt).toLocaleDateString();
+  return new Date("firstShownAt" in record ? record.firstShownAt : record.createdAt).toLocaleDateString();
 }
 
 /** The Journal filter's kinds, in reading order. Shared so both journals offer the same options. */

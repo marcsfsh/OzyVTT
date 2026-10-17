@@ -416,7 +416,7 @@ describe("The player's chronicle and the player's clock", () => {
     tags: [],
     payload: null,
     fired: false,
-    createdAt: "2026-07-20T00:00:00.000Z",
+    firstShownAt: "2026-07-20T00:00:00.000Z",
     ...over
   });
 
@@ -521,7 +521,7 @@ describe("The Campaign dashboard's deadlines card", () => {
     render(
       <CampaignHome
         pages={[
-          { id: "p1", title: "Strahd", entityType: "character", tags: [], updatedAt: "2026-07-28T00:00:00.000Z" }
+          { id: "p1", title: "Strahd", entityType: "character", tags: [], playerUpdatedAt: "2026-07-28T00:00:00.000Z" }
         ]}
         onOpenEntry={vi.fn()}
         onPickType={vi.fn()}

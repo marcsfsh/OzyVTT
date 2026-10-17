@@ -103,7 +103,8 @@ export function useGmFeeds(gmToken: string, section: CodexSection | null) {
                     entityType: page.entityType,
                     revealedToPlayers: page.revealedToPlayers,
                     rev: page.rev,
-                    updatedAt: page.updatedAt
+                    updatedAt: page.updatedAt,
+                    playerUpdatedAt: page.playerUpdatedAt
                   }
                 : row
             )

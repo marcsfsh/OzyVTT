@@ -112,9 +112,10 @@ export function nextSessionCard<
 export function playerCampaignFeedProps(
   input: Readonly<{ records: readonly PlayerCodexChronicleRecord[]; today: string | null }>
 ) {
+  // Newest to players first, by when each row was first shown to them.
   const entries: readonly CampaignEntry[] = [...input.records]
     .filter((record) => !DASHBOARD_CARDED_KINDS.has(record.kind))
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .sort((a, b) => b.firstShownAt.localeCompare(a.firstShownAt))
     .map((record) => ({
       id: record.id,
       summary: chronicleRowSummary(record),

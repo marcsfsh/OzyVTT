@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { campaignFeedProps, nextSessionCard, pendingDowntime, recordsOnInstant } from "./dashboard";
-import type { CodexChronicleRecord } from "@vtt/domain";
+import {
+  campaignFeedProps,
+  nextSessionCard,
+  pendingDowntime,
+  playerCampaignFeedProps,
+  recordsOnInstant
+} from "./dashboard";
+import type { CodexChronicleRecord, PlayerCodexChronicleRecord } from "@vtt/domain";
 
 /** The dashboard's pure selection rules. The session card's heading must reflect the record, never a constant. */
 
@@ -136,5 +142,38 @@ describe("Records on one in-world day (the Calendar's day panel)", () => {
     ];
     expect(recordsOnInstant(rows, 100).map((row) => row.id)).toEqual(["a"]);
     expect(recordsOnInstant(rows, 999)).toEqual([]);
+  });
+});
+
+// A player row carries when it was first shown, so a record the GM prepared weeks ago and revealed today is the
+// player's newest activity.
+describe("The player's latest journal activity", () => {
+  const PLAYER_ROW = (id: string, text: string, firstShownAt: string): PlayerCodexChronicleRecord => ({
+    kind: "entry",
+    id,
+    title: null,
+    text,
+    sessionId: null,
+    sessionNumber: null,
+    realDate: null,
+    inWorldLabel: null,
+    inWorldDate: null,
+    calendarInstant: null,
+    tags: [],
+    fired: false,
+    payload: null,
+    firstShownAt
+  });
+
+  it("puts the record shown most recently first, and dates an undated row by when it was shown", () => {
+    const feed = playerCampaignFeedProps({
+      records: [
+        PLAYER_ROW("j1", "We reached the town.", "2026-07-20T12:00:00.000Z"),
+        PLAYER_ROW("j2", "The order meets at midnight.", "2026-08-07T12:00:00.000Z")
+      ],
+      today: null
+    });
+    expect(feed.entries.map((entry) => entry.id)).toEqual(["j2", "j1"]);
+    expect(feed.entries[0].when).toBe(new Date("2026-08-07T12:00:00.000Z").toLocaleDateString());
   });
 });

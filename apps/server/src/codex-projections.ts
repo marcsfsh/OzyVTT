@@ -37,7 +37,7 @@ import type {
 } from "@vtt/domain";
 import { inWorldLabel } from "./codex/calendar.js";
 import { deadlineFired } from "./codex/journal-kinds.js";
-import type { CodexChronicleSource } from "./codex/journal.js";
+import { chronicleOrder, type CodexChronicleSource } from "./codex/journal.js";
 
 /**
  * The Codex viewer-safety boundary: every player-facing Codex read projects through here. The player shapes in
@@ -49,20 +49,22 @@ export function projectGmPage(row: CodexPage): CodexPage {
   return row;
 }
 
-/** null when the page is not revealed to players; otherwise the player-facing projection (no gmBody, no gmFields). */
+/**
+ * null when the page is not revealed to players; otherwise the player-facing projection. Allow-list: the GM body,
+ * GM fields, `rev`, the folder (the GM's private filing) and `updatedAt` (which a GM-only save moves) never enter
+ * it. `playerUpdatedAt` is the edit time players get.
+ */
 export function projectPlayerPage(row: CodexPage): PlayerCodexPage | null {
   if (!row.revealedToPlayers) return null;
-  // Allow-list: gmBody, gmFields and rev never enter the result (GM-only attributes live in `gmFields`).
   return {
     id: row.id,
     title: row.title,
     entityType: row.entityType,
     fields: row.fields,
-    folder: row.folder,
     tags: row.tags,
     body: row.playerBody,
     bannerAssetId: row.bannerAssetId,
-    updatedAt: row.updatedAt
+    playerUpdatedAt: row.playerUpdatedAt
   };
 }
 
@@ -70,16 +72,16 @@ export function projectGmPageSummary(row: CodexPageSummary): CodexPageSummary {
   return row;
 }
 
+/** As `projectPlayerPage`, without the body and fields. */
 export function projectPlayerPageSummary(row: CodexPageSummary): PlayerCodexPageSummary | null {
   if (!row.revealedToPlayers) return null;
   return {
     id: row.id,
     title: row.title,
     entityType: row.entityType,
-    folder: row.folder,
     tags: row.tags,
     bannerAssetId: row.bannerAssetId,
-    updatedAt: row.updatedAt
+    playerUpdatedAt: row.playerUpdatedAt
   };
 }
 
@@ -252,6 +254,41 @@ function playerSessionLink(
   return { sessionId: row.sessionId, sessionNumber: row.sessionNumber };
 }
 
+/**
+ * Chronicle records in a player's order. The store places an entry by its session's number, and a hidden
+ * session's number would show players where that session falls, so here an entry is placed by the number a
+ * player receives for it. Ties go by when players could first read each record.
+ */
+export function orderPlayerChronicle(
+  records: readonly CodexChronicleSource[],
+  context: PlayerSessionNumberContext
+): CodexChronicleSource[] {
+  return [...records].sort(
+    chronicleOrder({
+      sessionNumberOf: (entry) => playerSessionLink(entry, context).sessionNumber,
+      timeOf: (record) => (record.kind === "entry" ? record.entry.firstShownAt : record.page.firstShownAt) ?? ""
+    })
+  );
+}
+
+/** One pin's or page's entries in a player's order: by when players could first read each one. */
+export function orderPlayerAttached(entries: readonly CodexJournalEntry[]): CodexJournalEntry[] {
+  return [...entries].sort(
+    (a, b) => (a.firstShownAt ?? "").localeCompare(b.firstShownAt ?? "") || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+  );
+}
+
+/** The journal timeline in a player's order, by the same rule as `orderPlayerChronicle`. */
+export function orderPlayerTimeline(
+  entries: readonly CodexJournalEntry[],
+  context: PlayerSessionNumberContext
+): CodexJournalEntry[] {
+  return orderPlayerChronicle(
+    entries.map((entry) => ({ kind: "entry", entry }) as const),
+    context
+  ).flatMap((record) => (record.kind === "entry" ? [record.entry] : []));
+}
+
 export function projectGmJournalEntry(row: CodexJournalEntry): CodexJournalEntry {
   return row;
 }
@@ -262,7 +299,10 @@ export function projectPlayerJournalEntry(
   if (!row.revealedToPlayers) return null;
   if (!playerStandingVisible(row, context)) return null;
   if (!playerQuestEventVisible(row, context)) return null;
+  // The write that lets players read an entry dates it, so an undated one has never been shown. It fails closed.
+  if (row.firstShownAt === null) return null;
   const session = playerSessionLink(row, context);
+  // No `createdAt`, which would tell players when the GM wrote the entry.
   return {
     id: row.id,
     text: row.playerText,
@@ -272,7 +312,7 @@ export function projectPlayerJournalEntry(
     realDate: row.realDate,
     inWorldLabel: row.inWorldLabel,
     tags: row.tags,
-    createdAt: row.createdAt
+    firstShownAt: row.firstShownAt
   };
 }
 
@@ -532,11 +572,12 @@ export function projectPlayerChronicleRecord(
         context.revealedPageIds ?? EMPTY_PAGE_IDS,
         context.revealedQuestIds ?? EMPTY_PAGE_IDS
       ),
-      createdAt: projected.createdAt
+      firstShownAt: projected.firstShownAt
     };
   }
   const projected = projectPlayerPage(record.page);
-  if (!projected) return null;
+  // As for an entry: an undated page has never been shown, so it fails closed.
+  if (!projected || record.page.firstShownAt === null) return null;
   return {
     kind: "event",
     id: projected.id,
@@ -551,7 +592,7 @@ export function projectPlayerChronicleRecord(
     tags: projected.tags,
     fired: false,
     payload: null,
-    createdAt: record.page.createdAt
+    firstShownAt: record.page.firstShownAt
   };
 }
 

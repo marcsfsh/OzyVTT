@@ -6,8 +6,11 @@ import {
   projectGmStanding,
   projectPlayerCalendar,
   projectPlayerChronicleRecord,
+  projectPlayerJournalEntry,
   projectPlayerMarker,
+  projectPlayerPage,
   projectPlayerPageMarker,
+  projectPlayerPageSummary,
   projectPlayerStanding,
   projectRevealAudit
 } from "../src/codex-projections.js";
@@ -18,6 +21,7 @@ import type {
   CodexJournalEntry,
   CodexJournalKind,
   CodexMarker,
+  CodexPage,
   CodexStanding
 } from "@vtt/domain";
 
@@ -55,6 +59,7 @@ function entryRow(overrides: Partial<CodexJournalEntry> & { kind: CodexJournalKi
     payload: null,
     createdAt: "2026-07-29T00:00:00.000Z",
     updatedAt: "2026-07-29T00:00:00.000Z",
+    firstShownAt: "2026-07-30T00:00:00.000Z",
     ...overrides
   };
 }
@@ -459,5 +464,121 @@ describe("reveal audit projection: an aggregation and not a second opinion", () 
     expect(silent).toEqual([
       { kind: "journal", id: silentStanding.id, title: "Faction standing changed", journalKind: "standing" }
     ]);
+  });
+});
+
+/** A page row as the store returns one: filed in a GM folder, with its GM-side save later than its player half. */
+function pageRow(overrides: Partial<CodexPage> = {}): CodexPage {
+  return {
+    id: "22222222-2222-4222-8222-222222222222",
+    title: "The Lantern Order",
+    entityType: "faction",
+    fields: { motto: "Light the way" },
+    gmFields: { goal: "Seize the capital" },
+    folder: "Villains/Secret societies",
+    tags: ["order"],
+    playerBody: "A guild of lamplighters.",
+    gmBody: "A front for the cult.",
+    revealedToPlayers: true,
+    bannerAssetId: null,
+    inWorldLabel: null,
+    calendarInstant: null,
+    inWorldDate: null,
+    rev: 4,
+    createdAt: "2026-07-01T00:00:00.000Z",
+    updatedAt: "2026-07-30T00:00:00.000Z",
+    playerUpdatedAt: "2026-07-02T00:00:00.000Z",
+    firstShownAt: "2026-07-03T00:00:00.000Z",
+    ...overrides
+  };
+}
+
+// The folder path is the GM's private filing, and `updatedAt` moves on a GM-only save. Players get neither, and
+// get `playerUpdatedAt`, which only their half moves, in place of the edit time.
+describe("page projection: no folder and no GM edit time reach a player", () => {
+  it("leaves both off the player page and the player summary, and carries the player half's date", () => {
+    const row = pageRow();
+    const page = projectPlayerPage(row)!;
+    const summary = projectPlayerPageSummary(row)!;
+
+    expect(Object.keys(page).sort()).toEqual([
+      "bannerAssetId",
+      "body",
+      "entityType",
+      "fields",
+      "id",
+      "playerUpdatedAt",
+      "tags",
+      "title"
+    ]);
+    expect(Object.keys(summary).sort()).toEqual([
+      "bannerAssetId",
+      "entityType",
+      "id",
+      "playerUpdatedAt",
+      "tags",
+      "title"
+    ]);
+    for (const projected of [page, summary]) {
+      expect(projected.playerUpdatedAt).toBe("2026-07-02T00:00:00.000Z");
+      // The values as well as the keys: neither the path nor the GM's save time is anywhere in the payload.
+      expect(JSON.stringify(projected)).not.toContain("Villains");
+      expect(JSON.stringify(projected)).not.toContain("Secret societies");
+      expect(JSON.stringify(projected)).not.toContain("2026-07-30");
+    }
+  });
+
+  it("leaves both off a dated event page's chronicle row", () => {
+    const event = pageRow({
+      entityType: "event",
+      inWorldLabel: "Hammer 10, 1492 DR",
+      calendarInstant: 9,
+      inWorldDate: { year: 1492, month: 0, day: 10 }
+    });
+    const row = projectPlayerChronicleRecord({ kind: "event", page: event }, playerContext())!;
+    expect(JSON.stringify(row)).not.toContain("Villains");
+    expect(JSON.stringify(row)).not.toContain("2026-07-30");
+  });
+
+  it("projects nothing at all for a hidden page", () => {
+    expect(projectPlayerPage(pageRow({ revealedToPlayers: false }))).toBeNull();
+    expect(projectPlayerPageSummary(pageRow({ revealedToPlayers: false }))).toBeNull();
+  });
+});
+
+// A record's creation time would tell players when the GM prepared it, so the player shapes leave it out and
+// carry the moment players could first read the record.
+describe("journal and chronicle projection: the first-shown date", () => {
+  it("carries `firstShownAt` and no `createdAt` on a player entry and both kinds of chronicle row", () => {
+    const entry = entryRow({ kind: "note", revealedToPlayers: true });
+    const event = pageRow({
+      entityType: "event",
+      inWorldLabel: "Hammer 10, 1492 DR",
+      calendarInstant: 9,
+      inWorldDate: { year: 1492, month: 0, day: 10 }
+    });
+    const projected = [
+      projectPlayerJournalEntry(entry, playerContext())!,
+      projectPlayerChronicleRecord({ kind: "entry", entry }, playerContext())!,
+      projectPlayerChronicleRecord({ kind: "event", page: event }, playerContext())!
+    ];
+    expect(projected.map((row) => row.firstShownAt)).toEqual([
+      "2026-07-30T00:00:00.000Z",
+      "2026-07-30T00:00:00.000Z",
+      "2026-07-03T00:00:00.000Z"
+    ]);
+    for (const row of projected) {
+      expect(Object.keys(row)).not.toContain("createdAt");
+      expect(JSON.stringify(row)).not.toContain("2026-07-29");
+      expect(JSON.stringify(row)).not.toContain("2026-07-01");
+    }
+  });
+
+  it("projects nothing for a revealed record that has no first-shown date, which it would only lack by a bug", () => {
+    const entry = entryRow({ kind: "note", revealedToPlayers: true, firstShownAt: null });
+    expect(projectPlayerJournalEntry(entry, playerContext())).toBeNull();
+    expect(projectPlayerChronicleRecord({ kind: "entry", entry }, playerContext())).toBeNull();
+    const event = pageRow({ entityType: "event", calendarInstant: 9, firstShownAt: null });
+    expect(projectPlayerChronicleRecord({ kind: "event", page: event }, playerContext())).toBeNull();
   });
 });

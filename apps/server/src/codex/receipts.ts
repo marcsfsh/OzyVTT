@@ -23,7 +23,7 @@ export function recallCommand(db: CodexDb, commandId: string): CodexCommandRecei
 
 /**
  * Stores a response against its `commandId` and prunes expired receipts. Outside any `write`: a receipt is
- * bookkeeping about a response, and bumping the revision again would invalidate every ETag a second time.
+ * bookkeeping about a response, and bumping the revision again would invalidate every GM ETag a second time.
  */
 export function recordCommand(
   db: CodexDb,
