@@ -115,9 +115,12 @@ audience. There are four:
 - **Game** (`apps/server/src/projections.ts`): `projectPlayerView` and `projectGmView`. Players
   get only `public` actors, a health band instead of exact HP, and owner-only sheet resources
   for their own character. A hidden effect's source becomes "A hidden threat". Private rolls,
-  owner identity, GM notes and hidden turns are removed.
+  owner identity, GM notes and hidden turns are removed. A live scene's map reaches players before
+  its fight, with the public tokens the GM has placed; the turn order and the tray wait for the
+  fight. A player's reply to an area they aimed names only the creatures they may see.
 - **Table viewer** (`viewer-presentation.ts`, `viewer-encounter.ts`): the public screen in a
-  room that may hold non-players. Only public actors with a position become tokens; annotations
+  room that may hold non-players. It follows the live scene, before and during its fight, unless
+  the GM paused it. Only public actors with a position become tokens; annotations
   are public and unexpired; initiative appears only during combat; nothing is shown while
   paused. The fields that may cross are the `ViewerEncounterScene` and
   `ViewerPresentationProjection` types, plus `sound` (`ViewerSoundProjection`, added by
@@ -134,7 +137,8 @@ audience. There are four:
 
 The rule for a new field: it may reach a player or the viewer only if everything it carries is
 already public to them, and it carries no exact quantity and no identity, position or existence
-of a hidden thing. When in doubt, leave it out. Fog of war is presentation only (ADR-0022);
+of a hidden thing. When in doubt, leave it out. A token wholly under the manual fog is left out of
+what players and the table screen receive (`fog-cover.ts`), and otherwise fog is presentation (ADR-0022);
 hidden things are stripped by the projections regardless of what fog covers.
 
 ## Maps, tokens and the grid

@@ -365,7 +365,7 @@ describe("public game API over /api/v1", () => {
     expect(hiddenBody).toContain("target combatants you can see");
     expect(hiddenBody).not.toContain("Unrevealed Tyrant");
 
-    // GM-only resolve inputs are refused for a player: an area template and a strict-mode override.
+    // A player may aim an area for their own character, but an attack never takes one (and this map has no grid).
     expect(
       (
         await post(base, GAME_PATHS.actionResolve, playerToken, {
@@ -374,7 +374,8 @@ describe("public game API over /api/v1", () => {
           template: { shape: "circle", origin: { x: 10, y: 10 }, target: { x: 40, y: 40 } }
         })
       ).status
-    ).toBe(403);
+    ).toBe(409);
+    // A strict-mode override stays the GM's.
     expect(
       (
         await post(base, GAME_PATHS.actionResolve, playerToken, {
