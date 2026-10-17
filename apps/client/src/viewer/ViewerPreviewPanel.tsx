@@ -16,14 +16,19 @@ function topLimit(): number {
   return Math.round(bar) + 8;
 }
 
-/** Where the panel opens: the top right corner under the tab bar, no wider than the window allows. */
+/**
+ * Where the panel opens: the top right corner under the tab bar and the table's header (whose TV menu opened it), no
+ * wider than the window allows.
+ */
 function openingRect(): Rect {
+  const header = document.querySelector(".table-header")?.getBoundingClientRect().bottom ?? 0;
+  const top = Math.max(topLimit(), Math.round(header) + 8);
   const width = Math.min(460, window.innerWidth - GUTTER * 2);
   return {
     x: Math.max(GUTTER, window.innerWidth - width - GUTTER),
-    y: topLimit(),
+    y: top,
     width,
-    height: Math.min(340, Math.max(MIN_HEIGHT, window.innerHeight - topLimit() - GUTTER))
+    height: Math.min(340, Math.max(MIN_HEIGHT, window.innerHeight - top - GUTTER))
   };
 }
 
