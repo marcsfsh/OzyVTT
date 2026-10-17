@@ -41,6 +41,8 @@ export type TargetingSession = Readonly<{
   skill?: string;
   /** The ability a cast chooses (Hex); it is not rolled until one is chosen. */
   ability?: AbilityId;
+  /** The GM places a spell's lingering area rather than resolving an action: the zone it is for. */
+  placeZoneId?: string;
 }>;
 
 let session: TargetingSession | null = null;
@@ -117,6 +119,40 @@ export function beginTargeting(
   }
   result = null;
   typedPreview = false;
+  emit();
+}
+/** The GM places (or moves) a spell's lingering area: the same template placement, sent as `spell-zone:place`. */
+export function beginZonePlacement(
+  zone: Readonly<{ id: string; name: string; casterId: string; area: ContentActionSummary["area"] }>
+) {
+  if (!zone.area) return;
+  beginTargeting(
+    {
+      id: `spell-zone-${zone.id}`,
+      name: `${zone.name} area`,
+      activation: "other",
+      description: "",
+      attackBonus: null,
+      reachFeet: null,
+      rangeFeet: null,
+      rangeNormalFeet: null,
+      saveAbility: null,
+      saveDc: null,
+      damage: [],
+      area: zone.area,
+      attackCount: null,
+      usesLimit: null,
+      usesPer: null,
+      usesRecharge: null,
+      usesPool: null,
+      requiresEffectTag: null,
+      multiattack: null,
+      grants: false,
+      reaction: null
+    },
+    zone.casterId
+  );
+  if (session) session = { ...session, placeZoneId: zone.id };
   emit();
 }
 export function toggleTarget(actorId: string) {
@@ -235,6 +271,23 @@ export function resolveTargeting(
 ) {
   if (!session || busy) return;
   const { attackerId, action, mode, selected, template, slotLevel, spend, darts, damageType, skill, ability } = session;
+  if (session.placeZoneId !== undefined) {
+    if (!template?.placed) return;
+    const zoneId = session.placeZoneId;
+    busy = true;
+    emit();
+    void command("spell-zone:place", {
+      zoneId,
+      template: { shape: template.shape, origin: template.placed.origin, target: template.placed.target },
+      ...(revision !== undefined ? { expectedRevision: revision } : {})
+    }).then((response) => {
+      busy = false;
+      if (response.ok) session = null;
+      emit();
+      onResult(response.ok, response.message);
+    });
+    return;
+  }
   // A single-target attack previews first (commit: false) so the result card can offer Confirm, and the
   // server holds the die for it. Templates, multi-target and save/utility actions resolve straight
   // through. An explicit `commit` in opts wins (the Confirm tap).
@@ -304,11 +357,17 @@ export function resolveActionDirect(
   actionId: string,
   revision: number | undefined,
   onResult: (ok: boolean, message?: string) => void,
-  override?: { reason: string }
+  override?: { reason: string },
+  /** A spell readied rather than cast now, at a chosen slot level. */
+  readied?: Readonly<{ slotLevel?: number }>
 ) {
+  const extra = readied
+    ? { ready: true, ...(readied.slotLevel !== undefined ? { slotLevel: readied.slotLevel } : {}) }
+    : {};
   void command("action:resolve", {
     actorId: attackerId,
     actionId,
+    ...extra,
     ...(override ? { override } : {}),
     ...(revision !== undefined ? { expectedRevision: revision } : {})
   }).then((response) => {
@@ -318,8 +377,8 @@ export function resolveActionDirect(
     } else if (response.blocked?.overridable)
       blockedPrompt = {
         blocked: response.blocked,
-        retry: (confirmed) => resolveActionDirect(attackerId, actionId, undefined, onResult, confirmed),
-        asked: { type: "action.resolve", payload: { commandId: newId(), actorId: attackerId, actionId } }
+        retry: (confirmed) => resolveActionDirect(attackerId, actionId, undefined, onResult, confirmed, readied),
+        asked: { type: "action.resolve", payload: { commandId: newId(), actorId: attackerId, actionId, ...extra } }
       };
     emit();
     onResult(response.ok, response.blocked ? undefined : response.message);

@@ -5,6 +5,7 @@ import { ABILITY_NAMES } from "../ability-checks.js";
 import {
   addEffect,
   HASTED_TAG,
+  MAGE_ARMOR_TAG,
   makeEffect,
   PERSISTENT_RAGE_TAG,
   RAGE_ROUNDS,
@@ -18,9 +19,6 @@ import { deriveEquipment } from "../equipment-derivation.js";
 import { currentSpeedFeet } from "../speed.js";
 import type { DefinitionAction, LiveActor, ResolveContext } from "./context.js";
 import { moveMark } from "./marks.js";
-
-/** A grant keyed on these tags measures its recipient when it lands, as Dash does: Mage Armor's AC, Haste's Speed. */
-const MAGE_ARMOR_TAG = "mage-armor";
 
 /** Reckless Attack's Advantage is on attack rolls using Strength. A sheet built before that gate was authored carries
  *  the roll mode ungated, so it is narrowed as it lands. */

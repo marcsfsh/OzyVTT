@@ -15,6 +15,7 @@ import { ConfirmRow } from "./ConfirmRow";
 import { FightMenu } from "./FightMenu";
 import { ActingConsole } from "./ActingConsole";
 import { GmInitiativeRow } from "./GmInitiativeRow";
+import { SpellAreas } from "./SpellAreas";
 
 /** How long a turn button ignores taps after a turn command settles: longer than a double tap. */
 const TURN_SETTLE_MS = 500;
@@ -443,6 +444,8 @@ export function GmEncounterPanel({
           {/* Players' questions, pinned above the turn order. Allow replays the parked command with GM
           authority; it can fail against current state, in which case the question stays and says so. */}
           <PendingAsksForGm state={state} onFeedback={setMessage} />
+          {/* The spell areas the server runs on the map; one a player cast waits here to be placed. */}
+          <SpellAreas state={state} busy={busy} run={run} />
           {(state.combat.pendingInitiative ?? []).length > 0 && (
             <div className="initiative-gathering" role="status">
               <span>

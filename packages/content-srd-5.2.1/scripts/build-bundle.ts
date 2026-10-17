@@ -40,8 +40,8 @@ import {
   statBlockSaveOutcome,
   withoutOngoingDamage
 } from "./save-outcomes.js";
-import { areaOfProse, multiattackOfProse, withProseFacts } from "../src/action-prose.js";
-import { castingOptionsFor, makesSpellAttack, spellEffectFor } from "./spell-effects.js";
+import { multiattackOfProse, withProseFacts } from "../src/action-prose.js";
+import { castingOptionsFor, makesSpellAttack, spellAreaFor, spellEffectFor } from "./spell-effects.js";
 import { castingTimeText, SPELL_FIELD_CORRECTIONS } from "./spell-corrections.js";
 import { printedHitDamage, printedSaveDamage } from "./monster-damage.js";
 import { traitMechanicsOf } from "./trait-mechanics.js";
@@ -1192,7 +1192,7 @@ const spellRecords = onlySrd(spells).map((spell) => {
     shape: fields.shape_type
       ? { type: fields.shape_type, size: fields.shape_size, unit: fields.shape_size_unit }
       : null,
-    area: areaOfProse(fields.desc),
+    area: spellAreaFor(slugOf(spell.pk), fields.desc),
     effect,
     classes: fields.classes.map(slugOf).sort(),
     description: fields.desc,

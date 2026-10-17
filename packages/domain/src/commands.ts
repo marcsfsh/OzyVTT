@@ -355,6 +355,9 @@ export const ActionResolveSchema = z
     cover: z.enum(["half", "three-quarters", "total"]).optional(),
     /** Free-text annotation (the Ready action's trigger), shown in the granted effect's name. */
     note: z.string().trim().min(1).max(100).optional(),
+    /** Ready this spell rather than cast it now (SRD Ready): its slot is spent and it is held with Concentration until
+     *  the start of the caster's next turn; casting it off-turn then releases it with the Reaction. */
+    ready: z.boolean().optional(),
     /** false previews the attack roll only (no damage/riders/economy). The server holds the previewed d20, so a second
      *  preview of the same attack shows the same die, and the confirm (`commit: true`) uses it. Non-attack actions
      *  ignore it. */
@@ -1027,6 +1030,30 @@ export const CharacterFinishPreparingSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** Puts a spell on the prepared list in place of one the class chose: another spell of the class's list, or a
+ *  Wizard's from the spellbook. */
+export const CharacterSwapSpellSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    spellId: z.string().min(1).max(80),
+    /** The spell on the sheet it replaces. */
+    replaces: z.string().min(1).max(80),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Adds a Wizard spell to the spellbook: a pick the Wizard's levels give, or a copy from a Spell Scroll the character
+ *  carries (`itemId`) or from another spellbook. */
+export const CharacterAddToSpellbookSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    spellId: z.string().min(1).max(80),
+    from: z.enum(["level", "scroll", "book"]),
+    itemId: z.string().min(1).max(120).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const CharacterSetInventorySchema = z
   .object({
     commandId: z.uuid(),
@@ -1396,6 +1423,26 @@ export const AnnotationColorSetSchema = z
     commandId: z.uuid(),
     id: z.uuid(),
     color: HexColorSchema,
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Places a spell's lingering area on the map (GM): one a player's cast left unplaced, or a new spot for it. Its
+ *  zone acts there from then on (`SpellZone`). */
+export const SpellZonePlaceSchema = z
+  .object({
+    commandId: z.uuid(),
+    zoneId: z.string().min(1).max(120),
+    template: z
+      .object({ shape: AnnotationShapeKindSchema, origin: AnnotationPointSchema, target: AnnotationPointSchema })
+      .strict(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Ends a spell's lingering area (GM): the webs burned away, a guardian dismissed, or a ruling. */
+export const SpellZoneEndSchema = z
+  .object({
+    commandId: z.uuid(),
+    zoneId: z.string().min(1).max(120),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

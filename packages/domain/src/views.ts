@@ -34,7 +34,7 @@ export type PlayerHp =
  * viewing player's own character is the source of (their grapple, their Concentration), which they may end. */
 export type PlayerEffect = Omit<
   EffectInstance,
-  "sourceActorId" | "sourceActionId" | "castId" | "ongoingDamage" | "magical"
+  "sourceActorId" | "sourceActionId" | "castId" | "ongoingDamage" | "spell" | "magical"
 > & {
   yours?: true;
 };
@@ -75,6 +75,7 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
     /** Sheet resources (spell slots, prepared spells, inventory, currency). Your own claimed character always; another player's only at `partyVisibility` `sheet-and-resources`. */ spellSlots?: Actor["spellSlots"];
     pactSlots?: Actor["pactSlots"];
     preparedSpellIds?: Actor["preparedSpellIds"];
+    /** A Wizard's spellbook beyond its sheet. Same gate as `preparedSpellIds`. */ spellbook?: Actor["spellbook"];
     preparation?: Actor["preparation"];
     inventory?: Actor["inventory"];
     currency?: Actor["currency"];
@@ -96,7 +97,17 @@ export type PlayerAnnotation = Omit<Annotation, "ownerSessionId"> & { mine: bool
  *  wire (the call reaches the player through `rollCalls`), and a hidden source's name is masked server-side. */
 export type PlayerPendingSave = Omit<
   PendingSave,
-  "sourceActorId" | "endsEffects" | "repeatOf" | "onFailEffect" | "callId" | "magical" | "immuneOnSuccess"
+  | "sourceActorId"
+  | "endsEffects"
+  | "repeatOf"
+  | "onFailEffect"
+  | "callId"
+  | "onSuccessEffect"
+  | "failureNote"
+  | "breaksConcentration"
+  | "zoneId"
+  | "magical"
+  | "immuneOnSuccess"
 > & {
   onFailEffect?: Omit<
     NonNullable<PendingSave["onFailEffect"]>,

@@ -32,6 +32,7 @@ import {
   addEffect,
   CONCENTRATING_TAG,
   effectDurationOf,
+  endConcentrationSustainedBy,
   endEffectIfPresent,
   makeEffect,
   sourceOf,
@@ -45,6 +46,7 @@ import {
   type EquipmentDerivation,
   type RollModeClaims
 } from "./equipment-derivation.js";
+import { countZoneDamage } from "./spell-zone-state.js";
 
 export type SaveAnswerDependencies = Readonly<{
   random: RandomSource;
@@ -336,6 +338,8 @@ export function createPendingSaves(
     replaceExisting?: boolean;
     /** The GM's call for a roll these saves answer. */
     callId?: string;
+    /** What else each save carries: what a success leaves, a line for a failure, the spell area that raised it. */
+    extra?: Pick<PendingSave, "onSuccessEffect" | "failureNote" | "breaksConcentration" | "zoneId">;
     /** Against a spell or a magic item, which Magic Resistance meets with Advantage. */
     magical?: boolean;
     /** A success makes the target immune to this trait of its source for the fight (a ghast's Stench). */
@@ -364,6 +368,10 @@ export function createPendingSaves(
       : {}),
     ...(input.repeatOf ? { repeatOf: input.repeatOf } : {}),
     ...(input.callId !== undefined ? { callId: input.callId } : {}),
+    ...(input.extra?.onSuccessEffect ? { onSuccessEffect: structuredClone(input.extra.onSuccessEffect) } : {}),
+    ...(input.extra?.failureNote ? { failureNote: input.extra.failureNote } : {}),
+    ...(input.extra?.breaksConcentration ? { breaksConcentration: true as const } : {}),
+    ...(input.extra?.zoneId !== undefined ? { zoneId: input.extra.zoneId } : {}),
     ...(input.magical ? { magical: true as const } : {}),
     ...(input.immuneOnSuccess ? { immuneOnSuccess: true as const } : {}),
     createdAt: input.createdAt
@@ -427,7 +435,11 @@ export function applyFailureEffect(
       sourceName: onFail.sourceName,
       sourceActionId: onFail.sourceActionId ?? null,
       startedRound: state.combat.round,
-      duration: effectDurationOf(state, onFail.duration, target.id, onFail.sourceActorId),
+      // "Until the end of the current turn": this turn's end, not the next one's.
+      duration:
+        onFail.currentTurn && onFail.duration?.type === "until-bearer-turn-end"
+          ? { type: "until-bearer-turn-end", skipsCurrentTurn: false }
+          : effectDurationOf(state, onFail.duration, target.id, onFail.sourceActorId),
       // Saves parked before failures carried their own lifetime were all grapples.
       endsWhenSourceDefeated: onFail.endsWhenSourceDefeated ?? onFail.tags.includes("grapple"),
       concentration: onFail.castId !== undefined,
@@ -757,6 +769,8 @@ export function answerSave(
     // Keep the whole application, not just its total.
     application = outcome.application;
     events.push(...outcome.events);
+    // A spell area that stops after so much damage counts it (Guardian of Faith).
+    events.push(...countZoneDamage(state, pending.zoneId, appliedDamage, deps.catalog));
   }
   const immunities = {
     resolveDefinition: (definitionId: string) => deps.resolveDefinition(definitionId),
@@ -793,6 +807,14 @@ export function answerSave(
     events.push(
       ...applyFailureEffect(state, target.id, pending.onFailEffect, `${commandId}:${saveId}:fail`, immunities)
     );
+  // What a success leaves instead (Heat Metal's Disadvantage on a creature that keeps hold of the object).
+  if (success && pending.onSuccessEffect)
+    events.push(
+      ...applyFailureEffect(state, target.id, pending.onSuccessEffect, `${commandId}:${saveId}:success`, immunities)
+    );
+  if (!success && pending.failureNote) events.push({ kind: "effect", text: pending.failureNote, actorId: target.id });
+  // SRD Sleet Storm: a failure "and lose Concentration".
+  if (!success && pending.breaksConcentration) events.push(...endConcentrationSustainedBy(state, target.id));
   if (outcomeCondition)
     conditionApplied = target.conditions.some(
       (condition) =>

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema, type GameState } from "@vtt/domain";
 import type { MoveMode } from "@vtt/domain/commands";
-import type { ActorDefinition } from "@vtt/schemas";
+import { InventoryItemSchema, type ActorDefinition } from "@vtt/schemas";
+import { ContentLibrary } from "../src/content-library.js";
+import { equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { RulesBlockedError } from "../src/game-store.js";
 import { addEffect, makeEffect, releaseGrapplesOutOfRange } from "../src/effects.js";
 import { applyMovementRules, dragAlong, dragCostsExtra, grappledBy, movementStatus } from "../src/movement-rules.js";
@@ -177,6 +179,76 @@ describe("special speeds", () => {
       { mode: "swim", budgetFeet: 40, extraCost: true },
       { mode: "climb", budgetFeet: 40, extraCost: true }
     ]);
+  });
+});
+
+describe("speeds a spell or an item grants", () => {
+  const library = new ContentLibrary().forAudience("gm");
+  const catalog = equipmentCatalogOf(library);
+  /** The effect a cast leaves (its modifiers as the bundle authors them), on Borin. */
+  const cast = (state: GameState, spellId: string) => {
+    const grant = library.spellRecord(spellId)!.effect!.grant!;
+    addEffect(
+      state,
+      HERO,
+      makeEffect({
+        id: `cast-${spellId}`,
+        name: grant.name!,
+        tags: grant.tags,
+        duration: { type: "manual" },
+        modifiers: grant.modifiers
+      })
+    );
+  };
+
+  it("flies 60 feet under Fly, and hovers", () => {
+    const state = game({ [HERO]: cell(0, 0) });
+    cast(state, "fly");
+    expect(movementStatus(state, HERO, { resolveDefinition }).modes).toContainEqual({
+      mode: "fly",
+      budgetFeet: 60,
+      extraCost: false
+    });
+    move(state, HERO, cell(0, 0), cell(12, 0), { mode: "fly" });
+    expect(used(state)).toBe(60);
+  });
+
+  it("climbs at its Speed under Spider Climb, Longstrider's 10 feet included", () => {
+    const state = game({ [HERO]: cell(0, 0) });
+    cast(state, "spider-climb");
+    cast(state, "longstrider");
+    expect(movementStatus(state, HERO, { resolveDefinition }).modes).toContainEqual({
+      mode: "climb",
+      budgetFeet: 40,
+      extraCost: false
+    });
+    move(state, HERO, cell(0, 0), cell(8, 0), { mode: "climb" });
+    expect(used(state)).toBe(40);
+  });
+
+  it("swims 40 feet with a Ring of Swimming on, and not once it comes off", () => {
+    const state = game({ [HERO]: cell(0, 0) });
+    const hero = state.actors.find((actor) => actor.id === HERO)!;
+    const ring = InventoryItemSchema.parse({
+      id: "ring-of-swimming",
+      name: "Ring of Swimming",
+      quantity: 1,
+      equipped: true,
+      attuned: false,
+      category: library.equipmentRecord("ring-of-swimming")!.category
+    });
+    hero.inventory = [ring];
+    expect(movementStatus(state, HERO, { resolveDefinition, catalog }).modes).toContainEqual({
+      mode: "swim",
+      budgetFeet: 40,
+      extraCost: false
+    });
+    hero.inventory = [{ ...ring, equipped: false }];
+    expect(movementStatus(state, HERO, { resolveDefinition, catalog }).modes).toContainEqual({
+      mode: "swim",
+      budgetFeet: 30,
+      extraCost: true
+    });
   });
 });
 

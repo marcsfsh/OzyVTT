@@ -32,6 +32,7 @@ const MODIFIER_LABELS: Readonly<
   "spell-slot": ["Spellcasting", "Spell slots"],
   "ability-score": ["The character", "Ability score"],
   speed: ["The character", "Speed"],
+  "special-speed": ["The character", "Fly, swim, climb or burrow speed"],
   "extra-attack": ["The character", "Extra attack"],
   darkvision: ["The character", "Darkvision"],
   sense: ["The character", "Another sense"],
@@ -59,6 +60,8 @@ function blankModifier(type: string): Draft {
       return { type, amount: 1 };
     case "speed":
       return { type, amount: 10 };
+    case "special-speed":
+      return { type, movement: "fly", feet: 30 };
     case "armor-class":
       return { type, amount: 1, whileArmored: false };
     case "initiative":
@@ -126,6 +129,53 @@ export const ROLL_MODE_WAYS: readonly SelectOption[] = [
 
 export const signed = (amount: number) => `${amount >= 0 ? "+" : ""}${amount}`;
 
+const MOVEMENTS: readonly SelectOption[] = [
+  opt("fly", "Fly"),
+  opt("swim", "Swim"),
+  opt("climb", "Climb"),
+  opt("burrow", "Burrow")
+];
+
+/** The row's words for a granted speed: "Fly 60 ft", "Climb equal to Speed". */
+export function specialSpeedLabel(modifier: Readonly<Record<string, unknown>>): string {
+  const movement = MOVEMENTS.find((entry) => entry.value === modifier.movement)?.label ?? "Fly";
+  const amount = modifier.equalToSpeed === true ? "equal to Speed" : `${Number(modifier.feet ?? 0)} ft`;
+  return `${movement} ${amount}${modifier.hover === true ? ", hovers" : ""}`;
+}
+
+/** The fields of a granted speed (Fly's 60 feet, Spider Climb's Climb Speed equal to Speed), shared with effects. */
+export const specialSpeedFields = (): FieldDef[] => [
+  {
+    key: "movement",
+    label: "Way of moving",
+    kind: "select",
+    options: MOVEMENTS,
+    visibleWhen: hasType("special-speed")
+  },
+  {
+    key: "equalToSpeed",
+    label: "Equal to its Speed",
+    kind: "switch",
+    visibleWhen: hasType("special-speed"),
+    help: "On for “a Climb Speed equal to your Speed”."
+  },
+  {
+    key: "feet",
+    label: "Speed",
+    kind: "number",
+    min: 5,
+    max: 300,
+    unit: "ft",
+    visibleWhen: (row) => row.type === "special-speed" && row.equalToSpeed !== true
+  },
+  {
+    key: "hover",
+    label: "Can hover",
+    kind: "switch",
+    visibleWhen: (row) => row.type === "special-speed" && row.movement === "fly"
+  }
+];
+
 export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
   key: "modifiers",
   label,
@@ -145,6 +195,7 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       return `${name} ${modifier.formula ?? ""} ${modifier.damageType ?? ""}`.trim();
     if (modifier.type === "spell-slot")
       return `${name} ${signed(Number(modifier.amount ?? 0))} at level ${modifier.level ?? 1}`;
+    if (modifier.type === "special-speed") return specialSpeedLabel(modifier);
     const amount = modifier.amount ?? modifier.count ?? modifier.feet ?? modifier.threshold;
     return typeof amount === "number" ? `${name} ${signed(amount)}` : name;
   },
@@ -292,6 +343,7 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       visibleWhen: hasType("darkvision"),
       note: "Display only."
     },
+    ...specialSpeedFields(),
     { key: "whileArmored", label: "Only while wearing armour", kind: "switch", visibleWhen: hasType("armor-class") },
     {
       key: "proficiencyBonus",

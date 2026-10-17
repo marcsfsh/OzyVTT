@@ -231,7 +231,7 @@ export function rollHitOptions(ctx: ResolveContext): void {
       // A Concentration smite starts the caster's Concentration as any cast does, and its mark is held by it.
       const spell = action.spellId ? ctx.deps.catalog?.spellRecord?.(action.spellId) : undefined;
       const castId = spell?.concentration ? `${ctx.input.commandId}:${action.id}` : undefined;
-      if (spell && castId) beginConcentration(ctx, spell, castId);
+      if (spell && castId) beginConcentration(ctx, spell, castId, slotLevel ?? spell.level);
       const ended: EffectNarration[] = [];
       const effect = addEffect(
         ctx.state,

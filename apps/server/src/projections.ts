@@ -178,6 +178,11 @@ const PENDING_SAVE_FIELDS = {
   repeatOf: "never",
   // The call reaches the player through `rollCalls`, which carries only their own part of it.
   callId: "never",
+  // What a success or a failure brings is narrated when it lands; the spell area names its caster.
+  onSuccessEffect: "never",
+  failureNote: "never",
+  breaksConcentration: "never",
+  zoneId: "never",
   // Whether a hidden source's save is magical says something about it; only Magic Resistance reads it.
   magical: "never",
   // What a success earns is the stat block's text, the GM's knowledge.
@@ -204,6 +209,7 @@ const ON_FAIL_EFFECT_FIELDS = {
   castId: "never",
   sourceActionId: "never",
   ongoingDamage: "never",
+  currentTurn: "player",
   magical: "never"
 } as const satisfies Record<keyof NonNullable<PendingSave["onFailEffect"]>, FieldAudience>;
 
@@ -362,10 +368,15 @@ function playerEffect(
     sourceActionId: _sourceActionId,
     castId: _castId,
     ongoingDamage: _ongoingDamage,
+    // The level a spell was cast or readied at is the caster's to know; the effect's name says which spell. A spell
+    // the viewer's own character holds readied reaches them, so their sheet can release it.
+    spell: _spell,
+    readiedSpell,
     magical: _magical,
     ...visible
   } = effect;
-  const yours = sourceActorId !== null && yourActorIds.has(sourceActorId) ? { yours: true as const } : {};
+  const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);
+  const yours = mine ? { yours: true as const, ...(readiedSpell ? { readiedSpell: { ...readiedSpell } } : {}) } : {};
   if (!isHiddenSource(sourceActorId, publicActorIds)) return { ...visible, ...yours };
   return { ...visible, name: withoutSourceName(visible.name, effect.sourceName), sourceName: HIDDEN_SOURCE };
 }
@@ -460,6 +471,7 @@ const PLAYER_ACTOR_FIELDS = {
   spellSlots: "derived",
   pactSlots: "derived",
   preparedSpellIds: "derived",
+  spellbook: "derived",
   preparation: "derived",
   inventory: "derived",
   currency: "derived",
@@ -514,6 +526,7 @@ function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): P
  * | actionUses, hitDice, heroicInspiration  |  Y   |  -  |       -        |     -      |          Y          |
  * | spellSlots, pactSlots, preparedSpellIds |  Y   |  -  |       -        |     -      |          Y          |
  * | preparation (Long Rest prepare step)    |  Y   |  -  |       -        |     -      |          Y          |
+ * | spellbook (a Wizard's beyond the sheet) |  Y   |  -  |       -        |     -      |          Y          |
  * | inventory, currency                     |  Y   |  -  |       -        |     -      |          Y          |
  * | notes, ownerSessionId, conditionImmunities, legendary, lastUsedAt, archived, sheetPreview, lastLongRestAt:   |
  * | never, at any tier.                                                                                            |
@@ -576,6 +589,7 @@ export function projectPlayerView(
           spellSlots,
           pactSlots,
           preparedSpellIds,
+          spellbook,
           preparation,
           inventory,
           currency,
@@ -633,6 +647,7 @@ export function projectPlayerView(
                 spellSlots: spellSlots === null ? null : spellSlots.map((slot) => ({ ...slot })),
                 pactSlots: pactSlots === null ? null : { ...pactSlots },
                 preparedSpellIds: [...preparedSpellIds],
+                spellbook: spellbook.map((entry) => ({ ...entry })),
                 preparation: preparation === null ? null : { ...preparation },
                 inventory: inventory.map(playerInventoryRow),
                 currency: { ...currency }

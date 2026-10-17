@@ -143,6 +143,49 @@
 .initiative-gathering span {
   flex: 1 1 12rem;
 }
+/* The spell areas the server runs: one line each, an unplaced one marked as not finished. */
+.spell-areas {
+  margin-bottom: var(--space-2);
+  padding: var(--space-2) 0.65rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--indigo);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+.spell-areas-head {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-label);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--indigo-text);
+}
+.spell-areas-list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.spell-area-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
+.spell-area-row.unplaced .spell-area-text {
+  color: var(--caution-hi);
+}
+.spell-area-text {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.spell-area-buttons {
+  display: inline-flex;
+  gap: var(--space-1);
+}
 .reaction-prompt .save-prompt-label {
   color: var(--cyan-hi);
 }

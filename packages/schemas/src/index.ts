@@ -364,6 +364,19 @@ export const ModifierSchema = z.discriminatedUnion("type", [
   /** Baked into the sheet's speed at build time on a feature unless gated (then read with the live loadout);
    *  summed live on an effect, so it ends with it. */
   z.object({ type: z.literal("speed"), amount: z.number().int().min(-30).max(60), ...riderGate }).strict(),
+  /** A Fly, Swim, Climb or Burrow Speed: `feet` (Fly's 60, a Ring of Swimming's 40), or with `equalToSpeed` the
+   *  creature's Speed as it stands (Spider Climb); `hover` lets a flier hover. Read live by the movement rules from
+   *  items and effects, so it ends with them. */
+  z
+    .object({
+      type: z.literal("special-speed"),
+      movement: z.enum(["fly", "swim", "climb", "burrow"]),
+      feet: z.number().int().min(5).max(300).optional(),
+      equalToSpeed: z.boolean().optional(),
+      hover: z.boolean().optional(),
+      ...riderGate
+    })
+    .strict(),
   /**
    * Flat AC. `whileArmored` (the Defense fighting style) predates `when: [{type: "while-armored"}]` and
    * stays because shipped bundles use it.
@@ -678,6 +691,24 @@ export const EffectInstanceSchema = z
       .optional(),
     /** How many more times its damage riders may land before it ends (a coat of Basic Poison). */
     damageUses: z.number().int().min(1).max(10).optional(),
+    /** A Ready action's held spell (SRD Ready): the action that casts it, released with the Reaction at the level its
+     *  slot was spent at when it was readied. */
+    readiedSpell: z
+      .object({ actionId: z.string().min(1).max(120), level: z.number().int().min(0).max(9) })
+      .strict()
+      .optional(),
+    /** The spell this effect keeps up on its caster and the level it was cast at, so what the spell lets the caster do
+     *  on later turns (Spiritual Weapon's attack) is offered while it lasts, at that level. */
+    spell: z
+      .object({
+        id: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80),
+        level: z.number().int().min(0).max(9)
+      })
+      .strict()
+      .optional(),
     /** It comes from a spell or a magic item, so a save repeated against it is one Magic Resistance helps with. */
     magical: z.literal(true).optional(),
     /** It ends when a spell restores the bearer's hit points (an infernal wound). */
@@ -1028,6 +1059,22 @@ export const ActorSchema = z.object({
     .default(null),
   /** Spell ids prepared right now, re-chosen on a long rest. Owner-only. */
   preparedSpellIds: z.array(z.string().max(80)).max(400).default([]),
+  /** A Wizard's spellbook beyond the Wizard spells on its sheet: spells its Wizard levels added that the build didn't
+   *  list, and spells copied in (`copied`: from a scroll or another book, paid for). Owner-only. */
+  spellbook: z
+    .array(
+      z
+        .object({
+          id: z
+            .string()
+            .regex(/^[a-z0-9-]+$/)
+            .max(80),
+          copied: z.literal(true).optional()
+        })
+        .strict()
+    )
+    .max(300)
+    .default([]),
   /** Open after a Long Rest for a caster that changes its prepared spells then (SRD Spell Preparation by Class): the
    *  spells it may still swap in (null: any number). Null when closed. Owner-only. */
   preparation: z

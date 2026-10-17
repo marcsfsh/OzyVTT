@@ -12,8 +12,7 @@ import {
   rollSelfInitiative,
   setInitiativeScore,
   startEncounter,
-  swapInitiative,
-  type TurnAdvanceDeps
+  swapInitiative
 } from "../encounter.js";
 import {
   AddCombatantSchema,
@@ -45,23 +44,6 @@ async function mappedDistance(
   kit: Kit
 ): Promise<(state: GameState, actorIdA: string, actorIdB: string) => number | null> {
   return kit.creatureDistance().catch(() => () => null);
-}
-
-/** What a turn's end and the next one's start read: stat blocks, items, the server's dice, and where creatures stand
- *  (the auras that reach them). */
-function turnAdvanceDeps(
-  kit: Kit,
-  state: GameState,
-  distance: (state: GameState, actorIdA: string, actorIdB: string) => number | null
-): TurnAdvanceDeps {
-  return {
-    resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
-    catalog: kit.equipmentCatalog(),
-    rollDie: (sides) => kit.context.random(sides),
-    newId: kit.context.newId,
-    now: () => new Date().toISOString(),
-    distanceFeet: (actorIdA, actorIdB) => distance(state, actorIdA, actorIdB)
-  };
 }
 
 export const encounterCommands = [
@@ -264,6 +246,7 @@ export const encounterCommands = [
       const { actorId } = request;
       let outcome: TimelineOutcome | undefined;
       const effectEvents: EffectNarration[] = [];
+      const geometry = await kit.liveGeometry();
       const distance = await mappedDistance(kit);
       const { state, duplicate } = await executeTimeline((draft, timeline) => {
         if (draft.combat.historyCursor !== null)
@@ -274,7 +257,7 @@ export const encounterCommands = [
         // Its turn ends first, recorded like any other, so Previous can bring it back.
         if (draft.combat.turnActorId === actorId && draft.combat.initiative.length > 1 && !gathering)
           outcome = planNextTurn(draft, timeline, false, (advancing) =>
-            nextInitiativeTurn(advancing, effectEvents, turnAdvanceDeps(kit, advancing, distance))
+            nextInitiativeTurn(advancing, effectEvents, kit.turnAdvanceDeps(advancing, geometry, distance))
           );
         else if (draft.combat.turnActorId === actorId && gathering) {
           const order = draft.combat.initiative.filter((entry) => entry.actorId !== actorId);
@@ -403,10 +386,11 @@ export const encounterCommands = [
       // Rewound and changed: rewrite history only after GM confirmation (TimelineConfirmationRequired).
       let outcome: TimelineOutcome | undefined;
       const effectEvents: EffectNarration[] = [];
+      const geometry = await kit.liveGeometry();
       const distance = await mappedDistance(kit);
       const { state, duplicate } = await executeTimeline((draft, timeline) => {
         outcome = planNextTurn(draft, timeline, request.confirmRewrite === true, (advancing) =>
-          nextInitiativeTurn(advancing, effectEvents, turnAdvanceDeps(kit, advancing, distance))
+          nextInitiativeTurn(advancing, effectEvents, kit.turnAdvanceDeps(advancing, geometry, distance))
         );
       });
       if (duplicate) return;
@@ -446,6 +430,7 @@ export const encounterCommands = [
     async run({ principal, executeTimeline }, kit) {
       // End Turn is a live forward step like the GM's Next. Players cannot advance while the table is rewound.
       const effectEvents: EffectNarration[] = [];
+      const geometry = await kit.liveGeometry();
       const distance = await mappedDistance(kit);
       const { state, duplicate } = await executeTimeline((draft, timeline) => {
         if (draft.combat.historyCursor !== null)
@@ -454,7 +439,7 @@ export const encounterCommands = [
             "history_review"
           );
         planNextTurn(draft, timeline, false, (advancing) =>
-          endTurn(advancing, initiatorOf(principal), effectEvents, turnAdvanceDeps(kit, advancing, distance))
+          endTurn(advancing, initiatorOf(principal), effectEvents, kit.turnAdvanceDeps(advancing, geometry, distance))
         );
       });
       if (duplicate) return;

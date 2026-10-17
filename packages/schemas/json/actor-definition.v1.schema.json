@@ -1281,6 +1281,46 @@
           "properties": {
             "type": {
               "type": "string",
+              "const": "special-speed"
+            },
+            "movement": {
+              "type": "string",
+              "enum": [
+                "fly",
+                "swim",
+                "climb",
+                "burrow"
+              ]
+            },
+            "feet": {
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 300
+            },
+            "equalToSpeed": {
+              "type": "boolean"
+            },
+            "hover": {
+              "type": "boolean"
+            },
+            "when": {
+              "$ref": "#/$defs/__schema36"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema44"
+            }
+          },
+          "required": [
+            "type",
+            "movement"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
               "const": "armor-class"
             },
             "amount": {

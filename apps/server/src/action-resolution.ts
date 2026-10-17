@@ -32,11 +32,13 @@ import { applyMasteryForces, masterySwingOf, offeredPush, spendSap, spendVex } f
 import { hitOffersOf, rollHitOptions, spendHitOptions } from "./resolution/hit-options.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
 import { strikeBackOnHit } from "./resolution/struck.js";
-import { parkActionSave, parkForAcReaction, parkReaction } from "./resolution/pending.js";
-import { startConcentration } from "./resolution/concentration.js";
+import { parkActionSave, parkForAcReaction, parkHeldObjectSave, parkReaction } from "./resolution/pending.js";
+import { markSpellUp, openSpellZone, startConcentration } from "./resolution/concentration.js";
 import { applyRageRules } from "./resolution/rage.js";
 import { releaseHideAndReady } from "./resolution/release.js";
 import { openResolve } from "./resolution/validate.js";
+import { holdReadiedSpell } from "./resolution/ready.js";
+import { healLimit } from "./loose-healing.js";
 
 export type { ResolveDependencies, ResolveInput };
 
@@ -56,6 +58,12 @@ export function resolveDefinitionAction(
   const ctx = openResolve(state, action, input, deps);
   ctx.builtin?.check?.(ctx);
   ctx.builtin?.apply?.(ctx);
+  // A readied spell is cast now and held: its slot and the action are spent, and nothing else happens yet.
+  if (input.ready === true) {
+    holdReadiedSpell(ctx);
+    commitEconomy(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
   // A failed check to read a scroll spends the cast and the scroll, and nothing else happens.
   if (readScroll(ctx)) {
     commitEconomy(ctx);
@@ -102,6 +110,8 @@ export function resolveDefinitionAction(
   strikeBackOnHit(ctx);
   applyMasteryForces(ctx);
   startConcentration(ctx);
+  markSpellUp(ctx);
+  openSpellZone(ctx);
   applyGrant(ctx);
   applyHealing(ctx);
   applyConditionCures(ctx);
@@ -109,6 +119,7 @@ export function resolveDefinitionAction(
   parkReaction(ctx);
   ctx.builtin?.forcedSave?.(ctx);
   parkActionSave(ctx);
+  parkHeldObjectSave(ctx);
   applyRageRules(ctx);
 
   commitEconomy(ctx);
@@ -214,6 +225,8 @@ export function actionAvailability(
   catalog?: EquipmentCatalog
 ): ReadonlyArray<ActionAvailability> {
   return actions.map((action): ActionAvailability => {
+    // The spell an action casts, so a later action shows as waiting for it while the spell isn't up.
+    const spell = action.spellId ? catalog?.spellRecord?.(action.spellId) : undefined;
     const evaluation = evaluateActionEconomy(
       state,
       attacker,
@@ -224,7 +237,8 @@ export function actionAvailability(
       siblings,
       undefined,
       false,
-      catalog
+      catalog,
+      spell
     );
     let usesRemaining: number | null = null;
     if (action.uses) {
@@ -283,6 +297,10 @@ export function actionAvailability(
         : null,
       reaction: action.reaction ?? null,
       healing: action.healing ? { formula: action.healing.formula } : null,
+      healTargets:
+        action.healing && !action.healing.self && healLimit(action, spell, undefined) > 1
+          ? healLimit(action, spell, undefined)
+          : null,
       // A builtin says what the stat block's action list says of it (Help picks one creature, Dodge none).
       targeting: builtin
         ? (BUILTIN_TARGETING[action.id] ?? "none")

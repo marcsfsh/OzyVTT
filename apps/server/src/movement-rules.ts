@@ -7,6 +7,7 @@ import { holdsFeature } from "./class-features.js";
 import { isIncapacitated } from "./condition-rules.js";
 import { areEnemies } from "./creature-sides.js";
 import { effectiveActions } from "./effective-actions.js";
+import { READIED_TAG, releaseReadied } from "./effects.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { imageToGrid, type SquareGridCalibration } from "./grid-calibration.js";
 import { travelBudgetFeet, travelCostsExtra, type TravelMode } from "./speed.js";
@@ -65,6 +66,8 @@ export type MovementRulesOutcome = Readonly<{
   prompts: ReadonlyArray<{ actorId: string; name: string }>;
   /** It crawled (Prone), for the narration. */
   crawled: boolean;
+  /** It was a Readied creature's move off its turn, taken with its Reaction. */
+  readied?: true;
 }>;
 
 /**
@@ -85,6 +88,20 @@ export type MovementRulesOutcome = Readonly<{
  */
 /** A move spends movement only on the mover's own turn in combat, with movement rules on. While a wait-mode
  *  fight gathers initiative no turn has begun, so tokens are still being positioned. */
+/** SRD Ready: a Readied creature may "move up to your Speed in response" to its trigger, with its Reaction, off its
+ *  own turn. Counted like any move (unless the movement rules are off), but against its Speed, not the turn's. */
+function readiedMove(state: GameState, mover: GameState["actors"][number], mode: MoveMode): boolean {
+  return (
+    turnsRunning(state) &&
+    state.combat.turnActorId !== mover.id &&
+    mode !== "teleport" &&
+    mode !== "forced" &&
+    state.combat.initiative.some((entry) => entry.actorId === mover.id) &&
+    mover.effects.some((effect) => effect.tags.includes(READIED_TAG)) &&
+    familyModeFor(state.combat, "movement") !== "freeform"
+  );
+}
+
 function movementCounts(state: GameState, actorId: string): boolean {
   return (
     turnsRunning(state) &&
@@ -124,7 +141,7 @@ export function movementStatus(
           const budget = travelBudgetFeet(actor, derivation, definition, mode);
           return budget === null
             ? []
-            : [{ mode, budgetFeet: budget, extraCost: travelCostsExtra(actor, definition, mode) }];
+            : [{ mode, budgetFeet: budget, extraCost: travelCostsExtra(actor, definition, mode, derivation) }];
         })
       : [];
   return {
@@ -280,17 +297,30 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   const mover = state.actors.find((candidate) => candidate.id === actorId);
   const prompts: Array<{ actorId: string; name: string }> = [];
   const outcome: Policing = { warnings: [], overridden: null };
+  let readied = false;
   const done = (crawled = false): MovementRulesOutcome => ({
     warning: outcome.warnings.length > 0 ? outcome.warnings.join(" ") : null,
     overridden: outcome.overridden,
     prompts,
-    crawled
+    crawled,
+    ...(readied ? { readied: true as const } : {})
   });
   // Forced movement is the GM's (the command refuses a player's), and spends nothing.
   if (!mover || from === null || to === null || mode === "forced") return done();
-  const counted = movementCounts(state, actorId);
-  // SRD: you move on your own turn. A player's move off it (a readied move, a reaction that moves) is the GM's call.
-  if (input.byPlayer && turnsRunning(state) && state.combat.turnActorId !== actorId)
+  readied = readiedMove(state, mover, mode);
+  const counted = movementCounts(state, actorId) || readied;
+  // A readied move is the creature's Reaction: one it still has.
+  if (readied && state.combat.reactionsUsed.includes(mover.id))
+    police(
+      state,
+      input,
+      "economy.reaction-used",
+      `${mover.name} has no reaction left to take the readied move with.`,
+      outcome
+    );
+  // SRD: you move on your own turn. A player's move off it (a reaction that moves) is the GM's call; a readied move
+  // is the creature's own Reaction.
+  if (input.byPlayer && turnsRunning(state) && state.combat.turnActorId !== actorId && !readied)
     police(
       state,
       input,
@@ -317,7 +347,7 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     police(state, input, "movement.no-speed", `${mover.name} has no ${MODE_NAMES[travel]} Speed.`, outcome);
     budget = travelBudgetFeet(mover, derivation, moverDefinition, "walk");
   }
-  const slowed = crawling || travelCostsExtra(mover, moverDefinition, travel);
+  const slowed = crawling || travelCostsExtra(mover, moverDefinition, travel, derivation);
   const extraPerStep = (slowed ? 1 : 0) + (input.dragging?.costsExtra ? 1 : 0);
   const options: MovementCostOptions = {
     extraPerStep,
@@ -343,7 +373,8 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   const moved = charge?.feet ?? null;
   const difficultFeet = charge?.difficultFeet ?? 0;
   if (moved !== null && budget !== null && moved > 0.05) {
-    const used = state.combat.turn.movementUsedFeet;
+    // A readied move is its own: up to its Speed, whatever the creature whose turn it is has moved.
+    const used = readied ? 0 : state.combat.turn.movementUsedFeet;
     const overrun = used + moved > budget + 1e-6;
     if (overrun) {
       const how = [
@@ -365,7 +396,12 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
         true
       );
     }
-    state.combat = { ...state.combat, turn: { ...state.combat.turn, movementUsedFeet: used + moved } };
+    if (!readied) state.combat = { ...state.combat, turn: { ...state.combat.turn, movementUsedFeet: used + moved } };
+  }
+  // The readied move spends the Reaction and uses up the ready, and a spell it held with it.
+  if (readied) {
+    state.combat = { ...state.combat, reactionsUsed: [...new Set([...state.combat.reactionsUsed, mover.id])] };
+    releaseReadied(state, mover.id);
   }
   openOpportunityAttacks(state, input, mover, charge?.path ?? [from, to], prompts);
   return done(crawling);
