@@ -98,7 +98,7 @@ export function LevelFlow({
   if (!actor)
     return (
       <Gate title="That character isn't here" onClose={onClose}>
-        This sheet isn&rsquo;t on the table any more. It may have been archived or deleted.
+        This sheet isn't on the table any more. It may have been archived or deleted.
       </Gate>
     );
 
@@ -112,16 +112,16 @@ export function LevelFlow({
   if (classOrderUnknown(definition))
     return (
       <Gate title={`${actor.name}'s classes were added by hand`} onClose={onClose}>
-        The sheet lists its classes but not which level went to which, so it can&rsquo;t be releveled step-by-step.
-        Rebuild it in the builder to level it here.
+        The sheet lists its classes but not which level went to which, so it can't be releveled step-by-step. Rebuild it
+        in the builder to level it here.
       </Gate>
     );
 
   if (!identity || !ledger || !definition)
     return (
       <Gate title={`${actor.name} wasn't built here`} onClose={onClose}>
-        This sheet wasn&rsquo;t built here, so it can&rsquo;t be releveled step-by-step yet. Edit the sheet directly, or
-        rebuild it in the builder.
+        This sheet wasn't built here, so it can't be releveled step-by-step yet. Edit the sheet directly, or rebuild it
+        in the builder.
       </Gate>
     );
 
@@ -136,7 +136,7 @@ export function LevelFlow({
     return (
       <LevelPage>
         <p className="cb-note" role="status">
-          Reading {actor.name}&rsquo;s choices at level {target.level}…
+          Reading {actor.name}'s choices at level {target.level}…
         </p>
         <Button variant="ghost" onClick={() => setTarget(null)}>
           Back
@@ -275,7 +275,7 @@ export function LevelFlow({
         </section>
       )}
 
-      {atCap && <p className="cb-note">At the table&rsquo;s level cap ({cap}).</p>}
+      {atCap && <p className="cb-note">At the table's level cap ({cap}).</p>}
 
       {current > 1 && (
         <section className="cb-level-preview">

@@ -340,7 +340,7 @@ function QuestEditor({
     if (
       !(await confirm({
         title: "Delete quest",
-        body: `Delete “${quest.title}”? Its objectives and your GM-only notes are lost. Pages it links to are not deleted.`,
+        body: `Delete "${quest.title}"? Its objectives and your GM-only notes are lost. Pages it links to are not deleted.`,
         confirmLabel: "Delete",
         danger: true
       }))

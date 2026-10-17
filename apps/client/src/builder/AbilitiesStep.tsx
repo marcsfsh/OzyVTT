@@ -463,7 +463,7 @@ export function HitPointsSection({
         <span className="cb-offer-count tabular" role="status">
           {multiclass ? dice.join("/") : hitDie} · CON{" "}
           {base.con == null
-            ? "—"
+            ? "None"
             : abilityModifier(base.con + bonuses.con) >= 0
               ? `+${abilityModifier(base.con + bonuses.con)}`
               : abilityModifier(base.con + bonuses.con)}

@@ -335,8 +335,8 @@ export function PagesView({
               value={sort}
               onChange={(event) => changeSort(event.target.value as NotebookSort)}
             >
-              <option value="name-asc">Name A–Z</option>
-              <option value="name-desc">Name Z–A</option>
+              <option value="name-asc">Name A-Z</option>
+              <option value="name-desc">Name Z-A</option>
               <option value="recent">Recently edited</option>
             </Select>
             <Select

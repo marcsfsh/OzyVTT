@@ -45,14 +45,14 @@ export function MapPicker({
     >
       {currentMap && (
         <div className="codex-atlas-nestrow">
-          <Switch checked={nest} onChange={onNestChange} label={`Nest inside “${currentMap.name}”`} />
+          <Switch checked={nest} onChange={onNestChange} label={`Nest inside "${currentMap.name}"`} />
           <p className="codex-inspector-hint">
             {nest ? (
               <>
                 The new map sits inside <strong>{currentMap.name}</strong>, and you can drill into it from here.
               </>
             ) : (
-              <>The new map is added at the top level, not inside any other map.</>
+              <>The new map is added at the top level.</>
             )}
           </p>
         </div>

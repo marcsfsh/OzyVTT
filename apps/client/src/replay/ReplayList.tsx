@@ -103,7 +103,7 @@ export function ReplayList({
             <p>
               {role === "gm"
                 ? "No replays yet. Every fight that ends is kept here."
-                : "Your GM hasn’t shared a fight yet."}
+                : "Your GM hasn't shared a fight yet."}
             </p>
           </div>
         )}

@@ -212,7 +212,7 @@ export function MyCharacter({
         ) : (
           /* Nobody claimed: point at the Table's claim picker rather than duplicating it. */
           <div className="scene-empty">
-            <p>You haven&rsquo;t claimed a character yet.</p>
+            <p>You haven't claimed a character yet.</p>
             <Button variant="primary" arrow onClick={onGoToTable}>
               Go to the table
             </Button>
@@ -231,7 +231,7 @@ export function MyCharacter({
                 const claimed = actor.claimStatus === "claimed";
                 /* Openable when the tier allows it and the row is someone's character. */
                 const rowOpenable = openable && claimed;
-                const label = `${actor.name}${line ? ` — ${line}` : ""}${claimed && actor.presence ? ` — ${presenceLabel(actor.presence)}` : ""}${claimed ? "" : ` — ${CLAIM_WORD.available}`}`;
+                const label = `${actor.name}${line ? `, ${line}` : ""}${claimed && actor.presence ? `, ${presenceLabel(actor.presence)}` : ""}${claimed ? "" : `, ${CLAIM_WORD.available}`}`;
                 const body = (
                   <>
                     <Avatar
@@ -240,7 +240,7 @@ export function MyCharacter({
                       presence={claimed && actor.presence ? presenceDot(actor.presence) : undefined}
                     />
                     <span className="my-character-party-name">{actor.name}</span>
-                    <span className="my-character-party-line">{line ?? (claimed ? "—" : CLAIM_WORD.available)}</span>
+                    <span className="my-character-party-line">{line ?? (claimed ? "None" : CLAIM_WORD.available)}</span>
                   </>
                 );
                 return (
@@ -294,7 +294,7 @@ export function MyCharacter({
         open={rolling}
         maxLevel={state.builderPolicy.maxLevel}
         onClose={() => setRolling(false)}
-        onRolled={() => toast("Rolled up and claimed — it's yours.", { tone: "success" })}
+        onRolled={() => toast("Rolled up and claimed. It's yours.", { tone: "success" })}
       />
       {dialog}
     </section>

@@ -118,14 +118,14 @@ function ApiReferenceBody({ gmToken }: Readonly<{ gmToken: string }>) {
                 variant="secondary"
                 className="api-export-spec"
                 onClick={() => exportSpec(document)}
-                title="Download the full OpenAPI 3.1 document - import it into Postman, openapi-generator, or any spec-aware tool."
+                title="Download the full OpenAPI 3.1 document for Postman, openapi-generator or any other OpenAPI tool."
               >
                 <IconDownload /> Export OpenAPI spec
               </Button>
             </div>
             <p className="api-reference-count">
-              {operationCount} operations across {Object.keys(document.paths).length} paths. Example values are
-              synthetic - real ids come from the game state.
+              {operationCount} operations across {Object.keys(document.paths).length} paths. Example values are made up.
+              Real ids come from the game state.
             </p>
             {GROUPS.map((group) => {
               const paths = Object.entries(document.paths).filter(([path]) => group.match(path));
@@ -222,7 +222,7 @@ export function ApiReference({ gmToken }: Readonly<{ gmToken: string }>) {
     >
       <summary>
         <strong>API reference</strong>
-        <span>Every endpoint this server exposes, straight from its own contract - click one for its full spec.</span>
+        <span>Every endpoint this server exposes, read from its own contract. Open one for its full spec.</span>
       </summary>
       {/* Mounted only while open, so the fetch happens on first open, not every Settings visit. */}
       {open && <ApiReferenceBody gmToken={gmToken} />}
@@ -250,7 +250,7 @@ export function ApiReferencePage({ gmToken, onBack }: Readonly<{ gmToken: string
           </Button>
           <Button
             variant="secondary"
-            title="The new tab asks for the GM password once — the GM token is never persisted."
+            title="The new tab asks for the GM password once and never stores the GM token."
             onClick={() => window.open(API_REFERENCE_PATH, "_blank", "noopener")}
           >
             Open in a new tab

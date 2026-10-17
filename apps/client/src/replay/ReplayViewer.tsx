@@ -67,7 +67,7 @@ function GmViewer({
   const launch = async () => {
     const ok = await confirm({
       title: "Launch from this moment?",
-      body: `The table becomes this fight at turn ${index + 1}. Your live scene is parked in Scenes — resume it anytime.`,
+      body: `The table becomes this fight at turn ${index + 1}. Your live scene is parked in Scenes. Resume it anytime.`,
       confirmLabel: "Launch"
     });
     if (!ok) return;
@@ -125,9 +125,7 @@ function GmViewer({
               </Button>
             )}
             {refused.code === "history_review" && (
-              <span>
-                Step back to the live turn on the table first - the fight&rsquo;s history banner has the way out.
-              </span>
+              <span>Step back to the live turn on the table first. The fight's history banner has the way out.</span>
             )}
             <Button variant="ghost" size="sm" onClick={() => setRefused(null)}>
               Dismiss
@@ -267,7 +265,7 @@ function PlayerViewer({
         </Button>
         <div className="replay-header-text">
           <h2>Replay</h2>
-          <p className="replay-meta">You&rsquo;re watching this fight as the party saw it.</p>
+          <p className="replay-meta">You're watching this fight as the party saw it.</p>
         </div>
       </div>
       <Transport

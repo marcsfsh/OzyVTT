@@ -102,7 +102,7 @@ export function StagingTray({
       )}
       {placementHint && entries.length > 0 && placed < entries.length && (
         <p className="staging-tray-hint">
-          Drag them from the tray above the map to place them — or tap a tray token to drop it at the centre.
+          Drag a token from the tray above the map to place it, or tap it to drop it at the centre.
         </p>
       )}
     </section>

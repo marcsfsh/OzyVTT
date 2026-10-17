@@ -38,7 +38,7 @@ export function stepDetail(step: StepId, context: OfferContext, level: number): 
     return (
       <>
         <p>{context.background.description ?? context.background.summary}</p>
-        <p className="tabular">Skills: {context.background.skillProficiencies.map(titleize).join(", ") || "—"}</p>
+        <p className="tabular">Skills: {context.background.skillProficiencies.map(titleize).join(", ") || "None"}</p>
       </>
     );
   }
@@ -50,10 +50,10 @@ export function stepDetail(step: StepId, context: OfferContext, level: number): 
           Hit die {context.classRecord.hitDie} · saves{" "}
           {context.classRecord.savingThrows.map((ability) => ability.toUpperCase()).join(", ")}
         </p>
-        {/* "—" for absent, matching every review row and allocator cell. */}
+        {/* "None" for absent, matching every review row and allocator cell. */}
         <p className="tabular">
-          Armor: {context.classRecord.armorProficiencies.join(", ") || "—"} · weapons:{" "}
-          {context.classRecord.weaponProficiencies.join(", ") || "—"}
+          Armor: {context.classRecord.armorProficiencies.join(", ") || "None"} · weapons:{" "}
+          {context.classRecord.weaponProficiencies.join(", ") || "None"}
         </p>
         <FeatureList
           items={featureItems(context.classRecord.features.filter((feature) => (feature.level ?? 1) <= level))}

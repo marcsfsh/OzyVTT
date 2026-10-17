@@ -159,7 +159,7 @@ export const resolveRef = (ref: string, components: Components): Schema | undefi
 
 export function authOptions(operation: Operation): readonly string[] {
   const security = operation.security;
-  if (!security || security.length === 0) return ["public - no credentials"];
+  if (!security || security.length === 0) return ["public · no credentials"];
   return security.map((entry) => {
     if ("bearerAuth" in entry)
       return entry.bearerAuth.length > 0
@@ -208,7 +208,7 @@ export function typeLabel(schema: Schema | undefined, components: Components): s
   }
   if (schema.type === "integer" || schema.type === "number") {
     const { minimum, maximum } = schema;
-    if (minimum !== undefined && maximum !== undefined) return `${schema.type} (${minimum}–${maximum})`;
+    if (minimum !== undefined && maximum !== undefined) return `${schema.type} (${minimum}-${maximum})`;
     if (minimum !== undefined) return `${schema.type} (≥ ${minimum})`;
     if (maximum !== undefined) return `${schema.type} (≤ ${maximum})`;
     return schema.type;

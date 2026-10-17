@@ -31,4 +31,4 @@ export function charactersFor(
 /** Shared so `TagInput` labels and `Combobox` meta say the same word. */
 export const ARCHIVED_META = "Archived";
 export const archivedOptionLabel = (title: string, archived: boolean): string =>
-  archived ? `${title} — ${ARCHIVED_META}` : title;
+  archived ? `${title} · ${ARCHIVED_META}` : title;

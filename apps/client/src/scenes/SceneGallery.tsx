@@ -94,7 +94,7 @@ export function SceneGallery({
       !combatActive ||
       (await confirm({
         title: "Make scene live?",
-        body: `Make “${scene.name}” live? Players and the shared screen switch now; the current fight is parked and resumes when you switch back.`,
+        body: `Make "${scene.name}" live? Players and the shared screen switch now. The current fight is parked and resumes when you switch back.`,
         confirmLabel: "Make live"
       }))
     ) {
@@ -118,7 +118,7 @@ export function SceneGallery({
     if (
       await confirm({
         title: "Delete scene?",
-        body: `Delete “${scene.name}”? Its staged tokens and fog go with it. This cannot be undone.`,
+        body: `Delete "${scene.name}"? Its staged tokens and fog go with it. This cannot be undone.`,
         confirmLabel: "Delete",
         danger: true
       })

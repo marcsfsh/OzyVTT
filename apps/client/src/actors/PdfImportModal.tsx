@@ -85,7 +85,7 @@ export function PdfImportModal({ open, onClose, role, onImported }: Props) {
       <div className="pdf-import-head">
         <Eyebrow>IMPORT</Eyebrow>
         <h2>Import from D&amp;D Beyond</h2>
-        <p>Choose a character PDF exported from D&amp;D Beyond. It's read on your device — nothing is uploaded.</p>
+        <p>Choose a character PDF exported from D&amp;D Beyond. It's read on your device and nothing is uploaded.</p>
       </div>
 
       <input
@@ -170,13 +170,13 @@ export function PdfImportModal({ open, onClose, role, onImported }: Props) {
               <dd>
                 {(view.character?.classes ?? [])
                   .map((c: { name: string; level: number }) => `${c.name} ${c.level}`)
-                  .join(" / ") || "—"}
+                  .join(" / ") || "None"}
               </dd>
             </div>
             <div>
               <dt>Species · background</dt>
               <dd>
-                {[view.character?.race?.name, view.character?.background?.name].filter(Boolean).join(" · ") || "—"}
+                {[view.character?.race?.name, view.character?.background?.name].filter(Boolean).join(" · ") || "None"}
               </dd>
             </div>
             <div>
@@ -184,7 +184,7 @@ export function PdfImportModal({ open, onClose, role, onImported }: Props) {
               <dd className="pdf-import-abilities">
                 {ABIL.map((a) => (
                   <span key={a}>
-                    {a.toUpperCase()} {view.abilityScores?.[a] ?? "—"}
+                    {a.toUpperCase()} {view.abilityScores?.[a] ?? "None"}
                   </span>
                 ))}
               </dd>
@@ -199,7 +199,7 @@ export function PdfImportModal({ open, onClose, role, onImported }: Props) {
               <dt>Spellcasting</dt>
               <dd>
                 {view.spellcasting
-                  ? `${String(view.spellcasting.ability).toUpperCase()} · save DC ${view.spellcasting.saveDc ?? "—"} · ${view.spellcasting.spells?.length ?? 0} spells`
+                  ? `${String(view.spellcasting.ability).toUpperCase()} · save DC ${view.spellcasting.saveDc ?? "None"} · ${view.spellcasting.spells?.length ?? 0} spells`
                   : "None"}
               </dd>
             </div>

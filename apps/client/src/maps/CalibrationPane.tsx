@@ -143,7 +143,7 @@ export function CalibrationPane({
     run(async () => {
       await request("", { folder }, "PATCH");
       await onSaved(map.id);
-      toast(folder ? `Moved to “${folder}”.` : "Removed from its folder.", { tone: "success" });
+      toast(folder ? `Moved to "${folder}".` : "Removed from its folder.", { tone: "success" });
     });
   const restartCalibration = () => {
     setPoints([]);

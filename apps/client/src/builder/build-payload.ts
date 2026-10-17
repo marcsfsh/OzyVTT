@@ -418,7 +418,7 @@ export function abilityCapPreview(
       ability,
       total: scores[ability],
       offerKey,
-      reason: `${ABILITY_LABELS[ability]} would be ${scores[ability]} - no ability may go above ${maximum} here. ${fix}`
+      reason: `${ABILITY_LABELS[ability]} would be ${scores[ability]}, and no ability may go above ${maximum} here. ${fix}`
     };
   };
 
@@ -687,7 +687,7 @@ export function stepBlockedReason(
                 ? ` Take ${record.name} to level ${record.subclassLevel - 1} to continue.`
                 : ` Drop to level ${record.subclassLevel - 1} to continue.`
               : "";
-          return `No ${record.name} subclasses are available yet - a level ${record.subclassLevel} ${record.name} must have one.${escape}`;
+          return `No ${record.name} subclasses are available yet, and a level ${record.subclassLevel} ${record.name} must have one.${escape}`;
         }
       }
       const conflict = heldConflict("features");
@@ -764,7 +764,7 @@ export function stepBlockedReason(
           const die = context.levelDice[index + 1] ?? context.hitDie;
           const faces = die ? hitDieFaces(die) : 12;
           if (entry < 1 || entry > faces)
-            return `A ${die ?? "d12"} roll is 1-${faces} - fix the level ${index + 2} entry.`;
+            return `A ${die ?? "d12"} roll is 1-${faces}. Fix the level ${index + 2} entry.`;
         }
       }
       return null;

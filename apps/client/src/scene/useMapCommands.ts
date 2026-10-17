@@ -119,7 +119,7 @@ export function useMapCommands({
       !result.ok
         ? (result.message ?? "That question could not be sent.")
         : result.ran
-          ? "That worked this time - no question needed."
+          ? "That worked this time. No question was needed."
           : ASKED
     );
   };

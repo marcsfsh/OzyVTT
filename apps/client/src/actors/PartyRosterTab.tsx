@@ -67,7 +67,7 @@ export function PartyRosterTab({
     }
     toast(
       next
-        ? `Archived. ${actor.name} is hidden from players — find them under Archived below.`
+        ? `Archived. ${actor.name} is hidden from players and listed under Archived below.`
         : `${actor.name} is back on the table.`,
       { tone: "success" }
     );
@@ -133,9 +133,12 @@ export function PartyRosterTab({
       toast(result.message ?? "Couldn't resolve the import.", { tone: "error" });
       return;
     }
-    toast(approve ? `${pending.name} joined the roster — ready to claim.` : `Turned away ${pending.name}.`, {
-      tone: "success"
-    });
+    toast(
+      approve ? `${pending.name} joined the roster, ready for a player to claim.` : `Turned away ${pending.name}.`,
+      {
+        tone: "success"
+      }
+    );
     setPreviewImportId(null);
   };
 
@@ -161,7 +164,7 @@ export function PartyRosterTab({
         : file.name;
     toast(
       result.ok
-        ? `${name} joined the roster — ready to claim.`
+        ? `${name} joined the roster, ready for a player to claim.`
         : (result.message ?? "The sheet could not be imported."),
       {
         tone: result.ok ? "success" : "error"
@@ -186,7 +189,7 @@ export function PartyRosterTab({
           <h3 className="nh-card-title">{actor.name}</h3>
           {line && <span className="nh-card-meta">{line}</span>}
           <span className="nh-card-meta">
-            {CLAIM_WORD[claim]} · HP {actor.hp.current}/{actor.hp.maximum} · AC {actor.armorClass ?? "—"}
+            {CLAIM_WORD[claim]} · HP {actor.hp.current}/{actor.hp.maximum} · AC {actor.armorClass ?? "None"}
           </span>
         </div>
         {isArchived && (
@@ -378,7 +381,7 @@ export function PartyRosterTab({
         open={pdfImportOpen}
         role="gm"
         onClose={() => setPdfImportOpen(false)}
-        onImported={(name) => toast(`${name} joined the roster — ready to claim.`, { tone: "success" })}
+        onImported={(name) => toast(`${name} joined the roster, ready for a player to claim.`, { tone: "success" })}
       />
       {dialog}
       {forceRelease.dialog}
@@ -394,13 +397,13 @@ function ImportPreview({ definition }: Readonly<{ definition: ActorDefinition }>
     <dl className="import-preview">
       <div>
         <dt>Class &amp; level</dt>
-        <dd>{classLine(definition) ?? "—"}</dd>
+        <dd>{classLine(definition) ?? "None"}</dd>
       </div>
       <div>
         <dt>Species · background</dt>
         <dd>
           {[definition.character?.race?.name, definition.character?.background?.name].filter(Boolean).join(" · ") ||
-            "—"}
+            "None"}
         </dd>
       </div>
       <div>

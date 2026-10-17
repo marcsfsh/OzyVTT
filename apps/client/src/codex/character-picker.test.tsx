@@ -152,7 +152,7 @@ describe("`5a` — Who played", () => {
     expect(list.getAllByRole("option").map((option) => option.textContent)).toEqual([
       "Ozy",
       "Ismark",
-      "Ireena — Archived"
+      "Ireena · Archived"
     ]);
   });
 
@@ -162,7 +162,7 @@ describe("`5a` — Who played", () => {
 
     await user.click(screen.getByRole("combobox", { name: "Who played" }));
     const list = within(await screen.findByRole("listbox", { name: "Who played" }));
-    await user.click(list.getByRole("option", { name: "Ireena — Archived" }));
+    await user.click(list.getByRole("option", { name: "Ireena · Archived" }));
 
     // The stored value is the plain name; `optionLabel` is display only.
     expect(within(document.querySelector(".nh-taginput-tags")!).getByText("Ireena")).toBeInTheDocument();
@@ -187,7 +187,7 @@ describe("`5a` — Who played", () => {
 
     await user.click(screen.getByRole("combobox", { name: "Who played" }));
     const list = within(await screen.findByRole("listbox", { name: "Who played" }));
-    expect(list.getAllByRole("option").map((option) => option.textContent)).toEqual(["Ismark", "Ireena — Archived"]);
+    expect(list.getAllByRole("option").map((option) => option.textContent)).toEqual(["Ismark", "Ireena · Archived"]);
   });
 });
 

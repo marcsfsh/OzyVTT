@@ -278,7 +278,7 @@ describe("What it can do", () => {
     const box = within(await palette());
 
     await user.type(box.getByLabelText("Search the Codex"), "Vallaki");
-    expect(await box.findByText(/New page “Vallaki”/)).toBeInTheDocument();
+    expect(await box.findByText(/New page "Vallaki"/)).toBeInTheDocument();
 
     search.mockResolvedValue({ hits: [HIT], truncated: false });
     await user.clear(box.getByLabelText("Search the Codex"));

@@ -273,8 +273,7 @@ export function CodexShell({
             className="codex-preview-modal"
           >
             <p className="codex-inspector-hint">
-              This is the real player Codex, read through a player session. Anything hidden from players is absent here,
-              not dimmed.
+              This is the real player Codex, read through a player session. Anything hidden from players is absent here.
             </p>
             {previewToken && <PlayerCodex token={previewToken} embedded />}
           </Modal>

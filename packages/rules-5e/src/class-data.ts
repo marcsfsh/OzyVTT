@@ -321,7 +321,8 @@ export function multiclassShortfalls<New extends MulticlassCandidate, Current ex
 
 /**
  * Why a new class can't be taken, in sentences: "Wizard needs Intelligence 13; you have 10." for the new class, and
- * "Your Fighter needs Strength 13 or Dexterity 13; you have Strength 10 and Dexterity 12." for one already taken.
+ * "Fighter, a class you already have, needs Strength 13 or Dexterity 13; you have Strength 10 and Dexterity 12."
+ * for one already taken.
  */
 export function multiclassShortfallText(
   abilityScores: Readonly<Partial<Record<Ability, number>>>,
@@ -341,7 +342,7 @@ export function multiclassShortfallText(
           : minimums.minimums
               .map((minimum) => `${ABILITY_NAMES[minimum.ability]} ${score(minimum.ability)}`)
               .join(" and ");
-      const who = entry.id === newClass.id ? entry.name : `Your ${entry.name}`;
+      const who = entry.id === newClass.id ? entry.name : `${entry.name}, a class you already have,`;
       return `${who} needs ${wanted}; you have ${have}.`;
     })
     .join(" ");

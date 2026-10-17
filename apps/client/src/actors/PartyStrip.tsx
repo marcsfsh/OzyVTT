@@ -40,7 +40,7 @@ export function PartyStrip(props: Props) {
     // A player who has claimed nobody never gets here, so an empty party is always the GM's.
     return (
       <section className="party-strip party-strip-empty" aria-label="The party">
-        <p>No characters yet — create or import them on the Roster tab.</p>
+        <p>No characters yet. Create or import them on the Roster tab.</p>
         {props.onOpenRoster && (
           <Button variant="ghost" size="sm" onClick={props.onOpenRoster}>
             Open Roster
@@ -64,7 +64,7 @@ export function PartyStrip(props: Props) {
           const openable = props.role === "gm" || claim === "mine";
           const label = [actor.name, detail, CLAIM_WORD[claim], actor.presence ? presenceLabel(actor.presence) : null]
             .filter((part): part is string => Boolean(part))
-            .join(" — ");
+            .join(", ");
           const body = (
             <>
               <Avatar name={actor.name} size="sm" presence={actor.presence ? presenceDot(actor.presence) : undefined} />

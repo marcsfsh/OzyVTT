@@ -326,7 +326,7 @@ export function TokenControls({
         disabled={busy}
         onClick={toggleReaction}
       >
-        {reactionUsed ? "Reaction spent - restore" : "Use reaction"}
+        {reactionUsed ? "Reaction spent · Restore" : "Use reaction"}
       </button>
       {role === "gm" && placed && (
         <button type="button" className="token-context-item" onClick={onReturnToTray}>

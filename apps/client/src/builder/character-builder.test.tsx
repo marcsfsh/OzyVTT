@@ -980,7 +980,7 @@ describe("the Level flow's class choice", () => {
     expect((within(grid).getByRole("radio", { name: /^Fighter/ }) as HTMLButtonElement).disabled).toBe(true);
     expect(
       within(grid).getByText(
-        "Fighter needs Strength 13 or Dexterity 13; you have Strength 10 and Dexterity 12. Your Cleric needs Wisdom 13; you have 12."
+        "Fighter needs Strength 13 or Dexterity 13; you have Strength 10 and Dexterity 12. Cleric, a class you already have, needs Wisdom 13; you have 12."
       )
     ).toBeInTheDocument();
   });

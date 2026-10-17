@@ -277,7 +277,7 @@ export function AsiOffer({
                     return (
                       <option key={ability} value={ability} disabled={noRoom && ability !== chosen}>
                         {ABILITY_LABELS[ability]}
-                        {total == null ? "" : ` — ${total}${noRoom ? ` (over ${ABILITY_SCORE_CAP})` : ""}`}
+                        {total == null ? "" : ` · ${total}${noRoom ? ` (over ${ABILITY_SCORE_CAP})` : ""}`}
                       </option>
                     );
                   })}

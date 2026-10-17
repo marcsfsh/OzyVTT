@@ -45,7 +45,7 @@ export function parseDiceFormula(source: string): DiceExpression {
     const fragment = normalized.slice(position);
     const match = fragment.match(/^([+-]?)(?:(\d*)d(\d+)(?:(kh|kl)(\d+))?|(\d+))/);
     if (!match || (terms.length > 0 && match[1] === ""))
-      throw new DiceFormulaError(`Unsupported dice expression near “${fragment.slice(0, 12)}”.`, position);
+      throw new DiceFormulaError(`Unsupported dice expression near "${fragment.slice(0, 12)}".`, position);
     const sign: 1 | -1 = match[1] === "-" ? -1 : 1;
     if (match[3]) {
       const count = match[2] ? Number(match[2]) : 1;

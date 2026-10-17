@@ -76,7 +76,7 @@ export function CommandPalette({
       onCreatePage &&
       !hits.some((hit) => hit.kind === "page" && hit.title.toLowerCase() === trimmed.toLowerCase())
     ) {
-      list.push({ kind: "create", label: `New page “${trimmed}”`, title: trimmed });
+      list.push({ kind: "create", label: `New page "${trimmed}"`, title: trimmed });
     }
     if (!trimmed) {
       if (onCreatePage) {

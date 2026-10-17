@@ -56,7 +56,7 @@ export function DashCard({
           </div>
         ) : isEmpty ? (
           /* The default says emptiness is the normal resting state. */
-          <p className="codex-dashcard-empty">{empty ?? "Nothing to show — this fills itself as the campaign runs."}</p>
+          <p className="codex-dashcard-empty">{empty ?? "Nothing here yet. It fills in as the campaign runs."}</p>
         ) : (
           children
         )}

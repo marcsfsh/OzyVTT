@@ -448,8 +448,8 @@ describe("The player's copy of the card (viewer safety)", () => {
     const objectives = within(card.getByRole("list", { name: "Objectives for The Sunless Crown" }));
     expect(objectives.getByText("Find the crypt")).toBeInTheDocument();
     expect(objectives.getByText("Open the sarcophagus")).toBeInTheDocument();
-    expect(objectives.getByText("— done")).toBeInTheDocument();
-    expect(objectives.getByText("— not done")).toBeInTheDocument();
+    expect(objectives.getByText(", done")).toBeInTheDocument();
+    expect(objectives.getByText(", not done")).toBeInTheDocument();
     // The read-only branch renders no control at all, not a disabled checkbox.
     expect(card.queryAllByRole("checkbox")).toHaveLength(0);
     expect(card.queryAllByRole("textbox")).toHaveLength(0);
@@ -516,8 +516,8 @@ describe("The player's quest reader", () => {
     expect(reader.getByText("The burgomaster wants the crown returned.")).toBeInTheDocument();
     const objectives = within(reader.getByRole("list", { name: "Objectives for The Sunless Crown" }));
     expect(objectives.getByText("Find the crypt")).toBeInTheDocument();
-    expect(objectives.getByText("— done")).toBeInTheDocument();
-    expect(objectives.getByText("— not done")).toBeInTheDocument();
+    expect(objectives.getByText(", done")).toBeInTheDocument();
+    expect(objectives.getByText(", not done")).toBeInTheDocument();
     /** No writable control in the reader and no checkbox anywhere; the rail's filter is the one input. */
     expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
     expect(reader.queryAllByRole("textbox")).toHaveLength(0);

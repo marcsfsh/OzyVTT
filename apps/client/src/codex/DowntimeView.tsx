@@ -319,8 +319,8 @@ export function DowntimeView({
           {/* Shown once above the list: the cause is the campaign's, not any one record's. */}
           {noCampaignDate && (
             <Alert tone="warning">
-              Set your date on the Calendar before passing time — confirming moves it forward, and there is nothing to
-              move it from.
+              Set your date on the Calendar before passing time. Confirming moves the date forward, so it needs a date
+              to start from.
             </Alert>
           )}
           <ul className="codex-downtime-pending">

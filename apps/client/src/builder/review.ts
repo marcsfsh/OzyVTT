@@ -16,7 +16,7 @@ import {
 
 function pickedNames(draft: BuilderDraft, offer: BuilderOffer): string {
   const picks = draft.picks[offer.key] ?? [];
-  if (picks.length === 0) return "—";
+  if (picks.length === 0) return "None";
   // The full ability name, matching the "Strength / 17" row above.
   return picks
     .map((id) =>
@@ -78,19 +78,19 @@ export function reviewSections(input: ReviewInput): ReviewSection[] {
       // The modifier is what the player rolls with, so show it beside the score.
       value:
         total == null
-          ? "—"
+          ? "None"
           : `${total}${bonuses[ability] ? ` (${base[ability]} +${bonuses[ability]})` : ""} · ${modifier! >= 0 ? "+" : ""}${modifier}`,
       numeric: true
     };
   });
   return [
-    sectionFor(input, "species", "species", [{ label: "Species", value: context.species?.name ?? "—" }]),
+    sectionFor(input, "species", "species", [{ label: "Species", value: context.species?.name ?? "None" }]),
     sectionFor(input, "background", "background", [
-      { label: "Background", value: context.background?.name ?? "—" },
+      { label: "Background", value: context.background?.name ?? "None" },
       ...(context.originFeat ? [{ label: "Origin feat", value: context.originFeat.name }] : [])
     ]),
     sectionFor(input, "class", "class", [
-      { label: context.classes.length > 1 ? "Classes" : "Class", value: classLineOf(context) ?? "—" },
+      { label: context.classes.length > 1 ? "Classes" : "Class", value: classLineOf(context) ?? "None" },
       { label: "Level", value: String(draft.level), numeric: true },
       context.classes.length > 1
         ? {
@@ -98,7 +98,7 @@ export function reviewSections(input: ReviewInput): ReviewSection[] {
             value: context.classes.map(({ record, levels }) => `${levels}${record.hitDie}`).join(" + "),
             numeric: true
           }
-        : { label: "Hit die", value: context.hitDie ?? "—", numeric: true }
+        : { label: "Hit die", value: context.hitDie ?? "None", numeric: true }
     ]),
     /* No separate subclass item: the subclass is a feature offer, so `sectionFor` already emits it. */
     sectionFor(input, "features", "features", []),

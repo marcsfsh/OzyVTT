@@ -268,7 +268,7 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
     step !== "review"
       ? null
       : connection !== "online"
-        ? "The table is offline — reconnecting…"
+        ? "The table is offline. Reconnecting…"
         : (offersRefusal ??
           (offersCurrent ? null : "Checking these choices with the table…") ??
           capacity?.blockedReason ??
@@ -398,7 +398,7 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
     unsaved.current = null;
     if (saved) saveDraft(draft);
     onClose();
-    if (saved) toast("Draft saved — resume it from Create a character.", { tone: "success" });
+    if (saved) toast("Draft saved. Resume it from Create a character.", { tone: "success" });
   };
   // Escape saves and closes like the header button; this is a full page, not a Modal.
   const saveAndCloseRef = useRef(saveAndClose);
@@ -598,7 +598,7 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
                 />
               )}
               {draft.level >= policy.maxLevel && (
-                <p className="cb-note">At the table&rsquo;s level cap ({policy.maxLevel}).</p>
+                <p className="cb-note">At the table's level cap ({policy.maxLevel}).</p>
               )}
               {draft.classId && room > 0 && context.classes.length < MAX_CLASSES && (
                 <Field
@@ -859,7 +859,7 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
               ) : (
                 <>You started a character {describeWhen(resumable.updatedAt)}.</>
               )}{" "}
-              It stays exactly as you left it until you answer — resume it, or discard it to save the one you build now.{" "}
+              It stays as you left it until you answer. Resume it, or discard it to save the one you build now.{" "}
               <Button
                 variant="secondary"
                 size="sm"
