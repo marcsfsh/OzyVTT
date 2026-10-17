@@ -58,7 +58,10 @@ export function withStandingRiders(action: ActorAction, derivation: EquipmentDer
   const riders = collectRiders(derivation.carriers, { ...derivation.context, moment: null, sourceItemId });
   if (riders.length === 0) return action;
 
-  const attackBonus = sumRiders(riders, "attack-bonus");
+  // A wand of the war mage's bonus to spell attack rolls lands on every spell attack its bearer makes.
+  const attackBonus =
+    sumRiders(riders, "attack-bonus") +
+    (action.spellId !== undefined && action.attack ? sumRiders(riders, "spell-attack-bonus") : 0);
   const damageBonus = sumRiders(riders, "damage-bonus");
   const critDice = riders.reduce(
     (total, rider) => (rider.modifier.type === "critical-bonus-dice" ? total + (rider.modifier.count ?? 0) : total),

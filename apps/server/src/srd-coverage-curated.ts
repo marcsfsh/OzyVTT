@@ -730,15 +730,12 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:dragon-scale-mail": guided(
     "The +1 AC and the Resistance to one type are applied. Advantage on saves against a dragon's breath, and sensing dragons, are the GM's."
   ),
-  "item:dragon-slayer": guided(
-    "The +1 to attack and damage rolls is applied. The extra 3d6 against Dragons is the GM's."
-  ),
   "item:dwarven-plate": guided("The +2 AC is applied. The Reaction against forced movement is the GM's."),
   "item:dwarven-thrower": guided(
     "The +3 to attack and damage rolls is applied. Throwing it, its return and the extra damage against Giants are the GM's."
   ),
   "item:giant-slayer": guided(
-    "The +1 to attack and damage rolls is applied. The extra 2d6 against Giants is the GM's."
+    "The +1 to attack and damage rolls and the extra 2d6 against Giants are applied. The Giant's save against Prone is the GM's."
   ),
   "item:hammer-of-thunderbolts": guided(
     "The +1 to attack and damage rolls is applied. Its thrown thunderclap and its powers against Giants are the GM's."
@@ -747,7 +744,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Its Detect Thoughts and Suggestion casts are cast actions. The telepathy itself is the GM's."
   ),
   "item:holy-avenger": guided(
-    "The +3 to attack and damage rolls is applied. The extra 2d10 Radiant against Fiends and Undead, and its aura, are the GM's."
+    "The +3 to attack and damage rolls and the extra 2d10 Radiant against Fiends and Undead are applied. The aura's Advantage on saves against spells for its wielder's allies is the GM's."
   ),
   "item:iron-bands": guided(
     "The throw's attack roll is applied. Restraining the target on a hit, and the check to break free, are the GM's."
@@ -756,8 +753,11 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:luck-blade": guided(
     "The +1 to attack and damage rolls and saving throws is applied. Its Luck reroll and its Wish are the GM's."
   ),
+  "item:mace-of-disruption": guided(
+    "The extra 2d6 Radiant against Fiends and Undead is applied. The save against destruction at 25 Hit Points or fewer, and the Frightened condition a success leaves, are the GM's."
+  ),
   "item:mace-of-smiting": guided(
-    "The +1 to attack and damage rolls is applied. The extra bonus against Constructs and the damage on a 20 are the GM's."
+    "The +1 to attack and damage rolls, +3 against Constructs, and the 7 Bludgeoning on a Critical Hit (14 against a Construct) are applied. Destroying a Construct left at 25 Hit Points or fewer is the GM's."
   ),
   "item:nine-lives-stealer": guided(
     "The +2 to attack and damage rolls is applied. Life Stealing on a Critical Hit is the GM's."
@@ -799,13 +799,22 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Resistance to Cold damage and its one-charge Fog Cloud are applied. The spells that cost more charges are the GM's."
   ),
   "item:staff-of-power": guided(
-    "The +2 to AC and saving throws is applied. Its weapon bonus, its spells and its Retributive Strike are the GM's."
+    "The +2 to AC, saving throws and spell attack rolls is applied. Its weapon bonus, its spells and its Retributive Strike are the GM's."
+  ),
+  "item:staff-of-the-magi": guided(
+    "Its four casts that cost no charge and the +2 to spell attack rolls are applied. Its weapon bonus, the spells that cost charges, Spell Absorption and Retributive Strike are the GM's."
   ),
   "item:staff-of-the-woodlands": guided(
-    "Its one-charge casts are cast actions, and Tree Form's use is counted. Its weapon bonus, its spell attack bonus and the spells that cost more charges are the GM's."
+    "Its one-charge casts are cast actions, Tree Form's use is counted, and the +2 to spell attack rolls is applied. Its weapon bonus and the spells that cost more charges are the GM's."
   ),
   "item:staff-of-thunder-and-lightning": guided(
     "Lightning Strike and Thunderclap are applied, each once a day. Its weapon bonus and the powers on a hit are the GM's."
+  ),
+  "item:talisman-of-pure-good": guided(
+    "The +2 to spell attack rolls is applied. The 8d6 Radiant it deals a Fiend or an Undead that touches it, and Pure Rebuke's fissure on its charges, are the GM's."
+  ),
+  "item:talisman-of-ultimate-evil": guided(
+    "The +2 to spell attack rolls is applied. The 8d6 Necrotic it deals a creature other than a Fiend or an Undead that touches it, and Ultimate End's fissure on its charges, are the GM's."
   ),
   "item:sword-of-wounding": guided(
     "The extra Necrotic damage is applied. The save that stops the target regaining Hit Points is the GM's."
@@ -818,6 +827,15 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "item:wand-of-lightning-bolts": guided(
     "Lightning Bolt at DC 15 on its charges is applied. Spending more charges for a higher-level Lightning Bolt is the GM's."
+  ),
+  "item:wand-of-the-war-mage-1": guided(
+    "The +1 to spell attack rolls is applied. Ignoring Half Cover on a spell attack is the GM's, who sets the cover."
+  ),
+  "item:wand-of-the-war-mage-2": guided(
+    "The +2 to spell attack rolls is applied. Ignoring Half Cover on a spell attack is the GM's, who sets the cover."
+  ),
+  "item:wand-of-the-war-mage-3": guided(
+    "The +3 to spell attack rolls is applied. Ignoring Half Cover on a spell attack is the GM's, who sets the cover."
   ),
   "item:weapon-of-warning": guided(
     "Advantage on Initiative for its wielder is applied. The same for allies within 30 feet, and waking them, are the GM's."

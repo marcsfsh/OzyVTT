@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema, type GameState } from "@vtt/domain";
 import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
-import { loadEquipment, loadMagicItems } from "@vtt/content-srd-5.2.1";
+import { loadEquipment, loadMagicItems, loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { effectiveActions } from "../src/effective-actions.js";
 import type { EquipmentReference } from "@vtt/content-srd-5.2.1";
@@ -343,6 +343,34 @@ describe("the shipped on-hit dice on a bound melee block", () => {
     expect(resolution.damageTotal).toBe(16);
   });
 
+  it("dragon-slayer adds 3d6 of the weapon's type against a Dragon, and nothing against another creature", () => {
+    const definition = definitionOf();
+    const catalog = catalogOf([shipped("dragon-slayer")]);
+    const dragon = loadMonsterDefinitions().find((entry) => entry.source.externalId === "adult-black-dragon")!;
+    const swing = (foeDefinitionId: string | undefined) => {
+      const state = fight(stateWith([boundTo("dragon-slayer", "longsword")]));
+      state.actors[1]!.definitionId = foeDefinitionId;
+      const action = effectiveActions(definition, state.actors[0], catalog).find(
+        (entry) => entry.id === "item-dragon-slayer"
+      )!;
+      // d20 = 10 (hit); longsword 1d8 = 5, +3 Strength and +1; the rider's 3d6 = 1 + 2 + 3.
+      return resolveDefinitionAction(
+        state,
+        action,
+        { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000205" },
+        {
+          ...deps([10, 5, 1, 2, 3], catalog, definition),
+          resolveDefinition: (id) => (id === "dragon" ? dragon : undefined)
+        }
+      );
+    };
+    expect(swing("dragon").damage).toEqual([
+      { formula: "1d8 + 4", type: "slashing", total: 9 },
+      { formula: "3d6", type: "slashing", total: 6 }
+    ]);
+    expect(swing(undefined).damage).toEqual([{ formula: "1d8 + 4", type: "slashing", total: 9 }]);
+  });
+
   it("frost-brand and sword-of-wounding land their dice the same way, each from its shipped record", () => {
     const definition = definitionOf();
     for (const [id, formula, faces, type, total] of [
@@ -441,14 +469,23 @@ describe("the authored riders are present in the shipped bundle", () => {
       "dwarven-thrower": ["attack-bonus +3", "damage-bonus +3"],
       defender: ["attack-bonus +3", "damage-bonus +3"],
       "vorpal-sword": ["attack-bonus +3", "damage-bonus +3"],
-      "holy-avenger": ["attack-bonus +3", "damage-bonus +3"],
+      "holy-avenger": ["attack-bonus +3", "damage-bonus +3", "extra-damage 2d10 radiant vs fiend, undead"],
       "scimitar-of-speed": ["attack-bonus +2", "damage-bonus +2"],
       "nine-lives-stealer": ["attack-bonus +2", "damage-bonus +2"],
       "quarterstaff-of-the-acrobat": ["attack-bonus +2", "damage-bonus +2"],
       "dagger-of-venom": ["attack-bonus +1", "damage-bonus +1"],
-      "giant-slayer": ["attack-bonus +1", "damage-bonus +1"],
-      "dragon-slayer": ["attack-bonus +1", "damage-bonus +1"],
-      "mace-of-smiting": ["attack-bonus +1", "damage-bonus +1"],
+      "giant-slayer": ["attack-bonus +1", "damage-bonus +1", "extra-damage 2d6 of the weapon's type vs giant"],
+      "dragon-slayer": ["attack-bonus +1", "damage-bonus +1", "extra-damage 3d6 of the weapon's type vs dragon"],
+      "mace-of-smiting": [
+        "attack-bonus +1",
+        "damage-bonus +1",
+        "attack-bonus +2 vs construct",
+        "damage-bonus +2 vs construct",
+        "damage-bonus +7 on a critical hit",
+        "damage-bonus +7 on a critical hit vs construct"
+      ],
+      "mace-of-disruption": ["extra-damage 2d6 radiant vs fiend, undead"],
+      "vicious-weapon": ["extra-damage 2d6 of the weapon's type"],
       "hammer-of-thunderbolts": ["attack-bonus +1", "damage-bonus +1"],
       "berserker-axe": ["attack-bonus +1", "damage-bonus +1"],
       "luck-blade": ["attack-bonus +1", "damage-bonus +1"],
@@ -457,10 +494,23 @@ describe("the authored riders are present in the shipped bundle", () => {
       "sword-of-wounding": ["extra-damage 2d6 necrotic"]
     };
     const WEAPON_SCOPED = ["attack-bonus", "extra-damage", "critical-range", "critical-bonus-dice", "damage-bonus"];
-    const nameOf = (modifier: { type: string; amount?: number; formula?: string; damageType?: string }): string =>
-      modifier.type === "extra-damage"
-        ? `extra-damage ${modifier.formula} ${modifier.damageType}`
-        : `${modifier.type} ${(modifier.amount ?? 0) >= 0 ? "+" : ""}${modifier.amount}`;
+    type Named = {
+      type: string;
+      amount?: number;
+      formula?: string;
+      damageType?: string;
+      when?: ReadonlyArray<{ type: string; creatureTypes?: readonly string[] }>;
+    };
+    // A gate names when the rider fires: on a critical hit, or against the creature types it names.
+    const gateOf = (modifier: Named): string => {
+      const crit = modifier.when?.some((trigger) => trigger.type === "on-critical-hit") ? " on a critical hit" : "";
+      const versus = modifier.when?.find((trigger) => trigger.type === "versus-creature-type")?.creatureTypes;
+      return `${crit}${versus ? ` vs ${versus.join(", ")}` : ""}`;
+    };
+    const nameOf = (modifier: Named): string =>
+      (modifier.type === "extra-damage"
+        ? `extra-damage ${modifier.formula} ${modifier.damageType ?? "of the weapon's type"}`
+        : `${modifier.type} ${(modifier.amount ?? 0) >= 0 ? "+" : ""}${modifier.amount}`) + gateOf(modifier);
     const actual = Object.fromEntries(
       weapons
         .map(
@@ -469,9 +519,7 @@ describe("the authored riders are present in the shipped bundle", () => {
               row.id,
               (row.modifiers ?? [])
                 .filter((modifier) => WEAPON_SCOPED.includes(modifier.type))
-                .map((modifier) =>
-                  nameOf(modifier as { type: string; amount?: number; formula?: string; damageType?: string })
-                )
+                .map((modifier) => nameOf(modifier as Named))
             ] as const
         )
         .filter(([, riders]) => riders.length > 0)
@@ -482,11 +530,15 @@ describe("the authored riders are present in the shipped bundle", () => {
     ).toEqual(AUTHORED);
 
     // Every +N pair has no explicit gate or scope: `THIS_ITEM_BY_DEFAULT` means "made with this magic
-    // weapon", and `scope: "bearer"` would let two magic weapons in a pack stack.
+    // weapon", and `scope: "bearer"` would let two magic weapons in a pack stack. A rider gated on the hit, a
+    // critical hit or the target's creature type is the item's own printed condition.
+    const printedGate = (trigger: { type: string }) =>
+      ["on-hit", "on-attack-roll", "on-critical-hit", "versus-creature-type"].includes(trigger.type);
     for (const row of weapons) {
       for (const modifier of row.modifiers ?? []) {
         if (!WEAPON_SCOPED.includes(modifier.type)) continue;
-        expect(modifier.when, `${row.id}/${modifier.type} must stay ungated`).toBeUndefined();
+        const printed = modifier.when !== undefined && modifier.when.every(printedGate);
+        if (!printed) expect(modifier.when, `${row.id}/${modifier.type} must stay ungated`).toBeUndefined();
         expect(
           (modifier as { scope?: string }).scope,
           `${row.id}/${modifier.type} must not set an explicit scope`
@@ -497,7 +549,7 @@ describe("the authored riders are present in the shipped bundle", () => {
 
   it("leaves every RESERVED item bare, so a later unit finds an unauthored carrier", () => {
     // Rows whose printed effects need mechanics the engine does not model yet.
-    for (const id of ["sun-blade", "energy-bow", "vicious-weapon", "spellguard-shield", "thunderous-greatclub"]) {
+    for (const id of ["sun-blade", "energy-bow", "spellguard-shield", "thunderous-greatclub"]) {
       const row = shipped(id) as unknown as { modifiers: unknown[]; casts: unknown[]; cursed: boolean };
       expect(row.modifiers, `${id} is reserved and must carry no modifiers`).toEqual([]);
       expect(row.casts, `${id} is reserved and must carry no casts`).toEqual([]);

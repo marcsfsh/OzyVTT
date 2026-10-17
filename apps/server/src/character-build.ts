@@ -194,7 +194,7 @@ const CARRIER_RIDER_DISPOSITION: Readonly<
   "extra-damage": "at-its-moment", // resolution/damage.ts rolls it as its own typed damage entry
   "damage-bonus": "standing", // effective-actions folds it into the first damage part's formula; a moment-gated one lands as a bonusDamage line in resolution/damage.ts
   "check-bonus": "standing", // checkRiderBonus, into every check and skill row and the builtin checks
-  "spell-attack-bonus": "unread", // no spell-attack path reads it yet
+  "spell-attack-bonus": "standing", // effective-actions folds it into a spell attack's bonus
   "damage-reduction": "at-its-moment", // hit-points.ts damageReductionsFor, taken off the hit before resistances
   "damage-resistance": "standing", // derivation.damageResistances, beside the definition's own
   "damage-vulnerability": "standing", // derivation.damageVulnerabilities, beside the definition's own
