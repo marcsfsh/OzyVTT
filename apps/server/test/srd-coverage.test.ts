@@ -40,9 +40,9 @@ describe("the SRD coverage manifest", () => {
     expect(Object.keys(GLOSSARY_COVERAGE).filter((id) => !glossary.has(id))).toEqual([]);
     const kinds = new Set(
       loadMonsterDefinitions().flatMap((definition) =>
-        (
-          (definition.extensions["open5e.srd-2024"] as { traits?: { name: string }[] } | undefined)?.traits ?? []
-        ).map((trait) => traitKind(trait.name))
+        ((definition.extensions["open5e.srd-2024"] as { traits?: { name: string }[] } | undefined)?.traits ?? []).map(
+          (trait) => traitKind(trait.name)
+        )
       )
     );
     expect(Object.keys(MONSTER_TRAIT_COVERAGE).filter((kind) => !kinds.has(kind))).toEqual([]);
@@ -55,7 +55,10 @@ describe("the SRD coverage manifest", () => {
     const keys = new Set([
       ...loadSpells().map((spell) => `spell:${spell.id}`),
       ...features.map((feature) => `feature:${feature.id}`),
-      ...loadEquipment().map((item) => `item:${item.id}`)
+      ...loadEquipment().map((item) => `item:${item.id}`),
+      ...loadMonsterDefinitions().flatMap((definition) =>
+        definition.actions.map((action) => `action:${definition.name}/${action.id}`)
+      )
     ]);
     expect(Object.keys(RECORD_OVERRIDES).filter((key) => !keys.has(key))).toEqual([]);
   });
