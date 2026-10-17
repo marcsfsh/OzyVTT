@@ -35,6 +35,7 @@ const ApiReferencePage = lazySurface(() => import("../integrations/ApiReference"
 const MapManager = lazySurface(() => import("../maps/MapManager").then((m) => m.MapManager));
 const ReplayList = lazySurface(() => import("../replay/ReplayList").then((m) => m.ReplayList));
 const ViewerControls = lazySurface(() => import("../viewer/ViewerControls").then((m) => m.ViewerControls));
+const SoundBoard = lazySurface(() => import("../sound/SoundBoard").then((m) => m.SoundBoard));
 // A floating panel over the table: nothing to hold its place while it loads.
 const ViewerPreviewPanel = lazySurface(
   () => import("../viewer/ViewerPreviewPanel").then((m) => m.ViewerPreviewPanel),
@@ -261,8 +262,15 @@ export function GmShell({
           />
         ))}
 
-      {/* The shared-screen controls own their frame. */}
-      {tab("viewer") && (
+      {/* The shared-screen controls own their frame: what the table screen shows, or at `/sound` what it plays. */}
+      {tab("viewer") && route.segments[1] === "sound" && (
+        <SoundBoard
+          gmToken={token}
+          scenes={scenes.map((scene) => ({ id: scene.id, name: scene.name }))}
+          activeSceneId={state.combat.activeSceneId ?? null}
+        />
+      )}
+      {tab("viewer") && route.segments[1] !== "sound" && (
         <ViewerControls
           gmToken={token}
           {...(selectedMap

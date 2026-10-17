@@ -14,6 +14,7 @@ import {
   MAP_ASSET_PATHS,
   OPENAPI_DOCUMENT_PATH,
   SESSION_PATHS,
+  SOUND_ASSET_PATHS,
   SYSTEM_PATHS,
   VIEWER_PATHS,
   VIEWER_SESSION_COOKIE
@@ -633,6 +634,107 @@ export const openApiDocument = {
         }
       }
     },
+    [SOUND_ASSET_PATHS.collection]: {
+      post: {
+        operationId: "uploadSoundAsset",
+        security: [{ gmAuth: [] }],
+        description:
+          "Uploads one sound file as the raw request body (MP3, Ogg Vorbis or Opus, WAV, M4A or ADTS AAC, WebM audio, or FLAC; at most 50 MB). `filename` and `name` are query parameters. The format is read from the bytes, not the name, and the file is walked far enough to read its length and refuse one cut short or holding video. Content-addressed: identical bytes return the existing sound with `duplicate: true`.",
+        parameters: [
+          { name: "filename", in: "query", schema: { type: "string" } },
+          { name: "name", in: "query", schema: { type: "string" } }
+        ],
+        requestBody: { required: true, content: { "audio/*": { schema: { type: "string", format: "binary" } } } },
+        responses: {
+          "201": {
+            description: "New sound stored",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/SoundAssetUploadResponse" } } }
+          },
+          "200": {
+            description: "Identical bytes already stored; the existing sound is returned",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/SoundAssetUploadResponse" } } }
+          },
+          "400": apiError,
+          "401": apiError,
+          "413": apiError
+        }
+      },
+      get: {
+        operationId: "listSoundAssets",
+        security: [{ gmAuth: [] }],
+        description: "The GM's sound library: each sound's name, format and length.",
+        responses: {
+          "200": {
+            description: "Every sound in the library",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/SoundAssetListResponse" } } }
+          },
+          "401": apiError
+        }
+      }
+    },
+    [SOUND_ASSET_PATHS.byId]: {
+      patch: {
+        operationId: "renameSoundAsset",
+        security: [{ gmAuth: [] }],
+        parameters: [uuidParam("id")],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                additionalProperties: false,
+                required: ["name"],
+                properties: { name: { type: "string", minLength: 1, maxLength: 120 } }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "The renamed sound",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/SoundAssetResponse" } } }
+          },
+          "400": apiError,
+          "401": apiError,
+          "404": apiError
+        }
+      },
+      delete: {
+        operationId: "deleteSoundAsset",
+        security: [{ gmAuth: [] }],
+        description:
+          "Deletes a sound from the library. It is taken off the sound board and every scene's sound first, and stops if it is playing.",
+        parameters: [uuidParam("id")],
+        responses: {
+          "200": {
+            description: "Deleted",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/SoundAssetDeletedResponse" } } }
+          },
+          "400": apiError,
+          "401": apiError,
+          "404": apiError
+        }
+      }
+    },
+    [SOUND_ASSET_PATHS.content]: {
+      get: {
+        operationId: "getSoundAssetContent",
+        description:
+          "The sound file's bytes. Authorized for the GM, or for a paired table screen (cookie) only while the sound is playing on it; never for a player. Supports ETag/If-None-Match (304) and byte ranges (206/416), and is sent with `Cache-Control: private, no-store`.",
+        security: [{ gmAuth: [] }, { viewerCookieAuth: [] }],
+        parameters: [uuidParam("id")],
+        responses: {
+          "200": { description: "The whole file" },
+          "206": { description: "Partial content for a byte-range request" },
+          "304": { description: "Not modified" },
+          "400": apiError,
+          "403": apiError,
+          "404": apiError,
+          "416": { description: "Range not satisfiable" }
+        }
+      }
+    },
     [VIEWER_PATHS.pairings]: {
       post: {
         operationId: "createViewerPairing",
@@ -702,7 +804,7 @@ export const openApiDocument = {
         responses: {
           "200": {
             description:
-              "Current player-safe presentation state (map, camera, measurement, pings, initiative, encounter)",
+              "Current player-safe presentation state (map, camera, measurement, pings, initiative, encounter, and what the sound board is playing)",
             content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerPresentationResponse" } } }
           },
           "401": { $ref: "#/components/responses/ApiError" }
@@ -741,6 +843,38 @@ export const openApiDocument = {
         }
       }
     },
+    [VIEWER_PATHS.soundStatus]: {
+      post: {
+        operationId: "reportViewerSoundStatus",
+        security: [{ viewerCookieAuth: [] }],
+        description:
+          "A paired table screen says whether its browser lets it play sound yet (`blocked` until someone taps it; `muted` for the GM's silent preview) and which sounds it could not play. The GM's sound board shows it.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                additionalProperties: false,
+                required: ["sound"],
+                properties: {
+                  sound: { type: "string", enum: ["on", "blocked", "muted"] },
+                  unplayable: { type: "array", maxItems: 20, items: { type: "string", format: "uuid" } }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "Received",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerSoundStatusResponse" } } }
+          },
+          "400": apiError,
+          "401": apiError
+        }
+      }
+    },
     [VIEWER_PATHS.events]: {
       get: {
         operationId: "streamViewerPresentation",
@@ -769,6 +903,22 @@ export const openApiDocument = {
             content: { "application/json": { schema: { $ref: "#/components/schemas/GameSnapshotResponse" } } }
           },
           "304": { description: "Unchanged since the revision in If-None-Match" },
+          "401": apiError,
+          "403": apiError
+        }
+      }
+    },
+    [GAME_PATHS.sound]: {
+      get: {
+        operationId: "getSoundBoard",
+        security: gameSecurity("scene:read"),
+        description:
+          "The sound board (GM-grade only): the playlist, ambient layers, effect pads and scene sounds, what is playing and from when (on `serverTime`'s clock), and each connected table screen's sound state. Players are never sent any of it; table screens receive only what is playing, through the viewer event stream.",
+        responses: {
+          "200": {
+            description: "The board",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/SoundBoardResponse" } } }
+          },
           "401": apiError,
           "403": apiError
         }
@@ -2068,6 +2218,48 @@ export const openApiDocument = {
             description: "The player-safe presentation projection; the same shape the event stream sends."
           }
         }
+      },
+      ViewerSoundStatusResponse: envelopeSchema("#/components/schemas/ViewerSoundStatusData"),
+      ViewerSoundStatusData: {
+        type: "object",
+        additionalProperties: false,
+        required: ["received"],
+        properties: { received: { const: true } }
+      },
+      SoundAssetUploadResponse: envelopeSchema("#/components/schemas/SoundAssetUploadData"),
+      SoundAssetUploadData: {
+        type: "object",
+        additionalProperties: false,
+        required: ["sound", "duplicate"],
+        properties: { sound: { $ref: "#/components/schemas/SoundAsset" }, duplicate: { type: "boolean" } }
+      },
+      SoundAssetListResponse: envelopeSchema("#/components/schemas/SoundAssetListData"),
+      SoundAssetListData: {
+        type: "object",
+        additionalProperties: false,
+        required: ["sounds"],
+        properties: { sounds: { type: "array", items: { $ref: "#/components/schemas/SoundAsset" } } }
+      },
+      SoundAssetResponse: envelopeSchema("#/components/schemas/SoundAssetData"),
+      SoundAssetData: {
+        type: "object",
+        additionalProperties: false,
+        required: ["sound"],
+        properties: { sound: { $ref: "#/components/schemas/SoundAsset" } }
+      },
+      SoundAssetDeletedResponse: envelopeSchema("#/components/schemas/SoundAssetDeletedData"),
+      SoundAssetDeletedData: {
+        type: "object",
+        additionalProperties: false,
+        required: ["deleted"],
+        properties: { deleted: { const: true } }
+      },
+      SoundBoardResponse: envelopeSchema("#/components/schemas/SoundBoardData"),
+      SoundBoardData: {
+        type: "object",
+        additionalProperties: false,
+        required: ["view"],
+        properties: { view: { $ref: "#/components/schemas/SoundBoardView" } }
       },
       ViewerCommandResponse: envelopeSchema("#/components/schemas/ViewerCommandData"),
       ViewerCommandData: {

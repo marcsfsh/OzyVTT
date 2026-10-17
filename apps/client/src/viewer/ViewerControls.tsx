@@ -5,6 +5,7 @@ import { HOST_PATHS } from "@vtt/api-contract";
 import { apiRequest } from "../lib/api";
 import { newId } from "../lib/ids";
 import { clampPoint, imagePointFromClient, useAuthorizedMapImage } from "../scene/mapImage";
+import { SharedScreenSwitch } from "./SharedScreenSwitch";
 import "./viewer-controls.css";
 
 type Point = Readonly<{ x: number; y: number }>;
@@ -16,7 +17,20 @@ type ViewerMetadata = Readonly<{
   lastUsedAt: string | null;
   revokedAt: string | null;
 }>;
-type ViewerConnection = Readonly<{ connectionId: string; viewerId: string; name: string; connectedAt: string }>;
+type ViewerConnection = Readonly<{
+  connectionId: string;
+  viewerId: string;
+  name: string;
+  connectedAt: string;
+  /** Whether the screen may play sound, or waits for someone to tap it. */
+  sound: "on" | "blocked" | "muted" | "unknown";
+}>;
+const SOUND_WORDS: Readonly<Record<ViewerConnection["sound"], string>> = {
+  on: "Sound on",
+  blocked: "Sound waits for a tap on the screen",
+  muted: "Preview, no sound",
+  unknown: "Checking sound"
+};
 type PresentationSummary = Readonly<{
   revision: number;
   enabled: boolean;
@@ -183,7 +197,10 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
           <h2 id="viewer-controls-title">Table viewer</h2>
           <p>Only explicitly presented, player-safe information appears on paired televisions and projectors.</p>
         </div>
-        <strong className={connections.length ? "online" : ""}>{connections.length} connected</strong>
+        <div className="viewer-controls-status">
+          <SharedScreenSwitch current="display" />
+          <strong className={connections.length ? "online" : ""}>{connections.length} connected</strong>
+        </div>
       </header>
 
       <div className="viewer-controls-body scroll-y frame-fill">
@@ -423,7 +440,11 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
                     <div>
                       <strong>{viewer.name}</strong>
                       <span>
-                        {viewer.revokedAt ? "Revoked" : connectedIds.has(viewer.id) ? "Connected" : "Offline"}
+                        {viewer.revokedAt
+                          ? "Revoked"
+                          : connectedIds.has(viewer.id)
+                            ? `Connected · ${SOUND_WORDS[connections.find((connection) => connection.viewerId === viewer.id)!.sound]}`
+                            : "Offline"}
                       </span>
                     </div>
                     {!viewer.revokedAt && (

@@ -210,6 +210,67 @@ export function IconPlay({ className }: Readonly<{ className?: string }>) {
   );
 }
 
+/** Pause: hold what is playing where it is. */
+export function IconPause({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M6.2 4.7h4.2v14.6H6.2zM13.6 4.7h4.2v14.6h-4.2z" />
+    </Glyph>
+  );
+}
+
+/** Stop: end what is playing. */
+export function IconStop({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M5.5 5.5h13v13h-13z" />
+    </Glyph>
+  );
+}
+
+/** Skip: on to the next track. */
+export function IconSkip({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M4.6 4.7 15 12 4.6 19.3zM16 4.7h3.4v14.6H16z" />
+    </Glyph>
+  );
+}
+
+/** Sound: a speaker with its waves. */
+export function IconVolume({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M2.8 8.6h4l5.4-4.4v15.6l-5.4-4.4h-4z" />
+      <path
+        d="M15.2 8.4a4.6 4.6 0 0 1 0 7.2M17.8 5.4a8.6 8.6 0 0 1 0 13.2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.4"
+      />
+    </Glyph>
+  );
+}
+
+/** No sound: the speaker struck through, for a screen that can't play yet. */
+export function IconVolumeOff({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M2.8 8.6h4l5.4-4.4v15.6l-5.4-4.4h-4z" />
+      <path d="M15 8.6 21.4 15M21.4 8.6 15 15" fill="none" stroke="currentColor" strokeWidth="2.6" />
+    </Glyph>
+  );
+}
+
+/** Music: a note, for the playlist. */
+export function IconMusic({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M9 4.6 20.4 2.6v13.1a3.4 3.4 0 1 1-2.8-3.3V7.4l-5.8 1v9.3a3.4 3.4 0 1 1-2.8-3.3z" />
+    </Glyph>
+  );
+}
+
 /** Forward: "this takes you there". Centred on the 24-box so it can be rotated for ← ↑ ↓. */
 export function IconArrow({ className }: Readonly<{ className?: string }>) {
   return (

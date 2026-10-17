@@ -24,6 +24,7 @@
 | [020](0020-combat-rules-engine.md)              | Accepted                                       | Server-owned combat rules: validated action resolution with rules modes + audited overrides, action instances, persistent effects, typed damage, and the dying state                                          |
 | [021](0021-player-character-sheet.md)           | Accepted                                       | Interactive player character sheet (builder-ready): the play sheet ships. The guided builder was deferred and **has since shipped** — see [its closing record](0021-player-character-sheet-closing-record.md) |
 | [022](0022-manual-fog-of-war.md)                | Accepted                                       | Manual GM-painted fog as ordered rect strokes over the scene boundary — presentation only, never the security boundary                                                                                        |
+| [024](0024-table-sound.md)                      | Accepted                                       | Music and ambient sound on the table screen only: a GM sound library, a server-run board in its own store, and a viewer feed that carries only what is playing                                                |
 
 Use [template.md](template.md) for material decisions. A proposed ADR becomes accepted only after its spike has evidence.
 

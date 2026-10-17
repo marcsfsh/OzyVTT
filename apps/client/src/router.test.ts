@@ -14,6 +14,7 @@ import {
   navigate,
   pathForGmTab,
   redirectForRetiredPath,
+  SOUND_BOARD_PATH,
   popTransient,
   pushTransient,
   registerNavigationGuard,
@@ -41,6 +42,15 @@ describe("The address table", () => {
     expect(pathForGmTab("viewer")).toBe("/viewer-controls");
     expect(gmTabForPath("/viewer-controls")).toBe("viewer");
     expect(gmTabForPath("/viewer")).toBeNull();
+  });
+
+  it("gives the sound board its own address in the Shared screen tab, for the GM only", () => {
+    expect(SOUND_BOARD_PATH).toBe("/viewer-controls/sound");
+    expect(gmTabForPath(SOUND_BOARD_PATH)).toBe("viewer");
+    expect(isKnownPath(SOUND_BOARD_PATH)).toBe(true);
+    expect(isKnownPath("/viewer-controls/sound/extra")).toBe(false);
+    expect(isKnownPath("/viewer-controls/music")).toBe(false);
+    expect(isGmOnlyPath(SOUND_BOARD_PATH)).toBe(true);
   });
 
   it("round-trips every GM tab through its address", () => {

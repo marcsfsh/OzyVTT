@@ -17,6 +17,7 @@ import { ACTOR_DEFINITION_SCHEMA_VERSION } from "@vtt/schemas";
 import { nextAnnotationExpiry } from "./annotations.js";
 import { fillMissingSpeeds, fillStoredProseFacts, reconcileArmorClasses, storedDefinition } from "./actor-roster.js";
 import { createApiV1Router } from "./api-v1.js";
+import { AudioAssetStore } from "./audio-assets.js";
 import { ContentLibrary } from "./content-library.js";
 import { equipmentCatalogOf } from "./equipment-derivation.js";
 import { reconcileMagicMarkers } from "./inventory.js";
@@ -61,6 +62,10 @@ import { ViewerCoordinator } from "./viewer-coordinator.js";
 import { createViewerRouter } from "./viewer-http.js";
 import { projectViewerEncounter } from "./viewer-encounter.js";
 import { ViewerPresentationStore } from "./viewer-presentation-store.js";
+import { SoundCatalogStore } from "./sound-catalog.js";
+import { createSoundRouter } from "./sound-http.js";
+import { SoundService } from "./sound-service.js";
+import { SoundStore } from "./sound-store.js";
 import { CharacterDraftStore } from "./character-drafts.js";
 import { turnReminder } from "./turn-reminder.js";
 
@@ -71,6 +76,7 @@ export type CreateServerOptions = {
   integrationCredentialsPath: string;
   mapAssetsPath?: string;
   tokenAssetsPath?: string;
+  soundAssetsPath?: string;
   webDist: string;
   useDevelopmentClient: boolean;
   developmentClientPort: number;
@@ -132,6 +138,27 @@ export function createServer(options: CreateServerOptions) {
     verifyIntegration: (token: string, scope: "codex:read" | "codex:write") => credentials.verify(token, scope)
   };
   const viewerCoordinator = new ViewerCoordinator(viewerAccess, viewerPresentation, authorizeGm);
+  // The table's sound (ADR-0024): the GM's library of files and the board, each in its own store. The board's
+  // output reaches table screens through the viewer feed and the GM's devices as `sound:changed`; players get none.
+  const soundAssets = new AudioAssetStore(
+    options.soundAssetsPath ?? join(dirname(options.databasePath), "sound-assets")
+  );
+  const soundCatalog = new SoundCatalogStore(options.databasePath);
+  const soundStore = new SoundStore(options.databasePath);
+  const sound = new SoundService({
+    store: soundStore,
+    assets: soundAssets,
+    catalog: soundCatalog,
+    screens: () => viewerCoordinator.soundScreens(),
+    changed: () => {
+      viewerCoordinator.broadcast();
+      pushSoundToGm();
+    }
+  });
+  viewerCoordinator.attachSound(
+    (now) => sound.viewerSound(now),
+    () => pushSoundToGm()
+  );
   const gmLoginRateLimiter = new LoginRateLimiter();
   const presence = new PresenceRegistry(options.presenceGraceMs ?? 8000, () => broadcast());
   const presenceFor = (sessionId: string) => presence.statusFor(sessionId);
@@ -173,6 +200,12 @@ export function createServer(options: CreateServerOptions) {
       }
       socket.emit("state:updated", gm ? gmView(current) : projectPlayerView(current, player?.sessionId, presenceFor));
     }
+  }
+  /** Sends the sound board to the GM's devices; a player's socket is never sent it. */
+  function pushSoundToGm() {
+    const view = sound.view();
+    for (const socket of io.sockets.sockets.values())
+      if (auth.verify(socket.handshake.auth?.token)) socket.emit("sound:changed", view);
   }
   /** Tells every client the codex changed so it refetches its own projected view. Content-free (only a
    *  revision): naming the changed scope would leak what the GM is working on. */
@@ -395,6 +428,7 @@ export function createServer(options: CreateServerOptions) {
     newId: randomUUID,
     // Archives live in the game store's own table; `replay.launch` reads one document through this hook.
     archiveDocument: (id) => store.getEncounterArchive(id),
+    sound,
     onEncounterArchived: ({ sceneId, turnCount }) => {
       // Log the fight to the codex timeline, pinned to the location marker that links this scene, if any.
       try {
@@ -546,6 +580,23 @@ export function createServer(options: CreateServerOptions) {
     })
   );
   app.use(
+    createSoundRouter({
+      service: sound,
+      assets: soundAssets,
+      authorizeGm,
+      // A table screen may load a sound only while it is playing; the GM's library stays the GM's.
+      authorizeViewer: (token, assetId) => {
+        if (!token) return false;
+        try {
+          viewerAccess.verify(token);
+          return sound.isOnAir(assetId);
+        } catch {
+          return false;
+        }
+      }
+    })
+  );
+  app.use(
     createCodexRouter({
       store: codexStore,
       assets: codexAssets,
@@ -639,6 +690,8 @@ export function createServer(options: CreateServerOptions) {
         presence.connect(gm.sessionId, "gm");
         acknowledge({ ok: true, role: "gm", sessionId: gm.sessionId });
         broadcast();
+        // The board too, so a GM device that (re)joins never waits for the next change to see it.
+        socket.emit("sound:changed", sound.view());
         return;
       }
       const existingPlayer = auth.verifyPlayer(token);
@@ -729,8 +782,12 @@ export function createServer(options: CreateServerOptions) {
       characterDrafts.initialize(),
       codexStore.initialize(),
       codexAssets.initialize(),
-      homebrewStore.initialize()
+      homebrewStore.initialize(),
+      soundAssets.initialize(),
+      soundCatalog.initialize(),
+      soundStore.initialize()
     ]);
+    await sound.initialize();
     // The store's startup seeds may change the state without a revision bump.
     committedState.reset();
     await reconcileContentDerived();
@@ -739,6 +796,7 @@ export function createServer(options: CreateServerOptions) {
   function close() {
     presence.dispose();
     viewerCoordinator.dispose();
+    sound.dispose();
     for (const timer of annotationExpiryTimers) clearTimeout(timer);
     annotationExpiryTimers.clear();
     io.close();
@@ -751,6 +809,8 @@ export function createServer(options: CreateServerOptions) {
     viewerPresentation.close();
     characterDrafts.close();
     homebrewStore.close();
+    soundCatalog.close();
+    soundStore.close();
   }
 
   return {
@@ -766,6 +826,7 @@ export function createServer(options: CreateServerOptions) {
     viewerAccess,
     viewerPresentation,
     viewerCoordinator,
+    sound,
     initialize,
     close
   };

@@ -10,6 +10,7 @@ import { DOCK_POSITIONS, EncounterPanel, type DockPosition } from "../encounter/
 import { useMediaQuery } from "../lib/useMediaQuery";
 import type { MapSelection } from "../maps/MapManager";
 import { ReplayShelf } from "../replay/ReplayShelf";
+import { NowPlaying } from "../sound/NowPlaying";
 import { EncounterMap } from "../scene/EncounterMap";
 import { SceneBuilder } from "../scenes/SceneBuilder";
 import { navigate, pathForGmTab } from "../router";
@@ -252,6 +253,8 @@ export function TableView(props: TableViewProps) {
         scrolls, except the docked arm: with the tracker docked into the map, the dice panel renders bare
         and cannot fit, so the column declares a scroll. */}
       <div className={`table-sidebar table-sheet${showDocked ? " scroll-y" : ""}`}>
+        {/* The table's sound, mid-fight: play or pause, volume, what is on. Nothing until the board holds sound. */}
+        {props.role === "gm" && <NowPlaying token={token} />}
         {props.role === "gm" && staged ? (
           <SceneBuilder
             scene={staged}

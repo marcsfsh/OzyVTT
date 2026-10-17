@@ -75,3 +75,5 @@ export * from "./results.js";
 export * from "./content.js";
 /** The Socket.IO contract both ends are typed against. */
 export * from "./socket.js";
+/** The table's music and ambient sound board (ADR-0024). */
+export * from "./sound.js";
