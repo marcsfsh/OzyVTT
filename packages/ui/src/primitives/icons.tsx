@@ -298,6 +298,15 @@ export function IconTerrain({ className }: Readonly<{ className?: string }>) {
   );
 }
 
+/** Wall: courses of brick, for walls, doors and what blocks sight on the map. */
+export function IconWall({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M3 3.4h18v4.4H3zM3 9.4h8.3v4.4H3zM12.7 9.4H21v4.4h-8.3zM3 15.4h18v4.4H3z" />
+    </Glyph>
+  );
+}
+
 /** Colour: labels a choice of colour only, never what a mark means. */
 export function IconColor({ className }: Readonly<{ className?: string }>) {
   return (

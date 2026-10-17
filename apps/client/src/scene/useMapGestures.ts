@@ -10,7 +10,7 @@ import type {
 import { setTemplatePlacement, toggleTarget, type TargetingSession } from "../encounter/targeting";
 import type { GridCalibration } from "./gridPreview";
 import { imagePointFromClient } from "./mapImage";
-import type { MapTool } from "./mapTools";
+import { isVisionTool, type MapTool } from "./mapTools";
 import type { MapCommands } from "./useMapCommands";
 import { anchoredCamera, clampZoom, imageAtFraction, MAP_OVERLAYS, type MapView, type Point } from "./useMapView";
 
@@ -32,6 +32,7 @@ export type Gesture =
   | Readonly<{ kind: "measure" | AnnotationShapeKind; origin: Point; current: Point }>
   | Readonly<{ kind: "fog"; op: "reveal" | "hide"; origin: Point; current: Point }>
   | Readonly<{ kind: "terrain"; op: "difficult" | "clear"; origin: Point; current: Point }>
+  | Readonly<{ kind: "wall"; wallKind: "wall" | "door" | "window"; origin: Point; current: Point }>
   | Readonly<{ kind: "annotation-move"; id: string; grab: Point; geometry: Readonly<{ origin: Point; target: Point }> }>
   | Readonly<{ kind: "annotation-resize"; id: string; anchor: Point; current: Point }>
   /** Two fingers. Every field is read when the pinch begins and never updated, so zoom is absolute
@@ -52,9 +53,9 @@ const TAP_SLOP = 8;
 
 /**
  * Pointer and keyboard handling for the map stage: token drags (and the tray's tap-to-place), pan,
- * pinch, measuring and shapes, fog strokes, moving and resizing a shape, template placement, and the
- * token menu by right-click or long press. Nothing is sent until a gesture ends, and a second finger
- * abandons the gesture underneath.
+ * pinch, measuring and shapes, fog strokes, walls and lights, doors, moving and resizing a shape, template
+ * placement, and the token menu by right-click or long press. Nothing is sent until a gesture ends, and a second
+ * finger abandons the gesture underneath.
  */
 export function useMapGestures({
   role,
@@ -74,7 +75,8 @@ export function useMapGestures({
   tokensById,
   resetKey,
   onSelect,
-  onContextMenu: openMenu
+  onContextMenu: openMenu,
+  onPlaceLight
 }: Readonly<{
   role: "gm" | "player";
   tool: MapTool;
@@ -96,6 +98,8 @@ export function useMapGestures({
   resetKey: string;
   onSelect: (annotationId: string | null) => void;
   onContextMenu: (menu: Readonly<{ actorId: string; x: number; y: number }>) => void;
+  /** The GM's Light tool: a tap places the chosen light there. */
+  onPlaceLight?: (point: Point) => void;
 }>) {
   const { camera, setCamera, boxFraction } = view;
   const { busyActorId, setMessage } = commands;
@@ -229,6 +233,40 @@ export function useMapGestures({
       setGesture({ kind: activeTargeting.template.shape, origin: point, current: point });
       return;
     }
+    // A door's handle opens or closes it (the GM's any, a player's beside their character, which the server checks).
+    const door = target.closest("[data-door-id]");
+    if (tool === "select" && door) {
+      event.preventDefault();
+      const doorId = door.getAttribute("data-door-id")!;
+      void commands.setDoorOpen(doorId, door.getAttribute("data-door-open") !== "true");
+      return;
+    }
+    if (role === "gm" && isVisionTool(tool)) {
+      const point = pointFromScreen(event.clientX, event.clientY);
+      if (!point) return;
+      event.preventDefault();
+      if (tool === "vision-erase") {
+        const wallId = target.closest("[data-wall-id]")?.getAttribute("data-wall-id");
+        const lightId = target.closest("[data-light-id]")?.getAttribute("data-light-id");
+        if (wallId) void commands.removeWall(wallId);
+        else if (lightId) void commands.removeLight(lightId);
+        else setMessage("Tap a wall, door, window or light to remove it.");
+        return;
+      }
+      if (tool === "vision-light") {
+        onPlaceLight?.(point);
+        return;
+      }
+      capturePointer(event);
+      setMessage("");
+      setGesture({
+        kind: "wall",
+        wallKind: tool === "vision-door" ? "door" : tool === "vision-window" ? "window" : "wall",
+        origin: point,
+        current: point
+      });
+      return;
+    }
     const handleId = target.closest<HTMLElement>("[data-annotation-handle]")?.dataset.annotationHandle;
     const shapeId = target.closest<HTMLElement>("[data-annotation-id]")?.dataset.annotationId;
     if (tool === "select" && shapeId) {
@@ -331,7 +369,13 @@ export function useMapGestures({
       });
       return;
     }
-    if (tool !== "select" && tool !== "terrain-difficult" && tool !== "terrain-clear" && calibration) {
+    if (
+      tool !== "select" &&
+      tool !== "terrain-difficult" &&
+      tool !== "terrain-clear" &&
+      !isVisionTool(tool) &&
+      calibration
+    ) {
       const point = pointFromScreen(event.clientX, event.clientY);
       if (!point) return;
       event.preventDefault();
@@ -489,6 +533,12 @@ export function useMapGestures({
       const { op, origin, current } = gesture;
       setGesture(null);
       commands.paintTerrain(op, origin, current);
+      return;
+    }
+    if (gesture.kind === "wall") {
+      const { wallKind, origin, current } = gesture;
+      setGesture(null);
+      commands.addWall(wallKind, origin, current);
       return;
     }
     if (gesture.kind === "measure") {

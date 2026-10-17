@@ -605,3 +605,10 @@
   fill: var(--surface-2);
   stroke: var(--line-strong);
 }
+
+/* Dynamic vision on the shared screen: the same flat opaque darkness as the fog, the party's remembered ground at
+   about half strength. */
+.vision-overlay-player {
+  fill: var(--void);
+  fill-opacity: 1;
+}

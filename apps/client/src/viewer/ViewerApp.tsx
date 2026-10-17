@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Input } from "@vtt/ui";
 import { ApiError, apiRequest } from "../lib/api";
 import { probeImageDimensions } from "../scene/mapImage";
-import { FogOverlay } from "../scene/FogOverlay";
+import { FogOverlay, type VisionMask } from "../scene/FogOverlay";
 import { TerrainOverlay } from "../scene/TerrainOverlay";
 import { bandFraction, TokenGlyph, TokenHealthAura, TokenStatusBadges } from "../scene/tokenGlyph";
 import { AnnotationGlyph, PingGlyph } from "../scene/annotationGlyph";
@@ -72,6 +72,8 @@ export type Presentation = Readonly<{
     }>;
     /** Difficult terrain the fog reveals. */
     terrain?: Readonly<{ difficult: readonly Readonly<{ x: number; y: number; width: number; height: number }>[] }>;
+    /** Dynamic vision: where the party sees now and what it has seen. */
+    vision?: VisionMask;
   }>;
 }>;
 
@@ -371,6 +373,11 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
             );
           return <AnnotationGlyph key={annotation.id} data={data} arrowSize={arrowSize} color={annotation.color} />;
         })}
+        {/* With dynamic vision on, dark where the party can't see; below the tokens, which are only those it
+          perceives. */}
+        {onActiveMap && presentation.encounter.vision && (
+          <FogOverlay width={size.width} height={size.height} vision={presentation.encounter.vision} variant="player" />
+        )}
         {tokens.map((token) => (
           <g
             className={`viewer-token ${token.kind}${token.active ? " active" : ""}`}
