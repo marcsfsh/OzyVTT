@@ -240,7 +240,8 @@ export function EncounterMap({
     onShapeAdded: (annotationId) => {
       setTool("select");
       setSelectedId(annotationId);
-    }
+    },
+    waitingAsks: state?.combat.pendingRuleAsks?.length ?? 0
   });
   const { message, busyActorId } = commands;
   const { gesture, handlers, keyboardMove } = useMapGestures({
