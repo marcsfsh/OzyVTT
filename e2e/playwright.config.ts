@@ -32,7 +32,7 @@ export default defineConfig({
     url: `http://localhost:${basePort + index}/api/v1/host/setup`,
     // Never run against a server that already holds data.
     reuseExistingServer: false,
-    // SIGTERM rather than the default kill, so the server removes its data directory.
+    // SIGTERM, so the server removes its data directory on the way out.
     gracefulShutdown: { signal: "SIGTERM", timeout: 5_000 }
   }))
 });
