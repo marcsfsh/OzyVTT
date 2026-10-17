@@ -1,4 +1,4 @@
-import { IconPlay } from "@vtt/ui";
+import { SunMark } from "@vtt/ui";
 import { initialsOf } from "../scene/tokenGlyph";
 import "./InitiativeList.css";
 
@@ -42,7 +42,7 @@ export function ConditionDots({
 }
 
 /**
- * One initiative row's shared content: avatar, active caret, name (+ optional "YOU" badge),
+ * One initiative row's shared content: avatar, the sun glyph on the active row, name (+ optional "YOU" badge),
  * condition dots, a coarse health note, and the score. Used by both the player panel and the
  * viewer; the caller owns the surrounding <li>. No HP bar: health is the coarse Bloodied/Down text
  * plus the token's ring on the map.
@@ -55,11 +55,7 @@ export function InitiativeRow({ entry, self = false }: Readonly<{ entry: Initiat
       </span>
       <span className="init-row-body">
         <span className="init-row-name-line">
-          {entry.active && (
-            <span className="init-row-caret" aria-hidden="true">
-              <IconPlay />
-            </span>
-          )}
+          {entry.active && <SunMark size="sm" className="init-row-caret" />}
           <strong className="init-row-name">{entry.name}</strong>
           {self && <span className="init-row-you">YOU</span>}
           <ConditionDots conditionIds={entry.conditionIds} conditions={entry.conditions} />

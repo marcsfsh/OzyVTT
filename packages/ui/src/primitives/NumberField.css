@@ -16,7 +16,7 @@
   transform: translateY(-50%);
   pointer-events: none;
   color: var(--text-dim);
-  font: 600 var(--fs-sm) / 1 var(--font-body);
+  font: 600 var(--fs-sm) / 1 var(--font-label);
 }
 
 /* Room for the suffix ("lb", "gp", "ft") so a long value never slides under it. */

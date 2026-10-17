@@ -1,21 +1,9 @@
-/* The bar, panel, rail and Tools button take the full material. The cut is a `mask-image`, not the
-   `.chamfer` backing layer, because the panel and rail scroll and an absolute backing layer would
-   scroll away with their content; a mask also does not clip hit-testing. The stop is `--chamfer / √2`
-   (stops run along the gradient axis). Masked elements show no box-shadow, so the plate is 94% opaque
-   and the rim separates them from the map. */
+/* The bar, panel, rail and Tools button share one edge. The plate is 94% opaque so the map shows
+   faintly through, and the edge separates them from it. */
 .map-toolbar,
 .map-toolbar-panel,
 .map-toolbar-rail,
 .map-toolbar-toggle {
-  --chamfer-mask-stop: calc(var(--chamfer) / 1.4142);
-  -webkit-mask-image:
-    linear-gradient(135deg, transparent 0 var(--chamfer-mask-stop), currentColor var(--chamfer-mask-stop)),
-    linear-gradient(315deg, transparent 0 var(--chamfer-mask-stop), currentColor var(--chamfer-mask-stop));
-  mask-image:
-    linear-gradient(135deg, transparent 0 var(--chamfer-mask-stop), currentColor var(--chamfer-mask-stop)),
-    linear-gradient(315deg, transparent 0 var(--chamfer-mask-stop), currentColor var(--chamfer-mask-stop));
-  -webkit-mask-composite: source-in;
-  mask-composite: intersect;
   border: var(--rim-w) solid var(--rim-color);
   outline: 1px solid var(--bezel-color);
   outline-offset: calc(-1 * var(--bezel-inset));
@@ -31,13 +19,11 @@
   max-width: 100%;
   padding: var(--space-1);
   border-radius: var(--radius-md);
-  background:
-    var(--material-scanline),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--surface-2) 94%, transparent),
-      color-mix(in srgb, var(--surface-1) 94%, transparent)
-    );
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-2) 94%, transparent),
+    color-mix(in srgb, var(--surface-1) 94%, transparent)
+  );
 }
 /* The rim brightens on hover, focus and press (touch has no hover). Only the phone's Tools button is
    a control here; the bar itself is not. */

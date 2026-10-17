@@ -15,12 +15,19 @@ The rules a UI change has to follow. Token values live in
 
 ## Look
 
-Retrowave in a magenta-to-blue range over deep indigo surfaces, with white and cool-grey text.
-The identity comes from colour, the perspective grid, neon linework and a faint screen texture,
-used with restraint.
+Chrome sun: retrowave in a magenta-to-blue range over deep indigo surfaces, with white and
+cool-grey text. The identity comes from the sun, square panels with a chrome lip, the perspective
+grid and neon linework, used with restraint.
 
+- The sun (`--grad-sun`) is the one warm thing, and it means "press this" or "this is now": the
+  primary button's frame, the current turn, the glyph beside the current name. Never decoration on
+  a resting surface, and never a fill behind words.
+- Every surface is square. A panel is a flat plate with a 1px edge and the 2px chrome lip along its
+  top (`--material-lip`); nested panels take the plate alone. Controls are raised (`--raised`).
 - Neon marks state: interactive, focused, selected or live. Resting surfaces stay dark.
 - At most one glowing element per region at rest, and one bold moment per view.
+- Chrome lettering belongs to the title screen alone. Every other heading is solid Bungee with the
+  hard heading shadow.
 - Nothing pulses or loops. One-shot cues (a crit flash, a bar filling) are fine.
 - Legibility wins every conflict with mood. In the light theme, without exception.
 
@@ -30,6 +37,7 @@ Never hard-code a colour in a component; add a token first and use `var(--...)`.
 
 | Meaning                        | Token                                                   |
 | ------------------------------ | ------------------------------------------------------- |
+| Press this, this is now        | `--grad-sun` (frames, the turn glyph, the sheet's pips) |
 | Primary action, attention      | `--magenta` (text uses `--magenta-text`)                |
 | Positive, heal, confirm, focus | `--success` / `--cyan` (text uses `--cyan-hi`)          |
 | Caution, "not finished"        | `--caution` (warm orange; text uses `--caution-hi`)     |
@@ -48,14 +56,17 @@ sunset and daybreak. They share one token set; only values change.
 
 ## Type
 
-| Role     | Token                        | Use                                             |
-| -------- | ---------------------------- | ----------------------------------------------- |
-| Wordmark | `--font-wordmark` (Bungee)   | App name and top-level view titles only         |
-| Display  | `--font-display` (Russo One) | Section headers, dice totals                    |
-| Body     | `--font-body` (Manrope)      | Everything functional, including control labels |
-| Mono     | `--font-mono` (Space Mono)   | Dice notation, modifiers, coordinates, HP       |
+| Role     | Token                         | Use                                                         |
+| -------- | ----------------------------- | ----------------------------------------------------------- |
+| Wordmark | `--font-wordmark` (Bungee)    | The app name                                                |
+| Display  | `--font-display` (Bungee)     | Headings, the primary button, the current name, stat values |
+| Label    | `--font-label` (Bai Jamjuree) | Tabs, uppercase labels, chips, secondary buttons            |
+| Body     | `--font-body` (Tomorrow)      | Names, descriptions, paragraphs                             |
+| Numbers  | `--font-numeric` (Tomorrow)   | HP, AC, initiative, modifiers, dice, every game number      |
+| Mono     | `--font-mono` (Space Mono)    | Code only                                                   |
 
-Use the `--fs-*` size tokens and `tabular-nums` on anything that updates live.
+Use the `--fs-*` size tokens. Tomorrow's digits are proportional, so a number that updates live
+reserves its widest value with `min-width` in `ch` and aligns to the end of that box.
 
 ## Layout
 
@@ -69,8 +80,8 @@ Use the `--fs-*` size tokens and `tabular-nums` on anything that updates live.
 - Breakpoints come from one ladder: `max-width` 760 / 650 / 560, and `min-width` 850 / 980 / 1280
   where a layout earns another column. The table viewer reflows on aspect ratio instead, because
   a TV is always landscape.
-- Spacing uses the 4px `--space-*` ladder. Surfaces are square (`--radius-sm/md/lg` are 0);
-  `--radius-pill` is for gauges, chips and token rings.
+- Spacing uses the 4px `--space-*` ladder. Surfaces are square (`--radius-sm/md/lg` are 0),
+  gauges and chips included; `--radius-pill` is for token rings, dots, avatars and swatches.
 
 ## Phones and touch
 
@@ -92,8 +103,11 @@ mouse is a bug.
 Build from `@vtt/ui`. A new primitive goes into `packages/ui` with `nh-` prefixed CSS and a test
 next to it.
 
-- One primary button per view. Labels are sentence case and name their result ("Roll
-  initiative", "End turn").
+- One primary button per view: the sun frame, its label in Bungee. Labels are sentence case and
+  name their result ("Roll initiative", "End turn").
+- A tab bar or segmented control is a sunken track; the chosen option is raised with a cyan
+  underline, because cyan is selection.
+- Chips and badges are a tinted strip with a 3px bar in their tone on the leading edge.
 - Hover owns the surface lift; selection owns the edge, the glow and the check mark.
 - Disabled controls dim colour, border and background individually, never with group opacity,
   and keep the reason for being disabled at full strength.

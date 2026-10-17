@@ -389,7 +389,7 @@
   border-radius: 0;
   background: color-mix(in srgb, var(--surface-3) 68%, var(--magenta));
   color: var(--text);
-  font: 800 clamp(1rem, 1.8vw, 1.85rem)/1 var(--font-mono);
+  font: 800 clamp(1rem, 1.8vw, 1.85rem)/1 var(--font-numeric);
   white-space: nowrap;
 }
 .viewer-hidden-turn {
@@ -447,7 +447,7 @@
 }
 .viewer-initiative li strong {
   color: var(--text);
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
 }
 .viewer-initiative .init-row {
   font-size: clamp(1.05rem, 1.3vw, 1.55rem);

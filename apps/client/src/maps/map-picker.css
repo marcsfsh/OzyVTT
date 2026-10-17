@@ -120,9 +120,9 @@
   color: var(--text);
 }
 
-/* Panel material on a backing layer, never the element, because `clip-path` clips hit-testing.
-   The picker is outermost and takes the scanline; tiles are nested and get rim + bezel over a flat
-   plate. Tiles are buttons, so they also get the cue wedge on hover/focus/press. */
+/* Panel material on a backing layer behind the content. The picker is outermost and takes the chrome
+   lip; tiles are nested and get the edge over a flat plate. Tiles are buttons, so they also get the
+   cue wedge on hover/focus/press. */
 .map-picker,
 .map-tile {
   position: relative;
@@ -138,7 +138,6 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
   border: var(--rim-w) solid var(--rim-color);
   background: var(--material-fill);
   background-origin: border-box;
@@ -150,7 +149,7 @@
     background var(--dur-hover);
 }
 .map-picker {
-  --material-fill: var(--material-scanline), var(--material-plate);
+  --material-fill: var(--material-lip), var(--material-plate);
 }
 .map-tile {
   --material-fill: var(--material-plate);

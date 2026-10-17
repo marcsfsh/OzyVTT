@@ -30,7 +30,7 @@
   z-index: 41;
 }
 /* Positioned from the ⋯ button's rect via inline top/left/width/max-height. This box is the frame
-   and does not scroll; `.encounter-menu-body` does. `.encounter-menu::before` (plate, rim, chamfer)
+   and does not scroll; `.encounter-menu-body` does. `.encounter-menu::before` (plate and edge)
    is `position: absolute; inset: -1px`, which in a scroll container would be sized to the
    scrollport and scroll away from the content. The 85vh cap is allowed on a fixed overlay. A menu
    takes a brighter rim than the panel it opened from. */

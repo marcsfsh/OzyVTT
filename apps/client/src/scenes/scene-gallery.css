@@ -33,8 +33,7 @@
   gap: var(--space-2);
 }
 
-/* The "New scene" door takes the resting glow (`--nh-glow`, the Button primitive's own hook, which
-   follows the chamfer). */
+/* The "New scene" button takes the resting glow (`--nh-glow`, the Button primitive's own hook). */
 .scene-gallery-bar .nh-btn--primary {
   --nh-glow: var(--glow-drop-magenta);
 }

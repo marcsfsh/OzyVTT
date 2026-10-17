@@ -82,9 +82,8 @@
   border-left-color: var(--success);
 }
 
-/* Panel material on a backing layer, never the element, because `clip-path` clips hit-testing.
-   `inset: -1px` spans the border box. The log is always the outermost panel, so it takes the
-   scanline; its rows do not. */
+/* Panel material on a backing layer behind the content; `inset: -1px` spans the border box. The log
+   is always the outermost panel, so it takes the chrome lip; its rows do not. */
 .combat-log {
   position: relative;
   isolation: isolate;
@@ -98,7 +97,6 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
   border: var(--rim-w) solid var(--rim-color);
   background: var(--material-fill);
   background-origin: border-box;
@@ -110,5 +108,5 @@
     background var(--dur-hover);
 }
 .combat-log {
-  --material-fill: var(--material-scanline), var(--material-plate);
+  --material-fill: var(--material-lip), var(--material-plate);
 }

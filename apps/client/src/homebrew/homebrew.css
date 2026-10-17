@@ -111,7 +111,7 @@
 /* Full font shorthand: the global h3 weight would otherwise synthesise faux-bold. */
 .hb-group-head {
   margin: 0;
-  font: 400 var(--fs-2xs) / 1.3 var(--font-display);
+  font: 700 var(--fs-2xs) / 1.3 var(--font-label);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-dim);
@@ -363,7 +363,7 @@
   min-height: var(--tap-min);
   display: flex;
   align-items: center;
-  font: 400 var(--fs-sm) / 1.3 var(--font-display);
+  font: 700 var(--fs-sm) / 1.3 var(--font-label);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-dim);
@@ -414,7 +414,7 @@
 }
 .hb-fieldset-legend {
   padding: 0 var(--space-2);
-  font: 400 var(--fs-xs) / 1.3 var(--font-display);
+  font: 700 var(--fs-xs) / 1.3 var(--font-label);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-dim);
@@ -533,7 +533,7 @@
 }
 .hb-lt-head {
   padding: var(--space-1) var(--space-2);
-  font: 400 var(--fs-2xs) / 1.3 var(--font-display);
+  font: 700 var(--fs-2xs) / 1.3 var(--font-label);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-dim);
@@ -677,9 +677,9 @@
   }
 }
 
-/* Material: the chamfer, rim and fill go on a ::before backing layer, not the element, because
-   clip-path also clips hit-testing. Scanlines only on the outermost panels (rail and detail);
-   nested panels and the modebar get the flat plate. Last in the file so it wins on source order. */
+/* Material: the edge and fill go on a ::before backing layer behind the content. The chrome lip only on
+   the outermost panels (rail and detail); nested panels and the modebar get the flat plate. Last in the
+   file so it wins on source order. */
 .hb-modebar,
 .hb-rail,
 .hb-main,
@@ -701,7 +701,6 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
   border: var(--rim-w) solid var(--rim-color);
   background: var(--material-fill);
   background-origin: border-box;
@@ -714,7 +713,7 @@
 }
 .hb-rail,
 .hb-main {
-  --material-fill: var(--material-scanline), var(--material-plate);
+  --material-fill: var(--material-lip), var(--material-plate);
 }
 .hb-modebar,
 .hb-section--advanced,

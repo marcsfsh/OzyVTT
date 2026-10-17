@@ -304,7 +304,7 @@
 }
 .map-preview text {
   fill: #0a0805;
-  font: 700 14px var(--font-mono);
+  font: 700 14px var(--font-numeric);
   text-anchor: middle;
   dominant-baseline: central;
 }
@@ -508,7 +508,7 @@
 .map-review dd {
   margin: 0;
   color: var(--text);
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-size: var(--fs-sm);
 }
 
@@ -605,7 +605,7 @@
 }
 .map-point-summary strong {
   color: var(--text);
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
 }
 
 /* Breakpoints: 560/561 is the pane's composition, 849/850 the rail's, 1280 where the rail stops
@@ -718,9 +718,9 @@
   }
 }
 
-/* Panel material on a backing layer, never the element, because `clip-path` clips hit-testing (the
-   crosshair row is five adjacent 44px targets). No scanline: these panels are nested, and the pane
-   itself has no fill so the canvas reads as the content. */
+/* Panel material on a backing layer behind the content (the crosshair row is five adjacent 44px
+   targets). No lip: these panels are nested, and the pane itself has no fill so the canvas reads as
+   the content. */
 .map-list-empty,
 .map-empty,
 .point-editor fieldset,
@@ -745,7 +745,6 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
   border: var(--rim-w) solid var(--rim-color);
   background: var(--material-fill);
   background-origin: border-box;

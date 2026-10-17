@@ -8,7 +8,7 @@
   border-radius: 50%;
   background: linear-gradient(140deg, var(--magenta), var(--cyan));
   color: var(--text-on-neon);
-  font: 800 var(--fs-sm) / 1 var(--font-body);
+  font: 700 var(--fs-sm) / 1 var(--font-body);
   letter-spacing: 0.02em;
   user-select: none;
   overflow: visible;

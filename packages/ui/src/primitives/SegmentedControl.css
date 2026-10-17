@@ -1,39 +1,15 @@
-/* The pressed option is filled with the per-theme `--state-on` and carries a leading tick. Each theme's hue also
-   means something else (dusk's orange = caution, light's cyan = focus, dark's magenta = primary/Switch), so the
-   shape disambiguates: the group takes the corner cut and the pressed option the tick.
-   The cut is on the group's backing layer, never on an option or the group itself, because clip-path would clip
-   the options' `.tap-target` hit areas. */
+/* A segmented control is the tab bar's track at a smaller scale: a sunken strip whose pressed option is raised and
+   underlined in cyan. Shape carries the state (raised box plus underline), so it reads without colour. */
 .nh-segmented {
-  position: relative;
-  isolation: isolate;
   display: inline-flex;
   /* Wrap rather than overflow: four options at 375px would otherwise run off-screen. */
   flex-wrap: wrap;
   gap: 2px;
   padding: 3px;
-  border: 1px solid transparent;
+  border: 0;
   border-radius: 0;
-  background: transparent;
-  --chamfer: 0.42rem;
-  --chamfer-cut: polygon(
-    0 var(--chamfer),
-    var(--chamfer) 0,
-    100% 0,
-    100% calc(100% - var(--chamfer)),
-    calc(100% - var(--chamfer)) 100%,
-    0 100%
-  );
-}
-.nh-segmented::before {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  z-index: -1;
-  box-sizing: border-box;
-  pointer-events: none;
-  clip-path: var(--chamfer-cut);
-  border: 1px solid var(--rim-color);
-  background: var(--surface-2);
+  background: var(--track);
+  box-shadow: inset 0 0 0 1px var(--track-edge);
 }
 .nh-segmented-option {
   position: relative;
@@ -43,30 +19,21 @@
   gap: var(--space-2);
   /* Paint stays compact; `.tap-target` on the option lifts the hit area to 44px. */
   min-height: 2.25rem;
-  /* The tick's own lane, on every option (the tick is a background and adds no width), so pressing never reflows
-     the row. */
-  padding: var(--space-2) var(--space-3) var(--space-2) calc(var(--space-3) + var(--cue-w) + var(--space-2));
+  padding: var(--space-2) var(--space-4);
   border: 0;
   border-radius: 0;
-  background-color: transparent;
+  background: transparent;
   color: var(--text-dim);
-  font: 600 var(--fs-sm) / 1 var(--font-body);
+  /* One weight for every option, so pressing never reflows the row. */
+  font: 600 var(--fs-sm) / 1 var(--font-label);
   cursor: pointer;
-  /* The cue at this control's scale; the root token's inset would paint through the first letter. Keep the 1:2
-     w:h ratio. Wider than the button's because this mark is a persistent state. */
-  --cue-w: 0.4rem;
-  --cue-h: 0.8rem;
-  --cue-inset: 0.3rem;
 }
 .nh-segmented--sm .nh-segmented-option {
   min-height: 1.85rem;
-  padding: var(--space-1) var(--space-2) var(--space-1) calc(var(--space-2) + var(--cue-w) + var(--space-1));
-  --cue-w: 0.34rem;
-  --cue-h: 0.68rem;
-  --cue-inset: 0.26rem;
+  padding: var(--space-1) var(--space-3);
 }
 /* Label and icon state their own ink: the client's `button span { color: var(--text-dim); margin-top }` would
-   otherwise beat the inherited pressed colour (leaving unreadable text on the fill) and push the label down. */
+   otherwise beat the inherited pressed colour and push the label down. */
 .nh-segmented-label,
 .nh-segmented-icon {
   color: inherit;
@@ -77,17 +44,14 @@
 .nh-segmented-option:hover,
 .nh-segmented-option:active {
   color: var(--text);
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
 }
-/* Pressed = the per-theme fill plus the leading tick, no glow (a filter shouldn't outshine the answer it
-   filters). The tick is a background because `::after` is the `.tap-target` extension; it sits inside the
-   left padding, so pressing can't reflow the row. */
 .nh-segmented-option[aria-pressed="true"] {
-  background-color: var(--state-on, var(--magenta));
-  color: var(--state-on-ink);
-  background-image: var(--cue-mark);
-  background-repeat: no-repeat;
-  background-size: var(--cue-w) var(--cue-h);
-  background-position: var(--cue-inset) center;
+  color: var(--text);
+  background: var(--tab-on);
+  box-shadow:
+    var(--tab-on-sheen),
+    inset 0 -2px 0 var(--cyan);
 }
 .nh-segmented-icon {
   font-size: 1em;

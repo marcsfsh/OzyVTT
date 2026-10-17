@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { GmView } from "@vtt/domain";
-import { Modal, Tabs, useToast } from "@vtt/ui";
+import { Modal, Tabs, useToast, Wordmark } from "@vtt/ui";
 import { PartyRosterTab } from "../actors/PartyRosterTab";
 import { useConfirm } from "../components/feedback";
 import { lazySurface } from "../components/lazySurface";
@@ -64,6 +64,7 @@ export function GmTabBar() {
   const gmTab: GmTab = litGmTab(route.path) ?? "table";
   return (
     <div className="frame-tabbar rim-gm">
+      <Wordmark variant="solid" sun className="app-logo" aria-hidden="true" />
       <Tabs
         className="gm-tabs"
         ariaLabel="GM sections"

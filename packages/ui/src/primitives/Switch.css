@@ -6,7 +6,7 @@
   border: 0;
   background: none;
   color: var(--text);
-  font: 600 var(--fs-sm) / 1.3 var(--font-body);
+  font: 600 var(--fs-sm) / 1.3 var(--font-label);
   cursor: pointer;
 }
 .nh-switch--labeled {
@@ -26,9 +26,9 @@
   margin: 0;
   font: inherit;
 }
-/* Sibling to SegmentedControl, not the same control: in dark both use the same magenta, so they differ by shape
-   (Switch = pill track and round thumb; SegmentedControl = cut rectangle and tick). The track keeps
-   `--radius-pill`; don't unify the shapes. */
+/* Sibling to SegmentedControl, not the same control, and they differ by shape (Switch = pill track and round
+   thumb; SegmentedControl = a square track with a raised, underlined option). The track keeps `--radius-pill`;
+   don't unify the shapes. */
 .nh-switch-track {
   position: relative;
   flex: none;

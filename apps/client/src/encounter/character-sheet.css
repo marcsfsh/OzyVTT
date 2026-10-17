@@ -5,7 +5,7 @@
   margin-top: 0.9rem;
   align-items: stretch;
 }
-/* Read mid-fight, so the chip takes a flat plate, never the scanline. */
+/* Read mid-fight, so the chip takes a flat plate. */
 .sheet-vital {
   display: flex;
   flex-direction: column;
@@ -26,7 +26,7 @@
   line-height: 1;
 }
 .sheet-vital strong {
-  font: 700 1.15rem/1 var(--font-mono);
+  font: 700 1.15rem/1 var(--font-numeric);
   color: var(--text);
 }
 .sheet-vital-hp {
@@ -57,7 +57,7 @@
 .sheet-section-label {
   display: block;
   color: var(--text-muted);
-  font: 800 var(--fs-2xs)/1 var(--font-mono);
+  font: 800 var(--fs-2xs)/1 var(--font-label);
   text-transform: uppercase;
   letter-spacing: 0.07em;
   margin-bottom: 0.35rem;
@@ -82,7 +82,7 @@
 }
 .sheet-rest-pool {
   color: var(--text-dim);
-  font: 700 var(--fs-sm) var(--font-mono);
+  font: 700 var(--fs-sm) var(--font-numeric);
 }
 .sheet-rest-pool.empty {
   color: var(--text-muted);
@@ -94,7 +94,7 @@
 }
 .sheet-settings-label {
   color: var(--text-muted);
-  font: 800 var(--fs-2xs)/1 var(--font-mono);
+  font: 800 var(--fs-2xs)/1 var(--font-label);
   text-transform: uppercase;
   letter-spacing: 0.07em;
 }
@@ -120,7 +120,7 @@
 .sheet-ability strong {
   display: block;
   font-size: 1rem;
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
 }
 .sheet-ability small {
   display: block;
@@ -197,7 +197,7 @@
 }
 .sheet-skill-list li strong {
   color: var(--text);
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
 }
 .sheet-spell-list li small {
   color: var(--text-muted);
@@ -232,7 +232,7 @@
   border-radius: var(--radius-md);
   background: var(--surface-3);
   color: var(--text);
-  font: 700 var(--fs-xs)/1 var(--font-mono);
+  font: 700 var(--fs-xs)/1 var(--font-numeric);
   cursor: pointer;
 }
 .sheet-roll-chip:hover:not(:disabled) {
@@ -252,7 +252,7 @@
   border-radius: var(--radius-md);
   background: var(--surface-3);
   color: var(--text-muted);
-  font: 700 var(--fs-2xs)/1 var(--font-mono);
+  font: 700 var(--fs-2xs)/1 var(--font-label);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   cursor: pointer;
@@ -290,7 +290,7 @@
 }
 .sheet-inv-head span {
   color: var(--text-muted);
-  font: 800 0.54rem/1 var(--font-mono);
+  font: 800 0.54rem/1 var(--font-label);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   text-align: center;
@@ -343,7 +343,7 @@
   border-radius: var(--radius-md);
   background: var(--surface-2);
   color: var(--text-muted);
-  font: 700 var(--fs-2xs)/1 var(--font-mono);
+  font: 700 var(--fs-2xs)/1 var(--font-label);
   text-transform: uppercase;
   letter-spacing: 0.03em;
   text-align: center;
@@ -370,7 +370,7 @@
   margin: 0.1rem 0 var(--space-2);
   padding-bottom: var(--space-1);
   border-bottom: 1px solid var(--line);
-  font: 800 var(--fs-2xs)/1 var(--font-mono);
+  font: 800 var(--fs-2xs)/1 var(--font-label);
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: var(--cyan-hi);
@@ -380,7 +380,7 @@
 }
 .sheet-action-subhead {
   margin: 0 0 0.35rem;
-  font: 800 var(--fs-2xs)/1 var(--font-mono);
+  font: 800 var(--fs-2xs)/1 var(--font-label);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-muted);
@@ -414,7 +414,7 @@
 }
 .sheet-item-cat {
   color: var(--text-muted);
-  font: 700 var(--fs-2xs)/1 var(--font-mono);
+  font: 700 var(--fs-2xs)/1 var(--font-label);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -462,7 +462,7 @@
   border-radius: var(--radius-pill);
   background: var(--surface-3);
   color: var(--text-muted);
-  font: 700 var(--fs-2xs)/1 var(--font-mono);
+  font: 700 var(--fs-2xs)/1 var(--font-label);
   text-transform: uppercase;
   letter-spacing: 0.03em;
   cursor: pointer;
@@ -507,7 +507,7 @@
 }
 .sheet-picker-owned {
   color: var(--cyan);
-  font: 700 var(--fs-2xs)/1 var(--font-mono);
+  font: 700 var(--fs-2xs)/1 var(--font-numeric);
 }
 .sheet-picker-meta {
   color: var(--text-muted);
@@ -577,7 +577,7 @@
   border-radius: var(--radius-md);
   background: var(--surface-2);
   color: var(--text);
-  font: 700 var(--fs-sm) var(--font-mono);
+  font: 700 var(--fs-sm) var(--font-numeric);
 }
 .sheet-editor {
   margin: var(--space-2) 0 0;
@@ -654,7 +654,7 @@
   border-radius: var(--radius-md);
   background: var(--surface-2);
   color: var(--text);
-  font: 700 var(--fs-xs)/1 var(--font-mono);
+  font: 700 var(--fs-xs)/1 var(--font-numeric);
   cursor: pointer;
 }
 .sheet-ability-rolls button:hover:not(:disabled) {
@@ -735,7 +735,7 @@
   border: 1.5px solid var(--line);
   display: grid;
   place-items: center;
-  font: 800 var(--fs-2xs)/1 var(--font-mono);
+  font: 800 var(--fs-2xs)/1 var(--font-numeric);
   color: transparent;
 }
 .sheet-prof-dot.proficient {
@@ -784,7 +784,7 @@
 }
 .sheet-spellcast-field strong {
   margin-top: 0.1rem;
-  font: 700 1rem/1 var(--font-mono);
+  font: 700 1rem/1 var(--font-numeric);
   color: var(--text);
 }
 .sheet-spell-group {
@@ -833,18 +833,18 @@
   content: "";
   display: block;
   height: 0.58rem;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--line-strong);
-  background: var(--surface-2);
+  border-radius: 0;
+  border: 1px solid var(--line-raised);
+  background: var(--track);
   transition:
     background var(--dur-hover) ease,
     border-color var(--dur-hover) ease,
     box-shadow var(--dur-hover) ease;
 }
 .sheet-pip.filled::before {
-  border-color: var(--cyan);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--cyan) 88%, var(--cyan-hi)), var(--cyan));
-  box-shadow: 0 0 4px color-mix(in srgb, var(--cyan) 45%, transparent);
+  border-color: transparent;
+  background: var(--grad-sun-glyph);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--magenta) 45%, transparent);
 }
 .sheet-pip:hover:not(:disabled)::before {
   border-color: var(--magenta);
@@ -855,7 +855,7 @@
 }
 .sheet-slot-count {
   color: var(--text-muted);
-  font: 700 var(--fs-2xs) var(--font-mono);
+  font: 700 var(--fs-2xs) var(--font-numeric);
 }
 .sheet-spell-list {
   grid-template-columns: 1fr;
@@ -962,7 +962,7 @@
   border-radius: var(--radius-md);
   background: var(--surface-2);
   color: var(--text);
-  font: 700 var(--fs-2xs)/1 var(--font-mono);
+  font: 700 var(--fs-2xs)/1 var(--font-numeric);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1034,7 +1034,7 @@
   border: 1px solid var(--line);
   background: var(--surface-3);
   color: var(--text-muted);
-  font: 700 var(--fs-2xs)/1.2 var(--font-mono);
+  font: 700 var(--fs-2xs)/1.2 var(--font-label);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -1102,10 +1102,9 @@
 }
 
 /* Header: name and identity on the left; log toggle, Pop out, New tab and × on the right.
-   The hero treatment (scanline, 2px bottom rim, glow) is pure paint on a backing layer at `inset: 0`
-   whose bottom border replaces the old 1px rule, so the header's height does not change. The glow is
-   a `filter` on the layer, never a `box-shadow` on the element: it follows the cut and does not make
-   the header a containing block for the modal's fixed children. */
+   The hero treatment (chrome lip, bottom edge, glow) is pure paint on a backing layer at `inset: 0`, so the
+   header's height does not change. The glow is a `filter` on the layer, never a `box-shadow` on the element,
+   which would make the header a containing block for the modal's fixed children. */
 .sheet-header {
   position: relative;
   isolation: isolate;
@@ -1123,9 +1122,8 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
   border-bottom: var(--rim-w) solid var(--rim-color);
-  background: var(--material-scanline), var(--material-plate);
+  background: var(--material-lip), var(--material-plate);
   background-origin: border-box;
   background-clip: border-box;
   filter: var(--rim-glow);
@@ -1138,10 +1136,35 @@
   min-width: 0;
   flex: 1;
 }
+/* The sheet's two touches of the sun: the portrait's sunset frame with the short rule under the name, and the
+   spell slot pips. */
+.sheet-portrait {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  box-sizing: border-box;
+  border: 3px solid transparent;
+  background:
+    linear-gradient(160deg, var(--surface-3) 0%, var(--surface-1) 75%) padding-box,
+    var(--grad-sun) border-box;
+  box-shadow: var(--glow-sun);
+  color: var(--heading-ink);
+  font: 400 1.2rem / 1 var(--font-display);
+}
 .sheet-name {
   display: block;
   font: 400 var(--fs-h1) / 1.1 var(--font-display);
-  color: var(--text);
+  color: var(--heading-ink);
+  text-shadow: var(--heading-shadow);
+}
+.sheet-name-rule {
+  display: block;
+  width: 4rem;
+  height: 2px;
+  margin: 0.35rem 0 0.1rem;
+  background: var(--grad-sun-x);
 }
 .sheet-header-sub {
   display: flex;
@@ -1152,7 +1175,7 @@
 }
 .sheet-idline {
   color: var(--cyan-hi);
-  font: 700 var(--fs-sm)/1.2 var(--font-mono);
+  font: 700 var(--fs-sm)/1.2 var(--font-numeric);
 }
 .sheet-header-controls {
   display: flex;
@@ -1240,7 +1263,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text);
-  font: 700 var(--fs-2xs)/1.5 var(--font-mono);
+  font: 700 var(--fs-2xs)/1.5 var(--font-label);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -1249,7 +1272,7 @@
   align-items: baseline;
   gap: 0.35rem;
   margin-left: auto;
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-size: var(--fs-sm);
 }
 .sheet-last-roll-faces {
@@ -1355,6 +1378,11 @@
   flex: 1;
   min-height: 0;
 }
+/* The embedded header is one compact row, so it drops the portrait and the rule. */
+.sheet-embedded .sheet-portrait,
+.sheet-embedded .sheet-name-rule {
+  display: none;
+}
 /* Inside the tracker on a phone the sheet is a pane, not a document: the header collapses to one
    row (name, controls, way back) so the sheet body keeps usable height. */
 @media (max-width: 979px) {
@@ -1363,8 +1391,9 @@
   .sheet-header {
     flex-wrap: wrap;
   }
+  /* The portrait keeps its place beside the name; the 4.3rem is its width plus the header's gap. */
   .sheet-header-id {
-    flex: 1 1 100%;
+    flex: 1 1 calc(100% - 4.3rem);
   }
   .sheet-embedded .sheet-header {
     flex-wrap: nowrap;

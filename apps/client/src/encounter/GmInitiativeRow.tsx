@@ -1,4 +1,4 @@
-import { IconPlay } from "@vtt/ui";
+import { SunMark } from "@vtt/ui";
 import { useRef, useState, type ReactNode, type Ref } from "react";
 import type { GmActor, GmView, InitiativeEntry, MutationResult } from "@vtt/domain";
 import { healthBandFor, useConditionLabels } from "./conditions";
@@ -148,11 +148,7 @@ export function GmInitiativeRow({
           </span>
           <span className="initiative-main-col">
             <span className="initiative-name-line">
-              {active && (
-                <span className="initiative-caret" aria-hidden="true">
-                  <IconPlay />
-                </span>
-              )}
+              {active && <SunMark size="sm" className="initiative-caret" />}
               <strong className="initiative-name-text">{actor?.name ?? "(removed)"}</strong>
               {actor && <ConditionDots conditionIds={conditionIds} conditions={conditionLabels} />}
               {actor && state.combat.reactionsUsed.includes(actor.id) && (

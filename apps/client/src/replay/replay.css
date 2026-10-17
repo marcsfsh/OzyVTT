@@ -81,7 +81,7 @@
   min-width: 8rem;
 }
 .replay-position {
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-variant-numeric: tabular-nums;
   opacity: 0.8;
   white-space: nowrap;
@@ -202,10 +202,10 @@
 .replay-initiative li > strong {
   grid-column: 2;
   grid-row: 1;
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
 }
 .replay-init-hp {
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-size: 0.82rem;
   opacity: 0.8;
   grid-column: 1;
@@ -312,11 +312,10 @@
   }
 }
 
-/* Panel material on a backing layer, never the element, because `clip-path` clips hit-testing.
-   The missing-stage panel is an empty surface, so it gets the full treatment with the rest glow;
+/* Panel material on a backing layer behind the content. The missing-stage panel is an empty surface, so it gets the full treatment with the rest glow;
    it is the only thing on the stage when shown. */
 .replay-stage-missing {
-  --material-fill: var(--material-scanline), var(--material-plate);
+  --material-fill: var(--material-lip), var(--material-plate);
 }
 .replay-stage-missing::before {
   content: "";
@@ -325,7 +324,6 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
   border: var(--rim-w) solid var(--rim-color);
   background: var(--material-fill);
   background-origin: border-box;

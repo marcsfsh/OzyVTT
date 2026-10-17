@@ -4,8 +4,8 @@
 }
 
 /* Trigger and items meet the 44px floor as paint: overlapping `.tap-target` extensions in a popover list
-   would steal neighbours' taps. The trigger's cut is on a backing layer because clip-path would eat the
-   icon variant's `::after` hit area. */
+   would steal neighbours' taps. The trigger is a raised control painted on a backing layer, because the icon
+   variant's `::after` is its hit area. */
 .nh-menu-trigger {
   position: relative;
   isolation: isolate;
@@ -19,12 +19,11 @@
   border-radius: 0;
   background: transparent;
   color: var(--text);
-  font: 600 var(--fs-sm) / 1 var(--font-body);
+  font: 600 var(--fs-sm) / 1 var(--font-label);
   cursor: pointer;
   list-style: none;
-  --nh-fill: var(--surface-2);
-  --nh-rim: var(--rim-color);
-  --chamfer-trigger: 0.38rem;
+  --nh-fill: var(--raised);
+  --nh-rim: var(--line-raised);
 }
 .nh-menu-trigger::before {
   content: "";
@@ -33,16 +32,9 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: polygon(
-    0 var(--chamfer-trigger),
-    var(--chamfer-trigger) 0,
-    100% 0,
-    100% calc(100% - var(--chamfer-trigger)),
-    calc(100% - var(--chamfer-trigger)) 100%,
-    0 100%
-  );
   border: 1px solid var(--nh-rim);
   background: var(--nh-fill);
+  box-shadow: var(--raised-sheen);
   transition:
     border-color var(--dur-hover),
     background-color var(--dur-hover);
@@ -56,6 +48,7 @@
 /* `:active` says what `:hover` says. */
 .nh-menu-trigger:hover,
 .nh-menu-trigger:active {
+  --nh-fill: var(--raised-hover);
   --nh-rim: var(--rim-color-hi);
 }
 
@@ -79,7 +72,6 @@
   line-height: 1;
   --nh-rim: var(--rim-color);
   --nh-fill: color-mix(in srgb, var(--surface-2) 82%, transparent);
-  --chamfer-trigger: 0.26rem;
 }
 .nh-menu-trigger--icon::after,
 .nh-card-tools .nh-menu-trigger::after {
@@ -135,23 +127,10 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
-  /* The brighter rim: `--rim-color-hi`, one step above an ordinary panel's `--rim-color`. */
-  border: var(--rim-w) solid var(--rim-color-hi);
-  background-color: var(--surface-2);
-  background-image:
-    linear-gradient(
-      to bottom,
-      transparent 0 calc(var(--scanline-gap) - 1px),
-      var(--scanline-color) calc(var(--scanline-gap) - 1px) var(--scanline-gap)
-    ),
-    linear-gradient(to bottom, color-mix(in srgb, var(--text) 5%, transparent), transparent 45%);
-  background-repeat: repeat, no-repeat;
-  background-size:
-    100% var(--scanline-gap),
-    100% 100%;
-  background-origin: border-box;
-  background-clip: border-box;
+  /* A floating panel: the raised edge, since it sits over other panels, and the panel's lip. */
+  border: var(--rim-w) solid var(--line-raised);
+  background: var(--material-lip), linear-gradient(var(--surface-2), var(--surface-2));
+  box-shadow: var(--shadow-2);
 }
 
 .nh-menu-item {
@@ -165,7 +144,7 @@
   border-radius: 0;
   background: transparent;
   color: var(--text);
-  font: 500 var(--fs-sm) / 1.3 var(--font-body);
+  font: 600 var(--fs-sm) / 1.3 var(--font-label);
   text-align: left;
   cursor: pointer;
   transition:

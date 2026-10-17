@@ -64,7 +64,7 @@
   line-height: 1.35;
 }
 .nh-review-stats dd.nh-review-num {
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-variant-numeric: tabular-nums;
 }
 

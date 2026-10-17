@@ -1,5 +1,5 @@
 /* The reveal toggle is an icon-only eye; magenta is the state. The 44px floor is met by `.tap-target`, not paint,
-   because it sits in dense rows. No `--chamfer-cut`: the paint is a glyph, not a box. */
+   because it sits in dense rows. */
 .nh-reveal {
   display: inline-flex;
   vertical-align: middle;
@@ -52,7 +52,7 @@
 
 /* The GM-only content pill reads as status: mono face, tracked uppercase. */
 .nh-reveal-pill {
-  font-family: var(--font-mono);
+  font-family: var(--font-label);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }

@@ -403,7 +403,7 @@
   font-weight: 700;
   text-align: center;
   font-size: var(--fs-body);
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
 }
 .action-apply {
   width: 100%;

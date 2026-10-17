@@ -105,8 +105,8 @@
   color: var(--text);
 }
 
-/* Panel material on a backing layer, never the element, because `clip-path` clips hit-testing.
-   The two outer panels take the scanline; `.scene-create` is nested and gets rim + bezel. The
+/* Panel material on a backing layer behind the content. The two outer panels take the chrome lip;
+   `.scene-create` is nested and gets the edge over a flat plate. The
    staging workspace is GM-private, so `.scene-builder` keeps its violet edge, moved onto the layer
    (a negative-z-index pseudo paints above its owner's border). */
 .scene-panel,
@@ -126,7 +126,6 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
   border: var(--rim-w) solid var(--rim-color);
   background: var(--material-fill);
   background-origin: border-box;
@@ -139,7 +138,7 @@
 }
 .scene-panel,
 .scene-builder {
-  --material-fill: var(--material-scanline), var(--material-plate);
+  --material-fill: var(--material-lip), var(--material-plate);
 }
 .scene-create {
   --material-fill: var(--material-plate);

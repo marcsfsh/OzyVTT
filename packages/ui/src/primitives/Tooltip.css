@@ -36,17 +36,9 @@
   inset: 0;
   z-index: -1;
   box-sizing: border-box;
-  clip-path: polygon(0 0.34rem, 0.34rem 0, 100% 0, 100% calc(100% - 0.34rem), calc(100% - 0.34rem) 100%, 0 100%);
-  border: var(--rim-w) solid var(--rim-color-hi);
-  background-color: var(--surface-2);
-  background-image: linear-gradient(
-    to bottom,
-    transparent 0 calc(var(--scanline-gap) - 1px),
-    var(--scanline-color) calc(var(--scanline-gap) - 1px) var(--scanline-gap)
-  );
-  background-size: 100% var(--scanline-gap);
-  background-origin: border-box;
-  background-clip: border-box;
+  border: var(--rim-w) solid var(--line-raised);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-2);
 }
 .nh-tooltip--bottom .nh-tooltip-bubble {
   bottom: auto;

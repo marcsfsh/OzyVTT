@@ -32,12 +32,10 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
   border: 1px solid var(--line);
   border-left: 2px solid var(--nh-rule);
   background: var(--surface-2);
-  /* A lift as a drop-shadow filter, since box-shadow can't follow the cut. */
-  filter: drop-shadow(0 6px 14px color-mix(in srgb, var(--void) 55%, transparent));
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--void) 55%, transparent);
 }
 .nh-toast--success {
   --nh-rule: var(--success);

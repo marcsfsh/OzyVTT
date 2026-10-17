@@ -79,7 +79,7 @@ export function applyMarkdownFormat(
   }
 }
 
-/** Toolbar marks. Letterforms (B / I / S / H) stay text; symbols are SVG paths because Manrope lacks them and
+/** Toolbar marks. Letterforms (B / I / S / H) stay text; symbols are SVG paths because the body face lacks them and
  * the platform would substitute a face at the wrong size or an emoji. */
 function Mark({ children }: Readonly<{ children: ReactNode }>) {
   return (

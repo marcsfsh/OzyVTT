@@ -151,9 +151,8 @@
   }
 }
 
-/* The panel material on a `::before` backing layer, as `.nh-panel::before` does: `clip-path` clips
-   hit-testing, so it must not be on the element. `inset: -1px` puts the rim where the border was.
-   Thumbs are tiles in a grid, so no texture (many textured tiles cause interference). */
+/* The panel material on a `::before` backing layer; `inset: -1px` puts the edge where the border was.
+   Thumbs are tiles in a grid, so no lip. */
 .token-library-empty,
 .token-thumb {
   position: relative;
@@ -169,7 +168,6 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
   border: var(--rim-w) solid var(--rim-color);
   background: var(--material-fill);
   background-origin: border-box;
@@ -181,7 +179,7 @@
     background var(--dur-hover);
 }
 .token-library-empty {
-  --material-fill: var(--material-scanline), var(--material-plate);
+  --material-fill: var(--material-lip), var(--material-plate);
 }
 .token-thumb {
   --material-fill: var(--material-plate);

@@ -36,35 +36,27 @@
   flex-wrap: wrap;
   row-gap: 0.1em;
 }
-/* The caret renders only for the active entry, so it mounts on the turn change and this one-shot
-   animation runs exactly once. The map token pulses in the same beat (`encounter-turn-pulse`,
-   encounter-map.css), so a player watching the map also notices. */
-.init-row-caret {
-  flex: none;
-  color: var(--magenta-text);
-  font-size: 0.85em;
-  animation: init-turn-flare 0.6s var(--ease-settle, ease-out) 1;
+/* The sun glyph renders only for the active entry, so it mounts on the turn change and this one-shot rise runs
+   exactly once. The map token pulses in the same beat (`encounter-turn-pulse`, encounter-map.css), so a player
+   watching the map also notices. */
+.init-row-caret,
+.initiative-caret {
+  animation: init-turn-rise 0.6s var(--ease-settle, ease-out) 1;
 }
-@keyframes init-turn-flare {
+@keyframes init-turn-rise {
   0% {
     opacity: 0;
-    transform: translateX(-0.5em) scale(0.7);
-    text-shadow: none;
-  }
-  45% {
-    opacity: 1;
-    transform: translateX(0) scale(1.35);
-    text-shadow: 0 0 0.5em var(--magenta);
+    transform: translateY(0.35em) scale(0.7);
   }
   100% {
     opacity: 1;
-    transform: translateX(0) scale(1);
-    text-shadow: none;
+    transform: none;
   }
 }
-/* The caret still marks the active row; it just arrives without the flare. */
+/* The glyph still marks the active row; it just arrives without the rise. */
 @media (prefers-reduced-motion: reduce) {
-  .init-row-caret {
+  .init-row-caret,
+  .initiative-caret {
     animation: none;
   }
 }
@@ -120,7 +112,7 @@
   flex: none;
   min-width: 2.2em;
   color: var(--text);
-  font-family: var(--font-mono);
+  font-family: var(--font-numeric);
   font-weight: 800;
   font-size: 0.95em;
   text-align: right;

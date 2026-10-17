@@ -10,6 +10,7 @@ import { beginTargeting, setTargetingResult, useTargeting } from "./targeting";
 import { formatChallenge, titleCase } from "./format";
 import type { SrdExtension } from "./sheet-extension";
 import { sameName } from "./sheet-names";
+import { initialsOf } from "../scene/tokenGlyph";
 import { SheetAbilities } from "./SheetAbilities";
 import { SheetActions } from "./SheetActions";
 import { SheetIdentityEditor } from "./SheetIdentityEditor";
@@ -334,8 +335,12 @@ export function CharacterSheet({
       className={`sheet-header${draggable ? " sheet-header--drag" : ""}`}
       onPointerDown={draggable ? beginDrag("move") : undefined}
     >
+      <span className="sheet-portrait" aria-hidden="true">
+        {initialsOf(actor.name)}
+      </span>
       <div className="sheet-header-id">
         <strong className="sheet-name">{actor.name}</strong>
+        <span className="sheet-name-rule" aria-hidden="true" />
         <div className="sheet-header-sub">
           <span className="sheet-idline">{identityLine}</span>
           {actor.kind === "player-character" && definition && editMode !== "identity" && (

@@ -26,8 +26,8 @@
   right: var(--space-4);
   margin-bottom: 0;
 }
-/* Staging tray chips: neutral plate, team colour on a 1px edge and the round avatar disc. The cut
-   stays on a backing layer: `.tray-token` is the drag surface, and `clip-path` clips hit-testing. */
+/* Staging tray chips: neutral plate, team colour on a 1px edge and the round avatar disc, painted on a
+   backing layer behind the drag surface. */
 .encounter-token-tray {
   position: relative;
   isolation: isolate;
@@ -53,7 +53,6 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
   border: 1px solid var(--tray-edge);
   background: var(--material-fill);
   background-origin: border-box;
@@ -84,9 +83,7 @@
   justify-content: flex-end;
   gap: 0.45rem;
 }
-/* `--chamfer-cut` must be restated, not just `--chamfer`: a custom property's `var()`s are substituted
-   where it is declared, so it inherits from `:root` as a fixed polygon (see Badge.css). `--team` is
-   the one value the three kinds change. */
+/* `--team` is the one value the three kinds change. */
 .tray-token {
   position: relative;
   isolation: isolate;
@@ -102,15 +99,6 @@
   touch-action: none;
   --team: var(--cyan);
   --team-edge: color-mix(in srgb, var(--team) 45%, var(--line-strong));
-  --chamfer: 0.32rem;
-  --chamfer-cut: polygon(
-    0 var(--chamfer),
-    var(--chamfer) 0,
-    100% 0,
-    100% calc(100% - var(--chamfer)),
-    calc(100% - var(--chamfer)) 100%,
-    0 100%
-  );
 }
 .tray-token::before {
   content: "";
@@ -119,7 +107,6 @@
   z-index: -1;
   box-sizing: border-box;
   pointer-events: none;
-  clip-path: var(--chamfer-cut);
   border: 1px solid var(--team-edge);
   background: var(--material-plate);
   background-origin: border-box;
@@ -422,7 +409,7 @@
   background: transparent;
   padding: 0;
 }
-/* The dock is the frame, so the panel's own `::before` frame (and scanline) is dropped. */
+/* The dock is the frame, so the panel's own `::before` frame (and lip) is dropped. */
 .encounter-map-dock .encounter-panel::before {
   display: none;
 }
@@ -596,7 +583,7 @@
 
 .encounter-live-distance {
   fill: var(--cyan-hi);
-  font: 800 15px var(--font-mono);
+  font: 800 15px var(--font-numeric);
   text-anchor: middle;
   paint-order: stroke;
   stroke: #0a0805;

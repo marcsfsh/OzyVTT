@@ -7,9 +7,44 @@
   letter-spacing: var(--tracking-display);
   text-transform: uppercase;
 }
+/* The app bar's lockup: the sun glyph, then the name. The glyph scales with the name's font size. */
+.nh-wordmark-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  font-size: var(--fs-h2);
+}
+.nh-wordmark-lockup .nh-wordmark {
+  font-size: inherit;
+}
+.nh-wordmark-lockup .nh-sun {
+  width: 1.2em;
+  height: 0.6em;
+}
+
+/* The sun glyph: a half disc in the glyph gradient with two slats cut out by a mask, so it sits on any surface. */
+.nh-sun {
+  display: inline-block;
+  flex: none;
+  width: 22px;
+  height: 11px;
+  border-radius: 999px 999px 0 0;
+  background: var(--grad-sun-glyph);
+  -webkit-mask-image: var(--sun-slats);
+  mask-image: var(--sun-slats);
+}
+.nh-sun--sm {
+  width: 16px;
+  height: 8px;
+}
+.nh-sun--lg {
+  width: 26px;
+  height: 13px;
+}
+
 .nh-eyebrow {
   display: inline-block;
-  font: 700 var(--fs-xs) / 1.4 var(--font-body);
+  font: 700 var(--fs-xs) / 1.4 var(--font-label);
   letter-spacing: var(--tracking-eyebrow);
   text-transform: uppercase;
   color: var(--text-muted);
