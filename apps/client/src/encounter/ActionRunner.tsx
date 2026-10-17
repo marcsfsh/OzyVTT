@@ -122,7 +122,14 @@ export function ActionRunner({
     area?.placed && calibration
       ? targetRows(
           actor.id,
-          caughtByArea(calibration, area.shape, area.placed, area.widthFeet, state.combat.tokens).flatMap((id) => {
+          caughtByArea(
+            calibration,
+            area.shape,
+            area.placed,
+            area.widthFeet,
+            state.combat.tokens,
+            area.sizeFeet
+          ).flatMap((id) => {
             const target = combatants.find((candidate) => candidate.id === id);
             return target ? [{ id: target.id, name: target.name, kind: target.kind }] : [];
           }),

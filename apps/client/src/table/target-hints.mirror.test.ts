@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema, type AnnotationShapeKind } from "@vtt/domain";
-import { shapeGeometry } from "../../../server/src/annotations";
+import { shapeGeometry, templateOfArea } from "../../../server/src/annotations";
 import { tokensInTemplate } from "../../../server/src/area-targeting";
 import { creatureDistance } from "../../../server/src/movement-narration";
 import { caughtByArea, creatureDistanceFeet } from "./targetHints";
@@ -71,5 +71,36 @@ describe("target hints agree with the server", () => {
         [...server].sort()
       );
     }
+  });
+
+  it("catches the same creatures with an action's own area, whatever length the drag has", () => {
+    const positions = [cell(2, 2), cell(3, 2), cell(4, 4), cell(6, 2), cell(2, 6), cell(5, 5), cell(8, 8)];
+    const state = table(positions);
+    // A 15-foot Cone dragged one square, a 10-foot-radius Sphere dragged one, a 15-foot Cube dragged two.
+    const placements = [
+      { area: { shape: "cone", sizeFeet: 15 }, origin: cell(2, 2), target: cell(3, 2) },
+      { area: { shape: "sphere", sizeFeet: 10 }, origin: cell(4, 3), target: cell(5, 3) },
+      { area: { shape: "cube", sizeFeet: 15 }, origin: { x: 100, y: 100 }, target: { x: 200, y: 200 } }
+    ] as const;
+    for (const { area, origin, target } of placements) {
+      const placed = templateOfArea(GRID, { origin, target }, area);
+      const snapped = shapeGeometry(GRID, placed.shape, placed.origin, placed.target);
+      const server = tokensInTemplate(state, GRID, snapped, placed.shape, null);
+      const hint = caughtByArea(
+        CALIBRATION,
+        placed.shape,
+        { origin, target },
+        null,
+        state.combat.tokens,
+        area.sizeFeet
+      );
+      expect(hint.sort()).toEqual([...server].sort());
+    }
+    // The drag's own length would have caught fewer.
+    const dragged = { origin: cell(4, 3), target: cell(5, 3) };
+    expect(caughtByArea(CALIBRATION, "circle", dragged, null, state.combat.tokens)).toEqual([ids[2]]);
+    expect(caughtByArea(CALIBRATION, "circle", dragged, null, state.combat.tokens, 10).sort()).toEqual(
+      [ids[1], ids[2]].sort()
+    );
   });
 });

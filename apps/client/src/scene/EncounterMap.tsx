@@ -298,7 +298,8 @@ export function EncounterMap({
           placedArea.shape,
           placedArea.placed,
           placedArea.widthFeet,
-          tokens.filter((placed) => placed.actorId !== activeTargeting?.attackerId)
+          tokens.filter((placed) => placed.actorId !== activeTargeting?.attackerId),
+          placedArea.sizeFeet
         )
       : []
   );

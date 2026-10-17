@@ -1,5 +1,5 @@
 import type { AnnotationShapeKind, EncounterToken } from "@vtt/domain";
-import { imageToGridPreview, snapShapePreview, type GridCalibration } from "../scene/gridPreview";
+import { imageToGridPreview, sizedShapePreview, snapShapePreview, type GridCalibration } from "../scene/gridPreview";
 
 /**
  * Hints for choosing targets, computed from the positions this viewer was sent: how far a creature is, and who an
@@ -36,15 +36,20 @@ function footprintCells(calibration: GridCalibration, position: Readonly<{ x: nu
   return cells;
 }
 
-/** The creatures whose space an area placed from `origin` to `target` covers, of those this viewer can see. */
+/** The creatures whose space an area placed from `origin` to `target` covers, of those this viewer can see. With
+ *  `sizeFeet` the area keeps that size wherever the drag points it, as the server sizes an action's own area. */
 export function caughtByArea(
   calibration: GridCalibration,
   shape: AnnotationShapeKind,
   placed: Readonly<{ origin: Readonly<{ x: number; y: number }>; target: Readonly<{ x: number; y: number }> }>,
   widthFeet: number | null,
-  tokens: readonly EncounterToken[]
+  tokens: readonly EncounterToken[],
+  sizeFeet?: number
 ): string[] {
-  const snapped = snapShapePreview(calibration, shape, placed.origin, placed.target);
+  const snapped =
+    sizeFeet !== undefined
+      ? sizedShapePreview(calibration, shape, placed.origin, placed.target, sizeFeet)
+      : snapShapePreview(calibration, shape, placed.origin, placed.target);
   const from = imageToGridPreview(calibration, snapped.origin);
   const to = imageToGridPreview(calibration, snapped.target);
   const dx = to.column - from.column;
