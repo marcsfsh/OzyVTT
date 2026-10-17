@@ -1936,7 +1936,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
     // A rider fires at one moment, not two.
     const twoMoments = RiderWhenSchema.safeParse([{ type: "on-hit" }, { type: "on-critical-hit" }]);
     expect(twoMoments.success).toBe(false);
-    expect(!twoMoments.success && JSON.stringify(twoMoments.error.issues)).toContain("one moment, not two");
+    expect(!twoMoments.success && JSON.stringify(twoMoments.error.issues)).toContain("only one moment");
     // A filter with no moment is an authoring mistake, not "always".
     const orphanFilter = RiderWhenSchema.safeParse([{ type: "versus-size", sizes: ["large"] }]);
     expect(orphanFilter.success).toBe(false);
