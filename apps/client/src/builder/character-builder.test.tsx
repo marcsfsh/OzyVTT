@@ -1022,6 +1022,10 @@ describe("the Level flow's class choice", () => {
       await screen.findByText(/Level 3 went to Cleric\./, { selector: ".cb-level-preview p" })
     ).toBeInTheDocument();
     expect(screen.getByText(/Cleric 2 \/ Fighter 1/)).toBeInTheDocument();
+    // The note names the character rather than saying "your".
+    expect(document.querySelector(".cb-level-preview p")?.textContent).toMatch(
+      /\w's level 3 choices and HP roll are kept/
+    );
     await user.click(screen.getByRole("button", { name: "Level down to 2" }));
     await waitFor(() => expect(offers.length).toBeGreaterThan(0));
     expect(offers.at(-1)).toMatchObject({ level: 2, classLevels: ["cleric", "fighter"] });
@@ -1136,6 +1140,19 @@ describe("a level-up", () => {
     await waitFor(() => expect(document.querySelector('[role="radiogroup"][aria-label="Species"]')).not.toBeNull());
     await user.click(screen.getByText("Back to level 4"));
     expect(await screen.findByText(/Mira becomes level 4: Cleric 4\./)).toBeInTheDocument();
+    // A phone has no rail, so the step lists the earlier steps itself.
+    const earlier = document.querySelector<HTMLElement>('nav[aria-label="Earlier steps"]')!;
+    expect([...earlier.querySelectorAll("button")].map((button) => button.textContent)).toEqual([
+      "Species",
+      "Background",
+      "Class & level",
+      "Class features",
+      "Ability scores",
+      "Equipment"
+    ]);
+    await user.click(within(earlier).getByText("Background"));
+    await waitFor(() => expect(screen.queryByText(/Mira becomes level 4/)).toBeNull());
+    expect(screen.getByText("Back to level 4")).toBeInTheDocument();
   });
 
   it("names each of the two +1 pickers of an Ability Score Improvement apart", async () => {

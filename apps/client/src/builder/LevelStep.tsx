@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { BuilderOffer, ContentFeatureSummary } from "@vtt/domain";
-import { FeatureList } from "@vtt/ui";
+import { Button, FeatureList } from "@vtt/ui";
 import type { BuilderCatalogs } from "../content/catalogs";
 import { classSequenceOf, offerFilled, type BuilderDraft, type OfferContext } from "./build-payload";
 
@@ -51,7 +51,8 @@ export function LevelStep({
   offers,
   catalogs,
   renderOffer,
-  hitPoints
+  hitPoints,
+  earlier
 }: Readonly<{
   name: string;
   draft: BuilderDraft;
@@ -61,6 +62,8 @@ export function LevelStep({
   renderOffer: (offer: BuilderOffer) => ReactNode;
   /** The hit points section, which the abilities step shows too. */
   hitPoints: ReactNode;
+  /** The steps before this one, each a tap away. A phone shows no step rail, so the step lists them itself. */
+  earlier: readonly Readonly<{ label: string; onOpen: () => void }>[];
 }>) {
   const level = draft.level;
   const { classId, classLevel } = classAtLevel(draft, level);
@@ -70,9 +73,16 @@ export function LevelStep({
   return (
     <>
       <p className="cb-note">
-        {name} becomes level {level}: {className} {classLevel}. The earlier steps keep their answers. Choose one in the
-        steps above to change it.
+        {name} becomes level {level}: {className} {classLevel}. The earlier steps keep their answers. Open one to change
+        it.
       </p>
+      <nav className="cb-level-earlier" aria-label="Earlier steps">
+        {earlier.map((step) => (
+          <Button key={step.label} variant="secondary" size="sm" onClick={step.onOpen}>
+            {step.label}
+          </Button>
+        ))}
+      </nav>
       {features.length > 0 && (
         <section className="cb-offer" aria-labelledby="cb-level-new">
           <div className="cb-offer-head">

@@ -284,7 +284,9 @@ export function LevelFlow({
             {multiclass && (
               <>
                 Level {current} went to {lastName}.
-                {onlyLevel ? ` It is your only ${lastName} level, so ${lastName} comes off the sheet.` : ""}{" "}
+                {onlyLevel
+                  ? ` It is ${actor.name}'s only ${lastName} level, so ${lastName} comes off the sheet.`
+                  : ""}{" "}
               </>
             )}
             {removed.length > 0 ? (
@@ -303,7 +305,7 @@ export function LevelFlow({
             ) : (
               <>Level {current} added no choices of its own.</>
             )}{" "}
-            Your level {current} choices and HP roll are kept, and leveling back up restores them exactly.
+            {actor.name}'s level {current} choices and HP roll are kept, and leveling back up restores them exactly.
           </p>
         </section>
       )}

@@ -529,7 +529,7 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
             {displacedSpeciesFeat && (
               <p className="cb-note">
                 {context.background?.name} grants <strong>{context.originFeat!.name}</strong>, which replaces your{" "}
-                {displacedSpeciesFeat.label} choice — pick a different Origin feat on Species.
+                {displacedSpeciesFeat.label} choice. Pick a different Origin feat on Species.
               </p>
             )}
             {stepOffers("background").map(renderOffer)}
@@ -683,6 +683,9 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
             offers={offers}
             catalogs={catalogs}
             renderOffer={renderOffer}
+            earlier={steps
+              .slice(0, steps.indexOf("level"))
+              .map((id, index) => ({ label: STEP_LABELS[id as StepId], onOpen: () => goTo(index) }))}
             hitPoints={
               <HitPointsSection
                 draft={draft}

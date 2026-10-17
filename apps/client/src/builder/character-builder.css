@@ -355,3 +355,15 @@
   color: var(--text-dim);
   font-size: var(--fs-sm);
 }
+
+/* The step rail lists the earlier steps above 760px; below it the level step lists them itself. */
+.cb-level-earlier {
+  display: none;
+}
+@media (max-width: 760px) {
+  .cb-level-earlier {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+}
