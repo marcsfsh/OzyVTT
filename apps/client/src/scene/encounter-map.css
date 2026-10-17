@@ -1,30 +1,48 @@
-/* The map takes whatever height the rows above leave, never a fraction of the viewport. */
+/* The map's frame: the rail of tools (and its options) beside the map, then the map column. Nothing floats over the
+   map but tokens and marks: the tray, the GM's look-through banner, the feedback line and the refused-move bar are
+   rows of the map column. */
+.map-bench {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.map-bench-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
 .encounter-map-interaction {
   position: relative;
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  padding: var(--space-2) var(--space-3) 0;
 }
-/* The tray floats over the map's top edge, so it appearing (on drag or with unplaced tokens) does not
-   shove the map down. */
-.encounter-map-interaction:not(.enlarged) .encounter-token-tray {
-  position: absolute;
-  z-index: 4;
-  top: 0;
-  left: 0;
-  right: 0;
-  margin-bottom: 0;
+/* The GM sees through one creature's eyes: a violet row says so, with its one way out. */
+.map-seeing-as {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--tap-min);
+  padding: 0 var(--space-3);
+  border-bottom: 1px solid var(--violet);
+  background: color-mix(in srgb, var(--violet) 14%, var(--surface-1));
+  color: var(--violet-hi);
+  font-size: var(--fs-sm);
+  font-weight: 700;
 }
-/* In enlarged mode (a flex column) an in-flow tray would steal height from the stage and jitter the
-   map on every grab, so it floats here too, inset to the container's padding. */
-.encounter-map-interaction.enlarged .encounter-token-tray {
-  position: absolute;
-  z-index: 4;
-  top: var(--space-4);
-  left: var(--space-4);
-  right: var(--space-4);
-  margin-bottom: 0;
+@media (max-width: 979px) {
+  .map-bench {
+    flex-direction: column;
+  }
+  .encounter-map-interaction {
+    padding: var(--space-1) var(--space-2) 0;
+  }
 }
 /* Staging tray chips: neutral plate, team colour on a 1px edge and the round avatar disc, painted on a
    backing layer behind the drag surface. */
@@ -166,7 +184,6 @@
 }
 /* The stage: a 2px rim and corner ticks painted in front; nothing is painted behind the map. */
 .encounter-map-stage {
-  --dock-side-width: 22rem;
   position: relative;
   flex: 1;
   min-height: 12rem;
@@ -180,8 +197,7 @@
 }
 /* The corner ticks: eight background layers on one `::after` (`::before` is left free for the
    material utilities). `pointer-events: none` is required: this box spans the stage and would
-   otherwise swallow every press on the map. z-index 1 is above the map svg and below every control:
-   dock (2), toolbar (3), tray and shape editor (4), open phone rail (5). */
+   otherwise swallow every press on the map. z-index 1 is above the map svg. */
 .encounter-map-stage::after {
   content: "";
   position: absolute;
@@ -216,7 +232,7 @@
 }
 /* No viewport cap: the stage takes the frame's leftover height (below 980px it states its own band
    height, end of file). `> svg` only: @vtt/ui glyphs in the stage are `<svg width="1em">`, and a
-   descendant selector would size them all. Keep the :fullscreen and .enlarged variants scoped too. */
+   descendant selector would size them all. Keep the :fullscreen variant scoped too. */
 .encounter-map-stage > svg {
   display: block;
   width: 100%;
@@ -350,107 +366,6 @@
   opacity: 0.78;
   filter: none;
 }
-/* z-index 5, above the staging tray's 4: on a short landscape map the tray can overlap this cluster,
-   and the Scenes menu inside it must win. */
-.encounter-map-zoom {
-  position: absolute;
-  right: 0.7rem;
-  bottom: 0.7rem;
-  z-index: 5;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.35rem;
-  max-width: calc(100% - 1.4rem);
-}
-.encounter-map-zoom.zoom-dock-right {
-  right: auto;
-  left: 0.7rem;
-  justify-content: flex-start;
-}
-/* Fixed rem widths per edge (never a viewport %), so the dock does not reflow on resize. The dock does
-   not scroll: it bounds the tracker as a flex column so `.encounter-region` is the one scroller
-   (otherwise the region becomes a zero-extent scrollport inside a scrolling dock). */
-.encounter-map-dock {
-  position: absolute;
-  z-index: 2;
-  display: flex;
-  padding: 0.6rem;
-  background: color-mix(in srgb, var(--surface-1) 94%, transparent);
-}
-/* The dock's inner edge is the map/panel boundary, so it carries the horizon rule (--rule-beam-v)
-   through `border-image` (a border cannot hold a gradient; a pseudo would scroll with the content).
-   The table gets no sky: a horizon would compete with the map. */
-.encounter-map-dock.dock-right {
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: var(--dock-side-width);
-  border-left: 1px solid var(--line);
-  border-image: var(--rule-beam-v) 1;
-}
-.encounter-map-dock.dock-left {
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: var(--dock-side-width);
-  border-right: 1px solid var(--line);
-  border-image: var(--rule-beam-v) 1;
-}
-/* A bounded flex column, so `.encounter-region` has something to flex against. `>` so a nested panel
-   (a sheet inside the tracker) does not take this. */
-.encounter-map-dock > .encounter-panel {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  margin: 0;
-  border: 0;
-  background: transparent;
-  padding: 0;
-}
-/* The dock is the frame, so the panel's own `::before` frame (and lip) is dropped. */
-.encounter-map-dock .encounter-panel::before {
-  display: none;
-}
-/* Grab strip on the dock's inner edge, full height. It sits exactly on the dock's border (z-index 3
-   vs 2), so it is transparent at rest or it would cover the beam; it paints only while grabbed. */
-.encounter-map-dock-resize {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 14px;
-  z-index: 3;
-  cursor: col-resize;
-  touch-action: none;
-}
-.encounter-map-dock-resize.dock-resize-left {
-  left: calc(var(--dock-side-width) - 7px);
-}
-.encounter-map-dock-resize.dock-resize-right {
-  right: calc(var(--dock-side-width) - 7px);
-}
-.encounter-map-dock-resize::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 2px;
-  transform: translateX(-50%);
-  background: transparent;
-  transition:
-    background 0.15s,
-    width 0.15s;
-}
-.encounter-map-dock-resize:hover::before,
-.encounter-map-dock-resize:active::before {
-  background: var(--cyan);
-  width: 3px;
-}
-.encounter-map-zoom .nh-btn {
-  box-shadow: var(--shadow-1);
-}
 .encounter-map-stage:fullscreen {
   width: 100vw;
   height: 100vh;
@@ -462,31 +377,6 @@
 .encounter-map-stage:fullscreen > svg {
   max-height: 100vh;
   height: 100vh;
-}
-/* "Enlarge map" is an in-tab overlay (not the Fullscreen API): the interaction area floats over the
-   page and the stage flex-fills it. Nothing in it scrolls (the docked tracker's region does), so it
-   declares no scroll. */
-.encounter-map-interaction.enlarged {
-  position: fixed;
-  inset: 1rem;
-  z-index: 40;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  padding: var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--bg) 97%, transparent);
-  box-shadow: var(--shadow-2);
-}
-.encounter-map-interaction.enlarged .encounter-map-stage {
-  flex: 1;
-  min-height: 0;
-}
-/* Direct child only, like the stage rule. */
-.encounter-map-interaction.enlarged .encounter-map-stage > svg {
-  max-height: none;
-  height: 100%;
 }
 .encounter-map-saving {
   margin: var(--space-2) 0 0;
@@ -500,17 +390,9 @@
 .encounter-map-interaction .encounter-map-saving {
   position: absolute;
   z-index: 4;
-  left: 0;
+  left: var(--space-3);
   bottom: 0;
   margin: 0;
-}
-/* Enlarged mode floats it over the map with a plate; `--space-4` tracks the container's padding. */
-.encounter-map-interaction.enlarged .encounter-map-saving {
-  left: var(--space-4);
-  bottom: var(--space-4);
-  padding: 0.2rem 0.55rem;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--void) 78%, transparent);
 }
 .encounter-map-feedback {
   min-height: 1.25rem;
@@ -519,37 +401,6 @@
   font-size: 0.78rem;
 }
 
-/* The map toolbar: one non-wrapping bar, everything else one tap deeper in a bounded panel.
-   The overlay spans the stage but is `pointer-events: none`, so the map behind the empty part of the
-   row stays draggable; only the bar, panel and rail take input. `inset` gives the panel a height to
-   shrink into, so it scrolls rather than spilling out of the stage's `overflow: hidden`. */
-.encounter-map-overlay {
-  position: absolute;
-  left: 0.7rem;
-  right: 0.7rem;
-  bottom: 0.7rem;
-  top: calc(0.7rem + var(--tray-height, 0px));
-  z-index: 3;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.4rem;
-  pointer-events: none;
-}
-.encounter-map-overlay > * {
-  pointer-events: auto;
-}
-/* Phone form (≤560px): one `Tools` button at the bottom-left (thumb reach), opening a rail upward.
-   It ignores the tray offset: the tray is at the top edge, and on a short stage paying for it would
-   push the button out of the stage. */
-.encounter-map-overlay.compact {
-  top: 0.7rem;
-  justify-content: flex-end;
-}
-/* Open, the rail outranks the token tray (z-index 4) so it can use the whole stage height. */
-.encounter-map-overlay.compact.open {
-  z-index: 5;
-}
 .map-button-icon {
   display: inline-grid;
   place-items: center;
@@ -577,10 +428,6 @@
 .annotation-shape.live .annotation-shape-body {
   stroke-dasharray: 4 4;
 }
-.encounter-map-stage.has-dock-left .encounter-map-overlay {
-  left: calc(var(--dock-side-width) + 0.7rem);
-}
-
 .encounter-live-distance {
   fill: var(--cyan-hi);
   font: 800 15px var(--font-numeric);
@@ -611,29 +458,10 @@
   fill: var(--caution-hi);
 }
 
-/* Phone form of the map. The toolbar collapses to its Tools button in JS at the same breakpoint
-   (MapToolbar's COMPACT_QUERY); these rules keep the two floating clusters in opposite bottom corners
-   so a saved right dock never stacks them. */
+/* The narrowest phones drop the names under tokens; the number and initials stay. */
 @media (max-width: 560px) {
-  .encounter-map-stage {
-    min-height: 14rem;
-  }
   .encounter-token-name {
     display: none;
-  }
-  .encounter-shape-editor {
-    width: 12rem;
-  }
-  .encounter-map-zoom,
-  .encounter-map-zoom.zoom-dock-right {
-    right: 0.7rem;
-    left: auto;
-    justify-content: flex-end;
-    max-width: calc(100% - 8rem);
-  }
-  .map-toolbar-rail,
-  .map-toolbar-panel {
-    width: min(17rem, calc(100vw - 2.8rem));
   }
 }
 .token-health {
@@ -775,58 +603,21 @@
   clip-path: var(--token-bracket-cut);
 }
 
-.encounter-map-scene-live {
-  display: inline-flex;
-  gap: 0.35rem;
-}
-
-@media (max-width: 650px) {
-  .encounter-map-dock.dock-right,
-  .encounter-map-dock.dock-left {
-    width: min(var(--dock-side-width), 62vw);
-  }
-}
-
-/* Below 980px the map is a band with a stated height on the stage (not the interaction, which also
-   holds the status line), and the sheet below takes the rest. 14rem fits the shortest supported phone
-   (375x667). In landscape it cannot fit, and `section.table` is content-sized so nothing shrinks it,
-   hence the ceiling `100dvh - 204px` (tab bar 44 + sheet floor 132 + padding 20 + gap 8, from
-   shell/table-view.css; update together). */
+/* Below 980px the map pane's height is set by the divider under it (shell/table-view.css); the stage fills it. The
+   tray keeps one row with horizontal scroll, its hint hidden. `justify-content: flex-start` is required: with
+   `flex-end`, nowrap and `overflow-x` the overflow goes off the start edge, out of `scrollLeft`'s reach. */
 @media (max-width: 979px) {
-  .encounter-map-interaction:not(.enlarged) {
-    flex: 0 1 auto;
-    min-height: 0;
+  .encounter-map-stage {
+    min-height: 6rem;
   }
-  .encounter-map-interaction:not(.enlarged) .encounter-map-stage {
-    flex: 0 1 14rem;
-    min-height: 9rem;
-    max-height: calc(100dvh - 12.75rem);
-    height: auto;
-  }
-  /* Below 980px "Saving move…" stays in flow: the stage height is stated, so it grows the interaction
-     instead of shrinking the map, and floating it would cover the compact Tools button. */
-  .encounter-map-interaction:not(.enlarged) .encounter-map-saving {
-    position: static;
-    margin: var(--space-2) 0 0;
-  }
-  /* The status line folds when empty (it usually is), so it costs nothing below 980px until there is
-     something to read; it keeps its `role="status"`. When shown, the height comes out of the sheet,
-     never the map. */
-  .encounter-map-interaction:not(.enlarged) .encounter-map-feedback {
-    min-height: 0;
+  .encounter-map-feedback {
     margin: var(--space-1) 0 0;
   }
-  .encounter-map-interaction:not(.enlarged) .encounter-map-feedback:empty {
-    display: none;
-  }
-  /* One row of tray wherever the map is a band, with horizontal scroll, so the tray cannot cover the
-     map or the dock's tab bar. `justify-content: flex-start` is required: with `flex-end`, nowrap and
-     `overflow-x` the overflow goes off the start edge, out of `scrollLeft`'s reach. The hint text is
-     hidden (it would wrap). Keep this the last tray rule: source order decides at equal specificity. */
   .encounter-token-tray {
     flex-direction: row;
     align-items: center;
     gap: 0.3rem;
+    min-height: 0;
   }
   .encounter-token-tray > div:first-child {
     flex: 0 0 auto;
@@ -846,18 +637,6 @@
   .encounter-token-tray-list > .tray-token {
     flex: none;
   }
-}
-
-/* The map's Scenes button is a menu with both errands. A `<summary>` trigger needs the button shadow
-   stated; `Menu` clamps its own horizontal overflow. */
-.encounter-map-scene-menu > .encounter-map-scene-trigger {
-  box-shadow: var(--shadow-1);
-}
-.encounter-map-scene-live-name {
-  margin: 0;
-  padding: var(--space-2) var(--space-3) var(--space-1);
-  color: var(--text-muted);
-  font-size: var(--fs-xs);
 }
 
 /* How the mover's next drag travels: one tap per mode, under the map so it never covers a token. The modes wrap

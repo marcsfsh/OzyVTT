@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
-import { CombatLogDrawer } from "../encounter/CombatLog";
 import { RollCallPrompts } from "../encounter/RollCallPrompt";
 import {
   currentHref,
@@ -75,17 +74,11 @@ export function App() {
   const entry = useEntryAnimation();
   const session = useSession(entry.begin);
   const { signedIn, state, connection } = session;
-  /**
-   * The combat log drawer's state lives here because its door is in two places (the dock, and the
-   * docked-into-the-map arm with no dock), and the drawer itself sits outside the pane.
-   */
-  const [logOpen, setLogOpen] = useState(false);
   /** Keyboard safety is shell plumbing: installed once, for every region on every surface. */
   useEffect(() => installKeyboardFocusHelper(), []);
   useAddressMemory(signedIn?.role ?? null, route);
   /** The signed-in shell. It mounts during the entry drive, behind the opaque curtain. */
   const shell = signedIn && state ? { ...signedIn, state } : null;
-  const openLog = () => setLogOpen(true);
 
   return (
     <main className={entry.phase === "settle" ? "anim-cascade" : undefined}>
@@ -127,7 +120,6 @@ export function App() {
             token={shell.token}
             connection={connection}
             busy={session.busy}
-            onOpenLog={openLog}
             onSignOut={() => void session.signOutGm()}
             onRevokeAll={() => void session.revokeAllGmSessions()}
           />
@@ -137,14 +129,10 @@ export function App() {
             state={shell.state as PlayerView}
             token={shell.token}
             connection={connection}
-            onOpenLog={openLog}
             onLeave={session.leavePlayer}
           />
         )}
       </div>
-      {/* The combat log drawer lives outside the pane because it is `position: fixed` and the pane is
-        where transforms happen. Non-modal, so the table stays live behind it. */}
-      {shell && <CombatLogDrawer open={logOpen} onClose={() => setLogOpen(false)} />}
     </main>
   );
 }

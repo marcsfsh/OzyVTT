@@ -80,6 +80,9 @@ reserves its widest value with `min-width` in `ch` and aligns to the end of that
 - Breakpoints come from one ladder: `max-width` 760 / 650 / 560, and `min-width` 850 / 980 / 1280
   where a layout earns another column. The table viewer reflows on aspect ratio instead, because
   a TV is always landscape.
+- The table is a docked workbench (ADR-0025): nothing floats over the map but tokens and marks. A
+  tool's options open beside the rail, a prompt takes the panel's prompt slot, and a notice takes the
+  status line.
 - Spacing uses the 4px `--space-*` ladder. Surfaces are square (`--radius-sm/md/lg` are 0),
   gauges and chips included; `--radius-pill` is for token rings, dots, avatars and swatches.
 

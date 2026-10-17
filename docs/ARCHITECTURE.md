@@ -334,6 +334,13 @@ Codex and homebrew are fetched over HTTP. Socket request/replies go through `lib
 calls through `lib/api.ts`. The table viewer is a separate bundle that never loads the game client.
 Rules checks on the client are hints only; the server decides.
 
+The table (`shell/TableView.tsx`) is a docked workbench (ADR-0025): a header bar over the map with the scene and
+the status line (`table/TableHeader.tsx`), the map's tool rail beside it (`scene/MapRail.tsx`), and one panel
+(`table/TablePanel.tsx`) with Needs you or the player's prompt slot above its tabs and the view's one primary in
+its footer. Nothing floats over the map but tokens and marks; notices land in the status line through
+`ToastOutlet`. The map and the panel share small module stores: the targeting session (`encounter/targeting.ts`),
+the live map's grid and size (`scene/tableGeometry.ts`) and the GM's selected token (`scene/selectedToken.ts`).
+
 Surfaces not needed for first paint load on first use (`components/lazySurface.tsx`): the Codex,
 homebrew, settings and the API reference, the character builder and level flow, replays, the map
 library, the shared-screen controls and the sound board. pdf.js loads with the first imported PDF. The build targets

@@ -666,14 +666,12 @@ export function CharacterSheet({
             New tab
           </Button>
         )}
-        <IconButton
-          label={embedded ? "Back to initiative" : "Close"}
-          size="sm"
-          className="sheet-close"
-          onClick={onClose}
-        >
-          <IconX />
-        </IconButton>
+        {/* Embedded in the table's panel, the tabs are the way back. */}
+        {!embedded && (
+          <IconButton label="Close" size="sm" className="sheet-close" onClick={onClose}>
+            <IconX />
+          </IconButton>
+        )}
       </div>
     </div>
   );
@@ -772,8 +770,8 @@ export function CharacterSheet({
     </div>
   );
 
-  // Embedded (e.g. the player's initiative panel): fills its container, no modal chrome, and × goes
-  // back to the initiative view. No state is passed, so no dice log.
+  // Embedded in the table's panel: fills its tab, with no modal chrome and no close. No state is passed, so no
+  // dice log.
   if (embedded)
     return (
       <>

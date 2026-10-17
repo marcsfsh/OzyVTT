@@ -93,13 +93,11 @@ export function PlayerShell({
   state,
   token,
   connection,
-  onOpenLog,
   onLeave
 }: Readonly<{
   state: PlayerView;
   token: string;
   connection: Connection;
-  onOpenLog: () => void;
   onLeave: () => void;
 }>) {
   const route = useRoute();
@@ -140,6 +138,6 @@ export function PlayerShell({
             onBack={() => navigate("/table")}
           />
         );
-      return <TableView role="player" state={state} token={token} onOpenLog={onOpenLog} onLeave={onLeave} />;
+      return <TableView role="player" state={state} token={token} onLeave={onLeave} />;
   }
 }

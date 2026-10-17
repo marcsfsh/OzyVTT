@@ -1,9 +1,8 @@
 import type { AnnotationShapeKind, AnnotationVisibility } from "@vtt/domain";
-import type { DockPosition } from "../encounter/DockPicker";
 
-/** The map's tools and the toolbar's contract, shared by the toolbar, its groups and the map. */
+/** The map's tools and the rail's contract, shared by the rail, its groups and the map. */
 
-/** The map's pointer mode; defined here because the toolbar sets it. */
+/** The map's pointer mode; defined here because the rail sets it. */
 export type MapTool =
   | "select"
   | "measure"
@@ -33,7 +32,7 @@ export type LightPresetId = (typeof LIGHT_PRESETS)[number]["id"];
 export type ClearScope = "mine" | "players" | "all";
 
 /** The uncalibrated-map reason, reused so a disabled control always says why. */
-export const NEEDS_GRID = "Needs a calibrated grid — set one up on the Scenes tab, under Maps.";
+export const NEEDS_GRID = "Needs a calibrated grid. Set one up on the Scenes tab, under Maps.";
 
 /**
  * Who a new drawing is for: "Shown to players" for public, "GM only" for GM-secret. The owner-scoped
@@ -55,7 +54,7 @@ export function drawingAudienceOptions(
       ];
 }
 
-export interface MapToolbarProps {
+export interface MapRailProps {
   role: "gm" | "player";
   /** The live pointer mode, and the only way to change it. */
   tool: MapTool;
@@ -107,20 +106,13 @@ export interface MapToolbarProps {
   onLookThroughChange: (choice: string | null) => void;
   lookThroughOptions: ReadonlyArray<{ id: string; name: string }>;
 
-  /**
-   * The "Preview what players see" tool. No panel behind it: the preview is already a fixed,
-   * draggable panel. Absent: not offered (players have nothing to preview).
-   */
-  viewerPreview?: Readonly<{ on: boolean; onToggle: () => void }>;
-
   /* View */
   onZoom: (factor: number) => void;
   onResetView: () => void;
-  enlarged: boolean;
-  onToggleEnlarged: () => void;
   fullscreen: boolean;
   onToggleFullscreen: () => void;
-  dock?: Readonly<{ position: DockPosition; onChange: (position: DockPosition) => void }>;
   notificationsMuted: boolean;
   onNotificationsMutedChange: (muted: boolean) => void;
+  /** A player's Me: brings their own token into view. Shown in the tool row on a phone. */
+  onLocate?: () => void;
 }

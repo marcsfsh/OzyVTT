@@ -76,7 +76,8 @@ export function useMapGestures({
   resetKey,
   onSelect,
   onContextMenu: openMenu,
-  onPlaceLight
+  onPlaceLight,
+  onTokenPress
 }: Readonly<{
   role: "gm" | "player";
   tool: MapTool;
@@ -100,6 +101,8 @@ export function useMapGestures({
   onContextMenu: (menu: Readonly<{ actorId: string; x: number; y: number }>) => void;
   /** The GM's Light tool: a tap places the chosen light there. */
   onPlaceLight?: (point: Point) => void;
+  /** A token pressed with the Select tool, or opened for its menu. */
+  onTokenPress?: (actorId: string) => void;
 }>) {
   const { camera, setCamera, boxFraction } = view;
   const { busyActorId, setMessage } = commands;
@@ -169,6 +172,7 @@ export function useMapGestures({
     }
   };
   const openContextMenuFor = (actorId: string, x: number, y: number) => {
+    onTokenPress?.(actorId);
     if (!actors.has(actorId)) return;
     if (role === "player" && !canMove(actorId)) return; // players only act on their own claimed token
     onSelect(null);
@@ -310,6 +314,7 @@ export function useMapGestures({
       return;
     }
     if (tool === "select" && tokenId && tokensById.has(tokenId)) {
+      onTokenPress?.(tokenId);
       if (!canMove(tokenId)) return;
       event.preventDefault();
       capturePointer(event);
