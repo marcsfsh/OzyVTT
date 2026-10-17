@@ -16,6 +16,7 @@ import {
   usePlayback,
   when
 } from "./ReplayStage";
+import { countOf } from "@vtt/domain";
 
 /** The launch refusals the panel can route somewhere; any other refusal is a toast. */
 const ROUTED_REFUSALS = ["scene_room_full", "history_review"] as const;
@@ -95,7 +96,7 @@ function GmViewer({
         <div className="replay-header-text">
           <h2>Replay</h2>
           <p className="replay-meta">
-            {when(document.startedAt)} to {when(document.endedAt)} · {document.turns.length} turns
+            {when(document.startedAt)} to {when(document.endedAt)} · {countOf(document.turns.length, "turn")}
           </p>
         </div>
         <div className="replay-header-actions">

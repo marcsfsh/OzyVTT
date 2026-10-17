@@ -1,5 +1,6 @@
 import { useMemo, type ReactNode } from "react";
 import { Combobox, Input } from "@vtt/ui";
+import { countOf } from "@vtt/domain";
 
 /**
  * The atlas's ways around, shared by the GM and player atlases: the root maps, the path down to the open
@@ -161,7 +162,7 @@ export function PinFilter({
       )}
       {dimmed && (
         <span className="codex-atlas-filtercount" role="status">
-          {pins.length - dimmed.size} of {pins.length} pins match
+          {pins.length - dimmed.size} of {countOf(pins.length, "pin")} match
         </span>
       )}
     </div>
