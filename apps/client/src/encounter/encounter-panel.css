@@ -512,8 +512,8 @@
   color: var(--text);
   font-weight: 700;
 }
-/* Hover comes from the material (rim brightens, cue wedge appears), not the generic
-   `.turn-controls .encounter-primary:hover` fill and glow. */
+/* Hover comes from the material (rim brightens, cue wedge appears). The generic
+   `.turn-controls .encounter-primary:hover` fill and glow stay off here. */
 .encounter-topbar .turn-controls button:hover:not(:disabled) {
   background: none;
   box-shadow: none;
@@ -1054,7 +1054,7 @@
 .encounter-primary:not(.turn-prev, .is-quiet):active:not(:disabled) {
   --primary-tint: var(--primary-tint-hover);
 }
-/* Reviewing history, Next turn resumes live play: a cyan edge instead of the sun, since it is a different
+/* Reviewing history, Next turn resumes live play: a cyan edge where the sun would be, since it is a different
    kind of step. */
 .turn-controls .encounter-primary.resume::before,
 .turn-controls .encounter-primary.resume:hover:not(:disabled)::before {

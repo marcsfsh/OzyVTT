@@ -8,7 +8,7 @@ import { RowTools } from "./RowTools";
 import { aidGiverOf, isKnockedOut, StabilizeControl, type AidGiver } from "./StabilizeControl";
 
 /** Who in the fight could give a dying creature aid, the creature whose turn it is first (the aid is its action):
- *  conscious characters and NPCs, not the dying one. */
+ *  conscious characters and NPCs, without the dying one. */
 function fightHelpers(state: GmView, targetId: string): AidGiver[] {
   const turn = state.combat.turnActorId;
   return state.combat.initiative

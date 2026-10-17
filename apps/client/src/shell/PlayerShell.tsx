@@ -34,7 +34,7 @@ export const onPlayerTable = (route: Route) => viewOf(route) === "table" && rout
 
 /**
  * The player's views are tabs at real addresses (`/table`, `/codex/*`), so Back walks between them and
- * pages can be linked. The recap count is part of the tab's accessible name ("Codex, 2 new"), not just
+ * pages can be linked. The recap count is part of the tab's accessible name ("Codex, 2 new"), with more than
  * a coloured dot.
  */
 export function PlayerTabBar({ token }: Readonly<{ token: string }>) {
@@ -126,7 +126,7 @@ export function PlayerShell({
         />
       );
     /* One Settings component for both roles. `SettingsPage` renders the GM groups only for a GM token,
-       so GM-only controls are absent from a player's tree, not hidden. `/settings/api` is GM-only. */
+       so GM-only controls are absent from a player's tree, and never just hidden. `/settings/api` is GM-only. */
     case "settings":
       return reachable ? (
         <SettingsPage role="player" state={state} onLeave={onLeave} />

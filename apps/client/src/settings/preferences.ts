@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 
 /**
- * Device-local settings: preferences about this browser rather than the table. Only preferences with
+ * Device-local settings: preferences about this browser. The table's own settings live elsewhere. Only preferences with
  * no server home live here (theme and the dice-input preference have their own stores; how the table
  * plays is server state). `autoArrange`: whether a newly created scene opens for arranging.
  */

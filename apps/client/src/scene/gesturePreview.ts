@@ -9,7 +9,7 @@ import {
 } from "./gridPreview";
 import type { Gesture } from "./useMapGestures";
 
-/** The live, grid-snapped drawing of a measure or shape gesture in progress, matching what the server will save. */
+/** The live, grid-snapped drawing of a measure or shape gesture in progress, which matches what the server will save. */
 export function gesturePreview(
   calibration: GridCalibration | null,
   gesture: Gesture | null,

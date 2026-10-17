@@ -527,7 +527,7 @@
 .token-health-down {
   fill: var(--danger);
 }
-/* The band class sets a custom property, not paint: `healthFillClass()` returns one class for the
+/* The band class sets a custom property and no paint: `healthFillClass()` returns one class for the
    ring (stroke), bar (fill) and aura stops (stop-color). Keep in step with encounter-map.css. */
 .token-health-bar-track {
   fill: var(--void);

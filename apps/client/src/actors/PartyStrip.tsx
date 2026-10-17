@@ -12,7 +12,7 @@ import "./party-strip.css";
  * shows the same people).
  *
  * Renders only projection-carried fields. A player's copy follows the party-visibility tier, read
- * from the field rather than inferred: no strip at `off`, and other characters' exact HP only from
+ * from the field itself: no strip at `off`, and other characters' exact HP only from
  * `full-sheet` up. The GM's strip is never gated.
  *
  * A player may open only their own entry: `CharacterSheet` renders damage/heal controls the server
@@ -85,7 +85,7 @@ export function PartyStrip(props: Props) {
                   {body}
                 </button>
               ) : (
-                /* A plain readout rather than a disabled button: a player cannot open someone else's sheet. */
+                /* A plain readout: a player cannot open someone else's sheet, so there is no button. */
                 <span className="party-strip-entry is-static" role="group" aria-label={label}>
                   {body}
                 </span>

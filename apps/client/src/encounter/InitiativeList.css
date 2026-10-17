@@ -27,7 +27,7 @@
   min-width: 0;
   flex: 1 1 auto;
 }
-/* Wrap rather than crush: on a narrow surface the dots/health tag drop to a second line. */
+/* Wrap: on a narrow surface the dots/health tag drop to a second line. */
 .init-row-name-line {
   display: flex;
   align-items: center;

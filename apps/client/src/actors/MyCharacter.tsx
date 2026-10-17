@@ -27,7 +27,7 @@ const needsAid = (actor: PlayerActor) =>
 const TIERS: readonly PartyVisibility[] = ["off", "name-and-class", "full-sheet", "sheet-and-resources"];
 
 /**
- * The tier this player was given. Defaults to `name-and-class` rather than the fullest tier, so a
+ * The tier this player was given. Defaults to `name-and-class`, the narrowest tier with a card, so a
  * projection without the field never shows more than the GM opened.
  */
 export function partyVisibilityOf(state: PlayerView): PartyVisibility {
@@ -210,7 +210,7 @@ export function MyCharacter({
             </div>
           </div>
         ) : (
-          /* Nobody claimed: point at the Table's claim picker rather than duplicating it. */
+          /* Nobody claimed: point at the Table's claim picker, which already does the job. */
           <div className="scene-empty">
             <p>You haven't claimed a character yet.</p>
             <Button variant="primary" arrow onClick={onGoToTable}>
@@ -219,7 +219,7 @@ export function MyCharacter({
           </div>
         )}
 
-        {/* `off` removes this party surface, not allies from state: initiative and tokens still need
+        {/* `off` removes this party surface and leaves allies in state: initiative and tokens still need
           every ally, so presence in `state.actors` is not permission to list them. Unclaimed
           characters are listed at every tier where this surface exists. */}
         {tier !== "off" && others.length > 0 && (
@@ -255,7 +255,7 @@ export function MyCharacter({
                         {body}
                       </button>
                     ) : (
-                      /* A plain readout rather than a disabled button when there is no sheet to open. */
+                      /* A plain readout when there is no sheet to open: a disabled button would promise one. */
                       <span className="my-character-party-row is-static" role="group" aria-label={label}>
                         {body}
                       </span>

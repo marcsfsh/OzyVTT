@@ -59,7 +59,7 @@ describe("a multiclass draft's classes", () => {
       { id: "fighter", levels: 3 },
       { id: "wizard", levels: 2 }
     ]);
-    // Another Fighter level goes on the end; taking it back removes the last Fighter level, not the first.
+    // Another Fighter level goes on the end; taking it back removes the last Fighter level.
     const fourth = withClassLevels(threeAndTwo, "fighter", 4);
     expect(classSequenceOf(fourth)).toEqual(["fighter", "fighter", "fighter", "wizard", "wizard", "fighter"]);
     expect(classSequenceOf(withClassLevels(fourth, "fighter", 3))).toEqual(classSequenceOf(threeAndTwo));

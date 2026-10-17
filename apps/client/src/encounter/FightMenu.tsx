@@ -71,8 +71,8 @@ export function placeFightMenu(
 const RECENT_COUNT = 10;
 
 /**
- * The ⋯ fight menu: the table's rules settings, the health display, the environment, adding
- * someone to the fight and ending it. Rich content keeps it a bespoke popover rather than a Menu.
+ * The ⋯ fight menu: the table's rules settings, the health display, the environment, and adding
+ * someone to the fight and ending it. Rich content makes it a bespoke popover; a Menu can't hold it.
  */
 export function FightMenu({
   state,
@@ -92,7 +92,7 @@ export function FightMenu({
 }>) {
   const [menuOpen, setMenuOpen] = useState(false);
   // Close the ⋯ popover on Escape (outside clicks hit the backdrop). Rich content keeps it a bespoke
-  // popover rather than a Menu.
+  // popover; a Menu can't hold it.
   useEffect(() => {
     if (!menuOpen) return;
     const onKey = (event: KeyboardEvent) => {
@@ -104,7 +104,7 @@ export function FightMenu({
   // Anchor the ⋯ menu to its button (see `placeFightMenu`), portaled out to clear the dock stacking.
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  /* The scroller is the body, not the menu: every scroll offset read and write goes here. */
+  /* The scroller is the body: every scroll offset read and write goes here. */
   const menuBodyRef = useRef<HTMLDivElement>(null);
   const [menuPos, setMenuPos] = useState<FightMenuPlacement | null>(null);
   useLayoutEffect(() => {

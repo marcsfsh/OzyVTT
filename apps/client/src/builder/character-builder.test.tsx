@@ -430,7 +430,7 @@ function offersFor(request: BuilderOffersRequest) {
   }
   const picks = Object.fromEntries(
     offers.flatMap((offer) => {
-      // An improvement's "raise ability scores" answer is its own shorthand, not one of the feat options.
+      // An improvement's "raise ability scores" answer is its own shorthand, separate from the feat options.
       const kept = (request.picks?.[offer.key] ?? []).filter(
         (id) => offer.options.some((option) => option.id === id) || (offer.kind === "asi-or-feat" && id === "asi")
       );
@@ -521,7 +521,7 @@ async function toClassFeatures(user: ReturnType<typeof userEvent.setup>, level: 
 
 // Issue 1
 
-describe("Issue 1 — an answered offer keeps the options it did not take", () => {
+describe("Issue 1: an answered offer keeps the options it did not take", () => {
   it("leaves all three Keen Senses skills on screen after Perception is picked, and lets the pick be swapped", async () => {
     const user = userEvent.setup();
     mount();
@@ -572,7 +572,7 @@ describe("Issue 1 — an answered offer keeps the options it did not take", () =
    * 12-option offer behaves like the 3-option one, and the grid's bounded scroll region keeps the
    * page height in check.
    */
-  it("keeps a LONG answered offer's options mounted and greys them — the fold is deleted, not gated", async () => {
+  it("keeps a LONG answered offer's options mounted and greys them; the fold is deleted", async () => {
     const user = userEvent.setup();
     mount();
     await toClassFeatures(user, 1);
@@ -637,7 +637,7 @@ describe("Issue 1 — an answered offer keeps the options it did not take", () =
 
 // Issue 2b
 
-describe("Issue 2b — the class features step and its subclass", () => {
+describe("Issue 2b: the class features step and its subclass", () => {
   it("names the level the subclass arrives at, in the step body, when the build is below it", async () => {
     const user = userEvent.setup();
     mount();
@@ -648,7 +648,7 @@ describe("Issue 2b — the class features step and its subclass", () => {
     expect(screen.queryByRole("heading", { name: "Cleric Subclass" })).toBeNull();
 
     /**
-     * In the step body, not the detail pane, which is hidden on narrow screens. jsdom loads no
+     * In the step body: the detail pane is hidden on narrow screens. jsdom loads no
      * stylesheet, so this asserts structure: the note is in the step and the pane is not rendered.
      */
     expect(document.querySelector(".cb-step")).toContainElement(
@@ -679,7 +679,7 @@ describe("Issue 2b — the class features step and its subclass", () => {
 
 // Issue 2c
 
-describe("Issue 2c — a spell's rules can be read while choosing spells", () => {
+describe("Issue 2c: a spell's rules can be read while choosing spells", () => {
   it("opens the rules in a modal, changes no pick, and closes on Escape", async () => {
     const user = userEvent.setup();
     mount();
@@ -735,7 +735,7 @@ describe("Issue 2c — a spell's rules can be read while choosing spells", () =>
     expect(offerNamed("Cleric cantrips")).toBeInTheDocument();
   });
 
-  it("offers the rules on a card that capacity has locked — the two you did NOT take are the ones worth reading", async () => {
+  it("offers the rules on a card that capacity has locked: the two you did NOT take are the ones worth reading", async () => {
     const user = userEvent.setup();
     mount();
     await toClassFeatures(user, 1);
@@ -809,7 +809,7 @@ describe("multiclassing on the class step", () => {
       classLevels: ["cleric", "cleric", "fighter"],
       picks: { "feature:elf-keen-senses": ["perception"] }
     };
-    /** The rebuild's class step, keeping `heldClasses`. */
+    /** The rebuild's class step, which keeps `heldClasses`. */
     const classStepOf = async (heldClasses: readonly string[]) => {
       const view = render(
         <ToastProvider>
@@ -1022,7 +1022,7 @@ describe("the Level flow's class choice", () => {
       await screen.findByText(/Level 3 went to Cleric\./, { selector: ".cb-level-preview p" })
     ).toBeInTheDocument();
     expect(screen.getByText(/Cleric 2 \/ Fighter 1/)).toBeInTheDocument();
-    // The note names the character rather than saying "your".
+    // The note names the character where it used to say "your".
     expect(document.querySelector(".cb-level-preview p")?.textContent).toMatch(
       /\w's level 3 choices and HP roll are kept/
     );
@@ -1091,7 +1091,7 @@ describe("a level-up", () => {
     }) as never);
   });
 
-  /** Mira, a level 3 Life Domain Cleric built here, going to level 4. */
+  /** Mira, a level 3 Life Domain Cleric built here, who goes to level 4. */
   const seed = (): BuilderDraft => ({
     ...emptyDraft(),
     name: "Mira",

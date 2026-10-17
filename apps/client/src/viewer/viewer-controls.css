@@ -5,7 +5,7 @@
   gap: var(--space-4);
 }
 /* At the two-column width the region does not scroll, so the frame supplies the bottom padding. Two
-   classes to win on specificity, not bundle order. */
+   classes win on specificity, whatever the bundle order. */
 .viewer-controls.pane-frame {
   padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
 }
@@ -112,7 +112,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.65rem;
 }
-/* The labels name a map, so they wrap inside their button rather than run into the next one. */
+/* The labels name a map, so they wrap inside their button and never run into the next one. */
 .viewer-control-actions .nh-btn {
   white-space: normal;
   text-wrap: balance;

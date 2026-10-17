@@ -232,7 +232,7 @@ export function LevelFlow({
         </p>
       </header>
 
-      {/* Buttons, not a slider: a 20-stop scrubber is unusable at 390px. */}
+      {/* Buttons: a 20-stop slider is unusable at 390px. */}
       <ol className="cb-level-rail" aria-label="Levels">
         {Array.from({ length: cap }, (_, index) => index + 1).map((level) => (
           <li

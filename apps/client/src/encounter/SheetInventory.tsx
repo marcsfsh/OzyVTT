@@ -100,7 +100,7 @@ export function SheetInventory({
         ...(spellId ? { spellId } : {}),
         ...(item.weightLb != null ? { weightEach: item.weightLb } : {}),
         ...(item.description ? { description: item.description } : {}),
-        // Carry the weapon/armor stats so equipping matters. The weapon block is narrowed, not spread: the
+        // Carry the weapon/armor stats so equipping matters. The weapon block is narrowed and never spread: the
         // browse summary's `mastery` is refused by the strict wire schema (see `inventoryWeaponFrom`).
         ...(item.weapon ? { weapon: inventoryWeaponFrom(item.weapon) } : {}),
         ...(item.armor ? { armor: item.armor } : {})

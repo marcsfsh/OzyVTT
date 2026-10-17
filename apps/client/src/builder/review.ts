@@ -17,7 +17,7 @@ import {
 function pickedNames(draft: BuilderDraft, offer: BuilderOffer): string {
   const picks = draft.picks[offer.key] ?? [];
   if (picks.length === 0) return "None";
-  // The full ability name, matching the "Strength / 17" row above.
+  // The full ability name, as in the "Strength / 17" row above.
   return picks
     .map((id) =>
       id === ASI_SHORTHAND

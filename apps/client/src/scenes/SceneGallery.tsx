@@ -141,7 +141,7 @@ export function SceneGallery({
   const drag = useRef<{ id: string; order: string[]; start: string; commit: (order: string[]) => void } | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOrder, setDragOrder] = useState<readonly string[] | null>(null);
-  // Pointer move/up listen on the window while dragging, not on the grip: the grip moves in the DOM as
+  // Pointer move/up listen on the window while dragging, and the grip doesn't: the grip moves in the DOM as
   // the list reorders, which would strand pointer capture. A ref carries the live order and a commit
   // closure so the listeners always read fresh state without re-subscribing.
   const beginDrag = (sceneId: string, event: React.PointerEvent) => {

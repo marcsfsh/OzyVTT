@@ -9,7 +9,7 @@ import { saveAnswerPayload, saveDamageAmend } from "./save-answer";
 /**
  * The number typed into the save prompt's damage field is what comes off hit points. Runs the
  * prompt's payload builder (`save-answer.ts`) through the server's `.strict()` schema and its
- * `answerSave`, asserting hit points:
+ * `answerSave`, and asserts hit points:
  *   1. the amended number is what lands;
  *   2. it lands as fire, so a fire-resistant target still halves it;
  *   3. it is halved once: `damageOverride` is the pre-halving proposal, so echoing the previewed
@@ -281,7 +281,7 @@ describe("the save prompt's damage field", () => {
     const table = tableWith({ resistant: false, halfOnSuccess: false });
     expect(saveDamageAmend(17, "9999")).toBe(9999);
 
-    // Assert the message, not the path: `save.answer` surfaces `issues[0].message` verbatim
+    // Assert the message and leave the path alone: `save.answer` surfaces `issues[0].message` verbatim
     // (`issueMessage`, apps/server/src/commands/saves.ts).
     for (const typed of ["9999", "1001"]) {
       const refusal = SaveAnswerSchema.safeParse({

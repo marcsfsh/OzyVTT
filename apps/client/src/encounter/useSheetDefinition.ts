@@ -122,7 +122,7 @@ export function useSheetDefinition(
    */
   const [serverActions, setServerActions] = useState<readonly ContentActionSummary[]>([]);
   /**
-   * The sheet's numbers, from the server; chips read this instead of recomputing. Refetched on
+   * The sheet's numbers, from the server; chips read this and recompute nothing. Refetched on
    * effects, conditions and HP as well as inventory, since riders can depend on them.
    */
   const [derived, setDerived] = useState<ActorDerivedSheet | null>(null);

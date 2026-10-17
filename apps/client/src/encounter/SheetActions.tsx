@@ -41,7 +41,7 @@ export function SheetActions({
   definition: ActorDefinition;
   serverActions: readonly ContentActionSummary[];
   rolls: SheetRolls;
-  /** True on the player's own turn in a fight: attacks resolve on the server instead of as loose rolls. */
+  /** True on the player's own turn in a fight: attacks resolve on the server and are no loose rolls. */
   structuredAttacks: boolean;
   /** The runner for the inline preference, with the fight it resolves in. */
   inline: Readonly<{

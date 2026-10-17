@@ -48,7 +48,7 @@
 .claim-card-action {
   margin-top: auto;
 }
-/* A card someone else holds says what to do instead of offering a button that can't work. */
+/* A card someone else holds says what to do; a button there could not work. */
 .claim-card-taken {
   margin: auto 0 0;
   color: var(--text-dim);

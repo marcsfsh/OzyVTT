@@ -27,7 +27,7 @@ const COPY_ROOTS = [
 /** Source files that are test support or the scanner itself: what they say is read by developers in a failing test. */
 const NOT_COPY = /\.test\.|\.d\.ts$|-harness\.ts$|\/(copy-scan|writing-rules|convention-sources)\.ts$/;
 
-/** Every file under `dir` (repo-relative) that `keep` accepts, skipping directories `skip` names. */
+/** Every file under `dir` (repo-relative) that `keep` accepts. Directories `skip` names are left out. */
 function walk(dir: string, keep: (path: string) => boolean, skip: (path: string) => boolean = () => false): string[] {
   const out: string[] = [];
   for (const name of readdirSync(`${REPO}/${dir}`).sort()) {
@@ -86,7 +86,7 @@ const exempt = (entry: ProseString, rule: string) =>
 
 describe("The writing rules, on every string a person reads", () => {
   it("reads the client, the UI kit, the server and the OpenAPI prose", () => {
-    // Named anchors, so a scan that stops reading a root fails by name rather than by a count.
+    // Named anchors, so a scan that stops reading a root fails by name and a count can't hide it.
     const at = (file: string, text: RegExp) => strings.some((entry) => entry.file === file && text.test(entry.text));
     expect(at("apps/client/src/encounter/ActionTargetPicker.tsx", /^Choose what|caught when you roll/)).toBe(true);
     expect(at("packages/ui/src/primitives/Checklist.tsx", /^, done$/)).toBe(true);

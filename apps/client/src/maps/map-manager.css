@@ -124,7 +124,7 @@
 .map-library-rail .map-picker-grid {
   max-height: none;
 }
-/* Empty states get one designed frame (the material below), not a dashed placeholder. */
+/* Empty states get one designed frame (the material below) and no dashed placeholder. */
 .map-list-empty {
   margin: var(--space-2) 0 0;
   padding: var(--space-4);
@@ -381,7 +381,7 @@
   gap: var(--space-2);
 }
 
-/* Fields step. Grids size from their own width (`auto-fit` with a real minimum), not the viewport:
+/* Fields step. Grids size from their own width (`auto-fit` with a real minimum), never the viewport:
    above 560px the step body is a column of varying width beside the canvas. */
 .grid-detected {
   margin: 0;
@@ -671,7 +671,7 @@
 }
 
 /* From 561px the pane is two columns, canvas | steps: the step column scrolls itself, so the 40% cap
-   is lifted. Short panes, not narrow ones, are what starve a one-column pane, so this starts well
+   is lifted. Short panes starve a one-column pane, and narrow ones don't, so this starts well
    below laptop widths. The step column's minimum is 14rem. */
 @media (min-width: 561px) {
   /* The empty pane is a one-child message box and must not get the two-column template. */

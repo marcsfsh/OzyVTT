@@ -80,7 +80,7 @@ export function ReplayList({
   };
 
   /* Heading (and the player's way back) stay fixed; the rows are the one scroll region. Rows are
-     plain `<li>`s with rules drawn in `replay.css`, not cards. */
+     plain `<li>`s with rules drawn in `replay.css`, and no cards. */
   return (
     <section className="replay-panel replay-list-page pane-frame pane-scene scanlines frame-col anim-view">
       <div className="pane-sky" aria-hidden="true" />

@@ -437,7 +437,7 @@ describe("Heroic Inspiration on the sheet", () => {
     );
     const user = userEvent.setup();
     expect(screen.getByText("Held · spend it to reroll one die")).toBeTruthy();
-    // A player spends it from a reroll, not from a button of its own.
+    // A player spends it from a reroll; it has no button of its own.
     expect(screen.queryByRole("button", { name: "Give Heroic Inspiration" })).toBeNull();
     await user.click(await screen.findByRole("button", { name: "Roll a Strength check, +1" }));
     // The reroll is offered once the check is the character's latest roll.

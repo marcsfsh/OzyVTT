@@ -1,6 +1,6 @@
 /* The phone's map and panel split: a full-width grip drawn 20px tall. Its hit area reaches 24px up over the map
    pane's feedback line, which takes no taps, to make 44px without covering the tabs below. `touch-action: none` so a
-   finger drags the split instead of scrolling the page. */
+   finger drags the split and the page doesn't scroll. */
 .pane-divider {
   position: relative;
   flex: none;

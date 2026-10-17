@@ -10,7 +10,7 @@
   box-shadow: inset 0 0 0 2px var(--focus-ring-color);
 }
 /* `.pane-frame` has no bottom padding (its region normally owns it); this region runs to the pane's
-   edge, so the frame keeps the last row off it. Two classes to win on specificity, not bundle order. */
+   edge, so the frame keeps the last row off it. Two classes win on specificity, whatever the bundle order. */
 .replay-viewer.pane-frame {
   padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
 }
@@ -109,7 +109,7 @@
   min-height: 0;
   overflow: hidden;
 }
-/* `> svg`, not a descendant match: every @vtt/ui glyph is an `<svg width="1em">`, and a class rule
+/* `> svg` and no descendant match: every @vtt/ui glyph is an `<svg width="1em">`, and a class rule
    beats a presentation attribute. */
 .replay-stage > svg {
   width: 100%;

@@ -21,7 +21,7 @@
   border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
   color: var(--text);
 }
-/* The options menu is a fixed viewport overlay rather than a dropdown inside the panel, so the
+/* The options menu is a fixed viewport overlay outside the panel, so the
    tracker's scroller can never clip it. This transparent layer catches outside clicks (no dim, so it
    reads as a popover); it sits above the enlarged map (z-40) and below the menu. */
 .encounter-menu-backdrop {
@@ -45,7 +45,7 @@
   border: 1px solid transparent;
   box-shadow: var(--shadow-2);
 }
-/* `min-height: 0` lets the body shrink inside the capped column instead of pushing the frame past it. */
+/* `min-height: 0` lets the body shrink inside the capped column, so it never pushes the frame past it. */
 .encounter-menu-body {
   display: grid;
   gap: 0.6rem;
@@ -94,7 +94,7 @@
   color: var(--text-muted);
   font-size: var(--fs-sm);
 }
-/* `Recent`, collapsed, ten monsters deep, matching `.scene-prep-recent`: a bordered 44px row with the
+/* `Recent`, collapsed, ten monsters deep, like `.scene-prep-recent`: a bordered 44px row with the
    caret at the far edge (`display: flex` on a <summary> suppresses the native marker). */
 .menu-add-recent > summary {
   min-height: var(--tap-min);

@@ -225,7 +225,7 @@ export function ActionRunner({
           <strong>Blocked:</strong> {blockedPrompt.blocked.message}
         </ConfirmRow>
       )}
-      {/* Name what is left ("1× Tail") so the GM picks the next attack instead of re-tapping the last. */}
+      {/* Name what is left ("1× Tail") so the GM picks the next attack and doesn't re-tap the last. */}
       {attacksLeft > 0 && !picking && instance && (
         <p className="action-instance-note" role="status">
           Remaining in this action: {componentLabel(instance, actions)}.

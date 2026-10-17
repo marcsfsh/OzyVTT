@@ -5,7 +5,7 @@ import "./character-sheet.css";
 
 type DefinitionAction = ActorDefinition["actions"][number];
 
-/** A spell this creature could ready: one it casts with an action (SRD Ready), not a ritual or what a spell lets
+/** A spell this creature could ready: one it casts with an action (SRD Ready). A ritual is left out, and so is what a spell lets
  *  its caster do later. */
 export function readyableSpells(definition: ActorDefinition): DefinitionAction[] {
   return definition.actions.filter(

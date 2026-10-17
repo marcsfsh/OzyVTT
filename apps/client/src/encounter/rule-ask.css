@@ -1,5 +1,5 @@
 /* Asking the GM: the player's refusal-and-ask, the player's waiting question, and the GM's queue.
-   Caution, not danger: nothing is lost, a move is just not allowed yet. */
+   Caution: nothing is lost, and a move is only not allowed yet. */
 .rule-ask {
   padding: 0.6rem var(--space-3);
   border: 1px solid var(--line-strong);

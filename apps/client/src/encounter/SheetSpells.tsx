@@ -281,7 +281,7 @@ export function SheetSpells({
   const { rollFlat } = rolls;
   const spellcasting = definition.spellcasting;
   const character = definition.character;
-  // Cantrips scale with the character's total level, not any one class's.
+  // Cantrips scale with the character's total level across every class.
   const characterLevel = Math.max(
     1,
     (character?.classes ?? []).reduce((sum, entry) => sum + entry.level, 0)

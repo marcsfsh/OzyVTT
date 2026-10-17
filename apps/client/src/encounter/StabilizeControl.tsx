@@ -25,7 +25,7 @@ export function aidGiverOf(
   };
 }
 
-/** Outside a fight, who in the party could give aid: conscious characters and NPCs on the roster, not the one in need. */
+/** Outside a fight, who in the party could give aid: conscious characters and NPCs on the roster, without the one in need. */
 export function partyHelpers(state: GmView, targetId: string): AidGiver[] {
   return rosterActors(state.actors)
     .filter(

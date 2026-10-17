@@ -148,8 +148,8 @@ export const GROUPS: ReadonlyArray<{ title: string; match: (path: string) => boo
 ];
 
 /**
- * Paths no group claims, listed under "Other" so a missing `GROUPS` entry gives a wrong heading
- * rather than a missing endpoint.
+ * Paths no group claims, listed under "Other" so a missing `GROUPS` entry shows as a wrong heading
+ * and the endpoint is still there.
  */
 export const ungrouped = (paths: readonly string[]) =>
   paths.filter((path) => !GROUPS.some((group) => group.match(path)));
@@ -225,7 +225,7 @@ function noteOf(schema: Schema): string {
 
 export type FieldRow = Readonly<{ name: string; type: string; required: boolean; note: string }>;
 
-/** Object fields, flattening one level of nested objects / arrays-of-objects so shapes like `entries[].actorId` are spelled out. */
+/** Object fields, with one level of nested objects / arrays-of-objects flattened so shapes like `entries[].actorId` are spelled out. */
 export function fieldRows(schema: Schema, components: Components): FieldRow[] {
   const properties = (schema.properties ?? {}) as Record<string, Schema>;
   const required = new Set<string>(schema.required ?? []);

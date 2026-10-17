@@ -49,7 +49,7 @@ type WizardReply = Readonly<{
  *
  * Mode depends on the map kind: a battle map is either a printed square grid (the wizard) or
  * gridless distance (`PUT .../scale`); regional and world maps only have the scale path. The scale
- * path never calls the wizard, so its fourth step is a review, not a verification.
+ * path never calls the wizard, so its fourth step is a review with no verification.
  */
 export function CalibrationPane({
   map,
@@ -64,7 +64,7 @@ export function CalibrationPane({
   previewUrl: string | null;
   gmToken: string;
   folderNames: readonly string[];
-  /** The library refetches after a save, keeping this map selected. */
+  /** The library refetches after a save and keeps this map selected. */
   onSaved: (mapId: string) => Promise<void>;
   /** Below 850px: back to the rail of maps. */
   onShowRail: () => void;

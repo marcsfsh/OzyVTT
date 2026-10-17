@@ -70,7 +70,7 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
 }
 
 /** What the server lists for this character beyond its own rows: the generic actions it can take (with the Bonus
- *  Action forms its features give) and which of its rows are added to a hit rather than taken alone. Read once per
+ *  Action forms its features give) and which of its rows are added to a hit and never taken alone. Read once per
  *  sheet; the server still decides each use. */
 function useServerActionFacts(actorId: string, definition: ActorDefinition, effectsKey: string) {
   const [facts, setFacts] = useState<{
@@ -101,7 +101,7 @@ function useServerActionFacts(actorId: string, definition: ActorDefinition, effe
 }
 
 /**
- * A player's action console on their own turn, mirroring the GM's ActionRunner for their claimed
+ * A player's action console on their own turn, the counterpart of the GM's ActionRunner for their claimed
  * character: pick an action and targets, roll the d20 (or type the face a physical die shows), see why
  * it has Advantage or Disadvantage, and confirm.
  * Per the table's player-damage policy the server either hands the damage to the GM (proposal) or
@@ -155,7 +155,7 @@ export function PlayerActionRunner({
           (action) =>
             !facts.ridesAHit.has(action.id) &&
             !facts.awaiting.has(action.id) &&
-            // What a spell's area does later is the server's or the GM's to run, not a player's tap.
+            // What a spell's area does later is the server's or the GM's to run; a player's tap doesn't.
             !(action.activation === "other" && /^spell-.+-then-/.test(action.id)) &&
             (action.attack ||
               action.save ||

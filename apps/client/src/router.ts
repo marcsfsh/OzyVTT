@@ -62,7 +62,7 @@ async function mayLeave(): Promise<boolean> {
 
 /**
  * Pushes a same-path entry whose only job is to be popped, so Android back closes the phone nav
- * drawer instead of leaving the section. Dialogs stay out of history.
+ * drawer and the page stays in the section. Dialogs stay out of history.
  */
 const transients = new Map<string, () => void>();
 
@@ -71,7 +71,7 @@ export function pushTransient(key: string, onPop: () => void): void {
   window.history.pushState({ transient: key }, "", window.location.href);
 }
 
-/** Withdraw a transient entry that was closed by its own affordance rather than by the back gesture. */
+/** Withdraw a transient entry that was closed by its own affordance, where the back gesture didn't close it. */
 export function popTransient(key: string): void {
   if (!transients.has(key)) return;
   transients.delete(key);
@@ -156,7 +156,7 @@ export function replaceQuery(mutate: (query: URLSearchParams) => void): void {
   publish();
 }
 
-/** Builds an address with query parameters, dropping empty ones so a URL never carries `?tag=`. */
+/** Builds an address with query parameters, and drops empty ones so a URL never carries `?tag=`. */
 export function withQuery(path: string, params: Readonly<Record<string, string | number | null | undefined>>): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {

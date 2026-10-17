@@ -125,7 +125,7 @@ export function ActingConsole({
           )}
           {legendaryActor ? (
             // Off-turn legendary console: the turn economy belongs to the turn actor, so offer a spend (-1, for a
-            // legendary action run by hand) and a GM correction (+1) and a way back instead of Action/Bonus/Reaction.
+            // legendary action run by hand) and a GM correction (+1) and a way back in place of Action/Bonus/Reaction.
             <div className="acting-console-economy-row">
               <button
                 type="button"

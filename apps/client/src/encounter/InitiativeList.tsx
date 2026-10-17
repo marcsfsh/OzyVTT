@@ -19,7 +19,7 @@ export type InitiativeRowEntry = Readonly<{
 
 /**
  * Condition presence for a dense list row: plain dots (up to 4, then +N) with the names in the
- * tooltip and the accessible name. Takes ids and labels, not a rules lookup, so the shared screen can
+ * tooltip and the accessible name. Takes ids and labels and no rules lookup, so the shared screen can
  * use it without a socket.
  */
 export function ConditionDots({

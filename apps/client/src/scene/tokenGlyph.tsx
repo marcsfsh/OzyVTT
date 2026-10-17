@@ -98,7 +98,7 @@ export function TokenGlyph({
 }
 
 /**
- * Original 16×16 glyphs for the SRD conditions, so a token reads "poisoned, prone" rather than
+ * Original 16×16 glyphs for the SRD conditions, so a token reads "poisoned, prone" where initials would read
  * "P, P". Unknown ids fall back to the initial letter. Single filled paths (evenodd carves cutouts).
  */
 export const CONDITION_GLYPHS: Record<string, string> = {
@@ -143,7 +143,7 @@ export function hpFillFraction(
 }
 
 /** Band class for token health fill/stroke/stop-color: cyan healthy (>50%), magenta bloodied
-    (25-50%), danger below. A class rather than a hex so it follows the theme tokens. */
+    (25-50%), danger below. A class (no hex) so it follows the theme tokens. */
 export function healthFillClass(fraction: number): string {
   const clamped = Math.max(0, Math.min(1, fraction));
   if (clamped > 0.5) return "hp-fill-healthy"; // --cyan
@@ -152,14 +152,14 @@ export function healthFillClass(fraction: number): string {
 }
 
 /**
- * A soft glow coloured by the health fraction, hugging the token's edge and fading outward. Rendered
+ * A soft glow coloured by the health fraction, which hugs the token's edge and fades outward. Rendered
  * under the token (before TokenGlyph), so the body and active-turn ring paint over it. SVG space.
  */
 export function TokenHealthAura({ sizePx, fraction }: Readonly<{ sizePx: number; fraction: number }>) {
   const gradientId = useId();
   const clamped = Math.max(0, Math.min(1, fraction));
   const bandClass = healthFillClass(clamped);
-  // A thin band from the body edge (0.5) out to 0.86, peaking at the edge; the inner half is hidden
+  // A thin band from the body edge (0.5) out to 0.86 that peaks at the edge; the inner half is hidden
   // behind the opaque body.
   const outer = sizePx * 0.86;
   const edge = Math.round(((sizePx * 0.5) / outer) * 100);
@@ -179,7 +179,7 @@ export function TokenHealthAura({ sizePx, fraction }: Readonly<{ sizePx: number;
 }
 
 /**
- * A token health indicator shown instead of the band dot when the GM opts in: a thin HP bar under
+ * A token health indicator shown in place of the band dot when the GM opts in: a thin HP bar under
  * the token, or a ring around it (the aura renders separately, behind the token). The fraction is
  * always audience-safe: the server only sends this style when allowed, and non-owners get a
  * band-derived fraction.

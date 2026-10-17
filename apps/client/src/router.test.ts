@@ -101,7 +101,7 @@ describe("The address table", () => {
   });
 
   /**
-   * A retired address redirects rather than 404s, so old bookmarks land somewhere true.
+   * A retired address redirects (no 404), so old bookmarks land somewhere true.
    */
   it("redirects the addresses that moved, and nothing else", () => {
     expect(redirectForRetiredPath("/encounter", new URLSearchParams())).toBe("/table");
@@ -140,7 +140,7 @@ describe("Which addresses exist", () => {
     expect(isKnownPath("/codex/sessions/s1")).toBe(true);
     expect(isKnownPath("/codex/quests/q1")).toBe(true);
     expect(isKnownPath("/codex/atlas/m1")).toBe(true);
-    // The journal focuses an entry with `?entry=`, not a path segment; the other shape must not work.
+    // The journal focuses an entry with `?entry=` and no path segment; the other shape must not work.
     expect(isKnownPath("/codex/journal/j1")).toBe(false);
     expect(isKnownPath("/codex/settings/anything")).toBe(false);
   });
@@ -188,7 +188,7 @@ describe("Which addresses exist", () => {
     ];
     for (const address of addresses) {
       const renders = codexSectionOf(address.split("/").filter(Boolean)) !== null;
-      expect(isKnownPath(address), `${address} — router says ${isKnownPath(address)}, shell says ${renders}`).toBe(
+      expect(isKnownPath(address), `${address}: router says ${isKnownPath(address)}, shell says ${renders}`).toBe(
         renders
       );
     }
@@ -333,7 +333,7 @@ describe("Navigating", () => {
   });
 });
 
-describe("Navigation guards (D6 — autosave off, draft dirty)", () => {
+describe("Navigation guards (D6: autosave off, draft dirty)", () => {
   /**
    * Flush past the guard chain before asserting a non-navigation: `mayLeave()` awaits each guard, so
    * the push lands several microtasks after `navigate()` returns. A macrotask boundary is past all of
@@ -496,7 +496,7 @@ describe("Resume-last-location", () => {
     localStorage.clear();
   });
 
-  it("resumes only from the bare root — a deep link always wins", () => {
+  it("resumes only from the bare root: a deep link always wins", () => {
     rememberLocation("gm", "/codex/quests");
     expect(resumeTarget("gm", "/codex/pages/p1")).toBeNull();
     expect(resumeTarget("gm", "/")).toBe("/codex/quests");
@@ -532,7 +532,7 @@ describe("Resume-last-location", () => {
 
   /**
    * Locations are remembered per tab, so leaving the Codex for the Table and coming back returns to
-   * the record that was open, not the tab's front door.
+   * the record that was open, where the tab's front door would otherwise be.
    */
   describe("per tab", () => {
     it("returns to the record that was open in that tab, not to the tab's front door", () => {
@@ -542,7 +542,7 @@ describe("Resume-last-location", () => {
       expect(lastLocationForTab("gm", "table")).toBe("/table");
     });
 
-    it("keeps the tabs apart — leaving one does not overwrite where you were in another", () => {
+    it("keeps the tabs apart: leaving one does not overwrite where you were in another", () => {
       rememberLocation("gm", "/codex/quests/q1");
       rememberLocation("gm", "/scenes?view=maps");
       expect(lastLocationForTab("gm", "codex")).toBe("/codex/quests/q1");

@@ -1,6 +1,6 @@
 /**
  * The source files the convention checks read (`design-conventions.test.ts`, `play-vocabulary.test.ts`).
- * Imported, not a test file.
+ * Imported by tests; it is no test file itself.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 

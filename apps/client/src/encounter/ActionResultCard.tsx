@@ -226,7 +226,7 @@ export function ActionResultCard({
           <IconWarning /> {warning}
         </p>
       ))}
-      {/* Narration of what happened (a push, a forced save), matching the feed. Includes `gmOnly`
+      {/* Narration of what happened (a push, a forced save), as in the feed. Includes `gmOnly`
           rows because this component takes a `GmView` and is mounted only in the GM console. Reusing
           it for a player would need a client-side filter here; the server also strips gmOnly rows
           from non-GM acks (`withoutGmOnlyNarration`, game-operations.ts). */}

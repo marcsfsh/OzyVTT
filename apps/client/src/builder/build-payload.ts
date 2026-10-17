@@ -256,7 +256,7 @@ const kindNoun = (kind: string) =>
         ? "language"
         : "option";
 
-/** The built-in "raise two points instead of taking a feat" row id the server understands. */
+/** The built-in "raise two points in place of a feat" row id the server understands. */
 export const ASI_SHORTHAND = "asi";
 
 /** An offer is satisfied when exactly filled, or deferred because its catalog is empty. */
@@ -384,7 +384,7 @@ export type AbilityCapBreach = Readonly<{
   total: number;
   /** The ASI offer whose increase broke the ceiling; null when the background's own spread did. */
   offerKey: string | null;
-  /** Said in the player's words, naming the ability and both ways out. */
+  /** Said in the player's words, and names the ability and both ways out. */
   reason: string;
 }>;
 
@@ -397,7 +397,7 @@ export type AbilityCapPreview = Readonly<{
 
 /**
  * Walks the ability scores in the server's order and reports the first increase past its ceiling. An input
- * check, not a game outcome: the background spread, each ASI and each feat's ability pick reject above the
+ * check with no game outcome: the background spread, each ASI and each feat's ability pick reject above the
  * ceiling (20, or an Epic Boon's 30), level by level, while species increases clamp. The server recomputes all
  * of it.
  */
@@ -536,7 +536,7 @@ export function buildCreatePayload(draft: BuilderDraft, choices: readonly Charac
 }
 
 // Roster capacity: the table stores at most 100 sheets and 200 combatants (`actor-roster.ts`), so
-// the wizard warns as it fills and blocks once full, rather than failing at Create.
+// the wizard warns as it fills and blocks once full, so Create never fails on it.
 
 export const DEFINITION_LIMIT = 100;
 export const ACTOR_LIMIT = 200;
@@ -613,7 +613,7 @@ export function stepBlockedReason(
     offersForStep(offers, owner).find((offer) => !offerFilled(offer, draft));
   /**
    * One template for "this pick is not answered yet". The label is printed as the content prints it,
-   * unquoted, matching the heading it points at.
+   * unquoted, as in the heading it points at.
    */
   const pickReason = (offer: BuilderOffer) => {
     // Offers on one step can share a label (six "Ability Score Improvement"s), so stamp the level

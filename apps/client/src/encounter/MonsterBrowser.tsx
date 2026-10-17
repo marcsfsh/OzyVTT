@@ -6,7 +6,7 @@ import { formatChallenge, titleCase } from "./format";
 import { loadMonsterCatalog } from "./monster-catalog";
 import "./monster-browser.css";
 
-/** Challenge-rating bands for the filter: wide enough to browse by, matching the SRD's tiers of play. */
+/** Challenge-rating bands for the filter: wide enough to browse by, and close to the SRD's tiers of play. */
 const CR_BANDS = [
   { id: "any", label: "Any CR", min: 0, max: 30 },
   { id: "0-1", label: "CR 0 to 1", min: 0, max: 1 },

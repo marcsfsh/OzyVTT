@@ -481,7 +481,7 @@ export function ViewerApp() {
         <p role="alert">{message}</p>
       </main>
     );
-  // Sound plays whether or not a map is shown: music during a break is the GM's call, not the screen's.
+  // Sound plays whether or not a map is shown: music during a break is the GM's call alone.
   const sound = <TableSound sound={presentation.sound} receivedAt={receivedAt} live={connection === "live"} />;
   if (!presentation.enabled)
     return (

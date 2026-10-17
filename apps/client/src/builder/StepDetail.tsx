@@ -50,7 +50,7 @@ export function stepDetail(step: StepId, context: OfferContext, level: number): 
           Hit die {context.classRecord.hitDie} · saves{" "}
           {context.classRecord.savingThrows.map((ability) => ability.toUpperCase()).join(", ")}
         </p>
-        {/* "None" for absent, matching every review row and allocator cell. */}
+        {/* "None" for absent, as in every review row and allocator cell. */}
         <p className="tabular">
           Armor: {context.classRecord.armorProficiencies.join(", ") || "None"} · weapons:{" "}
           {context.classRecord.weaponProficiencies.join(", ") || "None"}

@@ -41,7 +41,7 @@ const SAVE: PendingSave = {
 
 /**
  * The same 17 split across two damage types, against a fire-resistant target. An amended 12 is halved once to 6
- * (4 fire + 2 cold), then the fire is resisted, landing 2 + 2 = 4: neither 12 nor its half, which proves the
+ * (4 fire + 2 cold), then the fire is resisted, so 2 + 2 = 4 lands: neither 12 nor its half, which proves the
  * prompt prints the server's number. The mirror test runs this save through the real `answerSave`.
  */
 const TWO_TYPE: PendingSave = {
@@ -65,7 +65,7 @@ const feedback: string[] = [];
 /**
  * The prompt in the roll mode under test; manual mode never auto-rolls. Wrapped in `<StrictMode>`
  * like the app (`main.tsx`): its mount → cleanup → mount once left the recheck's mounted flag
- * cleared, swallowing every recheck ack.
+ * cleared, and swallows every recheck ack.
  */
 const mount = (save: PendingSave, rollMode: "auto" | "manual" = "manual") =>
   render(
@@ -101,7 +101,7 @@ const ack = (
   acknowledge({ ok: true, outcome: { dc: 15, conditionApplied: false, committed: false, ...outcome } });
 };
 /**
- * Waits for the debounced recheck by count rather than shape: the mount roll is itself an
+ * Waits for the debounced recheck by count, since shape can't tell: the mount roll is itself an
  * uncommitted `save:answer`, so "the last one has commit: false" would already be true.
  */
 const nextAnswer = async (before: number) => {
@@ -140,7 +140,7 @@ describe("the save prompt's damage field", () => {
     const user = userEvent.setup();
     mount(SAVE);
     await user.type(screen.getByLabelText(/Damage on a failure/), "12");
-    // A physical die's face, not a total: the server adds the bonus and holds the die.
+    // A physical die's face and no total: the server adds the bonus and holds the die.
     await user.type(screen.getByLabelText("Your save d20"), "18");
     await user.click(screen.getByRole("button", { name: "Use" }));
     expect(lastAnswer()).toMatchObject({

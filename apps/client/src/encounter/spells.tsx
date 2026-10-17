@@ -59,7 +59,7 @@ function buildSpellIndex(spells: readonly ContentSpellSummary[]): SpellIndex {
   return { byName, matcher: new RegExp(`\\b(${escaped.join("|")})\\b`, "gi") };
 }
 
-/** Splits a plain-text run on recognized spell names, wrapping each hit in a button that opens its card. */
+/** Splits a plain-text run on recognized spell names and wraps each hit in a button that opens its card. */
 function linkSpells(
   text: string,
   index: SpellIndex,
@@ -114,7 +114,7 @@ export function SpellcastingText({ text }: Readonly<{ text: string }>) {
   const index = useMemo(() => buildSpellIndex(spells), [spells]);
   const [open, setOpen] = useState<ContentSpellSummary | null>(null);
   const lines = text
-    .replace(/\s*—\s*/g, " - ")
+    .replace(/\s*\u2014\s*/g, " - ")
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);

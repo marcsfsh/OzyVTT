@@ -32,7 +32,7 @@ function GmViewer({
 }: Readonly<{ gmToken: string; archiveId: number; onBack: () => void; onLaunched: () => void }>) {
   const { document, error } = useArchiveDocument<ArchiveDocument>(archiveId, gmToken);
   const [launching, setLaunching] = useState(false);
-  /** A refusal with somewhere to go stays on screen (an Alert, not a toast): it is a state with a next step. */
+  /** A refusal with somewhere to go stays on screen (an Alert, since a toast fades): it is a state with a next step. */
   const [refused, setRefused] = useState<{ code: RoutedRefusal; message: string } | null>(null);
   const { confirm, dialog } = useConfirm();
   const { toast } = useToast();
@@ -114,7 +114,7 @@ function GmViewer({
       </div>
       {/* The refusal and its way out. A full scene list links to the scene gallery, the only place a
         prepared scene can be removed; a history review says where to go (the rewind banner on the
-        table) rather than offering a route. */}
+        table) and offers no route. */}
       {refused && (
         <Alert tone="warning" className="replay-refusal" title="That moment could not be launched">
           <p>{refused.message}</p>

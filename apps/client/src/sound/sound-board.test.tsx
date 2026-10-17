@@ -107,7 +107,7 @@ describe("the sound board", () => {
     );
     // The GM's own silent preview is not a table screen.
     expect(await screen.findByText("No table screen connected")).toBeInTheDocument();
-    // Rain is already a layer, so its row says so in words rather than offering it again.
+    // Rain is already a layer, so its row says so in words and offers nothing again.
     expect(screen.getByText("In ambience")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Add Tavern Song to the playlist" }));
     expect(sent).toContainEqual([

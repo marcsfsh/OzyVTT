@@ -70,7 +70,7 @@ export type ServerRolls = Readonly<{
 
 /**
  * Dice the wizard throws on the server. Rolls arrive through the roll history (`dice.roll` replies
- * with an id, not a total), so the number the wizard uses is the one the table can see was rolled.
+ * with an id and no total), so the number the wizard uses is the one the table can see was rolled.
  */
 export function useServerRolls(
   rolls: ReadonlyArray<Readonly<{ id: string; total: number }>>,

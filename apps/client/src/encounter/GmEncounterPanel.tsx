@@ -71,7 +71,7 @@ export function GmEncounterPanel({
   // until shortly after the last turn command settled; otherwise one double tap skips a combatant.
   const turnSettlesAt = useRef(0);
   const [message, setMessage] = useState("");
-  // Encounter-setup opt-in: claimed players roll their own initiative (per encounter, not persisted).
+  // Encounter-setup opt-in: claimed players roll their own initiative (per encounter, never persisted).
   const [playersRollInitiative, setPlayersRollInitiative] = useState(false);
   // SRD Surprise and group rolls, per fight: who rolls initiative at Disadvantage, and one roll per stat block.
   const [surprised, setSurprised] = useState<ReadonlySet<string>>(() => new Set());
@@ -120,7 +120,7 @@ export function GmEncounterPanel({
       // Roster only: a replay launch adds a burst of actors the server deletes when the replay ends.
       for (const actor of rosterActors(state.actors)) if (!known.has(actor.id) && !actor.archived) valid.add(actor.id);
       knownActorIdsRef.current = new Set(state.actors.map((actor) => actor.id));
-      // An empty tray stays empty: "nothing staged" is a decision, not a gap to fill with the roster.
+      // An empty tray stays empty: "nothing staged" is a decision, and the roster doesn't fill it.
       return valid;
     });
   }, [actorsById, state.actors, state.combat.active]);

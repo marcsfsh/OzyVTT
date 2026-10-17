@@ -6,10 +6,10 @@ import react from "@vitejs/plugin-react";
  *
  * TWO PROJECTS, because one of these tests is not a component test at all.
  *
- *   - **dom** — everything under `src/**\/*.test.{ts,tsx}`: `jsdom` because the behaviour under test
+ *   - **dom**: everything under `src/**\/*.test.{ts,tsx}`: `jsdom` because the behaviour under test
  *     is rendering (see `test/setup.ts` for the jsdom gaps this app hits and what they mean for what
  *     those tests can honestly prove).
- *   - **node** — `*.mirror.test.ts` only, in the plain Node environment with NO setup file. These
+ *   - **node**: `*.mirror.test.ts` only, in the plain Node environment with NO setup file. These
  *     tests push real client payloads and editor output through the SERVER's own modules, and the
  *     server's store reaches for `node:sqlite`, which vite refuses to bundle for a
  *     browser-shaped environment. `test/setup.ts` is skipped for the same reason it is needed

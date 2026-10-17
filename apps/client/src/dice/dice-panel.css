@@ -67,8 +67,8 @@
   align-items: center;
 }
 /* The adv/disadv buttons sit beside a labelled Stepper (a label band over the controls), so `end`
-   aligns them with the stepper's control rather than stretching them over both tracks. 46px = the
-   44px stepper button plus its 1px frame; `min-height` so larger text grows rather than clips. */
+   aligns them with the stepper's control, so they never stretch over both tracks. 46px = the
+   44px stepper button plus its 1px frame; `min-height` so larger text grows and never clips. */
 .dice-adv-row {
   display: flex;
   flex-wrap: wrap;
@@ -239,7 +239,7 @@
   text-decoration: line-through;
 }
 /* The formula is free text with no length bound; with the list's x axis clipped, it breaks mid-token
-   rather than being cut off. */
+   so none of it is cut off. */
 .roll-formula {
   color: var(--text-dim);
   font-family: var(--font-numeric);
