@@ -221,9 +221,11 @@ describe("party visibility — the tier is enforced in projectPlayerView, never 
       const goblin = actorIn(tier, GOBLIN);
       expect(free, `unclaimed character dropped at tier ${tier}`).toBeDefined();
       expect(goblin, `monster dropped at tier ${tier}`).toBeDefined();
-      // Neither ever gains a sheet, a class line, or resources, however permissive the tier is.
+      // Neither ever gains a sheet or resources, however permissive the tier is. The unclaimed character carries
+      // its class line at every tier, for the claim picker: anyone may claim it and read the whole sheet.
       expect(free!.definition, `unclaimed sheet leaked at tier ${tier}`).toBeUndefined();
-      expect(free!.classLine, `unclaimed class line leaked at tier ${tier}`).toBeUndefined();
+      expect(free!.classLine, `unclaimed class line at tier ${tier}`).toBe("Bard 2");
+      expect(goblin!.classLine).toBeUndefined();
       expect(goblin!.definition).toBeUndefined();
       for (const field of RESOURCES) expect(field in free!, `unclaimed ${field} leaked at tier ${tier}`).toBe(false);
       expect(JSON.stringify(viewAt(tier)), `unclaimed sheet serialized at tier ${tier}`).not.toContain("FREE-SECRET");
@@ -301,5 +303,22 @@ describe("pools — the shape a resource tracker binds to", () => {
     const view = viewAt("sheet-and-resources");
     expect("pools" in view.actors.find((actor) => actor.id === GOBLIN)!).toBe(false);
     expect("pools" in view.actors.find((actor) => actor.id === FREE)!).toBe(false);
+  });
+
+  it("names an unclaimed character's species and class for the claim picker, and drops them once it is claimed", async () => {
+    const { createInitialGameState } = await import("../src/initial-game-state.js");
+    const state = createInitialGameState();
+    const picker = projectPlayerView(state, ME, () => null).actors;
+    expect(picker.map((actor) => [actor.species, actor.classLine])).toEqual([
+      ["Dwarf", "Fighter 7"],
+      ["Human", "Cleric 7"],
+      ["Elf", "Wizard 7"]
+    ]);
+    for (const actor of picker) expect(actor.definition).toBeUndefined();
+    state.partyVisibility = "off";
+    state.actors[0]!.ownerSessionId = "40000000-0000-4000-8000-0000000000ff";
+    const claimed = projectPlayerView(state, ME, () => null).actors[0]!;
+    expect(claimed.species).toBeUndefined();
+    expect(claimed.classLine).toBeUndefined();
   });
 });

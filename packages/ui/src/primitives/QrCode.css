@@ -1,0 +1,13 @@
+/* The QR code: square modules, ink on paper in every theme. The parent sets the width; it stays square. */
+.nh-qr {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+}
+.nh-qr-paper {
+  fill: var(--qr-paper);
+}
+.nh-qr-ink {
+  fill: var(--qr-ink);
+}

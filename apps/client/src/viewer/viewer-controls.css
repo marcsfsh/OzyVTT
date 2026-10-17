@@ -57,6 +57,11 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
 }
+/* In one column the screens come first: pairing the TV is the first thing done here, and the presentation tools
+   mean nothing until a screen is paired. Two columns put them back on the right. */
+.viewer-col-access {
+  order: -1;
+}
 .viewer-tools-head h3 {
   margin: 0.2rem 0 0;
   font: 400 1.15rem var(--font-display);
@@ -113,35 +118,33 @@
   text-wrap: balance;
   text-align: center;
 }
-/* The code is read aloud to whoever is at the TV, so it stays on one line across the full width,
-   sized to the panel: fourteen mono characters with their tracking are about 9.5em wide. */
-.viewer-pairing-code {
-  container-type: inline-size;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 0.3rem var(--space-4);
-  align-items: center;
+/* Pairing a screen: its code, its name and the button, in one block under the address. */
+.viewer-pair-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
   padding: var(--space-4);
   border-left: 4px solid var(--magenta);
-  border-radius: var(--radius-sm);
   background: var(--surface-2);
 }
-.viewer-pairing-code .nh-eyebrow,
-.viewer-pairing-code strong {
-  grid-column: 1 / -1;
+.viewer-pair-form h3 {
+  margin: 0;
+  font: 400 1.05rem var(--font-display);
 }
-.viewer-pairing-code strong {
-  font: 700 clamp(1rem, 9cqi, 2.25rem) var(--font-mono);
-  letter-spacing: 0.08em;
-  white-space: nowrap;
-  color: var(--text);
+.viewer-pair-form p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.85rem;
 }
-.viewer-pairing-code small {
-  grid-column: 1;
-  color: var(--text-muted);
+.viewer-pair-form label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-weight: 600;
+  font-size: 0.85rem;
 }
-.viewer-pairing-code .nh-btn {
-  grid-column: 2;
+.viewer-pair-form .nh-btn {
+  align-self: flex-start;
 }
 
 .viewer-tool-tabs {
@@ -267,6 +270,9 @@
   }
   .viewer-col {
     min-height: 0;
+  }
+  .viewer-col-access {
+    order: 0;
   }
   /* Explicit tracks: a percentage max-height against a content-sized row is circular and overflowed. */
   .viewer-tool-preview {

@@ -192,6 +192,15 @@ export const ActorRemoveSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** `inFight` is the GM's second yes: releasing a character who is in the running fight. */
+export const CharacterForceReleaseSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    inFight: z.literal(true).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const SetTokenImageSchema = z
   .object({
     commandId: z.uuid(),

@@ -91,14 +91,14 @@
   min-height: 0;
 }
 
-.map-rail {
+.map-library-rail {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   min-width: 0;
   min-height: 0;
 }
-.map-rail-filters {
+.map-library-rail-filters {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -117,11 +117,11 @@
 /* The scroll region is the wrapper (`.scroll-y` in the markup), never the `<ul>`: a grid with a
    definite block size stops sizing its auto rows from its cards. The picker's 21rem cap is lifted
    so only one thing scrolls. */
-.map-rail-list {
+.map-library-rail-list {
   min-height: 0;
   padding-right: var(--space-1);
 }
-.map-rail .map-picker-grid {
+.map-library-rail .map-picker-grid {
   max-height: none;
 }
 /* Empty states get one designed frame (the material below), not a dashed placeholder. */
@@ -203,6 +203,26 @@
   color: var(--text-dim);
   font-size: var(--fs-sm);
   line-height: 1.4;
+}
+/* Saved: the line says what is now true, in the confirm colour with its check. */
+.map-step-note.is-done {
+  border-left-color: var(--success);
+  color: var(--text);
+  font-size: var(--fs-body);
+}
+.map-step-note.is-done::before {
+  content: "Done. ";
+  font-weight: 700;
+  color: var(--cyan-hi);
+}
+/* The crosshair's look, folded away under the drag hint. */
+.crosshair-details summary {
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
 }
 
 /* The canvas column: `flex-basis: 0` takes the leftover height, and the min-height floor keeps it on
@@ -688,7 +708,7 @@
 /* Below 850px the rail and the pane are the same column: tapping a map shows the pane, and its
    "All maps" row returns. 849 so it never double-fires with `min-width: 850px`. */
 @media (max-width: 849px) {
-  .map-body[data-view="pane"] > .map-rail {
+  .map-body[data-view="pane"] > .map-library-rail {
     display: none;
   }
   .map-body[data-view="rail"] > .map-pane {

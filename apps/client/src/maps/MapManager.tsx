@@ -26,14 +26,20 @@ export type MapSelection = Readonly<{
 export function MapManager({
   gmToken,
   preferredMapId,
+  openOnPreferred = false,
   onSelectionChange,
-  onBack
+  onBack,
+  next
 }: Readonly<{
   gmToken: string;
   preferredMapId?: string | null;
+  /** The GM came here to set this map's grid, so a phone opens straight on its calibration. */
+  openOnPreferred?: boolean;
   onSelectionChange?: (map: MapSelection | null) => void;
   /** The frame's back row; the shell passes the door in. */
   onBack?: () => void;
+  /** Where to go once a grid is set: back to whatever sent the GM here. */
+  next?: Readonly<{ label: string; go: () => void }>;
 }>) {
   const [maps, setMaps] = useState<readonly MapAsset[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -78,7 +84,8 @@ export function MapManager({
     if (!maps.some((map) => map.id === preferredMapId)) return;
     assertedPreferredId.current = preferredMapId;
     setSelectedId(preferredMapId);
-  }, [preferredMapId, maps]);
+    if (openOnPreferred) setNarrowView("pane");
+  }, [preferredMapId, maps, openOnPreferred]);
   useEffect(() => {
     if (!onSelectionChange) return;
     onSelectionChange(
@@ -147,10 +154,11 @@ export function MapManager({
             folderNames={folderNames}
             onSaved={refresh}
             onShowRail={() => setNarrowView("rail")}
+            {...(next ? { next } : {})}
           />
         ) : (
           <div className="map-pane map-pane-empty">
-            <p className="map-empty">No maps uploaded yet — add one above and it lands here to be calibrated.</p>
+            <p className="map-empty">No maps uploaded yet. Add one above to set its grid here.</p>
           </div>
         )}
       </div>

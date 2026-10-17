@@ -546,6 +546,8 @@ const PLAYER_ACTOR_FIELDS = {
   conditionImmunities: "never",
   legendary: "never",
   lastUsedAt: "never",
+  firstClaimedAt: "never",
+  sample: "never",
   archived: "never",
   sheetPreview: "never"
 } as const satisfies Record<keyof Actor, "table" | "party" | "derived" | "never">;
@@ -589,14 +591,16 @@ function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): P
  * | hp (exact for a PC), effects (masked)   |  Y   |  Y  |       Y        |     Y      |          Y          |
  * | claimStatus, presence, healthDisplay    |  Y   |  Y  |       Y        |     Y      |          Y          |
  * | classLine                               |  -   |  -  |       Y        |     Y      |          Y          |
+ * An unclaimed character is not another player's, so no tier applies: it carries `classLine` and `species` for
+ * the claim picker, and nothing more of its sheet.
  * | definition (the imported sheet)         |  Y   |  -  |       -        |     Y      |          Y          |
  * | actionUses, hitDice, heroicInspiration  |  Y   |  -  |       -        |     -      |          Y          |
  * | spellSlots, pactSlots, preparedSpellIds |  Y   |  -  |       -        |     -      |          Y          |
  * | preparation (Long Rest prepare step)    |  Y   |  -  |       -        |     -      |          Y          |
  * | spellbook (a Wizard's beyond the sheet) |  Y   |  -  |       -        |     -      |          Y          |
  * | inventory, currency                     |  Y   |  -  |       -        |     -      |          Y          |
- * | notes, ownerSessionId, conditionImmunities, legendary, lastUsedAt, archived, sheetPreview, lastLongRestAt:   |
- * | never, at any tier.                                                                                            |
+ * | notes, ownerSessionId, conditionImmunities, legendary, lastUsedAt, firstClaimedAt, sample, archived,          |
+ * | sheetPreview, lastLongRestAt: never, at any tier.                                                              |
  *
  * `off` keeps the base entry: initiative and tokens still reference the ally, and the map renders
  * nothing for a token whose actor is missing. Rules for new fields: never gate `mine` on the tier;
@@ -679,12 +683,16 @@ export function projectPlayerView(
         const effectiveDisplay = source.healthDisplay ?? state.combat.healthDisplay;
         const sharedDisplayStyle =
           effectiveDisplay.audience === "all" && effectiveDisplay.style !== "band" ? effectiveDisplay.style : null;
+        // An unclaimed character is one any player may claim, which hands over its whole sheet, so its species and
+        // class line for the claim picker tell no one anything they couldn't read by claiming it.
+        const available = source.kind === "player-character" && ownerSessionId === null;
         // At `off` another player's sheet is not even looked up.
         const storedSheet =
-          cardVisible && source.definitionId
+          (cardVisible || available) && source.definitionId
             ? state.definitions.find((entry) => entry.id === source.definitionId)?.definition
             : undefined;
-        const classLine = theirs && cardVisible ? classLineOf(storedSheet) : null;
+        const classLine = (theirs && cardVisible) || available ? classLineOf(storedSheet) : null;
+        const species = available ? (storedSheet?.character?.race?.name ?? null) : null;
         return {
           ...pickFields(source, source.kind === "player-character" ? PARTY_FIELDS : TABLE_FIELDS),
           hp: playerHp(source),
@@ -696,6 +704,7 @@ export function projectPlayerView(
           // and claim screen; the entry stays so the map still renders the clone's token.
           ...(replaySceneId !== undefined ? { replaySceneId } : {}),
           ...(classLine !== null ? { classLine } : {}),
+          ...(species !== null ? { species } : {}),
           ...(sheetVisible && storedSheet ? { definition: storedSheet } : {}),
           ...(resourcesVisible ? { actionUses: { ...actionUses }, heroicInspiration } : {}),
           // Same gate as actionUses: a private sheet resource. Copied, never a live reference into GameState.

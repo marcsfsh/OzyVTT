@@ -107,9 +107,11 @@ export function App() {
             driving={entry.phase === "drive"}
             bootstrapped={session.bootstrapped}
             busy={session.busy}
+            resuming={session.resuming}
+            gmPrompt={session.gmPrompt}
             notice={session.notice}
             onJoin={session.joinPlayer}
-            onSignIn={(password) => void session.signInGm(password)}
+            onSignIn={(password, keep) => void session.signInGm(password, keep)}
             onSetPassword={(password) => void session.setGmPassword(password)}
             onClearNotice={session.clearNotice}
           />
@@ -122,6 +124,7 @@ export function App() {
             busy={session.busy}
             onSignOut={() => void session.signOutGm()}
             onRevokeAll={() => void session.revokeAllGmSessions()}
+            onChangePassword={session.changeGmPassword}
           />
         )}
         {shell?.role === "player" && (

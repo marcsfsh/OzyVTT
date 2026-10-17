@@ -176,12 +176,29 @@ export async function signInAsGm(page: Page) {
   await expect(page.getByRole("tablist", { name: "GM sections" })).toBeVisible();
 }
 
+/** Joins, claims `name`, and goes from My character (where a claim lands) to the Table. */
 export async function joinAndClaim(page: Page, name: string) {
   await ensureGmPassword(page.request);
   await press(page.getByRole("button", { name: "Join as Player" }));
   await press(page.getByRole("listitem").filter({ hasText: name }).getByRole("button", { name: "Claim" }));
   await press(page.getByRole("dialog").getByRole("button", { name: "Claim" }));
   await expect(page.getByText(`You're playing ${name}.`)).toBeVisible();
+  await expect(page.getByRole("tab", { name: "My character", selected: true })).toBeVisible();
+  await press(page.getByRole("tab", { name: "Table" }));
+}
+
+/**
+ * Opens a section of the GM's app: its tab, or on a narrow screen the More menu's item for it (the tab bar
+ * keeps every section one tap away without scrolling sideways).
+ */
+export async function openGmSection(page: Page, name: string) {
+  const tab = page.getByRole("tab", { name, exact: true });
+  if (await tab.isVisible()) {
+    await press(tab);
+    return;
+  }
+  await press(page.getByLabel(/more sections$/i));
+  await press(page.getByRole("menuitem", { name, exact: true }));
 }
 
 type Point = { x: number; y: number };
@@ -201,10 +218,11 @@ async function fingers(page: Page) {
   };
 }
 
-/** Drags with one finger on a touch project, or the mouse otherwise. */
-export async function drag(page: Page, target: Locator, by: Point) {
+/** Drags with one finger on a touch project, or the mouse otherwise: from `start` (by default the middle of
+ *  `target`) by `by`. */
+export async function drag(page: Page, target: Locator, by: Point, start?: Point) {
   const box = (await target.boundingBox())!;
-  const from = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  const from = start ?? { x: box.x + box.width / 2, y: box.y + box.height / 2 };
   const steps = 8;
   if (touchPages.has(page)) {
     const touch = await fingers(page);

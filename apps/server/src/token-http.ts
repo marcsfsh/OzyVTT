@@ -1,7 +1,7 @@
 import express, { Router, type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
-import { VIEWER_SESSION_COOKIE } from "@vtt/api-contract";
-import { apiErrorHandler, bearerToken, cookie, pathParam, sendData, sendFailure, sendRefusal } from "./http-kit.js";
+import { apiErrorHandler, pathParam, sendData, sendFailure, sendRefusal } from "./http-kit.js";
+import { callerOf, refuse, type CredentialVerifiers } from "./request-auth.js";
 import type { MapAssetMetadata, MapAssetStore } from "./map-assets.js";
 import type { TokenCatalogEntry, TokenCatalogStore } from "./token-catalog.js";
 
@@ -24,11 +24,13 @@ const FAULT = "Token request failed.";
 type TokenRouterOptions = Readonly<{
   assets: MapAssetStore;
   catalog: TokenCatalogStore;
-  authorizeGm: (token: string | undefined) => boolean;
-  authorizePlayer: (token: string | undefined, assetId: string) => boolean;
-  authorizeViewer: (token: string | undefined, assetId: string) => boolean;
-  /** Resolves a joined player session (for browse and upload); its id keys the upload cap. Absent means GM-only. */
-  playerSession?: (token: string | undefined) => Readonly<{ sessionId: string }> | null;
+  /** The server's credential checks. A joined player may browse the library and upload; the session id keys the
+   *  upload cap. */
+  verifiers: CredentialVerifiers;
+  /** Whether this joined player may load this image now: only one a creature in their own view wears. */
+  playerMayLoad: (assetId: string, sessionId: string) => boolean;
+  /** Whether a paired table screen may load this image now. */
+  viewerMayLoad: (assetId: string) => boolean;
   now?: () => number;
 }>;
 
@@ -57,33 +59,34 @@ function publicToken(metadata: MapAssetMetadata, entry: TokenCatalogEntry) {
 export function createTokenRouter(options: TokenRouterOptions) {
   const router = Router();
   const requireGm = (request: Request, response: Response, next: NextFunction) => {
-    if (!options.authorizeGm(bearerToken(request)))
-      return sendFailure(response, 401, "unauthenticated", "A valid GM session is required.");
-    next();
+    const caller = callerOf(request, response, options.verifiers);
+    if (caller.kind === "gm") return next();
+    return refuse(response, caller, "The GM manages the token library.");
   };
-  const canReadContent = (request: Request, assetId: string) => {
-    const token = bearerToken(request);
-    return (
-      options.authorizeGm(token) ||
-      options.authorizePlayer(token, assetId) ||
-      options.authorizeViewer(cookie(request, VIEWER_SESSION_COOKIE), assetId)
-    );
+  /** Answers the refusal itself and returns false when the caller may not load this image now. */
+  const mayReadContent = (request: Request, response: Response, assetId: string) => {
+    const caller = callerOf(request, response, options.verifiers, { viewer: true });
+    const allowed =
+      caller.kind === "gm" ||
+      (caller.kind === "player" && options.playerMayLoad(assetId, caller.sessionId)) ||
+      (caller.kind === "viewer" && options.viewerMayLoad(assetId));
+    if (!allowed) refuse(response, caller, "That token image is not available to this table session.");
+    return allowed;
   };
 
   /** A player may upload their own character's token. The GM keeps every management route; a player gets
    *  only this upload and the browse list, with uploads landing in one folder the GM can curate. */
   const requireGmOrPlayer = (request: Request, response: Response, next: NextFunction) => {
-    const token = bearerToken(request);
-    if (options.authorizeGm(token)) {
+    const caller = callerOf(request, response, options.verifiers);
+    if (caller.kind === "gm") {
       response.locals.tokenPrincipal = { role: "gm" };
       return next();
     }
-    const player = options.playerSession?.(token) ?? null;
-    if (player) {
-      response.locals.tokenPrincipal = { role: "player", sessionId: player.sessionId };
+    if (caller.kind === "player") {
+      response.locals.tokenPrincipal = { role: "player", sessionId: caller.sessionId };
       return next();
     }
-    return sendFailure(response, 401, "unauthenticated", "A valid GM or player session is required.");
+    return refuse(response, caller, "The token library takes a GM or player session.");
   };
   const principalOf = (response: Response) =>
     response.locals.tokenPrincipal as { role: "gm" } | { role: "player"; sessionId: string };
@@ -204,8 +207,7 @@ export function createTokenRouter(options: TokenRouterOptions) {
   router.get(`${TOKEN_COLLECTION}/:id/content`, async (request, response) => {
     const id = tokenId(request);
     if (!id) return sendFailure(response, 400, "validation_failed", "Token asset ID is malformed.");
-    if (!canReadContent(request, id))
-      return sendFailure(response, 403, "forbidden", "That token image is not available to this table session.");
+    if (!mayReadContent(request, response, id)) return;
     const metadata = await options.assets.get(id);
     const content = metadata ? await options.assets.readOriginal(id) : null;
     if (!metadata || !content) return sendFailure(response, 404, "not_found", "Token asset was not found.");

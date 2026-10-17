@@ -28,6 +28,8 @@
 | [024](0024-table-sound.md)                      | Accepted                                       | Music and ambient sound on the table screen only: a GM sound library, a server-run board in its own store, and a viewer feed that carries only what is playing                                                |
 | [025](0025-table-docked-workbench.md)           | Accepted                                       | The table as a docked workbench: a header bar, a tool rail with docked options, and one tabbed panel with Needs you or the prompt slot above and the primary below; nothing floats over the map               |
 | [026](0026-homebrew-creation-wizards.md)        | Accepted                                       | Homebrew is made step by step in a wizard per type, over the same draft the full editor edits: borrowed editor fields, a few composers, and the editor's own publish checklist placed on the steps            |
+| [027](0027-session-lifecycle.md)                | Accepted                                       | One helper reads every caller: 401 for no credential or a dead one, 403 only for a valid one without the role; a session that ends is told; the GM tab resumes after a reload                                 |
+| [028](0028-table-screen-pairing.md)             | Accepted                                       | A table screen shows a short code and the GM types it; the code only names the request, and the screen's own secret collects the same viewer credential                                                       |
 
 Use [template.md](template.md) for material decisions. A proposed ADR becomes accepted only after its spike has evidence.
 

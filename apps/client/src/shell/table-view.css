@@ -75,13 +75,29 @@
   }
 }
 
+/* A player who has claimed nobody while no map is live: the picker takes the whole table, no map pane. */
+.table-bench.is-claiming {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "head"
+    "panel";
+}
+.table-bench.is-claiming .table-bench-panel {
+  border-left: 0;
+}
+
 /* The empty map state stands in for a loaded map, so it takes the map's place. */
 .map-empty-hero {
   position: relative;
-  overflow: hidden;
   flex: 1;
   min-height: 12rem;
   margin: var(--space-3);
+}
+/* The GM's box holds the scene button and the join address, more than a phone's map pane: it is a `.scroll-y`
+   region instead, with its decoration clipped to the box. */
+.map-empty-hero:not(.scroll-y),
+.map-empty-hero .empty-atmos {
+  overflow: clip;
 }
 .map-empty-hero > :not(.empty-atmos) {
   position: relative;
@@ -101,7 +117,7 @@
   margin-top: var(--space-4);
 }
 
-/* A player's own sheet ends with the shared replays and the way out. */
+/* A player's own sheet ends with the shared replays. */
 .table-sheet-foot {
   display: flex;
   flex-direction: column;
@@ -109,7 +125,4 @@
   margin-top: var(--space-4);
   padding-top: var(--space-3);
   border-top: 1px solid var(--line);
-}
-.table-leave {
-  align-self: flex-start;
 }

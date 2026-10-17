@@ -11,6 +11,17 @@
   max-width: 56rem;
   margin-inline: auto;
 }
+/* The heading, and the way out beside it: Sign out for the GM, Leave table for a player. */
+.settings-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.settings-head-text {
+  min-width: 0;
+}
 .settings-head h2 {
   margin: 0;
   font: 700 1.4rem/1.2 var(--font-display);
@@ -283,4 +294,26 @@
   .settings-player-actions > * {
     flex: 1 1 auto;
   }
+}
+
+/* Changing the GM password: two fields and the Show switch. */
+.settings-password {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.settings-password label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.settings-password .nh-switch {
+  align-self: flex-start;
+}
+.settings-error {
+  margin: 0;
+  color: var(--danger-text);
+  font-size: 0.9rem;
 }

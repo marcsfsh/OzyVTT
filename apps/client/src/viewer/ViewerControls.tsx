@@ -5,6 +5,7 @@ import { HOST_PATHS } from "@vtt/api-contract";
 import { apiRequest } from "../lib/api";
 import { newId } from "../lib/ids";
 import { clampPoint, imagePointFromClient, useAuthorizedMapImage } from "../scene/mapImage";
+import { PairScreenForm } from "./PairScreenForm";
 import { SharedScreenSwitch } from "./SharedScreenSwitch";
 import "./viewer-controls.css";
 
@@ -67,7 +68,6 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
   const [presentation, setPresentation] = useState<PresentationSummary | null>(null);
   const [viewers, setViewers] = useState<readonly ViewerMetadata[]>([]);
   const [connections, setConnections] = useState<readonly ViewerConnection[]>([]);
-  const [pairing, setPairing] = useState<Readonly<{ code: string; expiresAt: string }> | null>(null);
   const [busy, setBusy] = useState(false);
   const [tool, setTool] = useState<PresentationTool>("ping");
   const [draftPoints, setDraftPoints] = useState<readonly Point[]>([]);
@@ -345,7 +345,7 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
         {/* At the two-column width this column is its own scroll region; below it, it is inert. */}
         <div className="viewer-col viewer-col-access surface-glass scroll-y">
           <div className="viewer-address">
-            <span>Second-screen address</span>
+            <span>Open on the table screen</span>
             {viewerUrls.length > 1 ? (
               <Select
                 aria-label="Second-screen network address"
@@ -365,24 +365,10 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
               Copy address
             </Button>
           </div>
+          <PairScreenForm gmToken={gmToken} onPaired={() => void refresh().catch(() => {})} />
           <div className="viewer-control-actions">
             <Button variant="secondary" disabled={busy} onClick={() => window.open("/viewer.html", "vtt-table-viewer")}>
               Open viewer here
-            </Button>
-            <Button
-              variant="secondary"
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  const data = await apiRequest<{ pairing: Readonly<{ code: string; expiresAt: string }> }>(
-                    "/api/v1/viewer/pairings",
-                    { token: gmToken, body: {} }
-                  );
-                  setPairing(data.pairing);
-                })
-              }
-            >
-              Create pairing code
             </Button>
             <Button
               variant="secondary"
@@ -419,18 +405,6 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
               {mapIsPresented ? "Current map is live" : "Switch viewer to current map"}
             </Button>
           </div>
-          {pairing && (
-            <div className="viewer-pairing-code" role="status">
-              <Eyebrow>Pairing code</Eyebrow>
-              <strong className="tabular">{pairing.code}</strong>
-              <small>
-                Expires <span className="tabular">{new Date(pairing.expiresAt).toLocaleTimeString()}</span>
-              </small>
-              <Button variant="secondary" onClick={() => void copy(pairing.code, "Pairing code copied.")}>
-                Copy code
-              </Button>
-            </div>
-          )}
           {viewers.length > 0 && (
             <div className="viewer-access-list">
               <h3>Paired displays</h3>

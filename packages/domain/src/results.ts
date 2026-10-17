@@ -19,6 +19,8 @@ export type RefusalCode =
   | "refused"
   | "history_review"
   | "scene_room_full"
+  | "in_fight"
+  | "unauthenticated"
   | "internal_error";
 export type MutationResult = {
   ok: boolean;

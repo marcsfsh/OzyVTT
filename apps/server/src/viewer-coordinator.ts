@@ -199,7 +199,10 @@ export class ViewerCoordinator {
   async presentMap(sourceRevision: number, map: Readonly<{ assetId: string; altText: string; camera: ViewerCamera }>) {
     const current = this.presentation.snapshot;
     if (current.pausedByGm === true) return false;
-    if (current.enabled && current.activeMap?.assetId === map.assetId) return false;
+    // The encounter sync can switch the screen to the new map first, under a placeholder name; the map's own name
+    // still has to reach it.
+    if (current.enabled && current.activeMap?.assetId === map.assetId && current.activeMap.altText === map.altText)
+      return false;
     const result = await this.presentation.execute(
       {
         id: `scene-present:${sourceRevision}:${current.revision}`,

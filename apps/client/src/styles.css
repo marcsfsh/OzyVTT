@@ -405,38 +405,18 @@ textarea:focus {
 .card input {
   margin-bottom: var(--space-4);
 }
-/* Primary fill for hand-rolled card buttons. Sets `--nh-fill`/`--nh-rim` rather than `background`:
-   `.nh-btn` paints on a `::before` layer, and a background here would show through translucent layers
-   (e.g. the landing's glass door). Bare `<button>`s get the background on the second line. */
-.card button {
+/* Primary fill for a hand-rolled `<button>` in a card. `@vtt/ui` buttons and switches paint themselves: a rule
+   here would put dark ink on the primary's dark plate. */
+.card button:not(.nh-btn):not(.nh-switch) {
   text-align: center;
-  --nh-fill: var(--primary);
-  --nh-rim: var(--magenta-hi);
+  background: var(--primary);
   color: var(--text-on-neon);
   border: 0;
   margin-right: var(--space-2);
 }
-.card button:not(.nh-btn) {
-  background: var(--primary);
-}
-.card button:hover:not(:disabled) {
-  --nh-fill: var(--magenta-hi);
-  box-shadow: var(--glow-magenta);
-}
-.card button:not(.nh-btn):hover:not(:disabled) {
+.card button:not(.nh-btn):not(.nh-switch):hover:not(:disabled) {
   background: var(--magenta-hi);
-}
-/* A ghost action in a card is text only: `.card button` above would otherwise give it the primary fill. */
-.card .link {
-  --nh-fill: transparent;
-  --nh-rim: transparent;
-  background: transparent;
-  color: var(--text-dim);
-}
-.card .link:hover:not(:disabled) {
-  --nh-fill: transparent;
-  color: var(--text);
-  box-shadow: none;
+  box-shadow: var(--glow-magenta);
 }
 
 .notice {

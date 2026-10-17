@@ -19,8 +19,9 @@ import {
   type GameReply
 } from "./commands/index.js";
 import type { EncounterArchiveDocument } from "./encounter-archive.js";
-import { bearerToken, expressPath, issuesOf, pathParam, sendData, sendFailure } from "./http-kit.js";
+import { expressPath, issuesOf, pathParam, sendData, sendFailure } from "./http-kit.js";
 import { projectPlayerReplay } from "./replay-projection.js";
+import { callerOf, isUnauthenticated, refuse, type CredentialVerifiers } from "./request-auth.js";
 import type { SightContent } from "./vision/senses.js";
 
 /**
@@ -31,16 +32,16 @@ import type { SightContent } from "./vision/senses.js";
  * credential, checked against each route's scope and acting with GM authority. Players keep the table's
  * player limits. The public viewer never authenticates here.
  *
- * Errors: 400 validation_failed, 401 unauthenticated, 403 forbidden (bad/revoked/underscoped token or
- * role denial), 404 not_found, and 409 conflict for game refusals, stale `expectedRevision` (with
- * `error.currentRevision`) and timeline navigations awaiting confirmation (`error.details.needsConfirm`).
+ * Errors: 400 validation_failed, 401 unauthenticated (no token, or a malformed, expired or revoked one), 403
+ * forbidden (a valid credential without the scope, or a role denial), 404 not_found, and 409 conflict for game
+ * refusals, stale `expectedRevision` (with `error.currentRevision`) and timeline navigations awaiting confirmation
+ * (`error.details.needsConfirm`).
  */
 
 export type GameApiRouterOptions = Readonly<{
   game: GameCommands;
-  gmSession: (token: string) => Readonly<{ sessionId: string }> | null;
-  playerSession: (token: string) => Readonly<{ sessionId: string }> | null;
-  verifyIntegration: (token: string, scope: IntegrationScope) => Readonly<{ id: string; name: string }> | null;
+  /** The server's credential checks; the route's scope decides whether an integration credential reaches it. */
+  verifiers: CredentialVerifiers;
   archives: Readonly<{
     list: () => readonly EncounterArchiveSummary[];
     get: (id: number) => string | null;
@@ -75,23 +76,12 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   }
 
   function resolvePrincipal(req: Request, res: Response, scope: IntegrationScope): GamePrincipal | null {
-    const token = bearerToken(req);
-    if (!token) {
-      sendFailure(
-        res,
-        401,
-        "unauthenticated",
-        "A GM session, player session, or integration bearer token is required."
-      );
-      return null;
-    }
-    const gm = options.gmSession(token);
-    if (gm) return { kind: "gm", sessionId: gm.sessionId };
-    const player = options.playerSession(token);
-    if (player) return { kind: "player", sessionId: player.sessionId };
-    const credential = options.verifyIntegration(token, scope);
-    if (credential) return { kind: "integration", credentialId: credential.id, name: credential.name };
-    sendFailure(res, 403, "forbidden", "The token is invalid, revoked, or missing the required scope.");
+    const caller = callerOf(req, res, options.verifiers, { scope });
+    if (caller.kind === "gm") return { kind: "gm", sessionId: caller.sessionId };
+    if (caller.kind === "player") return { kind: "player", sessionId: caller.sessionId };
+    if (caller.kind === "integration" && caller.inScope)
+      return { kind: "integration", credentialId: caller.id, name: caller.name };
+    refuse(res, caller, "This credential does not carry the scope this route needs.");
     return null;
   }
 
@@ -166,6 +156,9 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   });
 
   router.post(expressPath(GAME_PATHS.commands), async (req, res) => {
+    // A dead credential hears so before its envelope is read; the command's own scope is checked once it is known.
+    const caller = callerOf(req, res, options.verifiers, { scope: "any" });
+    if (isUnauthenticated(caller)) return refuse(res, caller, "");
     const envelope = GameCommandEnvelopeSchema.safeParse(req.body);
     if (!envelope.success)
       return sendFailure(res, 400, "validation_failed", "The command envelope is malformed.", {

@@ -29,6 +29,7 @@ import { findCatalogRecord } from "../src/homebrew-srd-copy.js";
 import { createHomebrewValidator, scenarioCatalogs } from "../src/homebrew-validate.js";
 import { buildHomebrewUsageIndex } from "../src/homebrew-usages.js";
 import { requestConventions } from "../src/http-kit.js";
+import { fixedVerifiers } from "./fixed-verifiers.js";
 
 // HTTP-boundary tests for the homebrew router. This surface is the only way to read a draft or a
 // published-but-hidden record, so every route being GM-only is part of the visibility guarantee (drafts
@@ -56,8 +57,7 @@ async function fixture(options: { validate?: HomebrewValidator; realValidation?:
   app.use(
     createHomebrewRouter({
       store,
-      authorizeGm: (token) => token === "gm-token",
-      authorizePlayer: (token) => token === "player-token",
+      verifiers: fixedVerifiers({ gm: ["gm-token"], player: ["player-token"] }),
       notifyChanged: () => {
         pings.push(store.revision);
       },
@@ -197,8 +197,7 @@ describe("homebrew HTTP authorization gate", () => {
     });
     const router = createHomebrewRouter({
       store,
-      authorizeGm: (token) => token === "gm-token",
-      authorizePlayer: () => false,
+      verifiers: fixedVerifiers({ gm: ["gm-token"] }),
       notifyChanged: () => {}
     }) as unknown as { stack: Array<{ route?: { path: string; methods: Record<string, boolean> } }> };
     const mounted = new Map<string, Set<string>>();
