@@ -30,6 +30,7 @@
 | [026](0026-homebrew-creation-wizards.md)        | Accepted                                       | Homebrew is made step by step in a wizard per type, over the same draft the full editor edits: borrowed editor fields, a few composers, and the editor's own publish checklist placed on the steps            |
 | [027](0027-session-lifecycle.md)                | Accepted                                       | One helper reads every caller: 401 for no credential or a dead one, 403 only for a valid one without the role; a session that ends is told; the GM tab resumes after a reload                                 |
 | [028](0028-table-screen-pairing.md)             | Accepted                                       | A table screen shows a short code and the GM types it; the code only names the request, and the screen's own secret collects the same viewer credential                                                       |
+| [029](0029-one-game-clock.md)                   | Accepted                                       | One game clock: the Codex calendar keeps the day and the game keeps the hour, and time that passes at the table moves the Codex date by the midnights it crossed                                              |
 
 Use [template.md](template.md) for material decisions. A proposed ADR becomes accepted only after its spike has evidence.
 
