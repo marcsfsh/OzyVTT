@@ -184,7 +184,7 @@ describe("a leveled spell cast outside a fight", () => {
       warning: expect.stringMatching(/has none left/)
     });
     expect(spendLooseUses(hero, cure, actions, 1, "freeform")).toEqual({ usesLeft: null, spent: false });
-    // The table's standing policy ships slots on Advise.
-    expect(slotsModeFor(state)).toBe("assisted");
+    // Slots follow the table's standing dial, which starts on Enforce.
+    expect(slotsModeFor(state)).toBe("strict");
   });
 });
