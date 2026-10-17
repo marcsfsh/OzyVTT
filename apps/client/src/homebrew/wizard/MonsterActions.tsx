@@ -246,7 +246,9 @@ function ActionBuilder({
 
       {kind === "attack" && <AttackAnswers action={action} draft={draft} idPrefix={idPrefix} onChange={onChange} />}
       {kind === "save" && <SaveAnswers action={action} draft={draft} idPrefix={idPrefix} onChange={onChange} />}
-      {kind === "multiattack" && <MultiattackAnswers action={action} all={all} onChange={onChange} />}
+      {kind === "multiattack" && (
+        <MultiattackAnswers action={action} all={all} idPrefix={idPrefix} onChange={onChange} />
+      )}
       {activation === "reaction" && (
         <ReactionAnswers action={action} draft={draft} idPrefix={idPrefix} onChange={onChange} />
       )}
@@ -631,8 +633,14 @@ type Component = { actionId: string; count: number; or?: string[] };
 function MultiattackAnswers({
   action,
   all,
+  idPrefix,
   onChange
-}: Readonly<{ action: MonsterAction; all: readonly MonsterAction[]; onChange: (next: MonsterAction) => void }>) {
+}: Readonly<{
+  action: MonsterAction;
+  all: readonly MonsterAction[];
+  idPrefix: string;
+  onChange: (next: MonsterAction) => void;
+}>) {
   const plan = (Array.isArray(action.multiattack) ? action.multiattack : []) as Component[];
   const usable = all.filter(
     (candidate) =>
@@ -667,8 +675,9 @@ function MultiattackAnswers({
         return (
           <div className="hb-monster-action">
             <FieldGrid min="10rem">
-              <Field label="Attack">
+              <Field label="Attack" htmlFor={`${idPrefix}-plan-${index}`}>
                 <Select
+                  id={`${idPrefix}-plan-${index}`}
                   value={component.actionId}
                   onChange={(event) =>
                     put({ actionId: event.target.value, or: component.or?.filter((id) => id !== event.target.value) })

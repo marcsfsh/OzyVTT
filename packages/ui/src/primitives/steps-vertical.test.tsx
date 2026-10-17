@@ -28,8 +28,8 @@ describe("Steps, vertical", () => {
     render(<Steps steps={STEPS} current={2} orientation="vertical" onStepSelect={onStepSelect} maxSelectable={3} />);
     const jumps = screen.getAllByRole("button");
     expect(jumps.map((jump) => jump.textContent)).toEqual([
-      "What it is — done",
-      "How it's cast — not finished",
+      "What it is, done",
+      "How it's cast, not finished",
       "4Review"
     ]);
     await userEvent.click(jumps[2]);

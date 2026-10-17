@@ -82,15 +82,15 @@ const saveFlag = (key: "repeatSave" | "endsOnDamage", label: string, help: strin
   }
 });
 
-function RangeQuestion({ draft, onDraft }: StepProps) {
+function RangeQuestion({ draft, onDraft, idPrefix }: StepProps) {
   const kind = rangeKindOf(draft);
   const distance = getAt(draft, "range.distance");
   return (
     <div className="hb-field">
-      <span className="nh-field-label" id="hb-wiz-spell-range-label">
+      <span className="nh-field-label" id={`${idPrefix}-range-label`}>
         Range
       </span>
-      <div className="hb-chips" role="group" aria-labelledby="hb-wiz-spell-range-label">
+      <div className="hb-chips" role="group" aria-labelledby={`${idPrefix}-range-label`}>
         {RANGE_KINDS.map((option) => (
           <Chip
             key={option.value}
@@ -106,8 +106,9 @@ function RangeQuestion({ draft, onDraft }: StepProps) {
         ))}
       </div>
       {(kind === "feet" || kind === "miles") && (
-        <Field label={kind === "feet" ? "Feet" : "Miles"}>
+        <Field label={kind === "feet" ? "Feet" : "Miles"} htmlFor={`${idPrefix}-range-distance`}>
           <NumberField
+            id={`${idPrefix}-range-distance`}
             value={typeof distance === "number" ? distance : null}
             min={kind === "feet" ? 5 : 1}
             max={kind === "feet" ? 5280 : 100}
@@ -127,7 +128,7 @@ function RangeQuestion({ draft, onDraft }: StepProps) {
 const HEAL_FORMULA = /^(?:\d+d\d+(?:\s*\+\s*\d+)?|\d+)$/i;
 
 /** The engine reads a spell's healing from its text, so this answer is the healing sentence in the description. */
-function HealingQuestion({ draft, onDraft }: StepProps) {
+function HealingQuestion({ draft, onDraft, idPrefix }: StepProps) {
   const healing = healingOf(draft);
   const [text, setText] = useState(healing?.formula ?? "");
   useEffect(() => setText(healing?.formula ?? ""), [healing?.formula]);
@@ -139,14 +140,16 @@ function HealingQuestion({ draft, onDraft }: StepProps) {
     <div className="hb-field">
       <Field
         label="Hit Points it restores"
+        htmlFor={`${idPrefix}-healing`}
         help={
           malformed
             ? undefined
-            : "Like 2d8. Leave it empty for a spell that heals nothing. The healing is written into the spell's text, where the sheet reads it."
+            : "Leave it empty for a spell that heals nothing. The healing goes into the spell's text, where the sheet reads it."
         }
         error={malformed ? `"${typed}" is not a roll the sheet can read. Try 2d8 or 2d8 + 4.` : undefined}
       >
         <Input
+          id={`${idPrefix}-healing`}
           value={text}
           placeholder="2d8"
           invalid={malformed}
@@ -176,7 +179,7 @@ function HealingQuestion({ draft, onDraft }: StepProps) {
 
 const DICE_STEP = /^\d+d\d+$/i;
 
-function ScalingQuestion({ draft, onDraft }: StepProps) {
+function ScalingQuestion({ draft, onDraft, idPrefix }: StepProps) {
   const scaling = scalingOf(draft);
   const level = typeof draft.level === "number" ? draft.level : 1;
   const [perSlot, setPerSlot] = useState(scaling.perSlot ?? "");
@@ -207,6 +210,7 @@ function ScalingQuestion({ draft, onDraft }: StepProps) {
     <div className="hb-field">
       <Field
         label="Extra dice per slot level"
+        htmlFor={`${idPrefix}-per-slot`}
         help={
           malformed
             ? undefined
@@ -217,6 +221,7 @@ function ScalingQuestion({ draft, onDraft }: StepProps) {
         error={malformed ? `"${typed}" is not a number of dice. Try 1d6 or 2d8.` : undefined}
       >
         <Input
+          id={`${idPrefix}-per-slot`}
           value={perSlot}
           placeholder="1d6"
           disabled={!rolls}

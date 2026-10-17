@@ -87,7 +87,7 @@ export function Steps({
                 {step.label}
                 {/* The check is decorative, so state is spoken only when the flow declared one. */}
                 {step.state != null && state !== "current" && (
-                  <span className="nh-sr-only">{state === "done" ? " — done" : " — not finished"}</span>
+                  <span className="nh-sr-only">{state === "done" ? ", done" : ", not finished"}</span>
                 )}
               </span>
             </>
