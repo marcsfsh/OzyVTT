@@ -633,7 +633,10 @@ export function answerSave(
     if (pending.advantageAtSize && sizeRank(target.size) >= sizeRank(pending.advantageAtSize))
       sources.advantage.push({ source: "size", label: `${pending.actionName}: its size` });
     sources.advantage.push(...traitSaveClaims(state, target, definition, deps));
-    const ward = holyWardClaim(state, target, pending.sourceActorId, deps.resolveDefinition);
+    const ward = holyWardClaim(state, target, pending.sourceActorId, {
+      resolveDefinition: deps.resolveDefinition,
+      ...(deps.catalog ? { catalog: deps.catalog } : {})
+    });
     if (ward) sources.advantage.push(ward);
     const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
     // A player's choice is never read: the rules count Advantage and Disadvantage, and only the GM may force a mode.

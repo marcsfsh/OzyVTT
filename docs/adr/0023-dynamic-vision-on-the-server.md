@@ -81,9 +81,10 @@ ask only "is it GM-only" asks it. Where a line would name a hidden creature it s
 the projections' mask, or leaves the name out, so play still reads for the GM. What it covers:
 
 - Feed lines and toasts that name a cause: the GM's Apply of a hit, the turn reminder, an effect
-  ended by Escape or another rule, a strike-back offer, aura and trait lines, Heat Metal's note, a
-  held creature dragged along, an opportunity attack against a hidden mover, and every resolver line
-  built from a rules event.
+  ended by Escape, by its bearer acting (Invisibility, Vicious Mockery) or by another rule, a
+  strike-back offer, aura and trait lines, Heat Metal's note, a failed save's push (Thunderwave), a
+  spell that Slow makes fail, a held creature dragged along, an opportunity attack against a hidden
+  mover, and every resolver line built from a rules event.
 - A creature that was hidden when it set off is narrated only where it is now ("came into view"),
   never with the distance it came or its old ranges.
 - No opportunity attack opens for a player's character against a mover hidden from the table, and no
@@ -91,10 +92,14 @@ the projections' mask, or leaves the name out, so play still reads for the GM. W
   player. A player's Shield or Parry answer tells them only whether the attack landed and what it
   dealt.
 - What a hidden creature would show in public dice: Disadvantage on a ranged attack beside it, Sneak
-  Attack through it, Pack Tactics, Aura of Authority and Aura of Protection. Hide counts only the
-  enemies the hider's player may know of.
-- Refusals: the off-turn refusal, moving Hunter's Mark, a reeling creature, ending an imposed effect
-  and a parked attack that can't finish name no hidden creature. A missing creature and someone
+  Attack through it, Pack Tactics and Aura of Authority. A Paladin hidden from the table gives a
+  visible creature none of its auras (Aura of Protection, Aura of Courage, Aura of Devotion, Smite
+  of Protection's Half Cover), and its Holy Nimbus burns none. Holy Ward gives no Advantage against
+  a Fiend or an Undead hidden from the table. Hide counts only the enemies the hider's player may
+  know of.
+- Refusals: the off-turn refusal, moving Hunter's Mark, a reeling creature, an effect that bars
+  Reactions, spells or a second action under Slow, ending an imposed effect and a parked attack that
+  can't finish name no hidden creature. A missing creature and someone
   else's get the same answer, so a player can't probe which ids exist.
 - A public roll made by a creature hidden from the table becomes GM-only as the command that made it
   commits, so it never reaches players later, live or in a replay, when the creature steps into view.
@@ -195,8 +200,10 @@ staged scenes, replays turn by turn). `vision-geometry.test.ts`, `vision-sight.t
 attack modes and Hide. The shared hidden check has its own end-to-end tests, each of which failed
 before its fix: `hidden-narration.test.ts` (feed lines and toasts), `hidden-prompts.test.ts`
 (reaction prompts and their replies), `hidden-rules.test.ts` (refusals, dice, templates, token
-images, id probing) and `hidden-rolls.test.ts` (rolls made while hidden, the replay, unplaced
-creatures under the fog, feed ids). `vision-projections.test.ts` covers a hidden creature's carried
+images, id probing), `hidden-rolls.test.ts` (rolls made while hidden, the replay, unplaced
+creatures under the fog, feed ids) and `hidden-riders.test.ts` (the Phase 1 rules: pushes, a
+slowing hit, effects that end as their bearer acts, refusals that name an effect, a Paladin's
+auras, Holy Nimbus and Holy Ward). Each of its cases fails with its hidden check removed. `vision-projections.test.ts` covers a hidden creature's carried
 light. The rules-5e path test and the client's move-preview mirror test cover walls
 in the path search. A browser look at 390 x 844 (touch) and 1280 x 800 covered a player's view in
 the dark, a door tapped open on a phone, the GM's Vision group, looking through a character, and a

@@ -1,5 +1,5 @@
-import { SLOWED_TAG } from "../effects.js";
-import type { ResolveContext } from "./context.js";
+import { SLOWED_TAG, sourceOf } from "../effects.js";
+import { tableLineOf, type ResolveContext } from "./context.js";
 
 /** SRD Slow: "If it casts a spell with a Somatic component, there is a 25 percent chance the spell fails." Rolled
  *  once, when the cast is committed, as a d4 that fails on a 1; the slot and the action are spent all the same. True
@@ -12,10 +12,14 @@ export function slowedSpellFails(ctx: ResolveContext): boolean {
   const spell = deps.catalog?.spellRecord?.(action.spellId);
   if (spell?.components.somatic !== true) return false;
   if (deps.random(4) !== 1) return false;
-  ctx.tableNarration.push({
-    kind: "effect",
-    text: `${attacker.name}'s ${spell.name} fails, its gestures made too slowly under ${slowed.name}.`,
-    actorIds: [attacker.id]
-  });
+  // The effect's name can carry its caster's, which the table's line masks while the caster is hidden.
+  ctx.tableNarration.push(
+    tableLineOf(ctx, {
+      kind: "effect",
+      text: `${attacker.name}'s ${spell.name} fails, its gestures made too slowly under ${slowed.name}.`,
+      actorId: attacker.id,
+      ...sourceOf(slowed)
+    })
+  );
   return true;
 }

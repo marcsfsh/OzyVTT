@@ -647,7 +647,7 @@ export function spendUntilItActs(ctx: ResolveContext): void {
     (candidate) => candidate.tags.includes(UNTIL_IT_ACTS_TAG) && !candidate.id.startsWith(input.commandId)
   )) {
     endEffect(state, attacker.id, effect.id);
-    effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name: effect.name });
+    effectsEnded.push(endedEffect(attacker, effect));
     // Once no creature keeps the spell, it is over, and so is its caster's Concentration on it.
     const { castId, sourceActorId } = effect;
     if (castId === undefined || sourceActorId === null) continue;
@@ -658,7 +658,7 @@ export function spendUntilItActs(ctx: ResolveContext): void {
     const holding = caster?.effects.find((other) => other.castId === castId && other.tags.includes(CONCENTRATING_TAG));
     if (!kept && caster && holding) {
       endEffect(state, caster.id, holding.id);
-      effectsEnded.push({ actorId: caster.id, actorName: caster.name, name: holding.name });
+      effectsEnded.push(endedEffect(caster, holding));
     }
   }
 }
@@ -669,6 +669,6 @@ export function spendUntilOwnAttack(ctx: ResolveContext): void {
   if (attack === null) return;
   for (const effect of attacker.effects.filter((candidate) => candidate.tags.includes(UNTIL_OWN_ATTACK_TAG))) {
     endEffect(state, attacker.id, effect.id);
-    effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name: effect.name });
+    effectsEnded.push(endedEffect(attacker, effect));
   }
 }

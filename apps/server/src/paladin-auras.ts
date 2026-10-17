@@ -117,10 +117,12 @@ export function holyNimbusBurns(
   target: Actor,
   context: AuraContext
 ): Array<Readonly<{ paladin: Actor; amount: number }>> {
+  const hidden = tableHiddenCheck(state, context);
   return paladinsCarrying(state, HOLY_NIMBUS_TAG, context).flatMap(({ paladin, definition }) => {
     if (paladin.id === target.id || target.hp.current <= 0 || !areEnemies(paladin, target, context.resolveDefinition))
       return [];
-    if (paladin.visibility !== "public" && target.visibility === "public") return [];
+    // A Paladin hidden from the table burns no visible creature: the damage would give it away.
+    if (hidden(paladin.id) && !hidden(target.id)) return [];
     const distance = context.distanceFeet?.(paladin.id, target.id) ?? null;
     if (distance === null || distance > auraReachFeet(definition) + 1e-6) return [];
     const amount = abilityModifier(definition?.abilityScores.cha ?? 10) + (definition?.proficiencyBonus ?? 0);
@@ -129,17 +131,20 @@ export function holyNimbusBurns(
 }
 
 /** SRD Holy Nimbus, Holy Ward: "You have Advantage on any saving throw you are forced to make by a Fiend or an
- *  Undead." The claim on a save `target` makes against the creature that forced it, or null. */
+ *  Undead." The claim on a save `target` makes against the creature that forced it, or null. A forcer hidden from the
+ *  table gives a visible creature no Advantage, which would tell the table what kind of creature it is. */
 export function holyWardClaim(
   state: GameState,
   target: Actor,
   sourceActorId: string | null,
-  resolveDefinition: (definitionId: string) => ActorDefinition | undefined
+  context: Pick<AuraContext, "resolveDefinition" | "catalog">
 ): Readonly<{ source: string; label: string }> | null {
   if (sourceActorId === null || !carries(target, HOLY_NIMBUS_TAG)) return null;
   const forcer = state.actors.find((actor) => actor.id === sourceActorId);
   if (!forcer) return null;
-  const type = creatureTypeOf(forcer, forcer.definitionId ? resolveDefinition(forcer.definitionId) : undefined);
+  const hidden = tableHiddenCheck(state, context);
+  if (hidden(forcer.id) && !hidden(target.id)) return null;
+  const type = creatureTypeOf(forcer, forcer.definitionId ? context.resolveDefinition(forcer.definitionId) : undefined);
   return type === "fiend" || type === "undead" ? { source: "holy-ward", label: "Holy Nimbus (Holy Ward)" } : null;
 }
 

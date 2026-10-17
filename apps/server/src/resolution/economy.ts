@@ -381,6 +381,19 @@ const ANSWERS_A_ROLL: ReadonlySet<string> = new Set([
   "boon-of-fate"
 ]);
 
+/** An effect's name in a refusal, as the creature's own sheet shows it: a caster hidden from the table is "A hidden
+ *  threat" there. */
+function shownEffectName(
+  state: GameState,
+  effect: Readonly<{ name: string; sourceActorId: string | null; sourceName: string | null }>,
+  resolveDefinition: Evaluation["resolveDefinition"]
+): string {
+  const hiddenCaster =
+    effect.sourceActorId !== null &&
+    hiddenFrom(state, resolveDefinition ? { definition: resolveDefinition } : {})(effect.sourceActorId);
+  return hiddenCaster ? withoutSourceName(effect.name, effect.sourceName) : effect.name;
+}
+
 /** Incapacitation and 0 HP forbid every action, Bonus Action and Reaction (SRD 2024 "Incapacitated"), legendary
  *  actions and feature activations included; a required effect (Frenzy needs Rage) must be active, and a raging
  *  Barbarian can't cast spells. */
@@ -404,27 +417,21 @@ function checkAbleToAct({ state, attacker, action, resolveDefinition, violations
   if (unreacting && action.activation === "reaction")
     violations.push({
       rule: "condition.no-reactions",
-      message: `${attacker.name} can't take Reactions while ${unreacting.name} lasts.`
+      message: `${attacker.name} can't take Reactions while ${shownEffectName(state, unreacting, resolveDefinition)} lasts.`
     });
   // SRD Stinking Cloud: while poisoned by it, "the creature can't take an action or a Bonus Action".
   const reeling = attacker.effects.find((effect) => effect.tags.includes(NO_ACTIONS_TAG));
-  if (reeling && (action.activation === "action" || action.activation === "bonus-action")) {
-    // Named as the creature's own sheet shows it: a caster hidden from the table is "A hidden threat".
-    const hiddenCaster =
-      reeling.sourceActorId !== null &&
-      hiddenFrom(state, resolveDefinition ? { definition: resolveDefinition } : {})(reeling.sourceActorId);
-    const name = hiddenCaster ? withoutSourceName(reeling.name, reeling.sourceName) : reeling.name;
+  if (reeling && (action.activation === "action" || action.activation === "bonus-action"))
     violations.push({
       rule: "condition.incapacitated",
-      message: `${attacker.name} is reeling from ${name} and can't take an action or a Bonus Action this turn.`
+      message: `${attacker.name} is reeling from ${shownEffectName(state, reeling, resolveDefinition)} and can't take an action or a Bonus Action this turn.`
     });
-  }
   // SRD Befuddlement: the target "can't cast spells or take the Magic action".
   const befuddled = attacker.effects.find((effect) => effect.tags.includes(NO_SPELLS_TAG));
   if (befuddled && (action.spellId !== undefined || action.spellSlot !== undefined || isMagicAction(action)))
     violations.push({
       rule: "condition.no-spells",
-      message: `${attacker.name} can't cast spells or take the Magic action while ${befuddled.name} lasts.`
+      message: `${attacker.name} can't cast spells or take the Magic action while ${shownEffectName(state, befuddled, resolveDefinition)} lasts.`
     });
   // SRD Rage: "you can't cast spells".
   if ((action.spellId !== undefined || action.spellSlot !== undefined) && hasEffectTag(attacker, RAGING_TAG))
@@ -787,12 +794,12 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
   if (slowed && action.activation === "bonus-action" && state.combat.turn.actionUsed)
     violations.push({
       rule: "economy.bonus-action-used",
-      message: `${attacker.name} took an action this turn, and ${slowed.name} leaves no Bonus Action as well.`
+      message: `${attacker.name} took an action this turn, and ${shownEffectName(state, slowed, evaluation.resolveDefinition)} leaves no Bonus Action as well.`
     });
   if (slowed && action.activation === "action" && !state.combat.turn.actionUsed && state.combat.turn.bonusActionUsed)
     violations.push({
       rule: "economy.action-used",
-      message: `${attacker.name} took a Bonus Action this turn, and ${slowed.name} leaves no action as well.`
+      message: `${attacker.name} took a Bonus Action this turn, and ${shownEffectName(state, slowed, evaluation.resolveDefinition)} leaves no action as well.`
     });
   if (onOwnTurn && action.activation === "bonus-action") {
     if (state.combat.turn.bonusActionUsed)
