@@ -10,6 +10,7 @@ import { useState } from "react";
 import { Combobox } from "./Combobox";
 import { Drawer } from "./Drawer";
 import { MarkdownEditor, applyMarkdownFormat, wikiLinkContext } from "./MarkdownEditor";
+import { Modal } from "./Modal";
 import { TagInput } from "./TagInput";
 
 describe("Drawer", () => {
@@ -80,6 +81,23 @@ describe("Drawer", () => {
  * autocomplete loop, the format helper and the Edit/View switch. Caret position after insertion is restored in
  * `requestAnimationFrame` and isn't observable in jsdom, so tests check the resulting value.
  */
+describe("Modal", () => {
+  it("is named by its visible title, and by ariaLabel when it has none", () => {
+    const { rerender } = render(
+      <Modal open onClose={() => {}} title="Rest">
+        <p>Body</p>
+      </Modal>
+    );
+    expect(screen.getByRole("dialog", { name: "Rest" })).toBeInTheDocument();
+    rerender(
+      <Modal open onClose={() => {}} ariaLabel="Search the Codex">
+        <p>Body</p>
+      </Modal>
+    );
+    expect(screen.getByRole("dialog", { name: "Search the Codex" })).toBeInTheDocument();
+  });
+});
+
 describe("MarkdownEditor — the [[ ]] autocomplete", () => {
   /** `userEvent.type` treats `[` and `{` as key descriptors, so literal brackets are doubled here. */
   const typeText = (element: HTMLElement, text: string) =>
