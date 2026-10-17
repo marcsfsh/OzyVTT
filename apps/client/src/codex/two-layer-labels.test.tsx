@@ -141,6 +141,7 @@ describe("The two-layer notes control names its layers the same way everywhere (
         onOpenQuest={vi.fn()}
         onChanged={vi.fn()}
         onOpenPage={vi.fn()}
+        onFollowLink={vi.fn()}
         autosave={{ enabled: false, intervalSeconds: 1 }}
       />
     );
