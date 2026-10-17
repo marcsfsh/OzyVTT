@@ -170,10 +170,9 @@ describe("the sheet's checks", () => {
     await user.click(screen.getByRole("button", { name: "Roll" }));
     expect(sent("check:roll")).toEqual([]);
     const refusal = await screen.findByText("Type the d20's face, a whole number from 1 to 20.");
-    // Pinned under the rolls bar: the pane scrolls, and a line at its foot is never seen from a skill near its top.
+    // A toast: the pane scrolls, and a line at its foot is never seen from a skill near its top.
     expect(refusal.closest(".sheet-pane")).toBeNull();
-    await user.click(screen.getByRole("button", { name: "Dismiss the message" }));
-    expect(screen.queryByText("Type the d20's face, a whole number from 1 to 20.")).toBeNull();
+    expect(refusal.closest(".nh-toast")).not.toBeNull();
   });
 
   it("marks and explains Advantage and Disadvantage before the roll", async () => {
