@@ -27,7 +27,8 @@ import { SchemaForm, sectionDomId } from "./SchemaForm";
 import { SpellListContents } from "./SpellListContents";
 import { forStorage, withDefaults } from "./defaults";
 import { SCHEMAS, fieldAt, sectionTitle } from "./schemas";
-import { useAutosave } from "./useAutosave";
+import { keepLocalEdits, useAutosave } from "./useAutosave";
+import { trackClosingSave } from "./closingSaves";
 import { useSchemaContext } from "./useSchemaContext";
 import { duplicateNameNote, issueReason, publishIssues, type BlockedReason } from "./validate";
 import type { CustomRenderer } from "./FieldRenderer";
@@ -149,18 +150,20 @@ export function RecordDetail({
       return next.rev;
     },
     resync: async () => (await homebrewApi.get(gmToken, docRef.current.id)).rev,
-    isConflict: (error) => error instanceof ApiError && error.isConflict
+    isConflict: (error) => error instanceof ApiError && error.isConflict,
+    onUnmountFlush: (pending) => trackClosingSave(initial.id, pending)
   });
 
-  /** Conflict reload: replace the draft with the server copy wholesale, since two authored bodies
-      cannot be merged. */
+  /** Conflict reload: the server's copy, with what was changed here since the last save kept on top of it. The
+      changes then save against the server's revision. */
   const reload = async () => {
     try {
       const next = await homebrewApi.get(gmToken, docRef.current.id);
       adopt(next);
       const filled = withDefaults(next.type, next.record);
-      setDraft(filled);
+      const merged = keepLocalEdits(autosave.savedDraft(), draftRef.current, filled);
       autosave.markSaved(next.rev, filled);
+      setDraft(merged);
       setActionError(null);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Couldn't reload that record.");

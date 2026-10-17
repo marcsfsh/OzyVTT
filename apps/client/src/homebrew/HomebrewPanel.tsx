@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { flushSync } from "react-dom";
 import { Alert, Button, Skeleton, useToast } from "@vtt/ui";
 import { IconChevron } from "@vtt/ui";
 import { socket } from "../socket";
@@ -15,6 +16,7 @@ import { PackActions } from "./PackActions";
 import { RecordDetail, type DetailMode } from "./RecordDetail";
 import { homebrewApi, listAllHomebrew, type HomebrewRecordDocument, type HomebrewRecordSummary } from "./api";
 import { ApiError } from "../lib/api";
+import { closingSave } from "./closingSaves";
 import { blankDraft } from "./defaults";
 import { typeLabel } from "./types";
 import { WIZARDS } from "./wizard";
@@ -90,11 +92,16 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
 
   const select = useCallback(
     async (id: string) => {
-      setSelectedId(id);
-      setMode("editor");
-      setSelected(null);
-      setSelectError(null);
+      // The open editor closes at once and sends its last edit; the record is read after that lands, so reopening
+      // the same record never starts from a copy without it.
+      flushSync(() => {
+        setSelectedId(id);
+        setMode("editor");
+        setSelected(null);
+        setSelectError(null);
+      });
       try {
+        await closingSave(id);
         setSelected(await homebrewApi.get(gmToken, id));
       } catch (error) {
         setSelectError(error instanceof Error ? error.message : "Couldn't open that record.");
