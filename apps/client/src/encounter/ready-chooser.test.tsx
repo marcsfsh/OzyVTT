@@ -78,7 +78,7 @@ describe("the Ready action on a player's turn", () => {
     expect(chooser.queryByRole("button", { name: /Healing Word/ })).toBeNull();
     await user.click(chooser.getByRole("button", { name: /Fireball/ }));
     const dialog = within(screen.getByRole("dialog", { name: "Ready Fireball" }));
-    await user.click(dialog.getByRole("button", { name: "4th level" }));
+    await user.click(dialog.getByRole("button", { name: "Level 4" }));
     await user.click(dialog.getByRole("button", { name: "Ready it" }));
     await waitFor(() =>
       expect(command).toHaveBeenCalledWith("action:resolve", {
@@ -100,5 +100,19 @@ describe("the Ready action on a player's turn", () => {
     await waitFor(() =>
       expect(command).toHaveBeenCalledWith("action:resolve", { actorId: ME, actionId: "ready", expectedRevision: 2 })
     );
+  });
+
+  it("says a refusal above the action list, and brings it into view", async () => {
+    const user = userEvent.setup();
+    const scrolled = vi.spyOn(Element.prototype, "scrollIntoView");
+    command.mockResolvedValueOnce({ ok: false, message: "Wren has already used an action this turn." } as never);
+    mount();
+    await user.click(await screen.findByRole("button", { name: "Ready" }));
+    await user.click(screen.getByRole("button", { name: /An action or a move/ }));
+    const refusal = await screen.findByText("Wren has already used an action this turn.");
+    const list = screen.getByText(/Your actions/);
+    expect(refusal.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(scrolled).toHaveBeenCalledWith({ block: "nearest" });
+    scrolled.mockRestore();
   });
 });

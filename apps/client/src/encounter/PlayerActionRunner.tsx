@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { choosesAbility, type ActorDefinition, type ContentActionSummary } from "@vtt/domain";
 import { read } from "../lib/command";
-import { ActionResultHead, HealingOutcome } from "./ActionResultHead";
+import { ActionResultHead, CheckOutcome, HealingOutcome } from "./ActionResultHead";
 import { ActionRow } from "./ActionRow";
 import { ActionTargetPicker } from "./ActionTargetPicker";
 import { actionSummaryParts } from "./action-summary";
@@ -200,6 +200,13 @@ export function PlayerActionRunner({
     },
     []
   );
+  // The list gives way to the picker, the result or a refusal in place, and on a phone the list was scrolled down to
+  // the tapped row, so the runner's top is brought back into view.
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const shown = picking ? `pick:${picking.action.id}` : result ? `result:${result.actionName}` : feedback || null;
+  useEffect(() => {
+    if (shown) rootRef.current?.scrollIntoView({ block: "nearest" });
+  }, [shown]);
 
   if (actions.length === 0 && facts.common.length === 0) return null;
   const onOutcome = (ok: boolean, message?: string) => {
@@ -207,9 +214,15 @@ export function PlayerActionRunner({
   };
 
   return (
-    <div className="action-runner player-actions">
+    <div className="action-runner player-actions" ref={rootRef}>
       {/* On Enforce the resolve suppresses its own message, so the refusal and the ask are shown here. */}
       <AskTheGmPrompt onFeedback={onFeedback} />
+      {/* A refusal sits at the top, where the runner scrolls to: below a long list it went unseen. */}
+      {feedback && (
+        <p className="save-prompt-outcome" role="status">
+          {feedback}
+        </p>
+      )}
       {!picking && !result && (
         <>
           <p className="player-actions-label">
@@ -285,11 +298,18 @@ export function PlayerActionRunner({
       {result && (
         <div className="action-result" role="status">
           <ActionResultHead result={result} />
-          {/* Why the d20 had Advantage or Disadvantage, before the player confirms it. */}
-          {result.attack && result.rollMode && result.rollMode.mode !== "normal" && (
+          {/* Why the d20 had Advantage or Disadvantage: an attack's before the player confirms it, a check's (Hide in
+              armor) with its total. */}
+          {(result.attack || result.check) && result.rollMode && result.rollMode.mode !== "normal" && (
             <p className="action-rollmode">{modeWords(result.rollMode).replace(/^ · /, "")}</p>
           )}
           {result.attack && <AttackOutcome attack={result.attack} audience="player" />}
+          {result.check && <CheckOutcome check={result.check} />}
+          {result.effectGranted && (
+            <p className="action-effect-granted">
+              {definition.name} gains <strong>{result.effectGranted.name}</strong>.
+            </p>
+          )}
           {result.preview && result.attack && (
             <AttackPreview
               attack={result.attack}
@@ -384,11 +404,6 @@ export function PlayerActionRunner({
               ) : null;
             })()}
         </div>
-      )}
-      {feedback && (
-        <p className="save-prompt-outcome" role="status">
-          {feedback}
-        </p>
       )}
     </div>
   );

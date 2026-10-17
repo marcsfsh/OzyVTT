@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GameStateSchema, type GmView, type MutationResult } from "@vtt/domain";
 
@@ -9,6 +9,7 @@ vi.mock("../lib/command", () => ({
   read: vi.fn(async () => ({ ok: false }))
 }));
 
+import { ActionTargetPicker } from "./ActionTargetPicker";
 import { SpellAreas } from "./SpellAreas";
 import { clearTargeting, resolveTargeting, setTemplatePlacement, useTargeting } from "./targeting";
 
@@ -56,6 +57,12 @@ const state = GameStateSchema.parse({
   }
 }) as unknown as GmView;
 
+/** The turn order's picker for whatever session the list starts. */
+function Picker() {
+  const picking = useTargeting();
+  return picking ? <ActionTargetPicker picking={picking} targets={[]} busy={false} onRoll={() => {}} /> : null;
+}
+
 /** Shows the targeting session the list starts, as the map's confirm bar reads it. */
 function Session() {
   const session = useTargeting();
@@ -98,6 +105,23 @@ describe("the GM's spell areas", () => {
       template: { shape: "circle", origin: { x: 125, y: 125 }, target: { x: 175, y: 125 } },
       expectedRevision: 4
     });
+  });
+
+  it("asks the turn order's picker to Place the area, since placing it rolls nothing", async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <SpellAreas state={state} busy={false} run={run} />
+        <Picker />
+      </>
+    );
+    await user.click(screen.getByRole("button", { name: "Place" }));
+    const picker = screen.getByRole("group", { name: "Targets for Moonbeam area" });
+    expect(picker.textContent).toContain("drag the 5-ft sphere on the map, then Place.");
+    expect(picker.textContent).not.toContain("Roll");
+    act(() => setTemplatePlacement({ x: 125, y: 125 }, { x: 175, y: 125 }));
+    expect(picker.textContent).toContain("(placed - Place to set it there).");
+    expect(within(picker).getByRole("button", { name: "Place" })).toBeTruthy();
   });
 
   it("ends an area", async () => {

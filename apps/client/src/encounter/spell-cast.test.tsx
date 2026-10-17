@@ -230,7 +230,7 @@ describe("the prepare step after a Long Rest", () => {
 
   it("offers the step and its Done, with the prepare toggles live", () => {
     const edit = mountCleric({ changesLeft: null }, true);
-    expect(screen.getByText("Long Rest: change your prepared spells.")).toBeTruthy();
+    expect(screen.getByText("After the Long Rest you can change your prepared spells.")).toBeTruthy();
     expect((screen.getByRole("button", { name: "Prepare" }) as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(edit).toHaveBeenLastCalledWith("character:finish-preparing", { actorId: actor.id });
