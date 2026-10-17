@@ -19,7 +19,7 @@ interface DrawerProps {
 /**
  * Non-modal side panel that stays open beside a working view (like devtools beside a page).
  * Not built on `Modal`: no top layer, scrim, focus trap or scroll lock, because the view behind must stay
- * usable. An `<aside>` landmark rather than `role="dialog"`, which would promise focus containment. Escape
+ * usable. An `<aside>` landmark, because `role="dialog"` would promise focus containment. Escape
  * closes it only while focus is inside, so it never steals Escape from the view behind. It stays mounted while
  * closed (off-screen, hidden, `inert`) so the slide animates both ways. Callers own the open state.
  */

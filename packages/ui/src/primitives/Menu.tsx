@@ -74,7 +74,7 @@ export function Menu({
     document.addEventListener("keydown", onKeyDown);
     el.addEventListener("toggle", place);
     window.addEventListener("resize", place);
-    // Capture, because the list the menu sits in scrolls, not the window.
+    // Capture, because the list the menu sits in scrolls and the window doesn't.
     window.addEventListener("scroll", place, true);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown);

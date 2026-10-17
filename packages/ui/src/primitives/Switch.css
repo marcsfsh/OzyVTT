@@ -13,7 +13,7 @@
   padding: var(--space-1) 0;
 }
 /* In a form grid the switch reserves the label band its Field neighbours use, so the track lines up with their
-   input wells. Margin, not padding, so the 44px hit area moves with the track. */
+   input wells. Margin, so the 44px hit area moves with the track; padding would not. */
 .nh-switch--banded {
   margin-top: var(--nh-label-band);
 }
@@ -26,7 +26,7 @@
   margin: 0;
   font: inherit;
 }
-/* Sibling to SegmentedControl, not the same control, and they differ by shape (Switch = pill track and round
+/* Sibling to SegmentedControl, and a different control: they differ by shape (Switch = pill track and round
    thumb; SegmentedControl = a square track with a raised, underlined option). The track keeps `--radius-pill`;
    don't unify the shapes. */
 .nh-switch-track {

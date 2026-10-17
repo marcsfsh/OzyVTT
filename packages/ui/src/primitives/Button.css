@@ -2,7 +2,7 @@
    The button.
    Fill and edge are painted on a backing layer (`::before`, z-index -1 inside the button's stacking context)
    so a variant can change its edge width (the primary's 3px sun frame) without the button changing size:
-     - `isolation: isolate` keeps the z-index -1 layer inside the button instead of behind an ancestor.
+     - `isolation: isolate` keeps the z-index -1 layer inside the button, out from behind an ancestor.
      - `inset: -1px` spans the border box, so the layer covers the 1px transparent border too.
    Variants set only `--nh-fill`, `--nh-rim`, `--nh-rim-w`, `--nh-sheen` and `--nh-glow`; the primary paints its
    frame itself. `:active` appears wherever `:hover` does, because many devices have no hover.
@@ -164,7 +164,7 @@
   width: 2.25rem;
   height: 2.25rem;
   padding: 0;
-  /* line-height:1 so a glyph child (✕) centres instead of riding a ~1.5 line box. */
+  /* line-height:1 so a glyph child (✕) centres and doesn't ride a ~1.5 line box. */
   line-height: 1;
   border: 1px solid transparent;
   border-radius: 0;

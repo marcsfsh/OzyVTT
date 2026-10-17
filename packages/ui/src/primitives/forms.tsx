@@ -60,7 +60,7 @@ interface FieldProps {
   htmlFor?: string;
   /** Helper text shown below the control when there's no error. */
   help?: ReactNode;
-  /** Error text (with icon) — replaces help and gets role=alert. */
+  /** Error text (with icon): replaces help and gets role=alert. */
   error?: ReactNode;
   required?: boolean;
   className?: string;

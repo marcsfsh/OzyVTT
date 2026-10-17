@@ -156,7 +156,7 @@
 .nh-menu-item:active {
   background: var(--surface-3);
 }
-/* Disabled dims per property, not group `opacity`: the client's bare `button:disabled { opacity: .55 }` would
+/* Disabled dims per property and never with group `opacity`: the client's bare `button:disabled { opacity: .55 }` would
    otherwise apply. `:hover` ties at (0,2,0), hence the `:disabled:hover` reset below. */
 .nh-menu-item:disabled {
   opacity: 1;

@@ -11,7 +11,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: ButtonSize;
   /** Stretch to the container width. */
   block?: boolean;
-  /** Add a hover-lift, for card-like / CTA buttons, not dense toolbars. */
+  /** Add a hover-lift, for card-like and CTA buttons. Dense toolbars go without. */
   lift?: boolean;
   /** Append a forward arrow that nudges on hover, for navigational actions. */
   arrow?: boolean;

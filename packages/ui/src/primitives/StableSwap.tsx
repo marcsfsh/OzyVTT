@@ -12,7 +12,7 @@ interface StableSwapProps {
 /**
  * A label that is its own state must not resize when the state changes, or a neighbouring control slides
  * out from under the pointer. Both strings share one `inline-grid` cell, so the width is the longer one in
- * the inherited font. The alternate string is a `data-` attribute painted by `::after`, not a hidden text
+ * the inherited font. The alternate string is a `data-` attribute painted by `::after`, with no hidden text
  * node: a hidden node would still match `queryByText`, and client tests assert that a revealed row never
  * contains "Hidden from players".
  */

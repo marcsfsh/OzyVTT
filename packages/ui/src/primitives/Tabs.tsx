@@ -38,7 +38,7 @@ export function Tabs({
 
   const horizontal = orientation === "horizontal";
 
-  /* A ResizeObserver rather than a window listener, because the bar overflows when its container narrows. */
+  /* A ResizeObserver, because the bar overflows when its container narrows and a window listener can't see that. */
   useEffect(() => {
     const bar = barRef.current;
     if (!bar || !horizontal) return;

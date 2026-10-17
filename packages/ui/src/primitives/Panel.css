@@ -33,7 +33,7 @@
 }
 
 .nh-panel-head {
-  /* The client's bare `header { max-width: 40rem }` would pin the title and actions to 640px; fix it here, not in
+  /* The client's bare `header { max-width: 40rem }` would pin the title and actions to 640px; the fix lives here, outside
      the app. */
   max-width: none;
   display: flex;

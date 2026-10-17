@@ -46,7 +46,7 @@
   font-size: var(--fs-xs);
 }
 
-/* The capacity reason, stated once next to the count rather than on every locked card. Same caution colour and
+/* The capacity reason, stated once next to the count, and never on every locked card. Same caution colour and
    size as a per-option reason. */
 .nh-choicegrid-locked {
   display: flex;
@@ -91,7 +91,7 @@
 
 /* No detail pane; WizardShell owns master-detail. */
 
-/* auto-fit, not auto-fill, so an offer with two options doesn't reserve empty tracks and leave the cards adrift. */
+/* auto-fit, so an offer with two options doesn't reserve empty tracks and leave the cards adrift. */
 @media (min-width: 561px) {
   .nh-choicegrid-items {
     grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));

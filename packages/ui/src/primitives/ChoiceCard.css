@@ -20,8 +20,8 @@
 .nh-choice span {
   margin-top: 0;
 }
-/* Hover owns the surface, not the edge of a chosen card: `:not()` takes its argument's specificity, so a hover
-   border rule would out-specify `.is-selected` and turn its cyan edge grey. Excluded rather than out-specified. */
+/* Hover owns the surface; a chosen card's edge stays its own: `:not()` takes its argument's specificity, so a hover
+   border rule would out-specify `.is-selected` and turn its cyan edge grey. Excluded, so no specificity fight. */
 .nh-choice:hover:not(:disabled) {
   background: var(--surface-2);
 }
@@ -36,9 +36,9 @@
 
 /* ---- The reference control beside a card (ChoiceCard's `action`) ----
    A flex sibling, never on top of the card, whose whole box is its tap area. 44px square, stated directly
-   rather than via `.tap-target`, whose ::after would overhang a narrow card.
+   in the box itself, because `.tap-target`'s ::after would overhang a narrow card.
    One frame encloses both halves so it's obvious which card the control belongs to; ChoiceGrid.css widens the
-   gap between pairs. The divider is the wrapper's background through a 1px gap, not a border, because the
+   gap between pairs. The divider is the wrapper's background through a 1px gap, with no border, because the
    client's bare `button:hover` border rule would repaint a border on either child. `align-items: stretch`
    makes both halves the same height. */
 .nh-choice-wrap {
@@ -92,7 +92,7 @@
   background: var(--surface-1);
   color: var(--text-dim);
   font-size: 1.15rem;
-  /* Leading of 1 keeps the grid area the box's height rather than a 1.5-line strut. */
+  /* Leading of 1 keeps the grid area the box's height, with no 1.5-line strut. */
   line-height: 1;
   cursor: pointer;
 }
@@ -147,7 +147,7 @@
   color: var(--text-muted);
   font-size: var(--fs-xs);
 }
-/* Locked is caution, not danger (rose-red means damage). Full strength: the reason is the most important thing
+/* Locked is caution (rose-red means damage). Full strength: the reason is the most important thing
    on a disabled card. */
 .nh-choice-locked {
   display: flex;

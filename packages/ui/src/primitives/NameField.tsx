@@ -10,7 +10,7 @@ interface NameFieldProps {
   onChange: (value: string) => void;
   label?: ReactNode;
   placeholder?: string;
-  /** Recent generator output — click one to take it. Keep the list short (4-6). */
+  /** Recent generator output: click one to take it. Keep the list short (4-6). */
   suggestions?: readonly string[];
   /** Draw a fresh batch. Omit to hide the shuffle button entirely. */
   onShuffle?: () => void;

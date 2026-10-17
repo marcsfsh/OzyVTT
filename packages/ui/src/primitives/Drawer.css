@@ -56,7 +56,7 @@
   text-shadow: var(--heading-shadow);
 }
 
-/* 44px floor via `.tap-target` (the hit area grows, not the paint), as `.nh-modal-close` does, so the header
+/* 44px floor via `.tap-target` (the hit area grows and the paint stays), as `.nh-modal-close` does, so the header
    stays one line. The 6px overhang clears the title (8px gap) and the body (16px header padding). */
 .nh-drawer-close {
   position: relative;

@@ -1,4 +1,4 @@
-/* Severity is a 2px leading rule, not a fill: text sits on a neutral ground in every theme (tinted text on a tint
+/* Severity is a 2px leading rule and no fill: text sits on a neutral ground in every theme (tinted text on a tint
    fails in daybreak). The material is on a backing layer behind the content. */
 .nh-alert {
   position: relative;

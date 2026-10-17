@@ -2,7 +2,7 @@
    underlined in cyan. Shape carries the state (raised box plus underline), so it reads without colour. */
 .nh-segmented {
   display: inline-flex;
-  /* Wrap rather than overflow: four options at 375px would otherwise run off-screen. */
+  /* Wrap: four options at 375px would otherwise run off-screen. */
   flex-wrap: wrap;
   gap: 2px;
   padding: 3px;
