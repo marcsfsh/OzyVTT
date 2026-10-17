@@ -1508,7 +1508,8 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       "The ability-check bonus the server rolls: item check-bonus riders and Exhaustion included",
     "derived.abilities[].checkMode":
       "Advantage or Disadvantage the rules give this ability's checks, with what grants each side (Poisoned, armor worn without training, Hex)",
-    "derived.abilities[].save": "The save the server will actually roll, minus only per-save cover",
+    "derived.abilities[].save":
+      "The save the server will actually roll, minus only per-save cover and an ally Paladin's aura (both depend on the moment)",
     "derived.abilities[].saveMode": "Advantage or Disadvantage the rules give this save, with its sources",
     "derived.abilities[].saveFromItems": "The equipment share of `save`, so a sheet can say where the bonus came from",
     "derived.abilities[].saveAutoFails":

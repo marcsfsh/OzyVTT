@@ -19,7 +19,7 @@ import {
 import { choiceOverrideDefenses } from "./choice-overrides.js";
 import { autoFailsPhysicalSaves } from "./condition-rules.js";
 import { standingDefences } from "./hit-points.js";
-import { saveRollSources, saveTotalFor } from "./saving-throws.js";
+import { auraBonusOf, saveRollSources, saveTotalFor } from "./saving-throws.js";
 import { currentSpeedFeet } from "./speed.js";
 
 /**
@@ -52,11 +52,13 @@ export function deriveActorSheet(
     skill: (id) => skills.find((skill) => skill.id === id)?.name,
     tool: (id) => catalog?.equipmentRecord?.(id)?.name
   };
+  // The Paladin's own aura always reaches it; an ally's depends on where they stand, so it joins the save when rolled.
+  const aura = auraBonusOf(actor, definition) ?? 0;
 
   const abilities = ABILITIES.map((ability): DerivedAbilityRow => {
     const check = checkPlan(actor, definition, derivation, { ability }, { names });
     // The save the resolver would roll. Cover is excluded: it belongs to one attack's line of sight.
-    const save = saveTotalFor(definition, actor, ability, derivation);
+    const save = saveTotalFor(definition, actor, ability, derivation) + aura;
     const saveSources = saveRollSources(actor, ability, derivation);
     return {
       ability,
@@ -67,7 +69,7 @@ export function deriveActorSheet(
       // An item-granted save proficiency shows on the proficiency dot too.
       saveProficient: proficientSaves.has(ability) || derivation.saves.some((entry) => entry.id === ability),
       // The equipment's share, isolated by re-asking with the empty derivation so there is one sum.
-      saveFromItems: save - saveTotalFor(definition, actor, ability, EMPTY_DERIVATION),
+      saveFromItems: save - aura - saveTotalFor(definition, actor, ability, EMPTY_DERIVATION),
       saveAutoFails: ability === "str" || ability === "dex" ? autoFailsPhysicalSaves(actor) : null
     };
   });

@@ -12,6 +12,7 @@ import { recordRoll } from "../roll-history.js";
 import {
   answerSave,
   anySaveRollSources,
+  auraOfProtection,
   dismissSave,
   recordSaveRoll,
   saveRiderBonusForAnySave,
@@ -31,7 +32,7 @@ export const saveCommands = [
     type: "save.roll",
     operationId: "rollSave",
     description:
-      'Rolls a saving throw for one character. When a pending save is open for that character and ability, this ANSWERS it through the same path the encounter tracker uses - the damage and condition apply and the prompt closes - and acks `route: "answered"` with the `saveId`. With nothing open it rolls a loose, attributed save under the same rules the resolver uses (the modifier, Exhaustion, the Advantage and Disadvantage the rules give, and the automatic failure of a Strength or Dexterity save while Paralyzed, Petrified, Stunned or Unconscious), and acks `route: "loose"` with the `outcome`. `face` is a typed d20 (a player only while the table lets players type their dice); `total` and `rollMode` are the GM\'s alone. GM-grade for anyone; a player session only for their own claimed character.',
+      'Rolls a saving throw for one character. When a pending save is open for that character and ability, this ANSWERS it through the same path the encounter tracker uses - the damage and condition apply and the prompt closes - and acks `route: "answered"` with the `saveId`. With nothing open it rolls a loose, attributed save under the same rules the resolver uses (the modifier, Exhaustion, an ally Paladin\'s aura, the Advantage and Disadvantage the rules give, and the automatic failure of a Strength or Dexterity save while Paralyzed, Petrified, Stunned or Unconscious), and acks `route: "loose"` with the `outcome`. `face` is a typed d20 (a player only while the table lets players type their dice); `total` and `rollMode` are the GM\'s alone. GM-grade for anyone; a player session only for their own claimed character.',
     summary:
       "Roll a saving throw: answers a matching pending save when one is open, otherwise rolls a loose, attributed save.",
     schema: SaveRollSchema,
@@ -63,6 +64,7 @@ export const saveCommands = [
         return { ...answered, route: "answered", saveId: pending.id };
       }
       // Loose save: the resolver's own rules, with no DC and nothing to apply.
+      const distance = await kit.creatureDistance();
       const rollId = kit.context.newId();
       let outcome: Readonly<Record<string, unknown>> | undefined;
       const { state, duplicate } = await execute((draft) => {
@@ -101,6 +103,11 @@ export const saveCommands = [
         }
         const definition = live.definitionId ? kit.resolveDefinitionIn(draft, live.definitionId) : undefined;
         const derivation = deriveEquipment(live, definition, kit.equipmentCatalog());
+        const aura =
+          auraOfProtection(draft, live, {
+            resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
+            distanceFeet: (actorIdA, actorIdB) => distance(draft, actorIdA, actorIdB)
+          })?.amount ?? 0;
         const sources = saveRollSources(live, ability, derivation);
         const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
         const forced = initiator.role === "gm" ? rollMode : undefined;
@@ -111,7 +118,7 @@ export const saveCommands = [
           live,
           initiator,
           forced ?? aggregated.mode,
-          saveTotalFor(definition, live, ability, derivation),
+          saveTotalFor(definition, live, ability, derivation) + aura,
           saveRiderDiceTerms(derivation, ability),
           face === undefined ? {} : { face },
           (sides) => kit.context.random(sides)
@@ -223,7 +230,7 @@ export const saveCommands = [
     type: "death-save.roll",
     operationId: "rollDeathSave",
     description:
-      "Rolls a death saving throw for a dying character (at 0 HP): natural 20 regains 1 HP, natural 1 counts two failures, a total of 10+ (after Exhaustion, save bonuses and Bless's d4) succeeds (three stabilize), otherwise a failure (three kill). In a fight a player commits one per turn, on the character's own turn. Default applies in one step; pass `commit: false` to preview the projected pips first: the server holds the previewed die, so another preview shows the same one and the confirm (`commit: true`) uses it, and `reroll` throws it again (a player spends Heroic Inspiration, the GM throws afresh). `naturalRoll` is a typed d20 (a player only while the table lets players type their dice, and never over a die the server already threw). Riders on every saving throw give Advantage or Disadvantage; a player's `rollMode` is ignored. The roll is recorded in the shared history and the response carries `deathSave`. GM-grade anyone; a player session only their claimed character.",
+      "Rolls a death saving throw for a dying character (at 0 HP): natural 20 regains 1 HP, natural 1 counts two failures, a total of 10+ (after Exhaustion, save bonuses, Bless's d4 and an ally Paladin's aura) succeeds (three stabilize), otherwise a failure (three kill). In a fight a player commits one per turn, on the character's own turn. Default applies in one step; pass `commit: false` to preview the projected pips first: the server holds the previewed die, so another preview shows the same one and the confirm (`commit: true`) uses it, and `reroll` throws it again (a player spends Heroic Inspiration, the GM throws afresh). `naturalRoll` is a typed d20 (a player only while the table lets players type their dice, and never over a die the server already threw). Riders on every saving throw give Advantage or Disadvantage; a player's `rollMode` is ignored. The roll is recorded in the shared history and the response carries `deathSave`. GM-grade anyone; a player session only their claimed character.",
     summary: "Roll a death saving throw for a dying character (GM anyone; a player their claimed character).",
     schema: DeathSaveRollSchema,
     malformed: "The death save is malformed.",
@@ -231,6 +238,7 @@ export const saveCommands = [
       const initiator = initiatorOf(principal);
       const { commandId, actorId, commit, rollMode, naturalRoll, reroll } = request;
       const rollId = kit.context.newId();
+      const distance = await kit.creatureDistance();
       let roll: ReturnType<typeof rollDeathSave> | undefined;
       let rollModeSources: ReturnType<typeof shownRollMode>;
       let events: EffectNarration[] = [];
@@ -254,8 +262,13 @@ export const saveCommands = [
         }
         const definition = actor.definitionId ? kit.resolveDefinitionIn(draft, actor.definitionId) : undefined;
         const derivation = deriveEquipment(actor, definition, kit.equipmentCatalog());
-        // A death save is a saving throw: Exhaustion, every-save bonuses and Bless's d4.
-        const modifier = exhaustionPenalty(actor) + saveRiderBonusForAnySave(derivation);
+        // A death save is a saving throw: Exhaustion, every-save bonuses and Bless's d4, and an ally Paladin's aura.
+        const aura =
+          auraOfProtection(draft, actor, {
+            resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
+            distanceFeet: (actorIdA, actorIdB) => distance(draft, actorIdA, actorIdB)
+          })?.amount ?? 0;
+        const modifier = exhaustionPenalty(actor) + saveRiderBonusForAnySave(derivation) + aura;
         const sources = anySaveRollSources(derivation);
         const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
         const forced = initiator.role === "gm" ? rollMode : undefined;

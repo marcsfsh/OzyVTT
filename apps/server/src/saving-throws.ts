@@ -18,6 +18,7 @@ import { CommandRejectedError } from "./game-store.js";
 import { recordRoll as recordRollInHistory, rolledTerms } from "./roll-history.js";
 import { requireGm, type Initiator } from "./authorization.js";
 import { holdsFeature } from "./class-features.js";
+import { areAllies } from "./creature-sides.js";
 import { holdRoll, releaseHeldRoll, rollHeldTest } from "./held-rolls.js";
 import { applyDamageDetailed, previewDamage, adjustableActor } from "./hit-points.js";
 import { setCondition } from "./actor-conditions.js";
@@ -109,7 +110,7 @@ export function saveRiderDiceTerms(derivation: EquipmentDerivation, ability: Abi
 }
 
 /** The flat rider bonus to a saving throw that names no ability, such as a death save: riders that apply to
- *  every save (Ring of Protection, Aura of Protection) and none tied to one ability. */
+ *  every save (Ring of Protection) and none tied to one ability. */
 export function saveRiderBonusForAnySave(derivation: EquipmentDerivation): number {
   const momentary = collectRiders(derivation.carriers, { ...derivation.context, moment: "on-saving-throw" });
   return derivation.saveBonus + sumRiders(momentary, "save-bonus");
@@ -125,6 +126,52 @@ export function saveRiderDiceTermsForAnySave(derivation: EquipmentDerivation): s
 /** Advantage and Disadvantage on a saving throw that names no ability (a death save): riders on every save. */
 export function anySaveRollSources(derivation: EquipmentDerivation): RollModeClaims {
   return rollModeClaims(derivation, ["save"], "on-saving-throw");
+}
+
+/** What Aura of Protection reads: who stands where. Without `distanceFeet` (no map) only a Paladin's own aura is known
+ *  to reach it. */
+export type AuraContext = Readonly<{
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
+  distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
+}>;
+
+/** A Paladin's own Aura of Protection bonus: its Charisma modifier, at least +1, while it holds the feature and isn't
+ *  Incapacitated ("The aura is inactive while you have the Incapacitated condition"); null otherwise. */
+export function auraBonusOf(paladin: Actor, definition: ActorDefinition | undefined): number | null {
+  if (isIncapacitated(paladin) || !holdsFeature(definition, "aura-of-protection", "Aura of Protection")) return null;
+  return Math.max(1, scoreModifier(definition?.abilityScores.cha ?? 10));
+}
+
+/**
+ * SRD Aura of Protection: "You and your allies in the aura gain a bonus to saving throws equal to your Charisma
+ * modifier (minimum bonus of +1)", in a 10-foot Emanation (30 feet with Aura Expansion). A creature benefits from one
+ * aura at a time, so the best counts. A hidden Paladin's aura never shows on a visible creature's save, which would
+ * reveal it.
+ */
+export function auraOfProtection(
+  state: GameState,
+  target: Actor,
+  context: AuraContext
+): Readonly<{ amount: number; source: string }> | null {
+  let best: { amount: number; source: string } | null = null;
+  for (const paladin of state.actors) {
+    if (paladin.archived || (paladin.visibility !== "public" && target.visibility === "public")) continue;
+    const definition = paladin.definitionId ? context.resolveDefinition(paladin.definitionId) : undefined;
+    const amount = auraBonusOf(paladin, definition);
+    if (amount === null) continue;
+    if (paladin.id !== target.id) {
+      if (!areAllies(paladin, target, context.resolveDefinition)) continue;
+      const reach = holdsFeature(definition, "aura-expansion", "Aura Expansion") ? 30 : 10;
+      const distance = context.distanceFeet?.(paladin.id, target.id) ?? null;
+      if (distance === null || distance > reach + 1e-6) continue;
+    }
+    if (!best || amount > best.amount)
+      best = {
+        amount,
+        source: paladin.id === target.id ? "Aura of Protection" : `${paladin.name}'s Aura of Protection`
+      };
+  }
+  return best;
 }
 
 const ABILITIES: readonly AbilityId[] = ["str", "dex", "con", "int", "wis", "cha"];
@@ -425,8 +472,9 @@ export function answerSave(
     const definition = target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined;
     const derivation = deriveEquipment(target, definition, deps.catalog);
     // Exhaustion (-2 x level, SRD 5.2.1) and item save bonuses come through `saveTotalFor`, shared with the sheet's
-    // chip; cover's per-save bonus is added on top.
-    const modifier = saveTotalFor(definition, target, pending.ability, derivation) + pending.saveBonus;
+    // chip; cover's per-save bonus and an ally Paladin's aura are added on top.
+    const aura = auraOfProtection(state, target, deps)?.amount ?? 0;
+    const modifier = saveTotalFor(definition, target, pending.ability, derivation) + pending.saveBonus + aura;
     // A save that ends effects when failed is a concentration check.
     const sources = saveRollSources(target, pending.ability, derivation, pending.endsEffects !== undefined);
     const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
