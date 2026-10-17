@@ -120,6 +120,17 @@ describe("reading a scroll in a fight", () => {
     expect(rowOf(table, IDS.wizard)).toBeUndefined();
   });
 
+  it("reads with the reader's own check: a Poisoned reader rolls it with Disadvantage", () => {
+    const table = tableOf({ [IDS.wizard]: wizardInput() });
+    write(table, IDS.wizard, scrollOf("fireball"));
+    fight(table, IDS.wizard);
+    table.actor(IDS.wizard).conditions = [{ id: "poisoned" }];
+    // d20s 15 and 2 under Disadvantage: 2 + Int 3 = 5 misses DC 13, and the scroll is lost.
+    const lost = resolveAt(table, IDS.wizard, READ, [15, 2]);
+    expect(lost.check).toMatchObject({ total: 5, dc: 13, success: false });
+    expect(rowOf(table, IDS.wizard)).toBeUndefined();
+  });
+
   it("refuses a scroll whose spell is not on the reader's list", () => {
     const table = tableOf({ [IDS.fighter]: fighterInput() });
     write(table, IDS.fighter, scrollOf("fireball"));
