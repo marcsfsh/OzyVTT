@@ -12,7 +12,7 @@ const MAX_SCENES = 20;
 // Go-live refusals, exported because `replay-launch.ts` pre-checks the room refusal. The Replays tab
 // routes both by their codes.
 export const SCENE_ROOM_REFUSAL =
-  "Remove a prepared scene first - launching needs room to park the table and stage the replay.";
+  "Remove a prepared scene first. Launching needs room to park the table and stage the replay.";
 export const HISTORY_REVIEW_REFUSAL = "Finish reviewing the combat history before switching scenes.";
 
 /** A parked scene's combat is the live top-level combat minus the map and scene bookkeeping. */
@@ -101,7 +101,7 @@ function buildSceneCombat(state: GameState, combatantIds: readonly string[], geo
     }),
     geometry
   );
-  // A newly prepared scene inherits the table's current policy settings rather than resetting to defaults.
+  // A newly prepared scene inherits the table's current policy settings.
   return {
     ...emptySceneCombat(),
     rulesMode: state.combat.rulesMode,
@@ -182,7 +182,7 @@ export function setSceneCombatants(
   const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId);
   if (!scene) throw new CommandRejectedError("That scene no longer exists.");
   if (state.combat.activeSceneId === sceneId)
-    throw new CommandRejectedError("This scene is live - change its combatants from the encounter instead.");
+    throw new CommandRejectedError("This scene is live. Change who is in it from the fight.");
   // Preserve where already-staged combatants stand so adding/removing one doesn't reset the layout.
   const placed = new Map(scene.combat.tokens.map((token) => [token.actorId, token.position]));
   const combat = buildSceneCombat(state, combatantIds, geometry);
@@ -289,7 +289,7 @@ export function sceneHeadroom(state: GameState): number {
   return MAX_SCENES - state.combat.scenes.length;
 }
 
-/** `activateScene` with the target created rather than resumed; used for replay launch. */
+/** `activateScene` for a target it creates fresh; used for replay launch. */
 export function activateNewScene(
   state: GameState,
   input: Readonly<{

@@ -191,7 +191,7 @@ describe("choosing a land on a Long Rest", () => {
     ).toBe(200);
     const inFight = await rechoose("polar");
     expect(inFight.status).toBe(409);
-    expect((await inFight.json()).error.message).toMatch(/end the encounter first/);
+    expect((await inFight.json()).error.message).toMatch(/end the fight first/i);
   });
 
   it("swaps the land of a Druid who multiclassed into the circle", async () => {

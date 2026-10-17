@@ -33,7 +33,7 @@ import type {
 /** One offerable option. `level` is populated for spells so callers can apply `maxSpellLevel`. */
 export type CatalogChoiceOption = Readonly<{ id: string; name: string; level?: number }>;
 
-/** The wire catalogs the resolver reads - exactly what the content endpoints serve. */
+/** The wire catalogs the resolver reads: exactly what the content endpoints serve. */
 export type CatalogChoiceCatalogs = Readonly<{
   classes: readonly ContentClassSummary[];
   subclasses: readonly ContentSubclassSummary[];
@@ -202,7 +202,7 @@ export type PickSourceReference = Readonly<{ offer: string; where?: string | nul
  * Resolver for `fromPicks`: the options are the character's own earlier answers ("one of your known Warlock
  * cantrips that deals damage"), narrowed by a closed predicate slug over spell catalog fields (ADR-0008).
  * `answered` is the build's ledger. Unknown spell ids are dropped. Throws `CatalogChoiceError` when nothing
- * survives, which the survey treats as "defer", not "reject".
+ * survives, which the survey treats as "defer".
  */
 export function resolvePickChoice(
   source: PickSourceReference,
@@ -235,7 +235,7 @@ export function resolvePickChoice(
     `fromPicks:${source.offer}`,
     options,
     source.where
-      ? `Nothing chosen for "${source.offer}" is ${source.where.replace(/-/g, " ")} yet - make that pick first.`
-      : `Nothing has been chosen for "${source.offer}" yet - make that pick first.`
+      ? `Nothing chosen for "${source.offer}" is ${source.where.replace(/-/g, " ")} yet. Make that pick first.`
+      : `Nothing has been chosen for "${source.offer}" yet. Make that pick first.`
   );
 }

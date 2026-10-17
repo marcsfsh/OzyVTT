@@ -86,7 +86,7 @@ describe("Thunderwave", () => {
     expect(positionOf(state, FOE)).toEqual(cell(3, 2));
     expect(events).toContainEqual(
       expect.objectContaining({
-        text: "Goblin is pushed 10 feet straight away from Ansel - move the token.",
+        text: "Goblin is pushed 10 feet straight away from Ansel. Move the token.",
         gmOnly: true
       })
     );

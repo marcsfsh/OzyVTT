@@ -351,7 +351,7 @@ export function CampaignHome({
           </DashCard>
         )}
 
-        {/* 7. Faction standing, expanding in place (Adjust lives only here). */}
+        {/* 7. Faction standing, which expands in place (Adjust lives only here). */}
         <StandingCard
           standing={standing}
           showReveal={showReveal}

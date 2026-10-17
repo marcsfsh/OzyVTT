@@ -14,7 +14,7 @@ import type { SightContent } from "./vision/senses.js";
  * Each turn's state is run through the live player projection. Visibility was snapshotted per turn,
  * so a creature revealed on turn 7 stays hidden in turns 0-6 with no separate reveal logic.
  *
- * Stricter than the live feed: `self-only` rolls are dropped (the reader is any player, not the
+ * Stricter than the live feed: `self-only` rolls are dropped (the reader is any player, who may not be the
  * roller), and roll payloads lose `initiatorSessionId`. Archive turn labels can name hidden
  * combatants, so labels are recomputed from each turn's public state.
  *
@@ -151,7 +151,7 @@ export function projectPlayerReplay(
     endedAt: document.endedAt,
     turnCount: turns.length,
     turns,
-    // Self-only and gm-only rolls are dropped: the reader is any player, not the roller.
+    // Self-only and gm-only rolls are dropped: the reader is any player, who may not be the roller.
     rolls: (document.rolls ?? []).filter((roll) => rollShown(roll, document.turns, sights)).map(playerRoll),
     attribution: document.attribution ?? null
     // Not projected: journal (payloads naming hidden combatants), finalState/postEncounterState (full
@@ -160,7 +160,7 @@ export function projectPlayerReplay(
 }
 
 /** The battle-map images a shared archive's player replay renders, so the map router can serve them.
- *  Derived from the projected player document, not the stored one, which also references prepared
+ *  Derived from the projected player document. The stored one also references prepared
  *  scenes' maps players must not see. Does not check the shared flag: never call it on an unshared archive. */
 export function playerReplayMapAssetIds(
   id: number,

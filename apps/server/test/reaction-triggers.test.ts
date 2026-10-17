@@ -491,9 +491,9 @@ describe("what the table hears", () => {
       targetIds: [IDS.knight],
       attackNatural: 14
     });
-    expect(heard).toContain("Knight may use Parry - the attack waits on their answer.");
+    expect(heard).toContain("Knight may use Parry. The attack waits on the answer.");
     await run("reaction.answer", { reactionId: store.snapshot.combat.pendingReactions[0].id, use: true });
-    expect(heard).toContain("Knight used Parry - Corin's Longsword misses.");
+    expect(heard).toContain("Knight used Parry, and Corin's Longsword misses.");
   });
 
   it("a prompt is withdrawn once its creature drops, and the held attack finishes without it", async () => {
@@ -508,7 +508,7 @@ describe("what the table hears", () => {
     // Something else drops the Knight before the answer: a creature at 0 HP can't take a reaction.
     await run("actor.apply-damage", { actorId: IDS.knight, amount: 999 });
     expect(store.snapshot.combat.pendingReactions).toEqual([]);
-    expect(heard.some((line) => line.startsWith("Knight declined Parry - Corin's Longsword hits"))).toBe(true);
+    expect(heard.some((line) => line.startsWith("Knight declined Parry, and Corin's Longsword hits"))).toBe(true);
   });
 
   it("Hellish Rebuke: the GM's applied damage names its source, and the answer forces the save", async () => {

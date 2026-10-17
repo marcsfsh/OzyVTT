@@ -148,8 +148,8 @@ export const GROUPS: ReadonlyArray<{ title: string; match: (path: string) => boo
 ];
 
 /**
- * Paths no group claims, listed under "Other" so a missing `GROUPS` entry gives a wrong heading
- * rather than a missing endpoint.
+ * Paths no group claims, listed under "Other" so a missing `GROUPS` entry shows as a wrong heading
+ * and the endpoint is still there.
  */
 export const ungrouped = (paths: readonly string[]) =>
   paths.filter((path) => !GROUPS.some((group) => group.match(path)));
@@ -159,7 +159,7 @@ export const resolveRef = (ref: string, components: Components): Schema | undefi
 
 export function authOptions(operation: Operation): readonly string[] {
   const security = operation.security;
-  if (!security || security.length === 0) return ["public - no credentials"];
+  if (!security || security.length === 0) return ["public · no credentials"];
   return security.map((entry) => {
     if ("bearerAuth" in entry)
       return entry.bearerAuth.length > 0
@@ -208,7 +208,7 @@ export function typeLabel(schema: Schema | undefined, components: Components): s
   }
   if (schema.type === "integer" || schema.type === "number") {
     const { minimum, maximum } = schema;
-    if (minimum !== undefined && maximum !== undefined) return `${schema.type} (${minimum}–${maximum})`;
+    if (minimum !== undefined && maximum !== undefined) return `${schema.type} (${minimum}-${maximum})`;
     if (minimum !== undefined) return `${schema.type} (≥ ${minimum})`;
     if (maximum !== undefined) return `${schema.type} (≤ ${maximum})`;
     return schema.type;
@@ -225,7 +225,7 @@ function noteOf(schema: Schema): string {
 
 export type FieldRow = Readonly<{ name: string; type: string; required: boolean; note: string }>;
 
-/** Object fields, flattening one level of nested objects / arrays-of-objects so shapes like `entries[].actorId` are spelled out. */
+/** Object fields, with one level of nested objects / arrays-of-objects flattened so shapes like `entries[].actorId` are spelled out. */
 export function fieldRows(schema: Schema, components: Components): FieldRow[] {
   const properties = (schema.properties ?? {}) as Record<string, Schema>;
   const required = new Set<string>(schema.required ?? []);
@@ -254,7 +254,7 @@ export function fieldRows(schema: Schema, components: Components): FieldRow[] {
   return rows;
 }
 
-/** A synthetic example value for a schema - enum/const first, then format-aware placeholders. Depth- and cycle-guarded. */
+/** A synthetic example value for a schema: enum/const first, then format-aware placeholders. Depth- and cycle-guarded. */
 function exampleValue(
   schema: Schema | undefined,
   components: Components,

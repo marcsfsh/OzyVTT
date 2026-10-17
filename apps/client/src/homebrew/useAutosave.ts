@@ -44,7 +44,7 @@ export interface Autosave<T> {
   /** Publishing and the visibility toggle must await this first, so they never act on the
       pre-edit body. */
   flush: () => Promise<void>;
-  /** `SaveState`'s "Retry" — re-runs the failed PATCH. */
+  /** `SaveState`'s "Retry": re-runs the failed PATCH. */
   retry: () => void;
   /** Adopt a server copy as the baseline after a publish, unpublish or visibility change (each
       bumps `rev`) or a conflict reload, so the next autosave does not 409. */

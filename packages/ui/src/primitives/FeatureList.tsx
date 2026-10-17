@@ -7,7 +7,7 @@ import "./FeatureList.css";
 export interface FeatureItem {
   id: string;
   title: ReactNode;
-  /** Short qualifier shown beside the title: "Level 3", "1/short rest". */
+  /** Short qualifier shown beside the title: "Level 3", "1/Short Rest". */
   meta?: ReactNode;
   /** Provenance / kind badge slot. */
   badge?: ReactNode;

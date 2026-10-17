@@ -64,7 +64,7 @@ export function SheetVitals({
           role === "gm" ? (
             <HpAdjust actor={actor} controls={["revive"]} onFeedback={onFeedback} />
           ) : (
-            <p className="sheet-vital-note">Dead. Only a revival brings them back - ask the GM.</p>
+            <p className="sheet-vital-note">Dead. Only a revival brings {actor.name} back, and the GM decides that.</p>
           )
         ) : (
           <HpAdjust

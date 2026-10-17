@@ -69,7 +69,7 @@ export function useCodexSearch(
 const KIND_MARKS: Readonly<
   Record<Exclude<CodexRecordKind, "page">, Readonly<{ icon: string; label: string; color: string }>>
 > = {
-  // `scroll`, not `hourglass` (an `event` page's glyph), so journal and event hits differ.
+  // `scroll`, since `hourglass` is an `event` page's glyph and journal and event hits must differ.
   journal: { icon: "scroll", label: "Journal", color: "var(--cyan)" },
   map: { icon: "compass", label: "Map", color: "var(--codex-type-location)" },
   // A map marker is a "pin" in the UI; the wire kind stays `marker`.

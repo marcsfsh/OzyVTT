@@ -67,7 +67,7 @@ function mount(scope: "feature" | "item", value: Draft) {
 
 describe("the runtime speed effect-modifier row", () => {
   it("is offered in the EFFECT vocabulary and mints the shape the schema accepts", async () => {
-    // Switching variant must replace the row (the union is `.strict()`), not merge `roll`/`mode` into it.
+    // Switching variant must replace the row (the union is `.strict()`), and never merge `roll`/`mode` into it.
     const form = mount("feature", withModifier({ type: "roll-mode", roll: "attack", mode: "advantage" }));
     await form.openBoth(/Advantage on attack/);
     await userEvent.selectOptions(form.kind(), "speed");

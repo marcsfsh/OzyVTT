@@ -61,15 +61,15 @@ function checkPlayerRemoval(
   const label = conditionLabel(conditionId);
   const escape = linked.find((effect) => effect.escapeDc !== null);
   const how = escape
-    ? `escape it (DC ${escape.escapeDc}) or ask the GM`
+    ? `Escape it (DC ${escape.escapeDc}) or ask the GM`
     : linked.length > 0
-      ? `it ends with ${linked[0].name}, or ask the GM`
-      : "it ends by its own rules, or ask the GM";
+      ? `It ends with ${linked[0].name}, or ask the GM`
+      : "It ends by its own rules, or ask the GM";
   policeConditionRule(
     state,
     actor,
     "condition.imposed",
-    `${actor.name} didn't give itself ${label} - ${how}.`,
+    `${actor.name} didn't give itself ${label}. ${how}.`,
     options,
     events
   );
@@ -84,13 +84,13 @@ function standUp(state: GameState, actor: Actor, scope: Initiator, options: SetC
       state,
       actor,
       "movement.stand-up-off-turn",
-      `${actor.name} can stand up only on its own turn - it costs half its Speed.`,
+      `${actor.name} can stand up only on its own turn, and it costs half its Speed.`,
       options,
       events
     );
     return events;
   }
-  // Charged when the current combatant stands on its own turn in a live fight, following the movement family.
+  // Charged when the current combatant stands on its own turn in a live fight, unless the movement family is freeform.
   if (
     state.combat.active &&
     state.combat.turnActorId === actor.id &&
@@ -109,8 +109,8 @@ function standUp(state: GameState, actor: Actor, scope: Initiator, options: SetC
     // One sentence for both exits: strict throws it, assisted narrates it.
     const violation =
       effective === 0
-        ? `${actor.name} can't stand up - its Speed is 0.`
-        : `Standing up costs ${cost} ft of movement - ${actor.name} has ${Math.max(0, Math.round(budgetLeft * 10) / 10)} ft left.`;
+        ? `${actor.name} can't stand up while its Speed is 0.`
+        : `Standing up costs ${cost} ft of movement, and ${actor.name} has ${Math.max(0, Math.round(budgetLeft * 10) / 10)} ft left.`;
     const waived = overrideWaives(options?.override, "movement.stand-up-cost");
     if (
       blocked &&
@@ -128,8 +128,8 @@ function standUp(state: GameState, actor: Actor, scope: Initiator, options: SetC
     };
     events.push({ kind: "condition", text: `${actor.name} stood up (${cost} ft of movement).`, actorId: actor.id });
     // Assisted mode (and a strict turn already covered by a GM Allow) narrates the violation as a
-    // "Rules note", the movement family's convention, rather than passing silently. An explicit
-    // `override` on this command is audited by the caller instead.
+    // "Rules note", the movement family's convention, so it never passes silently. An explicit
+    // `override` on this command is audited by the caller.
     if (blocked && !waived) events.push({ kind: "condition", text: `Rules note: ${violation}`, actorId: actor.id });
   }
   return events;
@@ -173,7 +173,7 @@ export function setCondition(
   // Lowering Exhaustion is taking some of it off.
   if (scope.role === "player" && conditionId === "exhaustion" && level !== undefined && level < previousExhaustion)
     checkPlayerRemoval(state, actor, conditionId, options, events);
-  // Immunity: skip with narration rather than reject (SRD condition immunity). Innate and item-granted
+  // Immunity: skip with narration and refuse nothing (SRD condition immunity). Innate and item-granted
   // immunities read the same; without a catalog only innate ones apply.
   const written = applyCondition(actor, conditionId, {
     level,
@@ -184,7 +184,7 @@ export function setCondition(
     return [
       {
         kind: "condition",
-        text: `${actor.name} is immune to ${conditionLabel(conditionId)} - not applied.`,
+        text: `${actor.name} is immune to ${conditionLabel(conditionId)}, so it isn't applied.`,
         actorId: actor.id,
         immune: true
       }

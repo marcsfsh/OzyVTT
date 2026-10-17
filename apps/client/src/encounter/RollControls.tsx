@@ -160,7 +160,7 @@ export function RollControls({
   /** Drives whether the prompt rolls itself as soon as it appears. */
   rollMode: "auto" | "manual";
   /** Overrides the auto-roll-on-appear decision (default: `rollMode === "auto"`). Death saves suppress
-   * it off-turn, rolling only once the dying creature's turn comes up. */
+   * it off-turn, and it rolls only once the dying creature's turn comes up. */
   autoRoll?: boolean;
   busy: boolean;
   /** Whether a rolled-but-unapplied preview exists; the parent flips this from its outcome state. */

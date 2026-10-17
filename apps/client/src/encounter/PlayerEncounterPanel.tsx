@@ -84,7 +84,7 @@ export function PlayerTurnEconomy({
   const reactionUsed = combat.reactionsUsed.includes(myId);
   const showMove = myTurn && moveBudget !== undefined && moveBudget !== null;
   const giveBackLocked = (combat.ruleExceptions.economy ?? combat.rulesMode) !== "freeform";
-  const lockedTitle = "Spent - only the GM can give it back";
+  const lockedTitle = "Spent. Only the GM can give it back.";
   return (
     <div
       className={`turn-economy${unconscious ? " is-unconscious" : ""}`}
@@ -121,7 +121,7 @@ export function PlayerTurnEconomy({
                     slot: "bonus-action",
                     used: !combat.turn.bonusActionUsed
                   }),
-                "The bonus action could not be updated."
+                "The Bonus Action could not be updated."
               )
             }
           >
@@ -188,7 +188,7 @@ export function PlayerTurnEconomy({
 
 /** What the table puts in a player's panel besides the fight: the prompt slot, the dice, the log, the party. */
 export type PlayerPanelSlots = Readonly<{
-  /** The prompt slot (and a short rest to spend Hit Dice in), above the tabs. */
+  /** The prompt slot (and a Short Rest to spend Hit Dice in), above the tabs. */
   top?: ReactNode;
   dice?: ReactNode;
   log?: ReactNode;

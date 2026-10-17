@@ -27,7 +27,7 @@ const needsAid = (actor: PlayerActor) =>
 const TIERS: readonly PartyVisibility[] = ["off", "name-and-class", "full-sheet", "sheet-and-resources"];
 
 /**
- * The tier this player was given. Defaults to `name-and-class` rather than the fullest tier, so a
+ * The tier this player was given. Defaults to `name-and-class`, the narrowest tier with a card, so a
  * projection without the field never shows more than the GM opened.
  */
 export function partyVisibilityOf(state: PlayerView): PartyVisibility {
@@ -210,16 +210,16 @@ export function MyCharacter({
             </div>
           </div>
         ) : (
-          /* Nobody claimed: point at the Table's claim picker rather than duplicating it. */
+          /* Nobody claimed: point at the Table's claim picker, which already does the job. */
           <div className="scene-empty">
-            <p>You haven&rsquo;t claimed a character yet.</p>
+            <p>You haven't claimed a character yet.</p>
             <Button variant="primary" arrow onClick={onGoToTable}>
               Go to the table
             </Button>
           </div>
         )}
 
-        {/* `off` removes this party surface, not allies from state: initiative and tokens still need
+        {/* `off` removes this party surface and leaves allies in state: initiative and tokens still need
           every ally, so presence in `state.actors` is not permission to list them. Unclaimed
           characters are listed at every tier where this surface exists. */}
         {tier !== "off" && others.length > 0 && (
@@ -231,7 +231,7 @@ export function MyCharacter({
                 const claimed = actor.claimStatus === "claimed";
                 /* Openable when the tier allows it and the row is someone's character. */
                 const rowOpenable = openable && claimed;
-                const label = `${actor.name}${line ? ` — ${line}` : ""}${claimed && actor.presence ? ` — ${presenceLabel(actor.presence)}` : ""}${claimed ? "" : ` — ${CLAIM_WORD.available}`}`;
+                const label = `${actor.name}${line ? `, ${line}` : ""}${claimed && actor.presence ? `, ${presenceLabel(actor.presence)}` : ""}${claimed ? "" : `, ${CLAIM_WORD.available}`}`;
                 const body = (
                   <>
                     <Avatar
@@ -240,7 +240,7 @@ export function MyCharacter({
                       presence={claimed && actor.presence ? presenceDot(actor.presence) : undefined}
                     />
                     <span className="my-character-party-name">{actor.name}</span>
-                    <span className="my-character-party-line">{line ?? (claimed ? "—" : CLAIM_WORD.available)}</span>
+                    <span className="my-character-party-line">{line ?? (claimed ? "None" : CLAIM_WORD.available)}</span>
                   </>
                 );
                 return (
@@ -255,7 +255,7 @@ export function MyCharacter({
                         {body}
                       </button>
                     ) : (
-                      /* A plain readout rather than a disabled button when there is no sheet to open. */
+                      /* A plain readout when there is no sheet to open: a disabled button would promise one. */
                       <span className="my-character-party-row is-static" role="group" aria-label={label}>
                         {body}
                       </span>
@@ -294,7 +294,7 @@ export function MyCharacter({
         open={rolling}
         maxLevel={state.builderPolicy.maxLevel}
         onClose={() => setRolling(false)}
-        onRolled={() => toast("Rolled up and claimed — it's yours.", { tone: "success" })}
+        onRolled={() => toast("Rolled up and claimed. It's yours.", { tone: "success" })}
       />
       {dialog}
     </section>

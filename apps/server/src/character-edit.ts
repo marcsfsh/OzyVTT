@@ -12,7 +12,7 @@ function editableDefinition(state: GameState, actorId: string): { definitionId: 
   if (actor.kind !== "player-character") throw new CommandRejectedError("Only player characters can be edited here.");
   const definitionId = actor.definitionId;
   if (!definitionId || !definitionId.startsWith("import-"))
-    throw new CommandRejectedError("This character has no editable sheet - import one first.");
+    throw new CommandRejectedError("This character has no editable sheet. Import one first.");
   const entry = state.definitions.find((candidate) => candidate.id === definitionId);
   if (!entry) throw new CommandRejectedError("This character's sheet is missing.");
   return { definitionId, definition: entry.definition };
@@ -36,7 +36,7 @@ function replaceDefinition(
 }
 
 /**
- * Merges a supplied block over the stored one, carrying forward every field the caller omitted. Each
+ * Merges a supplied block over the stored one and carries forward every field the caller omitted. Each
  * sheet editor sends a narrow slice of a block, so a wholesale replace would destroy fields it doesn't
  * know about (the `choices` ledger, training, import overrides). Absence means "leave alone"; to clear
  * a field, supply it explicitly.
@@ -115,7 +115,7 @@ export function setCharacterIdentity(
     throw new CommandRejectedError(
       built
         ? "This character was built here: change classes, levels and feats in the Level flow, which checks them."
-        : "Only the GM can change a character's classes, levels or feats - you can rename them."
+        : "Only the GM can change a character's classes, levels or feats. You can rename the character."
     );
   replaceDefinition(state, actorId, definitionId, { ...definition, character: next }, catalog);
 }

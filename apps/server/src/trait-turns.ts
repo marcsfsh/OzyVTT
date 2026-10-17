@@ -97,7 +97,7 @@ function regenerate(
       events.push(...endEffect(state, actor.id, down.id));
       events.push({
         kind: "condition",
-        text: `${actor.name} dies - it started its turn at 0 HP and its ${regeneration.name} didn't work (${why}).`,
+        text: `${actor.name} dies. It started its turn at 0 HP and its ${regeneration.name} didn't work (${why}).`,
         actorId: actor.id
       });
     } else
@@ -162,7 +162,7 @@ function goBerserk(
   );
   events.push({
     kind: "effect",
-    text: `${actor.name} goes berserk (rolled ${die}) - it attacks the nearest creature it can see until it is no longer Bloodied.`,
+    text: `${actor.name} goes berserk (rolled ${die}). It attacks the nearest creature it can see until it is no longer Bloodied.`,
     actorId: actor.id
   });
 }
@@ -244,7 +244,7 @@ function burnAround(state: GameState, bearer: Actor, aura: Aura, deps: TraitTurn
   if (targets === null) {
     events.push({
       kind: "effect",
-      text: `${bearer.name}'s ${aura.name}: each creature within ${aura.rangeFeet} feet takes ${aura.damage.map((part) => `${part.formula} ${part.type}`).join(" plus ")} damage - the map can't measure, so apply it by hand.`,
+      text: `${bearer.name}'s ${aura.name}: each creature within ${aura.rangeFeet} feet takes ${aura.damage.map((part) => `${part.formula} ${part.type}`).join(" plus ")} damage. The map can't measure, so apply it by hand.`,
       actorId: bearer.id,
       gmOnly: true
     });
@@ -352,7 +352,7 @@ function aurasStartedIn(state: GameState, actor: Actor, deps: TraitTurnDeps, eve
       if (aura.reminder)
         events.push({
           kind: "effect",
-          text: `${bearer.name}'s ${aura.name} - ${aura.reminder}`,
+          text: `${bearer.name}'s ${aura.name}: ${aura.reminder}`,
           actorId: actor.id,
           gmOnly: true
         });

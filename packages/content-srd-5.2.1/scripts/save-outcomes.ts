@@ -97,7 +97,7 @@ export function failureDurationOf(clause: string): SaveFailureDuration | undefin
   return timed[2] === "its" ? { type: "until-bearer-turn-end" } : { type: "until-source-turn-end" };
 }
 
-/** "Repeats the save at the end of each of its turns" in its printings, ending on a success. A save repeated a
+/** "Repeats the save at the end of each of its turns" in its printings, which ends on a success. A save repeated a
  *  set number of times (Flesh to Stone's three) or once (a basilisk's next turn) is left to the GM. */
 function repeatsEachTurn(clause: string): boolean {
   if (/\bthree (?:times|successes|of these)\b/i.test(clause)) return false;
@@ -217,7 +217,7 @@ function failureLifetime(clause: string, named: NamedConditions): Omit<SaveOutco
  * A 2024 stat-block save: "Failure: ... Success: Half damage." The failure clause runs from "Failure:" (or
  * "First Failure") to the next label; a success that is not printed does nothing, so only an explicit
  * "Success: Half damage" halves. "Failure or Success:" lines apply either way and are not the success line, and
- * "Failure by 5 or More" is a further branch, not part of the plain failure. The save's reach ("within 10 feet")
+ * "Failure by 5 or More" is a further branch, apart from the plain failure. The save's reach ("within 10 feet")
  * is a grapple's range.
  */
 export function statBlockSaveOutcome(description: string): SaveOutcome {
@@ -280,7 +280,7 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   // No save at the cast: 150 HP or fewer is Stunned outright, then a Constitution save at the end of each of its
   // turns ends it. (A tougher target's Speed 0 until your next turn is left to the GM.)
   "power-word-stun": { failureConditions: ["stunned"], repeatSave: true, failsAtHitPoints: 150 },
-  // Three successes or three failures, not one repeat: the GM keeps count.
+  // Three successes or three failures: the GM keeps count.
   "flesh-to-stone": { repeatSave: undefined },
   contagion: { repeatSave: undefined },
   // "The target gains no benefit from Half Cover or Three-Quarters Cover for this save."
@@ -306,5 +306,5 @@ export function spellSaveOutcomeFor(spellId: string, description: string): SaveO
   return Object.fromEntries(Object.entries(merged).filter(([, value]) => value !== undefined)) as SaveOutcome;
 }
 
-/** Every override must still name a spell, so a renamed id fails the build instead of going quiet. */
+/** Every override must still name a spell, so a renamed id fails the build out loud. */
 export const SPELL_SAVE_OVERRIDE_IDS: readonly string[] = Object.keys(SPELL_SAVE_OVERRIDES);

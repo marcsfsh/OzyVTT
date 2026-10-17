@@ -13,7 +13,7 @@ interface ModalProps {
   footer?: ReactNode;
   /** Top accent hairline; magenta by default. */
   accent?: PanelAccent;
-  /** `full` is a roomy centred sheet on a laptop and edge-to-edge at ≤760px. Use it instead of overriding max-height. */
+  /** `full` is a roomy centred sheet on a laptop and edge-to-edge at ≤760px. Use it and leave max-height alone. */
   size?: "sm" | "md" | "lg" | "full";
   /** `top` pins the dialog near the top of the viewport (the command-palette shape). */
   align?: "center" | "top";

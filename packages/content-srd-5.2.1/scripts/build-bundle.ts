@@ -285,7 +285,7 @@ const SIZES = new Set(["tiny", "small", "medium", "large", "huge", "gargantuan"]
 const DICE_PATTERN = /^\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?$/i;
 const SAVE_PATTERN = /(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma) Saving Throw:\s*DC\s*(\d+)/;
 
-/** CR 0-4 -> +2 and +1 per four CR after, matching the 5e proficiency table. */
+/** CR 0-4 -> +2 and +1 per four CR after, as the 5e proficiency table has it. */
 const proficiencyFromChallenge = (challenge: number) => Math.max(2, 2 + Math.floor((Math.ceil(challenge) - 1) / 4));
 
 const formulaOf = (count: number, dieType: string, bonus: number | null): string => {
@@ -429,7 +429,7 @@ const ACTION_ENRICHMENTS: Record<string, Pick<ActorAction, "targetRules" | "reac
   "mage/protective-magic": PROTECTIVE_MAGIC
 };
 
-const PRINTED_NAME = "[A-Z][A-Za-z'’-]*(?: [A-Z][A-Za-z'’-]*)*";
+const PRINTED_NAME = "[A-Z][A-Za-z'\u2019-]*(?: [A-Z][A-Za-z'\u2019-]*)*";
 
 /**
  * What one action says about another, read across the stat block: a grapple that keeps an attack off its target
@@ -442,7 +442,7 @@ function linkedActions(actions: ActorAction[], idOf: (name: string) => string | 
   const keptOffGrappled = new Set<string>();
   for (const action of actions) {
     const match = new RegExp(
-      `While Grappled\\b[^.]*can[’']t be targeted by the [^.]*?[’']s? (${PRINTED_NAME})\\.`
+      `While Grappled\\b[^.]*can[\u2019']t be targeted by the [^.]*?[\u2019']s? (${PRINTED_NAME})\\.`
     ).exec(action.description);
     const id = match ? idOf(match[1]) : undefined;
     if (id) keptOffGrappled.add(id);
@@ -488,7 +488,7 @@ const usesSuffix = (action: ActionFields): string => {
 /**
  * Limited-use pool from the upstream uses fields (ADR-0020): "Recharge X-Y" is a start-of-turn d6
  * pool, "Recharge after a Short or Long Rest" is short-rest, and "N/Day" is long-rest (the app treats
- * a long rest as a day). Upstream `RECHARGE` with a numeric param is a roll recharge.
+ * a Long Rest as a day). Upstream `RECHARGE` with a numeric param is a roll recharge.
  */
 const usesOf = (
   action: ActionFields
@@ -557,7 +557,7 @@ const SAVE_ACTION_FIXES: Readonly<
     reminder:
       "Roar runs its First Roar (Frightened for 1 minute). The Second Roar (Paralyzed) and Third Roar (Con save, 44 (8d10) Thunder damage and Prone, half on a success) are applied by hand."
   },
-  // The save happens when the target finishes a Long Rest, not on the hit.
+  // The save happens when the target finishes a Long Rest.
   "otyugh/bite": {
     why: "the Constitution save is made after a Long Rest",
     drop: "save",
@@ -715,7 +715,7 @@ function withoutSourceTags(text: string): string {
  */
 const CORRECTIONS: Record<string, Partial<CreatureFields>> = {
   // octopus: CON/CHA modifiers stored as scores; a garbage 30 in the CON save column
-  // (the SRD table prints +0 there, i.e. no proficiency - open5e's convention is null).
+  // (the SRD table prints +0 there, i.e. no proficiency: open5e's convention is null).
   "srd-2024_octopus": { ability_score_constitution: 11, ability_score_charisma: 4, saving_throw_constitution: null },
   // mastiff / swarm-of-rats: the save *modifier* stored where the SRD-printed save bonus belongs.
   "srd-2024_mastiff": { saving_throw_wisdom: 3 },
@@ -789,7 +789,7 @@ const monsters: ActorDefinition[] = creatures
     const footprint = FOOTPRINT_BY_SIZE[fields.size];
     const sortedActions = (actionsByCreature.get(creature.pk) ?? []).sort(
       (left, right) =>
-        // An unnumbered action (some legendary ones) goes after the numbered stat block, not before Multiattack.
+        // An unnumbered action (some legendary ones) goes after the numbered stat block.
         (left.fields.order_in_statblock ?? Number.MAX_SAFE_INTEGER) -
           (right.fields.order_in_statblock ?? Number.MAX_SAFE_INTEGER) || left.pk.localeCompare(right.pk)
     );
@@ -864,7 +864,7 @@ const monsters: ActorDefinition[] = creatures
           (prose?.damage ?? (save ? (saveDamage?.damage ?? []) : []));
       const damage = fix?.drop === "outcome" || fix?.drop === "damage" ? [] : (printed?.damage ?? fromRows);
       // rangeFeet is the maximum attackable range; rangeNormalFeet the normal band when the
-      // weapon has two ranges (disadvantage between them - SRD Range).
+      // weapon has two ranges (disadvantage between them, per SRD Range).
       const attack = row
         ? {
             bonus: row.to_hit_mod,
@@ -942,7 +942,7 @@ const monsters: ActorDefinition[] = creatures
               legendary: {
                 cost: action.fields.legendary_action_cost ?? 1,
                 // "The dragon can't take this action again until the start of its next turn."
-                ...(/can[’']t take this action again until the start of its next turn/i.test(action.fields.desc)
+                ...(/can[\u2019']t take this action again until the start of its next turn/i.test(action.fields.desc)
                   ? { oncePerRound: true as const }
                   : {})
               }
@@ -984,7 +984,7 @@ const monsters: ActorDefinition[] = creatures
     if (damageResistances.length > 0 || damageImmunities.length > 0 || damageVulnerabilities.length > 0)
       report.typedDefenses += 1;
     // Legendary resources (SRD 2024): every legendary SRD creature prints "Legendary Action Uses: 3"
-    // (the "(4 in Lair)" bump stays prose - lairs aren't modeled). Legendary Resistance parses the
+    // (the "(4 in Lair)" bump stays prose: lairs aren't modeled). Legendary Resistance parses the
     // non-lair N from the trait name; the "(or N+1/Day in Lair)" variant likewise stays prose.
     const hasLegendaryActions = sortedActions.some((action) => action.fields.action_type === "LEGENDARY_ACTION");
     const resistanceTrait = (traitsByCreature.get(creature.pk) ?? [])
@@ -1219,7 +1219,7 @@ const weaponPropertyRecords = onlySrd(weaponProperties).map((property) => ({
 /**
  * The Weapons table's Properties and Mastery columns, joined from the markdown SRD because the open5e
  * fixtures do not link weapons to properties. Both are optional on the schema, so the join fails
- * the build rather than dropping them silently.
+ * the build, so neither is dropped silently.
  *
  * A property cell's parenthetical is dropped from the slug (`Versatile (1d10)` -> `versatile`), since riders
  * match the bare word; the Versatile die is kept as `versatileDice`.
@@ -1234,7 +1234,7 @@ const stripTags = (value: string) =>
 const tableSlug = (value: string) =>
   stripTags(value)
     .toLowerCase()
-    .replace(/['’]/g, "")
+    .replace(/['\u2019]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
@@ -1283,7 +1283,7 @@ const weaponTable = (() => {
     const properties = stripTags(cells[2]);
     rows.set(tableSlug(cells[0]), {
       properties:
-        properties === "" || properties === "—" || properties === "-"
+        properties === "" || properties === "\u2014" || properties === "-"
           ? []
           : properties
               .split(",")
@@ -1322,7 +1322,7 @@ const weaponTable = (() => {
 const weaponRecords = onlySrd(weapons).map((weapon) => {
   const id = slugOf(weapon.pk);
   const row = weaponTable.get(id);
-  // Fail closed rather than emit a weapon with inert mastery and empty properties.
+  // Fail closed, so no weapon is emitted with inert mastery and empty properties.
   if (!row)
     throw new Error(
       `No SRD Weapons-table row for "${id}" - check the name slug in sources/dnd-5e-srd-markdown/equipment.md.`
@@ -1337,7 +1337,7 @@ const weaponRecords = onlySrd(weapons).map((weapon) => {
     ...(row.ammunition !== null ? { ammunition: row.ammunition } : {}),
     improvised: weapon.fields.is_improvised,
     mastery: row.mastery,
-    // `[]` when the table prints "—": a Mace has no properties, which differs from "not recorded".
+    // `[]` when the table prints an em dash: a Mace has no properties, which differs from "not recorded".
     properties: row.properties,
     damage: { dice: weapon.fields.damage_dice, type: weapon.fields.damage_type },
     // range 0 means a melee weapon.
@@ -1427,9 +1427,9 @@ const SKILL_ABILITY: Readonly<Record<string, string>> = {
 };
 const skillRecords = describesRecords(skills).map(({ id, name, description }) => {
   const ability = SKILL_ABILITY[id];
-  // Fail closed rather than emit a skill the character sheet cannot resolve an ability for.
+  // Fail closed, so no skill is emitted that the character sheet cannot resolve an ability for.
   if (!ability) throw new Error(`No SRD ability column for skill "${id}" - add it to SKILL_ABILITY.`);
-  // Key order matches the committed bundle so a rebuild is a no-op diff, not 36 reordered lines.
+  // Key order matches the committed bundle so a rebuild is a no-op diff.
   return { id, name, ability, description };
 });
 const damageTypeRecords = describesRecords(damageTypes);
@@ -1453,7 +1453,7 @@ const ruleRecords = onlySrd(rules)
 const attribution = {
   license: "CC-BY-4.0",
   attribution:
-    "This work includes material from the System Reference Document 5.2.1 (“SRD 5.2.1”) by Wizards of the Coast LLC, available at https://www.dndbeyond.com/srd. The SRD 5.2.1 is licensed under the Creative Commons Attribution 4.0 International License, available at https://creativecommons.org/licenses/by/4.0/legalcode.",
+    "This work includes material from the System Reference Document 5.2.1 (\u201cSRD 5.2.1\u201d) by Wizards of the Coast LLC, available at https://www.dndbeyond.com/srd. The SRD 5.2.1 is licensed under the Creative Commons Attribution 4.0 International License, available at https://creativecommons.org/licenses/by/4.0/legalcode.",
   source: {
     name: srdDocument.fields.name,
     author: srdDocument.fields.author,
@@ -1475,7 +1475,7 @@ const attribution = {
   ]
 };
 
-// Fail closed on every bundle, not just monsters: nothing is written unless everything validates.
+// Fail closed on every bundle, monsters and the rest: nothing is written unless everything validates.
 const validateBundle = (label: string, schema: z.ZodType, value: unknown) => {
   const parsed = schema.safeParse(value);
   if (!parsed.success) {

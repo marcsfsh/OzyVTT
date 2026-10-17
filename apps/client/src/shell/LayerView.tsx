@@ -45,7 +45,7 @@ export function LayerView({
           /* The wizard gates its last step on this prop: a disabled Create beats a banner to notice. */
           connection={connection}
           onClose={() => navigate(home)}
-          onCreated={(name) => toast(`${name} joined the roster — ready to claim.`, { tone: "success" })}
+          onCreated={(name) => toast(`${name} joined the roster, ready for a player to claim.`, { tone: "success" })}
         />
       ) : (
         /* The builder is closed to players at this table: one line and one door back. */
@@ -53,8 +53,8 @@ export function LayerView({
           <div className="pane-sky" aria-hidden="true" />
           <div className="scene-empty frame-fill">
             <p>
-              Your GM builds the characters at this table. Ask them to make you one, or claim one that&rsquo;s already
-              on the table.
+              Your GM builds the characters at this table. Ask them to make you one, or claim one that's already on the
+              table.
             </p>
             <Button variant="primary" onClick={() => navigate("/table")}>
               Back to the table

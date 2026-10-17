@@ -4,8 +4,8 @@ import type { ClassMechanicsModule } from "./overlay.js";
 export const bard: ClassMechanicsModule = {
   features: {
     /**
-     * Uses scale off the Charisma modifier, not the printed Bardic Die column (that is the die size, so
-     * it stays display-only and is not in `liveResources`). Cutting Words and Peerless Skill spend the
+     * Uses scale off the Charisma modifier. The printed Bardic Die column is the die size, so
+     * it stays display-only and is not in `liveResources`. Cutting Words and Peerless Skill spend the
      * same pool. The die granted to another creature and Superior Inspiration stay prose.
      */
     "bardic-inspiration": {

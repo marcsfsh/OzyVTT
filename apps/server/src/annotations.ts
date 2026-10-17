@@ -31,7 +31,7 @@ function withinMap(point: AnnotationPoint, geometry: AnnotationMapGeometry, labe
   if (!onMap(point, geometry)) throw new CommandRejectedError(`${label} must be inside the map.`);
 }
 
-/** Snaps both endpoints to grid cell centers and measures whole-cell Chebyshev distance (every cell = one grid step, no diagonal penalty), matching 5e's simplified movement rule. */
+/** Snaps both endpoints to grid cell centers and measures whole-cell Chebyshev distance (every cell = one grid step, no diagonal penalty), as 5e's simplified movement rule does. */
 function measurementGeometry(
   calibration: SquareGridCalibration,
   origin: AnnotationPoint,
@@ -93,8 +93,8 @@ function radialGeometry(
 
 /**
  * Cone/line: the origin (apex) and the far end (a cone's base center) each snap to a grid cell
- * center, so the shape points in any direction while both ends stay grid-aligned, instead of
- * snapping the rotation to fixed increments.
+ * center, so the shape points in any direction while both ends stay grid-aligned, and the rotation never
+ * snaps to fixed increments.
  */
 function pointableGeometry(
   calibration: SquareGridCalibration,
@@ -199,7 +199,7 @@ function resolveVisibility(
 ): { visibility: AnnotationVisibility; visibleToActorId: string | null } {
   if (actor.role === "gm") {
     if (!(["public", "gm-only", "gm-actor"] as const).includes(visibility as "public" | "gm-only" | "gm-actor"))
-      throw new CommandRejectedError("Choose Everyone, Just the GM, or a specific character.");
+      throw new CommandRejectedError("Choose Shown to players, GM only, or one character.");
     if (visibility === "gm-actor") {
       if (!visibleToActorId || !state.actors.some((candidate) => candidate.id === visibleToActorId))
         throw new CommandRejectedError("Pick a character to reveal this to.");
@@ -208,7 +208,7 @@ function resolveVisibility(
     return { visibility, visibleToActorId: null };
   }
   if (!(["public", "owner-only", "owner-gm"] as const).includes(visibility as "public" | "owner-only" | "owner-gm"))
-    throw new CommandRejectedError("Choose Everyone, Just me, or Just me and the GM.");
+    throw new CommandRejectedError("Choose Shown to players, Only me, or Only me and the GM.");
   return { visibility, visibleToActorId: null };
 }
 
@@ -407,7 +407,7 @@ export function setAnnotationMovable(state: GameState, id: string, movableByOthe
   };
 }
 
-/** Soonest future expiry among current annotations, or null if none are ephemeral - used to schedule the next expiry re-broadcast. */
+/** Soonest future expiry among current annotations, or null if none are ephemeral: used to schedule the next expiry re-broadcast. */
 export function nextAnnotationExpiry(state: GameState, now: number): number | null {
   const expiries = state.combat.annotations
     .map((annotation) => annotation.expiresAt)

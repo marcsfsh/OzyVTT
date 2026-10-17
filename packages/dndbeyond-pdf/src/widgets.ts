@@ -7,8 +7,8 @@ export interface Widget {
   y: number;
 }
 
-/** The slice of pdfjs's `getDocument` we depend on. The caller injects it — the Node legacy build
- * (tests/CLI) or the browser build with a worker (client) — so this module stays environment-agnostic. */
+/** The slice of pdfjs's `getDocument` we depend on. The caller injects it (the Node legacy build
+ * for tests and the CLI, or the browser build with a worker in the client), so this module stays environment-agnostic. */
 export type GetDocument = (opts: Record<string, unknown>) => { promise: Promise<PdfDoc> };
 interface PdfDoc {
   numPages: number;

@@ -81,7 +81,7 @@ export function CharacterSheet({
   state?: GmView | PlayerView;
   standalone?: boolean;
   embedded?: boolean;
-  /** Combat context for the player's OWN sheet, enabling structured attacks from the Actions section on their turn. */ combat?: {
+  /** Combat context for the player's OWN sheet, which turns on structured attacks from the Actions section on their turn. */ combat?: {
     revision: number;
     active: boolean;
     myTurn: boolean;
@@ -328,7 +328,7 @@ export function CharacterSheet({
     beginTargeting(aimless ? { ...own, targeting: "none" } : own, actor.id, slotLevel, darts);
     if (effectiveAttackMode === "jump") onJumpToInitiative?.();
   };
-  // A smite is added to a hit in a fight, so its Cast tap says where to find it rather than starting a refused cast.
+  // A smite is added to a hit in a fight, so its Cast tap says where to find it and starts no cast the server would refuse.
   const hitExtraNote = (actionId: string | null | undefined): string | null => {
     const row = inFight && actionId ? serverActions.find((candidate) => candidate.id === actionId) : undefined;
     return row?.ridesAHit
@@ -607,7 +607,7 @@ export function CharacterSheet({
       {!definition && role === "gm" && definitionId && !unloaded && <p className="sheet-status">Loading stat block…</p>}
       {actor.kind === "player-character" && !definitionId && (
         <p className="sheet-status">
-          No imported sheet yet - the GM can import this character's JSON sheet from the roster.
+          No imported sheet yet. The GM can import this character's JSON sheet from the roster.
         </p>
       )}
     </div>

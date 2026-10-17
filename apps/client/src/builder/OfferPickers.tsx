@@ -93,13 +93,13 @@ export function OfferPicker({
   const isFeat = FEAT_KINDS.has(offer.kind);
   const options: ChoiceOption[] = offer.options.map((option) => ({
     value: option.id,
-    // The option's name is the title for every kind (equipment included), matching the review step.
+    // The option's name is the title for every kind (equipment included), as in the review step.
     title: option.name,
     // Feats show their summary. A spell's type line ("Cantrip", "Level 3") also goes in `description`,
     // not `meta`, which is the mono micro-label meant for numbers.
     description: isFeat ? featSummary(catalogs, option.id) : spellLevelLine(option.level),
     badge: sourceBadge(offerSource(catalogs, option.id)),
-    // A proficiency the build already holds stays listed but disabled, saying where it came from;
+    // A proficiency the build already holds stays listed but disabled and says where it came from;
     // picked from another source it would be merged away server-side, silently costing a pick.
     ...(offer.unavailable?.[option.id]
       ? { disabled: true, disabledReason: asReason(offer.unavailable[option.id]) }
@@ -175,7 +175,7 @@ export function AsiOffer({
       title: option.name,
       description: featSummary(catalogs, option.id),
       badge: sourceBadge(offerSource(catalogs, option.id)),
-      // A feat whose prerequisite this build does not meet stays listed, saying why.
+      // A feat whose prerequisite this build does not meet stays listed and says why.
       ...(offer.unavailable?.[option.id]
         ? { disabled: true, disabledReason: asReason(offer.unavailable[option.id]) }
         : {}),
@@ -277,7 +277,7 @@ export function AsiOffer({
                     return (
                       <option key={ability} value={ability} disabled={noRoom && ability !== chosen}>
                         {ABILITY_LABELS[ability]}
-                        {total == null ? "" : ` — ${total}${noRoom ? ` (over ${ABILITY_SCORE_CAP})` : ""}`}
+                        {total == null ? "" : ` · ${total}${noRoom ? ` (over ${ABILITY_SCORE_CAP})` : ""}`}
                       </option>
                     );
                   })}

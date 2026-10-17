@@ -23,7 +23,7 @@
   background: var(--surface-2);
   overflow: hidden;
 }
-/* −/+ carry the 44px floor as real paint. `min-width`, not `width`, because flex-shrink can shave a flex item's
+/* −/+ carry the 44px floor as real paint. `min-width`, because flex-shrink can shave a flex item's
    width below the floor. */
 .nh-stepper-btn {
   display: grid;

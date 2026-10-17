@@ -98,7 +98,7 @@ export type MovementRulesOutcome = Readonly<{
 /** A move spends movement only on the mover's own turn in combat, with movement rules on. While a wait-mode
  *  fight gathers initiative no turn has begun, so tokens are still being positioned. */
 /** SRD Ready: a Readied creature may "move up to your Speed in response" to its trigger, with its Reaction, off its
- *  own turn. Counted like any move (unless the movement rules are off), but against its Speed, not the turn's. */
+ *  own turn. Counted like any move (unless the movement rules are off), against its Speed and apart from the turn's. */
 function readiedMove(state: GameState, mover: GameState["actors"][number], mode: MoveMode): boolean {
   return (
     turnsRunning(state) &&
@@ -335,7 +335,7 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
       state,
       input,
       "movement.off-turn",
-      `It isn't ${mover.name}'s turn - moving now needs the GM's go-ahead.`,
+      `It isn't ${mover.name}'s turn, so moving now needs the GM's go-ahead.`,
       outcome
     );
   // Teleportation spends no movement and provokes nothing, and a player's needs the GM's go-ahead (the spell or
@@ -397,7 +397,7 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
       ].filter((part): part is string => part !== null);
       const message =
         budget === 0
-          ? `${mover.name} can't move - its Speed is 0.`
+          ? `${mover.name} can't move while its Speed is 0.`
           : `${mover.name} has ${Math.max(0, Math.round((budget - used) * 10) / 10)} ft of movement left (this move needs ${Math.round(moved * 10) / 10} ft${how.length > 0 ? `, ${how.join(", ")}` : ""}).`;
       // A GM Allow covers the movement family for the rest of the turn, as before.
       police(

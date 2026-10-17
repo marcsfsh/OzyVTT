@@ -269,7 +269,7 @@ function QuestEditor({
     try {
       localStorage.setItem(QUEST_DETAILS_KEY, open ? "open" : "closed");
     } catch {
-      /* private mode - fine */
+      /* private mode: fine */
     }
   }, []);
   useEffect(() => {
@@ -346,7 +346,7 @@ function QuestEditor({
     if (
       !(await confirm({
         title: "Delete quest",
-        body: `Delete “${quest.title}”? Its objectives and your GM-only notes are lost. Pages it links to are not deleted.`,
+        body: `Delete "${quest.title}"? Its objectives and your GM-only notes are lost. Pages it links to are not deleted.`,
         confirmLabel: "Delete",
         danger: true
       }))

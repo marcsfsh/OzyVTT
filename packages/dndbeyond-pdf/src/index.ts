@@ -33,7 +33,7 @@ export function validateDraft(draft: Record<string, unknown>, warnings: string[]
 export interface ImportOptions {
   /** Passed through to pdfjs getDocument (e.g. `{ verbosity: 0 }`). */
   docOptions?: Record<string, unknown>;
-  /** SRD content spell ids (from `content:spells`) — spells not in the set are flagged as unmatched. */
+  /** SRD content spell ids (from `content:spells`). Spells not in the set are flagged as unmatched. */
   knownSpellIds?: ReadonlySet<string>;
 }
 

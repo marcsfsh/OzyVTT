@@ -18,7 +18,7 @@ export type FieldDef = Readonly<{
 /** Presentation for one field key, joined onto the shared key table. */
 type FieldPresentation = Readonly<{ label: string; kind?: "text" | "textarea"; placeholder?: string }>;
 /**
- * Join presentation onto the shared key list, keeping its order. Keyed per type because the same key
+ * Join presentation onto the shared key list in its order. Keyed per type because the same key
  * reads differently by type (`goals` is "Secret agenda" on a faction).
  */
 function withKeys(type: EntityType, present: Readonly<Record<string, FieldPresentation>>): readonly FieldDef[] {

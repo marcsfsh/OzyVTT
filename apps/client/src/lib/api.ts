@@ -1,4 +1,4 @@
-/** A refusal or failure from `/api/v1`, carrying the envelope's `error` fields. */
+/** A refusal or failure from `/api/v1`, with the envelope's `error` fields. */
 export class ApiError extends Error {
   constructor(
     message: string,

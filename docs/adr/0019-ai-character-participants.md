@@ -36,7 +36,7 @@ Use a provider-neutral cancellable adapter. Provide explicit GM/table consent an
 
 - The stable API, complete combat commands, safe projections, presence, and credential lifecycle must exist first.
 - Structured configuration takes more design work than a prompt box but is safer and more understandable.
-- Different personas can choose different valid actions, making deterministic testing quality-oriented rather than requiring one “correct” move.
+- Different personas can choose different valid actions, so deterministic testing is quality-oriented and needs no single "correct" move.
 - Model/provider quality and availability remain variable; scripted fake agents are required for CI.
 - Social consent, speech cadence, moderation, privacy, and cost controls become product responsibilities.
 - This is post-Version-1 and does not delay the human multiplayer vertical slice.

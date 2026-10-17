@@ -258,7 +258,7 @@ const PLAYER_READABLE_CONTENT_READS = [
   "content:names"
 ] as const;
 /** The bestiary, stat blocks and the monster wizard's benchmarks (SRD only, so no homebrew can ride them): GM-grade
- *  only, and that gate is asserted below rather than assumed. */
+ *  only, and that gate is asserted below. */
 const GM_ONLY_CONTENT_READS = [
   "content:monsters",
   "content:monster-actions",

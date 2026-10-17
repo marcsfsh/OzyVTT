@@ -232,7 +232,7 @@ function resolutionOf(ctx: ResolveContext): ActionResolution {
         }
       : ctx.builtinSave,
     damage,
-    // What every apply path lands: a negative part deals 0 of its type rather than eating another's.
+    // What every apply path lands: a negative part deals 0 of its type and never eats into another's.
     damageTotal: owedDamageTotal({ damage, bonusDamage }),
     crit: ctx.crit,
     ...rollModeOf(ctx),

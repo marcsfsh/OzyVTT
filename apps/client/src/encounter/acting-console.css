@@ -65,7 +65,7 @@
 .acting-console .action-runner {
   margin-top: 0.45rem;
 }
-/* Solid border: dashed edges mean a state (at will vs prepared) elsewhere in this file, not a
+/* Solid border: dashed edges mean a state (at will vs prepared) elsewhere in this file, and this is no
    secondary control. */
 .builtin-more {
   display: inline-flex;
@@ -86,7 +86,7 @@
   gap: 0.35rem;
   margin-top: 0.55rem;
 }
-/* Paint grows to 44px: the strip's gap is smaller than an overhang would need. Solid, not dashed. */
+/* Paint grows to 44px: the strip's gap is smaller than an overhang would need. Solid border. */
 .legendary-offer {
   display: inline-flex;
   align-items: center;

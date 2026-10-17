@@ -182,7 +182,7 @@ import type {
   WallRemoveSchema
 } from "./commands.js";
 
-/** A brief, ephemeral battlemap notification ("Goblin took 6 damage"). Never stored in GameState - presentation only; the roll history is the durable record. */
+/** A brief, ephemeral battlemap notification ("Goblin took 6 damage"). Never stored in GameState; it is presentation only, and the roll history is the durable record. */
 export type TableEvent = Readonly<{
   id: string;
   kind: "damage" | "heal" | "save" | "action" | "condition" | "reaction" | "effect" | "death-save";
@@ -295,7 +295,7 @@ export interface ClientToServerEvents {
   ) => void;
   /** The caller's parked character build (one per player session, one for the GM), or null. */
   "character:draft": (payload: Record<string, never>, acknowledgement: (result: CharacterDraftResult) => void) => void;
-  /** Park the caller's in-progress build on the server, replacing any it parked before. */
+  /** Park the caller's in-progress build on the server, over any it parked before. */
   "character:save-draft": (
     payload: CommandPayload<typeof CharacterDraftSaveSchema>,
     acknowledgement: (result: MutationResult & { updatedAt?: string }) => void

@@ -8,7 +8,7 @@ import { RowTools } from "./RowTools";
 import { aidGiverOf, isKnockedOut, StabilizeControl, type AidGiver } from "./StabilizeControl";
 
 /** Who in the fight could give a dying creature aid, the creature whose turn it is first (the aid is its action):
- *  conscious characters and NPCs, not the dying one. */
+ *  conscious characters and NPCs, without the dying one. */
 function fightHelpers(state: GmView, targetId: string): AidGiver[] {
   const turn = state.combat.turnActorId;
   return state.combat.initiative
@@ -78,7 +78,7 @@ function InitiativeScore({
       type="button"
       className="initiative-score-value tap-target"
       disabled={busy}
-      title="Initiative - click to edit"
+      title="Edit initiative"
       onClick={() => {
         setEditScore(String(score));
         setEditing(true);
@@ -150,7 +150,7 @@ export function GmInitiativeRow({
           className="initiative-expand"
           aria-expanded={expanded}
           title={
-            expanded ? "Close" : `Manage ${actor?.name ?? "this token"} - HP, conditions, effects, reaction, sheet`
+            expanded ? "Close" : `Manage ${actor?.name ?? "this token"} · HP, conditions, effects, reaction, sheet`
           }
           onClick={onToggleExpanded}
         >

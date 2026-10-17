@@ -293,7 +293,7 @@ const choiceSummaryOf = (choice: FeatureRecord["choice"]): WireChoice | null =>
         minSpellLevel: choice.minSpellLevel ?? null,
         fromPicks: choice.fromPicks ? { offer: choice.fromPicks.offer, where: choice.fromPicks.where ?? null } : null,
         options: (choice.options ?? []).map((option) => {
-          // One level of nesting only, matching the schema: a nested choice cannot carry options.
+          // One level of nesting only, as in the schema: a nested choice cannot carry options.
           const nested = featurePicks(option).map((pick) => ({
             kind: pick.kind,
             choose: pick.choose,
@@ -360,7 +360,7 @@ const equipmentOptionsOf = (
     items: option.items.map((item) => ({ id: item.id, name: item.name, quantity: item.quantity })),
     goldPieces: option.goldPieces
   }));
-// The printed 20-row table as display data. Missing columns are null, not 0, so "no cantrips" differs
+// The printed 20-row table as display data. A missing column is null and a printed zero is 0, so "no cantrips" differs
 // from "zero cantrips at this level".
 const levelRowOf = (row: ClassLevelRow): ContentClassLevelRow => ({
   level: row.level,

@@ -265,13 +265,13 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
     }
     const document = options.archives.get(id);
     if (document === null) return sendFailure(res, 404, "not_found", "No such encounter archive.");
-    // The stored JSON is spliced in verbatim, avoiding a parse/re-serialize of a potentially large document.
+    // The stored JSON is spliced in verbatim, which avoids a parse/re-serialize of a potentially large document.
     return res
       .type("application/json")
       .send(`{"ok":true,"apiVersion":"${API_VERSION}","data":{"id":${id},"document":${document}}}`);
   });
 
-  /** Per-replay sharing: GM-grade only, storing the GM's decision. */
+  /** Per-replay sharing: GM-grade only, and stores the GM's decision. */
   router.post(expressPath(ENCOUNTER_ARCHIVE_PATHS.visibility), authorize("combat:write"), (req, res) => {
     if (!requireGmGradePrincipal(res)) return;
     const id = archiveIdParam(req, res);

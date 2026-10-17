@@ -169,7 +169,7 @@ export function ConnectionGraph({
     );
   }, []);
   /**
-   * A ref callback rather than an effect: the component returns early while loading or empty, so the
+   * A ref callback, because an effect would miss it: the component returns early while loading or empty, so the
    * <svg> often mounts after the first render and an empty-deps effect would never attach the observer.
    */
   const observerRef = useRef<ResizeObserver | null>(null);

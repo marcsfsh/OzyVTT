@@ -91,7 +91,7 @@ const DEFAULTS: Readonly<Record<HomebrewType, () => Draft>> = {
      `FeatReferenceSchema` is `.strict()`. */
   feat: () => ({ ...BASE, category: "general", repeatable: false, feature: blankFeature() }),
 
-  /* `SpellReferenceSchema` fields are `.nullable()`, not `.optional()`: each key is required,
+  /* `SpellReferenceSchema` fields are `.nullable()`: each key is required,
      so the nulls below must stay. */
   spell: () => ({
     source: "homebrew",

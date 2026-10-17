@@ -12,8 +12,8 @@ import { answerSave, createPendingSaves, saveTotalFor } from "../src/saving-thro
 import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
 
 // Every field the homebrew editor offers must change play. One describe per field group; each test
-// proves the effect at the far end (a rolled number, an applied condition, halved damage), not merely
-// that the value survived into the derivation.
+// proves the effect at the far end (a rolled number, an applied condition, halved damage). Showing
+// that the value survived into the derivation is not enough.
 
 const IDS = {
   hero: "10000000-0000-4000-8000-000000000001",
@@ -387,7 +387,7 @@ describe("row 3: the four dropped grant kinds", () => {
       { role: "gm" },
       { resolveDefinition: () => definition, catalog }
     );
-    expect(events[0].text).toMatch(/immune to Frightened - not applied/);
+    expect(events[0].text).toMatch(/immune to Frightened, so it isn't applied/);
     expect(state.actors[0].conditions).toHaveLength(0);
 
     // Negative control: the same command with the periapt unequipped applies the condition.
@@ -604,7 +604,7 @@ describe("row 5: an item's effects rider", () => {
     const action = effectiveActions(definition, state.actors[0], catalog).find(
       (entry) => entry.id === "item-blade-of-certainty"
     )!;
-    // Two d20 faces are consumed only if advantage really applied: 6 then 17, keeping the 17.
+    // Two d20 faces are consumed only if advantage really applied: 6 then 17, and the 17 is kept.
     const resolution = resolveDefinitionAction(
       state,
       action,
@@ -731,7 +731,7 @@ describe("row 6: an item that casts a spell, with its cast details", () => {
 
     expect(dcOf({}, [row])).toMatchObject({ dc: 14, spellcasting: true });
     expect(dcOf({}, [row, necklace])!.dc).toBe(16);
-    // A printed DC is the wand's, not the wielder's.
+    // A printed DC belongs to the wand.
     expect(dcOf({ saveDc: 15 }, [row, necklace])).toEqual({
       ability: "dex",
       dc: 15,
@@ -769,7 +769,7 @@ describe("row 6: an item that casts a spell, with its cast details", () => {
         { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(9) },
         deps([3, 3, 3, 3, 3, 3, 3, 3], catalog, definition)
       )
-    ).toThrow(/spends a level-3 spell slot/);
+    ).toThrow(/spends a level 3 spell slot/);
   });
 
   it("degrades to a name-only cast when the catalog cannot resolve the spell", () => {

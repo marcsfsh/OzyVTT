@@ -7,7 +7,7 @@
  *   4. `build-magic-items.ts`: magic items. Bases resolve against the weapons and armor from step 2.
  *   5. `build-glossary.ts`: the Rules Glossary.
  *
- * No step reads its own output. `--out=<dir>` sends every step's bundles there instead of `bundles/`,
+ * No step reads its own output. `--out=<dir>` sends every step's bundles there (the default is `bundles/`),
  * and each step reads earlier steps' bundles from the same directory.
  */
 import { execFileSync } from "node:child_process";

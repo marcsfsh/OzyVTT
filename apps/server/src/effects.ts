@@ -7,7 +7,7 @@ import { wardingAura } from "./paladin-auras.js";
 import { endZonesOfCast } from "./spell-zone-state.js";
 
 /** Effect lifecycle (ADR-0020): the engine ends effects on turn boundaries, source defeat and explicit
- *  end, clearing linked conditions and firing onEnd grants. Returns narration events rather than writing
+ *  end, which clears linked conditions and fires onEnd grants. Returns narration events and writes nothing to
  *  the log. Sweeps touch only actors in the current initiative, so parked scenes keep their effects. */
 
 /** `immune` marks a condition skipped for immunity, so a caller can drop its generic "is X" line without reading
@@ -35,7 +35,7 @@ export const NO_REACTIONS_TAG = "no-reactions";
 export const NO_OPPORTUNITY_ATTACKS_TAG = "no-opportunity-attacks";
 /** The bearer can't regain Hit Points while this lasts (Chill Touch). */
 export const NO_HEALING_TAG = "no-healing";
-/** Slow on its target: on its turns an action or a Bonus Action, not both, one attack with the Attack action, and a
+/** Slow on its target: on its turns an action or a Bonus Action (only one), one attack with the Attack action, and a
  *  chance that a spell with a Somatic component fails. */
 export const SLOWED_TAG = "slowed";
 /** The bearer can't cast spells or take the Magic action while this lasts (Befuddlement). */
@@ -169,7 +169,7 @@ const linkedByAnEffect = (actor: Actor, conditionId: string) =>
 
 type ConditionEntry = Actor["conditions"][number];
 
-/** Writes one condition entry, keeping the list sorted and the entry's provenance flags. */
+/** Writes one condition entry, and keeps the list sorted and the entry's provenance flags. */
 function writeCondition(actor: Actor, entry: ConditionEntry): void {
   actor.conditions = [...actor.conditions.filter((condition) => condition.id !== entry.id), entry].sort((left, right) =>
     left.id.localeCompare(right.id)
@@ -250,7 +250,7 @@ export function conditionGained(
 }
 
 /** Adds an effect (idempotent by id). A grant from the same source actor and action replaces the older
- *  instance (a re-declared Rage refreshes rather than stacks). Applies linked conditions the bearer is not
+ *  instance (a re-declared Rage refreshes and never stacks). Applies linked conditions the bearer is not
  *  immune to, and runs what gaining them does (`conditionGained`). */
 export function addEffect(
   state: GameState,
@@ -263,7 +263,7 @@ export function addEffect(
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   const existing = actor.effects.find((candidate) => candidate.id === effect.id);
   if (existing) return existing;
-  // SRD Concentration: one at a time - starting a new one ends the source's others. Effects of one cast share a
+  // SRD Concentration: one at a time, starting a new one ends the source's others. Effects of one cast share a
   // `castId` and are one Concentration.
   if (effect.concentration && effect.sourceActorId !== null) {
     const ended = endConcentrationSustainedBy(state, effect.sourceActorId, effect.castId);
@@ -275,7 +275,7 @@ export function addEffect(
   // marked as outliving this effect.
   const heldBefore = new Set(actor.effects.flatMap((candidate) => candidate.linkedConditionIds));
   // Extra movement adds up (SRD Dash: each one gains "extra movement for the current turn"), so a second Dash stands
-  // beside the first rather than refreshing it.
+  // beside the first, and the first is never refreshed.
   const stacks = effect.movementGrantFeet !== undefined;
   const replaced =
     effect.sourceActionId !== null && !stacks
@@ -367,7 +367,7 @@ function addLethargy(state: GameState, actor: Actor, haste: EffectInstance, even
 }
 
 /** Tolerant single-effect removal used by every sweep; returns false when the effect is already gone. A fight's end
- *  or a long rest (`sweeping`) starts nothing that would outlast it, such as Haste's lethargy. */
+ *  or a Long Rest (`sweeping`) starts nothing that would outlast it, such as Haste's lethargy. */
 function endEffectInternal(
   state: GameState,
   actor: Actor,
@@ -598,7 +598,7 @@ export function expireEffectsAtTurnStart(state: GameState, incomingActorId: stri
 }
 
 /** Turn-boundary expiry when `outgoingActorId`'s turn ends: "until the end of its next turn" effects borne by it,
- *  and "until the end of your next turn" effects it is the source of, end - unless they began during this very turn,
+ *  and "until the end of your next turn" effects it is the source of, end, unless they began during this very turn,
  *  in which case the next one is theirs. Only actors in the current initiative. */
 export function expireEffectsAtTurnEnd(state: GameState, outgoingActorId: string): EffectNarration[] {
   const events: EffectNarration[] = [];
@@ -646,7 +646,7 @@ export function endEncounterEffects(state: GameState, combatantIds: readonly str
   return events;
 }
 
-/** A long rest: eight hours pass and the creature sleeps (Unconscious, so its Concentration ends). Its effects
+/** A Long Rest: eight hours pass and the creature sleeps (Unconscious, so its Concentration ends). Its effects
  *  measured in turns or rounds end; "until ended" ones (a curse, a disease) stay. */
 export function endEffectsAtLongRest(state: GameState, actorId: string): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);

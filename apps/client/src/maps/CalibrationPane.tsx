@@ -37,7 +37,7 @@ type WizardReply = Readonly<{
  * The UI's four steps are not the server's (`grid-calibration-wizard.ts`: measure -> refine ->
  * verify -> complete). The UI step is `Math.min(rawStep, maxStep)` from local state only:
  *   UI 0 (mode)   - no server state yet.
- *   UI 1 (canvas) - ends with `POST .../calibration/wizards`, which jumps the server to refine.
+ *   UI 1 (canvas): ends with `POST .../calibration/wizards`, which jumps the server to refine.
  *   UI 2 (fields) - `POST .../actions {adjust|undo|redo}`; the server stays at refine.
  *   UI 3 (verify) - `POST .../actions {verify}` then `.../complete`.
  * The server computes every number (cell size, origin, rotation locked at 0, overlay lines,
@@ -49,7 +49,7 @@ type WizardReply = Readonly<{
  *
  * Mode depends on the map kind: a battle map is either a printed square grid (the wizard) or
  * gridless distance (`PUT .../scale`); regional and world maps only have the scale path. The scale
- * path never calls the wizard, so its fourth step is a review, not a verification.
+ * path never calls the wizard, so its fourth step is a review with no verification.
  */
 export function CalibrationPane({
   map,
@@ -64,7 +64,7 @@ export function CalibrationPane({
   previewUrl: string | null;
   gmToken: string;
   folderNames: readonly string[];
-  /** The library refetches after a save, keeping this map selected. */
+  /** The library refetches after a save and keeps this map selected. */
   onSaved: (mapId: string) => Promise<void>;
   /** Below 850px: back to the rail of maps. */
   onShowRail: () => void;
@@ -143,7 +143,7 @@ export function CalibrationPane({
     run(async () => {
       await request("", { folder }, "PATCH");
       await onSaved(map.id);
-      toast(folder ? `Moved to “${folder}”.` : "Removed from its folder.", { tone: "success" });
+      toast(folder ? `Moved to "${folder}".` : "Removed from its folder.", { tone: "success" });
     });
   const restartCalibration = () => {
     setPoints([]);

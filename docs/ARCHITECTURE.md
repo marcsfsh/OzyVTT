@@ -128,7 +128,7 @@ Every byte that reaches a player or the shared screen goes through a projection 
 audience. There are four:
 
 - **Game** (`apps/server/src/projections.ts`): `projectPlayerView` and `projectGmView`. Players
-  get only `public` actors, a health band instead of exact HP, and owner-only sheet resources
+  get only `public` actors, a health band with no exact HP, and owner-only sheet resources
   for their own character. A hidden effect's source becomes "A hidden threat". Private rolls,
   owner identity, GM notes and hidden turns are removed. A live scene's map reaches players before
   its fight, with the public tokens the GM has placed; the turn order and the tray wait for the
@@ -241,7 +241,7 @@ refuses a rider gated on a moment its reader never collects.
 
 A magic item's charges are an `actionUses` pool keyed by the carried row (`itemPool` in
 `item-actions.ts`), so two copies count separately and the count moves with the row when the GM hands
-it over (`character.give-item`). A long rest gives back the item's printed dice (`charges.regain`), not
+it over (`character.give-item`). A Long Rest gives back the item's printed dice (`charges.regain`), not
 every charge, and spending the last one rolls the SRD's d20 for the GM (`item-charges.ts`). Ammunition is
 counted on its row too (`ammunition.ts`): a shot from an Ammunition weapon needs a piece of the kind it fires
 and spends one, and half of the pieces fired come back when the encounter ends. Magic ammunition is bound to a
@@ -259,8 +259,8 @@ it Prone, and Fire damage on an oiled creature within the minute deals 5 more. A
 Poison are effects the item grants its user; a coat's damage lasts a set number of hits (`damageUses`), in a fight
 or out of one.
 
-What a save does is data on the action's save block, not read from its description: `successDamage`
-(half or none) and the `failureCondition` a failed save imposes. They are written where the content
+What a save does is data on the action's save block: `successDamage` (half or none) and the
+`failureCondition` a failed save imposes. Nothing parses the description for it. They are written where the content
 is made (the SRD build, the builder, homebrew) and copied onto the pending save prompt.
 
 Every ability check, from a sheet chip, a builtin action or the GM's call for a roll, comes from one plan
@@ -298,8 +298,8 @@ names no family is the GM's own ruling on the whole command.
   names the class each level went to (`classLevels`, kept in the choice ledger so a rebuild keeps the
   order); each class's features read that class's own level, and the server checks the SRD
   multiclass prerequisites with the scores of the moment each class is taken. An unfinished build
-  is parked on the server (`character-drafts.ts`), one per player session and one for the GM, beside
-  the game state rather than in it, and read back only by its owner. A D&D Beyond PDF can be
+  is parked on the server (`character-drafts.ts`), one per player session and one for the GM, in its own
+  table beside the game state, and read back only by its owner. A D&D Beyond PDF can be
   imported as an actor definition.
 - A fresh table starts with a sample party (`sample-party.ts`): three level 7 characters made by the
   same builder from a fixed seed, so they level like any built character. Each is marked `sample`
@@ -339,7 +339,7 @@ crosses midnight moves the GM's date by the days crossed (`onTimePassed` in the 
 ## Public HTTP API
 
 `/api/v1` exposes the game commands, the Codex, homebrew and the viewer over versioned
-envelopes, using the same handlers, authorization and projections as the UI. The OpenAPI
+envelopes, with the same handlers, authorization and projections as the UI. The OpenAPI
 document is assembled in `apps/server/src/openapi/` and served at `/api/v1/openapi.json`. The
 components with a Zod schema behind them (the contract's shapes, the homebrew vocabulary and record
 bodies, the Codex write bodies and records, the content catalogs, the viewer, map, available-actions and

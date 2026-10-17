@@ -4,7 +4,7 @@ import { abilityModifier as modifierOf, weaponAbilityModifierFrom } from "@vtt/r
 import { usesScopeLabel } from "./action-summary";
 import { PlayerActionRunner } from "./PlayerActionRunner";
 import { RichText } from "./RichText";
-import { ordinal, signed } from "./format";
+import { signed } from "./format";
 import { sameName } from "./sheet-names";
 import type { SheetRolls } from "./useSheetRolls";
 
@@ -41,7 +41,7 @@ export function SheetActions({
   definition: ActorDefinition;
   serverActions: readonly ContentActionSummary[];
   rolls: SheetRolls;
-  /** True on the player's own turn in a fight: attacks resolve on the server instead of as loose rolls. */
+  /** True on the player's own turn in a fight: attacks resolve on the server and are no loose rolls. */
   structuredAttacks: boolean;
   /** The runner for the inline preference, with the fight it resolves in. */
   inline: Readonly<{
@@ -350,7 +350,7 @@ export function SheetActions({
                   .sort((left, right) => left - right)
                   .map((level) => (
                     <div key={level} className="sheet-action-subgroup">
-                      <h5 className="sheet-action-subhead">{level === 0 ? "Cantrips" : `${ordinal(level)} Level`}</h5>
+                      <h5 className="sheet-action-subhead">{level === 0 ? "Cantrips" : `Level ${level}`}</h5>
                       {spellGroups.get(level)!.map(renderAction)}
                     </div>
                   ))}

@@ -54,7 +54,7 @@ describe("the prepare step a Long Rest opens", () => {
       classId: "wizard"
     });
     expect(() => setPreparedSpell(state, HERO, "fly", true, () => extra, "player")).toThrowError(
-      /can prepare \d+ spells - unprepare one first/
+      /can prepare \d+ spells\. Unprepare one first/
     );
     finishPreparing(state, HERO);
     expect(() => setPreparedSpell(state, HERO, "fireball", false, resolveDefinition, "player")).toThrowError(
@@ -66,7 +66,7 @@ describe("the prepare step a Long Rest opens", () => {
     const { state, hero } = fight(wizard);
     openPreparation(hero, wizard);
     expect(() => setPreparedSpell(state, HERO, "fireball", false, resolveDefinition, "player")).toThrowError(
-      /not in a fight/
+      /outside a fight/
     );
     endEncounter(state);
   });

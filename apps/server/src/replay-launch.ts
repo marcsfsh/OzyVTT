@@ -13,7 +13,7 @@ import { activateNewScene, sceneHeadroom, sceneSlotsNeededToGoLive, SCENE_ROOM_R
  * them out of roster surfaces (`rosterActors`) and lets `scenes.ts` delete them with the scene.
  */
 
-/** The definition cap `GameStateSchema` enforces; the launch refuses up front rather than failing mid-clone. */
+/** The definition cap `GameStateSchema` enforces; the launch refuses up front, so a clone never fails halfway. */
 const MAX_DEFINITIONS = 100;
 
 export type ReplayLaunchInput = Readonly<{
@@ -135,7 +135,7 @@ export function launchReplay(state: GameState, input: ReplayLaunchInput): Replay
   }
   if (state.definitions.length + definitionsToStore.length > MAX_DEFINITIONS) {
     throw new CommandRejectedError(
-      "The table's sheet library is full - delete some imported stat blocks before launching a replay."
+      "The table's sheet library is full. Delete some imported stat blocks before launching a replay."
     );
   }
 
@@ -155,7 +155,7 @@ export function launchReplay(state: GameState, input: ReplayLaunchInput): Replay
         name: source.name,
         ownerSessionId: null,
         archived: false,
-        // Scoped to this launch; a clone of a clone is re-scoped rather than left pointing at its old scene.
+        // Scoped to this launch; a clone of a clone is re-scoped, so it never points at its old scene.
         replaySceneId: input.sceneId,
         ...(clone.definitionId ? { definitionId: definitionIdMap.get(clone.definitionId) ?? clone.definitionId } : {})
       }

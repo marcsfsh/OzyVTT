@@ -196,7 +196,7 @@ describe("multiclass prerequisites", () => {
       ]
     });
     expect(() => build(weakFighter)).toThrow(
-      "To take Wizard at level 4: Your Fighter needs Strength 13 or Dexterity 13; you have Strength 11 and Dexterity 12."
+      "To take Wizard at level 4: Fighter, a class you already have, needs Strength 13 or Dexterity 13; you have Strength 11 and Dexterity 12."
     );
   });
 

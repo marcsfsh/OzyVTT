@@ -99,7 +99,7 @@ describe("The Calendar grid", () => {
   it("marks your date and the players' date as different days", () => {
     renderCalendar();
 
-    // The cell labels name each clock, not only a colour.
+    // The cell labels name each clock in words as well as colour.
     expect(screen.getByRole("button", { name: "Hammer 4, your date" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Hammer 2, players' date" })).toBeInTheDocument();
   });
@@ -282,7 +282,7 @@ describe("Eras (5f)", () => {
     expect(screen.getByRole("heading", { name: "Hammer 1491 DR" })).toBeInTheDocument();
   });
 
-  /** Eras are structure, not secrets: both projections carry them. */
+  /** Eras are structure and no secret: both projections carry them. */
   it("gives the player's calendar the same reading of the year", () => {
     render(
       <PlayerCalendarView
@@ -332,7 +332,7 @@ describe("The player's Calendar", () => {
     currentDate: { year: 1491, month: 0, day: 2 }
   };
 
-  it("shows ONE clock — the published date — and no way to change the world", () => {
+  it("shows ONE clock (the published date) and no way to change the world", () => {
     render(
       <PlayerCalendarView
         calendar={PLAYER_CALENDAR}

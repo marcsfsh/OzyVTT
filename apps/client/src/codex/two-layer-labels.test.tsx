@@ -110,7 +110,7 @@ beforeEach(() => {
 
 describe("The two-layer notes control names its layers the same way everywhere (5a.1 / 5c)", () => {
   it("is defined once, and these are the words", () => {
-    // The definition the other tests compare against, rather than a retyped literal.
+    // The definition the other tests compare against, so no literal is retyped.
     expect(BODY_LAYER.player.label).toBe("Player-visible notes");
     expect(BODY_LAYER.gm.label).toBe("GM-only notes");
   });
@@ -170,7 +170,7 @@ describe("The two-layer notes control names its layers the same way everywhere (
     await expectCanonicalPair();
     // The tab doesn't say "GM only", which is the content pill's wording.
     expect(screen.getByRole("switch", { name: "Show this page to players" })).toBeInTheDocument();
-    // The page's own switch says its state in words, not only with the eye.
+    // The page's own switch says its state in words as well as with the eye.
     expect(screen.getByRole("switch", { name: "Show this page to players" })).toHaveTextContent(
       /Hidden from players|Shown to players/
     );

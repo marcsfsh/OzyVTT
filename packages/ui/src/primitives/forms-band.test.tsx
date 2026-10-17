@@ -24,7 +24,7 @@ function ruleFor(source: string, selector: string): string {
 describe("the label band is one named token, derived from the field metrics it has to match", () => {
   it("declares --nh-label-band in forms.css as label line-box + field gap", () => {
     const forms = css("forms.css");
-    // Read the two rules the band restates rather than hard-coding values, so a retune fails here.
+    // Read the two rules the band restates, so values aren't hard-coded and a retune fails here.
     const labelFont = ruleFor(forms, ".nh-field-label");
     const fieldGap = ruleFor(forms, ".nh-field");
     const size = labelFont.match(/font:\s*600\s*var\((--[\w-]+)\)\s*\/\s*([\d.]+)/);
@@ -36,7 +36,7 @@ describe("the label band is one named token, derived from the field metrics it h
     const [, gapToken] = gap!;
     expect(
       ruleFor(forms, ":root"),
-      `--nh-label-band must stay the arithmetic of the two rules above it — ${sizeToken} × ${lineHeight} + ${gapToken}.\n` +
+      `--nh-label-band must stay the arithmetic of the two rules above it: ${sizeToken} × ${lineHeight} + ${gapToken}.\n` +
         `Fix: if a field's label metrics changed, change this calc in the same edit; the band exists to be the SAME height.`
     ).toBe(`--nh-label-band: calc(var(${sizeToken}) * ${lineHeight} + var(${gapToken}));`);
   });
@@ -55,8 +55,8 @@ describe("the label band is one named token, derived from the field metrics it h
     );
   });
 
-  it("is matched — not spent — by the labeled stepper, which stacks its own real label into the band", () => {
-    // The stepper has a label, so it needs the same gap under the same font, not a spacer.
+  it("is matched (and never spent) by the labeled stepper, which stacks its own real label into the band", () => {
+    // The stepper has a label, so it needs the same gap under the same font, with no spacer.
     const stepper = css("Stepper.css");
     expect(ruleFor(stepper, ".nh-stepper--labeled")).toContain("display: grid");
     expect(ruleFor(stepper, ".nh-stepper--labeled")).toContain("gap: var(--space-2)");
@@ -77,7 +77,7 @@ describe("Stepper (D23a)", () => {
     expect(screen.getByText("Dice")).toBeInTheDocument();
   });
 
-  it("renders no band at all without a visible label — the six ability steppers keep their inline row", () => {
+  it("renders no band at all without a visible label: the six ability steppers keep their inline row", () => {
     const { container } = render(<Stepper value={10} onChange={() => {}} aria-label="Strength" />);
     const root = container.querySelector(".nh-stepper")!;
     expect(root.className).not.toContain("nh-stepper--labeled");
@@ -97,7 +97,7 @@ describe("Stepper (D23a)", () => {
 
     view.rerender(<Stepper value={1} onChange={onChange} min={1} max={6} label="Dice" />);
     expect(screen.getByRole("button", { name: "Decrease" })).toBeDisabled();
-    // Both edges disabled, so the clamp is visible rather than a silent correction.
+    // Both edges disabled, so the clamp is visible and no silent correction.
     expect(screen.getByRole("button", { name: "Increase" })).toBeEnabled();
   });
 
@@ -146,7 +146,7 @@ describe("Switch (D23b)", () => {
     view.rerender(
       <Switch checked onChange={() => {}} label="Shown to players" aria-label="Show this page to players" />
     );
-    // A constant accessible name, not one that changes with the state label.
+    // A constant accessible name that stays put when the state label changes.
     expect(screen.getByRole("switch")).toHaveAccessibleName("Show this page to players");
   });
 });

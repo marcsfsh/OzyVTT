@@ -119,7 +119,7 @@ export function ReactionPrompt({
         const swing = reaction.kind === "leaves-reach" ? "opportunity attack" : reaction.actionName;
         onFeedback(
           use
-            ? `${actorName}'s ${swing}: ${attack ? `${attack.outcome.toUpperCase()} (${attack.total})` : "resolved"}${outcome.appliedDamage > 0 ? ` - ${outcome.appliedDamage} damage` : ""}.`
+            ? `${actorName}'s ${swing}: ${attack ? `${attack.outcome.toUpperCase()} (${attack.total})` : "resolved"}${outcome.appliedDamage > 0 ? `, ${outcome.appliedDamage} damage` : ""}.`
             : reaction.kind === "leaves-reach"
               ? `${actorName} let ${reaction.sourceName} go.`
               : `${actorName} kept the reaction.`
@@ -128,10 +128,10 @@ export function ReactionPrompt({
         const attack = outcome.resolution?.attack;
         const landed = attack && (attack.outcome === "hit" || attack.outcome === "crit");
         onFeedback(
-          `${use ? `${actorName} used ${reaction.actionName}` : `${actorName} declined ${reaction.actionName}`} - ${
+          `${use ? `${actorName} used ${reaction.actionName}` : `${actorName} declined ${reaction.actionName}`}. ${
             landed
-              ? `the attack hits${outcome.appliedDamage > 0 ? ` for ${outcome.appliedDamage} damage` : ""}`
-              : "the attack misses"
+              ? `The attack hits${outcome.appliedDamage > 0 ? ` for ${outcome.appliedDamage} damage` : ""}`
+              : "The attack misses"
           }.`
         );
       } else if (reaction.kind === "damaged-by-creature") {
@@ -140,9 +140,9 @@ export function ReactionPrompt({
           use
             ? `${actorName} used ${reaction.actionName} against ${reaction.sourceName}${
                 save
-                  ? ` - DC ${save.dc} ${save.ability.toUpperCase()} save`
+                  ? `: DC ${save.dc} ${save.ability.toUpperCase()} save`
                   : outcome.appliedDamage > 0
-                    ? ` - ${outcome.appliedDamage} damage`
+                    ? `: ${outcome.appliedDamage} damage`
                     : ""
               }.`
             : `${actorName} kept the reaction.`
@@ -152,9 +152,9 @@ export function ReactionPrompt({
         onFeedback(
           `${
             use
-              ? `${actorName} used ${reaction.actionName} - ${reaction.proposedDamage} damage became ${outcome.appliedDamage}`
+              ? `${actorName} used ${reaction.actionName}, and ${reaction.proposedDamage} damage became ${outcome.appliedDamage}`
               : `${actorName} took ${outcome.appliedDamage} damage`
-          }${defences ? ` - ${defences}` : ""}.`
+          }${defences ? `; ${defences}` : ""}.`
         );
       }
     });

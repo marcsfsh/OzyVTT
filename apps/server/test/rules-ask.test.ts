@@ -120,7 +120,7 @@ async function fightWithExhaustedMovement() {
 }
 
 const STAND_UP = GAME_PATHS.actorConditions.replace("{actorId}", HERO);
-/** Hero tries to stand up with no movement left - the blocked command, carrying the revision it was sent at. */
+/** Hero tries to stand up with no movement left: the blocked command, with the revision it was sent at. */
 const standUpBody = (revision: number) => ({
   commandId: randomUUID(),
   actorId: HERO,
@@ -134,7 +134,7 @@ describe("ask the GM", () => {
     const { base, server, heroSession } = await fightWithExhaustedMovement();
     const body = standUpBody(server.store.snapshot.revision);
 
-    // The block itself: machine-readable, so the client can offer one button rather than parse prose.
+    // The block itself: machine-readable, so the client can offer one button with no prose to parse.
     const blocked = await post(base, STAND_UP, heroSession, body);
     expect(blocked.status).toBe(409);
     expect((await blocked.json()).error.details.blocked.rule).toBe("movement.stand-up-cost");
@@ -175,14 +175,14 @@ describe("ask the GM", () => {
     // Viewer safety: the parked payload can name target ids a player is not allowed to know.
     expect("command" in mine.combat.pendingRuleAsks[0]).toBe(false);
     expect(JSON.stringify(mine.combat.pendingRuleAsks)).not.toContain("conditionId");
-    // Another player's table shows nothing: not the question, not that one was asked.
+    // Another player's table shows nothing: no question, and no sign one was asked.
     expect(theirs.combat.pendingRuleAsks).toEqual([]);
     // The GM's view carries the whole thing, payload included; that is what Allow replays.
     const gmView = await fetch(base + GAME_PATHS.snapshot, { headers: bearer(gmToken) });
     expect(JSON.stringify((await gmView.json()).data.game)).toContain("pendingRuleAsks");
   });
 
-  it("re-runs the parked command on Allow - with the stale expectedRevision stripped, or every Allow would 409", async () => {
+  it("re-runs the parked command on Allow: with the stale expectedRevision stripped, or every Allow would 409", async () => {
     const { base, server, heroSession, gmToken } = await fightWithExhaustedMovement();
     // Ask at revision N...
     const staleRevision = server.store.snapshot.revision;
@@ -239,7 +239,7 @@ describe("ask the GM", () => {
     expect(entries.some((entry) => entry.text.includes("The GM declined Hero's blocked action."))).toBe(true);
   });
 
-  it("just runs the command when the block has already cleared - no question is parked", async () => {
+  it("just runs the command when the block has already cleared: no question is parked", async () => {
     const { base, server, heroSession, gmToken } = await fightWithExhaustedMovement();
     const body = standUpBody(server.store.snapshot.revision);
     // The GM relaxes movement policing before the player taps Ask.
@@ -350,7 +350,7 @@ describe("ask the GM", () => {
       actorId: HERO,
       rule: "movement.stand-up-cost",
       family: "movement" as const,
-      message: "Standing up costs 15 ft of movement - Hero has 0 ft left.",
+      message: "Standing up costs 15 ft of movement, and Hero has 0 ft left.",
       command: {
         type: "actor.set-condition" as const,
         payload: { actorId: HERO, conditionId: "prone", active: false }

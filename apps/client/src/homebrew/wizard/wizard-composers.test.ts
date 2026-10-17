@@ -143,7 +143,7 @@ describe("the monster wizard keeps the SRD's arithmetic", () => {
   it("writes the bestiary line until the GM writes one", () => {
     const draft = answer("monster", answer("monster", monster(), "type", "fey"), "alignment", "chaotic neutral");
     expect(draft.summary).toBe(summaryLineOf(draft));
-    expect(draft.summary).toBe("Medium fey, chaotic neutral - CR 1");
+    expect(draft.summary).toBe("Medium fey, chaotic neutral · CR 1");
     const written = withChallenge({ ...draft, summary: "A hound of the ash wastes." }, 3);
     expect(written.summary).toBe("A hound of the ash wastes.");
   });

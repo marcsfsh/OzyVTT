@@ -4,7 +4,7 @@
  *   (b) no raw search or number input where a primitive exists
  *   (c) one eyebrow, the `Eyebrow` primitive
  *   (d) colours come from design-tokens.css
- *   (e) feedback is a toast, not a component's own inline message
+ *   (e) feedback is a toast, and a component shows no inline message of its own
  *   (f) one breakpoint ladder
  *   (g) no viewport-fraction caps on in-flow content
  *   (h) scroll regions are declared with `.scroll-y`
@@ -84,7 +84,7 @@ describe("the scans read the tree", () => {
 /**
  * `\p{Extended_Pictographic}` alone misses most real offenders (⏻ ⇲ ✕ ▾ ✓ ← are not pictographic), so
  * the arrow, technical, geometric, dingbat and arrows-B blocks are added. Typography and maths
- * (− × · … – — and curly quotes) fall outside them and stay legal.
+ * (the minus sign, the times sign, the middle dot, the ellipsis, the dashes and curly quotes) fall outside them and stay legal.
  */
 const GLYPH = /[←-⇿⌀-⏿■-◿☀-➿⬀-⯿]|\p{Extended_Pictographic}/gu;
 
@@ -168,7 +168,7 @@ describe("(c) one eyebrow, the Eyebrow primitive", () => {
     const hits: Hit[] = [];
     for (const source of allTsx()) {
       const src = stripComments(source.read());
-      // A class token, not `\beyebrow\b`, which would match `viewer-eyebrow`.
+      // A class token: `\beyebrow\b` would match `viewer-eyebrow`.
       for (const { value, index } of classNameValues(src))
         if (value.split(/[^A-Za-z0-9_-]+/).includes("eyebrow"))
           hits.push({ key: source.path, at: cite(source.path, src, index, value.trim().slice(0, 60)) });

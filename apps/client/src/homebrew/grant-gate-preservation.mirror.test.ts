@@ -282,7 +282,7 @@ describe("FAR END: the Berserker a GM duplicated, edited and published is still 
     // The immunity is real: the same sheet refuses the condition once raging.
     const raging = tableWith(definition, catalog);
     rage(raging);
-    expect(frighten(raging, definition, catalog)[0]!.text).toBe("Ozar is immune to Frightened - not applied.");
+    expect(frighten(raging, definition, catalog)[0]!.text).toBe("Ozar is immune to Frightened, so it isn't applied.");
     expect(raging.actors[0].conditions).toEqual([]);
     // The condition added in the edit is gated by the same `when`.
     expect(
@@ -295,7 +295,7 @@ describe("FAR END: the Berserker a GM duplicated, edited and published is still 
         { role: "gm" },
         { resolveDefinition: () => definition, catalog }
       )[0]!.text
-    ).toBe("Ozar is immune to Paralyzed - not applied.");
+    ).toBe("Ozar is immune to Paralyzed, so it isn't applied.");
   });
 
   it("CONTROL: the same road with the gate dropped makes that Barbarian permanently immune", async () => {
@@ -315,7 +315,7 @@ describe("FAR END: the Berserker a GM duplicated, edited and published is still 
     expect(definition.conditionImmunities ?? []).toContain("frightened");
     const catalog = equipmentCatalogOf(view);
     const calm = tableWith(definition, catalog);
-    expect(frighten(calm, definition, catalog)[0]!.text).toBe("Ozar is immune to Frightened - not applied.");
+    expect(frighten(calm, definition, catalog)[0]!.text).toBe("Ozar is immune to Frightened, so it isn't applied.");
     expect(
       calm.actors[0].conditions,
       "a level-6 Barbarian who is not raging, and cannot be Frightened ever again"

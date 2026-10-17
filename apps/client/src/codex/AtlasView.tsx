@@ -32,7 +32,7 @@ type AtlasActor = Readonly<{ id: string; name: string }>;
  */
 export type AtlasTarget = Readonly<{ mapId: string | null; markerId: string | null }>;
 
-/** "Players can't see this map yet" on a drill chip: the design system's GM-only glyph, not an emoji. */
+/** "Players can't see this map yet" on a drill chip: the design system's GM-only glyph, drawn as SVG. */
 function GmOnlyMark() {
   return (
     <span className="codex-descend-lock" role="img" aria-label="GM only" title="GM only. Players cannot see this map.">
@@ -115,7 +115,7 @@ export function AtlasView({
    * `onNavigate`, which runs the unsaved-changes guard for the inspector's draft.
    */
   const selectedMarkerId = pinId;
-  /** This atlas address with a pin selected (or none), keeping the `?q=`/`?tag=` filters. */
+  /** This atlas address with a pin selected (or none). The `?q=`/`?tag=` filters stay. */
   const pinHref = useCallback(
     (markerId: string | null) =>
       withQuery(currentMapId ? `${CODEX_ROOT}/atlas/${currentMapId}` : `${CODEX_ROOT}/atlas`, {
@@ -418,7 +418,7 @@ export function AtlasView({
 
       <AtlasChildren maps={childMaps} onEnter={enterMap} mark={(map) => !map.revealedToPlayers && <GmOnlyMark />} />
 
-      {/* The party's position in words, not only as a ring on the map. */}
+      {/* The party's position in words, beside the ring on the map. */}
       {partyMarker && (
         <div className="codex-atlas-party">
           <span className="codex-atlas-partytext">

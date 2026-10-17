@@ -66,7 +66,7 @@ describe("an item's actions outside the fight", () => {
   it("are used through the server, which spends the charge, and say how many are left", () => {
     const onLooseUse = vi.fn();
     mount(onLooseUse);
-    expect(screen.getByText(/2 of 3 charges left per long rest/)).toBeTruthy();
+    expect(screen.getByText(/2 of 3 charges left per Long Rest/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Use" }));
     expect(onLooseUse).toHaveBeenCalledWith("item-gem-of-seeing-peer");
     // The bands' only charge is spent, so their throw waits for a rest.

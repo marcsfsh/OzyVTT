@@ -68,7 +68,7 @@ function narrateVerdict(kit: Kit, actorId: string, result: CheckResult, visibili
   if (outcome.dc === null) return;
   kit.context.appendLog({
     kind: "action",
-    text: `${kit.actorName(actorId)} rolled ${outcome.total} on ${outcome.label} vs DC ${outcome.dc} - ${outcome.success ? "success" : "failure"}.`,
+    text: `${kit.actorName(actorId)} rolled ${outcome.total} on ${outcome.label} vs DC ${outcome.dc} · ${outcome.success ? "success" : "failure"}.`,
     actorId,
     actorIds: [actorId],
     gmOnly: visibility !== "public" || kit.actorHidden(actorId)

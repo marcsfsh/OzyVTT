@@ -14,7 +14,7 @@ export function ActionRow({
 }: Readonly<{
   action: ContentActionSummary;
   parts: readonly string[];
-  /** Shown instead of the bullets when the action has no mechanics to list. */
+  /** Shown in place of the bullets when the action has no mechanics to list. */
   note: string;
   hint?: string | null;
   disabled: boolean;

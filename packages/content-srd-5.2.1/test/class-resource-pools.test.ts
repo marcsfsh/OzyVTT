@@ -18,7 +18,7 @@ import {
 const classes = loadClasses();
 const subclasses = loadSubclasses();
 
-/** A feature and every inline option under it - both carry the identical `uses` vocabulary. */
+/** A feature and every inline option under it: both carry the identical `uses` vocabulary. */
 function riderNodes(
   feature: FeatureRecord
 ): Array<{ id: string; uses?: FeatureRecord["uses"]; actions: FeatureRecord["actions"] }> {

@@ -168,7 +168,7 @@ export function TuneGridStep({
           {wizard.calibration.cellSizePx.toFixed(0)} px squares · {wizard.calibration.distancePerCell} ft each
         </p>
       )}
-      {/* Shown, not behind a `<details>`: the nudges are what this step is for, and the coordinate fields
+      {/* Shown in full, outside a `<details>`: the nudges are what this step is for, and the coordinate fields
         under them are the keyboard alternative. Every one is a server action. */}
       <div className="adjustment-groups">
         <fieldset>
@@ -346,7 +346,7 @@ export function VerifyStep({
 }
 
 /**
- * Step 3 on the scale path: a review, not a verification. The scale path has no server-side check, so
+ * Step 3 on the scale path: a review with no verification. The scale path has no server-side check, so
  * this reads back what will be saved, and no "verified" badge. When the server would refuse the span or
  * the distance, the sentence says which and the Scale row stays empty.
  */

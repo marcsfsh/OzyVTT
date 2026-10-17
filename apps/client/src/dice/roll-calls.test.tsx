@@ -180,10 +180,10 @@ describe("the player's card for a call", () => {
     expect(screen.getByText("DC 15")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Roll Wisdom (Perception) check" }));
     expect(sent("roll-call:answer")).toEqual([{ callId: CALL, actorId: ARIA }]);
-    expect(await screen.findByText("Wisdom (Perception): 17 (d20 12) vs DC 15 - success.")).toBeTruthy();
+    expect(await screen.findByText("Wisdom (Perception): 17 (d20 12) vs DC 15 · success.")).toBeTruthy();
     // The server's view drops the answered call; the card keeps its result until it is put away.
     rerender(<RollCallPrompts state={playerState([])} />);
-    expect(screen.getByText("Wisdom (Perception): 17 (d20 12) vs DC 15 - success.")).toBeTruthy();
+    expect(screen.getByText("Wisdom (Perception): 17 (d20 12) vs DC 15 · success.")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Done" }));
     expect(screen.queryByText("The GM calls for a roll")).toBeNull();
   });
@@ -215,7 +215,7 @@ describe("the player's card for a call", () => {
       wrapper: ToastProvider
     });
     await user.click(await screen.findByRole("button", { name: "Roll Wisdom (Perception) check" }));
-    expect(await screen.findByText("Wisdom (Perception): 9 (d20 4) vs DC 15 - failure.")).toBeTruthy();
+    expect(await screen.findByText("Wisdom (Perception): 9 (d20 4) vs DC 15 · failure.")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Reroll · Heroic Inspiration" }));
     expect(sent("check:reroll")).toEqual([{ actorId: ARIA }]);
     rerender(<RollCallPrompts state={playerState([], { heroicInspiration: true })} />);
@@ -244,7 +244,7 @@ describe("the player's card for a call", () => {
     });
     await user.type(await screen.findByLabelText("Your d20 for the Wisdom (Perception) check"), "9");
     await user.click(screen.getByRole("button", { name: "Use" }));
-    expect(await screen.findByText("Wisdom (Perception): 14 (d20 9, typed) vs DC 15 - failure.")).toBeTruthy();
+    expect(await screen.findByText("Wisdom (Perception): 14 (d20 9, typed) vs DC 15 · failure.")).toBeTruthy();
     // The prompt slot drops the card while the server's view no longer holds the call, then mounts the kept one anew.
     unmount();
     render(<RollCallPrompts state={playerState([], { heroicInspiration: true })} />, { wrapper: ToastProvider });

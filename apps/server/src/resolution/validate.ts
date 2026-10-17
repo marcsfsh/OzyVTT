@@ -95,7 +95,7 @@ function combatantsOf(
     !startsALastingSpell &&
     input.builtin !== true
   )
-    throw new CommandRejectedError("That action has no structured effect to resolve - run it from its description.");
+    throw new CommandRejectedError("That action has no structured effect to resolve. Run it from its description.");
   return { attacker, targets };
 }
 
@@ -190,13 +190,13 @@ export function openResolve(
   if (targets.length > 1)
     for (const target of targets)
       if ((input.cover ?? null) === null && coverFor(null, target) === "total")
-        warnings.push(`${target.name} has Total Cover - leave it out if the effect can't reach it.`);
+        warnings.push(`${target.name} has Total Cover. Leave it out if the effect can't reach it.`);
   if (attackCover === "total" && coverMode !== "freeform") {
     const waived = overrideWaives(input.override, "cover.total");
     if (coverMode === "strict" && !waived && !overrideCovers(state.combat.turn, "cover.total"))
       throw new RulesBlockedError("cover.total", "The target has Total Cover and can't be targeted directly.");
     if (waived && overridden === null) overridden = { rule: "cover.total", reason: overrideReason(input.override) };
-    else warnings.push("The target has Total Cover - allowed per the rules mode.");
+    else warnings.push("The target has Total Cover. The rules mode allows it.");
   }
 
   // SRD Hide: "you must be out of any enemy's line of sight". With dynamic vision on the engine knows who sees whom;
@@ -295,11 +295,11 @@ function laterActionReminders(
     // SRD Rituals: 10 minutes longer than the spell's casting time, and no slot.
     ...(action.id === ritualSpellActionId(spell.id)
       ? [
-          `${spell.name} as a Ritual takes 10 minutes longer than its ${spell.castingTime}: the Magic action on each of the caster's turns, keeping Concentration, and no slot.`
+          `${spell.name} as a Ritual takes 10 minutes longer than its ${spell.castingTime}. The caster takes the Magic action on each turn and keeps Concentration, and no slot is spent.`
         ]
       : isLongCastingTime(spell.castingTime)
         ? [
-            `${spell.name} takes ${spell.castingTime} to cast: the Magic action on each of the caster's turns until then, keeping Concentration. If that breaks, the spell fails and ${fromScroll ? "the scroll isn't lost - give it back on the sheet" : "its slot isn't spent - restore it on the sheet"}.`
+            `${spell.name} takes ${spell.castingTime} to cast. Until then, the caster takes the Magic action on each turn and keeps Concentration. If that breaks, the spell fails and ${fromScroll ? "the scroll isn't lost, so give it back on the sheet" : "its slot isn't spent, so restore it on the sheet"}.`
           ]
         : []),
     ...later

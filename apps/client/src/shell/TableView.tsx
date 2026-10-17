@@ -71,7 +71,7 @@ export function TableView(props: TableViewProps) {
   const staged = gm?.stagedScene ?? null;
   const stagedMap = staged ? gm?.mapLibrary.find((map) => map.id === staged.mapAssetId) : undefined;
   const stagedNeedsGrid = stagedMap !== undefined && !stagedMap.calibration && !stagedMap.scale;
-  // A player who has claimed nobody while no map is live sees the picker across the whole table, not under an empty
+  // A player who has claimed nobody while no map is live sees the picker across the whole table, never under an empty
   // map box.
   const claimingOnly = props.role === "player" && !playerHasClaimed && !state.combat.mapAssetId;
   // The phone's split between the map pane and the panel. Choosing a target lowers the divider so the map takes

@@ -163,7 +163,7 @@ export function isMagicalAction(ctx: MagicalSource): boolean {
   return item !== undefined && ctx.deps.catalog?.equipmentRecord(catalogIdOf(item))?.isMagic === true;
 }
 
-/** Conditions a failed save leaves on their own rather than on its effect: Prone ends by standing up, and
+/** Conditions a failed save leaves on their own, outside its effect: Prone ends by standing up, and
  *  Exhaustion stacks and leaves with rests. */
 const BARE_FAILURE_CONDITIONS: ReadonlySet<string> = new Set(["prone", "exhaustion"]);
 
@@ -255,7 +255,7 @@ function successEffectFor(ctx: MagicalSource & Pick<ResolveContext, "castId">): 
   };
 }
 
-/** SRD Power Word Stun: a target over its hit-point gate isn't Stunned - "Otherwise, its Speed is 0 until the start
+/** SRD Power Word Stun: a target over its hit-point gate isn't Stunned. Instead, "Otherwise, its Speed is 0 until the start
  *  of your next turn". */
 const SPEED_ZERO_OVER_THE_GATE: ReadonlySet<string> = new Set(["power-word-stun"]);
 
@@ -303,7 +303,7 @@ export function parkActionSave(ctx: ResolveContext): void {
           });
         }
         ctx.warnings.push(
-          `${target.name} has more than ${threshold} hit points - ${action.name} doesn't affect it that way.`
+          `${target.name} has more than ${threshold} hit points, so ${action.name} doesn't affect it that way.`
         );
         continue;
       }
@@ -394,7 +394,7 @@ export function parkBurstSave(ctx: ResolveContext): void {
     : [];
   if (!deps.distanceFeet)
     warnings.push(
-      `${action.name}: each creature within ${burst.radiusFeet} feet of ${target.name} also makes the save - add them by hand.`
+      `${action.name}: each creature within ${burst.radiusFeet} feet of ${target.name} also makes the save. Add them by hand.`
     );
   createPendingSaves(state, {
     sourceActorId: attacker.id,

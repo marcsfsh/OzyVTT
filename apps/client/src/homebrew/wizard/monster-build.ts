@@ -135,7 +135,7 @@ export function withProficiencies(
   });
 }
 
-/** Re-prints saves, skills, Passive Perception and Initiative after `change`, keeping what was proficient. */
+/** Re-prints saves, skills, Passive Perception and Initiative after `change`. What was proficient stays proficient. */
 function keepingProficiencies(before: Draft, after: Draft): Draft {
   const dexBefore = modifierOf(scoresOf(before).dex);
   const initiative = typeof before.initiativeBonus === "number" ? before.initiativeBonus : dexBefore;
@@ -174,7 +174,7 @@ function rebuiltHitPoints(before: Draft, after: Draft): Draft {
 
 /* ------------------------------------------------- the answers that move others ---- */
 
-/** The bestiary line the SRD gives each stat block: "Small fey, chaotic neutral - CR 1". */
+/** The bestiary line the SRD gives each stat block: "Small fey, chaotic neutral · CR 1". */
 export function summaryLineOf(draft: Draft): string {
   const bag = statblockOf(draft);
   const size = sizeOf(draft);
@@ -184,7 +184,7 @@ export function summaryLineOf(draft: Draft): string {
   const cr =
     rating === null
       ? ""
-      : ` - CR ${rating === 0.125 ? "1/8" : rating === 0.25 ? "1/4" : rating === 0.5 ? "1/2" : rating}`;
+      : ` · CR ${rating === 0.125 ? "1/8" : rating === 0.25 ? "1/4" : rating === 0.5 ? "1/2" : rating}`;
   return `${size.charAt(0).toUpperCase()}${size.slice(1)} ${type}${alignment}${cr}`;
 }
 
@@ -289,7 +289,7 @@ export function sensesOf(draft: Draft): Partial<Record<Sense, number>> {
   return out;
 }
 
-/** The bag's `senses` lines ("darkvision 60 ft."), in the SRD's order, keeping any line this doesn't read. */
+/** The bag's `senses` lines ("darkvision 60 ft."), in the SRD's order. A line this doesn't read is kept. */
 export function withSense(draft: Draft, sense: Sense, feet: number | null): Draft {
   const lines = Array.isArray(statblockOf(draft).senses) ? (statblockOf(draft).senses as string[]) : [];
   const others = lines.filter((line) => !SENSE_LINE.test(line));

@@ -274,7 +274,7 @@ export function updatePage(
   return getPage(db, pageId)!;
 }
 
-/** Writes a past revision forward as a new save, checkpointing the state it discards so the restore can be undone. */
+/** Writes a past revision forward as a new save, and checkpoints the state it discards so the restore can be undone. */
 export function restoreRevision(db: CodexDb, pageId: string, revisionId: number, authorTag: string): CodexPage {
   const content = revisionContent(db, pageId, revisionId);
   if (!content) throw new CodexNotFoundError("That revision no longer exists.");
@@ -334,7 +334,7 @@ export function listFullPages(db: CodexDb): CodexPage[] {
   ).map(toPage);
 }
 
-/** Dated `event` pages. Filtering on type rather than clearing dates keeps a type switch lossless. */
+/** Dated `event` pages. Filtering on type, and keeping the dates, makes a type switch lossless. */
 export function listDatedEventPages(db: CodexDb): CodexPage[] {
   return (
     db.database

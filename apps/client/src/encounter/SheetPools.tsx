@@ -6,8 +6,8 @@ import { command } from "../lib/command";
 type Pool = Readonly<{ id: string; name: string; limit: number; per: string }>;
 
 const PER_LABELS: Readonly<Record<string, string>> = {
-  "long-rest": "long rest",
-  "short-rest": "short rest",
+  "long-rest": "Long Rest",
+  "short-rest": "Short Rest",
   encounter: "fight",
   recharge: "recharge"
 };
@@ -41,7 +41,7 @@ export function poolsOf(actions: readonly ContentActionSummary[]): Pool[] {
 }
 
 /**
- * Limited uses on this character: what is left of each pool, spending several at once (its player or the GM: Lay on
+ * Limited uses on this character: what is left of each pool, and spending several at once (its player or the GM: Lay on
  * Hands' points outside a fight, Focus Points for something the engine doesn't run), and the GM giving uses back.
  * The server checks every amount.
  */

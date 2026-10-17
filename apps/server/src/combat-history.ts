@@ -47,7 +47,7 @@ function restorableSlice(state: GameState): string {
       effects: actor.effects,
       deathSaves: actor.deathSaves,
       actionUses: actor.actionUses,
-      // A rewound Fireball gives its slot back; a rewound short rest its Hit Dice.
+      // A rewound Fireball gives its slot back; a rewound Short Rest its Hit Dice.
       spellSlots: actor.spellSlots,
       pactSlots: actor.pactSlots,
       hitDice: actor.hitDice
@@ -59,10 +59,10 @@ export function timelineDirtied(before: GameState, after: GameState): boolean {
   return restorableSlice(before) !== restorableSlice(after);
 }
 
-/** "Round 3 - Borin" (the current actor at capture; labels are GM-only downstream). */
+/** "Round 3 · Borin" (the current actor at capture; labels are GM-only downstream). */
 export function turnLabel(state: GameState): string {
   const name = state.actors.find((actor) => actor.id === state.combat.turnActorId)?.name ?? "Unknown";
-  return `Round ${state.combat.round} - ${name}`;
+  return `Round ${state.combat.round} · ${name}`;
 }
 
 /** Merge-restores a snapshot: rolls back combat and actor hp/conditions; keeps roll history, claims, roster
@@ -70,7 +70,7 @@ export function turnLabel(state: GameState): string {
 export function applyTimelineRestore(state: GameState, snapshot: GameState, cursor: number | null) {
   const currentActorIds = new Set(state.actors.map((actor) => actor.id));
   const snapshotActors = new Map(snapshot.actors.map((actor) => [actor.id, actor]));
-  // Defense in depth: roster removal is refused while rewound, but filter anyway rather than corrupt state.
+  // Defense in depth: roster removal is refused while rewound, but filter anyway so state can't be corrupted.
   const initiative = snapshot.combat.initiative.filter((entry) => currentActorIds.has(entry.actorId));
   if (initiative.length === 0) throw new CommandRejectedError("That turn references combatants that no longer exist.");
   const turnActorId =
@@ -110,12 +110,12 @@ export function applyTimelineRestore(state: GameState, snapshot: GameState, curs
 }
 
 /** A scene swap or replay launch invalidates the snapshots, which belonged to the fight that parked. The
- *  resumed fight gets a fresh baseline, so Previous restores it rather than only moving the turn pointer,
+ *  resumed fight gets a fresh baseline, so Previous restores it and does more than move the turn pointer,
  *  which made the next Next tick durations and roll Recharge a second time. */
 export function restartTimeline(state: GameState, timeline: TimelineOps) {
   timeline.truncateAll();
   if (state.combat.active && state.combat.turnActorId !== null)
-    timeline.capture("turn", `Resumed - ${turnLabel(state)}`, state);
+    timeline.capture("turn", `Resumed · ${turnLabel(state)}`, state);
 }
 
 /** Previous: from live, park the present as a return-point and restore the last boundary; while rewound,
@@ -131,7 +131,7 @@ export function planPreviousTurn(state: GameState, timeline: TimelineOps, confir
   if (cursor === null) {
     const last = entries[entries.length - 1];
     const snapshot = timeline.read(last.index);
-    if (!snapshot) throw new CommandRejectedError("The timeline is out of sync - try again.");
+    if (!snapshot) throw new CommandRejectedError("The timeline is out of sync. Try again.");
     timeline.capture("return", turnLabel(state), state);
     applyTimelineRestore(state, snapshot, last.index);
     return { kind: "rewound", label: last.label };
@@ -140,7 +140,7 @@ export function planPreviousTurn(state: GameState, timeline: TimelineOps, confir
     if (!confirmDiscard)
       throw new TimelineConfirmationRequired("discard-changes", "Discard the changes made at this point in history?");
     const snapshot = timeline.read(cursor);
-    if (!snapshot) throw new CommandRejectedError("The timeline is out of sync - try again.");
+    if (!snapshot) throw new CommandRejectedError("The timeline is out of sync. Try again.");
     const entry = entries.find((candidate) => candidate.index === cursor);
     applyTimelineRestore(state, snapshot, cursor);
     return { kind: "discarded", label: entry?.label ?? turnLabel(state) };
@@ -148,7 +148,7 @@ export function planPreviousTurn(state: GameState, timeline: TimelineOps, confir
   const prior = entries.filter((candidate) => candidate.index < cursor).at(-1);
   if (!prior) throw new CommandRejectedError("You're at the beginning of the recorded fight.");
   const snapshot = timeline.read(prior.index);
-  if (!snapshot) throw new CommandRejectedError("The timeline is out of sync - try again.");
+  if (!snapshot) throw new CommandRejectedError("The timeline is out of sync. Try again.");
   applyTimelineRestore(state, snapshot, prior.index);
   return { kind: "stepped", label: prior.label };
 }
@@ -186,9 +186,9 @@ export function planNextTurn(
     return { kind: "rewrote", label: rewriteLabel };
   }
   const ahead = entries.find((candidate) => candidate.index > cursor);
-  if (!ahead) throw new CommandRejectedError("The timeline is out of sync - try again.");
+  if (!ahead) throw new CommandRejectedError("The timeline is out of sync. Try again.");
   const snapshot = timeline.read(ahead.index);
-  if (!snapshot) throw new CommandRejectedError("The timeline is out of sync - try again.");
+  if (!snapshot) throw new CommandRejectedError("The timeline is out of sync. Try again.");
   if (ahead.kind === "return") {
     applyTimelineRestore(state, snapshot, null);
     timeline.remove(ahead.index);

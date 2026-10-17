@@ -47,7 +47,7 @@ export type ResolveInput = Readonly<{
   cover?: "half" | "three-quarters" | "total" | null;
   /** false previews the attack roll only (no damage, riders, prompts or economy); the confirm uses the held die. */
   commit?: boolean;
-  /** A natural d20 used instead of rolling: a typed physical die, or a parked attack's replay. */
+  /** A natural d20 to use with no roll: a typed physical die, or a parked attack's replay. */
   attackNatural?: number;
   /** `attackNatural` was typed from a physical die, so its record says so. */
   typedFace?: boolean;
@@ -80,14 +80,14 @@ export type ResolveInput = Readonly<{
   economyPaid?: boolean;
   /** A reaction's AC bonus against this attack only (Parry), added to the target's AC. */
   reactionAcBonus?: Readonly<{ amount: number; source: string }>;
-  /** A parked attack's effect dice as they rolled (Bless's d4), reused by the replay instead of rolling again. */
+  /** A parked attack's effect dice as they rolled (Bless's d4), which the replay reuses with no new roll. */
   attackBonusDice?: ReadonlyArray<Readonly<{ label: string; dice: string; total: number }>>;
   /** Extras to add to the hit, chosen from the preview's offers (Sneak Attack, a smite and its slot, a charge). */
   hitOptions?: readonly HitOptionChoice[];
   /** The cast's area was placed on the map as a template, whose annotation takes this command's id; a spell that
    *  leaves its area behind (Moonbeam) keeps acting there. */
   areaPlaced?: boolean;
-  /** Ready the spell rather than cast it now: its slot is spent and it is held with Concentration (SRD Ready). */
+  /** Ready the spell for later: its slot is spent and it is held with Concentration (SRD Ready). */
   ready?: boolean;
 }>;
 
@@ -130,7 +130,7 @@ type RollBase = Pick<
 export type EndedEffect = { actorId: string; actorName: string; name: string; source?: EffectSource };
 export type EffectSource = Readonly<{ actorId: string | null; name: string | null }>;
 
-/** An ended-effect line for `bearer`, carrying the effect's source. */
+/** An ended-effect line for `bearer`, with the effect's source. */
 export const endedEffect = (
   bearer: Readonly<{ id: string; name: string }>,
   effect: Readonly<{ name: string; sourceActorId: string | null; sourceName: string | null }>

@@ -217,7 +217,7 @@ describe("Moonbeam: entering the Cylinder or ending a turn there, once per turn"
     expect(savesOf(state, FOE)).toEqual([expect.objectContaining({ proposedDamage: 10 })]);
   });
 
-  it("rolls at the level it was cast at: 3d10 from a 3rd-level slot", () => {
+  it("rolls at the level it was cast at: 3d10 from a level 3 spell slot", () => {
     const { state } = moonbeam(3);
     walk(
       state,
@@ -504,7 +504,7 @@ describe("Guardian of Faith: enemies only, and gone after 60 damage", () => {
     ]);
     expect(savesOf(caster.state, FOE2)[0]).toMatchObject({ ability: "dex", proposedDamage: 20 });
     const { events } = answer(caster.state, FOE2, 1);
-    expect(events.map((event) => event.text)).toContain("Guardian of Faith ends, having dealt 60 damage.");
+    expect(events.map((event) => event.text)).toContain("Guardian of Faith ends after dealing 60 damage.");
     expect(caster.state.combat.spellZones).toEqual([]);
   });
 });

@@ -33,7 +33,7 @@ function mountedRoutes(stack: readonly Layer[]): Array<Readonly<{ method: string
 /** Routes anyone may call: they take no session, or check something other than a credential. */
 const PUBLIC = new Set([
   "GET /api/v1/host/setup",
-  // Setting the first password is gated on the host machine's own address, not on a credential.
+  // Setting the first password is gated on the host machine's own address alone.
   "POST /api/v1/host/setup",
   "POST /api/v1/host/gm/sign-in",
   "GET /api/v1/system/health",

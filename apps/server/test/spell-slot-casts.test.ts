@@ -18,7 +18,7 @@ const catalog = equipmentCatalogOf(view);
 const HERO = "7a4b1a58-0f6c-4a52-9a51-2f60cf6f9d10";
 const FOE = "7a4b1a58-0f6c-4a52-9a51-2f60cf6f9d12";
 
-/** A level-3 Human Sage Druid with Wisdom 17 (+3): Cure Wounds and Entangle prepared, two 2nd-level slots. */
+/** A level-3 Human Sage Druid with Wisdom 17 (+3): Cure Wounds and Entangle prepared, two level 2 spell slots. */
 const druid = (): CharacterCreateRequestInput =>
   ({
     name: "Maelin",
@@ -121,7 +121,7 @@ describe("a leveled spell cast with a slot", () => {
     });
   });
 
-  it("heals with a 2nd-level slot's dice, and spends that slot", () => {
+  it("heals with a level 2 spell slot's dice, and spends that slot", () => {
     const state = fight();
     const hero = state.actors[0];
     hero.hp = { ...hero.hp, current: 1 };
@@ -133,7 +133,7 @@ describe("a leveled spell cast with a slot", () => {
       { actorId: HERO, targetIds: [HERO], commandId: "50000000-0000-4000-8000-000000000001", slotLevel: 2 },
       deps()
     );
-    // 4d8 at 2nd level, every die a 3, plus Wisdom.
+    // 4d8 at level 2, every die a 3, plus Wisdom.
     expect(resolution.healing!.total).toBe(15);
     expect(hero.hp.current).toBe(16);
     expect(hero.spellSlots!.find((slot) => slot.level === 2)!.remaining).toBe(before - 1);

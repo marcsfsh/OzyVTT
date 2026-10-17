@@ -38,7 +38,7 @@
   --nh-glow: var(--glow-drop-magenta);
 }
 
-/* Each card's Go live is a magenta edge rather than a magenta fill at rest, so nine of them do not
+/* Each card's Go live is a magenta edge and no magenta fill at rest, so nine of them do not
    drown out the door above; hover keeps the primitive's fill and glow. */
 .nh-card-actions .nh-btn--primary:not(:hover):not(:active):not(:focus-visible) {
   --nh-fill: transparent;
@@ -90,7 +90,7 @@
     calc(var(--sky-horizon-inset) + var(--sky-sun-crown) + env(safe-area-inset-bottom));
 }
 
-/* Phone: two columns with the 16/10 thumb instead of 358px squares, and stacked actions so each
+/* Phone: two columns with the 16/10 thumb where the laptop has 358px squares, and stacked actions so each
    keeps a full-width 44px target. The reorder grip has no edge-autoscroll, so off-screen cards are
    reordered via the ⋯ menu's Move earlier / later. */
 @media (max-width: 560px) {

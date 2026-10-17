@@ -21,8 +21,8 @@
   gap: 0.6rem;
   margin-left: auto;
 }
-/* The identity card. `min-width: 0` on the facts column so a long name ellipsizes instead of pushing
-   the doors off. */
+/* The identity card. `min-width: 0` on the facts column so a long name ellipsizes and the doors stay
+   in place. */
 .my-character-card {
   display: flex;
   align-items: center;

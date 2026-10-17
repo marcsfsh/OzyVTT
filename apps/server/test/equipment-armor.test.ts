@@ -42,7 +42,7 @@ import {
 
 describe("a built character's Armor Class follows what is worn now", () => {
   it("drops to 10 + Dex when the chain mail comes off, and Defense goes with it", () => {
-    // Fighter A: Chain Mail 16, Dex 13 (+1, not added to heavy armor), Defense +1.
+    // Fighter A: Chain Mail 16, Dex 13 (+1, which heavy armor ignores), Defense +1.
     const table = tableOf({ [IDS.fighter]: fighterInput("fighter-a") });
     expect(table.actor(IDS.fighter).armorClass).toBe(17);
     write(table, IDS.fighter, edit(table, IDS.fighter, "chain-mail", { equipped: false }));

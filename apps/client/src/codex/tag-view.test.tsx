@@ -154,7 +154,7 @@ describe("Everything that carries the tag, across types", () => {
   });
 });
 
-describe("Pins — the one kind that is not client-enumerable", () => {
+describe("Pins: the one kind that is not client-enumerable", () => {
   it("waits for the search rather than claiming there are no pins", () => {
     let resolve: (value: unknown) => void = () => {};
     gmSearch.mockReturnValue(
@@ -199,7 +199,7 @@ describe("Role-blindness", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows no reveal badge at all on player rows — because the field is absent, not because a flag says so", async () => {
+  it("shows no reveal badge at all on player rows, because the field is absent (no flag says so)", async () => {
     playerSearch.mockResolvedValue({ hits: [PIN_HIT], truncated: false });
     // Player projections have no `revealedToPlayers`; they type-check unchanged.
     render(

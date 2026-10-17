@@ -94,7 +94,7 @@ export function SceneGallery({
       !combatActive ||
       (await confirm({
         title: "Make scene live?",
-        body: `Make “${scene.name}” live? Players and the shared screen switch now; the current fight is parked and resumes when you switch back.`,
+        body: `Make "${scene.name}" live? Players and the shared screen switch now. The current fight is parked and resumes when you switch back.`,
         confirmLabel: "Make live"
       }))
     ) {
@@ -118,7 +118,7 @@ export function SceneGallery({
     if (
       await confirm({
         title: "Delete scene?",
-        body: `Delete “${scene.name}”? Its staged tokens and fog go with it. This cannot be undone.`,
+        body: `Delete "${scene.name}"? Its staged tokens and fog go with it. This cannot be undone.`,
         confirmLabel: "Delete",
         danger: true
       })
@@ -141,7 +141,7 @@ export function SceneGallery({
   const drag = useRef<{ id: string; order: string[]; start: string; commit: (order: string[]) => void } | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOrder, setDragOrder] = useState<readonly string[] | null>(null);
-  // Pointer move/up listen on the window while dragging, not on the grip: the grip moves in the DOM as
+  // Pointer move/up listen on the window while dragging, and the grip doesn't: the grip moves in the DOM as
   // the list reorders, which would strand pointer capture. A ref carries the live order and a commit
   // closure so the listeners always read fresh state without re-subscribing.
   const beginDrag = (sceneId: string, event: React.PointerEvent) => {

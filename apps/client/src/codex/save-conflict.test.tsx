@@ -96,7 +96,7 @@ describe("PageEditor save/conflict path", () => {
     await waitFor(() => expect(screen.queryByText(/saving/i)).not.toBeInTheDocument(), { timeout: 4000 });
   });
 
-  it("sends the page's current rev as expectedRev — the optimistic-concurrency check", async () => {
+  it("sends the page's current rev as expectedRev: the optimistic-concurrency check", async () => {
     const user = userEvent.setup();
     renderEditor();
     await user.type(screen.getByLabelText(/title/i), "!");

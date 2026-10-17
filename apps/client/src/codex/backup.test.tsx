@@ -25,7 +25,7 @@ import { ApiError } from "../lib/api";
 
 /**
  * The restore confirm, tested as a safety device: every section is listed with a count (a missing one is
- * 0), plurals are real words, and the server's refusal is quoted rather than paraphrased.
+ * 0), plurals are real words, and the server's refusal is quoted word for word.
  */
 
 /** A File whose `.text()` resolves; jsdom lacks the reader. */

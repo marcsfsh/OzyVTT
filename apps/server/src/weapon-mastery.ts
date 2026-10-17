@@ -63,7 +63,7 @@ type MasteryHandler = Readonly<{
   onHitPush?: (swing: MasterySwing) => readonly MasteryPush[];
   /** A melee swing landed. True when it opens this weapon's swing at a second creature (Cleave). */
   opensCleave?: (swing: MasterySwing) => boolean;
-  /** The Light extra attack made with this weapon is part of the Attack action, costing no Bonus Action (Nick). */
+  /** The Light extra attack made with this weapon is part of the Attack action and costs no Bonus Action (Nick). */
   freesLightExtraAttack?: () => boolean;
 }>;
 
@@ -92,7 +92,7 @@ const MASTERY_HANDLERS: Readonly<Record<string, MasteryHandler | undefined>> = {
         : []
   },
 
-  /** Nick (SRD): the Light property's extra attack, made with this weapon, is part of the Attack action instead of a
+  /** Nick (SRD): the Light property's extra attack, made with this weapon, is part of the Attack action and takes no
    *  Bonus Action, still once per turn. Read when the weapon's Light extra attack is minted. */
   nick: { freesLightExtraAttack: () => true },
 

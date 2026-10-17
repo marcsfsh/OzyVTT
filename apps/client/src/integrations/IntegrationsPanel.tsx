@@ -167,14 +167,14 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
           <strong id="integration-secret-heading">
             {issued.rotated ? `New secret for "${issued.name}"` : `Secret for "${issued.name}"`}
           </strong>
-          <p>This is the only time this secret will be shown. Copy it now - the server cannot redisplay it.</p>
+          <p>This is the only time this secret is shown. Copy it now. The server can't show it again.</p>
           <code className="integration-token">{issued.token}</code>
           <div className="integration-secret-actions">
             <Button variant="primary" onClick={copyToken}>
               {copyConfirmed ? "Copied" : "Copy secret"}
             </Button>
             <Button variant="secondary" onClick={dismissIssued}>
-              {copyConfirmed ? "Done" : "I have saved it elsewhere - dismiss"}
+              {copyConfirmed ? "Done" : "I saved it elsewhere"}
             </Button>
           </div>
           {!copyConfirmed && (
@@ -221,8 +221,8 @@ export function IntegrationsPanel({ gmToken }: { gmToken: string }) {
           </span>
           <span className="nh-empty-title">Issue your first credential</span>
           <span className="nh-empty-text">
-            A scoped credential lets a stream overlay or another tool read from this game. Name it, pick what it may
-            reach, and create it — the secret is shown once.
+            A scoped credential gives a stream overlay or another tool access to this game. Name it and pick what it may
+            reach. Its secret is shown once, when you create it.
           </span>
           <Button variant="primary" onClick={startCredential}>
             Name a credential

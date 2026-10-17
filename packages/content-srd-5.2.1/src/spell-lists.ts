@@ -17,7 +17,7 @@ import type { SpellListReference } from "./character-content.js";
 /** Structural, so the resolver serves both `SpellReference` and the projected wire summary. */
 export type SpellListSpell = Readonly<{ id: string; classes: readonly string[] }>;
 
-/** What a batch resolve found - the diagnostics a publish gate needs, computed once. */
+/** What a batch resolve found: the diagnostics a publish gate needs, computed once. */
 export type SpellListResolution = Readonly<{
   /** Declared list id -> its resolved member spell ids. Only ids that exist in `spells` appear. */
   memberIds: ReadonlyMap<string, ReadonlySet<string>>;
@@ -25,9 +25,9 @@ export type SpellListResolution = Readonly<{
   emptyListIds: readonly string[];
   /** Lists whose `basedOn` forms a loop. Their `basedOn` is ignored entirely; the rest still resolves. */
   cyclicListIds: readonly string[];
-  /** `basedOn` ids that are neither another declared list nor a tag any spell carries - a typo, silently contributing nothing. */
+  /** `basedOn` ids that are neither another declared list nor a tag any spell carries: a typo, silently contributing nothing. */
   unknownBasedOn: readonly string[];
-  /** Declared list ids that are also an existing spell tag ("wizard"): the overlay merges into that list instead of creating one. */
+  /** Declared list ids that are also an existing spell tag ("wizard"): the overlay merges into that list. */
   shadowedListIds: readonly string[];
 }>;
 
@@ -90,7 +90,7 @@ function membersOf(
   const cached = memo.get(listId);
   if (cached) return cached;
   const members = taggedWith(spells, listId);
-  memo.set(listId, members); // before recursing: a cyclic edge then reads the partial set instead of looping
+  memo.set(listId, members); // before recursing: a cyclic edge then reads the partial set and can't loop
   const list = listsById.get(listId);
   if (list) {
     if (!cyclic.has(listId)) {
@@ -121,7 +121,7 @@ export function resolveSpellLists(
     for (const base of list.basedOn) {
       if (!listsById.has(base) && taggedWith(spells, base).size === 0) unknownBasedOn.add(base);
     }
-    // The id is already a live spell tag, so this overlay extends that list instead of creating one.
+    // The id is already a live spell tag, so this overlay extends that list.
     if (spells.some((spell) => spell.classes.includes(list.id))) shadowedListIds.push(list.id);
   }
   return {

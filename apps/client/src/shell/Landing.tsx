@@ -107,7 +107,7 @@ export function Landing({
         <span className="landing-grid" />
         <span className="landing-noise" />
       </div>
-      {/* A sibling of the scene, not inside it: it must paint over the vignette and the content, and the
+      {/* A sibling of the scene, outside it: it must paint over the vignette and the content, and the
         scene is its own stacking context. */}
       <span className="landing-flare" aria-hidden="true" />
       <header className="home-hero anim-view">

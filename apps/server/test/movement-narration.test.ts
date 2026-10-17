@@ -8,7 +8,7 @@ const MOVER = "10000000-0000-4000-8000-000000000001";
 const ALLY = "10000000-0000-4000-8000-000000000002";
 const LURKER = "10000000-0000-4000-8000-000000000003";
 
-/** 50px cells, 5 ft each, origin at 0,0 - cell (c,r) center = (25 + 50c, 25 + 50r). */
+/** 50px cells, 5 ft each, origin at 0,0; cell (c,r) center = (25 + 50c, 25 + 50r). */
 const GRID: TokenMapGeometry = {
   width: 1000,
   height: 1000,
@@ -60,7 +60,7 @@ describe("movement narration", () => {
       geometry: GRID
     });
     expect(narration?.publicText).toBe("Borin moved 20 ft - Mirena 5 ft → 15 ft.");
-    expect(narration?.gmText).toBe("Hidden ranges for Borin - Unseen Stalker 10 ft → 20 ft.");
+    expect(narration?.gmText).toBe("Hidden ranges for Borin: Unseen Stalker 10 ft → 20 ft.");
   });
 
   it("keeps a hidden mover's narration entirely GM-only", () => {

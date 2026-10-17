@@ -12,7 +12,7 @@ const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
  * golden inputs for the combat-rules regression suite. */
 export type ActorFixtureName = "monster" | "player-character" | "torva-grimtusk" | "pip-underbough" | "sable-vex";
 
-/** Raw parsed JSON - callers validate with ActorDefinitionSchema so fixture drift fails loudly in tests. */
+/** Raw parsed JSON: callers validate with ActorDefinitionSchema so fixture drift fails loudly in tests. */
 export function loadActorFixture(name: ActorFixtureName): unknown {
   return JSON.parse(readFileSync(join(packageRoot, "actors", `${name}.v1.json`), "utf8"));
 }

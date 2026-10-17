@@ -98,7 +98,7 @@ export function CodexShell({
     try {
       localStorage.setItem(CONSOLE_KEY, consoleOpen ? "open" : "closed");
     } catch {
-      /* private mode - fine */
+      /* private mode: fine */
     }
   }, [consoleOpen]);
 
@@ -276,8 +276,7 @@ export function CodexShell({
             className="codex-preview-modal"
           >
             <p className="codex-inspector-hint">
-              This is the real player Codex, read through a player session. Anything hidden from players is absent here,
-              not dimmed.
+              This is the real player Codex, read through a player session. Anything hidden from players is absent here.
             </p>
             {previewToken && <PlayerCodex token={previewToken} embedded />}
           </Modal>
@@ -323,7 +322,7 @@ export function CodexShell({
           deadlines={dash.deadlines}
           downtimePending={dash.downtimePending}
           onOpenDowntime={() => navigate(pathForSection("downtime"))}
-          /* The pin's own reveal flag, not a computed visibility: the map gates it too, and the Atlas
+          /* The pin's own reveal flag, and no computed visibility: the map gates it too, and the Atlas
              is where that switch lives. */
           party={
             campaign.party

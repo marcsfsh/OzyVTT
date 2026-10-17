@@ -42,7 +42,7 @@ export function TableSound({
     });
     engineRef.current = engine;
     setStatus(engine.currentStatus);
-    // Any touch or key on the screen counts as the interaction the browser waits for, not only the button.
+    // Any touch or key on the screen counts as the interaction the browser waits for, beyond the button itself.
     const unlock = () => {
       if (engine.currentStatus === "blocked") engine.unlock();
     };

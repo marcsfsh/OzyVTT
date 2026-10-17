@@ -26,7 +26,7 @@ const ABILITIES: Readonly<Record<string, AbilityId>> = {
 export const spellIdOfName = (name: string): string =>
   name
     .toLowerCase()
-    .replace(/['’]/g, "")
+    .replace(/['\u2019]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
@@ -90,8 +90,8 @@ function namedSpells(clause: string): Array<Readonly<{ name: string; atLevel?: n
 
 /**
  * Reads the creature's casting: its Spellcasting action's lists and numbers, then every other action that casts. An
- * action that casts one spell becomes that cast itself (`self`), keeping its own cost (a legendary action, a 3/Day
- * Misty Step); one that casts a choice of spells lists them, sharing its uses. A Multiattack that lets Spellcasting
+ * action that casts one spell becomes that cast itself (`self`) and keeps its own cost (a legendary action, a 3/Day
+ * Misty Step); one that casts a choice of spells lists them, and they share its uses. A Multiattack that lets Spellcasting
  * fill a place ("It can replace one attack with a use of Spellcasting to cast Shatter") names the cast it means, which
  * joins the list when it is cast at another level. Reactions stay as they are (Protective Magic's Shield is its own
  * reaction).
@@ -126,7 +126,7 @@ export function withSpellcasting(
     const body = action.description.replace(/^Legendary Action[^.]*\.\s*/, "");
     // "The dragon uses Spellcasting to cast Fear" / "... Guiding Bolt (level 2 version)" / "Invisibility on itself".
     const viaList =
-      /\buses Spellcasting to cast ([A-Z][A-Za-z'’ ]+?(?: \(level \d version\))?)(?= on itself|[.,])/.exec(body);
+      /\buses Spellcasting to cast ([A-Z][A-Za-z'\u2019 ]+?(?: \(level \d version\))?)(?= on itself|[.,])/.exec(body);
     if (viaList && listNumbers) {
       const { name, atLevel } = spellOf(viaList[1]!);
       const spellId = spellIdOfName(name);
@@ -143,7 +143,7 @@ export function withSpellcasting(
     // "The mage casts Misty Step, using the same spellcasting ability as Spellcasting." / "The doppelganger casts
     // Detect Thoughts, requiring no spell components and using Charisma as the spellcasting ability (spell save DC 12)."
     const casts =
-      /\bcasts ((?:the )?[A-Z][A-Za-z'’ ]+?(?: \(level \d version\))?(?:,? (?:or )?[A-Z][A-Za-z'’ ]+?(?: \(level \d version\))?)*?)(?: on (?:itself|that creature))?, (?:requiring [^,]+ and )?using (the same spellcasting ability as Spellcasting|[A-Z][a-z]+ as (?:the )?spellcasting ability)/.exec(
+      /\bcasts ((?:the )?[A-Z][A-Za-z'\u2019 ]+?(?: \(level \d version\))?(?:,? (?:or )?[A-Z][A-Za-z'\u2019 ]+?(?: \(level \d version\))?)*?)(?: on (?:itself|that creature))?, (?:requiring [^,]+ and )?using (the same spellcasting ability as Spellcasting|[A-Z][a-z]+ as (?:the )?spellcasting ability)/.exec(
         body
       );
     if (!casts) return action;
@@ -171,7 +171,7 @@ export function withSpellcasting(
   // A Multiattack's "use of Spellcasting to cast Shatter" names that cast; "a use of Spellcasting" alone, any of them.
   const rewired = cast.map((action): ActorAction => {
     if (!spellcasting || !action.multiattack) return action;
-    const named = /\bSpellcasting to cast ([A-Z][A-Za-z'’ ]+?(?: \(level \d version\))?)(?=[.,]| or )/.exec(
+    const named = /\bSpellcasting to cast ([A-Z][A-Za-z'\u2019 ]+?(?: \(level \d version\))?)(?=[.,]| or )/.exec(
       action.description
     );
     const target = named ? spellOf(named[1]!) : null;

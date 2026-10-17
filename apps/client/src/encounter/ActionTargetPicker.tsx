@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef } from "react";
-import type { AbilityId } from "@vtt/domain";
+import type { AbilityId, ContentActionSummary } from "@vtt/domain";
 import { Button, Select, Stepper } from "@vtt/ui";
 import { useSkillCatalog } from "../content/catalogs";
 import { ABILITY_WORDS } from "../dice/roll-call-words";
@@ -22,6 +22,18 @@ import {
   toggleTarget,
   type TargetingSession
 } from "./targeting";
+
+/**
+ * An SRD action that rolls nothing (Help, Dash, Dodge). Only the server's built-in rows are judged: a sheet's own
+ * action reaches the picker without its healing, so it can't be told apart from one that rolls.
+ */
+export const rollsNothing = (action: ContentActionSummary): boolean =>
+  action.builtin === true &&
+  action.attackBonus === null &&
+  action.saveAbility === null &&
+  !action.checkSkills?.length &&
+  action.damage.length === 0 &&
+  !action.healing;
 
 /**
  * Choosing who an action targets: one (radio) or several (checkboxes), or, for an area, where to drag
@@ -66,13 +78,16 @@ export function ActionTargetPicker({
   const assigned = darts ? Object.values(darts.counts).reduce((sum, count) => sum + count, 0) : 0;
   // The level or "Cantrip" the list shows in brackets is noise once the action is chosen.
   const name = plainActionName(picking.action.name);
+  const verb = rollsNothing(picking.action) ? "Use" : "Roll";
   const where = onMap ? " on the map or in the list" : "";
   return (
     <div className="action-targeting" role="group" aria-label={`Targets for ${name}`} ref={groupRef}>
       {picking.mode === "none" ? (
         <p className="action-targeting-head">
           <strong>{name}</strong> ·{" "}
-          {picking.action.checkSkills?.length ? "choose the skill, then Roll." : "no target to choose. Roll to use it."}
+          {picking.action.checkSkills?.length
+            ? "choose the skill, then Roll."
+            : `no target to choose.${verb === "Roll" ? " Roll to use it." : ""}`}
         </p>
       ) : picking.mode === "template" ? (
         <>
@@ -82,8 +97,8 @@ export function ActionTargetPicker({
           </p>
           <p className="action-targeting-hint">
             {picking.template?.placed
-              ? "Drag again to move it. Every creature inside is caught when you roll."
-              : "Drag on the map to place it. Every creature inside is caught when you roll."}
+              ? "Drag again to move it. Everything inside is caught when you roll."
+              : "Drag on the map to place it. Everything inside is caught when you roll."}
           </p>
           {picking.template?.placed && insideNow && (
             <>
@@ -218,7 +233,7 @@ export function ActionTargetPicker({
             Cancel
           </Button>
           <button type="button" className="encounter-primary" disabled={busy || !ready} onClick={() => onRoll()}>
-            Roll {name}
+            {verb} {name}
           </button>
         </div>
       </InFooter>

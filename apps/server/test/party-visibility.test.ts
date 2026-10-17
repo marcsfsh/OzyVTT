@@ -109,7 +109,7 @@ const RESOURCES = [
 ] as const;
 const TIERS: readonly PartyVisibility[] = ["off", "name-and-class", "full-sheet", "sheet-and-resources"];
 
-describe("party visibility — the tier is enforced in projectPlayerView, never client-side", () => {
+describe("party visibility: the tier is enforced in projectPlayerView, on the server", () => {
   it("defaults to name-and-class for a save written before the field existed (additive parse)", () => {
     expect(GameStateSchema.parse({ schemaVersion: 1 }).partyVisibility).toBe("name-and-class");
   });
@@ -134,7 +134,7 @@ describe("party visibility — the tier is enforced in projectPlayerView, never 
 
   // `partyVisibility` does not govern `projectPlayerCombat`, so dropping an ally's actor entry would
   // leave them named in the turn order with no actor to resolve their token. The fight must stay coherent.
-  it("keeps the fight coherent at every tier - the turn order, the tokens and the actor list agree", () => {
+  it("keeps the fight coherent at every tier: the turn order, the tokens and the actor list agree", () => {
     for (const tier of TIERS) {
       const state = tableAt(tier);
       state.combat = {
@@ -215,7 +215,7 @@ describe("party visibility — the tier is enforced in projectPlayerView, never 
     expect(theirs.hitDice!.entries).not.toBe(source.hitDice!.entries);
   });
 
-  it("governs claimed party members only - an unclaimed character and a monster are unchanged at every tier", () => {
+  it("governs claimed party members only: an unclaimed character and a monster are unchanged at every tier", () => {
     for (const tier of TIERS) {
       const free = actorIn(tier, FREE);
       const goblin = actorIn(tier, GOBLIN);
@@ -261,11 +261,11 @@ describe("party visibility — the tier is enforced in projectPlayerView, never 
 
 // `pools` names the pools behind `actionUses` (spent counts) and their ceilings. It is a pure function
 // of the definition's actions computed at projection time, so there is nothing to store or sync.
-describe("pools — the shape a resource tracker binds to", () => {
+describe("pools: the shape a resource tracker binds to", () => {
   it("names every pool, keyed by the exact actionUses key, with the ceiling the engine enforces", () => {
     const mine = actorIn("sheet-and-resources", MINE)!;
     expect(mine.pools).toEqual([
-      // The shared pool: keyed on `uses.pool`, ceiling 2 (the max over its members, not Preserve Life's
+      // The shared pool: keyed on `uses.pool`, ceiling 2 (the max over its members, above Preserve Life's
       // printed 1), and named from the slug.
       { id: "channel-divinity", name: "Channel Divinity", limit: 2, per: "short-rest" },
       // The solo pool: keyed on the action id and named from that action.

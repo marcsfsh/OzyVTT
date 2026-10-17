@@ -35,7 +35,7 @@ describe("progressionFromClass reconciliation", () => {
 
   it("builds a table where authored classes win and un-authored ones keep the SRD fallback", () => {
     const table = progressionTableFromClasses(authored);
-    // Authored: the row is the adapter output, not the static object.
+    // Authored: the row is the adapter output.
     expect(table.fighter).toEqual(progressionFromClass(authored.find((entry) => entry.id === "fighter")!));
     // Every SRD class is authored, so the fallback is exercised with a deliberately partial list.
     const partial = progressionTableFromClasses(authored.filter((entry) => entry.id !== "barbarian"));

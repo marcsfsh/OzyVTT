@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-07-19. Implements the BUILD_PLAN Phase-2 gate item ("the smallest intuitive
+Accepted on 2026-07-19. Implements the BUILD_PLAN Phase-2 gate item ("the smallest intuitive
 manual-fog/reveal slice over the recipient-safe scene boundary").
 
 Amended 2026-10-17 by [ADR-0023](0023-dynamic-vision-on-the-server.md): a creature whose whole space
@@ -11,7 +11,7 @@ See "Consequences" below. The rest of this decision stands.
 
 ## Context and decision drivers
 
-The owner asked what could be learned from AboveVTT and Foundry's dnd5e (design study only —
+The owner asked what could be learned from AboveVTT and Foundry's dnd5e (design study only:
 AboveVTT is AGPL-3.0, so its code is never read for reuse, and this repo's convention treats
 Foundry the same way). AboveVTT's strongest table-facing idea absent here was manual fog of war:
 the GM hides the map and reveals it area by area; players see darkness, the GM sees a dim veil.
@@ -26,7 +26,7 @@ lifecycle, and must never become a second, weaker version of the real visibility
   wire per stroke), meaningless on gridless maps, and expensive to render on phones.
 - **Reveal-only polygon regions**: matches AboveVTT most closely but needs polygon subtraction the
   moment the GM wants to re-hide, and polygon drawing is poor on touch.
-- **Ordered rect strokes folded over "all hidden"** (chosen): a painter's list — each stroke either
+- **Ordered rect strokes folded over "all hidden"** (chosen): a painter's list, where each stroke either
   reveals or re-covers a rectangle; later strokes win. Works identically on gridless maps
   (image-pixel space, the annotation convention), stays tiny on the wire (≤200 × 6 numbers),
   renders as ONE SVG mask, and re-hide needs no geometry math. The `kind: "rect"` discriminant
@@ -34,20 +34,20 @@ lifecycle, and must never become a second, weaker version of the real visibility
 
 ## Decision
 
-`sceneCombatShape.fog = { enabled, shapes[] }` — enabled-false default (every existing save parses
+`sceneCombatShape.fog = { enabled, shapes[] }`, with an enabled-false default (every existing save parses
 unchanged; a no-op until switched on), enabled-with-no-strokes = fully hidden map. Three GM-only
-commands under `scene:write` — `fog.set-enabled`, `fog.paint`, `fog.reset` — each accepting an
+commands under `scene:write` (`fog.set-enabled`, `fog.paint`, `fog.reset`) each accept an
 optional `sceneId` so the GM preps a parked scene's fog privately (the token-move pattern; the
 active scene's stored slot stays empty per the single-source-of-truth invariant). The server owns
 geometry: paint snaps to whole grid cells on calibrated unrotated maps (rotated grids keep the raw
-rect — snapping an axis-aligned rect against a rotated lattice would distort; documented
+rect, since snapping an axis-aligned rect against a rotated lattice would distort; documented
 simplification), clamps to the map bounds, compacts the list when a stroke covers the whole map
 ("Reveal all"), and caps at 200 strokes. `fog.reset` IS "Hide all".
 
-Lifecycle decisions (each pinned by a test): encounter start/end **preserve** fog — it is scene
+Lifecycle decisions (each pinned by a test): encounter start/end **preserve** fog: it is scene
 dressing prepped before a fight and persisting after it; scene park/resume carries each scene's
 fog verbatim; fog is **excluded from the combat timeline's restorable slice** and survives
-rewinds — revealing terrain is narration, not combat state, so a turn rewind must neither re-black
+rewinds. Revealing terrain is narration and no part of combat state, so a turn rewind must neither re-black
 the players' map nor trip the "discard changes?" confirmation.
 
 Rendering is one shared `FogOverlay` mask component: the GM sees the veil dimmed, above the map
@@ -59,8 +59,8 @@ everything**, so anything inside fog is visually covered even where public data 
 Fog is presentation, **never the security boundary**: players receive the mask verbatim (it is
 exactly what they must render), and hidden combatants / GM-only annotations remain stripped by
 their own projection filters regardless of fog. The corollary a GM must know: a _public_ token
-inside fog is visually covered but still present in the player payload — hiding a monster's
-existence still requires `gm-only` visibility, not fog. No token-vision, light sources, or
+inside fog is visually covered but still present in the player payload. Hiding a monster's
+existence takes `gm-only` visibility; fog can't do it. No token-vision, light sources, or
 auto-reveal-on-move: v1 is deliberately manual (the combat-first "obvious GM action" over a
 settings surface).
 
@@ -73,7 +73,7 @@ compaction making "Reveal all" a natural reset valve.
 
 ## Mobile, security, and visibility impact
 
-The five fog tools sit behind the map toolbar's labelled **Fog** group (GM only) — on/off is a
+The five fog tools sit behind the map toolbar's labelled **Fog** group (GM only): on/off is a
 Switch, Reveal and Hide are the two drag tools, and Reveal all / Hide all are buttons. They share
 the annotation pointer plumbing so touch drags work, and were smoke-verified at 375 px. The viewer sanitizer
 validates fog geometry like every other viewer field; the viewer projection sends fog only with

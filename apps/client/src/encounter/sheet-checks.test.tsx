@@ -294,7 +294,7 @@ describe("the sheet's saving throws", () => {
     await user.click(await screen.findByRole("button", { name: "Roll a Dexterity saving throw, +1" }));
     expect(sent("save:roll")).toEqual([{ actorId: HERO, ability: "dex" }]);
     expect(sent("dice:roll")).toEqual([]);
-    expect(await screen.findByText("Dexterity save: 9 (d20 8) vs DC 13 - failure.")).toBeTruthy();
+    expect(await screen.findByText("Dexterity save: 9 (d20 8) vs DC 13 · failure.")).toBeTruthy();
   });
 
   it("says when a condition fails the save without a roll", async () => {
@@ -437,7 +437,7 @@ describe("Heroic Inspiration on the sheet", () => {
     );
     const user = userEvent.setup();
     expect(screen.getByText("Held · spend it to reroll one die")).toBeTruthy();
-    // A player spends it from a reroll, not from a button of its own.
+    // A player spends it from a reroll; it has no button of its own.
     expect(screen.queryByRole("button", { name: "Give Heroic Inspiration" })).toBeNull();
     await user.click(await screen.findByRole("button", { name: "Roll a Strength check, +1" }));
     // The reroll is offered once the check is the character's latest roll.

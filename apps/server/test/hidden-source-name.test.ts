@@ -232,7 +232,7 @@ describe("a hidden attacker's real name never reaches the player it just hit", (
     expect(promptView.combat.pendingSaves.map((save) => save.onFailEffect?.name)).toEqual([`Grappled by ${MASK}`]);
   });
 
-  it("still names a PUBLIC attacker in all four - the control that proves the effects did not vanish", () => {
+  it("still names a PUBLIC attacker in all four: the control that proves the effects did not vanish", () => {
     const { outcomes, playerView, promptView } = fight("public");
     expect(outcomes).toEqual(["hit", "hit", "hit"]);
     expect(JSON.stringify(playerView)).toContain(ATTACKER_NAME);

@@ -8,7 +8,7 @@ type ResolveDefinition = (definitionId: string) => ActorDefinition | undefined;
 
 /** Sets the remaining slots for one level, clamped to 0..max. Covers spending and restoring (Arcane
  *  Recovery); the caller computes the target. Rejects if the actor has no pool at that level. `pact` names the
- *  Pact Magic pool instead of the spell slots. */
+ *  Pact Magic pool; without it, the spell slots. */
 export function setSpellSlotRemaining(
   state: GameState,
   actorId: string,
@@ -22,16 +22,16 @@ export function setSpellSlotRemaining(
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   if (pact) {
     if (actor.pactSlots?.level !== level)
-      throw new CommandRejectedError(`${actor.name} has no level-${level} Pact Magic slots.`);
+      throw new CommandRejectedError(`${actor.name} has no level ${level} Pact Magic slots.`);
     const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
     const max = pactSlotMaximum(definition)?.max ?? actor.pactSlots.remaining;
     actor.pactSlots = { ...actor.pactSlots, remaining: Math.max(0, Math.min(max, remaining)) };
     return;
   }
   const slot = actor.spellSlots?.find((entry) => entry.level === level);
-  if (!slot) throw new CommandRejectedError(`${actor.name} has no level-${level} spell slots.`);
+  if (!slot) throw new CommandRejectedError(`${actor.name} has no level ${level} spell slots.`);
   const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
-  // The same maxima seeding and the long rest use, so derived multiclass tables aren't clamped down.
+  // The same maxima seeding and the Long Rest use, so derived multiclass tables aren't clamped down.
   const max =
     spellSlotMaxima(definition, deriveEquipment(actor, definition, catalog).spellSlots).find(
       (entry) => entry.level === level
@@ -83,7 +83,7 @@ const chargeable = (definition: ActorDefinition, classId: string | undefined) =>
 
 /** Prepare or un-prepare a known spell on the actor's live prepared set. Validated against the definition's known
  *  list and its prepared cap; cantrips and always-prepared spells can't be toggled. A player changes the list only
- *  in the prepare step a Long Rest opens (SRD), swapping in at most what it allows, and never mid-fight; the GM may
+ *  in the prepare step a Long Rest opens (SRD), by at most what it allows, and never mid-fight; the GM may
  *  change it any time. */
 export function setPreparedSpell(
   state: GameState,
@@ -104,7 +104,7 @@ export function setPreparedSpell(
   if (prepared === has) return;
   if (role === "player") {
     if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
-      throw new CommandRejectedError("Prepared spells change after a Long Rest, not in a fight.");
+      throw new CommandRejectedError("Prepared spells change after a Long Rest, outside a fight.");
     if (actor.preparation === null)
       throw new CommandRejectedError("You change your prepared spells when you finish a Long Rest.");
     if (prepared && actor.preparation.changesLeft === 0)
@@ -116,7 +116,7 @@ export function setPreparedSpell(
       actor.preparedSpellIds.includes(entry.id)
     ).length;
     if (cap !== null && charged >= cap)
-      throw new CommandRejectedError(`${actor.name} can prepare ${cap} spells - unprepare one first.`);
+      throw new CommandRejectedError(`${actor.name} can prepare ${cap} spells. Unprepare one first.`);
     actor.preparedSpellIds = [...actor.preparedSpellIds, spellId];
     if (role === "player" && actor.preparation?.changesLeft != null)
       actor.preparation = { changesLeft: actor.preparation.changesLeft - 1 };

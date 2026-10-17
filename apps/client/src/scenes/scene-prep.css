@@ -29,7 +29,7 @@
 .scene-prep-map-name strong {
   color: var(--text);
 }
-/* On a phone the two buttons stay side by side at 44px rather than stacking. */
+/* On a phone the two buttons stay side by side at 44px. */
 .scene-prep-adds {
   display: flex;
   flex-wrap: wrap;

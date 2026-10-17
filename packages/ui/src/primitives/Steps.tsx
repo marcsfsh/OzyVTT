@@ -21,7 +21,7 @@ interface StepsProps {
   /** Highest index the flow accepts a jump to (inclusive). When supplied it replaces the "done steps only" rule,
       so a visited-but-unfinished step stays reachable. */
   maxSelectable?: number;
-  /** Accessible name for the flow — used by the compact indicator's progress bar. */
+  /** Accessible name for the flow, used by the compact indicator's progress bar. */
   ariaLabel?: string;
   /** The full form's direction above 760px: a horizontal rail (default) or a vertical list for a column beside the
       step body. */
@@ -31,7 +31,7 @@ interface StepsProps {
 
 /** Progress indicator for multi-step flows. Two forms swapped by media query (no JS breakpoint):
       - ≤760px: "Step 3 of 7" + the step name + a progress bar.
-      - >760px: the full rail, scrolling sideways rather than wrapping, or a vertical list (`orientation`).
+      - >760px: the full rail, which scrolls sideways and never wraps, or a vertical list (`orientation`).
     Only one form is displayed, so `display:none` keeps the other out of the accessibility tree. */
 export function Steps({
   steps,

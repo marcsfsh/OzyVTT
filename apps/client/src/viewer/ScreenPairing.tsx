@@ -31,7 +31,7 @@ export function ScreenPairing({ onPaired }: Readonly<{ onPaired: () => void }>) 
     const later = (ms: number) => {
       if (!stopped) timer = window.setTimeout(() => void step(), ms);
     };
-    /** One round: read where this screen's request stands, opening a new one when there is none. */
+    /** One round: read where this screen's request stands, and open a new one when there is none. */
     const step = async () => {
       try {
         const current = await apiRequest<Current>(VIEWER_PATHS.screenPairingsCurrent);

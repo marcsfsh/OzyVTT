@@ -30,7 +30,7 @@ describe("rules and refusals with a creature hidden by sight or the fog", () => 
     expect(table.latest().combat.hiddenTurn).toBe(true);
     const dodge = await emit(table.player, "action:resolve", { actorId: HERO, actionId: "dodge" });
     expect(dodge).toMatchObject({ ok: false, code: "economy.not-your-turn" });
-    expect(dodge.message).toBe("Not your turn yet - wait for your turn.");
+    expect(dodge.message).toBe("Not your turn yet. Wait for your turn.");
   });
 
   it("gives Borin's shot no Disadvantage, and no name, from an unseen enemy beside Borin", async () => {

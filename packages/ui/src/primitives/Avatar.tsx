@@ -5,7 +5,7 @@ type AvatarSize = "sm" | "md" | "lg";
 export type AvatarPresence = "online" | "away" | "offline";
 
 interface AvatarProps {
-  /** Full name — drives the monogram and the accessible label. */
+  /** Full name: drives the monogram and the accessible label. */
   name: string;
   /** Optional portrait/token image; falls back to the monogram. */
   src?: string;

@@ -38,7 +38,7 @@ const optionsOf = (field: FieldDef): readonly string[] =>
   field.options ? resolveOptions(field, ctx, {}).map((option) => option.value) : [];
 
 /** Every field whose suggestions are the damage-type vocabulary, found by identity with the canonical
-    array rather than by key name (`damagePartsField`'s row is keyed plainly `type`). */
+    array, whatever the key name (`damagePartsField`'s row is keyed plainly `type`). */
 const damageTypeFields = () => everyField().filter(({ field }) => suggestionsOf(field) === DAMAGE_TYPE_IDS);
 
 describe("enumerated fields offer the complete SRD list", () => {
@@ -73,7 +73,7 @@ describe("enumerated fields offer the complete SRD list", () => {
     for (const { type, field } of closed) expect(optionsOf(field), `${type}.${field.key}`).toEqual(DAMAGE_TYPE_IDS);
   });
 
-  it("every damage-type field is a VISIBLE chooser — the client's `3d`", () => {
+  it("every damage-type field is a VISIBLE chooser: the client's `3d`", () => {
     /** A `<datalist>` has no visible cue (and no control on iOS Safari), so each must be a `pick`.
         Checked on the field; the rendered behaviour is in `pick-fields.test.tsx`. */
     for (const { type, field } of damageTypeFields()) {
@@ -116,7 +116,7 @@ describe("enumerated fields offer the complete SRD list", () => {
   });
 });
 
-describe("an open slug always keeps its “other”", () => {
+describe('an open slug always keeps its "other"', () => {
   it("the open-slug fields are text or tag inputs, never closed selects", () => {
     // Open `ContentIdSchema` columns: a closed select would make values like "unique" unauthorable.
     const openSlugs: ReadonlyArray<readonly [HomebrewType, string]> = [
@@ -132,7 +132,7 @@ describe("an open slug always keeps its “other”", () => {
       const kind = found!.field.kind ?? "text";
       // `pick` is a renderer flag on the same `text` kind; the column stays open.
       expect(kind, `${type}.${key} must stay free-entry`).toBe("text");
-      // Declares a list rather than resolving one: `equipment.category` draws from the live catalog,
+      // Declares a list and resolves none: `equipment.category` draws from the live catalog,
       // which is empty in a bare context.
       expect(found!.field.suggestions, `${type}.${key} must still offer a list`).toBeDefined();
     }
@@ -153,7 +153,7 @@ describe("an open slug always keeps its “other”", () => {
     }
   });
 
-  it("every `pick` field declares a list — a chooser over nothing is worse than a text box", () => {
+  it("every `pick` field declares a list: a chooser over nothing is worse than a text box", () => {
     // `pick` renders `Combobox` only when suggestions resolve non-empty, so a `pick` with no list
     // silently falls back to a bare input.
     const picks = everyField().filter(({ field }) => field.pick === true);
@@ -164,7 +164,7 @@ describe("an open slug always keeps its “other”", () => {
     for (const { type, field } of picks) {
       expect(field.suggestions, `${type}.${field.key} is pick with no suggestions`).toBeDefined();
       // A flag on `text` or `tags`, never its own kind; both keep the column open.
-      expect(["text", "tags"], `${type}.${field.key} — pick is a flag on text or tags, not a kind`).toContain(
+      expect(["text", "tags"], `${type}.${field.key}: pick is a flag on text or tags, not a kind`).toContain(
         field.kind ?? "text"
       );
     }
@@ -174,6 +174,6 @@ describe("an open slug always keeps its “other”", () => {
     // The form reads the constant beside `EquipmentReferenceSchema.rarity`, so they can't drift.
     const rarity = everyField().find((entry) => entry.type === "equipment" && entry.field.key === "rarity");
     expect(suggestionsOf(rarity!.field)).toEqual(RARITY_IDS);
-    expect(rarity!.field.pick, "rarity must be a visible chooser — the client's 3a").toBe(true);
+    expect(rarity!.field.pick, "rarity must be a visible chooser: the client's 3a").toBe(true);
   });
 });

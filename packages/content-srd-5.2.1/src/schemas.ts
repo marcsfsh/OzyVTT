@@ -232,7 +232,7 @@ export const SpellReferenceSchema = z.object({
   area: ActionAreaSchema.nullable().default(null),
   /** What one cast does to its targets: the spell attacks it makes, the damage it deals, the hit points it restores.
    *  Read from the text at build time with a reviewed table, because the source's `damage` and `attack_roll` columns
-   *  describe the prose (Hex's later 1d6, Faerie Fire's "attack rolls against"), not a cast. A zone, a summons or a
+   *  describe the prose (Hex's later 1d6, Faerie Fire's "attack rolls against") and no single cast. A zone, a summons or a
    *  rider on later hits casts with none of these, and stays for the GM. Actions built from a spell read this. */
   effect: SpellEffectSchema.nullable().default(null),
   classes: z.array(z.string()),
@@ -338,7 +338,7 @@ export const ItemSpellCastSchema = z
     atLevel: z.number().int().min(0).max(9).optional(),
     /** Which ability powers it; absent = the wielder's own spellcasting ability. */
     ability: AbilitySchema.optional(),
-    /** A flat printed DC ("save DC 15"), overriding any derivation. */
+    /** A flat printed DC ("save DC 15"). It overrides any derivation. */
     saveDc: z.number().int().min(1).max(40).optional(),
     /** Charges. Share one pool across several casts with `uses.pool`. */
     uses: FeatureUsesSchema.optional(),
@@ -350,7 +350,7 @@ export type ItemSpellCast = z.infer<typeof ItemSpellCastSchema>;
 
 /**
  * How a charged item's charges come back, beside the pools its actions and casts declare: `regain` is rolled on a
- * long rest ("regains 1d6 + 1 expended charges daily at dawn"; absent = all come back), and `lastChargeRoll` rolls a
+ * Long Rest ("regains 1d6 + 1 expended charges daily at dawn"; absent = all come back), and `lastChargeRoll` rolls a
  * d20 when the last charge is spent, whose 1 does what the item's text says (most crumble).
  */
 export const ItemChargesSchema = z
@@ -438,7 +438,7 @@ export type ItemAppliesTo = z.infer<typeof ItemAppliesToSchema>;
 /**
  * Unified equipment catalog entry. The only `.strict()` content schema: for hand-authored homebrew
  * items, throwing on an undeclared key catches typos like `weight` for `weightLb`. Declare new fields
- * rather than relaxing it.
+ * and keep it strict.
  *
  * Riders live here, never on the carried `InventoryItem` row: the owner receives their inventory
  * verbatim in their projection, so a rider there would reveal a cursed item's mechanics.
@@ -475,7 +475,7 @@ export const EquipmentReferenceSchema = z
 
     /** Where it is worn or held. Absent = fall back to `category` for the three the engine already knows. */
     slot: ItemSlotSchema.optional(),
-    /** With no `weapon`/`armor` block this row is a template, deriving nothing until the player binds it to a base. */
+    /** With no `weapon`/`armor` block this row is a template and derives nothing until the player binds it to a base. */
     appliesTo: ItemAppliesToSchema.nullable().optional(),
     /** Display and filtering only ("uncommon", "legendary"). An open slug. */
     rarity: ContentIdSchema.optional(),
@@ -511,7 +511,7 @@ export const EquipmentReferenceSchema = z
     /** Feats granted while active, depth 1. Nothing has `grants.items`, so a grant cycle cannot be expressed. */
     grantsFeatIds: z.array(ContentIdSchema).max(4).default([]),
 
-    /** The same rider block a feature, feat and chosen option carry, spread rather than restated. */
+    /** The same rider block a feature, feat and chosen option carry, spread in whole. */
     ...featureRiders
   })
   .strict()
@@ -522,7 +522,7 @@ export const EquipmentReferenceSchema = z
         code: "custom",
         path: ["cursed"],
         message:
-          "A cursed item must require attunement - attunement is both what springs the curse and what reveals it."
+          "A cursed item must require attunement, because attunement is what springs the curse and what reveals it."
       });
     }
     if (item.damageTypeChoice) {

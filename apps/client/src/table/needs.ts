@@ -100,7 +100,7 @@ export function needsTitle(item: NeedsItem, state: GmView): string {
         ? `${item.actors[0].name} still rolls initiative`
         : `${item.actors.length} characters still roll initiative`;
     case "rest":
-      return `${item.actor.name} asks for a long rest`;
+      return `${item.actor.name} asks for a Long Rest`;
   }
   void state;
 }

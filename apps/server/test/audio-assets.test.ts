@@ -7,7 +7,7 @@ import { AudioAssetStore, inspectAudio } from "../src/audio-assets.js";
 import { adts, flac, m4a, mp3, ogg, wav, webm } from "./audio-fixtures.js";
 import { png } from "./image-fixtures.js";
 
-/** The first part of a file, ending mid-frame: a cut exactly on a frame boundary looks like a shorter whole file. */
+/** The first part of a file, cut mid-frame: a cut exactly on a frame boundary looks like a shorter whole file. */
 const cut = (file: Buffer, keep: number) => file.subarray(0, Math.floor(file.length * keep) - 7);
 
 describe("sound file inspection", () => {
@@ -61,7 +61,7 @@ describe("sound file inspection", () => {
   });
 
   it("refuses what isn't a sound the table can play, saying what it is", () => {
-    expect(() => inspectAudio(png(10, 10))).toThrow("This file is an image, not a sound");
+    expect(() => inspectAudio(png(10, 10))).toThrow("This file is an image, and only sound files can be uploaded here");
     expect(() => inspectAudio(Buffer.from("%PDF-1.7 not a song"))).toThrow("a PDF document");
     expect(() => inspectAudio(Buffer.from("just some text, renamed to .mp3"))).toThrow(
       "not a sound file browsers can play"

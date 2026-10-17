@@ -12,7 +12,7 @@ const MAX_FOG_SHAPES = 200;
  *  live table and a parked scene's private prep (`sceneId`) share this one implementation. */
 
 const fogSlice = (state: GameState, sceneId: string | undefined) => {
-  const slice = layerSlice(state, sceneId, "fog", "That scene is live - edit its fog on the table.");
+  const slice = layerSlice(state, sceneId, "fog", "That scene is live. Edit its fog on the table.");
   return { fog: slice.layer, write: slice.write };
 };
 
@@ -35,12 +35,12 @@ export function paintFog(
 ) {
   const slice = fogSlice(state, sceneId);
   const rect = normalizedRect(geometry, input.rect, "Drag a larger area to paint fog.");
-  // A stroke covering the whole map supersedes everything before it, so compact instead of accumulating.
+  // A stroke covering the whole map supersedes everything before it, so compact and never accumulate.
   const coversMap =
     rect.x <= 0 && rect.y <= 0 && rect.x + rect.width >= geometry.width && rect.y + rect.height >= geometry.height;
   const kept = coversMap ? [] : slice.fog.shapes;
   if (kept.length >= MAX_FOG_SHAPES)
-    throw new CommandRejectedError("The fog has too many strokes - Reset it and reveal again.");
+    throw new CommandRejectedError("The fog has too many strokes. Reset it and reveal again.");
   slice.write({ ...slice.fog, shapes: [...kept, { kind: "rect", id: input.id, op: input.op, ...rect }] });
 }
 

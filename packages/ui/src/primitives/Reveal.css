@@ -1,4 +1,4 @@
-/* The reveal toggle is an icon-only eye; magenta is the state. The 44px floor is met by `.tap-target`, not paint,
+/* The reveal toggle is an icon-only eye; magenta is the state. The 44px floor is met by `.tap-target` and no paint,
    because it sits in dense rows. */
 .nh-reveal {
   display: inline-flex;

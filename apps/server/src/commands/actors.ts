@@ -146,7 +146,7 @@ export const actorCommands = [
     description:
       "Sets or clears (null) a combatant's token image from the uploaded token library: the GM for any combatant, a player for their own claimed character.",
     summary:
-      "Set or clear a combatant's token image from the token library - the GM for anyone, a player for their own claimed character.",
+      "Set or clear a combatant's token image from the token library: the GM for anyone, a player for their own claimed character.",
     schema: SetTokenImageSchema,
     malformed: "The token image command is malformed.",
     async run({ principal, request, execute }, kit) {
@@ -205,7 +205,7 @@ export const actorCommands = [
     description:
       "Archives or restores a character (GM-grade only). Archived characters are hidden from players, refused by claim, and rejected server-side by scene staging and encounter start/add; a character in the running encounter must be removed first. Archiving a CLAIMED character releases the claim in the same mutation, so its player is not left holding an invisible claim.",
     summary:
-      "Archive or restore a character - archived characters are hidden from players, refused by claim, rejected by scene and encounter staging, and any claim is released on archive (GM).",
+      "Archive or restore a character (GM). An archived character is hidden from players, refused by claim and rejected by scene and encounter staging, and any claim is released on archive.",
     schema: SetActorArchivedSchema,
     malformed: "The archive command is malformed.",
     gmOnly: "Only the GM can archive characters.",
@@ -228,7 +228,7 @@ export const actorCommands = [
       if (!duplicate && releasedClaim)
         kit.context.appendLog({
           kind: "encounter",
-          text: `${kit.actorName(actorId)} was archived - their player's claim was released.`,
+          text: `${kit.actorName(actorId)} was archived, and the player's claim was released.`,
           actorIds: [actorId],
           gmOnly: true
         });
@@ -239,7 +239,7 @@ export const actorCommands = [
     type: "actor.set-sheet-preview",
     operationId: "setActorSheetPreview",
     description:
-      "Shares (or un-shares) an ARCHIVED character's sheet with players as a read-only keepsake (GM-grade only). Default hidden - a retired character stays private until the GM shares it. Meaningless while the character is not archived. Players receive only the character's id and name in their projection.",
+      "Shares (or un-shares) an ARCHIVED character's sheet with players as a read-only keepsake (GM-grade only). Hidden by default: a retired character stays private until the GM shares it. Meaningless while the character is not archived. Players receive only the character's id and name in their projection.",
     summary: "Share or hide an archived character's sheet as a read-only keepsake for players; hidden by default (GM).",
     schema: SetActorSheetPreviewSchema,
     malformed: "The sheet-preview command is malformed.",
@@ -267,7 +267,8 @@ export const actorCommands = [
     operationId: "setActorSpeed",
     description:
       "Sets a combatant's walking speed in feet (GM-grade only); null clears it to unknown, which skips the movement rules for that combatant. Speed seeds from the imported definition automatically.",
-    summary: "Set a combatant's walking speed in feet (null clears to unknown, skipping movement rules) (GM).",
+    summary:
+      "Set a combatant's walking speed in feet (null clears it to unknown, and movement rules then skip it) (GM).",
     schema: ActorSetSpeedSchema,
     malformed: "The speed command is malformed.",
     gmOnly: "Only the GM can set movement speed.",
@@ -286,7 +287,7 @@ export const actorCommands = [
     type: "actor.set-armor-class",
     operationId: "setActorArmorClass",
     description:
-      "Sets a combatant's Armor Class by hand (GM-grade only), replacing the one derived from what it wears until cleared with null - for what the sheet can't derive (Mage Armor, natural armor, a ruling). Live effects such as the Shield spell still add to it. Players see that the GM set their character's AC.",
+      "Sets a combatant's Armor Class by hand (GM-grade only). It replaces the one derived from what it wears until cleared with null. It is for what the sheet can't derive (Mage Armor, natural armor, a ruling). Live effects such as the Shield spell still add to it. Players see that the GM set their character's AC.",
     summary: "Set or clear a combatant's Armor Class by hand (null returns to the derived AC) (GM).",
     schema: ActorSetArmorClassSchema,
     malformed: "The armor class command is malformed.",

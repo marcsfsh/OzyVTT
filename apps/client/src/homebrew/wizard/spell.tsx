@@ -1,4 +1,4 @@
-/** The spell wizard. Its steps follow the spell card from top to bottom, ending with the spell lists and the text. */
+/** The spell wizard. Its steps follow the spell card from top to bottom, and the spell lists and the text come last. */
 
 import { useEffect, useState } from "react";
 import type { ContentSpellSummary } from "@vtt/domain";

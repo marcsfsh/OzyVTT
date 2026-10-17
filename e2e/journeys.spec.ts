@@ -387,7 +387,7 @@ test("a player answers the GM's call with a physical die, then rerolls it with H
   await expectPageFits(player);
   await fillIn(face, "18");
   await press(card.getByRole("button", { name: "Use" }));
-  await expect(card).toContainText("(d20 18, typed) vs DC 10 - success");
+  await expect(card).toContainText("(d20 18, typed) vs DC 10 · success");
 
   // The reroll is typed too, and its button keeps its whole label on a phone.
   const reroll = card.getByRole("button", { name: "Reroll · Heroic Inspiration" });

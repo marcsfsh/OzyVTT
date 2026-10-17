@@ -29,7 +29,7 @@ import { CodexIcon } from "./icons";
 import { CodexMarkdown } from "./CodexMarkdown";
 import { JournalFilters, filterChronicle } from "./JournalFilters";
 
-/** The player's Journal: the GM's year grouping and Today marker, using the server's `calendarInstant`. */
+/** The player's Journal: the GM's year grouping and Today marker, from the server's `calendarInstant`. */
 export function PlayerJournal({
   records,
   calendar,

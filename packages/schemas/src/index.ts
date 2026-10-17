@@ -13,7 +13,7 @@ const EffectTagSchema = z
   .string()
   .regex(/^[a-z0-9-]+$/)
   .max(40);
-/** Open identity slug, matching the content catalog's `ContentIdSchema`. */
+/** Open identity slug, the same as the content catalog's `ContentIdSchema`. */
 const RiderSlugSchema = z
   .string()
   .regex(/^[a-z0-9-]+$/)
@@ -26,7 +26,7 @@ export const PickBudgetScalingSchema = z.strictObject({
   /** The `classResources.id` of the printed column - `eldritch-invocations`, `weapon-mastery`. */
   id: RiderSlugSchema
 });
-/** A safe dice expression, one die term plus at most one flat modifier - never an evaluable string (ADR-0008). */
+/** A safe dice expression, one die term plus at most one flat modifier, never an evaluable string (ADR-0008). */
 export const DiceFormulaSchema = z
   .string()
   .regex(/^\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?$/i, "Use a safe dice formula such as 1d8 + 3.");
@@ -41,8 +41,8 @@ export const HealingFormulaSchema = z
   .regex(/^(?:\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?|\d+)$/i, "Use dice such as 2d8 + 3, or a number.");
 export const AbilitySchema = z.enum(["str", "dex", "con", "int", "wis", "cha"]);
 export type AbilityId = z.infer<typeof AbilitySchema>;
-/** The SRD's 13 damage types. Riders name one of these, so a misspelled type is refused instead of publishing a
- * gate or a defence that matches nothing. */
+/** The SRD's 13 damage types. Riders name one of these, so a misspelled type is refused, and no
+ * gate or defence that matches nothing is published. */
 export const DamageTypeSchema = z.enum([
   "acid",
   "bludgeoning",
@@ -112,7 +112,7 @@ export type ItemSlot = z.infer<typeof ItemSlotSchema>;
  *   - `dynamic-gate` live actor state                  -> a labelled note, re-checked per roll
  *   - `moment`       the named roll or event           -> fires at that moment only
  *   - `filter`       narrows whatever moment it accompanies
- * Data, not an expression language (ADR-0008): bounded `.strict()` objects, no OR/NOT/nesting/arithmetic.
+ * Plain data with no expression language (ADR-0008): bounded `.strict()` objects, no OR/NOT/nesting/arithmetic.
  * Every trigger here has a reader; one the engine cannot answer does not belong in the vocabulary.
  */
 export const RiderTriggerSchema = z.discriminatedUnion("type", [
@@ -289,7 +289,7 @@ function checkSharedTriggerRules(triggers: readonly RiderTrigger[], context: z.R
   if (duplicate)
     context.addIssue({
       code: "custom",
-      message: `Two "${duplicate.type}" triggers on one rider - list the values in a single entry instead.`
+      message: `Two "${duplicate.type}" triggers on one rider. List the values in a single entry.`
     });
 }
 
@@ -300,12 +300,12 @@ export const RiderWhenSchema = z
   .superRefine((triggers, context) => {
     const kinds = triggers.map((trigger) => RIDER_TRIGGER_KINDS[trigger.type]);
     if (kinds.filter((kind) => kind === "moment").length > 1) {
-      context.addIssue({ code: "custom", message: "A rider fires at one moment, not two." });
+      context.addIssue({ code: "custom", message: "A rider fires at only one moment." });
     }
     if (kinds.includes("filter") && !kinds.includes("moment")) {
       context.addIssue({
         code: "custom",
-        message: "A filter needs a moment to narrow - add the roll or event it applies to."
+        message: "A filter needs a moment to narrow. Add the roll or event it applies to."
       });
     }
     checkSharedTriggerRules(triggers, context);
@@ -324,7 +324,7 @@ export const GrantWhenSchema = z
     if (offender) {
       context.addIssue({
         code: "custom",
-        message: `A grant is a standing fact, so it cannot wait for a roll: "${offender.type}" is only knowable during one, and the grant has been collected before any roll starts. Gate it on a state instead - attuned, while-armored, while-unarmored, while-shield, while-character-is, while-proficient-with, while-effect-tag, while-hp-at-or-below, while-condition - or move the mechanic to a modifier, where a moment IS read.`
+        message: `A grant is a standing fact, so it cannot wait for a roll: "${offender.type}" is only knowable during one, and the grant has been collected before any roll starts. Gate it on a state (attuned, while-armored, while-unarmored, while-shield, while-character-is, while-proficient-with, while-effect-tag, while-hp-at-or-below, while-condition), or move the mechanic to a modifier, where a moment IS read.`
       });
     }
     checkSharedTriggerRules(triggers, context);
@@ -415,7 +415,7 @@ export const ModifierSchema = z.discriminatedUnion("type", [
     .strict(),
   /** More magic items attuned at once than the SRD's three (Use Magic Device: four). Read when an item is attuned. */
   z.object({ type: z.literal("attunement-slots"), amount: z.number().int().min(1).max(3), ...riderGate }).strict(),
-  /** One more use of a limited resource. `poolId` is the live `actionUses` key, not a `classResources` column. */
+  /** One more use of a limited resource. `poolId` is the live `actionUses` key. */
   z
     .object({
       type: z.literal("resource-bonus"),
@@ -523,7 +523,7 @@ export const ModifierSchema = z.discriminatedUnion("type", [
       ...riderGate
     })
     .strict(),
-  /** An extra spell slot of one level. Layered over the single-sourced slot maxima, so the seed, the long rest and the spend-clamp cannot disagree. */
+  /** An extra spell slot of one level. Layered over the single-sourced slot maxima, so the seed, the Long Rest and the spend-clamp cannot disagree. */
   z
     .object({
       type: z.literal("spell-slot"),
@@ -646,7 +646,7 @@ export const EffectInstanceSchema = z
       .nullable()
       .default(null),
     /** SRD "Combining Game Effects": instances sharing a key are one effect, so readers take the most potent
-     * contribution instead of summing (two Slows are -10, not -20). Absent or different keys sum. */
+     * contribution with no sum (two Slows are -10). Absent or different keys sum. */
     stackKey: z
       .string()
       .regex(/^[a-z0-9:-]+$/)
@@ -909,9 +909,9 @@ export type HitDiceEntry = z.infer<typeof HitDiceEntrySchema>;
 
 /**
  * Normalise accepted Hit Dice inputs to the pool shape (ADR-0007 additive growth):
- *   - `{die, maximum, remaining}`             — an older single-die save.
- *   - `[{die, maximum, remaining}, …]`        — a bare pool array.
- *   - `{die, maximum, remaining, entries[]}`  — the current shape; the summary is re-derived, never trusted.
+ *   - `{die, maximum, remaining}`: an older single-die save.
+ *   - `[{die, maximum, remaining}, ...]`: a bare pool array.
+ *   - `{die, maximum, remaining, entries[]}`: the current shape; the summary is re-derived, never trusted.
  * Malformed input passes through so Zod reports the real error.
  */
 function normaliseHitDicePool(input: unknown): unknown {
@@ -963,7 +963,7 @@ export const HitDicePoolSchema = z.preprocess(
 );
 export type HitDicePool = NonNullable<z.infer<typeof HitDicePoolSchema>>;
 
-/** Build a pool (summary included) from per-die entries. An empty pool is `null` — "not modeled". */
+/** Build a pool (summary included) from per-die entries. An empty pool is `null`, meaning "not modeled". */
 export function makeHitDicePool(entries: readonly HitDiceEntry[]): HitDicePool | null {
   return entries.length === 0 ? null : (HitDicePoolSchema.parse(entries) as HitDicePool);
 }
@@ -1076,7 +1076,7 @@ export const ActorSchema = z.object({
     .strict()
     .nullable()
     .default(null),
-  /** Spell ids prepared right now, re-chosen on a long rest. Owner-only. */
+  /** Spell ids prepared right now, re-chosen on a Long Rest. Owner-only. */
   preparedSpellIds: z.array(z.string().max(80)).max(400).default([]),
   /** A Wizard's spellbook beyond the Wizard spells on its sheet: spells its Wizard levels added that the build didn't
    *  list, and spells copied in (`copied`: from a scroll or another book, paid for). Owner-only. */
@@ -1163,7 +1163,7 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   armorClassBonus: z.number().int().min(1).max(10).optional(),
   /** Conditions the recipient is immune to while it lasts (Heroism: Frightened). */
   conditionImmunities: z.array(ConditionIdSchema).min(1).max(6).optional(),
-  /** Conditions the recipient has while it lasts, ending with it (Greater Invisibility: Invisible). */
+  /** Conditions the recipient has while it lasts, which end with it (Greater Invisibility: Invisible). */
   conditions: z.array(ConditionIdSchema).min(1).max(3).optional(),
   /** Temporary Hit Points the recipient gains at the start of each of its turns (Heroism: the caster's spellcasting
    *  ability modifier, fixed when the spell is cast). */
@@ -1212,7 +1212,7 @@ export const ActionUsesSchema = z
   });
 
 /** The conditions a failed save can impose. Closed because the engine applies the id itself. Exhaustion is
- * left out: it stacks by level, and a plain condition write would reset it rather than add one. */
+ * left out: it stacks by level, and a plain condition write would reset the stack, where each failed save should add a level. */
 export const SaveConditionSchema = z.enum([
   "blinded",
   "charmed",
@@ -1428,7 +1428,7 @@ export const MultiattackComponentSchema = z
  * another action casts ("The mage casts Misty Step"). The engine makes each entry a cast action, `id`, with the spell's
  * attack, save, damage and effects at these numbers and no slot: an `atLevel` cast at that level ("level 5 version"),
  * a `perDay` one that many times between Long Rests (any other the action's own uses limit). `self`: the action is
- * itself the cast of its one spell (a legendary "uses Spellcasting to cast Fear"), keeping its own cost.
+ * itself the cast of its one spell (a legendary "uses Spellcasting to cast Fear"), and it keeps its own cost.
  */
 export const CastsSpellsSchema = z
   .object({
@@ -1500,7 +1500,7 @@ export const ActionSchema = z.object({
       formula: HealingFormulaSchema,
       /** The user heals itself (Second Wind), so there is no target to pick. */
       self: z.literal(true).optional(),
-      /** The roll is one pool divided among the targets (Preserve Life), not regained by each. */
+      /** The roll is one pool divided among the targets (Preserve Life). */
       divided: z.literal(true).optional(),
       /** No target is healed past this fraction of its maximum (Preserve Life: half). */
       upToFractionOfMaximum: z.number().min(0.1).max(1).optional(),
@@ -1529,7 +1529,7 @@ export const ActionSchema = z.object({
   /** Compound action: one shared action slot, components tracked (crocodile Multiattack = one Bite + one Tail). A
    *  component's `or` names other actions that can fill its place ("using Scimitar or Shortbow in any combination"). */
   multiattack: z.array(MultiattackComponentSchema).min(1).max(6).optional(),
-  /** Plans a Multiattack can be instead of `multiattack` ("or it makes two Hurl Flame attacks"), chosen by the first
+  /** Other plans a Multiattack can be, beside `multiattack` ("or it makes two Hurl Flame attacks"), chosen by the first
    *  attack taken. */
   multiattackAlternatives: z.array(z.array(MultiattackComponentSchema).min(1).max(6)).min(1).max(2).optional(),
   /** What can take the place of a Multiattack's attacks ("It can replace one attack with a use of Roar"): one of
@@ -1592,7 +1592,7 @@ export const ActionSchema = z.object({
     .optional(),
   /** Declared reaction the engine can offer as a pending prompt; see `ActionReactionSchema`. */
   reaction: ActionReactionSchema.optional(),
-  /** Minted by the engine from an equipped weapon, not authored: the Light property's extra attack (`light`), or
+  /** Minted by the engine from an equipped weapon, with no authoring: the Light property's extra attack (`light`), or
    *  Cleave's swing at a second creature (`cleave`), made with the inventory item `itemId`. */
   extraAttack: z
     .object({
@@ -1607,7 +1607,7 @@ export const ActionSchema = z.object({
   /** Taken in place of one attack of the Attack action (Breath Weapon: "replace one of your attacks"): it opens the
    *  Attack action, or spends one attack the action has left. Pairs with activation "action". */
   replacesAttack: z.boolean().optional(),
-  /** SRD Legendary Action: taken on other creatures' turns, spending `cost` from the per-round pool that refills on the creature's own turn. Pairs with activation "other". `oncePerRound`: "can't take this action again until the start of its next turn". */
+  /** SRD Legendary Action: taken on other creatures' turns. It spends `cost` from the per-round pool that refills on the creature's own turn. Pairs with activation "other". `oncePerRound`: "can't take this action again until the start of its next turn". */
   legendary: z
     .object({ cost: z.number().int().min(1).max(5), oncePerRound: z.literal(true).optional() })
     .strict()
@@ -1799,7 +1799,7 @@ export const ProficienciesSchema = z
       .default([]),
     saveOverrides: z.partialRecord(AbilitySchema, z.number().int().min(-20).max(30)).optional(),
     skillOverrides: z.record(SkillIdSchema, z.number().int().min(-20).max(30)).optional(),
-    /** Armor/weapon/tool/language training as open slugs. Absent means "not recorded", not "none": an import that
+    /** Armor/weapon/tool/language training as open slugs. Absent means "not recorded" (an empty list means none): an import that
      * never listed armor training must not read as untrained. */
     armor: z.array(ProficiencyIdSchema).max(20).optional(),
     /** Weapon proficiencies: a group ("simple", "martial") or a single weapon id ("longsword"). */
@@ -1922,7 +1922,7 @@ export function resolveSpellcasting(
   return { ability: spellcasting.ability, saveDc: spellcasting.saveDc, attackBonus: spellcasting.attackBonus };
 }
 
-/** The choice ledger as a list, treating "no ledger recorded" as empty. Use when you only need to read. */
+/** The choice ledger as a list, where "no ledger recorded" reads as empty. Use when you only need to read. */
 export function characterChoices(
   character: z.infer<typeof CharacterIdentitySchema> | undefined
 ): readonly CharacterChoice[] {
@@ -1948,7 +1948,7 @@ const TraitSaveSchema = z
 /**
  * What a stat block's trait does that the engine runs, read from the trait's text when the bundle is built (SRD 5.2.1
  * monsters); its prose stays on the sheet. `name` is the trait's printed name, for the feed.
- * - `regeneration`: hit points regained at the start of each of its turns, not on the turn after it takes one of
+ * - `regeneration`: hit points regained at the start of each of its turns, except the turn after it takes one of
  *   `stoppedBy`'s types (the troll's Acid or Fire); only at 1 Hit Point or more (`needsHitPoints`, the oni); and at 0
  *   Hit Points it dies only when a turn starts without regenerating (`deathWaitsForTurn`, the troll).
  * - `undead-fortitude`: damage that drops it to 0 asks a save of DC `dcBase` plus the damage taken, unless the damage
@@ -2063,7 +2063,7 @@ export const ActorDefinitionSchema = z
     damageVulnerabilities: z.array(DamageTypeIdSchema).max(20).optional(),
     /** Seeded onto the actor's `conditionImmunities`, which the engine enforces. */
     conditionImmunities: z.array(ConditionIdSchema).max(20).optional(),
-    /** Legendary creature resources (SRD 2024): legendary actions per round (spent on other creatures' turns) and Legendary Resistance per day (re-arms on a long rest). */
+    /** Legendary creature resources (SRD 2024): legendary actions per round (spent on other creatures' turns) and Legendary Resistance per day (re-arms on a Long Rest). */
     legendary: z
       .object({
         actionsPerRound: z.number().int().min(1).max(5).optional(),

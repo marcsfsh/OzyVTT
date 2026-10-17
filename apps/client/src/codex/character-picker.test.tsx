@@ -142,7 +142,7 @@ describe("the rule underneath both fields (characters.ts)", () => {
   });
 });
 
-describe("`5a` — Who played", () => {
+describe("`5a`: Who played", () => {
   it("offers the campaign's characters, archived last and marked", async () => {
     const user = userEvent.setup();
     renderSessions();
@@ -153,7 +153,7 @@ describe("`5a` — Who played", () => {
     expect(list.getAllByRole("option").map((option) => option.textContent)).toEqual([
       "Ozy",
       "Ismark",
-      "Ireena — Archived"
+      "Ireena · Archived"
     ]);
   });
 
@@ -163,7 +163,7 @@ describe("`5a` — Who played", () => {
 
     await user.click(screen.getByRole("combobox", { name: "Who played" }));
     const list = within(await screen.findByRole("listbox", { name: "Who played" }));
-    await user.click(list.getByRole("option", { name: "Ireena — Archived" }));
+    await user.click(list.getByRole("option", { name: "Ireena · Archived" }));
 
     // The stored value is the plain name; `optionLabel` is display only.
     expect(within(document.querySelector(".nh-taginput-tags")!).getByText("Ireena")).toBeInTheDocument();
@@ -188,11 +188,11 @@ describe("`5a` — Who played", () => {
 
     await user.click(screen.getByRole("combobox", { name: "Who played" }));
     const list = within(await screen.findByRole("listbox", { name: "Who played" }));
-    expect(list.getAllByRole("option").map((option) => option.textContent)).toEqual(["Ismark", "Ireena — Archived"]);
+    expect(list.getAllByRole("option").map((option) => option.textContent)).toEqual(["Ismark", "Ireena · Archived"]);
   });
 });
 
-describe("`5e.3` — downtime's Who", () => {
+describe("`5e.3`: downtime's Who", () => {
   it("offers the same list in the same order, with the same word for archived", async () => {
     const user = userEvent.setup();
     renderDowntime();
@@ -200,7 +200,7 @@ describe("`5e.3` — downtime's Who", () => {
     await user.click(screen.getByRole("combobox", { name: "Who spent the time" }));
     const options = await screen.findAllByRole("option");
     expect(options.map((option) => option.textContent)).toEqual(["Ozy", "Ismark", "IreenaArchived"]);
-    // A separate muted `meta` span, not part of the name.
+    // A separate muted `meta` span, outside the name.
     expect(within(options[2]).getByText("Archived")).toHaveClass("nh-combobox-optionmeta");
   });
 

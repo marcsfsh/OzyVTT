@@ -45,7 +45,7 @@ function asAuthoredBody(body: HomebrewBody): HomebrewBody {
   return next as HomebrewBody;
 }
 
-/** Every choice block a feature carries, whichever spelling holds it — the untyped twin of
+/** Every choice block a feature carries, whichever spelling holds it. The untyped twin of
     `featurePicks`, over a body this walker deliberately reads as `Record<string, unknown>`. */
 function choiceBlocksOn(feature: Record<string, unknown>): Record<string, unknown>[] {
   const plural = asArray(feature.choices).filter(isObject);

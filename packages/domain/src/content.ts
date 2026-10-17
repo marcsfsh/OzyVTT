@@ -129,7 +129,7 @@ export type ContentSpellsResult = {
   /** The bundle's canonical CC BY 4.0 line (ADR-0015). */ attribution?: string;
 };
 /** One addable-equipment catalog row (SRD gear, weapons and armor in one shape). `category` is an open slug;
- * only "weapon", "armor" and "shield" drive AC and attack derivation, so group by the data, not a closed list.
+ * only "weapon", "armor" and "shield" drive AC and attack derivation, so group by the data itself.
  * `weapon` also carries browse-only `mastery`, which must not be copied onto an inventory row
  * (`ItemWeaponSchema` is strict); `inventoryWeaponFrom` does the conversion. */
 export const ContentEquipmentSummarySchema = z.strictObject({
@@ -282,7 +282,7 @@ export type ContentStartingEquipmentOption = Wire<z.infer<typeof ContentStarting
 const ContentChoiceListSchema = z.strictObject({
   choose: z.number().int().min(0).max(10),
   from: z.array(slug()),
-  /** An open catalog slug supplying options instead of or beside `from`, resolved by `resolveCatalogChoice`
+  /** An open catalog slug that supplies options, alone or beside `from`, resolved by `resolveCatalogChoice`
    * ("two languages from the Standard Languages table"). Null when `from` names them outright. */
   fromCatalog: z.string().nullable()
 });
@@ -478,7 +478,7 @@ export type ContentFeatsResult = {
   feats?: readonly ContentFeatSummary[];
   attribution?: string;
 };
-/** Name pools for one species, feeding the random generator. Pool `id` is an open slug; order comes from the data. */
+/** Name pools for one species, for the random generator. Pool `id` is an open slug; order comes from the data. */
 export const ContentNameBundleSchema = z.strictObject({
   speciesId: slug(),
   source: ContentSourceKindSchema,
@@ -544,7 +544,7 @@ export type ContentActionSummary = Readonly<{
   /** SRD Legendary Action cost against the creature's per-round pool (taken on other creatures' turns). */ legendaryCost?: number;
   /** "Can't take this action again until the start of its next turn." */ legendaryOncePerRound?: true;
   /** Taken as one attack of the Attack action (an Unarmed Strike, a Breath Weapon), so it spends one the action has left. */ replacesAttack?: true;
-  /** Added to a hit rather than taken alone (Sneak Attack, a smite): chosen on an attack's result. */ ridesAHit?: true;
+  /** Added to a hit and never taken alone (Sneak Attack, a smite): chosen on an attack's result. */ ridesAHit?: true;
   /** Darts the action makes, each assigned to a target (Magic Missile); see `ActorAction.darts`. */ darts?: number;
   /** Damage types the caster picks from (Chromatic Orb); see `ActorAction.damageTypes`. */ damageTypes?: readonly DamageType[];
   /** The conditions the caster picks one of for a failed save (Blindness/Deafness); `action.resolve`'s

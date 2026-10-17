@@ -283,7 +283,7 @@ describe("the table screen's sound", () => {
     await new Promise((resolve) => setTimeout(resolve, 700));
     const now = test.server.sound.view().board.music.current!;
     expect(now.assetId).toBe(other.id);
-    // The next track starts where the last one ended, not when the timer happened to run.
+    // The next track starts where the last one ended, whenever the timer happened to run.
     expect(now.startedAt).toBe(started.startedAt + 400);
   });
 

@@ -40,7 +40,7 @@ function installKeyboardFocusHelper(): () => void {
 /**
  * The app reopens where you left it: every signed-in address is remembered, and a fresh sign-in
  * without a deep link resumes there. A deep link always wins (the sign-in renders at the requested
- * path). A player who deep-linked a GM-only address gets the not-found view, not a redirect that would
+ * path). A player who deep-linked a GM-only address gets the not-found view, with no redirect that would
  * confirm the address means something; only the resume default is rewritten. Old addresses redirect
  * to their new homes (`/encounter` → `/table`, `/setup` → `/settings`, `/scenes?view=maps` →
  * `/scenes/maps`) so bookmarks land; `replace` keeps Back honest.

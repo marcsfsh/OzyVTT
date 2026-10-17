@@ -77,7 +77,7 @@ const renderWorkspace = () =>
     </ToastProvider>
   );
 
-describe("Codex shell — cross-mode navigation", () => {
+describe("Codex shell: cross-mode navigation", () => {
   beforeEach(() => {
     listPages.mockResolvedValue(PAGES);
     listRelationships.mockResolvedValue([]);
@@ -95,7 +95,7 @@ describe("Codex shell — cross-mode navigation", () => {
     }));
   });
 
-  it("starts on Pages — the GM's first action is actionable", async () => {
+  it("starts on Pages: the GM's first action is actionable", async () => {
     renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     expect(screen.getByRole("button", { name: "Pages" })).toHaveAttribute("aria-current", "page");

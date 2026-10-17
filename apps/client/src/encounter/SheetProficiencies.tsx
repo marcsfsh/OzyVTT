@@ -57,7 +57,7 @@ export function SheetProficiencies({
   const proficiencies = definition.proficiencies;
   const [profDraft, setProfDraft] = useState<ProficiencyDraft>({ saves: [], skills: {} });
   // Skills and the ability each check uses come from the catalog, ordered by name. A row whose
-  // ability the bundle never set shows no bonus rather than a wrong one.
+  // ability the bundle never set shows no bonus, so it can't show a wrong one.
   const skillCatalog = useSkillCatalog();
   const sheetSkills: readonly SheetSkill[] = [...skillCatalog.items]
     .map((skill) => ({
@@ -151,7 +151,7 @@ export function SheetProficiencies({
                     disabled={busy}
                     onClick={() => cycleSkill(skill.id)}
                   >
-                    {tier ?? "—"}
+                    {tier ?? "none"}
                   </button>
                 </li>
               );
@@ -211,7 +211,7 @@ export function SheetProficiencies({
                       className="sheet-roll-chip"
                       title={`${skill.name} names no governing ability, so it has no rollable bonus`}
                     >
-                      —
+                      None
                     </span>
                   ) : (
                     <button

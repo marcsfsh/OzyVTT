@@ -44,7 +44,7 @@ export function campaignFeedProps(
   input: Readonly<{ records: readonly CodexChronicleRecord[]; calendar: GmCodexCalendar | null }>
 ) {
   const pending = pendingDowntime(input.records);
-  // Pending downtime has its own card, so drop those ids from the feed. Excluded by id, not kind, because
+  // Pending downtime has its own card, so drop those ids from the feed. Excluded by id, and never by kind, because
   // `DASHBOARD_CARDED_KINDS` is shared with the player, who has no such card.
   const carded = new Set(pending.map((row) => row.id));
   const entries: readonly CampaignEntry[] = [...input.records]

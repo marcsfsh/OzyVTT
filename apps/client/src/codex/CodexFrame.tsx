@@ -87,7 +87,7 @@ export function CodexFrame({
     try {
       localStorage.setItem(sidebarKey, sidebarMode);
     } catch {
-      /* private mode - fine */
+      /* private mode: fine */
     }
   }, [sidebarKey, sidebarMode, embedded]);
   const collapsed = railBand || (!embedded && sidebarMode === "rail");
@@ -95,7 +95,7 @@ export function CodexFrame({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const openDrawer = () => {
     setDrawerOpen(true);
-    // The Android back gesture closes the drawer instead of leaving the section.
+    // The Android back gesture closes the drawer and the page stays in the section.
     if (!embedded) pushTransient(drawerKey, () => setDrawerOpen(false));
   };
   const closeDrawer = () => {

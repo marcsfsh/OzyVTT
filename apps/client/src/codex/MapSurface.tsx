@@ -40,7 +40,7 @@ type MapSurfaceProps = Readonly<{
   markers: readonly SurfaceMarker[];
   placing: boolean;
   selectedMarkerId: string | null;
-  /** Pins that don't match the filter. They dim (still tappable) rather than disappear. */
+  /** Pins that don't match the filter. They dim (still tappable) and stay on the map. */
   dimmedMarkerIds?: ReadonlySet<string> | null;
   readOnly?: boolean;
   /**
@@ -195,7 +195,7 @@ export function MapSurface({
       pointers.current.delete(event.pointerId);
       const state = gesture.current;
       const svg = svgRef.current;
-      // A cancelled gesture (stolen by the OS) discards rather than commits its last preview.
+      // A cancelled gesture (stolen by the OS) discards its last preview and commits nothing.
       const cancelled = event.type === "pointercancel";
       if (state.mode === "marker" && state.pointerId === event.pointerId) {
         if (!cancelled) {

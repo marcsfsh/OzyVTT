@@ -107,7 +107,7 @@ function deps(faces: number[], definition: ActorDefinition): ResolveDependencies
 }
 
 const cmd = (n: number) => `50000000-0000-4000-8000-0000000000${String(n).padStart(2, "0")}`;
-/** A fresh action slot: the charge pool is under test, not the action economy. */
+/** A fresh action slot: the charge pool is under test. */
 const newTurn = (state: GameState) => {
   state.combat = { ...state.combat, turn: { ...state.combat.turn, actionUsed: false, actionInstance: null } };
 };
@@ -166,7 +166,7 @@ describe("a Wand of Fireballs spends a charge, rolls real damage, and refuses at
       proposedDamage: 40,
       halfOnSuccess: true
     });
-    // The charge is spent on the authored pool key, not the action id.
+    // The charge is spent on the authored pool key.
     expect(actor.actionUses[CHARGES]).toBe(1);
   });
 
@@ -197,18 +197,18 @@ describe("a Wand of Fireballs spends a charge, rolls real damage, and refuses at
         { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(3) },
         deps([1, 1, 1, 1, 1, 1, 1, 1], definition)
       )
-    ).toThrow("Cast Fireball (Wand of Fireballs): no uses remaining (7/long rest).");
+    ).toThrow("Cast Fireball (Wand of Fireballs): no uses remaining (7/Long Rest).");
     // And nothing was rolled or spent on the refused press.
     expect(actor.actionUses[CHARGES]).toBe(7);
 
-    // The pool re-arms on a long rest. Known over-recovery: the SRD recharges 1d6 + 1 at dawn, this
+    // The pool re-arms on a Long Rest. Known over-recovery: the SRD recharges 1d6 + 1 at dawn, this
     // restores all seven.
     state.combat = { ...state.combat, active: false, initiative: [] };
     applyRest(state, IDS.hero, "long", () => definition, catalog);
     expect(actor.actionUses[CHARGES]).toBeUndefined();
   });
 
-  it("offers the wand NOTHING before attunement - the negative control on the whole far end", () => {
+  it("offers the wand NOTHING before attunement: the negative control on the whole far end", () => {
     const definition = definitionOf();
     const unattuned = fight(stateWith([item({ ...WAND_ROW, attuned: false })]));
     expect(
@@ -319,7 +319,7 @@ describe("an item action with a printed DC, a condition read off its prose, and 
         { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(6) },
         deps([], definition)
       )
-    ).toThrow("Command Obedience: no uses remaining (1/long rest).");
+    ).toThrow("Command Obedience: no uses remaining (1/Long Rest).");
   });
 });
 
@@ -353,7 +353,7 @@ describe("a staff's resistance and its shared charge pool", () => {
     expect(state.actors[0].actionUses["staff-of-fire-charges"]).toBe(1);
   });
 
-  it("shares ONE pool across three casts on the Staff of Charming - the second cast sees the first's spend", () => {
+  it("shares ONE pool across three casts on the Staff of Charming: the second cast sees the first's spend", () => {
     const definition = definitionOf();
     const state = fight(
       stateWith([
@@ -399,7 +399,7 @@ describe("a staff's resistance and its shared charge pool", () => {
         { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(9) },
         deps([], definition)
       )
-    ).toThrow(/no uses remaining \(10\/long rest\)/);
+    ).toThrow(/no uses remaining \(10\/Long Rest\)/);
   });
 });
 

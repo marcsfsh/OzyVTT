@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
-// The atlas renders a real image-backed surface; this file is about the party flag, not the camera.
+// The atlas renders a real image-backed surface; this file is about the party flag and leaves the camera alone.
 vi.mock("../scene/mapImage", () => ({
   useAuthorizedMapImage: () => ({ status: "ready", url: "blob:map", width: 1000, height: 800 }),
   imagePointFromClient: () => null,
@@ -238,7 +238,7 @@ describe("One party pin for the whole atlas", () => {
     await waitFor(() => expect(setPartyMarker).toHaveBeenCalledWith("gm", "k1", false));
   });
 
-  it("offers no second way to move the party — the pin IS the position", async () => {
+  it("offers no second way to move the party: the pin IS the position", async () => {
     await renderAtlas([MARKER({ isParty: true })]);
     const user = userEvent.setup();
     await user.click(document.querySelector('[data-marker-id="k1"]')!);

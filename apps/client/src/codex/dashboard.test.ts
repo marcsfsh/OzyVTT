@@ -29,7 +29,7 @@ describe("Which session the dashboard names, and what it calls it", () => {
     expect(card?.id).toBe("s4");
   });
 
-  it("says 'Last session' about a played one — the lie D18 was raised to kill", () => {
+  it("says 'Last session' about a played one: the lie D18 was raised to kill", () => {
     const card = nextSessionCard([SESSION({ id: "s3", sessionNumber: 3, status: "played" })], null);
     expect(card?.heading).toBe("Last session");
   });
@@ -111,7 +111,7 @@ describe("Downtime waiting on the GM (D18 #5)", () => {
     expect(pendingDowntime([DOWNTIME("w2", false, "Bo", false)])[0].revealed).toBe(false);
   });
 
-  it("does not also leave a pending row in the feed — one record, one place on the dashboard", () => {
+  it("does not also leave a pending row in the feed: one record, one place on the dashboard", () => {
     // Pending downtime has its own card with Confirm, so it leaves the feed.
     const feed = campaignFeedProps({
       records: [DOWNTIME("w1", false), DOWNTIME("w2", true), RECORD({ id: "e9" })],

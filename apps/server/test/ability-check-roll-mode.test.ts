@@ -10,7 +10,7 @@ import { startEncounter } from "../src/encounter.js";
 import { addEffect } from "../src/effects.js";
 
 // `roll-mode {roll: "check"}` must reach the die. A fixed pair (3 then 17) is queued into the
-// resolver's `random` and each case asserts which face the check kept, going through
+// resolver's `random` and each case asserts which face the check kept. Each case goes through
 // `resolveDefinitionAction` with `equipmentCatalog()` as `action.resolve` does. `BOOTS` mirrors
 // boots-of-elvenkind ("Advantage on Dexterity (Stealth) checks"), whose bundle row has `modifiers: []`.
 
@@ -170,7 +170,7 @@ describe("advantage on an ability check reaches the d20", () => {
     expect(record.total).toBe(21);
   });
 
-  it("takes the boots off and the SAME queue gives 3 - one die, no advantage, DC 15 missed", () => {
+  it("takes the boots off and the SAME queue gives 3: one die, no advantage, DC 15 missed", () => {
     const definition = definitionOf();
     const state = stateWith([item({ ...BOOTS_ROW, equipped: false })]);
     const resolution = resolveBuiltin(state, "hide", deps([3, 17], catalogOf([BOOTS]), definition));
@@ -412,7 +412,7 @@ describe("checkRollMode narrows the way checkRiderBonus does", () => {
     expect(checkRollMode(derivation, { ability: "dex", skill: "stealth" }).mode).toBe("advantage");
     expect(checkRollMode(derivation, { ability: "dex", skill: "acrobatics" }).mode).toBe("normal");
     expect(checkRollMode(derivation, { ability: "str", skill: "stealth" }).mode).toBe("normal");
-    // A caller that cannot name the check gets nothing rather than everyone's advantage (fail-closed).
+    // A caller that cannot name the check gets no advantage from anyone's rider (fail-closed).
     expect(checkRollMode(derivation).mode).toBe("normal");
   });
 });

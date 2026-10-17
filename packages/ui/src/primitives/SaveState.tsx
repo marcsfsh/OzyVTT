@@ -8,9 +8,9 @@ export type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "conflict" | "e
 
 interface SaveStateProps {
   status: SaveStatus;
-  /** Rendered only for "conflict" — the record changed on the server. */
+  /** Rendered only for "conflict": the record changed on the server. */
   onReload?: () => void;
-  /** Rendered only for "error" — the PATCH failed. */
+  /** Rendered only for "error": the PATCH failed. */
   onRetry?: () => void;
   className?: string;
 }
@@ -54,7 +54,7 @@ type View = Readonly<{
   icon: ReactNode;
 }>;
 
-/* One table, so a status can't ship with a word but no glyph. "saving" uses the shuffle glyph rather than a
+/* One table, so a status can't ship with a word but no glyph. "saving" uses the shuffle glyph and no
    spinner, because looping motion isn't allowed. */
 const VIEWS: Record<SaveStatus, View> = {
   idle: { label: "Saved", tone: "rest", settled: false, icon: <IconCheck /> },

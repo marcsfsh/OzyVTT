@@ -69,11 +69,11 @@ interface AbilityScoreAllocatorProps {
 }
 
 const signed = (value: number | null) =>
-  value == null ? "—" : value === 0 ? "±0" : value > 0 ? `+${value}` : `−${Math.abs(value)}`;
-const plain = (value: number | null) => (value == null ? "—" : String(value));
+  value == null ? "None" : value === 0 ? "±0" : value > 0 ? `+${value}` : `−${Math.abs(value)}`;
+const plain = (value: number | null) => (value == null ? "None" : String(value));
 
-/** The ability-score step for all four generation methods. Assignment is a per-ability `<Select>` rather than
-    drag-and-drop, which fails on a phone. Numbers use `.tabular` so columns line up as they change. Pure
+/** The ability-score step for all four generation methods. Assignment is a per-ability `<Select>`, because
+    drag-and-drop fails on a phone. Numbers use `.tabular` so columns line up as they change. Pure
     presentation: scores, costs and modifiers come from `@vtt/rules-5e` as props. */
 export function AbilityScoreAllocator({
   mode,
@@ -139,7 +139,7 @@ export function AbilityScoreAllocator({
             tone={overspent ? "magenta" : "cyan"}
             label={budget.label ?? "Points remaining"}
           />
-          {/* Caution, not danger: over budget is unfinished, not destructive. The flow's footer owns the fix. */}
+          {/* Caution: over budget is unfinished and destroys nothing. The flow's footer owns the fix. */}
           {overspent && (
             <Alert tone="warning" title="Over budget">
               You have spent {budget.spent} of {budget.total} points.
@@ -181,7 +181,7 @@ export function AbilityScoreAllocator({
                     value={assigned?.id ?? ""}
                     onChange={(event) => onAssign?.(row.id, event.target.value === "" ? null : event.target.value)}
                   >
-                    <option value="">—</option>
+                    <option value="">None</option>
                     {assigned && <option value={assigned.id}>{assigned.value}</option>}
                     {unassigned.map((entry) => (
                       <option key={entry.id} value={entry.id}>
@@ -206,7 +206,7 @@ export function AbilityScoreAllocator({
                 <span className="nh-abil-cell-label" aria-hidden="true">
                   Bonus
                 </span>
-                <span className="nh-abil-num tabular">{row.bonus ? signed(row.bonus) : "—"}</span>
+                <span className="nh-abil-num tabular">{row.bonus ? signed(row.bonus) : "None"}</span>
               </span>
 
               <span className="nh-abil-cell">
@@ -225,7 +225,7 @@ export function AbilityScoreAllocator({
 
               {row.note != null && <span className="nh-abil-note">{row.note}</span>}
 
-              {/* The row's outcome, read on focus instead of a live region that would announce every keystroke. */}
+              {/* The row's outcome, read on focus; a live region would announce every keystroke. */}
               <span className="nh-sr-only" id={outcomeId}>
                 Total {plain(row.total)}, modifier {signed(row.modifier)}
               </span>

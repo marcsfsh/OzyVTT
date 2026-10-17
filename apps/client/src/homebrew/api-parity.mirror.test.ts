@@ -36,7 +36,7 @@ const open = results.filter((result) => !result.covered && !isSystemForced(resul
 /* ---------------------------------------------------------------------- the census ---- */
 
 describe("the census: every API-authorable key the editor cannot reach, held to a reasoned row", () => {
-  it("pins the walk — the plan's two schema-intrinsic counts, and this file's own expansion", () => {
+  it("pins the walk: the plan's two schema-intrinsic counts, and this file's own expansion", () => {
     // `objectSchemas`/`declaredKeys` are properties of the schemas; the counts below are properties
     // of the canonicaliser. When a schema or control change moves them, re-pin in the same change.
     expect(stats).toEqual({ objectSchemas: 212, declaredKeys: 1098 });

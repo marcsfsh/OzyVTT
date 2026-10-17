@@ -67,8 +67,8 @@ export function seedHitDice(definition: ActorDefinition): Actor["hitDice"] {
   return single ? makeHitDicePool([single]) : null;
 }
 
-/** Spell-slot maxima by level, deriving the SRD multiclass table when only per-class casters are declared,
- *  plus item slots. Seeding, long rest and the spend clamp all read this. */
+/** Spell-slot maxima by level: the SRD multiclass table when only per-class casters are declared,
+ *  plus item slots. Seeding, Long Rest and the spend clamp all read this. */
 export function spellSlotMaxima(
   definition: ActorDefinition | undefined,
   equipmentSlots: readonly { level: number; amount: number }[] = []
@@ -157,7 +157,7 @@ export function seedPactSlots(definition: ActorDefinition): Actor["pactSlots"] {
   return pact ? { level: pact.level, remaining: pact.max } : null;
 }
 
-/** The spells a sheet starts the day with prepared (defaults the long rest also restores). */
+/** The spells a sheet starts the day with prepared (defaults the Long Rest also restores). */
 export function seedPreparedSpellIds(definition: ActorDefinition): string[] {
   return definition.spellcasting
     ? definition.spellcasting.spells.filter((spell) => spell.prepared || spell.alwaysPrepared).map((spell) => spell.id)
@@ -167,8 +167,8 @@ export function seedPreparedSpellIds(definition: ActorDefinition): string[] {
 /** The `source.name` the character builder stamps on what it builds. */
 export const BUILDER_SOURCE_NAME = "OzyVTT Character Builder";
 
-/** Whether a sheet's Armor Class is worked out from what the character wears (a built character), rather than a
- *  printed total that already counts its armor (a stat block, an imported sheet). */
+/** Whether a sheet's Armor Class is worked out from what the character wears (a built character), where a stat block
+ *  or an imported sheet prints a total that already counts its armor. */
 export function armorClassFromLoadout(definition: ActorDefinition): boolean {
   // `source` is required by the schema, but hand-built definitions (tests, old fixtures) can lack it.
   return definition.source?.name === BUILDER_SOURCE_NAME;
@@ -305,7 +305,7 @@ function instantiate(
   catalog?: EquipmentCatalog
 ) {
   if (state.actors.length >= MAX_ACTORS)
-    throw new CommandRejectedError("The roster is full - remove unused combatants first.");
+    throw new CommandRejectedError("The roster is full. Remove unused combatants first.");
   const inventory = (definition.startingInventory ?? []).map((item) => ({ ...item }));
   // Seeding through the same derivation as inventory writes gives monsters and PDF imports their
   // equipment riders from the start.
@@ -375,7 +375,7 @@ export function importActorDefinition(
   catalog?: EquipmentCatalog
 ) {
   if (state.definitions.length >= MAX_IMPORTED_DEFINITIONS)
-    throw new CommandRejectedError("The imported-sheet library is full - remove unused combatants first.");
+    throw new CommandRejectedError("The imported-sheet library is full. Remove unused combatants first.");
   const definitionId = `import-${actorId}`;
   const kind = definition.schemaId === "vtt.actor-character" ? ("player-character" as const) : ("monster" as const);
   const filled = withDefinitionProseFacts(definition);
@@ -406,7 +406,7 @@ export function fillStoredProseFacts(state: GameState): boolean {
 /** Queue a player-submitted import for GM approval; the definition is pre-validated by the caller. */
 export function submitPendingImport(state: GameState, definition: ActorDefinition, id: string, submittedBy: string) {
   if (state.pendingImports.length >= 20)
-    throw new CommandRejectedError("The import queue is full - ask your GM to review the pending sheets first.");
+    throw new CommandRejectedError("The import queue is full. Ask your GM to review the pending sheets first.");
   state.pendingImports = [
     ...state.pendingImports.filter((entry) => entry.id !== id),
     { id, name: definition.name, submittedBy, definition }
@@ -431,7 +431,7 @@ export function resolvePendingImport(
 /** Archived characters are out of play; rejected (not filtered) so the GM's selection never silently changes. */
 export function assertNotArchived(state: GameState, actorId: string) {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
-  if (actor?.archived) throw new CommandRejectedError(`${actor.name} is archived - restore them first.`);
+  if (actor?.archived) throw new CommandRejectedError(`${actor.name} is archived. Restore ${actor.name} first.`);
 }
 
 /**
@@ -610,7 +610,7 @@ function rememberHitPointRolls(previous: ActorDefinition | undefined, next: Acto
 export function removeActor(state: GameState, actorId: string) {
   const actor = state.actors.find((item) => item.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
-  // An archived but still-claimed character can be deleted, releasing the claim in the same mutation.
+  // An archived but still-claimed character can be deleted, and the claim is released in the same mutation.
   // A character still in play keeps the protection.
   if (actor.kind === "player-character" && actor.ownerSessionId !== null) {
     if (!actor.archived) throw new CommandRejectedError("Release that character's claim before removing it.");

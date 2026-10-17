@@ -75,7 +75,7 @@ describe("Lay on Hands", () => {
       limit: 25,
       per: "long-rest"
     });
-    // A pool one action spends goes by that action's name, not its key.
+    // A pool one action spends goes by that action's name.
     expect(pools.find((entry) => entry.id === "paladins-smite")?.name).toBe("Divine Smite (no slot)");
   });
 
@@ -116,7 +116,7 @@ describe("Lay on Hands", () => {
 
     const tooMuch = await resolve({ actionId: "lay-on-hands", targetIds: [ALLY], spend: 30 });
     expect(tooMuch.status).toBe(409);
-    expect(JSON.stringify(await tooMuch.json())).toContain("Lay on Hands has 18 left - this spends 30.");
+    expect(JSON.stringify(await tooMuch.json())).toContain("Lay on Hands has 18 left, and this spends 30.");
 
     // The Paladin's next turn brings a new Bonus Action for the cure.
     for (let turn = 0; turn < 2; turn += 1)
@@ -128,7 +128,7 @@ describe("Lay on Hands", () => {
       expect((await post(GAME_PATHS.initiativeNext, gmToken, { commandId: randomUUID() })).status).toBe(200);
     const nothingToCure = await resolve({ actionId: "lay-on-hands-cure-poison", targetIds: [ALLY] });
     expect((await nothingToCure.json()).error.message).toBe(
-      "Bryn isn't Poisoned - Lay on Hands: Cure Poison would do nothing."
+      "Bryn isn't Poisoned, so Lay on Hands: Cure Poison would do nothing."
     );
     expect(spent()).toBe(12);
   });

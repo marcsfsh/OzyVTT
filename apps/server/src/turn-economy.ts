@@ -22,7 +22,7 @@ function policeGiveBack(state: GameState, initiator: Initiator, spent: string, n
   const rule = "economy.spent-slot" as const;
   const mode = effectiveModeFor(state.combat, rule);
   if (mode === "freeform" || overrideCovers(state.combat.turn, rule)) return;
-  const message = `${spent} is spent - only the GM can give it back.`;
+  const message = `${spent} is spent. Only the GM can give it back.`;
   if (mode === "strict") throw new RulesBlockedError(rule, message);
   notes?.push(message);
 }

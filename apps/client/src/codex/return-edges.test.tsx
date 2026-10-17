@@ -166,7 +166,7 @@ describe("Journal entry → its marker", () => {
     listMarkers.mockImplementation(async (_token: string, mapId: string) => (mapId === "m1" ? [MARKER] : []));
   });
 
-  it("opens the Atlas on the pin's own map AND selects the pin — both halves", async () => {
+  it("opens the Atlas on the pin's own map AND selects the pin: both halves", async () => {
     chronicle.mockResolvedValue([RECORD({ attachMarkerId: "k1" })]);
     const user = userEvent.setup();
     renderWorkspace();
@@ -175,7 +175,7 @@ describe("Journal entry → its marker", () => {
     await user.click(await screen.findByRole("button", { name: "Open pin" }));
 
     expect(screen.getByRole("button", { name: "Atlas" })).toHaveAttribute("aria-current", "page");
-    // The pin's map, not the default.
+    // The pin's map, where the default would be wrong.
     const surface = await screen.findByTestId("map-surface");
     await waitFor(() => expect(surface).toHaveAttribute("data-asset", "a1"));
     expect(

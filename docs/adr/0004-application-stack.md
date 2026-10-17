@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-07-15.
+Accepted on 2026-07-15.
 
 ## Context and decision drivers
 
@@ -12,15 +12,15 @@ The product is a single-host, browser-based, combat-first D&D 5e VTT for one GM 
 
 - Polyglot server (e.g. a non-JavaScript backend) with a JavaScript/TypeScript client: allows a different persistence/runtime ecosystem, but forces two type systems and duplicated command/event/schema definitions across a network boundary.
 - JavaScript without static types: fastest to start, but the shared command/event/schema contracts between `apps/client`, `apps/server`, and `packages/domain` are exactly the kind of cross-boundary contract static types are meant to protect.
-- TypeScript end to end with a workspace of shared packages: one language and type system across client, server, and domain code; contracts in `packages/domain` and `packages/schemas` are imported, not re-implemented, on both sides of the socket.
+- TypeScript end to end with a workspace of shared packages: one language and type system across client, server, and domain code; contracts in `packages/domain` and `packages/schemas` are imported on both sides of the socket, with no second implementation.
 
 ## Decision
 
-Use TypeScript end to end in an npm workspace (`apps/*`, `packages/*`), Node.js 24+ as the server runtime, React 19 with Vite for the browser client, Express 5 and Socket.IO 4 on the server, Zod for runtime schema validation, and Node's built-in `node:sqlite` for persistence (ADR-006). The map/token canvas is SVG/DOM (ADR-0003, closed 2026-08-01); the PixiJS spike dependency it names was removed 2026-08-05 with the last file that imported it. Shared contracts — commands, events, projections, and actor/content schemas — live in `packages/domain`, `packages/schemas`, and `packages/rules-5e` and are imported by both `apps/client` and `apps/server`, never duplicated.
+Use TypeScript end to end in an npm workspace (`apps/*`, `packages/*`), Node.js 24+ as the server runtime, React 19 with Vite for the browser client, Express 5 and Socket.IO 4 on the server, Zod for runtime schema validation, and Node's built-in `node:sqlite` for persistence (ADR-006). The map/token canvas is SVG/DOM (ADR-0003, closed 2026-08-01); the PixiJS spike dependency it names was removed 2026-08-05 with the last file that imported it. Shared contracts (commands, events, projections, and actor/content schemas) live in `packages/domain`, `packages/schemas`, and `packages/rules-5e` and are imported by both `apps/client` and `apps/server`, never duplicated.
 
 ## Consequences and tradeoffs
 
-One language and one dependency graph simplify shared-contract maintenance and let the domain/rules packages be unit-tested without a browser or an HTTP server. Node 24 becomes the minimum supported runtime because of `node:sqlite` (tracked as RISK-001: the API is still release-candidate/experimental and must be reviewed before production packaging or Node upgrades). Workspace packages currently ship TypeScript source rather than compiled output, so the supported launch path still depends on the `tsx` loader even after the client build (tracked as GAP-004); ordered package compilation is required before self-host packaging.
+One language and one dependency graph simplify shared-contract maintenance and let the domain/rules packages be unit-tested without a browser or an HTTP server. Node 24 becomes the minimum supported runtime because of `node:sqlite` (tracked as RISK-001: the API is still release-candidate/experimental and must be reviewed before production packaging or Node upgrades). Workspace packages currently ship TypeScript source with no compiled output, so the supported launch path still depends on the `tsx` loader even after the client build (tracked as GAP-004); ordered package compilation is required before self-host packaging.
 
 ## Mobile, security, and visibility impact
 

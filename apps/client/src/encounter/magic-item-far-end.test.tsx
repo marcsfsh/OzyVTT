@@ -51,7 +51,7 @@ function serveCatalog() {
   );
 }
 
-/** A real imported PC, so the sheet renders its Inventory section rather than the "no sheet yet" note. */
+/** A real imported PC, so the sheet renders its Inventory section and no "no sheet yet" note. */
 const DEFINITION = ActorDefinitionSchema.parse(loadActorFixture("player-character"));
 const ACTOR = {
   id: "10000000-0000-4000-8000-000000000001",
@@ -88,7 +88,7 @@ describe("the far end of the magic-item ETL", () => {
       "Add Wand of the War Mage, +2",
       "Add Wand of the War Mage, +3"
     ]);
-    // Read off the DOM, not the record.
+    // Read off the DOM, never the record.
     expect(rows[0].textContent).toContain("Wand, Uncommon (Requires Attunement by a Spellcaster).");
     // ...and each tier shows its own rung.
     expect(rows[1].textContent).toContain("Wand, Rare (");
@@ -175,12 +175,12 @@ describe("the far end of the magic-item ETL", () => {
       .type(await screen.findByRole("searchbox", { name: "Search equipment" }), "armor of resistance");
     const rows = screen.getAllByRole("listitem");
     expect(rows).toHaveLength(1);
-    // Its d10 table went into the description rather than ten near-identical browse rows.
+    // Its d10 table went into the description, so there are no ten near-identical browse rows.
     expect(rows[0].textContent).toContain("Armor (Any Light, Medium, or Heavy), Rare (Requires Attunement).");
     expect(rows[0].textContent).toContain("1d10 1: Damage Type Acid");
   });
 
-  it("does not put a wand's mechanics on the wire — only what a browse row and an inventory row already carried", () => {
+  it("does not put a wand's mechanics on the wire, only what a browse row and an inventory row already carried", () => {
     // The browse projection has exactly these keys, none of them a rider, a cast or a cursed flag.
     // `appliesTo` (the printed eligibility qualifier plus resolved base ids) is SRD reference text,
     // identical for every viewer; it is null for the wand (only weapon/armor templates carry one).
@@ -233,7 +233,7 @@ describe("the base chooser", () => {
     await user.type(await screen.findByRole("searchbox", { name: "Search equipment" }), "Weapon, +1");
     await user.click(screen.getByRole("button", { name: "Add Weapon, +1" }));
 
-    // Nothing added yet: the chooser opened, showing the printed form and real bases.
+    // Nothing added yet: the chooser opened and shows the printed form and real bases.
     expect(added).toEqual([]);
     expect(screen.getByText(/applies to Any Simple or Martial/)).toBeTruthy();
     // All 38 bases are offered, each with its own numbers on the row.
@@ -284,7 +284,7 @@ describe("the base chooser", () => {
   });
 });
 
-describe("the wire seam - the real sheet ships the pick", () => {
+describe("the wire seam: the real sheet ships the pick", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

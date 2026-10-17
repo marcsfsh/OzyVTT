@@ -49,7 +49,7 @@ export type FieldRendererProps = Readonly<{
   draft: Draft;
   onDraft: (next: Draft) => void;
   ctx: SchemaContext;
-  /** `hb-{type}` — ids are `hb-{type}-{key with dots as dashes}`. */
+  /** `hb-{type}`: ids are `hb-{type}-{key with dots as dashes}`. */
   idPrefix: string;
   custom?: Readonly<Record<string, CustomRenderer>>;
   disabled?: boolean;
@@ -355,7 +355,7 @@ export function FieldRenderer(props: FieldRendererProps) {
       return (
         <fieldset className="hb-fieldset nh-fieldgrid-wide">
           <legend className="hb-fieldset-legend">{field.label}</legend>
-          {/* Group help sits above the members, not after their own help. */}
+          {/* Group help sits above the members, before their own help. */}
           {help && <p className="nh-field-help">{help}</p>}
           <FieldGrid>
             {(field.rows ?? []).map((child, childIndex) => (
@@ -436,8 +436,8 @@ export function FieldRenderer(props: FieldRendererProps) {
             value={asString(raw) || null}
             placeholder={field.placeholder ? suggestionLabel(field.placeholder) : undefined}
             disabled={isDisabled}
-            /* Show the whole bounded vocabulary rather than the default page of 8; large catalogs
-               use `searchable` + `CatalogPicker` instead. */
+            /* Show the whole bounded vocabulary past the default page of 8; large catalogs
+               use `searchable` + `CatalogPicker`. */
             limit={suggestions.length}
             allowFreeText
             /* `pickValue` normalizes typed words to the slug shape, so "Very Rare" stores as `very-rare`. */

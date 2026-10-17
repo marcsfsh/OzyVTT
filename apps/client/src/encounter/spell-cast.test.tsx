@@ -155,7 +155,7 @@ describe("casting a leveled spell from the sheet", () => {
 });
 
 describe("a Warlock's Pact Magic on the sheet", () => {
-  /** Warlock 5: two 3rd-level pact slots, one spent; Hex from the builder, Hold Person from a PDF (no action). */
+  /** Warlock 5: two level 3 Pact Magic slots, one spent; Hex from the builder, Hold Person from a PDF (no action). */
   const warlock = {
     ...definition,
     actions: [
@@ -212,7 +212,7 @@ describe("a Warlock's Pact Magic on the sheet", () => {
 
   it("casts a spell with a pact slot at the pact level, through its action or from the pool", () => {
     const { castSpellAction, edit } = mountWarlock();
-    expect(screen.getAllByRole("option", { name: "3rd · 1/2 · pact · upcast" }).length).toBe(2);
+    expect(screen.getAllByRole("option", { name: "Level 3 · 1/2 · pact · upcast" }).length).toBe(2);
     const casts = screen.getAllByRole("button", { name: "Cast" });
     fireEvent.click(casts[0]);
     expect(castSpellAction).toHaveBeenLastCalledWith("spell-hex", 3);

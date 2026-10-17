@@ -21,7 +21,7 @@ export type FeatQualification = Readonly<{
 
 /**
  * The half of a qualification that does not change from slot to slot. Features are read at the build's own
- * level rather than the slot's, which no SRD prerequisite tells apart. The starting class brings its own armor and
+ * level, whatever the slot's, which no SRD prerequisite tells apart. The starting class brings its own armor and
  * weapon training, a later class only what it gives a multiclass character.
  */
 export function featHoldings(
@@ -51,7 +51,7 @@ export function featHoldings(
   };
 }
 
-/** The `requires` slug that means the Spellcasting feature rather than a held feature id. */
+/** The `requires` slug that means the Spellcasting feature, where any other slug is a held feature id. */
 const SPELLCASTING = "spellcasting";
 
 /** Why this character cannot take the feat at this slot, in a sentence, or null when it qualifies. */

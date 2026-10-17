@@ -70,7 +70,7 @@ describe("Reading a character back into the wizard", () => {
       level: 3,
       classLevels: ["fighter", "fighter", "fighter"]
     });
-    // No race recorded: the rebuild cannot name a species, so the flow must gate rather than invent one.
+    // No race recorded: the rebuild cannot name a species, so the flow must gate and invent nothing.
     expect(
       identityOf(
         definition({
@@ -148,7 +148,7 @@ describe("Rolled hit points", () => {
     expect(hpRolls([], 1)).toEqual([]);
   });
 
-  it("returns null the moment ONE level is unrecorded — the server's own rule", () => {
+  it("returns null the moment ONE level is unrecorded, the server's own rule", () => {
     expect(hpRolls([roll(2, 6)], 3)).toBeNull();
     expect(hpRolls([roll(3, 4)], 3)).toBeNull();
     expect(hpRolls([{ level: 2, kind: "hp-roll", id: "hp" }], 2)).toBeNull();

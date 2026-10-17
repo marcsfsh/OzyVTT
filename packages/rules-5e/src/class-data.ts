@@ -228,7 +228,7 @@ export type ClassProgressionSource = Readonly<{
 }>;
 
 /** An authored class record as a progression row, so authored and homebrew classes use their own values
- * instead of SRD defaults. */
+ * where the SRD defaults would otherwise apply. */
 export function progressionFromClass(source: ClassProgressionSource): ClassProgression {
   return {
     hitDie: source.hitDie,
@@ -321,7 +321,8 @@ export function multiclassShortfalls<New extends MulticlassCandidate, Current ex
 
 /**
  * Why a new class can't be taken, in sentences: "Wizard needs Intelligence 13; you have 10." for the new class, and
- * "Your Fighter needs Strength 13 or Dexterity 13; you have Strength 10 and Dexterity 12." for one already taken.
+ * "Fighter, a class you already have, needs Strength 13 or Dexterity 13; you have Strength 10 and Dexterity 12."
+ * for one already taken.
  */
 export function multiclassShortfallText(
   abilityScores: Readonly<Partial<Record<Ability, number>>>,
@@ -341,7 +342,7 @@ export function multiclassShortfallText(
           : minimums.minimums
               .map((minimum) => `${ABILITY_NAMES[minimum.ability]} ${score(minimum.ability)}`)
               .join(" and ");
-      const who = entry.id === newClass.id ? entry.name : `Your ${entry.name}`;
+      const who = entry.id === newClass.id ? entry.name : `${entry.name}, a class you already have,`;
       return `${who} needs ${wanted}; you have ${have}.`;
     })
     .join(" ");

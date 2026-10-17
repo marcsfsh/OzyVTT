@@ -253,7 +253,7 @@ describe("SRD 5.2.1 monster bundle", () => {
 
   it("recovers structured attacks from statblock prose when upstream has no attack row", () => {
     const byId = (id: string) => monsters.find((monster) => monster.source.externalId === id)!;
-    // rat: flat "1 Piercing damage" - a fixed amount, dealt as printed (no dice, so a crit leaves it at 1).
+    // rat: flat "1 Piercing damage", a fixed amount, dealt as printed (no dice, so a crit leaves it at 1).
     const ratBite = byId("rat").actions.find((action) => action.id === "bite");
     expect(ratBite?.attack).toEqual({ bonus: 2, reachFeet: 5 });
     expect(ratBite?.damage).toEqual([{ formula: "1", type: "piercing" }]);
@@ -333,8 +333,8 @@ describe("SRD 5.2.1 reference bundles", () => {
       expect(condition.description, condition.id).not.toMatch(/[a-z]- [a-z]/);
     }
     expect(text("prone")).toContain("amount of movement equal to half your Speed");
-    // Unaware is its own bullet, not the tail of Automatic Critical Hits.
-    expect(text("unconscious")).toMatch(/within 5 feet of you\. \n\* Unaware\. You’re unaware/);
+    // Unaware is its own bullet, after Automatic Critical Hits.
+    expect(text("unconscious")).toMatch(/within 5 feet of you\. \n\* Unaware\. You\u2019re unaware/);
     expect(text("invisible")).toContain("\n* Attacks Affected.");
   });
 
@@ -510,7 +510,7 @@ describe("SRD 5.2.1 reference bundles", () => {
     });
 
     // Every slug used is one the weapon-property bundle actually publishes, bare of the fixture's
-    // own `-wp`/`-mastery` suffix - so a typo cannot reach a reader that matches on the bare word.
+    // own `-wp`/`-mastery` suffix, so a typo cannot reach a reader that matches on the bare word.
     const bare = (kind: "property" | "mastery") =>
       new Set(
         loadWeaponProperties()
@@ -524,7 +524,7 @@ describe("SRD 5.2.1 reference bundles", () => {
       for (const property of weapon.properties!)
         expect(bare("property"), `${weapon.id}: ${property}`).toContain(property);
     }
-    // A Mace has no properties: an empty array, not an absent key.
+    // A Mace has no properties: an empty array, and the key is present.
     expect(weapons.find((weapon) => weapon.id === "mace")!.properties).toEqual([]);
   });
 
@@ -726,10 +726,10 @@ describe("homebrew source discriminator and open item categories", () => {
     }
   });
 
-  it("strips an UNdeclared key from the very same schemas - which is what `source` used to be", () => {
+  it("strips an UNdeclared key from the very same schemas, which is what `source` used to be", () => {
     // Proves the test above can fail: an undeclared key is stripped without error.
     for (const [label, schema, body] of records) {
-      if (schema === EquipmentReferenceSchema) continue; // the one .strict() record - covered below
+      if (schema === EquipmentReferenceSchema) continue; // the one .strict() record: covered below
       const parsed = schema.parse({ ...body, contentSource: "homebrew" }) as Record<string, unknown>;
       expect(parsed.contentSource, label).toBeUndefined();
     }
@@ -835,7 +835,7 @@ describe("spell-list overlay", () => {
   });
 
   it("flags a list id that shadows an existing spell tag instead of silently merging into it", () => {
-    // An unnamespaced `wizard` list would extend the SRD Wizard list rather than create a new one.
+    // An unnamespaced `wizard` list would extend the SRD Wizard list.
     expect(resolveSpellLists([list("wizard", { add: ["cure-wounds"] })], spells).shadowedListIds).toEqual(["wizard"]);
     expect(resolveSpellLists([list("hb-wizard", { basedOn: ["wizard"] })], spells).shadowedListIds).toEqual([]);
   });

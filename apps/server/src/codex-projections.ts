@@ -337,7 +337,7 @@ function excerpt(text: string): string {
 
 // The chronicle: one timeline of journal entries and dated `event` pages
 
-/** Exhaustive, no `default`: a new journal kind is a compile error here rather than rendering as a plain entry. */
+/** Exhaustive, no `default`: a new journal kind is a compile error here and never renders as a plain entry. */
 function chronicleKindOf(kind: CodexJournalKind): CodexChronicleKind {
   switch (kind) {
     case "note":
@@ -439,7 +439,7 @@ export type GmChronicleContext = Readonly<{
   proposedDate?: CodexInWorldDate | null;
 }>;
 
-/** `publishedInstant`, not `campaignInstant`, so the GM context is not assignable here by accident. */
+/** `publishedInstant`, so the GM context (`campaignInstant`) is not assignable here by accident. */
 export type PlayerChronicleContext = PlayerSessionNumberContext &
   Readonly<{
     publishedInstant?: number | null;
@@ -600,7 +600,7 @@ export function sessionDisplayTitle(session: Readonly<{ sessionNumber: number | 
   return excerpt(session.recap) || "Untitled session";
 }
 
-/** null when not player-visible, matching each kind's player list endpoint (markers also need their map revealed). */
+/** null when not player-visible, as each kind's player list endpoint decides (markers also need their map revealed). */
 export function projectPlayerSearchHit(
   record: CodexSearchRecord,
   context: PlayerSessionNumberContext
@@ -795,7 +795,7 @@ function auditRow(record: CodexRevealAuditRecord): CodexRevealAuditRow | null {
       return projected === null ? null : { kind: "map", id: projected.id, title: projected.name, journalKind: null };
     }
     case "marker": {
-      // `projectPlayerPageMarker`, not `projectPlayerMarker`: the map gate applies here too.
+      // `projectPlayerPageMarker`, so the map gate applies here too.
       const projected = projectPlayerPageMarker(record);
       return projected === null
         ? null

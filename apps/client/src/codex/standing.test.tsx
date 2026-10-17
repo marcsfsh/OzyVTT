@@ -102,7 +102,7 @@ describe("The seven tiers are a reading rule with hard edges", () => {
   });
 
   it("the bands are exhaustive and non-overlapping across the whole scale", () => {
-    // Every integer maps to exactly one word, matching the displayed table.
+    // Every integer maps to exactly one word, as the displayed table does.
     for (let value = STANDING_MIN; value <= STANDING_MAX; value += 1) {
       const matches = STANDING_TIERS.filter((tier) => value >= tier.min && value <= tier.max);
       expect(matches, `${value} should sit in exactly one band`).toHaveLength(1);
@@ -167,7 +167,7 @@ describe("The card says where you stand, in words", () => {
     expect(within(card).getByText("+50")).toBeInTheDocument();
   });
 
-  it("offers Adjust only to a caller that can write — a player's card has nothing to tap", () => {
+  it("offers Adjust only to a caller that can write: a player's card has nothing to tap", () => {
     // A capability flag, never a role check: the player's Codex renders this component too.
     const { unmount } = renderCard([CARD(20)], vi.fn());
     expect(screen.getByRole("button", { name: "Adjust" })).toBeInTheDocument();
@@ -217,7 +217,7 @@ describe("Adjusting standing writes the reason with it", () => {
   });
 
   /** The server makes `reason` optional, so the button arms as soon as the value changes. */
-  it("arms as soon as the value moves, reason or not — the server does not require one", async () => {
+  it("arms as soon as the value moves, reason or not: the server does not require one", async () => {
     renderAdjuster(STANDING(10));
     const user = userEvent.setup();
 
@@ -369,7 +369,7 @@ describe("Standing and milestone chronicle kinds read by icon AND word", () => {
     expect(milestoneOf(standing)).toBeNull();
     expect(downtimeOf(milestone)).toBeNull();
     expect(downtimeOf(standing)).toBeNull();
-    // The gate is the kind, not the payload shape.
+    // The gate is the kind; the payload shape doesn't open it.
     expect(milestoneOf(record({ kind: "entry", payload: { level: 5, reason: "x" } }))).toBeNull();
   });
 

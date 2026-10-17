@@ -4,7 +4,7 @@ import "./confirm-row.css";
 
 /**
  * A question that needs a yes before anything happens (a rules override, a history rewrite): the
- * sentence, Cancel, and the confirming button. Inline rather than a dialog, so the table stays live.
+ * sentence, Cancel, and the confirming button. Inline, so the table stays live behind it.
  */
 export function ConfirmRow({
   ariaLabel,

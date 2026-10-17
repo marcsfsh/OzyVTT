@@ -157,11 +157,11 @@ describe("homebrew HTTP authorization gate", () => {
       const anonymous = await call();
       expect(anonymous.status, `${label} unauthenticated`).toBe(401);
       const text = await anonymous.text();
-      // Nothing about the GM's library may appear in a denial: not a name, not an id.
+      // Nothing about the GM's library may appear in a denial: no name and no id.
       expect(text, `${label} leaked a record name`).not.toContain("Secret");
       expect(text, `${label} leaked a record id`).not.toContain(draft.id);
     }
-    // An authenticated player is forbidden, not unauthenticated: a 401 would send them to re-login for a
+    // An authenticated player gets forbidden (403): a 401 would send them to re-login for a
     // surface that is never theirs.
     const playerCalls = [
       get(base, CONTENT, PLAYER),
@@ -186,7 +186,7 @@ describe("homebrew HTTP authorization gate", () => {
         .filter((path) => path.startsWith("/api/v1/homebrew"))
         .sort()
     ).toEqual([...declared].sort());
-    // Read Express's route table rather than probing over HTTP: the route table is exactly what was registered,
+    // Read Express's route table with no HTTP probing: the route table is exactly what was registered,
     // so a documented-but-unmounted path cannot hide. Same shape as `codex-http.test.ts`'s mount check.
     const directory = await mkdtemp(join(tmpdir(), "vtt-homebrew-mount-"));
     const store = new HomebrewStore(join(directory, "vtt.sqlite"));
@@ -230,7 +230,7 @@ describe("homebrew HTTP CRUD", () => {
     const record = created.data.record;
     expect(record).toMatchObject({ type: "class", state: "draft", visibleToPlayers: false, deletedAt: null, rev: 1 });
     // `record` is self-describing on the wire (the pack format is a bare array of records) even
-    // though `type` is stored on the row rather than inside the authored body.
+    // though `type` is stored on the row and outside the authored body.
     expect(record.record).toMatchObject({ id: record.id, type: "class", name: "Blood Hunter", hitDie: "d10" });
     expect(pings).toEqual([1]); // one content-free ping per write
 
@@ -264,7 +264,7 @@ describe("homebrew HTTP CRUD", () => {
     expect(stale.status).toBe(409);
     const conflict = await body(stale);
     expect(conflict.error.code).toBe("conflict");
-    // The editor's autosave resyncs from this number instead of clobbering.
+    // The editor's autosave resyncs from this number and clobbers nothing.
     expect(conflict.error.currentRevision).toBe(2);
     const after = await body(await get(base, byId(record.id), GM));
     expect(after.data.record.record.name).toBe("Blood Hunter II");
@@ -295,7 +295,7 @@ describe("homebrew HTTP CRUD", () => {
   it("keeps publish and visibility separate, and refuses to make a draft player-visible", async () => {
     const { base } = await fixture();
     const record = await createRecord(base);
-    // draft + visible is meaningless: a 409 rather than a silent no-op.
+    // draft + visible is meaningless: a 409.
     const early = await post(base, sub(HOMEBREW_PATHS.contentVisibility, record.id), GM, { visibleToPlayers: true });
     expect(early.status).toBe(409);
 
@@ -343,7 +343,7 @@ describe("homebrew HTTP CRUD", () => {
   });
 
   // A PATCH to a published record goes through validation: an autosave that makes the record invalid
-  // demotes it to a hidden draft, so the library never claims "Published - shown to players" for a record
+  // demotes it to a hidden draft, so the library never shows players a published record that
   // `publishedFor` would drop.
   describe("a record other published records depend on", () => {
     /** A published list, and a second published list that draws its spells only from the first. */
@@ -399,7 +399,7 @@ describe("homebrew HTTP CRUD", () => {
       const id = await publishAndShare(base);
       expect(store.publishedFor("player").spellLists).toHaveLength(1);
 
-      // The autosave that empties the list - still a legal PATCH, and it still lands.
+      // The autosave that empties the list: still a legal PATCH, and it still lands.
       const patched = await body(
         await patch(base, byId(id), GM, { record: { id, name: "Blood Magic", source: "homebrew", add: [] } })
       );
@@ -520,7 +520,7 @@ describe("homebrew HTTP CRUD", () => {
   });
 
   // End to end in the order a GM would work: duplicate a class and a subclass, re-point the subclass,
-  // publish in either order, and build a character, checking the resulting numbers.
+  // publish in either order, and build a character, then check the resulting numbers.
   it('takes a GM from "duplicate Fighter" to a published, playable class - and the character is really built', async () => {
     const { base, contentLibrary } = await fixture({ realValidation: true });
     const duplicate = async (id: string) =>
@@ -600,7 +600,7 @@ describe("homebrew HTTP CRUD", () => {
       BuilderPolicySchema.parse({})
     );
 
-    // The numbers, not just the absence of a throw, and they match the SRD Fighter's: a duplicate that
+    // The numbers themselves, and they match the SRD Fighter's: a duplicate that
     // publishes but computes differently would be wrong.
     // Level 1: 10+2 Con. Rolls 1/10/4/6, +2 Con each = 41.
     expect(built.hitPoints.maximum).toBe(41);
@@ -608,7 +608,7 @@ describe("homebrew HTTP CRUD", () => {
     expect(built.abilityScores).toEqual({ str: 19, dex: 13, con: 15, int: 8, wis: 12, cha: 10 });
     // Chain mail 16 from the copied starting-equipment option + the Defense style's +1.
     expect(built.armorClass).toBe(17);
-    // The homebrew class and its subclass are what the sheet records, not the SRD originals.
+    // The sheet records the homebrew class and its subclass.
     expect(built.character?.classes).toEqual([
       {
         id: heroClass.id,
@@ -760,7 +760,7 @@ describe("homebrew HTTP packs", () => {
     expect(HomebrewPackImportResponseSchema.safeParse(applied).success).toBe(true);
     expect(applied.data.imported).toHaveLength(4);
     expect(applied.data.rejected).toEqual([]);
-    // All reported, and the 200-character id is rendered rather than emitted verbatim, which would fail the
+    // All reported, and the 200-character id is rendered short, since the verbatim id would fail the
     // response contract.
     expect(applied.data.reminted).toHaveLength(4);
     expect(applied.data.reminted.map((entry: Json) => entry.originalId).sort()).toEqual(
@@ -826,7 +826,7 @@ describe("homebrew HTTP packs", () => {
     expect(untouched).toMatchObject({ state: "published", visibleToPlayers: true });
     expect(untouched.record.name).toBe("Shared List");
     expect(store.publishedFor("player").spellLists).toHaveLength(1);
-    // The deleted record stays deleted rather than walking back in.
+    // The deleted record stays deleted.
     expect(store.get(deleted.id)!.deletedAt).not.toBeNull();
     // And the row overwriting is meant for goes through.
     expect(applied.data.overwritten.map((entry: Json) => entry.id)).toEqual([draft.id]);

@@ -81,7 +81,6 @@ export function PushChoice({
   );
 }
 
-const ORDINALS = ["", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th"];
 const titled = (type: string) => (type.length > 0 ? `${type[0].toUpperCase()}${type.slice(1)}` : type);
 
 /**
@@ -160,7 +159,7 @@ export function HitOfferChoices({
                     disabled={busy}
                     onClick={() => update(offer.id, { slotLevel: level })}
                   >
-                    {ORDINALS[level] ?? level} slot
+                    Level {level} slot
                   </button>
                 ))}
               </span>
@@ -180,7 +179,7 @@ export function HitOfferChoices({
 /**
  * An attack previewed but not yet applied: Confirm resolves the hit for real (damage, riders, economy) with the die
  * shown, which the server holds (ADR-0012). The GM may force Advantage or Disadvantage and reroll freely; a player
- * rerolls only by spending Heroic Inspiration, typing the reroll's face when the shown die was typed. A hit that offers
+ * rerolls only by spending Heroic Inspiration, and types the reroll's face when the shown die was typed. A hit that offers
  * a Push asks how far first, and a hit that can carry extras (Sneak Attack, a smite) offers them; Confirm sends those
  * choices.
  */

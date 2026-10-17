@@ -156,7 +156,7 @@ export function RevealAudit({ gmToken }: Readonly<{ gmToken: string }>) {
       <div className="codex-audit">
         <header className="codex-audit-head">
           <h3 className="codex-audit-title">Everything shared with players</h3>
-          {/* What players actually receive, not how many reveal flags are set. */}
+          {/* What players actually receive, which can differ from how many reveal flags are set. */}
           {!loading && (
             <p className="codex-audit-count">
               {revealed} {revealed === 1 ? "record is" : "records are"} shown to players across the Codex.

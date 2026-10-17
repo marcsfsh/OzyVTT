@@ -264,7 +264,7 @@ export function usageOf(action: MonsterAction): Usage {
 
 const SUFFIX = /\s*\((?:Recharge [0-9-]+|\d+\/Day)\)$/;
 
-/** The uses and the name's printed suffix together: "Fire Breath (Recharge 5-6)", "Misty Step (3/Day)". A long rest
+/** The uses and the name's printed suffix together: "Fire Breath (Recharge 5-6)", "Misty Step (3/Day)". A Long Rest
  *  is this table's day. */
 export function withUsage(action: MonsterAction, usage: Usage): MonsterAction {
   const name = (typeof action.name === "string" ? action.name : "").replace(SUFFIX, "");

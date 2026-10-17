@@ -10,10 +10,10 @@ export const SYSTEM_PATHS = {
   capabilities: `${API_NAMESPACE}/system/capabilities`
 } as const;
 
-/** Served separately from SYSTEM_PATHS: it documents the whole contract rather than being one system operation among others. */
+/** Served separately from SYSTEM_PATHS: it documents the whole contract and is no system operation of its own. */
 export const OPENAPI_DOCUMENT_PATH = `${API_NAMESPACE}/openapi.json` as const;
 
-/** GM-authorized credential management, not integration-token authorized. `{id}` is OpenAPI-style; the Express router substitutes `:id`. */
+/** GM-authorized credential management; an integration token can't reach it. `{id}` is OpenAPI-style; the Express router substitutes `:id`. */
 /** The host's own GM account: first-run password setup (from the host machine only), sign-in and sign-out.
  *  Same-origin only: open CORS here would let any web page relay password guesses. */
 export const HOST_NAMESPACE = `${API_NAMESPACE}/host` as const;
@@ -35,7 +35,7 @@ export const INTEGRATION_CREDENTIAL_PATHS = {
 } as const;
 
 /** Documentation-only paths for `map-http.ts`, kept so the OpenAPI document matches the running routes. The router
- * keeps its own literal paths because it templates `:id` rather than `{id}`. */
+ * keeps its own literal paths because it templates `:id` (Express style). */
 export const MAP_ASSET_PATHS = {
   collection: `${API_NAMESPACE}/map-assets`,
   byId: `${API_NAMESPACE}/map-assets/{id}`,
@@ -154,7 +154,7 @@ export const CODEX_ASSET_PATHS = {
  * The GM homebrew authoring surface (`homebrew-http.ts`). Every operation is GM-only; players see homebrew
  * only through the merged `CONTENT_PATHS` catalogs, and only records that are published, `visibleToPlayers`
  * and not deleted. One polymorphic collection serves all content types via `type`. `{id}` is OpenAPI-style;
- * ids are content slugs (`hb-<slug>-<6 hex>`, <=60 chars), not UUIDs.
+ * ids are content slugs (`hb-<slug>-<6 hex>`, <=60 chars).
  */
 export const HOMEBREW_PATHS = {
   content: `${API_NAMESPACE}/homebrew/content`,
@@ -737,7 +737,7 @@ export const GameMutationAcceptedSchema = z
   .catchall(z.unknown());
 
 export const GameViewKindSchema = z.enum(["gm", "player"]);
-/** The projection envelope for GET /game. `game` is the full GM view or the player-safe view - shapes owned by @vtt/domain and not duplicated here. */
+/** The projection envelope for GET /game. `game` is the full GM view or the player-safe view: shapes owned by @vtt/domain and not duplicated here. */
 export const GameSnapshotSchema = z
   .object({
     view: GameViewKindSchema,
@@ -746,7 +746,7 @@ export const GameSnapshotSchema = z
   })
   .strict();
 
-/** `kind` stays an open string so new log kinds are additive, not breaking. */
+/** `kind` stays an open string so a new log kind is an additive change. */
 export const GameLogEntrySchema = z
   .object({
     id: z.number().int().positive(),
@@ -810,7 +810,7 @@ export const EncounterArchiveDeletedSchema = z
   .object({ id: z.number().int().positive(), deleted: z.literal(true) })
   .strict();
 
-/** Issued by POST /sessions/player - the same open, LAN-trust join the socket performs. */
+/** Issued by POST /sessions/player: the same open, LAN-trust join the socket performs. */
 export const PlayerSessionIssuedSchema = z.object({ token: z.string().min(1), sessionId: z.uuid() }).strict();
 
 export const GameMutationAcceptedResponseSchema = successEnvelopeSchema(GameMutationAcceptedSchema);
@@ -845,13 +845,13 @@ export const HomebrewContentTypeSchema = z.enum([
 ]);
 /** Set only by `/publish` and `/unpublish`; orthogonal to `visibleToPlayers`, which only `/visibility` sets. */
 export const HomebrewContentStateSchema = z.enum(["draft", "published"]);
-/** A persisted homebrew id (`hb-<slug>-<6 hex>`). Capped at 60, not 80: persisted ActorDefinition ids cap at 60,
+/** A persisted homebrew id (`hb-<slug>-<6 hex>`). Capped at 60, below the content id's 80: persisted ActorDefinition ids cap at 60,
  * and a longer one would fail `GameStateSchema.parse` on the next boot. */
 const HomebrewIdSchema = z
   .string()
   .regex(/^[a-z0-9-]+$/)
   .max(60);
-/** The offending field, machine-addressable, so a form editor can point at it instead of parsing prose. */
+/** The offending field, machine-addressable, so a form editor can point at it with no prose to parse. */
 export const HomebrewValidationIssueSchema = z
   .object({
     path: z.array(z.union([z.string(), z.number().int()])),
@@ -867,7 +867,7 @@ export const HomebrewValiditySchema = z
     warnings: z.array(HomebrewValidationIssueSchema)
   })
   .strict();
-/** The authored content body only - never row state. Opaque until each type's authored shape lands; see the HomebrewRecord component. */
+/** The authored content body only, never row state. Opaque until each type's authored shape lands; see the HomebrewRecord component. */
 export const HomebrewRecordSchema = z.record(z.string(), z.unknown());
 export const HomebrewRecordDocumentSchema = z
   .object({

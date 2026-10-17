@@ -40,7 +40,7 @@ export type AudioAssetMetadata = Readonly<{
 
 /** 50 MB holds about 50 minutes of 128 kbps MP3 or 5 minutes of CD-quality WAV. The upload sits in the GM
  *  laptop's memory while it is checked, and the table screen downloads it over Wi-Fi before it plays, so a
- *  bigger file buys a long wait at the table rather than better sound. */
+ *  bigger file buys a long wait at the table and no better sound. */
 export const AUDIO_MAX_BYTES = 50 * 1024 * 1024;
 /** Longer than any session; a larger figure is a header lying about its length. */
 const MAX_DURATION_MS = 12 * 60 * 60 * 1_000;
@@ -472,7 +472,9 @@ function inspectWebm(buffer: Buffer): Found | null {
     offset = element.end;
   }
   if (docType !== "webm")
-    throw new InvalidRequestError(`Only WebM files are supported, not ${docType || "this EBML type"}. ${SUPPORTED}`);
+    throw new InvalidRequestError(
+      `${docType ? `A ${docType} file can't be read here.` : "This EBML file can't be read here."} ${SUPPORTED}`
+    );
   if (header.end >= buffer.length) throw incomplete();
   const segment = ebmlElement(buffer, header.end, buffer.length);
   if (segment.id !== SEGMENT) throw damaged("WebM");
@@ -679,7 +681,7 @@ export function inspectAudio(input: Uint8Array, maxBytes = AUDIO_MAX_BYTES): Aud
     const kind = otherKind(buffer);
     throw new InvalidRequestError(
       kind
-        ? `This file is ${kind}, not a sound. ${SUPPORTED}`
+        ? `This file is ${kind}, and only sound files can be uploaded here. ${SUPPORTED}`
         : `This is not a sound file browsers can play. ${SUPPORTED}`
     );
   }

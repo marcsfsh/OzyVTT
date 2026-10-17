@@ -310,8 +310,8 @@ function bearerContext(
   };
 }
 
-/** `scope: "this-item"` on a carrier that is no item would degrade to "bearer" in `scopeOf`, turning "only with
- *  this weapon" into "always"; fail closed instead. */
+/** `scope: "this-item"` on a carrier that is no item would degrade to "bearer" in `scopeOf` and turn "only with
+ *  this weapon" into "always"; fail closed. */
 const notItemScoped = (modifier: Modifier): boolean => modifier.scope !== "this-item";
 
 /** Which of a character's own feat or feature riders the collector may see: not the builder-baked ones, which
@@ -430,7 +430,7 @@ export function deriveEquipment(
   const weaponProficiencies: string[] = [];
   const itemEffectTags: string[] = [];
 
-  // Gated grants see the bearer's own sheet and live state, not what other grants hand over in this same
+  // Gated grants see the bearer's own sheet and live state, and never what other grants hand over in this same
   // recompute (circular). Chained grants therefore don't fire: under-granting beats over-granting.
   const gateContext = bearerContext(actor, definition, equipped, { weapons: [], armor: [], tools: [], effectTags: [] });
 
@@ -452,7 +452,7 @@ export function deriveEquipment(
     return true;
   };
 
-  /** An item's own effects apply while it is active, as carriers rather than live effects on the actor. */
+  /** An item's own effects apply while it is active, as carriers and never as live effects on the actor. */
   const takeEffects = (block: RiderBlock | EquipmentReference, itemId: string, itemLabel: string) => {
     for (const effect of block.effects) {
       itemEffectTags.push(...effect.tags);
@@ -503,7 +503,7 @@ export function deriveEquipment(
       sources.push({ itemId: sourceId, itemName: name, summary: summarise(block) });
   }
 
-  // Weapon attacks come from the equipped list, not the active one. Item-granted weapon training
+  // Weapon attacks come from the equipped list, which can differ from the active one. Item-granted weapon training
   // already applies in this recomputation.
   const weaponActionIds: string[] = [];
   // Weapons this character spent a Weapon Mastery pick on, read from the stored choice ledger.

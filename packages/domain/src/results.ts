@@ -101,7 +101,7 @@ export type HitOffer = Readonly<{
   name: string;
   /** What it adds, for the label ("3d6 Piercing", "2d8 Radiant"). */
   dice: string;
-  /** What choosing it spends ("1st-level slot and your Bonus Action", "once per turn"), or null. */
+  /** What choosing it spends ("a level 1 spell slot and your Bonus Action", "once per turn"), or null. */
   cost: string | null;
   /** Pick one when choosing it (Divine Strike: Necrotic or Radiant). */
   damageTypes?: readonly string[];
@@ -158,14 +158,14 @@ export type ActionResolution = Readonly<{
   }> | null;
   /** On a previewed hit, the push its weapon mastery offers (SRD "up to 10 feet"); the confirm says how far with `pushFeet`. */
   push?: Readonly<{ targetName: string; maxFeet: number }> | null;
-  /** Reaction prompts this hit opened (Uncanny Dodge): the triggering damage waits on the answer instead of the apply button. */
+  /** Reaction prompts this hit opened (Uncanny Dodge): the triggering damage waits on the answer. */
   reactionPrompts?: ReadonlyArray<Readonly<{ actorId: string; actorName: string; actionName: string }>>;
   /** An extra attack this swing opened (Cleave's swing at a second creature), for the result card to offer. */
   opens?: Readonly<{ actionId: string; actionName: string }>;
   /** The attack would hit, and the target's reaction (Parry, Shield) may still turn it into a miss. Nothing past the
    *  roll has happened yet: answering the prompt finishes the attack, damage included. */
   waitingOnReaction?: true;
-  /** A builtin action's check roll (Hide vs DC 15; Influence/Search/Study with dc/success null - GM adjudicates). */
+  /** A builtin action's check roll (Hide vs DC 15; Influence/Search/Study with dc/success null: GM adjudicates). */
   check?: Readonly<{
     skill: string;
     total: number;
@@ -305,9 +305,9 @@ export const ActionAvailabilitySchema = z.strictObject({
   usesRemaining: z.number().int().min(0).nullable(),
   /** Rolls left in the open compound-action instance for this action; null when no instance applies. */
   componentsRemaining: z.number().int().min(0).nullable(),
-  /** True for the SRD generic actions every combatant can take (Dodge, Dash, Help, ...) - not on the stat block. */
+  /** True for the SRD generic actions every combatant can take (Dodge, Dash, Help, ...), which no stat block lists. */
   builtin: z.boolean().optional(),
-  /** Added to a hit rather than taken alone (Sneak Attack, a smite): chosen on an attack's result. */
+  /** Added to a hit and never taken alone (Sneak Attack, a smite): chosen on an attack's result. */
   ridesAHit: z.literal(true).optional(),
   // Display values only (ADR-0007); resolution recomputes from the id.
   description: z.string(),
@@ -351,7 +351,7 @@ const RollModeSummarySchema = z.strictObject({
   advantage: z.array(z.string()),
   disadvantage: z.array(z.string())
 });
-/** The sheet's derived numbers. Sent only via `actor:available-actions` (authorized per actor), not `PlayerView`. Every
+/** The sheet's derived numbers. Sent only via `actor:available-actions` (authorized per actor); `PlayerView` leaves them out. Every
  *  number is what the server would roll: Exhaustion, item riders and features included. */
 const DerivedAbilityRowSchema = z.strictObject({
   ability: AbilityIdSchema,
@@ -535,7 +535,7 @@ const BuilderOfferSchema = z.strictObject({
    *  the pick may be left open. */
   unresolvable: z.string().nullable(),
   /** Option id -> why this build cannot usefully take it (already held, or no proficiency to build on).
-   *  Shown disabled rather than hidden, so an earlier answer never vanishes. Null for kinds without the rule. */
+   *  Shown disabled, so an earlier answer never vanishes. Null for kinds without the rule. */
   unavailable: z.record(z.string(), z.string()).nullable()
 });
 export type BuilderOffer = Wire<z.infer<typeof BuilderOfferSchema>>;

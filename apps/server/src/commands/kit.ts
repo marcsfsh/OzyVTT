@@ -74,7 +74,7 @@ export function gmGradeLabelOf(principal: GamePrincipal): string {
 /** What the commands need from the server around them. */
 export type CommandContext = Readonly<{
   store: GameStore;
-  /** The committed state for reads: frozen, and cloned once per revision rather than per read. */
+  /** The committed state for reads: frozen, and cloned once per revision, however many reads there are. */
   readState: () => GameState;
   combatLog: Pick<CombatLogStore, "list" | "exportSince">;
   contentLibrary: ContentLibrary;
@@ -322,7 +322,7 @@ export function createKit(context: CommandContext) {
           : null;
     },
 
-    /** A rule the table advises rather than enforces, let through: a note for the GM alone. */
+    /** A rule the table advises on and doesn't enforce, let through: a note for the GM alone. */
     logRulesNotes(notes: readonly string[], actorId: string | null) {
       for (const note of notes)
         context.appendLog({
@@ -374,12 +374,12 @@ export function createKit(context: CommandContext) {
           gmOnly: hidden
         });
       // A reaction window opened: the table hears why nothing landed yet.
-      const waiting = resolution.waitingOnReaction ? "the attack waits" : "the damage waits";
+      const waiting = resolution.waitingOnReaction ? "The attack waits" : "The damage waits";
       for (const prompt of resolution.reactionPrompts ?? []) {
         const promptHidden = hidden || actorHidden(prompt.actorId);
         context.appendLog({
           kind: "reaction",
-          text: `${prompt.actorName} may use ${prompt.actionName} - ${waiting} on their answer.`,
+          text: `${prompt.actorName} may use ${prompt.actionName}. ${waiting} on the answer.`,
           actorIds: [prompt.actorId],
           gmOnly: promptHidden
         });

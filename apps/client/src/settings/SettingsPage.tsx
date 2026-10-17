@@ -47,7 +47,7 @@ import "./settings.css";
 /**
  * Settings: one page, three groups. Includes the rules dial, `builderPolicy`, and access &
  * integrations.
- * Who sees what is structural, not a filter: `SETTINGS_GROUPS` declares each group's audience and
+ * Who sees what is structural, and no filter: `SETTINGS_GROUPS` declares each group's audience and
  * only allowed groups render, so GM-only controls are never mounted for a player. The GM groups take
  * `state` as a `GmView`, which a player projection is not.
  */
@@ -703,7 +703,7 @@ function ChangePasswordDialog({
 /**
  * A GM token is not yet a GM view: on a cold deep link to `/settings` the first state can still be
  * player-projected (no `rulesPolicy`, `stagingDefaults` or `combat.healthDisplay`) until the session
- * join lands. So check the GM-only fields `TableGroup` reads, not the role; the GM groups mount on
+ * join lands. So check the GM-only fields `TableGroup` reads, and leave the role alone; the GM groups mount on
  * the next state.
  */
 function gmViewOrNull(state: GmView | PlayerView | null): GmView | null {

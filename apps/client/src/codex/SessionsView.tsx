@@ -437,7 +437,7 @@ function SessionEditor({
 
       {/* Its own full-width row so the chip cloud isn't squeezed on a phone. */}
       {/* `pick` shows a chooser over character pages (active first, archived marked); `allowFreeText`
-          keeps guests without a page. Stores names, not page ids. */}
+          keeps guests without a page. Stores names, and no page ids. */}
       <Field label="Who played" htmlFor="s-attendees">
         <TagInput
           id="s-attendees"

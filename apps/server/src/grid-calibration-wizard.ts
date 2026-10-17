@@ -234,7 +234,7 @@ export function verifyWizardIntersection(
 }
 
 /**
- * A verified intersection is reassurance, not a requirement: the 3-by-3 area drag
+ * A verified intersection is reassurance and no requirement: the 3-by-3 area drag
  * already is the calibration, so completion only needs a calibration to exist.
  */
 export function completeGridCalibrationWizard(state: GridCalibrationWizardState): GridCalibrationWizardState {

@@ -58,7 +58,7 @@ export type EncounterArchiveDocument = Readonly<{
 
 export type BuildEncounterArchiveInput = Readonly<{
   entries: readonly TurnHistoryEntry[];
-  /** The timeline's snapshot reader (runs inside the command transaction); a snapshot that fails to read is dropped rather than aborting the archive. */
+  /** The timeline's snapshot reader (runs inside the command transaction); a snapshot that fails to read is dropped and the archive still lands. */
   readState: (index: number) => GameState | null;
   log: readonly CombatLogEntry[];
   journal: readonly JournalEntry[];
@@ -85,7 +85,7 @@ export function buildEncounterArchive(input: BuildEncounterArchiveInput): Encoun
   const rolls = new Map<string, RollRecord>();
   for (const state of states) for (const roll of state.rolls) if (!rolls.has(roll.id)) rolls.set(roll.id, roll);
   // Full stat blocks for every referenced definition, so the document is self-contained. Imported sheets
-  // win over bundled ids, matching live resolution.
+  // win over bundled ids, as live resolution does.
   const definitions = new Map<string, EncounterArchiveDefinition>();
   for (const state of states) {
     for (const actor of state.actors) {

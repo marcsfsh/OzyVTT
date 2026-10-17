@@ -73,7 +73,7 @@ export function createApiV1Router(options: ApiV1RouterOptions) {
       api: { version: API_VERSION, namespace: `/api/v${API_VERSION}` },
       realtime: { protocolVersion: REALTIME_PROTOCOL_VERSION, transport: "socket.io" },
       supportedScopes: IntegrationScopeSchema.options,
-      // Inlined rather than derived from `SystemCapabilitiesSchema`, so a new flag must be added in both
+      // Inlined, with no derivation from `SystemCapabilitiesSchema`, so a new flag must be added in both
       // places. `codex: true` tells a credential holder the worldbuilding surface exists.
       features: {
         webhooks: false,

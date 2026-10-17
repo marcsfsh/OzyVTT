@@ -19,7 +19,7 @@ let draggedFolderPath: string | null = null;
 const invalidFolderDrop = (target: string, dragged: string | null) =>
   dragged !== null && (target === dragged || target.startsWith(`${dragged}/`));
 
-/** Walk/create the folder-node chain for a "A/B/C" path, returning the leaf node. */
+/** Walk/create the folder-node chain for a "A/B/C" path, and return the leaf node. */
 function ensureFolder(root: FolderNode, folderPath: string): FolderNode {
   let node = root;
   let path = "";
@@ -140,7 +140,7 @@ function FolderBranch({
           <span className="codex-tree-count">{countPages(folder)}</span>
         </button>
         {/*
-          One `Menu` instead of four small icon buttons: their ::after hit areas would overlap each other,
+          One `Menu` in place of four small icon buttons: their ::after hit areas would overlap each other,
           and 4x44px won't fit the row. The trigger's overhang is covered by `.codex-tree-folder-actions`' margin.
         */}
         <div className="codex-tree-folder-actions">
@@ -232,7 +232,7 @@ export function NotebookTree({ node, depth = 0, ...handlers }: NotebookTreeProps
             <span className="codex-list-title">{page.title}</span>
           </button>
           {/* Always rendered, with the value passed: a row with no mark can't be told from a hidden one.
-              A sibling of the row's button, not a child, so it doesn't become part of the button's
+              A sibling of the row's button, outside it, so it doesn't become part of the button's
               accessible name. */}
           <VisibilityBadge revealed={page.revealedToPlayers} />
           <button

@@ -23,12 +23,12 @@ export type CodexEditorProps = Readonly<{
   onNavigate: (target: string) => void;
   /** GM-layer instances take the violet chrome and the "GM only" tag. */
   gmLayer?: boolean;
-  /** Titles that exist, so an unresolved link renders as a redlink rather than a working one. */
+  /** Titles that exist, so an unresolved link renders as a redlink and never as a working one. */
   knownTitles?: ReadonlySet<string>;
   /** Makes the page a link names when none has that title; without it such a link is an inert redlink. */
   onCreatePage?: (title: string) => void;
   /**
-   * Take the frame's height instead of the primitive's 14rem floor. Only for a mount inside an unbroken flex
+   * Take the frame's height in place of the primitive's 14rem floor. Only for a mount inside an unbroken flex
    * column with a definite height; elsewhere it would collapse the field.
    */
   fill?: boolean;

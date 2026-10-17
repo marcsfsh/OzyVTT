@@ -2,7 +2,7 @@
  * A monster action's damage, read from its printed stat-block text, which is the authority: open5e's attack rows
  * drop the "plus 7 (2d6) Poison damage" of almost a hundred attacks and get a few dice wrong. The hit clause gives
  * what every hit deals and what it deals only under a stated condition; a save's "Failure:" clause gives what the
- * failure deals at once, leaving damage that recurs on later turns to the GM, named in `laterDamage`.
+ * failure deals at once. Damage that recurs on later turns is left to the GM, named in `laterDamage`.
  * `test/monster-damage.test.ts` checks every bundled monster against its own text.
  */
 import type { ActorAction } from "@vtt/schemas";
@@ -68,7 +68,7 @@ export function printedHitDamage(
   if (!clause) return null;
   const damage: Part[] = [];
   const conditionalDamage: ConditionalDamage[] = [];
-  const terms = new RegExp(`(?:^|,?\\s*\\b(plus|or)\\s+)${TERM.source}(?:\\s+(?:if|when)\\s+([^,.;—]+))?`, "g");
+  const terms = new RegExp(`(?:^|,?\\s*\\b(plus|or)\\s+)${TERM.source}(?:\\s+(?:if|when)\\s+([^,.;\u2014]+))?`, "g");
   for (const match of clause.first.matchAll(terms)) {
     const [, connector, flat, dice, typeName, condition] = match;
     const type = typeName.toLowerCase();

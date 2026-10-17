@@ -439,7 +439,7 @@ export function applyFailureEffect(
       sourceName: onFail.sourceName,
       sourceActionId: onFail.sourceActionId ?? null,
       startedRound: state.combat.round,
-      // "Until the end of the current turn": this turn's end, not the next one's.
+      // "Until the end of the current turn": the end of this turn.
       duration:
         onFail.currentTurn && onFail.duration?.type === "until-bearer-turn-end"
           ? { type: "until-bearer-turn-end", skipsCurrentTurn: false }
@@ -489,7 +489,7 @@ function pushOnFailure(
     return [
       {
         kind: "effect",
-        text: `${target.name} is pushed ${push.feet} feet straight away from ${pending.sourceName} - move the token.`,
+        text: `${target.name} is pushed ${push.feet} feet straight away from ${pending.sourceName}. Move the token.`,
         actorId: target.id,
         gmOnly: true
       }
@@ -686,7 +686,7 @@ export function answerSave(
 
   let success = autoSucceeded !== null || (autoFailed === null && total >= pending.dc);
   // SRD Legendary Resistance: on a failed save the creature can choose to succeed. The GM commits with
-  // the flag; the pool rides actionUses["legendary-resistance"] and a long rest re-arms it.
+  // the flag; the pool rides actionUses["legendary-resistance"] and a Long Rest re-arms it.
   let legendaryNote: string | null = null;
   if (legendaryResistance) {
     if (!commit) throw new CommandRejectedError("Commit the save to spend Legendary Resistance.");
@@ -817,7 +817,7 @@ export function answerSave(
       }
     );
     appliedDamage = outcome.application.totalApplied;
-    // Keep the whole application, not just its total.
+    // Keep the whole application along with its total.
     application = outcome.application;
     events.push(...outcome.events);
     // A spell area that stops after so much damage counts it (Guardian of Faith).
@@ -920,7 +920,7 @@ export function answerSave(
   };
 }
 
-/** Drop a pending save without resolving it (GM housekeeping - e.g. the effect ended). */
+/** Drop a pending save without resolving it (GM housekeeping, e.g. the effect ended). */
 export function dismissSave(state: GameState, saveId: string, scope: Initiator) {
   requireGm(scope, "Only the GM can dismiss a saving throw.");
   if (!state.combat.pendingSaves.some((entry) => entry.id === saveId))

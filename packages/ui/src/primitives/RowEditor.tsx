@@ -28,10 +28,10 @@ interface RowEditorProps<T> {
 
 /** The repeating-rows editor behind every `kind: "rows"` field (monster actions, equipment options, damage
     parts, granted spells).
-    `rowKey` must be a stable id, not the index: keyed by index, removing a row hands its focus, open state and
+    `rowKey` must be a stable id and never the index: keyed by index, removing a row hands its focus, open state and
     unsaved keystrokes to the next record. The caller mints the id with `newId()`, which is why `onAdd` returns
     the row.
-    One ⋯ menu per row (Move up, Move down, Remove) instead of three icon targets; the drag grip is a pointer-only
+    One ⋯ menu per row (Move up, Move down, Remove) in place of three icon targets; the drag grip is a pointer-only
     extra. Collapse state is UI-local and never stored in the draft. */
 export function RowEditor<T>({
   rows,
@@ -80,10 +80,10 @@ export function RowEditor<T>({
     const row = onAdd();
     onChange([...rows, row]);
     setExpanded((prev) => [...prev, rowKey(row)]);
-    setAnnouncement(`${addLabel} — ${rows.length + 1} total.`);
+    setAnnouncement(`${addLabel}, ${rows.length + 1} total.`);
   };
 
-  /* Pointer events, not HTML5 drag-and-drop, which never fires from touch. Pointer capture keeps moves coming
+  /* Pointer events, because HTML5 drag-and-drop never fires from touch. Pointer capture keeps moves coming
      when the finger leaves the grip. */
   const onGripDown = (event: ReactPointerEvent<HTMLSpanElement>, index: number) => {
     if (!reorderable || rows.length < 2) return;
@@ -206,7 +206,7 @@ export function RowEditor<T>({
       )}
 
       <div className="nh-roweditor-foot">
-        {/* At capacity, disable Add with its reason rather than hiding it. */}
+        {/* At capacity, disable Add and show its reason; the button stays visible. */}
         <Button
           variant="secondary"
           size="sm"

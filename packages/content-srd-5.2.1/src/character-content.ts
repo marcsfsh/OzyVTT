@@ -36,7 +36,7 @@ export {
   type RiderTriggerKind
 } from "@vtt/schemas";
 
-/** Every identity in the content catalog is an open slug - never a closed enum (principle 3). */
+/** Every identity in the content catalog is an open slug, never a closed enum (principle 3). */
 export const ContentIdSchema = z
   .string()
   .regex(/^[a-z0-9-]+$/)
@@ -127,7 +127,7 @@ export const FeatureSaveDcSchema = z.union([
     .object({
       /** The printed constant the modifiers are added to; 8 in every SRD 5.2.1 printing. */
       base: z.number().int().min(1).max(30).default(8),
-      /** Whose modifier is added - the caster's ability, not the ability the target rolls. */
+      /** Whose modifier is added: the caster's ability, whatever the target rolls. */
       ability: AbilitySchema,
       /** Whether the character's proficiency bonus is added too (every SRD printing: yes). */
       proficiencyBonus: z.boolean().default(true)
@@ -154,14 +154,14 @@ export const FeatureSaveSchema = z
 export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true }).extend({
   attack: FeatureAttackSchema.optional(),
   save: FeatureSaveSchema.optional(),
-  /** Damage that grows with level, replacing `damage` at the highest matching level (Sneak Attack, Divine Smite). */
+  /** Damage that grows with level. It replaces `damage` at the highest matching level (Sneak Attack, Divine Smite). */
   damageByLevel: z
     .array(
       z.object({ level: ContentLevelSchema, formula: DiceFormulaSchema, type: z.string().min(1).max(40) }).strict()
     )
     .max(20)
     .optional(),
-  /** Healing that grows with level, replacing `healing.formula` at the highest matching level (Divine Spark's heal,
+  /** Healing that grows with level. It replaces `healing.formula` at the highest matching level (Divine Spark's heal,
    *  Wholeness of Body's Martial Arts die). */
   healingByLevel: z
     .array(z.object({ level: ContentLevelSchema, formula: HealingFormulaSchema }).strict())
@@ -190,7 +190,7 @@ export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true 
     })
     .strict()
     .optional(),
-  /** A compound plan that grows with level, replacing `multiattack` at the highest matching level (Flurry of
+  /** A compound plan that grows with level. It replaces `multiattack` at the highest matching level (Flurry of
    *  Blows' third strike at Monk 10). */
   multiattackByLevel: z
     .array(z.object({ level: ContentLevelSchema, multiattack: ActionSchema.shape.multiattack.unwrap() }).strict())
@@ -206,7 +206,7 @@ export type FeatureAction = z.infer<typeof FeatureActionSchema>;
  */
 export function grantedSpellGateMessage(spellIds: readonly string[]): string {
   const named = spellIds.map((id) => `"${id}"`).join(", ");
-  return `A gated grant cannot hand over a spell, so a grants block cannot carry "when" and "spells" together: ${named} would reach nothing at all. The other ten lists are recomputed from the sheet on every read, so their gate is answered on every read - but a granted spell is baked into the character's spell list, its prepared count and its cantrip's action when the character is BUILT, and nothing reads the gate again afterwards. Put the spells in a second grants block with no "when" - this record without one, or a second feature - and keep the gate on the ten lists that can carry it.`;
+  return `A gated grant cannot hand over a spell, so a grants block cannot carry "when" and "spells" together: ${named} would reach nothing at all. The other ten lists are recomputed from the sheet on every read, so their gate is answered on every read. A granted spell is baked into the character's spell list, its prepared count and its cantrip's action when the character is BUILT, and nothing reads the gate again afterwards. Put the spells in a second grants block with no "when" (this record without one, or a second feature), and keep the gate on the ten lists that can carry it.`;
 }
 
 /**
@@ -271,7 +271,7 @@ export const ITEM_REFUSED_MODIFIER_TYPES: readonly Modifier["type"][] = Object.f
   "attunement-slots"
 ]);
 export const ITEM_REFUSED_MODIFIER_MESSAGE =
-  "An item cannot change hit points, an ability score or the attunement limit - those are baked into the sheet or decide the item's own attunement, and cannot be un-granted when the item comes off. Use a specific bonus instead: armor-class, save-bonus, check-bonus, or spell-save-dc. (All three stay available on a feat.)";
+  "An item cannot change hit points, an ability score or the attunement limit. Those are baked into the sheet or decide the item's own attunement, and cannot be un-granted when the item comes off. Use a specific bonus instead: armor-class, save-bonus, check-bonus, or spell-save-dc. (All three stay available on a feat.)";
 
 /** The rider fields shared by `FeatureRecord`, `FeatureOption` and magic items (spread into `EquipmentReferenceSchema`). */
 export const featureRiders = {
@@ -326,7 +326,7 @@ export const ExtraPickSchema = z
     if ((grant.amount === undefined) === (grant.scaling === undefined)) {
       context.addIssue({
         code: "custom",
-        message: "An extra pick states either a flat `amount` or a `scaling` rule - exactly one."
+        message: "An extra pick states exactly one of a flat `amount` or a `scaling` rule."
       });
     }
   });
@@ -339,7 +339,7 @@ export type ExtraPick = z.infer<typeof ExtraPickSchema>;
 const extraPicksField = z.array(ExtraPickSchema).max(4).default([]);
 
 /**
- * One "you can replace..." clause, editing a row of `character.choices[]`. `"level-up"` rewrites the
+ * One "you can replace..." clause, which edits a row of `character.choices[]`. `"level-up"` rewrites the
  * ledger at build time; `"short-rest"`/`"long-rest"` set `actor.choiceOverrides`, cleared by the
  * matching rest, except a pick the build reads (its options grant spells, or another pick depends on it),
  * whose ledger row is rewritten and the sheet rebuilt.
@@ -397,7 +397,7 @@ const spellLevelWindow = (choice: { minSpellLevel?: number; maxSpellLevel?: numb
     context.addIssue({
       code: "custom",
       path: ["minSpellLevel"],
-      message: `minSpellLevel ${choice.minSpellLevel} is above maxSpellLevel ${choice.maxSpellLevel} - no spell can satisfy both.`
+      message: `minSpellLevel ${choice.minSpellLevel} is above maxSpellLevel ${choice.maxSpellLevel}, so no spell can satisfy both.`
     });
   }
 };
@@ -423,7 +423,7 @@ const oneChoiceForm = (record: { choice?: unknown; choices?: unknown }, context:
     context.addIssue({
       code: "custom",
       path: ["choices"],
-      message: "Author `choice` (one pick) or `choices` (several) - never both."
+      message: "Author `choice` (one pick) or `choices` (several), and never both."
     });
   }
 };
@@ -486,7 +486,7 @@ export const FeatureChoiceSchema = z
       context.addIssue({
         code: "custom",
         path: ["from"],
-        message: "Author `options` alone - `from` is derived from the option ids."
+        message: "Author `options` alone. `from` is derived from the option ids."
       });
     }
     if (choice.options) {
@@ -523,9 +523,9 @@ export const FeatureRecordSchema = z
     choice: FeatureChoiceSchema.optional(),
     /** Several picks from one record (Magic Initiate). Mutually exclusive with `choice`; read through `featurePicks`. */
     choices: z.array(FeatureChoiceSchema).min(1).max(4).optional(),
-    /** Budgets this feature raises - one extra cantrip, one extra skill, one more prepared spell. */
+    /** Budgets this feature raises: one extra cantrip, one extra skill, one more prepared spell. */
     extraPicks: extraPicksField,
-    /** Picks this feature lets the character re-make later - on a level-up, or on a rest (see `ReplaceableChoiceSchema`). */
+    /** Picks this feature lets the character re-make later: on a level-up, or on a rest (see `ReplaceableChoiceSchema`). */
     replaces: replacesField,
     /** Spell lists the class's own spell picks may also draw on, the spells counting as the class's (Magical
      *  Secrets: "from the Bard, Cleric, Druid, and Wizard spell lists"). */
@@ -554,7 +554,7 @@ export const ChoiceListSchema = z
       context.addIssue({
         code: "custom",
         message:
-          'A "choose N" list needs a non-empty `from` list or a `fromCatalog` slug - otherwise the pick has no options and the build can never be completed.'
+          'A "choose N" list needs a non-empty `from` list or a `fromCatalog` slug. Without one the pick has no options and the build can never be completed.'
       });
     }
   });
@@ -586,7 +586,7 @@ export const ClassLevelRowSchema = z
     level: ContentLevelSchema,
     proficiencyBonus: z.number().int().min(2).max(6),
     features: z.array(ContentIdSchema).max(12).default([]),
-    /** Nine counts, index 0 = 1st-level slots. Absent for a non-caster row. */
+    /** Nine counts, index 0 = level 1 slots. Absent for a non-caster row. */
     spellSlots: z.array(z.number().int().min(0).max(4)).length(9).optional(),
     /** Warlock Pact Magic: one uniform slot level with its own count. */
     pactSlots: z
@@ -609,7 +609,7 @@ export const ClassLevelRowSchema = z
             id: ContentIdSchema,
             name: z.string().min(1).max(60),
             amount: z.union([z.number().int().min(0).max(999), z.string().min(1).max(20)]),
-            /** This column is ink only - no live pool answers to this id, and none is expected to. */
+            /** This column is ink only: no live pool answers to this id, and none is expected to. */
             display: z.boolean().optional()
           })
           .strict()
@@ -624,7 +624,7 @@ export type ClassLevelRow = z.infer<typeof ClassLevelRowSchema>;
 export const ContentSpellcastingSchema = z
   .object({
     ability: AbilitySchema,
-    /** "known" = a fixed spells-known list; "prepared" = re-chosen on a long rest. */
+    /** "known" = a fixed spells-known list; "prepared" = re-chosen on a Long Rest. */
     prepares: z.enum(["known", "prepared"]),
     ritual: z.boolean().default(false),
     /** Spellcasting focus slug ("arcane-focus", "holy-symbol", "druidic-focus"); null = none. */
@@ -894,11 +894,11 @@ export type NamePoolReference = z.infer<typeof NamePoolReferenceSchema>;
 export const SpellListReferenceSchema = z
   .object({
     ...contentRecordBase,
-    /** Start from these existing list ids - SRD (`wizard`) or another overlay. Empty = start blank. */
+    /** Start from these existing list ids: SRD (`wizard`) or another overlay. Empty = start blank. */
     basedOn: z.array(ContentIdSchema).max(8).default([]),
     /** Spell ids added on top of the `basedOn` expansion. SRD spell ids are perfectly legal here. */
     add: z.array(ContentIdSchema).max(500).default([]),
-    /** Spell ids removed last, after everything else - a `remove` always wins. */
+    /** Spell ids removed last, after everything else: a `remove` always wins. */
     remove: z.array(ContentIdSchema).max(500).default([])
   })
   .strict();

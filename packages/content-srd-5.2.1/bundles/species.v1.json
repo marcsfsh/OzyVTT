@@ -4,7 +4,7 @@
     "name": "Dragonborn",
     "source": "srd",
     "summary": "Dragon-blooded folk with a breath weapon and an elemental birthright.",
-    "description": "Dragonborn trace their lineage to a dragon progenitor. Their scales, breath, and inner resistance echo the kind of dragon in their ancestry, and at the height of their power they can even manifest spectral wings of the same energy.",
+    "description": "Dragonborn trace their lineage to a dragon progenitor. The kind of dragon sets the damage type of their Breath Weapon and their Damage Resistance, and from level 5 they can sprout spectral wings and fly for a time.",
     "sizes": [
       "medium"
     ],
@@ -1329,8 +1329,8 @@
     "id": "dwarf",
     "name": "Dwarf",
     "source": "srd",
-    "summary": "Stout, stone-wise, and famously hard to poison or wear down.",
-    "description": "Dwarves are a hardy folk shaped by mountain and stone. Their endurance is legendary, their senses reach deep into the dark, and they can read the bones of the earth itself.",
+    "summary": "Hardy folk of mountain and stone with a resistance to poison.",
+    "description": "Dwarves are hardy folk shaped by mountain and stone. They have Darkvision out to 120 feet and Resistance to Poison damage. Dwarven Toughness raises their Hit Point maximum at every level.",
     "sizes": [
       "medium"
     ],
@@ -1423,8 +1423,8 @@
     "id": "elf",
     "name": "Elf",
     "source": "srd",
-    "summary": "Long-lived, keen-sensed, and touched by the Feywild.",
-    "description": "Elves are magical people of otherworldly grace, whose ancestors dwelled in the Feywild. Their bonds with that plane leave them with heightened senses and a trance-like rest.",
+    "summary": "Long-lived folk with keen senses and ties to the Feywild.",
+    "description": "Elves are magical people whose ancestors lived in the Feywild. They have keen senses and resist being Charmed. An elf needs no sleep and rests in a four-hour trance.",
     "sizes": [
       "medium"
     ],
@@ -1727,8 +1727,8 @@
     "id": "gnome",
     "name": "Gnome",
     "source": "srd",
-    "summary": "Small, quick-witted, and touched with innate magic.",
-    "description": "Gnomes are small, inventive folk whose minds are as restless as their hands. Every gnome carries a spark of magic, expressed through a lineage tied to the deep forests or the workshops beneath the hills.",
+    "summary": "Small, quick-witted folk with a spark of innate magic.",
+    "description": "Gnomes are small, inventive folk with Advantage on Intelligence, Wisdom and Charisma saving throws. Each has a little innate magic from a lineage: forest gnomes speak with animals, and rock gnomes build tiny clockwork devices.",
     "sizes": [
       "small"
     ],
@@ -1883,7 +1883,7 @@
     "name": "Goliath",
     "source": "srd",
     "summary": "Towering descendants of Giants who carry an ancestral boon.",
-    "description": "Goliaths are descended from Giants, and each carries a supernatural boon from that ancestry - a flicker of cloud, fire, frost, hill, stone, or storm. Tall and tireless, they can even swell to a Giant's stature for a time.",
+    "description": "Goliaths are descended from Giants, and each carries a supernatural boon from one kind of giant: cloud, fire, frost, hill, stone or storm. From level 5 they can grow to Large size for a time.",
     "sizes": [
       "medium"
     ],
@@ -2148,8 +2148,8 @@
     "id": "halfling",
     "name": "Halfling",
     "source": "srd",
-    "summary": "Small, brave, and blessed with uncanny luck.",
-    "description": "Halflings are a small, cheerful people who slip through the world with surprising ease. Luck seems to favor them, fear rarely finds purchase in their hearts, and larger folk make convenient cover.",
+    "summary": "Small, brave folk with uncanny luck.",
+    "description": "Halflings are small, cheerful folk. They can reroll a 1 on a d20 Test and have Advantage on saving throws against being Frightened. A larger creature is cover enough for them to hide behind.",
     "sizes": [
       "small"
     ],
@@ -2210,8 +2210,8 @@
     "id": "human",
     "name": "Human",
     "source": "srd",
-    "summary": "Resourceful, skillful, and versatile.",
-    "description": "Humans are the most adaptable of the common species. They range widely in appearance and temperament, and their ambition drives them into every corner of the world.",
+    "summary": "Adaptable folk with an extra skill and an Origin feat.",
+    "description": "Humans are the most widespread of the common species. They gain an extra skill proficiency and an Origin feat, and finishing a Long Rest gives them Heroic Inspiration.",
     "sizes": [
       "small",
       "medium"
@@ -2260,8 +2260,8 @@
     "id": "orc",
     "name": "Orc",
     "source": "srd",
-    "summary": "Relentless, night-eyed, and surging with adrenaline.",
-    "description": "Orcs are broad, tireless people built for the charge. Their eyes pierce the deepest dark, their bodies flood with battle-fury on demand, and they simply refuse to fall while any strength remains.",
+    "summary": "Tireless folk with Darkvision and bursts of adrenaline.",
+    "description": "Orcs are broad, tireless people built for the charge. They have Darkvision out to 120 feet, and Adrenaline Rush makes a Dash a Bonus Action that also grants Temporary Hit Points. Once per Long Rest, Relentless Endurance keeps an Orc at 1 Hit Point when damage would drop it to 0.",
     "sizes": [
       "medium"
     ],
@@ -2347,7 +2347,7 @@
     "name": "Tiefling",
     "source": "srd",
     "summary": "Bearers of a fiendish legacy from the Lower Planes.",
-    "description": "Tieflings carry the mark of a fiendish legacy - abyssal, chthonic, or infernal. That otherworldly inheritance shows in their appearance and blooms into supernatural magic as they grow in power.",
+    "description": "Tieflings carry an abyssal, chthonic or infernal legacy, and it shows in their appearance. The legacy gives them a damage Resistance and a cantrip, and it grants more spells at levels 3 and 5.",
     "sizes": [
       "small",
       "medium"

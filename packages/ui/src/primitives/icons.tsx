@@ -23,7 +23,7 @@ function Glyph({ children, className }: Readonly<{ children: ReactNode; classNam
   );
 }
 
-/** Selection tick — the single "chosen" mark across the system. */
+/** Selection tick: the single "chosen" mark across the system. */
 export function IconCheck({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
@@ -41,7 +41,7 @@ export function IconChevron({ className }: Readonly<{ className?: string }>) {
   );
 }
 
-/* The horizontal chevrons are drawn rather than rotated, so no call site picks its own transform. */
+/* The horizontal chevrons are drawn in each direction, so no call site picks its own transform. */
 
 /** Back / previous. */
 export function IconChevronLeft({ className }: Readonly<{ className?: string }>) {
@@ -75,7 +75,7 @@ export function IconSearch({ className }: Readonly<{ className?: string }>) {
   );
 }
 
-/** Shuffle / generate — the name generator's action. */
+/** Shuffle / generate: the name generator's action. */
 export function IconShuffle({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
@@ -87,7 +87,7 @@ export function IconShuffle({ className }: Readonly<{ className?: string }>) {
   );
 }
 
-/** A die — the "roll it for me" action. */
+/** A die: the "roll it for me" action. */
 export function IconDie({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
@@ -99,7 +99,7 @@ export function IconDie({ className }: Readonly<{ className?: string }>) {
   );
 }
 
-/** Pencil — "edit this section" in the review step. */
+/** Pencil: "edit this section" in the review step. */
 export function IconPencil({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
@@ -120,7 +120,7 @@ export function IconWarning({ className }: Readonly<{ className?: string }>) {
   );
 }
 
-/** Info / neutral highlight — low urgency, never an alarm. */
+/** Info / neutral highlight: low urgency, never an alarm. */
 export function IconInfo({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
@@ -338,7 +338,7 @@ export function IconDraw({ className }: Readonly<{ className?: string }>) {
   );
 }
 
-/** Fog of war: bands rather than a cloud, since it hides a rectangle of ground. Gaps keep the bands from fusing. */
+/** Fog of war: bands, since it hides a rectangle of ground. Gaps keep the bands from fusing. */
 export function IconFog({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>

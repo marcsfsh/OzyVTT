@@ -50,7 +50,7 @@ describe("the party strip's sheet", () => {
         <PartyStrip role="gm" state={state} />
       </ToastProvider>
     );
-    await user.click(screen.getByRole("button", { name: /^Lyra .*Open sheet\.$/ }));
+    await user.click(screen.getByRole("button", { name: /^Lyra,.*Open sheet\.$/ }));
     await user.click(await screen.findByRole("button", { name: "Level up or down…" }));
     expect(navigate).toHaveBeenCalledWith(`/characters/${LYRA}/level`);
     // The sheet closes behind it.

@@ -10,7 +10,7 @@ import type { TokenMapGeometry } from "./token-placement.js";
  * on a calibrated grid, distancePerPixel on a scaled gridless map); an unmeasurable map narrates
  * without numbers.
  *
- * Viewer safety: the result splits into a player-visible line (only when the mover is public, naming
+ * Viewer safety: the result splits into a player-visible line (only when the mover is public; it names
  * only public combatants) and a GM-only line with hidden combatants' distances, or the whole narration
  * when the mover is hidden. A player can never learn a hidden token's range from the log.
  */
@@ -58,7 +58,7 @@ export type CreatureFootprint = Readonly<{ position: Point; sizeCells: number; s
 
 /**
  * Rules-facing distance between two creatures, edge to edge (SRD: from the nearest point of each
- * creature's space), so Medium adjacent to Large (2x2) is 5 ft, not 10. Grid maps subtract each
+ * creature's space), so Medium adjacent to Large (2x2) is 5 ft away. Grid maps subtract each
  * footprint's half-width in cells; scaled gridless maps subtract each token's radius beyond its central
  * cell. Null when unmeasurable.
  */
@@ -202,7 +202,7 @@ export function narrateTokenMove(
     publicText: withRanges(visible),
     gmText:
       concealed.length > 0
-        ? `Hidden ranges for ${mover.name} - ${concealed.map((range) => range.label).join(", ")}.`
+        ? `Hidden ranges for ${mover.name}: ${concealed.map((range) => range.label).join(", ")}.`
         : null
   };
 }

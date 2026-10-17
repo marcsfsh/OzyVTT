@@ -27,7 +27,7 @@ describe("one spell slot per turn", () => {
     const { state, resolve, hero } = fight(wizard);
     strictSlots(state);
     resolve("spell-misty-step", { targetIds: [] });
-    expect(() => resolve("spell-magic-missile", {})).toThrowError(/only one per turn/);
+    expect(() => resolve("spell-magic-missile", {})).toThrowError(/only one is allowed per turn/);
     // A cantrip costs no slot.
     resolve("spell-fire-bolt", {}, [15, 5]);
     heroTurnAgain(state);
@@ -39,7 +39,7 @@ describe("one spell slot per turn", () => {
     const { state, resolve } = fight(wizard);
     state.combat = { ...state.combat, ruleExceptions: { slots: "assisted" } };
     resolve("spell-magic-missile", {});
-    expect(resolve("spell-misty-step", { targetIds: [] }).warnings?.join(" ")).toMatch(/only one per turn/);
+    expect(resolve("spell-misty-step", { targetIds: [] }).warnings?.join(" ")).toMatch(/only one is allowed per turn/);
   });
 
   it("is waved through when the GM stops policing spell slots", () => {

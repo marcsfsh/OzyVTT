@@ -336,7 +336,7 @@
   column-gap: 0.6rem;
   margin-top: 0.3rem;
 }
-/* Rows use subgrid (not display: contents) so a hovered row highlights end to end, making it clear
+/* Rows use subgrid (display: contents can't paint) so a hovered row highlights end to end and shows
    which Equip/Attune/× belongs to which item. */
 .sheet-inv-row {
   grid-column: 1 / -1;
@@ -574,7 +574,7 @@
   color: var(--text-muted);
   font-size: var(--fs-xs);
 }
-/* One clamped line (where rarity and attunement are). A line clamp, not `white-space: nowrap`, which
+/* One clamped line (where rarity and attunement are). A line clamp: `white-space: nowrap`
    sizes the flex item to the whole entry and makes the list scroll sideways. */
 .sheet-picker-desc {
   min-width: 0;
@@ -909,7 +909,7 @@ span.roll-mode-tag {
 .sheet-prepare-step button {
   min-height: 44px;
 }
-/* A pick re-made after a Long Rest (a Land Druid's land): its name, then the choice, wrapping on a phone. */
+/* A pick re-made after a Long Rest (a Land Druid's land): its name, then the choice. It wraps on a phone. */
 .sheet-rechoice {
   display: flex;
   flex-wrap: wrap;
@@ -1152,7 +1152,7 @@ span.roll-mode-tag {
   opacity: 0.5;
   cursor: default;
 }
-/* The whole tag column grows to 44px, not only the pressable `.toggle`, so tags in one column match. */
+/* The whole tag column grows to 44px with the pressable `.toggle`, so tags in one column match. */
 .sheet-prep-tag {
   display: flex;
   align-items: center;
@@ -1526,7 +1526,7 @@ span.roll-mode-tag {
 
 /* Embedded in a panel: fills its container, panel chrome, no modal. The containing region becomes a
    flex column while the sheet shows (`.encounter-region.is-sheet`). `overflow: hidden` makes it clip
-   rather than grow, so the rim is a real border rather than a backing layer. */
+   and never grow, so the rim is a real border on its own. */
 .sheet-embedded {
   display: flex;
   flex-direction: column;
@@ -1550,7 +1550,7 @@ span.roll-mode-tag {
 .sheet-embedded .sheet-name-rule {
   display: none;
 }
-/* Inside the tracker on a phone the sheet is a pane, not a document: the header collapses to one
+/* Inside the tracker on a phone the sheet is a pane: the header collapses to one
    row (name, controls, way back) so the sheet body keeps usable height. */
 @media (max-width: 979px) {
   /* `.sheet-header-id` is `min-width: 0`, so the name could shrink below one word next to the tool
@@ -1597,7 +1597,7 @@ span.roll-mode-tag {
   height: 100dvh;
   background: var(--surface-2);
 }
-/* Inside the SPA's `/characters/:id` layer it fills the pane, not the window. `sheet.html` has no
+/* Inside the SPA's `/characters/:id` layer it fills the pane. `sheet.html` has no
    `.sheet-page`, so its 100dvh column is unaffected. */
 .sheet-page > .sheet-standalone {
   flex: 1;

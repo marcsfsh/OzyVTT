@@ -25,7 +25,7 @@ export type {
   StagedFeature
 } from "./overlay.js";
 
-/** The twelve SRD 5.2.1 classes. A missing key here is a compile error, not a silent absence. */
+/** The twelve SRD 5.2.1 classes. A missing key here is a compile error. */
 export type ClassId =
   | "barbarian"
   | "bard"
@@ -57,7 +57,7 @@ const MODULES: Readonly<Record<ClassId, ClassMechanicsModule>> = {
 
 const modules = Object.entries(MODULES) as Array<[ClassId, ClassMechanicsModule]>;
 
-/** Mechanics by class id, then feature id. Classes with no riders are omitted rather than mapped to `{}`. */
+/** Mechanics by class id, then feature id. Classes with no riders are left out (no `{}` entry). */
 export const CLASS_MECHANICS: MechanicsOverlay = Object.freeze(
   Object.fromEntries(
     modules

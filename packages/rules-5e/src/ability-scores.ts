@@ -65,7 +65,7 @@ export const ABILITY_ROLL_FORMULA = "4d6kh3";
 export const ABILITY_SCORE_MINIMUM = 1;
 export const ABILITY_SCORE_MAXIMUM = 30;
 
-/** Smallest and largest total a dice expression can produce, honouring sign and `kh`/`kl` keeps. */
+/** Smallest and largest total a dice expression can produce, with sign and `kh`/`kl` keeps honoured. */
 export function diceExpressionBounds(expression: DiceExpression): { minimum: number; maximum: number } {
   let minimum = 0;
   let maximum = 0;

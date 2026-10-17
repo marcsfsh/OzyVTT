@@ -69,7 +69,7 @@ describe("the unarmored-defense rider row", () => {
     expect(form.shieldSwitch()).toBeTruthy();
     expect(form.container.textContent).toContain("Not read on an item");
     // `FieldRenderer` composes help and note; the flag's meaning holds wherever it is authored.
-    expect(form.container.textContent).toContain("On is the Barbarian's rule");
+    expect(form.container.textContent).toContain("On follows the Barbarian's rule");
 
     // The note is prose in the help slot, so it adds no tap target on either scope.
     const feature = mount(true, "feature");

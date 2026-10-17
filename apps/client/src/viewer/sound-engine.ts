@@ -40,7 +40,7 @@ export type SoundEngineHooks = Readonly<{
   onUnplayable: (assetIds: readonly string[]) => void;
 }>;
 
-/** A sound that was stopped fades out over this long rather than cutting off. */
+/** A sound that was stopped fades out over this long, so it never cuts off. */
 const STOP_FADE_MS = 500;
 const LEVEL_RAMP_MS = 150;
 const PAUSE_FADE_MS = 200;

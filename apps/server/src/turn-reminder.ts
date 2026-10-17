@@ -29,7 +29,7 @@ function timeLeft(effect: Effect, bearerId: string, sourceName: string): string 
 
 /**
  * The turn-start reminder: the incoming combatant's conditions and effects, with where each came from and how long
- * it has left ("Borin: Prone; Paralyzed by Ghoul (Claw) - ends at the end of this turn"), so whatever the engine
+ * it has left ("Borin: Prone; Paralyzed (ends at the end of this turn)."), so whatever the engine
  * can't end by itself is in front of the table. Null when there is nothing to remind. A hidden source is named
  * "A hidden threat", as in the player projection, since the line is read by the whole table. `hiddenFromTable` is the
  * shared check (`hiddenFrom`), so a source out of every character's sight or under the fog is masked too; without it

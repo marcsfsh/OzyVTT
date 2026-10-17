@@ -6,7 +6,7 @@
  */
 import type { ClassMechanicsModule } from "./overlay.js";
 
-/** Every damage type but Force - Superior Defense's "Resistance to all damage except Force damage". */
+/** Every damage type but Force: Superior Defense's "Resistance to all damage except Force damage". */
 const ALL_BUT_FORCE = [
   "acid",
   "bludgeoning",
@@ -31,7 +31,7 @@ export const monk: ClassMechanicsModule = {
     /**
      * Focus Points read off the printed column; the shared `pool` lets all three 1-point actions (and
      * Stunning Strike) spend one counter. These are the paid forms; the free Disengage/Dash forms are in
-     * the text. Flurry's strikes are a compound bonus action: resolving it opens a pool of Unarmed Strikes
+     * the text. Flurry's strikes are a compound Bonus Action: resolving it opens a pool of Unarmed Strikes
      * (two, three from Heightened Focus at 10) that each strike spends. Heightened Focus's other upgrades stay prose.
      */
     "monks-focus": {

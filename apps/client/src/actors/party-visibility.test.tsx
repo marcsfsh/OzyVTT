@@ -13,7 +13,7 @@ import { PartyStrip } from "./PartyStrip";
  * every aria-label and title, since an accessible name leaks too.
  */
 
-/** Exact HP strings, chosen to be unmistakable in a substring sweep — no other number renders "83". */
+/** Exact HP strings, chosen to be unmistakable in a substring sweep: no other number renders "83". */
 const HP = { mine: "41/44", ally: "37/83", other: "12/95", unclaimed: "26/26" } as const;
 
 const playerActor = (over: Partial<PlayerActor> & Pick<PlayerActor, "id" | "name">): PlayerActor =>
@@ -89,7 +89,7 @@ function gmView(): GmView {
   } as unknown as GmView;
 }
 
-/** Rendered text plus every accessible name and tooltip on the tree — the two places HP was leaking. */
+/** Rendered text plus every accessible name and tooltip on the tree: the two places HP was leaking. */
 function surfaceText(container: HTMLElement): string {
   const parts = [container.textContent ?? ""];
   for (const node of container.querySelectorAll<HTMLElement>("[aria-label], [title]")) {
@@ -100,7 +100,7 @@ function surfaceText(container: HTMLElement): string {
 
 const TIERS: readonly PartyVisibility[] = ["off", "name-and-class", "full-sheet", "sheet-and-resources"];
 
-describe("party visibility — the player's party strip", () => {
+describe("party visibility: the player's party strip", () => {
   it("renders NO party surface at `off`", () => {
     const { container } = render(<PartyStrip role="player" state={playerView("off")} />);
     expect(
@@ -110,7 +110,7 @@ describe("party visibility — the player's party strip", () => {
     expect(container.textContent).toBe("");
   });
 
-  it("leaks no other character's HP anywhere at `off` — not in text, not in an aria-label", () => {
+  it("leaks no other character's HP anywhere at `off`, in text or in an aria-label", () => {
     const { container } = render(<PartyStrip role="player" state={playerView("off")} />);
     const swept = surfaceText(container);
     for (const [who, hp] of Object.entries(HP)) {
@@ -128,7 +128,7 @@ describe("party visibility — the player's party strip", () => {
     // Who: every character on the table, including the unclaimed one.
     for (const name of ["Mira Thorne", "Borin Stoneguard", "Lyra Emberwise", "Sable Vex"])
       expect(swept).toContain(name);
-    // What they play: the tier's own field, rendered rather than inferred.
+    // What they play: the tier's own field, rendered as it stands.
     expect(swept).toContain("Fighter 7");
     expect(swept).toContain("Wizard 5");
 
@@ -140,7 +140,7 @@ describe("party visibility — the player's party strip", () => {
   });
 
   for (const tier of ["full-sheet", "sheet-and-resources"] as const) {
-    it(`at \`${tier}\` the strip carries exact HP — the tier that opens the sheet that holds it`, () => {
+    it(`at \`${tier}\` the strip carries exact HP, the tier that opens the sheet that holds it`, () => {
       const { container } = render(<PartyStrip role="player" state={playerView(tier)} />);
       const swept = surfaceText(container);
       for (const hp of Object.values(HP)) expect(swept).toContain(hp);
@@ -162,7 +162,7 @@ describe("party visibility — the player's party strip", () => {
   });
 });
 
-describe("party visibility — the GM's own strip is never gated", () => {
+describe("party visibility: the GM's own strip is never gated", () => {
   it("shows every character and every exact HP, whatever the tier says", () => {
     // The tier gates players only; `gmView()` carries `partyVisibility: "off"`.
     const { container } = render(<PartyStrip role="gm" state={gmView()} />);

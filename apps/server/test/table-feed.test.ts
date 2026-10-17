@@ -405,7 +405,7 @@ describe("a feed row naming a combatant the roster no longer holds", () => {
 
     // Control, taken before anything vanishes: the public turn line reaches this player, so "absent"
     // below is a decision and not an empty feed.
-    expect((await feed(base, playerToken)).map((entry) => entry.text)).toContain("Round 1 - Public Hero's turn.");
+    expect((await feed(base, playerToken)).map((entry) => entry.text)).toContain("Round 1 · Public Hero's turn.");
 
     await server.store.execute({ id: randomUUID(), type: "test.roster-drop" }, (state) => {
       state.actors = state.actors.filter((actor) => actor.id !== OTHER);
@@ -416,9 +416,9 @@ describe("a feed row naming a combatant the roster no longer holds", () => {
     // The row exists, the GM reads it, and the player's feed does not carry it.
     const gmRows = (await feed(base, gmToken)).map((entry) => entry.text);
     const playerRows = (await feed(base, playerToken)).map((entry) => entry.text);
-    expect(gmRows).toContain("Round 1 - A combatant's turn.");
-    expect(playerRows).not.toContain("Round 1 - A combatant's turn.");
+    expect(gmRows).toContain("Round 1 · A combatant's turn.");
+    expect(playerRows).not.toContain("Round 1 · A combatant's turn.");
     // ...and the row the player did get is still there.
-    expect(playerRows).toContain("Round 1 - Public Hero's turn.");
+    expect(playerRows).toContain("Round 1 · Public Hero's turn.");
   });
 });

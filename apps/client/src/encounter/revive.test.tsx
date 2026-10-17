@@ -67,7 +67,7 @@ describe("a dead character's hit points", () => {
         onFeedback={() => {}}
       />
     );
-    expect(screen.getByText(/Only a revival brings them back/)).toBeTruthy();
+    expect(screen.getByText(/Only a revival brings .+ back, and the GM decides that/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Heal" })).toBeNull();
     expect(screen.queryByLabelText("Amount")).toBeNull();
   });

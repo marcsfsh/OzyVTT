@@ -46,7 +46,7 @@ import type {
 } from "@vtt/domain";
 import { apiBlob, apiRequest, type ApiRequest } from "../lib/api";
 
-/** Restated from the server so an input can refuse rather than earn a 400. */
+/** Restated from the server so an input can refuse before the server answers with a 400. */
 export const CONNECTION_LABEL_MAX = 40;
 export const AUTOSAVE_INTERVAL_MIN = 1;
 export const AUTOSAVE_INTERVAL_MAX = 600;

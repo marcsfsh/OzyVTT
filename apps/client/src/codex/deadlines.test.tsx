@@ -221,7 +221,7 @@ describe("Downtime proposes; the GM confirms", () => {
     await waitFor(() => expect(applyDowntime).toHaveBeenCalledWith("gm", "w1"));
   });
 
-  /** The fixture is built so each likely bug gives a different number: all 4, ignoring `fired` 3, `<` instead of `<=` 1. */
+  /** The fixture is built so each likely bug gives a different number: all 4, ignoring `fired` 3, `<` in place of `<=` 1. */
   it("says how many deadlines confirming would pass", async () => {
     await renderJournal([
       DOWNTIME, // proposes Hammer 10
@@ -569,7 +569,7 @@ describe("The new controls take the tap route a stacked control needs", () => {
         onOpenMap={vi.fn()}
       />
     );
-    // Reuses the row class that carries the floor rather than a bespoke one.
+    // Reuses the row class that carries the floor, with no bespoke one.
     expect(within(screen.getByRole("navigation", { name: "Deadlines" })).getByRole("button")).toHaveClass(
       "codex-campaign-recentitem"
     );
