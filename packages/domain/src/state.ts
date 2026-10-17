@@ -264,14 +264,33 @@ export const PendingSaveSchema = z
   .strict();
 export type PendingSave = z.infer<typeof PendingSaveSchema>;
 
+/** What an ability check is made with: the ability, and a skill or a tool (or both) when one applies. */
+export const CheckSubjectSchema = z
+  .object({
+    ability: AbilityIdSchema,
+    skill: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(60)
+      .optional(),
+    tool: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional()
+  })
+  .strict();
+export type CheckSubject = z.infer<typeof CheckSubjectSchema>;
+
 /**
  * Dice thrown before they count, held so a second look at the same roll returns the same dice (ADR-0012): a previewed
- * save, death save, attack or opportunity attack. GM-only; the player saw the dice in the roll itself.
+ * save, death save, attack or opportunity attack, and the latest check, which Heroic Inspiration may still reroll.
+ * GM-only; the player saw the dice in the roll itself.
  */
 export const HeldRollSchema = z
   .object({
-    /** What the dice belong to: `save:<saveId>`, `death-save:<actorId>`, `attack:<actorId>` or
-     *  `reaction:<reactionId>`. */
+    /** What the dice belong to: `save:<saveId>`, `death-save:<actorId>`, `attack:<actorId>`, `reaction:<reactionId>`
+     *  or `check:<actorId>`. */
     key: z.string().min(1).max(200),
     actorId: z.uuid(),
     /** The d20 faces thrown so far, in order. */
@@ -288,6 +307,18 @@ export const HeldRollSchema = z
     /** The round and turn they were thrown in: a die held for one turn's attack is not reused on a later turn. */
     round: z.number().int().nonnegative(),
     turnActorId: z.uuid().nullable(),
+    /** A check's subject and how it was made, so Heroic Inspiration can reroll it. */
+    check: z
+      .object({
+        subject: CheckSubjectSchema,
+        dc: z.number().int().min(1).max(40).nullable(),
+        visibility: RollVisibilitySchema,
+        /** The GM's forced mode, which a reroll keeps. */
+        rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
+        findActorId: z.uuid().optional()
+      })
+      .strict()
+      .optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();

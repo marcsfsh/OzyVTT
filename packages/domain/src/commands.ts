@@ -608,6 +608,49 @@ export const SaveRollSchema = z
     error: "Supply either a typed d20 or a final total, not both."
   });
 
+const SkillOrToolIdSchema = z
+  .string()
+  .regex(/^[a-z0-9-]+$/)
+  .max(80);
+
+/**
+ * An ability check rolled on the server: an ability, a skill or a tool (or a tool with the skill it uses). The server
+ * works out the bonus and the Advantage or Disadvantage from the rules, and records the roll.
+ */
+export const CheckRollSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    ability: AbilitySchema,
+    skill: SkillOrToolIdSchema.optional(),
+    tool: SkillOrToolIdSchema.optional(),
+    /** The DC to beat; absent, the GM adjudicates. */
+    dc: z.number().int().min(1).max(40).optional(),
+    /** Who sees the roll. A player can't roll GM-only; a hidden creature's roll is always the GM's. */
+    visibility: RollVisibilitySchema.default("public"),
+    /** A typed d20: the face a physical die shows (the one that counts). Players only while the table lets them. */
+    face: z.number().int().min(1).max(20).optional(),
+    /** The GM's choice of roll mode. Ignored from a player. */
+    rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
+    /** The creature a Wisdom (Perception or Survival) check is made to find: the roller's Hunter's Mark on it gives
+     *  Advantage. */
+    findActorId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+
+/** Reroll one die of a character's latest check (the lowest), while it is still their latest roll: a player spends
+ *  Heroic Inspiration; the GM rerolls freely. */
+export const CheckRerollSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    /** The face the rerolled physical die shows, for a check that was typed. */
+    face: z.number().int().min(1).max(20).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+
 /** The GM gives or takes a character's Heroic Inspiration. */
 export const ActorSetHeroicInspirationSchema = z
   .object({

@@ -223,6 +223,8 @@ export const GAME_PATHS = {
   rulesPolicy: `${API_NAMESPACE}/game/rules/policy`,
   actionUse: `${API_NAMESPACE}/game/actions/use`,
   saveRoll: `${API_NAMESPACE}/game/saves/roll`,
+  checkRoll: `${API_NAMESPACE}/game/actors/{actorId}/check`,
+  checkReroll: `${API_NAMESPACE}/game/actors/{actorId}/check/reroll`,
   actorHeroicInspiration: `${API_NAMESPACE}/game/actors/{actorId}/heroic-inspiration`,
   rulesAsk: `${API_NAMESPACE}/game/rules/ask`,
   rulesAnswer: `${API_NAMESPACE}/game/rules/answer`,
@@ -528,6 +530,8 @@ export const GAME_COMMANDS = {
   "rules.set-policy": { scope: "combat:write", method: "post", path: GAME_PATHS.rulesPolicy },
   "action.use": { scope: "combat:write", method: "post", path: GAME_PATHS.actionUse },
   "save.roll": { scope: "combat:write", method: "post", path: GAME_PATHS.saveRoll },
+  "check.roll": { scope: "combat:write", method: "post", path: GAME_PATHS.checkRoll },
+  "check.reroll": { scope: "combat:write", method: "post", path: GAME_PATHS.checkReroll },
   "actor.set-heroic-inspiration": {
     scope: "actor:write",
     method: "post",

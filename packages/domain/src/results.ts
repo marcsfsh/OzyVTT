@@ -209,6 +209,24 @@ export type DeathSaveResult = MutationResult & {
     /** What gave the death save Advantage or Disadvantage. */ rollModeSources?: ActionRollMode;
   }>;
 };
+/** A check the server rolled. A blind roll's numbers stay with the GM: the roller gets `hiddenFromRoller` alone. */
+export type CheckRollOutcome = Readonly<{
+  /** "Dexterity (Stealth)", "Strength check", "Thieves' Tools (Dexterity)". */
+  label: string;
+  natural: number;
+  total: number;
+  dc: number | null;
+  /** Null when there was no DC to beat. */
+  success: boolean | null;
+  /** What gave the check Advantage or Disadvantage; absent for a plain d20. */
+  rollMode?: ActionRollMode;
+  /** Reliable Talent counted a d20 of 9 or lower as 10. */
+  reliableTalent?: true;
+  /** The d20 was typed from a physical die. */
+  typed?: true;
+  rollId: string;
+}>;
+export type CheckRollResult = MutationResult & { check?: CheckRollOutcome; hiddenFromRoller?: boolean };
 /** Outcome of answering a pending save; applied damage/condition already happened server-side when present. */
 export type SaveAnswerResult = MutationResult & {
   outcome?: {

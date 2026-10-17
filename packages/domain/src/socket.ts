@@ -25,6 +25,7 @@ import type {
   ActorMovementResult,
   AnnotationAddResult,
   CharacterDraftResult,
+  CheckRollResult,
   DamageApplyResult,
   DeathSaveResult,
   DiceRollResult,
@@ -76,6 +77,8 @@ import type {
   CharacterSetProficienciesSchema,
   CharacterSetSlotSchema,
   CharacterSubmitImportSchema,
+  CheckRerollSchema,
+  CheckRollSchema,
   CommandIdentitySchema,
   DamageResolveSchema,
   DeathSaveRollSchema,
@@ -270,6 +273,16 @@ export interface ClientToServerEvents {
         outcome?: SaveAnswerResult["outcome"];
       }
     ) => void
+  ) => void;
+  /** Roll an ability check on the server: an ability, a skill or a tool. */
+  "check:roll": (
+    payload: CommandPayload<typeof CheckRollSchema>,
+    acknowledgement: (result: CheckRollResult) => void
+  ) => void;
+  /** Reroll one die of a character's latest check: Heroic Inspiration for a player, free for the GM. */
+  "check:reroll": (
+    payload: CommandPayload<typeof CheckRerollSchema>,
+    acknowledgement: (result: CheckRollResult) => void
   ) => void;
   /** GM: give or take a character's Heroic Inspiration. */
   "actor:set-heroic-inspiration": (

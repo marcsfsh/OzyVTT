@@ -6,7 +6,7 @@ machine-derivable surfaces of the app (state shape, command catalog, HTTP paths)
 file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.
 
 - API version `1` · realtime protocol `1`
-- 12 GameState fields · 97 commands · 215 HTTP paths
+- 12 GameState fields · 99 commands · 217 HTTP paths
 
 ## GameState shape
 
@@ -34,7 +34,7 @@ schema in `packages/domain/src/commands.ts`, its route and scope in `GAME_COMMAN
 OpenAPI operation, and one table entry under `apps/server/src/commands/`, which both transports
 register from. Then the projection decision.
 
-Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `death-save`, `dice`, `effect`, `encounter`, `fog`, `initiative`, `reaction`, `replay`, `rules`, `save`, `scene`, `table`, `terrain`, `token`, `turn`.
+Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `damage`, `death-save`, `dice`, `effect`, `encounter`, `fog`, `initiative`, `reaction`, `replay`, `rules`, `save`, `scene`, `table`, `terrain`, `token`, `turn`.
 
 | Command | Scope |
 | --- | --- |
@@ -88,6 +88,8 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `
 | `character.set-proficiencies` | `actor:write` |
 | `character.set-slot` | `actor:write` |
 | `character.submit-import` | `actor:write` |
+| `check.reroll` | `combat:write` |
+| `check.roll` | `combat:write` |
 | `damage.resolve` | `combat:write` |
 | `death-save.roll` | `combat:write` |
 | `dice.roll` | `roll:create` |
@@ -221,6 +223,8 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/actors/{actorId}/archived`
 - `POST /api/v1/game/actors/{actorId}/armor-class`
 - `GET /api/v1/game/actors/{actorId}/available-actions`
+- `POST /api/v1/game/actors/{actorId}/check`
+- `POST /api/v1/game/actors/{actorId}/check/reroll`
 - `POST /api/v1/game/actors/{actorId}/conditions`
 - `POST /api/v1/game/actors/{actorId}/currency`
 - `POST /api/v1/game/actors/{actorId}/damage`
