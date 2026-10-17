@@ -557,7 +557,9 @@ export function generateCharacterRequest(
     }
   ];
   if (plan.reduce((total, entry) => total + entry.level, 0) !== input.level)
-    reject(`The class levels add up to ${plan.reduce((total, entry) => total + entry.level, 0)}, not ${input.level}.`);
+    reject(
+      `The class levels add up to ${plan.reduce((total, entry) => total + entry.level, 0)}, but the character is level ${input.level}.`
+    );
   if (new Set(plan.map((entry) => entry.classId)).size !== plan.length) reject("Each class may be listed once.");
   if (plan.length > MAX_CLASSES) reject(`A character can have at most ${MAX_CLASSES} classes.`);
   if (input.classId && input.classId !== plan[0].classId)

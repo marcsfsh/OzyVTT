@@ -629,7 +629,9 @@ export class HomebrewStore implements HomebrewContentSource {
     const existing = this.recordRow(id);
     if (existing && !overwrite) throw new HomebrewStateError(`A record already exists at "${id}".`);
     if (existing && existing.type !== type)
-      throw new HomebrewStateError(`"${id}" is ${withArticle(existing.type)}, not ${withArticle(type)}.`);
+      throw new HomebrewStateError(
+        `"${id}" is already ${withArticle(existing.type)}, so it can't be replaced with ${withArticle(type)}.`
+      );
     const refusal = existing ? overwriteRefusal(projectSummary(existing)) : null;
     if (refusal) throw new HomebrewStateError(refusal);
     const name = recordName(body);

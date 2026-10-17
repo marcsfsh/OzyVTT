@@ -391,7 +391,7 @@ function validateBackgroundAllocation(input: CharacterCreateRequestInput, backgr
   for (const ability of abilities) {
     if (!options.from.includes(ability))
       reject(
-        `${background.name} increases ${options.from.map((a) => a.toUpperCase()).join("/")}, not ${ability.toUpperCase()}.`
+        `${background.name} can increase only ${options.from.map((a) => a.toUpperCase()).join("/")}, and ${ability.toUpperCase()} is not one of them.`
       );
   }
   const spread = spreadKey(input.backgroundBonusAllocation.map((entry) => entry.amount));

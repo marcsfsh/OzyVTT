@@ -103,7 +103,9 @@ function chosenSubject(ctx: ResolveContext, ability: CheckSubject["ability"]): C
   if (skill === undefined) return { ability };
   const skillAbility = skills[skill];
   if (skillAbility === undefined)
-    throw new CommandRejectedError(`${ctx.action.name} uses ${Object.keys(skills).join(", ")}, not ${skill}.`);
+    throw new CommandRejectedError(
+      `${ctx.action.name} uses ${Object.keys(skills).join(", ")}, and ${skill} is not one of them.`
+    );
   return { ability: skillAbility, skill };
 }
 

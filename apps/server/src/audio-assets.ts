@@ -472,7 +472,9 @@ function inspectWebm(buffer: Buffer): Found | null {
     offset = element.end;
   }
   if (docType !== "webm")
-    throw new InvalidRequestError(`Only WebM files are supported, not ${docType || "this EBML type"}. ${SUPPORTED}`);
+    throw new InvalidRequestError(
+      `${docType ? `A ${docType} file can't be read here.` : "This EBML file can't be read here."} ${SUPPORTED}`
+    );
   if (header.end >= buffer.length) throw incomplete();
   const segment = ebmlElement(buffer, header.end, buffer.length);
   if (segment.id !== SEGMENT) throw damaged("WebM");

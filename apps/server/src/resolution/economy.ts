@@ -1185,7 +1185,7 @@ function checkTargeting(
       if (target.id === first.targetId) {
         violations.push({
           rule: "attack.cleave-same-target",
-          message: `Cleave swings at another target, not ${target.name} again.`
+          message: `${target.name} took the hit that set off Cleave. Choose a second creature for the extra attack.`
         });
         continue;
       }
@@ -1206,7 +1206,7 @@ function checkTargeting(
           rule: "target.not-an-enemy",
           message:
             target.id === attacker.id
-              ? `${action.name} distracts an enemy, not ${attacker.name} itself.`
+              ? `${action.name} distracts an enemy, so ${attacker.name} can't target itself.`
               : `${target.name} is ${attacker.name}'s ally, and ${action.name} distracts an enemy.`
         });
       const apart = distanceFeet?.(attacker.id, target.id) ?? null;
