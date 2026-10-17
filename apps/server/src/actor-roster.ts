@@ -691,6 +691,34 @@ export function removeActor(state: GameState, actorId: string) {
   };
 }
 
+export type SampleRemoval = Readonly<{
+  removed: readonly string[];
+  kept: ReadonlyArray<Readonly<{ name: string; reason: string }>>;
+}>;
+
+/**
+ * Removes every sample character the roster rules let go, in one mutation. Each is tried on its own copy of the state
+ * first, so one refused (a player holds it, or a fight uses it) leaves the table as it was for that one and the rest
+ * still go. The refused ones are named with the refusal.
+ */
+export function removeSampleCharacters(state: GameState): SampleRemoval {
+  const removed: string[] = [];
+  const kept: { name: string; reason: string }[] = [];
+  for (const sample of state.actors.filter((actor) => actor.sample === true)) {
+    const trial = structuredClone(state);
+    try {
+      removeActor(trial, sample.id);
+    } catch (error) {
+      if (!(error instanceof CommandRejectedError)) throw error;
+      kept.push({ name: sample.name, reason: error.message });
+      continue;
+    }
+    Object.assign(state, trial);
+    removed.push(sample.name);
+  }
+  return { removed, kept };
+}
+
 /** Definition lookup for sheets/actions: imported stat blocks first, then the bundled content. */
 export function storedDefinition(state: GameState, definitionId: string): ActorDefinition | undefined {
   return state.definitions.find((entry) => entry.id === definitionId)?.definition;

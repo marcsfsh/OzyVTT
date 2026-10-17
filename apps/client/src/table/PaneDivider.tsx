@@ -11,6 +11,38 @@ const MEMORY_KEY = "vtt.table-split";
 
 const clamp = (value: number) => Math.round(Math.max(SPLIT_MIN, Math.min(SPLIT_MAX, value)));
 
+/** What a phone's panel is busy with: choosing a target needs the map, and the character sheet needs the panel. */
+export type SplitMoment = "choosing" | "sheet" | null;
+/** While a target is chosen, the map pane takes at least this share. */
+export const TARGETING_SHARE = 55;
+/** While the sheet fills the panel, the map pane takes at most this share. */
+export const SHEET_SHARE = SPLIT_MIN;
+
+/**
+ * The map pane's share for the moment: the person's own split, moved for a moment that needs the map or the panel.
+ * Moving the divider during a moment keeps that split until the moment ends, and it is remembered as their own.
+ */
+export function useMomentShare(moment: SplitMoment) {
+  const [split, setSplit] = useTableSplit();
+  const [movedIn, setMovedIn] = useState<SplitMoment>(null);
+  const [seen, setSeen] = useState(moment);
+  if (seen !== moment) {
+    setSeen(moment);
+    setMovedIn(null);
+  }
+  const share =
+    moment === null || movedIn === moment
+      ? split
+      : moment === "choosing"
+        ? Math.max(split, TARGETING_SHARE)
+        : Math.min(split, SHEET_SHARE);
+  const change = (next: number) => {
+    setSplit(next);
+    if (moment !== null) setMovedIn(moment);
+  };
+  return [share, change] as const;
+}
+
 /** The split the person chose on this device, as a percent of the table's height for the map pane. */
 export function useTableSplit() {
   const [split, setSplit] = useState<number>(() => {

@@ -49,6 +49,12 @@ export type EncounterStartEntry = Readonly<{
 export type AnnotationGeometryInput = Readonly<{ origin: AnnotationPoint; target: AnnotationPoint }>;
 export type AnnotationAddResult = MutationResult & { annotationId?: string };
 export type ActorAddResult = MutationResult & { actorId?: string };
+/** The sample characters one removal took away, and each it kept with the reason (a player holds it, or a fight uses
+ *  it). */
+export type SampleRemovalResult = MutationResult & {
+  removed?: readonly string[];
+  kept?: ReadonlyArray<Readonly<{ name: string; reason: string }>>;
+};
 export type SceneCreateResult = MutationResult & { sceneId?: string };
 
 /** Server-computed outcome of resolving a definition action (rolls already recorded in the roll history). */

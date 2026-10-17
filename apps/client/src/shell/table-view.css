@@ -126,3 +126,7 @@
   padding-top: var(--space-3);
   border-top: 1px solid var(--line);
 }
+/* In a fight it holds nothing, and its rule would take height from the sheet. */
+.table-sheet-foot:empty {
+  display: none;
+}

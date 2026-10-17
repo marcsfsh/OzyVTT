@@ -54,6 +54,8 @@ type QuestsViewProps = Readonly<{
   onChanged: () => void | Promise<void>;
   /** A linked page opens in Pages, which also leaves this section. */
   onOpenPage: (pageId: string) => void;
+  /** Follows a body's `[[link]]`: to its page, or to quick-create when no page has the title. */
+  onFollowLink: (target: string) => void;
   autosave: CodexAutosaveSettings;
   onPickTag?: (tag: string) => void;
 }>;
@@ -68,6 +70,7 @@ export function QuestsView({
   onOpenQuest,
   onChanged,
   onOpenPage,
+  onFollowLink,
   autosave,
   onPickTag,
   filter = "",
@@ -185,6 +188,7 @@ export function QuestsView({
               onPickTag={onPickTag}
               onChanged={onChanged}
               onOpenPage={onOpenPage}
+              onFollowLink={onFollowLink}
               onDeleted={() => {
                 onOpenQuest(null);
                 void onChanged();
@@ -237,6 +241,7 @@ function QuestEditor({
   onPickTag,
   onChanged,
   onOpenPage,
+  onFollowLink,
   onDeleted
 }: Readonly<{
   gmToken: string;
@@ -246,6 +251,7 @@ function QuestEditor({
   onPickTag?: (tag: string) => void;
   onChanged: () => void | Promise<void>;
   onOpenPage: (pageId: string) => void;
+  onFollowLink: (target: string) => void;
   onDeleted: () => void;
 }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
@@ -412,7 +418,8 @@ function QuestEditor({
               ariaLabel={BODY_LAYER.player.label}
               placeholder="What players have been told about this quest"
               pages={pages}
-              onNavigate={() => undefined}
+              onNavigate={onFollowLink}
+              onCreatePage={onFollowLink}
             />
           ) : (
             <CodexEditor
@@ -424,7 +431,8 @@ function QuestEditor({
               ariaLabel={BODY_LAYER.gm.label}
               placeholder="Details players cannot see"
               pages={pages}
-              onNavigate={() => undefined}
+              onNavigate={onFollowLink}
+              onCreatePage={onFollowLink}
               gmLayer
             />
           )}

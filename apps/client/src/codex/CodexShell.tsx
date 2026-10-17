@@ -40,6 +40,7 @@ import { ConnectionGraph } from "./RelationshipGraph";
 import { PlayerCodex } from "./PlayerCodex";
 import { campaignFeedProps } from "./dashboard";
 import { useGmFeeds } from "./useGmFeeds";
+import { usePageLinks } from "./pageLinks";
 import "./codex.css";
 
 /**
@@ -121,6 +122,8 @@ export function CodexShell({
   const refreshList = list.reload;
   const loadSessions = sessionFeed.reload;
   const loadQuests = questFeed.reload;
+  // A quest's or a session's `[[link]]` goes where a page's does, and offers to create a page no one has made yet.
+  const followLink = usePageLinks(pages, setQuickCreate);
   const standing = campaign.standing;
   const campaignLoading = campaignFeed.loading;
   const campaignError = campaignFeed.error;
@@ -410,6 +413,7 @@ export function CodexShell({
           statusFilter={route.query.get("status")}
           onFilterChange={setListFilter}
           onPickTag={(tag) => navigate(tagPath(tag))}
+          onFollowLink={followLink}
         />
       )}
 
@@ -425,6 +429,7 @@ export function CodexShell({
           openQuestId={recordId}
           onOpenQuest={(id) => navigate(id ? questPath(id) : pathForSection("quests"))}
           onOpenPage={(pageId) => navigate(pagePath(pageId))}
+          onFollowLink={followLink}
           filter={route.query.get("q") ?? ""}
           statusFilter={route.query.get("status")}
           onFilterChange={setListFilter}

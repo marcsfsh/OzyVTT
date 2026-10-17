@@ -94,6 +94,7 @@ const renderSessions = (over: Partial<React.ComponentProps<typeof SessionsView>>
       autosave={{ enabled: false, intervalSeconds: 1 }}
       pages={PAGES}
       actors={ACTORS}
+      onFollowLink={vi.fn()}
       {...over}
     />
   );

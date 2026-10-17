@@ -246,6 +246,17 @@ describe("resolveCatalogChoice", () => {
     expect(resolveCatalogChoice("weapons", catalogs).map((option) => option.id)).toEqual(["longsword"]);
   });
 
+  it("offers the kinds of weapon for `weapons`, and no magic weapon made from one", () => {
+    // A Berserker Axe is any axe made magic: it has no weapon statistics of its own (Weapon Mastery picks a kind).
+    const berserkerAxe: ContentEquipmentSummary = {
+      ...equipmentSummary("berserker-axe", "weapon"),
+      weapon: null,
+      appliesTo: { label: "Any Axe", baseIds: ["battleaxe", "greataxe", "handaxe"] }
+    };
+    const withMagic: CatalogChoiceCatalogs = { ...catalogs, equipment: [...catalogs.equipment, berserkerAxe] };
+    expect(resolveCatalogChoice("weapons", withMagic).map((option) => option.id)).toEqual(["longsword"]);
+  });
+
   it("resolves <listId>-spells through the spell's classes tags, carrying the spell level", () => {
     const options = resolveCatalogChoice("wizard-spells", catalogs);
     expect(options.map((option) => option.id)).toEqual(["fire-bolt", "magic-missile"]);

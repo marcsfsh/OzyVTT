@@ -47,9 +47,15 @@ Option 3. The table (`shell/TableView.tsx`) is a frame of docked regions:
   second row, the map pane, a divider, then the panel, whose footer is the bar under the thumb. The divider
   (`table/PaneDivider.tsx`) is a separator with a value that a finger drags and the arrow keys move, remembered
   on the device. Choosing a target lowers it so the map takes most of the height, and the target picker's Cancel
-  and Roll move into the bar (`table/footerSlot.tsx`) while the bar's own controls step aside. What the panel
+  and Roll move into the bar (`table/footerSlot.tsx`) while the bar's own controls step aside. The player's own
+  sheet raises it so the sheet takes most of the height, and an attack tapped on that sheet is aimed on the Turn
+  tab, where the picker has room beside the bigger map; the panel goes back to the sheet once the roll is made.
+  Moving the divider during either moment keeps that split until the moment ends (`useMomentShare`). A prompt in
+  the slot gives way, and scrolls itself, before the tabs and the bar do, so the bar stays on screen; the bar keeps
+  its buttons on one row with End turn, and the hit points and movement in a row under them. What the panel
   brings into view (the picker, a result, the active row) scrolls its own region alone (`lib/reveal.ts`), since
-  `scrollIntoView` would also move the clipped boxes above it.
+  `scrollIntoView` would also move the clipped boxes above it. A box that clips its overflow uses `overflow: clip`,
+  which focus cannot scroll; the GM's spell areas scroll with the turn order in its region.
 
 - **The map's camera** (`scene/useMapView.ts`, `scene/cameraFollow.ts`) fills the map pane edge to edge, so the
   map has no bands round it. It opens close enough that a one-cell token is about 32 pixels on a phone and 40 on
@@ -89,9 +95,13 @@ tab choice is stored under `vtt.table-tab.<role>.<width>`. Reverting is a client
 
 - `table/panel-tabs.test.tsx`: the tablists per role and moment, panels tied to tabs, the remembered tab, and the
   footer's primary.
-- `table/pane-divider.test.tsx`: the separator's value, keys, drag and memory.
+- `table/pane-divider.test.tsx`: the separator's value, keys, drag and memory, and the split through choosing a
+  target and showing the sheet.
+- `table/phone-sheet.test.tsx`: the sheet tells the table it is shown, and on a phone an attack tapped on it is
+  aimed on the Turn tab.
 - `table/needs-you.test.tsx`, `table/prompt-slot.test.tsx`, `table/tap-to-target.test.tsx`.
 - `scene/camera.test.ts`: the view's shape, the readable opening zoom, framing and what the camera follows.
 - `apps/server/test/reaction-prompt-roll.test.ts`: the prompt's attack total reaches a player only with its roll.
 - `e2e/journeys.spec.ts`: the fight journey on the new layout at 390 by 844 with touch and at 1280 by 800, with
-  the uncovered-token and uncovered-primary checks.
+  the uncovered-token and uncovered-primary checks, and a save on the player's own turn with the bar and the save's
+  button inside the viewport and uncovered.

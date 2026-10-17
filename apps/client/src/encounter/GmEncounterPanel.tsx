@@ -407,9 +407,10 @@ export function GmEncounterPanel({
           {confirm.message}
         </ConfirmRow>
       )}
-      {/* The spell areas the server runs on the map; one a player cast waits here to be placed. */}
-      <SpellAreas state={state} busy={busy} run={run} onFeedback={setMessage} />
       <div className="encounter-region scroll-y">
+        {/* The spell areas the server runs on the map; one a player cast waits here to be placed. They scroll with
+            the order, so a few of them never crowd the order out of its section. */}
+        <SpellAreas state={state} busy={busy} run={run} onFeedback={setMessage} />
         <ol className="initiative-list gm">
           {state.combat.initiative.map((entry) => {
             const active = state.combat.turnActorId === entry.actorId;

@@ -67,15 +67,17 @@ export function TableHeader(
         <span className="table-header-staging" role="group" aria-label="Staged scene">
           <span className="table-header-staged-name">
             <IconScene />
-            <span>
-              Staging <strong>{staged.name}</strong> · GM only
+            <span className="table-header-staged-text">
+              <span className="table-header-staged-word">Staging </span>
+              <strong>{staged.name}</strong>
+              <span className="table-header-staged-word"> · GM only</span>
             </span>
           </span>
           {/* Back to live only when a scene is live to go back to. */}
           {live && (
             <Button variant="ghost" size="sm" onClick={gm.onBackToLive} title="Return to the scene players see">
               <IconChevronLeft />
-              Back to live
+              <span className="table-header-back-label">Back to live</span>
             </Button>
           )}
           {/* Before Make live: a map without its grid lets tokens sit anywhere, off the squares. */}

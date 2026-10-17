@@ -286,6 +286,71 @@ test("the GM runs a fight on a new scene and the player moves their token", asyn
   }
 });
 
+test("a save on the player's own turn leaves the bar under the thumb on screen", async ({ open }) => {
+  const hero = PARTY[1];
+  const player = await open("/");
+  await ensureGmPassword(player.request);
+  // The GM's side is the API: this journey is about the player's panel.
+  const { token } = (
+    await (await player.request.post("/api/v1/host/gm/sign-in", { data: { password: GM_PASSWORD } })).json()
+  ).data;
+  const headers = { authorization: `Bearer ${token}` };
+  const gm = async (path: string, data: Record<string, unknown>) => {
+    const reply = await player.request.post(path, { headers, data: { commandId: randomUUID(), ...data } });
+    expect(reply.ok(), `${path}: ${await reply.text()}`).toBe(true);
+  };
+  const game = async () => (await (await player.request.get("/api/v1/game", { headers })).json()).data.game;
+  let state = await game();
+  const { id: actorId, ownerSessionId } = state.actors.find((actor: { name: string }) => actor.name === hero);
+  if (ownerSessionId) await gm(`/api/v1/game/claims/${actorId}/force-release`, { actorId, inFight: true });
+  // The fight journey leaves this character's fight running. On its own this journey starts one: on the live
+  // scene's map when a scene is live, else on a map of its own.
+  if (
+    !state.combat.initiative.some((entry: { actorId: string }) => entry.actorId === actorId) ||
+    !state.combat.active
+  ) {
+    if (state.combat.active) await gm("/api/v1/game/encounter/end", {});
+    let mapAssetId = state.combat.activeSceneId ? state.combat.mapAssetId : null;
+    if (!mapAssetId) {
+      const upload = await player.request.post(`/api/v1/map-assets?name=Smoke%20yard&kind=battlemap`, {
+        headers: { ...headers, "content-type": "image/png" },
+        data: battleMap()
+      });
+      expect(upload.ok(), await upload.text()).toBe(true);
+      mapAssetId = (await upload.json()).data.asset.id;
+    }
+    await gm("/api/v1/game/encounter/start", { mapAssetId, entries: [{ actorId, score: 20 }] });
+  }
+  for (let step = 0; step < 4 && (await game()).combat.turnActorId !== actorId; step += 1)
+    await gm("/api/v1/game/initiative/next", {});
+  state = await game();
+  expect(state.combat.turnActorId).toBe(actorId);
+  await joinAndClaim(player, hero);
+  await press(player.getByRole("tab", { name: "Turn" }));
+  await expect(player.getByRole("heading", { name: "Your turn" })).toBeVisible();
+
+  // A saving throw for this character on its own turn: the GM's ruling stands in for whatever forced it.
+  await gm("/api/v1/game/actions/resolve", {
+    actorId,
+    actionId: "spell-sacred-flame",
+    targetIds: [actorId],
+    override: { reason: "A save on the character's own turn" }
+  });
+  const slot = player.getByRole("region", { name: "Answer now" });
+  await expect(slot.getByRole("heading", { name: /Dexterity saving throw/ })).toBeVisible();
+  // The prompt throws the die as it opens and shows a disabled Roll until the server answers. A new Confirm button
+  // then takes its place, so the check waits for Confirm, the button the player presses.
+  const confirm = slot.getByRole("button", { name: "Confirm" });
+  await expect(confirm).toBeVisible();
+  // The save's own button leads the view, and the bar with End turn stays inside the viewport, uncovered.
+  await expectUncovered(confirm);
+  await expectUncovered(player.getByRole("button", { name: "End turn" }));
+  await expectPageFits(player);
+  // Answered, the prompt leaves the slot.
+  await press(confirm);
+  await expect(slot.getByRole("heading", { name: /Dexterity saving throw/ })).toBeHidden();
+});
+
 test("a player answers the GM's call with a physical die, then rerolls it with Heroic Inspiration", async ({
   open
 }) => {

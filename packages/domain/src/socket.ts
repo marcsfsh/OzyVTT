@@ -37,6 +37,7 @@ import type {
   ReactionAnswerResult,
   RulesBlocked,
   SaveAnswerResult,
+  SampleRemovalResult,
   SceneCreateResult,
   StabilizeResult,
   LightAddResult,
@@ -260,6 +261,11 @@ export interface ClientToServerEvents {
   "actor:remove": (
     payload: CommandPayload<typeof ActorRemoveSchema>,
     acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** Removes every sample character the GM may remove; the reply names those removed and those kept, with why. */
+  "actor:remove-samples": (
+    payload: CommandPayload<typeof CommandIdentitySchema>,
+    acknowledgement: (result: SampleRemovalResult) => void
   ) => void;
   "actor:import-definition": (
     payload: CommandPayload<typeof ActorImportDefinitionSchema>,

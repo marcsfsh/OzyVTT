@@ -52,12 +52,15 @@ export function PlayerTurnEconomy({
   revision,
   endWaits,
   quiet = false,
-  unconscious = false
+  unconscious = false,
+  hp
 }: Readonly<{
   combat: PlayerView["combat"];
   myId: string;
   myTurn: boolean;
   mySpeedFeet?: number;
+  /** The character's hit points, shown beside the movement. */
+  hp?: string;
   /** The game's revision: this turn's movement budget (Dash and Slow included) is asked again as it changes. */
   revision?: number;
   /** Why End turn waits (a death save still to roll); it is disabled meanwhile. */
@@ -79,6 +82,7 @@ export function PlayerTurnEconomy({
     });
   };
   const reactionUsed = combat.reactionsUsed.includes(myId);
+  const showMove = myTurn && moveBudget !== undefined && moveBudget !== null;
   const giveBackLocked = (combat.ruleExceptions.economy ?? combat.rulesMode) !== "freeform";
   const lockedTitle = "Spent - only the GM can give it back";
   return (
@@ -151,11 +155,6 @@ export function PlayerTurnEconomy({
       >
         Reaction
       </button>
-      {myTurn && moveBudget !== undefined && moveBudget !== null && (
-        <span className="economy-movement" title="Movement spent this turn / this turn's movement">
-          Move {Math.round(combat.turn.movementUsedFeet)}/{moveBudget} ft
-        </span>
-      )}
       {myTurn && (
         <button
           type="button"
@@ -166,6 +165,17 @@ export function PlayerTurnEconomy({
         >
           End turn
         </button>
+      )}
+      {/* The readouts follow the buttons, so on a phone End turn shares the buttons' row and the bar keeps two rows. */}
+      {(hp !== undefined || showMove) && (
+        <span className="economy-status">
+          {hp !== undefined && <span className="economy-hp">{hp}</span>}
+          {showMove && (
+            <span className="economy-movement" title="Movement spent this turn / this turn's movement">
+              Move {Math.round(combat.turn.movementUsedFeet)}/{moveBudget} ft
+            </span>
+          )}
+        </span>
       )}
       {feedback && (
         <span className="economy-feedback" role="status">
@@ -194,8 +204,15 @@ export type PlayerPanelSlots = Readonly<{
 export function PlayerEncounterPanel({
   state,
   phone = false,
-  slots
-}: Readonly<{ state: PlayerView; phone?: boolean; slots?: PlayerPanelSlots }>) {
+  slots,
+  onSheetShown
+}: Readonly<{
+  state: PlayerView;
+  phone?: boolean;
+  slots?: PlayerPanelSlots;
+  /** Whether the panel shows the player's own sheet, so a phone's divider can give the sheet the height. */
+  onSheetShown?: (shown: boolean) => void;
+}>) {
   const { combat } = state;
   const myId = state.actors.find((actor) => "claimStatus" in actor && actor.claimStatus === "mine")?.id ?? null;
   const myActor = state.actors.find((actor) => actor.id === myId) ?? null;
@@ -212,6 +229,11 @@ export function PlayerEncounterPanel({
     fighting ? "turn" : "me",
     `${fighting}|${phone}`
   );
+  const sheetShown = myActor !== null && tab === (fighting ? "sheet" : "me");
+  useEffect(() => {
+    onSheetShown?.(sheetShown);
+    return () => onSheetShown?.(false);
+  }, [onSheetShown, sheetShown]);
   // "Jump" sheet-attack mode: an attack tapped on the sheet comes to the Turn tab to pick and confirm, then
   // returns to the sheet once it commits.
   const [returnToSheetAfterAttack, setReturnToSheetAfterAttack] = useState(false);
@@ -239,6 +261,8 @@ export function PlayerEncounterPanel({
           role="player"
           state={state}
           embedded
+          /* A phone's sheet under the map has no room for a target picker, so its attacks are aimed on the Turn tab. */
+          {...(phone ? { attackMode: "jump" as const } : {})}
           {...(inCombat
             ? {
                 combat: {
@@ -419,12 +443,6 @@ export function PlayerEncounterPanel({
   const footer =
     fighting && inFight && myId !== null ? (
       <div className="table-panel-foot-row player-foot">
-        {/* The character's hit points, in view on every tab. */}
-        {ownHp && (
-          <span className="player-foot-hp">
-            {`HP ${ownHp.current}/${ownHp.maximum}${ownHp.temporary > 0 ? ` +${ownHp.temporary}` : ""}`}
-          </span>
-        )}
         <PlayerTurnEconomy
           combat={combat}
           myId={myId}
@@ -433,6 +451,10 @@ export function PlayerEncounterPanel({
           revision={state.revision}
           quiet={rollPending}
           unconscious={myActor !== null && isDying(myActor)}
+          /* The character's hit points, in view on every tab. */
+          {...(ownHp
+            ? { hp: `HP ${ownHp.current}/${ownHp.maximum}${ownHp.temporary > 0 ? ` +${ownHp.temporary}` : ""}` }
+            : {})}
           {...(myActor && owesDeathSave(state, myActor) ? { endWaits: "Roll your death save first." } : {})}
         />
       </div>

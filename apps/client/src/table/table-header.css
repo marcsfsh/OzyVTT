@@ -115,4 +115,34 @@
     max-width: 8.5rem;
     padding: 0;
   }
+  /* A staged scene keeps one row too: the status takes the room left, the name gives way to Make live, and the
+     words round the name and Back to live's label are left to screen readers. */
+  .table-header-staging {
+    flex: 0 1 auto;
+    flex-wrap: nowrap;
+  }
+  .table-header-staged-name {
+    flex: 0 1 auto;
+    min-width: 2.5rem;
+  }
+  .table-header-staged-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .table-header-staging > .nh-btn {
+    flex: none;
+  }
+  .table-header.is-staging .table-status {
+    flex-basis: 0;
+  }
+  .table-header-staged-word,
+  .table-header-back-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }

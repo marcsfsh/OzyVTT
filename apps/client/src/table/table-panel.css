@@ -7,10 +7,12 @@
   min-width: 0;
   min-height: 0;
 }
-/* What must be answered sits above the tabs and never takes more than half the panel; past that it scrolls. */
+/* What must be answered sits above the tabs and never takes more than half the panel; past that it scrolls. It gives
+   way before the tabs and the footer do, so the bar under the thumb stays on screen however short the panel. */
 .table-panel > .needs-you,
 .table-panel > .prompt-slot {
-  flex: none;
+  flex: 0 1 auto;
+  min-height: 0;
   max-height: 50%;
 }
 .table-panel > .prompt-slot {

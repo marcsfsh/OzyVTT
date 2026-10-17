@@ -16,7 +16,7 @@ import { ConditionEditor } from "./conditions";
 import { SavePrompt } from "./SavePrompt";
 import { RichText } from "./RichText";
 import { DicePanel, ROLL_VISIBILITY_WORD, VISIBILITY_OPTIONS } from "../dice/DicePanel";
-import { rollModeOf, useRollPreference } from "../dice/roll-preference";
+import { rollModeOf, useRollPreference, type SheetAttackMode } from "../dice/roll-preference";
 import { DyingTracker } from "./DyingTracker";
 import { HealTargetPicker, type LooseHeal } from "./HealTargetPicker";
 import { isKnockedOut, partyHelpers, StabilizeControl } from "./StabilizeControl";
@@ -71,6 +71,7 @@ export function CharacterSheet({
   embedded = false,
   combat,
   onJumpToInitiative,
+  attackMode,
   standaloneActions,
   onLevel,
   onClose
@@ -88,6 +89,8 @@ export function CharacterSheet({
     targets: readonly { actorId: string; name: string }[];
   };
   /** In "jump" sheet-attack mode, called after an attack chip starts targeting so the panel hops to the initiative view. */ onJumpToInitiative?: () => void;
+  /** Where an attack tapped here is aimed when the panel decides it, in place of the player's setting. */
+  attackMode?: SheetAttackMode;
   /** Page-level doors for the standalone presentation, shown as the frame's bottom row. Only the SPA's `/characters/:id` passes any; `sheet.html` has no router. */ standaloneActions?: React.ReactNode;
   /** Opens the level page for this character; a sheet opened over another page passes it, so levelling is one tap
    *  from wherever the sheet is. */
@@ -246,7 +249,7 @@ export function CharacterSheet({
   } = useRollPreference();
   // Only the embedded panel can jump to the initiative view and back, so elsewhere the picker is
   // always inline.
-  const effectiveAttackMode = onJumpToInitiative ? sheetAttackMode : "inline";
+  const effectiveAttackMode = onJumpToInitiative ? (attackMode ?? sheetAttackMode) : "inline";
   // The dice log sits behind the header's Sheet/Dice toggle, one pane at a time. Defaults to the sheet.
   const hasLog = state !== undefined;
   const [mobilePane, setMobilePane] = useState<"sheet" | "log">("sheet");
@@ -731,7 +734,7 @@ export function CharacterSheet({
         </Select>
       </label>
       {/* Mid-fight only: whether an attack tapped here resolves inline or on the initiative view. */}
-      {liveCombat?.active === true && actor.kind === "player-character" && onJumpToInitiative && (
+      {liveCombat?.active === true && actor.kind === "player-character" && onJumpToInitiative && !attackMode && (
         <>
           <span className="sheet-settings-label">Attacks</span>
           <SegmentedControl
