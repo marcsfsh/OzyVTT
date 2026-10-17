@@ -1,6 +1,6 @@
 # ADR-018: Character-sheet PDF ingestion
 
-- Status: Accepted (amended 2026-07-26 — see Amendment)
+- Status: Accepted (amended 2026-07-26; see Amendment)
 - Date: 2026-07-15
 
 ## Context
@@ -27,7 +27,7 @@ Players often already have completed character sheets as PDFs but not canonical 
 
 Use a version-pinned local MarkItDown adapter to extract a completed PDF into inert Markdown inside an isolated, no-network, resource-limited temporary worker. Feed that Markdown to a VTT-owned deterministic converter that produces field candidates with provenance, confidence, warnings, and unresolved alternatives. Normalize candidates into a draft canonical `actor-character` JSON document, validate it with the normal schema, and require review of ambiguous/required fields before authorized creation or update.
 
-The original PDF, Markdown, and draft remain import-job artifacts, not live domain state. A player may upload and review; GM approval is the conservative initial policy for adding/updating a shared actor. Scanned/image-only sheets are explicitly unsupported until a separate bounded offline OCR decision is accepted.
+The original PDF, Markdown, and draft remain import-job artifacts, outside live domain state. A player may upload and review; GM approval is the conservative initial policy for adding/updating a shared actor. Scanned/image-only sheets are explicitly unsupported until a separate bounded offline OCR decision is accepted.
 
 ## Consequences and tradeoffs
 
@@ -40,7 +40,7 @@ The original PDF, Markdown, and draft remain import-job artifacts, not live doma
 
 ## Mobile impact
 
-Phone users must be able to select/upload a PDF, see job progress, correct required fields, save/resume review, and understand failures. Dense source comparison may use a field-focused review rather than a full side-by-side PDF layout on narrow screens.
+Phone users must be able to select/upload a PDF, see job progress, correct required fields, save/resume review, and understand failures. Dense source comparison may use a field-focused review on narrow screens, with no full side-by-side PDF layout.
 
 ## Security and privacy impact
 
@@ -62,12 +62,12 @@ The adapter is additive. Removing or replacing MarkItDown does not invalidate ap
 
 Phase 1.5 ships as `packages/dndbeyond-pdf` + a GM review modal. Two departures from the
 original proposal, both validated by a working extractor over six fixtures (Cleric 5, Bard 20,
-Warlock 20, Fighter 20, Wizard 20, a 6-class multiclass — all validate against `ActorDefinitionSchema`):
+Warlock 20, Fighter 20, Wizard 20, a 6-class multiclass; all validate against `ActorDefinitionSchema`):
 
-- **Extraction runs in the browser, not a server worker.** D&D Beyond's PDF export is a _named
+- **Extraction runs in the browser, with no server worker.** D&D Beyond's PDF export is a _named
   AcroForm_: every character value is a widget (`/T` field name + `/V` value), so extraction is a
   deterministic field-name → schema mapping via `pdfjs-dist` (Apache-2.0; worker bundled locally,
-  no CDN) — no MarkItDown/Python worker, and the PDF never leaves the device (strictly more private
+  no CDN), with no MarkItDown/Python worker, and the PDF never leaves the device (strictly more private
   than the proposed sandbox). This removes the packaging/isolation burden the original decision
   carried. The server still re-validates every definition through `ActorDefinitionSchema` and applies
   the normal import authorization, so server authority is unchanged.

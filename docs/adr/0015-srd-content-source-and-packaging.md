@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-07-17. (Previously an index-only proposal: "curated, versioned SRD bundle separate from executable code.")
+Accepted on 2026-07-17. (Previously an index-only proposal: "curated, versioned SRD bundle separate from executable code.")
 
 ## Context and decision drivers
 
@@ -19,7 +19,7 @@ sheet/generator projects. Key findings: open5e-api vendors normalized Django fix
 the SRD 5.2 2024 rules under CC BY 4.0 (`data/v2/wizards-of-the-coast/srd-2024/`, including
 331 creatures with structured per-action attack rows); 5e-bits/5e-database is denormalized
 and easy to parse but its 2024 monster set is nearly empty (a full bestiary exists only in
-its 2014/OGL data); the markdown SRD is prose (reference display, not mechanics); the
+its 2014/OGL data); the markdown SRD is prose (reference display with no mechanics); the
 character tools are out of scope ("not a character builder") and one carries no license.
 
 ## Considered options
@@ -29,10 +29,10 @@ character tools are out of scope ("not a character builder") and one carries no 
   reconstructing stat blocks from normalized joins (Creature + CreatureAction +
   CreatureActionAttack + CreatureTrait).
 - **5e-bits/5e-database:** simplest record shapes and MIT tooling, but the full bestiary is
-  2014 rules under OGL 1.0a — a mixed-license bundle and a ruleset mismatch with
+  2014 rules under OGL 1.0a: a mixed-license bundle and a ruleset mismatch with
   `content-srd-5.2.1`.
 - **Markdown SRD (downfallx or open5e `raw_sources`):** CC BY 4.0 2024 prose; would require
-  brittle scraping to drive mechanics. Useful later as a rules-reference pane, not as the
+  brittle scraping to drive mechanics. Useful later as a rules-reference pane; it can't be the
   mechanics source.
 - **Running an external content service (open5e API/5e-srd-api):** violates the offline/
   LAN-only constraint outright.
@@ -44,7 +44,7 @@ Its fixtures are vendored unmodified into
 `packages/content-srd-5.2.1/sources/open5e-srd-2024/` (only the CC-BY `srd-2024` document;
 third-party/OGL publisher data is deliberately excluded). A deterministic build-time ETL
 (`scripts/build-bundle.ts`) joins the fixtures and adapts each stat block into canonical
-`ActorDefinition` v1 JSON per ADR-0007/ADR-0008 — structured attack/save/damage where the
+`ActorDefinition` v1 JSON per ADR-0007/ADR-0008: structured attack/save/damage where the
 source is structured, inert text (`extensions`, descriptions) for everything else. Combat-
 and sheet-relevant reference data ships alongside the bestiary: spells (with structured
 save/attack/damage/upcast fields), the weapon and armor tables, weapon property/mastery
@@ -52,7 +52,7 @@ texts, skills, damage types, conditions, and the core-rules glossary. The genera
 under `bundles/` are committed and reviewed like code; the ETL validates every bundle
 fail-closed before writing. Reviewed corrections for upstream fixture bugs live in explicit
 `CORRECTIONS` tables in the ETL (with the printed SRD values), and fixtures open5e mislabels
-as SRD are dropped via an `EXCLUSIONS` list — never edits to the vendored sources. The
+as SRD are dropped via an `EXCLUSIONS` list. The vendored sources are never edited. The
 required CC BY 4.0 attribution ships in the bundle and must be shown by any surface that
 displays the content.
 
@@ -63,7 +63,7 @@ reference under one permissive license, at the cost of vendoring ~2.7 MB of sour
 plus ~1.6 MB of generated bundles in git. Regenerating after an upstream refresh is a re-run
 of the ETL plus a reviewable diff. Choosing 2024 (SRD 5.2.1) over 2014 (SRD 5.1) means the
 older bestiary is not bundled; a future OGL 5.1 bundle would be a separate package with its
-own license notice, not a mix-in. Classes, species, feats, backgrounds, and magic items were
+own license notice, kept apart from this one. Classes, species, feats, backgrounds, and magic items were
 originally left out as outside the product's scope.
 
 **Update, 2026-10-15:** the guided builder and magic items shipped, so all of that content is now
@@ -82,7 +82,7 @@ device-specific behavior.
 
 Bundles carry `schemaVersion` per document (ADR-0007), so a future `ActorDefinition` v2
 coexists with v1 and migrates deliberately. Swapping or adding a content source means a new
-`sources/<name>/` directory and adapter run — the canonical bundle format and consumers are
+`sources/<name>/` directory and adapter run; the canonical bundle format and consumers are
 unchanged. Removing the content entirely is deleting the package's `sources/` and `bundles/`
 directories.
 
@@ -100,10 +100,10 @@ cross-validated statblock-by-statblock against an independent CC-BY copy of the 
 exact 330/330 name coverage in both directions and zero mismatches on size, AC, HP, CR, all
 six ability scores, saving throws, initiative bonuses, and attack bonuses; all 339 spell
 headers (level/school/classes/concentration/ritual) and all 38 weapon damage entries also
-match exactly. Documented curation: `giant-fly` excluded (no SRD statblock — verified
+match exactly. Documented curation: `giant-fly` excluded (no SRD statblock, verified
 against the SRD text), 25 Tiny sizes restored (upstream flattens Tiny to small), octopus
 CON/CHA + three saving-throw values and greater-invisibility's description corrected. ETL
-report: 989 actions adapted — 390 structured attacks from upstream rows plus 33 recovered
+report: 989 actions adapted: 390 structured attacks from upstream rows plus 33 recovered
 by a deterministic parser over the standardized statblock prose, 184 structured saves.
 Every bundle is validated fail-closed before writing. Full workspace `check`/`test`/`build`
 green (191 tests), `npm ls` dependency tree consistent, ETL output hash-identical across

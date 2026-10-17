@@ -6,7 +6,7 @@ Accepted.
 
 ## Decision
 
-Until a GM password exists, only a request originating from loopback may set it. The server stores a bcrypt hash, not the password. After bootstrap, GM logins receive a signed, time-limited session token.
+Until a GM password exists, only a request originating from loopback may set it. The server stores a bcrypt hash and never the password. After bootstrap, GM logins receive a signed, time-limited session token.
 
 ## Consequences
 

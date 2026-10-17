@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-07-15.
+Accepted on 2026-07-15.
 
 ## Context and decision drivers
 
@@ -35,8 +35,8 @@ Schema changes use ordered migrations. Backup/restore and downgrade policy remai
 
 Automated store tests cover migration/initialization, one transactional command, persisted receipt/event, duplicate retry, revision conflict, restart recovery, and periodic snapshots.
 
-## Update — 2026-10-14
+## Update of 2026-10-14
 
 The ordered domain events and periodic snapshots were removed as unread (see ADR-0013). Every
 store now records its migrations in one shared `migrations` table (`apps/server/src/database.ts`),
-and a file from before that history was reset is refused at startup rather than upgraded.
+and a file from before that history was reset is refused at startup with no upgrade.

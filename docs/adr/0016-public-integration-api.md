@@ -2,11 +2,11 @@
 
 ## Status
 
-Accepted — 2026-07-31 (proposed 2026-07-15).
+Accepted on 2026-07-31 (proposed 2026-07-15).
 
 The v1 surface shipped, its conventions are enforced by contract tests, and the compatibility clause this
-ADR always promised is written down below. What remained "proposed" was never the architecture — it was
-the missing normative statement.
+ADR always promised is written down below. What remained "proposed" was the missing normative statement:
+the architecture itself was settled.
 
 ## Context and decision drivers
 
@@ -37,29 +37,29 @@ This is the statement the ADR promised. It binds every `/api/v1` surface, the ta
    Server-Sent Events stream.
 2. **Request correlation.** Every `/api/v1` router echoes a caller-supplied UUID-v4 `X-Request-Id` on the
    response header and in the error body, minting one when the caller sends none. A value that is not a
-   UUID v4 is replaced rather than echoed.
+   UUID v4 is replaced with a minted one.
 3. **Idempotency is per surface, and the API does not pretend otherwise.** _Game_ writes accept a
    `commandId` (UUID) and execute it exactly once; a retry replays the stored outcome with
-   `duplicate: true`. D19: codex JSON-body writes accept an optional `commandId` (UUID); resend the same id to retry safely and the stored outcome is replayed verbatim — same status, same bytes — with an `x-idempotent-replay` header so a caller can tell a replay from a fresh execution. The receipt is written after the write commits, so a crash between the two re-executes ONE identical retry rather than reporting success for a write that never landed; only a 2xx is recorded, so a retry after an error re-executes. Body-less codex POSTs and every codex DELETE carry none — they are naturally idempotent already. _Homebrew_ writes still carry none and rely on `expectedRev`.
+   `duplicate: true`. D19: codex JSON-body writes accept an optional `commandId` (UUID); resend the same id to retry safely and the stored outcome is replayed verbatim (same status, same bytes) with an `x-idempotent-replay` header so a caller can tell a replay from a fresh execution. The receipt is written after the write commits, so a crash between the two re-executes ONE identical retry, so nothing reports success for a write that never landed; only a 2xx is recorded, so a retry after an error re-executes. Body-less codex POSTs and every codex DELETE carry none: they are naturally idempotent already. _Homebrew_ writes still carry none and rely on `expectedRev`.
    The API-wide "every write accepts `commandId`" claim that shipped in `info.description` was false for
    two of the three surfaces when it was written; it is now true of two of them and says so.
 4. **Concurrency, two vocabularies.** `expectedRevision` (game) targets the global GameState revision.
    `expectedRev` (codex pages/sessions/quests, homebrew rows) targets one record's revision. Both reject a
    stale write with 409 and `error.currentRevision`. Codex maps, pins, journal entries, calendar, settings
    and standing are last-write-wins by owner decision; do not spread `expectedRev` without cause.
-5. **Status codes.** 400 malformed — a schema failure carries every problem in `details.issues` as
-   `{ path, message }`, never only the first. 401 — no credential, or an `Authorization` header that is not
-   parseable, and nothing else. 403 — the caller presented something and was refused: a role denial, or a
-   token that is **invalid, revoked, or missing the required scope**. 404 — absent _or secret_: the
-   existence of a record the caller may not see is **never distinguishable** from its absence. 409 — a
-   domain refusal or a stale revision. 413 — oversized body. One stated exception: binary asset-content
+5. **Status codes.** 400 malformed: a schema failure carries every problem in `details.issues` as
+   `{ path, message }`, never only the first. 401: no credential, or an `Authorization` header that is not
+   parseable, and nothing else. 403: the caller presented something and was refused: a role denial, or a
+   token that is **invalid, revoked, or missing the required scope**. 404: absent _or secret_, and the
+   existence of a record the caller may not see is **never distinguishable** from its absence. 409: a
+   domain refusal or a stale revision. 413: oversized body. One stated exception: binary asset-content
    routes answer 403 before any existence check, because a media URL must not become an existence oracle.
    **Amended 2026-10-17 by [ADR-0027](0027-session-lifecycle.md):** 401 now also covers a token that is invalid,
    expired or revoked, and 403 is only for a valid credential without the role or scope. Asset content still refuses
    before any existence check, so its answer still never depends on whether the file exists.
 6. **Change observation.** Socket.IO emits a content-light `codex:changed` / `homebrew:changed` ping when
-   that surface moves; integrations may listen instead of polling, and must treat a ping as "re-read"
-   rather than as data. Polling uses weak ETags: `GET /game` and **every codex `GET`** send one, and the
+   that surface moves; integrations may listen and skip polling, and must treat a ping as "re-read"
+   and never as data. Polling uses weak ETags: `GET /game` and **every codex `GET`** send one, and the
    conditional check runs after authorization and existence so a 304 can never confirm a hidden record.
 7. **Bounds are a design decision.** This is a single-group LAN product. Codex list reads are
    **unpaginated** and stay that way inside v1; suite search returns at most 50 hits; homebrew lists use
@@ -72,7 +72,7 @@ This is the statement the ADR promised. It binds every `/api/v1` surface, the ta
 
 ## Consequences and tradeoffs
 
-Public DTOs/contracts must be intentionally designed and contract-tested rather than exposing internal state. Feature work carries additional documentation/compatibility/security obligations. In exchange, integrations remain decoupled from storage/UI and core can be refactored behind stable boundaries.
+Public DTOs/contracts must be intentionally designed and contract-tested, and never expose internal state. Feature work carries additional documentation/compatibility/security obligations. In exchange, integrations remain decoupled from storage/UI and core can be refactored behind stable boundaries.
 
 ## Mobile, security, and visibility impact
 

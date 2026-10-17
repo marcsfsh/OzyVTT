@@ -45,7 +45,7 @@ shown as a day count.
 - The GM's Rest dialog reads the calendar over the Codex API, and the Codex calendar shows the game's hour beside
   the GM's date.
 
-Setting the date by hand in the Codex is a correction of the calendar, not time passing: it does not move
+Setting the date by hand in the Codex is a correction of the calendar, and no time passes: it does not move
 `rest.clockHours`.
 
 ## Consequences and tradeoffs

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-10-17.
+Accepted on 2026-10-17.
 
 ## Context and decision drivers
 
@@ -57,7 +57,7 @@ plays. Deleting a sound takes it off the board and every scene sound first.
 playlist of tracks (each with its own level), shuffle, the current track and the rest of the shuffled pass; ambient
 layers, each looping on its own and switched on or off; effect pads; the one-shots fired and still sounding; a
 pause that freezes every position; and a sound per scene. The server hands a track over a 2-second crossfade before
-its end, and the next track starts at that moment rather than when the timer happened to fire, so every screen
+its end, and the next track starts at that moment, whenever the timer happens to fire, so every screen
 agrees. A shuffled playlist plays each track once per pass and never opens a pass with the track that just played.
 Playing anything lifts a pause.
 
@@ -71,7 +71,7 @@ When the scene goes live (`scene.activate`, or `scene.create` with `activate`) i
 switched "Starts when live" off. Effect pads are left alone.
 
 **Table screen** (`viewer-coordinator.ts`, `viewer/sound-engine.ts`, `viewer/TableSound.tsx`). The viewer feed's
-projection gains `sound`, composed when it is sent rather than stored, so a sound change never bumps the
+projection gains `sound`, composed when it is sent and never stored, so a sound change never bumps the
 presentation revision: the master level, whether it is paused, and for the music, each playing layer and each
 sounding effect only its play id, file id, level and how far in it is at that moment. The screen plays each at that
 position plus the time since it arrived, so a screen that connects late joins mid-track, and only re-seeks when it

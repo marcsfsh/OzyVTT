@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-07-15.
+Accepted on 2026-07-15.
 
 ## Context and decision drivers
 
@@ -17,19 +17,19 @@ Actors, actions, and later maps/encounters must be importable, validated, versio
 
 ## Decision
 
-Canonical content — actor definitions today, and later maps/encounters — is versioned, schema-validated JSON. Each document carries an explicit schema identifier and integer `schemaVersion` (for example `ACTOR_DEFINITION_SCHEMA_VERSION`); schemas are defined once, at runtime with Zod (`packages/schemas/src/index.ts`) and, for the actor-definition v1 contract, also published as machine-readable JSON Schema (`packages/schemas/json/actor-definition.v1.schema.json`, generated from the Zod schema by `npm run map`). Deterministic, common fields (identity, provenance, ability scores, AC, HP, speed, structured action formulas/attacks/saves/damage) are typed and validated; anything the schema does not yet model stays in a bounded, size-limited `extensions` record or an inert `description` text field rather than blocking import. Adapters map external/third-party formats into this canonical shape rather than the domain accepting arbitrary external shapes directly.
+Canonical content (actor definitions today, and later maps/encounters) is versioned, schema-validated JSON. Each document carries an explicit schema identifier and integer `schemaVersion` (for example `ACTOR_DEFINITION_SCHEMA_VERSION`); schemas are defined once, at runtime with Zod (`packages/schemas/src/index.ts`) and, for the actor-definition v1 contract, also published as machine-readable JSON Schema (`packages/schemas/json/actor-definition.v1.schema.json`, generated from the Zod schema by `npm run map`). Deterministic, common fields (identity, provenance, ability scores, AC, HP, speed, structured action formulas/attacks/saves/damage) are typed and validated; anything the schema does not yet model stays in a bounded, size-limited `extensions` record or an inert `description` text field, so it never blocks import. Adapters map external/third-party formats into this canonical shape, and the domain accepts no arbitrary external shape directly.
 
 ## Consequences and tradeoffs
 
-Adding a new structured field is a schema change with a version bump, not a silent behavioral change; older saved content keeps its own `schemaVersion` and is migrated deliberately rather than reinterpreted. Unsupported or not-yet-modeled rules text is preserved as inert description rather than dropped, so an import is never blocked by a mechanic the schema doesn't support yet — but that also means such mechanics are not automated until a later schema version adds structured fields for them (see BUILD_PLAN.md §7.3, "Structured core, text fallback").
+Adding a new structured field is a schema change with a version bump, so behavior never changes silently; older saved content keeps its own `schemaVersion` and is migrated deliberately. Unsupported or not-yet-modeled rules text is preserved as inert description, so an import is never blocked by a mechanic the schema doesn't support yet. That also means such mechanics are not automated until a later schema version adds structured fields for them (see BUILD_PLAN.md §7.3, "Structured core, text fallback").
 
 ## Mobile, security, and visibility impact
 
-Content is data, not code: Zod/JSON Schema validation happens before anything is persisted or broadcast, so a malformed or hostile import cannot reach the domain layer or a client as executable behavior. Because content is plain validated JSON, the same import path works identically from a phone's file picker or a desktop upload; there is no platform-specific import mechanism.
+Content is data and carries no code: Zod/JSON Schema validation happens before anything is persisted or broadcast, so a malformed or hostile import cannot reach the domain layer or a client as executable behavior. Because content is plain validated JSON, the same import path works identically from a phone's file picker or a desktop upload; there is no platform-specific import mechanism.
 
 ## Migration / reversibility
 
-`schemaVersion` and `schemaId` are pinned per document (see the architectural invariant in BUILD_PLAN.md §9.3 that "ruleset and schema versions are pinned to saved content/encounters and migrated deliberately"). A new schema version can be introduced alongside the old one, with explicit migration rather than in-place reinterpretation of existing content. `packages/content-srd-5.2.1` is reserved for curated, normalized SRD content bundles once conversion begins, and `packages/test-fixtures` already holds representative fixtures — both are separate from executable code, so content-format changes do not require code changes to the packages that merely consume it.
+`schemaVersion` and `schemaId` are pinned per document (see the architectural invariant in BUILD_PLAN.md §9.3 that "ruleset and schema versions are pinned to saved content/encounters and migrated deliberately"). A new schema version can be introduced alongside the old one, with explicit migration, so existing content is never reinterpreted in place. `packages/content-srd-5.2.1` is reserved for curated, normalized SRD content bundles once conversion begins, and `packages/test-fixtures` already holds representative fixtures. Both are separate from executable code, so content-format changes do not require code changes to the packages that merely consume it.
 
 ## Validation evidence
 
