@@ -83,6 +83,10 @@ function damageInForce(ctx: ResolveContext): ResolveContext["action"]["damage"] 
 export function rollWeaponDamage(ctx: ResolveContext): void {
   const { action, deps, damage, input } = ctx;
   const parts = damageInForce(ctx);
+  if (parts.length > 0 && action.missDamage === "half" && missed(ctx.attack)) {
+    halfOnAMiss(ctx, parts);
+    return;
+  }
   if (parts.length === 0 || !rollsDamage(ctx.attack)) return;
   if (action.darts !== undefined && input.targetIds.length > 0) {
     for (let dart = 0; dart < action.darts; dart += 1) {
@@ -103,6 +107,20 @@ export function rollWeaponDamage(ctx: ResolveContext): void {
     recordRoll(ctx, rolled, "damage");
     damage.push({ formula: rolled.expression.source, type: part.type, total: rolled.total });
   });
+}
+
+const missed = (attack: ActionResolutionAttack | null) =>
+  attack !== null && (attack.outcome === "miss" || attack.outcome === "fumble");
+
+/** SRD Acid Arrow: "On a miss, the arrow splashes the target with acid for half as much of the initial damage only." The
+ *  dice roll as for a hit, and half of each part (rounded down) is owed like Graze's damage. */
+function halfOnAMiss(ctx: ResolveContext, parts: ResolveContext["action"]["damage"]): void {
+  for (const part of parts) {
+    const rolled = resolveDice(parseDiceFormula(part.formula), ctx.deps.random);
+    recordRoll(ctx, rolled, "damage");
+    const amount = Math.floor(rolled.total / 2);
+    if (amount > 0) ctx.bonusDamage.push({ amount, type: part.type, source: `${ctx.action.name} (miss)` });
+  }
 }
 
 /** What a darts action owes each creature its darts struck (`damageTargets`); anything a rider added beyond the

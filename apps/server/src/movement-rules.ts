@@ -7,7 +7,7 @@ import { holdsFeature } from "./class-features.js";
 import { isIncapacitated } from "./condition-rules.js";
 import { areEnemies } from "./creature-sides.js";
 import { effectiveActions } from "./effective-actions.js";
-import { READIED_TAG, releaseReadied } from "./effects.js";
+import { NO_OPPORTUNITY_ATTACKS_TAG, NO_REACTIONS_TAG, READIED_TAG, releaseReadied } from "./effects.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { imageToGrid, type SquareGridCalibration } from "./grid-calibration.js";
 import { travelBudgetFeet, travelCostsExtra, type TravelMode } from "./speed.js";
@@ -429,7 +429,11 @@ function openOpportunityAttacks(
       !enemy ||
       !areEnemies(mover, enemy, input.resolveDefinition) ||
       state.combat.reactionsUsed.includes(enemy.id) ||
-      isIncapacitated(enemy)
+      isIncapacitated(enemy) ||
+      // Shocking Grasp, or anything that takes away Reactions.
+      enemy.effects.some(
+        (effect) => effect.tags.includes(NO_OPPORTUNITY_ATTACKS_TAG) || effect.tags.includes(NO_REACTIONS_TAG)
+      )
     )
       continue;
     const enemyPosition = state.combat.tokens.find((token) => token.actorId === enemy.id)?.position ?? null;

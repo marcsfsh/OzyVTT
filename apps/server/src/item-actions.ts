@@ -214,7 +214,9 @@ export function spellCastMechanics(
   numbers: Readonly<{ attackBonus: number; saveDc: number; bearersDc: boolean; modifier: number }>,
   scaled: Readonly<{ roll?: string | null; attacks?: number }> = {}
 ): Pick<ActorAction, "damage"> &
-  Partial<Pick<ActorAction, "attack" | "save" | "healing" | "darts" | "damageTypes" | "grants">> {
+  Partial<
+    Pick<ActorAction, "attack" | "save" | "healing" | "darts" | "damageTypes" | "grants" | "onHit" | "missDamage">
+  > {
   // No cast model: the save still applies, and the rest is the GM's.
   const effect = spell.effect ?? { attacks: 0, damage: [], healing: null };
   const scale = (formula: string) => (scaled.roll && formula === spell.damage.roll ? scaled.roll : formula);
@@ -232,7 +234,10 @@ export function spellCastMechanics(
             bonus: numbers.attackBonus,
             ...(attacks > 1 ? { count: Math.min(10, attacks) } : {}),
             ...spellAttackReach(spell)
-          }
+          },
+          // What a hit lands besides its damage (Ray of Sickness's Poisoned), and what a miss still deals (Acid Arrow).
+          ...(effect.onHit ? { onHit: structuredClone(effect.onHit) } : {}),
+          ...(effect.missDamage ? { missDamage: effect.missDamage } : {})
         }
       : castSave
         ? {
@@ -310,7 +315,8 @@ export function laterSpellAction(
             ...(later.attackRange.kind === "melee"
               ? { reachFeet: later.attackRange.feet }
               : { rangeFeet: later.attackRange.feet })
-          }
+          },
+          ...(later.onHit ? { onHit: structuredClone(later.onHit) } : {})
         }
       : later.save
         ? { save: { ...later.save, dc: numbers.saveDc, ...(numbers.bearersDc ? { spellcasting: true } : {}) } }
@@ -355,7 +361,19 @@ export function withSpellAttackReach(action: ActorAction, spell: SpellReference 
 export function withSpellEffects(action: ActorAction, spell: SpellReference | undefined): ActorAction {
   const effect = spell?.effect;
   if (!spell || !effect || action.spellId !== spell.id) return action;
-  if ((effect.laterActions ?? []).some((row) => laterSpellActionId(spell.id, row.name) === action.id)) return action;
+  const later = (effect.laterActions ?? []).find((row) => laterSpellActionId(spell.id, row.name) === action.id);
+  if (later)
+    return action.attack && action.onHit === undefined && later.onHit
+      ? { ...action, onHit: structuredClone(later.onHit) }
+      : action;
+  const hitRiders =
+    action.attack !== undefined
+      ? {
+          ...(action.onHit === undefined && effect.onHit ? { onHit: structuredClone(effect.onHit) } : {}),
+          ...(action.missDamage === undefined && effect.missDamage ? { missDamage: effect.missDamage } : {})
+        }
+      : {};
+  action = { ...action, ...hitRiders };
   const grants = action.grants === undefined && effect.grant ? structuredClone(effect.grant) : undefined;
   const failureEffect =
     action.save && !action.save.failureEffect && effect.failureEffect
@@ -561,6 +579,31 @@ export function extraAttackAction(
  *  cast's own roll gave, in the damage and the healing (Cure Wounds' 4d8, Heal's 80), and its count is the rays or
  *  darts the cast makes (Scorching Ray's fourth ray, Magic Missile's fourth dart). A count of targets (Bless, Hold
  *  Person) is a targeting limit, not read here. */
+/** "The damage (both initial and later) increases": what a hit leaves dealing later (Acid Arrow's 2d4) gains the dice
+ *  the higher slot adds to the hit, die for die. */
+function withScaledOngoing(
+  rider: NonNullable<ActorAction["onHit"]>[number],
+  base: string | null,
+  roll: string | null
+): NonNullable<ActorAction["onHit"]>[number] {
+  const dice = (formula: string | null) => /^(\d+)d(\d+)$/.exec(formula?.trim() ?? "");
+  const from = dice(base);
+  const to = dice(roll);
+  if (!rider.ongoingDamage || !from || !to || from[2] !== to[2]) return rider;
+  const added = Number(to[1]) - Number(from[1]);
+  if (added <= 0) return rider;
+  return {
+    ...rider,
+    ongoingDamage: {
+      ...rider.ongoingDamage,
+      damage: rider.ongoingDamage.damage.map((part) => {
+        const own = dice(part.formula);
+        return own && own[2] === from[2] ? { ...part, formula: `${Number(own[1]) + added}d${own[2]}` } : part;
+      })
+    }
+  };
+}
+
 export function upcastAction(action: ActorAction, spell: SpellReference, level: number): ActorAction {
   const row = spell.castingOptions.find((option) => option.type === `slot_level_${level}`);
   if (!row) return action;
@@ -583,6 +626,7 @@ export function upcastAction(action: ActorAction, spell: SpellReference, level: 
   return {
     ...action,
     damage: action.damage.map((part) => ({ ...part, formula: damage(part.formula) })),
+    ...(action.onHit ? { onHit: action.onHit.map((rider) => withScaledOngoing(rider, spell.damage.roll, roll)) } : {}),
     ...(action.healing ? { healing: { formula: healing(action.healing.formula) } } : {}),
     ...(rays ? { attack: { ...action.attack!, count: Math.min(10, count) } } : {}),
     ...(darts ? { darts: Math.min(20, count) } : {})

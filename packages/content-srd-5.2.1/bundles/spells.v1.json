@@ -41,6 +41,26 @@
     "kind": "ranged",
     "feet": 90
    },
+   "onHit": [
+    {
+     "conditions": [],
+     "name": "Acid Arrow",
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "2d4",
+        "type": "acid"
+       }
+      ],
+      "at": "bearer-turn-end"
+     },
+     "duration": {
+      "type": "rounds",
+      "rounds": 1
+     }
+    }
+   ],
+   "missDamage": "half",
    "damage": [
     {
      "formula": "4d4",
@@ -3102,7 +3122,22 @@
      "type": "necrotic"
     }
    ],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Chill Touch",
+    "tags": [
+     "no-healing"
+    ],
+    "target": "target",
+    "onHit": true,
+    "duration": {
+     "type": "until-source-turn-end"
+    }
+   }
   },
   "classes": [
    "sorcerer",
@@ -4426,6 +4461,18 @@
     "kind": "melee",
     "feet": 65
    },
+   "onHit": [
+    {
+     "conditions": [
+      {
+       "id": "frightened"
+      }
+     ],
+     "duration": {
+      "type": "until-source-next-turn"
+     }
+    }
+   ],
    "damage": [
     {
      "formula": "3d12",
@@ -4442,6 +4489,18 @@
       "kind": "melee",
       "feet": 65
      },
+     "onHit": [
+      {
+       "conditions": [
+        {
+         "id": "frightened"
+        }
+       ],
+       "duration": {
+        "type": "until-source-next-turn"
+       }
+      }
+     ],
      "damage": [
       {
        "formula": "3d12",
@@ -17756,7 +17815,27 @@
      "type": "cold"
     }
    ],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "speed",
+      "amount": -10
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Ray of Frost",
+    "tags": [
+     "ray-of-frost"
+    ],
+    "target": "target",
+    "onHit": true,
+    "duration": {
+     "type": "until-source-next-turn"
+    }
+   }
   },
   "classes": [
    "sorcerer",
@@ -17827,6 +17906,18 @@
     "kind": "ranged",
     "feet": 60
    },
+   "onHit": [
+    {
+     "conditions": [
+      {
+       "id": "poisoned"
+      }
+     ],
+     "duration": {
+      "type": "until-source-turn-end"
+     }
+    }
+   ],
    "damage": [
     {
      "formula": "2d8",
@@ -19449,7 +19540,22 @@
      "type": "lightning"
     }
    ],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Shocking Grasp",
+    "tags": [
+     "no-opportunity-attacks"
+    ],
+    "target": "target",
+    "onHit": true,
+    "duration": {
+     "type": "until-bearer-next-turn"
+    }
+   }
   },
   "classes": [
    "sorcerer",
@@ -20626,7 +20732,22 @@
      "type": "radiant"
     }
    ],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Starry Wisp",
+    "tags": [
+     "outlined"
+    ],
+    "target": "target",
+    "onHit": true,
+    "duration": {
+     "type": "until-source-turn-end"
+    }
+   }
   },
   "classes": [
    "bard",

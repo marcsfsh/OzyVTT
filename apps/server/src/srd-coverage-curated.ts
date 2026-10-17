@@ -818,14 +818,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
 
   // Spells whose data applies the cast's main numbers and leaves a rider the table would expect the server to apply.
-  "spell:acid-arrow": guided(
-    "The hit's 4d4 Acid damage is applied. The 2d4 at the end of the target's next turn, and half damage on a miss, are the GM's."
-  ),
   "spell:befuddlement": guided(
     "The save and its 10d12 Psychic damage are applied. Keeping the target from casting spells and taking the Magic action is the GM's."
-  ),
-  "spell:chill-touch": guided(
-    "The hit's Necrotic damage is applied. Keeping the target from regaining Hit Points is the GM's."
   ),
   "spell:chromatic-orb": guided(
     "The attack and the chosen damage type are applied. The leap to another target on matching dice is the GM's."
@@ -838,9 +832,6 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "spell:conjure-elemental": guided(
     "The spirit's save, its 8d8 damage and Restrained are a later action the GM calls. The repeat save with 4d8 damage at the start of each of the target's turns is the GM's."
-  ),
-  "spell:conjure-fey": guided(
-    "The spirit's attacks and their Psychic damage are applied. The Frightened condition a hit imposes is the GM's."
   ),
   "spell:contact-other-plane": guided(
     "The DC 15 Intelligence save is opened, and a failure imposes Incapacitated. The 6d6 Psychic damage on a failure, and the entity's answers, are the GM's."
@@ -903,13 +894,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:prismatic-wall": guided(
     "The save against Blinded for a creature near the wall is applied. Each layer's save and effect are the GM's."
   ),
-  "spell:ray-of-frost": guided("The hit's Cold damage is applied. The 10 feet off the target's Speed are the GM's."),
-  "spell:ray-of-sickness": guided("The hit's Poison damage is applied. The Poisoned condition is the GM's."),
   "spell:regenerate": guided(
     "The 4d8 + 15 Hit Points are applied. The 1 Hit Point at the start of each of the target's turns is the GM's."
-  ),
-  "spell:shocking-grasp": guided(
-    "The hit's Lightning damage is applied. Keeping the target from making Opportunity Attacks is the GM's."
   ),
   "spell:sleep": guided(
     "A failed save imposes Incapacitated until the end of the target's next turn, and damage ends it. The second save, and Unconscious on its failure, are the GM's."
@@ -922,9 +908,6 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "spell:spirit-guardians": guided(
     "spell-zones.ts asks for the save when a creature enters the Emanation or ends its turn there. The halved Speed inside it is the GM's."
-  ),
-  "spell:starry-wisp": guided(
-    "The hit's Radiant damage is applied. Denying the target the Invisible condition is the GM's."
   ),
   "spell:storm-of-vengeance": guided(
     "The first turn's save, Thunder damage and Deafened condition are applied. The storm's turns 2 to 10 are the GM's."

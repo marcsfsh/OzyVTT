@@ -29,6 +29,12 @@ const MAX_EFFECTS = 20;
 export const MAGE_ARMOR_TAG = "mage-armor";
 /** The bearer can't take an action or a Bonus Action while this lasts (SRD Stinking Cloud's poisoning). */
 export const NO_ACTIONS_TAG = "no-actions";
+/** The bearer can't take Reactions while this lasts. */
+export const NO_REACTIONS_TAG = "no-reactions";
+/** The bearer can't make Opportunity Attacks while this lasts (Shocking Grasp). */
+export const NO_OPPORTUNITY_ATTACKS_TAG = "no-opportunity-attacks";
+/** The bearer can't regain Hit Points while this lasts (Chill Touch). */
+export const NO_HEALING_TAG = "no-healing";
 /** On an escapable effect: the escape is a Strength (Athletics) check alone (a spell's restraint: Web, Entangle). */
 export const ESCAPE_ATHLETICS_TAG = "escape-athletics";
 /** The tag on a caster's own "Concentrating on X" effect; ending it ends everything its cast made. */

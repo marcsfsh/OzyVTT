@@ -62,6 +62,8 @@ describe("rule families", () => {
       // Ending what someone else imposed skips the action or save its rules ask for; a raging Barbarian can't cast.
       ["condition.imposed", "economy"],
       ["condition.raging", "economy"],
+      // An effect that takes away Reactions (Slow) is "you have no reaction", like Incapacitated.
+      ["condition.no-reactions", "economy"],
       ["legendary.own-turn", "economy"],
       // An extra attack waits on the swing that opens it: a matter of what this turn has done.
       ["attack.light-needs-attack", "economy"],

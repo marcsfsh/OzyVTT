@@ -10,6 +10,7 @@ import {
   HASTED_TAG,
   hasEffectTag,
   NO_ACTIONS_TAG,
+  NO_REACTIONS_TAG,
   RAGING_TAG,
   READIED_TAG,
   RECKLESS_TAG,
@@ -377,6 +378,13 @@ function checkAbleToAct({ attacker, action, violations }: Evaluation): void {
         message: `${attacker.name} is down (0 HP) and can't take actions, bonus actions, or reactions.`
       });
   }
+  // "Can't take Reactions" while an effect lasts.
+  const unreacting = attacker.effects.find((effect) => effect.tags.includes(NO_REACTIONS_TAG));
+  if (unreacting && action.activation === "reaction")
+    violations.push({
+      rule: "condition.no-reactions",
+      message: `${attacker.name} can't take Reactions while ${unreacting.name} lasts.`
+    });
   // SRD Stinking Cloud: while poisoned by it, "the creature can't take an action or a Bonus Action".
   const reeling = attacker.effects.find((effect) => effect.tags.includes(NO_ACTIONS_TAG));
   if (reeling && (action.activation === "action" || action.activation === "bonus-action"))

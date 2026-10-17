@@ -35,8 +35,10 @@ import {
   endKnockOut,
   KNOCKED_OUT_TAG,
   makeEffect,
+  NO_HEALING_TAG,
   reduceExhaustion,
   removeConditionDirect,
+  sourceOf,
   type EffectNarration
 } from "./effects.js";
 import { reconcileEquipment } from "./inventory.js";
@@ -578,6 +580,17 @@ export const deadCantHealLine = (name: string) => `${name} is dead and can't reg
 export function healActor(state: GameState, actorId: string, amount: number, scope: Initiator): EffectNarration[] {
   const actor = adjustableActor(state, actorId, scope);
   if (isDead(actor)) return [{ kind: "condition", text: deadCantHealLine(actor.name), actorId }];
+  // "It can't regain Hit Points until the end of your next turn" (Chill Touch).
+  const barred = actor.effects.find((effect) => effect.tags.includes(NO_HEALING_TAG));
+  if (barred)
+    return [
+      {
+        kind: "condition",
+        text: `${actor.name} can't regain hit points while ${barred.name} lasts.`,
+        actorId,
+        ...sourceOf(barred)
+      }
+    ];
   const before = actor.hp.current;
   const wasDying = actor.hp.current <= 0 && actor.deathSaves !== null;
   actor.hp.current = Math.min(actor.hp.maximum, actor.hp.current + amount);

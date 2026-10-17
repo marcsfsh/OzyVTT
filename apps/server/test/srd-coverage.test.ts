@@ -24,7 +24,8 @@ import { deriveEquipment } from "../src/equipment-derivation.js";
 import { hasEvasion, magicResistanceOf, saveRollSources } from "../src/saving-throws.js";
 import { currentSpeedFeet, speedZeroed } from "../src/speed.js";
 import { wardingAura } from "../src/paladin-auras.js";
-import { monsterTraitKinds, renderSrdCoverage, srdCoverageRows, traitKind } from "../src/srd-coverage.js";
+import { healActor } from "../src/hit-points.js";
+import { monsterTraitKinds, renderSrdCoverage, spellState, srdCoverageRows, traitKind } from "../src/srd-coverage.js";
 import {
   CONDITION_COVERAGE,
   GLOSSARY_COVERAGE,
@@ -226,6 +227,19 @@ describe("the curated claims hold in the engine", () => {
     const context = { resolveDefinition: (id: string) => definitions[id], distanceFeet: () => 10 };
     expect(wardingAura(game, game.actors[1]!, "frightened", context)).toBe("Paladin's Aura of Courage");
     expect(wardingAura(game, game.actors[1]!, "frightened", { ...context, distanceFeet: () => 15 })).toBeNull();
+  });
+
+  it("a spell's hit leaves its rider: Chill Touch bars healing, read by the healing path", () => {
+    const touch = loadSpells().find((spell) => spell.id === "chill-touch")!;
+    expect(spellState(touch)).toBe("enforced");
+    const touched = ActorSchema.parse({
+      ...creature(),
+      hp: { current: 5, maximum: 20 },
+      effects: [{ id: "chill", name: "Chill Touch", tags: touch.effect!.grant!.tags, duration: { type: "manual" } }]
+    });
+    const game = GameStateSchema.parse({ schemaVersion: 1, actors: [touched] });
+    healActor(game, HERO, 10, { role: "gm" });
+    expect(game.actors[0]!.hp.current).toBe(5);
   });
 
   it("a trait kind the bundle runs as a mechanic is never curated reference", () => {

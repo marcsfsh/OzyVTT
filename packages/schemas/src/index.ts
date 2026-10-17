@@ -1112,6 +1112,8 @@ export const EffectGrantSchema = z
     duration: z.discriminatedUnion("type", [
       z.object({ type: z.literal("rounds"), rounds: z.number().int().min(1).max(100) }).strict(),
       z.object({ type: z.literal("until-source-next-turn") }).strict(),
+      /** Until the start of the recipient's own next turn (Shocking Grasp: "until the start of its next turn"). */
+      z.object({ type: z.literal("until-bearer-next-turn") }).strict(),
       /** Until the end of the granter's next turn (Rage, which the bearer's own attacks keep extending). */
       z.object({ type: z.literal("until-source-turn-end") }).strict(),
       z.object({ type: z.literal("encounter") }).strict(),
@@ -1298,6 +1300,31 @@ export const SaveFailureEffectSchema = z
   })
   .strict();
 
+/** Conditions a hit lands on its target as one source-linked effect (a crocodile's Bite: Grappled and Restrained, escape
+ *  DC 15; Ray of Sickness: Poisoned until the end of the caster's next turn). */
+export const OnHitRiderSchema = z
+  .object({
+    /** None when the hit leaves only its `name`d effect (a stirge attached, draining blood). */
+    conditions: z
+      .array(z.object({ id: ConditionIdSchema, level: z.number().int().min(1).max(6).optional() }).strict())
+      .max(3),
+    /** The effect's name when the text names what it is ("Attached"); absent, the first condition's. */
+    name: z.string().min(1).max(60).optional(),
+    /** Damage it deals as turns start while it lasts (a stirge's 2d4 Necrotic at the start of each of its turns). */
+    ongoingDamage: OngoingDamageSchema.optional(),
+    /** It lands in place of the hit's damage ("the rug can give it the Grappled condition ... instead of dealing
+     *  damage"): a target it can't take still takes the damage. */
+    insteadOfDamage: z.literal(true).optional(),
+    escapeDc: z.number().int().min(1).max(40).optional(),
+    /** The rider only applies to targets of at most this size (crocodile Bite: large). */
+    maxTargetSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
+    /** How long the conditions last (a lich's touch: until the start of its next turn). Absent: until ended,
+     *  or until the grapple ends when the rider grapples. */
+    duration: SaveFailureDurationSchema.optional()
+  })
+  .strict();
+export type OnHitRider = z.infer<typeof OnHitRiderSchema>;
+
 /** One place in a Multiattack's plan: an action taken `count` times, or any of `or` in its place. */
 export const MultiattackComponentSchema = z
   .object({
@@ -1436,32 +1463,9 @@ export const ActionSchema = z.object({
     .max(3)
     .optional(),
   /** On-hit conditions applied to the target as one source-linked effect (Bite: Grappled + Restrained, escape DC 15). */
-  onHit: z
-    .array(
-      z
-        .object({
-          /** None when the hit leaves only its `name`d effect (a stirge attached, draining blood). */
-          conditions: z
-            .array(z.object({ id: ConditionIdSchema, level: z.number().int().min(1).max(6).optional() }).strict())
-            .max(3),
-          /** The effect's name when the text names what it is ("Attached"); absent, the first condition's. */
-          name: z.string().min(1).max(60).optional(),
-          /** Damage it deals as turns start while it lasts (a stirge's 2d4 Necrotic at the start of each of its turns). */
-          ongoingDamage: OngoingDamageSchema.optional(),
-          /** It lands in place of the hit's damage ("the rug can give it the Grappled condition ... instead of dealing
-           *  damage"): a target it can't take still takes the damage. */
-          insteadOfDamage: z.literal(true).optional(),
-          escapeDc: z.number().int().min(1).max(40).optional(),
-          /** The rider only applies to targets of at most this size (crocodile Bite: large). */
-          maxTargetSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
-          /** How long the conditions last (a lich's touch: until the start of its next turn). Absent: until ended,
-           *  or until the grapple ends when the rider grapples. */
-          duration: SaveFailureDurationSchema.optional()
-        })
-        .strict()
-    )
-    .max(2)
-    .optional(),
+  onHit: z.array(OnHitRiderSchema).max(2).optional(),
+  /** A miss still deals half the hit's damage, rounded down (Acid Arrow: "half as much of the initial damage only"). */
+  missDamage: z.literal("half").optional(),
   /** Targeting restrictions the engine enforces (Tail can't target the creature this crocodile grapples). */
   targetRules: z
     .array(z.enum(["not-grappled-by-source"]))

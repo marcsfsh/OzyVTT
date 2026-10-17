@@ -18,6 +18,7 @@ import {
   DamageTypeSchema,
   HealingFormulaSchema,
   ItemSlotSchema,
+  OnHitRiderSchema,
   SaveFailureEffectSchema,
   SaveOutcomeFields
 } from "@vtt/schemas";
@@ -105,6 +106,8 @@ export const SpellLaterActionSchema = z
     /** When it happens, for the reminder on casting ("a creature enters the Emanation or ends its turn there"). */
     when: z.string().min(1).max(300),
     attackRange: SpellAttackRangeSchema.optional(),
+    /** Conditions its hit lands (Conjure Fey's spirit: Frightened until the start of the caster's next turn). */
+    onHit: z.array(OnHitRiderSchema).max(2).optional(),
     save: z
       .object({ ability: AbilityShortSchema, ...SaveOutcomeFields })
       .strict()
@@ -126,6 +129,10 @@ export const SpellEffectSchema = z
     attacks: z.number().int().min(0).max(10),
     /** How those attacks are made. Absent, the spell's range decides. */
     attackRange: SpellAttackRangeSchema.optional(),
+    /** Conditions a hit lands on its target (Ray of Sickness: Poisoned until the end of the caster's next turn). */
+    onHit: z.array(OnHitRiderSchema).max(2).optional(),
+    /** A miss still deals half the hit's damage (Acid Arrow). */
+    missDamage: z.literal("half").optional(),
     /** Damage to each target, every part rolled; with `darts`, what each dart deals. */
     damage: SpellDamageSchema,
     /** The damage types the caster picks from on each cast (Chromatic Orb); the damage carries the first. */

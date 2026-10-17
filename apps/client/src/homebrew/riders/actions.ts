@@ -343,6 +343,14 @@ export const actionsField = (scope: RiderScope): FieldDef => ({
           max: 1000,
           unit: "ft",
           help: "The 80 in “range 80/320”. Past it, up to the range, the attack rolls at disadvantage."
+        },
+        {
+          key: "missDamage",
+          label: "A miss deals half the damage",
+          kind: "switch",
+          help: "Like Acid Arrow: on a miss the target still takes half the damage, rounded down.",
+          read: (scope) => scope.missDamage === "half",
+          write: (next, scope) => ({ ...scope, missDamage: next === true ? "half" : undefined })
         }
       ]
     },

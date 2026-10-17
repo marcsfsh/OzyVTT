@@ -5,7 +5,7 @@
  * the caster makes ("Make a ranged spell attack"), never one the text only mentions. `test/spell-effects.test.ts`
  * pins the cases.
  */
-import { DamageTypeSchema, type ActionArea, type DamageType } from "@vtt/schemas";
+import { DamageTypeSchema, type ActionArea, type DamageType, type OnHitRider } from "@vtt/schemas";
 import { areaOfProse } from "../src/action-prose.js";
 import type { SpellEffect, SpellLaterAction, SpellReference } from "../src/schemas.js";
 import { healingOfText, spellAttackRangeOf, type SpellRange } from "../src/spell-effect.js";
@@ -278,6 +278,7 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "bonus-action",
       when: "On your later turns, a Bonus Action teleports the spirit up to 30 feet and makes the attack (a hit also Frightens the target until the start of your next turn).",
       attackRange: melee(65),
+      onHit: [{ conditions: [{ id: "frightened" }], duration: { type: "until-source-next-turn" } }],
       damage: [{ formula: "3d12", type: "psychic", addsModifier: true }]
     }
   ],
@@ -563,6 +564,25 @@ const CAST_REACTIONS: Readonly<Record<string, NonNullable<SpellEffect["reaction"
   "hellish-rebuke": { trigger: "damaged-by-creature", response: "strike-back", rangeFeet: 60 }
 };
 
+/** What a cast's hit lands on its target besides its damage (SRD 5.2.1 text). */
+const CAST_ON_HIT: Readonly<Record<string, readonly OnHitRider[]>> = {
+  "ray-of-sickness": [{ conditions: [{ id: "poisoned" }], duration: { type: "until-source-turn-end" } }],
+  // "With both you and the spirit as the source of the fear": the caster is.
+  "conjure-fey": [{ conditions: [{ id: "frightened" }], duration: { type: "until-source-next-turn" } }],
+  // "2d4 Acid damage at the end of its next turn": the target's next turn ends before the caster's next turn starts.
+  "acid-arrow": [
+    {
+      conditions: [],
+      name: "Acid Arrow",
+      ongoingDamage: { damage: [{ formula: "2d4", type: "acid" }], at: "bearer-turn-end" },
+      duration: { type: "rounds", rounds: 1 }
+    }
+  ]
+};
+
+/** A miss still deals this share of the hit's damage (Acid Arrow: "half as much of the initial damage only"). */
+const CAST_MISS_DAMAGE: Readonly<Record<string, "half">> = { "acid-arrow": "half" };
+
 type Grant = NonNullable<SpellEffect["grant"]>;
 type FailureEffect = NonNullable<SpellEffect["failureEffect"]>;
 type Modifier = Grant["modifiers"][number];
@@ -605,6 +625,39 @@ const markDamage = (type: DamageType): Modifier => ({
  * and Haste's Speed are measured on the creature when it lands (`grant.ts`).
  */
 const CAST_GRANTS: Readonly<Record<string, Grant>> = {
+  // "Its Speed is reduced by 10 feet until the start of your next turn."
+  "ray-of-frost": spellGrant({
+    name: "Ray of Frost",
+    tags: ["ray-of-frost"],
+    target: "target",
+    onHit: true,
+    duration: { type: "until-source-next-turn" },
+    modifiers: [{ type: "speed", amount: -10 }]
+  }),
+  // "It can't make Opportunity Attacks until the start of its next turn."
+  "shocking-grasp": spellGrant({
+    name: "Shocking Grasp",
+    tags: ["no-opportunity-attacks"],
+    target: "target",
+    onHit: true,
+    duration: { type: "until-bearer-next-turn" }
+  }),
+  // "It can't regain Hit Points until the end of your next turn."
+  "chill-touch": spellGrant({
+    name: "Chill Touch",
+    tags: ["no-healing"],
+    target: "target",
+    onHit: true,
+    duration: { type: "until-source-turn-end" }
+  }),
+  // "Until the end of your next turn, it ... can't benefit from the Invisible condition"; its Dim Light is the GM's.
+  "starry-wisp": spellGrant({
+    name: "Starry Wisp",
+    tags: ["outlined"],
+    target: "target",
+    onHit: true,
+    duration: { type: "until-source-turn-end" }
+  }),
   bless: spellGrant({
     name: "Bless",
     tags: ["blessed"],
@@ -740,9 +793,13 @@ export function spellEffectFor(
   const targets = CAST_TARGETS[id];
   const grant = CAST_GRANTS[id];
   const failureEffect = SAVE_FAILURE_EFFECTS[id];
+  const onHit = CAST_ON_HIT[id];
+  const missDamage = CAST_MISS_DAMAGE[id];
   return {
     attacks,
     ...(attackRange ? { attackRange } : {}),
+    ...(onHit ? { onHit: structuredClone(onHit) as OnHitRider[] } : {}),
+    ...(missDamage ? { missDamage } : {}),
     damage: castDamage(id, roll, types, healing !== null),
     ...(choices ? { damageTypes: [...choices] } : {}),
     ...(NO_CAST_SAVE.has(id) ? { noCastSave: true as const } : {}),
@@ -823,6 +880,8 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...Object.keys(UPCAST_CORRECTIONS),
   ...Object.keys(CAST_REACTIONS),
   ...Object.keys(CAST_GRANTS),
+  ...Object.keys(CAST_ON_HIT),
+  ...Object.keys(CAST_MISS_DAMAGE),
   ...Object.keys(SAVE_FAILURE_EFFECTS),
   ...Object.keys(SPELL_AREAS)
 ];

@@ -523,6 +523,10 @@
             "$ref": "#/$defs/__schema55"
           }
         },
+        "missDamage": {
+          "type": "string",
+          "const": "half"
+        },
         "targetRules": {
           "maxItems": 2,
           "type": "array",
@@ -573,6 +577,19 @@
                     "type": {
                       "type": "string",
                       "const": "until-source-next-turn"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "until-bearer-next-turn"
                     }
                   },
                   "required": [

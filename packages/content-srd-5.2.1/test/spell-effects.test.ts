@@ -156,6 +156,33 @@ describe("what one cast of an SRD spell does", () => {
     expect(effectOf("sorcerous-burst")!.damage).toEqual([{ formula: "1d8", type: "acid" }]);
   });
 
+  it("says what a hit leaves on its target besides the damage, and what a miss still deals", () => {
+    expect(effectOf("ray-of-frost")!.grant).toMatchObject({
+      target: "target",
+      onHit: true,
+      duration: { type: "until-source-next-turn" },
+      modifiers: [{ type: "speed", amount: -10 }]
+    });
+    expect(effectOf("shocking-grasp")!.grant).toMatchObject({
+      tags: ["no-opportunity-attacks"],
+      duration: { type: "until-bearer-next-turn" }
+    });
+    expect(effectOf("chill-touch")!.grant).toMatchObject({ tags: ["no-healing"], onHit: true });
+    expect(effectOf("starry-wisp")!.grant).toMatchObject({ tags: ["outlined"], onHit: true });
+    expect(effectOf("ray-of-sickness")!.onHit).toEqual([
+      { conditions: [{ id: "poisoned" }], duration: { type: "until-source-turn-end" } }
+    ]);
+    expect(effectOf("acid-arrow")).toMatchObject({
+      missDamage: "half",
+      onHit: [{ ongoingDamage: { damage: [{ formula: "2d4", type: "acid" }], at: "bearer-turn-end" } }]
+    });
+    // Conjure Fey's spirit frightens what it hits, on the cast and on later turns.
+    expect(effectOf("conjure-fey")!.onHit).toEqual([
+      { conditions: [{ id: "frightened" }], duration: { type: "until-source-next-turn" } }
+    ]);
+    expect(effectOf("conjure-fey")!.laterActions![0]!.onHit).toEqual(effectOf("conjure-fey")!.onHit);
+  });
+
   it("reviews only spells that exist", () => {
     const ids = new Set(loadSpells().map((spell) => spell.id));
     expect(SPELL_EFFECT_REVIEWED_IDS.filter((id) => !ids.has(id))).toEqual([]);
