@@ -7,6 +7,7 @@
 import {
   DamageTypeSchema,
   SaveConditionSchema,
+  type ForcedPush,
   type OngoingDamage,
   type SaveCondition,
   type SaveFailureDuration
@@ -25,7 +26,15 @@ export type SaveOutcome = {
   failsAtHitPoints?: number;
   ongoingDamage?: OngoingDamage;
   ignoresCover?: true;
+  failurePush?: ForcedPush;
 };
+
+/** The push a failure clause prints: "is pushed 10 feet away from you", "pushed up to 30 feet straight away from the
+ *  dragon". */
+export function failurePushOf(clause: string): ForcedPush | undefined {
+  const push = /\bpushed (up to )?(\d+) feet (?:straight )?away from\b/.exec(clause);
+  return push ? { feet: Number.parseInt(push[2]!, 10), ...(push[1] ? { upTo: true as const } : {}) } : undefined;
+}
 
 const CONDITIONS: ReadonlySet<string> = new Set(SaveConditionSchema.options);
 
@@ -185,7 +194,8 @@ export function withoutOngoingDamage(text: string): string | null {
 function failureLifetime(clause: string, named: NamedConditions): Omit<SaveOutcome, "successDamage"> {
   const first = named.conditions;
   const failureConditions = [...new Set([...first, ...companionConditions(clause, first)])].slice(0, 4);
-  if (failureConditions.length === 0) return { failureConditions };
+  const push = failurePushOf(clause);
+  if (failureConditions.length === 0) return { failureConditions, ...(push ? { failurePush: push } : {}) };
   const escape = first.includes("grappled") ? clause.match(/\(escape DC (\d+)\)/) : null;
   const duration = failureDurationOf(clause);
   const ongoing = ongoingDamageOf(clause);
@@ -197,7 +207,8 @@ function failureLifetime(clause: string, named: NamedConditions): Omit<SaveOutco
     ...(escape ? { escapeDc: Number.parseInt(escape[1]!, 10) } : {}),
     ...(ENDS_ON_DAMAGE.test(clause) ? { endsOnDamage: true as const } : {}),
     ...(/\ba Speed of 0\b/.test(clause) ? { speedZero: true as const } : {}),
-    ...(ongoing ? { ongoingDamage: ongoing } : {})
+    ...(ongoing ? { ongoingDamage: ongoing } : {}),
+    ...(push ? { failurePush: push } : {})
   };
 }
 

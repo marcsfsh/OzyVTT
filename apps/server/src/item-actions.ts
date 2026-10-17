@@ -225,6 +225,7 @@ export function spellCastMechanics(
       | "grants"
       | "onHit"
       | "missDamage"
+      | "burst"
       | "drain"
       | "endsConditions"
       | "endsOneCondition"
@@ -252,7 +253,9 @@ export function spellCastMechanics(
           },
           // What a hit lands besides its damage (Ray of Sickness's Poisoned), and what a miss still deals (Acid Arrow).
           ...(effect.onHit ? { onHit: structuredClone(effect.onHit) } : {}),
-          ...(effect.missDamage ? { missDamage: effect.missDamage } : {})
+          ...(effect.missDamage ? { missDamage: effect.missDamage } : {}),
+          // What bursts after the attack, at the caster's spell save DC (Ice Knife).
+          ...(effect.burst ? { burst: { ...structuredClone(effect.burst), dc: numbers.saveDc } } : {})
         }
       : castSave
         ? {
@@ -644,6 +647,20 @@ function withScaledOngoing(
   };
 }
 
+/** A burst's dice at a slot `above` the spell's level ("The Cold damage increases by 1d6 for each spell slot level
+ *  above 1"). */
+function burstAt(burst: NonNullable<ActorAction["burst"]>, above: number): NonNullable<ActorAction["burst"]> {
+  const added = (burst.diceAddedPerSlot ?? 0) * Math.max(0, above);
+  if (added === 0) return burst;
+  return {
+    ...burst,
+    damage: burst.damage.map((part, index) => {
+      const dice = /^(\d+)(d\d+)(.*)$/.exec(part.formula);
+      return index === 0 && dice ? { ...part, formula: `${Number(dice[1]) + added}${dice[2]}${dice[3]}` } : part;
+    })
+  };
+}
+
 export function upcastAction(action: ActorAction, spell: SpellReference, level: number): ActorAction {
   const row = spell.castingOptions.find((option) => option.type === `slot_level_${level}`);
   if (!row) return action;
@@ -667,7 +684,8 @@ export function upcastAction(action: ActorAction, spell: SpellReference, level: 
     ...action,
     damage: action.damage.map((part) => ({ ...part, formula: damage(part.formula) })),
     ...(action.onHit ? { onHit: action.onHit.map((rider) => withScaledOngoing(rider, spell.damage.roll, roll)) } : {}),
-    ...(action.healing ? { healing: { formula: healing(action.healing.formula) } } : {}),
+    ...(action.healing ? { healing: { ...action.healing, formula: healing(action.healing.formula) } } : {}),
+    ...(action.burst ? { burst: burstAt(action.burst, level - spell.level) } : {}),
     ...(rays ? { attack: { ...action.attack!, count: Math.min(10, count) } } : {}),
     ...(darts ? { darts: Math.min(20, count) } : {})
   };

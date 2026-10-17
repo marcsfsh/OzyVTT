@@ -11087,7 +11087,10 @@
   "save": {
    "ability": "str",
    "successDamage": "none",
-   "failureConditions": []
+   "failureConditions": [],
+   "failurePush": {
+    "feet": 15
+   }
   },
   "target": {
    "type": "creature",
@@ -12650,6 +12653,17 @@
    "attackRange": {
     "kind": "ranged",
     "feet": 60
+   },
+   "burst": {
+    "radiusFeet": 5,
+    "ability": "dex",
+    "damage": [
+     {
+      "formula": "2d6",
+      "type": "cold"
+     }
+    ],
+    "diceAddedPerSlot": 1
    },
    "damage": [
     {
@@ -21761,7 +21775,10 @@
   "save": {
    "ability": "con",
    "successDamage": "half",
-   "failureConditions": []
+   "failureConditions": [],
+   "failurePush": {
+    "feet": 10
+   }
   },
   "target": {
    "type": "creature",

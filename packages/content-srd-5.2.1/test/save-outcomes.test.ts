@@ -245,3 +245,18 @@ describe("save outcomes in the shipped content", () => {
     });
   });
 });
+
+describe("a failure's push", () => {
+  it("is read off the spell and the stat block, 'up to' kept", () => {
+    const spells = loadSpells();
+    expect(spells.find((spell) => spell.id === "thunderwave")?.save?.failurePush).toEqual({ feet: 10 });
+    const dragon = loadMonsterDefinitions().find((entry) => entry.source.externalId === "adult-bronze-dragon")!;
+    expect(dragon.actions.find((action) => action.id === "repulsion-breath")?.save?.failurePush).toEqual({
+      feet: 60,
+      upTo: true
+    });
+    // A hit's push is the attack's own.
+    const giant = loadMonsterDefinitions().find((entry) => entry.source.externalId === "fire-giant")!;
+    expect(giant.actions.find((action) => action.id === "hammer-throw")?.onHitPush).toEqual({ feet: 15, upTo: true });
+  });
+});

@@ -3,7 +3,7 @@ import { armorClassInPlay, type GameState } from "@vtt/domain";
 import { deriveEquipment } from "../src/equipment-derivation.js";
 import { healActor } from "../src/hit-points.js";
 import { applyMovementRules } from "../src/movement-rules.js";
-import { answerSave } from "../src/saving-throws.js";
+import { answerSave, saveRollSources } from "../src/saving-throws.js";
 import { currentSpeedFeet } from "../src/speed.js";
 import {
   ALLY,
@@ -14,6 +14,7 @@ import {
   fight,
   fighterInput,
   FOE,
+  FOE2,
   HERO,
   heroTurnAgain,
   warlockInput,
@@ -259,5 +260,62 @@ describe("Slow", () => {
     );
     expect(slowedBard.state.combat.pendingSaves).toEqual([]);
     expect(actor(slowedBard.state, HERO).spellSlots?.find((slot) => slot.level === 1)?.remaining).toBe(slotsBefore - 1);
+  });
+});
+
+describe("Warlock invocations", () => {
+  const blaster = build(warlockInput([]));
+
+  it("Eldritch Spear adds 30 feet a Warlock level to the picked cantrip's range", () => {
+    const { action } = fight(blaster);
+    // Eldritch Blast's 120 feet, and 150 more at Warlock 5.
+    expect(action("spell-eldritch-blast").attack?.rangeFeet).toBe(270);
+  });
+
+  it("Eldritch Mind gives Advantage on the Constitution save that keeps Concentration, and on no other", () => {
+    const { hero } = fight(blaster);
+    const derivation = deriveEquipment(hero, blaster, catalog);
+    expect(saveRollSources(hero, "con", derivation, true).advantage).toEqual([
+      expect.objectContaining({ label: expect.stringContaining("Eldritch Mind") })
+    ]);
+    expect(saveRollSources(hero, "con", derivation).advantage).toEqual([]);
+  });
+});
+
+describe("Ice Knife", () => {
+  const knifer = build(wizardInput(["ice-knife"]));
+  const saves = (state: GameState) =>
+    state.combat.pendingSaves.map((save) => ({
+      target: save.targetActorId,
+      ability: save.ability,
+      damage: save.proposedDamage,
+      name: save.actionName
+    }));
+
+  it("bursts hit or miss: the target and each creature within 5 feet of it make a Dexterity save against 2d6 Cold", () => {
+    const { state, resolve } = fight(knifer, { distance: 5 });
+    // The d20 misses; the 2d6 roll 3 and 4.
+    expect(resolve("spell-ice-knife", {}, [2, 3, 4]).attack?.outcome).toBe("miss");
+    expect(saves(state)).toEqual([
+      { target: FOE, ability: "dex", damage: 7, name: "Ice Knife: burst" },
+      { target: HERO, ability: "dex", damage: 7, name: "Ice Knife: burst" },
+      { target: FOE2, ability: "dex", damage: 7, name: "Ice Knife: burst" }
+    ]);
+    expect(state.combat.pendingSaves[0]).toMatchObject({ dc: 15, halfOnSuccess: false });
+  });
+
+  it("asks the GM to add the creatures near the target when the map can't measure", () => {
+    const { state, resolve } = fight(knifer);
+    const result = resolve("spell-ice-knife", {}, [15, 5, 3, 4]);
+    expect(saves(state).map((save) => save.target)).toEqual([FOE]);
+    expect(result.warnings).toContain(
+      "Ice Knife: each creature within 5 feet of Goblin also makes the save - add them by hand."
+    );
+  });
+
+  it("adds 1d6 Cold for each slot level above 1", () => {
+    const { state, resolve } = fight(knifer);
+    resolve("spell-ice-knife", { slotLevel: 2 }, [15, 5, 1, 1, 1]);
+    expect(state.combat.pendingSaves[0]?.proposedDamage).toBe(3);
   });
 });

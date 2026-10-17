@@ -2,7 +2,7 @@
  * What an action's prose says that play needs as data. Read where an action enters the system (the content
  * build, a homebrew save, an import), so the engine never reads prose while a fight runs.
  */
-import type { ActionArea, ActionReaction, ActorAction, DamageDrain } from "@vtt/schemas";
+import type { ActionArea, ActionReaction, ActorAction, DamageDrain, ForcedPush } from "@vtt/schemas";
 
 /**
  * The area of effect a description names. SRD 2024 phrasing is consistent enough to pattern-match ("60-foot
@@ -210,19 +210,29 @@ export function drainOfProse(description: string): DamageDrain | null {
   };
 }
 
+/** The push an attack's hit makes, from its SRD 2024 text: "the target is pushed up to 15 feet straight away from the
+ *  giant". Null when the text prints none. */
+export function hitPushOfProse(description: string): ForcedPush | null {
+  const push = /\bthe target is pushed (up to )?(\d+) feet (?:straight )?away from\b/.exec(description);
+  return push ? { feet: Number.parseInt(push[2]!, 10), ...(push[1] ? { upTo: true as const } : {}) } : null;
+}
+
 /** The action with its prose facts filled: the area (an authored one wins), whether it is a Multiattack whose
- *  attacks nothing structured names, a Parry's AC reaction (an authored reaction wins), and what its damage drains
- *  (an authored drain wins). The same object when nothing changes. */
+ *  attacks nothing structured names, a Parry's AC reaction (an authored reaction wins), what its damage drains and
+ *  how far its hit pushes (an authored one wins). The same object when nothing changes. */
 export function withProseFacts<Action extends ActorAction>(action: Action): Action {
   const area = action.area ?? areaOfProse(action.description);
   const untracked = /multiattack/i.test(action.name) && !action.multiattack;
   const reaction = action.reaction ?? (action.activation === "reaction" ? acReactionOfProse(action.description) : null);
   const drain = action.drain ?? (action.damage.length > 0 ? drainOfProse(action.description) : null);
+  // A save's push is the save's (`failurePush`); an attack's lands with the hit.
+  const push = action.onHitPush ?? (action.attack && !action.save ? hitPushOfProse(action.description) : null);
   if (
     area === (action.area ?? null) &&
     untracked === (action.untrackedMultiattack === true) &&
     reaction === (action.reaction ?? null) &&
-    drain === (action.drain ?? null)
+    drain === (action.drain ?? null) &&
+    push === (action.onHitPush ?? null)
   )
     return action;
   const { untrackedMultiattack: _previous, ...rest } = action;
@@ -231,6 +241,7 @@ export function withProseFacts<Action extends ActorAction>(action: Action): Acti
     ...(area ? { area } : {}),
     ...(untracked ? { untrackedMultiattack: true as const } : {}),
     ...(reaction ? { reaction } : {}),
-    ...(drain ? { drain } : {})
+    ...(drain ? { drain } : {}),
+    ...(push ? { onHitPush: push } : {})
   } as Action;
 }

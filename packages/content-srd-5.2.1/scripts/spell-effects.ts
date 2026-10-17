@@ -602,6 +602,13 @@ const CAST_HEALING: Readonly<Record<string, NonNullable<SpellEffect["healing"]>>
   "power-word-heal": { formula: "1", addsModifier: false, toMaximum: true }
 };
 
+/** What bursts after the cast's attack, hit or miss (SRD 5.2.1 text). */
+const CAST_BURSTS: Readonly<Record<string, NonNullable<SpellEffect["burst"]>>> = {
+  // "Hit or miss, the shard then explodes. The target and each creature within 5 feet of it must succeed on a Dexterity
+  // saving throw or take 2d6 Cold damage." "The Cold damage increases by 1d6 for each spell slot level above 1."
+  "ice-knife": { radiusFeet: 5, ability: "dex", damage: [{ formula: "2d6", type: "cold" }], diceAddedPerSlot: 1 }
+};
+
 /** What the cast's damage drains as it lands (SRD 5.2.1 text). */
 const CAST_DRAINS: Readonly<Record<string, NonNullable<SpellEffect["drain"]>>> = {
   // "Its Hit Point maximum is reduced by an amount equal to the Necrotic damage it took" on a failed save; "This spell
@@ -863,12 +870,14 @@ export function spellEffectFor(
   const missDamage = CAST_MISS_DAMAGE[id];
   const drain = CAST_DRAINS[id];
   const cures = CAST_CURES[id];
+  const burst = CAST_BURSTS[id];
   return {
     attacks,
     ...(attackRange ? { attackRange } : {}),
     ...(onHit ? { onHit: structuredClone(onHit) as OnHitRider[] } : {}),
     ...(missDamage ? { missDamage } : {}),
     ...(drain ? { drain: { ...drain } } : {}),
+    ...(burst ? { burst: structuredClone(burst) } : {}),
     damage: castDamage(id, roll, types, healing !== null),
     ...(choices ? { damageTypes: [...choices] } : {}),
     ...(NO_CAST_SAVE.has(id) ? { noCastSave: true as const } : {}),
@@ -955,6 +964,7 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...Object.keys(CAST_ON_HIT),
   ...Object.keys(CAST_MISS_DAMAGE),
   ...Object.keys(CAST_DRAINS),
+  ...Object.keys(CAST_BURSTS),
   ...Object.keys(CAST_CURES),
   ...Object.keys(CAST_HEALING),
   ...Object.keys(SAVE_FAILURE_EFFECTS),

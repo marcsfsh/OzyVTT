@@ -109,6 +109,7 @@ export type PlayerPendingSave = Omit<
   | "magical"
   | "immuneOnSuccess"
   | "drain"
+  | "failurePush"
 > & {
   onFailEffect?: Omit<
     NonNullable<PendingSave["onFailEffect"]>,

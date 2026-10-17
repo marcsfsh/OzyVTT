@@ -31,6 +31,7 @@ import {
   shownRollMode
 } from "../saving-throws.js";
 import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
+import { pushTokenAway } from "../forced-movement.js";
 import { defineCommand } from "./pipeline.js";
 
 // Saving throws, owed and loose, and death saves.
@@ -164,7 +165,7 @@ export const saveCommands = [
     type: "save.answer",
     operationId: "answerSave",
     description:
-      "Answers a pending saving throw; on commit the outcome auto-applies damage and conditions. `method: \"roll\"`: the server throws the d20, or takes `face`, a typed d20 (a player only while the table lets players type their dice, and never over a die the server already threw for this save), and adds the save's modifier; a Strength or Dexterity save fails without a roll while the creature is Paralyzed, Petrified, Stunned or Unconscious. A preview (`commit: false`) holds its die, so another preview shows the same one and the confirm uses it; `reroll` throws it again (a player spends Heroic Inspiration to reroll one die, the GM throws afresh). A player's `rollMode` is ignored: the rules decide. `method: \"manual\"` with `total` is the GM's ruling, used as given. Player sessions may answer only their claimed character's saves. The response carries the `outcome`.",
+      "Answers a pending saving throw; on commit the outcome auto-applies damage and conditions, and pushes a creature whose failure pushes it on the live map. `method: \"roll\"`: the server throws the d20, or takes `face`, a typed d20 (a player only while the table lets players type their dice, and never over a die the server already threw for this save), and adds the save's modifier; a Strength or Dexterity save fails without a roll while the creature is Paralyzed, Petrified, Stunned or Unconscious. A preview (`commit: false`) holds its die, so another preview shows the same one and the confirm uses it; `reroll` throws it again (a player spends Heroic Inspiration to reroll one die, the GM throws afresh). A player's `rollMode` is ignored: the rules decide. `method: \"manual\"` with `total` is the GM's ruling, used as given. Player sessions may answer only their claimed character's saves. The response carries the `outcome`.",
     summary: "Answer a pending saving throw by rolling, by a typed d20, or (the GM) by a total.",
     schema: SaveAnswerSchema,
     malformed: "The saving-throw answer is malformed.",
@@ -175,6 +176,9 @@ export const saveCommands = [
         request;
       const pending = kit.read().combat.pendingSaves.find((entry) => entry.id === saveId);
       const distance = await kit.creatureDistance();
+      // A failure that pushes moves the token on the live map; one changed meanwhile asks the GM to move it.
+      const mapAssetId = kit.read().combat.mapAssetId;
+      const geometry = pending?.failurePush ? await kit.liveGeometry() : null;
       let answered: ReturnType<typeof answerSave> | undefined;
       const { state, duplicate } = await execute((draft) => {
         answered = answerSave(
@@ -193,7 +197,9 @@ export const saveCommands = [
             now: () => new Date().toISOString(),
             resolveDefinition: kit.resolveDefinition,
             catalog: kit.equipmentCatalog(),
-            distanceFeet: (actorIdA, actorIdB) => distance(draft, actorIdA, actorIdB)
+            distanceFeet: (actorIdA, actorIdB) => distance(draft, actorIdA, actorIdB),
+            pushToken: (input) =>
+              geometry && draft.combat.mapAssetId === mapAssetId ? pushTokenAway(draft, input, geometry) : null
           },
           legendaryResistance,
           rollMode,

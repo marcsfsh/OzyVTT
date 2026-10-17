@@ -1286,7 +1286,11 @@
      "successDamage": "none",
      "failureConditions": [
       "prone"
-     ]
+     ],
+     "failurePush": {
+      "feet": 60,
+      "upTo": true
+     }
     },
     "damage": [],
     "area": {
@@ -2657,7 +2661,11 @@
      "ability": "dex",
      "dc": 19,
      "successDamage": "half",
-     "failureConditions": []
+     "failureConditions": [],
+     "failurePush": {
+      "feet": 30,
+      "upTo": true
+     }
     },
     "damage": [
      {
@@ -3177,7 +3185,11 @@
      "successDamage": "half",
      "failureConditions": [
       "prone"
-     ]
+     ],
+     "failurePush": {
+      "feet": 20,
+      "upTo": true
+     }
     },
     "damage": [
      {
@@ -4436,7 +4448,11 @@
      "successDamage": "none",
      "failureConditions": [
       "prone"
-     ]
+     ],
+     "failurePush": {
+      "feet": 60,
+      "upTo": true
+     }
     },
     "damage": [],
     "area": {
@@ -5850,7 +5866,11 @@
      "ability": "dex",
      "dc": 23,
      "successDamage": "half",
-     "failureConditions": []
+     "failureConditions": [],
+     "failurePush": {
+      "feet": 30,
+      "upTo": true
+     }
     },
     "damage": [
      {
@@ -10751,7 +10771,11 @@
      "successDamage": "none",
      "failureConditions": [
       "prone"
-     ]
+     ],
+     "failurePush": {
+      "feet": 30,
+      "upTo": true
+     }
     },
     "damage": [],
     "area": {
@@ -17512,7 +17536,11 @@
       "formula": "1d8",
       "type": "fire"
      }
-    ]
+    ],
+    "onHitPush": {
+     "feet": 15,
+     "upTo": true
+    }
    }
   ],
   "token": {
@@ -48356,7 +48384,11 @@
      "successDamage": "none",
      "failureConditions": [
       "prone"
-     ]
+     ],
+     "failurePush": {
+      "feet": 40,
+      "upTo": true
+     }
     },
     "damage": [],
     "area": {

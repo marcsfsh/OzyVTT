@@ -1199,6 +1199,17 @@ export const SaveConditionSchema = z.enum([
 ]);
 export type SaveCondition = z.infer<typeof SaveConditionSchema>;
 
+/** Forced movement straight away from the creature that causes it (SRD): Thunderwave's 10 feet, a fire giant's Hammer
+ *  Throw "up to 15 feet". `upTo` lets the source stop it short; `maxTargetSize` is the largest creature it moves. */
+export const ForcedPushSchema = z
+  .object({
+    feet: z.number().int().min(5).max(120),
+    upTo: z.literal(true).optional(),
+    maxTargetSize: SizeSchema.optional()
+  })
+  .strict();
+export type ForcedPush = z.infer<typeof ForcedPushSchema>;
+
 /**
  * What a saving throw does, as data: the damage a success takes ("half" for Fireball, "none" for Sacred
  * Flame) and the condition a failure imposes. Every save block (stat-block action, feature action, spell)
@@ -1234,7 +1245,10 @@ export const SaveOutcomeFields = {
   /** What else a failure starts, from the SRD's own rules: "burning" (Rules Glossary Burning: 1d4 Fire at the start of
    * each of its turns until it is put out) or "oil" (covered in Oil: Fire damage before the oil dries, within 1
    * minute, brings 5 more Fire damage). */
-  failureHazard: z.enum(["burning", "oil"]).optional()
+  failureHazard: z.enum(["burning", "oil"]).optional(),
+  /** A failure also pushes the creature straight away from the source (Thunderwave: "is pushed 10 feet away from
+   *  you"). */
+  failurePush: ForcedPushSchema.optional()
 };
 
 /** An area of effect the GM places as a map template ("60-foot Cone"). `widthFeet` is a line's width, null otherwise. */
@@ -1302,6 +1316,21 @@ export const SaveFailureEffectSchema = z
     endsOnSpellHealing: z.literal(true).optional()
   })
   .strict();
+
+/** What bursts after an attack, hit or miss (Ice Knife's shard): the target and each creature within `radiusFeet` of it
+ *  make the save, a failure taking `damage`, and `diceAddedPerSlot` more dice for each slot level above the spell's. */
+export const BurstSchema = z
+  .object({
+    radiusFeet: z.number().int().min(5).max(60),
+    ability: AbilitySchema,
+    damage: z
+      .array(z.object({ formula: DamageFormulaSchema, type: z.string().min(1).max(40) }).strict())
+      .min(1)
+      .max(3),
+    diceAddedPerSlot: z.number().int().min(1).max(4).optional()
+  })
+  .strict();
+export type Burst = z.infer<typeof BurstSchema>;
 
 /** What damage takes besides hit points as it lands (SRD Life Drain, Vampiric Touch, Harm): the target's Hit Point
  *  maximum decreases by the damage it took, and the creature that dealt it regains hit points from it. With a
@@ -1496,6 +1525,12 @@ export const ActionSchema = z.object({
   missDamage: z.literal("half").optional(),
   /** What its damage drains as it lands (a wraith's Life Drain, Vampiric Touch). */
   drain: DamageDrainSchema.optional(),
+  /** A hit also pushes the target straight away from the attacker (a fire giant's Hammer Throw). */
+  onHitPush: ForcedPushSchema.optional(),
+  /** What bursts after its attack, hit or miss, against the user's save DC (Ice Knife's explosion). */
+  burst: BurstSchema.extend({ dc: z.number().int().min(1).max(40) })
+    .strict()
+    .optional(),
   /** Targeting restrictions the engine enforces (Tail can't target the creature this crocodile grapples). */
   targetRules: z
     .array(z.enum(["not-grappled-by-source"]))

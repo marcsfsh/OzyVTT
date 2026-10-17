@@ -3,6 +3,7 @@ import {
   ActionAreaSchema,
   ActorDefinitionSchema,
   DamageDrainSchema,
+  ForcedPushSchema,
   ActorSchema,
   EffectInstanceSchema,
   EffectModifiersSchema,
@@ -291,6 +292,8 @@ export const PendingSaveSchema = z
     immuneOnSuccess: z.literal(true).optional(),
     /** What the save's damage drains as it lands (Harm's lower Hit Point maximum). GM bookkeeping, never projected. */
     drain: DamageDrainSchema.optional(),
+    /** Where a failure pushes the creature (Thunderwave), narrated when it lands. */
+    failurePush: ForcedPushSchema.optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();

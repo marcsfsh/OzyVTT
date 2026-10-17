@@ -9885,7 +9885,14 @@
       {
        "id": "eldritch-mind",
        "name": "Eldritch Mind",
-       "description": "You have Advantage on Constitution saving throws that you make to maintain Concentration."
+       "description": "You have Advantage on Constitution saving throws that you make to maintain Concentration.",
+       "modifiers": [
+        {
+         "type": "roll-mode",
+         "roll": "concentration",
+         "mode": "advantage"
+        }
+       ]
       },
       {
        "id": "eldritch-smite",

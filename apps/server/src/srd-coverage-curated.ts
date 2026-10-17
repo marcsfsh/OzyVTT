@@ -649,7 +649,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Protector's training and Thaumaturge's extra cantrip are applied. Thaumaturge's bonus to Arcana and Religion checks is the GM's."
   ),
   "feature:eldritch-invocations": guided(
-    "Each invocation's spells and riders are applied (Agonizing Blast's damage, the free casts). Repelling Blast's push and Eldritch Spear's range are the GM's."
+    "Agonizing Blast's damage, Eldritch Spear's range on a spell attack, Repelling Blast's push (resolution/masteries.ts), Eldritch Mind's Advantage and the free casts are applied. The senses (Devil's Sight, Witch Sight), the pact-weapon invocations, Lessons of the First Ones, Gaze of Two Minds, Gift of the Protectors and Investment of the Chain Master are the GM's."
   ),
   "feature:elemental-fury": guided(
     "Primal Strike's extra damage is applied once a turn. Potent Spellcasting's bonus to cantrip damage is the GM's."
@@ -869,11 +869,11 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:freedom-of-movement": guided(
     "speed.ts gives the target a Swim Speed equal to its Speed. Ignoring Difficult Terrain, the immunity to magical Paralyzed and Restrained, and slipping free of restraints are the GM's."
   ),
+  "spell:gust-of-wind": guided(
+    "The cast's save pushes a creature that fails 15 feet away from the caster. The save at the end of a creature's turn in the Line, the doubled cost of moving toward the caster and turning the Line are the GM's."
+  ),
   "spell:hideous-laughter": guided(
     "A failed save imposes Prone and Incapacitated, repeated at the end of each of the target's turns. The save with Advantage each time it takes damage is the GM's."
-  ),
-  "spell:ice-knife": guided(
-    "The attack's Piercing damage is applied. The explosion's Dexterity save and 2d6 Cold damage are the GM's."
   ),
   "spell:irresistible-dance": guided(
     "A failed save imposes Charmed. The dance's Disadvantage, the Advantage against the dancer and its save to collect itself are the GM's."
@@ -916,9 +916,6 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "spell:storm-of-vengeance": guided(
     "The first turn's save, Thunder damage and Deafened condition are applied. The storm's turns 2 to 10 are the GM's."
-  ),
-  "spell:thunderwave": guided(
-    "The save and its Thunder damage are applied. The 10-foot push on a failed save is the GM's to move."
   ),
   "spell:tsunami": guided(
     "The wall's first save and damage are applied. Its movement and the damage on later turns are the GM's."

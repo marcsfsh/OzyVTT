@@ -78,7 +78,10 @@ export function spellState(spell: SpellReference): CoverageState {
       (effect.laterActions ?? []).some(laterApplies));
   const saveApplies =
     spell.save !== null &&
-    (spell.save.failureConditions.length > 0 || (effect?.damage.length ?? 0) > 0 || spell.save.speedZero === true);
+    (spell.save.failureConditions.length > 0 ||
+      (effect?.damage.length ?? 0) > 0 ||
+      spell.save.speedZero === true ||
+      spell.save.failurePush !== undefined);
   if (applies || saveApplies) return "enforced";
   if (spell.level > 0 || spell.concentration || spell.area !== null || spell.save !== null) return "guided";
   return "reference";

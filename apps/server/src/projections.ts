@@ -187,8 +187,9 @@ const PENDING_SAVE_FIELDS = {
   magical: "never",
   // What a success earns is the stat block's text, the GM's knowledge.
   immuneOnSuccess: "never",
-  // What the damage drains is narrated when it lands.
-  drain: "never"
+  // What the damage drains, and where a failure pushes, are narrated when they land.
+  drain: "never",
+  failurePush: "never"
 } as const satisfies Record<keyof PendingSave, FieldAudience>;
 
 // How long what a failure imposes would last is the save's own text, read on the prompt by the one who owes it.

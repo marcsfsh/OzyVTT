@@ -40,7 +40,13 @@ import { applyMasteryForces, masterySwingOf, offeredPush, spendSap, spendVex } f
 import { hitOffersOf, rollHitOptions, spendHitOptions } from "./resolution/hit-options.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
 import { strikeBackOnHit } from "./resolution/struck.js";
-import { parkActionSave, parkForAcReaction, parkHeldObjectSave, parkReaction } from "./resolution/pending.js";
+import {
+  parkActionSave,
+  parkBurstSave,
+  parkForAcReaction,
+  parkHeldObjectSave,
+  parkReaction
+} from "./resolution/pending.js";
 import { markSpellUp, openSpellZone, startConcentration } from "./resolution/concentration.js";
 import { applyRageRules } from "./resolution/rage.js";
 import { releaseHideAndReady } from "./resolution/release.js";
@@ -133,6 +139,7 @@ export function resolveDefinitionAction(
   parkReaction(ctx);
   ctx.builtin?.forcedSave?.(ctx);
   parkActionSave(ctx);
+  parkBurstSave(ctx);
   parkHeldObjectSave(ctx);
   applyRageRules(ctx);
 

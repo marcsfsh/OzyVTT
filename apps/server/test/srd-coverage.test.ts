@@ -267,6 +267,12 @@ describe("the curated claims hold in the engine", () => {
     expect(heal.effect!.endsConditions).toContain("blinded");
   });
 
+  it("a push: Thunderwave's failed save carries the push the save answer makes", () => {
+    const thunderwave = loadSpells().find((spell) => spell.id === "thunderwave")!;
+    expect(spellState(thunderwave)).toBe("enforced");
+    expect(thunderwave.save?.failurePush).toEqual({ feet: 10 });
+  });
+
   it("a trait kind the bundle runs as a mechanic is never curated reference", () => {
     const running = [...monsterTraitKinds()].filter(([, kind]) => kind.running > 0).map(([name]) => name);
     expect(running.length).toBeGreaterThan(0);

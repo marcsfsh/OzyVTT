@@ -21,13 +21,29 @@ export function effectiveActions(
 ): readonly ActorAction[] {
   const declared = definition?.actions ?? [];
   // A spell's later action rolls at the level the spell is up at (Spiritual Weapon from a 3rd-level slot).
-  const taken = declared.map((action) => atLevelUp(withTakenActions(action), actor, catalog));
+  const taken = declared.map((action) =>
+    withEldritchSpear(atLevelUp(withTakenActions(action), actor, catalog), definition)
+  );
   // The definition's own list when nothing changed, so a caller holding it sees the same array.
   const base = taken.every((action, index) => action === declared[index]) ? declared : taken;
   if (!actor) return base;
   const derivation = deriveEquipment(actor, definition, catalog);
   if (derivation.carriers.length === 0 && derivation.actions.length === 0) return base;
   return [...base, ...derivation.actions].map((action) => withStandingRiders(action, derivation, actor));
+}
+
+/** SRD Eldritch Spear: the cantrip picked for it reaches 30 feet farther for each Warlock level. Applied to the spell
+ *  attack's range, where the engine measures it; a save cantrip's range stays the GM's. */
+function withEldritchSpear(action: ActorAction, definition: ActorDefinition | undefined): ActorAction {
+  const rangeFeet = action.attack?.rangeFeet;
+  if (rangeFeet === undefined || action.spellId === undefined) return action;
+  const character = definition?.character;
+  const picked = character?.choices?.find(
+    (choice) => choice.kind === "cantrip" && choice.payload?.featureId === "eldritch-spear"
+  )?.id;
+  const level = character?.classes.find((entry) => entry.id === "warlock")?.level ?? 0;
+  if (picked !== action.spellId || level === 0) return action;
+  return { ...action, attack: { ...action.attack!, rangeFeet: rangeFeet + 30 * level } };
 }
 
 /** A later action of a spell its caster has up at a higher level, rolled at that level; anything else unchanged. */

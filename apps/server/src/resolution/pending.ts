@@ -7,7 +7,9 @@ import { HAZARDS } from "../hazards.js";
 import { halvedDamageParts, previewDamage } from "../hit-points.js";
 import { offerableReaction } from "../reaction-offers.js";
 import { applyFailureEffect, createPendingSaves } from "../saving-throws.js";
-import type { ResolveContext } from "./context.js";
+import { rollDice } from "@vtt/rules-5e";
+import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
+import { recordRoll, type ResolveContext } from "./context.js";
 import { coverBonusOf, coverFor } from "../cover.js";
 import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { damagePartsOf } from "./damage.js";
@@ -353,10 +355,56 @@ export function parkActionSave(ctx: ResolveContext): void {
       ...(onFailEffect ? { onFailEffect } : {}),
       ...(onSuccessEffect ? { extra: { onSuccessEffect } } : {}),
       ...(action.drain ? { drain: action.drain } : {}),
+      ...(action.save.failurePush ? { failurePush: action.save.failurePush } : {}),
       magical: isMagicalAction(ctx),
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())
     });
+}
+
+/**
+ * What bursts after an attack, hit or miss (SRD Ice Knife: "the shard then explodes. The target and each creature within
+ * 5 feet of it must succeed on a Dexterity saving throw"): its damage is rolled once, and each creature the map puts
+ * within reach of the target owes the save, the attacker too. Without a map only the target does, and the GM is told
+ * to add the rest.
+ */
+export function parkBurstSave(ctx: ResolveContext): void {
+  const { state, action, attacker, attack, deps, input, warnings } = ctx;
+  const burst = action.burst;
+  if (!burst || attack === null || input.commit === false) return;
+  const target = state.actors.find((candidate) => candidate.id === attack.targetId);
+  if (!target) return;
+  const parts = burst.damage.map((part) => {
+    const rolled = rollDice(part.formula, deps.random);
+    recordRoll(ctx, rolled, "damage", `${action.name}: burst`);
+    return { amount: Math.max(0, rolled.total), type: part.type };
+  });
+  const near = deps.distanceFeet
+    ? state.combat.initiative.flatMap((entry) => {
+        if (entry.actorId === target.id) return [];
+        const distance = deps.distanceFeet!(target.id, entry.actorId);
+        return distance !== null && distance <= burst.radiusFeet + DISTANCE_TOLERANCE_FEET ? [entry.actorId] : [];
+      })
+    : [];
+  if (!deps.distanceFeet)
+    warnings.push(
+      `${action.name}: each creature within ${burst.radiusFeet} feet of ${target.name} also makes the save - add them by hand.`
+    );
+  createPendingSaves(state, {
+    sourceActorId: attacker.id,
+    sourceName: attacker.name,
+    actionName: `${action.name}: burst`,
+    ability: burst.ability,
+    dc: burst.dc,
+    targetIds: [target.id, ...near],
+    proposedDamage: parts.reduce((sum, part) => sum + part.amount, 0),
+    proposedDamageParts: parts,
+    halfOnSuccess: false,
+    conditionIds: [],
+    magical: isMagicalAction(ctx),
+    newSaveId: deps.newRollId,
+    createdAt: Date.parse(deps.now())
+  });
 }
 
 const conditionDeps = (deps: ResolveContext["deps"]) => ({

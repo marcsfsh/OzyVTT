@@ -16,7 +16,7 @@ import {
   type DiceResolution,
   type RandomSource
 } from "@vtt/rules-5e";
-import type { ActorDefinition, DamageDrain } from "@vtt/schemas";
+import type { ActorDefinition, DamageDrain, ForcedPush } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { withoutSameHazard } from "./hazards.js";
 import { recordRoll as recordRollInHistory, rolledTerms } from "./roll-history.js";
@@ -47,6 +47,7 @@ import {
   type RollModeClaims
 } from "./equipment-derivation.js";
 import { countZoneDamage } from "./spell-zone-state.js";
+import { sizeAtMost } from "./resolution/context.js";
 
 export type SaveAnswerDependencies = Readonly<{
   random: RandomSource;
@@ -59,6 +60,10 @@ export type SaveAnswerDependencies = Readonly<{
   catalog?: EquipmentCatalog;
   /** Creature-to-creature distance, for the strike-back reaction the save's damage may open. */
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
+  /** Moves a token straight away from another on the live map (a failure's push); null when the map can't. */
+  pushToken?: (
+    input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number }>
+  ) => Readonly<{ value: number; unit: string }> | null;
 }>;
 export type SaveOutcome = Readonly<{
   success: boolean;
@@ -334,6 +339,8 @@ export function createPendingSaves(
     immuneOnSuccess?: boolean;
     /** What the save's damage drains as it lands (Harm's lower Hit Point maximum). */
     drain?: DamageDrain;
+    /** Where a failure pushes the creature (Thunderwave). */
+    failurePush?: ForcedPush;
     newSaveId: () => string;
     createdAt: number;
   }>
@@ -365,6 +372,7 @@ export function createPendingSaves(
     ...(input.magical ? { magical: true as const } : {}),
     ...(input.immuneOnSuccess ? { immuneOnSuccess: true as const } : {}),
     ...(input.drain ? { drain: { ...input.drain } } : {}),
+    ...(input.failurePush ? { failurePush: { ...input.failurePush } } : {}),
     createdAt: input.createdAt
   }));
   // A re-cast against the same target replaces its older prompt.
@@ -454,6 +462,42 @@ export function applyFailureEffect(
   return [
     { kind: "effect", text: `${target.name} is ${applied.name}.`, actorId: target.id, ...sourceOf(applied) },
     ...events
+  ];
+}
+
+/**
+ * A failure's push (Thunderwave's 10 feet, a dragon's Repulsion Breath "up to 60 feet"), the whole way, straight away
+ * from the save's source on the live map. Too big a creature stays put; a map that can't place it asks the GM to move
+ * the token.
+ */
+function pushOnFailure(
+  target: GameState["actors"][number],
+  pending: PendingSave,
+  deps: SaveAnswerDependencies
+): EffectNarration[] {
+  const push = pending.failurePush!;
+  const sourceId = pending.sourceActorId;
+  if (sourceId === null || sourceId === target.id) return [];
+  if (push.maxTargetSize && !sizeAtMost(target.size, push.maxTargetSize)) return [];
+  const moved = deps.pushToken?.({ actorId: target.id, awayFromActorId: sourceId, distanceFeet: push.feet }) ?? null;
+  if (moved === null)
+    return [
+      {
+        kind: "effect",
+        text: `${target.name} is pushed ${push.feet} feet straight away from ${pending.sourceName} - move the token.`,
+        actorId: target.id,
+        gmOnly: true
+      }
+    ];
+  const travelled = Math.round(moved.value * 10) / 10;
+  if (travelled <= 0) return [];
+  return [
+    {
+      kind: "effect",
+      text: `${target.name} is pushed ${travelled} ${moved.unit} straight away from ${pending.sourceName}.`,
+      actorId: target.id,
+      source: { actorId: sourceId, name: pending.sourceName }
+    }
   ];
 }
 
@@ -798,6 +842,7 @@ export function answerSave(
       ...applyFailureEffect(state, target.id, pending.onSuccessEffect, `${commandId}:${saveId}:success`, immunities)
     );
   if (!success && pending.failureNote) events.push({ kind: "effect", text: pending.failureNote, actorId: target.id });
+  if (!success && pending.failurePush) events.push(...pushOnFailure(target, pending, deps));
   // SRD Sleet Storm: a failure "and lose Concentration".
   if (!success && pending.breaksConcentration) events.push(...endConcentrationSustainedBy(state, target.id));
   if (outcomeCondition)

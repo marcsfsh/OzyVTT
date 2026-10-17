@@ -12,6 +12,7 @@ import {
   ActionAreaSchema,
   ActionGrantSchema,
   AmmunitionKindSchema,
+  BurstSchema,
   ActionReactionSchema,
   ActionSchema,
   ActorDefinitionSchema,
@@ -141,6 +142,8 @@ export const SpellEffectSchema = z
     missDamage: z.literal("half").optional(),
     /** What its damage drains as it lands (Vampiric Touch's healing, Harm's lower Hit Point maximum). */
     drain: DamageDrainSchema.optional(),
+    /** What bursts after its attack, hit or miss (Ice Knife's explosion), against the caster's spell save DC. */
+    burst: BurstSchema.optional(),
     /** Damage to each target, every part rolled; with `darts`, what each dart deals. */
     damage: SpellDamageSchema,
     /** The damage types the caster picks from on each cast (Chromatic Orb); the damage carries the first. */
