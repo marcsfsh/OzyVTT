@@ -421,6 +421,8 @@ export const ReactionAnswerSchema = z
     attackNatural: z.number().int().min(1).max(20).optional(),
     /** Push mastery (SRD "up to 10 feet"): how far to push on this hit, 0 to decline; absent pushes the full 10. */
     pushFeet: z.number().int().min(0).max(10).multipleOf(5).optional(),
+    /** The extras the swing's previewed hit offered that the answerer adds to it (Sneak Attack), sent with the confirm. */
+    hitOptions: z.array(HitOptionChoiceSchema).max(6).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

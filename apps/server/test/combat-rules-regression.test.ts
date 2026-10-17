@@ -4245,3 +4245,84 @@ describe("Haste: one more action from a short list, and lethargy when it ends (S
     expect(game.actors.find((actor) => actor.id === IDS.torva)!.effects).toEqual([]);
   });
 });
+
+describe("Opportunity attacks: one melee attack with a weapon or an Unarmed Strike (SRD Opportunity Attacks)", () => {
+  const PROMPT = "40000000-0000-4000-8000-0000000000ab";
+  /** The crocodile's turn: it leaves Pip's reach and Pip may strike. */
+  const leaving = () => {
+    const game = buildGame([
+      { actorId: IDS.croc1, score: 20 },
+      { actorId: IDS.pip, score: 8 }
+    ]);
+    game.combat = {
+      ...game.combat,
+      pendingReactions: [
+        {
+          id: PROMPT,
+          kind: "leaves-reach",
+          actorId: IDS.pip,
+          actionId: "opportunity-attack",
+          actionName: "Opportunity Attack",
+          sourceActorId: IDS.croc1,
+          sourceName: "Giant Crocodile",
+          targetActorId: IDS.croc1,
+          triggerCommandId: nextCommandId(),
+          proposedDamage: 0,
+          proposedDamageParts: [],
+          critical: false,
+          weighed: null,
+          acBonus: null,
+          rollsAttack: true,
+          parkedAttack: null,
+          createdAt: 0
+        }
+      ]
+    };
+    return game;
+  };
+  const strike = (
+    game: GameState,
+    actionId: string | undefined,
+    faces: number[],
+    options: Parameters<typeof answerReaction>[7] = {}
+  ) =>
+    answerReaction(
+      game,
+      nextCommandId(),
+      PROMPT,
+      true,
+      actionId,
+      { role: "gm" },
+      {
+        resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition,
+        random: () => {
+          const face = faces.shift();
+          if (face === undefined) throw new Error("dice queue empty");
+          return face;
+        },
+        newRollId: nextCommandId,
+        gmSessionId: IDS.gmSession,
+        now: () => "2026-07-18T00:00:00.000Z"
+      },
+      options
+    );
+
+  it("refuses a ranged weapon or a spell, and keeps the reaction", () => {
+    const game = leaving();
+    expect(() => strike(game, "shortbow", [18, 4])).toThrow(
+      /An opportunity attack is one melee attack with a weapon or an Unarmed Strike - Shortbow isn't one/
+    );
+    expect(game.combat.reactionsUsed).not.toContain(IDS.pip);
+    expect(game.combat.pendingReactions).toHaveLength(1);
+  });
+
+  it("takes an Unarmed Strike, and keeps the size rule on its Grapple option", () => {
+    const game = leaving();
+    // A Small halfling can't grapple a Huge crocodile: the option's own rule, not the reaction's.
+    expect(() => strike(game, "unarmed-grapple", [])).toThrow(/more than one size larger/);
+    const punch = strike(game, "unarmed-strike", [18, 2]);
+    expect(punch.used).toBe(true);
+    expect(punch.resolution?.attack).toMatchObject({ naturalRoll: 18 });
+    expect(game.combat.reactionsUsed).toContain(IDS.pip);
+  });
+});

@@ -21,6 +21,7 @@ import {
   type EquipmentDerivation,
   type RollModeClaims
 } from "../equipment-derivation.js";
+import { builtinBaseId } from "../builtin-actions.js";
 import { UNARMED_STRIKE_ACTION_ID } from "../item-actions.js";
 import { VEXED_TAG } from "../weapon-mastery.js";
 import { areAllies, areEnemies } from "../creature-sides.js";
@@ -45,8 +46,8 @@ function attackKindsOf(ctx: ResolveContext, distance: number | null): AttackKind
   const { action, input, attacker } = ctx;
   const kinds = new Set<AttackKind>(input.attackKinds ?? []);
   const attack = action.attack;
-  // Matched by id so a Monk's own strike (which shadows the builtin) still counts as unarmed.
-  const unarmed = action.id === UNARMED_STRIKE_ACTION_ID;
+  // Matched by id so a Monk's own strike (which shadows the builtin) and a Bonus Action strike count as unarmed.
+  const unarmed = builtinBaseId(action.id) === UNARMED_STRIKE_ACTION_ID;
   if (attack) {
     const melee = attack.reachFeet !== undefined;
     const ranged = attack.rangeFeet !== undefined;
@@ -83,7 +84,7 @@ function attackAbilityOf(ctx: ResolveContext): "str" | "dex" | undefined {
   const str = scoreModifier(scores.str);
   const dex = scoreModifier(scores.dex);
   // Martial Arts lets a Monk's strike use Dexterity; the builtin strike is Strength.
-  if (ctx.action.id === UNARMED_STRIKE_ACTION_ID)
+  if (builtinBaseId(ctx.action.id) === UNARMED_STRIKE_ACTION_ID)
     return ctx.deps.definition?.character?.martialArts && dex > str ? "dex" : "str";
   const weapon = ctx.attacker.inventory.find((item) => item.id === ctx.riderItemId)?.weapon;
   return weapon ? weaponAbilityFrom(weapon.properties ?? [], weapon.rangeFeet, str, dex) : undefined;

@@ -1,9 +1,15 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import { type ActionResolution, type PendingReaction, type PlayerPendingReaction } from "@vtt/domain";
+import {
+  type ActionResolution,
+  type HitOffer,
+  type HitOptionChoice,
+  type PendingReaction,
+  type PlayerPendingReaction
+} from "@vtt/domain";
 import { Button, IconX } from "@vtt/ui";
 import { command } from "../lib/command";
 import { damageAdjustments } from "./format";
-import { PushChoice } from "./AttackPreview";
+import { HitOfferChoices, PushChoice } from "./AttackPreview";
 import { DieModeButtons, type DieMode } from "./RollControls";
 import "./prompts.css";
 
@@ -12,7 +18,8 @@ import "./prompts.css";
  * - Uncanny Dodge: the hit's damage is parked here, so both buttons apply it, halved on Use. Each names what the
  *   server weighed through the reactor's defences; a prompt parked before that was recorded shows the raw numbers.
  * - Parry or Shield: the attack waits at its roll; both buttons finish it, Use against the raised AC.
- * - An opportunity attack or Retaliation: Attack rolls a melee swing to confirm, re-roll or type; Let them go clears.
+ * - An opportunity attack or Retaliation: Attack rolls a melee swing to confirm, re-roll or type, with the extras
+ *   its hit can carry (Sneak Attack) to add; Let them go clears.
  * - Hellish Rebuke or Storm's Thunder: Use strikes the creature that dealt the damage.
  * The GM's dismiss clears the prompt without applying anything it holds, for a moment settled by hand.
  */
@@ -39,7 +46,11 @@ export function ReactionPrompt({
     attack: NonNullable<ActionResolution["attack"]>;
     mode?: DieMode;
     push?: ActionResolution["push"];
+    hitOffers?: readonly HitOffer[];
   } | null>(null);
+  // Extras for the hit (Sneak Attack); a re-roll can change what is offered, so only those still offered are sent.
+  const [extras, setExtras] = useState<HitOptionChoice[]>([]);
+  const hitOptions = extras.filter((choice) => rolled?.hitOffers?.some((offer) => offer.id === choice.id));
   // null means the full distance, so a re-roll that changes the offer never carries a stale pick.
   const [pushPick, setPushPick] = useState<number | null>(null);
   const push = rolled?.push ?? null;
@@ -53,7 +64,13 @@ export function ReactionPrompt({
   // `use` distinguishes the swing (Attack) from letting the mover go; opts drive the preview flow.
   const answer = (
     use: boolean,
-    opts: { commit?: boolean; rollMode?: DieMode; attackNatural?: number; pushFeet?: number } = {}
+    opts: {
+      commit?: boolean;
+      rollMode?: DieMode;
+      attackNatural?: number;
+      pushFeet?: number;
+      hitOptions?: HitOptionChoice[];
+    } = {}
   ) => {
     setBusy(true);
     void command("reaction:answer", { reactionId: reaction.id, use, ...opts }).then((result) => {
@@ -70,7 +87,8 @@ export function ReactionPrompt({
           setRolled({
             attack: outcome.resolution.attack,
             mode: outcome.resolution.rollMode?.mode,
-            push: outcome.resolution.push
+            push: outcome.resolution.push,
+            ...(outcome.resolution.hitOffers ? { hitOffers: outcome.resolution.hitOffers } : {})
           });
           return;
         }
@@ -172,6 +190,9 @@ export function ReactionPrompt({
         )}
       </span>
       {push && pushFeet !== undefined && <PushChoice push={push} value={pushFeet} busy={busy} onPick={setPushPick} />}
+      {rolled?.hitOffers && rolled.hitOffers.length > 0 && (
+        <HitOfferChoices offers={rolled.hitOffers} chosen={hitOptions} busy={busy} onChange={setExtras} />
+      )}
       {opportunity && rolled ? (
         // The swing is rolled: confirm it, re-roll adv/disadv, type a d20, or let them go.
         <span className="save-prompt-confirm">
@@ -195,7 +216,8 @@ export function ReactionPrompt({
               answer(true, {
                 commit: true,
                 attackNatural: rolled.attack.naturalRoll,
-                ...(pushFeet !== undefined ? { pushFeet } : {})
+                ...(pushFeet !== undefined ? { pushFeet } : {}),
+                ...(hitOptions.length > 0 ? { hitOptions } : {})
               })
             }
           >
