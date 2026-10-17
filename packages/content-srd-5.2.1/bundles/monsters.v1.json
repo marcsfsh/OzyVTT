@@ -37981,6 +37981,31 @@
     "height": 1
    }
   },
+  "traitMechanics": [
+   {
+    "kind": "aura",
+    "name": "Vile Appearance",
+    "trigger": "turn-start-inside",
+    "rangeFeet": 30,
+    "affects": "all",
+    "creatureTypes": [
+     "beast",
+     "humanoid"
+    ],
+    "save": {
+     "ability": "wis",
+     "dc": 11,
+     "successDamage": "none",
+     "failureConditions": [
+      "frightened"
+     ],
+     "failureDuration": {
+      "type": "until-bearer-next-turn"
+     },
+     "immuneOnSuccess": true
+    }
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,

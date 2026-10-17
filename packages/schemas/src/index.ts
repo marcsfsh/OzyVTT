@@ -1885,6 +1885,8 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
       trigger: z.enum(["bearer-turn-end", "turn-start-inside", "bearer-turn-start"]),
       rangeFeet: z.number().int().min(5).max(120),
       affects: z.enum(["all", "enemies", "chosen", "grapple-partners"]),
+      /** Only creatures of these types ("any Beast or Humanoid", a sea hag's Vile Appearance). */
+      creatureTypes: z.array(RiderSlugSchema).min(1).max(6).optional(),
       notWhileIncapacitated: z.literal(true).optional(),
       damage: TraitDamageSchema.optional(),
       save: TraitSaveSchema.optional(),

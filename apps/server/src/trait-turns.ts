@@ -9,6 +9,7 @@ import { HAZARDS } from "./hazards.js";
 import { applyDamageDetailed, damageAdjustmentDetail, healActor } from "./hit-points.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
 import { applyFailureEffect, createPendingSaves } from "./saving-throws.js";
+import { creatureTypeOf } from "./statblock-facts.js";
 import {
   AURA_IMMUNE_TAG,
   REGENERATING_AT_ZERO_TAG,
@@ -223,6 +224,9 @@ function reached(state: GameState, bearer: Actor, aura: Aura, deps: TraitTurnDep
     if (other.id === bearer.id || other.hp.current <= 0) return false;
     // "Of the azer's choice": it chooses its enemies. "Any enemy": the same.
     if (aura.affects !== "all" && !areEnemies(bearer, other, deps.resolveDefinition)) return false;
+    // "Any Beast or Humanoid": a creature of another type is spared; one whose type nothing says is the GM's.
+    const type = aura.creatureTypes ? creatureTypeOf(other, definitionOf(other, deps)) : null;
+    if (type !== null && !aura.creatureTypes!.includes(type)) return false;
     const apart = distanceFeet(bearer.id, other.id);
     return apart !== null && apart <= aura.rangeFeet + DISTANCE_TOLERANCE_FEET;
   });

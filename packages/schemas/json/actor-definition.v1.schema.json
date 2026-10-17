@@ -3159,6 +3159,14 @@
                 "grapple-partners"
               ]
             },
+            "creatureTypes": {
+              "minItems": 1,
+              "maxItems": 6,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema40"
+              }
+            },
             "notWhileIncapacitated": {
               "type": "boolean",
               "const": true

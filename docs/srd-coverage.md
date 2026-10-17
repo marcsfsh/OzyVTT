@@ -22,7 +22,7 @@ stops matching the engine. Known gaps in enforced records are GitHub issues.
 | --- | --- | --- | --- |
 | Spells (339) | 86 | 245 | 8 |
 | Monster actions (989) | 864 | 80 | 45 |
-| Monster traits (106) | 24 | 4 | 78 |
+| Monster traits (106) | 25 | 4 | 77 |
 | Barbarian features (23) | 15 | 2 | 6 |
 | Bard features (16) | 11 | 3 | 2 |
 | Cleric features (19) | 11 | 3 | 5 |
@@ -44,7 +44,7 @@ stops matching the engine. Known gaps in enforced records are GitHub issues.
 | Armor (13) | 13 | 0 | 0 |
 | Conditions (15) | 12 | 3 | 0 |
 | Rules glossary (155) | 97 | 14 | 44 |
-| All records (2420) | 1419 | 588 | 413 |
+| All records (2420) | 1420 | 588 | 412 |
 
 ## How records are classified
 
@@ -250,7 +250,7 @@ The number after each trait is how many stat blocks print it.
 | Undead Restoration (1) | reference | Its return after death happens off the table; the GM runs it. |
 | Vampire Weakness (2) | reference | Running water, invitations and the stake are the GM's to apply. |
 | Vampiric Connection (1) | reference | Communication and senses like this are the GM's to run. |
-| Vile Appearance (1) | reference | The bundle doesn't carry this aura as a mechanic, so the save for a creature that starts its turn within 30 feet is the GM's to call. |
+| Vile Appearance (1) | enforced | trait-turns.ts opens the Wisdom save for each Beast or Humanoid that starts its turn within 30 feet of the hag. A failure is Frightened until the start of its next turn, and a success makes it immune for the fight. Whether the creature can see the hag's true form is the GM's, who dismisses the save when it can't. |
 | Water Breathing (9) | reference | Breathing isn't tracked. |
 | Water Form (1) | enforced | movement-rules.ts lets the elemental end a move in another creature's space. Fitting through a narrow gap is the GM's to allow. |
 | Water Susceptibility (1) | reference | Water on the map isn't tracked, so the Cold damage is the GM's to deal. |

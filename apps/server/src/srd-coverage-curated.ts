@@ -553,8 +553,8 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Undead Restoration": revives,
   "Vampire Weakness": reference("Running water, invitations and the stake are the GM's to apply."),
   "Vampiric Connection": senses,
-  "Vile Appearance": reference(
-    "The bundle doesn't carry this aura as a mechanic, so the save for a creature that starts its turn within 30 feet is the GM's to call."
+  "Vile Appearance": enforced(
+    "trait-turns.ts opens the Wisdom save for each Beast or Humanoid that starts its turn within 30 feet of the hag. A failure is Frightened until the start of its next turn, and a success makes it immune for the fight. Whether the creature can see the hag's true form is the GM's, who dismisses the save when it can't."
   ),
   "Water Breathing": breath,
   "Water Form": sharesSpace("the elemental"),
