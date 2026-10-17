@@ -90,7 +90,7 @@ export const restingCommands = [
     type: "rest.party",
     operationId: "restParty",
     description:
-      "GM-only: rests several characters together. All of them must be able to rest (out of any running encounter, at 1 hit point or more, and for a Long Rest 16 hours of game time after their last one) or none does, and the refusal names who can't and why. Long: each gets a Long Rest now and the game clock moves 8 hours. Short: the party's Short Rest opens; each player spends Hit Dice on their own device and marks themselves done (rest.mark-done), and rest.finish ends it.",
+      "GM-only: rests several characters together. All of them must be able to rest (out of any running encounter, at 1 hit point or more, and for a Long Rest 16 hours of game time after their last one) or none does, and the refusal names who can't and why. Long: each gets a Long Rest now and the game clock moves 8 hours. Short: the party's Short Rest opens; each player spends Hit Dice on their own device and marks themselves done (rest.mark-done), and rest.finish ends it. Rolling Initiative, taking any damage or casting a spell other than a cantrip takes a member out of it, with no benefits (SRD Interrupting the Rest).",
     summary: "Rest several characters together: a Long Rest now, or a Short Rest that stays open for Hit Dice.",
     schema: RestPartySchema,
     malformed: "The party rest is malformed.",

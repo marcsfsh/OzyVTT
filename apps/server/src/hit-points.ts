@@ -39,6 +39,7 @@ import {
 } from "./effects.js";
 import { reconcileEquipment } from "./inventory.js";
 import { offerDamageReaction } from "./damage-reactions.js";
+import { leaveShortRest } from "./short-rest-interruptions.js";
 import { choiceOverrideDefenses, type OverrideDamageDefenses } from "./choice-overrides.js";
 import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 
@@ -348,8 +349,9 @@ export function applyDamageDetailed(
   // SRD Knocking Out a Creature: a melee attack that would drop it to 0 can leave it at 1 HP and Unconscious instead.
   const knockedOut = input.nonlethal === true && !wasAtZero && actor.hp.current === 0 && damageToHp > 0;
   if (knockedOut) actor.hp.current = 1;
-  // Sleep, Turn Undead and the like end the moment the bearer takes any damage.
-  if (totalAdjusted > 0) events.push(...endEffectsOnDamage(state, actor));
+  // Sleep, Turn Undead and the like end the moment the bearer takes any damage, and so does a Short Rest.
+  if (totalAdjusted > 0)
+    events.push(...endEffectsOnDamage(state, actor), ...leaveShortRest(state, new Set([actor.id]), "took damage"));
 
   let deathSaveFailuresAdded = 0;
   let instantDeath = false;

@@ -25,6 +25,8 @@ import {
 import { upcastAction } from "../item-actions.js";
 import { lastChargeLine, lastChargeRollFor } from "../item-charges.js";
 import { consumableRowFor, withOneUsedUp } from "../consumables.js";
+import type { EffectNarration } from "../effects.js";
+import { leaveShortRest } from "../short-rest-interruptions.js";
 import { castSlotLevel } from "../resolution/economy.js";
 import { withChosenDamageType } from "../resolution/validate.js";
 import { useCostOf, withChosenCost } from "../use-cost.js";
@@ -358,10 +360,13 @@ export const actionCommands = [
       let spend: ReturnType<typeof spendLooseUses> = { usesLeft: null, spent: false };
       let lastCharge: string | null = null;
       let usedUp = false;
+      let restLines: EffectNarration[] = [];
       const { state, duplicate } = await execute((draft) => {
         requireActorAccess(initiator, draft, actorId, "attack");
         const live = draft.actors.find((candidate) => candidate.id === actorId)!;
         spend = spendLooseUses(live, action, available, castLevel, slotsModeFor(draft), definition);
+        // Casting a spell other than a cantrip stops a Short Rest.
+        restLines = spell && spell.level > 0 ? leaveShortRest(draft, new Set([actorId]), `cast ${spell.name}`) : [];
         // A potion drunk or a flask thrown outside a fight is used up all the same.
         const consumable = consumableRowFor(action, live.inventory, kit.equipmentCatalog());
         if (consumable) live.inventory = withOneUsedUp(live.inventory, consumable.id);
@@ -412,6 +417,7 @@ export const actionCommands = [
       });
       if (duplicate) return { route: "loose", rollIds };
       kit.publishRolls(state, commandId);
+      kit.publishNarrations(restLines);
       if (spend.warning)
         kit.context.appendLog({
           kind: "action",

@@ -6,6 +6,7 @@ import { ActorDefinitionSchema } from "@vtt/schemas";
 import { loadActorFixture } from "@vtt/test-fixtures";
 import { GameAccessDeniedError } from "../src/authorization.js";
 import { startEncounter } from "../src/encounter.js";
+import { applyDamageDetailed } from "../src/hit-points.js";
 import {
   answerLongRest,
   applyRest,
@@ -181,6 +182,22 @@ describe("the GM rests the party", () => {
     expect(state.rest.shortRest).toBeNull();
   });
 
+  it("taking damage ends a member's Short Rest, which then gives them nothing", () => {
+    // SRD Short Rest: "A Short Rest is stopped by ... Taking any damage. An interrupted Short Rest confers no benefits."
+    const state = game();
+    startPartyRest(state, [TORVA, BRYN], "short", resolve(state));
+    const shrugged = applyDamageDetailed(state, BRYN, { amount: 0 }, GM);
+    expect(shrugged.events).toEqual([]);
+    const { events } = applyDamageDetailed(state, BRYN, { amount: 4 }, GM);
+    expect(events.map((event) => event.text)).toContain(
+      "Bryn took damage, which ends their Short Rest without its benefits."
+    );
+    expect(state.rest.shortRest).toEqual({ actorIds: [TORVA], done: [] });
+    const { rested } = finishPartyShortRest(state, true, resolve(state));
+    expect(rested).toEqual(["Torva"]);
+    expect(actor(state, BRYN).actionUses).toEqual({ rage: 2, "action-surge": 1 });
+  });
+
   it("calling the Short Rest off gives nothing and passes no time", () => {
     const state = game();
     startPartyRest(state, [TORVA], "short", resolve(state));
@@ -251,5 +268,68 @@ describe("over the API", () => {
     expect((await again.json()).error.message).toBe("Torva just finished a Long Rest - another can start in 16 hours.");
     expect((await post(GAME_PATHS.timePass, gmToken, { commandId: randomUUID(), hours: 16 })).status).toBe(200);
     expect((await ask(player, TORVA)).status).toBe(200);
+  });
+
+  it("casting a spell other than a cantrip ends the caster's Short Rest", async () => {
+    // SRD Short Rest: "A Short Rest is stopped by ... Casting a spell other than a cantrip".
+    const caster = {
+      spellSlots: [{ level: 1, remaining: 2 }],
+      preparedSpellIds: ["cure-wounds"]
+    };
+    const state = game(caster);
+    state.definitions = [
+      {
+        id: "import-torva",
+        definition: ActorDefinitionSchema.parse({
+          ...torva,
+          actions: [
+            ...torva.actions,
+            {
+              id: "spell-cure-wounds",
+              name: "Cure Wounds",
+              activation: "action",
+              description: "A creature you touch regains Hit Points.",
+              damage: [],
+              healing: { formula: "2d8 + 3" },
+              spellId: "cure-wounds",
+              spellSlot: { level: 1 }
+            }
+          ],
+          spellcasting: {
+            ability: "wis",
+            slots: [{ level: 1, max: 2 }],
+            spells: [
+              {
+                id: "cure-wounds",
+                name: "Cure Wounds",
+                level: 1,
+                prepared: true,
+                alwaysPrepared: false,
+                actionId: "spell-cure-wounds"
+              }
+            ]
+          }
+        })
+      }
+    ];
+    const { base, gmToken, post, server, close } = await bootServer(state);
+    cleanups.push(close);
+    const party = await post(GAME_PATHS.restParty, gmToken, {
+      commandId: randomUUID(),
+      kind: "short",
+      actorIds: [TORVA, BRYN]
+    });
+    expect(party.status).toBe(200);
+    const cast = await post(GAME_PATHS.actionUse, gmToken, {
+      commandId: randomUUID(),
+      actorId: TORVA,
+      actionId: "spell-cure-wounds"
+    });
+    expect(cast.status).toBe(200);
+    expect(server.store.snapshot.rest.shortRest).toEqual({ actorIds: [BRYN], done: [] });
+    const log = await (await fetch(base + GAME_PATHS.log, { headers: { authorization: `Bearer ${gmToken}` } })).json();
+    expect((log.data.entries as ReadonlyArray<{ text: string }>).map((entry) => entry.text)).toContain(
+      "Torva cast Cure Wounds, which ends their Short Rest without its benefits."
+    );
   });
 });
