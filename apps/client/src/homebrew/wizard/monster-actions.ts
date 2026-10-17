@@ -230,6 +230,8 @@ export function editAction(
   actions: readonly MonsterAction[],
   creature: string
 ): MonsterAction {
+  // A change to the text itself is the GM writing their own.
+  if (after.description !== before.description) return after;
   const held = typeof before.description === "string" ? before.description : "";
   const was = generatedText(before, actions, creature);
   const now = generatedText(after, actions, creature);

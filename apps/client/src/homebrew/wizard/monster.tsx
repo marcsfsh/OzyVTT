@@ -56,10 +56,10 @@ const title = (slug: string) =>
 const statblockField = (key: string, words: Partial<FieldDef>): FieldDef => ({
   key,
   label: key,
-  ...words,
   read: (draft) => statblockOf(draft)[key],
   write: (next, draft) =>
-    withStatblock(draft, { [key]: typeof next === "string" && next.trim() === "" ? undefined : next })
+    withStatblock(draft, { [key]: typeof next === "string" && next.trim() === "" ? undefined : next }),
+  ...words
 });
 
 const ALIGNMENTS = [
