@@ -80,6 +80,9 @@ reserves its widest value with `min-width` in `ch` and aligns to the end of that
 - Breakpoints come from one ladder: `max-width` 760 / 650 / 560, and `min-width` 850 / 980 / 1280
   where a layout earns another column. The table viewer reflows on aspect ratio instead, because
   a TV is always landscape.
+- The table is a docked workbench (ADR-0025): nothing floats over the map but tokens and marks. A
+  tool's options open beside the rail, a prompt takes the panel's prompt slot, and a notice takes the
+  status line.
 - Spacing uses the 4px `--space-*` ladder. Surfaces are square (`--radius-sm/md/lg` are 0),
   gauges and chips included; `--radius-pill` is for token rings, dots, avatars and swatches.
 
@@ -127,3 +130,19 @@ Say what the control does or what belongs in the field, and nothing else.
 - No exclamation marks and no questions outside a confirm dialog.
 - No filler such as "simply", "just", "easily", "lets you" or "note that". A hint that carries
   no information is deleted.
+- Hints, messages and help text are complete sentences. Labels, chips and status lines may be
+  fragments joined with `·`.
+- Say what is true without setting it against what isn't: no "X, not Y", "X rather than Y",
+  "X instead of Y" or "not only X but also Y".
+- No three-part rhetorical series ("fast, simple and safe"). When there are three things to
+  say, use two sentences or a list.
+- Never tell the reader that something is important or worth noticing. State the fact.
+- No clause tacked on with "-ing" at the end of a sentence ("..., turning the hit into a miss").
+  Write a second sentence with its own subject and verb.
+- Plain words: use, get, start, end, help, show, is, has. Avoid comprehensive, crucial,
+  enhance, leverage, robust, seamless, streamline, utilize and vital.
+- Refer to a character by name. The app doesn't know a character's pronouns, so copy never says
+  "he", "she" or "her": "Roll for Lyra", "Damage waits on Lyra's reaction".
+- Straight quotes and apostrophes. No emojis.
+- Rules words follow SRD 5.2.1: "level 3 spell slot", "Bonus Action", "saving throw".
+- The same rules apply to code comments.

@@ -31,6 +31,8 @@ export type MutationResult = {
   /** Present when a rules-mode validation blocked the command (ADR-0020); resend with override to bypass. */ blocked?: RulesBlocked;
 };
 export type DiceRollResult = MutationResult & { rollId?: string; hiddenFromRoller?: boolean };
+/** A spellbook addition's reply: whether the spell is in the book now (a copy from a scroll can fail its check). */
+export type SpellbookResult = MutationResult & { inBook?: boolean };
 export type EncounterStartEntry = Readonly<{
   actorId: string;
   score?: number;
@@ -250,6 +252,7 @@ export type SaveAnswerResult = MutationResult & {
     committed: boolean;
     /** Condition id that forced an automatic failure (Paralyzed on a Dex save); null/absent when rolled. */ autoFailed?:
       string | null;
+    /** The trait that made it succeed without a roll (Greater Magic Resistance against a spell). */ autoSucceeded?: string;
     /** Advantage/disadvantage sources that shaped the save roll (Restrained, Dodge). */ rollMode?: ActionRollMode;
     /** The typed breakdown behind `appliedDamage`; absent when the save applied no damage. */ parts?: DamageApplication["parts"];
     /** Flat reduction taken off before Resistance. */ flatReduction?: number;
@@ -312,6 +315,8 @@ export const ActionAvailabilitySchema = z.strictObject({
   reaction: ActionReactionSchema.nullable(),
   /** The hit points it restores (a potion's 2d4 + 2), for display. */
   healing: z.strictObject({ formula: z.string() }).nullable().optional(),
+  /** How many creatures one use heals when it can be more than one (Prayer of Healing's five); null otherwise. */
+  healTargets: z.number().int().nullable().optional(),
   /** Who a tap picks: one creature, several, or none (it acts on its user); null when nothing structured resolves. */
   targeting: z.enum(["none", "single", "multi"]).nullable().optional(),
   /** Darts it makes, each assigned to a target (Magic Missile read from a scroll or cast from a wand). */
@@ -403,13 +408,38 @@ const RechoiceSchema = z.strictObject({
   chosen: z.string().nullable()
 });
 export type Rechoice = Wire<z.infer<typeof RechoiceSchema>>;
+/** What a prepared caster may change about its spells (SRD Spell Preparation by Class): for each class that changes its
+ *  list after a Long Rest, the spells it may swap in for one the sheet lists (its class list for which it has slots, a
+ *  Wizard's spellbook), and a Wizard's spellbook: the spells in it, how many more its levels add free, the highest
+ *  level it can prepare, and the Wizard spells that could go in. Null for a sheet that can't be rebuilt here. */
+const SpellChoicesSchema = z.strictObject({
+  swaps: z.array(
+    z.strictObject({
+      classId: z.string(),
+      className: z.string(),
+      /** The sheet's spells this class chose, which a swap replaces. */
+      replaces: z.array(z.string()),
+      spellIds: z.array(z.string())
+    })
+  ),
+  spellbook: z
+    .strictObject({
+      spellIds: z.array(z.string()),
+      freeLeft: z.number().int().min(0),
+      maxLevel: z.number().int().min(0).max(9),
+      addable: z.array(z.string())
+    })
+    .nullable()
+});
+export type SpellChoices = Wire<z.infer<typeof SpellChoicesSchema>>;
 /** What `actor:available-actions` answers: the table's rules mode, each action's availability, the sheet, and the
  *  picks the character may re-make on a rest. */
 export const AvailableActionsReplySchema = z.strictObject({
   rulesMode: z.enum(["strict", "assisted", "freeform"]),
   actions: z.array(ActionAvailabilitySchema),
   derived: ActorDerivedSheetSchema,
-  rechoices: z.array(RechoiceSchema)
+  rechoices: z.array(RechoiceSchema),
+  spellChoices: SpellChoicesSchema.nullable()
 });
 export type AvailableActionsReply = Wire<z.infer<typeof AvailableActionsReplySchema>>;
 export type ActorActionsAvailabilityResult = { ok: boolean; message?: string } & Partial<AvailableActionsReply>;
@@ -441,6 +471,18 @@ export const ActorMovementReplySchema = z.strictObject({
 });
 export type ActorMovementReply = Wire<z.infer<typeof ActorMovementReplySchema>>;
 export type ActorMovementResult = { ok: boolean; message?: string } & Partial<ActorMovementReply>;
+
+/** What `vision:preview` answers the GM: where one creature (or the whole party) sees now, as image-pixel polygons
+ *  (`[x0, y0, x1, y1, ...]`), and the creatures it perceives. Empty while the scene's vision is off. */
+export const VisionPreviewReplySchema = z.strictObject({
+  enabled: z.boolean(),
+  visible: z.array(z.array(z.number())),
+  actorIds: z.array(z.string())
+});
+export type VisionPreviewReply = Wire<z.infer<typeof VisionPreviewReplySchema>>;
+export type VisionPreviewResult = { ok: boolean; message?: string } & Partial<VisionPreviewReply>;
+export type WallAddResult = MutationResult & { wallIds?: readonly string[] };
+export type LightAddResult = MutationResult & { lightId?: string };
 
 /** What `character:draft` answers: the caller's parked build and when it was last saved, or null for none. */
 export const CharacterDraftReplySchema = z.strictObject({

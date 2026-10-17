@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { ScreenSoundSchema, type ScreenSound, type SoundScreen, type ViewerSoundProjection } from "@vtt/domain";
 import { ViewerAccessDeniedError, type ViewerAccessMetadata, type ViewerAccessStore } from "./viewer-access.js";
 import type {
   ViewerCamera,
@@ -10,7 +11,19 @@ import type {
 } from "./viewer-presentation.js";
 import type { ViewerPresentationStore } from "./viewer-presentation-store.js";
 
-type PresentationListener = (projection: ViewerPresentationProjection) => void;
+/** What a table screen receives: the stored presentation, plus what the sound board is playing (ADR-0024). */
+export type ViewerFeedProjection = ViewerPresentationProjection & Readonly<{ sound: ViewerSoundProjection }>;
+type PresentationListener = (projection: ViewerFeedProjection) => void;
+type SoundReport = Readonly<{ sound: Exclude<ScreenSound, "unknown">; unplayable: readonly string[] }>;
+
+const SILENT: ViewerSoundProjection = {
+  masterVolume: 0,
+  paused: false,
+  crossfadeMs: 0,
+  music: null,
+  ambient: [],
+  effects: []
+};
 type CloseListener = () => void;
 
 type ViewerSubscriber = {
@@ -29,12 +42,13 @@ type GmSubscriber = {
   close: CloseListener;
 };
 
-/** A table screen connected right now, under the viewer credential it paired with. */
+/** A table screen connected right now, under the viewer credential it paired with, and whether it can play sound. */
 export const ViewerConnectionMetadataSchema = z.strictObject({
   connectionId: z.string(),
   viewerId: z.uuid(),
   name: z.string(),
-  connectedAt: z.iso.datetime()
+  connectedAt: z.iso.datetime(),
+  sound: ScreenSoundSchema
 });
 export type ViewerConnectionMetadata = Readonly<z.infer<typeof ViewerConnectionMetadataSchema>>;
 
@@ -42,6 +56,11 @@ export class ViewerCoordinator {
   private readonly subscribers = new Map<string, ViewerSubscriber>();
   private readonly gmSubscribers = new Map<string, GmSubscriber>();
   private readonly pingTimers = new Set<ReturnType<typeof setTimeout>>();
+  /** What each paired screen last said about its sound, by viewer credential. Lost on restart; screens re-report
+   *  when they reconnect. */
+  private readonly soundReports = new Map<string, SoundReport>();
+  private soundSource: (now: number) => ViewerSoundProjection = () => SILENT;
+  private screensChanged: () => void = () => {};
 
   constructor(
     private readonly access: ViewerAccessStore,
@@ -62,12 +81,47 @@ export class ViewerCoordinator {
       close
     };
     this.subscribers.set(connectionId, subscriber);
-    listener(this.presentation.project(this.now()));
+    listener(this.project());
+    this.screensChanged();
     return {
       connectionId,
       viewer: structuredClone(viewer),
-      disconnect: () => this.subscribers.delete(connectionId)
+      disconnect: () => {
+        if (this.subscribers.delete(connectionId)) this.screensChanged();
+      }
     };
+  }
+
+  /** The presentation a screen is sent: the stored one with the sound board's current output. */
+  project(now = this.now()): ViewerFeedProjection {
+    return { ...this.presentation.project(now), sound: this.soundSource(now) };
+  }
+
+  /** Where the sound comes from, and who to tell when the screens' sound states change (the GM's board). */
+  attachSound(source: (now: number) => ViewerSoundProjection, screensChanged: () => void) {
+    this.soundSource = source;
+    this.screensChanged = screensChanged;
+  }
+
+  /** A screen says whether its browser lets it play sound yet, and which sounds it could not play. */
+  reportSound(token: string, report: SoundReport) {
+    const viewer = this.access.verify(token);
+    const previous = this.soundReports.get(viewer.id);
+    this.soundReports.set(viewer.id, report);
+    if (JSON.stringify(previous) !== JSON.stringify(report)) this.screensChanged();
+  }
+
+  /** The connected screens with their sound state, for the GM. */
+  soundScreens(): readonly SoundScreen[] {
+    return [...this.subscribers.values()].map(({ connectionId, viewer }) => {
+      const report = this.soundReports.get(viewer.id);
+      return {
+        connectionId,
+        name: viewer.name,
+        sound: report?.sound ?? "unknown",
+        unplayable: [...(report?.unplayable ?? [])]
+      };
+    });
   }
 
   /** Subscribes the GM's own session to the live presentation the paired screen shows, for an in-tab preview. */
@@ -75,7 +129,7 @@ export class ViewerCoordinator {
     if (!this.authorizeGm(token)) throw new ViewerAccessDeniedError("A valid GM session is required.");
     const connectionId = randomUUID();
     this.gmSubscribers.set(connectionId, { connectionId, token, listener, close });
-    listener(this.presentation.project(this.now()));
+    listener(this.project());
     return { connectionId, disconnect: () => this.gmSubscribers.delete(connectionId) };
   }
 
@@ -140,10 +194,11 @@ export class ViewerCoordinator {
   }
 
   /** Presents a scene's map on the shared screen when the scene goes live (enables presentation and
-   *  switches map in one server-internal action). Skips when that map is already presented, to avoid
-   *  resetting the camera. */
+   *  switches map in one server-internal action), so the screen follows the live scene. Skips when that map is
+   *  already presented, to avoid resetting the camera, and while the GM has the screen paused. */
   async presentMap(sourceRevision: number, map: Readonly<{ assetId: string; altText: string; camera: ViewerCamera }>) {
     const current = this.presentation.snapshot;
+    if (current.pausedByGm === true) return false;
     if (current.enabled && current.activeMap?.assetId === map.assetId) return false;
     const result = await this.presentation.execute(
       {
@@ -163,6 +218,8 @@ export class ViewerCoordinator {
       this.subscribers.delete(connectionId);
       subscriber.close();
     }
+    this.soundReports.delete(viewerId);
+    this.screensChanged();
   }
 
   activeViewers(): readonly ViewerConnectionMetadata[] {
@@ -170,12 +227,13 @@ export class ViewerCoordinator {
       connectionId,
       viewerId: viewer.id,
       name: viewer.name,
-      connectedAt
+      connectedAt,
+      sound: this.soundReports.get(viewer.id)?.sound ?? "unknown"
     }));
   }
 
   broadcast() {
-    const projection = this.presentation.project(this.now());
+    const projection = this.project();
     for (const [connectionId, subscriber] of this.subscribers) {
       try {
         this.access.verify(subscriber.token);
@@ -183,6 +241,7 @@ export class ViewerCoordinator {
       } catch {
         this.subscribers.delete(connectionId);
         subscriber.close();
+        this.screensChanged();
       }
     }
     for (const [connectionId, subscriber] of this.gmSubscribers) {

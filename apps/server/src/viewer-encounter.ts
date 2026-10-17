@@ -2,11 +2,26 @@ import type { GameState } from "@vtt/domain";
 import { healthBandOf } from "./hit-points.js";
 import { conditionLabels, projectPublicInitiative } from "./projections.js";
 import { visibleTerrain } from "./terrain.js";
+import {
+  exploredRectsOf,
+  partySight,
+  partyViewerIds,
+  tokenShown,
+  visionOf,
+  type AudienceSight
+} from "./vision/audience.js";
+import type { SightContent } from "./vision/senses.js";
 import type { ViewerEncounterScene, ViewerInitiative } from "./viewer-presentation.js";
 
-export function projectViewerInitiative(state: GameState): ViewerInitiative {
+/** The shared screen is in a room that may hold anyone, so it sees through the whole party: a creature no character
+ *  perceives (dynamic vision) or that stands wholly under the fog is hidden from it as a GM-only one is. */
+export function projectViewerInitiative(
+  state: GameState,
+  content: SightContent = {},
+  sight: AudienceSight = partySight(state, content)
+): ViewerInitiative {
   if (!state.combat.active) return { visible: false, round: 0, hiddenTurn: false, entries: [] };
-  const publicEntries = projectPublicInitiative(state);
+  const publicEntries = projectPublicInitiative(state, sight.hidden);
   const hasPublicActiveEntry = publicEntries.some((entry) => entry.active);
   return {
     visible: true,
@@ -25,16 +40,29 @@ export function projectViewerInitiative(state: GameState): ViewerInitiative {
   };
 }
 
-export function projectViewerEncounterScene(state: GameState, now = Date.now()): ViewerEncounterScene {
+export function projectViewerEncounterScene(
+  state: GameState,
+  now = Date.now(),
+  content: SightContent = {},
+  sight: AudienceSight = partySight(state, content)
+): ViewerEncounterScene {
   if (!state.combat.mapAssetId) return { mapAssetId: null, tokens: [], annotations: [] };
   const fog = { enabled: state.combat.fog.enabled, shapes: state.combat.fog.shapes.map((shape) => ({ ...shape })) };
-  // As for players: only the terrain the fog reveals.
-  const terrain = visibleTerrain(state.combat);
-  // A live scene shows its map, fog and terrain immediately; tokens and drawings appear only once combat runs,
-  // so no combatant data reaches the public screen before then.
-  if (!state.combat.active) return { mapAssetId: state.combat.mapAssetId, tokens: [], annotations: [], fog, terrain };
+  // As for players: only the terrain the fog reveals, and with dynamic vision only what the party has seen.
+  const terrain = visibleTerrain(state.combat, sight.enabled ? exploredRectsOf(state) : undefined);
+  const visionBlock = visionOf(state, partyViewerIds(state), content);
+  const vision = visionBlock.enabled
+    ? { vision: { visible: visionBlock.visible, explored: visionBlock.explored } }
+    : {};
+  // A live scene shows what players see on their own screens: its map, fog and terrain, the public tokens the GM
+  // has placed that the party may see, and public drawings. Before the fight only placed tokens show.
   const publicActors = new Map(
-    state.actors.filter((actor) => actor.visibility === "public").map((actor) => [actor.id, actor])
+    state.actors
+      .filter(
+        (actor) =>
+          actor.visibility === "public" && !actor.archived && !sight.hidden.has(actor.id) && tokenShown(sight, actor.id)
+      )
+      .map((actor) => [actor.id, actor])
   );
   return {
     mapAssetId: state.combat.mapAssetId,
@@ -80,10 +108,15 @@ export function projectViewerEncounterScene(state: GameState, now = Date.now()):
         : []
     ),
     fog,
-    terrain
+    terrain,
+    ...vision
   };
 }
 
-export function projectViewerEncounter(state: GameState, now = Date.now()) {
-  return { initiative: projectViewerInitiative(state), encounter: projectViewerEncounterScene(state, now) };
+export function projectViewerEncounter(state: GameState, now = Date.now(), content: SightContent = {}) {
+  const sight = partySight(state, content);
+  return {
+    initiative: projectViewerInitiative(state, content, sight),
+    encounter: projectViewerEncounterScene(state, now, content, sight)
+  };
 }

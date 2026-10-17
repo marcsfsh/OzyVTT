@@ -44,6 +44,14 @@ export const MAP_ASSET_PATHS = {
   calibrationWizardComplete: `${API_NAMESPACE}/map-assets/{id}/calibration/wizards/{wizardId}/complete`
 } as const;
 
+/** Documentation-only paths for `sound-http.ts`: the GM's library of uploaded sound files (ADR-0024). See the note on
+ * MAP_ASSET_PATHS. */
+export const SOUND_ASSET_PATHS = {
+  collection: `${API_NAMESPACE}/sound-assets`,
+  byId: `${API_NAMESPACE}/sound-assets/{id}`,
+  content: `${API_NAMESPACE}/sound-assets/{id}/content`
+} as const;
+
 /** The HttpOnly cookie a paired table viewer (or the GM's preview of it) authenticates with. */
 export const VIEWER_SESSION_COOKIE = "vtt_viewer_session";
 
@@ -56,7 +64,8 @@ export const VIEWER_PATHS = {
   presentation: `${API_NAMESPACE}/viewer/presentation`,
   presentationCommands: `${API_NAMESPACE}/viewer/presentation/commands`,
   previewSession: `${API_NAMESPACE}/viewer/preview-session`,
-  events: `${API_NAMESPACE}/viewer/events`
+  events: `${API_NAMESPACE}/viewer/events`,
+  soundStatus: `${API_NAMESPACE}/viewer/sound-status`
 } as const;
 
 /**
@@ -217,6 +226,8 @@ export const GAME_PATHS = {
   characterSetSlot: `${API_NAMESPACE}/game/actors/{actorId}/spell-slot`,
   characterSetPrepared: `${API_NAMESPACE}/game/actors/{actorId}/prepared-spell`,
   characterFinishPreparing: `${API_NAMESPACE}/game/actors/{actorId}/finish-preparing`,
+  characterSwapSpell: `${API_NAMESPACE}/game/actors/{actorId}/swap-spell`,
+  characterAddToSpellbook: `${API_NAMESPACE}/game/actors/{actorId}/spellbook`,
   characterSetInventory: `${API_NAMESPACE}/game/actors/{actorId}/inventory`,
   characterGiveItem: `${API_NAMESPACE}/game/actors/{actorId}/inventory/give`,
   characterRecoverAmmunition: `${API_NAMESPACE}/game/actors/{actorId}/inventory/recover-ammunition`,
@@ -250,6 +261,8 @@ export const GAME_PATHS = {
   annotationsClear: `${API_NAMESPACE}/game/annotations/clear`,
   annotationById: `${API_NAMESPACE}/game/annotations/{id}`,
   annotationMove: `${API_NAMESPACE}/game/annotations/{id}/move`,
+  spellZonePlace: `${API_NAMESPACE}/game/spell-zones/{zoneId}/place`,
+  spellZoneEnd: `${API_NAMESPACE}/game/spell-zones/{zoneId}/end`,
   annotationColor: `${API_NAMESPACE}/game/annotations/{id}/color`,
   annotationVisibility: `${API_NAMESPACE}/game/annotations/{id}/visibility`,
   annotationMovable: `${API_NAMESPACE}/game/annotations/{id}/movable`,
@@ -275,7 +288,27 @@ export const GAME_PATHS = {
   fogPaint: `${API_NAMESPACE}/game/fog/paint`,
   fogReset: `${API_NAMESPACE}/game/fog/reset`,
   terrainPaint: `${API_NAMESPACE}/game/terrain/paint`,
-  terrainReset: `${API_NAMESPACE}/game/terrain/reset`
+  terrainReset: `${API_NAMESPACE}/game/terrain/reset`,
+  // The sound board (ADR-0024): GM-grade, kept apart from the game state and its revision.
+  sound: `${API_NAMESPACE}/game/sound`,
+  soundArrange: `${API_NAMESPACE}/game/sound/arrange`,
+  soundPlay: `${API_NAMESPACE}/game/sound/play`,
+  soundStop: `${API_NAMESPACE}/game/sound/stop`,
+  soundNextTrack: `${API_NAMESPACE}/game/sound/next-track`,
+  soundPause: `${API_NAMESPACE}/game/sound/pause`,
+  sceneSound: `${API_NAMESPACE}/game/scenes/{sceneId}/sound`,
+  visionEnabled: `${API_NAMESPACE}/game/vision/enabled`,
+  visionAmbient: `${API_NAMESPACE}/game/vision/ambient`,
+  visionExploredReset: `${API_NAMESPACE}/game/vision/explored/reset`,
+  visionPreview: `${API_NAMESPACE}/game/vision/preview`,
+  walls: `${API_NAMESPACE}/game/walls`,
+  wallsClear: `${API_NAMESPACE}/game/walls/clear`,
+  wallById: `${API_NAMESPACE}/game/walls/{wallId}`,
+  wallMove: `${API_NAMESPACE}/game/walls/{wallId}/move`,
+  doorOpen: `${API_NAMESPACE}/game/doors/{wallId}/open`,
+  lights: `${API_NAMESPACE}/game/lights`,
+  lightById: `${API_NAMESPACE}/game/lights/{lightId}`,
+  lightMove: `${API_NAMESPACE}/game/lights/{lightId}/move`
 } as const;
 
 /** Session issuance for headless/alternate player clients: the HTTP mirror of the socket's open join. */
@@ -594,6 +627,8 @@ export const GAME_COMMANDS = {
     method: "post",
     path: GAME_PATHS.characterFinishPreparing
   },
+  "character.swap-spell": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSwapSpell },
+  "character.add-to-spellbook": { scope: "actor:write", method: "post", path: GAME_PATHS.characterAddToSpellbook },
   "character.set-inventory": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetInventory },
   "character.give-item": { scope: "actor:write", method: "post", path: GAME_PATHS.characterGiveItem },
   "character.recover-ammunition": {
@@ -612,6 +647,8 @@ export const GAME_COMMANDS = {
   "annotation.add": { scope: "combat:write", method: "post", path: GAME_PATHS.annotations },
   "annotation.ping": { scope: "combat:write", method: "post", path: GAME_PATHS.annotationsPing },
   "annotation.move": { scope: "combat:write", method: "post", path: GAME_PATHS.annotationMove },
+  "spell-zone.place": { scope: "combat:write", method: "post", path: GAME_PATHS.spellZonePlace },
+  "spell-zone.end": { scope: "combat:write", method: "post", path: GAME_PATHS.spellZoneEnd },
   "annotation.remove": { scope: "combat:write", method: "delete", path: GAME_PATHS.annotationById },
   "annotation.set-color": { scope: "combat:write", method: "post", path: GAME_PATHS.annotationColor },
   "annotation.set-visibility": { scope: "combat:write", method: "post", path: GAME_PATHS.annotationVisibility },
@@ -642,7 +679,25 @@ export const GAME_COMMANDS = {
   "fog.paint": { scope: "scene:write", method: "post", path: GAME_PATHS.fogPaint },
   "fog.reset": { scope: "scene:write", method: "post", path: GAME_PATHS.fogReset },
   "terrain.paint": { scope: "scene:write", method: "post", path: GAME_PATHS.terrainPaint },
-  "terrain.reset": { scope: "scene:write", method: "post", path: GAME_PATHS.terrainReset }
+  "terrain.reset": { scope: "scene:write", method: "post", path: GAME_PATHS.terrainReset },
+  "sound.arrange": { scope: "scene:write", method: "post", path: GAME_PATHS.soundArrange },
+  "sound.play": { scope: "scene:write", method: "post", path: GAME_PATHS.soundPlay },
+  "sound.stop": { scope: "scene:write", method: "post", path: GAME_PATHS.soundStop },
+  "sound.next-track": { scope: "scene:write", method: "post", path: GAME_PATHS.soundNextTrack },
+  "sound.pause": { scope: "scene:write", method: "post", path: GAME_PATHS.soundPause },
+  "sound.set-scene-preset": { scope: "scene:write", method: "post", path: GAME_PATHS.sceneSound },
+  "vision.set-enabled": { scope: "scene:write", method: "post", path: GAME_PATHS.visionEnabled },
+  "vision.set-ambient": { scope: "scene:write", method: "post", path: GAME_PATHS.visionAmbient },
+  "vision.reset-explored": { scope: "scene:write", method: "post", path: GAME_PATHS.visionExploredReset },
+  "wall.add": { scope: "scene:write", method: "post", path: GAME_PATHS.walls },
+  "wall.move": { scope: "scene:write", method: "post", path: GAME_PATHS.wallMove },
+  "wall.remove": { scope: "scene:write", method: "delete", path: GAME_PATHS.wallById },
+  "wall.clear": { scope: "scene:write", method: "post", path: GAME_PATHS.wallsClear },
+  // Players open doors beside their own character, so it is a combat command.
+  "door.set-open": { scope: "combat:write", method: "post", path: GAME_PATHS.doorOpen },
+  "light.add": { scope: "scene:write", method: "post", path: GAME_PATHS.lights },
+  "light.move": { scope: "scene:write", method: "post", path: GAME_PATHS.lightMove },
+  "light.remove": { scope: "scene:write", method: "delete", path: GAME_PATHS.lightById }
 } as const satisfies Record<
   string,
   Readonly<{ scope: z.infer<typeof IntegrationScopeSchema>; method: "post" | "delete"; path: string }>

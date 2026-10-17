@@ -38,8 +38,20 @@ export function offerableReaction<R extends ActionReaction>(
     const reaction = action.reaction;
     if (action.activation !== "reaction" || !reaction || !wanted(reaction)) continue;
     // The same checks a resolve of the action runs: able to act, reaction unspent, uses and slots left.
-    if (evaluateActionEconomy(state, reactor, action, [], definition, undefined, actions).violations.length > 0)
-      continue;
+    // With the catalog, so a scroll the reactor can't read isn't offered.
+    const evaluation = evaluateActionEconomy(
+      state,
+      reactor,
+      action,
+      [],
+      definition,
+      undefined,
+      actions,
+      undefined,
+      false,
+      deps.catalog
+    );
+    if (evaluation.violations.length > 0) continue;
     return { action, reaction };
   }
   return null;

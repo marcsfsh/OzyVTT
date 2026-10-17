@@ -18,13 +18,14 @@ export { Tabs } from "./primitives/Tabs";
 export { Menu, MenuItem } from "./primitives/Menu";
 export { Modal } from "./primitives/Modal";
 export { Drawer } from "./primitives/Drawer";
-export { ToastProvider, useToast, useToastMute, type ToastTone } from "./primitives/Toast";
+export { ToastProvider, ToastOutlet, useToast, useToastMute, type ToastTone } from "./primitives/Toast";
 export { Badge, type BadgeTone } from "./primitives/Badge";
 export { Avatar, type AvatarPresence } from "./primitives/Avatar";
 export { Meter, type MeterTone } from "./primitives/Meter";
 export { Alert } from "./primitives/Alert";
 export { Switch } from "./primitives/Switch";
 export { Stepper } from "./primitives/Stepper";
+export { Slider } from "./primitives/Slider";
 /* The reveal family: the one way the product asks "do the players see this?". */
 export { RevealSwitch, VisibilityBadge, HiddenFromPlayers, GmOnlyTag } from "./primitives/Reveal";
 export { SegmentedControl, type SegmentedOption } from "./primitives/SegmentedControl";
@@ -53,6 +54,13 @@ export {
   IconEyeOff,
   IconX,
   IconPlay,
+  IconPause,
+  IconStop,
+  IconSkip,
+  IconShuffle,
+  IconVolume,
+  IconVolumeOff,
+  IconMusic,
   IconArrow,
   IconDownload,
   // Map tools and content marks.
@@ -62,6 +70,7 @@ export {
   IconDraw,
   IconFog,
   IconTerrain,
+  IconWall,
   IconColor,
   IconCleanup,
   IconScene,
@@ -74,7 +83,15 @@ export {
   IconDockLeft,
   IconDockRight,
   IconDockSidebar,
-  IconSparkle
+  IconSparkle,
+  IconBell,
+  IconGrip,
+  IconTv,
+  IconTarget,
+  IconLocate,
+  IconWait,
+  IconLog,
+  IconMore
 } from "./primitives/icons";
 export { Combobox } from "./primitives/Combobox";
 export { MarkdownEditor } from "./primitives/MarkdownEditor";

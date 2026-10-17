@@ -1,20 +1,34 @@
 import { useId } from "react";
 
+type Rect = Readonly<{ x: number; y: number; width: number; height: number }>;
+
+/** Dynamic vision as the server sends it: where the audience sees now (flat `[x0, y0, x1, y1, ...]` polygons) and
+ *  what the party has seen (rects). */
+export type VisionMask = Readonly<{ visible: readonly (readonly number[])[]; explored: readonly Rect[] }>;
+
+const points = (polygon: readonly number[]) => {
+  const pairs: string[] = [];
+  for (let index = 0; index + 1 < polygon.length; index += 2) pairs.push(`${polygon[index]},${polygon[index + 1]}`);
+  return pairs.join(" ");
+};
+
 /**
- * Manual fog-of-war mask: one SVG `<mask>` with a white base (fog everywhere); each stroke in order
- * paints black (reveal) or white (hide). The GM sees fog dimmed below tokens; players and the shared
- * screen get it solid above everything, so anything inside fog is covered even where public data
- * crossed the wire.
+ * The map's cover, as SVG masks. Manual fog: a white base (fog everywhere) with each stroke in order painting black
+ * (reveal) or white (hide). Dynamic vision: dark everywhere, the party's remembered ground half dark, and what is in
+ * sight now clear; the server drew the polygons, so this only paints them. The GM sees the cover dimmed; players and
+ * the shared screen get it solid, so the part of a token under it is covered (the server leaves out tokens wholly under
+ * the fog or out of sight).
  */
 export function FogOverlay({
   width,
   height,
   fog,
+  vision,
   variant
 }: Readonly<{
   width: number;
   height: number;
-  fog: Readonly<{
+  fog?: Readonly<{
     enabled: boolean;
     shapes: readonly Readonly<{
       id: string;
@@ -25,41 +39,92 @@ export function FogOverlay({
       height: number;
     }>[];
   }>;
+  vision?: VisionMask | null;
   variant: "gm" | "player";
 }>) {
   const base = useId();
-  if (!fog.enabled) return null;
-  // Chromium caches an SVG <mask>'s raster and does not re-evaluate it when only its child <rect>s
-  // change (stale holes remain after Hide all until a repaint). Suffixing the mask id with a hash of the
-  // fog makes any change a new url() reference, forcing a re-resolve.
-  const signature = `${fog.shapes.length}-${fog.shapes.map((shape) => `${shape.op[0]}${Math.round(shape.x)}.${Math.round(shape.y)}.${Math.round(shape.width)}.${Math.round(shape.height)}`).join("_")}`;
-  const maskId = `${base}${signature}`;
+  // Chromium caches an SVG <mask>'s raster and does not re-evaluate it when only its children change (stale holes
+  // remain until a repaint). Suffixing the mask id with a hash of the geometry makes any change a new url().
+  const fogSignature = fog
+    ? `${fog.shapes.length}-${fog.shapes.map((shape) => `${shape.op[0]}${Math.round(shape.x)}.${Math.round(shape.y)}.${Math.round(shape.width)}.${Math.round(shape.height)}`).join("_")}`
+    : "";
+  const fogMask = `${base}f${fogSignature}`;
+  const visionMask = `${base}v${vision ? signatureOf(vision) : ""}`;
   return (
     <>
-      <defs>
-        <mask id={maskId}>
-          <rect x={0} y={0} width={width} height={height} fill="white" />
-          {fog.shapes.map((shape) => (
-            <rect
-              key={shape.id}
-              x={shape.x}
-              y={shape.y}
-              width={shape.width}
-              height={shape.height}
-              fill={shape.op === "reveal" ? "black" : "white"}
-            />
-          ))}
-        </mask>
-      </defs>
-      <rect
-        className={`fog-overlay fog-overlay-${variant}`}
-        x={0}
-        y={0}
-        width={width}
-        height={height}
-        mask={`url(#${maskId})`}
-        pointerEvents="none"
-      />
+      {fog?.enabled && (
+        <>
+          <defs>
+            <mask id={fogMask}>
+              <rect x={0} y={0} width={width} height={height} fill="white" />
+              {fog.shapes.map((shape) => (
+                <rect
+                  key={shape.id}
+                  x={shape.x}
+                  y={shape.y}
+                  width={shape.width}
+                  height={shape.height}
+                  fill={shape.op === "reveal" ? "black" : "white"}
+                />
+              ))}
+            </mask>
+          </defs>
+          <rect
+            className={`fog-overlay fog-overlay-${variant}`}
+            x={0}
+            y={0}
+            width={width}
+            height={height}
+            mask={`url(#${fogMask})`}
+            pointerEvents="none"
+          />
+        </>
+      )}
+      {vision && (
+        <>
+          <defs>
+            <mask id={visionMask}>
+              <rect x={0} y={0} width={width} height={height} fill="white" />
+              {/* Remembered ground: the cover at about half strength. */}
+              {vision.explored.map((rect, index) => (
+                <rect key={index} x={rect.x} y={rect.y} width={rect.width} height={rect.height} fill="#6e6e6e" />
+              ))}
+              {/* In sight now. The thin stroke closes the hairline seams between neighbouring pieces. */}
+              {vision.visible.map((polygon, index) => (
+                <polygon key={index} points={points(polygon)} fill="black" stroke="black" strokeWidth={1.5} />
+              ))}
+            </mask>
+          </defs>
+          <rect
+            className={`vision-overlay vision-overlay-${variant}`}
+            x={0}
+            y={0}
+            width={width}
+            height={height}
+            mask={`url(#${visionMask})`}
+            pointerEvents="none"
+          />
+        </>
+      )}
     </>
   );
+}
+
+/** A short fingerprint of the mask's geometry (see the Chromium note above). */
+function signatureOf(vision: VisionMask): string {
+  let hash = 0x811c9dc5;
+  const add = (value: number) => {
+    hash = Math.imul(hash ^ Math.round(value * 10), 0x01000193) >>> 0;
+  };
+  for (const polygon of vision.visible) {
+    add(polygon.length);
+    for (const value of polygon) add(value);
+  }
+  for (const rect of vision.explored) {
+    add(rect.x);
+    add(rect.y);
+    add(rect.width);
+    add(rect.height);
+  }
+  return `${vision.visible.length}-${vision.explored.length}-${hash.toString(36)}`;
 }

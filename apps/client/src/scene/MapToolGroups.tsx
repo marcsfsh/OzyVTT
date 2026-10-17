@@ -9,11 +9,21 @@ import {
   IconColor,
   IconEye,
   IconEyeOff,
+  IconSparkle,
   IconTerrain,
+  IconWall,
   IconX
 } from "@vtt/ui";
-import type { DockPosition } from "../encounter/DockPicker";
-import { drawingAudienceOptions, NEEDS_GRID, type ClearScope, type MapTool, type MapToolbarProps } from "./mapTools";
+import {
+  drawingAudienceOptions,
+  LIGHT_PRESETS,
+  NEEDS_GRID,
+  type ClearScope,
+  type LightPresetId,
+  type MapTool,
+  type MapRailProps,
+  type VisionTool
+} from "./mapTools";
 
 const SHAPE_TOOLS: ReadonlyArray<{ id: AnnotationShapeKind; label: string }> = [
   { id: "circle", label: "Circle" },
@@ -39,7 +49,7 @@ export function DrawGroup({
   onClear,
   id,
   onPickTool
-}: MapToolbarProps & { id: string; onPickTool: (tool: MapTool) => void }) {
+}: MapRailProps & { id: string; onPickTool: (tool: MapTool) => void }) {
   const scopes: ReadonlyArray<{ scope: ClearScope; label: string }> =
     role === "gm"
       ? [
@@ -155,7 +165,7 @@ export function FogGroup({
   onRevealAll,
   onHideAll,
   onPickTool
-}: MapToolbarProps & { onPickTool: (tool: MapTool) => void }) {
+}: MapRailProps & { onPickTool: (tool: MapTool) => void }) {
   return (
     <>
       <Switch
@@ -217,7 +227,7 @@ export function TerrainGroup({
   hasTerrain,
   onClearTerrain,
   onPickTool
-}: MapToolbarProps & { onPickTool: (tool: MapTool) => void }) {
+}: MapRailProps & { onPickTool: (tool: MapTool) => void }) {
   return (
     <>
       <p className="map-toolbar-note">
@@ -261,17 +271,181 @@ export function TerrainGroup({
   );
 }
 
+const WALL_TOOLS: ReadonlyArray<{ id: VisionTool; label: string; title: string }> = [
+  { id: "vision-wall", label: "Wall", title: "Drag a wall. Sight and light stop at it, and so does movement." },
+  { id: "vision-door", label: "Door", title: "Drag a door. It starts closed, and a tap opens or closes it." },
+  { id: "vision-window", label: "Window", title: "Drag a window. Sight goes through it, and movement stops at it." },
+  { id: "vision-erase", label: "Remove", title: "Tap a wall, door, window or light to remove it." }
+];
+
+/** Walls, doors and windows: what blocks sight and movement once vision is on. */
+export function WallsGroup({
+  tool,
+  visionEnabled,
+  visionBusy,
+  hasWalls,
+  onClearWalls,
+  onPickTool
+}: MapRailProps & { onPickTool: (tool: MapTool) => void }) {
+  return (
+    <>
+      <p className="map-toolbar-note">
+        {visionEnabled
+          ? "Walls and closed doors block sight and movement. Windows block movement only."
+          : "Walls block movement now. They block sight once vision is on, under Light."}
+      </p>
+      <div className="map-toolbar-choices" role="group" aria-label="Wall tools">
+        {WALL_TOOLS.map((entry) => (
+          <button
+            key={entry.id}
+            type="button"
+            className="map-toolbar-choice tap-target interactive"
+            aria-pressed={tool === entry.id}
+            disabled={visionBusy}
+            title={entry.title}
+            onClick={() => onPickTool(tool === entry.id ? "select" : entry.id)}
+          >
+            <span className="map-toolbar-row-icon" aria-hidden="true">
+              {entry.id === "vision-erase" ? <IconX /> : <IconWall />}
+            </span>
+            {entry.label}
+          </button>
+        ))}
+      </div>
+      <div className="map-toolbar-actions">
+        <Button variant="secondary" block disabled={visionBusy || !hasWalls} onClick={onClearWalls}>
+          Remove all walls
+        </Button>
+      </div>
+    </>
+  );
+}
+
+/** Lights, the scene's ambient light, the vision switch, and seeing the map as one creature does. */
+export function LightGroup({
+  tool,
+  visionEnabled,
+  visionBusy,
+  onVisionEnabledChange,
+  ambient,
+  onAmbientChange,
+  lightPreset,
+  onLightPresetChange,
+  onForgetExplored,
+  lookThrough,
+  onLookThroughChange,
+  lookThroughOptions,
+  id,
+  onPickTool
+}: MapRailProps & { id: string; onPickTool: (tool: MapTool) => void }) {
+  const preset = LIGHT_PRESETS.find((entry) => entry.id === lightPreset) ?? LIGHT_PRESETS[0];
+  return (
+    <>
+      <div className="map-toolbar-choices" role="group" aria-label="Light tools">
+        <button
+          type="button"
+          className="map-toolbar-choice tap-target interactive"
+          aria-pressed={tool === "vision-light"}
+          disabled={visionBusy}
+          title="Tap the map to place a light."
+          onClick={() => onPickTool(tool === "vision-light" ? "select" : "vision-light")}
+        >
+          <span className="map-toolbar-row-icon" aria-hidden="true">
+            <IconSparkle />
+          </span>
+          Place
+        </button>
+        <button
+          type="button"
+          className="map-toolbar-choice tap-target interactive"
+          aria-pressed={tool === "vision-erase"}
+          disabled={visionBusy}
+          title="Tap a light to remove it."
+          onClick={() => onPickTool(tool === "vision-erase" ? "select" : "vision-erase")}
+        >
+          <span className="map-toolbar-row-icon" aria-hidden="true">
+            <IconX />
+          </span>
+          Remove
+        </button>
+      </div>
+      <Field label="Light to place" htmlFor={`${id}-light`} className="map-toolbar-field">
+        <Select
+          id={`${id}-light`}
+          value={lightPreset}
+          onChange={(event) => onLightPresetChange(event.target.value as LightPresetId)}
+        >
+          {LIGHT_PRESETS.map((entry) => (
+            <option key={entry.id} value={entry.id}>
+              {entry.label}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <p className="map-toolbar-note">
+        {tool === "vision-light"
+          ? `Tap the map to place it. It sheds bright light for ${preset.brightFeet} ft and dim light for ${preset.dimFeet} ft more.`
+          : "Choose Place, then tap the map."}
+      </p>
+      <Field label="Ambient light" className="map-toolbar-field">
+        <SegmentedControl
+          ariaLabel="Ambient light"
+          size="sm"
+          className="map-toolbar-segmented"
+          value={ambient}
+          onChange={(value) => onAmbientChange(value as "bright" | "dim" | "dark")}
+          options={[
+            { value: "bright", label: "Bright" },
+            { value: "dim", label: "Dim" },
+            { value: "dark", label: "Dark" }
+          ]}
+        />
+      </Field>
+      <Switch
+        className="map-toolbar-switch"
+        checked={visionEnabled}
+        disabled={visionBusy}
+        onChange={onVisionEnabledChange}
+        label="Vision"
+      />
+      <p className="map-toolbar-note">
+        {visionEnabled
+          ? "Players see only what their characters see."
+          : "Turn this on to hide what the characters can't see."}
+      </p>
+      <Field label="See as a token" htmlFor={`${id}-look`} className="map-toolbar-field">
+        <Select
+          id={`${id}-look`}
+          value={lookThrough ?? ""}
+          disabled={!visionEnabled}
+          onChange={(event) => onLookThroughChange(event.target.value || null)}
+        >
+          <option value="">Nobody · see everything</option>
+          <option value="party">The whole party</option>
+          {lookThroughOptions.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <div className="map-toolbar-actions">
+        <Button variant="secondary" block disabled={visionBusy || !visionEnabled} onClick={onForgetExplored}>
+          Forget what the party has seen
+        </Button>
+      </div>
+    </>
+  );
+}
+
 export function ViewGroup({
   onZoom,
   onResetView,
-  enlarged,
-  onToggleEnlarged,
   fullscreen,
   onToggleFullscreen,
-  dock,
   notificationsMuted,
   onNotificationsMutedChange
-}: MapToolbarProps & { id: string }) {
+}: MapRailProps) {
   return (
     <>
       <div className="map-toolbar-actions map-toolbar-actions-row">
@@ -284,38 +458,19 @@ export function ViewGroup({
       </div>
       <div className="map-toolbar-actions">
         <Button variant="secondary" block onClick={onResetView}>
-          Reset view
-        </Button>
-        <Button variant="secondary" block disabled={fullscreen} onClick={onToggleEnlarged}>
-          {enlarged ? "Shrink map" : "Enlarge map"}
+          Show the whole map
         </Button>
         <Button variant="secondary" block onClick={onToggleFullscreen}>
           {fullscreen ? "Exit fullscreen" : "Fullscreen"}
         </Button>
       </div>
-      {dock && (
-        <Field label="Turn order panel" className="map-toolbar-field">
-          <SegmentedControl
-            ariaLabel="Turn order panel position"
-            size="sm"
-            className="map-toolbar-segmented"
-            value={dock.position}
-            onChange={(value) => dock.onChange(value as DockPosition)}
-            options={[
-              { value: "left", label: "Left" },
-              { value: "right", label: "Right" },
-              { value: "sidebar", label: "Sidebar" }
-            ]}
-          />
-        </Field>
-      )}
       <Switch
         className="map-toolbar-switch"
         checked={!notificationsMuted}
         onChange={(on) => onNotificationsMutedChange(!on)}
         label="Notifications"
       />
-      <p className="map-toolbar-note">Notifications are muted for you only — the rest of the table still sees them.</p>
+      <p className="map-toolbar-note">Muting notifications affects only this device.</p>
     </>
   );
 }

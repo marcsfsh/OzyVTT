@@ -1,6 +1,6 @@
 import type { GameState } from "@vtt/domain";
 import { conditionLabel } from "./condition-rules.js";
-import { HIDDEN_SOURCE, withoutSourceName } from "./projections.js";
+import { HIDDEN_SOURCE, withoutSourceName } from "./hidden-source.js";
 
 type Effect = GameState["actors"][number]["effects"][number];
 
@@ -13,6 +13,8 @@ function timeLeft(effect: Effect, bearerId: string, sourceName: string): string 
       return `${duration.remaining} ${duration.remaining === 1 ? "round" : "rounds"} left`;
     case "until-source-next-turn":
       return `until ${sourceName}'s next turn starts`;
+    case "until-bearer-next-turn":
+      return "until the start of its next turn";
     case "until-bearer-turn-end":
       return duration.skipsCurrentTurn ? "until the end of its next turn" : "ends at the end of this turn";
     case "until-source-turn-end":
@@ -29,13 +31,19 @@ function timeLeft(effect: Effect, bearerId: string, sourceName: string): string 
  * The turn-start reminder: the incoming combatant's conditions and effects, with where each came from and how long
  * it has left ("Borin: Prone; Paralyzed by Ghoul (Claw) - ends at the end of this turn"), so whatever the engine
  * can't end by itself is in front of the table. Null when there is nothing to remind. A hidden source is named
- * "A hidden threat", as in the player projection, since the line is read by the whole table.
+ * "A hidden threat", as in the player projection, since the line is read by the whole table. `hiddenFromTable` is the
+ * shared check (`hiddenFrom`), so a source out of every character's sight or under the fog is masked too; without it
+ * only GM-only sources are.
  */
-export function turnReminder(state: GameState, actorId: string): string | null {
+export function turnReminder(
+  state: GameState,
+  actorId: string,
+  hiddenFromTable: (actorId: string) => boolean = (id) =>
+    state.actors.find((candidate) => candidate.id === id)?.visibility !== "public"
+): string | null {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) return null;
-  const hidden = (sourceActorId: string | null) =>
-    sourceActorId !== null && state.actors.find((candidate) => candidate.id === sourceActorId)?.visibility !== "public";
+  const hidden = (sourceActorId: string | null) => sourceActorId !== null && hiddenFromTable(sourceActorId);
   const items: string[] = [];
   for (const condition of actor.conditions) {
     if (actor.effects.some((effect) => effect.linkedConditionIds.includes(condition.id))) continue;

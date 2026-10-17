@@ -23,6 +23,7 @@ export function DyingTracker({
   isActingTurn,
   viewer,
   inspired = false,
+  rollLabel,
   aid
 }: Readonly<{
   actorId: string;
@@ -36,6 +37,8 @@ export function DyingTracker({
   viewer: "gm" | "player";
   /** The dying character holds Heroic Inspiration. */
   inspired?: boolean;
+  /** What the roll button says ("Roll death save"). */
+  rollLabel?: ReactNode;
   /** What someone else can do for the creature while it is dying (stabilize it). */
   aid?: ReactNode;
 }>) {
@@ -111,6 +114,7 @@ export function DyingTracker({
           typed={typed}
           currentMode={forced}
           faceLabel="Death save d20"
+          {...(rollLabel !== undefined ? { rollLabel } : {})}
           onInvalidFace={onFeedback}
           onRoll={() => send(false)}
           onTyped={(face) => send(false, { naturalRoll: face })}

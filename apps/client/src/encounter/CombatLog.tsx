@@ -1,6 +1,6 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { CombatLogEntry } from "@vtt/domain";
-import { Drawer, Eyebrow } from "@vtt/ui";
+import { Eyebrow } from "@vtt/ui";
 import { read } from "../lib/command";
 import { socket } from "../socket";
 import "./combat-log.css";
@@ -53,8 +53,7 @@ function useCombatLog() {
 
 /**
  * The list pins itself to the newest line with `scrollTop = scrollHeight`, and a hidden element
- * measures 0, so the list must be unmounted while closed and re-pinned on mount (a `Drawer` stays
- * mounted while closed). `DockAccordion.tsx` handles the same trap the same way.
+ * measures 0, so the list is mounted only while its tab is shown and is re-pinned on mount.
  */
 function CombatLogList() {
   const log = useCombatLog();
@@ -75,7 +74,7 @@ function CombatLogList() {
   );
 }
 
-/** The panel presentation: its own heading over the list, where the log has a column. */
+/** The Log tab: its own heading over the list. */
 export function CombatLogPanel() {
   return (
     <section className="combat-log" aria-labelledby="combat-log-heading">
@@ -85,17 +84,5 @@ export function CombatLogPanel() {
       </div>
       <CombatLogList />
     </section>
-  );
-}
-
-/**
- * The log as a non-modal drawer from the right (no scrim, focus trap or scroll lock), so the table
- * stays live behind it. The list mounts only while open; see `CombatLogList`.
- */
-export function CombatLogDrawer({ open, onClose }: Readonly<{ open: boolean; onClose: () => void }>) {
-  return (
-    <Drawer open={open} onClose={onClose} side="right" title="Combat log" className="combat-log-drawer">
-      {open && <CombatLogList />}
-    </Drawer>
   );
 }

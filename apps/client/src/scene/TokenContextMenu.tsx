@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { GmActor, PlayerActor } from "@vtt/domain";
 import { IconButton, IconX, Select } from "@vtt/ui";
@@ -28,6 +28,7 @@ export function TokenContextMenu({
   y,
   reactionUsed,
   placed,
+  moveModes,
   onOpenSheet,
   onReturnToTray,
   onClose
@@ -39,13 +40,13 @@ export function TokenContextMenu({
   y: number;
   reactionUsed: boolean;
   placed: boolean;
+  /** How the creature whose move counts now travels on its next drag. */
+  moveModes?: ReactNode;
   onOpenSheet: () => void;
   onReturnToTray: () => void;
   onClose: () => void;
 }>) {
   const ref = useRef<HTMLDivElement | null>(null);
-  const [feedback, setFeedback] = useState("");
-  const [busy, setBusy] = useState(false);
   const [library, setLibrary] = useState(false);
   const [box, setBox] = useState<{ left: number; top: number; maxHeight: number } | null>(null);
 
@@ -88,6 +89,97 @@ export function TokenContextMenu({
     };
   }, [onClose]);
 
+  // The image picker replaces the menu while open; closing it dismisses the whole flow.
+  if (library && gmToken)
+    return (
+      <TokenLibrary
+        actorId={actor.id}
+        actorName={actor.name}
+        definitionId={actor.definitionId ?? null}
+        currentAssetId={actor.tokenAssetId ?? null}
+        gmToken={gmToken}
+        onClose={onClose}
+      />
+    );
+
+  // Keep the menu on screen near the pointer: move it up until its bottom fits, and when even then it
+  // cannot fit, give it the viewport column and let it scroll itself (as `.encounter-menu` does).
+  const style: React.CSSProperties = box
+    ? { left: box.left, top: box.top, maxHeight: box.maxHeight }
+    : // First paint, before measurement: the pointer position clamped to the viewport. The layout effect
+      // corrects it in the same frame, so this is never seen.
+      {
+        left: Math.max(MARGIN, Math.min(x, window.innerWidth - MARGIN)),
+        top: Math.max(MARGIN, Math.min(y, window.innerHeight - MARGIN)),
+        visibility: "hidden"
+      };
+
+  // In fullscreen only the fullscreen element's subtree renders, so portal into it (document.body is
+  // hidden). Falls back to body otherwise.
+  return createPortal(
+    <div
+      ref={ref}
+      className="token-context-menu anim-popover scroll-y"
+      role="menu"
+      style={style}
+      aria-label={`Actions for ${actor.name}`}
+    >
+      <div className="token-context-head">
+        <strong>{actor.name}</strong>
+        <IconButton label="Close menu" size="sm" onClick={onClose}>
+          <IconX />
+        </IconButton>
+      </div>
+      <TokenControls
+        actor={actor}
+        role={role}
+        gmToken={gmToken}
+        reactionUsed={reactionUsed}
+        placed={placed}
+        moveModes={moveModes}
+        onOpenSheet={() => {
+          onOpenSheet();
+          onClose();
+        }}
+        onReturnToTray={() => {
+          onReturnToTray();
+          onClose();
+        }}
+        onPickImage={() => setLibrary(true)}
+      />
+    </div>,
+    document.fullscreenElement ?? document.body
+  );
+}
+
+/**
+ * What can be done to one token: the GM's HP, size, health display, conditions, sheet, image, visibility, reaction
+ * and tray; a player's conditions, sheet and reaction on their own. The same controls sit in the token's menu on the
+ * map and in the GM's Token tab.
+ */
+export function TokenControls({
+  actor,
+  role,
+  gmToken,
+  reactionUsed,
+  placed,
+  moveModes,
+  onOpenSheet,
+  onReturnToTray,
+  onPickImage
+}: Readonly<{
+  actor: Actor;
+  role: "gm" | "player";
+  gmToken: string | null;
+  reactionUsed: boolean;
+  placed: boolean;
+  moveModes?: ReactNode;
+  onOpenSheet: () => void;
+  onReturnToTray: () => void;
+  onPickImage: () => void;
+}>) {
+  const [feedback, setFeedback] = useState("");
+  const [busy, setBusy] = useState(false);
   const toggleReaction = () => {
     setBusy(true);
     void command("turn:use-reaction", { actorId: actor.id, used: !reactionUsed }).then((result) => {
@@ -141,47 +233,9 @@ export function TokenContextMenu({
           ? "large"
           : "medium");
 
-  // The image picker replaces the menu while open; closing it dismisses the whole flow.
-  if (library && gmToken)
-    return (
-      <TokenLibrary
-        actorId={actor.id}
-        actorName={actor.name}
-        definitionId={actor.definitionId ?? null}
-        currentAssetId={actor.tokenAssetId ?? null}
-        gmToken={gmToken}
-        onClose={onClose}
-      />
-    );
-
-  // Keep the menu on screen near the pointer: move it up until its bottom fits, and when even then it
-  // cannot fit, give it the viewport column and let it scroll itself (as `.encounter-menu` does).
-  const style: React.CSSProperties = box
-    ? { left: box.left, top: box.top, maxHeight: box.maxHeight }
-    : // First paint, before measurement: the pointer position clamped to the viewport. The layout effect
-      // corrects it in the same frame, so this is never seen.
-      {
-        left: Math.max(MARGIN, Math.min(x, window.innerWidth - MARGIN)),
-        top: Math.max(MARGIN, Math.min(y, window.innerHeight - MARGIN)),
-        visibility: "hidden"
-      };
-
-  // In fullscreen only the fullscreen element's subtree renders, so portal into it (document.body is
-  // hidden). Falls back to body otherwise.
-  return createPortal(
-    <div
-      ref={ref}
-      className="token-context-menu anim-popover scroll-y"
-      role="menu"
-      style={style}
-      aria-label={`Actions for ${actor.name}`}
-    >
-      <div className="token-context-head">
-        <strong>{actor.name}</strong>
-        <IconButton label="Close menu" size="sm" onClick={onClose}>
-          <IconX />
-        </IconButton>
-      </div>
+  return (
+    <>
+      {moveModes}
       {role === "gm" && <HpAdjust actor={actor} controls={["damage", "heal"]} onFeedback={setFeedback} />}
       {role === "gm" && (
         <label className="token-context-size">
@@ -242,18 +296,11 @@ export function TokenContextMenu({
           onFeedback={setFeedback}
         />
       </details>
-      <button
-        type="button"
-        className="token-context-item"
-        onClick={() => {
-          onOpenSheet();
-          onClose();
-        }}
-      >
+      <button type="button" className="token-context-item" onClick={onOpenSheet}>
         Open {actor.kind === "player-character" ? "character sheet" : "stat block"}
       </button>
       {role === "gm" && gmToken && (
-        <button type="button" className="token-context-item" onClick={() => setLibrary(true)}>
+        <button type="button" className="token-context-item" onClick={onPickImage}>
           Set token image…
         </button>
       )}
@@ -282,14 +329,7 @@ export function TokenContextMenu({
         {reactionUsed ? "Reaction spent - restore" : "Use reaction"}
       </button>
       {role === "gm" && placed && (
-        <button
-          type="button"
-          className="token-context-item"
-          onClick={() => {
-            onReturnToTray();
-            onClose();
-          }}
-        >
+        <button type="button" className="token-context-item" onClick={onReturnToTray}>
           Return to tray
         </button>
       )}
@@ -298,7 +338,6 @@ export function TokenContextMenu({
           {feedback}
         </p>
       )}
-    </div>,
-    document.fullscreenElement ?? document.body
+    </>
   );
 }

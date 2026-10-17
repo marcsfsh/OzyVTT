@@ -8,6 +8,7 @@ import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
 import { effectiveModeFor, overrideCovers, overrideReason, overrideWaives } from "../rules-families.js";
 import {
   isLongCastingTime,
+  laterRowOf,
   laterSpellActionId,
   ritualSpellActionId,
   upcastAction,
@@ -15,9 +16,20 @@ import {
   withSpellEffects
 } from "../item-actions.js";
 import { coverBonusOf, coverFor } from "../cover.js";
+import { builtinBaseId } from "../builtin-actions.js";
+import { isIncapacitated } from "../condition-rules.js";
+import { areEnemies } from "../creature-sides.js";
+import { sceneSight } from "../vision/sight.js";
 import { scrollOfAction } from "../scrolls.js";
 import { builtinHandlerFor } from "./builtins.js";
-import type { DefinitionAction, LiveActor, ResolveContext, ResolveDependencies, ResolveInput } from "./context.js";
+import {
+  resolveHiddenCheck,
+  type DefinitionAction,
+  type LiveActor,
+  type ResolveContext,
+  type ResolveDependencies,
+  type ResolveInput
+} from "./context.js";
 import { castLevelOf, planEconomy, type EconomyPlan } from "./economy.js";
 
 /** The attacker and targets, refused unless the action has something structured to resolve against them. */
@@ -25,7 +37,8 @@ function combatantsOf(
   state: GameState,
   action: DefinitionAction,
   input: ResolveInput,
-  catalog: ResolveDependencies["catalog"]
+  catalog: ResolveDependencies["catalog"],
+  spell: SpellReference | undefined
 ): { attacker: LiveActor; targets: LiveActor[] } {
   if (!state.combat.active) throw new CommandRejectedError("Start an encounter before resolving actions.");
   const inFight = (actorId: string) => state.combat.initiative.some((entry) => entry.actorId === actorId);
@@ -53,11 +66,16 @@ function combatantsOf(
     action.spellSlot !== undefined ||
     action.legendary !== undefined ||
     consumableRowFor(action, attacker.inventory, catalog) !== null;
+  // Casting a spell that lasts and acts again later (Produce Flame, a lingering area) is something done, even with no
+  // creature under it yet.
+  const startsALastingSpell =
+    spell !== undefined && (spell.effect?.laterActions ?? []).length > 0 && laterRowOf(spell, action.id) === undefined;
   const structuredWithoutTargets =
     (action.grants !== undefined && action.grants.target !== "target") ||
     action.healing?.self === true ||
     action.multiattack !== undefined ||
     spendsALimitedUse ||
+    startsALastingSpell ||
     input.builtin === true;
   // A touch that heals by the points spent or ends a condition (Lay on Hands) is spent on someone.
   const touchesSomeone = action.endsConditions !== undefined || action.healing?.perUse === true;
@@ -71,10 +89,34 @@ function combatantsOf(
     action.grants === undefined &&
     action.multiattack === undefined &&
     !spendsALimitedUse &&
+    !startsALastingSpell &&
     input.builtin !== true
   )
     throw new CommandRejectedError("That action has no structured effect to resolve - run it from its description.");
   return { attacker, targets };
+}
+
+/** The enemies on the map that see the creature and that it sees, by name; none while dynamic vision is off. A
+ *  creature hidden from whoever asks (by sight, the fog or GM-only) never counts for one they can see, or the refusal
+ *  would name it. */
+function enemiesWatching(
+  state: GameState,
+  hider: LiveActor,
+  deps: ResolveDependencies,
+  hidden: (actorId: string) => boolean
+): string[] {
+  const sight = sceneSight(state, {
+    ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
+    ...(deps.catalog ? { catalog: deps.catalog } : {})
+  });
+  if (!sight.enabled) return [];
+  return state.combat.initiative.flatMap((entry) => {
+    const enemy = state.actors.find((actor) => actor.id === entry.actorId);
+    if (!enemy || enemy.id === hider.id || isIncapacitated(enemy)) return [];
+    if (hidden(enemy.id) && !hidden(hider.id)) return [];
+    if (!areEnemies(hider, enemy, deps.resolveDefinition)) return [];
+    return sight.sees(hider.id, enemy.id) && sight.sees(enemy.id, hider.id) ? [enemy.name] : [];
+  });
 }
 
 /** Validates the resolve against the encounter and the rules mode, plans its economy, and opens the
@@ -85,9 +127,11 @@ export function openResolve(
   input: ResolveInput,
   deps: ResolveDependencies
 ): ResolveContext {
+  const hiddenFromTable = resolveHiddenCheck(state, deps, false);
+  const hiddenFromInitiator = resolveHiddenCheck(state, deps, true);
   const spell = declared.spellId ? deps.catalog?.spellRecord?.(declared.spellId) : undefined;
   const reaching = withSpellEffects(withSpellAttackReach(declared, spell), spell);
-  const { attacker, targets } = combatantsOf(state, reaching, input, deps.catalog);
+  const { attacker, targets } = combatantsOf(state, reaching, input, deps.catalog, spell);
   // A spell cast with a higher slot rolls that slot's dice and makes its rays (before the economy opens the action's
   // instance); a paid replay names the slot it was cast with.
   const castLevel = input.economyPaid ? input.slotLevel : castLevelOf(state, attacker, reaching, input.slotLevel);
@@ -142,12 +186,30 @@ export function openResolve(
     else warnings.push("The target has Total Cover - allowed per the rules mode.");
   }
 
+  // SRD Hide: "you must be out of any enemy's line of sight". With dynamic vision on the engine knows who sees whom;
+  // only an enemy the hider sees counts ("if you can see a creature, you can discern whether it can see you"), so
+  // the refusal never gives away one the player doesn't know of.
+  if (input.builtin && builtinBaseId(action.id) === "hide") {
+    const watchers = enemiesWatching(state, attacker, deps, hiddenFromInitiator);
+    const mode = effectiveModeFor(state.combat, "hide.seen");
+    if (watchers.length > 0 && mode !== "freeform") {
+      const message = `${watchers.join(" and ")} can see ${attacker.name}. Hide out of every enemy's sight.`;
+      const waived = overrideWaives(input.override, "hide.seen");
+      if (mode === "strict" && !waived && !overrideCovers(state.combat.turn, "hide.seen"))
+        throw new RulesBlockedError("hide.seen", message);
+      if (waived && overridden === null) overridden = { rule: "hide.seen", reason: overrideReason(input.override) };
+      else warnings.push(message);
+    }
+  }
+
   const builtin = input.builtin ? builtinHandlerFor(action.id) : undefined;
   const ctx: ResolveContext = {
     state,
     action,
     input,
     deps,
+    hiddenFromTable,
+    hiddenFromInitiator,
     attacker,
     targets,
     builtin,
@@ -206,9 +268,9 @@ export function withChosenDamageType(action: DefinitionAction, chosen: string | 
   return { ...action, damage: action.damage.map((part) => ({ ...part, type: chosen })) };
 }
 
-/** The GM's reminder on casting a spell that does more later (SRD text): the engine can't see a creature enter an
- *  area or a turn come round, so the GM resolves the later action when it happens. A scroll read for a long casting
- *  time spends no slot, and "if the casting is interrupted, the scroll isn't lost". */
+/** The GM's reminder on casting a spell that does more later (SRD text): what the caster may do on later turns, and
+ *  what the GM spots for an area the server doesn't watch (an area with a zone it does). A scroll read for a long
+ *  casting time spends no slot, and "if the casting is interrupted, the scroll isn't lost". */
 function laterActionReminders(
   spell: SpellReference | undefined,
   action: DefinitionAction,
@@ -227,7 +289,9 @@ function laterActionReminders(
             `${spell.name} takes ${spell.castingTime} to cast: the Magic action on each of the caster's turns until then, keeping Concentration. If that breaks, the spell fails and ${fromScroll ? "the scroll isn't lost - give it back on the sheet" : "its slot isn't spent - restore it on the sheet"}.`
           ]
         : []),
-    ...later.map((row) => `${spell.name}: ${row.when} Use "${spell.name}: ${row.name}" for it.`)
+    ...later
+      .filter((row) => row.zone === undefined)
+      .map((row) => `${spell.name}: ${row.when} Use "${spell.name}: ${row.name}" for it.`)
   ];
 }
 

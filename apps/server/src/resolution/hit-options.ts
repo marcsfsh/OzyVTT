@@ -8,7 +8,7 @@ import { RulesBlockedError } from "../game-store.js";
 import { upcastAction } from "../item-actions.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { effectiveModeFor, overrideCovers, overrideWaives } from "../rules-families.js";
-import { recordRoll, sizeAtMost, type DefinitionAction, type ResolveContext } from "./context.js";
+import { recordRoll, sizeAtMost, tableLineOf, type DefinitionAction, type ResolveContext } from "./context.js";
 import { beginConcentration } from "./concentration.js";
 import { criticalExpression } from "./damage.js";
 import { commitEconomy, evaluateActionEconomy, planEconomy } from "./economy.js";
@@ -59,8 +59,8 @@ function sneakAttackQualifies(ctx: ResolveContext): true | false | string {
     const ally = state.actors.find((candidate) => candidate.id === entry.actorId);
     if (!ally || ally.id === attacker.id || ally.id === target.id) continue;
     if (!areAllies(attacker, ally, deps.resolveDefinition) || ally.hp.current <= 0 || isIncapacitated(ally)) continue;
-    // An ally the players can't see never qualifies a visible attacker on its own: the offer would reveal it.
-    if (ally.visibility !== "public" && attacker.visibility === "public") continue;
+    // An ally hidden from the table never qualifies a visible attacker on its own: the offer would reveal it.
+    if (ctx.hiddenFromTable(ally.id) && !ctx.hiddenFromTable(attacker.id)) continue;
     const apart = deps.distanceFeet?.(ally.id, target.id) ?? null;
     if (apart === null) unmeasured = true;
     else if (apart <= 5 + DISTANCE_TOLERANCE_FEET) return true;
@@ -231,7 +231,7 @@ export function rollHitOptions(ctx: ResolveContext): void {
       // A Concentration smite starts the caster's Concentration as any cast does, and its mark is held by it.
       const spell = action.spellId ? ctx.deps.catalog?.spellRecord?.(action.spellId) : undefined;
       const castId = spell?.concentration ? `${ctx.input.commandId}:${action.id}` : undefined;
-      if (spell && castId) beginConcentration(ctx, spell, castId);
+      if (spell && castId) beginConcentration(ctx, spell, castId, slotLevel ?? spell.level);
       const ended: EffectNarration[] = [];
       const effect = addEffect(
         ctx.state,
@@ -252,8 +252,7 @@ export function rollHitOptions(ctx: ResolveContext): void {
         ended,
         ctx.deps
       );
-      for (const event of ended)
-        ctx.tableNarration.push({ kind: "effect", text: event.text, actorIds: [event.actorId] });
+      for (const event of ended) ctx.tableNarration.push(tableLineOf(ctx, event));
       ctx.effectsApplied.push({ targetId: target.id, targetName: target.name, name: effect.name, conditionIds: [] });
     }
     if (rider.lingers) lingerOn(ctx, target, action, cast, rider.lingers);

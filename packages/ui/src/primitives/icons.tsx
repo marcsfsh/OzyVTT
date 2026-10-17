@@ -210,6 +210,67 @@ export function IconPlay({ className }: Readonly<{ className?: string }>) {
   );
 }
 
+/** Pause: hold what is playing where it is. */
+export function IconPause({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M6.2 4.7h4.2v14.6H6.2zM13.6 4.7h4.2v14.6h-4.2z" />
+    </Glyph>
+  );
+}
+
+/** Stop: end what is playing. */
+export function IconStop({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M5.5 5.5h13v13h-13z" />
+    </Glyph>
+  );
+}
+
+/** Skip: on to the next track. */
+export function IconSkip({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M4.6 4.7 15 12 4.6 19.3zM16 4.7h3.4v14.6H16z" />
+    </Glyph>
+  );
+}
+
+/** Sound: a speaker with its waves. */
+export function IconVolume({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M2.8 8.6h4l5.4-4.4v15.6l-5.4-4.4h-4z" />
+      <path
+        d="M15.2 8.4a4.6 4.6 0 0 1 0 7.2M17.8 5.4a8.6 8.6 0 0 1 0 13.2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.4"
+      />
+    </Glyph>
+  );
+}
+
+/** No sound: the speaker struck through, for a screen that can't play yet. */
+export function IconVolumeOff({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M2.8 8.6h4l5.4-4.4v15.6l-5.4-4.4h-4z" />
+      <path d="M15 8.6 21.4 15M21.4 8.6 15 15" fill="none" stroke="currentColor" strokeWidth="2.6" />
+    </Glyph>
+  );
+}
+
+/** Music: a note, for the playlist. */
+export function IconMusic({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M9 4.6 20.4 2.6v13.1a3.4 3.4 0 1 1-2.8-3.3V7.4l-5.8 1v9.3a3.4 3.4 0 1 1-2.8-3.3z" />
+    </Glyph>
+  );
+}
+
 /** Forward: "this takes you there". Centred on the 24-box so it can be rotated for ← ↑ ↓. */
 export function IconArrow({ className }: Readonly<{ className?: string }>) {
   return (
@@ -294,6 +355,15 @@ export function IconTerrain({ className }: Readonly<{ className?: string }>) {
         fillRule="evenodd"
         d="M3 3h18v18H3zM4.6 4.6v14.8h14.8V4.6zM4.6 10.4 10.4 4.6H13L4.6 13zM4.6 17.4 17.4 4.6h2v2L6.6 19.4h-2zM11 19.4 19.4 11v2.6l-5.8 5.8z"
       />
+    </Glyph>
+  );
+}
+
+/** Wall: courses of brick, for walls, doors and what blocks sight on the map. */
+export function IconWall({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M3 3.4h18v4.4H3zM3 9.4h8.3v4.4H3zM12.7 9.4H21v4.4h-8.3zM3 15.4h18v4.4H3z" />
     </Glyph>
   );
 }
@@ -438,6 +508,85 @@ export function IconThemeLight({ className }: Readonly<{ className?: string }>) 
   return (
     <Glyph className={className}>
       <path fillRule="evenodd" d={THEME_RING} />
+    </Glyph>
+  );
+}
+
+/* Table glyphs, drawn as strokes at the set's line weight. */
+function Stroke({ d }: Readonly<{ d: string }>) {
+  return (
+    <path d={d} fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+  );
+}
+
+/** Something waits on you: the GM's queue of decisions. */
+export function IconBell({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4zM10 21h4" />
+    </Glyph>
+  );
+}
+
+/** A handle the pointer drags: the divider between two panes. */
+export function IconGrip({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M6 9h12M6 15h12" />
+    </Glyph>
+  );
+}
+
+/** The table screen. */
+export function IconTv({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M3 5h18v12H3zM8 21h8M12 17v4" />
+    </Glyph>
+  );
+}
+
+/** Aiming at a creature. */
+export function IconTarget({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M12 5a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM12 2v5M12 17v5M2 12h5M17 12h5" />
+    </Glyph>
+  );
+}
+
+/** Find your own token on the map. */
+export function IconLocate({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v4M12 18v4M2 12h4M18 12h4" />
+    </Glyph>
+  );
+}
+
+/** Waiting on someone else. */
+export function IconWait({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M6 3h12M6 21h12M7 3c0 6 10 6 10 9s-10 3-10 9M17 3c0 6-10 6-10 9" />
+    </Glyph>
+  );
+}
+
+/** The log of what happened. */
+export function IconLog({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M5 6h14M5 12h14M5 18h9" />
+    </Glyph>
+  );
+}
+
+/** More choices in a menu. */
+export function IconMore({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M5 10.4a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM12 10.4a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM19 10.4a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2z" />
     </Glyph>
   );
 }

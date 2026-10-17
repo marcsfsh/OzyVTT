@@ -9,7 +9,10 @@ It has two parts:
 - **The table.** Upload a battlemap, calibrate its grid, stage scenes, and run initiative with
   server-enforced 5e rules: attacks, typed damage, saves, conditions, reactions, spell slots,
   rests and death saves. Players use an interactive character sheet and roll on their own turn.
-  A second screen (a TV or tablet) shows a player-safe view of the map and turn order.
+  Fog and dynamic vision (walls, doors, lights, Darkvision) are worked out on the server, so each
+  player's device receives only what their character can see. A second screen (a TV or tablet)
+  shows a player-safe view of the map and turn order, and plays the music, ambience and sound
+  effects the GM uploads and runs from a sound board.
 - **The Codex.** A wiki of typed pages (characters, locations, factions, items and more), an
   atlas of nested maps, a journal on a custom calendar, sessions, quests, downtime and a
   relationship graph. Every record has a player half and a GM-only half, and players only ever
@@ -65,7 +68,7 @@ move it aside to start fresh.
 The smoke suite (`e2e/`) starts its own servers on ports 3201 and 3202 (set `SMOKE_PORT` to move
 them), each against a fresh temporary data directory, and runs the first-evening journeys at a
 390x844 touch phone and a 1280x800 laptop: GM setup and sign-in, a player claiming a character, a
-fight on a new scene, and pairing the table viewer. It needs Chromium once:
+fight on a new scene, pairing the table viewer, and playing music on it. It needs Chromium once:
 `npx playwright install chromium`.
 
 ## Running a fight
@@ -78,6 +81,9 @@ fight on a new scene, and pairing the table viewer. It needs Chromium once:
 4. Pick combatants and start the encounter. Blank initiative scores are rolled on the server.
 5. Drag tokens onto the map. Players move only their own character; the GM moves anything.
    GM-only combatants never appear on player screens or the table viewer.
+6. For sound, open **Shared screen**, then **Sound**: upload files you have the right to play,
+   put them in the playlist, the ambience or the effects, and press play. Sound comes from the
+   table screen only; tap it once if it asks. A scene can start its own sound when it goes live.
 
 ## Using the Codex
 

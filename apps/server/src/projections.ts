@@ -19,7 +19,10 @@ import type {
 import { actionPools } from "./effective-actions.js";
 import { HASTED_TAG } from "./effects.js";
 import { healthBandOf } from "./hit-points.js";
+import { HIDDEN_SOURCE, withoutSourceName } from "./hidden-source.js";
 import { visibleTerrain } from "./terrain.js";
+import { exploredRectsOf, playerSight, tokenShown, visionOf, type AudienceSight } from "./vision/audience.js";
+import type { SightContent } from "./vision/senses.js";
 
 type PresenceLookup = (sessionId: string) => PresenceStatus | null;
 
@@ -41,9 +44,10 @@ export function playerHp(actor: GameState["actors"][number]): PlayerHp {
 }
 
 /** A roll a player may see: public or their own, and never one attributed to an actor hidden from them. */
-function visibleToPlayer(state: GameState, roll: RollRecord, playerSessionId?: string) {
+function visibleToPlayer(state: GameState, roll: RollRecord, playerSessionId?: string, sight?: AudienceSight) {
   if (roll.actorId && state.actors.some((actor) => actor.id === roll.actorId && actor.visibility !== "public"))
     return false;
+  if (roll.actorId && sight?.hidden.has(roll.actorId)) return false;
   return (
     roll.visibility === "public" || (roll.visibility === "self-only" && roll.initiatorSessionId === playerSessionId)
   );
@@ -66,9 +70,16 @@ export function conditionLabels(actor: GameState["actors"][number]): readonly st
   );
 }
 
-export function projectPublicInitiative(state: GameState): readonly PlayerInitiativeEntry[] {
+/** The turn order the table may see: public combatants, less any the audience can't perceive (`hidden`, from dynamic
+ *  vision). */
+export function projectPublicInitiative(
+  state: GameState,
+  hidden: ReadonlySet<string> = new Set()
+): readonly PlayerInitiativeEntry[] {
   const publicActors = new Map(
-    state.actors.filter((actor) => actor.visibility === "public").map((actor) => [actor.id, actor])
+    state.actors
+      .filter((actor) => actor.visibility === "public" && !hidden.has(actor.id))
+      .map((actor) => [actor.id, actor])
   );
   return state.combat.initiative.flatMap((entry) => {
     const actor = publicActors.get(entry.actorId);
@@ -128,18 +139,7 @@ export function projectPlayerAnnotations(
     .map((annotation) => safeAnnotation(annotation, playerSessionId));
 }
 
-// The one mask a hidden source's identity collapses to; shared so adjacent fields never disagree.
-export const HIDDEN_SOURCE = "A hidden threat";
-
-/** Scrubs a hidden source's name out of a free-form label ("Grappled by Vashkar") at the security
- *  boundary, since resolvers interpolate it and blanking would leave an empty chip. Word-boundary match;
- *  it can't catch other spellings, so resolvers must only interpolate the source's own `sourceName`. */
-export function withoutSourceName(text: string, sourceName: string | null): string {
-  const needle = sourceName?.trim() ?? "";
-  if (needle.length === 0) return text;
-  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return text.replace(new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, "giu"), HIDDEN_SOURCE);
-}
+export { HIDDEN_SOURCE, withoutSourceName } from "./hidden-source.js";
 
 type FieldAudience = "player" | "derived" | "never";
 type PlayerKeys<M> = { [K in keyof M]: M[K] extends "player" ? K : never }[keyof M];
@@ -177,7 +177,16 @@ const PENDING_SAVE_FIELDS = {
   // Names the effect a repeated save would end; the prompt's action name already says which.
   repeatOf: "never",
   // The call reaches the player through `rollCalls`, which carries only their own part of it.
-  callId: "never"
+  callId: "never",
+  // What a success or a failure brings is narrated when it lands; the spell area names its caster.
+  onSuccessEffect: "never",
+  failureNote: "never",
+  breaksConcentration: "never",
+  zoneId: "never",
+  // Whether a hidden source's save is magical says something about it; only Magic Resistance reads it.
+  magical: "never",
+  // What a success earns is the stat block's text, the GM's knowledge.
+  immuneOnSuccess: "never"
 } as const satisfies Record<keyof PendingSave, FieldAudience>;
 
 // How long what a failure imposes would last is the save's own text, read on the prompt by the one who owes it.
@@ -193,12 +202,15 @@ const ON_FAIL_EFFECT_FIELDS = {
   speedZero: "player",
   endsWhenSourceDefeated: "player",
   rangeFeet: "player",
+  endsOnSpellHealing: "player",
   name: "derived",
   sourceName: "derived",
   sourceActorId: "derived",
   castId: "never",
   sourceActionId: "never",
-  ongoingDamage: "never"
+  ongoingDamage: "never",
+  currentTurn: "player",
+  magical: "never"
 } as const satisfies Record<keyof NonNullable<PendingSave["onFailEffect"]>, FieldAudience>;
 
 const PENDING_REACTION_FIELDS = {
@@ -243,21 +255,39 @@ function ownedBy(state: GameState, actorId: string, playerSessionId: string | un
   return owner !== null && owner === playerSessionId;
 }
 
-export function projectPlayerCombat(state: GameState, playerSessionId?: string, now = Date.now()): PlayerCombatView {
-  const initiative = projectPublicInitiative(state);
+/** The combat a player sees. A creature none of their characters perceive (dynamic vision) or that stands wholly under
+ *  the fog is hidden from them as a GM-only one is (`AudienceSight`); a spectator (no session) sees through the whole
+ *  party. */
+export function projectPlayerCombat(
+  state: GameState,
+  playerSessionId?: string,
+  now = Date.now(),
+  content: SightContent = {},
+  sight: AudienceSight = playerSight(state, playerSessionId, content)
+): PlayerCombatView {
+  const initiative = projectPublicInitiative(state, sight.hidden);
   const publicActorIds = new Set(
-    state.actors.filter((actor) => actor.visibility === "public").map((actor) => actor.id)
+    state.actors
+      .filter((actor) => actor.visibility === "public" && !sight.hidden.has(actor.id))
+      .map((actor) => actor.id)
   );
   const currentIsPublic = initiative.some((entry) => entry.active);
+  // The live map reaches players before a fight as on the table screen; before a fight only placed tokens are sent,
+  // since who waits in the tray is the GM's.
+  const showsToken = (token: GameState["combat"]["tokens"][number]) =>
+    publicActorIds.has(token.actorId) &&
+    tokenShown(sight, token.actorId) &&
+    (state.combat.active || token.position !== null);
   return {
     active: state.combat.active,
     round: state.combat.round,
     turnActorId: currentIsPublic ? state.combat.turnActorId : null,
-    mapAssetId: state.combat.active ? state.combat.mapAssetId : null,
+    mapAssetId: state.combat.mapAssetId,
     hiddenTurn: state.combat.active && state.combat.turnActorId !== null && !currentIsPublic,
-    initiative,
-    tokens: state.combat.active ? state.combat.tokens.filter((token) => publicActorIds.has(token.actorId)) : [],
-    annotations: state.combat.active ? projectPlayerAnnotations(state, playerSessionId, now) : [],
+    // Before a fight the order holds only who the GM staged, which is not the players' to know yet.
+    initiative: state.combat.active ? initiative : [],
+    tokens: state.combat.mapAssetId ? state.combat.tokens.filter(showsToken) : [],
+    annotations: state.combat.mapAssetId ? projectPlayerAnnotations(state, playerSessionId, now) : [],
     // A hidden combatant's turn stays opaque: economy flags, action instance and per-turn uses (which
     // name stat-block action ids) reset to idle rather than narrate its activity.
     turn: currentIsPublic
@@ -280,7 +310,9 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
           turnUses: { ...state.combat.turn.turnUses },
           movementUsedFeet: state.combat.turn.movementUsedFeet,
           // Whether Action Surge or Haste left the creature another action: the table sees both taken.
-          ...(extraActionReady(state) ? { extraActionReady: true as const } : {})
+          ...(extraActionReady(state) ? { extraActionReady: true as const } : {}),
+          // A dying character's save for this turn is made, so its player is not offered a second.
+          ...(state.combat.turn.deathSaveRolled === true ? { deathSaveRolled: true as const } : {})
         }
       : {
           actionUsed: false,
@@ -300,10 +332,16 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
     playerInitiativeMode: state.combat.playerInitiativeMode,
     underwater: state.combat.underwater,
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => publicActorIds.has(actorId)),
-    // Fog carries geometry only and is never the security boundary; hidden actors are stripped regardless.
+    // The fog's shapes; what lies wholly under them was already left out above (`AudienceSight.fogged`).
     fog: { enabled: state.combat.fog.enabled, shapes: state.combat.fog.shapes.map((shape) => ({ ...shape })) },
     // Only the revealed part: terrain under the fog would show the layout of ground players haven't seen.
-    terrain: visibleTerrain(state.combat),
+    terrain: visibleTerrain(state.combat, sight.enabled ? exploredRectsOf(state) : undefined),
+    // Where their own characters see now and what the party has seen; computed on the server whenever the map reaches
+    // them, before a fight as in one.
+    vision:
+      sight.enabled && state.combat.mapAssetId
+        ? visionOf(state, sight.viewerIds, content)
+        : { enabled: false as const },
     // legendaryUsed is omitted: a monster's remaining legendary actions are GM knowledge.
     // While the GM reviews an earlier turn players get only the flag; turn labels can name hidden combatants.
     rewound: state.combat.historyCursor !== null,
@@ -343,7 +381,7 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
   };
 }
 
-/** An effect as players see it: no source or cast ids or ongoing damage dice, and a hidden source masked in both
+/** An effect as players see it: no source or cast ids, ongoing damage dice or magic mark, and a hidden source masked in both
  *  `sourceName` and `name`. `yours` marks one the viewer's own character is the source of, which they may end (their
  *  grapple, their Concentration); a hidden source is never a player's character, so the flag says nothing about one. */
 function playerEffect(
@@ -356,9 +394,15 @@ function playerEffect(
     sourceActionId: _sourceActionId,
     castId: _castId,
     ongoingDamage: _ongoingDamage,
+    // The level a spell was cast or readied at is the caster's to know; the effect's name says which spell. A spell
+    // the viewer's own character holds readied reaches them, so their sheet can release it.
+    spell: _spell,
+    readiedSpell,
+    magical: _magical,
     ...visible
   } = effect;
-  const yours = sourceActorId !== null && yourActorIds.has(sourceActorId) ? { yours: true as const } : {};
+  const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);
+  const yours = mine ? { yours: true as const, ...(readiedSpell ? { readiedSpell: { ...readiedSpell } } : {}) } : {};
   if (!isHiddenSource(sourceActorId, publicActorIds)) return { ...visible, ...yours };
   return { ...visible, name: withoutSourceName(visible.name, effect.sourceName), sourceName: HIDDEN_SOURCE };
 }
@@ -373,7 +417,8 @@ export function projectPlayerRollCalls(state: GameState, playerSessionId: string
       .map((actor) => actor.id)
   );
   return state.rollCalls.flatMap((call) => {
-    const entries = call.entries.filter((entry) => mine.has(entry.actorId));
+    // An answered entry is done for its player: the call ends for them, and stays open only for the GM to close.
+    const entries = call.entries.filter((entry) => mine.has(entry.actorId) && entry.result === undefined);
     if (entries.length === 0) return [];
     return [
       {
@@ -453,6 +498,7 @@ const PLAYER_ACTOR_FIELDS = {
   spellSlots: "derived",
   pactSlots: "derived",
   preparedSpellIds: "derived",
+  spellbook: "derived",
   preparation: "derived",
   inventory: "derived",
   currency: "derived",
@@ -507,6 +553,7 @@ function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): P
  * | actionUses, hitDice, heroicInspiration  |  Y   |  -  |       -        |     -      |          Y          |
  * | spellSlots, pactSlots, preparedSpellIds |  Y   |  -  |       -        |     -      |          Y          |
  * | preparation (Long Rest prepare step)    |  Y   |  -  |       -        |     -      |          Y          |
+ * | spellbook (a Wizard's beyond the sheet) |  Y   |  -  |       -        |     -      |          Y          |
  * | inventory, currency                     |  Y   |  -  |       -        |     -      |          Y          |
  * | notes, ownerSessionId, conditionImmunities, legendary, lastUsedAt, archived, sheetPreview, lastLongRestAt:   |
  * | never, at any tier.                                                                                            |
@@ -520,11 +567,16 @@ export function projectPlayerView(
   state: GameState,
   playerSessionId: string | undefined,
   presenceFor: PresenceLookup,
-  now = Date.now()
+  now = Date.now(),
+  content: SightContent = {}
 ): PlayerView {
+  // The creatures this player's characters don't perceive, or that stand wholly under the fog, are hidden like gm-only.
+  const sight = playerSight(state, playerSessionId, content);
   // Archived characters are hidden from players entirely, like gm-only actors.
   const publicActorIds = new Set(
-    state.actors.filter((actor) => actor.visibility === "public" && !actor.archived).map((actor) => actor.id)
+    state.actors
+      .filter((actor) => actor.visibility === "public" && !actor.archived && !sight.hidden.has(actor.id))
+      .map((actor) => actor.id)
   );
   const tier = state.partyVisibility;
   // The viewer's own characters, so the effects they are the source of are marked theirs to end.
@@ -554,11 +606,11 @@ export function projectPlayerView(
       .filter((actor) => actor.archived && actor.sheetPreview && actor.visibility === "public")
       .map((actor) => ({ id: actor.id, name: actor.name })),
     rollCalls: projectPlayerRollCalls(state, playerSessionId),
-    combat: projectPlayerCombat(state, playerSessionId, now),
+    combat: projectPlayerCombat(state, playerSessionId, now, content, sight),
     rest: playerRest(state, yourActorIds),
-    // Tiers subtract fields, never entries; only gm-only visibility and archiving remove an actor.
+    // Tiers subtract fields, never entries; only gm-only visibility, archiving and sight remove an actor.
     actors: state.actors
-      .filter((actor) => actor.visibility === "public" && !actor.archived)
+      .filter((actor) => actor.visibility === "public" && !actor.archived && !sight.hidden.has(actor.id))
       .map((source) => {
         const {
           ownerSessionId,
@@ -569,6 +621,7 @@ export function projectPlayerView(
           spellSlots,
           pactSlots,
           preparedSpellIds,
+          spellbook,
           preparation,
           inventory,
           currency,
@@ -626,6 +679,7 @@ export function projectPlayerView(
                 spellSlots: spellSlots === null ? null : spellSlots.map((slot) => ({ ...slot })),
                 pactSlots: pactSlots === null ? null : { ...pactSlots },
                 preparedSpellIds: [...preparedSpellIds],
+                spellbook: spellbook.map((entry) => ({ ...entry })),
                 preparation: preparation === null ? null : { ...preparation },
                 inventory: inventory.map(playerInventoryRow),
                 currency: { ...currency }
@@ -634,7 +688,7 @@ export function projectPlayerView(
           ...(sharedDisplayStyle ? { healthDisplay: { style: sharedDisplayStyle } } : {})
         };
       }),
-    rolls: state.rolls.filter((roll) => visibleToPlayer(state, roll, playerSessionId)).map(playerRoll)
+    rolls: state.rolls.filter((roll) => visibleToPlayer(state, roll, playerSessionId, sight)).map(playerRoll)
   };
 }
 

@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ViewerSoundProjection } from "@vtt/domain";
 import { Button, Input } from "@vtt/ui";
 import { ApiError, apiRequest } from "../lib/api";
 import { probeImageDimensions } from "../scene/mapImage";
-import { FogOverlay } from "../scene/FogOverlay";
+import { FogOverlay, type VisionMask } from "../scene/FogOverlay";
 import { TerrainOverlay } from "../scene/TerrainOverlay";
 import { bandFraction, TokenGlyph, TokenHealthAura, TokenStatusBadges } from "../scene/tokenGlyph";
 import { AnnotationGlyph, PingGlyph } from "../scene/annotationGlyph";
 import { InitiativeRow } from "../encounter/InitiativeList";
+import { TableSound } from "./TableSound";
 import "./viewer.css";
 
 type Point = Readonly<{ x: number; y: number }>;
@@ -72,7 +74,11 @@ export type Presentation = Readonly<{
     }>;
     /** Difficult terrain the fog reveals. */
     terrain?: Readonly<{ difficult: readonly Readonly<{ x: number; y: number; width: number; height: number }>[] }>;
+    /** Dynamic vision: where the party sees now and what it has seen. */
+    vision?: VisionMask;
   }>;
+  /** What the sound board is playing, with how far in each sound was when this was sent. */
+  sound?: ViewerSoundProjection;
 }>;
 
 type ConnectionState = "pairing" | "connecting" | "live" | "reconnecting";
@@ -371,6 +377,11 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
             );
           return <AnnotationGlyph key={annotation.id} data={data} arrowSize={arrowSize} color={annotation.color} />;
         })}
+        {/* With dynamic vision on, dark where the party can't see; below the tokens, which are only those it
+          perceives. */}
+        {onActiveMap && presentation.encounter.vision && (
+          <FogOverlay width={size.width} height={size.height} vision={presentation.encounter.vision} variant="player" />
+        )}
         {tokens.map((token) => (
           <g
             className={`viewer-token ${token.kind}${token.active ? " active" : ""}`}
@@ -456,6 +467,8 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
 export function ViewerApp() {
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [presentation, setPresentation] = useState<Presentation | null>(null);
+  // When the presentation arrived, on the clock the sound engine counts from.
+  const [receivedAt, setReceivedAt] = useState(0);
   const [message, setMessage] = useState("");
   const sourceRef = useRef<EventSource | null>(null);
   // The initiative column is drag-resizable (persisted) so long names can fit.
@@ -475,11 +488,13 @@ export function ViewerApp() {
     try {
       const { presentation } = await apiRequest<{ presentation: Presentation }>(PRESENTATION_PATH, { failure });
       setPresentation(presentation);
+      setReceivedAt(performance.now());
       setConnection("live");
       const source = new EventSource("/api/v1/viewer/events");
       sourceRef.current = source;
       source.addEventListener("presentation", (event) => {
         setPresentation(JSON.parse((event as MessageEvent).data));
+        setReceivedAt(performance.now());
         setConnection("live");
       });
       source.onerror = async () => {
@@ -517,12 +532,15 @@ export function ViewerApp() {
         <p role="alert">{message}</p>
       </main>
     );
+  // Sound plays whether or not a map is shown: music during a break is the GM's call, not the screen's.
+  const sound = <TableSound sound={presentation.sound} receivedAt={receivedAt} live={connection === "live"} />;
   if (!presentation.enabled)
     return (
       <main className="viewer-waiting">
         <span className="viewer-eyebrow">VIEWER CONNECTED</span>
         <h1>Presentation paused</h1>
         <p>The GM will begin when the table is ready.</p>
+        {sound}
       </main>
     );
   return (
@@ -545,6 +563,7 @@ export function ViewerApp() {
       </div>
       <MapStage presentation={presentation} />
       <Initiative presentation={presentation} onResize={resizeInitiative} />
+      {sound}
     </main>
   );
 }

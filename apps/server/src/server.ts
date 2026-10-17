@@ -17,6 +17,7 @@ import { ACTOR_DEFINITION_SCHEMA_VERSION } from "@vtt/schemas";
 import { nextAnnotationExpiry } from "./annotations.js";
 import { fillMissingSpeeds, fillStoredProseFacts, reconcileArmorClasses, storedDefinition } from "./actor-roster.js";
 import { createApiV1Router } from "./api-v1.js";
+import { AudioAssetStore } from "./audio-assets.js";
 import { ContentLibrary } from "./content-library.js";
 import { equipmentCatalogOf } from "./equipment-derivation.js";
 import { reconcileMagicMarkers } from "./inventory.js";
@@ -61,8 +62,14 @@ import { ViewerCoordinator } from "./viewer-coordinator.js";
 import { createViewerRouter } from "./viewer-http.js";
 import { projectViewerEncounter } from "./viewer-encounter.js";
 import { ViewerPresentationStore } from "./viewer-presentation-store.js";
+import { SoundCatalogStore } from "./sound-catalog.js";
+import { createSoundRouter } from "./sound-http.js";
+import { SoundService } from "./sound-service.js";
+import { SoundStore } from "./sound-store.js";
 import { CharacterDraftStore } from "./character-drafts.js";
 import { turnReminder } from "./turn-reminder.js";
+import { hiddenFrom, hideRollsOfHidden, rememberExplored } from "./vision/audience.js";
+import type { SightContent } from "./vision/senses.js";
 
 export type CreateServerOptions = {
   authPath: string;
@@ -71,6 +78,7 @@ export type CreateServerOptions = {
   integrationCredentialsPath: string;
   mapAssetsPath?: string;
   tokenAssetsPath?: string;
+  soundAssetsPath?: string;
   webDist: string;
   useDevelopmentClient: boolean;
   developmentClientPort: number;
@@ -94,8 +102,24 @@ export function createServer(options: CreateServerOptions) {
     cors: options.clientOrigin ? { origin: options.clientOrigin } : undefined
   });
   const auth = new AuthService(options.authPath);
+  // Late-bound: the content library is built below, and the store only calls this from a command.
+  let sightContent: () => SightContent = () => ({});
   const store = new GameStore(options.databasePath, options.initialGameState ?? createInitialGameState(), {
-    timelineDirtied
+    timelineDirtied,
+    // What the party sees joins what it has seen, in the same transaction as the move or door that showed it. A
+    // failure here must not undo the command; the next one catches up.
+    afterMutate: (state, before) => {
+      try {
+        rememberExplored(state, sightContent());
+      } catch (error) {
+        console.error("remembering what the party saw failed:", error instanceof Error ? error.message : error);
+      }
+      try {
+        hideRollsOfHidden(state, before, sightContent());
+      } catch (error) {
+        console.error("hiding a hidden creature's rolls failed:", error instanceof Error ? error.message : error);
+      }
+    }
   });
   // Every read of the game state outside a command's own transaction goes through here.
   const committedState = createStateReader(store);
@@ -121,6 +145,10 @@ export function createServer(options: CreateServerOptions) {
   // `publishedFor(audience)` gives `ContentLibrary` only published (and, for players, player-visible)
   // records; drafts are in neither slice.
   const contentLibrary = new ContentLibrary(homebrewStore);
+  sightContent = () => ({
+    definition: (definitionId) => contentLibrary.monsterForInstance(definitionId),
+    catalog: equipmentCatalogOf(contentLibrary.forAudience("gm"))
+  });
   const authorizeGm = (token: string | undefined) => auth.verify(token) !== null;
   // The codex authorization callbacks, shared by `createCodexRouter` and the `POST /codex/import` guard
   // so "who may write the codex" has one definition.
@@ -132,6 +160,27 @@ export function createServer(options: CreateServerOptions) {
     verifyIntegration: (token: string, scope: "codex:read" | "codex:write") => credentials.verify(token, scope)
   };
   const viewerCoordinator = new ViewerCoordinator(viewerAccess, viewerPresentation, authorizeGm);
+  // The table's sound (ADR-0024): the GM's library of files and the board, each in its own store. The board's
+  // output reaches table screens through the viewer feed and the GM's devices as `sound:changed`; players get none.
+  const soundAssets = new AudioAssetStore(
+    options.soundAssetsPath ?? join(dirname(options.databasePath), "sound-assets")
+  );
+  const soundCatalog = new SoundCatalogStore(options.databasePath);
+  const soundStore = new SoundStore(options.databasePath);
+  const sound = new SoundService({
+    store: soundStore,
+    assets: soundAssets,
+    catalog: soundCatalog,
+    screens: () => viewerCoordinator.soundScreens(),
+    changed: () => {
+      viewerCoordinator.broadcast();
+      pushSoundToGm();
+    }
+  });
+  viewerCoordinator.attachSound(
+    (now) => sound.viewerSound(now),
+    () => pushSoundToGm()
+  );
   const gmLoginRateLimiter = new LoginRateLimiter();
   const presence = new PresenceRegistry(options.presenceGraceMs ?? 8000, () => broadcast());
   const presenceFor = (sessionId: string) => presence.statusFor(sessionId);
@@ -171,8 +220,17 @@ export function createServer(options: CreateServerOptions) {
         socket.disconnect(true);
         continue;
       }
-      socket.emit("state:updated", gm ? gmView(current) : projectPlayerView(current, player?.sessionId, presenceFor));
+      socket.emit(
+        "state:updated",
+        gm ? gmView(current) : projectPlayerView(current, player?.sessionId, presenceFor, Date.now(), sightContent())
+      );
     }
+  }
+  /** Sends the sound board to the GM's devices; a player's socket is never sent it. */
+  function pushSoundToGm() {
+    const view = sound.view();
+    for (const socket of io.sockets.sockets.values())
+      if (auth.verify(socket.handshake.auth?.token)) socket.emit("sound:changed", view);
   }
   /** Tells every client the codex changed so it refetches its own projected view. Content-free (only a
    *  revision): naming the changed scope would leak what the GM is working on. */
@@ -233,10 +291,10 @@ export function createServer(options: CreateServerOptions) {
       logged?: boolean;
     }>
   ) {
-    const { actors } = committedState.read();
     const actorIds = event.actorIds ?? [];
-    const publicToPlayers =
-      !event.gmOnly && actorIds.every((id) => actors.find((actor) => actor.id === id)?.visibility === "public");
+    // The shared check: GM-only, or out of every character's sight or under the fog (ADR-0023).
+    const hidden = hiddenFrom(committedState.read(), sightContent());
+    const publicToPlayers = !event.gmOnly && !actorIds.some(hidden);
     const payload: TableEvent = { id: randomUUID(), kind: event.kind, text: event.text, actorIds, at: Date.now() };
     for (const socket of io.sockets.sockets.values()) {
       const token = socket.handshake.auth?.token;
@@ -247,8 +305,8 @@ export function createServer(options: CreateServerOptions) {
     // (`logged: false`). Call `appendLog` directly only for lines with no toast.
     if (event.logged !== false) appendLog({ kind: event.kind, text: event.text, actorIds, gmOnly: event.gmOnly });
   }
-  /** Appends a feed line and pushes it live, gated like toasts. `!== "public"` so an actor no longer on the
-   *  roster (or a future visibility) fails closed. */
+  /** Appends a feed line and pushes it live, gated like toasts. An actor no longer on the roster counts as hidden, so
+   *  the gate fails closed. */
   function appendLog(
     entry: Readonly<{
       kind: CombatLogEntry["kind"];
@@ -261,9 +319,7 @@ export function createServer(options: CreateServerOptions) {
   ) {
     const current = committedState.read();
     const actorIds = entry.actorIds ?? [];
-    const gmOnly =
-      entry.gmOnly === true ||
-      actorIds.some((id) => current.actors.find((actor) => actor.id === id)?.visibility !== "public");
+    const gmOnly = entry.gmOnly === true || actorIds.some(hiddenFrom(current, sightContent()));
     const row = combatLog.append({
       kind: entry.kind,
       text: entry.text,
@@ -296,7 +352,7 @@ export function createServer(options: CreateServerOptions) {
       text: `Round ${state.combat.round} - ${name}'s turn.`,
       actorIds: [state.combat.turnActorId]
     });
-    const reminder = turnReminder(state, state.combat.turnActorId);
+    const reminder = turnReminder(state, state.combat.turnActorId, hiddenFrom(state, sightContent()));
     if (reminder !== null) appendLog({ kind: "turn", text: reminder, actorIds: [state.combat.turnActorId] });
   }
   /** Turns a timeline navigation outcome into log lines: plain turns for forward play, GM-only notes for rewinds. */
@@ -341,7 +397,10 @@ export function createServer(options: CreateServerOptions) {
   }
   async function publishGameState(state: GameState) {
     try {
-      await viewerCoordinator.synchronizeEncounter(state.revision, projectViewerEncounter(state, Date.now()));
+      await viewerCoordinator.synchronizeEncounter(
+        state.revision,
+        projectViewerEncounter(state, Date.now(), sightContent())
+      );
     } catch {
       for (const socket of io.sockets.sockets.values())
         if (auth.verify(socket.handshake.auth?.token))
@@ -390,11 +449,12 @@ export function createServer(options: CreateServerOptions) {
     logTimelineOutcome,
     scheduleAnnotationExpiry,
     gmView: (state) => gmView(state),
-    playerView: (state, sessionId) => projectPlayerView(state, sessionId, presenceFor),
+    playerView: (state, sessionId) => projectPlayerView(state, sessionId, presenceFor, Date.now(), sightContent()),
     random: (sides) => randomInt(1, sides + 1),
     newId: randomUUID,
     // Archives live in the game store's own table; `replay.launch` reads one document through this hook.
     archiveDocument: (id) => store.getEncounterArchive(id),
+    sound,
     onEncounterArchived: ({ sceneId, turnCount }) => {
       // Log the fight to the codex timeline, pinned to the location marker that links this scene, if any.
       try {
@@ -500,11 +560,10 @@ export function createServer(options: CreateServerOptions) {
       authorizePlayer: (token, assetId) => {
         if (auth.verifyPlayer(token) === null) return false;
         const { combat } = committedState.read();
-        // A player may load the active battle map, any revealed atlas map, or the map of a replay the GM shared.
+        // A player may load the live battle map (before its fight too, as their projection names it), any revealed
+        // atlas map, or the map of a replay the GM shared.
         return (
-          (combat.active && combat.mapAssetId === assetId) ||
-          codexStore.isAssetRevealedToPlayers(assetId) ||
-          sharedReplayMap(assetId)
+          combat.mapAssetId === assetId || codexStore.isAssetRevealedToPlayers(assetId) || sharedReplayMap(assetId)
         );
       },
       authorizeViewer: (token, assetId) => {
@@ -526,19 +585,42 @@ export function createServer(options: CreateServerOptions) {
       authorizeGm,
       // A joined player may browse the GM's token library and upload their own token image.
       playerSession: (token) => auth.verifyPlayer(token),
-      authorizePlayer: (token, assetId) =>
-        auth.verifyPlayer(token) !== null &&
-        committedState.read().actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId),
+      // Only a creature the reader may know of: an image worn by one hidden by sight or the fog would answer
+      // whether it is in play.
+      authorizePlayer: (token, assetId) => {
+        const player = auth.verifyPlayer(token);
+        if (!player) return false;
+        const state = committedState.read();
+        const hidden = hiddenFrom(state, sightContent(), player.sessionId);
+        return state.actors.some((actor) => actor.tokenAssetId === assetId && !hidden(actor.id));
+      },
       authorizeViewer: (token, assetId) => {
         if (!token) return false;
         try {
           viewerAccess.verify(token);
+          const state = committedState.read();
+          const hidden = hiddenFrom(state, sightContent());
           return (
             viewerPresentation.project().enabled &&
-            committedState
-              .read()
-              .actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId)
+            state.actors.some((actor) => actor.tokenAssetId === assetId && !hidden(actor.id))
           );
+        } catch {
+          return false;
+        }
+      }
+    })
+  );
+  app.use(
+    createSoundRouter({
+      service: sound,
+      assets: soundAssets,
+      authorizeGm,
+      // A table screen may load a sound only while it is playing; the GM's library stays the GM's.
+      authorizeViewer: (token, assetId) => {
+        if (!token) return false;
+        try {
+          viewerAccess.verify(token);
+          return sound.isOnAir(assetId);
         } catch {
           return false;
         }
@@ -595,7 +677,8 @@ export function createServer(options: CreateServerOptions) {
       }
     },
     revision: () => store.revision,
-    newId: randomUUID
+    newId: randomUUID,
+    sightContent: () => sightContent()
   });
   const apiV1Router = createApiV1Router({
     applicationVersion: options.applicationVersion ?? "0.1.0",
@@ -639,6 +722,8 @@ export function createServer(options: CreateServerOptions) {
         presence.connect(gm.sessionId, "gm");
         acknowledge({ ok: true, role: "gm", sessionId: gm.sessionId });
         broadcast();
+        // The board too, so a GM device that (re)joins never waits for the next change to see it.
+        socket.emit("sound:changed", sound.view());
         return;
       }
       const existingPlayer = auth.verifyPlayer(token);
@@ -710,7 +795,13 @@ export function createServer(options: CreateServerOptions) {
       );
     socket.emit(
       "state:updated",
-      projectPlayerView(committedState.read(), auth.verifyPlayer(socket.handshake.auth.token)?.sessionId, presenceFor)
+      projectPlayerView(
+        committedState.read(),
+        auth.verifyPlayer(socket.handshake.auth.token)?.sessionId,
+        presenceFor,
+        Date.now(),
+        sightContent()
+      )
     );
   });
 
@@ -729,16 +820,24 @@ export function createServer(options: CreateServerOptions) {
       characterDrafts.initialize(),
       codexStore.initialize(),
       codexAssets.initialize(),
-      homebrewStore.initialize()
+      homebrewStore.initialize(),
+      soundAssets.initialize(),
+      soundCatalog.initialize(),
+      soundStore.initialize()
     ]);
+    await sound.initialize();
     // The store's startup seeds may change the state without a revision bump.
     committedState.reset();
     await reconcileContentDerived();
-    await viewerCoordinator.synchronizeEncounter(store.revision, projectViewerEncounter(committedState.read()));
+    await viewerCoordinator.synchronizeEncounter(
+      store.revision,
+      projectViewerEncounter(committedState.read(), Date.now(), sightContent())
+    );
   }
   function close() {
     presence.dispose();
     viewerCoordinator.dispose();
+    sound.dispose();
     for (const timer of annotationExpiryTimers) clearTimeout(timer);
     annotationExpiryTimers.clear();
     io.close();
@@ -751,6 +850,8 @@ export function createServer(options: CreateServerOptions) {
     viewerPresentation.close();
     characterDrafts.close();
     homebrewStore.close();
+    soundCatalog.close();
+    soundStore.close();
   }
 
   return {
@@ -766,6 +867,7 @@ export function createServer(options: CreateServerOptions) {
     viewerAccess,
     viewerPresentation,
     viewerCoordinator,
+    sound,
     initialize,
     close
   };

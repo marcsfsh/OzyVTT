@@ -210,6 +210,8 @@ export function scrollCastAction(
     ...mechanics,
     // A healing area heals the creatures the reader picks, as the spell's own cast does, so it isn't templated.
     ...(spell.area && !mechanics.healing ? { area: spell.area } : {}),
+    // A reaction spell's trigger rides the scroll's action too, so the table offers it when the trigger happens.
+    ...(spell.effect?.reaction ? { reaction: structuredClone(spell.effect.reaction) } : {}),
     spellId: spell.id
   };
 }

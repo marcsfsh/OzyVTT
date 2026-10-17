@@ -605,3 +605,45 @@
   fill: var(--surface-2);
   stroke: var(--line-strong);
 }
+
+/* "Tap to turn on sound": the browser holds sound back until someone touches the screen. Bottom left, clear of the
+   zoom buttons, and large enough to read from across the room. It stays quiet until something is waiting to play;
+   then it takes the magenta edge that means "press this". */
+.viewer-sound-unlock {
+  position: fixed;
+  z-index: 6;
+  left: 1rem;
+  bottom: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-1) 88%, transparent);
+  color: var(--text);
+  font: 700 clamp(var(--fs-body), 1.6vw, var(--fs-h2)) / 1.2 var(--font-label);
+  cursor: pointer;
+}
+.viewer-sound-unlock svg {
+  flex: none;
+  font-size: 1.4em;
+}
+.viewer-sound-unlock.waiting {
+  border-color: var(--magenta);
+  box-shadow: var(--glow-magenta);
+}
+.viewer-sound-unlock:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--focus-ring-color);
+}
+
+/* Dynamic vision on the shared screen is the fog's flat opaque darkness. The party's remembered ground shows through
+   at about half strength. */
+.vision-overlay-player {
+  fill: var(--void);
+  fill-opacity: 1;
+}

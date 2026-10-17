@@ -4,11 +4,7 @@ import type { GmActor, GmView, InitiativeEntry, MutationResult } from "@vtt/doma
 import { healthBandFor, useConditionLabels } from "./conditions";
 import { ConditionDots } from "./InitiativeList";
 import { initialsOf } from "../scene/tokenGlyph";
-import { DyingTracker } from "./DyingTracker";
-import { PendingDamagePrompt } from "./PendingDamagePrompt";
-import { ReactionPrompt } from "./ReactionPrompt";
 import { RowTools } from "./RowTools";
-import { SavePrompt } from "./SavePrompt";
 import { aidGiverOf, isKnockedOut, StabilizeControl, type AidGiver } from "./StabilizeControl";
 
 /** Who in the fight could give a dying creature aid, the creature whose turn it is first (the aid is its action):
@@ -94,9 +90,8 @@ function InitiativeScore({
 }
 
 /**
- * One row of the GM's turn order, with what hangs off it: the tools card when expanded, the acting
- * console on the active row, and the decisions this creature owes (death saves, saving throws,
- * reactions, a player's hit awaiting Apply), which stay visible whether or not the row is expanded.
+ * One row of the GM's turn order, with what hangs off it: the tools card when expanded and the acting console on the
+ * active row. The decisions a creature owes wait in Needs you; the row marks them (a hit to apply, the dying tally).
  */
 export function GmInitiativeRow({
   entry,
@@ -111,7 +106,6 @@ export function GmInitiativeRow({
   actingConsole,
   busy,
   run,
-  rollMode,
   hpDamageType,
   onHpDamageTypeChange,
   onOpenSheet,
@@ -130,7 +124,6 @@ export function GmInitiativeRow({
   actingConsole: ReactNode;
   busy: boolean;
   run: (operation: () => Promise<MutationResult>, success: string) => Promise<void>;
-  rollMode: "auto" | "manual";
   hpDamageType: string | null;
   onHpDamageTypeChange: (type: string | null) => void;
   onOpenSheet: (actorId: string) => void;
@@ -140,6 +133,9 @@ export function GmInitiativeRow({
   const conditionLabels = useConditionLabels(actor?.conditions ?? []);
   const conditionIds = actor?.conditions.map((condition) => condition.id);
   const band = actor ? healthBandFor(actor.hp) : null;
+  const pendingDamage = (state.combat.pendingDamage ?? [])
+    .filter((proposal) => proposal.targetActorId === entry.actorId)
+    .reduce((sum, proposal) => sum + proposal.proposedTotal, 0);
   return (
     <li
       ref={rowRef}
@@ -172,6 +168,14 @@ export function GmInitiativeRow({
               {actor && state.combat.reactionsUsed.includes(actor.id) && (
                 <span className="reaction-spent-dot" title="Reaction spent (restore in the row tools)">
                   R
+                </span>
+              )}
+              {pendingDamage > 0 && (
+                <span className="initiative-flag initiative-flag--caution">−{pendingDamage} pending</span>
+              )}
+              {actor?.deathSaves && down && !actor.deathSaves.stable && actor.deathSaves.failures < 3 && (
+                <span className="initiative-flag initiative-flag--danger">
+                  Dying {actor.deathSaves.successes}/{actor.deathSaves.failures}
                 </span>
               )}
               {actor && (
@@ -209,28 +213,6 @@ export function GmInitiativeRow({
         />
       )}
       {active && actingConsole}
-      {/* Required decisions and the dying state stay visible whether or not the row is expanded. */}
-      {actor && actor.deathSaves && actor.hp.current <= 0 && state.combat.turnActorId !== actor.id && (
-        <DyingTracker
-          actorId={actor.id}
-          name={actor.name}
-          deathSaves={actor.deathSaves}
-          canRoll
-          onFeedback={onFeedback}
-          rollMode={rollMode}
-          isActingTurn={state.combat.turnActorId === actor.id}
-          viewer="gm"
-          aid={
-            <StabilizeControl
-              targetId={actor.id}
-              targetName={actor.name}
-              helpers={fightHelpers(state, actor.id)}
-              gm
-              onFeedback={onFeedback}
-            />
-          }
-        />
-      )}
       {/* A creature knocked out stays Unconscious until healed or given first aid. */}
       {actor && isKnockedOut(actor) && (
         <div className="dying-tracker" role="group" aria-label={`${actor.name} is knocked out`}>
@@ -245,43 +227,6 @@ export function GmInitiativeRow({
           />
         </div>
       )}
-      {actor &&
-        state.combat.pendingSaves
-          .filter((save) => save.targetActorId === actor.id)
-          .map((save) => (
-            <SavePrompt
-              key={save.id}
-              save={save}
-              targetName={actor.name}
-              canDismiss
-              onFeedback={onFeedback}
-              rollMode={rollMode}
-              viewer="gm"
-              legendaryResistanceLeft={
-                actor.legendary?.resistancesPerDay !== undefined
-                  ? Math.max(0, actor.legendary.resistancesPerDay - (actor.actionUses["legendary-resistance"] ?? 0))
-                  : undefined
-              }
-            />
-          ))}
-      {actor &&
-        state.combat.pendingReactions
-          .filter((reaction) => reaction.actorId === actor.id)
-          .map((reaction) => (
-            <ReactionPrompt
-              key={reaction.id}
-              reaction={reaction}
-              actorName={actor.name}
-              canDismiss
-              onFeedback={onFeedback}
-              rollMode={rollMode}
-              viewer="gm"
-            />
-          ))}
-      {actor &&
-        (state.combat.pendingDamage ?? [])
-          .filter((proposal) => proposal.targetActorId === actor.id)
-          .map((proposal) => <PendingDamagePrompt key={proposal.id} proposal={proposal} onFeedback={onFeedback} />)}
     </li>
   );
 }

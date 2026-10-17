@@ -6,7 +6,7 @@ machine-derivable surfaces of the app (state shape, command catalog, HTTP paths)
 file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.
 
 - API version `1` · realtime protocol `1`
-- 14 GameState fields · 114 commands · 233 HTTP paths
+- 14 GameState fields · 135 commands · 260 HTTP paths
 
 ## GameState shape
 
@@ -36,7 +36,7 @@ schema in `packages/domain/src/commands.ts`, its route and scope in `GAME_COMMAN
 OpenAPI operation, and one table entry under `apps/server/src/commands/`, which both transports
 register from. Then the projection decision.
 
-Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `damage`, `death-save`, `dice`, `effect`, `encounter`, `fog`, `initiative`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `table`, `terrain`, `time`, `token`, `turn`.
+Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `damage`, `death-save`, `dice`, `door`, `effect`, `encounter`, `fog`, `initiative`, `light`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `sound`, `spell-zone`, `table`, `terrain`, `time`, `token`, `turn`, `vision`, `wall`.
 
 | Command | Scope |
 | --- | --- |
@@ -76,6 +76,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `annotation.set-visibility` | `combat:write` |
 | `builder.roll-abilities` | `actor:write` |
 | `builder.set-policy` | `actor:write` |
+| `character.add-to-spellbook` | `actor:write` |
 | `character.claim` | `actor:write` |
 | `character.create` | `actor:write` |
 | `character.discard-draft` | `actor:write` |
@@ -95,11 +96,13 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `character.set-proficiencies` | `actor:write` |
 | `character.set-slot` | `actor:write` |
 | `character.submit-import` | `actor:write` |
+| `character.swap-spell` | `actor:write` |
 | `check.reroll` | `combat:write` |
 | `check.roll` | `combat:write` |
 | `damage.resolve` | `combat:write` |
 | `death-save.roll` | `combat:write` |
 | `dice.roll` | `roll:create` |
+| `door.set-open` | `combat:write` |
 | `effect.add` | `combat:write` |
 | `effect.end` | `combat:write` |
 | `encounter.add-combatant` | `combat:write` |
@@ -120,6 +123,9 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `initiative.roll-self` | `combat:write` |
 | `initiative.set` | `combat:write` |
 | `initiative.swap` | `combat:write` |
+| `light.add` | `scene:write` |
+| `light.move` | `scene:write` |
+| `light.remove` | `scene:write` |
 | `reaction.answer` | `combat:write` |
 | `reaction.dismiss` | `combat:write` |
 | `replay.launch` | `combat:write` |
@@ -144,6 +150,14 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `scene.rename` | `scene:write` |
 | `scene.reorder` | `scene:write` |
 | `scene.set-combatants` | `scene:write` |
+| `sound.arrange` | `scene:write` |
+| `sound.next-track` | `scene:write` |
+| `sound.pause` | `scene:write` |
+| `sound.play` | `scene:write` |
+| `sound.set-scene-preset` | `scene:write` |
+| `sound.stop` | `scene:write` |
+| `spell-zone.end` | `combat:write` |
+| `spell-zone.place` | `combat:write` |
 | `table.set-party-visibility` | `combat:write` |
 | `table.set-staging-defaults` | `combat:write` |
 | `terrain.paint` | `scene:write` |
@@ -154,6 +168,13 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `turn.use` | `combat:write` |
 | `turn.use-legendary` | `combat:write` |
 | `turn.use-reaction` | `combat:write` |
+| `vision.reset-explored` | `scene:write` |
+| `vision.set-ambient` | `scene:write` |
+| `vision.set-enabled` | `scene:write` |
+| `wall.add` | `scene:write` |
+| `wall.clear` | `scene:write` |
+| `wall.move` | `scene:write` |
+| `wall.remove` | `scene:write` |
 
 ## HTTP surface
 
@@ -271,8 +292,10 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/actors/{actorId}/size`
 - `POST /api/v1/game/actors/{actorId}/speed`
 - `POST /api/v1/game/actors/{actorId}/spell-slot`
+- `POST /api/v1/game/actors/{actorId}/spellbook`
 - `POST /api/v1/game/actors/{actorId}/spend-hit-dice`
 - `POST /api/v1/game/actors/{actorId}/stabilize`
+- `POST /api/v1/game/actors/{actorId}/swap-spell`
 - `POST /api/v1/game/actors/{actorId}/temp-hp`
 - `POST /api/v1/game/actors/{actorId}/token-image`
 - `POST /api/v1/game/actors/{actorId}/uses/restore`
@@ -302,6 +325,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `GET POST /api/v1/game/commands`
 - `POST /api/v1/game/damage/resolve`
 - `POST /api/v1/game/definitions/import`
+- `POST /api/v1/game/doors/{wallId}/open`
 - `POST /api/v1/game/encounter/combatants`
 - `POST /api/v1/game/encounter/combatants/{actorId}/remove`
 - `POST /api/v1/game/encounter/end`
@@ -320,6 +344,9 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/initiative/roll-self`
 - `POST /api/v1/game/initiative/set`
 - `POST /api/v1/game/initiative/swap`
+- `POST /api/v1/game/lights`
+- `DELETE /api/v1/game/lights/{lightId}`
+- `POST /api/v1/game/lights/{lightId}/move`
 - `GET /api/v1/game/log`
 - `POST /api/v1/game/reactions/{reactionId}/answer`
 - `POST /api/v1/game/reactions/{reactionId}/dismiss`
@@ -342,7 +369,16 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/scenes/{sceneId}/combatants`
 - `POST /api/v1/game/scenes/{sceneId}/duplicate`
 - `POST /api/v1/game/scenes/{sceneId}/rename`
+- `POST /api/v1/game/scenes/{sceneId}/sound`
 - `POST /api/v1/game/scenes/reorder`
+- `GET /api/v1/game/sound`
+- `POST /api/v1/game/sound/arrange`
+- `POST /api/v1/game/sound/next-track`
+- `POST /api/v1/game/sound/pause`
+- `POST /api/v1/game/sound/play`
+- `POST /api/v1/game/sound/stop`
+- `POST /api/v1/game/spell-zones/{zoneId}/end`
+- `POST /api/v1/game/spell-zones/{zoneId}/place`
 - `POST /api/v1/game/table/party-visibility`
 - `POST /api/v1/game/table/staging-defaults`
 - `POST /api/v1/game/terrain/paint`
@@ -353,6 +389,14 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/turn/legendary`
 - `POST /api/v1/game/turn/reaction`
 - `POST /api/v1/game/turn/use`
+- `POST /api/v1/game/vision/ambient`
+- `POST /api/v1/game/vision/enabled`
+- `POST /api/v1/game/vision/explored/reset`
+- `GET /api/v1/game/vision/preview`
+- `POST /api/v1/game/walls`
+- `DELETE /api/v1/game/walls/{wallId}`
+- `POST /api/v1/game/walls/{wallId}/move`
+- `POST /api/v1/game/walls/clear`
 - `GET POST /api/v1/gm/integration-credentials`
 - `GET /api/v1/gm/integration-credentials/{id}/audit`
 - `POST /api/v1/gm/integration-credentials/{id}/revoke`
@@ -382,6 +426,9 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `PUT /api/v1/map-assets/{id}/scale`
 - `GET /api/v1/openapi.json`
 - `POST /api/v1/sessions/player`
+- `GET POST /api/v1/sound-assets`
+- `DELETE PATCH /api/v1/sound-assets/{id}`
+- `GET /api/v1/sound-assets/{id}/content`
 - `GET /api/v1/system/capabilities`
 - `GET /api/v1/system/health`
 - `GET /api/v1/system/version`
@@ -393,6 +440,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `GET /api/v1/viewer/presentation`
 - `POST /api/v1/viewer/presentation/commands`
 - `POST /api/v1/viewer/preview-session`
+- `POST /api/v1/viewer/sound-status`
 
 ## Where things live
 

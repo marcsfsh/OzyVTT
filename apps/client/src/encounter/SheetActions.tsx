@@ -117,13 +117,25 @@ export function SheetActions({
         type ActionT = (typeof definition.actions)[number];
         const renderAction = (action: ActionT) => {
           const atk = action.attack;
+          // Outside a fight a heal is used here (Second Wind, Lay on Hands), and the server moves the hit points.
+          const looseHeal = onLooseUse !== null && action.healing !== undefined && !atk;
           return (
             <div key={action.id} className="sheet-entry">
               <p>
                 <strong>{action.name}.</strong> <RichText text={action.description} />
               </p>
-              {(atk || action.damage.length > 0) && (
+              {(atk || action.damage.length > 0 || looseHeal) && (
                 <div className="sheet-roll-row">
+                  {looseHeal && (
+                    <button
+                      type="button"
+                      className="sheet-roll-chip"
+                      disabled={rolling}
+                      onClick={() => onLooseUse(action.id)}
+                    >
+                      Use
+                    </button>
+                  )}
                   {atk && (
                     <button
                       type="button"

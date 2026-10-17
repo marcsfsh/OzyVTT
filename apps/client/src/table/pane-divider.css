@@ -1,0 +1,29 @@
+/* The phone's map and panel split: a full-width grip drawn 20px tall. Its hit area reaches 24px up over the map
+   pane's feedback line, which takes no taps, to make 44px without covering the tabs below. `touch-action: none` so a
+   finger drags the split instead of scrolling the page. */
+.pane-divider {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  height: 1.25rem;
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-1);
+  color: var(--text-muted);
+  cursor: row-resize;
+  touch-action: none;
+}
+.pane-divider::after {
+  content: "";
+  position: absolute;
+  inset: -1.5rem 0 0;
+}
+.pane-divider:hover,
+.pane-divider:focus-visible {
+  color: var(--cyan-hi);
+}
+.pane-divider:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: -2px;
+}

@@ -13,6 +13,10 @@ export function initialsOf(name: string) {
 export type TokenGlyphProps = Readonly<{
   sizePx: number;
   name: string;
+  /** The text under the token when it differs from the name (a short "Goblin 2"); the initials come from the name. */
+  label?: string;
+  /** A monster's number among its kind, drawn on a badge at the token's top left. */
+  number?: number;
   active?: boolean;
   /** Optional portrait; drawn clipped to the token circle. Missing or failed loads fall back to initials. */
   imageUrl?: string | null;
@@ -33,6 +37,8 @@ export type TokenGlyphProps = Readonly<{
 export function TokenGlyph({
   sizePx,
   name,
+  label,
+  number,
   active,
   imageUrl,
   turnClassName,
@@ -78,8 +84,14 @@ export function TokenGlyph({
           {initialsOf(name)}
         </text>
       )}
+      {number !== undefined && (
+        <g className="token-number" transform={`translate(${-sizePx * 0.4} ${-sizePx * 0.4})`} aria-hidden="true">
+          <rect x={-sizePx * 0.17} y={-sizePx * 0.17} width={sizePx * 0.34} height={sizePx * 0.34} />
+          <text style={{ fontSize: sizePx * 0.26 }}>{number}</text>
+        </g>
+      )}
       <text className={nameClassName} y={nameY} style={nameStyle}>
-        {name}
+        {label ?? name}
       </text>
     </>
   );

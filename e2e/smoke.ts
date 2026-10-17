@@ -124,6 +124,42 @@ export async function expectPageFits(page: Page) {
 }
 
 /**
+ * A control sits wholly inside the viewport and nothing covers its centre: `elementFromPoint` there lands on the
+ * control itself. The bar under the thumb pads itself by the device's safe area, so this holds on a notched phone.
+ */
+export async function expectUncovered(control: Locator) {
+  await expect(control).toBeVisible();
+  const found = await control.evaluate((element: HTMLElement) => {
+    const box = element.getBoundingClientRect();
+    const x = box.left + box.width / 2;
+    const y = box.top + box.height / 2;
+    const hit = document.elementFromPoint(x, y);
+    return {
+      inside: box.top >= 0 && box.left >= 0 && box.bottom <= window.innerHeight && box.right <= window.innerWidth,
+      hit: hit !== null && (hit === element || element.contains(hit)),
+      at: hit ? `${hit.tagName.toLowerCase()}.${[...hit.classList].join(".")}` : "nothing"
+    };
+  });
+  expect.soft(found.inside, `${control} inside the viewport`).toBe(true);
+  expect.soft(found.hit, `${control} is uncovered (the centre hits ${found.at})`).toBe(true);
+}
+
+/** Nothing covers a token on the map: `elementFromPoint` at its centre lands on the token. */
+export async function expectTokenUncovered(page: Page, tokenId: string) {
+  const token = page.locator(`g.encounter-token[data-token-id="${tokenId}"]`);
+  await expect(token).toBeVisible();
+  const found = await token.evaluate((element: SVGGElement) => {
+    const box = element.getBoundingClientRect();
+    const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+    return {
+      hit: hit !== null && element.contains(hit),
+      at: hit ? `${hit.tagName.toLowerCase()}.${[...hit.classList].join(".")}` : "nothing"
+    };
+  });
+  expect.soft(found.hit, `the token's centre hits ${found.at}`).toBe(true);
+}
+
+/**
  * Sets the GM password from loopback unless the first journey already did (409), so any journey can
  * run on its own with `--grep`. Players cannot join before it is set.
  */
@@ -265,4 +301,25 @@ export function battleMap(width = 700, height = 500): Buffer {
     chunk("IDAT", deflateSync(rows)),
     chunk("IEND", Buffer.alloc(0))
   ]);
+}
+
+/** A WAV of a soft 440 Hz tone, built here so the suite carries no binary. */
+export function toneWav(seconds: number, sampleRate = 22_050): Buffer {
+  const samples = Math.round(seconds * sampleRate);
+  const file = Buffer.alloc(44 + samples * 2);
+  file.write("RIFF", 0, "latin1");
+  file.writeUInt32LE(36 + samples * 2, 4);
+  file.write("WAVEfmt ", 8, "latin1");
+  file.writeUInt32LE(16, 16);
+  file.writeUInt16LE(1, 20);
+  file.writeUInt16LE(1, 22);
+  file.writeUInt32LE(sampleRate, 24);
+  file.writeUInt32LE(sampleRate * 2, 28);
+  file.writeUInt16LE(2, 32);
+  file.writeUInt16LE(16, 34);
+  file.write("data", 36, "latin1");
+  file.writeUInt32LE(samples * 2, 40);
+  for (let index = 0; index < samples; index++)
+    file.writeInt16LE(Math.round(Math.sin((2 * Math.PI * 440 * index) / sampleRate) * 6_000), 44 + index * 2);
+  return file;
 }

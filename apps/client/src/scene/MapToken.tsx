@@ -16,6 +16,8 @@ export function MapToken({
   targetable,
   targeted,
   tableHealthDisplay,
+  number,
+  label,
   onKeyDown
 }: Readonly<{
   encounterToken: EncounterToken & { position: EncounterTokenPosition };
@@ -30,6 +32,10 @@ export function MapToken({
   targeted: boolean;
   /** The table's default (GM view only); a token's own `healthDisplay` overrides it. */
   tableHealthDisplay?: HealthDisplay;
+  /** A monster's number among its kind, the same as in every list. */
+  number?: number;
+  /** The short text under the token. */
+  label: string;
   onKeyDown: (event: KeyboardEvent<SVGGElement>) => void;
 }>) {
   const band = healthBandFor(actor.hp);
@@ -49,7 +55,7 @@ export function MapToken({
       className={`encounter-token ${actor.kind}${movable ? " movable" : " locked"}${actor.visibility === "gm-only" ? " hidden" : ""}${active ? " active" : ""}${dragging ? " dragging" : ""}${targetable ? " targetable" : ""}${targeted ? " targeted" : ""}`}
       role={movable ? "button" : "img"}
       tabIndex={movable ? 0 : undefined}
-      aria-label={`${actor.name}${active ? ", active turn" : ""}${movable ? ". Drag to move; arrow keys move one step; Delete returns it to the tray." : ", view only."}`}
+      aria-label={`${actor.name}${active ? ", active turn" : ""}${targetable ? (targeted ? ", targeted" : ", can be targeted") : ""}${movable ? ". Drag to move; arrow keys move one step; Delete returns it to the tray." : ", view only."}`}
       aria-keyshortcuts={movable ? "ArrowUp ArrowDown ArrowLeft ArrowRight Delete" : undefined}
       onKeyDown={movable ? onKeyDown : undefined}
     >
@@ -63,6 +69,8 @@ export function MapToken({
         token={authToken}
         sizePx={encounterToken.sizePx}
         name={actor.name}
+        label={label}
+        {...(number !== undefined ? { number } : {})}
         active={active}
         turnClassName="encounter-token-turn"
         bodyClassName="encounter-token-body"

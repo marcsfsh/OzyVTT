@@ -1,0 +1,118 @@
+/* The panel beside the map: what must be answered, the tabs, the chosen tab's body and the footer. A flex column
+   that fills its column; the body takes the leftover height and scrolls itself. */
+.table-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+/* What must be answered sits above the tabs and never takes more than half the panel; past that it scrolls. */
+.table-panel > .needs-you,
+.table-panel > .prompt-slot {
+  flex: none;
+  max-height: 50%;
+}
+.table-panel > .prompt-slot {
+  padding: var(--space-2) var(--space-3) 0;
+}
+.table-panel-tabs {
+  flex: none;
+  margin: var(--space-2) var(--space-3) 0;
+}
+.table-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  flex: 1 1 0;
+  min-height: 0;
+  padding: var(--space-3);
+  overscroll-behavior: contain;
+}
+.table-panel-body[hidden] {
+  display: none;
+}
+.table-panel-body:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: -2px;
+}
+.table-panel-empty {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+/* The footer: the view's one primary, under the thumb on a phone. */
+.table-panel-foot {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  padding-bottom: max(var(--space-2), env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.table-panel-foot-main,
+.table-panel-foot-slot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+/* While something holds the bar (a target picker's Cancel and Roll), the bar's own controls step aside, so it
+   keeps one primary. */
+.table-panel-foot-slot:empty {
+  display: none;
+}
+.table-panel-foot-slot:not(:empty) + .table-panel-foot-main {
+  display: none;
+}
+.table-panel-foot:not(:has(> .table-panel-foot-main)):has(> .table-panel-foot-slot:empty) {
+  display: none;
+}
+.table-panel-foot-slot .action-targeting-buttons {
+  display: flex;
+  gap: var(--space-2);
+  margin: 0;
+}
+.table-panel-foot-slot .action-targeting-buttons > .encounter-primary {
+  flex: 1 1 auto;
+}
+.table-panel-foot .encounter-feedback {
+  margin: 0;
+  font-size: var(--fs-xs);
+}
+.table-panel-foot-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.table-panel-foot-row > .table-panel-primary {
+  flex: 1 1 auto;
+}
+/* The staged scene's builder and the claim picker take the whole panel. */
+.table-panel-staging,
+.table-panel-claim {
+  padding: var(--space-3);
+  gap: var(--space-3);
+}
+.table-panel-claim > .claim-view {
+  flex: 1 1 0;
+  min-height: 0;
+  margin: 0;
+}
+@media (max-width: 979px) {
+  .table-panel > .needs-you,
+  .table-panel > .prompt-slot {
+    max-height: 45%;
+  }
+  .table-panel-tabs {
+    margin: var(--space-1) var(--space-2) 0;
+  }
+  .table-panel-body {
+    padding: var(--space-2) var(--space-3);
+  }
+  .table-panel-foot {
+    box-shadow: 0 -8px 20px color-mix(in srgb, var(--void) 60%, transparent);
+  }
+}

@@ -225,7 +225,10 @@ describe("save outcomes in the shipped content", () => {
     // A reminder that was only the damage goes.
     expect(monsterAction("vrock", "spores").save?.ongoingDamage?.at).toBe("bearer-turn-start");
     expect(monsterAction("vrock", "spores").reminder).toBeUndefined();
-    // Losing hit points is not damage, and with no condition there is nothing for it to last with.
-    expect(monsterAction("horned-devil", "infernal-tail").save).not.toHaveProperty("ongoingDamage");
+    // Losing hit points is not damage: an infernal wound is the failure's own effect, taking untyped hit points.
+    expect(monsterAction("horned-devil", "infernal-tail").save).toMatchObject({
+      failureEffect: { name: "Infernal Wound", duration: { type: "rounds", rounds: 10 }, endsOnSpellHealing: true },
+      ongoingDamage: { damage: [{ formula: "3d6" }], at: "bearer-turn-start", hitPointLoss: true }
+    });
   });
 });

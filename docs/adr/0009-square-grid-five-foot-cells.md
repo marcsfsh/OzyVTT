@@ -28,6 +28,6 @@ and should not be scheduled.
 
 ## What is still open
 
-Nothing about the grid itself. Fog is a separate decision (ADR-0022) and is presentation only.
+Nothing about the grid itself. Fog and dynamic vision are separate decisions (ADR-0022, ADR-0023).
 Difficult terrain and the movement preview now build on these cells: see the 2026-10-16 amendment to
 ADR-0020.

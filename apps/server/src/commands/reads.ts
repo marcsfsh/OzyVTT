@@ -9,17 +9,22 @@ import { builderOffers } from "../builder-offers.js";
 import { draftOwnerOf } from "../character-drafts.js";
 import { BUILTIN_TARGETING, builtinActionsFor } from "../builtin-actions.js";
 import { builtinCheckSkills } from "../resolution/builtins.js";
-import { actionSummaryOf, type ContentView } from "../content-library.js";
+import { actionSummariesOf, actionSummaryOf, type ContentView } from "../content-library.js";
 import { effectiveActions } from "../effective-actions.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { rechoicesOf } from "../ledger-rechoice.js";
+import { spellChoicesOf } from "../spell-choices.js";
 import {
   ActorAvailableActionsSchema,
   ActorMovementSchema,
   BuilderOffersSchema,
-  ContentActionsSchema
+  ContentActionsSchema,
+  VisionPreviewSchema
 } from "@vtt/domain/commands";
 import { srdMonsterBenchmarks } from "../monster-benchmarks.js";
+import { partyViewerIds } from "../vision/audience.js";
+import { flatPolygon } from "../vision/geometry.js";
+import { sceneSight } from "../vision/sight.js";
 import { movementStatus } from "../movement-rules.js";
 import { GameNotFoundError } from "./failures.js";
 import { initiatorOf, isGmGrade, type GamePrincipal, type Kit } from "./kit.js";
@@ -95,7 +100,7 @@ export const gameReads = [
       const imported = storedDefinition(kit.read(), definitionId);
       // Browse uses the catalog's own lookup (honours draft/published/deleted), not the play-time resolver.
       const definition = imported ?? catalog.monster(definitionId);
-      const actions = imported ? imported.actions.map(actionSummaryOf) : catalog.monsterActionSummaries(definitionId);
+      const actions = imported ? actionSummariesOf(imported.actions) : catalog.monsterActionSummaries(definitionId);
       if (!actions) throw new GameNotFoundError("That stat block is not in the bundled content.");
       // SRD generic actions (Dodge, Dash, Help, ...) follow the stat block's own; a declared id shadows its builtin.
       const builtins = builtinActionsFor(definition)
@@ -142,17 +147,17 @@ export const gameReads = [
     // The same evaluation as resolution, read-only. GM-grade any combatant; a player their own.
     run: (principal, input, kit) => {
       const state = kit.read();
-      const actor = state.actors.find(
-        (candidate) => candidate.id === (input as z.output<typeof ActorAvailableActionsSchema>).actorId
-      );
-      if (!actor) throw new GameNotFoundError("That combatant no longer exists.");
+      const actorId = (input as z.output<typeof ActorAvailableActionsSchema>).actorId;
+      // Access first: a missing creature and someone else's get one answer, so a player can't probe which ids exist.
       requireActorAccess(
         initiatorOf(principal),
         state,
-        actor.id,
+        actorId,
         "check",
         "You can only check your own character's actions."
       );
+      const actor = state.actors.find((candidate) => candidate.id === actorId);
+      if (!actor) throw new GameNotFoundError("That combatant no longer exists.");
       const definition = actor.definitionId ? kit.resolveDefinition(actor.definitionId) : undefined;
       if (actor.definitionId && !definition) throw new GameNotFoundError("That combatant's stat block is unavailable.");
       // Stat-block rows, then builtins. The effective list, so item-derived actions and raised pool limits show.
@@ -177,7 +182,9 @@ export const gameReads = [
           catalog
         ),
         // Read against the GM's content, as `actor.rechoose` checks them.
-        rechoices: rechoicesOf(actor, definition, kit.contentLibrary.forAudience("gm"))
+        rechoices: rechoicesOf(actor, definition, kit.contentLibrary.forAudience("gm")),
+        // Read against the GM's content and the table's builder policy, as the swap and the spellbook check them.
+        spellChoices: spellChoicesOf(actor, definition, kit.contentLibrary.forAudience("gm"), state.builderPolicy)
       };
     }
   },
@@ -200,8 +207,7 @@ export const gameReads = [
     run: (principal, input, kit) => {
       const state = kit.read();
       const actorId = (input as z.output<typeof ActorMovementSchema>).actorId;
-      if (!state.actors.some((candidate) => candidate.id === actorId))
-        throw new GameNotFoundError("That combatant no longer exists.");
+      // Access first, as for the actions read: one answer for a missing creature and someone else's.
       requireActorAccess(
         initiatorOf(principal),
         state,
@@ -209,6 +215,8 @@ export const gameReads = [
         "check",
         "You can only check your own character's movement."
       );
+      if (!state.actors.some((candidate) => candidate.id === actorId))
+        throw new GameNotFoundError("That combatant no longer exists.");
       return movementStatus(state, actorId, {
         resolveDefinition: (definitionId) => kit.resolveDefinition(definitionId),
         catalog: kit.equipmentCatalog()
@@ -240,6 +248,33 @@ export const gameReads = [
   },
 
   {
+    event: "vision:preview",
+    path: GAME_PATHS.visionPreview,
+    scope: "scene:read",
+    gmOnly: "Only the GM can look through a creature's eyes.",
+    schema: VisionPreviewSchema,
+    malformed: "The vision preview is malformed.",
+    httpInput: ({ query }) => (typeof query.actorId === "string" ? { actorId: query.actorId } : {}),
+    // The same sight the projections use: one creature's, or the whole party's when none is named.
+    run: (_principal, input, kit) => {
+      const state = kit.read();
+      const { actorId } = input as z.output<typeof VisionPreviewSchema>;
+      if (actorId !== undefined && !state.actors.some((actor) => actor.id === actorId))
+        throw new GameNotFoundError("That combatant no longer exists.");
+      const sight = sceneSight(state, kit.sightContent());
+      if (!sight.enabled) return { enabled: false, visible: [], actorIds: [] };
+      const viewers = actorId === undefined ? partyViewerIds(state) : [actorId];
+      const perceived = sight.perceivedBy(viewers);
+      return {
+        enabled: true,
+        // As the projections draw it: no light carried by a creature these eyes don't perceive.
+        visible: sight.areaOf(viewers, (carrierId) => perceived.has(carrierId)).map(flatPolygon),
+        actorIds: [...perceived]
+      };
+    }
+  },
+
+  {
     event: "log:read",
     path: GAME_PATHS.log,
     scope: "combat:read",
@@ -254,6 +289,17 @@ export const gameReads = [
         principal.kind === "player" ? principal.sessionId : undefined
       )
     })
+  },
+
+  {
+    event: "sound:board",
+    path: GAME_PATHS.sound,
+    scope: "scene:read",
+    gmOnly: "Only the GM controls the table's sound.",
+    run: (_principal, _input, kit) => {
+      if (!kit.context.sound) throw new GameNotFoundError("Sound is not available on this server.");
+      return { view: kit.context.sound.view() };
+    }
   }
 ] satisfies readonly ReadSpec[];
 

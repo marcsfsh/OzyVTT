@@ -18,6 +18,7 @@ import {
   MAP_ASSET_PATHS,
   OPENAPI_DOCUMENT_PATH,
   SESSION_PATHS,
+  SOUND_ASSET_PATHS,
   SYSTEM_PATHS,
   VIEWER_PATHS
 } from "@vtt/api-contract";
@@ -36,6 +37,7 @@ describe("the OpenAPI document", () => {
       OPENAPI_DOCUMENT_PATH,
       ...Object.values(INTEGRATION_CREDENTIAL_PATHS),
       ...Object.values(MAP_ASSET_PATHS),
+      ...Object.values(SOUND_ASSET_PATHS),
       ...Object.values(VIEWER_PATHS),
       ...Object.values(GAME_PATHS),
       ...Object.values(CONTENT_PATHS),

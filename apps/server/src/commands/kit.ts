@@ -6,6 +6,8 @@ import type {
   GmView,
   PlayerView,
   RollRecord,
+  SoundBoard,
+  SoundBoardView,
   TableEvent
 } from "@vtt/domain";
 import { d20Die } from "@vtt/rules-5e";
@@ -16,13 +18,17 @@ import type { CombatLogStore } from "../combat-log.js";
 import type { TimelineOutcome } from "../combat-history.js";
 import type { ContentLibrary } from "../content-library.js";
 import type { EffectNarration } from "../effects.js";
-import type { InitiativeRollDeps, InitiativeRollSink } from "../encounter.js";
+import type { InitiativeRollDeps, InitiativeRollSink, TurnAdvanceDeps } from "../encounter.js";
 import { equipmentCatalogOf } from "../equipment-derivation.js";
 import type { GameStore } from "../game-store.js";
+import type { SoundDeps } from "../sound-board.js";
 import { tokenCreatureDistance } from "../movement-narration.js";
-import { withoutSourceName } from "../projections.js";
+import { withoutSourceName } from "../hidden-source.js";
 import { describeRoll, recordRoll, rollFeedIsGmOnly, rollsForCommand } from "../roll-history.js";
+import type { ZoneDeps } from "../spell-zones.js";
 import type { TokenMapGeometry } from "../token-placement.js";
+import { hiddenFrom, playerSight } from "../vision/audience.js";
+import type { SightContent } from "../vision/senses.js";
 
 /** Who is acting. Integration credentials are the GM's own automation and act with GM authority
  *  (ADR-0016); players keep player limits. The public viewer never reaches a command. */
@@ -118,6 +124,20 @@ export type CommandContext = Readonly<{
   ) => void;
   /** Reads one stored archive document (raw JSON) for `replay.launch`; without it replays can't launch. */
   archiveDocument?: (id: number) => string | null;
+  /** The sound board, kept in its own store (ADR-0024); without it the sound commands refuse. */
+  sound?: SoundPort;
+}>;
+
+/** What the sound commands need from the sound board service (`sound-service.ts`). */
+export type SoundPort = Readonly<{
+  run: (
+    commandId: string,
+    change: (board: SoundBoard, deps: SoundDeps) => void
+  ) => Promise<Readonly<{ soundRevision: number; duplicate: boolean }>>;
+  durationOf: (assetId: string) => number | null;
+  view: () => SoundBoardView;
+  /** Starts a scene's saved sound when it goes live, unless the GM turned that off. Best-effort. */
+  sceneWentLive: (sceneId: string, sourceRevision: number) => Promise<void>;
 }>;
 
 export type Kit = ReturnType<typeof createKit>;
@@ -127,8 +147,26 @@ export function createKit(context: CommandContext) {
   const { store, contentLibrary } = context;
   const read = context.readState;
   const actorName = (actorId: string) => read().actors.find((actor) => actor.id === actorId)?.name ?? "A combatant";
-  const actorHidden = (actorId: string) =>
-    read().actors.find((actor) => actor.id === actorId)?.visibility === "gm-only";
+  /** What dynamic vision reads from the content: stat blocks, and the catalog with species senses and lit items. */
+  const sightContent = (): SightContent => ({
+    definition: (definitionId) => contentLibrary.monsterForInstance(definitionId),
+    catalog: equipmentCatalogOf(contentLibrary.forAudience("gm"))
+  });
+  /** The creatures hidden from this initiator by sight or the fog, which it may not target; none for the GM. */
+  const unseenBy = (initiator: Initiator, state: GameState): ReadonlySet<string> =>
+    initiator.role === "gm" ? new Set() : playerSight(state, initiator.sessionId, sightContent()).hidden;
+  /** The shared hidden check (`hiddenFrom`) as the table sees `state`, which every public line and die follows. */
+  const hiddenFromTable = (state: GameState) => hiddenFrom(state, sightContent());
+  /** The same check for whoever acts: the table's view for the GM, that player's own for a player, since a reply or
+   *  refusal reaches only them. */
+  const hiddenFor = (initiator: Initiator, state: GameState) =>
+    hiddenFrom(state, sightContent(), initiator.role === "player" ? initiator.sessionId : undefined);
+  /** Hidden from the table now: GM-only, or a creature no character perceives or wholly under the fog. An actor no
+   *  longer on the roster is not, so a line about one just removed reads as before. */
+  const actorHidden = (actorId: string) => {
+    const state = read();
+    return state.actors.some((actor) => actor.id === actorId) && hiddenFromTable(state)(actorId);
+  };
 
   /** Play-time definition lookup: imported stat blocks first; `monsterForInstance` ignores homebrew status so
    *  a soft-deleted creature's live tokens keep working. */
@@ -160,7 +198,11 @@ export function createKit(context: CommandContext) {
     read,
     actorName,
     actorHidden,
+    hiddenFromTable,
+    hiddenFor,
+    unseenBy,
     resolveDefinitionIn,
+    sightContent,
     /** The same lookup against the committed state, for reads outside a command transaction. */
     resolveDefinition: (definitionId: string) => resolveDefinitionIn(read(), definitionId),
     /** The catalog a principal may read: GM-grade sees everything, a player only player-visible records. */
@@ -179,6 +221,40 @@ export function createKit(context: CommandContext) {
       }
       creates.set(sessionId, [...recent, now]);
       return true;
+    },
+
+    /** What a spell area reads to act on creatures in `state` (`spell-zones.ts`): the live map, stat blocks, items and
+     *  the server's dice. */
+    zoneDeps: (state: GameState, geometry: TokenMapGeometry | null): ZoneDeps => ({
+      geometry,
+      resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId),
+      catalog: equipmentCatalogOf(contentLibrary.forAudience("gm")),
+      rollDie: (sides) => context.random(sides),
+      newId: context.newId,
+      now: () => new Date().toISOString()
+    }),
+
+    /** The deps a turn change runs with in `state`: recharge and ongoing-damage dice, repeat saves, the spell areas
+     *  on the live map, and where creatures stand for the auras that reach them. */
+    turnAdvanceDeps: (
+      state: GameState,
+      geometry: TokenMapGeometry | null,
+      distance: (state: GameState, actorIdA: string, actorIdB: string) => number | null
+    ): TurnAdvanceDeps => ({
+      resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId),
+      catalog: equipmentCatalogOf(contentLibrary.forAudience("gm")),
+      rollDie: (sides) => context.random(sides),
+      newId: context.newId,
+      now: () => new Date().toISOString(),
+      geometry,
+      distanceFeet: (actorIdA, actorIdB) => distance(state, actorIdA, actorIdB)
+    }),
+
+    /** The live map's geometry, read before a command's turn in the queue; null with no map or one gone missing, so a
+     *  turn still changes and only what needs the map waits. */
+    async liveGeometry(): Promise<TokenMapGeometry | null> {
+      const mapAssetId = read().combat.mapAssetId;
+      return mapAssetId ? context.tokenGeometryFor(mapAssetId).catch(() => null) : null;
     },
 
     /** What an initiative roll reads about its roller in `state`: stat blocks and items for its riders. */

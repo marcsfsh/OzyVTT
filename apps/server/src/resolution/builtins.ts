@@ -2,11 +2,18 @@ import { d20FacesFor } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { checkPlan, totalCheck, type CheckSubject } from "../ability-checks.js";
 import { builtinBaseId } from "../builtin-actions.js";
-import { addEffect, endEffect, makeEffect } from "../effects.js";
+import { addEffect, endEffect, ESCAPE_ATHLETICS_TAG, makeEffect } from "../effects.js";
 import { putOutFire } from "../hazards.js";
 import { CommandRejectedError } from "../game-store.js";
 import { createPendingSaves, saveModifierFor, shownRollMode } from "../saving-throws.js";
-import { abilityModifier, recordRoll, type DefinitionAction, type ResolveContext } from "./context.js";
+import {
+  abilityModifier,
+  endedEffect,
+  recordRoll,
+  tableLineOf,
+  type DefinitionAction,
+  type ResolveContext
+} from "./context.js";
 
 /** What the declarative action vocabulary can't express about a builtin action (`builtin-actions.ts`),
  *  one hook per moment of a resolve. A hook runs only for an action taken from the builtin catalog, so a
@@ -138,17 +145,24 @@ function escapeGrapple(ctx: ResolveContext): void {
     throw new CommandRejectedError("No escapable effect (one with an escape DC) is active on this combatant.");
   const athletics: CheckSubject = { ability: "str", skill: "athletics" };
   const acrobatics: CheckSubject = { ability: "dex", skill: "acrobatics" };
-  if (input.skill && input.skill !== "athletics" && input.skill !== "acrobatics")
-    throw new CommandRejectedError("Escaping a grapple uses Athletics or Acrobatics.");
+  // A spell's restraint (Web, Entangle) is broken with Strength (Athletics) alone.
+  const athleticsOnly = escapable.tags.includes(ESCAPE_ATHLETICS_TAG);
+  if (input.skill && input.skill !== "athletics" && (athleticsOnly || input.skill !== "acrobatics"))
+    throw new CommandRejectedError(
+      athleticsOnly
+        ? `Breaking free of ${escapable.name} takes a Strength (Athletics) check.`
+        : "Escaping a grapple uses Athletics or Acrobatics."
+    );
   const better =
+    athleticsOnly ||
     checkPlan(attacker, deps.definition, ctx.derivation, athletics).modifier >=
-    checkPlan(attacker, deps.definition, ctx.derivation, acrobatics).modifier
+      checkPlan(attacker, deps.definition, ctx.derivation, acrobatics).modifier
       ? athletics
       : acrobatics;
   const subject = input.skill === "athletics" ? athletics : input.skill === "acrobatics" ? acrobatics : better;
   if (rollCheck(ctx, subject, escapable.escapeDc)) {
     endEffect(state, attacker.id, escapable.id);
-    ctx.effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name: escapable.name });
+    ctx.effectsEnded.push(endedEffect(attacker, escapable));
   }
 }
 
@@ -162,8 +176,8 @@ function rollOnTheGround(ctx: ResolveContext): void {
       ...(deps.catalog ? { catalog: deps.catalog } : {})
     }
   });
-  for (const name of ended) ctx.effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name });
-  for (const event of events) ctx.tableNarration.push({ kind: "effect", text: event.text, actorIds: [event.actorId] });
+  for (const effect of ended) ctx.effectsEnded.push(endedEffect(attacker, effect));
+  for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
 }
 
 /** The DC of an unarmed Grapple or Shove: 8 + Strength modifier + Proficiency Bonus. */

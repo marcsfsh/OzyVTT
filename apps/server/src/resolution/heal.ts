@@ -3,9 +3,10 @@ import { rollDice } from "@vtt/rules-5e";
 import { setCondition } from "../actor-conditions.js";
 import { conditionLabel } from "../condition-rules.js";
 import { CommandRejectedError } from "../game-store.js";
+import { endEffect } from "../effects.js";
 import { deadCantHealLine, healActor } from "../hit-points.js";
 import { useCostOf } from "../use-cost.js";
-import { recordRoll, type LiveActor, type ResolveContext } from "./context.js";
+import { recordRoll, tableLineOf, type LiveActor, type ResolveContext } from "./context.js";
 
 /** Healing (Cure Wounds): rolled once, and every target regains it on the resolve. A willing creature's healing has
  *  nothing to gate, so it applies here instead of waiting on an Apply tap as damage does. Second Wind heals its user;
@@ -27,7 +28,7 @@ export function applyHealing(ctx: ResolveContext): void {
     if (rolled.terms.some((term) => term.kind === "dice")) recordRoll(ctx, rolled, "healing");
     total += rolled.total;
   }
-  const shares = sharesOf(targets, Math.max(0, total), healing);
+  const shares = healingShares(targets, Math.max(0, total), healing);
   const healed = targets.map((target, index) => {
     // A dead target among living ones regains nothing until it is revived; the others still heal.
     if (isDead(target)) {
@@ -43,7 +44,12 @@ export function applyHealing(ctx: ResolveContext): void {
       text: `${target.name} regains ${regained} ${regained === 1 ? "hit point" : "hit points"} (${action.name}).`,
       actorIds: [target.id]
     });
-    for (const event of events) tableNarration.push({ kind: "heal", text: event.text, actorIds: [event.actorId] });
+    for (const event of events) tableNarration.push(tableLineOf(ctx, event, "heal"));
+    // "The wound closes ... after a spell restores Hit Points to the target."
+    if (action.spellId !== undefined && regained > 0)
+      for (const effect of target.effects.filter((candidate) => candidate.endsOnSpellHealing))
+        for (const event of endEffect(state, target.id, effect.id))
+          tableNarration.push(tableLineOf(ctx, event, "heal"));
     return { targetId: target.id, targetName: target.name, regained };
   });
   ctx.healing = { total, targets: healed };
@@ -51,8 +57,8 @@ export function applyHealing(ctx: ResolveContext): void {
 
 /** What each target may regain: the whole roll each, or one pool split as evenly as each target's room allows. A cap
  *  ("no more than half its Hit Point maximum") limits both. */
-function sharesOf(
-  targets: readonly LiveActor[],
+export function healingShares(
+  targets: readonly Pick<LiveActor, "hp">[],
   total: number,
   healing: NonNullable<ResolveContext["action"]["healing"]>
 ): number[] {

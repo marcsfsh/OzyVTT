@@ -14,10 +14,11 @@ projection computed for their role. Nothing is sent as full state and filtered o
 ```
 Player browser ─┐                                  ┌─▶ game store ─────────┐
                 ├─ Socket.IO (game) ─┐             ├─▶ codex store         │
-GM browser ─────┤                    ├─▶ validate ─┼─▶ homebrew store      ├─ data/vtt.sqlite
-                └─ HTTP /api/v1 ─────┘   authorize ├─▶ viewer presentation │
+GM browser ─────┤                    ├─▶ validate ─┼─▶ homebrew store      │
+                └─ HTTP /api/v1 ─────┘   authorize ├─▶ viewer presentation ├─ data/vtt.sqlite
+                                                   ├─▶ sound board         │
                                                    └─▶ combat log ─────────┘
-Table viewer ◀── SSE + cookie, player-safe presentation projection only
+Table viewer ◀── SSE + cookie, player-safe presentation projection only (and what the sound board plays)
 ```
 
 The stores are independent. Each has its own revision counter and its own change notification,
@@ -82,6 +83,8 @@ Socket.IO over the same origin as HTTP. Server-to-client events come in two kind
 - **Ping channels** carry only a revision: `codex:changed` and `homebrew:changed`. Naming what
   changed would tell players which part of the world the GM is editing, so clients refetch
   their own projected view instead.
+- **GM-only channels** go to GM sockets alone: `sound:changed` carries the sound board and the table
+  screens' sound state. A player's socket is never sent it.
 
 On connect the server sends a full projected snapshot. The client keeps its token in
 `localStorage` and passes it in `socket.auth`, so reconnects resume without a new join. Presence
@@ -112,12 +115,18 @@ audience. There are four:
 - **Game** (`apps/server/src/projections.ts`): `projectPlayerView` and `projectGmView`. Players
   get only `public` actors, a health band instead of exact HP, and owner-only sheet resources
   for their own character. A hidden effect's source becomes "A hidden threat". Private rolls,
-  owner identity, GM notes and hidden turns are removed.
+  owner identity, GM notes and hidden turns are removed. A live scene's map reaches players before
+  its fight, with the public tokens the GM has placed; the turn order and the tray wait for the
+  fight. A player's reply to an area they aimed names only the creatures they may see.
 - **Table viewer** (`viewer-presentation.ts`, `viewer-encounter.ts`): the public screen in a
-  room that may hold non-players. Only public actors with a position become tokens; annotations
+  room that may hold non-players. It follows the live scene, before and during its fight, unless
+  the GM paused it. Only public actors with a position become tokens; annotations
   are public and unexpired; initiative appears only during combat; nothing is shown while
   paused. The fields that may cross are the `ViewerEncounterScene` and
-  `ViewerPresentationProjection` types.
+  `ViewerPresentationProjection` types, plus `sound` (`ViewerSoundProjection`, added by
+  `viewer-coordinator.ts` when the feed is sent): only what is playing, by file id, level and
+  position, never a name, the playlist or the library. The screen may fetch a sound file only
+  while it is in that projection.
 - **Codex** (`codex-projections.ts`): a player gets the player half of a revealed record and
   nothing else. Reveal is a graph: a child never leaks an unrevealed parent or target, and
   `codex/visibility.ts` resolves a record's neighbours for the projection. Some fields (staged
@@ -126,10 +135,23 @@ audience. There are four:
 - **Replay** (`replay-projection.ts`): a shared fight archive is rebuilt per turn from an
   allow-list. It carries no session ids, notes, stat blocks, or rolls that were not public.
 
+Sight is part of the boundary (ADR-0023). `vision/audience.ts` decides, per audience, which
+creatures it may know of. A player sees through their own placed characters; the table viewer, a
+spectator and a replay see through the whole party. A creature that isn't a player character is
+hidden from an audience, exactly like a `gm-only` one, when none of its characters perceive it
+(dynamic vision on), or when its whole space lies under the scene's manual fog (fog on). The same
+goes for one staged that way in a prepared scene, and, with the fog on, for one in the fight but not
+yet on the map. Every projection, the feed and toast gate, and a player's target check read that one
+answer (`AudienceSight`). Rules, narration and refusals ask it through `hiddenFrom`, the shared hidden
+check: GM-only, or hidden by sight or the fog, for the table or for one player. A line that would
+name a hidden creature names "A hidden threat", a rule it would bend for a visible creature doesn't
+apply, and a public roll it makes is recorded GM-only. Another player's character out of
+sight keeps its actor but loses its token. An audience's own characters are always sent, and so
+is a creature with any part of its space revealed.
+
 The rule for a new field: it may reach a player or the viewer only if everything it carries is
 already public to them, and it carries no exact quantity and no identity, position or existence
-of a hidden thing. When in doubt, leave it out. Fog of war is presentation only (ADR-0022);
-hidden things are stripped by the projections regardless of what fog covers.
+of a hidden thing. When in doubt, leave it out.
 
 ## Maps, tokens and the grid
 
@@ -143,6 +165,16 @@ hidden things are stripped by the projections regardless of what fog covers.
   preview that mirrors the server.
 - Drawings, measurements and pings live in `annotations.ts`. Fog is an ordered list of
   reveal/hide rectangles per scene (`fog.ts`). Scenes park and resume a fight (`scenes.ts`).
+- Dynamic vision (ADR-0023) is per scene and off by default: walls, doors and windows as
+  image-pixel segments, placed and carried lights, and an ambient light level
+  (`vision/edit.ts`). The server builds each viewer's visibility polygon against the walls, cuts it
+  to the creature's senses and the lights (`vision/geometry.ts`, `vision/sight.ts`), and caches
+  polygons by walls, origin and radius. Senses come from stat blocks, species and features, and
+  light from equipped items (`vision/senses.ts`). After every command the server adds what the
+  party sees to the scene's explored memory (`rememberExplored`). Players and the table screen
+  get only polygons and rectangles to paint. While vision is on, walls, closed doors and windows
+  also bar movement, and sight decides an attack's unseen Advantage and Disadvantage and whether
+  Hide is allowed.
 - Difficult terrain is a GM-painted set of cell-snapped rectangles per scene (`terrain.ts`).
   A move is charged along the cheapest grid path, where terrain costs double, other creatures'
   spaces cost double or bar the way, and crawling, climbing or swimming without the speed, or
@@ -151,7 +183,7 @@ hidden things are stripped by the projections regardless of what fog covers.
   rides on `token.move`, each speed with its own budget (`speed.ts`), and opportunity attacks are
   read along the whole path (`movement-rules.ts`). The map's drag preview runs the same function,
   and a mirror test checks the two agree. Players and the table screen get only the terrain the
-  fog reveals.
+  fog reveals, and with vision on only what the party has seen.
 
 ## Rules engine
 
@@ -167,7 +199,14 @@ write goes through `applyCondition` in `effects.ts`, which honours innate and it
 immunities and runs what gaining a condition sets off (an Incapacitated creature drops its
 Concentration and its grapples). Effects end by their duration at turn start and turn end; the
 start of a turn deals any ongoing damage, and the end opens any repeat saves
-(`turn-boundaries.ts`).
+(`turn-boundaries.ts`). What a stat block's traits do, read from their text when the bundle is built
+(`ActorDefinition.traitMechanics`), runs at those boundaries and as damage lands: Regeneration, auras,
+Undead Fortitude, a Death Burst (`trait-turns.ts`, `statblock-traits.ts`). A stat block's spells
+(`castsSpells`) become cast actions as the catalog loads (`monster-spells.ts`). A spell that leaves an area acting later (Moonbeam, Spirit Guardians, a
+wall of fire) opens a zone on the template the cast placed, or around its caster, which the server
+runs as tokens move, as the area moves and at each turn's end and start (`spell-zones.ts`); what
+such a spell lets its caster do on later turns is offered while it lasts, at the level it was cast
+(`lasting-spells.ts`).
 
 Bonuses, advantage, extra damage and defences are modifiers in one vocabulary (`ModifierSchema` in
 `packages/schemas`), shared by features, feats, chosen options, magic items and live effects, and
@@ -244,6 +283,20 @@ names no family is the GM's own ruling on the whole command.
   the game state rather than in it, and read back only by its owner. A D&D Beyond PDF can be
   imported as an actor definition.
 
+## Sound
+
+Music and ambient sound play on the table screen only (ADR-0024); players' devices and the GM's never
+play it. The GM's library is content-addressed files under `data/sound-assets/` with names in its own
+table (`audio-assets.ts`, `sound-catalog.ts`, GM-only routes in `sound-http.ts`); an upload is sniffed
+from its bytes and walked far enough to read its length and refuse a truncated, video or non-sound
+file. The board (`sound-board.ts`, persisted by `sound-store.ts`, run by `sound-service.ts`) is apart
+from the game state so it never bumps the game revision: a playlist the server moves on by itself with
+a crossfade, looping ambient layers, one-shot effects, levels, pause, and a sound per scene that starts
+when the scene goes live. The `sound.*` commands sit in the game command table but write that store.
+The table screen's engine (`viewer/sound-engine.ts`) streams each file through a Web Audio gain, joins
+at the position the feed gives, shows "Tap to turn on sound" until its browser allows sound, and
+reports which of the two it is in for the GM's board.
+
 ## Codex
 
 The worldbuilding Codex has its own store (`codex-store.ts`, a facade over one module per
@@ -274,7 +327,7 @@ envelopes), and a caught error reaches the caller only as a known refusal, never
 ## Persistence
 
 All stores share `data/vtt.sqlite` (WAL). Integration credentials have their own SQLite file;
-GM auth is `data/auth.json`; map, token and Codex images are files under `data/`. Paths are
+GM auth is `data/auth.json`; map, token and Codex images and the sound library's files are files under `data/`. Paths are
 chosen in `apps/server/src/index.ts`. `data/` is git-ignored.
 
 Every store opens its database and runs its migrations through `apps/server/src/database.ts`. Each
@@ -292,8 +345,15 @@ Codex and homebrew are fetched over HTTP. Socket request/replies go through `lib
 calls through `lib/api.ts`. The table viewer is a separate bundle that never loads the game client.
 Rules checks on the client are hints only; the server decides.
 
+The table (`shell/TableView.tsx`) is a docked workbench (ADR-0025): a header bar over the map with the scene and
+the status line (`table/TableHeader.tsx`), the map's tool rail beside it (`scene/MapRail.tsx`), and one panel
+(`table/TablePanel.tsx`) with Needs you or the player's prompt slot above its tabs and the view's one primary in
+its footer. Nothing floats over the map but tokens and marks; notices land in the status line through
+`ToastOutlet`. The map and the panel share small module stores: the targeting session (`encounter/targeting.ts`),
+the live map's grid and size (`scene/tableGeometry.ts`) and the GM's selected token (`scene/selectedToken.ts`).
+
 Surfaces not needed for first paint load on first use (`components/lazySurface.tsx`): the Codex,
 homebrew, settings and the API reference, the character builder and level flow, replays, the map
-library and the shared-screen controls. pdf.js loads with the first imported PDF. The build targets
+library, the shared-screen controls and the sound board. pdf.js loads with the first imported PDF. The build targets
 current phone and laptop browsers (Chrome and Edge 111, Firefox 121, Safari 16.4; `build.target` in
 `apps/client/vite.config.ts`), the floor the stylesheets' `:has()` and `dvh` already set.

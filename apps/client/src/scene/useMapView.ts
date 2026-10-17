@@ -1,5 +1,4 @@
-import { useEffect, useEffectEvent, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
-import type { DockPosition } from "../encounter/DockPicker";
+import { useEffect, useEffectEvent, useState, type RefObject } from "react";
 
 export type Point = Readonly<{ x: number; y: number }>;
 export type Camera = Readonly<{ center: Point; zoom: number }>;
@@ -10,9 +9,8 @@ type Fraction = Readonly<{ x: number; y: number }>;
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 6;
 
-/** Panels laid over the stage. A press or a wheel over one belongs to the panel, never to the map. */
-export const MAP_OVERLAYS =
-  ".encounter-map-overlay, .encounter-map-zoom, .encounter-shape-editor, .encounter-map-dock, .encounter-map-dock-resize, .encounter-target-bar";
+/** Controls inside the stage's box. A press or a wheel over one belongs to the control, never to the map. */
+export const MAP_OVERLAYS = ".encounter-shape-editor, .map-rail-wrap";
 
 /* Zoom-to-a-point in three pieces shared by wheel and pinch, so they cannot drift. The pinch reads
    its anchor from the camera it started in. */
@@ -30,25 +28,19 @@ export function anchoredCamera(size: Size, anchor: Point, fraction: Fraction, zo
   return { zoom, center: { x: anchor.x + width * (0.5 - fraction.x), y: anchor.y + height * (0.5 - fraction.y) } };
 }
 
-/**
- * The map stage's view: the camera (pan and zoom, with wheel-to-zoom on the stage), enlarge and
- * fullscreen, and dragging the docked tracker's inner edge to resize it.
- */
+/** The map stage's view: the camera (pan and zoom, with wheel-to-zoom on the stage) and fullscreen. */
 export function useMapView({
   assetId,
   size,
   svgRef,
-  stageRef,
-  dock
+  stageRef
 }: Readonly<{
   assetId: string;
   size: Size | null;
   svgRef: RefObject<SVGSVGElement | null>;
   stageRef: RefObject<HTMLDivElement | null>;
-  dock?: Readonly<{ position: DockPosition; width: number; onWidthChange: (width: number) => void }>;
 }>) {
   const [camera, setCamera] = useState<Camera>({ center: { x: 0, y: 0 }, zoom: 1 });
-  const [enlarged, setEnlarged] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const width = size?.width;
   const height = size?.height;
@@ -77,8 +69,7 @@ export function useMapView({
   // Wheel-to-zoom needs preventDefault, which React's passive synthetic onWheel cannot guarantee.
   const onWheel = useEffectEvent((event: WheelEvent) => {
     if (!svgRef.current || !size) return;
-    // Wheeling over an overlaid panel (docked tracker, open menu, shape editor) scrolls that panel
-    // instead of zooming the map, mirroring the pointer-down guard.
+    // Wheeling over a control in the stage scrolls that control, mirroring the pointer-down guard.
     if (event.target instanceof Element && event.target.closest(MAP_OVERLAYS)) return;
     event.preventDefault();
     zoomAt(event.clientX, event.clientY, event.deltaY < 0 ? 1.15 : 1 / 1.15);
@@ -93,35 +84,10 @@ export function useMapView({
 
   const resetView = () => {
     if (!size) return;
-    // Frame the whole map in the area the dock leaves visible: the dock's inner edge becomes the canvas
-    // edge. `baseScale` is the zoom-1 meet-scale read from the SVG's actual box, so letterboxing and the
-    // stage's max-height are accounted for.
-    const svgRect = svgRef.current?.getBoundingClientRect();
-    const dockRect = stageRef.current?.querySelector<HTMLElement>(".encounter-map-dock")?.getBoundingClientRect();
-    let center = { x: size.width / 2, y: size.height / 2 };
-    let zoom = 1;
-    if (svgRect && dockRect && svgRect.width > 0 && svgRect.height > 0) {
-      const baseScale = Math.min(svgRect.width / size.width, svgRect.height / size.height);
-      let visibleW = svgRect.width;
-      let offsetX = 0;
-      const visibleH = svgRect.height;
-      const offsetY = 0;
-      if (dock?.position === "right") {
-        visibleW -= dockRect.width;
-        offsetX = -dockRect.width / 2;
-      } else if (dock?.position === "left") {
-        visibleW -= dockRect.width;
-        offsetX = dockRect.width / 2;
-      }
-      if (visibleW > 0 && visibleH > 0 && baseScale > 0) {
-        const fit = Math.min(visibleW / (size.width * baseScale), visibleH / (size.height * baseScale));
-        zoom = Math.max(MIN_ZOOM, Math.min(1, fit));
-        const scale = baseScale * zoom;
-        center = { x: size.width / 2 - offsetX / scale, y: size.height / 2 - offsetY / scale };
-      }
-    }
-    setCamera({ center, zoom });
+    setCamera({ center: { x: size.width / 2, y: size.height / 2 }, zoom: 1 });
   };
+  /** Brings a point to the middle of the view, closer in when the whole map is showing. */
+  const centreOn = (point: Point) => setCamera((current) => ({ center: point, zoom: Math.max(current.zoom, 1.5) }));
   const zoomCenter = (factor: number) => {
     const svg = svgRef.current;
     if (!svg || !size) return;
@@ -132,37 +98,7 @@ export function useMapView({
     const el = stageRef.current;
     if (!el) return;
     if (document.fullscreenElement) void document.exitFullscreen();
-    else {
-      setEnlarged(false);
-      void el.requestFullscreen?.();
-    }
-  };
-  const toggleEnlarged = () =>
-    setEnlarged((current) => {
-      if (!current && fullscreen) void document.exitFullscreen?.();
-      return !current;
-    });
-  // Drag the docked panel's inner-edge strip to resize it. Window listeners keep the drag alive off the
-  // strip; width is clamped to [16rem, 60% of the stage] and persisted by the parent.
-  const beginDockResize = (event: ReactPointerEvent) => {
-    if (!dock) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const startX = event.clientX;
-    const startWidth = dock.width;
-    const stageWidth = stageRef.current?.getBoundingClientRect().width ?? 1000;
-    const maxWidth = stageWidth * 0.6;
-    const minWidth = 16 * 16; // 16rem
-    const onMove = (move: PointerEvent) => {
-      const delta = dock.position === "left" ? move.clientX - startX : startX - move.clientX;
-      dock.onWidthChange(Math.max(minWidth, Math.min(maxWidth, startWidth + delta)));
-    };
-    const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
+    else void el.requestFullscreen?.();
   };
   const viewBox = size
     ? `${camera.center.x - size.width / camera.zoom / 2} ${camera.center.y - size.height / camera.zoom / 2} ${size.width / camera.zoom} ${size.height / camera.zoom}`
@@ -175,11 +111,9 @@ export function useMapView({
     boxFraction,
     zoomCenter,
     resetView,
-    enlarged,
-    toggleEnlarged,
+    centreOn,
     fullscreen,
-    toggleFullscreen,
-    beginDockResize
+    toggleFullscreen
   };
 }
 
