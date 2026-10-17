@@ -1,5 +1,5 @@
 import type { PendingSave } from "@vtt/domain";
-import type { ActionReaction } from "@vtt/schemas";
+import { catalogIdOf, type ActionReaction } from "@vtt/schemas";
 import { setCondition } from "../actor-conditions.js";
 import { conditionLabel } from "../condition-rules.js";
 import { addEffect, makeEffect } from "../effects.js";
@@ -147,6 +147,13 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
   return true;
 }
 
+/** A spell's save, or a magic item's (a wand's), is one against magic: Magic Resistance meets it with Advantage. */
+export function isMagicalAction(ctx: Pick<ResolveContext, "action" | "attacker" | "riderItemId" | "deps">): boolean {
+  if (ctx.action.spellId !== undefined) return true;
+  const item = ctx.riderItemId === null ? undefined : ctx.attacker.inventory.find((row) => row.id === ctx.riderItemId);
+  return item !== undefined && ctx.deps.catalog?.equipmentRecord(catalogIdOf(item))?.isMagic === true;
+}
+
 /** Conditions a failed save leaves on their own rather than on its effect: Prone ends by standing up, and
  *  Exhaustion stacks and leaves with rests. */
 const BARE_FAILURE_CONDITIONS: ReadonlySet<string> = new Set(["prone", "exhaustion"]);
@@ -160,7 +167,7 @@ const BARE_FAILURE_CONDITIONS: ReadonlySet<string> = new Set(["prone", "exhausti
  * grappler" read the source from it. Undefined when every condition stays bare and the action declares nothing more.
  */
 export function failureEffectFor(
-  ctx: Pick<ResolveContext, "action" | "attacker" | "castId">,
+  ctx: Pick<ResolveContext, "action" | "attacker" | "castId" | "riderItemId" | "deps">,
   conditionIds: readonly string[]
 ): PendingSave["onFailEffect"] {
   const { action, attacker, castId } = ctx;
@@ -194,6 +201,7 @@ export function failureEffectFor(
     ...(grapple ? { endsWhenSourceDefeated: true, rangeFeet: save.rangeFeet ?? action.attack?.reachFeet ?? 5 } : {}),
     ...(ongoingDamage ? { ongoingDamage } : {}),
     ...(castId !== null ? { castId } : {}),
+    ...(isMagicalAction(ctx) ? { magical: true as const } : {}),
     sourceActionId: action.id
   };
 }
@@ -288,6 +296,7 @@ export function parkActionSave(ctx: ResolveContext): void {
       halfOnSuccess: action.save.successDamage === "half",
       conditionIds,
       ...(onFailEffect ? { onFailEffect } : {}),
+      magical: isMagicalAction(ctx),
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())
     });

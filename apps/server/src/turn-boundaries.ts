@@ -146,6 +146,8 @@ function openEndingSave(
     halfOnSuccess: false,
     conditionIds: [],
     repeatOf: { actorId: bearer.id, effectId: effect.id },
+    // Repeated against a spell's effect (Hold Person), it is still a save against magic.
+    magical: effect.magical === true,
     newSaveId: deps.newId,
     createdAt: Date.parse(deps.now())
   });

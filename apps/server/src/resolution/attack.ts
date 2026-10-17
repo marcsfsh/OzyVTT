@@ -23,7 +23,7 @@ import {
   requireTypedReroll,
   spendRerollRight
 } from "../held-rolls.js";
-import { GM_CHOICE } from "../saving-throws.js";
+import { GM_CHOICE, magicResistanceOf } from "../saving-throws.js";
 import { criticalThreshold } from "../effective-actions.js";
 import { endEffect, STEADY_AIM_TAG } from "../effects.js";
 import {
@@ -442,6 +442,14 @@ export function rollAttack(ctx: ResolveContext): void {
         : total >= targetAc
           ? ("hit" as const)
           : ("miss" as const);
+  // SRD Greater Magic Resistance: "the attack rolls of spells automatically miss it". Said to the GM only, since the
+  // reason names a trait of the stat block.
+  if (action.spellId !== undefined && magicResistanceOf(targetDefinition) === "succeeds") {
+    outcome = "miss";
+    ctx.crit = false;
+    if (deps.initiatorRole !== "player")
+      warnings.push(`${target.name}'s Greater Magic Resistance: spell attack rolls automatically miss it.`);
+  }
   if (outcome === "hit" && (has(target, "unconscious") || has(target, "paralyzed"))) {
     if ((distance !== null && distance <= 5) || (distance === null && action.attack.reachFeet !== undefined)) {
       outcome = "crit";

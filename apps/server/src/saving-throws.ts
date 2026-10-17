@@ -68,6 +68,8 @@ export type SaveOutcome = Readonly<{
   flatReduction?: number;
   /** The condition that forced an automatic failure (Paralyzed etc. on a Str/Dex save); null when the die was rolled. */
   autoFailed?: string | null;
+  /** The trait that made it succeed without a roll (Greater Magic Resistance against a spell). */
+  autoSucceeded?: string;
   /** Advantage/disadvantage sources that shaped the rolled save (Restrained, Dodge); absent for a plain d20. */
   rollMode?: AggregatedRollMode;
 }>;
@@ -215,6 +217,14 @@ export function saveModifierFor(definition: ActorDefinition | undefined, ability
   return scoreModifier(definition.abilityScores[ability]);
 }
 
+/** SRD Magic Resistance: "Advantage on saving throws against spells and other magical effects"; Greater Magic
+ *  Resistance (the rakshasa's) "automatically succeeds" on them. Read from the stat block's trait by its name. */
+export function magicResistanceOf(definition: ActorDefinition | undefined): "advantage" | "succeeds" | null {
+  if (holdsFeature(definition, "greater-magic-resistance", "Greater Magic Resistance")) return "succeeds";
+  if (holdsFeature(definition, "magic-resistance", "Magic Resistance")) return "advantage";
+  return null;
+}
+
 /** Proficiency bonus when an item grants this save's proficiency and the sheet lacks it. */
 function saveProficiencyFromItems(
   definition: ActorDefinition | undefined,
@@ -274,6 +284,8 @@ export function createPendingSaves(
     replaceExisting?: boolean;
     /** The GM's call for a roll these saves answer. */
     callId?: string;
+    /** Against a spell or a magic item, which Magic Resistance meets with Advantage. */
+    magical?: boolean;
     newSaveId: () => string;
     createdAt: number;
   }>
@@ -298,6 +310,7 @@ export function createPendingSaves(
       : {}),
     ...(input.repeatOf ? { repeatOf: input.repeatOf } : {}),
     ...(input.callId !== undefined ? { callId: input.callId } : {}),
+    ...(input.magical ? { magical: true as const } : {}),
     createdAt: input.createdAt
   }));
   // A re-cast against the same target replaces its older prompt.
@@ -371,6 +384,7 @@ export function applyFailureEffect(
       ...(onFail.castId !== undefined ? { castId: onFail.castId } : {}),
       ...(onFail.rangeFeet !== undefined ? { rangeFeet: onFail.rangeFeet } : {}),
       ...(onFail.ongoingDamage ? { ongoingDamage: onFail.ongoingDamage } : {}),
+      ...(onFail.magical ? { magical: true as const } : {}),
       // What it does while it lasts (Bane's -1d4).
       modifiers: [...onFail.modifiers]
     }),
@@ -471,7 +485,10 @@ export function answerSave(
   let total: number;
   let natural: number | null = null;
   let autoFailed: string | null = null;
+  let autoSucceeded: string | null = null;
   let rollMode: AggregatedRollMode | undefined;
+  const targetDefinition = target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined;
+  const magicResistance = pending.magical ? magicResistanceOf(targetDefinition) : null;
   if (method === "manual") {
     // The GM's typed total is a ruling, so it stands as given (a table may rule an exception to an auto-fail). A
     // player types the face their die shows instead, and the server adds the bonus.
@@ -483,8 +500,11 @@ export function answerSave(
     // SRD: Paralyzed/Petrified/Stunned/Unconscious auto-fail Str/Dex saves; no die is rolled, typed or not.
     autoFailed = autoFailsPhysicalSaves(target);
     total = 0;
+  } else if (magicResistance === "succeeds") {
+    autoSucceeded = "Greater Magic Resistance";
+    total = 0;
   } else {
-    const definition = target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined;
+    const definition = targetDefinition;
     const derivation = deriveEquipment(target, definition, deps.catalog);
     // Exhaustion (-2 x level, SRD 5.2.1) and item save bonuses come through `saveTotalFor`, shared with the sheet's
     // chip; cover's per-save bonus and an ally Paladin's aura are added on top.
@@ -498,6 +518,8 @@ export function answerSave(
       pending.endsEffects !== undefined,
       conditionsAtStake(state, pending)
     );
+    if (magicResistance === "advantage")
+      sources.advantage.push({ source: "magic-resistance", label: "Magic Resistance" });
     const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
     // A player's choice is never read: the rules count Advantage and Disadvantage, and only the GM may force a mode.
     const forced = scope.role === "gm" ? explicitRollMode : undefined;
@@ -544,7 +566,7 @@ export function answerSave(
     total = test.resolution.total;
   }
 
-  let success = autoFailed === null && total >= pending.dc;
+  let success = autoSucceeded !== null || (autoFailed === null && total >= pending.dc);
   // SRD Legendary Resistance: on a failed save the creature can choose to succeed. The GM commits with
   // the flag; the pool rides actionUses["legendary-resistance"] and a long rest re-arms it.
   let legendaryNote: string | null = null;
@@ -627,6 +649,7 @@ export function answerSave(
         conditionApplied: outcomeCondition,
         committed: false,
         autoFailed,
+        ...(autoSucceeded !== null ? { autoSucceeded } : {}),
         ...(natural !== null ? { natural } : {}),
         ...(rollMode ? { rollMode } : {}),
         ...(weighed && weighed.parts.length > 0 ? { parts: weighed.parts } : {}),
@@ -642,6 +665,12 @@ export function answerSave(
     events.push({
       kind: "condition",
       text: `${target.name} automatically fails the ${pending.ability.toUpperCase()} save (${conditionLabel(autoFailed)}).`,
+      actorId: target.id
+    });
+  if (autoSucceeded !== null)
+    events.push({
+      kind: "condition",
+      text: `${target.name} automatically succeeds on the ${pending.ability.toUpperCase()} save (${autoSucceeded}).`,
       actorId: target.id
     });
   let appliedDamage = 0;
@@ -733,6 +762,7 @@ export function answerSave(
       conditionApplied,
       committed: true,
       autoFailed,
+      ...(autoSucceeded !== null ? { autoSucceeded } : {}),
       ...(rollMode ? { rollMode } : {}),
       ...(application
         ? {

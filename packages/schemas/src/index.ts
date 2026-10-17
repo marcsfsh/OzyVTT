@@ -671,7 +671,9 @@ export const EffectInstanceSchema = z
       .strict()
       .optional(),
     /** How many more times its damage riders may land before it ends (a coat of Basic Poison). */
-    damageUses: z.number().int().min(1).max(10).optional()
+    damageUses: z.number().int().min(1).max(10).optional(),
+    /** It comes from a spell or a magic item, so a save repeated against it is one Magic Resistance helps with. */
+    magical: z.literal(true).optional()
   })
   .strict();
 export type EffectInstance = z.infer<typeof EffectInstanceSchema>;
