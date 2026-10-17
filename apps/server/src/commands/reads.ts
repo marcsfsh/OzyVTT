@@ -17,8 +17,12 @@ import {
   ActorAvailableActionsSchema,
   ActorMovementSchema,
   BuilderOffersSchema,
-  ContentActionsSchema
+  ContentActionsSchema,
+  VisionPreviewSchema
 } from "@vtt/domain/commands";
+import { partyViewerIds } from "../vision/audience.js";
+import { flatPolygon } from "../vision/geometry.js";
+import { sceneSight } from "../vision/sight.js";
 import { movementStatus } from "../movement-rules.js";
 import { GameNotFoundError } from "./failures.js";
 import { initiatorOf, isGmGrade, type GamePrincipal, type Kit } from "./kit.js";
@@ -224,6 +228,31 @@ export const gameReads = [
       if (!isGmGrade(principal) && kit.read().builderPolicy.playerBuilder !== "open")
         throw new GameAccessDeniedError("Your GM builds the characters at this table.");
       return builderOffers(input as z.output<typeof BuilderOffersSchema>, kit.catalogFor(principal));
+    }
+  },
+
+  {
+    event: "vision:preview",
+    path: GAME_PATHS.visionPreview,
+    scope: "scene:read",
+    gmOnly: "Only the GM can look through a creature's eyes.",
+    schema: VisionPreviewSchema,
+    malformed: "The vision preview is malformed.",
+    httpInput: ({ query }) => (typeof query.actorId === "string" ? { actorId: query.actorId } : {}),
+    // The same sight the projections use: one creature's, or the whole party's when none is named.
+    run: (_principal, input, kit) => {
+      const state = kit.read();
+      const { actorId } = input as z.output<typeof VisionPreviewSchema>;
+      if (actorId !== undefined && !state.actors.some((actor) => actor.id === actorId))
+        throw new GameNotFoundError("That combatant no longer exists.");
+      const sight = sceneSight(state, kit.sightContent());
+      if (!sight.enabled) return { enabled: false, visible: [], actorIds: [] };
+      const viewers = actorId === undefined ? partyViewerIds(state) : [actorId];
+      return {
+        enabled: true,
+        visible: sight.areaOf(viewers).map(flatPolygon),
+        actorIds: [...sight.perceivedBy(viewers)]
+      };
     }
   },
 

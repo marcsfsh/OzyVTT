@@ -99,7 +99,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     name: "Hide",
     activation: "action",
     description:
-      "Make a DC 15 Dexterity (Stealth) check while Heavily Obscured or behind Three-Quarters or Total Cover, out of any enemy's line of sight (the GM adjudicates eligibility - the engine can't see sight lines). On a success you have the Invisible condition while hidden; making an attack roll ends it. (SRD 5.2.1, Hide [Action])",
+      "Make a DC 15 Dexterity (Stealth) check while Heavily Obscured or behind Three-Quarters or Total Cover, out of any enemy's line of sight (with dynamic vision on, an enemy you can see that sees you stops it; otherwise the GM decides). On a success you have the Invisible condition while hidden; making an attack roll ends it. (SRD 5.2.1, Hide [Action])",
     damage: []
   },
   {

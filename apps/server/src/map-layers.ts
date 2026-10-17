@@ -2,13 +2,13 @@ import type { GameState, SceneCombat } from "@vtt/domain";
 import { CommandRejectedError } from "./game-store.js";
 import { gridToImage, imageToGrid, type SquareGridCalibration } from "./grid-calibration.js";
 
-/** The GM's painted map layers (fog, difficult terrain) share how a stroke finds its scene and its cells. */
+/** The GM's map layers (fog, difficult terrain, vision) share how an edit finds its scene and its cells. */
 
 export type LayerMapGeometry = Readonly<{ width: number; height: number; calibration: SquareGridCalibration | null }>;
 export type PaintRectInput = Readonly<{ x: number; y: number; width: number; height: number }>;
 
 /** A layer of the combat a stroke targets: the live table, or a parked scene's stored combat. */
-export function layerSlice<Key extends "fog" | "terrain">(
+export function layerSlice<Key extends "fog" | "terrain" | "vision">(
   state: GameState,
   sceneId: string | undefined,
   key: Key,

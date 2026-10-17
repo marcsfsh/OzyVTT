@@ -36,7 +36,8 @@ function checkDeps(kit: Kit, principal: GamePrincipal, draft: GameState): CheckR
     names: {
       skill: (id) => skills.find((skill) => skill.id === id)?.name,
       tool: (id) => catalog.equipmentRecord(id)?.name
-    }
+    },
+    unseen: kit.unseenBy(initiatorOf(principal), draft)
   };
 }
 

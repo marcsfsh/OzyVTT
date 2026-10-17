@@ -886,6 +886,114 @@ export const TerrainResetSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+
+// Dynamic vision (ADR-0023). The GM's edits take `sceneId` to prep a parked scene, as fog and terrain do.
+/** A map point in image pixels, before the server snaps and clamps it. */
+const VisionPointWireSchema = z
+  .object({ x: z.number().min(-100000).max(1_000_000), y: z.number().min(-100000).max(1_000_000) })
+  .strict();
+export const VisionSetEnabledSchema = z
+  .object({
+    commandId: z.uuid(),
+    enabled: z.boolean(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+export const VisionSetAmbientSchema = z
+  .object({
+    commandId: z.uuid(),
+    ambient: z.enum(["bright", "dim", "dark"]),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+export const VisionResetExploredSchema = z
+  .object({
+    commandId: z.uuid(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A chain of walls, doors or windows: each pair of consecutive points is one segment. */
+export const WallAddSchema = z
+  .object({
+    commandId: z.uuid(),
+    kind: z.enum(["wall", "door", "window"]),
+    points: z.array(VisionPointWireSchema).min(2).max(64),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+export const WallMoveSchema = z
+  .object({
+    commandId: z.uuid(),
+    wallId: z.uuid(),
+    a: VisionPointWireSchema,
+    b: VisionPointWireSchema,
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+export const WallRemoveSchema = z
+  .object({
+    commandId: z.uuid(),
+    wallId: z.uuid(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+export const WallClearSchema = z
+  .object({
+    commandId: z.uuid(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Open or close a door. A player may, for a door next to their own character's token on the live table. */
+export const DoorSetOpenSchema = z
+  .object({
+    commandId: z.uuid(),
+    wallId: z.uuid(),
+    open: z.boolean(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A light placed on the map (`position`) or carried by a token (`actorId`). */
+export const LightAddSchema = z
+  .object({
+    commandId: z.uuid(),
+    position: VisionPointWireSchema.optional(),
+    actorId: z.uuid().optional(),
+    brightFeet: z.number().min(0).max(240),
+    dimFeet: z.number().min(0).max(240),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict()
+  .refine((light) => (light.position === undefined) !== (light.actorId === undefined), {
+    message: "Give the light a place on the map or a token to carry it. It can't have both."
+  });
+export const LightMoveSchema = z
+  .object({
+    commandId: z.uuid(),
+    lightId: z.uuid(),
+    position: VisionPointWireSchema,
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+export const LightRemoveSchema = z
+  .object({
+    commandId: z.uuid(),
+    lightId: z.uuid(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM's look through one creature's eyes, or the whole party's when `actorId` is absent. */
+export const VisionPreviewSchema = z.object({ actorId: z.uuid().optional() }).strict();
 export const ActorRestSchema = z
   .object({
     commandId: z.uuid(),

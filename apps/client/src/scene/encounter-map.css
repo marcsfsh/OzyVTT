@@ -893,3 +893,93 @@
   gap: var(--space-2);
   margin-top: var(--space-1);
 }
+
+/* Dynamic vision. Players and the shared screen get the darkness as a flat opaque plate with a hard edge, and the
+   ground the party has seen through it at about half strength; the GM's look through a creature's eyes is the fog's
+   violet veil. Walls, windows and lights are GM-only marks, so violet; a door's handle is a control, so magenta. */
+.vision-overlay-player {
+  fill: var(--void);
+  fill-opacity: 1;
+}
+.vision-overlay-gm {
+  fill: color-mix(in srgb, var(--void) 72%, var(--violet));
+  fill-opacity: 0.55;
+}
+.vision-layer {
+  pointer-events: none;
+}
+.vision-wall-line,
+.vision-wall-preview {
+  stroke: var(--violet-hi);
+  stroke-width: 3;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+.vision-wall-preview {
+  stroke-dasharray: 6 4;
+}
+.vision-wall-window .vision-wall-line,
+.vision-wall-preview.vision-wall-window {
+  stroke: var(--violet);
+  stroke-dasharray: 2 5;
+}
+.vision-wall-door .vision-wall-line,
+.vision-wall-preview.vision-wall-door {
+  stroke: var(--magenta);
+  stroke-width: 4;
+}
+.vision-wall-door.open .vision-wall-line {
+  stroke-dasharray: 6 5;
+}
+.vision-door-ring {
+  fill: var(--surface-2);
+  stroke: var(--magenta);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.vision-wall-door.open .vision-door-ring {
+  fill: var(--magenta);
+}
+.vision-door-handle {
+  cursor: pointer;
+  outline: none;
+}
+.vision-door-handle:focus-visible .vision-door-ring {
+  stroke: var(--cyan);
+  stroke-width: 4;
+}
+/* A 44-pixel touch ring at every zoom, for door handles and, with Remove on, walls and lights. */
+.vision-hit {
+  fill: transparent;
+  stroke: transparent;
+  stroke-width: 44px;
+  vector-effect: non-scaling-stroke;
+  pointer-events: all;
+}
+.vision-layer.erasing .vision-hit {
+  cursor: crosshair;
+}
+.vision-light-dim,
+.vision-light-bright {
+  fill: var(--violet);
+  stroke: var(--violet-hi);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+.vision-light-dim {
+  fill-opacity: 0.05;
+  stroke-opacity: 0.45;
+  stroke-dasharray: 4 6;
+}
+.vision-light-bright {
+  fill-opacity: 0.08;
+  stroke-opacity: 0.7;
+}
+.vision-light-glyph {
+  fill: var(--violet-hi);
+  stroke: var(--void);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}

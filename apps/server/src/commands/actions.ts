@@ -1,9 +1,8 @@
-import type { RollRecord } from "@vtt/domain";
+import type { GameState, RollRecord } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
 import { resolveDefinitionAction } from "../action-resolution.js";
 import { addAnnotation, shapeGeometry } from "../annotations.js";
 import { areaOriginatesFromCaster, tokensInTemplate } from "../area-targeting.js";
-import { unseenByPlayer } from "../fog-cover.js";
 import { canPlayerTarget, GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { withSeenTargets } from "../resolution/seen-targets.js";
 import { builtinActionFor } from "../builtin-actions.js";
@@ -74,6 +73,14 @@ export const actionCommands = [
       // name, so a player's is kept.
       const initiator = initiatorOf(principal);
       const isPlayer = initiator.role === "player";
+      // The creatures a player may not target or be told of: GM-only ones, and those their characters can't perceive
+      // or that stand wholly under the fog.
+      const hiddenFromPlayer = (state: GameState): ReadonlySet<string> => {
+        const unseen = kit.unseenBy(initiator, state);
+        return new Set(
+          state.actors.filter((actor) => !canPlayerTarget(state, actor.id, unseen)).map((actor) => actor.id)
+        );
+      };
       if (isPlayer && override) throw new GameAccessDeniedError("Your GM adjudicates rules overrides.");
       // A player types the face their die shows, never a total: the server adds the bonus and reads a 1 or a 20.
       if (isPlayer && (attackTotal !== undefined || critical !== undefined || fumble !== undefined))
@@ -133,17 +140,20 @@ export const actionCommands = [
           );
           // An area catches everyone under it, seen or not. Whether it holds anyone is judged on what the caster's
           // player can see, so an empty refusal never tells them a hidden creature is there.
-          const unseen = isPlayer ? unseenByPlayer(draft, sessionIdOf(principal)) : new Set<string>();
+          const unseen = isPlayer ? hiddenFromPlayer(draft) : new Set<string>();
           if (!resolvedTargetIds.some((id) => !unseen.has(id)))
             throw new CommandRejectedError(
               isPlayer ? "No creatures you can see are inside that area." : "No combatants are inside that area."
             );
         } else {
           resolvedTargetIds = targetIds ?? [];
-          // A player may target only public combatants: resolving against a hidden actor would leak its
-          // name/AC/outcome through the ack (and in direct mode damage it).
-          if (isPlayer && resolvedTargetIds.some((targetId) => !canPlayerTarget(draft, targetId)))
-            throw new CommandRejectedError("You can only target combatants you can see.");
+          // A player may target only public combatants they can see: resolving against a hidden actor would leak
+          // its name/AC/outcome through the ack (and in direct mode damage it).
+          if (isPlayer) {
+            const unseen = hiddenFromPlayer(draft);
+            if (resolvedTargetIds.some((targetId) => unseen.has(targetId)))
+              throw new CommandRejectedError("You can only target combatants you can see.");
+          }
         }
         // Footprint-aware (SRD Creature Size): Medium adjacent to Large is 5 ft, not center-to-center 10.
         const distanceFeet = (actorIdA: string, actorIdB: string): number | null =>
@@ -238,7 +248,7 @@ export const actionCommands = [
       });
       if (duplicate || !resolution) return;
       // A player's reply names only the creatures they may see; the rest of an area's catch stays with the GM.
-      const reply = isPlayer ? withSeenTargets(resolution, unseenByPlayer(state, sessionIdOf(principal))) : resolution;
+      const reply = isPlayer ? withSeenTargets(resolution, hiddenFromPlayer(state)) : resolution;
       // A preview recorded only the attack die: publish the roll, but hold narration until the resolve is confirmed.
       kit.publishRolls(state, commandId);
       if (!resolution.preview) {

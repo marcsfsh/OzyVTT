@@ -94,8 +94,9 @@ describe("a live scene before its fight", () => {
       HERO,
       SCOUT
     ]);
-    // Anyone else's view (a spectator) leaves it under the fog.
+    // A spectator sees through the whole party, so the party's characters stay on its map too.
     expect(projectPlayerView(state, undefined, () => null).combat.tokens.map((entry) => entry.actorId)).toEqual([
+      HERO,
       SCOUT
     ]);
   });

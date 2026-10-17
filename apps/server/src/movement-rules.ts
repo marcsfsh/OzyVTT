@@ -50,6 +50,12 @@ export type MovementRulesInput = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
   /** The item catalog, so a reach-granting item widens the opportunity-attack trigger. */
   catalog?: EquipmentCatalog;
+  /** With dynamic vision on: whether the mover perceived a creature as it set off. One it didn't is no obstacle and no
+   *  refusal, as a hidden one isn't. Every creature counts when absent. */
+  perceives?: (actorId: string) => boolean;
+  /** With dynamic vision on: whether a creature saw the mover as it set off, which an opportunity attack needs. The
+   *  conditions alone decide (Blinded, Invisible) when absent. */
+  seenBy?: (actorId: string) => boolean;
   newPromptId: () => string;
   now: () => number;
   commandId: string;
@@ -246,6 +252,7 @@ function endsInOccupiedSpace(state: GameState, input: MovementRulesInput, to: Po
     if (token.actorId === input.actorId || !token.position || input.dragging?.actorIds.includes(token.actorId))
       return false;
     if (state.actors.find((actor) => actor.id === token.actorId)?.visibility === "gm-only") return false;
+    if (input.perceives && !input.perceives(token.actorId)) return false;
     for (const cell of cellsAt(input.calibration!, token.position, token.sizeCells ?? 1))
       if (mine.has(cell)) return true;
     return false;
@@ -300,7 +307,8 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   const options: MovementCostOptions = {
     extraPerStep,
     carried: input.dragging?.actorIds ?? [],
-    resolveDefinition: input.resolveDefinition
+    resolveDefinition: input.resolveDefinition,
+    ...(input.perceives ? { perceives: input.perceives } : {})
   };
   const straight = (): MovementCost | null => {
     const distance = input.distance(from, to);
@@ -312,7 +320,9 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
       state,
       input,
       "movement.blocked-path",
-      `${mover.name} can't get there - other creatures bar the way.`,
+      state.combat.vision.enabled && state.combat.vision.walls.length > 0
+        ? `${mover.name} can't get there. Walls or other creatures bar the way.`
+        : `${mover.name} can't get there. Other creatures bar the way.`,
       outcome
     );
     charge = straight();
@@ -396,7 +406,8 @@ function openOpportunityAttacks(
       )
         left = wasIn;
     }
-    if (left === null || !seesMover(enemy, enemyDefinition, mover, left)) continue;
+    if (left === null) continue;
+    if (input.seenBy ? !input.seenBy(enemy.id) : !seesMover(enemy, enemyDefinition, mover, left)) continue;
     if (
       state.combat.pendingReactions.some(
         (prompt) => prompt.kind === "leaves-reach" && prompt.actorId === enemy.id && prompt.targetActorId === actorId

@@ -239,7 +239,7 @@ describe("when and where a creature may move", () => {
         now: () => 0,
         commandId: "50000000-0000-4000-8000-000000000001"
       })
-    ).toThrowError("Borin can't get there - other creatures bar the way.");
+    ).toThrowError("Borin can't get there. Other creatures bar the way.");
   });
 });
 

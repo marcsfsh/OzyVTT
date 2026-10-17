@@ -19,6 +19,7 @@ import { saveCommands } from "./saves.js";
 import { sceneCommands } from "./scenes.js";
 import { soundCommands } from "./sound.js";
 import { tableSettingCommands } from "./table-settings.js";
+import { visionCommands } from "./vision.js";
 
 export { describeFailure, failureReply, NOT_JOINED_REPLY } from "./failures.js";
 export { isGmGrade, type CommandContext, type GamePrincipal } from "./kit.js";
@@ -42,7 +43,8 @@ export const gameCommands: readonly AnyCommand[] = [
   ...tableSettingCommands,
   ...sceneCommands,
   ...mapCommands,
-  ...soundCommands
+  ...soundCommands,
+  ...visionCommands
 ];
 export { gameReads };
 

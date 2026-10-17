@@ -60,6 +60,8 @@ export type StabilizeDeps = Readonly<{
   role: "gm" | "player";
   /** Creature-to-creature distance on the map; null when it can't be measured. */
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
+  /** Creatures hidden from a player by sight or the fog. */
+  unseen?: ReadonlySet<string>;
 }>;
 
 export type StabilizeOutcome = Readonly<{
@@ -153,7 +155,7 @@ export function stabilizeCreature(
   deps: StabilizeDeps
 ): StabilizeOutcome {
   const target = state.actors.find((candidate) => candidate.id === input.targetId);
-  if (!target || (scope.role === "player" && !canPlayerTarget(state, target.id)))
+  if (!target || (scope.role === "player" && !canPlayerTarget(state, target.id, deps.unseen)))
     throw new CommandRejectedError("That creature is not on the table.");
   if (input.method === "gm") {
     requireGm(scope, "Only the GM can rule a creature stable.");

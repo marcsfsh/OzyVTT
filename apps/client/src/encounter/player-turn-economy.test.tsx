@@ -38,6 +38,7 @@ function combat(rulesMode: PlayerCombatView["rulesMode"]): PlayerCombatView {
     reactionsUsed: [ME],
     fog: { enabled: false, shapes: [] },
     terrain: { difficult: [] },
+    vision: { enabled: false },
     pendingSaves: [],
     pendingReactions: [],
     pendingRuleAsks: [],

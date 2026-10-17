@@ -35,7 +35,10 @@ import type {
   RulesBlocked,
   SaveAnswerResult,
   SceneCreateResult,
-  StabilizeResult
+  StabilizeResult,
+  LightAddResult,
+  VisionPreviewResult,
+  WallAddResult
 } from "./results.js";
 import type { ClientRole, CombatLogEntry, GmView, PlayerView } from "./views.js";
 import type { SoundBoardResult, SoundBoardView, SoundCommandResult } from "./sound.js";
@@ -150,12 +153,24 @@ import type {
   TurnLegendarySchema,
   TurnReactionSchema,
   TurnUseSchema,
+  DoorSetOpenSchema,
+  LightAddSchema,
+  LightMoveSchema,
+  LightRemoveSchema,
   SoundArrangeSchema,
   SoundNextTrackSchema,
   SoundPauseSchema,
   SoundPlaySchema,
   SoundScenePresetSchema,
-  SoundStopSchema
+  SoundStopSchema,
+  VisionPreviewSchema,
+  VisionResetExploredSchema,
+  VisionSetAmbientSchema,
+  VisionSetEnabledSchema,
+  WallAddSchema,
+  WallClearSchema,
+  WallMoveSchema,
+  WallRemoveSchema
 } from "./commands.js";
 
 /** A brief, ephemeral battlemap notification ("Goblin took 6 damage"). Never stored in GameState - presentation only; the roll history is the durable record. */
@@ -725,6 +740,52 @@ export interface ClientToServerEvents {
   ) => void;
   "terrain:reset": (
     payload: CommandPayload<typeof TerrainResetSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "vision:set-enabled": (
+    payload: CommandPayload<typeof VisionSetEnabledSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "vision:set-ambient": (
+    payload: CommandPayload<typeof VisionSetAmbientSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "vision:reset-explored": (
+    payload: CommandPayload<typeof VisionResetExploredSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM only: where one creature, or the whole party, sees now. */
+  "vision:preview": (
+    payload: CommandPayload<typeof VisionPreviewSchema>,
+    acknowledgement: (result: VisionPreviewResult) => void
+  ) => void;
+  "wall:add": (payload: CommandPayload<typeof WallAddSchema>, acknowledgement: (result: WallAddResult) => void) => void;
+  "wall:move": (
+    payload: CommandPayload<typeof WallMoveSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "wall:remove": (
+    payload: CommandPayload<typeof WallRemoveSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "wall:clear": (
+    payload: CommandPayload<typeof WallClearSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "door:set-open": (
+    payload: CommandPayload<typeof DoorSetOpenSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "light:add": (
+    payload: CommandPayload<typeof LightAddSchema>,
+    acknowledgement: (result: LightAddResult) => void
+  ) => void;
+  "light:move": (
+    payload: CommandPayload<typeof LightMoveSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "light:remove": (
+    payload: CommandPayload<typeof LightRemoveSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "annotation:add": (

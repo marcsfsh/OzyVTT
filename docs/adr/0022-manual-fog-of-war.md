@@ -5,6 +5,10 @@
 Accepted — 2026-07-19. Implements the BUILD_PLAN Phase-2 gate item ("the smallest intuitive
 manual-fog/reveal slice over the recipient-safe scene boundary").
 
+Amended 2026-10-17 by [ADR-0023](0023-dynamic-vision-on-the-server.md): a creature whose whole space
+lies under the fog is now left out of players' payloads, so fog is part of the security boundary.
+See "Consequences" below. The rest of this decision stands.
+
 ## Context and decision drivers
 
 The owner asked what could be learned from AboveVTT and Foundry's dnd5e (design study only —
@@ -58,7 +62,13 @@ their own projection filters regardless of fog. The corollary a GM must know: a 
 inside fog is visually covered but still present in the player payload — hiding a monster's
 existence still requires `gm-only` visibility, not fog. No token-vision, light sources, or
 auto-reveal-on-move: v1 is deliberately manual (the combat-first "obvious GM action" over a
-settings surface). The 200-stroke cap trades unbounded paint history for a bounded wire size, with
+settings surface).
+
+**Superseded by ADR-0023 (2026-10-17).** The corollary above no longer holds. Players still
+receive the mask verbatim. But a public creature whose whole space lies under the fog is hidden from
+players, the table screen and replays like a GM-only one: no token, no actor, no feed line, and no
+target by id. A creature partly revealed is sent, and so are a player's own characters. Dynamic
+vision (token sight, walls and lights) is ADR-0023. The 200-stroke cap trades unbounded paint history for a bounded wire size, with
 compaction making "Reveal all" a natural reset valve.
 
 ## Mobile, security, and visibility impact

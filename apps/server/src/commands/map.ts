@@ -34,6 +34,8 @@ import {
 import { releaseGrapplesOutOfRange, type EffectNarration } from "../effects.js";
 import { movementCost } from "../terrain.js";
 import { moveEncounterToken, moveSceneToken } from "../token-placement.js";
+import { partySight } from "../vision/audience.js";
+import { sceneSight } from "../vision/sight.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf, type GamePrincipal, type Kit } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -106,6 +108,18 @@ export const mapCommands = [
         if (!state.combat.active && !isGmGrade(principal))
           throw new CommandRejectedError("Your GM places the tokens before the fight starts.");
         const from = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
+        // Dynamic vision, as the mover set off: what it perceived, and who saw it go. A player's move also passes over
+        // the creatures hidden from them under the fog, as their preview does.
+        const sight = sceneSight(state, kit.sightContent());
+        const perceivedAtStart = sight.enabled ? sight.perceivedBy([actorId]) : null;
+        const unseenByMover = kit.unseenBy(initiatorOf(principal), state);
+        const perceives =
+          perceivedAtStart || unseenByMover.size > 0
+            ? (id: string) => (perceivedAtStart?.has(id) ?? true) && !unseenByMover.has(id)
+            : null;
+        const seenAtStart = sight.enabled
+          ? new Set(state.actors.filter((actor) => sight.sees(actor.id, actorId)).map((actor) => actor.id))
+          : null;
         // Taking a placed token off the map mid-fight would move it for free.
         if (position === null && from !== null && !isGmGrade(principal) && state.combat.active)
           throw new CommandRejectedError("Only the GM takes a token off the map during a fight.");
@@ -145,6 +159,8 @@ export const mapCommands = [
           override: request.override ?? null,
           resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
           catalog: kit.equipmentCatalog(),
+          ...(perceives ? { perceives } : {}),
+          ...(seenAtStart ? { seenBy: (id: string) => seenAtStart.has(id) } : {}),
           newPromptId: kit.context.newId,
           now: Date.now,
           commandId
@@ -153,9 +169,19 @@ export const mapCommands = [
         movementOverridden = outcome.overridden;
         opportunityPrompts.push(...outcome.prompts);
         // Narrate from the post-mutation state so logged distances are the snapped, authoritative ones.
-        // Setting the scene before a fight tells the table nothing: the feed narrates moves in a fight.
+        // A creature the party can't perceive after the move is left out of the table's line. Setting the scene
+        // before a fight tells the table nothing: the feed narrates moves in a fight.
+        const unseen = partySight(state, kit.sightContent()).hidden;
         movement = state.combat.active
-          ? narrateTokenMove({ state, actorId, from, geometry, mode, crawled: outcome.crawled })
+          ? narrateTokenMove({
+              state,
+              actorId,
+              from,
+              geometry,
+              mode,
+              crawled: outcome.crawled,
+              hiddenFromTable: (id) => unseen.has(id)
+            })
           : null;
         const to = moverToken?.position ?? null;
         if (from !== null && to !== null)

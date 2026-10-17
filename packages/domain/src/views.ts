@@ -101,6 +101,28 @@ export type PlayerPendingSave = Omit<
 export type PlayerPendingReaction = Omit<PendingReaction, "sourceActorId" | "parkedAttack">;
 /** A player's view of their own parked ask. `command` is omitted: its payload can name ids the player may not know. */
 export type PlayerPendingRuleAsk = Omit<PendingRuleAsk, "command">;
+/** A polygon in image pixels as flat pairs: `[x0, y0, x1, y1, ...]`. */
+export type VisionPolygon = readonly number[];
+export type VisionRect = Readonly<{ x: number; y: number; width: number; height: number }>;
+/** A wall, door or window the party has seen. A door carries `open` only while one of your characters sees it, so a
+ *  door opened out of sight tells you nothing. */
+export type PlayerVisionWall = Readonly<{
+  id: string;
+  kind: "wall" | "door" | "window";
+  a: Readonly<{ x: number; y: number }>;
+  b: Readonly<{ x: number; y: number }>;
+  open?: boolean;
+}>;
+/** Dynamic vision as one player gets it (ADR-0023): where their own characters see now, what the party has seen in
+ *  this scene, and the walls in it. Everything else on the map is dark. */
+export type PlayerVision =
+  | Readonly<{ enabled: false }>
+  | Readonly<{
+      enabled: true;
+      visible: readonly VisionPolygon[];
+      explored: readonly VisionRect[];
+      walls: readonly PlayerVisionWall[];
+    }>;
 export type PlayerCombatView = Readonly<{
   active: boolean;
   round: number;
@@ -133,6 +155,7 @@ export type PlayerCombatView = Readonly<{
   reactionsUsed: readonly string[];
   /** The fog mask verbatim (geometry only - hidden things are stripped by their own filters). */ fog: CombatState["fog"];
   /** Difficult terrain, clipped to what the fog reveals so unrevealed ground keeps its layout. */ terrain: CombatState["terrain"];
+  /** Dynamic vision: with it on, `tokens` holds only the creatures your characters perceive. */ vision: PlayerVision;
   pendingSaves: readonly PlayerPendingSave[];
   pendingReactions: readonly PlayerPendingReaction[];
   /** The player's own parked Ask-the-GM questions only. */ pendingRuleAsks: readonly PlayerPendingRuleAsk[];

@@ -26,6 +26,8 @@ import { tokenCreatureDistance } from "../movement-narration.js";
 import { withoutSourceName } from "../projections.js";
 import { describeRoll, recordRoll, rollFeedIsGmOnly, rollsForCommand } from "../roll-history.js";
 import type { TokenMapGeometry } from "../token-placement.js";
+import { partySight, playerSight } from "../vision/audience.js";
+import type { SightContent } from "../vision/senses.js";
 
 /** Who is acting. Integration credentials are the GM's own automation and act with GM authority
  *  (ADR-0016); players keep player limits. The public viewer never reaches a command. */
@@ -144,8 +146,22 @@ export function createKit(context: CommandContext) {
   const { store, contentLibrary } = context;
   const read = context.readState;
   const actorName = (actorId: string) => read().actors.find((actor) => actor.id === actorId)?.name ?? "A combatant";
-  const actorHidden = (actorId: string) =>
-    read().actors.find((actor) => actor.id === actorId)?.visibility === "gm-only";
+  /** What dynamic vision reads from the content: stat blocks, and the catalog with species senses and lit items. */
+  const sightContent = (): SightContent => ({
+    definition: (definitionId) => contentLibrary.monsterForInstance(definitionId),
+    catalog: equipmentCatalogOf(contentLibrary.forAudience("gm"))
+  });
+  /** The creatures hidden from this initiator by sight or the fog, which it may not target; none for the GM. */
+  const unseenBy = (initiator: Initiator, state: GameState): ReadonlySet<string> =>
+    initiator.role === "gm" ? new Set() : playerSight(state, initiator.sessionId, sightContent()).hidden;
+  /** Hidden from the table: GM-only, or a creature no character perceives (dynamic vision) or wholly under the fog. */
+  const actorHidden = (actorId: string) => {
+    const state = read();
+    return (
+      state.actors.find((actor) => actor.id === actorId)?.visibility === "gm-only" ||
+      partySight(state, sightContent()).hidden.has(actorId)
+    );
+  };
 
   /** Play-time definition lookup: imported stat blocks first; `monsterForInstance` ignores homebrew status so
    *  a soft-deleted creature's live tokens keep working. */
@@ -177,7 +193,9 @@ export function createKit(context: CommandContext) {
     read,
     actorName,
     actorHidden,
+    unseenBy,
     resolveDefinitionIn,
+    sightContent,
     /** The same lookup against the committed state, for reads outside a command transaction. */
     resolveDefinition: (definitionId: string) => resolveDefinitionIn(read(), definitionId),
     /** The catalog a principal may read: GM-grade sees everything, a player only player-visible records. */
