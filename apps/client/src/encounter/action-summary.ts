@@ -40,7 +40,9 @@ export function actionSummaryParts(action: ContentActionSummary, all: readonly C
         : `${action.usesLimit}/${action.usesPer === "long-rest" ? "long rest" : action.usesPer === "short-rest" ? "short rest" : action.usesPer}`
     );
   if (action.legendaryCost !== undefined)
-    parts.push(`Legendary${action.legendaryCost > 1 ? ` ×${action.legendaryCost}` : ""}`);
+    parts.push(
+      `Legendary${action.legendaryCost > 1 ? ` ×${action.legendaryCost}` : ""}${action.legendaryOncePerRound ? ", once a round" : ""}`
+    );
   return parts;
 }
 

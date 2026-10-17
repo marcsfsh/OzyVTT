@@ -3891,7 +3891,11 @@ describe("legendary actions + Legendary Resistance (SRD 2024; Foundry-parity ado
     const monsters = loadMonsterDefinitions();
     const dragon = monsters.find((monster) => monster.source.externalId === "adult-red-dragon")!;
     expect(dragon.legendary).toEqual({ actionsPerRound: 3, resistancesPerDay: 3 });
-    expect(dragon.actions.find((action) => action.id === "commanding-presence")!.legendary).toEqual({ cost: 1 });
+    // "The dragon can't take this action again until the start of its next turn."
+    expect(dragon.actions.find((action) => action.id === "commanding-presence")!.legendary).toEqual({
+      cost: 1,
+      oncePerRound: true
+    });
     // SRD 5.2.1: all 30 legendary creatures print "Legendary Action Uses: 3" (the lair bump stays
     // prose); 32 creatures carry Legendary Resistance; every legendary action row costs 1.
     expect(monsters.filter((monster) => monster.legendary?.actionsPerRound === 3).length).toBe(30);
@@ -4331,7 +4335,7 @@ describe("Opportunity attacks: one melee attack with a weapon or an Unarmed Stri
   });
 });
 
-describe("Monster actions as the stat block prints them (Multiattack)", () => {
+describe("Monster actions as the stat block prints them (Multiattack, legendary actions)", () => {
   const MONSTER = "10000000-0000-4000-8000-000000000007";
   /** A bundled monster and Torva in a fight; `heroFirst` puts Torva's turn first, for legendary actions. */
   const fight = (externalId: string, heroFirst = false) => {
@@ -4435,5 +4439,28 @@ describe("Monster actions as the stat block prints them (Multiattack)", () => {
     act("scimitar");
     act("shortbow");
     expect(() => act("scimitar")).toThrow(/no attacks remaining|no Scimitar left/);
+  });
+
+  it("keeps the tyrannosaurus's Tail off the creature its Bite grapples", () => {
+    const { act } = fight("tyrannosaurus-rex");
+    act("bite");
+    expect(() => act("tail")).toThrow(/grappled by Tyrannosaurus Rex and can't be targeted by Tail/);
+  });
+
+  it("spends a prose legendary action's cost, refuses one taken again before the creature's turn, and swings Pounce", () => {
+    const { game, act } = fight("adult-red-dragon", true); // Torva's turn
+    act("commanding-presence", []);
+    expect(game.combat.legendaryUsed[MONSTER]).toBe(1);
+    expect(() => act("commanding-presence", [])).toThrow(
+      /can't take Commanding Presence again until the start of its next turn/
+    );
+    const pounce = act("pounce");
+    expect(pounce.attack).toMatchObject({ outcome: "hit" });
+    expect(game.combat.legendaryUsed[MONSTER]).toBe(2);
+    nextInitiativeTurn(game); // the dragon's own turn: the pool and the once-a-round marks refill
+    expect(game.combat.legendaryUsed).toEqual({});
+    nextInitiativeTurn(game);
+    act("commanding-presence", []);
+    expect(game.combat.legendaryUsed[MONSTER]).toBe(1);
   });
 });

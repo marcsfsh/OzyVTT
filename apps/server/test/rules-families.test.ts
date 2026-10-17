@@ -73,6 +73,8 @@ describe("rule families", () => {
       // Action Surge with two uses, Stunning Strike: once on a turn, a spent per-turn limit.
       ["feature.once-per-turn", "resources"],
       ["legendary.no-actions-remaining", "resources"],
+      // "Can't take this action again until the start of its next turn": spent for the round.
+      ["legendary.once-per-round", "resources"],
       ["range.out-of-range", "targeting"],
       ["range.out-of-reach", "targeting"],
       ["range.underwater", "targeting"],

@@ -1,7 +1,13 @@
-import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ContentActionSummary, GmActor, GmView } from "@vtt/domain";
 
+const command = vi.fn(async (..._args: unknown[]) => ({ ok: true }));
+vi.mock("../lib/command", () => ({ command: (...args: unknown[]) => command(...args) }));
+// The runner under the console reads the server; these tests are about the console's own controls.
+vi.mock("./ActionRunner", () => ({ ActionRunner: () => null }));
+
+import { ActingConsole } from "./ActingConsole";
 import { GmActionList } from "./GmActionList";
 import { actionSummaryParts, componentLabel } from "./action-summary";
 
@@ -104,5 +110,82 @@ describe("a stat block's Multiattack as the GM reads it", () => {
     expect(hintOf("Rend")).toBe("1 attack left");
     expect(hintOf("Bite")).toBe("1 attack left");
     expect(hintOf("Roar")).toBeNull();
+  });
+});
+
+describe("legendary actions on the GM's console", () => {
+  const dragon = {
+    id: MONSTER,
+    name: "Adult Red Dragon",
+    hp: { current: 256, maximum: 256 },
+    effects: [],
+    actionUses: {},
+    legendary: { actionsPerRound: 3 }
+  } as unknown as GmActor;
+  const hero = {
+    id: HERO,
+    name: "Torva",
+    hp: { current: 40, maximum: 40 },
+    effects: [],
+    actionUses: {}
+  } as unknown as GmActor;
+  const presence = summary("commanding-presence", "Commanding Presence", {
+    activation: "other",
+    legendaryCost: 1,
+    legendaryOncePerRound: true
+  });
+
+  it("offers a legendary action with nothing to roll as a tap, and says when it can't be taken again", () => {
+    const onUse = vi.fn();
+    const { rerender } = render(
+      <GmActionList
+        state={view({ turnActorId: HERO })}
+        actor={dragon}
+        actions={[presence]}
+        busy={false}
+        onUse={onUse}
+      />
+    );
+    const row = screen.getByRole("button", { name: /Commanding Presence/ });
+    expect(row.textContent).toContain("Legendary, once a round");
+    fireEvent.click(row);
+    expect(onUse).toHaveBeenCalledWith(presence, true);
+    rerender(
+      <GmActionList
+        state={view({ turnActorId: HERO, legendaryUsed: { [MONSTER]: 1, [`${MONSTER}:commanding-presence`]: 1 } })}
+        actor={dragon}
+        actions={[presence]}
+        busy={false}
+        onUse={onUse}
+      />
+    );
+    expect(hintOf("Commanding Presence")).toBe("Not again until its next turn");
+  });
+
+  it("spends one from the pool by hand for a legendary action run at the table", async () => {
+    command.mockClear();
+    const run = vi.fn(async (operation: () => Promise<unknown>) => {
+      await operation();
+    });
+    render(
+      <ActingConsole
+        state={view({ turnActorId: HERO, legendaryUsed: { [MONSTER]: 1 } })}
+        actorsById={
+          new Map([
+            [MONSTER, dragon],
+            [HERO, hero]
+          ])
+        }
+        busy={false}
+        run={run as never}
+        rollMode="auto"
+        onFeedback={() => {}}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Adult Red Dragon 2\/3/ }));
+    fireEvent.click(screen.getByRole("button", { name: "−1" }));
+    await waitFor(() =>
+      expect(command).toHaveBeenCalledWith("turn:use-legendary", { actorId: MONSTER, spent: 2, expectedRevision: 4 })
+    );
   });
 });

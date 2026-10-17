@@ -41,9 +41,10 @@ function combatantsOf(
     throw new CommandRejectedError("Choose exactly one target for this action.");
   if (action.grants?.target === "targets" && targets.length === 0)
     throw new CommandRejectedError("Choose the creatures this action targets.");
-  // A limited use or spell slot is itself the mechanic (Action Surge, Arcane Recovery, ...), so an
-  // action that only spends one resolves without a roll or a target.
-  const spendsALimitedUse = action.uses !== undefined || action.spellSlot !== undefined;
+  // A limited use, a spell slot or the legendary pool is itself the mechanic (Action Surge, Arcane Recovery, a dragon's
+  // Commanding Presence), so an action that only spends one resolves without a roll or a target.
+  const spendsALimitedUse =
+    action.uses !== undefined || action.spellSlot !== undefined || action.legendary !== undefined;
   const structuredWithoutTargets =
     (action.grants !== undefined && action.grants.target !== "target") ||
     action.healing?.self === true ||

@@ -1354,9 +1354,9 @@ export const ActionSchema = z.object({
   /** Taken in place of one attack of the Attack action (Breath Weapon: "replace one of your attacks"): it opens the
    *  Attack action, or spends one attack the action has left. Pairs with activation "action". */
   replacesAttack: z.boolean().optional(),
-  /** SRD Legendary Action: taken on other creatures' turns, spending `cost` from the per-round pool that refills on the creature's own turn. Pairs with activation "other". */
+  /** SRD Legendary Action: taken on other creatures' turns, spending `cost` from the per-round pool that refills on the creature's own turn. Pairs with activation "other". `oncePerRound`: "can't take this action again until the start of its next turn". */
   legendary: z
-    .object({ cost: z.number().int().min(1).max(5) })
+    .object({ cost: z.number().int().min(1).max(5), oncePerRound: z.literal(true).optional() })
     .strict()
     .optional(),
   /** The area it covers, for the map template. Filled from the description where the action enters the system

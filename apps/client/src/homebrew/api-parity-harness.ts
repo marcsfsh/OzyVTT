@@ -462,6 +462,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].legendary.oncePerRound",
+    types: ACTION_CARRIERS,
+    reason:
+      "a legendary action that can't be taken again until the creature's next turn - read from stat-block prose; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "actions[].damageByLevel[].**",
     types: FEATURE_CARRIERS,
     reason:

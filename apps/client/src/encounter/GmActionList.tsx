@@ -16,15 +16,22 @@ const isResolvable = (action: ContentActionSummary) =>
   action.grants ||
   action.multiattack !== null ||
   action.usesLimit !== null ||
+  action.legendaryCost !== undefined ||
   action.builtin === true;
-/** Rage/Reckless (grants), a Multiattack plan, a spent charge, and no-target builtins (Dodge, Hide) resolve with a single Use tap; single-target builtins (Help, Unarmed Strike) go through targeting. */
+/** Rage/Reckless (grants), a Multiattack plan, a spent charge, a legendary action that only spends the pool, and
+ *  no-target builtins (Dodge, Hide) resolve with a single Use tap; single-target builtins (Help, Unarmed Strike) go
+ *  through targeting. */
 const isTargetless = (action: ContentActionSummary) =>
   action.attackBonus === null &&
   action.saveAbility === null &&
   action.damage.length === 0 &&
   action.targeting !== "single" &&
   action.targeting !== "multi" &&
-  (action.grants || action.multiattack !== null || action.usesLimit !== null || action.builtin === true);
+  (action.grants ||
+    action.multiattack !== null ||
+    action.usesLimit !== null ||
+    action.legendaryCost !== undefined ||
+    action.builtin === true);
 
 /** How many places an open action has left for this action: its own, and those it shares ("Claw or Tail"). */
 const placesLeft = (components: Readonly<Record<string, number>>, actionId: string) =>
@@ -45,6 +52,8 @@ function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSu
     const perRound = actor.legendary?.actionsPerRound ?? 3;
     if ((state.combat.legendaryUsed[actor.id] ?? 0) + action.legendaryCost > perRound)
       return "No legendary actions left this round";
+    if (action.legendaryOncePerRound && (state.combat.legendaryUsed[`${actor.id}:${action.id}`] ?? 0) > 0)
+      return "Not again until its next turn";
   }
   if (action.usesLimit !== null && action.usesPer !== null) {
     const key = action.usesPool ?? action.id;

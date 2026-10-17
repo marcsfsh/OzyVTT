@@ -129,9 +129,28 @@ export function ActingConsole({
             </div>
           )}
           {legendaryActor ? (
-            // Off-turn legendary console: the turn economy belongs to the turn actor, so offer a GM correction
-            // (+1) and a way back instead of Action/Bonus/Reaction.
+            // Off-turn legendary console: the turn economy belongs to the turn actor, so offer a spend (-1, for a
+            // legendary action run by hand) and a GM correction (+1) and a way back instead of Action/Bonus/Reaction.
             <div className="acting-console-economy-row">
+              <button
+                type="button"
+                className="economy-slot"
+                disabled={busy || legendarySpent >= (legendaryPool ?? 0)}
+                title="Spend one legendary action"
+                onClick={() =>
+                  void run(
+                    () =>
+                      command("turn:use-legendary", {
+                        actorId: actor.id,
+                        spent: Math.min(legendaryPool ?? 0, legendarySpent + 1),
+                        expectedRevision: state.revision
+                      }),
+                    "Legendary action spent."
+                  )
+                }
+              >
+                −1
+              </button>
               <button
                 type="button"
                 className="economy-slot"

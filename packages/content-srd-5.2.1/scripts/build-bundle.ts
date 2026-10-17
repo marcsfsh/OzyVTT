@@ -378,11 +378,57 @@ const PROTECTIVE_MAGIC: Pick<ActorAction, "reaction"> = {
  * - protective-magic: its Shield, offered when an attack would hit.
  */
 const ACTION_ENRICHMENTS: Record<string, Pick<ActorAction, "targetRules" | "reaction">> = {
-  "giant-crocodile/tail": { targetRules: ["not-grappled-by-source"] },
   "archmage/protective-magic": PROTECTIVE_MAGIC,
   "lich/protective-magic": PROTECTIVE_MAGIC,
   "mage/protective-magic": PROTECTIVE_MAGIC
 };
+
+const PRINTED_NAME = "[A-Z][A-Za-z'’-]*(?: [A-Z][A-Za-z'’-]*)*";
+
+/**
+ * What one action says about another, read across the stat block: a grapple that keeps an attack off its target
+ * ("While Grappled, ... can't be targeted by the tyrannosaurus's Tail"), and a legendary action that makes one attack
+ * or uses another action ("it makes one Rend attack", "The kraken uses Lightning Strike"), which resolves as that
+ * action, so the swing spends the pool. "One Claw or Tail attack" stays the GM's pick.
+ */
+function linkedActions(actions: ActorAction[], idOf: (name: string) => string | undefined): ActorAction[] {
+  const byId = new Map(actions.map((action) => [action.id, action]));
+  const keptOffGrappled = new Set<string>();
+  for (const action of actions) {
+    const match = new RegExp(
+      `While Grappled\\b[^.]*can[’']t be targeted by the [^.]*?[’']s? (${PRINTED_NAME})\\.`
+    ).exec(action.description);
+    const id = match ? idOf(match[1]) : undefined;
+    if (id) keptOffGrappled.add(id);
+  }
+  return actions.map((action) => {
+    let next = action;
+    if (keptOffGrappled.has(next.id) && !next.targetRules?.includes("not-grappled-by-source"))
+      next = { ...next, targetRules: [...(next.targetRules ?? []), "not-grappled-by-source"] };
+    if (next.legendary && !next.attack && !next.save && next.damage.length === 0) {
+      const body = next.description.replace(/^Legendary Action[^.]*\.\s*/, "");
+      const named =
+        new RegExp(`\\bmakes one (${PRINTED_NAME}) attack\\b`).exec(body) ??
+        new RegExp(`\\buses (${PRINTED_NAME})(?=[.,]| and\\b)`).exec(body);
+      const source = named ? byId.get(idOf(named[1]) ?? "") : undefined;
+      if (source && (source.attack || source.save || source.damage.length > 0)) {
+        const { attack, save, damage, onHit, conditionalDamage, reminder, area, targetRules } = source;
+        next = {
+          ...next,
+          ...(attack ? { attack } : {}),
+          ...(save ? { save } : {}),
+          damage,
+          ...(onHit ? { onHit } : {}),
+          ...(conditionalDamage ? { conditionalDamage } : {}),
+          ...(reminder ? { reminder } : {}),
+          ...(area && !next.area ? { area } : {}),
+          ...(targetRules ? { targetRules } : {})
+        };
+      }
+    }
+    return next;
+  });
+}
 
 const usesSuffix = (action: ActionFields): string => {
   if (/\(Recharge /i.test(action.name)) return ""; // upstream already printed the recharge note in the name (basilisk, blink dog, cloaker)
@@ -835,10 +881,21 @@ const monsters: ActorDefinition[] = creatures
           : {}),
         ...(onHit ? { onHit } : {}),
         ...(uses ? { uses } : {}),
-        ...(legendary ? { legendary: { cost: action.fields.legendary_action_cost ?? 1 } } : {}),
+        ...(legendary
+          ? {
+              legendary: {
+                cost: action.fields.legendary_action_cost ?? 1,
+                // "The dragon can't take this action again until the start of its next turn."
+                ...(/can[’']t take this action again until the start of its next turn/i.test(action.fields.desc)
+                  ? { oncePerRound: true as const }
+                  : {})
+              }
+            }
+          : {}),
         ...(enrichment ?? {})
       });
     });
+    const actions = linkedActions(creatureActions, siblingIdOf);
     const senses = [
       fields.darkvision_range ? `darkvision ${fields.darkvision_range} ft.` : null,
       fields.blindsight_range ? `blindsight ${fields.blindsight_range} ft.` : null,
@@ -896,7 +953,7 @@ const monsters: ActorDefinition[] = creatures
       },
       initiativeBonus: fields.initiative_bonus,
       speedFeet: fields.walk ?? 0,
-      actions: creatureActions,
+      actions,
       token: { disposition: "hostile" as const, footprint: { width: footprint, height: footprint } },
       ...(damageResistances.length > 0 ? { damageResistances } : {}),
       ...(damageImmunities.length > 0 ? { damageImmunities } : {}),

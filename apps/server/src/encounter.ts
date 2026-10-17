@@ -508,6 +508,12 @@ function rollRecharges(state: GameState, actorId: string, deps: TurnAdvanceDeps,
   }
 }
 
+/** A creature's legendary pool refills at the start of its turn, and so do the actions it couldn't take again until
+ *  then (marked `<actorId>:<actionId>`). */
+function legendaryRefilled(used: GameState["combat"]["legendaryUsed"], actorId: string) {
+  return Object.fromEntries(Object.entries(used).filter(([key]) => key !== actorId && !key.startsWith(`${actorId}:`)));
+}
+
 export function nextInitiativeTurn(state: GameState, events?: EffectNarration[], deps?: TurnAdvanceDeps) {
   if (!state.combat.active || !state.combat.turnActorId || state.combat.initiative.length === 0)
     throw new CommandRejectedError("Start an encounter before advancing Initiative.");
@@ -537,9 +543,7 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
     // A new turn: fresh action/bonus/reaction for the incoming actor, and its legendary pool refills (SRD).
     turn: { ...EMPTY_TURN },
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== nextActorId),
-    legendaryUsed: Object.fromEntries(
-      Object.entries(state.combat.legendaryUsed).filter(([actorId]) => actorId !== nextActorId)
-    )
+    legendaryUsed: legendaryRefilled(state.combat.legendaryUsed, nextActorId)
   };
   // The incoming actor's durations tick: Reckless ends, Rage counts down (ADR-0020).
   const expiry = expireEffectsAtTurnStart(state, nextActorId);
@@ -568,8 +572,6 @@ export function previousInitiativeTurn(state: GameState) {
     // timeline restore is the real undo.
     turn: { ...EMPTY_TURN },
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== previousActorId),
-    legendaryUsed: Object.fromEntries(
-      Object.entries(state.combat.legendaryUsed).filter(([actorId]) => actorId !== previousActorId)
-    )
+    legendaryUsed: legendaryRefilled(state.combat.legendaryUsed, previousActorId)
   };
 }

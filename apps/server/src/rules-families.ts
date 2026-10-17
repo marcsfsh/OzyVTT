@@ -44,6 +44,8 @@ const RULE_FAMILIES = {
   "attack.rides-a-hit": "economy",
   // ...while "no legendary actions left this round" is a spent resource, like limited uses.
   "legendary.no-actions-remaining": "resources",
+  // "Can't take this action again until the start of its next turn": spent for the round, like the pool.
+  "legendary.once-per-round": "resources",
   "feature.no-uses-remaining": "resources",
   "feature.requires-effect": "resources",
   // "Once per turn" or "only once on a turn" (Action Surge with two uses, Stunning Strike): a per-turn limit.

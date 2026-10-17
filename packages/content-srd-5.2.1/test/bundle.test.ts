@@ -164,6 +164,25 @@ describe("SRD 5.2.1 monster bundle", () => {
     expect(prose).toEqual(["hydra"]);
   });
 
+  it("keeps the tyrannosaurus's Tail off the creature its Bite grapples, read from the Bite's text", () => {
+    const rex = monsters.find((monster) => monster.source.externalId === "tyrannosaurus-rex")!;
+    expect(rex.actions.find((action) => action.id === "tail")!.targetRules).toEqual(["not-grappled-by-source"]);
+  });
+
+  it("marks legendary actions taken once a round, and gives one that makes an attack that attack", () => {
+    const legendary = monsters.flatMap((monster) => monster.actions).filter((action) => action.legendary);
+    expect(legendary.filter((action) => action.legendary!.oncePerRound).length).toBe(41);
+    const dragon = monsters.find((monster) => monster.source.externalId === "adult-red-dragon")!;
+    const pounce = dragon.actions.find((action) => action.id === "pounce")!;
+    const rend = dragon.actions.find((action) => action.id === "rend")!;
+    expect(pounce.attack).toEqual(rend.attack);
+    expect(pounce.damage).toEqual(rend.damage);
+    expect(dragon.actions.find((action) => action.id === "fiery-rays")!.legendary).toEqual({
+      cost: 1,
+      oncePerRound: true
+    });
+  });
+
   it("carries structured limited-use pools (recharge and rest scopes)", () => {
     const byId = (id: string) => monsters.find((monster) => monster.source.externalId === id)!;
     expect(byId("white-dragon-wyrmling").actions.find((action) => action.id === "cold-breath")!.uses).toEqual({

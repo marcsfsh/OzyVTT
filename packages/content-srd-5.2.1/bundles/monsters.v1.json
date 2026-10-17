@@ -32,10 +32,30 @@
     "name": "Lash",
     "activation": "other",
     "description": "Legendary Action. The aboleth makes one Tentacle attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d6 + 5",
+      "type": "bludgeoning"
+     }
+    ],
     "legendary": {
      "cost": 1
-    }
+    },
+    "attack": {
+     "bonus": 9,
+     "reachFeet": 15
+    },
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 14,
+      "maxTargetSize": "large"
+     }
+    ]
    },
    {
     "id": "multiattack",
@@ -62,9 +82,20 @@
     "name": "Psychic Drain",
     "activation": "other",
     "description": "Legendary Action. If the aboleth has at least one creature Charmed or Grappled, it uses Consume Memories and regains 5 (1d10) Hit Points.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "3d6",
+      "type": "psychic"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "save": {
+     "ability": "int",
+     "dc": 16,
+     "successDamage": "half",
+     "failureConditions": []
     }
    },
    {
@@ -252,7 +283,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -283,7 +315,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Fear. The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -339,9 +372,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon can move up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d6 + 6",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d8",
+      "type": "acid"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 11,
+     "reachFeet": 10
     }
    },
    {
@@ -453,7 +499,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Invisibility on itself, and it can fly up to half its Fly Speed. The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -504,7 +551,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Shatter. The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -540,9 +588,22 @@
     "name": "Tail Swipe",
     "activation": "other",
     "description": "Legendary Action. The dragon makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 7",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d10",
+      "type": "lightning"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 12,
+     "reachFeet": 10
     }
    },
    {
@@ -680,9 +741,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d10 + 6",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d8",
+      "type": "fire"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 11,
+     "reachFeet": 10
     }
    },
    {
@@ -751,7 +825,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -914,9 +989,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 7",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d10",
+      "type": "lightning"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 12,
+     "reachFeet": 10
     }
    },
    {
@@ -1139,7 +1227,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -1171,7 +1260,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Mind Spike (level 4 version). The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -1227,9 +1317,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d10 + 6",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d8",
+      "type": "acid"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 11,
+     "reachFeet": 10
     }
    },
    {
@@ -1372,7 +1475,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -1460,9 +1564,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 8",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d8",
+      "type": "fire"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 14,
+     "reachFeet": 10
     }
    },
    {
@@ -1636,7 +1753,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "sphere",
@@ -1697,9 +1815,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 6",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d6",
+      "type": "poison"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 11,
+     "reachFeet": 10
     }
    },
    {
@@ -1816,7 +1947,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Command (level 2 version). The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -1847,7 +1979,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Scorching Ray. The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -1903,9 +2036,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "1d10 + 8",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d4",
+      "type": "fire"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 14,
+     "reachFeet": 10
     }
    },
    {
@@ -2013,7 +2159,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Hold Monster. The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -2056,7 +2203,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "line",
@@ -2117,9 +2265,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 8",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d8",
+      "type": "cold"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 13,
+     "reachFeet": 10
     }
    },
    {
@@ -2262,7 +2423,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "sphere",
@@ -2288,9 +2450,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d6 + 6",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d8",
+      "type": "cold"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 11,
+     "reachFeet": 10
     }
    },
    {
@@ -2348,7 +2523,8 @@
     "description": "Legendary Action. The dragon casts Fear, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 14). The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    }
   ],
@@ -2722,7 +2898,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -2753,7 +2930,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Fear. The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -2809,9 +2987,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 8",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d8",
+      "type": "acid"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 15,
+     "reachFeet": 15
     }
    },
    {
@@ -2923,7 +3114,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Invisibility on itself, and it can fly up to half its Fly Speed. The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -2974,7 +3166,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Shatter (level 3 version). The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -3010,9 +3203,22 @@
     "name": "Tail Swipe",
     "activation": "other",
     "description": "Legendary Action. The dragon makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 9",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d10",
+      "type": "lightning"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 16,
+     "reachFeet": 15
     }
    },
    {
@@ -3150,9 +3356,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d10 + 8",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d6",
+      "type": "fire"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 14,
+     "reachFeet": 15
     }
    },
    {
@@ -3221,7 +3440,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -3384,9 +3604,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 9",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d8",
+      "type": "lightning"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 16,
+     "reachFeet": 15
     }
    },
    {
@@ -3609,7 +3842,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -3641,7 +3875,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Mind Spike (level 5 version). The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -3697,9 +3932,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d10 + 8",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d8",
+      "type": "acid"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 15,
+     "reachFeet": 15
     }
    },
    {
@@ -3842,7 +4090,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -3930,9 +4179,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 10",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d8",
+      "type": "fire"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 17,
+     "reachFeet": 15
     }
    },
    {
@@ -4106,7 +4368,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "sphere",
@@ -4167,9 +4430,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 8",
+      "type": "slashing"
+     },
+     {
+      "formula": "3d6",
+      "type": "poison"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 15,
+     "reachFeet": 15
     }
    },
    {
@@ -4286,7 +4562,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Command (level 2 version). The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -4317,7 +4594,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Scorching Ray (level 3 version). The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -4373,9 +4651,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 10",
+      "type": "slashing"
+     },
+     {
+      "formula": "3d6",
+      "type": "fire"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 17,
+     "reachFeet": 15
     }
    },
    {
@@ -4483,7 +4774,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Hold Monster. The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -4526,7 +4818,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "line",
@@ -4587,9 +4880,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 10",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d8",
+      "type": "cold"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 17,
+     "reachFeet": 15
     }
    },
    {
@@ -4732,7 +5038,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "sphere",
@@ -4758,9 +5065,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 8",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d6",
+      "type": "cold"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 14,
+     "reachFeet": 15
     }
    },
    {
@@ -4818,7 +5138,8 @@
     "description": "Legendary Action. The dragon casts Fear, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 18). The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    }
   ],
@@ -25544,9 +25865,20 @@
     "name": "Storm Bolt",
     "activation": "other",
     "description": "Legendary Action. The kraken uses Lightning Strike.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "6d10",
+      "type": "lightning"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "save": {
+     "ability": "dex",
+     "dc": 23,
+     "successDamage": "half",
+     "failureConditions": []
     }
    },
    {
@@ -25597,7 +25929,8 @@
     },
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "emanation",
@@ -26098,7 +26431,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "emanation",
@@ -26130,7 +26464,8 @@
     "description": "Legendary Action. The lich casts Fear, using the same spellcasting ability as Spellcasting. The lich can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -28538,9 +28873,26 @@
     "name": "Glare",
     "activation": "other",
     "description": "Legendary Action. The mummy uses Dreadful Glare. The mummy can't take this action again until the start of its next turn.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "6d6 + 4",
+      "type": "psychic"
+     }
+    ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
+    },
+    "save": {
+     "ability": "wis",
+     "dc": 17,
+     "successDamage": "none",
+     "failureConditions": [
+      "paralyzed"
+     ],
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
     }
    },
    {
@@ -28628,7 +28980,8 @@
     "description": "Legendary Action. The mummy casts Command (level 2 version), using the same spellcasting ability as Spellcasting. The mummy can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -35712,7 +36065,8 @@
     },
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -36050,9 +36404,18 @@
     "name": "Arcane Prowl",
     "activation": "other",
     "description": "Legendary Action. The sphinx can teleport up to 30 feet to an unoccupied space it can see, and it makes one Claw attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "3d6 + 4",
+      "type": "slashing"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 8,
+     "reachFeet": 5
     }
    },
    {
@@ -36097,7 +36460,8 @@
     },
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -36249,9 +36613,18 @@
     "name": "Arcane Prowl",
     "activation": "other",
     "description": "Legendary Action. The sphinx can teleport up to 30 feet to an unoccupied space it can see, and it makes one Claw attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "4d6 + 6",
+      "type": "slashing"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 12,
+     "reachFeet": 5
     }
    },
    {
@@ -36300,7 +36673,8 @@
     },
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -38891,7 +39265,8 @@
     "description": "Legendary Action. The tarrasque moves up to its Speed. At the end of this movement, the tarrasque creates an instantaneous shock wave in a 60-foot Emanation originating from itself. Creatures in that area lose Concentration and, if Medium or smaller, have the Prone condition. The tarrasque can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "emanation",
@@ -39979,6 +40354,9 @@
       ],
       "maxTargetSize": "huge"
      }
+    ],
+    "targetRules": [
+     "not-grappled-by-source"
     ]
    }
   ],
@@ -40061,9 +40439,18 @@
     "name": "Charging Horn",
     "activation": "other",
     "description": "Legendary Action. The unicorn moves up to half its Speed without provoking Opportunity Attacks, and it makes one Radiant Horn attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "1d10 + 4",
+      "type": "radiant"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 7,
+     "reachFeet": 5
     }
    },
    {
@@ -40117,7 +40504,8 @@
     "description": "Legendary Action. The unicorn targets itself or one creature it can see within 60 feet of itself. The target gains 10 (3d6) Temporary Hit Points, and its AC increases by 2 until the end of the unicorn's next turn. The unicorn can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -40244,10 +40632,34 @@
     "name": "Deathless Strike",
     "activation": "other",
     "description": "Legendary Action. The vampire moves up to half its Speed, and it makes one Grave Strike attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "1d8 + 4",
+      "type": "bludgeoning"
+     },
+     {
+      "formula": "2d6",
+      "type": "necrotic"
+     }
+    ],
     "legendary": {
      "cost": 1
-    }
+    },
+    "attack": {
+     "bonus": 9,
+     "reachFeet": 5
+    },
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 14,
+      "maxTargetSize": "large"
+     }
+    ]
    },
    {
     "id": "multiattack",
@@ -40280,7 +40692,8 @@
     "description": "Legendary Action. The vampire casts Command, requiring no spell components and using Charisma as the spellcasting ability (spell save DC 17). The vampire can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {

@@ -215,6 +215,7 @@ export function actionSummaryOf(action: ActorDefinition["actions"][number]): Con
     grants: withTakenActions(action).grants !== undefined,
     reaction: action.reaction ?? null,
     ...(action.legendary ? { legendaryCost: action.legendary.cost } : {}),
+    ...(action.legendary?.oncePerRound ? { legendaryOncePerRound: true as const } : {}),
     ...(action.replacesAttack ? { replacesAttack: true as const } : {}),
     ...(hitRiderOf(action) ? { ridesAHit: true as const } : {}),
     ...(action.darts !== undefined ? { darts: action.darts } : {}),

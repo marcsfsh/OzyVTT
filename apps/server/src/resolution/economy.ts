@@ -44,8 +44,9 @@ export type EconomyPlan = Readonly<{
   bonusInstance: Readonly<{ actorId: string; components: Record<string, number> }> | null;
   /** Limited-use spend to record, keyed per scope. */
   spendUse: Readonly<{ key: string; per: "turn" | "encounter" | "long-rest" | "short-rest" | "recharge" }> | null;
-  /** Legendary-action cost to add to the attacker's per-round pool (SRD Legendary Actions). */
-  spendLegendary: Readonly<{ cost: number }> | null;
+  /** Legendary-action cost to add to the attacker's per-round pool (SRD Legendary Actions), and the mark of one it
+   *  can't take again until its next turn. */
+  spendLegendary: Readonly<{ cost: number; onceKey?: string }> | null;
   /** Spell slot the action spends from the bearer's own pools: a spell slot, or a Pact Magic slot (`pact`). */
   spendSpellSlot: Readonly<{ level: number; pact?: true }> | null;
   /** The slot level this cast is at: the one it spends, or the one the open spell it continues spent (a later ray).
@@ -829,8 +830,19 @@ function checkLegendary(
       rule: "legendary.no-actions-remaining",
       message: `${attacker.name} has ${Math.max(0, perRound - spent)} of ${perRound} legendary action${perRound === 1 ? "" : "s"} left this round${cost > 1 ? ` and ${action.name} costs ${cost}` : ""}.`
     });
-  return { cost };
+  // "Can't take this action again until the start of its next turn": marked beside the pool, cleared with it.
+  const onceKey = action.legendary.oncePerRound ? legendaryOnceKey(attacker.id, action.id) : null;
+  if (onceKey !== null && (state.combat.legendaryUsed[onceKey] ?? 0) > 0)
+    violations.push({
+      rule: "legendary.once-per-round",
+      message: `${attacker.name} can't take ${action.name} again until the start of its next turn.`
+    });
+  return { cost, ...(onceKey !== null ? { onceKey } : {}) };
 }
+
+/** Where `combat.legendaryUsed` marks a legendary action taken once until the creature's next turn, beside the
+ *  creature's own spent count (keyed by its id alone). */
+export const legendaryOnceKey = (actorId: string, actionId: string) => `${actorId}:${actionId}`;
 
 /** A spell cast with a slot (a prepared spell, or an item cast with `consumesSpellSlot`) spends one from the
  *  caster's own pools at `castSlot`; refused here if none remains or the slot is below the spell. */
@@ -1237,7 +1249,8 @@ export function commitEconomy({
       ...state.combat,
       legendaryUsed: {
         ...state.combat.legendaryUsed,
-        [attacker.id]: (state.combat.legendaryUsed[attacker.id] ?? 0) + plan.spendLegendary.cost
+        [attacker.id]: (state.combat.legendaryUsed[attacker.id] ?? 0) + plan.spendLegendary.cost,
+        ...(plan.spendLegendary.onceKey !== undefined ? { [plan.spendLegendary.onceKey]: 1 } : {})
       }
     };
   }
