@@ -185,7 +185,7 @@ const bonusOf = (draft: Draft, type: string) =>
   modifiersOf(draft).find((modifier) => modifier.type === type)?.amount ?? 0;
 
 /** Rows of these types replaced by one each at `amount` (none at 0), shaped as the rider form's own rows are. */
-function withBonus(
+export function withBonus(
   draft: Draft,
   types: readonly string[],
   amount: number,
