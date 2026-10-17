@@ -86,7 +86,17 @@ export function CharacterSheet({
 }>) {
   const [feedback, setFeedback] = useState("");
   const { toast } = useToast();
-  const { definitionId, definition, serverActions, derived, showEdited } = useSheetDefinition(actor, role, setFeedback);
+  // The GM's state carries every stored sheet (a built character's), which stays current when the sheet is rebuilt.
+  const liveDefinition =
+    role === "gm" && state && "definitions" in state && "definitionId" in actor
+      ? state.definitions.find((entry) => entry.id === actor.definitionId)?.definition
+      : undefined;
+  const { definitionId, definition, serverActions, derived, rechoices, showEdited } = useSheetDefinition(
+    actor,
+    role,
+    setFeedback,
+    liveDefinition
+  );
   // On the player's own turn, targeted stat-block actions resolve through the shared structured flow
   // (pick target -> roll -> resolve). Combat context is the `combat` prop when embedded in the
   // initiative panel, else derived from the player's `state`, so it works from any sheet surface.
@@ -374,6 +384,7 @@ export function CharacterSheet({
             spellSaveDcBonus={derived?.spellSaveDcBonus ?? 0}
             policeSlots={slotsPoliced}
             canPrepare={role === "gm" || Boolean(actor.preparation)}
+            rechoices={rechoices}
             castSpellAction={castSpellAction}
             routeSpell={(spell) => {
               const structured = structuredAttacks

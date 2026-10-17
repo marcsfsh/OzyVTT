@@ -30,6 +30,7 @@ import {
   setTemporaryHp,
   UNTYPED_DAMAGE
 } from "../hit-points.js";
+import { rechooseInLedger } from "../ledger-rechoice.js";
 import { applyRest, hitDieSizesToSpend, spendHitDice } from "../rests.js";
 import { restoreUses, spendUses } from "../use-pools.js";
 import { builtinAction } from "../builtin-actions.js";
@@ -273,21 +274,21 @@ export const actorHealthCommands = [
     type: "actor.rechoose",
     operationId: "rechooseActorPick",
     description:
-      "Re-makes a pick the character's content says may be re-made on a rest (Circle of the Land's land type on a Long Rest; Fiendish Resilience's damage type on either). The answer is NOT written to the character's choices ledger - it is runtime state on the actor, cleared by the matching rest - so a re-choice between fights needs no rebuild. A player session may re-choose only on their claimed character, the GM on anyone. Which offers are re-choosable, and what each may become, are both decided from the content: a client cannot widen either.",
+      "Re-makes a pick the character's content says may be re-made on a rest (Circle of the Land's land type on a Long Rest; Fiendish Resilience's damage type on either). A pick the build itself reads - its options grant spells, or another pick depends on it, as the land's spells and Nature's Ward do - is written to the character's choices ledger and the sheet is rebuilt from it, keeping what has been spent; a player makes it in the prepare step a Long Rest opens, the GM any time outside a fight. Any other pick is runtime state on the actor, cleared by the matching rest, so a re-choice between fights needs no rebuild. A player session may re-choose only on their claimed character, the GM on anyone. Which offers are re-choosable, and what each may become, are both decided from the content: a client cannot widen either.",
     summary:
       "Re-make a pick a feature says may be re-made on a rest (Circle of the Land's land type on a Long Rest, Fiendish Resilience's damage type on either). Your own character; the GM anyone.",
     schema: ActorRechooseSchema,
     malformed: "The re-choose command is malformed.",
-    // Stored as `choiceOverrides` on the actor (not the choices ledger) and cleared by the matching rest.
     // What may be re-chosen comes from content, never the request.
     async run({ principal, request, execute }, kit) {
       const { actorId, offer, id } = request;
-      let label = "";
+      const initiator = initiatorOf(principal);
+      let line = "";
       const { duplicate } = await execute((state) => {
         const actor = state.actors.find((candidate) => candidate.id === actorId);
         if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
         // Same owner-or-GM rule as a rest.
-        requireActorAccess(initiatorOf(principal), state, actorId, "resource");
+        requireActorAccess(initiator, state, actorId, "resource");
         const definition = actor.definitionId ? kit.resolveDefinition(actor.definitionId) : undefined;
         // GM audience: legality is a content question and must match what the GM would get. Nothing GM-only
         // is projected.
@@ -305,13 +306,33 @@ export const actorHealthCommands = [
             `"${id}" is not one of the options ${match.label} offers (${match.options.join(", ")}).`
           );
         }
-        label = match.label;
-        actor.choiceOverrides = { ...actor.choiceOverrides, [offer]: { id, per: match.per } };
+        const chosen = match.optionNames[id] ?? id;
+        if (!match.rebuilds) {
+          // Stored as `choiceOverrides` on the actor (not the choices ledger) and cleared by the matching rest.
+          actor.choiceOverrides = { ...actor.choiceOverrides, [offer]: { id, per: match.per } };
+          line = `${kit.actorName(actorId)} re-chose ${match.label}: ${chosen}.`;
+          return;
+        }
+        // The build reads this answer (the land's spells and Nature's Ward), so it goes into the ledger.
+        if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
+          throw new CommandRejectedError(`${match.label} is chosen after a rest - end the encounter first.`);
+        // SRD: "Whenever you finish a Long Rest, choose" - a player makes it in the step that rest opens.
+        if (initiator.role !== "gm" && match.per === "long-rest" && actor.preparation === null)
+          throw new CommandRejectedError(`${actor.name} chooses ${match.label} again after finishing a Long Rest.`);
+        rechooseInLedger(state, actorId, offer, id, {
+          library: kit.contentLibrary.forAudience("gm"),
+          policy: state.builderPolicy,
+          catalog: kit.equipmentCatalog()
+        });
+        // An override from before the answer moved into the ledger would only shadow it.
+        const { [offer]: _stale, ...others } = actor.choiceOverrides;
+        actor.choiceOverrides = others;
+        line = `${kit.actorName(actorId)} chose ${chosen} for ${match.label}.`;
       });
       if (!duplicate)
         kit.context.appendLog({
           kind: "encounter",
-          text: `${kit.actorName(actorId)} re-chose ${label}: ${id}.`,
+          text: line,
           actorIds: [actorId],
           gmOnly: kit.actorHidden(actorId)
         });

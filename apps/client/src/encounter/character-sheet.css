@@ -860,6 +860,23 @@
 .sheet-prepare-step button {
   min-height: 44px;
 }
+/* A pick re-made after a Long Rest (a Land Druid's land): its name, then the choice, wrapping on a phone. */
+.sheet-rechoice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0.4rem 0;
+}
+.sheet-rechoice > span {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.sheet-rechoice > :last-child {
+  flex: 1 1 10rem;
+  min-width: 0;
+  max-width: 16rem;
+}
 .sheet-spell-group-head {
   display: flex;
   align-items: center;

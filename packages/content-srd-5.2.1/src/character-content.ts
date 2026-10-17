@@ -333,7 +333,8 @@ const extraPicksField = z.array(ExtraPickSchema).max(4).default([]);
 /**
  * One "you can replace..." clause, editing a row of `character.choices[]`. `"level-up"` rewrites the
  * ledger at build time; `"short-rest"`/`"long-rest"` set `actor.choiceOverrides`, cleared by the
- * matching rest.
+ * matching rest, except a pick the build reads (its options grant spells, or another pick depends on it),
+ * whose ledger row is rewritten and the sheet rebuilt.
  */
 export const ReplaceableChoiceSchema = z
   .object({

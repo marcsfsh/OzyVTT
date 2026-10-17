@@ -378,7 +378,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     modifiers: "Typed numeric riders"
   },
   ReplaceableChoice: {
-    "": 'ONE "you can replace…" clause. `offer` is the same offer-key namespace `extraPicks` uses, and a key naming no pick this build has is a loud build rejection. `when: "level-up"` is a build-time permission over the choices ledger (the replaced row is deleted, never tombstoned); `"short-rest"` / `"long-rest"` are runtime state on the actor, set by actor.rechoose and cleared by the matching rest - a short-rest clause is satisfied by a long rest too.',
+    "": 'ONE "you can replace…" clause. `offer` is the same offer-key namespace `extraPicks` uses, and a key naming no pick this build has is a loud build rejection. `when: "level-up"` is a build-time permission over the choices ledger (the replaced row is deleted, never tombstoned); `"short-rest"` / `"long-rest"` are re-made with actor.rechoose: runtime state on the actor, cleared by the matching rest, unless the build reads the answer (its options grant spells, or another pick depends on it, as a land does), which rewrites the ledger row and rebuilds the sheet - a short-rest clause is satisfied by a long rest too.',
     amount: "How many of that offer's answers may be swapped at once"
   },
   ExtraPick: {

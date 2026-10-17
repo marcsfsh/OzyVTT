@@ -321,11 +321,23 @@ const ActorDerivedSheetSchema = z.strictObject({
   attunementSlots: z.number().int().min(1).max(10)
 });
 export type ActorDerivedSheet = Wire<z.infer<typeof ActorDerivedSheetSchema>>;
-/** What `actor:available-actions` answers: the table's rules mode, each action's availability, and the sheet. */
+/** A pick this character may re-make on a rest (Circle of the Land's land after a Long Rest), with its options and
+ *  the answer in force. */
+const RechoiceSchema = z.strictObject({
+  offer: z.string(),
+  label: z.string(),
+  per: z.enum(["short-rest", "long-rest"]),
+  options: z.array(z.strictObject({ id: z.string(), name: z.string() })),
+  chosen: z.string().nullable()
+});
+export type Rechoice = Wire<z.infer<typeof RechoiceSchema>>;
+/** What `actor:available-actions` answers: the table's rules mode, each action's availability, the sheet, and the
+ *  picks the character may re-make on a rest. */
 export const AvailableActionsReplySchema = z.strictObject({
   rulesMode: z.enum(["strict", "assisted", "freeform"]),
   actions: z.array(ActionAvailabilitySchema),
-  derived: ActorDerivedSheetSchema
+  derived: ActorDerivedSheetSchema,
+  rechoices: z.array(RechoiceSchema)
 });
 export type AvailableActionsReply = Wire<z.infer<typeof AvailableActionsReplySchema>>;
 export type ActorActionsAvailabilityResult = { ok: boolean; message?: string } & Partial<AvailableActionsReply>;

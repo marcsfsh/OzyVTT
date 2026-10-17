@@ -274,11 +274,11 @@ export const druid: ClassMechanicsModule = {
       /**
        * "Choose one type of land": four inline options, each granting that land's level-3 spells always
        * prepared; the table's later rows are staged features (`subclassStages`), which read this answer back,
-       * as Nature's Ward does. A re-choice on a Long Rest moves Nature's Ward's Resistance but not the spells,
-       * which are baked into the sheet: a different land's spells come with a rebuild.
+       * as Nature's Ward does.
        */
       "circle-of-the-land-spells": {
-        // Re-chosen on every Long Rest: the override lives in `actor.choiceOverrides` and the next Long Rest clears it.
+        // Re-chosen after each Long Rest: the new land replaces the ledger answer and the sheet is rebuilt, so the
+        // land's spells and Nature's Ward follow it.
         replaces: [{ offer: "feature:circle-of-the-land-spells", when: "long-rest", amount: 1 }],
         choice: {
           kind: "land",
