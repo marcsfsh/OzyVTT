@@ -10,11 +10,15 @@
   width: min(100vw - 2rem, 24rem);
   pointer-events: none;
 }
-/* On a phone the stack sits at the top edge, under the tab bar, away from the controls a thumb is reaching for. */
+/* On a phone the stack sits at the top edge, under the tab bar, away from the controls a thumb is reaching for. It
+   shows the newest message alone: a second one would hang over the page's own controls. */
 @media (max-width: 760px) {
   .nh-toast-viewport {
     top: calc(env(safe-area-inset-top) + 3.75rem);
     bottom: auto;
+  }
+  .nh-toast-viewport > .nh-toast:not(:last-child) {
+    display: none;
   }
 }
 /* Severity on a 2px leading rule, never the fill. Material on a backing layer because the toast has its own ✕. */
