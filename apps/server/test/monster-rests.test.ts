@@ -51,6 +51,6 @@ describe("the GM rests a monster", () => {
       kind: "long"
     });
     expect(response.status).toBe(409);
-    expect((await response.json()).error.message).toBe("Aboleth is dead - a rest can't bring them back.");
+    expect((await response.json()).error.message).toBe("Aboleth is dead, and a rest can't bring Aboleth back.");
   });
 });

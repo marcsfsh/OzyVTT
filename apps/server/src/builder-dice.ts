@@ -93,9 +93,7 @@ export function settleBuilderDice(
     if (hp.mode === "entries")
       (hp.entries ?? []).forEach((entry, index) => {
         if (stored.get(index + 2) !== entry)
-          reject(
-            `Your GM has the table roll hit points: choose "Roll on the table" for level ${index + 2} instead of typing it.`
-          );
+          reject(`Your GM has the table roll hit points: choose "Roll on the table" for level ${index + 2}.`);
       });
   }
 
@@ -126,18 +124,17 @@ function requireServerAbilityRoll(state: GameState, request: BuilderDiceRequest,
     request.abilityMethod === "custom"
       ? (state.builderPolicy.customFormula ?? ABILITY_ROLL_FORMULA)
       : ABILITY_ROLL_FORMULA;
-  if (!request.abilityRollId)
-    reject("Your GM has the table roll ability scores: roll them in the builder rather than typing them.");
+  if (!request.abilityRollId) reject("Your GM has the table roll ability scores. Roll them in the builder.");
   const record = state.rolls.find((roll) => roll.id === request.abilityRollId);
   if (!record || record.label !== ABILITY_ROLL_LABEL || record.initiatorSessionId !== context.sessionId)
-    reject("That ability roll is no longer in the table's recent rolls - roll the scores again.");
+    reject("That ability roll is no longer in the table's recent rolls. Roll the scores again.");
   if (record.normalizedFormula !== `6 x ${formula}`)
-    reject("That ability roll used a different formula from the table's - roll the scores again.");
+    reject("That ability roll used a different formula from the table's. Roll the scores again.");
   if (
     sortedValues(abilityRollTotals(record, formula)) !==
     sortedValues(ABILITIES.map((ability) => request.baseScores[ability]))
   )
-    reject("Those scores are not the six the table rolled - assign the rolled values.");
+    reject("Those scores are not the six the table rolled. Assign the rolled values.");
 }
 
 const sortedValues = (values: readonly number[]) => [...values].sort((left, right) => left - right).join(",");

@@ -629,7 +629,7 @@ export function applyDamageDetailed(
     );
     events.push({
       kind: "condition",
-      text: `${actor.name} was knocked out - Unconscious at 1 HP until it regains hit points.`,
+      text: `${actor.name} was knocked out, Unconscious at 1 HP until it regains hit points.`,
       actorId
     });
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0 && deathWard(state, actor, events)) {
@@ -789,7 +789,7 @@ export function setCurrentHp(state: GameState, actorId: string, current: number,
   requireGm(scope, "Only the GM can set hit points directly.");
   const actor = adjustableActor(state, actorId, scope);
   if (current > 0 && isDead(actor))
-    throw new CommandRejectedError(`${actor.name} is dead - revive them to give them hit points again.`);
+    throw new CommandRejectedError(`${actor.name} is dead. Revive ${actor.name} to give hit points again.`);
   const before = actor.hp.current;
   actor.hp.current = Math.max(0, Math.min(actor.hp.maximum, current));
   const events: EffectNarration[] = [];

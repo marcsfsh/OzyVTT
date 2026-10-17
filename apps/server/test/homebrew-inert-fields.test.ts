@@ -387,7 +387,7 @@ describe("row 3: the four dropped grant kinds", () => {
       { role: "gm" },
       { resolveDefinition: () => definition, catalog }
     );
-    expect(events[0].text).toMatch(/immune to Frightened - not applied/);
+    expect(events[0].text).toMatch(/immune to Frightened, so it isn't applied/);
     expect(state.actors[0].conditions).toHaveLength(0);
 
     // Negative control: the same command with the periapt unequipped applies the condition.
@@ -769,7 +769,7 @@ describe("row 6: an item that casts a spell, with its cast details", () => {
         { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(9) },
         deps([3, 3, 3, 3, 3, 3, 3, 3], catalog, definition)
       )
-    ).toThrow(/spends a level-3 spell slot/);
+    ).toThrow(/spends a level 3 spell slot/);
   });
 
   it("degrades to a name-only cast when the catalog cannot resolve the spell", () => {

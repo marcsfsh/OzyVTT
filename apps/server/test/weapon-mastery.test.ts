@@ -447,7 +447,7 @@ describe("Topple forces a Constitution save, and a failure lands Prone", () => {
     ]);
     // Two sentences, split by what may cross: the GM's keeps the DC; the table's names what forced the
     // save and carries no number, because the DC is the attacker's.
-    expect(hit.warnings).toContain("Topple: Foe's save is DC 13 - the prompt is in the turn order.");
+    expect(hit.warnings).toContain("Topple: Foe's save is DC 13. The prompt is in the turn order.");
     expect(hit.tableNarration).toEqual([
       {
         kind: "save",
@@ -483,7 +483,7 @@ describe("Topple forces a Constitution save, and a failure lands Prone", () => {
     const first = swing(built, "item-quarterstaff", [15, 3]);
     const second = swing(built, "item-quarterstaff", [15, 3]);
     expect([first.attack?.outcome, second.attack?.outcome]).toEqual(["hit", "hit"]);
-    expect(second.warnings).toContain("Topple: Foe's save is DC 15 - the prompt is in the turn order.");
+    expect(second.warnings).toContain("Topple: Foe's save is DC 15. The prompt is in the turn order.");
     expect(second.tableNarration).toEqual([
       {
         kind: "save",
@@ -690,7 +690,7 @@ describe("Push moves the target's token 10 feet straight away", () => {
     expect(hit.attack?.outcome).toBe("hit");
     expect(hit.damageTotal).toBe(7);
     expect(positionOf(built, IDS.foe)).toEqual(before);
-    expect(hit.warnings).toContain("Foe is pushed 10 feet straight away from Borin - move the token.");
+    expect(hit.warnings).toContain("Foe is pushed 10 feet straight away from Borin. Move the token.");
   });
 
   it("degrades the same way for a combatant still in the tray, instead of throwing", () => {
@@ -701,7 +701,7 @@ describe("Push moves the target's token 10 feet straight away", () => {
     const hit = pushSwing(built, "item-warhammer", [15, 4]);
     expect(hit.attack?.outcome).toBe("hit");
     expect(positionOf(built, IDS.foe)).toBeNull();
-    expect(hit.warnings).toContain("Foe is pushed 10 feet straight away from Borin - move the token.");
+    expect(hit.warnings).toContain("Foe is pushed 10 feet straight away from Borin. Move the token.");
   });
 
   it("says the map REFUSED the shove when it measures zero, not 'move the token'", () => {
@@ -716,9 +716,9 @@ describe("Push moves the target's token 10 feet straight away", () => {
 
     expect(positionOf(built, IDS.foe)).toEqual(before);
     expect(hit.warnings).toContain(
-      "Foe is pushed straight away from Borin, but the map has nowhere to put it - the token stays where it is."
+      "Foe is pushed straight away from Borin, but the map has nowhere to put it, so the token stays where it is."
     );
-    expect(hit.warnings).not.toContain("Foe is pushed 10 feet straight away from Borin - move the token.");
+    expect(hit.warnings).not.toContain("Foe is pushed 10 feet straight away from Borin. Move the token.");
   });
 
   it("degrades when the resolver has no geometry callback at all - the reaction path today", () => {
@@ -727,7 +727,7 @@ describe("Push moves the target's token 10 feet straight away", () => {
     const hit = pushSwing(built, "item-warhammer", [15, 4], false);
     expect(hit.attack?.outcome).toBe("hit");
     expect(positionOf(built, IDS.foe)).toEqual(before);
-    expect(hit.warnings).toContain("Foe is pushed 10 feet straight away from Borin - move the token.");
+    expect(hit.warnings).toContain("Foe is pushed 10 feet straight away from Borin. Move the token.");
   });
 });
 
@@ -1104,7 +1104,7 @@ describe("a mastery that cannot act off-turn says so where the GM reads it", () 
       kind: "action",
       gmOnly: true,
       actorIds: [IDS.hero],
-      text: "Rules note: Foe is pushed 10 feet straight away from Borin - move the token."
+      text: "Rules note: Foe is pushed 10 feet straight away from Borin. Move the token."
     });
     // ...and the swing itself still hit and narrated, and the token did not move, so the sentence is an
     // instruction rather than a report.
@@ -1145,7 +1145,7 @@ describe("a mastery that cannot act off-turn says so where the GM reads it", () 
       kind: "action",
       gmOnly: true,
       actorIds: [IDS.hero],
-      text: "Rules note: Foe is pushed 10 feet straight away from Borin - move the token."
+      text: "Rules note: Foe is pushed 10 feet straight away from Borin. Move the token."
     });
   });
 
@@ -1366,7 +1366,7 @@ describe("the table's own line reaches a player, not just the GM", () => {
     expect(playerHeard).not.toContain("the prompt is in the turn order");
     await heardLine(gmHeard, (text) => text.startsWith("Rules note:"), "the GM's own rules note");
     expect(gmHeard.map((entry) => entry.text)).toContain(
-      "Rules note: Topple: Foe's save is DC 13 - the prompt is in the turn order."
+      "Rules note: Topple: Foe's save is DC 13. The prompt is in the turn order."
     );
   });
 

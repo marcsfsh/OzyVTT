@@ -522,7 +522,7 @@ function martialArtsStrike(context: BuildContext): ActorAction | null {
     id: UNARMED_STRIKE_ACTION_ID,
     name: "Unarmed Strike",
     activation: "action",
-    description: `A strike with your body. You roll your Martial Arts die (${die}) in place of the normal damage, and use Dexterity or Strength for the attack and damage rolls - whichever is higher. (SRD 5.2.1, Martial Arts)`,
+    description: `A strike with your body. You roll your Martial Arts die (${die}) in place of the normal damage, and use Dexterity or Strength for the attack and damage rolls, whichever is higher. (SRD 5.2.1, Martial Arts)`,
     attack: { bonus: modifier + context.proficiencyBonus, reachFeet: 5 },
     damage: [
       {
@@ -1221,7 +1221,7 @@ export function buildCharacterDefinition(
       };
       for (const row of budget.cantripRows) {
         const option = listOptions.get(row.id) ?? reject(`"${row.id}" is not on the ${budget.className} spell list.`);
-        if (option.level !== 0) reject(`"${row.id}" is a level-${option.level} spell, not a cantrip.`);
+        if (option.level !== 0) reject(`"${row.id}" is a level ${option.level} spell. Record it as a spell choice.`);
         claim(row);
         if (alwaysPreparedGrants.has(option.id)) continue; // the grant supplies it, uncharged
         spells.push({
@@ -1236,7 +1236,7 @@ export function buildCharacterDefinition(
       for (const row of budget.spellRows) {
         const option = listOptions.get(row.id) ?? reject(`"${row.id}" is not on the ${budget.className} spell list.`);
         const spellLevel = option.level ?? 0;
-        if (spellLevel < 1) reject(`"${row.id}" is a cantrip - record it as a "cantrip" choice.`);
+        if (spellLevel < 1) reject(`"${row.id}" is a cantrip. Record it as a "cantrip" choice.`);
         if (spellLevel > budget.maxSlotLevel)
           reject(
             `"${row.id}" is level ${spellLevel}, above the highest slot level (${budget.maxSlotLevel}) at ${budget.className} ${entry.level}.`

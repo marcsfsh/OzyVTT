@@ -80,7 +80,7 @@ describe("turn time-travel timeline", () => {
     expect(store.snapshot.combat.historyCursor).toBeNull();
     const history = store.listTurnSnapshots();
     expect(history).toHaveLength(1);
-    expect(history[0]).toMatchObject({ index: 0, kind: "turn", label: "Round 1 - Alpha" });
+    expect(history[0]).toMatchObject({ index: 0, kind: "turn", label: "Round 1 · Alpha" });
   });
 
   it("rewinds the whole table to the end of the prior turn and resumes live without undoing anything", async () => {

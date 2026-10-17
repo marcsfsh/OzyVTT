@@ -225,7 +225,7 @@ function checkMarkMove(
       rule: "target.mark-still-standing",
       message: hiddenFrom(state, resolveDefinition ? { definition: resolveDefinition } : {})(standing.bearer.id)
         ? `${spell.name} moves only once its creature drops to 0 Hit Points.`
-        : `${spell.name} moves only once its creature drops to 0 Hit Points - ${standing.bearer.name} hasn't.`
+        : `${spell.name} moves only once its creature drops to 0 Hit Points, and ${standing.bearer.name} hasn't.`
     });
 }
 
@@ -238,7 +238,7 @@ function checkSpellUp({ attacker, action, siblings, violations }: Evaluation, sp
   if (!siblings.some((sibling) => sibling.spellId === spell.id && !laterRowOf(spell, sibling.id))) return;
   violations.push({
     rule: "feature.requires-effect",
-    message: `${attacker.name} doesn't have ${spell.name} up - cast it first.`
+    message: `${attacker.name} doesn't have ${spell.name} up. Cast it first.`
   });
 }
 
@@ -261,7 +261,7 @@ function checkTurnsBegun({ state, violations }: Evaluation): void {
   if (active && playerInitiativeMode === "wait" && pendingInitiative.length > 0)
     violations.push({
       rule: "initiative.gathering",
-      message: "Players are still rolling initiative - turns begin once everyone has rolled."
+      message: "Players are still rolling initiative. Turns begin once everyone has rolled."
     });
 }
 
@@ -302,7 +302,7 @@ function checkOwnTurn({ state, attacker, action, onOwnTurn, resolveDefinition, v
   const shown = current && !hiddenFrom(state, resolveDefinition ? { definition: resolveDefinition } : {})(current.id);
   violations.push({
     rule: "economy.not-your-turn",
-    message: shown ? `Not your turn yet - ${current.name} is up.` : "Not your turn yet - wait for your turn."
+    message: shown ? `Not your turn yet. ${current.name} is up.` : "Not your turn yet. Wait for your turn."
   });
 }
 
@@ -319,7 +319,7 @@ function checkActionSurge({ state, attacker, action, onOwnTurn, violations }: Ev
   else if (extra?.actorId === attacker.id && extra.surgedThisTurn)
     violations.push({
       rule: "feature.once-per-turn",
-      message: `${attacker.name} has already used Action Surge this turn - only once on a turn.`
+      message: `${attacker.name} has already used Action Surge this turn, and it works once on a turn.`
     });
   return true;
 }
@@ -336,7 +336,7 @@ function checkRecklessAttack({ state, attacker, action, onOwnTurn, violations }:
   else if (state.combat.turn.attackRolled === true)
     violations.push({
       rule: "attack.after-first-roll",
-      message: `${attacker.name} has already made an attack roll this turn - ${action.name} is decided with the first.`
+      message: `${attacker.name} has already made an attack roll this turn, and ${action.name} is decided with the first.`
     });
 }
 
@@ -346,7 +346,7 @@ function checkSteadyAim({ state, attacker, action, onOwnTurn, violations }: Eval
   if (state.combat.turn.movementUsedFeet > 0)
     violations.push({
       rule: "movement.already-moved",
-      message: `${attacker.name} has moved this turn - ${action.name} is only for a creature that hasn't.`
+      message: `${attacker.name} has moved this turn, and ${action.name} is only for a creature that hasn't.`
     });
 }
 
@@ -360,7 +360,7 @@ function checkOncePerTurn({ state, attacker, action, violations }: Evaluation): 
   if ((state.combat.turn.turnUses[key] ?? 0) > 0)
     violations.push({
       rule: "feature.once-per-turn",
-      message: `${attacker.name} has already used ${action.name} this turn - once per turn.`
+      message: `${attacker.name} has already used ${action.name} this turn, and it works once per turn.`
     });
   return key;
 }
@@ -403,13 +403,13 @@ function checkAbleToAct({ state, attacker, action, resolveDefinition, violations
     if (incapacitating !== null)
       violations.push({
         rule: "condition.incapacitated",
-        message: `${attacker.name} is ${conditionLabel(incapacitating)} and can't take actions, bonus actions, or reactions.`
+        message: `${attacker.name} is ${conditionLabel(incapacitating)} and can't take actions, Bonus Actions, or reactions.`
       });
     // At 0 HP a creature is down and can't act. Keyed on hp, so a defeated monster with no condition is blocked too.
     else if (attacker.hp.current <= 0)
       violations.push({
         rule: "condition.down",
-        message: `${attacker.name} is down (0 HP) and can't take actions, bonus actions, or reactions.`
+        message: `${attacker.name} is down (0 HP) and can't take actions, Bonus Actions, or reactions.`
       });
   }
   // "Can't take Reactions" while an effect lasts.
@@ -579,8 +579,8 @@ function checkTakenAlone({ action, violations }: Evaluation): void {
 const USE_SCOPE_LABELS: Readonly<Record<"turn" | "encounter" | "short-rest" | "long-rest", string>> = {
   turn: "turn",
   encounter: "encounter",
-  "short-rest": "short rest",
-  "long-rest": "long rest"
+  "short-rest": "Short Rest",
+  "long-rest": "Long Rest"
 };
 
 function checkLimitedUse({ state, attacker, action, siblings, violations }: Evaluation): EconomyPlan["spendUse"] {
@@ -608,9 +608,9 @@ export function noUsesRemaining(action: DefinitionAction, limit: number): string
   const uses = action.uses!;
   return `${action.name}: no uses remaining (${
     uses.per === "recharge"
-      ? `spent - recharges on ${uses.recharge}+ at the start of its turn`
+      ? `spent · recharges on ${uses.recharge}+ at the start of its turn`
       : uses.per === "own-turn"
-        ? `spent - back at the start of its next turn`
+        ? `spent · back at the start of its next turn`
         : `${limit}/${USE_SCOPE_LABELS[uses.per]}`
   }).`;
 }
@@ -805,7 +805,7 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
     if (state.combat.turn.bonusActionUsed)
       violations.push({
         rule: "economy.bonus-action-used",
-        message: `${attacker.name} has already used a bonus action this turn.`
+        message: `${attacker.name} has already used a Bonus Action this turn.`
       });
     // A compound bonus action opens its plan, which later swings spend (no rolls are consumed opening it).
     return {
@@ -861,7 +861,7 @@ function freshActionSlot(
     multiattack = planRecord(parents[0].id, opened.replacements);
   } else if (parents.length > 1) {
     if (action.attack && (action.attack.count ?? 1) > 1) components = attackPool(action);
-    notes.push(`${action.name} belongs to more than one Multiattack - tracking it standalone.`);
+    notes.push(`${action.name} belongs to more than one Multiattack, so it is tracked on its own.`);
   } else if (action.attack && (action.attack.count ?? 1) > 1) {
     components = attackPool(action);
   } else if (action.replacesAttack && attacksInAttackAction(siblings) > 1) {
@@ -1004,7 +1004,7 @@ function checkActionSlot(evaluation: Evaluation): SlotPlan {
   const named = leftovers();
   return refuse(
     named.length > 0
-      ? `${attacker.name} has no ${action.name} left in this action - remaining: ${named.join(", ")}.`
+      ? `${attacker.name} has no ${action.name} left in this action. Remaining: ${named.join(", ")}.`
       : `${attacker.name} has no attacks remaining in this action.`,
     current
   );
@@ -1035,7 +1035,7 @@ function checkLegendary(
   if (onOwnTurn)
     violations.push({
       rule: "legendary.own-turn",
-      message: `Legendary actions are taken on other creatures' turns - not on ${attacker.name}'s own.`
+      message: `Legendary actions are taken on other creatures' turns, and this is ${attacker.name}'s own.`
     });
   if (spent + cost > perRound)
     violations.push({
@@ -1069,14 +1069,14 @@ function checkSpellSlot({ state, attacker, action, slotLevel, violations }: Eval
   else if (slotsLeft(attacker, level, pact) <= 0) {
     violations.push({
       rule: "slots.none-remaining",
-      message: `${action.name} spends a level-${level} ${pact ? "Pact Magic" : "spell"} slot - ${attacker.name} has none left.`
+      message: `${action.name} spends a level ${level} ${pact ? "Pact Magic" : "spell"} slot, and ${attacker.name} has none left.`
     });
   }
   // SRD: "On a turn, you can expend only one spell slot to cast a spell", whoever's turn it is.
   if (state.combat.turn.spellSlotCasters?.includes(attacker.id))
     violations.push({
       rule: "slots.one-per-turn",
-      message: `${attacker.name} has already cast a spell with a spell slot this turn - only one per turn.`
+      message: `${attacker.name} has already cast a spell with a spell slot this turn, and only one is allowed per turn.`
     });
   return pact ? { level, pact: true } : { level };
 }
@@ -1207,7 +1207,7 @@ function checkTargeting(
           message:
             target.id === attacker.id
               ? `${action.name} distracts an enemy, not ${attacker.name} itself.`
-              : `${target.name} is ${attacker.name}'s ally - ${action.name} distracts an enemy.`
+              : `${target.name} is ${attacker.name}'s ally, and ${action.name} distracts an enemy.`
         });
       const apart = distanceFeet?.(attacker.id, target.id) ?? null;
       if (apart !== null && apart > 5 + DISTANCE_TOLERANCE_FEET)
@@ -1279,7 +1279,7 @@ function checkSpellTargets(
     if (unique.length > limit)
       violations.push({
         rule: "target.too-many",
-        message: `${spell.name} targets ${limit === 1 ? "one creature" : `up to ${limit} creatures`}${castLevel > spell.level ? ` with a level-${castLevel} slot` : ""}; ${unique.length} were chosen.`
+        message: `${spell.name} targets ${limit === 1 ? "one creature" : `up to ${limit} creatures`}${castLevel > spell.level ? ` with a level ${castLevel} slot` : ""}; ${unique.length} were chosen.`
       });
   }
   if (action.attack !== undefined || !distanceFeet) return;
@@ -1385,7 +1385,7 @@ export function planEconomy(
   if (blocking.length > 0) throw new RulesBlockedError(blocking[0].rule, blocking[0].message);
   warnings.push(...policed.filter((violation) => !covered(violation.rule)).map((violation) => violation.message));
   if (proseMultiattack && softViolations.some((violation) => !covered(violation.rule)))
-    warnings.push(`${attacker.name}'s Multiattack is prose-only - extra attacks aren't validated.`);
+    warnings.push(`${attacker.name}'s Multiattack is prose only, so extra attacks aren't validated.`);
   return { plan, overridden: waived ? { rule: waived.rule, reason: overrideReason(input.override) } : null };
 }
 

@@ -194,7 +194,9 @@ describe("the bind: one shipped row, two picked bases, two different numbers", (
         { catalog: CATALOG }
       )
     ).toThrow(
-      new CommandRejectedError('Dwarven Thrower applies to Warhammer - "greatsword" is not one of its printed bases.')
+      new CommandRejectedError(
+        'Dwarven Thrower applies to Warhammer, and "greatsword" is not one of its printed bases.'
+      )
     );
   });
 
@@ -551,7 +553,7 @@ describe("the bind: the four write-path rules", () => {
         resolve,
         { catalog: CATALOG, role: "player" }
       )
-    ).toThrow(/already bound - remove it and add it again/);
+    ).toThrow(/already bound. Remove it and add it again/);
     setInventoryItem(
       state,
       IDS.hero,

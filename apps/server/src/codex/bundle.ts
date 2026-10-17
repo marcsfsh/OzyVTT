@@ -202,11 +202,11 @@ function normalizeBundle(raw: unknown): CodexBundle {
   const unrecognised = Object.keys(bundle).find((key) => !BUNDLE_KEYS.has(key));
   if (unrecognised !== undefined)
     throw new CodexValidationError(
-      `That backup has a section the codex does not recognise: "${unrecognised}". Compare it with a fresh export - a mistyped section name means those records would be dropped rather than restored.`
+      `That backup has a section the codex does not recognise: "${unrecognised}". Compare it with a fresh export. With a mistyped section name, those records would be dropped.`
     );
   if (!Object.keys(bundle).some((key) => BUNDLE_KEYS.has(key)))
     throw new CodexValidationError(
-      'That backup holds no codex sections at all, so it is truncated or is not a backup file. A campaign with nothing in it still exports every section ("pages": [], and so on) - restoring this would erase the codex rather than replace it.'
+      'That backup holds no codex sections at all, so it is truncated or is not a backup file. A campaign with nothing in it still exports every section ("pages": [], and so on), so restoring this would erase the codex.'
     );
   const list = (key: string): unknown[] => {
     const value = bundle[key];
@@ -414,10 +414,10 @@ function normalizeBundle(raw: unknown): CodexBundle {
   const factions = standing.map((row) => row.factionPageId);
   if (new Set(factions).size !== factions.length)
     throw new CodexValidationError(
-      "That backup has two standing rows for the same faction - a faction holds one standing."
+      "That backup has two standing rows for the same faction. A faction holds one standing."
     );
   if (markers.filter((marker) => marker.isParty).length > 1)
-    throw new CodexValidationError("That backup marks more than one pin as the party's - only one pin can be.");
+    throw new CodexValidationError("That backup marks more than one pin as the party's. Only one pin can be.");
   const numbers = sessions.map((session) => session.sessionNumber).filter((value): value is number => value !== null);
   if (new Set(numbers).size !== numbers.length)
     throw new CodexValidationError("That backup has two sessions with the same number.");

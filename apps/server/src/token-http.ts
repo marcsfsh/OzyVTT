@@ -115,7 +115,7 @@ export function createTokenRouter(options: TokenRouterOptions) {
             response,
             429,
             "rate_limited",
-            `You can upload up to ${PLAYER_UPLOADS_PER_DAY} token images a day - ask your GM to add more.`
+            `You can upload up to ${PLAYER_UPLOADS_PER_DAY} token images a day. Ask your GM to add more.`
           );
         }
         if (!Buffer.isBuffer(request.body))

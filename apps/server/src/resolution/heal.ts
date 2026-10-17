@@ -115,13 +115,13 @@ export function applyConditionCures(ctx: ResolveContext): void {
     if (present.length === 0) {
       if (!alone) continue;
       throw new CommandRejectedError(
-        `${target.name} isn't ${cures.map((id) => conditionLabel(id)).join(" or ")} - ${action.name} would do nothing.`
+        `${target.name} isn't ${cures.map((id) => conditionLabel(id)).join(" or ")}, so ${action.name} would do nothing.`
       );
     }
     const picked = action.endsOneCondition ? (input.conditionId ?? present[0]) : undefined;
     if (picked !== undefined && !present.includes(picked))
       throw new CommandRejectedError(
-        `${target.name} isn't ${conditionLabel(picked)} - ${action.name} would do nothing.`
+        `${target.name} isn't ${conditionLabel(picked)}, so ${action.name} would do nothing.`
       );
     for (const id of picked !== undefined ? [picked] : present) {
       // The action is already authorized; it ends the condition whoever imposed it.

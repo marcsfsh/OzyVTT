@@ -227,7 +227,7 @@ describe("a class and its subclass publish in either order", () => {
     // With nothing naming it, the refusal stands, and says the subclass need not be published.
     const alone = validateForPublish("class", classBody(subclassPick), contextWith());
     expect(alone.valid).toBe(false);
-    expect(messages(alone)).toContain("it does not have to be published, it only has to exist");
+    expect(messages(alone)).toContain("It has to exist, published or not.");
   });
 
   it("publishes the SUBCLASS first, on the strength of a class that is still a draft", () => {

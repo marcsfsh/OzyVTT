@@ -279,7 +279,7 @@ function answerStrike(
       : undefined;
     if (picked && !meleeSwing(picked))
       throw new CommandRejectedError(
-        `${pending.kind === "leaves-reach" ? "An opportunity attack" : pending.actionName} is one melee attack with a weapon or an Unarmed Strike - ${picked.name} isn't one.`
+        `${pending.kind === "leaves-reach" ? "An opportunity attack" : pending.actionName} is one melee attack with a weapon or an Unarmed Strike, and ${picked.name} isn't one.`
       );
     const fallbackMelee = available.find(meleeSwing);
     // The swing is the reaction, so it spends the reaction slot even on the reactor's own turn.
@@ -428,7 +428,7 @@ function answerParkedAttack(answer: Answer): ReactionOutcome {
         answer.scope.role === "player" ? answer.scope.sessionId : undefined
       )(pending.sourceActorId);
     throw new CommandRejectedError(
-      `${hidden ? "The" : `${pending.sourceName}'s`} attack can't be finished any more - dismiss the prompt.`
+      `${hidden ? "The" : `${pending.sourceName}'s`} attack can't be finished any more. Dismiss the prompt.`
     );
   }
 

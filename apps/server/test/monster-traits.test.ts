@@ -350,7 +350,7 @@ describe("Regeneration", () => {
     expect(isDead(troll)).toBe(false);
     expect(troll.conditions.map((condition) => condition.id)).toContain("unconscious");
     expect(texts(events)).toContain(
-      "Troll drops to 0 HP - it dies only if it starts its turn at 0 HP and doesn't regenerate."
+      "Troll drops to 0 HP. It dies only if it starts its turn at 0 HP and doesn't regenerate."
     );
     advance(state);
     expect(actor(state, IDS.foe).hp.current).toBe(15);
@@ -365,7 +365,7 @@ describe("Regeneration", () => {
     expect(troll.hp.current).toBe(0);
     expect(isDead(troll)).toBe(true);
     expect(texts(events)).toContain(
-      "Troll dies - it started its turn at 0 HP and its Regeneration didn't work (it took Acid or Fire damage)."
+      "Troll dies. It started its turn at 0 HP and its Regeneration didn't work (it took Acid or Fire damage)."
     );
   });
 
@@ -388,9 +388,7 @@ describe("Undead Fortitude", () => {
     // DC 10; the zombie's Con save is +3, so a 7 makes it.
     const { events } = hurt(state, IDS.foe, [{ amount: 5, type: "slashing" }], [7]);
     expect(actor(state, IDS.foe).hp.current).toBe(1);
-    expect(texts(events)).toContain(
-      "Zombie's Undead Fortitude: CON save 10 (d20 7) vs DC 10 - it drops to 1 HP instead."
-    );
+    expect(texts(events)).toContain("Zombie's Undead Fortitude: CON save 10 (d20 7) vs DC 10: it drops to 1 HP.");
   });
 
   it("lets it fall on a failed save", () => {
@@ -398,7 +396,7 @@ describe("Undead Fortitude", () => {
     const { events } = hurt(state, IDS.foe, [{ amount: 5, type: "slashing" }], [6]);
     expect(actor(state, IDS.foe).hp.current).toBe(0);
     expect(isDead(actor(state, IDS.foe))).toBe(true);
-    expect(texts(events)).toContain("Zombie's Undead Fortitude: CON save 9 (d20 6) vs DC 10 - it falls.");
+    expect(texts(events)).toContain("Zombie's Undead Fortitude: CON save 9 (d20 6) vs DC 10: it falls.");
   });
 
   it("gives no save against Radiant damage or a Critical Hit", () => {
@@ -532,7 +530,7 @@ describe("auras", () => {
     expect(events).toContainEqual(
       expect.objectContaining({
         gmOnly: true,
-        text: "Balor's Fire Aura: each creature within 5 feet takes 3d8 fire damage - the map can't measure, so apply it by hand."
+        text: "Balor's Fire Aura: each creature within 5 feet takes 3d8 fire damage. The map can't measure, so apply it by hand."
       })
     );
   });
@@ -620,7 +618,7 @@ describe("Berserk", () => {
     const events = advance(state, [6]);
     expect(actor(state, IDS.foe).effects.map((effect) => effect.name)).toEqual(["Berserk"]);
     expect(texts(events)).toContain(
-      "Clay Golem goes berserk (rolled 6) - it attacks the nearest creature it can see until it is no longer Bloodied."
+      "Clay Golem goes berserk (rolled 6). It attacks the nearest creature it can see until it is no longer Bloodied."
     );
     actor(state, IDS.foe).hp.current = 100;
     for (let turn = 0; turn < 3; turn += 1) advance(state);

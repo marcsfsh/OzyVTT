@@ -548,7 +548,7 @@ describe("Rogue - the flat grants and the pick", () => {
     resolve(built, "stroke-of-luck", [], []);
     expect(built.hero.actionUses["stroke-of-luck"]).toBe(1);
     expect(() => resolve(built, "stroke-of-luck", [], [])).toThrowError(
-      /Stroke of Luck: no uses remaining \(1\/short rest\)/
+      /Stroke of Luck: no uses remaining \(1\/Short Rest\)/
     );
   });
 
@@ -583,7 +583,7 @@ describe("Rogue - the flat grants and the pick", () => {
     const built = table(rogueInput(11));
     built.state.combat = { ...built.state.combat, turn: { ...built.state.combat.turn, movementUsedFeet: 10 } };
     expect(() => resolve(built, "steady-aim", [], [])).toThrowError(
-      /has moved this turn - Steady Aim is only for a creature that hasn't/
+      /has moved this turn, and Steady Aim is only for a creature that hasn't/
     );
   });
 
@@ -726,12 +726,12 @@ describe("Ranger - Favored Enemy, audit row 32", () => {
     mark(first);
     expect(first.hero.actionUses["favored-enemy"]).toBe(2);
     expect(first.foe.effects.map((effect) => effect.name)).toEqual(["Hunter's Mark"]);
-    expect(() => mark(first)).toThrowError(/Hunter's Mark \(no slot\): no uses remaining \(2\/long rest\)/);
+    expect(() => mark(first)).toThrowError(/Hunter's Mark \(no slot\): no uses remaining \(2\/Long Rest\)/);
 
     const late = table(rangerInput(17));
     for (let cast = 0; cast < 6; cast += 1) mark(late);
     expect(late.hero.actionUses["favored-enemy"]).toBe(6);
-    expect(() => mark(late)).toThrowError(/Hunter's Mark \(no slot\): no uses remaining \(6\/long rest\)/);
+    expect(() => mark(late)).toThrowError(/Hunter's Mark \(no slot\): no uses remaining \(6\/Long Rest\)/);
   });
 });
 
@@ -788,13 +788,13 @@ describe("Ranger - the rest of the kit", () => {
     for (let use = 0; use < 2; use += 1) tire(plain);
     expect(plain.hero.actionUses["tireless"]).toBe(2);
     newTurn(plain);
-    expect(() => resolve(plain, "tireless", [], [])).toThrowError(/Tireless: no uses remaining \(2\/long rest\)/);
+    expect(() => resolve(plain, "tireless", [], [])).toThrowError(/Tireless: no uses remaining \(2\/Long Rest\)/);
 
     const focused = table(rangerInput(10, { wisFocus: true })); // Wis 15 + 4 -> +4
     for (let use = 0; use < 4; use += 1) tire(focused);
     expect(focused.hero.actionUses["tireless"]).toBe(4);
     newTurn(focused);
-    expect(() => resolve(focused, "tireless", [], [])).toThrowError(/Tireless: no uses remaining \(4\/long rest\)/);
+    expect(() => resolve(focused, "tireless", [], [])).toThrowError(/Tireless: no uses remaining \(4\/Long Rest\)/);
   });
 
   it("gives Tireless's 1d8 + Wisdom as Temporary Hit Points, and takes a level of Exhaustion off at a Short Rest", () => {
@@ -817,7 +817,7 @@ describe("Ranger - the rest of the kit", () => {
     expect(built.hero.actionUses["tireless"]).toBeUndefined();
     newTurn(built);
     expect(() => resolve(built, "natures-veil", [], [])).toThrowError(
-      /Nature's Veil: no uses remaining \(2\/long rest\)/
+      /Nature's Veil: no uses remaining \(2\/Long Rest\)/
     );
   });
 
@@ -1047,7 +1047,7 @@ describe("Paladin - the two free casts, audit rows 30 and 31", () => {
     newTurn(built);
     expect(() =>
       swing(built, "item-longsword", [19, 6, 3, 4], { hitOptions: [{ id: "spell-divine-smite-free" }] })
-    ).toThrowError(/Divine Smite \(no slot\): no uses remaining \(1\/long rest\)/);
+    ).toThrowError(/Divine Smite \(no slot\): no uses remaining \(1\/Long Rest\)/);
   });
 
   it("always has Find Steed prepared from level 5, on its OWN pool", () => {
@@ -1086,7 +1086,7 @@ describe("Paladin - Channel Divinity is ONE counter that three features spend", 
     expect(built.hero.actionUses["channel-divinity"]).toBe(2);
     newTurn(built);
     expect(() => resolve(built, "abjure-foes", [], [IDS.foe])).toThrowError(
-      /Abjure Foes: no uses remaining \(2\/long rest\)/
+      /Abjure Foes: no uses remaining \(2\/Long Rest\)/
     );
   });
 
@@ -1096,7 +1096,7 @@ describe("Paladin - Channel Divinity is ONE counter that three features spend", 
     expect(built.hero.actionUses["channel-divinity"]).toBe(3);
     newTurn(built);
     expect(() => resolve(built, "divine-sense", [], [])).toThrowError(
-      /Divine Sense: no uses remaining \(3\/long rest\)/
+      /Divine Sense: no uses remaining \(3\/Long Rest\)/
     );
   });
 
@@ -1130,7 +1130,7 @@ describe("Paladin - the auras that are really immunities", () => {
     const brave = table(paladinInput(10));
     const events = setCondition(brave.state, IDS.hero, "frightened", true, undefined, GM_SCOPE, immunitiesOf(brave));
     expect(events).toEqual([
-      { kind: "condition", text: "Bree is immune to Frightened - not applied.", actorId: IDS.hero, immune: true }
+      { kind: "condition", text: "Bree is immune to Frightened, so it isn't applied.", actorId: IDS.hero, immune: true }
     ]);
     expect(brave.hero.conditions).toEqual([]);
 
@@ -1143,7 +1143,7 @@ describe("Paladin - the auras that are really immunities", () => {
     const devoted = table(paladinInput(7));
     expect(
       setCondition(devoted.state, IDS.hero, "charmed", true, undefined, GM_SCOPE, immunitiesOf(devoted))[0].text
-    ).toBe("Bree is immune to Charmed - not applied.");
+    ).toBe("Bree is immune to Charmed, so it isn't applied.");
     // Frightened is not immune yet: the class aura is level 10.
     setCondition(devoted.state, IDS.hero, "frightened", true, undefined, GM_SCOPE, immunitiesOf(devoted));
     expect(devoted.hero.conditions).toEqual([{ id: "frightened" }]);
@@ -1367,7 +1367,7 @@ describe("Paladin - Oath of Devotion, audit row 28", () => {
     spend(built, "holy-nimbus");
     expect(built.hero.actionUses["holy-nimbus"]).toBe(1);
     newTurn(built);
-    expect(() => resolve(built, "holy-nimbus", [], [])).toThrowError(/Holy Nimbus: no uses remaining \(1\/long rest\)/);
+    expect(() => resolve(built, "holy-nimbus", [], [])).toThrowError(/Holy Nimbus: no uses remaining \(1\/Long Rest\)/);
   });
 
   it("REFUSES a level-19 Paladin with no Epic Boon feat", () => {

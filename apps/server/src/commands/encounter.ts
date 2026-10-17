@@ -107,7 +107,7 @@ export const encounterCommands = [
         timeline.truncateAll();
         // The previous fight's journal goes with it; this very command stays as the new fight's first entry.
         timeline.clearJournal(commandId);
-        timeline.capture("turn", `Combat begins - ${turnLabel(draft)}`, draft);
+        timeline.capture("turn", `Combat begins · ${turnLabel(draft)}`, draft);
       });
       if (duplicate) return;
       kit.context.appendLog({ kind: "encounter", text: "The encounter began.", gmOnly: false });
@@ -249,8 +249,8 @@ export const encounterCommands = [
     type: "encounter.remove-combatant",
     operationId: "removeEncounterCombatant",
     description:
-      "Takes a combatant out of the running fight (GM-grade only): its initiative entry, token and prompts go, the turn moves on first when it was its turn, and what it sustains ends - its grapples and Concentration, what lasts until its next turn, and a creature it swallowed climbs out of the corpse with the movement the stat block names, landing Prone. It stays on the roster.",
-    summary: "Take a combatant out of the running fight, ending what it holds (GM).",
+      "Takes a combatant out of the running fight (GM-grade only): its initiative entry, token and prompts go, the turn moves on first when it was its turn, and what it sustains ends: its grapples and Concentration, what lasts until its next turn, and a creature it swallowed, which climbs out of the corpse with the movement the stat block names and lands Prone. It stays on the roster.",
+    summary: "Take a combatant out of the running fight and end what it holds (GM).",
     schema: RemoveCombatantSchema,
     malformed: "The remove-combatant command is malformed.",
     gmOnly: "Only the GM can take a combatant out of the fight.",
@@ -372,8 +372,8 @@ export const encounterCommands = [
     type: "initiative.roll-remaining",
     operationId: "rollRemainingInitiative",
     description:
-      "Settles initiative for every combatant still pending a player roll with the provisional roll made at the start (GM-grade only), beginning a `wait`-mode fight.",
-    summary: "Use the start's rolls for every player still pending, beginning a wait-mode fight (GM).",
+      "Settles initiative for every combatant still pending a player roll with the provisional roll made at the start (GM-grade only). This begins a `wait`-mode fight.",
+    summary: "Use the start's rolls for every player still pending, and begin a wait-mode fight (GM).",
     schema: InitiativeRollRemainingSchema,
     malformed: "The initiative command is malformed.",
     gmOnly: "Only the GM can roll initiative for the rest of the table.",
@@ -468,8 +468,8 @@ export const encounterCommands = [
     type: "turn.use",
     operationId: "useTurnSlot",
     description:
-      "Marks the current turn's action or bonus action used/unused. A manual toggle: structured action resolution validates against this state per the encounter's rules mode, and un-marking the action slot also clears any open compound-action instance. Only the GM gives back a spent slot: a player's un-marking is the `economy.spent-slot` rules block (a GM note under advise).",
-    summary: "Mark the current turn's action or bonus action used/unused.",
+      "Marks the current turn's action or Bonus Action used/unused. A manual toggle: structured action resolution validates against this state per the encounter's rules mode, and un-marking the action slot also clears any open compound-action instance. Only the GM gives back a spent slot: a player's un-marking is the `economy.spent-slot` rules block (a GM note under advise).",
+    summary: "Mark the current turn's action or Bonus Action used/unused.",
     schema: TurnUseSchema,
     malformed: "The turn command is malformed.",
     async run({ principal, request, execute }, kit) {
@@ -485,7 +485,7 @@ export const encounterCommands = [
       if (used && turnActorId)
         kit.context.broadcastTableEvent({
           kind: "action",
-          text: `${kit.actorName(turnActorId)} used ${slot === "bonus-action" ? "a bonus action" : "an action"}.`,
+          text: `${kit.actorName(turnActorId)} used ${slot === "bonus-action" ? "a Bonus Action" : "an action"}.`,
           actorIds: [turnActorId],
           gmOnly: kit.actorHidden(turnActorId)
         });

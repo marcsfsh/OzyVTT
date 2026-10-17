@@ -594,7 +594,7 @@ export class HomebrewStore implements HomebrewContentSource {
     const database = this.requireDatabase();
     const existing = this.requireRow(id, expectedRev);
     if (visibleToPlayers && existing.state !== "published")
-      throw new HomebrewStateError("Publish this first - a draft can't be shown to players.");
+      throw new HomebrewStateError("Publish this first. A draft can't be shown to players.");
     const stamp = this.stamp();
     this.transaction(() => {
       database
@@ -882,7 +882,7 @@ export function overwriteRefusal(
     return "That record was deleted here. Restore it before overwriting it, or import with re-mint to land a fresh copy.";
   if (row.state === "published") {
     return row.visibleToPlayers
-      ? "That record is published and shown to players - overwriting it would take it away from them mid-session. Unpublish it first, or import with re-mint."
+      ? "That record is published and shown to players, so overwriting it would take it away from them mid-session. Unpublish it first, or import with re-mint."
       : "That record is published. Unpublish it before overwriting it, or import with re-mint to land a fresh copy.";
   }
   return null;

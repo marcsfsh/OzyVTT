@@ -19,7 +19,7 @@ function poolOn(state: GameState, actorId: string, poolId: string, deps: PoolDep
   const pool = actionPools(effectiveActions(definition, actor, deps.catalog)).find((entry) => entry.id === poolId);
   if (!pool) throw new CommandRejectedError(`${actor.name} has no limited-use pool called "${poolId}".`);
   if (pool.per === "turn")
-    throw new CommandRejectedError(`${pool.name} comes back every turn - it is spent by using it.`);
+    throw new CommandRejectedError(`${pool.name} comes back every turn. It is spent by using it.`);
   return { actor, pool, spent: actor.actionUses[poolId] ?? 0 };
 }
 

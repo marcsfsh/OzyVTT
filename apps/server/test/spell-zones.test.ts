@@ -486,7 +486,7 @@ describe("Guardian of Faith: enemies only, and gone after 60 damage", () => {
     ]);
     expect(savesOf(caster.state, FOE2)[0]).toMatchObject({ ability: "dex", proposedDamage: 20 });
     const { events } = answer(caster.state, FOE2, 1);
-    expect(events.map((event) => event.text)).toContain("Guardian of Faith ends, having dealt 60 damage.");
+    expect(events.map((event) => event.text)).toContain("Guardian of Faith ends after dealing 60 damage.");
     expect(caster.state.combat.spellZones).toEqual([]);
   });
 });

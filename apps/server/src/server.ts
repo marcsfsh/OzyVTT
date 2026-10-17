@@ -381,7 +381,7 @@ export function createServer(options: CreateServerOptions) {
     const name = state.actors.find((actor) => actor.id === state.combat.turnActorId)?.name ?? "A combatant";
     appendLog({
       kind: "turn",
-      text: `Round ${state.combat.round} - ${name}'s turn.`,
+      text: `Round ${state.combat.round} · ${name}'s turn.`,
       actorIds: [state.combat.turnActorId]
     });
     const reminder = turnReminder(state, state.combat.turnActorId, hiddenFrom(state, sightContent()));
@@ -397,7 +397,7 @@ export function createServer(options: CreateServerOptions) {
       case "rewrote":
         appendLog({
           kind: "history",
-          text: "The GM rewrote history from this turn - every later turn was undone.",
+          text: "The GM rewrote history from this turn, and every later turn was undone.",
           gmOnly: true
         });
         logTurnBegin(state);

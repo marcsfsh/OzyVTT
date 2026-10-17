@@ -1227,7 +1227,7 @@ describe("the same feat cannot be taken twice across different offers", () => {
     );
     // The Criminal's origin feat is Alert, and the ledger already spends Versatile on Alert.
     expect(() => buildCharacterDefinition(duplicate, library, defaultPolicy)).toThrowError(
-      /Alert is already on this character - a feat can only be taken once/
+      /Alert is already on this character. A feat can be taken only once/
     );
   });
 
@@ -1324,7 +1324,7 @@ describe("a feature whose only rider is limited USES still lands as a trackable 
         { actorId: ACTOR_ID, targetIds: [], commandId: "50000000-0000-4000-8000-000000000002" },
         deps
       )
-    ).toThrowError(/no uses remaining \(1\/short rest\)/);
+    ).toThrowError(/no uses remaining \(1\/Short Rest\)/);
   });
 });
 
@@ -1403,7 +1403,7 @@ describe("an action that shares a pool is gated on the POOL's size", () => {
         { actorId: CLERIC, targetIds: [], commandId: "50000000-0000-4000-8000-00000000000c" },
         deps()
       )
-    ).toThrowError(/no uses remaining \(2\/long rest\)/);
+    ).toThrowError(/no uses remaining \(2\/Long Rest\)/);
   });
 });
 

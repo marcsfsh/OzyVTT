@@ -71,7 +71,7 @@ describe("picking a scroll's spell", () => {
     write(table, IDS.wizard, { ...unpicked, quantity: 2 });
     expect(rowOf(table, IDS.wizard)).toMatchObject({ quantity: 2, spellId: "fireball" });
     expect(() => write(table, IDS.wizard, edit(table, IDS.wizard, "spell-scroll", { spellId: "shatter" }))).toThrow(
-      "Spell Scroll already bears a spell - only the GM can change it."
+      "Spell Scroll already bears a spell. Only the GM can change it."
     );
     write(table, IDS.wizard, edit(table, IDS.wizard, "spell-scroll", { spellId: "shatter" }), "gm");
     expect(rowOf(table, IDS.wizard)?.spellId).toBe("shatter");
@@ -230,7 +230,7 @@ describe("a scroll's spell, cast as the spell's own cast is", () => {
     fight(table, IDS.wizard);
     const read = resolveAt(table, IDS.wizard, READ, [], { targetIds: [] });
     expect(read.warnings?.find((line) => line.startsWith("Identify takes 1 minute to cast"))).toContain(
-      "the scroll isn't lost - give it back on the sheet"
+      "the scroll isn't lost, so give it back on the sheet"
     );
   });
 });

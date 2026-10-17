@@ -583,7 +583,7 @@ describe("actor.apply-damage narrates the type the GM named", () => {
     );
     expect(warning, "the GM was never told the type matched nothing").toBeDefined();
     expect(warning!.text).toBe(
-      '"fier" is not one of the SRD damage types - only a homebrew defence naming it exactly will match.'
+      '"fier" is not one of the SRD damage types. Only a homebrew defence naming it exactly will match.'
     );
     // The GM's typo is the GM's business: the table sees the damage row and not the warning.
     expect((await feed(base, playerToken)).some((entry) => entry.text.includes("SRD damage types"))).toBe(false);

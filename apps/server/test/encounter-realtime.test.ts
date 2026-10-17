@@ -314,7 +314,7 @@ describe("live authoritative encounter workflow", () => {
       });
       await new Promise((resolve) => setTimeout(resolve, 150));
 
-      expect(events.map((event) => event.text)).toContain("Public Hero used a bonus action.");
+      expect(events.map((event) => event.text)).toContain("Public Hero used a Bonus Action.");
       expect(events.map((event) => event.text)).toContain("Public Hero used an action.");
       expect(events.filter((event) => event.text.includes("used an action."))).toHaveLength(1);
     } finally {

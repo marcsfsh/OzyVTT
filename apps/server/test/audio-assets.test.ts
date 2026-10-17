@@ -61,7 +61,7 @@ describe("sound file inspection", () => {
   });
 
   it("refuses what isn't a sound the table can play, saying what it is", () => {
-    expect(() => inspectAudio(png(10, 10))).toThrow("This file is an image, not a sound");
+    expect(() => inspectAudio(png(10, 10))).toThrow("This file is an image, and only sound files can be uploaded here");
     expect(() => inspectAudio(Buffer.from("%PDF-1.7 not a song"))).toThrow("a PDF document");
     expect(() => inspectAudio(Buffer.from("just some text, renamed to .mp3"))).toThrow(
       "not a sound file browsers can play"

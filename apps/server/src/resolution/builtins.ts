@@ -235,7 +235,7 @@ function unarmedSave(failure: "grappled" | "prone" | "pushed") {
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())
     });
-    if (failure === "pushed") ctx.warnings.push(`On a failed save, ${target.name} is pushed 5 feet - move the token.`);
+    if (failure === "pushed") ctx.warnings.push(`On a failed save, ${target.name} is pushed 5 feet. Move the token.`);
     ctx.builtinSave = { ability, dc, targets: [{ targetId: target.id, targetName: target.name }] };
   };
 }

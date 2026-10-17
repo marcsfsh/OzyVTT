@@ -57,7 +57,7 @@ export function releaseHeldRoll(state: GameState, key: string): void {
     state.heldRolls = state.heldRolls.filter((entry) => entry.key !== key);
 }
 
-const SERVER_ROLLS = "At this table the server rolls players' dice. Tap Roll instead of typing a die.";
+const SERVER_ROLLS = "At this table the server rolls players' dice. Tap Roll.";
 
 /** Refuses a typed die the table doesn't take: a player's, while the table has the server throw players' dice, or one
  *  typed over a die the server already threw for this roll. The GM may always type. */

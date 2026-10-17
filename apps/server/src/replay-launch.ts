@@ -135,7 +135,7 @@ export function launchReplay(state: GameState, input: ReplayLaunchInput): Replay
   }
   if (state.definitions.length + definitionsToStore.length > MAX_DEFINITIONS) {
     throw new CommandRejectedError(
-      "The table's sheet library is full - delete some imported stat blocks before launching a replay."
+      "The table's sheet library is full. Delete some imported stat blocks before launching a replay."
     );
   }
 

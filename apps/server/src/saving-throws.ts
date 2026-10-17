@@ -489,7 +489,7 @@ function pushOnFailure(
     return [
       {
         kind: "effect",
-        text: `${target.name} is pushed ${push.feet} feet straight away from ${pending.sourceName} - move the token.`,
+        text: `${target.name} is pushed ${push.feet} feet straight away from ${pending.sourceName}. Move the token.`,
         actorId: target.id,
         gmOnly: true
       }

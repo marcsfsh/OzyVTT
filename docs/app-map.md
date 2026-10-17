@@ -1,4 +1,4 @@
-# App map (generated - do not edit by hand)
+# App map (generated, do not edit by hand)
 
 Regenerate with `npm run map`. A freshness test (`apps/server/test/app-map.test.ts`) fails
 if this drifts from the code, so it is always current. This is an orientation aid: it maps the
@@ -450,10 +450,10 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 
 ## Where things live
 
-Curated pointers (verify line numbers before relying on them - code moves):
+Curated pointers (verify line numbers before relying on them, because code moves):
 
-- **Wire contract (single source):** `packages/domain/src/` - `GameState` in `state.ts`, projections (`PlayerView`/`GmView`) in `views.ts`, `ClientToServerEvents`/`ServerToClientEvents` in `socket.ts`.
-- **Persisted/importable schemas:** `packages/schemas/src/index.ts` - `Actor`, `ActorDefinition`.
+- **Wire contract (single source):** `packages/domain/src/`: `GameState` in `state.ts`, projections (`PlayerView`/`GmView`) in `views.ts`, `ClientToServerEvents`/`ServerToClientEvents` in `socket.ts`.
+- **Persisted/importable schemas:** `packages/schemas/src/index.ts`: `Actor`, `ActorDefinition`.
 - **Command Zod schemas:** `packages/domain/src/commands.ts`.
 - **Command table + pipeline:** `apps/server/src/commands/` (`index.ts` lists every command).
 - **Scopes + OpenAPI:** `packages/api-contract/src/index.ts`.

@@ -98,7 +98,7 @@ describe("Lesser Restoration", () => {
     afflict(state, FOE, "blinded");
     const slots = JSON.stringify(actor(state, HERO).spellSlots);
     expect(() => resolve("spell-lesser-restoration", { conditionId: "deafened" })).toThrowError(
-      /Goblin isn't Deafened - Lesser Restoration would do nothing/
+      /Goblin isn't Deafened, so Lesser Restoration would do nothing/
     );
     expect(JSON.stringify(actor(state, HERO).spellSlots)).toBe(slots);
   });

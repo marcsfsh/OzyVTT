@@ -16,7 +16,7 @@ const MAX_ASKS = 10;
 export function parkRuleAsk(state: GameState, ask: PendingRuleAsk): PendingRuleAsk {
   const others = state.combat.pendingRuleAsks.filter((entry) => entry.actorId !== ask.actorId);
   if (others.length >= MAX_ASKS)
-    throw new CommandRejectedError("The GM already has ten questions waiting - give them a moment.");
+    throw new CommandRejectedError("The GM already has ten questions waiting. Give the GM a moment.");
   state.combat = { ...state.combat, pendingRuleAsks: [...others, ask] };
   return ask;
 }
@@ -30,7 +30,7 @@ export function findRuleAsk(state: GameState, askId: string): PendingRuleAsk | n
  *  changed, already answered) is told rather than believing it ran. */
 export function clearRuleAsk(state: GameState, askId: string): PendingRuleAsk {
   const ask = findRuleAsk(state, askId);
-  if (!ask) throw new CommandRejectedError("That question is no longer waiting - the fight moved on.");
+  if (!ask) throw new CommandRejectedError("That question is no longer waiting. The fight moved on.");
   state.combat = {
     ...state.combat,
     pendingRuleAsks: state.combat.pendingRuleAsks.filter((entry) => entry.id !== askId)

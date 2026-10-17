@@ -85,7 +85,7 @@ export function spendLooseUses(
     slot && action.spellSlot && slot.level < action.spellSlot.level
       ? `${action.name} needs a slot of level ${action.spellSlot.level} or higher.`
       : slot && slotsLeft(actor, slot.level, slot.pact) <= 0
-        ? `${action.name} spends a level-${slot.level} ${slot.pact ? "Pact Magic" : "spell"} slot - ${actor.name} has none left.`
+        ? `${action.name} spends a level ${slot.level} ${slot.pact ? "Pact Magic" : "spell"} slot, and ${actor.name} has none left.`
         : null;
   const refusal = unpreparedSpell(actor, action, definition) ?? slotRefusal;
   if (refusal !== null && slots === "strict") throw new CommandRejectedError(refusal);

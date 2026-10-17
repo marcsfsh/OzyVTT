@@ -539,7 +539,7 @@ describe("Barbarian: Reckless Attack is an effect the table can see and swing un
     const swungFirst = onTheTable(build(barbarianInput()));
     use(swungFirst, "item-greataxe", [IDS.foe], [3, 8]);
     expect(() => use(swungFirst, "reckless-attack")).toThrowError(
-      /Ozar has already made an attack roll this turn - Reckless Attack is decided with the first/
+      /Ozar has already made an attack roll this turn, and Reckless Attack is decided with the first/
     );
     const offTurn = onTheTable(build(barbarianInput()));
     nextInitiativeTurn(offTurn.state); // the foe's turn
@@ -564,7 +564,7 @@ describe("Boon of Combat Prowess: Peerless Aim until the start of the bearer's n
     use(built, "boon-of-combat-prowess");
     nextInitiativeTurn(built.state, [], turnDeps); // the foe's turn: a missed opportunity attack can't use it
     expect(() => use(built, "boon-of-combat-prowess")).toThrowError(
-      /no uses remaining \(spent - back at the start of its next turn\)/
+      /no uses remaining \(spent · back at the start of its next turn\)/
     );
     nextInitiativeTurn(built.state, [], turnDeps); // Ozar's own turn again
     use(built, "boon-of-combat-prowess");
@@ -596,7 +596,7 @@ describe("Barbarian: Persistent Rage is a counter the engine spends", () => {
     const built = onTheTable(build(barbarianInput()));
     use(built, "persistent-rage");
     expect(built.hero.actionUses["persistent-rage"]).toBe(1);
-    expect(() => use(built, "persistent-rage")).toThrowError(/no uses remaining \(1\/long rest\)/);
+    expect(() => use(built, "persistent-rage")).toThrowError(/no uses remaining \(1\/Long Rest\)/);
   });
 });
 
@@ -664,7 +664,7 @@ describe("Berserker: Mindless Rage refuses Frightened only while the Rage is run
       { resolveDefinition: () => table.definition, catalog }
     );
     expect(during).toEqual([
-      { kind: "condition", text: "Ozar is immune to Frightened - not applied.", actorId: IDS.hero, immune: true }
+      { kind: "condition", text: "Ozar is immune to Frightened, so it isn't applied.", actorId: IDS.hero, immune: true }
     ]);
     expect(table.hero.conditions, "the gate held but the condition landed anyway").toEqual([]);
 
@@ -678,7 +678,7 @@ describe("Berserker: Mindless Rage refuses Frightened only while the Rage is run
       { role: "gm" },
       { resolveDefinition: () => table.definition, catalog }
     );
-    expect(charmed[0]!.text).toBe("Ozar is immune to Charmed - not applied.");
+    expect(charmed[0]!.text).toBe("Ozar is immune to Charmed, so it isn't applied.");
     expect(table.hero.conditions).toEqual([]);
 
     // End the Rage and the immunity goes with it.
@@ -1120,7 +1120,7 @@ describe("Fighter: Action Surge is one more action on the turn", () => {
     use(built, "action-surge");
     expect(() => generic(built, "magic")).toThrow(/can't be a second Magic action/);
     generic(built, "dash");
-    expect(() => use(built, "action-surge")).toThrow(/only once on a turn/);
+    expect(() => use(built, "action-surge")).toThrow(/works once on a turn/);
     nextInitiativeTurn(built.state);
     expect(() => use(built, "action-surge")).toThrow(/own turn/);
   });
@@ -1323,7 +1323,7 @@ describe("Monk: the Bonus Action forms Martial Arts and Monk's Focus give", () =
     expect(built.state.combat.turn.bonusActionUsed).toBe(true);
     // One strike: Extra Attack belongs to the Attack action, not to the Bonus Action.
     expect(builtinActionFor(built.definition, "unarmed-strike-bonus")!.attack?.count).toBeUndefined();
-    expect(() => take(built, "unarmed-strike-bonus", [IDS.foe], [17, 6])).toThrow(/already used a bonus action/);
+    expect(() => take(built, "unarmed-strike-bonus", [IDS.foe], [17, 6])).toThrow(/already used a Bonus Action/);
   });
 
   it("takes Disengage or Dash alone as a Bonus Action for no Focus Point", () => {
@@ -1388,7 +1388,7 @@ describe("Monk: Focus Points are ONE pool, read off the printed column and reall
   it("refuses the twelfth spend on a level-11 Monk", () => {
     const built = onTheTable(build(monkInput(11)));
     built.hero.actionUses = { "focus-points": 11 };
-    expect(() => use(built, "flurry-of-blows")).toThrowError(/no uses remaining \(11\/short rest\)/);
+    expect(() => use(built, "flurry-of-blows")).toThrowError(/no uses remaining \(11\/Short Rest\)/);
   });
 });
 
@@ -1451,7 +1451,7 @@ describe("Monk: Superior Defense grants Resistance to everything but Force", () 
     expect(built.hero.actionUses["focus-points"]).toBe(20);
     const short = onTheTable(build(monkInput(20)));
     short.hero.actionUses = { "focus-points": 18 };
-    expect(() => use(short, "superior-defense")).toThrowError("Superior Defense has 2 left - this spends 3.");
+    expect(() => use(short, "superior-defense")).toThrowError("Superior Defense has 2 left, and this spends 3.");
   });
 });
 
@@ -1482,7 +1482,7 @@ describe("Monk: Uncanny Metabolism is a counter, and the Epic Boon is a feat", (
     const built = onTheTable(build(monkInput(11)));
     use(built, "uncanny-metabolism");
     expect(built.hero.actionUses["uncanny-metabolism"]).toBe(1);
-    expect(() => use(built, "uncanny-metabolism")).toThrowError(/no uses remaining \(1\/long rest\)/);
+    expect(() => use(built, "uncanny-metabolism")).toThrowError(/no uses remaining \(1\/Long Rest\)/);
   });
 
   it("puts the level-19 boon on the sheet", () => {
@@ -1682,7 +1682,7 @@ describe("Monk: Stunning Strike once per turn", () => {
     const built = onTheTable(build(monkInput(11)));
     use(built, "stunning-strike", [IDS.foe]);
     expect(() => use(built, "stunning-strike", [IDS.foe])).toThrowError(
-      /Shan has already used Stunning Strike this turn - once per turn/
+      /Shan has already used Stunning Strike this turn, and it works once per turn/
     );
     // Only the first spent a Focus Point.
     expect(built.hero.actionUses["focus-points"]).toBe(1);

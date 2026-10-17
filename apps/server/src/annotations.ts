@@ -197,7 +197,7 @@ function resolveVisibility(
 ): { visibility: AnnotationVisibility; visibleToActorId: string | null } {
   if (actor.role === "gm") {
     if (!(["public", "gm-only", "gm-actor"] as const).includes(visibility as "public" | "gm-only" | "gm-actor"))
-      throw new CommandRejectedError("Choose Everyone, Just the GM, or a specific character.");
+      throw new CommandRejectedError("Choose Shown to players, GM only, or one character.");
     if (visibility === "gm-actor") {
       if (!visibleToActorId || !state.actors.some((candidate) => candidate.id === visibleToActorId))
         throw new CommandRejectedError("Pick a character to reveal this to.");
@@ -206,7 +206,7 @@ function resolveVisibility(
     return { visibility, visibleToActorId: null };
   }
   if (!(["public", "owner-only", "owner-gm"] as const).includes(visibility as "public" | "owner-only" | "owner-gm"))
-    throw new CommandRejectedError("Choose Everyone, Just me, or Just me and the GM.");
+    throw new CommandRejectedError("Choose Shown to players, Only me, or Only me and the GM.");
   return { visibility, visibleToActorId: null };
 }
 

@@ -135,7 +135,7 @@ describe("tap routing (the seam)", () => {
     } catch (error) {
       const blocked = error as RulesBlockedError;
       expect(blocked.rule).toBe(NOT_YOUR_TURN);
-      expect(blocked.message).toBe("Not your turn yet - Hero is up.");
+      expect(blocked.message).toBe("Not your turn yet. Hero is up.");
       // Overridable and askable, which is why it is a rules block rather than silence.
       expect(blocked.overridable).toBe(true);
       expect(familyOf(blocked.rule)).toBe("economy");
@@ -143,7 +143,7 @@ describe("tap routing (the seam)", () => {
 
     const advise = fightState();
     advise.combat = { ...advise.combat, ruleExceptions: { economy: "assisted" } };
-    expect(offTurn(advise)).toEqual(["Not your turn yet - Hero is up."]);
+    expect(offTurn(advise)).toEqual(["Not your turn yet. Hero is up."]);
 
     const off = fightState();
     off.combat = { ...off.combat, ruleExceptions: { economy: "freeform" } };
@@ -158,7 +158,7 @@ describe("tap routing (the seam)", () => {
       offTurn(fight);
       expect.unreachable();
     } catch (error) {
-      expect((error as RulesBlockedError).message).toBe("Not your turn yet - wait for your turn.");
+      expect((error as RulesBlockedError).message).toBe("Not your turn yet. Wait for your turn.");
     }
   });
 
@@ -424,7 +424,7 @@ describe("action.use over the API", () => {
     expect(server.store.snapshot.actors[0].actionUses).toMatchObject({ zap: 1 });
     const again = await use("zap");
     expect(again.status).toBe(409);
-    expect((await again.json()).error.message).toBe("Zap: no uses remaining (1/long rest).");
+    expect((await again.json()).error.message).toBe("Zap: no uses remaining (1/Long Rest).");
     expect(server.store.snapshot.rolls).toHaveLength(1);
 
     const flared = await use("flare");

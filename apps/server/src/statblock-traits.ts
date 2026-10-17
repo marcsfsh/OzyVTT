@@ -117,7 +117,7 @@ export function stopRegeneration(
   return [
     {
       kind: "effect",
-      text: `${actor.name} took ${named} damage - its ${regeneration.name} won't work at the start of its next turn.`,
+      text: `${actor.name} took ${named} damage, so its ${regeneration.name} won't work at the start of its next turn.`,
       actorId: actor.id,
       gmOnly: true
     }
@@ -155,7 +155,7 @@ export function holdOnAtZero(
   );
   events.push({
     kind: "condition",
-    text: `${actor.name} drops to 0 HP - it dies only if it starts its turn at 0 HP and doesn't regenerate.`,
+    text: `${actor.name} drops to 0 HP. It dies only if it starts its turn at 0 HP and doesn't regenerate.`,
     actorId: actor.id
   });
   return true;
@@ -202,7 +202,7 @@ export function undeadFortitude(
   if (held) actor.hp.current = 1;
   events.push({
     kind: "condition",
-    text: `${actor.name}'s ${trait.name}: ${trait.ability.toUpperCase()} save ${save.total} (d20 ${save.natural}) vs DC ${dc} - ${held ? "it drops to 1 HP instead" : "it falls"}.`,
+    text: `${actor.name}'s ${trait.name}: ${trait.ability.toUpperCase()} save ${save.total} (d20 ${save.natural}) vs DC ${dc}: ${held ? "it drops to 1 HP" : "it falls"}.`,
     actorId: actor.id
   });
   return held;
@@ -239,7 +239,7 @@ export function deathBurst(
   if (!deps.distanceFeet) {
     events.push({
       kind: "effect",
-      text: `${actor.name} explodes (${burst.name}): each creature within ${burst.rangeFeet} feet makes a DC ${burst.save.dc} ${ability} save - ${total} damage on a failure, ${burst.save.successDamage === "half" ? "half" : "none"} on a success.`,
+      text: `${actor.name} explodes (${burst.name}): each creature within ${burst.rangeFeet} feet makes a DC ${burst.save.dc} ${ability} save: ${total} damage on a failure and ${burst.save.successDamage === "half" ? "half" : "none"} on a success.`,
       actorId: actor.id,
       gmOnly: true
     });

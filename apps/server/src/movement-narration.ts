@@ -202,7 +202,7 @@ export function narrateTokenMove(
     publicText: withRanges(visible),
     gmText:
       concealed.length > 0
-        ? `Hidden ranges for ${mover.name} - ${concealed.map((range) => range.label).join(", ")}.`
+        ? `Hidden ranges for ${mover.name}: ${concealed.map((range) => range.label).join(", ")}.`
         : null
   };
 }

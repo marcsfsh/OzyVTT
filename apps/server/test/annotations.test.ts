@@ -234,7 +234,7 @@ describe("authoritative annotation geometry", () => {
         },
         geometry
       )
-    ).toThrow("Everyone, Just me");
+    ).toThrow("Shown to players, Only me");
   });
 
   it("lets the owner move/resize and delete their own shape, but not another player's unless shared", () => {

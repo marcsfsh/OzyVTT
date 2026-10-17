@@ -1181,7 +1181,7 @@ describe("public game API over /api/v1", () => {
     // The studied move: 4 cells = 20 ft, with the hidden Tyrant's ranges split into a GM-only line.
     expect(movement.map((entry) => entry.text)).toContain("Public Hero moved 20 ft.");
     expect(movement.map((entry) => entry.text)).toContain(
-      "Hidden ranges for Public Hero - Unrevealed Tyrant 10 ft → 20 ft."
+      "Hidden ranges for Public Hero: Unrevealed Tyrant 10 ft → 20 ft."
     );
     expect(movement.find((entry) => entry.text.startsWith("Hidden ranges"))?.gmOnly).toBe(true);
 

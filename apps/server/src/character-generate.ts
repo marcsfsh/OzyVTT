@@ -546,7 +546,7 @@ export function generateCharacterRequest(
 ): GeneratedCharacter {
   if (!policy.allowedAbilityMethods.includes(GENERATOR_ABILITY_METHOD)) {
     reject(
-      "The generator sets ability scores with the standard array, which this table does not allow - enable it in Settings first."
+      "The generator sets ability scores with the standard array, which this table does not allow. Turn it on in Settings first."
     );
   }
   // A multiclass plan takes its classes' levels in turn, the starting class first.
@@ -586,7 +586,7 @@ export function generateCharacterRequest(
     );
     if (available.length === 0)
       reject(
-        `No ${record.name} ${record.subclassLabel ?? "subclass"} is in the content catalog, and a level-${level} ${record.name} needs one.`
+        `No ${record.name} ${record.subclassLabel ?? "subclass"} is in the content catalog, and a level ${level} ${record.name} needs one.`
       );
     return drawOne(available, random);
   };
@@ -701,12 +701,12 @@ export function generateCharacterRequest(
     const rows = answerOffer(open, survey, choices, { ...input, classId }, library, random);
     if (rows.length === 0) {
       reject(
-        `"${open.label}" asks for ${open.capacity} "${open.kind}" pick(s) and the generator found no legal option for it - that is a gap in the content, not in the request.`
+        `"${open.label}" asks for ${open.capacity} "${open.kind}" pick(s) and the generator found no legal option for it. The gap is in the content.`
       );
     }
     choices.push(...rows);
   }
-  reject("The generator could not settle this character - the content asks for more picks than it can answer.");
+  reject("The generator could not settle this character. The content asks for more picks than it can answer.");
 }
 
 function summaryOf(survey: ServerOfferSurvey): string {

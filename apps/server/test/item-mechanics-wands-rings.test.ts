@@ -197,7 +197,7 @@ describe("a Wand of Fireballs spends a charge, rolls real damage, and refuses at
         { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(3) },
         deps([1, 1, 1, 1, 1, 1, 1, 1], definition)
       )
-    ).toThrow("Cast Fireball (Wand of Fireballs): no uses remaining (7/long rest).");
+    ).toThrow("Cast Fireball (Wand of Fireballs): no uses remaining (7/Long Rest).");
     // And nothing was rolled or spent on the refused press.
     expect(actor.actionUses[CHARGES]).toBe(7);
 
@@ -319,7 +319,7 @@ describe("an item action with a printed DC, a condition read off its prose, and 
         { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(6) },
         deps([], definition)
       )
-    ).toThrow("Command Obedience: no uses remaining (1/long rest).");
+    ).toThrow("Command Obedience: no uses remaining (1/Long Rest).");
   });
 });
 
@@ -399,7 +399,7 @@ describe("a staff's resistance and its shared charge pool", () => {
         { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(9) },
         deps([], definition)
       )
-    ).toThrow(/no uses remaining \(10\/long rest\)/);
+    ).toThrow(/no uses remaining \(10\/Long Rest\)/);
   });
 });
 

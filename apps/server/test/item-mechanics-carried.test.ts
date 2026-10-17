@@ -217,7 +217,7 @@ describe("the Pipes of Haunting spend a charge, refuse the fourth press, and for
         { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(4) },
         deps([], definition)
       )
-    ).toThrow("Play the Pipes: no uses remaining (3/long rest).");
+    ).toThrow("Play the Pipes: no uses remaining (3/Long Rest).");
   });
 
   it("NUMBER TWO - a pending save the server ENFORCES at DC 15, naming Frightened off the shipped prose", () => {
@@ -420,7 +420,7 @@ describe("what the carried items' buttons do outside an encounter", () => {
     ]);
     expect(spendLooseUses(state.actors[0], action, available)).toEqual({ usesLeft: 0, spent: true });
     expect(() => spendLooseUses(state.actors[0], action, available)).toThrow(
-      "Throw the Bands: no uses remaining (1/long rest)."
+      "Throw the Bands: no uses remaining (1/Long Rest)."
     );
   });
 });
@@ -454,7 +454,7 @@ describe("the one printed to-hit among carried items that the vocabulary can say
         { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(10) },
         deps([12], definition)
       )
-    ).toThrow("Throw the Bands: no uses remaining (1/long rest).");
+    ).toThrow("Throw the Bands: no uses remaining (1/Long Rest).");
   });
 });
 
@@ -511,7 +511,7 @@ describe("the charge-alone items, whose counter is the whole of what they enforc
           { actorId: IDS.hero, targetIds: [], commandId: cmd(11) },
           deps([], definition)
         )
-      ).toThrow(`${label}: no uses remaining (${limit}/long rest).`);
+      ).toThrow(`${label}: no uses remaining (${limit}/Long Rest).`);
     }
   });
 });

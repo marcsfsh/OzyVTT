@@ -333,7 +333,7 @@ describe("Wild Shape - the pool, read off the printed column (audit row 54)", ()
     expect(state.actors[0].actionUses["wild-shape"]).toBe(2);
     expect(() =>
       resolveDefinitionAction(state, shape, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition))
-    ).toThrowError(/no uses remaining \(2\/long rest\)/);
+    ).toThrowError(/no uses remaining \(2\/Long Rest\)/);
   });
 });
 
@@ -396,7 +396,7 @@ describe("Land's Aid - a Circle of the Land action spending the CLASS's Wild Sha
         { actorId: HERO, targetIds: [FOE], commandId: command() },
         deps(definition)
       )
-    ).toThrowError(/no uses remaining \(2\/long rest\)/);
+    ).toThrowError(/no uses remaining \(2\/Long Rest\)/);
   });
 });
 
@@ -483,7 +483,7 @@ describe("Nature's Sanctuary - the third feature on the one Wild Shape counter",
         { actorId: HERO, targetIds: [], commandId: command() },
         deps(definition)
       )
-    ).toThrowError(/no uses remaining \(3\/long rest\)/);
+    ).toThrowError(/no uses remaining \(3\/Long Rest\)/);
   });
 });
 
@@ -550,7 +550,7 @@ describe("Bardic Inspiration - the counter the class is built around", () => {
     }
     expect(() =>
       resolveDefinitionAction(state, inspire, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition))
-    ).toThrowError(/no uses remaining \(3\/long rest\)/);
+    ).toThrowError(/no uses remaining \(3\/Long Rest\)/);
   });
 
   it("lets Cutting Words and Peerless Skill spend that SAME counter", () => {
@@ -588,7 +588,7 @@ describe("Bardic Inspiration - the counter the class is built around", () => {
         { actorId: HERO, targetIds: [], commandId: command() },
         deps(definition)
       )
-    ).toThrowError(/no uses remaining \(3\/long rest\)/);
+    ).toThrowError(/no uses remaining \(3\/Long Rest\)/);
   });
 });
 
@@ -700,7 +700,7 @@ describe("Divine Intervention - a pool that now costs the action the SRD prints"
         { actorId: HERO, targetIds: [], commandId: command() },
         deps(definition)
       )
-    ).toThrowError(/no uses remaining \(1\/long rest\)/);
+    ).toThrowError(/no uses remaining \(1\/Long Rest\)/);
   });
 });
 

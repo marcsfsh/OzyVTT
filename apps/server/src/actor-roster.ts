@@ -305,7 +305,7 @@ function instantiate(
   catalog?: EquipmentCatalog
 ) {
   if (state.actors.length >= MAX_ACTORS)
-    throw new CommandRejectedError("The roster is full - remove unused combatants first.");
+    throw new CommandRejectedError("The roster is full. Remove unused combatants first.");
   const inventory = (definition.startingInventory ?? []).map((item) => ({ ...item }));
   // Seeding through the same derivation as inventory writes gives monsters and PDF imports their
   // equipment riders from the start.
@@ -375,7 +375,7 @@ export function importActorDefinition(
   catalog?: EquipmentCatalog
 ) {
   if (state.definitions.length >= MAX_IMPORTED_DEFINITIONS)
-    throw new CommandRejectedError("The imported-sheet library is full - remove unused combatants first.");
+    throw new CommandRejectedError("The imported-sheet library is full. Remove unused combatants first.");
   const definitionId = `import-${actorId}`;
   const kind = definition.schemaId === "vtt.actor-character" ? ("player-character" as const) : ("monster" as const);
   const filled = withDefinitionProseFacts(definition);
@@ -406,7 +406,7 @@ export function fillStoredProseFacts(state: GameState): boolean {
 /** Queue a player-submitted import for GM approval; the definition is pre-validated by the caller. */
 export function submitPendingImport(state: GameState, definition: ActorDefinition, id: string, submittedBy: string) {
   if (state.pendingImports.length >= 20)
-    throw new CommandRejectedError("The import queue is full - ask your GM to review the pending sheets first.");
+    throw new CommandRejectedError("The import queue is full. Ask your GM to review the pending sheets first.");
   state.pendingImports = [
     ...state.pendingImports.filter((entry) => entry.id !== id),
     { id, name: definition.name, submittedBy, definition }
@@ -431,7 +431,7 @@ export function resolvePendingImport(
 /** Archived characters are out of play; rejected (not filtered) so the GM's selection never silently changes. */
 export function assertNotArchived(state: GameState, actorId: string) {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
-  if (actor?.archived) throw new CommandRejectedError(`${actor.name} is archived - restore them first.`);
+  if (actor?.archived) throw new CommandRejectedError(`${actor.name} is archived. Restore ${actor.name} first.`);
 }
 
 /**

@@ -320,7 +320,7 @@ export function removeCombatant(
   if (!actor || !state.combat.initiative.some((entry) => entry.actorId === actorId))
     throw new CommandRejectedError("That combatant is not in this encounter.");
   if (state.combat.initiative.length === 1)
-    throw new CommandRejectedError("It is the last combatant - end the encounter instead.");
+    throw new CommandRejectedError("It is the last one in the fight. End the fight to take it out.");
   if (state.combat.turnActorId === actorId)
     throw new CommandRejectedError("Advance past its turn before taking it out of the fight.");
   const events: EffectNarration[] = [
@@ -648,7 +648,7 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
     throw new CommandRejectedError("Start an encounter before advancing Initiative.");
   // Wait mode holds turns until every player has rolled their initiative (or the GM rolls the rest).
   if (state.combat.playerInitiativeMode === "wait" && state.combat.pendingInitiative.length > 0)
-    throw new CommandRejectedError("Players are still rolling initiative - roll for the rest to begin.");
+    throw new CommandRejectedError("Players are still rolling initiative. Roll for the rest to begin.");
   const currentIndex = state.combat.initiative.findIndex((entry) => entry.actorId === state.combat.turnActorId);
   if (currentIndex < 0) throw new CommandRejectedError("The current turn is not in Initiative.");
   // A defeated creature takes no more turns: the order passes over it to the next one still in the fight.

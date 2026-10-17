@@ -278,7 +278,7 @@ describe("a gated condition immunity refuses the condition only while the gate h
       { role: "gm" },
       { resolveDefinition: () => definition, catalog }
     );
-    expect(events[0].text).toMatch(/immune to Frightened - not applied/);
+    expect(events[0].text).toMatch(/immune to Frightened, so it isn't applied/);
     expect(bloodied.actors[0].conditions).toHaveLength(0);
   });
 });

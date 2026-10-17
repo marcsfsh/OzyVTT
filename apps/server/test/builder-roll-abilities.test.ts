@@ -152,7 +152,7 @@ describe("a player's rolled dice are the table's", () => {
     });
     const typed = await post(base, GAME_PATHS.characters, playerToken, fighterCreate());
     expect(typed.status).toBe(409);
-    expect((await typed.json()).error.message).toMatch(/roll them in the builder/);
+    expect((await typed.json()).error.message).toMatch(/Roll them in the builder/);
 
     const roll = (await (await post(base, GAME_PATHS.builderRollAbilities, playerToken, { method: "roll" })).json())
       .data;

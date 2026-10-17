@@ -587,7 +587,7 @@ describe("the charges a worn item rations", () => {
         { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(4) },
         deps([], definition)
       )
-    ).toThrow("Scintillating Colors: no uses remaining (3/long rest).");
+    ).toThrow("Scintillating Colors: no uses remaining (3/Long Rest).");
   });
 
   it("rations the Cloak of Invisibility at three and the Winged Boots at four", () => {
@@ -612,7 +612,7 @@ describe("the charges a worn item rations", () => {
           { actorId: IDS.hero, targetIds: [], commandId: cmd(5) },
           deps([], definition)
         )
-      ).toThrow(`${label}: no uses remaining (${limit}/long rest).`);
+      ).toThrow(`${label}: no uses remaining (${limit}/Long Rest).`);
     }
   });
 });

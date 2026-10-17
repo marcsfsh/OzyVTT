@@ -135,10 +135,7 @@ export const actionCommands = [
         let placed: Readonly<{ shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint }> | null =
           null;
         if (template) {
-          if (action.attack)
-            throw new CommandRejectedError(
-              "Attacks target a single token - pick it directly instead of placing a template."
-            );
+          if (action.attack) throw new CommandRejectedError("Attacks target a single token. Pick the token itself.");
           if (draft.combat.mapAssetId !== mapAssetId)
             throw new CommandRejectedError("The active encounter changed. Try again.");
           const calibration = geometry!.calibration!;
@@ -292,13 +289,13 @@ export const actionCommands = [
         if (resolution.overridden)
           kit.context.appendLog({
             kind: "override",
-            text: `OVERRIDE (${resolution.overridden.rule}): ${kit.actorName(actorId)} used ${resolution.actionName} - ${resolution.overridden.reason}`,
+            text: `OVERRIDE (${resolution.overridden.rule}): ${kit.actorName(actorId)} used ${resolution.actionName} · ${resolution.overridden.reason}`,
             actorIds: [actorId]
           });
         // Builtin check rolls narrate to the table.
         if (resolution.check) {
           const verdict =
-            resolution.check.success === null ? "" : resolution.check.success ? " - success" : " - failure";
+            resolution.check.success === null ? "" : resolution.check.success ? " · success" : " · failure";
           kit.context.appendLog({
             kind: "action",
             text: `${kit.actorName(actorId)} rolled ${resolution.check.total} on ${resolution.check.skill}${resolution.check.dc !== null ? ` vs DC ${resolution.check.dc}` : ""}${verdict}.`,
@@ -324,7 +321,7 @@ export const actionCommands = [
     type: "action.use",
     operationId: "useAction",
     description:
-      "Uses an action and lets the SERVER decide what that means. In the fight on this creature's turn it delegates to the full structured resolution and acks `route: \"resolved\"`. Off turn it is refused with the overridable, askable rules block `economy.not-your-turn` (reactions and legendary actions are exempt - taking those off turn is the point); under an `economy` exception of advise/off it resolves, with a GM-only warning line under advise. With no fight running - or with this creature not in the turn order - the server rolls the action's own attack die (and, only with `includeDamage`, its damage parts) as attributed rolls, spends what the action costs (an item's charges or a feature's per-rest uses, and any spell slot an item cast consumes; refused when none remain; an item's last charge rolls its d20 for the GM), uses up a potion, flask or Spell Scroll and the shot's ammunition, reads a scroll only if the reader can (a spell above the reader's levels rolls its check first, and a failure loses the scroll with nothing else rolled), touches no combat state, and acks `route: \"loose\"` with the roll ids, and for a heal who regained what (`healing`). An action with nothing to roll is still used, with a feed line. A heal (a potion, a healing spell, Second Wind, Lay on Hands) lands on `targetIds` through the fight's hit point rules (the dead stay dead), its user when none are named: a player heals their own character or another member of the party, the GM anyone; damage never moves on the loose route. GM-grade for any combatant, including a monster's sheet; a player session only for their own claimed character.",
+      "Uses an action and lets the SERVER decide what that means. In the fight on this creature's turn it delegates to the full structured resolution and acks `route: \"resolved\"`. Off turn it is refused with the overridable, askable rules block `economy.not-your-turn` (reactions and legendary actions are exempt, because taking those off turn is the point); under an `economy` exception of advise/off it resolves, with a GM-only warning line under advise. With no fight running, or with this creature not in the turn order, the server rolls the action's own attack die (and, only with `includeDamage`, its damage parts) as attributed rolls, spends what the action costs (an item's charges or a feature's per-rest uses, and any spell slot an item cast consumes; refused when none remain; an item's last charge rolls its d20 for the GM), uses up a potion, flask or Spell Scroll and the shot's ammunition, reads a scroll only if the reader can (a spell above the reader's levels rolls its check first, and a failure loses the scroll with nothing else rolled), touches no combat state, and acks `route: \"loose\"` with the roll ids, and for a heal who regained what (`healing`). An action with nothing to roll is still used, with a feed line. A heal (a potion, a healing spell, Second Wind, Lay on Hands) lands on `targetIds` through the fight's hit point rules (the dead stay dead), its user when none are named: a player heals their own character or another member of the party, the GM anyone; damage never moves on the loose route. GM-grade for any combatant, including a monster's sheet; a player session only for their own claimed character.",
     summary:
       "Use an action and let the SERVER route it: resolved in the fight on your turn, refused off turn, loose dice outside a fight, where a heal lands on whoever it is given to (GM anyone; a player their own claimed character).",
     schema: ActionUseSchema,
@@ -617,9 +614,7 @@ export const actionCommands = [
       // only while the table lets players type their dice.
       const typed = !resolution.terms.some((term) => term.kind === "dice");
       if (typed && !gmGrade && kit.read().builderPolicy.typedRolls !== "open")
-        throw new CommandRejectedError(
-          "At this table the server rolls players' dice. Roll the dice instead of typing them."
-        );
+        throw new CommandRejectedError("At this table the server rolls players' dice. Tap Roll to roll them.");
       const rollId = kit.context.newId();
       const { state, duplicate } = await execute((draft) => {
         // A player's roll with no actorId is attributed to their single claimed character (ambiguous claims

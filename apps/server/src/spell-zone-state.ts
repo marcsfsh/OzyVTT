@@ -43,5 +43,5 @@ export function countZoneDamage(
   const cap = zoneContentOf(zone, catalog)?.trigger.damageCap;
   if (cap === undefined || zone.damageDealt < cap) return [];
   endZone(state, zone.id);
-  return [{ kind: "effect", text: `${zone.name} ends, having dealt ${cap} damage.`, actorId: zone.casterId }];
+  return [{ kind: "effect", text: `${zone.name} ends after dealing ${cap} damage.`, actorId: zone.casterId }];
 }

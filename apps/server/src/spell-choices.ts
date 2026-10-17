@@ -135,7 +135,7 @@ export function swapClassSpell(
 ): Readonly<{ added: string; removed: string }> {
   const { actor, definition } = characterOf(state, actorId);
   if (inFight(state, actorId))
-    throw new CommandRejectedError("Prepared spells change after a Long Rest, not in a fight.");
+    throw new CommandRejectedError("Prepared spells change after a Long Rest, outside a fight.");
   if (role === "player") {
     if (actor.preparation === null)
       throw new CommandRejectedError("You change your prepared spells when you finish a Long Rest.");
@@ -166,7 +166,7 @@ export function swapClassSpell(
     const why = definition.spellcasting?.spells.some((spell) => spell.id === spellId)
       ? `${record.name} is already on ${actor.name}'s sheet.`
       : classId === WIZARD
-        ? `${record.name} isn't in ${actor.name}'s spellbook - copy it in first.`
+        ? `${record.name} isn't in ${actor.name}'s spellbook. Copy it in first.`
         : `${record.name} isn't ${withArticle(offered.className)} spell ${actor.name} has slots for.`;
     throw new CommandRejectedError(why);
   }
@@ -236,7 +236,7 @@ export function addToSpellbook(
   const book = spellChoicesOf(actor, definition, deps.library, deps.policy)?.spellbook;
   if (!book) throw new CommandRejectedError(`${actor.name} has no spellbook to add to.`);
   if (inFight(state, actorId))
-    throw new CommandRejectedError("Adding a spell to a spellbook takes hours - finish the fight first.");
+    throw new CommandRejectedError("Adding a spell to a spellbook takes hours. Finish the fight first.");
   const spell = deps.library.spellRecord(input.spellId);
   if (!spell) throw new CommandRejectedError("That spell is not in the content catalog.");
   if (book.spellIds.includes(spell.id))
@@ -250,7 +250,7 @@ export function addToSpellbook(
   if (input.from === "level") {
     if (book.freeLeft === 0)
       throw new CommandRejectedError(
-        `${actor.name}'s spellbook already holds the spells the Wizard's levels give - copy others in.`
+        `${actor.name}'s spellbook already holds the spells the Wizard's levels give. Copy others in.`
       );
     actor.spellbook = [...actor.spellbook, { id: spell.id }];
     return `${actor.name} adds ${spell.name} to the spellbook.`;

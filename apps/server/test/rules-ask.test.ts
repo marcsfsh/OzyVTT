@@ -350,7 +350,7 @@ describe("ask the GM", () => {
       actorId: HERO,
       rule: "movement.stand-up-cost",
       family: "movement" as const,
-      message: "Standing up costs 15 ft of movement - Hero has 0 ft left.",
+      message: "Standing up costs 15 ft of movement, and Hero has 0 ft left.",
       command: {
         type: "actor.set-condition" as const,
         payload: { actorId: HERO, conditionId: "prone", active: false }

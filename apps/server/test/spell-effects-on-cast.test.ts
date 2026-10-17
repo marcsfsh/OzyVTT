@@ -246,7 +246,7 @@ describe("Hex and Hunter's Mark", () => {
     expect(action("spell-hex-then-move")).toMatchObject({ name: "Hex: move", activation: "bonus-action" });
     heroTurnAgain(state);
     expect(() => resolve("spell-hex-then-move", { targetIds: [FOE2] })).toThrowError(
-      /Hex moves only once its creature drops to 0 Hit Points - Goblin hasn't/
+      /Hex moves only once its creature drops to 0 Hit Points, and Goblin hasn't/
     );
     actorOf(state, FOE).hp = { ...actorOf(state, FOE).hp, current: 0 };
     const moved = resolve("spell-hex-then-move", { targetIds: [FOE2] });

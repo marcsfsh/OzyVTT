@@ -57,7 +57,7 @@ export function spendHitDice(
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
-    throw new CommandRejectedError("Hit Dice are spent on a rest - end the encounter first.");
+    throw new CommandRejectedError("Hit Dice are spent on a rest. End the fight first.");
   refuseRestAtZero(actor, "Hit Dice are spent on a Short Rest, which needs");
   if (!actor.hitDice)
     throw new CommandRejectedError(`${actor.name} has no Hit Dice pool (its stat block has no hit-point formula).`);
@@ -77,8 +77,8 @@ export function spendHitDice(
 /** SRD Resting: "To start a Short Rest [or a Long Rest], you must have at least 1 Hit Point", and nothing brings
  *  the dead back but a revival. `needs` finishes the refusal: what asks for that 1 Hit Point. */
 function atZeroRefusal(actor: Actor, needs: string): string | null {
-  if (isDead(actor)) return `${actor.name} is dead - a rest can't bring them back.`;
-  if (actor.hp.current < 1) return `${actor.name} has 0 Hit Points - ${needs} at least 1. Heal them first.`;
+  if (isDead(actor)) return `${actor.name} is dead, and a rest can't bring ${actor.name} back.`;
+  if (actor.hp.current < 1) return `${actor.name} has 0 Hit Points. ${needs} at least 1. Heal ${actor.name} first.`;
   return null;
 }
 
@@ -91,13 +91,13 @@ function refuseRestAtZero(actor: Actor, needs: string): void {
 export function restRefusal(state: GameState, actor: Actor, kind: "long" | "short"): string | null {
   if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actor.id))
     return `End the encounter before resting ${actor.name}, who is in it.`;
-  const atZero = atZeroRefusal(actor, `a ${kind === "long" ? "Long" : "Short"} Rest needs`);
+  const atZero = atZeroRefusal(actor, `A ${kind === "long" ? "Long" : "Short"} Rest needs`);
   if (atZero) return atZero;
   const wait = kind === "long" ? longRestWait(actor.lastLongRestAt, state.rest.clockHours) : 0;
   if (wait === 0) return null;
   const since = state.rest.clockHours - (actor.lastLongRestAt ?? 0);
-  const finished = since <= 0 ? "just finished a Long Rest" : `finished a Long Rest ${hoursText(since)} ago`;
-  return `${actor.name} ${finished} - another can start in ${hoursText(wait)}.`;
+  const finished = since <= 0 ? "finished a Long Rest moments ago" : `finished a Long Rest ${hoursText(since)} ago`;
+  return `${actor.name} ${finished}. Another can start in ${hoursText(wait)}.`;
 }
 
 /** The pools a Short Rest partly or wholly refills beyond their own recharge, from the `short-rest-regain` riders the
@@ -311,7 +311,7 @@ export function startPartyRest(
   random?: (sides: number) => number
 ): EffectNarration[] {
   if (kind === "short" && state.rest.shortRest)
-    throw new CommandRejectedError("A Short Rest is already under way - finish it first.");
+    throw new CommandRejectedError("A Short Rest is already under way. Finish it first.");
   const members = actorIds.map((actorId) => {
     const actor = state.actors.find((candidate) => candidate.id === actorId);
     if (!actor) throw new CommandRejectedError("That combatant no longer exists.");

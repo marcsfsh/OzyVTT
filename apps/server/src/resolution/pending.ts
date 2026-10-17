@@ -303,7 +303,7 @@ export function parkActionSave(ctx: ResolveContext): void {
           });
         }
         ctx.warnings.push(
-          `${target.name} has more than ${threshold} hit points - ${action.name} doesn't affect it that way.`
+          `${target.name} has more than ${threshold} hit points, so ${action.name} doesn't affect it that way.`
         );
         continue;
       }
@@ -394,7 +394,7 @@ export function parkBurstSave(ctx: ResolveContext): void {
     : [];
   if (!deps.distanceFeet)
     warnings.push(
-      `${action.name}: each creature within ${burst.radiusFeet} feet of ${target.name} also makes the save - add them by hand.`
+      `${action.name}: each creature within ${burst.radiusFeet} feet of ${target.name} also makes the save. Add them by hand.`
     );
   createPendingSaves(state, {
     sourceActorId: attacker.id,

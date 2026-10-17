@@ -80,9 +80,10 @@ const STABLE: DeathSaves = { successes: 0, failures: 0, stable: true };
 
 /** What the target needs: dying (and not yet stable), or knocked out, which only first aid or the GM ends. */
 function targetState(target: LiveActor): "dying" | "knocked-out" {
-  if (isDead(target)) throw new CommandRejectedError(`${target.name} is dead - it's too late to stabilize them.`);
+  if (isDead(target))
+    throw new CommandRejectedError(`${target.name} is dead. It's too late to stabilize ${target.name}.`);
   if (target.effects.some((effect) => effect.tags.includes(KNOCKED_OUT_TAG))) return "knocked-out";
-  if (target.hp.current > 0) throw new CommandRejectedError(`${target.name} has hit points - they aren't dying.`);
+  if (target.hp.current > 0) throw new CommandRejectedError(`${target.name} has hit points and isn't dying.`);
   if (target.deathSaves?.stable) throw new CommandRejectedError(`${target.name} is already stable.`);
   if (target.deathSaves === null) throw new CommandRejectedError(`${target.name} isn't dying.`);
   return "dying";
@@ -178,7 +179,7 @@ export function stabilizeCreature(
   const condition = targetState(target);
   if (condition === "knocked-out" && input.method !== "medicine")
     throw new CommandRejectedError(
-      `${target.name} was knocked out, not dying - first aid (a Medicine check) wakes them.`
+      `${target.name} was knocked out and isn't dying. First aid (a Medicine check) wakes ${target.name}.`
     );
   // An Unconscious or downed creature gives no aid, in a fight or out of one.
   const incapacitated = incapacitatingCondition(helper);
@@ -227,7 +228,7 @@ export function stabilizeCreature(
       const message =
         input.method === "spare-the-dying"
           ? `${target.name} is ${rounded} ft away, beyond Spare the Dying's ${range} ft.`
-          : `${target.name} is ${rounded} ft away - ${aid.name.toLowerCase()} needs ${helper.name} beside them.`;
+          : `${target.name} is ${rounded} ft away, and ${aid.name.toLowerCase()} needs ${helper.name} alongside.`;
       overridden = policeTargeting(state, rule, message, input.override, warnings) ?? overridden;
     }
   }
@@ -246,7 +247,7 @@ export function stabilizeCreature(
     if (rolled.total < FIRST_AID_DC) {
       events.push({
         kind: "condition",
-        text: `${helper.name}'s first aid failed (${readout}) - ${target.name} is still ${condition === "dying" ? "dying" : "out cold"}.`,
+        text: `${helper.name}'s first aid failed (${readout}), and ${target.name} is still ${condition === "dying" ? "dying" : "out cold"}.`,
         actorId: target.id
       });
       return { stabilized: false, woke: false, check, events, overridden };
@@ -263,7 +264,7 @@ export function stabilizeCreature(
   const line =
     input.method === "healers-kit"
       ? `${helper.name} stabilized ${target.name} with a Healer's Kit.`
-      : `${helper.name} cast Spare the Dying - ${target.name} is stable.`;
+      : `${helper.name} cast Spare the Dying, and ${target.name} is stable.`;
   events.push(...settle(state, target, condition, line));
   return { stabilized: true, woke: false, check: null, events, overridden };
 }

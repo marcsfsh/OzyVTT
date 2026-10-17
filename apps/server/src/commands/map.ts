@@ -265,7 +265,7 @@ export const mapCommands = [
       if (movementOverridden)
         kit.context.appendLog({
           kind: "override",
-          text: `OVERRIDE (movement): ${kit.actorName(actorId)} moved past a movement rule - ${movementOverridden}`,
+          text: `OVERRIDE (movement): ${kit.actorName(actorId)} moved past a movement rule · ${movementOverridden}`,
           actorIds: [actorId]
         });
       // A GM creature's prompt against a mover hidden from the table names it as the projection does.
@@ -323,7 +323,7 @@ export const mapCommands = [
     type: "spell-zone.end",
     operationId: "endSpellZone",
     description:
-      "Ends a spell's lingering area (GM-grade only), removing it from the map: webs burned away, a guardian dismissed, or a ruling. The caster's Concentration on the spell is untouched; ending that ends the area too.",
+      "Ends a spell's lingering area and removes it from the map (GM-grade only): webs burned away, a guardian dismissed, or a ruling. The caster's Concentration on the spell is untouched; ending that ends the area too.",
     summary: "End a spell's lingering area (GM).",
     schema: SpellZoneEndSchema,
     malformed: "The spell-area command is malformed.",

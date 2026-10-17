@@ -60,7 +60,7 @@ describe("movement narration", () => {
       geometry: GRID
     });
     expect(narration?.publicText).toBe("Borin moved 20 ft - Mirena 5 ft → 15 ft.");
-    expect(narration?.gmText).toBe("Hidden ranges for Borin - Unseen Stalker 10 ft → 20 ft.");
+    expect(narration?.gmText).toBe("Hidden ranges for Borin: Unseen Stalker 10 ft → 20 ft.");
   });
 
   it("keeps a hidden mover's narration entirely GM-only", () => {

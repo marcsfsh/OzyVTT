@@ -384,7 +384,7 @@ function validateBackgroundAllocation(input: CharacterCreateRequestInput, backgr
     return;
   }
   if (input.backgroundBonusAllocation.length === 0)
-    reject(`${background.name} grants ability increases - choose a +2/+1 or +1/+1/+1 spread.`);
+    reject(`${background.name} grants ability increases. Choose a +2/+1 or +1/+1/+1 spread.`);
   const abilities = input.backgroundBonusAllocation.map((entry) => entry.ability);
   if (new Set(abilities).size !== abilities.length)
     reject("Background ability increases must go to distinct abilities.");
@@ -564,15 +564,15 @@ function surveyBuild(
     if (level < record.subclassLevel) {
       if (chosenId)
         reject(
-          `${record.name} chooses its ${label} at level ${record.subclassLevel}; a level-${level} ${record.name} has none.`
+          `${record.name} chooses its ${label} at level ${record.subclassLevel}; a level ${level} ${record.name} has none.`
         );
       return null;
     }
     if (!chosenId)
-      reject(`A level-${level} ${record.name} has ${withArticle(label)} (chosen at level ${record.subclassLevel}).`);
+      reject(`A level ${level} ${record.name} has ${withArticle(label)} (chosen at level ${record.subclassLevel}).`);
     const subclass = library.subclassRecord(chosenId) ?? reject(`No subclass "${chosenId}" is in the content catalog.`);
     if (subclass.classId !== record.id)
-      reject(`${subclass.name} is a ${subclass.classId} subclass, not a ${record.name} one.`);
+      reject(`${subclass.name} is a ${subclass.classId} subclass, so a ${record.name} can't take it.`);
     return subclass;
   };
   const classes = buildClassesOf(sequence, library, subclassOf);
@@ -1015,7 +1015,7 @@ function placeChoices(
       // `{kind, choose, from: []}` passes the content schema but cannot resolve; reject it as bad content
       // instead of letting a raw TypeError reach the client.
       reject(
-        `"${record.name}" offers a "${choice.kind}" choice with no options - its content record needs a non-empty "from" list or a "fromCatalog" slug.`
+        `"${record.name}" offers a "${choice.kind}" choice with no options. Its content record needs a non-empty "from" list or a "fromCatalog" slug.`
       );
     } else {
       try {
@@ -1261,10 +1261,10 @@ function placeChoices(
       if (heldFeatIds.has(feat.id)) {
         if (!feat.repeatable)
           reject(
-            `${feat.name} is already on this character - a feat can only be taken once unless it says it is repeatable.`
+            `${feat.name} is already on this character. A feat can be taken only once unless it says it is repeatable.`
           );
         if (repeatsOnlyWithADifferentSpellList(feat))
-          reject(`${feat.name} may be taken again only with a DIFFERENT spell list - choose another one.`);
+          reject(`${feat.name} may be taken again only with a DIFFERENT spell list. Choose another one.`);
       }
       matched.taken.push(row.id);
       heldFeatIds.add(feat.id);

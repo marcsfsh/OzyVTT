@@ -158,7 +158,7 @@ describe("taking a combatant out of the fight", () => {
     );
     removeCombatant(state, ALLY, resolveDefinition);
     expect(() => removeCombatant(fightOf(state), HERO, resolveDefinition)).toThrowError(
-      "It is the last combatant - end the encounter instead."
+      "It is the last one in the fight. End the fight to take it out."
     );
   });
 });

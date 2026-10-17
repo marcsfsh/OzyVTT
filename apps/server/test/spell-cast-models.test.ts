@@ -144,7 +144,7 @@ describe("a spell that takes a minute or more to cast", () => {
     const { resolve, action } = fight(caster);
     expect(action("spell-alarm").activation).toBe("action");
     expect(resolve("spell-alarm", { targetIds: [] }).warnings?.join(" ")).toMatch(
-      /Alarm takes 1 minute to cast: the Magic action on each of the caster's turns/
+      /Alarm takes 1 minute to cast\. Until then, the caster takes the Magic action on each turn/
     );
   });
 

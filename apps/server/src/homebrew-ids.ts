@@ -49,10 +49,10 @@ export function homebrewIdProblem(id: string, type: HomebrewContentType): string
   if (!id.startsWith(HOMEBREW_ID_PREFIX)) return `must start with "${HOMEBREW_ID_PREFIX}"`;
   // Re-checked here: an imported pack could carry a name-derived monster id that passes the generic rules.
   if (type === "monster" && !isOpaqueMonsterId(id))
-    return "must be an opaque monster id - a name-derived one reaches players through definitionId before the creature is revealed";
+    return "must be an opaque monster id, because a name-derived one reaches players through definitionId before the creature is revealed";
   if (id.length > HOMEBREW_ID_MAX_LENGTH)
     return `is ${id.length} characters; the persisted budget is ${HOMEBREW_ID_MAX_LENGTH}`;
-  if (!SLUG_LEGAL.test(id)) return `must match ${SLUG_LEGAL} - lowercase letters, digits and hyphens only`;
+  if (!SLUG_LEGAL.test(id)) return `must match ${SLUG_LEGAL}: lowercase letters, digits and hyphens only`;
   for (const suffix of RESERVED_SUFFIXES) {
     if (id.endsWith(suffix)) return `ends with the reserved catalog-choice family suffix "${suffix}"`;
   }

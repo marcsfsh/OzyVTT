@@ -85,7 +85,7 @@ export function setStanding(db: CodexDb, factionPageId: string, value: number, r
   const existing = getStanding(db, pageId);
   // A faction page is needed to start tracking, not to keep tracking, so a retyped page's standing stays editable.
   if (!existing && page.entityType !== "faction")
-    throw new CodexValidationError("Standing is tracked against a faction - pick a faction page.");
+    throw new CodexValidationError("Standing is tracked against a faction. Pick a faction page.");
   const next = standingValue(value);
   const payload = standingPayload({ factionPageId: pageId, delta: next - (existing?.value ?? 0), reason });
   const now = stamp(db);

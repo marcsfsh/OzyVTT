@@ -34,7 +34,7 @@ export const characterSheetCommands = [
     type: "character.claim",
     operationId: "claimCharacter",
     description:
-      "Claims an unclaimed player character for the calling session. Player sessions only - GM sessions and integration credentials are refused (an integration wanting a seat at the table should hold a player session from POST /sessions/player).",
+      "Claims an unclaimed player character for the calling session. Player sessions only: GM sessions and integration credentials are refused (an integration wanting a seat at the table should hold a player session from POST /sessions/player).",
     summary: "Claim an unclaimed player character for the calling player session.",
     schema: ActorRemoveSchema,
     malformed: "The claim command is malformed.",
@@ -63,7 +63,7 @@ export const characterSheetCommands = [
     type: "character.force-release",
     operationId: "forceReleaseCharacter",
     description:
-      "Force-releases a claimed character (GM-grade only) - the recovery path for a lost player device. A character in the running fight is refused with code `in_fight` (409) unless the request carries `inFight: true`. The player who held it is told on their own devices.",
+      "Force-releases a claimed character (GM-grade only): the recovery path for a lost player device. A character in the running fight is refused with code `in_fight` (409) unless the request carries `inFight: true`. The player who held it is told on their own devices.",
     summary: "Force-release a claimed character (GM).",
     schema: CharacterForceReleaseSchema,
     malformed: "The force-release command is malformed.",
@@ -83,7 +83,7 @@ export const characterSheetCommands = [
     type: "character.set-slot",
     operationId: "setSpellSlot",
     description:
-      "Sets a character's remaining spell slots for one level (clamped to the sheet maximum) - spend or restore a slot during play. With `pact`, it sets the Warlock's Pact Magic slots at that level instead. Player sessions may target only their claimed character.",
+      "Sets a character's remaining spell slots for one level (clamped to the sheet maximum), to spend or restore a slot during play. With `pact`, it sets the Warlock's Pact Magic slots at that level instead. Player sessions may target only their claimed character.",
     summary: "Spend or restore a character's spell slots for one level (clamped to the sheet maximum).",
     schema: CharacterSetSlotSchema,
     malformed: "The spell-slot command is malformed.",
@@ -237,7 +237,7 @@ export const characterSheetCommands = [
     type: "character.give-item",
     operationId: "giveItem",
     description:
-      "Moves one carried item row, whole, from one character to another (GM-grade only). It arrives unequipped and unattuned, and the charges it has spent go with it: a wand's charges belong to the wand, not to whoever held it.",
+      "Moves one carried item row, whole, from one character to another (GM-grade only). It arrives unequipped and unattuned, and the charges it has spent go with it: a wand's charges belong to the wand.",
     summary: "Hand one carried item, with its spent charges, to another character (GM).",
     schema: CharacterGiveItemSchema,
     malformed: "The give-item command is malformed.",
@@ -321,7 +321,7 @@ export const characterSheetCommands = [
     type: "character.set-identity",
     operationId: "setIdentity",
     description:
-      "Sets a character's identity (class/level/race/background/feats) on its editable imported sheet - a light hand-edit, not a guided builder. Player sessions may target only their claimed character, and may only rename: classes, levels, species and background ids, feats, features, the choice ledger and Martial Arts are the GM's. On a sheet built here (it carries the choice ledger) those belong to the builder for everyone, and the Level flow (`character.rebuild`) changes them.",
+      "Sets a character's identity (class/level/race/background/feats) on its editable imported sheet. It is a light hand-edit; the guided builder is `character.rebuild`. Player sessions may target only their claimed character, and may only rename: classes, levels, species and background ids, feats, features, the choice ledger and Martial Arts are the GM's. On a sheet built here (it carries the choice ledger) those belong to the builder for everyone, and the Level flow (`character.rebuild`) changes them.",
     summary:
       "Edit a character's identity (class/level/race/background/feats) on its imported sheet; players only rename.",
     schema: CharacterSetIdentitySchema,

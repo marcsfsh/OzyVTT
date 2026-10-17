@@ -374,12 +374,12 @@ export function createKit(context: CommandContext) {
           gmOnly: hidden
         });
       // A reaction window opened: the table hears why nothing landed yet.
-      const waiting = resolution.waitingOnReaction ? "the attack waits" : "the damage waits";
+      const waiting = resolution.waitingOnReaction ? "The attack waits" : "The damage waits";
       for (const prompt of resolution.reactionPrompts ?? []) {
         const promptHidden = hidden || actorHidden(prompt.actorId);
         context.appendLog({
           kind: "reaction",
-          text: `${prompt.actorName} may use ${prompt.actionName} - ${waiting} on their answer.`,
+          text: `${prompt.actorName} may use ${prompt.actionName}. ${waiting} on the answer.`,
           actorIds: [prompt.actorId],
           gmOnly: promptHidden
         });

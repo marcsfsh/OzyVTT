@@ -35,15 +35,15 @@ function authorizeEnd(
   if (!bearer || !effect) return;
   const how =
     effect.escapeDc !== null
-      ? `escape it (DC ${effect.escapeDc}) or ask the GM`
-      : "it ends by its own rules, or ask the GM";
+      ? `Escape it (DC ${effect.escapeDc}) or ask the GM`
+      : "It ends by its own rules, or ask the GM";
   // Named as the player's own sheet shows it: a source hidden from them stays "A hidden threat" here too.
   const name = sourceId !== null && hidden(sourceId) ? withoutSourceName(effect.name, effect.sourceName) : effect.name;
   policeConditionRule(
     state,
     bearer,
     "condition.imposed",
-    `${name} wasn't ${bearer.name}'s own doing - ${how}.`,
+    `${name} wasn't ${bearer.name}'s own doing. ${how}.`,
     { override },
     events
   );
@@ -119,7 +119,7 @@ export const effectCommands = [
     description:
       "Ends an effect: linked conditions clear (a released grapple removes Grappled/Restrained) and its on-end grants fire. GM-grade anyone. A player session may end an effect its claimed character is the source of, on any creature (releasing its grapple, dropping its Concentration), or one on its claimed character it gave itself; an effect someone else imposed on it is a rules block (`condition.imposed`) the player can ask the GM about.",
     summary:
-      "End an effect (GM anyone; a player one their character is the source of, or one on it that it gave itself), clearing linked conditions and firing its on-end grants.",
+      "End an effect (GM anyone; a player one their character is the source of, or one on it that it gave itself). Its linked conditions clear and its on-end grants fire.",
     schema: EffectEndSchema,
     malformed: "The effect command is malformed.",
     async run({ principal, request, execute }, kit) {

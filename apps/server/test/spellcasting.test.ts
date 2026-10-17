@@ -62,7 +62,7 @@ describe("setSpellSlotRemaining", () => {
   });
   it("rejects an unknown slot level", () => {
     const state = stateWith([{ level: 1, remaining: 4 }], []);
-    expect(() => setSpellSlotRemaining(state, actorId, 5, 1, resolve(state))).toThrowError(/no level-5/);
+    expect(() => setSpellSlotRemaining(state, actorId, 5, 1, resolve(state))).toThrowError(/no level 5/);
   });
 });
 

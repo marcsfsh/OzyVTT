@@ -170,12 +170,12 @@ describe("manual fog in the projections", () => {
         {
           index: 0,
           kind: "turn",
-          label: `Round 1 - ${GOBLIN_NAME}`,
+          label: `Round 1 · ${GOBLIN_NAME}`,
           revision: 1,
           at: "2026-10-17T09:00:00.000Z",
           state: covered
         },
-        { index: 1, kind: "turn", label: "Round 1 - Borin", revision: 5, at: "2026-10-17T10:30:00.000Z", state: lifted }
+        { index: 1, kind: "turn", label: "Round 1 · Borin", revision: 5, at: "2026-10-17T10:30:00.000Z", state: lifted }
       ],
       log: [],
       journal: [],

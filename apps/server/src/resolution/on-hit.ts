@@ -77,7 +77,7 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
     if (rider.insteadOfDamage) {
       ctx.damage.splice(0);
       ctx.bonusDamage.splice(0);
-      warnings.push(`${action.name}: ${target.name} is held instead of taking the hit's damage.`);
+      warnings.push(`${action.name}: ${target.name} is held, and the hit deals no damage.`);
     }
     const grapple = conditionIds.includes("grappled");
     const gained: EffectNarration[] = [];

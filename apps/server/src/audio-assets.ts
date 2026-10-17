@@ -679,7 +679,7 @@ export function inspectAudio(input: Uint8Array, maxBytes = AUDIO_MAX_BYTES): Aud
     const kind = otherKind(buffer);
     throw new InvalidRequestError(
       kind
-        ? `This file is ${kind}, not a sound. ${SUPPORTED}`
+        ? `This file is ${kind}, and only sound files can be uploaded here. ${SUPPORTED}`
         : `This is not a sound file browsers can play. ${SUPPORTED}`
     );
   }

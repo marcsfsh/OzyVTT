@@ -104,7 +104,7 @@ export function validateForPublish(
   // Tier 2: identity. Read the id from the raw body: `ActorDefinitionSchema` strips `id`.
   const id = idOf(body);
   const problem = homebrewIdProblem(id, type);
-  if (problem) add(["id"], `This record's id "${id}" ${problem}. Re-create the record rather than editing its id.`);
+  if (problem) add(["id"], `This record's id "${id}" ${problem}. Re-create the record to change its id.`);
 
   // Tiers 3 and 4, per type.
   const checks: Checks = {
@@ -237,7 +237,7 @@ function classIssues(entry: ClassReference, checks: Checks) {
   const self: SelfCatalog = {
     slug: `${entry.id}-subclasses`,
     count: subclassIds.size,
-    whenEmpty: `no subclass names "${entry.name}" yet. Create one first (duplicating an SRD subclass and picking this class is the quick way) - it does not have to be published, it only has to exist.`
+    whenEmpty: `no subclass names "${entry.name}" yet. Create one first (duplicating an SRD subclass and picking this class is the quick way). It has to exist, published or not.`
   };
   entry.features.forEach((feature, index) => {
     const granted = grants.get(feature.id) ?? 0;
@@ -246,7 +246,7 @@ function classIssues(entry: ClassReference, checks: Checks) {
     if (featurePicks(feature).length > 0 && granted === 0) {
       checks.add(
         ["features", index],
-        `"${feature.name}" asks the player to choose, but no level in the table grants it - the character builder would offer the pick and then refuse to create the character. Add "${feature.id}" to a level in the level table, or remove its choice.`
+        `"${feature.name}" asks the player to choose, but no level in the table grants it, so the character builder would offer the pick and then refuse to create the character. Add "${feature.id}" to a level in the level table, or remove its choice.`
       );
       return;
     }
@@ -273,7 +273,7 @@ function subclassIssues(entry: SubclassReference, checks: Checks) {
     // The check below needs the class's level table, which only a published class has here.
     checks.add(
       ["spellcasting"],
-      `A spellcasting subclass can only be checked against a published class's spell slots, and "${entry.classId}" is still a draft. Publish the class first - it does not need its subclasses published.`
+      `A spellcasting subclass can only be checked against a published class's spell slots, and "${entry.classId}" is still a draft. Publish the class first. Its subclasses can stay drafts.`
     );
   } else if (parent && entry.spellcasting) {
     // A subclass's own `levelTable` is not applied yet, so it cannot give a non-caster class spell slots.
@@ -283,7 +283,7 @@ function subclassIssues(entry: SubclassReference, checks: Checks) {
     if (!classCasts) {
       checks.add(
         ["spellcasting"],
-        `"${parent.name}" has no spell slots in its level table, and a subclass's own table is not applied yet - this subclass would create a caster with no slots. Third-caster subclasses are not supported yet.`
+        `"${parent.name}" has no spell slots in its level table, and a subclass's own table is not applied yet, so this subclass would create a caster with no slots. Third-caster subclasses are not supported yet.`
       );
     }
   }
@@ -305,7 +305,7 @@ function speciesIssues(entry: SpeciesReference, checks: Checks) {
       if (featurePicks(trait).length > 0)
         checks.add(
           ["lineages", index, "traits", traitIndex, "choice"],
-          `"${trait.name}" asks the player a question from inside a lineage. Lineage traits cannot carry choices yet - move the choice up to a species trait.`
+          `"${trait.name}" asks the player a question from inside a lineage. Lineage traits cannot carry choices yet. Move the choice up to a species trait.`
         );
     });
   });
@@ -408,7 +408,7 @@ function equipmentIssues(item: EquipmentReference, checks: Checks) {
   if (item.category !== "weapon" && item.category !== "armor") {
     checks.add(
       ["appliesTo"],
-      `"${item.name}" has an "applies to" list but its category is "${item.category}" - a template must be a weapon, an armor or ammunition, because those are what a bind can make it.`
+      `"${item.name}" has an "applies to" list but its category is "${item.category}". A template must be a weapon, an armor or ammunition, because those are what a bind can make it.`
     );
     return;
   }
@@ -432,7 +432,7 @@ function equipmentIssues(item: EquipmentReference, checks: Checks) {
     if (item.category === "armor" && base.category === "shield") {
       checks.add(
         ["appliesTo", "baseIds", index],
-        `"${baseId}" is a shield, and a shield cannot be a template's base - its armor block carries its +2 bonus, not a body AC. Make the magic shield its own fixed item instead.`
+        `"${baseId}" is a shield, and a shield cannot be a template's base: its armor block carries a +2 bonus where a body armor carries its AC. Make the magic shield its own fixed item.`
       );
       return;
     }
@@ -464,7 +464,7 @@ function spellListIssues(list: SpellListReference, checks: Checks) {
   if ((resolution.memberIds.get(list.id)?.size ?? 0) === 0) {
     checks.add(
       ["add"],
-      "This spell list resolves to no spells. A caster pointed at an empty list cannot be created at all - add spell ids, base it on an existing list, or tag spells with this list's id."
+      "This spell list resolves to no spells. A caster pointed at an empty list cannot be created at all. Add spell ids, base it on an existing list, or tag spells with this list's id."
     );
   }
 }
@@ -562,7 +562,7 @@ function riderIssues(modifiers: readonly Modifier[] | undefined, path: Path, lab
         [...path, index],
         read.length === 0
           ? `"${label}" gates ${withArticle(modifier.type)} on "${moment}", but a defence is read before any roll, so it would publish and then never apply. Drop the moment, or gate it on a state (while-effect-tag, while-condition, ...).`
-          : `"${label}" gates ${withArticle(modifier.type)} on "${moment}", a moment the damage roll never collects - it would publish and then add nothing, ever. Gate it on ${read.map((entry) => `"${entry}"`).join(", ")} instead (or drop the moment for an always-on bonus).`
+          : `"${label}" gates ${withArticle(modifier.type)} on "${moment}", a moment the damage roll never collects, so it would publish and then add nothing. Gate it on ${read.map((entry) => `"${entry}"`).join(", ")}, or drop the moment for an always-on bonus.`
       );
     }
     if (modifier.type === "extra-damage" && modifier.formula === undefined && modifier.abilityModifier === undefined) {

@@ -171,7 +171,7 @@ export function moveSceneToken(
   const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId);
   if (!scene) throw new CommandRejectedError("That scene no longer exists.");
   if (state.combat.activeSceneId === sceneId)
-    throw new CommandRejectedError("This scene is live - move its tokens on the encounter map instead.");
+    throw new CommandRejectedError("This scene is live. Move its tokens on the fight's map.");
   const token = scene.combat.tokens.find((candidate) => candidate.actorId === actorId);
   if (!token) throw new CommandRejectedError("That combatant is not staged in this scene.");
   if (position && (!Number.isFinite(position.x) || !Number.isFinite(position.y)))

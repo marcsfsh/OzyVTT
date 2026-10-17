@@ -50,7 +50,7 @@ export function buildHomebrewUsageIndex(state: GameState): HomebrewUsageIndex {
       record(
         "monster",
         actor.definitionId,
-        at("definition", "on the table right now - action and defence edits reach it immediately")
+        at("definition", "on the table right now, where action and defence edits reach it immediately")
       );
 
     for (const item of actor.inventory) {

@@ -181,12 +181,12 @@ describe("dynamic vision on the shared screen and in replays", () => {
         {
           index: 0,
           kind: "turn",
-          label: `Round 1 - ${GOBLIN_NAME}`,
+          label: `Round 1 · ${GOBLIN_NAME}`,
           revision: 1,
           at: "2026-10-17T09:00:00.000Z",
           state: unseen
         },
-        { index: 1, kind: "turn", label: "Round 1 - Borin", revision: 5, at: "2026-10-17T10:30:00.000Z", state: seen }
+        { index: 1, kind: "turn", label: "Round 1 · Borin", revision: 5, at: "2026-10-17T10:30:00.000Z", state: seen }
       ],
       log: [],
       journal: [],
