@@ -415,6 +415,10 @@
             "toMaximum": {
               "type": "boolean",
               "const": true
+            },
+            "temporary": {
+              "type": "boolean",
+              "const": true
             }
           },
           "required": [
@@ -721,6 +725,46 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 10
+            },
+            "conditionImmunities": {
+              "minItems": 1,
+              "maxItems": 6,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema52"
+              }
+            },
+            "temporaryHitPointsEachTurn": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                {
+                  "type": "string",
+                  "const": "spellcasting-modifier"
+                }
+              ]
+            },
+            "hitPointMaximumGain": {
+              "type": "object",
+              "properties": {
+                "amount": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "perSlot": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50
+                }
+              },
+              "required": [
+                "amount"
+              ],
+              "additionalProperties": false
             }
           },
           "required": [

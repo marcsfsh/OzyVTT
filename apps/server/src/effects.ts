@@ -131,6 +131,8 @@ export type ConditionImmunitySource = Readonly<{
  *  immunity to the Poisoned condition, or a Paladin's aura it stands in. */
 function immuneToCondition(actor: Actor, conditionId: string, source?: ConditionImmunitySource): boolean {
   if (actor.conditionImmunities.includes(conditionId)) return true;
+  // An effect's own immunity while it lasts (Heroism: Frightened).
+  if (actor.effects.some((effect) => effect.conditionImmunities?.includes(conditionId))) return true;
   if (conditionId === "poisoned" && hasCondition(actor, "petrified")) return true;
   if (
     source?.state &&
@@ -271,6 +273,12 @@ export function addEffect(
             candidate.sourceActorId === effect.sourceActorId && candidate.sourceActionId === effect.sourceActionId
         )
       : undefined;
+  // Aid: the Hit Point maximum and current hit points rise by the gain; a refresh adds only what it adds over the old.
+  const gain = (effect.hitPointMaximumGain ?? 0) - (replaced?.hitPointMaximumGain ?? 0);
+  if (gain !== 0) {
+    const maximum = Math.max(1, actor.hp.maximum + gain);
+    actor.hp = { ...actor.hp, maximum, current: Math.min(maximum, Math.max(0, actor.hp.current + gain)) };
+  }
   if (replaced) {
     // Refresh in place: no onEnd fires, linked conditions stay (re-applied below for safety).
     actor.effects = actor.effects.map((candidate) => (candidate.id === replaced.id ? effect : candidate));
@@ -368,6 +376,11 @@ function endEffectInternal(
   // A drained Hit Point maximum returns to normal; the hit points lost with it stay lost.
   if (effect.hitPointMaximumLoss !== undefined)
     actor.hp = { ...actor.hp, maximum: actor.hp.maximum + effect.hitPointMaximumLoss };
+  // Aid's gain goes, and the current hit points over the maximum with it.
+  if (effect.hitPointMaximumGain !== undefined) {
+    const maximum = Math.max(1, actor.hp.maximum - effect.hitPointMaximumGain);
+    actor.hp = { ...actor.hp, maximum, current: Math.min(actor.hp.current, maximum) };
+  }
   for (const conditionId of effect.linkedConditionIds) {
     if (linkedByAnEffect(actor, conditionId)) continue;
     const entry = actor.conditions.find((condition) => condition.id === conditionId);
@@ -628,9 +641,14 @@ export function endEffectsAtLongRest(state: GameState, actorId: string): EffectN
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) return [];
   const events: EffectNarration[] = [...endConcentrationSustainedBy(state, actorId)];
-  // SRD Long Rest: "If your Hit Point maximum was reduced, it returns to normal."
+  // SRD Long Rest: "If your Hit Point maximum was reduced, it returns to normal." An eight-hour gain (Aid) is spent by
+  // the rest's end too.
   for (const effect of [...actor.effects])
-    if (ENDS_WITH_THE_FIGHT.has(effect.duration.type) || effect.hitPointMaximumLoss !== undefined)
+    if (
+      ENDS_WITH_THE_FIGHT.has(effect.duration.type) ||
+      effect.hitPointMaximumLoss !== undefined ||
+      effect.hitPointMaximumGain !== undefined
+    )
       endEffectInternal(state, actor, effect.id, events, true);
   // The rest restores its hit points, and a knocked-out creature wakes when it regains any.
   events.push(...endKnockOut(state, actor));

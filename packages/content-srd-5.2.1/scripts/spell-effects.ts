@@ -596,9 +596,11 @@ const CAST_CURES: Readonly<Record<string, Readonly<{ conditions: readonly string
 };
 
 /** Healing the text gives as no single roll: Mass Heal's 700 divided among its targets, Power Word Heal's "regains all
- *  its Hit Points". */
+ *  its Hit Points", and False Life's Temporary Hit Points. */
 const CAST_HEALING: Readonly<Record<string, NonNullable<SpellEffect["healing"]>>> = {
   "mass-heal": { formula: "700", addsModifier: false, divided: true },
+  // "You gain 2d4 + 4 Temporary Hit Points", and 5 more for each slot level above 1.
+  "false-life": { formula: "2d4 + 4", addsModifier: false, self: true, temporary: true, perSlot: 5 },
   "power-word-heal": { formula: "1", addsModifier: false, toMaximum: true }
 };
 
@@ -747,6 +749,25 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
         when: [{ type: "on-saving-throw" }, { type: "versus-condition", conditionIds: ["poisoned"] }]
       }
     ]
+  }),
+  // "Immune to the Frightened condition and gains Temporary Hit Points equal to your spellcasting ability modifier at
+  // the start of each of its turns."
+  heroism: spellGrant({
+    name: "Heroism",
+    tags: ["heroism"],
+    target: "targets",
+    duration: rounds(10),
+    conditionImmunities: ["frightened"],
+    temporaryHitPointsEachTurn: "spellcasting-modifier"
+  }),
+  // "Each target's Hit Point maximum and current Hit Points increase by 5 for the duration", and 5 more for each slot
+  // level above 2. Its 8 hours end at the GM's word or a Long Rest.
+  aid: spellGrant({
+    name: "Aid",
+    tags: ["aid"],
+    target: "targets",
+    duration: { type: "manual" },
+    hitPointMaximumGain: { amount: 5, perSlot: 5 }
   }),
   "mage-armor": spellGrant({
     name: "Mage Armor",

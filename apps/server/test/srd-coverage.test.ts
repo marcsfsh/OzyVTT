@@ -273,6 +273,16 @@ describe("the curated claims hold in the engine", () => {
     expect(thunderwave.save?.failurePush).toEqual({ feet: 10 });
   });
 
+  it("Temporary Hit Points: False Life's roll is temporary, and Heroism's grant carries its immunity", () => {
+    const spells = loadSpells();
+    const falseLife = spells.find((spell) => spell.id === "false-life")!;
+    expect(spellState(falseLife)).toBe("enforced");
+    expect(falseLife.effect!.healing).toMatchObject({ temporary: true, self: true });
+    expect(spells.find((spell) => spell.id === "heroism")!.effect!.grant).toMatchObject({
+      conditionImmunities: ["frightened"]
+    });
+  });
+
   it("a trait kind the bundle runs as a mechanic is never curated reference", () => {
     const running = [...monsterTraitKinds()].filter(([, kind]) => kind.running > 0).map(([name]) => name);
     expect(running.length).toBeGreaterThan(0);

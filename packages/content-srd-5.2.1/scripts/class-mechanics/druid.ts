@@ -115,9 +115,9 @@ export const druid: ClassMechanicsModule = {
     },
 
     /**
-     * The use pool, read off the printed column (2 -> 3 -> 4), one use of which comes back on a Short Rest.
-     * Known Beast forms (needs a creature catalog with CR and Fly Speed filters), the temporary HP and form
-     * replacement stay prose.
+     * The use pool, read off the printed column (2 -> 3 -> 4), one use of which comes back on a Short Rest, and the
+     * Temporary Hit Points equal to the Druid level. Known Beast forms (needs a creature catalog with CR and Fly Speed
+     * filters) and the form replacement stay prose.
      */
     "wild-shape": {
       uses: { scaling: { type: "class-resource", id: "wild-shape" }, per: "long-rest" },
@@ -129,7 +129,9 @@ export const druid: ClassMechanicsModule = {
           activation: "bonus-action",
           description:
             "Shape-shift into a Beast form you have learned for this feature. You stay in that form for a number of hours equal to half your Druid level or until you use Wild Shape again, have the Incapacitated condition, or die. You can leave the form early as a Bonus Action, and you gain Temporary Hit Points equal to your Druid level when you assume a form.",
-          damage: []
+          damage: [],
+          healing: { formula: "0", self: true, temporary: true },
+          adds: { classLevel: 1 }
         }
       ]
     },

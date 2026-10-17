@@ -205,6 +205,14 @@ export function castAction(
   return { ...base, ...(spell.area && !mechanics.healing ? { area: spell.area } : {}), ...mechanics };
 }
 
+/** A cast's grant, its "spellcasting ability modifier" fixed at the caster's for this spell. */
+function castGrant(grant: NonNullable<ActorAction["grants"]>, modifier: number): NonNullable<ActorAction["grants"]> {
+  const copy = structuredClone(grant);
+  if (copy.temporaryHitPointsEachTurn !== "spellcasting-modifier") return copy;
+  const { temporaryHitPointsEachTurn: _each, ...rest } = copy;
+  return modifier >= 1 ? { ...rest, temporaryHitPointsEachTurn: Math.min(100, modifier) } : rest;
+}
+
 /** What an action casting this spell does, from the spell's cast model (`SpellReference.effect`): its spell
  *  attacks, its save, its damage and its healing. `scaled.roll` (an upcast row, a cantrip's tier) replaces only dice
  *  the source's own roll gave, so a reviewed whole-cast roll (Magic Missile's three darts) stands. An attack
@@ -267,14 +275,17 @@ export function spellCastMechanics(
             }
           }
         : {}),
-    // What the cast leaves on its targets (Bless, Hunter's Mark), sourced by the caster.
-    ...(effect.grant ? { grants: structuredClone(effect.grant) } : {}),
+    // What the cast leaves on its targets (Bless, Hunter's Mark), sourced by the caster; Heroism's Temporary Hit Points
+    // are the caster's modifier for this spell.
+    ...(effect.grant ? { grants: castGrant(effect.grant, numbers.modifier) } : {}),
     ...(effect.healing
       ? {
           healing: {
             formula: formulaPlus(scale(effect.healing.formula), effect.healing.addsModifier ? numbers.modifier : 0),
             ...(effect.healing.divided ? { divided: true as const } : {}),
-            ...(effect.healing.toMaximum ? { toMaximum: true as const } : {})
+            ...(effect.healing.toMaximum ? { toMaximum: true as const } : {}),
+            ...(effect.healing.self ? { self: true as const } : {}),
+            ...(effect.healing.temporary ? { temporary: true as const } : {})
           }
         }
       : {}),
@@ -677,6 +688,9 @@ export function upcastAction(action: ActorAction, spell: SpellReference, level: 
     };
   const damage = swapFrom(spell.damage.roll);
   const healing = swapFrom(spell.effect?.healing?.formula ?? spell.damage.roll);
+  const above = Math.max(0, level - spell.level);
+  // A flat amount for each level above ("5 additional Temporary Hit Points for each spell slot level above 1").
+  const healingPerSlot = (spell.effect?.healing?.perSlot ?? 0) * above;
   const count = row.targetCount;
   const rays = count !== null && action.attack !== undefined && (spell.effect?.attacks ?? 0) > 1;
   const darts = count !== null && action.darts !== undefined;
@@ -684,8 +698,25 @@ export function upcastAction(action: ActorAction, spell: SpellReference, level: 
     ...action,
     damage: action.damage.map((part) => ({ ...part, formula: damage(part.formula) })),
     ...(action.onHit ? { onHit: action.onHit.map((rider) => withScaledOngoing(rider, spell.damage.roll, roll)) } : {}),
-    ...(action.healing ? { healing: { ...action.healing, formula: healing(action.healing.formula) } } : {}),
-    ...(action.burst ? { burst: burstAt(action.burst, level - spell.level) } : {}),
+    ...(action.healing
+      ? { healing: { ...action.healing, formula: formulaPlus(healing(action.healing.formula), healingPerSlot) } }
+      : {}),
+    // Aid's "Each target's Hit Points increase by 5 for each spell slot level above 2."
+    ...(action.grants?.hitPointMaximumGain?.perSlot
+      ? {
+          grants: {
+            ...action.grants,
+            hitPointMaximumGain: {
+              ...action.grants.hitPointMaximumGain,
+              amount: Math.min(
+                100,
+                action.grants.hitPointMaximumGain.amount + action.grants.hitPointMaximumGain.perSlot * above
+              )
+            }
+          }
+        }
+      : {}),
+    ...(action.burst ? { burst: burstAt(action.burst, above) } : {}),
     ...(rays ? { attack: { ...action.attack!, count: Math.min(10, count) } } : {}),
     ...(darts ? { darts: Math.min(20, count) } : {})
   };

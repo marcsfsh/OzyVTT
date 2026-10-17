@@ -67,6 +67,22 @@ export function applyGrant(ctx: ResolveContext): void {
   for (const recipient of recipients) grantTo(ctx, recipient);
 }
 
+/** The Temporary Hit Points a grant gives at the start of each of the bearer's turns: a number, or the granter's
+ *  spellcasting ability modifier (a cast resolves it first, at the spell's own ability); none when it is under 1. */
+function turnStartTemporaryHitPoints(
+  each: NonNullable<DefinitionAction["grants"]>["temporaryHitPointsEachTurn"],
+  definition: ResolveContext["deps"]["definition"]
+): Partial<Pick<EffectInstance, "temporaryHitPointsEachTurn">> {
+  const ability = definition?.spellcasting?.ability;
+  const amount =
+    each === "spellcasting-modifier"
+      ? ability
+        ? abilityModifier(definition!.abilityScores[ability])
+        : 0
+      : (each ?? 0);
+  return amount >= 1 ? { temporaryHitPointsEachTurn: Math.min(100, amount) } : {};
+}
+
 function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
   const { state, action, attacker, input, deps, warnings } = ctx;
   const grant = action.grants!;
@@ -154,7 +170,12 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       ...(ctx.castId !== null ? { castId: ctx.castId } : {}),
       ...(armorClassBonus !== undefined ? { armorClassBonus } : {}),
       ...(steadyAim ? { speedZero: true } : {}),
-      ...grantedMovement
+      ...grantedMovement,
+      // Heroism: immune to Frightened, and Temporary Hit Points at the start of each of the bearer's turns.
+      ...(grant.conditionImmunities ? { conditionImmunities: [...grant.conditionImmunities] } : {}),
+      ...turnStartTemporaryHitPoints(grant.temporaryHitPointsEachTurn, deps.definition),
+      // Aid: the Hit Point maximum and current hit points rise while it lasts (`addEffect`).
+      ...(grant.hitPointMaximumGain ? { hitPointMaximumGain: grant.hitPointMaximumGain.amount } : {})
     }),
     replaced,
     deps

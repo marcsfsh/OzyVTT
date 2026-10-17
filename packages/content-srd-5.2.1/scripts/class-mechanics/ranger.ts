@@ -34,7 +34,7 @@ export const ranger: ClassMechanicsModule = {
       ]
     },
 
-    // Uses equal the Wisdom modifier (minimum 1). The temporary HP and the Exhaustion decrease stay prose.
+    // Uses equal the Wisdom modifier (minimum 1). The Exhaustion decrease on a Short Rest is the rest's (rests.ts).
     tireless: {
       uses: { scaling: { type: "ability-modifier", ability: "wis", minimum: 1 }, per: "long-rest" },
       actions: [
@@ -44,7 +44,9 @@ export const ranger: ClassMechanicsModule = {
           activation: "action",
           description:
             "As a Magic action, you give yourself Temporary Hit Points equal to 1d8 plus your Wisdom modifier (minimum of 1). Whenever you finish a Short Rest, your Exhaustion level, if any, also decreases by 1.",
-          damage: []
+          damage: [],
+          healing: { formula: "1d8", self: true, temporary: true },
+          adds: { abilityModifier: "wis" }
         }
       ]
     },

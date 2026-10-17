@@ -377,8 +377,13 @@ function playerEffect(
     spell: _spell,
     readiedSpell,
     magical: _magical,
-    // A monster's lower Hit Point maximum is the GM's to know; a character's shows on its own sheet.
+    // A monster's lower Hit Point maximum is the GM's to know; a character's shows on its own sheet. So are the
+    // amounts a spell's level or its caster's modifier set (Aid's gain, Heroism's Temporary Hit Points), and what
+    // the effect makes its bearer immune to.
     hitPointMaximumLoss: _hitPointMaximumLoss,
+    hitPointMaximumGain: _hitPointMaximumGain,
+    temporaryHitPointsEachTurn: _temporaryHitPointsEachTurn,
+    conditionImmunities: _conditionImmunities,
     ...visible
   } = effect;
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);

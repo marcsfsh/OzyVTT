@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { applyRest } from "../src/rests.js";
 import { BuilderPolicySchema, GameStateSchema, type Actor, type GameState } from "@vtt/domain";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { ContentLibrary } from "../src/content-library.js";
@@ -778,17 +779,32 @@ describe("Ranger - the rest of the kit", () => {
   it("scales Tireless off the FINAL Wisdom modifier, so an ASI moves the pool", () => {
     // `scaling: {type: "ability-modifier"}` resolves against the built scores: same record, same level,
     // two different numbers.
+    // Each use rolls its 1d8 of Temporary Hit Points.
+    const tire = (built: Table) => {
+      newTurn(built);
+      return resolve(built, "tireless", [4], []);
+    };
     const plain = table(rangerInput(10)); // Wis 15 -> +2
-    for (let use = 0; use < 2; use += 1) spend(plain, "tireless");
+    for (let use = 0; use < 2; use += 1) tire(plain);
     expect(plain.hero.actionUses["tireless"]).toBe(2);
     newTurn(plain);
     expect(() => resolve(plain, "tireless", [], [])).toThrowError(/Tireless: no uses remaining \(2\/long rest\)/);
 
     const focused = table(rangerInput(10, { wisFocus: true })); // Wis 15 + 4 -> +4
-    for (let use = 0; use < 4; use += 1) spend(focused, "tireless");
+    for (let use = 0; use < 4; use += 1) tire(focused);
     expect(focused.hero.actionUses["tireless"]).toBe(4);
     newTurn(focused);
     expect(() => resolve(focused, "tireless", [], [])).toThrowError(/Tireless: no uses remaining \(4\/long rest\)/);
+  });
+
+  it("gives Tireless's 1d8 + Wisdom as Temporary Hit Points, and takes a level of Exhaustion off at a Short Rest", () => {
+    const built = table(rangerInput(10)); // Wis 15 -> +2
+    resolve(built, "tireless", [5], []);
+    expect(built.hero.hp.temporary).toBe(7);
+    built.hero.conditions = [{ id: "exhaustion", level: 2 }];
+    built.state.combat = { ...built.state.combat, active: false };
+    applyRest(built.state, IDS.hero, "short", (id) => resolveIn(built.state, id));
+    expect(built.hero.conditions).toEqual([{ id: "exhaustion", level: 1 }]);
   });
 
   it("makes Nature's Veil a Bonus Action with its own Wisdom-sized pool", () => {

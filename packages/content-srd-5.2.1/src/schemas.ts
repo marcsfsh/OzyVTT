@@ -161,13 +161,19 @@ export const SpellEffectSchema = z
       .strict()
       .optional(),
     /** Hit points each target regains; `addsModifier` adds the caster's spellcasting ability modifier, `divided`
-     *  makes it one pool shared among the targets (Mass Heal), and `toMaximum` restores all of them (Power Word Heal). */
+     *  makes it one pool shared among the targets (Mass Heal), `toMaximum` restores all of them (Power Word Heal). */
     healing: z
       .object({
         formula: HealingFormulaSchema,
         addsModifier: z.boolean(),
         divided: z.literal(true).optional(),
-        toMaximum: z.literal(true).optional()
+        toMaximum: z.literal(true).optional(),
+        /** The caster alone gains it (False Life). */
+        self: z.literal(true).optional(),
+        /** It is Temporary Hit Points (False Life). */
+        temporary: z.literal(true).optional(),
+        /** What it adds for each slot level above the spell's ("5 additional Temporary Hit Points"). */
+        perSlot: z.number().int().min(1).max(50).optional()
       })
       .strict()
       .nullable(),

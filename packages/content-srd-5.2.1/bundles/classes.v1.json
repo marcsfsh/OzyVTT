@@ -3600,7 +3600,15 @@
       "name": "Wild Shape",
       "activation": "bonus-action",
       "description": "Shape-shift into a Beast form you have learned for this feature. You stay in that form for a number of hours equal to half your Druid level or until you use Wild Shape again, have the Incapacitated condition, or die. You can leave the form early as a Bonus Action, and you gain Temporary Hit Points equal to your Druid level when you assume a form.",
-      "damage": []
+      "damage": [],
+      "healing": {
+       "formula": "0",
+       "self": true,
+       "temporary": true
+      },
+      "adds": {
+       "classLevel": 1
+      }
      }
     ]
    },
@@ -7621,7 +7629,15 @@
       "name": "Tireless",
       "activation": "action",
       "description": "As a Magic action, you give yourself Temporary Hit Points equal to 1d8 plus your Wisdom modifier (minimum of 1). Whenever you finish a Short Rest, your Exhaustion level, if any, also decreases by 1.",
-      "damage": []
+      "damage": [],
+      "healing": {
+       "formula": "1d8",
+       "self": true,
+       "temporary": true
+      },
+      "adds": {
+       "abilityModifier": "wis"
+      }
      }
     ]
    },

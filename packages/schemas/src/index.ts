@@ -661,6 +661,12 @@ export const EffectInstanceSchema = z
     armorClassBonus: z.number().int().min(-10).max(10).optional(),
     /** Hit points this effect took off the bearer's Hit Point maximum (a Life Drain), given back when it ends. */
     hitPointMaximumLoss: z.number().int().min(1).max(10000).optional(),
+    /** What this effect adds to the bearer's Hit Point maximum (Aid), taken back when it ends. */
+    hitPointMaximumGain: z.number().int().min(1).max(1000).optional(),
+    /** Conditions the bearer is immune to while this lasts (Heroism: Frightened). */
+    conditionImmunities: z.array(ConditionIdSchema).max(6).optional(),
+    /** Temporary Hit Points the bearer gains at the start of each of its turns while this lasts (Heroism). */
+    temporaryHitPointsEachTurn: z.number().int().min(1).max(100).optional(),
     modifiers: EffectModifiersSchema.default([]),
     /** Conditions this effect applied to the same actor; removed automatically when the effect ends. */
     linkedConditionIds: z.array(ConditionIdSchema).max(4).default([]),
@@ -1144,7 +1150,20 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   target: z.enum(["self", "target", "targets"]).default("self"),
   onHit: z.boolean().optional(),
   /** Kept apart from `modifiers`, whose `armor-class` is written onto the sheet, like a reaction's lasting bonus. */
-  armorClassBonus: z.number().int().min(1).max(10).optional()
+  armorClassBonus: z.number().int().min(1).max(10).optional(),
+  /** Conditions the recipient is immune to while it lasts (Heroism: Frightened). */
+  conditionImmunities: z.array(ConditionIdSchema).min(1).max(6).optional(),
+  /** Temporary Hit Points the recipient gains at the start of each of its turns (Heroism: the caster's spellcasting
+   *  ability modifier, fixed when the spell is cast). */
+  temporaryHitPointsEachTurn: z
+    .union([z.number().int().min(1).max(100), z.literal("spellcasting-modifier")])
+    .optional(),
+  /** What the recipient's Hit Point maximum and current hit points rise by while it lasts (Aid's 5), `perSlot` more for
+   *  each slot level above the spell's. */
+  hitPointMaximumGain: z
+    .object({ amount: z.number().int().min(1).max(100), perSlot: z.number().int().min(1).max(50).optional() })
+    .strict()
+    .optional()
 }).strict();
 
 /** The most a limited-use pool can hold: Lay on Hands at Paladin 20 is 100 points. */
@@ -1473,7 +1492,9 @@ export const ActionSchema = z.object({
       /** The formula is regained once for each use spent (Lay on Hands: 1 hit point per point of its pool). */
       perUse: z.literal(true).optional(),
       /** Each target regains all its hit points, whatever the formula says (Power Word Heal). */
-      toMaximum: z.literal(true).optional()
+      toMaximum: z.literal(true).optional(),
+      /** The roll is Temporary Hit Points, which a creature takes only when they beat what it has (False Life). */
+      temporary: z.literal(true).optional()
     })
     .strict()
     .optional(),

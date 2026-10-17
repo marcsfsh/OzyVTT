@@ -308,6 +308,18 @@ describe("Wild Shape - the pool, read off the printed column (audit row 54)", ()
     expect(actionOf(build(druid(2, [primalOrder("warden")])), "wild-shape")?.activation).toBe("bonus-action");
   });
 
+  it("gives Temporary Hit Points equal to the Druid level as the form is assumed", () => {
+    const definition = build(druid(6, [primalOrder("warden")]));
+    const state = encounterWith(definition);
+    resolveDefinitionAction(
+      state,
+      actionOf(definition, "wild-shape")!,
+      { actorId: HERO, targetIds: [], commandId: command() },
+      deps(definition)
+    );
+    expect(state.actors[0].hp.temporary).toBe(6);
+  });
+
   it("really spends the counter, twice, and then refuses the third", () => {
     // A spent counter and a refusal.
     const definition = build(druid(2, [primalOrder("warden")]));

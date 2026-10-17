@@ -244,7 +244,25 @@
    "targets": {
     "count": 3
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Aid",
+    "tags": [
+     "aid"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "manual"
+    },
+    "hitPointMaximumGain": {
+     "amount": 5,
+     "perSlot": 5
+    }
+   }
   },
   "classes": [
    "bard",
@@ -8206,7 +8224,13 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": {
+    "formula": "2d4 + 4",
+    "addsModifier": false,
+    "self": true,
+    "temporary": true,
+    "perSlot": 5
+   }
   },
   "classes": [
    "sorcerer",
@@ -11869,7 +11893,26 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Heroism",
+    "tags": [
+     "heroism"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    },
+    "conditionImmunities": [
+     "frightened"
+    ],
+    "temporaryHitPointsEachTurn": "spellcasting-modifier"
+   }
   },
   "classes": [
    "bard",

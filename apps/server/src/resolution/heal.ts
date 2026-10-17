@@ -11,7 +11,7 @@ import { recordRoll, type LiveActor, type ResolveContext } from "./context.js";
 /** Healing (Cure Wounds): rolled once, and every target regains it on the resolve. A willing creature's healing has
  *  nothing to gate, so it applies here instead of waiting on an Apply tap as damage does. Second Wind heals its user;
  *  Preserve Life divides one roll among its targets, none past half its maximum; Lay on Hands regains its formula once
- *  per point spent. */
+ *  per point spent; False Life's roll is Temporary Hit Points. */
 export function applyHealing(ctx: ResolveContext): void {
   const { action, state, deps, tableNarration } = ctx;
   const healing = action.healing;
@@ -38,6 +38,20 @@ export function applyHealing(ctx: ResolveContext): void {
     if (isDead(target)) {
       tableNarration.push({ kind: "heal", text: deadCantHealLine(target.name), actorIds: [target.id] });
       return { targetId: target.id, targetName: target.name, regained: 0 };
+    }
+    // False Life, Tireless: Temporary Hit Points, which don't add up; the creature keeps the higher.
+    if (healing.temporary) {
+      const gained = shares[index] > target.hp.temporary ? shares[index] : 0;
+      if (gained > 0) target.hp = { ...target.hp, temporary: gained };
+      tableNarration.push({
+        kind: "heal",
+        text:
+          gained > 0
+            ? `${target.name} gains ${gained} Temporary Hit Points (${action.name}).`
+            : `${target.name} keeps the ${target.hp.temporary} Temporary Hit Points it has (${action.name}).`,
+        actorIds: [target.id]
+      });
+      return { targetId: target.id, targetName: target.name, regained: gained };
     }
     const before = target.hp.current;
     // The cast is already authorized; the caster heals whoever it targeted.
