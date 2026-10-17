@@ -41,6 +41,7 @@ import { areaOfProse, multiattackOfProse, withProseFacts } from "../src/action-p
 import { castingOptionsFor, makesSpellAttack, spellEffectFor } from "./spell-effects.js";
 import { castingTimeText, SPELL_FIELD_CORRECTIONS } from "./spell-corrections.js";
 import { printedHitDamage, printedSaveDamage } from "./monster-damage.js";
+import { traitMechanicsOf } from "./trait-mechanics.js";
 
 const sourceDir = sourcePath("open5e-srd-2024");
 
@@ -711,6 +712,7 @@ const report = {
   rechargeUses: 0,
   restUses: 0,
   legendaryCreatures: 0,
+  traitMechanics: 0,
   typedDefenses: 0,
   corrections: [] as string[],
   untypedDamage: [] as string[],
@@ -926,6 +928,13 @@ const monsters: ActorDefinition[] = creatures
           }
         : null;
     if (legendaryResource) report.legendaryCreatures += 1;
+    // Upstream order is the stat block's own.
+    const traitTexts = (traitsByCreature.get(creature.pk) ?? []).map((trait) => ({
+      name: trait.fields.name,
+      description: withoutSourceTags(trait.fields.desc)
+    }));
+    const traitMechanics = traitMechanicsOf(traitTexts);
+    report.traitMechanics += traitMechanics.length;
     return {
       schemaId: "vtt.actor-monster" as const,
       schemaVersion: 1 as const,
@@ -960,6 +969,7 @@ const monsters: ActorDefinition[] = creatures
       ...(damageVulnerabilities.length > 0 ? { damageVulnerabilities } : {}),
       ...(conditionImmunities.length > 0 ? { conditionImmunities } : {}),
       ...(legendaryResource ? { legendary: legendaryResource } : {}),
+      ...(traitMechanics.length > 0 ? { traitMechanics } : {}),
       extensions: {
         "open5e.srd-2024": {
           challengeRating: challenge,
@@ -994,11 +1004,7 @@ const monsters: ActorDefinition[] = creatures
           conditionImmunities: fields.condition_immunities_display || null,
           nonmagicalAttackImmunity: fields.nonmagical_attack_immunity,
           nonmagicalAttackResistance: fields.nonmagical_attack_resistance,
-          // Upstream order is the stat block's own.
-          traits: (traitsByCreature.get(creature.pk) ?? []).map((trait) => ({
-            name: trait.fields.name,
-            description: withoutSourceTags(trait.fields.desc)
-          }))
+          traits: traitTexts
         }
       }
     };
@@ -1439,7 +1445,7 @@ console.log(
   `rules mechanics (ADR-0020): multiattacks ${report.structuredMultiattacks} structured / ${report.proseMultiattacks} prose-only, on-hit riders ${report.onHitRiders}, save-for-damage actions ${report.saveDamage}, monsters with typed defenses ${report.typedDefenses}`
 );
 console.log(
-  `limited uses: ${report.rechargeUses} recharge pools, ${report.restUses} rest-scoped pools | legendary creatures: ${report.legendaryCreatures}`
+  `limited uses: ${report.rechargeUses} recharge pools, ${report.restUses} rest-scoped pools | legendary creatures: ${report.legendaryCreatures} | traits the engine runs: ${report.traitMechanics}`
 );
 console.log(
   `conditions: ${conditionRecords.length} | spells: ${spellRecords.length} | weapons: ${weaponRecords.length} (+${weaponPropertyRecords.length} properties) | armor: ${armorRecords.length}`

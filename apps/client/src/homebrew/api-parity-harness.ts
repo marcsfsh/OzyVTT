@@ -956,6 +956,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "traitMechanics[].**",
+    types: ["monster"],
+    reason:
+      "what a stat block's traits do (Regeneration, auras, Death Burst), read from the trait text as the catalog is built; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "proficiencies.**",
     types: ["monster"],
     reason: "0 of 330 SRD monsters author it, and a control would change which rung saves resolve on",

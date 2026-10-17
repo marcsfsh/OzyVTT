@@ -572,10 +572,12 @@ const TurnEndDurationSchemas = [
 
 /** How long a failed save's conditions last, as the text prints it: "for 1 minute" (10 rounds), "until the start of
  * the X's next turn", "until the end of its next turn" (the target's) or "until the end of your next turn" (the
- * source's). Absent: until something ends them (a Concentration spell's with its Concentration). */
+ * source's). `until-bearer-next-turn` is the start of the target's own next turn (an aura it started its turn in).
+ * Absent: until something ends them (a Concentration spell's with its Concentration). */
 export const SaveFailureDurationSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("rounds"), rounds: z.number().int().min(1).max(100) }).strict(),
   z.object({ type: z.literal("until-source-next-turn") }).strict(),
+  z.object({ type: z.literal("until-bearer-next-turn") }).strict(),
   z.object({ type: z.literal("until-bearer-turn-end") }).strict(),
   z.object({ type: z.literal("until-source-turn-end") }).strict()
 ]);
@@ -609,6 +611,8 @@ export const EffectInstanceSchema = z
     duration: z.discriminatedUnion("type", [
       z.object({ type: z.literal("rounds"), remaining: z.number().int().min(0).max(100) }).strict(),
       z.object({ type: z.literal("until-source-next-turn") }).strict(),
+      /** Until the start of the bearer's own next turn (a ghast's Stench, taken as that turn starts). */
+      z.object({ type: z.literal("until-bearer-next-turn") }).strict(),
       ...TurnEndDurationSchemas,
       z.object({ type: z.literal("encounter") }).strict(),
       z.object({ type: z.literal("manual") }).strict()
@@ -1721,6 +1725,97 @@ export function characterChoices(
   return character?.choices ?? [];
 }
 
+const TraitNameSchema = z.string().min(1).max(120);
+const TraitDamageSchema = z
+  .array(z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema }).strict())
+  .min(1)
+  .max(2);
+/** A trait's save, shaped like an action's so the engine reads one kind of save block. */
+const TraitSaveSchema = z
+  .object({
+    ability: AbilitySchema,
+    dc: z.number().int().min(1).max(40),
+    ...SaveOutcomeFields,
+    /** "Success: The target is immune to this ghast's Stench for 24 hours" (held for the rest of the fight). */
+    immuneOnSuccess: z.literal(true).optional()
+  })
+  .strict();
+
+/**
+ * What a stat block's trait does that the engine runs, read from the trait's text when the bundle is built (SRD 5.2.1
+ * monsters); its prose stays on the sheet. `name` is the trait's printed name, for the feed.
+ * - `regeneration`: hit points regained at the start of each of its turns, not on the turn after it takes one of
+ *   `stoppedBy`'s types (the troll's Acid or Fire); only at 1 Hit Point or more (`needsHitPoints`, the oni); and at 0
+ *   Hit Points it dies only when a turn starts without regenerating (`deathWaitsForTurn`, the troll).
+ * - `undead-fortitude`: damage that drops it to 0 asks a save of DC `dcBase` plus the damage taken, unless the damage
+ *   is of one of `exceptDamageTypes` or from a Critical Hit; a success leaves it at 1 Hit Point.
+ * - `aura`: an Emanation of `rangeFeet` that acts at the end of the bearer's turns (Fire Aura's damage), on each
+ *   creature that starts its turn in it (Stench's save), or at the start of the bearer's turns on what it grapples or
+ *   is grappled by (Barbed Hide). `affects` is every creature, its enemies, or those it chooses (taken as its
+ *   enemies); `notWhileIncapacitated` silences it while the bearer is Incapacitated; a save's success can make the
+ *   creature immune to it ("for 24 hours", held for the fight).
+ * - `death-burst`: the save each creature in the Emanation makes when it dies (Death Burst, Death Throes).
+ * - `melee-hit-damage`: what a creature that hits it with a melee attack roll takes (a black pudding's acid).
+ * - `berserk`: starting its turn Bloodied, a d6 of 6 sends it berserk until it is no longer Bloodied.
+ */
+export const TraitMechanicSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("regeneration"),
+      name: TraitNameSchema,
+      hitPoints: z.number().int().min(1).max(200),
+      stoppedBy: z.array(DamageTypeSchema).max(4).optional(),
+      needsHitPoints: z.literal(true).optional(),
+      deathWaitsForTurn: z.literal(true).optional()
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("undead-fortitude"),
+      name: TraitNameSchema,
+      ability: AbilitySchema,
+      dcBase: z.number().int().min(1).max(30),
+      exceptDamageTypes: z.array(DamageTypeSchema).max(4),
+      exceptCritical: z.literal(true).optional()
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("aura"),
+      name: TraitNameSchema,
+      trigger: z.enum(["bearer-turn-end", "turn-start-inside", "bearer-turn-start"]),
+      rangeFeet: z.number().int().min(5).max(120),
+      affects: z.enum(["all", "enemies", "chosen", "grapple-partners"]),
+      notWhileIncapacitated: z.literal(true).optional(),
+      damage: TraitDamageSchema.optional(),
+      save: TraitSaveSchema.optional(),
+      /** The fire it sets (a fire elemental's Emanation): "start burning" (SRD Burning). */
+      hazard: z.literal("burning").optional(),
+      /** What a failed save does that the engine leaves to the GM (a gibbering mouther's d8 table). */
+      reminder: z.string().min(1).max(600).optional()
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("death-burst"),
+      name: TraitNameSchema,
+      rangeFeet: z.number().int().min(5).max(120),
+      save: TraitSaveSchema,
+      damage: TraitDamageSchema
+    })
+    .strict(),
+  z.object({ kind: z.literal("melee-hit-damage"), name: TraitNameSchema, damage: TraitDamageSchema }).strict(),
+  z
+    .object({
+      kind: z.literal("berserk"),
+      name: TraitNameSchema,
+      /** The d6 face, or higher, that sends it berserk. */
+      on: z.number().int().min(1).max(6)
+    })
+    .strict()
+]);
+export type TraitMechanic = z.infer<typeof TraitMechanicSchema>;
+
 export const ActorDefinitionSchema = z
   .object({
     schemaId: z.enum(["vtt.actor-character", "vtt.actor-monster"]),
@@ -1770,6 +1865,8 @@ export const ActorDefinitionSchema = z
       })
       .strict()
       .optional(),
+    /** What its traits do that the engine runs (Regeneration, auras, Death Burst), read from their text. */
+    traitMechanics: z.array(TraitMechanicSchema).max(12).optional(),
     /** Character identity (class/level/race/background/feats); character definitions only. */
     character: CharacterIdentitySchema.optional(),
     proficiencies: ProficienciesSchema.optional(),

@@ -16,6 +16,8 @@ export function effectDurationLabel(effect: Pick<PlayerEffect, "duration">): str
       return `${duration.remaining} ${duration.remaining === 1 ? "round" : "rounds"} left`;
     case "until-source-next-turn":
       return "until its source's next turn";
+    case "until-bearer-next-turn":
+      return "until the start of its next turn";
     case "until-bearer-turn-end":
       return duration.skipsCurrentTurn ? "until the end of its next turn" : "until the end of its turn";
     case "until-source-turn-end":

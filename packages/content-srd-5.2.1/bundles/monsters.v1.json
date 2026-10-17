@@ -6666,6 +6666,22 @@
   "conditionImmunities": [
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "aura",
+    "name": "Fire Aura",
+    "trigger": "bearer-turn-end",
+    "rangeFeet": 5,
+    "affects": "chosen",
+    "notWhileIncapacitated": true,
+    "damage": [
+     {
+      "formula": "1d10",
+      "type": "fire"
+     }
+    ]
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -7018,6 +7034,42 @@
   "legendary": {
    "resistancesPerDay": 3
   },
+  "traitMechanics": [
+   {
+    "kind": "death-burst",
+    "name": "Death Throes",
+    "rangeFeet": 30,
+    "save": {
+     "ability": "dex",
+     "dc": 20,
+     "successDamage": "half",
+     "failureConditions": []
+    },
+    "damage": [
+     {
+      "formula": "9d6",
+      "type": "fire"
+     },
+     {
+      "formula": "9d6",
+      "type": "force"
+     }
+    ]
+   },
+   {
+    "kind": "aura",
+    "name": "Fire Aura",
+    "trigger": "bearer-turn-end",
+    "rangeFeet": 5,
+    "affects": "all",
+    "damage": [
+     {
+      "formula": "3d8",
+      "type": "fire"
+     }
+    ]
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 19,
@@ -7449,6 +7501,21 @@
   ],
   "conditionImmunities": [
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "aura",
+    "name": "Barbed Hide",
+    "trigger": "bearer-turn-start",
+    "rangeFeet": 5,
+    "affects": "grapple-partners",
+    "damage": [
+     {
+      "formula": "1d10",
+      "type": "piercing"
+     }
+    ]
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -8490,6 +8557,18 @@
    "grappled",
    "prone",
    "restrained"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "melee-hit-damage",
+    "name": "Corrosive Form",
+    "damage": [
+     {
+      "formula": "1d8",
+      "type": "acid"
+     }
+    ]
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -11008,6 +11087,13 @@
    "paralyzed",
    "petrified",
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "berserk",
+    "name": "Berserk",
+    "on": 6
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -14261,6 +14347,25 @@
    "exhaustion",
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "death-burst",
+    "name": "Death Burst",
+    "rangeFeet": 5,
+    "save": {
+     "ability": "dex",
+     "dc": 10,
+     "successDamage": "half",
+     "failureConditions": []
+    },
+    "damage": [
+     {
+      "formula": "2d4",
+      "type": "bludgeoning"
+     }
+    ]
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
@@ -15498,6 +15603,22 @@
    "restrained",
    "unconscious"
   ],
+  "traitMechanics": [
+   {
+    "kind": "aura",
+    "name": "Fire Aura",
+    "trigger": "bearer-turn-end",
+    "rangeFeet": 10,
+    "affects": "all",
+    "damage": [
+     {
+      "formula": "1d10",
+      "type": "fire"
+     }
+    ],
+    "hazard": "burning"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
@@ -15770,6 +15891,13 @@
    "paralyzed",
    "petrified",
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "berserk",
+    "name": "Berserk",
+    "on": 6
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -16535,6 +16663,27 @@
    "charmed",
    "exhaustion",
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "aura",
+    "name": "Stench",
+    "trigger": "turn-start-inside",
+    "rangeFeet": 5,
+    "affects": "all",
+    "save": {
+     "ability": "con",
+     "dc": 10,
+     "successDamage": "none",
+     "failureConditions": [
+      "poisoned"
+     ],
+     "failureDuration": {
+      "type": "until-bearer-next-turn"
+     },
+     "immuneOnSuccess": true
+    }
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -20166,6 +20315,23 @@
     "height": 1
    }
   },
+  "traitMechanics": [
+   {
+    "kind": "aura",
+    "name": "Gibbering",
+    "trigger": "turn-start-inside",
+    "rangeFeet": 20,
+    "affects": "all",
+    "notWhileIncapacitated": true,
+    "save": {
+     "ability": "wis",
+     "dc": 10,
+     "successDamage": "none",
+     "failureConditions": []
+    },
+    "reminder": "On a failed save: The target rolls 1d8 to determine what it does during the current turn:\n\n- 1-4: The target does nothing.\n- 5-6: The target takes no action or Bonus Action and uses all its movement to move in a random direction.\n- 7-8: The target makes a melee attack against a randomly determined creature within its reach or does nothing if it can't make such an attack."
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -23165,6 +23331,26 @@
   "conditionImmunities": [
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "aura",
+    "name": "Stench",
+    "trigger": "turn-start-inside",
+    "rangeFeet": 10,
+    "affects": "all",
+    "save": {
+     "ability": "con",
+     "dc": 16,
+     "successDamage": "none",
+     "failureConditions": [
+      "poisoned"
+     ],
+     "failureDuration": {
+      "type": "until-bearer-next-turn"
+     }
+    }
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
@@ -24701,6 +24887,25 @@
   "conditionImmunities": [
    "exhaustion",
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "death-burst",
+    "name": "Death Burst",
+    "rangeFeet": 5,
+    "save": {
+     "ability": "con",
+     "dc": 10,
+     "successDamage": "half",
+     "failureConditions": []
+    },
+    "damage": [
+     {
+      "formula": "2d4",
+      "type": "cold"
+     }
+    ]
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -27055,6 +27260,25 @@
    "exhaustion",
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "death-burst",
+    "name": "Death Burst",
+    "rangeFeet": 5,
+    "save": {
+     "ability": "dex",
+     "dc": 11,
+     "successDamage": "half",
+     "failureConditions": []
+    },
+    "damage": [
+     {
+      "formula": "2d6",
+      "type": "fire"
+     }
+    ]
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
@@ -27162,6 +27386,25 @@
   },
   "damageImmunities": [
    "fire"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "death-burst",
+    "name": "Death Burst",
+    "rangeFeet": 10,
+    "save": {
+     "ability": "dex",
+     "dc": 11,
+     "successDamage": "half",
+     "failureConditions": []
+    },
+    "damage": [
+     {
+      "formula": "2d6",
+      "type": "fire"
+     }
+    ]
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -30045,6 +30288,18 @@
    "exhaustion",
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "undead-fortitude",
+    "name": "Undead Fortitude",
+    "ability": "con",
+    "dcBase": 5,
+    "exceptDamageTypes": [
+     "radiant"
+    ],
+    "exceptCritical": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -30220,6 +30475,14 @@
   },
   "damageResistances": [
    "cold"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "regeneration",
+    "name": "Regeneration",
+    "hitPoints": 10,
+    "needsHitPoints": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -31507,6 +31770,28 @@
   "legendary": {
    "resistancesPerDay": 4
   },
+  "traitMechanics": [
+   {
+    "kind": "aura",
+    "name": "Fear Aura",
+    "trigger": "turn-start-inside",
+    "rangeFeet": 20,
+    "affects": "enemies",
+    "notWhileIncapacitated": true,
+    "save": {
+     "ability": "wis",
+     "dc": 21,
+     "successDamage": "none",
+     "failureConditions": [
+      "frightened"
+     ],
+     "failureDuration": {
+      "type": "until-bearer-next-turn"
+     },
+     "immuneOnSuccess": true
+    }
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 20,
@@ -33581,6 +33866,21 @@
    "cold",
    "fire"
   ],
+  "traitMechanics": [
+   {
+    "kind": "aura",
+    "name": "Heat Aura",
+    "trigger": "bearer-turn-end",
+    "rangeFeet": 5,
+    "affects": "all",
+    "damage": [
+     {
+      "formula": "3d10",
+      "type": "fire"
+     }
+    ]
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 11,
@@ -34629,6 +34929,21 @@
   "damageImmunities": [
    "fire"
   ],
+  "traitMechanics": [
+   {
+    "kind": "aura",
+    "name": "Fire Aura",
+    "trigger": "bearer-turn-end",
+    "rangeFeet": 5,
+    "affects": "chosen",
+    "damage": [
+     {
+      "formula": "2d6",
+      "type": "fire"
+     }
+    ]
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
@@ -35605,6 +35920,14 @@
    "paralyzed",
    "petrified",
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "regeneration",
+    "name": "Regeneration",
+    "hitPoints": 10,
+    "needsHitPoints": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -37520,6 +37843,25 @@
   "conditionImmunities": [
    "exhaustion",
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "death-burst",
+    "name": "Death Burst",
+    "rangeFeet": 5,
+    "save": {
+     "ability": "dex",
+     "dc": 10,
+     "successDamage": "half",
+     "failureConditions": []
+    },
+    "damage": [
+     {
+      "formula": "2d4",
+      "type": "fire"
+     }
+    ]
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -40105,6 +40447,18 @@
     "height": 2
    }
   },
+  "traitMechanics": [
+   {
+    "kind": "regeneration",
+    "name": "Regeneration",
+    "hitPoints": 15,
+    "stoppedBy": [
+     "acid",
+     "fire"
+    ],
+    "deathWaitsForTurn": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
@@ -40207,6 +40561,18 @@
     "height": 1
    }
   },
+  "traitMechanics": [
+   {
+    "kind": "regeneration",
+    "name": "Regeneration",
+    "hitPoints": 5,
+    "stoppedBy": [
+     "acid",
+     "fire"
+    ],
+    "deathWaitsForTurn": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
@@ -46048,6 +46414,18 @@
   "conditionImmunities": [
    "exhaustion",
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "undead-fortitude",
+    "name": "Undead Fortitude",
+    "ability": "con",
+    "dcBase": 5,
+    "exceptDamageTypes": [
+     "radiant"
+    ],
+    "exceptCritical": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
