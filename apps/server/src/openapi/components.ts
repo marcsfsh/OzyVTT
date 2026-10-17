@@ -14,6 +14,7 @@ import * as wire from "@vtt/domain";
 import { MapCatalogEntrySchema, PublicMapAssetSchema } from "../map-catalog.js";
 import { ViewerAccessMetadataSchema, ViewerPairingSchema } from "../viewer-access.js";
 import { ViewerConnectionMetadataSchema } from "../viewer-coordinator.js";
+import { PublicSoundAssetSchema } from "../sound-catalog.js";
 import * as codex from "../codex-requests.js";
 import { DESCRIPTIONS } from "./descriptions.js";
 import { commandBodySchemas, gameCommandDocs, type JsonSchema } from "./game-commands.js";
@@ -205,6 +206,8 @@ const TABLE_RESPONSES: ReadonlyArray<readonly [string, z.ZodType]> = [
     })
   ],
   ["MapAssetMetadata", PublicMapAssetSchema],
+  ["SoundAsset", PublicSoundAssetSchema],
+  ["SoundBoardView", wire.SoundBoardViewSchema],
   ["MapCatalogEntry", MapCatalogEntrySchema],
   ["ActorAvailableActionsData", wire.AvailableActionsReplySchema],
   ["ActorMovementData", wire.ActorMovementReplySchema],

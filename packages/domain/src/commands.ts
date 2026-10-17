@@ -24,6 +24,7 @@ import {
   InventoryItemSchema,
   ProficienciesSchema
 } from "@vtt/schemas";
+import { MAX_SOUND_EFFECTS, MAX_SOUND_LAYERS, MAX_SOUND_TRACKS, SoundVolumeSchema } from "./sound.js";
 
 // Wire schemas for every game command, shared by the socket handlers and the HTTP API. `commandId` is
 // the idempotency key; `expectedRevision` the optimistic-concurrency guard.
@@ -1438,3 +1439,58 @@ export const AnnotationClearSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+
+// ---------- The sound board (ADR-0024): GM-only, and kept in its own store, so none of these carry a game revision.
+
+const SoundSlotInputSchema = z.object({ assetId: z.uuid(), volume: SoundVolumeSchema }).strict();
+/** Replaces any part of the board's arrangement; a part left out stays as it is. */
+export const SoundArrangeSchema = z
+  .object({
+    commandId: z.uuid(),
+    masterVolume: SoundVolumeSchema.optional(),
+    music: z
+      .object({ tracks: z.array(SoundSlotInputSchema).max(MAX_SOUND_TRACKS), shuffle: z.boolean() })
+      .strict()
+      .optional(),
+    ambient: z.array(SoundSlotInputSchema).max(MAX_SOUND_LAYERS).optional(),
+    effects: z.array(SoundSlotInputSchema).max(MAX_SOUND_EFFECTS).optional()
+  })
+  .strict();
+/** Starts the playlist (at `assetId`, or its top), an ambient layer, an effect, or a scene's saved sound. */
+export const SoundPlaySchema = z
+  .object({
+    commandId: z.uuid(),
+    target: z.enum(["music", "ambient", "effect", "scene"]),
+    assetId: z.uuid().optional(),
+    sceneId: z.uuid().optional()
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if ((value.target === "ambient" || value.target === "effect") && !value.assetId)
+      context.addIssue({ code: "custom", path: ["assetId"], message: "Name the sound to play." });
+    if (value.target === "scene" && !value.sceneId)
+      context.addIssue({ code: "custom", path: ["sceneId"], message: "Name the scene whose sound to play." });
+  });
+/** Stops the music, one ambient layer, or everything. */
+export const SoundStopSchema = z
+  .object({ commandId: z.uuid(), target: z.enum(["music", "ambient", "all"]), assetId: z.uuid().optional() })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.target === "ambient" && !value.assetId)
+      context.addIssue({ code: "custom", path: ["assetId"], message: "Name the ambient layer to stop." });
+  });
+export const SoundNextTrackSchema = z.object({ commandId: z.uuid() }).strict();
+export const SoundPauseSchema = z.object({ commandId: z.uuid(), paused: z.boolean() }).strict();
+/** Saves what the board holds now as a scene's sound, clears it, or turns its start-when-live on or off. */
+export const SoundScenePresetSchema = z
+  .object({
+    commandId: z.uuid(),
+    sceneId: z.uuid(),
+    preset: z.enum(["save-current", "clear"]).optional(),
+    autoplay: z.boolean().optional()
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.preset === undefined && value.autoplay === undefined)
+      context.addIssue({ code: "custom", path: ["preset"], message: "Say whether to save, clear or switch it." });
+  });

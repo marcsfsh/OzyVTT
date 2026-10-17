@@ -17,6 +17,7 @@ import { rollCommands } from "./rolls.js";
 import { rulingCommands } from "./rulings.js";
 import { saveCommands } from "./saves.js";
 import { sceneCommands } from "./scenes.js";
+import { soundCommands } from "./sound.js";
 import { tableSettingCommands } from "./table-settings.js";
 
 export { describeFailure, failureReply, NOT_JOINED_REPLY } from "./failures.js";
@@ -40,7 +41,8 @@ export const gameCommands: readonly AnyCommand[] = [
   ...rulingCommands,
   ...tableSettingCommands,
   ...sceneCommands,
-  ...mapCommands
+  ...mapCommands,
+  ...soundCommands
 ];
 export { gameReads };
 

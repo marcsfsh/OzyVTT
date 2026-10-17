@@ -6,7 +6,7 @@ machine-derivable surfaces of the app (state shape, command catalog, HTTP paths)
 file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.
 
 - API version `1` · realtime protocol `1`
-- 14 GameState fields · 114 commands · 232 HTTP paths
+- 14 GameState fields · 120 commands · 243 HTTP paths
 
 ## GameState shape
 
@@ -36,7 +36,7 @@ schema in `packages/domain/src/commands.ts`, its route and scope in `GAME_COMMAN
 OpenAPI operation, and one table entry under `apps/server/src/commands/`, which both transports
 register from. Then the projection decision.
 
-Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `damage`, `death-save`, `dice`, `effect`, `encounter`, `fog`, `initiative`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `table`, `terrain`, `time`, `token`, `turn`.
+Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `damage`, `death-save`, `dice`, `effect`, `encounter`, `fog`, `initiative`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `sound`, `table`, `terrain`, `time`, `token`, `turn`.
 
 | Command | Scope |
 | --- | --- |
@@ -144,6 +144,12 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `scene.rename` | `scene:write` |
 | `scene.reorder` | `scene:write` |
 | `scene.set-combatants` | `scene:write` |
+| `sound.arrange` | `scene:write` |
+| `sound.next-track` | `scene:write` |
+| `sound.pause` | `scene:write` |
+| `sound.play` | `scene:write` |
+| `sound.set-scene-preset` | `scene:write` |
+| `sound.stop` | `scene:write` |
 | `table.set-party-visibility` | `combat:write` |
 | `table.set-staging-defaults` | `combat:write` |
 | `terrain.paint` | `scene:write` |
@@ -341,7 +347,14 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/scenes/{sceneId}/combatants`
 - `POST /api/v1/game/scenes/{sceneId}/duplicate`
 - `POST /api/v1/game/scenes/{sceneId}/rename`
+- `POST /api/v1/game/scenes/{sceneId}/sound`
 - `POST /api/v1/game/scenes/reorder`
+- `GET /api/v1/game/sound`
+- `POST /api/v1/game/sound/arrange`
+- `POST /api/v1/game/sound/next-track`
+- `POST /api/v1/game/sound/pause`
+- `POST /api/v1/game/sound/play`
+- `POST /api/v1/game/sound/stop`
 - `POST /api/v1/game/table/party-visibility`
 - `POST /api/v1/game/table/staging-defaults`
 - `POST /api/v1/game/terrain/paint`
@@ -381,6 +394,9 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `PUT /api/v1/map-assets/{id}/scale`
 - `GET /api/v1/openapi.json`
 - `POST /api/v1/sessions/player`
+- `GET POST /api/v1/sound-assets`
+- `DELETE PATCH /api/v1/sound-assets/{id}`
+- `GET /api/v1/sound-assets/{id}/content`
 - `GET /api/v1/system/capabilities`
 - `GET /api/v1/system/health`
 - `GET /api/v1/system/version`
@@ -392,6 +408,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `GET /api/v1/viewer/presentation`
 - `POST /api/v1/viewer/presentation/commands`
 - `POST /api/v1/viewer/preview-session`
+- `POST /api/v1/viewer/sound-status`
 
 ## Where things live
 

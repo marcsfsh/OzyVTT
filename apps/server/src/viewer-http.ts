@@ -77,6 +77,10 @@ const CommandSchema = z
   .object({ id: z.string(), expectedRevision: z.number().int().nonnegative().optional(), payload: PayloadSchema })
   .strict();
 const PairingSchema = z.object({ ttlMs: z.number().int().optional() }).strict();
+/** A screen's word on its own sound: `blocked` until someone taps it, `muted` for the GM's silent preview. */
+const SoundStatusSchema = z
+  .object({ sound: z.enum(["on", "blocked", "muted"]), unplayable: z.array(z.uuid()).max(20).default([]) })
+  .strict();
 const ExchangeSchema = z
   .object({ code: z.string(), name: z.string(), expiresInMs: z.number().int().positive().nullable().optional() })
   .strict();
@@ -188,7 +192,7 @@ export function createViewerRouter(options: ViewerRouterOptions) {
   router.get("/api/v1/viewer/presentation", (request, response) => {
     try {
       if (!options.authorizeGm(bearerToken(request))) requireViewer(request);
-      return sendData(response, 200, { presentation: options.presentation.project(now()) });
+      return sendData(response, 200, { presentation: options.coordinator.project(now()) });
     } catch (error) {
       return errorResponse(error, response);
     }
@@ -200,6 +204,16 @@ export function createViewerRouter(options: ViewerRouterOptions) {
       const command = CommandSchema.parse(request.body) as Omit<ViewerCommand, "role">;
       const result = await options.coordinator.executeGm(token, command);
       return sendData(response, 200, { revision: result.state.revision, duplicate: result.duplicate });
+    } catch (error) {
+      return errorResponse(error, response);
+    }
+  });
+
+  router.post("/api/v1/viewer/sound-status", (request, response) => {
+    try {
+      const token = requireViewer(request);
+      options.coordinator.reportSound(token, SoundStatusSchema.parse(request.body));
+      return sendData(response, 200, { received: true });
     } catch (error) {
       return errorResponse(error, response);
     }

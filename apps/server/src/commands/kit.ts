@@ -6,6 +6,8 @@ import type {
   GmView,
   PlayerView,
   RollRecord,
+  SoundBoard,
+  SoundBoardView,
   TableEvent
 } from "@vtt/domain";
 import { d20Die } from "@vtt/rules-5e";
@@ -19,6 +21,7 @@ import type { EffectNarration } from "../effects.js";
 import type { InitiativeRollDeps, InitiativeRollSink } from "../encounter.js";
 import { equipmentCatalogOf } from "../equipment-derivation.js";
 import type { GameStore } from "../game-store.js";
+import type { SoundDeps } from "../sound-board.js";
 import { tokenCreatureDistance } from "../movement-narration.js";
 import { withoutSourceName } from "../projections.js";
 import { describeRoll, recordRoll, rollFeedIsGmOnly, rollsForCommand } from "../roll-history.js";
@@ -118,6 +121,20 @@ export type CommandContext = Readonly<{
   ) => void;
   /** Reads one stored archive document (raw JSON) for `replay.launch`; without it replays can't launch. */
   archiveDocument?: (id: number) => string | null;
+  /** The sound board, kept in its own store (ADR-0024); without it the sound commands refuse. */
+  sound?: SoundPort;
+}>;
+
+/** What the sound commands need from the sound board service (`sound-service.ts`). */
+export type SoundPort = Readonly<{
+  run: (
+    commandId: string,
+    change: (board: SoundBoard, deps: SoundDeps) => void
+  ) => Promise<Readonly<{ soundRevision: number; duplicate: boolean }>>;
+  durationOf: (assetId: string) => number | null;
+  view: () => SoundBoardView;
+  /** Starts a scene's saved sound when it goes live, unless the GM turned that off. Best-effort. */
+  sceneWentLive: (sceneId: string, sourceRevision: number) => Promise<void>;
 }>;
 
 export type Kit = ReturnType<typeof createKit>;

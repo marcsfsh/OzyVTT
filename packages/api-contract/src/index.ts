@@ -44,6 +44,14 @@ export const MAP_ASSET_PATHS = {
   calibrationWizardComplete: `${API_NAMESPACE}/map-assets/{id}/calibration/wizards/{wizardId}/complete`
 } as const;
 
+/** Documentation-only paths for `sound-http.ts`: the GM's library of uploaded sound files (ADR-0024). See the note on
+ * MAP_ASSET_PATHS. */
+export const SOUND_ASSET_PATHS = {
+  collection: `${API_NAMESPACE}/sound-assets`,
+  byId: `${API_NAMESPACE}/sound-assets/{id}`,
+  content: `${API_NAMESPACE}/sound-assets/{id}/content`
+} as const;
+
 /** The HttpOnly cookie a paired table viewer (or the GM's preview of it) authenticates with. */
 export const VIEWER_SESSION_COOKIE = "vtt_viewer_session";
 
@@ -56,7 +64,8 @@ export const VIEWER_PATHS = {
   presentation: `${API_NAMESPACE}/viewer/presentation`,
   presentationCommands: `${API_NAMESPACE}/viewer/presentation/commands`,
   previewSession: `${API_NAMESPACE}/viewer/preview-session`,
-  events: `${API_NAMESPACE}/viewer/events`
+  events: `${API_NAMESPACE}/viewer/events`,
+  soundStatus: `${API_NAMESPACE}/viewer/sound-status`
 } as const;
 
 /**
@@ -275,7 +284,15 @@ export const GAME_PATHS = {
   fogPaint: `${API_NAMESPACE}/game/fog/paint`,
   fogReset: `${API_NAMESPACE}/game/fog/reset`,
   terrainPaint: `${API_NAMESPACE}/game/terrain/paint`,
-  terrainReset: `${API_NAMESPACE}/game/terrain/reset`
+  terrainReset: `${API_NAMESPACE}/game/terrain/reset`,
+  // The sound board (ADR-0024): GM-grade, kept apart from the game state and its revision.
+  sound: `${API_NAMESPACE}/game/sound`,
+  soundArrange: `${API_NAMESPACE}/game/sound/arrange`,
+  soundPlay: `${API_NAMESPACE}/game/sound/play`,
+  soundStop: `${API_NAMESPACE}/game/sound/stop`,
+  soundNextTrack: `${API_NAMESPACE}/game/sound/next-track`,
+  soundPause: `${API_NAMESPACE}/game/sound/pause`,
+  sceneSound: `${API_NAMESPACE}/game/scenes/{sceneId}/sound`
 } as const;
 
 /** Session issuance for headless/alternate player clients: the HTTP mirror of the socket's open join. */
@@ -640,7 +657,13 @@ export const GAME_COMMANDS = {
   "fog.paint": { scope: "scene:write", method: "post", path: GAME_PATHS.fogPaint },
   "fog.reset": { scope: "scene:write", method: "post", path: GAME_PATHS.fogReset },
   "terrain.paint": { scope: "scene:write", method: "post", path: GAME_PATHS.terrainPaint },
-  "terrain.reset": { scope: "scene:write", method: "post", path: GAME_PATHS.terrainReset }
+  "terrain.reset": { scope: "scene:write", method: "post", path: GAME_PATHS.terrainReset },
+  "sound.arrange": { scope: "scene:write", method: "post", path: GAME_PATHS.soundArrange },
+  "sound.play": { scope: "scene:write", method: "post", path: GAME_PATHS.soundPlay },
+  "sound.stop": { scope: "scene:write", method: "post", path: GAME_PATHS.soundStop },
+  "sound.next-track": { scope: "scene:write", method: "post", path: GAME_PATHS.soundNextTrack },
+  "sound.pause": { scope: "scene:write", method: "post", path: GAME_PATHS.soundPause },
+  "sound.set-scene-preset": { scope: "scene:write", method: "post", path: GAME_PATHS.sceneSound }
 } as const satisfies Record<
   string,
   Readonly<{ scope: z.infer<typeof IntegrationScopeSchema>; method: "post" | "delete"; path: string }>

@@ -38,6 +38,7 @@ import type {
   StabilizeResult
 } from "./results.js";
 import type { ClientRole, CombatLogEntry, GmView, PlayerView } from "./views.js";
+import type { SoundBoardResult, SoundBoardView, SoundCommandResult } from "./sound.js";
 
 // Type-only: the payload types are read off the schemas, and the schemas stay on the server's side of the import graph.
 import type {
@@ -148,7 +149,13 @@ import type {
   TokenMoveSchema,
   TurnLegendarySchema,
   TurnReactionSchema,
-  TurnUseSchema
+  TurnUseSchema,
+  SoundArrangeSchema,
+  SoundNextTrackSchema,
+  SoundPauseSchema,
+  SoundPlaySchema,
+  SoundScenePresetSchema,
+  SoundStopSchema
 } from "./commands.js";
 
 /** A brief, ephemeral battlemap notification ("Goblin took 6 damage"). Never stored in GameState - presentation only; the roll history is the durable record. */
@@ -170,6 +177,8 @@ export interface ServerToClientEvents {
   "log:entry": (entry: CombatLogEntry) => void;
   "codex:changed": (event: CodexChangedEvent) => void;
   "homebrew:changed": (event: HomebrewChangedEvent) => void;
+  /** The sound board changed, or a table screen's sound did. Sent to GM sessions only: players learn nothing of it. */
+  "sound:changed": (view: SoundBoardView) => void;
 }
 export type SessionJoinResult = {
   ok: boolean;
@@ -749,5 +758,31 @@ export interface ClientToServerEvents {
   "annotation:clear": (
     payload: CommandPayload<typeof AnnotationClearSchema>,
     acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM: the sound board, with the table screens' sound states. */
+  "sound:board": (payload: Record<string, never>, acknowledgement: (result: SoundBoardResult) => void) => void;
+  "sound:arrange": (
+    payload: CommandPayload<typeof SoundArrangeSchema>,
+    acknowledgement: (result: SoundCommandResult) => void
+  ) => void;
+  "sound:play": (
+    payload: CommandPayload<typeof SoundPlaySchema>,
+    acknowledgement: (result: SoundCommandResult) => void
+  ) => void;
+  "sound:stop": (
+    payload: CommandPayload<typeof SoundStopSchema>,
+    acknowledgement: (result: SoundCommandResult) => void
+  ) => void;
+  "sound:next-track": (
+    payload: CommandPayload<typeof SoundNextTrackSchema>,
+    acknowledgement: (result: SoundCommandResult) => void
+  ) => void;
+  "sound:pause": (
+    payload: CommandPayload<typeof SoundPauseSchema>,
+    acknowledgement: (result: SoundCommandResult) => void
+  ) => void;
+  "sound:set-scene-preset": (
+    payload: CommandPayload<typeof SoundScenePresetSchema>,
+    acknowledgement: (result: SoundCommandResult) => void
   ) => void;
 }

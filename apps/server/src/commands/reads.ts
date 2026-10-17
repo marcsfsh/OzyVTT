@@ -242,6 +242,17 @@ export const gameReads = [
         principal.kind === "player" ? principal.sessionId : undefined
       )
     })
+  },
+
+  {
+    event: "sound:board",
+    path: GAME_PATHS.sound,
+    scope: "scene:read",
+    gmOnly: "Only the GM controls the table's sound.",
+    run: (_principal, _input, kit) => {
+      if (!kit.context.sound) throw new GameNotFoundError("Sound is not available on this server.");
+      return { view: kit.context.sound.view() };
+    }
   }
 ] satisfies readonly ReadSpec[];
 

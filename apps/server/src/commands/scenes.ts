@@ -58,9 +58,10 @@ export const sceneCommands = [
           restartTimeline(draft, timeline);
         }
       });
-      // Going live also presents the map on the shared screen.
+      // Going live also presents the map on the shared screen and starts the scene's sound.
       if (!duplicate && activate === true && state.combat.mapAssetId)
         await kit.context.presentSceneMap(state.combat.mapAssetId);
+      if (!duplicate && activate === true) await kit.context.sound?.sceneWentLive(commandId, state.revision);
       return { sceneId: commandId };
     }
   }),
@@ -121,8 +122,9 @@ export const sceneCommands = [
           text: `This scene still stages ${resumedArchived.length} archived character${resumedArchived.length === 1 ? "" : "s"} (${resumedArchived.map((actor) => actor.name).join(", ")}) - restore or remove them.`,
           gmOnly: true
         });
-      // Going live also presents the scene's map on the shared screen.
+      // Going live also presents the scene's map on the shared screen and starts its sound.
       if (state.combat.mapAssetId) await kit.context.presentSceneMap(state.combat.mapAssetId);
+      await kit.context.sound?.sceneWentLive(sceneId, state.revision);
     }
   }),
 
