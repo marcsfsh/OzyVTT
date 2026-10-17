@@ -3,6 +3,7 @@ import { Router, type NextFunction, type Request, type Response } from "express"
 import {
   API_VERSION,
   ENCOUNTER_ARCHIVE_PATHS,
+  EncounterArchiveNameRequestSchema,
   GAME_PATHS,
   GAME_COMMANDS,
   GameCommandEnvelopeSchema,
@@ -47,6 +48,7 @@ export type GameApiRouterOptions = Readonly<{
     remove: (id: number) => void;
     /** Shares (or un-shares) one archived fight with players; false when no such archive exists. */
     setVisibility: (id: number, playerVisible: boolean) => boolean;
+    rename: (id: number, name: string | null) => boolean;
   }>;
   sessions: Readonly<{
     /** Issues a fresh player session (the socket's open LAN-trust join, over HTTP), or null before GM setup. */
@@ -237,8 +239,14 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
    *  unshared archive is a 404 for a player. Never 403, which would confirm the recording exists. */
   router.get(expressPath(ENCOUNTER_ARCHIVE_PATHS.collection), authorize("combat:read"), (_req, res) => {
     const principal = res.locals.principal as GamePrincipal;
+    // A player's view of the table never names scenes, so a shared replay goes without its scene's name.
     if (!isGmGrade(principal))
-      return sendData(res, 200, { encounters: options.archives.list().filter((entry) => entry.playerVisible) });
+      return sendData(res, 200, {
+        encounters: options.archives
+          .list()
+          .filter((entry) => entry.playerVisible)
+          .map(({ sceneName: _sceneName, ...entry }) => entry)
+      });
     return sendData(res, 200, { encounters: options.archives.list() });
   });
 
@@ -284,6 +292,18 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
     if (!options.archives.setVisibility(id, body.playerVisible))
       return sendFailure(res, 404, "not_found", "No such encounter archive.");
     return sendData(res, 200, { id, playerVisible: body.playerVisible });
+  });
+
+  /** The GM's own name for a replay, which a player sees once it is shared. GM-grade only. */
+  router.post(expressPath(ENCOUNTER_ARCHIVE_PATHS.name), authorize("combat:write"), (req, res) => {
+    if (!requireGmGradePrincipal(res)) return;
+    const id = archiveIdParam(req, res);
+    if (id === null) return;
+    const body = EncounterArchiveNameRequestSchema.safeParse(req.body);
+    if (!body.success) return sendFailure(res, 400, "validation_failed", "A replay's name is up to 80 characters.");
+    const name = body.data.name === null || body.data.name === "" ? null : body.data.name;
+    if (!options.archives.rename(id, name)) return sendFailure(res, 404, "not_found", "No such encounter archive.");
+    return sendData(res, 200, { id, name });
   });
 
   router.delete(expressPath(ENCOUNTER_ARCHIVE_PATHS.byId), authorize("admin"), (req, res) => {

@@ -1354,6 +1354,33 @@ export const openApiDocument = {
         }
       }
     },
+    [ENCOUNTER_ARCHIVE_PATHS.name]: {
+      post: {
+        operationId: "renameEncounterArchive",
+        security: gameSecurity("combat:write"),
+        description:
+          "Names one archived encounter (GM sessions and integration credentials only); null or an empty name takes the name away, and the replay is called by its scene and date again. A player sees the name on a replay the GM has shared, never the scene's.",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer", minimum: 1 } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/EncounterArchiveNameRequest" } }
+          }
+        },
+        responses: {
+          "200": {
+            description: "The stored name",
+            content: {
+              "application/json": { schema: { $ref: "#/components/schemas/EncounterArchiveNameResponse" } }
+            }
+          },
+          "400": apiError,
+          "401": apiError,
+          "403": apiError,
+          "404": apiError
+        }
+      }
+    },
     // ===== Codex: worldbuilding wiki / atlas / journal / calendar (codex-http.ts). Reads project per role; writes
     // are GM-grade. Scoped credentials act at GM grade except on `POST /codex/preview-session`. Every codex GET
     // answers a conditional request with 304. =====

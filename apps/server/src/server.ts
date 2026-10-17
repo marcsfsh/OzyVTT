@@ -677,7 +677,8 @@ export function createServer(options: CreateServerOptions) {
       list: () => store.listEncounterArchives(),
       get: (id) => store.getEncounterArchive(id),
       remove: (id) => store.deleteEncounterArchive(id),
-      setVisibility: (id, playerVisible) => store.setEncounterArchiveVisibility(id, playerVisible)
+      setVisibility: (id, playerVisible) => store.setEncounterArchiveVisibility(id, playerVisible),
+      rename: (id, name) => store.renameEncounterArchive(id, name)
     },
     sessions: {
       // The HTTP mirror of the socket's LAN-trust join: anyone who can reach the host may take a player seat

@@ -347,6 +347,8 @@ export const ENCOUNTER_ARCHIVE_PATHS = {
   collection: `${API_NAMESPACE}/encounters`,
   byId: `${API_NAMESPACE}/encounters/{id}`,
   visibility: `${API_NAMESPACE}/encounters/{id}/visibility`,
+  /** The GM's own name for a replay. */
+  name: `${API_NAMESPACE}/encounters/{id}/name`,
   /** Make one recorded moment live on the table. */
   launch: `${API_NAMESPACE}/encounters/{id}/launch`
 } as const;
@@ -764,12 +766,22 @@ export const EncounterArchiveSummarySchema = z
     endedAt: TimestampSchema,
     turnCount: z.number().int().nonnegative(),
     /** Has the GM shared this record with players? False until the GM does. */
-    playerVisible: z.boolean()
+    playerVisible: z.boolean(),
+    /** The GM's own name for the replay; null until the GM gives one. A player sees it on a shared replay. */
+    name: z.string().min(1).max(80).nullable(),
+    /** The live scene the fight was on, when it had one. GM-only: a player's list leaves it out, as their view
+     *  of the table never names scenes. */
+    sceneName: z.string().nullable().optional()
   })
   .strict();
 export const EncounterArchiveListSchema = z.object({ encounters: z.array(EncounterArchiveSummarySchema) }).strict();
 export const EncounterArchiveVisibilitySchema = z
   .object({ id: z.number().int().positive(), playerVisible: z.boolean() })
+  .strict();
+/** Renames a replay; null (or an empty name) takes the GM's name away again. */
+export const EncounterArchiveNameRequestSchema = z.object({ name: z.string().trim().max(80).nullable() }).strict();
+export const EncounterArchiveNameSchema = z
+  .object({ id: z.number().int().positive(), name: z.string().min(1).max(80).nullable() })
   .strict();
 /** `document` is the stored archive JSON verbatim (archiveSchemaVersion 3); its full shape is documented in apps/server/src/encounter-archive.ts. */
 export const EncounterArchiveDocumentSchema = z
@@ -799,6 +811,7 @@ export const EncounterArchiveListResponseSchema = successEnvelopeSchema(Encounte
 export const EncounterArchiveDocumentResponseSchema = successEnvelopeSchema(EncounterArchiveDocumentSchema);
 export const EncounterArchiveDeletedResponseSchema = successEnvelopeSchema(EncounterArchiveDeletedSchema);
 export const EncounterArchiveVisibilityResponseSchema = successEnvelopeSchema(EncounterArchiveVisibilitySchema);
+export const EncounterArchiveNameResponseSchema = successEnvelopeSchema(EncounterArchiveNameSchema);
 export const EncounterArchiveLaunchResponseSchema = successEnvelopeSchema(EncounterArchiveLaunchSchema);
 export const PlayerSessionIssuedResponseSchema = successEnvelopeSchema(PlayerSessionIssuedSchema);
 
