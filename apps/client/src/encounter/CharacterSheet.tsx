@@ -584,9 +584,6 @@ export function CharacterSheet({
           No imported sheet yet - the GM can import this character's JSON sheet from the roster.
         </p>
       )}
-      <p className="sheet-feedback" role="status">
-        {feedback}
-      </p>
     </div>
   );
 
@@ -760,6 +757,16 @@ export function CharacterSheet({
           </Button>
         </div>
       )}
+      {/* What the sheet last did or refused stays pinned here, since a tap far down the pane would never see a line
+          at its foot. */}
+      <div className={`sheet-feedback${feedback ? " has-text" : ""}`}>
+        <p role="status">{feedback}</p>
+        {feedback && (
+          <IconButton label="Dismiss the message" size="sm" onClick={() => setFeedback("")}>
+            <IconX />
+          </IconButton>
+        )}
+      </div>
       <div className="sheet-workspace-cols">
         {/* The sheet's pane is the declared scroll region in all four presentations. */}
         <div className="sheet-workspace-pane sheet-pane scroll-y">{sheetScroll}</div>
