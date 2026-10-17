@@ -230,7 +230,7 @@ export function resolvePickChoice(
     `fromPicks:${source.offer}`,
     options,
     source.where
-      ? `Nothing chosen for "${source.offer}" is ${source.where.replace(/-/g, " ")} yet - make that pick first.`
-      : `Nothing has been chosen for "${source.offer}" yet - make that pick first.`
+      ? `Nothing chosen for "${source.offer}" is ${source.where.replace(/-/g, " ")} yet. Make that pick first.`
+      : `Nothing has been chosen for "${source.offer}" yet. Make that pick first.`
   );
 }

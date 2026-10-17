@@ -289,7 +289,7 @@ function checkSharedTriggerRules(triggers: readonly RiderTrigger[], context: z.R
   if (duplicate)
     context.addIssue({
       code: "custom",
-      message: `Two "${duplicate.type}" triggers on one rider - list the values in a single entry instead.`
+      message: `Two "${duplicate.type}" triggers on one rider. List the values in a single entry.`
     });
 }
 
@@ -300,12 +300,12 @@ export const RiderWhenSchema = z
   .superRefine((triggers, context) => {
     const kinds = triggers.map((trigger) => RIDER_TRIGGER_KINDS[trigger.type]);
     if (kinds.filter((kind) => kind === "moment").length > 1) {
-      context.addIssue({ code: "custom", message: "A rider fires at one moment, not two." });
+      context.addIssue({ code: "custom", message: "A rider fires at only one moment." });
     }
     if (kinds.includes("filter") && !kinds.includes("moment")) {
       context.addIssue({
         code: "custom",
-        message: "A filter needs a moment to narrow - add the roll or event it applies to."
+        message: "A filter needs a moment to narrow. Add the roll or event it applies to."
       });
     }
     checkSharedTriggerRules(triggers, context);
@@ -324,7 +324,7 @@ export const GrantWhenSchema = z
     if (offender) {
       context.addIssue({
         code: "custom",
-        message: `A grant is a standing fact, so it cannot wait for a roll: "${offender.type}" is only knowable during one, and the grant has been collected before any roll starts. Gate it on a state instead - attuned, while-armored, while-unarmored, while-shield, while-character-is, while-proficient-with, while-effect-tag, while-hp-at-or-below, while-condition - or move the mechanic to a modifier, where a moment IS read.`
+        message: `A grant is a standing fact, so it cannot wait for a roll: "${offender.type}" is only knowable during one, and the grant has been collected before any roll starts. Gate it on a state (attuned, while-armored, while-unarmored, while-shield, while-character-is, while-proficient-with, while-effect-tag, while-hp-at-or-below, while-condition), or move the mechanic to a modifier, where a moment IS read.`
       });
     }
     checkSharedTriggerRules(triggers, context);

@@ -1020,7 +1020,7 @@ export const CombatStateSchema = z
       context.addIssue({
         code: "custom",
         path: ["scenes"],
-        message: "The active scene's stored combat must be empty - its live copy is the top-level combat."
+        message: "The active scene's stored combat must be empty, because its live copy is the top-level combat."
       });
     }
   });

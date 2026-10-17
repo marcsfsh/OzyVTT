@@ -89,7 +89,7 @@ export function buildDefinition(widgets: Widget[], options: { knownSpellIds?: Re
   const totalLevel = classes.reduce((s, c) => s + c.level, 0) || 1;
   if (classes.length > 4)
     warnings.push(
-      `This character has ${classes.length} classes; the schema supports at most 4. The extras were dropped — confirm before saving.`
+      `This character has ${classes.length} classes; the schema supports at most 4. The extras were dropped. Check them before saving.`
     );
   if (classes.length) {
     const character: Record<string, unknown> = { classes: classes.slice(0, 4) };
@@ -203,7 +203,7 @@ function buildSpellcasting(
   const castingClasses = new Set(spell.filter((i) => /^spellcastingclass\d+$/.test(i.key)).map((i) => i.value));
   if (castingClasses.size > 1)
     warnings.push(
-      `Multiclass spellcasting (${[...castingClasses].join(", ")}); one spellcasting ability is stored (${String(sc.ability).toUpperCase()}) — review the per-class DC/attack.`
+      `Multiclass spellcasting (${[...castingClasses].join(", ")}); one spellcasting ability is stored (${String(sc.ability).toUpperCase()}). Review the per-class DC and attack.`
     );
 
   // Position-walk: headers set the current level, slot headers set slot maxima, names emit spells.
@@ -268,7 +268,7 @@ function buildSpellcasting(
     const unmatched = deduped.filter((s) => !knownSpellIds.has(s.id)).length;
     if (unmatched)
       warnings.push(
-        `${unmatched} spell(s) aren't in the SRD list (homebrew, renamed, or another source) — they import by name but won't link to the reference.`
+        `${unmatched} spell(s) aren't in the SRD list (homebrew, renamed, or another source). They import by name but won't link to the reference.`
       );
   }
   return sc;

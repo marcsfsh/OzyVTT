@@ -411,13 +411,13 @@ export const ActionResolveSchema = z
   })
   .strict()
   .refine((payload) => payload.targetIds === undefined || payload.template === undefined, {
-    error: "Provide either explicit targets or an area template, not both."
+    error: "Provide explicit targets or an area template, and only one of the two."
   })
   .refine((payload) => payload.attackNatural === undefined || payload.attackTotal === undefined, {
-    error: "Supply either a natural d20 or a final total, not both."
+    error: "Supply a natural d20 or a final total, and only one of the two."
   })
   .refine((payload) => !(payload.critical === true && payload.fumble === true), {
-    error: "A roll is a natural 20 or a natural 1, not both."
+    error: "A roll can't be both a natural 20 and a natural 1."
   });
 // The message `save.answer` surfaces for out-of-bounds hand-entered damage (it reports the zod issue's own text).
 const SAVE_DAMAGE_BOUND = "Enter the damage as a whole number from 0 to 1000.";
@@ -650,7 +650,7 @@ export const SaveRollSchema = z
   })
   .strict()
   .refine((payload) => payload.face === undefined || payload.total === undefined, {
-    error: "Supply either a typed d20 or a final total, not both."
+    error: "Supply a typed d20 or a final total, and only one of the two."
   });
 
 const SkillOrToolIdSchema = z
@@ -1334,7 +1334,10 @@ export const BuilderOffersSchema = z
       .optional()
   })
   .strict()
-  .refine((draft) => !(draft.picks && draft.choices), "Send the answers as picks or as a ledger, not both.");
+  .refine(
+    (draft) => !(draft.picks && draft.choices),
+    "Send the answers as picks or as a ledger, and only one of the two."
+  );
 
 /** Level up/down or respec: `CharacterCreateSchema` minus the name, plus the actor. Fully re-validated. */
 export const CharacterRebuildSchema = CharacterCreateSchema.omit({ name: true }).extend({ actorId: z.uuid() }).strict();

@@ -206,7 +206,7 @@ export type FeatureAction = z.infer<typeof FeatureActionSchema>;
  */
 export function grantedSpellGateMessage(spellIds: readonly string[]): string {
   const named = spellIds.map((id) => `"${id}"`).join(", ");
-  return `A gated grant cannot hand over a spell, so a grants block cannot carry "when" and "spells" together: ${named} would reach nothing at all. The other ten lists are recomputed from the sheet on every read, so their gate is answered on every read - but a granted spell is baked into the character's spell list, its prepared count and its cantrip's action when the character is BUILT, and nothing reads the gate again afterwards. Put the spells in a second grants block with no "when" - this record without one, or a second feature - and keep the gate on the ten lists that can carry it.`;
+  return `A gated grant cannot hand over a spell, so a grants block cannot carry "when" and "spells" together: ${named} would reach nothing at all. The other ten lists are recomputed from the sheet on every read, so their gate is answered on every read. A granted spell is baked into the character's spell list, its prepared count and its cantrip's action when the character is BUILT, and nothing reads the gate again afterwards. Put the spells in a second grants block with no "when" (this record without one, or a second feature), and keep the gate on the ten lists that can carry it.`;
 }
 
 /**
@@ -271,7 +271,7 @@ export const ITEM_REFUSED_MODIFIER_TYPES: readonly Modifier["type"][] = Object.f
   "attunement-slots"
 ]);
 export const ITEM_REFUSED_MODIFIER_MESSAGE =
-  "An item cannot change hit points, an ability score or the attunement limit - those are baked into the sheet or decide the item's own attunement, and cannot be un-granted when the item comes off. Use a specific bonus instead: armor-class, save-bonus, check-bonus, or spell-save-dc. (All three stay available on a feat.)";
+  "An item cannot change hit points, an ability score or the attunement limit. Those are baked into the sheet or decide the item's own attunement, and cannot be un-granted when the item comes off. Use a specific bonus instead: armor-class, save-bonus, check-bonus, or spell-save-dc. (All three stay available on a feat.)";
 
 /** The rider fields shared by `FeatureRecord`, `FeatureOption` and magic items (spread into `EquipmentReferenceSchema`). */
 export const featureRiders = {
@@ -326,7 +326,7 @@ export const ExtraPickSchema = z
     if ((grant.amount === undefined) === (grant.scaling === undefined)) {
       context.addIssue({
         code: "custom",
-        message: "An extra pick states either a flat `amount` or a `scaling` rule - exactly one."
+        message: "An extra pick states exactly one of a flat `amount` or a `scaling` rule."
       });
     }
   });
@@ -397,7 +397,7 @@ const spellLevelWindow = (choice: { minSpellLevel?: number; maxSpellLevel?: numb
     context.addIssue({
       code: "custom",
       path: ["minSpellLevel"],
-      message: `minSpellLevel ${choice.minSpellLevel} is above maxSpellLevel ${choice.maxSpellLevel} - no spell can satisfy both.`
+      message: `minSpellLevel ${choice.minSpellLevel} is above maxSpellLevel ${choice.maxSpellLevel}, so no spell can satisfy both.`
     });
   }
 };
@@ -423,7 +423,7 @@ const oneChoiceForm = (record: { choice?: unknown; choices?: unknown }, context:
     context.addIssue({
       code: "custom",
       path: ["choices"],
-      message: "Author `choice` (one pick) or `choices` (several) - never both."
+      message: "Author `choice` (one pick) or `choices` (several), and never both."
     });
   }
 };
@@ -486,7 +486,7 @@ export const FeatureChoiceSchema = z
       context.addIssue({
         code: "custom",
         path: ["from"],
-        message: "Author `options` alone - `from` is derived from the option ids."
+        message: "Author `options` alone. `from` is derived from the option ids."
       });
     }
     if (choice.options) {
@@ -554,7 +554,7 @@ export const ChoiceListSchema = z
       context.addIssue({
         code: "custom",
         message:
-          'A "choose N" list needs a non-empty `from` list or a `fromCatalog` slug - otherwise the pick has no options and the build can never be completed.'
+          'A "choose N" list needs a non-empty `from` list or a `fromCatalog` slug. Without one the pick has no options and the build can never be completed.'
       });
     }
   });

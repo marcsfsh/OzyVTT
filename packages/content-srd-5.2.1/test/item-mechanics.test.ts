@@ -286,7 +286,7 @@ describe("the item mechanics overlay", () => {
     // A cursed item must require attunement; `boots-of-elvenkind` requires none.
     expect(rows.find((row) => row.id === "boots-of-elvenkind")!.attunement?.required).toBe(false);
     expect(() => applyItemMechanics(rows, { "boots-of-elvenkind": { cursed: true } })).toThrow(
-      "boots-of-elvenkind - the schema refuses the merged row. cursed: A cursed item must require attunement - attunement is both what springs the curse and what reveals it."
+      "boots-of-elvenkind - the schema refuses the merged row. cursed: A cursed item must require attunement, because attunement is what springs the curse and what reveals it."
     );
 
     // The bundle's own schema is the overlay's only validator.

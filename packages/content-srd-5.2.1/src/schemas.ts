@@ -522,7 +522,7 @@ export const EquipmentReferenceSchema = z
         code: "custom",
         path: ["cursed"],
         message:
-          "A cursed item must require attunement - attunement is both what springs the curse and what reveals it."
+          "A cursed item must require attunement, because attunement is what springs the curse and what reveals it."
       });
     }
     if (item.damageTypeChoice) {
