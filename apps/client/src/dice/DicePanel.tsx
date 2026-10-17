@@ -43,8 +43,15 @@ function modifierLabel(modifier: number) {
   return modifier === 0 ? "±0" : modifier > 0 ? `+${modifier}` : `−${Math.abs(modifier)}`;
 }
 
-function isBareD20(formula: string) {
-  return /^\s*1?d20\s*$/i.test(formula);
+/**
+ * A formula with its first single d20 rolled with Advantage (`2d20kh1`) or Disadvantage (`2d20kl1`), so "1d20 + 5"
+ * keeps its bonus; null when the formula has no single d20 to give it to.
+ */
+export function withD20Mode(formula: string, keep: "kh1" | "kl1"): string | null {
+  const match = /(^|[^0-9a-z])(1?d20)(?![0-9a-z])/i.exec(formula);
+  if (!match) return null;
+  const start = match.index + match[1].length;
+  return `${formula.slice(0, start)}2d20${keep}${formula.slice(start + match[2].length)}`;
 }
 
 export function DicePanel({
@@ -108,14 +115,16 @@ export function DicePanel({
     }
     void submit(`1d${sides}${modifierSuffix(modifier)}`, "manual");
   };
+  // An armed Advantage or Disadvantage goes to the formula's d20 and is spent; a formula with no d20 leaves it armed
+  // for the next roll that has one.
   const customRoll = () => {
-    if (isBareD20(formula) && (advantage || disadvantage)) {
-      const kind = advantage ? "kh1" : "kl1";
+    const armed = advantage ? "kh1" : disadvantage ? "kl1" : null;
+    const moded = armed ? withD20Mode(formula, armed) : null;
+    if (moded !== null) {
       setAdvantage(false);
       setDisadvantage(false);
-      return void submit(`2d20${kind}`, purpose);
     }
-    void submit(formula, purpose);
+    void submit(moded ?? formula, purpose);
   };
   // SRD Falling: 1d6 bludgeoning per 10 feet fallen, max 20d6, and the faller lands Prone. The server
   // rolls; this builds the formula and reminds about applying damage and Prone.
