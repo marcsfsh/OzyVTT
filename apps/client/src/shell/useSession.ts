@@ -7,6 +7,7 @@ import { apiRequest } from "../lib/api";
 import { joinTable, storedPlayerToken } from "../lib/session";
 import { navigate } from "../router";
 import { socket } from "../socket";
+import { withNumberedNames } from "../table/numbering";
 
 export type Connection = "online" | "reconnecting" | "offline";
 
@@ -40,14 +41,16 @@ export function useSession(enter: (commit: () => void) => void) {
     const onConnect = () => setConnection("online");
     const onDisconnect = () => setConnection("reconnecting");
     const onGaveUp = () => setConnection("offline");
-    socket.on("state:updated", setState);
+    // Creatures of one kind are numbered by name in every list, as on their tokens.
+    const onState = (next: PlayerView | GmView) => setState(withNumberedNames(next));
+    socket.on("state:updated", onState);
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
     socket.io.on("reconnect_attempt", onDisconnect);
     socket.io.on("reconnect", onConnect);
     socket.io.on("reconnect_failed", onGaveUp);
     return () => {
-      socket.off("state:updated", setState);
+      socket.off("state:updated", onState);
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
       socket.io.off("reconnect_attempt", onDisconnect);
