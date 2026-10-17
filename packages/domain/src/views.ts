@@ -29,11 +29,12 @@ export type HealthBand = "healthy" | "bloodied" | "down";
 export type PlayerHp =
   { kind: "exact"; current: number; maximum: number; temporary: number } | { kind: "band"; band: HealthBand };
 /** An effect as players see it: source ids never cross the wire, and a hidden source's name is masked server-side
- * (viewer safety). Its ongoing damage stays with the GM, since the dice are the stat block's. `yours` marks one the
+ * (viewer safety). Its ongoing damage stays with the GM, since the dice are the stat block's, and so does its magic
+ * mark, which only Magic Resistance reads. `yours` marks one the
  * viewing player's own character is the source of (their grapple, their Concentration), which they may end. */
 export type PlayerEffect = Omit<
   EffectInstance,
-  "sourceActorId" | "sourceActionId" | "castId" | "ongoingDamage" | "spell"
+  "sourceActorId" | "sourceActionId" | "castId" | "ongoingDamage" | "spell" | "magical"
 > & {
   yours?: true;
 };
@@ -105,8 +106,13 @@ export type PlayerPendingSave = Omit<
   | "failureNote"
   | "breaksConcentration"
   | "zoneId"
+  | "magical"
+  | "immuneOnSuccess"
 > & {
-  onFailEffect?: Omit<NonNullable<PendingSave["onFailEffect"]>, "castId" | "sourceActionId" | "ongoingDamage">;
+  onFailEffect?: Omit<
+    NonNullable<PendingSave["onFailEffect"]>,
+    "castId" | "sourceActionId" | "ongoingDamage" | "magical"
+  >;
 };
 /** A player's own pending reaction prompts only, masked like saves; the parked attack stays with the GM, since it names
  *  the attacker's action and how it was rolled. */

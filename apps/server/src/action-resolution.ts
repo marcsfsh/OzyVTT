@@ -31,6 +31,7 @@ import {
 import { applyMasteryForces, masterySwingOf, offeredPush, spendSap, spendVex } from "./resolution/masteries.js";
 import { hitOffersOf, rollHitOptions, spendHitOptions } from "./resolution/hit-options.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
+import { strikeBackOnHit } from "./resolution/struck.js";
 import { parkActionSave, parkForAcReaction, parkHeldObjectSave, parkReaction } from "./resolution/pending.js";
 import { markSpellUp, openSpellZone, startConcentration } from "./resolution/concentration.js";
 import { applyRageRules } from "./resolution/rage.js";
@@ -106,6 +107,7 @@ export function resolveDefinitionAction(
   if (ctx.action.reminder) ctx.warnings.push(ctx.action.reminder);
 
   applyOnHitEffects(ctx);
+  strikeBackOnHit(ctx);
   applyMasteryForces(ctx);
   startConcentration(ctx);
   markSpellUp(ctx);

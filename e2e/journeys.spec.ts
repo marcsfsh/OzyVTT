@@ -106,8 +106,13 @@ test("the GM runs a fight on a new scene and the player moves their token", asyn
   await expect(gm.getByText("Round 1")).toBeVisible();
   await expectPageFits(gm);
 
-  // The player places their own token from the tray, then drags it across the map.
+  // A move off the mover's turn goes to the GM, so if the goblin won initiative the GM ends its turn first.
   await expect(player.getByText("Round 1")).toBeVisible();
+  const yourTurn = player.getByText("Your turn - act, then end it below");
+  if (!(await yourTurn.isVisible())) await press(gm.getByRole("button", { name: "Next turn" }));
+  await expect(yourTurn).toBeVisible();
+
+  // The player places their own token from the tray, then drags it across the map.
   await press(player.getByLabel("Staging tray").getByRole("button", { name: hero }));
   const token = player.getByRole("button", { name: new RegExp(`^${hero}.*Drag to move`) });
   await expect(token).toBeVisible();

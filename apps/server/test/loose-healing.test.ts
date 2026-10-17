@@ -196,6 +196,34 @@ describe("healing outside a fight", () => {
     expect((await two.json()).error.message).toBe("Potion of Healing heals one creature; 2 were picked.");
   });
 
+  it("closes a wound that a spell's healing ends", async () => {
+    const state = idle();
+    state.actors.find((candidate) => candidate.id === FRIEND)!.effects = [
+      {
+        id: "wound",
+        name: "Infernal Wound",
+        tags: [],
+        sourceActorId: null,
+        sourceName: null,
+        sourceActionId: null,
+        startedRound: 1,
+        duration: { type: "manual" },
+        endsWhenSourceDefeated: false,
+        voidWhileIncapacitated: false,
+        concentration: false,
+        endsWithTag: null,
+        modifiers: [],
+        linkedConditionIds: [],
+        escapeDc: null,
+        onEnd: [],
+        endsOnSpellHealing: true
+      }
+    ];
+    const { base, server, heroSession } = await boot(state);
+    expect((await use(base, heroSession, "spell-prayer-of-healing", { targetIds: [FRIEND] })).status).toBe(200);
+    expect(server.store.snapshot.actors.find((candidate) => candidate.id === FRIEND)!.effects).toEqual([]);
+  });
+
   it("heals each creature a healing spell reaches, and tells the sheet how many that is", async () => {
     const { base, server, heroSession } = await boot(idle());
     const read = await fetch(base + GAME_PATHS.actorAvailableActions.replace("{actorId}", HERO), {

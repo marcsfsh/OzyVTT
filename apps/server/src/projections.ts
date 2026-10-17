@@ -182,7 +182,11 @@ const PENDING_SAVE_FIELDS = {
   onSuccessEffect: "never",
   failureNote: "never",
   breaksConcentration: "never",
-  zoneId: "never"
+  zoneId: "never",
+  // Whether a hidden source's save is magical says something about it; only Magic Resistance reads it.
+  magical: "never",
+  // What a success earns is the stat block's text, the GM's knowledge.
+  immuneOnSuccess: "never"
 } as const satisfies Record<keyof PendingSave, FieldAudience>;
 
 // How long what a failure imposes would last is the save's own text, read on the prompt by the one who owes it.
@@ -198,13 +202,15 @@ const ON_FAIL_EFFECT_FIELDS = {
   speedZero: "player",
   endsWhenSourceDefeated: "player",
   rangeFeet: "player",
+  endsOnSpellHealing: "player",
   name: "derived",
   sourceName: "derived",
   sourceActorId: "derived",
   castId: "never",
   sourceActionId: "never",
   ongoingDamage: "never",
-  currentTurn: "player"
+  currentTurn: "player",
+  magical: "never"
 } as const satisfies Record<keyof NonNullable<PendingSave["onFailEffect"]>, FieldAudience>;
 
 const PENDING_REACTION_FIELDS = {
@@ -349,7 +355,7 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
   };
 }
 
-/** An effect as players see it: no source or cast ids or ongoing damage dice, and a hidden source masked in both
+/** An effect as players see it: no source or cast ids, ongoing damage dice or magic mark, and a hidden source masked in both
  *  `sourceName` and `name`. `yours` marks one the viewer's own character is the source of, which they may end (their
  *  grapple, their Concentration); a hidden source is never a player's character, so the flag says nothing about one. */
 function playerEffect(
@@ -366,6 +372,7 @@ function playerEffect(
     // the viewer's own character holds readied reaches them, so their sheet can release it.
     spell: _spell,
     readiedSpell,
+    magical: _magical,
     ...visible
   } = effect;
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);

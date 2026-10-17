@@ -860,10 +860,11 @@
   font-size: var(--fs-xs);
 }
 
-/* How the mover's next drag travels: one tap per mode, under the map so it never covers a token. One row that
-   scrolls sideways rather than wrapping, so it costs one row of height at 390px. */
+/* How the mover's next drag travels: one tap per mode, under the map so it never covers a token. The modes wrap
+   at 390px: a sideways-scrolling strip hid Teleport off the edge with nothing to say it was there. */
 .encounter-move-modes {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
   margin-top: var(--space-2);
@@ -877,10 +878,8 @@
   letter-spacing: 0.04em;
 }
 .encounter-move-modes .nh-segmented {
-  flex-wrap: nowrap;
   min-width: 0;
   max-width: 100%;
-  overflow-x: auto;
 }
 .encounter-move-modes .nh-segmented-option {
   flex: none;

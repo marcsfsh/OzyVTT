@@ -197,7 +197,10 @@ function act(
     return;
   }
   const conditionIds = save.failureConditions;
-  const onFail = failureEffectFor({ action, attacker: caster, castId: zone.castId }, conditionIds);
+  const onFail = failureEffectFor(
+    { action, attacker: caster, castId: zone.castId, riderItemId: null, deps: { catalog: deps.catalog } },
+    conditionIds
+  );
   // A save at the start of the creature's own turn that lasts "until the end of that turn" ends with this one.
   const currentTurn = meeting === "starts its turn in" && save.failureDuration?.type === "until-bearer-turn-end";
   createPendingSaves(state, {
@@ -211,6 +214,8 @@ function act(
     proposedDamageParts: parts,
     halfOnSuccess: save.successDamage === "half",
     conditionIds,
+    // A save against a spell, which Magic Resistance meets with Advantage.
+    magical: true,
     ...(onFail ? { onFailEffect: currentTurn ? { ...onFail, currentTurn: true as const } : onFail } : {}),
     extra: {
       zoneId: zone.id,

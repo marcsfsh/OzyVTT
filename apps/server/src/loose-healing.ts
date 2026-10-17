@@ -4,6 +4,7 @@ import { rollDice } from "@vtt/rules-5e";
 import type { ActorAction } from "@vtt/schemas";
 import { GameAccessDeniedError, type Initiator } from "./authorization.js";
 import { CommandRejectedError } from "./game-store.js";
+import { endEffect } from "./effects.js";
 import { deadCantHealLine, healActor } from "./hit-points.js";
 import { healingShares } from "./resolution/heal.js";
 import { useCostOf } from "./use-cost.js";
@@ -99,6 +100,10 @@ export function applyLooseHealing(
     // The use is already authorized; the heal lands on whoever it was given to.
     const events = healActor(state, target.id, shares[index], { role: "gm" });
     const regained = target.hp.current - before;
+    // "The wound closes ... after a spell restores Hit Points to the target," in a fight or out of one.
+    if (action.spellId !== undefined && regained > 0)
+      for (const effect of target.effects.filter((candidate) => candidate.endsOnSpellHealing))
+        events.push(...endEffect(state, target.id, effect.id));
     return [
       {
         text: `${target.name} regains ${regained} ${regained === 1 ? "hit point" : "hit points"} (${action.name}).`,

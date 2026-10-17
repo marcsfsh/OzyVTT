@@ -9,7 +9,7 @@ import { builderOffers } from "../builder-offers.js";
 import { draftOwnerOf } from "../character-drafts.js";
 import { BUILTIN_TARGETING, builtinActionsFor } from "../builtin-actions.js";
 import { builtinCheckSkills } from "../resolution/builtins.js";
-import { actionSummaryOf, type ContentView } from "../content-library.js";
+import { actionSummariesOf, actionSummaryOf, type ContentView } from "../content-library.js";
 import { effectiveActions } from "../effective-actions.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { rechoicesOf } from "../ledger-rechoice.js";
@@ -84,7 +84,7 @@ export const gameReads = [
       const imported = storedDefinition(kit.read(), definitionId);
       // Browse uses the catalog's own lookup (honours draft/published/deleted), not the play-time resolver.
       const definition = imported ?? catalog.monster(definitionId);
-      const actions = imported ? imported.actions.map(actionSummaryOf) : catalog.monsterActionSummaries(definitionId);
+      const actions = imported ? actionSummariesOf(imported.actions) : catalog.monsterActionSummaries(definitionId);
       if (!actions) throw new GameNotFoundError("That stat block is not in the bundled content.");
       // SRD generic actions (Dodge, Dash, Help, ...) follow the stat block's own; a declared id shadows its builtin.
       const builtins = builtinActionsFor(definition)

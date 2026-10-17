@@ -98,6 +98,8 @@ export function effectDurationOf(
       return { type: "rounds", remaining: duration.rounds };
     case "until-source-next-turn":
       return { type: "until-source-next-turn" };
+    case "until-bearer-next-turn":
+      return { type: "until-bearer-next-turn" };
     case "until-bearer-turn-end":
       return turnEndDuration(state, "until-bearer-turn-end", bearerId);
     case "until-source-turn-end":
@@ -521,6 +523,11 @@ export function expireEffectsAtTurnStart(state: GameState, incomingActorId: stri
   for (const actor of state.actors) {
     if (!inFight.has(actor.id)) continue;
     for (const effect of [...actor.effects]) {
+      // "Until the start of its next turn": the bearer's own turn, whoever put it there.
+      if (effect.duration.type === "until-bearer-next-turn") {
+        if (actor.id === incomingActorId) endEffectInternal(state, actor, effect.id, events);
+        continue;
+      }
       const sustainedByIncoming = (effect.sourceActorId ?? actor.id) === incomingActorId;
       if (!sustainedByIncoming) continue;
       if (effect.duration.type === "until-source-next-turn") {
@@ -572,6 +579,7 @@ export function expireEffectsAtTurnEnd(state: GameState, outgoingActorId: string
 const ENDS_WITH_THE_FIGHT: ReadonlySet<EffectInstance["duration"]["type"]> = new Set([
   "rounds",
   "until-source-next-turn",
+  "until-bearer-next-turn",
   "until-bearer-turn-end",
   "until-source-turn-end",
   "encounter"

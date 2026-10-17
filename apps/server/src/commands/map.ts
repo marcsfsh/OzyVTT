@@ -132,7 +132,12 @@ export const mapCommands = [
           distance: (a, b) => mapDistance(geometry, a, b)?.value ?? null,
           cost: (a, b, options) => movementCost(state, geometry, actorId, a, b, options),
           calibration: geometry.calibration,
-          dragging: { actorIds: dragged, costsExtra: dragCostsExtra(state, actorId, dragged) },
+          dragging: {
+            actorIds: dragged,
+            costsExtra: dragCostsExtra(state, actorId, dragged, (definitionId) =>
+              kit.resolveDefinitionIn(state, definitionId)
+            )
+          },
           creatureDistance: (enemy, moverPoint) => {
             const enemyToken = state.combat.tokens.find((token) => token.actorId === enemy.actorId);
             if (!enemyToken || !moverToken) return null;

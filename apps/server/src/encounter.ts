@@ -550,6 +550,8 @@ export type TurnAdvanceDeps = Readonly<{
   now?: () => string;
   /** The live map, so the spell areas a creature starts or ends its turn in act on it; absent, they wait for a map. */
   geometry?: TokenMapGeometry | null;
+  /** Creature-to-creature distance on the map, for the auras that reach creatures as turns start and end. */
+  distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
 }>;
 
 /** SRD Recharge X-Y: at the start of the owner's turn, a d6 at or above the threshold re-arms the spent
@@ -639,7 +641,7 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
     state,
     outgoingId,
     ending,
-    deps?.newId ? { newId: deps.newId, now: deps.now ?? (() => new Date().toISOString()) } : undefined
+    deps?.newId ? { ...deps, newId: deps.newId, now: deps.now ?? (() => new Date().toISOString()) } : undefined
   );
   // A spell area the creature ends its turn in acts on it (Moonbeam, Spirit Guardians).
   const zones = zoneDepsOf(deps);

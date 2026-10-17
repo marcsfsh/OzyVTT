@@ -90,9 +90,7 @@ export function specialSpeedsOf(
     speeds.climb = Math.max(speeds.climb ?? 0, actor.speedFeet);
     speeds.swim = Math.max(speeds.swim ?? 0, actor.speedFeet);
   }
-  for (const rider of derivation
-    ? collectRiders(derivation.carriers, { ...derivation.context, moment: null })
-    : []) {
+  for (const rider of derivation ? collectRiders(derivation.carriers, { ...derivation.context, moment: null }) : []) {
     const modifier = rider.modifier;
     if (modifier.type !== "special-speed" || modifier.movement === undefined) continue;
     // "Equal to your Speed" is the Speed before changes; the budget then moves it with Speed, as it does any speed.

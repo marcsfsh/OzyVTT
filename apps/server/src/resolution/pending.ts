@@ -1,5 +1,5 @@
 import type { PendingSave } from "@vtt/domain";
-import type { ActionReaction } from "@vtt/schemas";
+import { catalogIdOf, type ActionReaction } from "@vtt/schemas";
 import { setCondition } from "../actor-conditions.js";
 import { conditionLabel } from "../condition-rules.js";
 import { addEffect, ESCAPE_ATHLETICS_TAG, makeEffect, NO_ACTIONS_TAG } from "../effects.js";
@@ -147,6 +147,17 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
   return true;
 }
 
+/** What the magic test reads: the action, its user, the item it rides, and the catalog. */
+type MagicalSource = Pick<ResolveContext, "action" | "attacker" | "riderItemId"> &
+  Readonly<{ deps: Pick<ResolveContext["deps"], "catalog"> }>;
+
+/** A spell's save, or a magic item's (a wand's), is one against magic: Magic Resistance meets it with Advantage. */
+export function isMagicalAction(ctx: MagicalSource): boolean {
+  if (ctx.action.spellId !== undefined) return true;
+  const item = ctx.riderItemId === null ? undefined : ctx.attacker.inventory.find((row) => row.id === ctx.riderItemId);
+  return item !== undefined && ctx.deps.catalog?.equipmentRecord(catalogIdOf(item))?.isMagic === true;
+}
+
 /** Conditions a failed save leaves on their own rather than on its effect: Prone ends by standing up, and
  *  Exhaustion stacks and leaves with rests. */
 const BARE_FAILURE_CONDITIONS: ReadonlySet<string> = new Set(["prone", "exhaustion"]);
@@ -166,7 +177,7 @@ const NO_ACTIONS_FAILURES: ReadonlySet<string> = new Set(["stinking-cloud"]);
  * grappler" read the source from it. Undefined when every condition stays bare and the action declares nothing more.
  */
 export function failureEffectFor(
-  ctx: Pick<ResolveContext, "action" | "attacker" | "castId">,
+  ctx: MagicalSource & Pick<ResolveContext, "castId">,
   conditionIds: readonly string[]
 ): PendingSave["onFailEffect"] {
   const { action, attacker, castId } = ctx;
@@ -205,10 +216,12 @@ export function failureEffectFor(
     ...(duration ? { duration } : {}),
     ...(save.repeatSave ? { repeatSave: { ability: save.ability, dc: save.dc } } : {}),
     ...(save.endsOnDamage ? { endsOnDamage: true } : {}),
+    ...(declared?.endsOnSpellHealing ? { endsOnSpellHealing: true as const } : {}),
     ...(save.speedZero ? { speedZero: true } : {}),
     ...(grapple ? { endsWhenSourceDefeated: true, rangeFeet: save.rangeFeet ?? action.attack?.reachFeet ?? 5 } : {}),
     ...(ongoingDamage ? { ongoingDamage } : {}),
     ...(castId !== null ? { castId } : {}),
+    ...(isMagicalAction(ctx) ? { magical: true as const } : {}),
     sourceActionId: action.id
   };
 }
@@ -303,6 +316,7 @@ export function parkActionSave(ctx: ResolveContext): void {
       halfOnSuccess: action.save.successDamage === "half",
       conditionIds,
       ...(onFailEffect ? { onFailEffect } : {}),
+      magical: isMagicalAction(ctx),
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())
     });
@@ -343,6 +357,8 @@ export function parkHeldObjectSave(ctx: ResolveContext): void {
       proposedDamage: 0,
       halfOnSuccess: false,
       conditionIds: [],
+      // A save against a spell, which Magic Resistance meets with Advantage.
+      magical: true,
       extra: {
         onSuccessEffect: {
           name: `${name}: holding the red-hot object`,

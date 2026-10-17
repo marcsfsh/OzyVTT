@@ -3,7 +3,11 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ContentActionSummary, GmActor, GmView } from "@vtt/domain";
 
 const command = vi.fn(async (..._args: unknown[]) => ({ ok: true }));
-vi.mock("../lib/command", () => ({ command: (...args: unknown[]) => command(...args) }));
+vi.mock("../lib/command", () => ({
+  command: (...args: unknown[]) => command(...args),
+  // The spell list's text links its spells to cards, from a reference these tests don't load.
+  read: async () => ({ ok: false })
+}));
 // The runner under the console reads the server; these tests are about the console's own controls.
 vi.mock("./ActionRunner", () => ({ ActionRunner: () => null }));
 
@@ -187,5 +191,68 @@ describe("legendary actions on the GM's console", () => {
     await waitFor(() =>
       expect(command).toHaveBeenCalledWith("turn:use-legendary", { actorId: MONSTER, spent: 2, expectedRevision: 4 })
     );
+  });
+});
+
+describe("a stat block's spell list", () => {
+  const mage = {
+    id: MONSTER,
+    name: "Mage",
+    hp: { current: 81, maximum: 81 },
+    effects: [],
+    actionUses: { "spellcasting-cone-of-cold": 1 }
+  } as unknown as GmActor;
+  const list = summary("spellcasting", "Spellcasting", {
+    description:
+      "The mage casts one of the following spells.\n\n- **At Will:** Detect Magic\n- **2/Day Each:** Fireball",
+    spellList: { ability: "int", saveDc: 14, attackBonus: 6 }
+  });
+  const fireball = summary("spellcasting-fireball", "Fireball", {
+    castFrom: "spellcasting",
+    saveAbility: "dex",
+    saveDc: 14,
+    damage: [{ formula: "8d6", type: "fire" }],
+    usesLimit: 2,
+    usesPer: "long-rest",
+    area: { shape: "sphere", sizeFeet: 20, widthFeet: null }
+  });
+  const coneOfCold = summary("spellcasting-cone-of-cold", "Cone of Cold", {
+    castFrom: "spellcasting",
+    saveAbility: "con",
+    saveDc: 14,
+    damage: [{ formula: "8d8", type: "cold" }],
+    usesLimit: 1,
+    usesPer: "long-rest"
+  });
+  const detectMagic = summary("spellcasting-detect-magic", "Detect Magic", { castFrom: "spellcasting" });
+  const staff = summary("arcane-burst", "Arcane Burst", {
+    attackBonus: 6,
+    damage: [{ formula: "3d8", type: "force" }]
+  });
+
+  it("heads its casts with the list's numbers, each spell a tap, the spent ones saying so", () => {
+    const onUse = vi.fn();
+    render(
+      <GmActionList
+        state={view()}
+        actor={mage}
+        actions={[staff, list, detectMagic, fireball, coneOfCold]}
+        busy={false}
+        onUse={onUse}
+      />
+    );
+    const group = screen.getByRole("group", { name: "Spellcasting" });
+    expect(group.textContent).toContain("DC 14 · +6 to hit · Intelligence · Magic action");
+    // The list is a heading, not a row; its spells are rows under it, and Arcane Burst stays with the other actions.
+    expect(screen.queryByRole("button", { name: /^Spellcasting/ })).toBeNull();
+    const row = screen.getByRole("button", { name: /Fireball/ });
+    expect(group.contains(row)).toBe(true);
+    expect(row.textContent).toContain("DC 14 DEX save");
+    expect(row.textContent).toContain("2/long rest");
+    expect(group.contains(screen.getByRole("button", { name: /Arcane Burst/ }))).toBe(false);
+    expect(hintOf("Cone of Cold")).toBe("No uses left");
+    expect(group.textContent).toContain("Nothing to roll: Detect Magic");
+    fireEvent.click(row);
+    expect(onUse).toHaveBeenCalledWith(fireball, false);
   });
 });

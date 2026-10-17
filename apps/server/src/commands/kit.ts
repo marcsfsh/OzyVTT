@@ -193,15 +193,20 @@ export function createKit(context: CommandContext) {
       now: () => new Date().toISOString()
     }),
 
-    /** The deps a turn change runs with in `state`: recharge and ongoing-damage dice, repeat saves, and the spell
-     *  areas on the live map. */
-    turnAdvanceDeps: (state: GameState, geometry: TokenMapGeometry | null): TurnAdvanceDeps => ({
+    /** The deps a turn change runs with in `state`: recharge and ongoing-damage dice, repeat saves, the spell areas
+     *  on the live map, and where creatures stand for the auras that reach them. */
+    turnAdvanceDeps: (
+      state: GameState,
+      geometry: TokenMapGeometry | null,
+      distance: (state: GameState, actorIdA: string, actorIdB: string) => number | null
+    ): TurnAdvanceDeps => ({
       resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId),
       catalog: equipmentCatalogOf(contentLibrary.forAudience("gm")),
       rollDie: (sides) => context.random(sides),
       newId: context.newId,
       now: () => new Date().toISOString(),
-      geometry
+      geometry,
+      distanceFeet: (actorIdA, actorIdB) => distance(state, actorIdA, actorIdB)
     }),
 
     /** The live map's geometry, read before a command's turn in the queue; null with no map or one gone missing, so a
