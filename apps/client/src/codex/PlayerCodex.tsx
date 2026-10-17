@@ -160,7 +160,7 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
     () =>
       standing
         .map((row) => ({ row, summary: pages.find((candidate) => candidate.id === row.factionPageId) }))
-        // Drop standings whose faction page is unrevealed rather than showing a nameless bar.
+        // Drop standings whose faction page is unrevealed, since their bar would have no name.
         .filter((pair): pair is { row: PlayerCodexStanding; summary: PlayerCodexPageSummary } => Boolean(pair.summary))
         .map(({ row, summary }) => ({ factionPageId: row.factionPageId, name: summary.title, value: row.value })),
     [standing, pages]

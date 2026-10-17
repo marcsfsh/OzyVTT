@@ -147,8 +147,8 @@
   color: var(--text-muted);
   font-size: var(--fs-xs);
 }
-/* Locked is caution (rose-red means damage). Full strength: the reason is the most important thing
-   on a disabled card. */
+/* Locked is caution (rose-red means damage). Full strength, because on a disabled card the reason is
+   what the reader came to see. */
 .nh-choice-locked {
   display: flex;
   align-items: center;

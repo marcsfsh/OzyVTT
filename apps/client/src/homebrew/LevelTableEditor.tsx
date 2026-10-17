@@ -168,7 +168,7 @@ export function LevelTableEditor({
     });
 
     if (JSON.stringify(next) !== JSON.stringify(rows)) onDraft(setAt(draft, "levelTable", next));
-    // Omits `draft`/`onDraft` so this runs only when the settings change, not on every edit.
+    // Omits `draft`/`onDraft` so this runs only when the settings change. An edit alone doesn't rerun it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [progression, classId, generated, rows]);
 

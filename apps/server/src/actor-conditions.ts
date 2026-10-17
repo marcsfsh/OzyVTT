@@ -90,7 +90,7 @@ function standUp(state: GameState, actor: Actor, scope: Initiator, options: SetC
     );
     return events;
   }
-  // Charged when the current combatant stands on its own turn in a live fight, following the movement family.
+  // Charged when the current combatant stands on its own turn in a live fight, unless the movement family is freeform.
   if (
     state.combat.active &&
     state.combat.turnActorId === actor.id &&

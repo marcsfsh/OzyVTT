@@ -504,7 +504,7 @@ function authoredCrossbow(): Draft {
   ]);
 }
 
-/** Shoots from `feet` away, passing a real `distanceFeet` to the resolver. */
+/** Shoots from `feet` away. The resolver gets a real `distanceFeet`. */
 function shoot(definition: ActorDefinition, feet: number, faces: readonly number[]) {
   const state: GameState = GameStateSchema.parse({
     schemaVersion: 1,

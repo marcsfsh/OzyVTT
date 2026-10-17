@@ -63,7 +63,7 @@
   font-size: 1.05em;
 }
 
-/* One column on a phone, filling out to a dozen cards on a laptop. */
+/* One column on a phone, and up to a dozen cards across on a laptop. */
 .nh-choicegrid-items {
   display: grid;
   grid-template-columns: 1fr;
@@ -76,7 +76,7 @@
   gap: var(--space-4);
 }
 
-/* Bounded region (`ChoiceGrid bounded`): caps the list and scrolls it in place, keeping every option mounted.
+/* Bounded region (`ChoiceGrid bounded`): caps the list and scrolls it in place. Every option stays mounted.
    Rows are `max-content`: with `auto` rows, a list taller than the cap shrinks every row to its cards' minimum
    height and clips their descriptions. 21rem matches `.map-picker-grid`. `overscroll-behavior: contain` stops
    scroll chaining; the padding leaves room for the focus ring, which `overflow` would clip. */

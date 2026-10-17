@@ -297,7 +297,7 @@ export function PlayerActionRunner({
           picking={picking}
           targets={foesFirst(
             targets
-              // A heal may be for the healer too (a potion drunk, not handed over), and so may a touch that cures or
+              // A heal may be for the healer too (a potion the healer drinks), and so may a touch that cures or
               // protects with no attack, save or damage (Lesser Restoration, Enhance Ability on the caster).
               .filter(
                 (target) =>

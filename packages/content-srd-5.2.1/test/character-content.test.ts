@@ -1022,7 +1022,7 @@ describe("character-builder content records", () => {
         successDamage: "half",
         failureConditions: []
       });
-      // 1d10, rising by 1d10 at character levels 5, 11, and 17, in the ancestry's own damage type.
+      // 1d10, plus 1d10 more at character levels 5, 11 and 17, in the ancestry's own damage type.
       const type = expectedTypes[lineage.id];
       expect(action.damage, lineage.id).toEqual([{ formula: "1d10", type }]);
       expect(action.damageByLevel, lineage.id).toEqual([
